@@ -17,6 +17,16 @@ Revision 2026-10-01. Companion to BUILD_SPECIFICATION.md v2.0 and REQUIREMENTS.j
 
 ## Owner actions (things only Christian can do)
 
+**Owner continuation update, 2026-10-02:** continue implementation through the
+project without slice pauses. Use the connected OnePlus/IN2019 for applicable
+software/device tests and defer S23-specific testing while that phone is away.
+Software preparation may continue against the recorded provisional designs when
+physical evidence is the missing dependency; this does not complete that
+dependency, finalize a decision, pass a gate or relax a target. Keep per-task
+results and open clauses explicit. S23/S Pen comparisons, owner preferences,
+external credentials and manual acceptance remain separate outstanding work.
+Use isolated worktrees for independent tasks and serialize builds/device runs.
+
 | When | Action |
 |---|---|
 | Before T0.01 | Free at least 70 GB on C:. |

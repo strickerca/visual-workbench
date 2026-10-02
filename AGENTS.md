@@ -32,6 +32,18 @@ Parallel agent implementation/review is explicitly authorized where it improves
 quality and efficiency; assign separate file ownership and serialize heavy builds
 and device tests. The S23 authorization and OnePlus reservation remain in force.
 
+Owner update (2026-10-02, full continuation): proceed through the project without
+pausing between implementation slices. The OnePlus/IN2019 is connected again and
+is authorized for applicable project tests; the prior reservation is released for
+this work. The S23 Ultra is being taken away, so defer all checks specifically
+requiring it. Select IN2019 explicitly, with no fallback to another device. Keep
+OnePlus software evidence separate from S23/S Pen, target-device performance and
+owner acceptance. Continue software using the documented provisional designs
+where hardware-only dependencies are deferred; keep those decisions and product
+gates pending. Do not invent pen measurements, preferences or gate approval.
+This supersedes the awake pause cadence and the earlier OnePlus reservation.
+Parallel implementation remains authorized; preserve other apps and processes.
+
 The owner shares the IN2019 with another app development session. Backgrounding
 can be normal. Check actual foreground state, use bounded starter-only relaunches,
 and preserve the other app and its processes. Do not reset adb or the device to
