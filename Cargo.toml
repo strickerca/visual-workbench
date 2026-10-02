@@ -8,6 +8,7 @@ members = [
     "tools/pen-inject/core",
     "tools/pen-inject/harness",
     "tools/pen-inject/inject",
+    "tools/bench/transport",
 ]
 
 [workspace.package]

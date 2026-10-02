@@ -1,0 +1,294 @@
+{
+  "schema": 1,
+  "task": "T0.06",
+  "date": "2026-10-02",
+  "acceptance": "incomplete_physical_measurements",
+  "device_model": "SM-S918U",
+  "android_release": 16,
+  "api_level": 36,
+  "final_gated_build_sha256": {
+    "Cargo.toml": "868c24a34f2cf1de4cfcf3c7abbd450b0aafccf900a5cd86141ca8772af417fb",
+    "Cargo.lock": "d45a1f58eef03232be2c71525332bbc3ad328b0f1d5bf8d4888970cbeb60d735",
+    "rust-toolchain.toml": "7daa90fd3135f5361b3eee9595738b3d68b51893d94bd42b49be25d4acaa8263",
+    ".cargo/config.toml": "db0ef1dddd1b273925e3b0b6ec10c34d720dddd54939b8e51290f9c0d1b4ed26",
+    "deny.toml": "23329ef41917009c97d44c3b18b7fbd6ae0eaf61826e6eaa708e8bff89885318",
+    "build.ps1": "81fc9b719babb322a01ef999c729b436ee589d252437a3b9ca193f59a7416619",
+    "tools/check_setup.py": "978dfedf2068e0805a542370c4d84fbeadb4636be689b54282286557a60c8488",
+    "tools/bench/transport/Cargo.toml": "5d3b8085e8020080ee689b8d56e477ec966a7a434afb58beab589cbb2eb783ac",
+    "tools/bench/transport/build_receipt.py": "4d7b3068a8c7ebadd2d8406ad916bbc9ceba2addc8665b8cc402109d5cd70850",
+    "tools/bench/transport/src/lib.rs": "488ed1af9624097d429caff6e0d8eb8d98869f62c1aa5be3717fe935669caf27",
+    "tools/bench/transport/src/main.rs": "53379d8021bb62b526e90e769bc8dfda2256d9556900b3868ea53a7beb62d892",
+    "target/release/transport-bench.exe": "94a446ca7a3f36c365598797d85a2b40f08fe255ce539e3fef70c89e9b803dd9",
+    "target/aarch64-linux-android/release/transport-bench": "15c2e330c6d0b7cc3ae893cd57566324878dbef6d7c1ced95097178a320036b0"
+  },
+  "runner_sha256": {
+    "tools/bench/transport/run_adb.ps1": "81926ce688fc7b83f6b58111e13839b93d5b2f5e7a8205811cc62792199023a7",
+    "tools/bench/transport/run_wifi.ps1": "d354d3df40647dd48af06f9dee05c5bf4ce144e40337153b92f37ab15326bc9d",
+    "tools/bench/transport/common.ps1": "7bdf854e68dec87e689ff1ed3f007f8ca6dba5129069d7ac17dce12ed7ca5438"
+  },
+  "adb_full_measured_before_quic_fix": {
+    "local_run": "transport-adb-6fa8f66bec3a49dfbde714aa7962fb8b",
+    "report_sha256": "db544921822176bd59cd110a477cc60fba34fb3453f6961bf80be3e77e9569e5",
+    "profile": "full",
+    "transport": "tcp",
+    "completed": true,
+    "echo": [
+      {
+        "bytes": 64,
+        "rtt": {
+          "count": 1000,
+          "min_ms": 0.8562500000000001,
+          "p50_ms": 9.703125,
+          "p95_ms": 40.272864999999996,
+          "p99_ms": 64.194219,
+          "max_ms": 138.047239,
+          "jitter_mean_absolute_successive_delta_ms": 8.966930880880875
+        },
+        "raw_sample_count": 1000
+      },
+      {
+        "bytes": 4096,
+        "rtt": {
+          "count": 1000,
+          "min_ms": 1.3582290000000001,
+          "p50_ms": 8.016250000000001,
+          "p95_ms": 32.896041000000004,
+          "p99_ms": 74.415573,
+          "max_ms": 132.709843,
+          "jitter_mean_absolute_successive_delta_ms": 7.4285174264264295
+        },
+        "raw_sample_count": 1000
+      },
+      {
+        "bytes": 1048576,
+        "rtt": {
+          "count": 1000,
+          "min_ms": 53.62375,
+          "p50_ms": 70.393645,
+          "p95_ms": 133.26484399999998,
+          "p99_ms": 222.76401,
+          "max_ms": 314.596718,
+          "jitter_mean_absolute_successive_delta_ms": 19.31912622522524
+        },
+        "raw_sample_count": 1000
+      }
+    ],
+    "bulk_bytes": 268435456,
+    "bulk_elapsed_ms": 7898.893226,
+    "bulk_mib_per_second": 32.40960381099345,
+    "payloads_verified": true
+  },
+  "adb_full_binary_cleanup_binding": {
+    "device_model": "SM-S918U",
+    "host_sha256": "b4d2159f08305596a3136f286b667bd4c20e99ff3afcd8b397ea976aa23b0996",
+    "android_sha256": "23d29c702e7c7da1db226fd39b86eaf83071b96aa35ad60e900e2ad00cbd3737",
+    "owned_device_cleanup_confirmed": true,
+    "owned_reverse_removed": true
+  },
+  "final_adb_smoke": {
+    "local_run": "transport-adb-8a18c93790fd487faedf753c963aaee4",
+    "report_sha256": "5f5910d6c1d1043ceb2e38f61bd19d79a76e0e02050719ed16b8571134014306",
+    "profile": "smoke",
+    "transport": "tcp",
+    "completed": true,
+    "echo": [
+      {
+        "bytes": 64,
+        "rtt": {
+          "count": 10,
+          "min_ms": 2.204583,
+          "p50_ms": 3.115365,
+          "p95_ms": 9.215521,
+          "p99_ms": 9.215521,
+          "max_ms": 9.215521,
+          "jitter_mean_absolute_successive_delta_ms": 2.342094777777778
+        },
+        "raw_sample_count": 10
+      },
+      {
+        "bytes": 4096,
+        "rtt": {
+          "count": 10,
+          "min_ms": 1.8661459999999999,
+          "p50_ms": 2.5038539999999996,
+          "p95_ms": 3.770104,
+          "p99_ms": 3.770104,
+          "max_ms": 3.770104,
+          "jitter_mean_absolute_successive_delta_ms": 0.8185534444444447
+        },
+        "raw_sample_count": 10
+      },
+      {
+        "bytes": 1048576,
+        "rtt": {
+          "count": 10,
+          "min_ms": 59.31401,
+          "p50_ms": 82.32843700000001,
+          "p95_ms": 140.578958,
+          "p99_ms": 140.578958,
+          "max_ms": 140.578958,
+          "jitter_mean_absolute_successive_delta_ms": 35.526771222222216
+        },
+        "raw_sample_count": 10
+      }
+    ],
+    "bulk_bytes": 1048576,
+    "bulk_elapsed_ms": 46.011458,
+    "bulk_mib_per_second": 21.733716849398686,
+    "payloads_verified": true
+  },
+  "final_adb_smoke_binding": {
+    "device_model": "SM-S918U",
+    "host_sha256": "94a446ca7a3f36c365598797d85a2b40f08fe255ce539e3fef70c89e9b803dd9",
+    "android_sha256": "15c2e330c6d0b7cc3ae893cd57566324878dbef6d7c1ced95097178a320036b0",
+    "owned_device_cleanup_confirmed": true,
+    "owned_reverse_removed": true
+  },
+  "final_quic_loopback_full": {
+    "local_run": "transport-host-70a64a272a26415bba7f7b57e18f7c53",
+    "report_sha256": "52a7fdb20b238929b6dffcaaa6ddcc3d8877e6206b0e50e6f6e38344c37116cf",
+    "profile": "full",
+    "transport": "quic",
+    "completed": true,
+    "echo": [
+      {
+        "bytes": 64,
+        "rtt": {
+          "count": 1000,
+          "min_ms": 0.08839999999999999,
+          "p50_ms": 0.12430000000000001,
+          "p95_ms": 0.16670000000000001,
+          "p99_ms": 0.205,
+          "max_ms": 0.2807,
+          "jitter_mean_absolute_successive_delta_ms": 0.014109709709709702
+        },
+        "raw_sample_count": 1000
+      },
+      {
+        "bytes": 4096,
+        "rtt": {
+          "count": 1000,
+          "min_ms": 0.1678,
+          "p50_ms": 0.21760000000000002,
+          "p95_ms": 0.287,
+          "p99_ms": 0.3235,
+          "max_ms": 0.4113,
+          "jitter_mean_absolute_successive_delta_ms": 0.023527327327327326
+        },
+        "raw_sample_count": 1000
+      },
+      {
+        "bytes": 1048576,
+        "rtt": {
+          "count": 1000,
+          "min_ms": 12.7052,
+          "p50_ms": 14.1773,
+          "p95_ms": 16.9171,
+          "p99_ms": 25.4252,
+          "max_ms": 89.3507,
+          "jitter_mean_absolute_successive_delta_ms": 1.8577980980980964
+        },
+        "raw_sample_count": 1000
+      }
+    ],
+    "bulk_bytes": 268435456,
+    "bulk_elapsed_ms": 2838.8127,
+    "bulk_mib_per_second": 90.17854541794884,
+    "payloads_verified": true,
+    "datagrams": {
+      "bytes": 1024,
+      "scheduled_hz": 120,
+      "sent": 1200,
+      "received": 1200,
+      "duplicate_echoes": 0,
+      "missing_roundtrip_echoes": 0,
+      "loss_fraction": 0.0,
+      "rtt": {
+        "count": 1200,
+        "min_ms": 0.12769999999999998,
+        "p50_ms": 0.4484,
+        "p95_ms": 0.6252,
+        "p99_ms": 1.1016000000000001,
+        "max_ms": 3.0378,
+        "jitter_mean_absolute_successive_delta_ms": 0.0861296080066723
+      },
+      "send_lateness": {
+        "count": 1200,
+        "min_ms": 0.32533300000000004,
+        "p50_ms": 7.664567,
+        "p95_ms": 15.820966999999998,
+        "p99_ms": 16.624799999999997,
+        "max_ms": 30.5565,
+        "jitter_mean_absolute_successive_delta_ms": 7.4936693969974995
+      }
+    }
+  },
+  "tls_negative": {
+    "different_certificate_rejected": true,
+    "client_exit_code": 1,
+    "completed_report_written": false
+  },
+  "route_facts": {
+    "tether_candidate_interfaces": 0,
+    "default_route_count": 1,
+    "default_routes": [
+      {
+        "tether_candidate": false,
+        "route_metric": 0,
+        "interface_metric": 30,
+        "automatic_metric_enabled": true
+      }
+    ],
+    "route_changes_applied": false,
+    "firewall_changes_applied": false
+  },
+  "pc_wifi_band_ghz": 5,
+  "pc_wifi_channel": 44,
+  "phone_wifi_diagnostic": {
+    "enabled": false,
+    "connected": false,
+    "ipv4_address_count": 0
+  },
+  "open_measurements": [
+    "USB tethering QUIC",
+    "5 GHz Wi-Fi QUIC",
+    "physical cable/Wi-Fi recovery",
+    "Windows inbound firewall experiment",
+    "background foreground-service comparison (optional, skipped)"
+  ],
+  "software_validation": {
+    "python_tests": 82,
+    "rust_tests": 16,
+    "device_selection_cases": 5,
+    "clippy_warnings_denied": "passed",
+    "gated_windows_android_release_build": "passed",
+    "rust_license_sources_bans": "passed",
+    "gradle_license_modules": 181,
+    "gradle_runtime_configurations": 6,
+    "aws_lc_in_lockfile": false,
+    "unrelated_locked_versions_removed": 0,
+    "standalone_adb_smoke_after_import_fix": "passed"
+  },
+  "successful_log_basenames": [
+    "t006-python-tests-26d85c8c0a704f97ad74a01f0eaa7fb8.log",
+    "t006-rust-tests-fd10195554a742d3823acc5d3f4081fc.log",
+    "t006-clippy-57701a0dc6a8423abf7059cad1fc6a7a.log",
+    "t006-device-fixtures-e07e207e0c684a02915672316ec67a5e.log",
+    "t006-final-gated-build-2b99b689a70147b1ac620de31ec58a93.log",
+    "t006-final-quic-full-0cfcf080f6e64d5abb6e9fdac4090219.log",
+    "t006-tls-negative-313fef0869824ce39a98d9a0329b89fa.log",
+    "t006-final-adb-smoke-import-fix-4b219d5dc866438fae9f95381db74f27.log",
+    "t006-s23-adb-full-918ebeede7d2483782a24cd5dde198f8.log"
+  ],
+  "screenshots": {
+    "created": 0,
+    "retained": 0,
+    "disposal_required": 0
+  },
+  "charging_stay_awake": {
+    "owner_requested": true,
+    "applied_value": 15,
+    "awake_verified": true,
+    "left_enabled": true
+  }
+}

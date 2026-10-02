@@ -253,6 +253,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - RTT p50/p95/p99, jitter and throughput for 64 B, 4 KB and 1 MB messages; carrier recovery time after unplug/replug and a Wi-Fi drop.
   - A route-table check proving whether tethering takes over the PC's default route, with the fix and its revert.
 - **Acceptance:** numbers recorded; D7 carrier order confirmed or revised in DECISIONS.md.
+- **Execution checkpoint, 2026-10-02:** bounded Windows/Android transport benchmark implemented; authorized S23 adb TCP measured 3,000 verified echoes and 256 MiB at 32.41 MiB/s. Phone Wi-Fi is disabled, USB tethering is absent and physical recovery is unmeasured. D7 remains provisional; T0.06 remains incomplete and does not unblock T1.06a. Source and exact validation are in `docs/evidence/T0.06.md`. Next independent task: T0.07, M, gpt-6-astra / xhigh.
 
 ### T0.07 — Video encode/decode spike
 - **Size:** M · **Depends on:** T0.02 · **Prompt:** `prompts/phase-0/T0.07-video-spike.md`

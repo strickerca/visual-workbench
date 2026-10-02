@@ -1597,7 +1597,9 @@
       "scenarios": [
         "A14"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged."
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "explicit",
@@ -1676,7 +1678,9 @@
       "scenarios": [
         "A14"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged."
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -2924,7 +2928,8 @@
       ],
       "evidence": [
         "docs/evidence/T0.03.md: All nine PERF methods defined in PERF-template.md; 10-minute S23 thermal baseline T0.04, recovery baseline T0.06, dated target confirmation T0.12 pending.",
-        "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance."
+        "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
+        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4721,7 +4726,9 @@
       "scenarios": [
         "A02"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged."
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",

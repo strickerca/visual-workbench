@@ -26,7 +26,7 @@ $o = [ordered]@{
     android_release = Property 'ro.build.version.release'; api_level = Property 'ro.build.version.sdk'
     build_id = Property 'ro.build.id'; security_patch = Property 'ro.build.version.security_patch'
     one_ui = Property 'ro.build.version.oneui'; chipset = Property 'ro.board.platform'
-    target_s23 = 'untestable: target S23 Ultra not connected; connected IN2019 is authorized for startup only'
+    target_s23 = if ($device.Model -match '^SM-S918') { 'connected target S23 Ultra; static capabilities only until runtime/physical measurements' } else { 'connected device is not the target S23 Ultra; target-specific acceptance unavailable' }
 }
 $size = ReadPhone @('shell','wm','size') 't003-phone-size'
 $o.display_sizes = @([regex]::Matches($size.text, '(Physical|Override) size:\s*(\d+)x(\d+)') | ForEach-Object { [ordered]@{ type = $_.Groups[1].Value; width = [int]$_.Groups[2].Value; height = [int]$_.Groups[3].Value } })

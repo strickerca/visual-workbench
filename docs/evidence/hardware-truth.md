@@ -67,3 +67,29 @@ zero ten-minute drawing sessions have been recorded in this task. Samsung
 pressure, hover, tilt/orientation signs, report rates, barrel/eraser behavior,
 Air Actions and Air Command interference remain unmeasured, as listed in T0.04.md.
 They are not classified as “not reported by device” without a physical S23 test.
+
+## Authorized S23 update, 2026-10-02
+
+The S23 is now connected and authorized for this project. Earlier OnePlus entries
+remain historical startup evidence; they do not describe the current target.
+Read-only S23 diagnostics reported SM-S918U, Samsung, Android 16/API 36,
+build BP4A.251205.006, security patch 2026-09-05, One UI raw value 80500 and
+chipset identifier kalama. `wm` reports 1080 x 2316 rendering size and density
+450; declared display modes also include 1440 x 3088 at approximately 120, 96,
+60, 48, 30, 24 and 10 Hz. Rendering size is not a claim about physical panel
+capability. No display mode was changed.
+
+The static input parser returned zero pen-device entries. This is inconclusive,
+not evidence that the S23 lacks a pen. Physical pressure, hover, tilt, buttons,
+Air Actions and the ten-minute thermal baseline still need T0.04 owner input.
+The one-time battery temperature was 32.5 degrees C; it is not a sustained-load
+baseline. S23 video decode measurements remain pending T0.07.
+
+The owner requested charging stay-awake. `svc power stayon true` was applied;
+`stay_on_while_plugged_in` read back 15, with `mWakefulness=Awake` and
+`mStayOn=true`. The previous value (7) is retained locally. Keep this setting
+as requested. The S23's Wi-Fi was disabled during T0.06; no USB-tether network
+interface was present. See T0.06.md for the real adb TCP measurement and gaps.
+
+Text-only diagnostic receipt: s23-sanitized-hardware-facts-678c7f1173d24aaca86f8b8a37946cfa.log.
+No serial, network identifier, screen capture or other app content is retained here.

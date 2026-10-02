@@ -1,8 +1,8 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-android', 'build-pen-probe', 'build-pen-inject', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-core', 'build-android', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
-    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen')][string]$HilMode = 'app',
+    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
@@ -52,9 +52,17 @@ try {
             Run-Step 'bind-pen-inject-build' 'python.exe' @('tools/pen-inject/build_receipt.py', 'record')
         }
         'build-desktop' { Run-LicenseGate; Run-Gradle 'build-desktop' @(':desktop:packageUberJarForCurrentOS') }
+        'build-transport' {
+            Run-LicenseGate
+            Run-Cargo 'build-transport-host' @('build', '--release', '--locked', '-p', 'vw-transport-bench')
+            . (Join-Path $projectRoot 'tools/enter-dev.ps1')
+            Run-Cargo 'build-transport-android' @('ndk', '-t', 'arm64-v8a', '--platform', '29', 'build', '--release', '--locked', '-p', 'vw-transport-bench')
+            Run-Step 'bind-transport-build' 'python.exe' @('tools/bench/transport/build_receipt.py', 'record')
+        }
         'run-desktop' { Run-LicenseGate; Run-Gradle 'run-desktop' @(':desktop:run') }
         'test-all' {
             Run-Step 'test-tools' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/tests', '-v')
+            Run-Step 'test-device-selection' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/device-selection-fixtures.ps1')
             Run-Cargo 'test-rust' @('test', '--workspace', '--locked')
             Run-Gradle 'test-kotlin' @(':shared:allTests', ':android:testDebugUnitTest', ':desktop:test', ':pen-probe:testDebugUnitTest')
         }

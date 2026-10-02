@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen')][string]$Mode = 'app',
+    [ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport')][string]$Mode = 'app',
     [ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
@@ -12,6 +12,10 @@ Import-Module (Join-Path $PSScriptRoot 'process.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'android-device.psm1') -Force
 
 try {
+    if ($Mode -eq 'transport') {
+        & (Join-Path $PSScriptRoot 'bench/transport/run_adb.ps1') -Profile full -TimeoutSeconds $TimeoutSeconds
+        exit 0
+    }
     if ($Mode -eq 'win-pen') {
         if (-not $OwnerReady) { throw 'Reserve the desktop with the owner before Windows input HIL' }
         & (Join-Path $PSScriptRoot 'pen-inject\hil-injection.ps1') -OwnerReady -Scenario $WinPenScenario -TimeoutSeconds $TimeoutSeconds

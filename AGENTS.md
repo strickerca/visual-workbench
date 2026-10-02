@@ -17,6 +17,14 @@ install on, launch on, or otherwise use it until the owner releases that reserva
 Host builds and offline tests may continue. This deferral does not pass hardware
 acceptance or waive the Phase 0 gate.
 
+Owner update (2026-10-02, overnight continuation): continue the full implementation
+plan without pausing between slices. The connected S23 Ultra (SM-S918U) is now
+authorized for project builds, installs and tests as needed. Device-name inventory
+is explicitly authorized to select it. Pin automated selection to SM-S918U; never
+fall back to the reserved OnePlus. Physical owner gestures and manual gate decisions
+remain unverified until performed; continue independent implementation while they
+are pending. Report each slice's result and next task/model/effort as work continues.
+
 The owner shares the IN2019 with another app development session. Backgrounding
 can be normal. Check actual foreground state, use bounded starter-only relaunches,
 and preserve the other app and its processes. Do not reset adb or the device to

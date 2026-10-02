@@ -17,8 +17,30 @@ function Invoke-VwAdb {
     return $result
 }
 
+function Select-VwAndroidTransport {
+    param([string[]]$Lines, [string]$ExpectedModel)
+    $devices = @($Lines | ForEach-Object {
+        if ($_ -match '^(\S+)\s+(device|offline|unauthorized)\b') {
+            $serial = $Matches[1]; $state = $Matches[2]
+            $model = if ($_ -match '\bmodel:(\S+)') { $Matches[1] -replace '_','-' } else { '' }
+            [pscustomobject]@{ Serial = $serial; State = $state; Model = $model }
+        }
+    })
+    if ($ExpectedModel) { $devices = @($devices | Where-Object { $_.Model -ceq $ExpectedModel }) }
+    if ($devices.Count -ne 1) { throw 'HIL requires exactly one matching authorized physical device; no fallback is allowed' }
+    if ($devices[0].State -ne 'device') { throw 'HIL prerequisite: selected device is not online/authorized' }
+    if ($devices[0].Serial -like 'emulator-*') { throw 'HIL acceptance requires physical hardware, not an emulator' }
+    return $devices[0]
+}
+
 function Get-VwAndroidDevice {
-    param([Parameter(Mandatory = $true)][string]$Root)
+    param([Parameter(Mandatory = $true)][string]$Root, [string]$ExpectedModel = $env:VW_ANDROID_EXPECTED_MODEL)
+    if (-not $ExpectedModel) {
+        $selectionFile = Join-Path $Root '.local/android-target.json'
+        if (Test-Path -LiteralPath $selectionFile -PathType Leaf) {
+            $ExpectedModel = (Get-Content -Raw -LiteralPath $selectionFile | ConvertFrom-Json).model
+        }
+    }
     $sdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { Join-Path $env:LOCALAPPDATA 'Android\Sdk' }
     $adbPath = Join-Path $sdkRoot 'platform-tools\adb.exe'
     if (-not (Test-Path -LiteralPath $adbPath -PathType Leaf)) {
@@ -28,18 +50,14 @@ function Get-VwAndroidDevice {
     }
     $listing = Invoke-VwProcess -FilePath $adbPath -ArgumentList @('devices', '-l') -WorkingDirectory $Root -Phase 'hil-device-selection' -TimeoutSeconds 30 -SensitiveCapture
     if ($listing.ExitCode -ne 0) { throw 'HIL prerequisite: adb device listing failed' }
-    $devices = @($listing.Lines | ForEach-Object {
-        if ($_ -match '^(\S+)\s+(device|offline|unauthorized)\b') { [pscustomobject]@{ Serial = $Matches[1]; State = $Matches[2] } }
-    })
-    if ($devices.Count -ne 1) { throw "HIL requires exactly one connected physical device; found $($devices.Count)" }
-    if ($devices[0].State -ne 'device') { throw "HIL prerequisite: device state is $($devices[0].State); authorize or recover adb before automation" }
-    if ($devices[0].Serial -like 'emulator-*') { throw 'HIL acceptance requires physical hardware, not an emulator' }
-    if ($env:VW_ANDROID_EXPECTED_SERIAL -and $devices[0].Serial -cne $env:VW_ANDROID_EXPECTED_SERIAL) { throw 'HIL device changed after selection; rerun device selection before testing' }
-    $device = [pscustomobject]@{ Serial = $devices[0].Serial; AdbPath = $adbPath; Root = $Root; Model = '' }
+    $selected = Select-VwAndroidTransport -Lines $listing.Lines -ExpectedModel $ExpectedModel
+    if ($env:VW_ANDROID_EXPECTED_SERIAL -and $selected.Serial -cne $env:VW_ANDROID_EXPECTED_SERIAL) { throw 'HIL device changed after selection; rerun device selection before testing' }
+    $device = [pscustomobject]@{ Serial = $selected.Serial; AdbPath = $adbPath; Root = $Root; Model = '' }
     $qemu = Invoke-VwAdb -Device $device -Arguments @('shell', 'getprop', 'ro.kernel.qemu') -Phase 'hil-physical-device' -TimeoutSeconds 30 -Capture
     if (($qemu.Lines -join '').Trim() -eq '1') { throw 'HIL acceptance requires physical hardware, not an emulator' }
     $model = Invoke-VwAdb -Device $device -Arguments @('shell', 'getprop', 'ro.product.model') -Phase 'hil-device-model' -TimeoutSeconds 30 -Capture
     $device.Model = ($model.Lines -join ' ').Trim()
+    if ($ExpectedModel -and $device.Model -cne $ExpectedModel) { throw 'Selected device model differs from authorization; refusing further access' }
     Write-Host "Selected physical device model: $($device.Model)"
     return $device
 }

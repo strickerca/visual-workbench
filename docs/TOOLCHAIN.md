@@ -176,3 +176,31 @@ SDK is linked; Air Actions use declarative XML and ordinary Android KeyEvents.
 Graphics Core includes `libgraphics-core.so`; the Maven license gate checks its
 publisher metadata, while distribution-wide native notices remain part of the
 existing release license work. This diagnostic app is not a release package.
+
+## T0.06 transport benchmark pins (2026-10-02)
+
+Official crates.io release metadata and licenses were checked before resolution.
+The Windows and Android release builds use these exact direct versions:
+
+| Crate | Pin | Declared license |
+|---|---|---|
+| quinn | 0.11.12 | MIT OR Apache-2.0 |
+| rustls | 0.23.45 | Apache-2.0 OR ISC OR MIT |
+| rcgen | 0.14.10 | MIT OR Apache-2.0 |
+| tokio | 1.53.1 | MIT |
+| serde | 1.0.229 | MIT OR Apache-2.0 |
+| serde_json | 1.0.151 | MIT OR Apache-2.0 |
+| thiserror | 2.0.21 | MIT OR Apache-2.0 |
+
+Quinn uses `runtime-tokio` and `rustls-ring` with defaults disabled; Rustls uses
+`std` and `ring` with defaults disabled. rcgen uses `crypto` and `ring` only.
+The resolved graph includes ring 0.17.14, quinn-proto 0.11.19 and quinn-udp 0.5.16;
+aws-lc-rs is absent. Cargo.lock fixes all transitives. cargo-deny passed with
+retained duplicate-version warnings for getrandom, syn and windows-sys; no license
+allowance was loosened. The unchanged Gradle census remains 181 exact modules
+across six configurations. See tools/bench/transport/README.md for source links.
+
+The authorized connected device is now SM-S918U (S23 Ultra), Android 16/API 36.
+Model-pinned HIL selection rejects other devices and ambiguous/offline matches.
+The owner enabled unattended testing and requested charging stay-awake; the
+setting was applied and verified while preserving its previous value locally.
