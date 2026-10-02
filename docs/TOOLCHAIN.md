@@ -247,3 +247,25 @@ benchmark README for primary platform API references.
 Android API references: [BitmapRegionDecoder](https://developer.android.com/reference/android/graphics/BitmapRegionDecoder)
 and [ImageDecoder](https://developer.android.com/reference/android/graphics/ImageDecoder).
 The benchmark APK requests largeHeap for the experiment, not for the product.
+
+## T1.01 geometry pins (2026-10-02)
+
+The official crates.io version API was checked before selection. All three pins
+are stable, non-yanked, and compatible with the pinned Rust 1.99.0 toolchain:
+
+- [libm 0.2.16](https://crates.io/crates/libm/0.2.16), MIT, released 2026-01-24,
+  Rust minimum 1.63. Default architecture-specific features are disabled; shared
+  transcendental and snapping math uses the portable implementation.
+- [proptest 1.11.0](https://crates.io/crates/proptest/1.11.0), MIT OR Apache-2.0,
+  released 2026-03-24, Rust minimum 1.85. Development only, std feature only;
+  fork/timeout helpers are disabled for the physical Android runner. The outer
+  process runner supplies the timeout and process-tree cleanup.
+- [Criterion 0.8.2](https://crates.io/crates/criterion/0.8.2), Apache-2.0 OR MIT,
+  released 2026-02-04, Rust minimum 1.86. Development only and non-Android targets;
+  cargo_bench_support enabled, default features disabled.
+
+Geometry reuses thiserror 2.0.21. Cargo resolution added 43 locked packages and
+removed no preexisting versions. The required Rust licenses/sources/bans gate
+passes without policy changes; duplicate-version/unencountered-allowance warnings
+remain. The unchanged Android graph passes at 184 modules / ten configurations /
+one bound parent POM. Cargo.lock contains the resolved checksums.

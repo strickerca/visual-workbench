@@ -1,0 +1,479 @@
+{
+  "schema": 1,
+  "task": "T1.01",
+  "date": "2026-10-02",
+  "baseline_commit": "27c565d50b2ca56e9aced145115b26d22fa43435",
+  "source_bindings": [
+    {
+      "path": "core/crates/vw-geom/benches/transforms.rs",
+      "sha256": "d2ec3438972c9275df54112c7ffb1930c605f66b60707bccdf4889b42614e87f"
+    },
+    {
+      "path": "core/crates/vw-geom/src/affine.rs",
+      "sha256": "17242ad2d7b6da561e8fd437147f6d948e74c80e62d0fb640ddf5b3d4c9ccb9a"
+    },
+    {
+      "path": "core/crates/vw-geom/src/asset.rs",
+      "sha256": "4f3171c4ccfa9622fcb4904d4ee531e31fd8d5934b6a4c8b060c1f50458e24ad"
+    },
+    {
+      "path": "core/crates/vw-geom/src/capture.rs",
+      "sha256": "e46ac64de787b5cec3b000edee555186a7c2b034c162efdaff9238a77a0d2ad4"
+    },
+    {
+      "path": "core/crates/vw-geom/src/display.rs",
+      "sha256": "a873404257faa9f8cc82f3069ec3d6f06774611ba502587884acb21e176afdb2"
+    },
+    {
+      "path": "core/crates/vw-geom/src/lens.rs",
+      "sha256": "dce2d505efd589ad5c152298cfa0ae2e58c365568252cedfeaa148755c7724ba"
+    },
+    {
+      "path": "core/crates/vw-geom/src/lib.rs",
+      "sha256": "7a0b2525fb30b776690b1b18d3221990747c4c5742e02b177266b40696901ca1"
+    },
+    {
+      "path": "core/crates/vw-geom/tests/known_answers.rs",
+      "sha256": "20481078b41b12b095ffe5f5ec23dfa4bba1400b8321a9fec827ab7349c5ec42"
+    },
+    {
+      "path": "core/crates/vw-geom/tests/properties.rs",
+      "sha256": "492348baf9f3ceaf86c5d41edb0d0406b09ab72a15b285f4c0a494a21a57c53e"
+    },
+    {
+      "path": "core/crates/vw-geom/Cargo.toml",
+      "sha256": "790824919672be04a06bfc9fbdf7a73b85fb09af972a4e24308f29cc8bf5d9cc"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "0d79b50a5461b04dbc749794ea49b5d917328344b6a70d7f340498ea1dcac72d"
+    },
+    {
+      "path": "tools/android-device.psm1",
+      "sha256": "c0cb518114fd5af448762dd254d3db14925b299c0b2e1e745f26b44060bca185"
+    }
+  ],
+  "platforms": {
+    "windows": "x86_64-pc-windows-msvc",
+    "android": "aarch64-linux-android",
+    "device_model": "SM-S918U",
+    "android_api": 36
+  },
+  "tests": {
+    "known_answer_tests_per_platform": 8,
+    "property_suites_per_platform": 5,
+    "cases_per_property_suite": 10000,
+    "random_cases_per_platform": 50000,
+    "seed": "0x565701011000",
+    "suites": [
+      "camera_screen_round_trip",
+      "exif_all_orientations_round_trip",
+      "capture_exact_physical_pixels",
+      "snapping_is_bit_idempotent",
+      "lens_stroke_snapshot_is_immutable"
+    ],
+    "windows": {
+      "phase": "t101-windows-final",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 13.212,
+      "sampled_peak_tree_working_set_bytes": 318775296,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 240,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t101-windows-final-92d04c0f4c674b4eb98c9f1a06bc5582.log",
+      "compiler_telemetry_cleaned": true,
+      "parent_exit_grace_seconds": 5
+    },
+    "android": {
+      "phase": "hil-rust-cargo-test",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 28.407,
+      "sampled_peak_tree_working_set_bytes": 164118528,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "hil-rust-cargo-test-1b8a3666d353439e9b24bc6933170652.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    "android_runtime_receipts": [
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "efc5a189152ea39d5f6f886d7344b847504fd16cacb5c7f0aab4abb9cd309133",
+        "validated_count": 8,
+        "validation_succeeded": true,
+        "owned_device_directory": "/data/local/tmp/vw-tests/8d673ae866894e668262ffbcc2bc07dc",
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "7a0b7dc9058ae5f6289e218ca86d9f6bb8f243306f84b26a1e495cfa5a9ffcfd",
+        "validated_count": 5,
+        "validation_succeeded": true,
+        "owned_device_directory": "/data/local/tmp/vw-tests/46b5be6328104126971406ffaf63b83b",
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "efc5a189152ea39d5f6f886d7344b847504fd16cacb5c7f0aab4abb9cd309133",
+        "validated_count": 8,
+        "validation_succeeded": true,
+        "owned_device_directory": "/data/local/tmp/vw-tests/afbf09687ba5470b865dca9f83d7252a",
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "7a0b7dc9058ae5f6289e218ca86d9f6bb8f243306f84b26a1e495cfa5a9ffcfd",
+        "validated_count": 5,
+        "validation_succeeded": true,
+        "owned_device_directory": "/data/local/tmp/vw-tests/2eb2938c4a5a4460b53636bc3d095573",
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0
+      }
+    ],
+    "initial_android_wrapper_failure": {
+      "phase": "hil-rust-cargo-test",
+      "exit_code": 1,
+      "parent_exit_code": 0,
+      "failure_reason": "descendants survived parent exit",
+      "elapsed_seconds": 68.067,
+      "sampled_peak_tree_working_set_bytes": 527683584,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "hil-rust-cargo-test-6327a3e98ddd4524bc7f8982e465b12b.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    "clippy": {
+      "phase": "t101-clippy",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 27.086,
+      "sampled_peak_tree_working_set_bytes": 582422528,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 240,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t101-clippy-7175f8fe797e4956b0ec757774f03cf1.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    "tool_regression": {
+      "phase": "t101-tool-regression",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 24.3,
+      "sampled_peak_tree_working_set_bytes": 134676480,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 180,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t101-tool-regression-299212b85c48447da55b8d7741f6e692.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    "tool_test_count": 93,
+    "rustdoc": {
+      "phase": "t101-rustdoc",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 10.342,
+      "sampled_peak_tree_working_set_bytes": 146120704,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 120,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t101-rustdoc-4839147c21004c6d8dc42b6c8c7a4956.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    "formatting": {
+      "phase": "t101-format-check",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 9.349,
+      "sampled_peak_tree_working_set_bytes": 72171520,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 60,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t101-format-check-f99dfeafce774b7f92818f67e9d74849.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    }
+  },
+  "benchmark": {
+    "unit": "ns/point",
+    "target_less_than": 50,
+    "estimates": {
+      "mean": {
+        "confidence_interval": {
+          "confidence_level": 0.95,
+          "lower_bound": 10.122717962807156,
+          "upper_bound": 10.819366081077513
+        },
+        "point_estimate": 10.44946715814542,
+        "standard_error": 0.17771960237704199
+      },
+      "median": {
+        "confidence_interval": {
+          "confidence_level": 0.95,
+          "lower_bound": 9.739647920324465,
+          "upper_bound": 10.285298396564432
+        },
+        "point_estimate": 10.038495853682416,
+        "standard_error": 0.131111385329625
+      },
+      "median_abs_dev": {
+        "confidence_interval": {
+          "confidence_level": 0.95,
+          "lower_bound": 0.7947881939229795,
+          "upper_bound": 1.4087982371250292
+        },
+        "point_estimate": 1.0950691978410396,
+        "standard_error": 0.1499326204741444
+      },
+      "slope": {
+        "confidence_interval": {
+          "confidence_level": 0.95,
+          "lower_bound": 10.225708236338049,
+          "upper_bound": 10.961748326537737
+        },
+        "point_estimate": 10.590296686095305,
+        "standard_error": 0.18786678159308734
+      },
+      "std_dev": {
+        "confidence_interval": {
+          "confidence_level": 0.95,
+          "lower_bound": 1.2347771275943187,
+          "upper_bound": 2.340006533050468
+        },
+        "point_estimate": 1.787709323927984,
+        "standard_error": 0.2891098678294237
+      }
+    },
+    "process": {
+      "phase": "t101-benchmark",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 242.529,
+      "sampled_peak_tree_working_set_bytes": 657129472,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t101-benchmark-eeba61d38b0e4e9194db404cab872e7e.log",
+      "compiler_telemetry_cleaned": true,
+      "parent_exit_grace_seconds": 5
+    },
+    "scope": "Release checked f64 affine map including finite-result checks; not camera construction or end-to-end latency."
+  },
+  "dependency_versions": {
+    "libm": {
+      "num": "0.2.16",
+      "license": "MIT",
+      "rust_version": "1.63",
+      "created_at": "2026-01-24T03:14:21.229132Z",
+      "checksum": "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981",
+      "yanked": false,
+      "features": {
+        "arch": [],
+        "default": [
+          "arch"
+        ],
+        "force-soft-floats": [],
+        "unstable": [
+          "unstable-intrinsics",
+          "unstable-float"
+        ],
+        "unstable-float": [],
+        "unstable-intrinsics": [],
+        "unstable-public-internals": []
+      }
+    },
+    "proptest": {
+      "num": "1.11.0",
+      "license": "MIT OR Apache-2.0",
+      "rust_version": "1.85",
+      "created_at": "2026-03-24T11:01:38.993611Z",
+      "checksum": "4b45fcc2344c680f5025fe57779faef368840d0bd1f42f216291f0dc4ace4744",
+      "yanked": false,
+      "features": {
+        "alloc": [],
+        "atomic64bit": [],
+        "attr-macro": [
+          "proptest-macro"
+        ],
+        "bit-set": [
+          "dep:bit-set",
+          "dep:bit-vec"
+        ],
+        "default": [
+          "std",
+          "fork",
+          "timeout",
+          "bit-set"
+        ],
+        "default-code-coverage": [
+          "std",
+          "fork",
+          "timeout",
+          "bit-set"
+        ],
+        "f16": [],
+        "fork": [
+          "std",
+          "rusty-fork",
+          "tempfile"
+        ],
+        "handle-panics": [
+          "std"
+        ],
+        "hardware-rng": [
+          "x86"
+        ],
+        "no_std": [
+          "num-traits/libm"
+        ],
+        "std": [
+          "rand/std",
+          "rand/os_rng",
+          "regex-syntax",
+          "num-traits/std"
+        ],
+        "timeout": [
+          "fork",
+          "rusty-fork/timeout"
+        ],
+        "unstable": [
+          "f16"
+        ]
+      }
+    },
+    "criterion": {
+      "num": "0.8.2",
+      "license": "Apache-2.0 OR MIT",
+      "rust_version": "1.86",
+      "created_at": "2026-02-04T10:43:03.398729Z",
+      "checksum": "950046b2aa2492f9a536f5f4f9a3de7b9e2476e575e05bd6c333371add4d98f3",
+      "yanked": false,
+      "features": {
+        "async": [],
+        "async_futures": [
+          "dep:futures",
+          "async"
+        ],
+        "async_smol": [
+          "dep:smol",
+          "async"
+        ],
+        "async_tokio": [
+          "dep:tokio",
+          "async"
+        ],
+        "cargo_bench_support": [],
+        "csv_output": [
+          "dep:csv"
+        ],
+        "default": [
+          "rayon",
+          "plotters",
+          "cargo_bench_support"
+        ],
+        "html_reports": [],
+        "plotters": [
+          "dep:plotters"
+        ],
+        "rayon": [
+          "dep:rayon"
+        ],
+        "real_blackbox": [],
+        "stable": [
+          "csv_output",
+          "html_reports",
+          "async_futures",
+          "async_smol",
+          "async_tokio"
+        ]
+      }
+    }
+  },
+  "licenses": {
+    "rust": {
+      "phase": "license-rust",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 5.921,
+      "sampled_peak_tree_working_set_bytes": 99471360,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "license-rust-50383025bdc64da3b5f02b365cf47448.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    "gradle": {
+      "phase": "license-gradle",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 51.453,
+      "sampled_peak_tree_working_set_bytes": 665382912,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "license-gradle-8562e8995b4e4e9bbee25d23fdefec20.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 20
+    },
+    "modules": 184,
+    "runtime_configurations": 10,
+    "parent_poms": 1,
+    "policy_changed": false
+  },
+  "cleanup": {
+    "screenshots_created": 0,
+    "android_owned_runs_disposed": 4,
+    "all_device_cleanup_confirmed": true,
+    "process_tree_cleanup_confirmed": true
+  },
+  "boundaries": [
+    "No physical pen gestures or Windows display/injection mapping acceptance.",
+    "Camera follow/match and peer-edit UI isolation remain T1.09/T1.10/T1.12 work.",
+    "Capture source identifiers/timestamps are the enclosing capture model responsibility.",
+    "SVG viewport implements centered meet/slice and stretch; SVG import resolves CSS/alignment and clipping."
+  ]
+}

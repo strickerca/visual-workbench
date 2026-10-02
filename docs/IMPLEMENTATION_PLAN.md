@@ -331,6 +331,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
 - **Requirements:** CORE-002, TUNNEL-007 (math and property tests; hardware verification in T3.01)
 - **Deliverables:** all spaces of BUILD_SPECIFICATION §4.2 (R, D, V, P, L, F, H, A), affine type with inverse, camera model, EXIF orientation transforms, PDF page transforms, pixel-snap helpers, property tests (round trip ≤ 1e-6 px for scales 1/64–64 and any rotation; F→H integer-exact).
 - **Acceptance:** proptest suites pass with ≥ 10,000 cases each, on Windows and on the phone.
+- **Execution checkpoint, 2026-10-02:** shared geometry implemented; `docs/evidence/T1.01.md` is PASS. Five 10,000-case suites and eight known-answer tests pass on Windows and the physical SM-S918U; checked affine mapping measures 10.590 ns/point (95% interval 10.226–10.962 ns, <50 ns target). The Android wrapper's initial verified compiler-telemetry survivor failure is retained; corrected full run and owned cleanup pass. CORE-002 and TUNNEL-007 remain in_progress/partial for downstream app/hardware clauses; PEN-006 receives math evidence only. Next independently eligible task: T1.02, size L, gpt-6-astra/max; actual session last verified gpt-6-astra/xhigh. No numbered phase gate or phase-end push is due.
 
 ### T1.02 — vw-model and vw-ops: document, operations, transactions, undo
 - **Size:** L · **Depends on:** T1.01 · **Prompt:** `prompts/phase-1/T1.02-model-ops.md`

@@ -114,7 +114,10 @@ function Invoke-VwAndroidCargoTest {
             $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
             [Environment]::SetEnvironmentVariable($name, $changes[$name], 'Process')
         }
-        $testRun = Invoke-VwProcess -FilePath 'cargo.exe' -ArgumentList @('+1.99.0', 'test', '--target', 'aarch64-linux-android', '-p', $Crate, '--locked', '--message-format=json-render-diagnostics', '--', '--test-threads=1') -WorkingDirectory $Device.Root -Phase 'hil-rust-cargo-test' -TimeoutSeconds $TimeoutSeconds -SensitiveCapture
+        # Host build scripts/proc macros can start MSVC's telemetry helper even
+        # when the final executable targets Android. Use the same narrowly
+        # verified helper cleanup as host Cargo builds; other survivors still fail.
+        $testRun = Invoke-VwProcess -FilePath 'cargo.exe' -ArgumentList @('+1.99.0', 'test', '--target', 'aarch64-linux-android', '-p', $Crate, '--locked', '--message-format=json-render-diagnostics', '--', '--test-threads=1') -WorkingDirectory $Device.Root -Phase 'hil-rust-cargo-test' -TimeoutSeconds $TimeoutSeconds -SensitiveCapture -CleanCompilerTelemetry
         if ($testRun.ExitCode -ne 0) { throw "Rust Android Cargo test failed (exit $($testRun.ExitCode)); inspect the phase receipts" }
         $summaries = [regex]::Matches(($testRun.Lines -join "`n"), 'Cargo Android target runner: PASS \((\d+) actual tests\)')
         $passedTests = 0

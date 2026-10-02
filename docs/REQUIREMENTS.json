@@ -117,9 +117,11 @@
       "scenarios": [
         "A01"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.01.md — shared camera and transforms verified on Windows/S23; receiving camera invariance across 100 peer edits and explicit default-off follow/match remain T1.09, T1.10 and T1.12."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -473,7 +475,9 @@
       "scenarios": [
         "A05"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T1.01.md — 10,000-case lens latch property suite per platform; math evidence only, product lens behavior remains T3.04."
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -1519,9 +1523,11 @@
       "scenarios": [
         "A07"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.01.md — exact integer F/H property suite passes at 100–300% DPI and negative/rotated origins on Windows/S23; physical Windows scaling/injection mapping remains T3.01 and negative-origin display hardware remains DISPLAY-003."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "updated: negative-origin hardware run moves to the virtual display (DISPLAY-003) when no second monitor exists"
     },
