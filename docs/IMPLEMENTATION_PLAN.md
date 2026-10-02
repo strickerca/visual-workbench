@@ -231,6 +231,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   Also an instrumentation replay harness that injects traces with stylus tool type, pressure, tilt, hover and buttons. Report: tilt yes/no, hover yes/no, report rate, barrel behavior with Air Command on and off, Air Actions delivery, battery temperature over a 10-minute pen session.
 - **Acceptance:** at least 24 owner traces recorded (lines, circles, small handwriting, fast flicks, hover-only passes, palm-down drawing, tilt calibration); replay reproduces sample counts exactly and every sample's timestamp within 1 ms.
 - **Execution, 2026-10-01:** probe/recorder/replay software implemented; required S23 owner corpus and thermal/capability measurements remain pending. See `docs/evidence/T0.04.md`. This task is not an accepted dependency for T0.10 and does not pass G0.
+- **Owner deferral, 2026-10-02:** continue code work while S23 measurements are deferred and the OnePlus is reserved by another project. Integrate the validated T0.04 software checkpoint; retain the incomplete physical acceptance and T0.10 dependency block. T0.05 depends only on T0.02 and may proceed independently.
 
 ### T0.05 — Windows pen-injection probe and test harness
 - **Size:** M · **Depends on:** T0.02 · **Prompt:** `prompts/phase-0/T0.05-injection-probe.md`

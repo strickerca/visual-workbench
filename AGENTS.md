@@ -11,6 +11,12 @@ The IN2019 is authorized for startup smoke tests; S23 Ultra pen/capture/latency
 verification remains pending. Do not mark a phase gate or product feature passed
 from a compiling skeleton.
 
+Owner update (2026-10-02): defer S23 Ultra physical work and continue software
+implementation. The OnePlus/IN2019 is reserved by another project; do not query,
+install on, launch on, or otherwise use it until the owner releases that reservation.
+Host builds and offline tests may continue. This deferral does not pass hardware
+acceptance or waive the Phase 0 gate.
+
 The owner shares the IN2019 with another app development session. Backgrounding
 can be normal. Check actual foreground state, use bounded starter-only relaunches,
 and preserve the other app and its processes. Do not reset adb or the device to
