@@ -1,0 +1,1097 @@
+{
+  "spec_revision": "2026-09-22/1.0",
+  "scope_note": "Delivery order does not remove retained features. Optional drivers/plugins may be separately installed.",
+  "requirements": [
+    {
+      "id": "CORE-001",
+      "requirement": "Single shared versioned document with immutable originals",
+      "acceptance_scenarios": [
+        "A01"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CORE-002",
+      "requirement": "Independent per-device zoom pan rotation and layout",
+      "acceptance_scenarios": [
+        "A01"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CORE-003",
+      "requirement": "Live in-progress strokes objects sliders and selections",
+      "acceptance_scenarios": [
+        "A02"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CORE-004",
+      "requirement": "Immediate local pen feedback independent of network or AI",
+      "acceptance_scenarios": [
+        "A01"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CORE-005",
+      "requirement": "Transactional undo redo and canceled provisional edits",
+      "acceptance_scenarios": [
+        "A06"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CORE-006",
+      "requirement": "Stable revision source and frame identity in all requests",
+      "acceptance_scenarios": [
+        "A07"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CORE-007",
+      "requirement": "Reconnection without duplicate native-document operations",
+      "acceptance_scenarios": [
+        "A14"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CORE-008",
+      "requirement": "Native editable project save reopen and crash recovery",
+      "acceptance_scenarios": [
+        "A18"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CORE-009",
+      "requirement": "Multiple documents and bookmarked working regions",
+      "acceptance_scenarios": [
+        "A01"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "PEN-001",
+      "requirement": "S Pen pressure hover tilt orientation and palm cancellation",
+      "acceptance_scenarios": [
+        "A06"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "PEN-002",
+      "requirement": "Configurable pressure curve cursor and stabilization",
+      "acceptance_scenarios": [
+        "A01"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "PEN-003",
+      "requirement": "Pen draws fingers navigate by default",
+      "acceptance_scenarios": [
+        "A01"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "PEN-004",
+      "requirement": "Contact-following offset inspection loupe",
+      "acceptance_scenarios": [
+        "A03"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "PEN-005",
+      "requirement": "Editable pen-button precision lens preserving base viewport",
+      "acceptance_scenarios": [
+        "A04"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "PEN-006",
+      "requirement": "Separate lens transform with latched stroke geometry",
+      "acceptance_scenarios": [
+        "A05"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "PEN-007",
+      "requirement": "Configurable lens scale placement smooth and pixel-grid rendering",
+      "acceptance_scenarios": [
+        "A04"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "PEN-008",
+      "requirement": "No transform jump on mid-stroke precision toggle",
+      "acceptance_scenarios": [
+        "A05"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "PEN-009",
+      "requirement": "Native barrel-button and Bluetooth Air Action event separation",
+      "acceptance_scenarios": [
+        "A09"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "PEN-010",
+      "requirement": "Configurable single double swipe and circular Air Actions",
+      "acceptance_scenarios": [
+        "A09"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "PEN-011",
+      "requirement": "Foreground capability onboarding and visible fallback controls",
+      "acceptance_scenarios": [
+        "A09"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "PEN-012",
+      "requirement": "Deduplicate button routes; never implicit chat submission",
+      "acceptance_scenarios": [
+        "A09"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EDIT-001",
+      "requirement": "Editable pens highlighters arrows lines shapes and text",
+      "acceptance_scenarios": [
+        "A02"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EDIT-002",
+      "requirement": "Sequential numbered markers linked to separate instructions",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EDIT-003",
+      "requirement": "Layers visibility order opacity locks and grouping",
+      "acceptance_scenarios": [
+        "A02"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EDIT-004",
+      "requirement": "Move resize rotate and editable annotation properties",
+      "acceptance_scenarios": [
+        "A02"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EDIT-005",
+      "requirement": "Stroke object and mask erasers",
+      "acceptance_scenarios": [
+        "A06"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EDIT-006",
+      "requirement": "Rectangular elliptical polygon freehand and painted selections",
+      "acceptance_scenarios": [
+        "A04"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EDIT-007",
+      "requirement": "Add subtract intersect invert expand shrink feather masks",
+      "acceptance_scenarios": [
+        "A04"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EDIT-008",
+      "requirement": "Change preserve reference explain selection semantics",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EDIT-009",
+      "requirement": "Crop rotate resize and nondestructive basic tonal adjustment",
+      "acceptance_scenarios": [
+        "A02"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EDIT-010",
+      "requirement": "Preserve-exterior compositing with explicit blend boundary",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EDIT-011",
+      "requirement": "Manual correction for optional assisted selection",
+      "acceptance_scenarios": [
+        "A04"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CAPTURE-001",
+      "requirement": "Desktop shortcut capture window region display to phone",
+      "acceptance_scenarios": [
+        "A07"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CAPTURE-002",
+      "requirement": "Freeze exact displayed frame at first valid markup",
+      "acceptance_scenarios": [
+        "A07"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CAPTURE-003",
+      "requirement": "One-action cancel accidental draft and resume live",
+      "acceptance_scenarios": [
+        "A07"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CAPTURE-004",
+      "requirement": "Frame age and frozen-state indication",
+      "acceptance_scenarios": [
+        "A07"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CAPTURE-005",
+      "requirement": "No freeze-on-contact when remote editing real application",
+      "acceptance_scenarios": [
+        "A08"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CAPTURE-006",
+      "requirement": "Prevent recursive self-capture and source feedback loops",
+      "acceptance_scenarios": [
+        "A18"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "TUNNEL-001",
+      "requirement": "Windows window or monitor live view on Android",
+      "acceptance_scenarios": [
+        "A08"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "TUNNEL-002",
+      "requirement": "Android live screen or app view on Windows",
+      "acceptance_scenarios": [
+        "A18"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "TUNNEL-003",
+      "requirement": "Separate view control and external-transmission authority",
+      "acceptance_scenarios": [
+        "A19"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "TUNNEL-004",
+      "requirement": "Authorized Windows native pen mouse keyboard control",
+      "acceptance_scenarios": [
+        "A08"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "TUNNEL-005",
+      "requirement": "Authorized Android cross-app control without root",
+      "acceptance_scenarios": [
+        "A18"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "TUNNEL-006",
+      "requirement": "Suspend input on stale geometry or invalid foreground target",
+      "acceptance_scenarios": [
+        "A08"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "TUNNEL-007",
+      "requirement": "DPI orientation negative monitor origin and coordinate mapping",
+      "acceptance_scenarios": [
+        "A17"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "TUNNEL-008",
+      "requirement": "No stale remote-input replay after reconnection",
+      "acceptance_scenarios": [
+        "A14"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "TUNNEL-009",
+      "requirement": "Explicit app-aware shortcut and undo destination",
+      "acceptance_scenarios": [
+        "A09"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CONNECT-001",
+      "requirement": "Personal-use USB connection with explicit device authorization",
+      "acceptance_scenarios": [
+        "A14"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CONNECT-002",
+      "requirement": "Local Wi-Fi without mandatory internet or account",
+      "acceptance_scenarios": [
+        "A14"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CONNECT-003",
+      "requirement": "Authenticated encrypted revocable pairing and local discovery",
+      "acceptance_scenarios": [
+        "A19"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CONNECT-004",
+      "requirement": "Working USB media path not assumed UDP over ADB reverse",
+      "acceptance_scenarios": [
+        "A14"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "CONNECT-005",
+      "requirement": "Bounded queues and separate media document input recovery",
+      "acceptance_scenarios": [
+        "A14"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "DISPLAY-001",
+      "requirement": "Optional real Windows extended monitor",
+      "acceptance_scenarios": [
+        "A17"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "DISPLAY-002",
+      "requirement": "Signed driver deployment with security settings retained",
+      "acceptance_scenarios": [
+        "A17"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "DISPLAY-003",
+      "requirement": "Selectable monitor geometry orientation scaling",
+      "acceptance_scenarios": [
+        "A17"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "DISPLAY-004",
+      "requirement": "Recover windows and topology on virtual display removal",
+      "acceptance_scenarios": [
+        "A17"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "ADOBE-001",
+      "requirement": "Direct remote drawing in installed Photoshop",
+      "acceptance_scenarios": [
+        "A15"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "ADOBE-002",
+      "requirement": "Direct remote editing in installed Illustrator",
+      "acceptance_scenarios": [
+        "A15"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "ADOBE-003",
+      "requirement": "Direct remote editing in installed Paint",
+      "acceptance_scenarios": [
+        "A15"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "ADOBE-004",
+      "requirement": "Per-tool per-version pen pressure tilt compatibility report",
+      "acceptance_scenarios": [
+        "A15"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "ADOBE-005",
+      "requirement": "Same-document independent native Photoshop and Illustrator views",
+      "acceptance_scenarios": [
+        "A15"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "ADOBE-006",
+      "requirement": "Optional Photoshop clean-pixel and selection-mask bridge",
+      "acceptance_scenarios": [
+        "A16"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "ADOBE-007",
+      "requirement": "Return edits to explicit document layer and revision",
+      "acceptance_scenarios": [
+        "A16"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "ADOBE-008",
+      "requirement": "No assumed layered native-file fidelity or Paint multiview parity",
+      "acceptance_scenarios": [
+        "A15"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "FORMAT-001",
+      "requirement": "200-MP-class photo and long screenshot test assets",
+      "acceptance_scenarios": [
+        "A10"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "FORMAT-002",
+      "requirement": "Tiled multiresolution demand decoding and transfer",
+      "acceptance_scenarios": [
+        "A10"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "FORMAT-003",
+      "requirement": "Bounded RAM GPU disk cache with low-space reserve",
+      "acceptance_scenarios": [
+        "A19"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "FORMAT-004",
+      "requirement": "Original resolution retained without silent preview substitution",
+      "acceptance_scenarios": [
+        "A10"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "FORMAT-005",
+      "requirement": "PNG JPEG WebP BMP TIFF applicable import export",
+      "acceptance_scenarios": [
+        "A11"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "FORMAT-006",
+      "requirement": "Multipage PDF navigation markup and explicit export fidelity",
+      "acceptance_scenarios": [
+        "A12"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "FORMAT-007",
+      "requirement": "Safe SVG rendering and suitable vector annotation export",
+      "acceptance_scenarios": [
+        "A12"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "FORMAT-008",
+      "requirement": "Codec-gated HEIC HEIF AVIF and feasible RAW DNG previews",
+      "acceptance_scenarios": [
+        "A12"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "FORMAT-009",
+      "requirement": "PSD PSB AI through native apps or labeled composite support",
+      "acceptance_scenarios": [
+        "A15"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "FORMAT-010",
+      "requirement": "Encoder dimension depth alpha and profile preflight",
+      "acceptance_scenarios": [
+        "A11"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "FORMAT-011",
+      "requirement": "Original profiles orientation and color conversion provenance",
+      "acceptance_scenarios": [
+        "A11"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EXPORT-001",
+      "requirement": "Clean full-image and source-resolution selection copy",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EXPORT-002",
+      "requirement": "Marked-up full-image and selection exports",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EXPORT-003",
+      "requirement": "Transparent irregular selection and separate mask export",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EXPORT-004",
+      "requirement": "Detail crop plus overview context package",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EXPORT-005",
+      "requirement": "Shared explicit transfer shelf without global clipboard recording",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EXPORT-006",
+      "requirement": "Windows image clipboard file drag and Android share adapters",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EXPORT-007",
+      "requirement": "Large-file handoff fallback and destination compatibility tests",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EXPORT-008",
+      "requirement": "Structured per-region instructions with exact source revision",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EXPORT-009",
+      "requirement": "Staging and submission are distinct actions",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EXPORT-010",
+      "requirement": "Codex MCP or App Server adapter without undocumented chat injection",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "EXPORT-011",
+      "requirement": "Returned-result wipe blink split difference and partial acceptance",
+      "acceptance_scenarios": [
+        "A13"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "UX-001",
+      "requirement": "Windows windowed maximized and borderless fullscreen",
+      "acceptance_scenarios": [
+        "A18"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "UX-002",
+      "requirement": "Portrait landscape right-handed and movable tools",
+      "acceptance_scenarios": [
+        "A18"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "UX-003",
+      "requirement": "Professional dark light themes accessible contrast reduced motion",
+      "acceptance_scenarios": [
+        "A18"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "UX-004",
+      "requirement": "Keyboard shortcuts pen quick controls and large touch targets",
+      "acceptance_scenarios": [
+        "A18"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "UX-005",
+      "requirement": "Capture control sync target and export-state indicators",
+      "acceptance_scenarios": [
+        "A18"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "QUALITY-001",
+      "requirement": "Sandbox and bound untrusted file decoding and external resources",
+      "acceptance_scenarios": [
+        "A19"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "QUALITY-002",
+      "requirement": "True redacted export not hidden sensitive original plus overlay",
+      "acceptance_scenarios": [
+        "A19"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "QUALITY-003",
+      "requirement": "Privacy-minimized diagnostics without device IDs or secrets",
+      "acceptance_scenarios": [
+        "A19"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "QUALITY-004",
+      "requirement": "Measure actual latency throughput memory thermals and recovery",
+      "acceptance_scenarios": [
+        "A20"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "QUALITY-005",
+      "requirement": "Hardware QA and explicit untested compatibility states",
+      "acceptance_scenarios": [
+        "A20"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "QUALITY-006",
+      "requirement": "Reproducible builds installers checksums dependency notices",
+      "acceptance_scenarios": [
+        "A20"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    },
+    {
+      "id": "QUALITY-007",
+      "requirement": "Retain all scope IDs and never call unimplemented controls finished",
+      "acceptance_scenarios": [
+        "A20"
+      ],
+      "implementation_status": "not_implemented_in_this_package",
+      "verification_status": "not_tested",
+      "target_release": "image_markup_and_tunnels",
+      "owner_decision": "accepted_user_requirement_or_accepted_recommended_default"
+    }
+  ],
+  "future_modules_not_in_current_release": [
+    "voice-controlled snapshots",
+    "timed and retrospective video clips",
+    "camera and screen AI observation",
+    "RTS-specific assistance"
+  ],
+  "remaining_diagnostics": [
+    "Android and One UI versions",
+    "installed Photoshop Illustrator Paint versions",
+    "monitor configuration and HDR",
+    "device input capability tests",
+    "available disk space at installation"
+  ]
+}

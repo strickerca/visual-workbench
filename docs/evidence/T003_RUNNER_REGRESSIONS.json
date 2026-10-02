@@ -1,0 +1,7 @@
+{
+    "success":  true,
+    "timeout":  true,
+    "survivor_rejected":  true,
+    "child_cleanup":  true,
+    "unrelated_preserved":  true
+}

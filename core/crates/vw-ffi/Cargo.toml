@@ -1,0 +1,14 @@
+[package]
+name = "vw-ffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+name = "vw_core"
+crate-type = ["cdylib", "rlib"]

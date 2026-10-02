@@ -1,0 +1,138 @@
+{
+  "task": "T0.03",
+  "requirements_only_allowed_changes": true,
+  "preserved_original_hardware_rows": 21,
+  "dated_additional_hardware_rows": 12,
+  "perf_methods": 9,
+  "historical_setup_sources_checked": 139,
+  "changed_historical_source_paths": [
+    "AGENTS.md",
+    "Cargo.lock",
+    "Cargo.toml",
+    "README.md",
+    "build.ps1",
+    "docs/REQUIREMENTS.json",
+    "docs/TOOLCHAIN.md",
+    "tools/diagnostics/pc-diagnostics.ps1",
+    "tools/diagnostics/phone-diagnostics.ps1",
+    "tools/process.psm1"
+  ],
+  "external_model_effort_annotations_preserved": [
+    {
+      "path": "docs/IMPLEMENTATION_PLAN.md",
+      "sha256": "a27dac6dc7df9768885a93ff7aa18e5c785365a262d6cffd03a4b5dae445c2dc"
+    },
+    {
+      "path": "prompts/phase-0/T0.01-toolchain.md",
+      "sha256": "be92fa88c954856c2088da72f700e8b0fe9aaea58b3e7c0c9e03ad097afaff69"
+    },
+    {
+      "path": "prompts/phase-0/T0.02-repo-skeleton.md",
+      "sha256": "15ea00dfbccacd0c7a44281263118ea5147ce2282f7ec2b0ef13d164e9f95db0"
+    },
+    {
+      "path": "prompts/phase-0/T0.03-diagnostics.md",
+      "sha256": "2ab572e6c668feb8553e4ba1e2faabcc3bc0835859f1a6b35c7fec217d37bb3f"
+    },
+    {
+      "path": "prompts/phase-0/T0.04-pen-probe.md",
+      "sha256": "8902be5d120cb0ac9adc10d353620bf32a8ff398bab438acddb75f7683137de6"
+    },
+    {
+      "path": "prompts/phase-0/T0.05-injection-probe.md",
+      "sha256": "a10a8c4a1d5f5c28823bab1d7272e506be3f21e45d7e68bea9398349c9a2e9d7"
+    },
+    {
+      "path": "prompts/phase-0/T0.06-transport-spike.md",
+      "sha256": "6d2653bccb31531827fccdd1f2387de896e9a35b79faa183132b3afb1d73a5c6"
+    },
+    {
+      "path": "prompts/phase-0/T0.07-video-spike.md",
+      "sha256": "bbb9f6c31f1e065cab2b4c826951e111fcb84f61c040f3b440a490ea7926dfed"
+    },
+    {
+      "path": "prompts/phase-0/T0.08-sudovda-spike.md",
+      "sha256": "97fd60675f08b79a03e12dfc28c3f335a170d173e3b7fd2882374fba41e84dc5"
+    },
+    {
+      "path": "prompts/phase-0/T0.09-image-spike.md",
+      "sha256": "37e0fddf88bb9778555a4fa5f3502a415639c267858fafa1a88ced5c93cdd52b"
+    },
+    {
+      "path": "prompts/phase-0/T0.10-stroke-spike.md",
+      "sha256": "122cc424d0cfa4a342e3c6a931e7df68d4f55151b2714880dc742be3d73c490a"
+    },
+    {
+      "path": "prompts/phase-0/T0.11-gpt-image-spike.md",
+      "sha256": "80ec8925fac06245616dbfb817bc0f4c3df7e368a449eeff7788c512693bae95"
+    },
+    {
+      "path": "prompts/phase-0/T0.12-gate-g0.md",
+      "sha256": "70cdf6e413a6fbd9b177b83ef8e42e2feb6eed98b92cc22a0dfe1b6703437392"
+    },
+    {
+      "path": "prompts/phase-1/T1.01-vw-geom.md",
+      "sha256": "905328da0b204152336137ebbb75f0a7cf10979fa1aef9e72c5e666cc1118e1d"
+    },
+    {
+      "path": "prompts/phase-1/T1.02-model-ops.md",
+      "sha256": "4c7f6c42d8ce96a32c8524751a689a3a93e5d70ec5964400c5edb452098429dd"
+    },
+    {
+      "path": "prompts/phase-1/T1.03-vw-store.md",
+      "sha256": "50e6e70b4bd73e022f08bb30c24c7f49e18b4d7ecc0fb85627112ca36ace17ab"
+    },
+    {
+      "path": "prompts/phase-1/T1.04-vw-ink.md",
+      "sha256": "32f81e705562d6e25d06d604568b4b9b34aec7968280b07e8dcbbfc9ca4247ec"
+    },
+    {
+      "path": "prompts/phase-1/T1.05-vw-raster.md",
+      "sha256": "51be7e8b3ad80ceb4f13ed27fde40b1007d55c1da4ad9e0a883f8f412ba40199"
+    },
+    {
+      "path": "prompts/phase-1/T1.06a-transport.md",
+      "sha256": "05d37c5af1e24e58b4a4979bdaaa75dfb48ce9c8cca875813be713cf0a8bd3a3"
+    },
+    {
+      "path": "prompts/phase-1/T1.06b-pairing.md",
+      "sha256": "06f99ac6b110ed8ae07fd1aaa37806211851c55226686a0c5da7be8412bf40ab"
+    },
+    {
+      "path": "prompts/phase-1/T1.07-ffi-shared.md",
+      "sha256": "56c5689a9366e6bf5954edc1cfa0dbe886a3a6f6a05b7d8552ff60678ca7ce80"
+    },
+    {
+      "path": "prompts/phase-1/T1.08a-android-canvas.md",
+      "sha256": "e22426d73b7a7e04d17bae264a495a605d190fb4704d4794afbb4b1861a21d08"
+    },
+    {
+      "path": "prompts/phase-1/T1.08b-android-tools.md",
+      "sha256": "3e0ad0809fc17d78afa678686cddd713eacd7fdb70d2b49f872693ccf59dbe0a"
+    },
+    {
+      "path": "prompts/phase-1/T1.09-desktop-shell.md",
+      "sha256": "8d405931653aad20413196a9405820c427e00cd3f2bdb426fd9c7ec437049903"
+    },
+    {
+      "path": "prompts/phase-1/T1.10-live-sync.md",
+      "sha256": "1db1e987eeab47536fe201a3911d139f5e424d0ac8afe52cbc1dfea233311c50"
+    },
+    {
+      "path": "prompts/phase-1/T1.11-import-export.md",
+      "sha256": "90abf3774202701f3440e732d11569c111b6c76f8f4ed49170598401bfe03133"
+    },
+    {
+      "path": "prompts/phase-1/T1.12-phase1-acceptance.md",
+      "sha256": "3e1c7565b4abce54457421776c725def1b1d66a21defab3f8c4a19ca36af8dcd"
+    }
+  ],
+  "all_other_historical_sources_unchanged": true,
+  "output_files_checked": 16,
+  "external_logs_and_receipts_checked": 149,
+  "known_local_identifier_findings": 0,
+  "identifier_values_retained": false,
+  "image_files_disposed": true,
+  "final_capture_binary_hash_matches": true,
+  "limits": "Known identifiers plus source gitleaks; not a proof of all possible secrets or identifiers."
+}

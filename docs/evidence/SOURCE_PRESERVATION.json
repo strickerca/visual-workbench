@@ -1,0 +1,62 @@
+{
+  "archived_reference_files": 39,
+  "byte_identical_original_files": [
+    "contracts/package.schema.json",
+    "contracts/storage.sql",
+    "contracts/vw_protocol.proto",
+    "docs/BUILD_SPECIFICATION.md",
+    "docs/DECISIONS.md",
+    "docs/IMPLEMENTATION_PLAN.md",
+    "docs/SOURCES.json",
+    "prompts/phase-0/T0.01-toolchain.md",
+    "prompts/phase-0/T0.02-repo-skeleton.md",
+    "prompts/phase-0/T0.03-diagnostics.md",
+    "prompts/phase-0/T0.04-pen-probe.md",
+    "prompts/phase-0/T0.05-injection-probe.md",
+    "prompts/phase-0/T0.06-transport-spike.md",
+    "prompts/phase-0/T0.07-video-spike.md",
+    "prompts/phase-0/T0.08-sudovda-spike.md",
+    "prompts/phase-0/T0.09-image-spike.md",
+    "prompts/phase-0/T0.10-stroke-spike.md",
+    "prompts/phase-0/T0.11-gpt-image-spike.md",
+    "prompts/phase-0/T0.12-gate-g0.md",
+    "prompts/phase-1/T1.01-vw-geom.md",
+    "prompts/phase-1/T1.02-model-ops.md",
+    "prompts/phase-1/T1.03-vw-store.md",
+    "prompts/phase-1/T1.04-vw-ink.md",
+    "prompts/phase-1/T1.05-vw-raster.md",
+    "prompts/phase-1/T1.06a-transport.md",
+    "prompts/phase-1/T1.06b-pairing.md",
+    "prompts/phase-1/T1.07-ffi-shared.md",
+    "prompts/phase-1/T1.08a-android-canvas.md",
+    "prompts/phase-1/T1.08b-android-tools.md",
+    "prompts/phase-1/T1.09-desktop-shell.md",
+    "prompts/phase-1/T1.10-live-sync.md",
+    "prompts/phase-1/T1.11-import-export.md",
+    "prompts/phase-1/T1.12-phase1-acceptance.md",
+    "tools/check_plan_coverage.py",
+    "tools/diagnostics/pc-diagnostics.ps1",
+    "tools/diagnostics/phone-diagnostics.ps1"
+  ],
+  "authorized_active_supplements_or_status_updates": [
+    "docs/REQUIREMENTS.json",
+    "docs/TOOLCHAIN.md",
+    "README.md"
+  ],
+  "requirements_updated": [
+    "DEV-001",
+    "DEV-002",
+    "LIC-001",
+    "LIC-002",
+    "QUALITY-007",
+    "SEC-004"
+  ],
+  "requirement_fields_updated": [
+    "impl_status",
+    "verify_status",
+    "evidence"
+  ],
+  "other_requirement_records_unchanged": 183,
+  "source_clauses_and_scenarios_unchanged": true,
+  "screenshots_created": 0
+}

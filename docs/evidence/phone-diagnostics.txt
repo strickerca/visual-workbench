@@ -1,0 +1,79 @@
+{
+    "schema_version":  2,
+    "collected_utc":  "2026-10-01T23:45:00.6605446Z",
+    "read_only":  true,
+    "shared_device":  true,
+    "foreground_changed":  false,
+    "model":  "IN2019",
+    "manufacturer":  "OnePlus",
+    "android_release":  "11",
+    "api_level":  "30",
+    "build_id":  "RP1A.201005.001",
+    "security_patch":  "2023-02-01",
+    "one_ui":  "untestable: property absent or outside allowlist",
+    "chipset":  "kona",
+    "target_s23":  "untestable: target S23 Ultra not connected; connected IN2019 is authorized for startup only",
+    "display_sizes":  [
+                          {
+                              "type":  "Physical",
+                              "width":  1080,
+                              "height":  2400
+                          }
+                      ],
+    "display_densities":  [
+                              {
+                                  "type":  "Physical",
+                                  "dpi":  450
+                              }
+                          ],
+    "display_modes":  [
+                          {
+                              "width":  1080,
+                              "height":  2400,
+                              "refresh_hz":  60
+                          },
+                          {
+                              "width":  1080,
+                              "height":  2400,
+                              "refresh_hz":  90
+                          }
+                      ],
+    "display_probe_status":  "readable",
+    "pen_devices":  [
+
+                    ],
+    "pen_probe_status":  "readable",
+    "pen_behavior":  "untestable: no physical S Pen traces; static axes do not establish pressure, hover, tilt or rate behavior",
+    "codec_vendor_declarations":  [
+                                      "c2.android.av1.decoder",
+                                      "c2.android.avc.decoder",
+                                      "c2.android.avc.encoder",
+                                      "c2.android.hevc.decoder",
+                                      "c2.android.hevc.encoder",
+                                      "c2.android.vp9.decoder",
+                                      "c2.android.vp9.encoder",
+                                      "OMX.google.h264.decoder",
+                                      "OMX.google.h264.encoder",
+                                      "OMX.google.hevc.decoder",
+                                      "OMX.google.vp9.decoder",
+                                      "OMX.google.vp9.encoder",
+                                      "OMX.qcom.video.decoder.avc",
+                                      "OMX.qcom.video.decoder.avc.secure",
+                                      "OMX.qcom.video.decoder.hevc",
+                                      "OMX.qcom.video.decoder.hevc.secure",
+                                      "OMX.qcom.video.decoder.vp9",
+                                      "OMX.qcom.video.decoder.vp9.secure",
+                                      "OMX.qcom.video.encoder.avc",
+                                      "OMX.qcom.video.encoder.hevc",
+                                      "OMX.qcom.video.encoder.hevc.cq"
+                                  ],
+    "codec_probe_status":  "readable",
+    "codec_execution":  "untestable: XML names do not establish hardware acceleration, low-latency support or 4:4:4 output; MediaCodec capability/processing probes pending",
+    "battery":  {
+                    "temperature_c":  28.4,
+                    "level_percent":  100,
+                    "ten_minute_baseline_recorded":  false,
+                    "status":  "readable"
+                },
+    "app_version":  "0.0.1-dev"
+}

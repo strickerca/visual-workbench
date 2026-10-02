@@ -1,0 +1,181 @@
+{
+  "verified_on": "2026-09-22",
+  "evidence_type": "official_documentation_inspection_not_hardware_validation",
+  "sources": [
+    {
+      "id": "S01",
+      "publisher": "Intel",
+      "url": "https://www.intel.com/content/www/us/en/support/articles/000020962/graphics.html",
+      "verified_claim": "Integrated graphics shares system memory; a reported 128 MB dedicated figure can be a compatibility value.",
+      "boundary": "Not a benchmark or assurance of available memory."
+    },
+    {
+      "id": "S02",
+      "publisher": "Adobe",
+      "url": "https://helpx.adobe.com/photoshop/system-requirements.html",
+      "verified_claim": "Photoshop disk and memory requirements distinguish installation minimum from recommended working space.",
+      "boundary": "Installed Photoshop version and actual workload remain unmeasured."
+    },
+    {
+      "id": "S03",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/develop/ui/compose/touch-input/stylus-input/advanced-stylus-features",
+      "verified_claim": "Pressure, hover, tilt/orientation, and palm/input cancellation handling are documented.",
+      "boundary": "Actual event sequences require S23 Ultra testing."
+    },
+    {
+      "id": "S04",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/jetpack/androidx/releases/ink",
+      "verified_claim": "Release table: stable 1.0.0 and preview 1.1.0-alpha08, latest update September 9, 2026.",
+      "boundary": "Preview examples are not a stable-release recommendation."
+    },
+    {
+      "id": "S05",
+      "publisher": "Samsung Developer",
+      "url": "https://developer.samsung.com/galaxy-spen-remote/air-actions.html",
+      "verified_claim": "Declarative Air Actions map predefined pen gestures to Android KeyEvents for the foreground app.",
+      "boundary": "One UI configuration and actual pen event routing require tests."
+    },
+    {
+      "id": "S06",
+      "publisher": "Samsung Developer",
+      "url": "https://developer.samsung.com/galaxy-spen-remote/faq.html",
+      "verified_claim": "App actions need enablement; foreground restrictions apply; predefined gestures should use Air Actions rather than raw sensor recognition.",
+      "boundary": "No global/background gesture interception promise."
+    },
+    {
+      "id": "S07",
+      "publisher": "Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-injectsyntheticpointerinput",
+      "verified_claim": "Native synthetic pointer API supports pen input.",
+      "boundary": "Individual target editors must accept the resulting path; this is not a virtual-display driver."
+    },
+    {
+      "id": "S08",
+      "publisher": "Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput",
+      "verified_claim": "Mouse/keyboard injection is restricted by process integrity levels.",
+      "boundary": "No security bypass or target-application compatibility guarantee."
+    },
+    {
+      "id": "S09",
+      "publisher": "Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/display/indirect-display-driver-model-overview",
+      "verified_claim": "UMDF/IddCx supports indirect display endpoints and provides DirectX surfaces.",
+      "boundary": "Reference/sample architecture is not a signed production driver."
+    },
+    {
+      "id": "S10",
+      "publisher": "Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/dashboard/code-signing-reqs",
+      "verified_claim": "Hardware dashboard driver submission/signing requirements include an associated EV certificate.",
+      "boundary": "Exact chosen driver distribution path still needs implementation and testing."
+    },
+    {
+      "id": "S11",
+      "publisher": "Adobe",
+      "url": "https://helpx.adobe.com/photoshop/kb/tablet-support-faq-photoshop.html",
+      "verified_claim": "Photoshop documents Windows Ink/WinTab and pressure settings, and limits official third-party tablet support.",
+      "boundary": "Custom pen bridge is not Adobe-certified or tested yet."
+    },
+    {
+      "id": "S12",
+      "publisher": "Adobe",
+      "url": "https://helpx.adobe.com/photoshop/using/viewing-multiple-images.html",
+      "verified_claim": "Photoshop supports multiple windows of the same image with independently managed views.",
+      "boundary": "Remote window placement and input need integration testing."
+    },
+    {
+      "id": "S13",
+      "publisher": "Adobe",
+      "url": "https://helpx.adobe.com/illustrator/using/viewing-artwork.html",
+      "verified_claim": "Illustrator supports multiple windows of one document at different view settings.",
+      "boundary": "No equivalent Paint capability is asserted."
+    },
+    {
+      "id": "S14",
+      "publisher": "Adobe Developer",
+      "url": "https://developer.adobe.com/photoshop/uxp/2022/ps-reference/media/imaging",
+      "verified_claim": "Imaging APIs expose pixels, masks and selections, including bounds, profile/depth and cached-pyramid semantics.",
+      "boundary": "API availability does not prove our plugin is implemented or that Illustrator exposes the same API."
+    },
+    {
+      "id": "S15",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/reference/android/graphics/BitmapRegionDecoder",
+      "verified_claim": "Bitmap region decoding is an Android capability.",
+      "boundary": "Codec-specific limits and memory behavior need testing."
+    },
+    {
+      "id": "S16",
+      "publisher": "libvips project",
+      "url": "https://www.libvips.org/",
+      "verified_claim": "A demand-driven image-processing foundation with emphasis on bounded memory.",
+      "boundary": "Candidate dependency, not a selected tested version or unlimited-format promise."
+    },
+    {
+      "id": "S17",
+      "publisher": "Google Developers",
+      "url": "https://developers.google.com/speed/webp/faq",
+      "verified_claim": "WebP has a maximum dimension of 16,383 pixels per side.",
+      "boundary": "Other formats also need separate preflight; no silent resizing."
+    },
+    {
+      "id": "S18",
+      "publisher": "PDFium project",
+      "url": "https://pdfium.googlesource.com/pdfium/",
+      "verified_claim": "Primary PDF rendering source project for evaluation.",
+      "boundary": "No claim of an implemented PDF editing/redaction pipeline."
+    },
+    {
+      "id": "S19",
+      "publisher": "resvg project",
+      "url": "https://github.com/linebender/resvg",
+      "verified_claim": "Primary SVG renderer source project for evaluation.",
+      "boundary": "Format fidelity, allowed resources and licenses require review."
+    },
+    {
+      "id": "S20",
+      "publisher": "OpenAI",
+      "url": "https://developers.openai.com/codex/mcp",
+      "verified_claim": "Codex exposes an MCP integration route.",
+      "boundary": "Not a universal push-message endpoint into arbitrary existing chats."
+    },
+    {
+      "id": "S21",
+      "publisher": "OpenAI",
+      "url": "https://developers.openai.com/codex/app-server",
+      "verified_claim": "App Server supports embedding Codex with structured session interaction.",
+      "boundary": "No currently installed account/session integration has been tested."
+    },
+    {
+      "id": "S22",
+      "publisher": "Android Open Source Project",
+      "url": "https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/docs/user/adb.1.md",
+      "verified_claim": "ADB forwarding/reversing supports TCP/socket connections and explicit pairing facilities.",
+      "boundary": "UDP/WebRTC media cannot be assumed to work through an ordinary TCP reverse mapping."
+    },
+    {
+      "id": "S23",
+      "publisher": "Genymobile / scrcpy project",
+      "url": "https://github.com/Genymobile/scrcpy",
+      "verified_claim": "Official Android mirroring/control implementation, USB/network and no-root foundation.",
+      "boundary": "Personal debugging authorization and version compatibility remain required."
+    },
+    {
+      "id": "S24",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/media/grow/media-projection",
+      "verified_claim": "MediaProjection documents screen/app capture consent and lifecycle requirements.",
+      "boundary": "Protected content and session revocation must be respected."
+    },
+    {
+      "id": "S25",
+      "publisher": "Microsoft Learn",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-pointer_pen_info",
+      "verified_claim": "Pen structure includes pressure, rotation, and tilt values.",
+      "boundary": "Transform/calibration correctness is an application responsibility."
+    }
+  ]
+}

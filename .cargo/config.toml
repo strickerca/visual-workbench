@@ -1,0 +1,11 @@
+[build]
+# Leave memory available for the Kotlin and Gradle processes on the 16 GB laptop.
+jobs = 2
+
+[target.aarch64-linux-android]
+runner = ["tools/android-rust-runner.cmd"]
+# Verify the resulting ELF segment alignment in the Android packaging gate.
+rustflags = [
+    "-C", "link-arg=-Wl,-z,max-page-size=16384",
+    "-C", "link-arg=-Wl,-z,common-page-size=16384",
+]

@@ -1,0 +1,21 @@
+[package]
+name = "vw-hello"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+name = "vw_hello"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "vw-hello-win"
+path = "src/main.rs"
+
+[dependencies]
+vw-ffi = { version = "=0.1.0", path = "../../core/crates/vw-ffi" }

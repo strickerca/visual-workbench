@@ -1,0 +1,60 @@
+{
+  "captures": [
+    {
+      "index": 1,
+      "expected": {
+        "width": 900,
+        "height": 600,
+        "dpi": 168
+      },
+      "capture": {
+        "capture": "selected-window PrintWindow; DWM physical bounds crop",
+        "physical_width": 900,
+        "physical_height": 600,
+        "window_dpi": 168,
+        "scale": 1.75,
+        "per_monitor_v2": true,
+        "raw_window_title_retained": false
+      }
+    },
+    {
+      "index": 2,
+      "expected": {
+        "width": 900,
+        "height": 600,
+        "dpi": 96
+      },
+      "capture": {
+        "capture": "selected-window PrintWindow; DWM physical bounds crop",
+        "physical_width": 900,
+        "physical_height": 600,
+        "window_dpi": 96,
+        "scale": 1,
+        "per_monitor_v2": true,
+        "raw_window_title_retained": false
+      }
+    }
+  ],
+  "rejected": [
+    {
+      "error": "diag-win: Screenshot requires one visible matching window; found 2",
+      "case": "ambiguous",
+      "exit_code": 1
+    },
+    {
+      "error": "diag-win: Screenshot requires one visible matching window; found 0",
+      "case": "missing",
+      "exit_code": 1
+    },
+    {
+      "error": "diag-win: Screenshot output unavailable or already exists",
+      "case": "existing-output",
+      "exit_code": 1
+    },
+    {
+      "error": "diag-win: Verification screenshots must stay outside the repository",
+      "case": "repository-output",
+      "exit_code": 1
+    }
+  ]
+}

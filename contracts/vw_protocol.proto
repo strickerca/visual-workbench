@@ -1,0 +1,744 @@
+// Visual Workbench wire protocol — DRAFT v1 (2026-10-01).
+// Finalized in task T1.06a (pairing messages in T1.06b). Both ends are the Rust core (vw-proto, prost), so the
+// schema is Rust-to-Rust; Kotlin never parses these messages directly.
+//
+// Rules:
+// - Additive changes only within a major version; retired field numbers become `reserved`.
+// - A peer MUST NOT re-encode messages from a newer minor version (unknown fields are dropped by prost).
+// - Major version mismatch at Hello -> refuse with an upgrade message.
+// - Coordinates: D = document space (f64, y-down), F = capture frame pixels. See BUILD_SPECIFICATION §4.2.
+
+syntax = "proto3";
+
+package vw.v1;
+
+// ---------------------------------------------------------------------------
+// Envelope and channels
+// ---------------------------------------------------------------------------
+
+enum Channel {
+  CHANNEL_UNSPECIFIED = 0;
+  CHANNEL_CONTROL = 1;    // hello, ping, clock sync, session state, grants
+  CHANNEL_OPS = 2;        // transactions, acks, rebase/sync
+  CHANNEL_EPHEMERAL = 3;  // gestures, cursor, viewport outline (latest-only)
+  CHANNEL_BLOB = 4;       // assets, tiles (windowed, prioritized)
+  CHANNEL_MEDIA = 5;      // frame tiles, video (latest-frame)
+  CHANNEL_INPUT = 6;      // remote input (never replayed across reconnects)
+}
+
+message Envelope {
+  Channel channel = 1;
+  uint64 seq = 2;  // per-channel, per-sender sequence
+  oneof body {
+    Hello hello = 10;
+    HelloAck hello_ack = 11;
+    Ping ping = 12;
+    Pong pong = 13;
+    SessionState session_state = 14;
+    GrantRequest grant_request = 15;
+    GrantUpdate grant_update = 16;
+    PairingProof pairing_proof = 17;
+    PakeMessage pake_message = 18;
+    PairingResult pairing_result = 19;
+
+    Transaction txn = 20;
+    TxnAck txn_ack = 21;
+    TxnReject txn_reject = 22;
+    SyncRequest sync_request = 23;
+    SyncBatch sync_batch = 24;
+    RebaseNotice rebase_notice = 25;
+    ConflictNotice conflict_notice = 26;
+
+    GestureUpdate gesture_update = 30;
+    GestureCancel gesture_cancel = 31;
+    CursorUpdate cursor_update = 32;
+    ViewportOutline viewport_outline = 33;
+
+    BlobRequest blob_request = 40;
+    BlobChunk blob_chunk = 41;
+    TileRequest tile_request = 42;
+    Tile tile = 43;
+
+    StreamControl stream_control = 50;
+    FrameTiles frame_tiles = 51;
+    VideoFrame video_frame = 52;
+    FreezeRequest freeze_request = 53;
+    LosslessFrame lossless_frame = 54;
+
+    InputEvent input_event = 60;
+    InputStatus input_status = 61;
+
+    OpenProject open_project = 70;  // CONTROL
+
+    ErrorMsg error = 90;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Common types
+// ---------------------------------------------------------------------------
+
+message Uuid { bytes value = 1; }  // 16 bytes, UUIDv7
+
+message OpId {
+  string device_id = 1;  // Crockford base32, 128-bit random
+  uint64 lamport = 2;
+}
+
+message Revision {
+  uint64 host_seq = 1;
+  bytes state_hash = 2;  // 32-byte BLAKE3
+}
+
+message PointD { double x = 1; double y = 2; }
+message RectD { double x = 1; double y = 2; double w = 3; double h = 4; }
+message RectI { int32 x = 1; int32 y = 2; int32 w = 3; int32 h = 4; }
+
+message Affine {  // [a c e; b d f; 0 0 1]
+  double a = 1; double b = 2; double c = 3; double d = 4; double e = 5; double f = 6;
+}
+
+message Color { uint32 rgba = 1; }  // sRGB, 8 bits per channel, non-premultiplied
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_NONE = 1;
+  ROLE_CHANGE = 2;
+  ROLE_PRESERVE = 3;
+  ROLE_REFERENCE = 4;
+  ROLE_EXPLAIN = 5;
+}
+
+// ---------------------------------------------------------------------------
+// CONTROL
+// ---------------------------------------------------------------------------
+
+enum Platform {
+  PLATFORM_UNSPECIFIED = 0;
+  PLATFORM_ANDROID = 1;
+  PLATFORM_WINDOWS = 2;
+  PLATFORM_IOS = 3;  // reserved for the future iPad app
+}
+
+enum Carrier {
+  CARRIER_UNSPECIFIED = 0;
+  CARRIER_QUIC_TETHER = 1;
+  CARRIER_QUIC_WIFI = 2;
+  CARRIER_TCP_ADB = 3;
+}
+
+message Hello {
+  uint32 protocol_major = 1;
+  uint32 protocol_minor = 2;
+  string device_id = 3;
+  Platform platform = 4;
+  string app_version = 5;
+  repeated string capabilities = 6;  // e.g. "frame_tiles", "video_hevc", "remote_input", "ghost_ink"
+  string device_label = 7;           // user-chosen label only; never a hardware or account identifier
+}
+
+message HelloAck {
+  bool accepted = 1;
+  uint32 protocol_minor = 2;
+  repeated string capabilities = 3;
+  string reason = 4;  // set when not accepted
+}
+
+message Ping { uint64 nonce = 1; int64 t_sent_ns = 2; }
+
+message Pong {
+  uint64 nonce = 1;
+  int64 t_sent_ns = 2;   // echoed
+  int64 t_recv_ns = 3;   // responder clock
+  int64 t_reply_ns = 4;  // responder clock
+}
+
+// Phone -> host: open (or create on the host) the mirror of a project, including one the phone
+// created offline. The host answers with SessionState.open_project_id and then SyncBatch/BLOB traffic.
+message OpenProject {
+  Uuid project_id = 1;
+  string title = 2;
+  string created_by_device = 3;
+  bool create_if_missing = 4;
+}
+
+message SessionState {
+  Carrier carrier = 1;
+  int64 connected_since_ms = 2;
+  Uuid open_project_id = 3;
+  Revision host_revision = 4;
+}
+
+enum Capability {
+  CAPABILITY_UNSPECIFIED = 0;
+  CAPABILITY_VIEW_CANVAS = 1;
+  CAPABILITY_EDIT_CANVAS = 2;
+  CAPABILITY_VIEW_SCREEN = 3;
+  CAPABILITY_REMOTE_INPUT = 4;
+  CAPABILITY_FILE_TRANSFER = 5;
+  CAPABILITY_AI_SEND = 6;
+  CAPABILITY_AGENT_CAPTURE = 7;
+}
+
+message GrantRequest {
+  Capability capability = 1;
+  Uuid scope_project_id = 2;
+  string reason = 3;
+}
+
+enum GrantState {
+  GRANT_STATE_UNSPECIFIED = 0;
+  GRANT_STATE_GRANTED = 1;
+  GRANT_STATE_PAUSED = 2;
+  GRANT_STATE_REVOKED = 3;
+  GRANT_STATE_EXPIRED = 4;
+  GRANT_STATE_DENIED = 5;
+}
+
+message GrantUpdate {
+  Capability capability = 1;
+  GrantState state = 2;
+  Uuid input_session_id = 3;  // set for CAPABILITY_REMOTE_INPUT
+  int64 expires_at_ms = 4;
+  string reason = 5;
+}
+
+// Pairing (BUILD_SPECIFICATION §4.7). Runs inside TLS 1.3; key material never leaves the device's
+// app-level trust store, and nothing here is written into project files.
+message PairingProof {
+  // QR path: HMAC-SHA256(secret, TLS exporter value with label "EXPORTER-vw-pairing").
+  bytes hmac = 1;
+  string device_id = 2;
+  Platform platform = 3;
+  string device_label = 4;    // user-chosen label only
+  bytes certificate_der = 5;  // the phone's self-signed certificate, pinned by the PC on success
+}
+
+message PakeMessage {
+  // Code path: PAKE (SPAKE2 or CPace) messages bound to the TLS exporter. No value derived from the
+  // code is sent before the key exchange. Codes are single-use, expire after 5 minutes, and pairing
+  // locks for 10 minutes after 5 failures (SEC-003).
+  uint32 step = 1;
+  bytes payload = 2;
+}
+
+message PairingResult {
+  bool paired = 1;
+  string reason = 2;                 // set when not paired: expired | used | locked_out | bad_proof
+  string pc_fingerprint_sha256 = 3;  // shown on both devices for confirmation on the code path
+  bytes certificate_der = 4;         // the PC certificate (already pinned from the QR on the QR path)
+}
+
+// ---------------------------------------------------------------------------
+// OPS — transactions
+// ---------------------------------------------------------------------------
+
+message Transaction {
+  Uuid txn_id = 1;
+  string device_id = 2;
+  Revision base_revision = 3;
+  repeated Op ops = 4;
+  Uuid gesture_id = 5;         // optional: lets the receiver swap provisional -> committed
+  int64 created_at_wall_ms = 6;
+  Uuid project_id = 7;
+}
+
+message Op {
+  OpId op_id = 1;
+  oneof kind {
+    CreateDocument create_document = 10;
+    UpdateDocument update_document = 11;
+    AddAsset add_asset = 12;
+    CreateLayer create_layer = 13;
+    UpdateLayer update_layer = 14;
+    DeleteLayer delete_layer = 15;
+    CreateObject create_object = 16;
+    SetProperty set_property = 17;
+    DeleteObject delete_object = 18;
+    Reorder reorder = 19;
+    Group group = 20;
+    Ungroup ungroup = 21;
+    SetInstruction set_instruction = 22;
+    DeleteInstruction delete_instruction = 23;
+    AddSemanticSnapshot add_semantic_snapshot = 24;
+    AddResult add_result = 25;
+    UpdateResult update_result = 26;
+    MaskOp mask_op = 27;
+  }
+}
+
+enum DocumentKind {
+  DOCUMENT_KIND_UNSPECIFIED = 0;
+  DOCUMENT_KIND_IMAGE = 1;
+  DOCUMENT_KIND_PDF = 2;
+  DOCUMENT_KIND_SVG = 3;
+  DOCUMENT_KIND_CAPTURE = 4;
+  DOCUMENT_KIND_TIMELINE = 5;  // reserved (HOOK-001); not implemented in this release
+}
+
+message CreateDocument {
+  Uuid document_id = 1;
+  DocumentKind kind = 2;
+  uint32 schema_version = 3;
+  string title = 4;
+  string primary_asset_id = 5;  // BLAKE3 hex
+  CaptureInfo capture = 6;      // set for DOCUMENT_KIND_CAPTURE
+}
+
+message CaptureInfo {
+  Uuid capture_session_id = 1;
+  uint64 frame_id = 2;
+  CaptureGeometry geometry = 3;
+  string platform = 4;      // windows | android
+  string app_name = 5;
+  string window_title = 6;  // stored locally; packages include it only when the owner opts in
+  bool lossless = 7;
+  bool degraded = 8;        // freeze fell back to the compressed frame (BUILD_SPECIFICATION §4.18)
+  int64 captured_at_ms = 9;
+}
+
+message UpdateDocument {
+  Uuid document_id = 1;
+  string title = 2;
+}
+
+message AddAsset {
+  string asset_id = 1;  // BLAKE3 hex of original bytes; bytes travel on CHANNEL_BLOB
+  string format = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+  uint32 orientation = 5;  // EXIF 1..8
+  uint32 bit_depth = 6;
+  bool has_alpha = 7;
+  string color_space = 8;
+  bytes icc_profile = 9;
+  uint64 byte_size = 10;
+  string source = 11;  // camera | import | capture | ai_result
+  int64 captured_at_ms = 12;
+  string metadata_json = 13;  // whitelisted metadata only (no location, serials or account data)
+}
+
+message CreateLayer {
+  Uuid layer_id = 1;
+  Uuid document_id = 2;
+  int32 page_index = 3;  // -1 when not a PDF page
+  string name = 4;
+  string kind = 5;       // annotation | mask | result | adjustment
+  string order_key = 6;  // fractional index
+}
+
+message UpdateLayer {
+  Uuid layer_id = 1;
+  optional string name = 2;
+  optional string order_key = 3;
+  optional bool visible = 4;
+  optional bool locked = 5;
+  optional float opacity = 6;
+  optional string blend = 7;  // normal | multiply
+}
+
+message DeleteLayer { Uuid layer_id = 1; }
+
+message Style {
+  Color stroke = 1;
+  double width = 2;
+  bool screen_constant_width = 3;
+  Color fill = 4;
+  bool has_fill = 5;
+}
+
+message Brush {
+  string family = 1;  // pen | marker | highlighter | vector_eraser
+  uint32 algorithm_version = 2;
+  double base_width = 3;
+  repeated double pressure_curve = 4;  // 8 values: 4 Bezier control points (x,y)
+  float stabilization = 5;             // 0..1
+}
+
+message Stroke {
+  // Parallel arrays (same length). D-space coordinates.
+  repeated double x = 1;
+  repeated double y = 2;
+  repeated uint32 t_ms = 3;
+  repeated float pressure = 4;     // normalized 0..1
+  repeated float tilt = 5;         // radians (Android AXIS_TILT); empty when the device has no tilt
+  repeated float orientation = 6;  // radians (Android AXIS_ORIENTATION); empty when unavailable.
+                                   // Conversion to Windows tiltX/tiltY: BUILD_SPECIFICATION §4.11.
+  Brush brush = 7;
+}
+
+message Polyline { repeated PointD points = 1; bool closed = 2; }
+
+message TextObject {
+  string text = 1;
+  string font_family = 2;  // bundled fonts only
+  double font_size = 3;    // D units
+  PointD anchor = 4;
+}
+
+message Marker {
+  uint32 number = 1;
+  PointD point = 2;
+  RectD box = 3;  // optional box; zero size when a point marker
+  repeated string element_eids = 4;
+}
+
+message RasterMaskRef {
+  string mask_asset_id = 1;  // tiled 8-bit mask stored as a blob
+  RectD bounds = 2;
+  double feather = 3;
+}
+
+message Adjustment {
+  // Nondestructive tonal adjustment (EDIT-009): parameters only, never baked into originals.
+  double brightness = 1;       // -1..1
+  double contrast = 2;         // -1..1
+  repeated double levels = 3;  // [in_black, in_white, gamma, out_black, out_white]
+}
+
+message ObjectState {
+  Uuid object_id = 1;
+  Uuid layer_id = 2;
+  string order_key = 3;
+  Affine transform = 4;
+  Style style = 5;
+  Role role = 6;
+  Uuid group_id = 7;
+  bool locked = 8;
+  bool hidden = 9;
+  string created_by = 10;
+  int64 created_at_ms = 11;
+  oneof shape {
+    Stroke stroke = 20;
+    Polyline line = 21;    // two points
+    Polyline arrow = 22;   // two or more points
+    RectD rect = 23;
+    RectD ellipse = 24;
+    Polyline polygon = 25;
+    TextObject text = 26;
+    Marker marker = 27;
+    Polyline selection_vector = 28;
+    RasterMaskRef selection_raster = 29;
+    RectD crop = 30;
+    Uuid result_id = 31;
+    Adjustment adjustment = 32;
+  }
+}
+
+message CreateObject { Uuid document_id = 1; ObjectState state = 2; }
+
+message PropertyValue {
+  oneof value {
+    double number = 1;
+    int64 integer = 2;
+    string text = 3;
+    bool flag = 4;
+    bytes raw = 5;
+    Color color = 6;
+    Affine transform = 7;
+    Style style = 8;
+    Role role = 9;
+  }
+}
+
+message SetProperty {
+  Uuid object_id = 1;
+  string property = 2;  // dotted path, e.g. "style.stroke", "transform", "role"
+  PropertyValue value = 3;
+}
+
+message DeleteObject { Uuid object_id = 1; }
+
+message Reorder { Uuid object_id = 1; string order_key = 2; Uuid layer_id = 3; }
+
+message Group { Uuid group_id = 1; repeated Uuid object_ids = 2; }
+
+message Ungroup { Uuid group_id = 1; }
+
+message SetInstruction {
+  Uuid instruction_id = 1;
+  Uuid document_id = 2;
+  repeated Uuid target_object_ids = 3;
+  Role role = 4;
+  string text = 5;
+  string entry_method = 6;  // pc_keyboard | phone_keyboard | voice | handwriting
+  string language = 7;
+}
+
+message DeleteInstruction { Uuid instruction_id = 1; }
+
+message AddSemanticSnapshot {
+  Uuid snapshot_id = 1;
+  Uuid document_id = 2;
+  string platform = 3;          // uia | android_ax | chromium_uia
+  int32 frame_delta_ms = 4;
+  bytes elements_json_zstd = 5;  // elements per BUILD_SPECIFICATION §4.3; all text untrusted
+}
+
+message AddResult {
+  Uuid result_id = 1;
+  Uuid document_id = 2;
+  string provider = 3;
+  string model = 4;
+  string request_json = 5;
+  string output_asset_id = 6;
+  string composite_asset_id = 7;
+  string proof_json = 8;   // must record changed_outside == 0
+  string metrics_json = 9;
+  double cost_estimate_usd = 10;
+  Uuid package_id = 11;  // the package the request was compiled from, when there is one
+}
+
+message UpdateResult {
+  Uuid result_id = 1;
+  string status = 2;  // pending | ready | accepted | rejected | partial | error (state mapping: BUILD_SPECIFICATION §4.18)
+  string acceptance_mask_asset_id = 3;
+}
+
+message MaskOp {
+  Uuid output_object_id = 1;
+  string op = 2;  // add | subtract | intersect | invert | expand | shrink | feather
+  repeated Uuid input_object_ids = 3;
+  double amount = 4;  // pixels for expand/shrink/feather
+}
+
+message TxnAck { Uuid txn_id = 1; uint64 host_seq = 2; bytes state_hash = 3; }
+
+message TxnReject {
+  Uuid txn_id = 1;
+  string code = 2;  // e.g. invalid_target, cycle, schema, permission
+  string message = 3;
+}
+
+message SyncRequest { uint64 since_host_seq = 1; Uuid project_id = 2; }
+
+message AckedTransaction { uint64 host_seq = 1; bytes state_hash = 2; Transaction txn = 3; }
+
+message SyncBatch { repeated AckedTransaction txns = 1; bool complete = 2; }
+
+message RebaseNotice {
+  // Host -> phone: these pending transactions were applied on a newer base; the phone re-applies
+  // its remaining pending operations on top of new_base.
+  repeated Uuid txn_ids = 1;
+  Revision new_base = 2;
+}
+
+message ConflictRecord {
+  // Written from Phase 1 (SYNC-001); reviewed and swapped in the Phase 3 UI (SYNC-003).
+  Uuid conflict_id = 1;
+  Uuid object_id = 2;
+  string property = 3;
+  PropertyValue kept_value = 4;
+  PropertyValue other_value = 5;
+  string kept_device = 6;
+  string other_device = 7;
+  int64 created_at_ms = 8;
+  bool delete_vs_edit = 9;        // true when a delete won over an edit
+  ObjectState edited_object = 10; // the edited object kept for restore when delete_vs_edit is true
+}
+
+message ConflictNotice { repeated ConflictRecord conflicts = 1; }
+
+// ---------------------------------------------------------------------------
+// EPHEMERAL
+// ---------------------------------------------------------------------------
+
+enum GestureKind {
+  GESTURE_KIND_UNSPECIFIED = 0;
+  GESTURE_KIND_STROKE = 1;
+  GESTURE_KIND_HANDLE_DRAG = 2;
+  GESTURE_KIND_SELECTION = 3;
+  GESTURE_KIND_SLIDER = 4;
+  GESTURE_KIND_SHAPE = 5;
+}
+
+message GestureUpdate {
+  Uuid gesture_id = 1;
+  uint32 seq = 2;
+  Uuid document_id = 3;
+  GestureKind kind = 4;
+  Stroke stroke_delta = 5;            // samples appended since the previous update
+  repeated PointD handle_positions = 6;
+  double slider_value = 7;
+  ObjectState preview_state = 8;      // for shapes and handle drags
+}
+
+message GestureCancel { Uuid gesture_id = 1; string reason = 2; }
+
+message CursorUpdate {
+  Uuid document_id = 1;
+  PointD position = 2;
+  bool hovering = 3;
+  string tool = 4;
+}
+
+message ViewportOutline {
+  Uuid document_id = 1;
+  repeated PointD corners = 2;  // four corners in D
+}
+
+// ---------------------------------------------------------------------------
+// BLOB
+// ---------------------------------------------------------------------------
+
+message BlobRequest { string asset_id = 1; uint64 offset = 2; uint64 length = 3; uint32 priority = 4; }
+
+message BlobChunk {
+  string asset_id = 1;
+  uint64 offset = 2;
+  bytes data = 3;
+  uint64 total_size = 4;
+  bool last = 5;
+}
+
+message TileRequest {
+  string asset_id = 1;
+  uint32 level = 2;  // 0 = full resolution
+  uint32 tx = 3;
+  uint32 ty = 4;
+  uint32 priority = 5;
+}
+
+message Tile {
+  string asset_id = 1;
+  uint32 level = 2;
+  uint32 tx = 3;
+  uint32 ty = 4;
+  string format = 5;  // webp_lossless | jpeg
+  bytes data = 6;
+}
+
+// ---------------------------------------------------------------------------
+// MEDIA
+// ---------------------------------------------------------------------------
+
+message CaptureGeometry {
+  string source_kind = 1;      // window | monitor | region | virtual_display
+  uint64 window_handle = 2;
+  string monitor_id = 3;
+  RectI client_rect_host = 4;  // Windows virtual-screen physical pixels (H)
+  double dpi_scale = 5;
+  uint32 geometry_revision = 6;
+  int64 timestamp_ns = 7;
+}
+
+message StreamControl {
+  Uuid capture_session_id = 1;
+  string action = 2;  // start | stop | pause
+  string source_kind = 3;
+  uint64 window_handle = 4;
+  string monitor_id = 5;
+  uint32 max_width = 6;
+  uint32 max_height = 7;
+  uint32 target_fps = 8;
+  string mode = 9;  // frame_tiles | video_hevc
+}
+
+message TileImage {
+  RectI rect = 1;     // in F
+  string format = 2;  // jpeg | webp_lossless | qoi
+  bytes data = 3;
+}
+
+message FrameTiles {
+  Uuid capture_session_id = 1;
+  uint64 frame_id = 2;
+  CaptureGeometry geometry = 3;
+  uint32 width = 4;
+  uint32 height = 5;
+  bool keyframe = 6;  // true = tiles cover the full frame
+  repeated TileImage tiles = 7;
+  int64 timestamp_ns = 8;
+  uint64 last_input_seq_applied = 9;  // drives ghost-ink fading (§4.11); 0 when no remote input
+}
+
+message VideoFrame {
+  Uuid capture_session_id = 1;
+  uint64 frame_id = 2;
+  CaptureGeometry geometry = 3;
+  string codec = 4;  // hevc | h264
+  bool keyframe = 5;
+  int64 pts_ns = 6;
+  bytes annexb = 7;
+  uint64 last_input_seq_applied = 8;  // drives ghost-ink fading (§4.11); 0 when no remote input
+}
+
+message FreezeRequest { Uuid capture_session_id = 1; uint64 frame_id = 2; }
+
+message LosslessFrame {
+  Uuid capture_session_id = 1;
+  uint64 frame_id = 2;
+  CaptureGeometry geometry = 3;
+  bool available = 4;  // false when the frame left the ring buffer
+  string format = 5;   // png | qoi
+  bytes data = 6;      // or empty with asset_id set for blob transfer
+  string asset_id = 7;
+}
+
+// ---------------------------------------------------------------------------
+// INPUT — never replayed across reconnects
+// ---------------------------------------------------------------------------
+
+enum PenPhase {
+  PEN_PHASE_UNSPECIFIED = 0;
+  PEN_PHASE_HOVER = 1;
+  PEN_PHASE_DOWN = 2;
+  PEN_PHASE_MOVE = 3;
+  PEN_PHASE_UP = 4;
+  PEN_PHASE_CANCEL = 5;
+}
+
+message PenEvent {
+  PenPhase phase = 1;
+  double x = 2;  // F space
+  double y = 3;
+  float pressure = 4;  // 0..1 after the owner's curve
+  float tilt_x = 5;    // degrees, -90..90; positive = tilted right (converted per §4.11)
+  float tilt_y = 6;    // degrees, -90..90; positive = tilted toward the user
+  float rotation = 7;  // degrees, 0..359; 0 unless the stylus reports barrel twist
+  bool barrel = 8;
+  bool eraser = 9;
+  int64 t_ns = 10;
+}
+
+message MouseEvent {
+  double x = 1;  // F space
+  double y = 2;
+  uint32 buttons = 3;  // bitmask
+  int32 wheel_delta = 4;
+  int64 t_ns = 5;
+}
+
+message KeyEvent {
+  uint32 virtual_key = 1;
+  uint32 scan_code = 2;
+  bool down = 3;
+  uint32 modifiers = 4;
+  string text = 5;  // for text input; empty for shortcuts
+}
+
+message InputEvent {
+  Uuid input_session_id = 1;
+  Uuid capture_session_id = 2;
+  uint32 geometry_revision = 3;
+  uint64 input_seq = 4;  // increments per event within the input session
+  oneof event {
+    PenEvent pen = 10;
+    MouseEvent mouse = 11;
+    KeyEvent key = 12;
+  }
+}
+
+message InputStatus {
+  Uuid input_session_id = 1;
+  string state = 2;   // active | paused | rejected
+  string reason = 3;  // e.g. target_changed, geometry_stale, elevated_target, session_expired
+}
+
+// ---------------------------------------------------------------------------
+
+message ErrorMsg {
+  string code = 1;
+  string message = 2;
+  bool retryable = 3;
+}

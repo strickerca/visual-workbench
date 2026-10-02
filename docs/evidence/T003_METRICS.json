@@ -1,0 +1,570 @@
+{
+  "task": "T0.03",
+  "date": "2026-10-01",
+  "status": "PASS WITH GAPS",
+  "model": "gpt-6.1-sol",
+  "reasoning_effort": "high",
+  "task_size": "S",
+  "next_task": {
+    "id": "T0.04",
+    "title": "Pen probe app and trace recorder",
+    "model": "gpt-6-astra",
+    "reasoning_effort": "xhigh",
+    "task_size": "M"
+  },
+  "passed_receipts": [
+    {
+      "phase": "test-tools",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 3.354,
+      "sampled_peak_tree_working_set_bytes": 31731712,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "test-tools-cc5a8519322a4f90bc8d31f5b823a0fc.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "test-rust",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 10.467,
+      "sampled_peak_tree_working_set_bytes": 61304832,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "test-rust-429d9a36774645ed8c7586d894463509.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "test-kotlin",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 115.239,
+      "sampled_peak_tree_working_set_bytes": 1172721664,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "test-kotlin-cc13a1c7d9f444288bb78d9f1943d96c.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "lint-setup",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 0.796,
+      "sampled_peak_tree_working_set_bytes": 9183232,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "lint-setup-5ba3216644924bc29f7ba89022abf260.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    {
+      "phase": "lint-plan",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 0.277,
+      "sampled_peak_tree_working_set_bytes": 2723840,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "lint-plan-aac67e26b3d6409195065afb37d99907.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    {
+      "phase": "lint-rust-format",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 1.327,
+      "sampled_peak_tree_working_set_bytes": 2056192,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "lint-rust-format-f5388661cba445d9aea416d0043f1a13.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    {
+      "phase": "lint-rust-clippy",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 1.8,
+      "sampled_peak_tree_working_set_bytes": 2707456,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "lint-rust-clippy-d505d0ceb74b4e97b5781b14adce6bfa.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    {
+      "phase": "lint-secrets",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 5.882,
+      "sampled_peak_tree_working_set_bytes": 75943936,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "lint-secrets-891331dd16ff4c5ea2e4a5c26d916761.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    {
+      "phase": "lint-kotlin",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 83.084,
+      "sampled_peak_tree_working_set_bytes": 1448763392,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "lint-kotlin-7de455a5dac64261993e1f535c00764b.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 20
+    },
+    {
+      "phase": "license-offline-policy",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 0.351,
+      "sampled_peak_tree_working_set_bytes": 14589952,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "license-offline-policy-f6d1e8eda9aa4a958e1aa036d389bb36.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "license-cargo-deny-version",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 1.039,
+      "sampled_peak_tree_working_set_bytes": 2711552,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 30,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "license-cargo-deny-version-cb96a3197c0249649eaa640109ea99b3.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "license-rust",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 0.658,
+      "sampled_peak_tree_working_set_bytes": 2707456,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "license-rust-b83f58cba93149a39c2cf34d53606d52.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "license-gradle",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 36.822,
+      "sampled_peak_tree_working_set_bytes": 642715648,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "license-gradle-a61060d36d50465c8fce536852051344.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "t003-final-diag-tests",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 6.989,
+      "sampled_peak_tree_working_set_bytes": 58048512,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 180,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-final-diag-tests-f4a68f71059f4d81bf8cb445e3f9d6db.log",
+      "surviving_processes_before_cleanup": [
+        {
+          "pid": 13168,
+          "name": "vctip"
+        }
+      ],
+      "compiler_telemetry_cleaned": true
+    },
+    {
+      "phase": "t003-final-build-after-lint",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 7.364,
+      "sampled_peak_tree_working_set_bytes": 86503424,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 180,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-final-build-after-lint-84cac010cfe64b25bf20626631d351cd.log",
+      "surviving_processes_before_cleanup": [
+        {
+          "pid": 11484,
+          "name": "vctip"
+        }
+      ],
+      "compiler_telemetry_cleaned": true
+    },
+    {
+      "phase": "t003-final-runner-regressions",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 15.04,
+      "sampled_peak_tree_working_set_bytes": 274702336,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 40,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-final-runner-regressions-fd5ba72102354d9fbfca2a34a508c7e5.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    {
+      "phase": "t003-pc-diagnostics",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 8.828,
+      "sampled_peak_tree_working_set_bytes": 150728704,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 120,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-pc-diagnostics-675ac5f81b0440748cd6ca99cd3a33a2.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "t003-phone-diagnostics-final",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 17.798,
+      "sampled_peak_tree_working_set_bytes": 105848832,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 180,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-phone-diagnostics-final-5e3db2cd67714826b6cfb777c8b6ffdf.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "t003-final-win-diagnostics",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 0.829,
+      "sampled_peak_tree_working_set_bytes": 9162752,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 30,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-final-win-diagnostics-e368f7ce12184c408387ddd21da8667f.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "t003-final-screenshot-fixture",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 59.002,
+      "sampled_peak_tree_working_set_bytes": 94093312,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 180,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-final-screenshot-fixture-6f56e5bf95714a16becf95fd82c1e483.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "t003-final-capture-monitor-1",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 1.903,
+      "sampled_peak_tree_working_set_bytes": 2166784,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 30,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-final-capture-monitor-1-a165cf53f4d14c1ea58c32edfd73dcf7.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "t003-final-capture-monitor-2",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 1.824,
+      "sampled_peak_tree_working_set_bytes": 6213632,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 30,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-final-capture-monitor-2-2b37549e698248588ac5790e5fd8d0ba.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    }
+  ],
+  "retained_nonpassing_attempts": [
+    {
+      "phase": "lint-kotlin",
+      "exit_code": 1,
+      "parent_exit_code": 0,
+      "failure_reason": "descendants survived parent exit",
+      "elapsed_seconds": 116.265,
+      "sampled_peak_tree_working_set_bytes": 1512333312,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "lint-kotlin-3421e8f11fa749e4b0c4697e998beffa.log",
+      "surviving_processes_before_cleanup": [
+        {
+          "pid": 8588,
+          "name": "java"
+        }
+      ],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "lint-rust-clippy",
+      "exit_code": 101,
+      "parent_exit_code": 101,
+      "failure_reason": null,
+      "elapsed_seconds": 2.568,
+      "sampled_peak_tree_working_set_bytes": 193122304,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "lint-rust-clippy-6eeadcfa10604eec81b0d4a07600ea2a.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "t003-boot-policy",
+      "exit_code": 1,
+      "parent_exit_code": 1,
+      "failure_reason": null,
+      "elapsed_seconds": 0.214,
+      "sampled_peak_tree_working_set_bytes": 0,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 30,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-boot-policy-89f7734cb2334233a13068539cb3e92f.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    },
+    {
+      "phase": "t003-diag-build",
+      "exit_code": 1,
+      "parent_exit_code": 0,
+      "failure_reason": "descendants survived parent exit",
+      "elapsed_seconds": 60.952,
+      "sampled_peak_tree_working_set_bytes": 979603456,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 180,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-diag-build-a09d9b9f0fab43b39fcbd5ba2eab5891.log",
+      "surviving_processes_before_cleanup": [
+        {
+          "pid": 27952,
+          "name": "vctip"
+        }
+      ]
+    },
+    {
+      "phase": "t003-diag-check",
+      "exit_code": 1,
+      "parent_exit_code": 0,
+      "failure_reason": "descendants survived parent exit",
+      "elapsed_seconds": 48.824,
+      "sampled_peak_tree_working_set_bytes": 908955648,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 180,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-diag-check-4736339c656d483483aafd4e06d0f70a.log"
+    },
+    {
+      "phase": "t003-scope-privacy-audit",
+      "exit_code": 1,
+      "parent_exit_code": 1,
+      "failure_reason": null,
+      "elapsed_seconds": 0.95,
+      "sampled_peak_tree_working_set_bytes": 9326592,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 30,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t003-scope-privacy-audit-43e7a14985054bbb9a1e8d080925b015.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false
+    }
+  ],
+  "new_registry_dependencies": [
+    {
+      "name": "proc-macro2",
+      "version": "1.0.107"
+    },
+    {
+      "name": "quote",
+      "version": "1.0.47"
+    },
+    {
+      "name": "syn",
+      "version": "2.0.119"
+    },
+    {
+      "name": "unicode-ident",
+      "version": "1.0.26"
+    },
+    {
+      "name": "windows",
+      "version": "0.62.2"
+    },
+    {
+      "name": "windows-collections",
+      "version": "0.3.2"
+    },
+    {
+      "name": "windows-core",
+      "version": "0.62.2"
+    },
+    {
+      "name": "windows-future",
+      "version": "0.3.2"
+    },
+    {
+      "name": "windows-implement",
+      "version": "0.60.2"
+    },
+    {
+      "name": "windows-interface",
+      "version": "0.59.3"
+    },
+    {
+      "name": "windows-link",
+      "version": "0.2.1"
+    },
+    {
+      "name": "windows-numerics",
+      "version": "0.3.1"
+    },
+    {
+      "name": "windows-result",
+      "version": "0.4.1"
+    },
+    {
+      "name": "windows-strings",
+      "version": "0.5.1"
+    },
+    {
+      "name": "windows-threading",
+      "version": "0.2.1"
+    }
+  ],
+  "binary": {
+    "path": "target/debug/diag-win.exe",
+    "bytes": 352768,
+    "sha256": "f175acf3f9e626e2964c2c2d1fee7b843a4123b385d130f45f37896346406e03"
+  },
+  "screenshots_created": 4,
+  "screenshots_disposed": 4,
+  "final_screenshot_count": 2,
+  "python_tests": 51,
+  "rust_tests": 5,
+  "runner_checks": 5,
+  "kotlin_feature_tests": 0,
+  "formal_phase_acceptance": false,
+  "target_s23_untested": true,
+  "commits": 0,
+  "pushes": 0,
+  "merges": 0
+}

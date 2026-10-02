@@ -1,0 +1,554 @@
+{
+  "verified_on": "2026-09-30 / 2026-10-01",
+  "evidence_type": "documentation and source inspection, not hardware validation",
+  "owner_diagnostics": {
+    "date": "2026-10-01",
+    "summary": "Windows 11 Home 25H2 build 26200.9457; Memory Integrity on; Intel Iris Xe driver 32.0.101.7088 at 3840x2160; 1.2 GB free on C:; no creative apps installed; Paint 11.2605.81.0; HEIF and HEVC extensions installed; adb not installed."
+  },
+  "sources": [
+    {
+      "id": "S01",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/jetpack/androidx/releases/ink",
+      "checked": "2026-10-01",
+      "claim": "Ink stable 1.0.0 (2025-12-17); preview 1.1.0-alpha09 (2026-09-23) renames brush color-shift targets SATURATION/LUMINOSITY to CHROMA/LIGHTNESS.",
+      "boundary": "Ink 1.0.0's JVM native loader (ink-nativeloader-jvm) ships a Linux x86-64 library only; 1.1.0-alpha09 adds macOS arm64; neither ships a Windows library (artifact inspection, 2026-10-01)."
+    },
+    {
+      "id": "S02",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/jetpack/androidx/releases/graphics",
+      "checked": "2026-09-30",
+      "claim": "graphics-core 1.0.4 stable; front-buffered renderers need API 29+.",
+      "boundary": "Latency on the S23 Ultra is unmeasured."
+    },
+    {
+      "id": "S03",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/jetpack/androidx/releases/input",
+      "checked": "2026-09-30",
+      "claim": "input-motionprediction 1.0.0 stable.",
+      "boundary": "Prediction quality on the S Pen is unmeasured."
+    },
+    {
+      "id": "S04",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/develop/ui/compose/touch-input/stylus-input/advanced-stylus-features",
+      "checked": "2026-09-22",
+      "claim": "Pressure, hover, tilt/orientation and cancellation handling are documented.",
+      "boundary": "Actual S23 Ultra axes need T0.04."
+    },
+    {
+      "id": "S05",
+      "publisher": "SamMobile",
+      "url": "https://www.sammobile.com/news/galaxy-s23-one-ui-8-5-stable-update-released-globally/",
+      "checked": "2026-09-30",
+      "claim": "One UI 8.5 (Android 16) stable for the S23 series from May 2026.",
+      "boundary": "Owner's device version unverified."
+    },
+    {
+      "id": "S06",
+      "publisher": "SamMobile",
+      "url": "https://www.sammobile.com/news/galaxy-s23-s23-s23-ultra-get-one-ui-9-0-beta-update/",
+      "checked": "2026-09-30",
+      "claim": "One UI 9 (Android 17) beta for the S23 series since September 2026.",
+      "boundary": "No stable date."
+    },
+    {
+      "id": "S07",
+      "publisher": "Samsung",
+      "url": "https://developer.samsung.com/galaxy-spen-remote/air-actions.html",
+      "checked": "2026-09-30",
+      "claim": "Declarative Air Actions map gestures to KeyEvents for the foreground app.",
+      "boundary": "No deprecation notice found; One UI 8.x behavior needs testing."
+    },
+    {
+      "id": "S08",
+      "publisher": "Samsung",
+      "url": "https://www.samsung.com/us/support/answer/ANS10003221/",
+      "checked": "2026-09-30",
+      "claim": "S25 Ultra and S26 Ultra S Pens have no Bluetooth or Air Actions.",
+      "boundary": "—"
+    },
+    {
+      "id": "S09",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/media/grow/media-projection",
+      "checked": "2026-09-30",
+      "claim": "Consent per session; single-app sharing; sharing stops on screen lock (Android 15 QPR1+).",
+      "boundary": "—"
+    },
+    {
+      "id": "S10",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/about/versions/17/behavior-changes-17",
+      "checked": "2026-09-30",
+      "claim": "Targeting API 37 requires ACCESS_LOCAL_NETWORK for LAN traffic.",
+      "boundary": "Only when targeting 37."
+    },
+    {
+      "id": "S11",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/guide/practices/page-sizes",
+      "checked": "2026-09-30",
+      "claim": "16 KB page-size alignment; NDK r28+ aligns by default.",
+      "boundary": "Play requirement; sideloaded apps still benefit."
+    },
+    {
+      "id": "S12",
+      "publisher": "Moonlight",
+      "url": "https://github.com/moonlight-stream/moonlight-android/blob/master/app/src/main/java/com/limelight/binding/video/MediaCodecHelper.java",
+      "checked": "2026-09-30",
+      "claim": "Low-latency MediaCodec keys including Qualcomm vendor extensions.",
+      "boundary": "GPL code: read for facts only, never copied."
+    },
+    {
+      "id": "S13",
+      "publisher": "Microsoft",
+      "url": "https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information",
+      "checked": "2026-10-01",
+      "claim": "25H2 build 26200 (support to 2027-10-12); 26H2 build 26300 released 2026-09-29.",
+      "boundary": "—"
+    },
+    {
+      "id": "S14",
+      "publisher": "Intel",
+      "url": "https://www.intel.com/content/www/us/en/support/articles/000101986/graphics.html",
+      "checked": "2026-10-01",
+      "claim": "11th-14th Gen graphics moved to legacy support on 2025-09-19: quarterly releases, critical and security fixes only.",
+      "boundary": "—"
+    },
+    {
+      "id": "S15",
+      "publisher": "Intel",
+      "url": "https://github.com/intel/media-driver/blob/master/docs/media_features.md",
+      "checked": "2026-09-30",
+      "claim": "Tiger Lake: HEVC 4:2:0 and 4:4:4 encode; AV1 decode only.",
+      "boundary": "Latency unmeasured."
+    },
+    {
+      "id": "S16",
+      "publisher": "Microsoft",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-pointer_pen_info",
+      "checked": "2026-09-30",
+      "claim": "Pen pressure 0-1024, rotation, tilt and pen flags.",
+      "boundary": "Editor acceptance needs testing."
+    },
+    {
+      "id": "S17",
+      "publisher": "Microsoft",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-injectsyntheticpointerinput",
+      "checked": "2026-09-22",
+      "claim": "Synthetic pointer injection supports pen input.",
+      "boundary": "No hover distance; cancels after ~1 s without refresh (per Sunshine source)."
+    },
+    {
+      "id": "S18",
+      "publisher": "Microsoft",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput",
+      "checked": "2026-09-22",
+      "claim": "Injection into higher-integrity windows fails silently.",
+      "boundary": "—"
+    },
+    {
+      "id": "S19",
+      "publisher": "Microsoft",
+      "url": "https://learn.microsoft.com/en-us/uwp/api/windows.graphics.capture.graphicscapturesession.includesecondarywindows",
+      "checked": "2026-09-30",
+      "claim": "IncludeSecondaryWindows, DirtyRegionMode and MinUpdateInterval arrived with contract 19 (Windows 11 24H2).",
+      "boundary": "—"
+    },
+    {
+      "id": "S20",
+      "publisher": "Microsoft",
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/display/iddcx1.10-updates",
+      "checked": "2026-09-30",
+      "claim": "IddCx 1.10 adds HDR10 and wide color gamut.",
+      "boundary": "—"
+    },
+    {
+      "id": "S21",
+      "publisher": "Microsoft",
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/dashboard/code-signing-reqs",
+      "checked": "2026-09-30",
+      "claim": "Attestation signing still requires an EV certificate.",
+      "boundary": "No Microsoft document confirms that a self-signed user-mode (UMDF) display driver installs with Secure Boot and Memory Integrity on; T0.08 is the proof."
+    },
+    {
+      "id": "S22",
+      "publisher": "SudoMaker",
+      "url": "https://github.com/SudoMaker/SudoVDA",
+      "checked": "2026-10-01",
+      "claim": "Virtual display driver with watchdog (default 3 s); runs in user mode. README: MIT and CC0/public domain for SudoVDA's own changes; Microsoft's sample code remains under Microsoft's license. The repository has no LICENSE file.",
+      "boundary": "The IddCx sample in Windows-driver-samples is MS-PL (S65). Signing and IOCTL details come from source inspection; verify in T0.08."
+    },
+    {
+      "id": "S23",
+      "publisher": "Google Chrome",
+      "url": "https://developer.chrome.com/blog/remote-debugging-port",
+      "checked": "2026-09-30",
+      "claim": "Since Chrome 136, remote debugging is ignored on the default profile.",
+      "boundary": "—"
+    },
+    {
+      "id": "S24",
+      "publisher": "Google Chrome",
+      "url": "https://developer.chrome.com/blog/windows-uia-support-update",
+      "checked": "2026-09-30",
+      "claim": "Chrome 138+ uses native UI Automation on Windows.",
+      "boundary": "—"
+    },
+    {
+      "id": "S25",
+      "publisher": "LizardByte",
+      "url": "https://github.com/LizardByte/Sunshine/releases",
+      "checked": "2026-09-30",
+      "claim": "Sunshine stable v2026.516; pen via synthetic pointer injection.",
+      "boundary": "GPL-3.0: separate tool only, never linked."
+    },
+    {
+      "id": "S26",
+      "publisher": "Moonlight",
+      "url": "https://github.com/moonlight-stream/moonlight-android",
+      "checked": "2026-09-30",
+      "claim": "v12.2 (2026-09-12) sends pen pressure, hover, buttons, eraser.",
+      "boundary": "GPL-3.0: separate tool only."
+    },
+    {
+      "id": "S27",
+      "publisher": "Genymobile",
+      "url": "https://github.com/Genymobile/scrcpy",
+      "checked": "2026-09-30",
+      "claim": "scrcpy 4.1 (2026-07-12), Apache-2.0; virtual displays, flex display, UHID.",
+      "boundary": "Bundled DLL licenses must pass the gate."
+    },
+    {
+      "id": "S28",
+      "publisher": "Adobe",
+      "url": "https://blog.developer.adobe.com/en/publish/2026/09/investing-in-the-future-of-creative-cloud-extensibility-uxp-comes-to-our-flagship-applications",
+      "checked": "2026-09-30",
+      "claim": "Illustrator UXP public beta by spring 2027; Photoshop CEP off by default Dec 2027; Illustrator Dec 2028; ExtendScript unaffected.",
+      "boundary": "—"
+    },
+    {
+      "id": "S29",
+      "publisher": "Adobe",
+      "url": "https://developer.adobe.com/photoshop/uxp/2022/ps-reference/media/imaging",
+      "checked": "2026-09-30",
+      "claim": "Imaging API: pixels, selections, pixel masks with bounds, depth and profile.",
+      "boundary": "—"
+    },
+    {
+      "id": "S30",
+      "publisher": "Adobe Community",
+      "url": "https://community.adobe.com/questions-712/multiple-issues-with-photoshop-27-10-1639899",
+      "checked": "2026-09-30",
+      "claim": "Photoshop 27.10 regressions acknowledged; rollback to 27.9.1 advised.",
+      "boundary": "Community thread; recheck before Phase 4."
+    },
+    {
+      "id": "S31",
+      "publisher": "Adobe",
+      "url": "https://developer.adobe.com/photoshop/uxp/2022/uxp-api/reference-js/global-members/data-transfers/web-socket",
+      "checked": "2026-09-30",
+      "claim": "UXP WebSocket client with binary frames; network domains in manifest.",
+      "boundary": "UXP cannot listen on sockets."
+    },
+    {
+      "id": "S32",
+      "publisher": "OpenAI",
+      "url": "https://developers.openai.com/codex/app-server",
+      "checked": "2026-10-01",
+      "claim": "App Server JSON-RPC: thread/turn methods; turn input accepts localImage {type, path}.",
+      "boundary": "Experimental; version-gate the adapter. No documented detail option on localImage and no documented `codex queue` command (checked 2026-10-01)."
+    },
+    {
+      "id": "S33",
+      "publisher": "Anthropic",
+      "url": "https://code.claude.com/docs/en/channels-reference",
+      "checked": "2026-10-01",
+      "claim": "Channels (research preview) push notifications/claude/channel events with string content and meta; custom channels need the development flag.",
+      "boundary": "No image payloads; send a path."
+    },
+    {
+      "id": "S34",
+      "publisher": "Anthropic",
+      "url": "https://code.claude.com/docs/en/mcp",
+      "checked": "2026-09-30",
+      "claim": "Claude Code MCP: stdio and HTTP transports; image tool results display inline.",
+      "boundary": "—"
+    },
+    {
+      "id": "S35",
+      "publisher": "Model Context Protocol",
+      "url": "https://blog.modelcontextprotocol.io/posts/2026-07-28/",
+      "checked": "2026-10-01",
+      "claim": "Spec 2026-07-28 is stateless (no initialize); Tasks and MCP Apps are extensions.",
+      "boundary": "Most local clients still speak 2025-11-25."
+    },
+    {
+      "id": "S36",
+      "publisher": "Model Context Protocol",
+      "url": "https://modelcontextprotocol.io/extensions/client-matrix",
+      "checked": "2026-09-30",
+      "claim": "MCP Apps supported in Claude Desktop/web and ChatGPT, not Claude Code CLI or Codex CLI.",
+      "boundary": "Community-maintained matrix."
+    },
+    {
+      "id": "S37",
+      "publisher": "Anthropic",
+      "url": "https://platform.claude.com/docs/en/build-with-claude/vision",
+      "checked": "2026-10-01",
+      "claim": "Claude 4.7 and later models accept up to 2576 px on the long edge (other models 1568 px); absolute pixel coordinates work best.",
+      "boundary": "Images are padded to a multiple of 28 px on the bottom and right; rescale by the resized size, not the padded size (vision-coordinates page)."
+    },
+    {
+      "id": "S38",
+      "publisher": "OpenAI",
+      "url": "https://developers.openai.com/api/docs/guides/image-generation",
+      "checked": "2026-10-01",
+      "claim": "GPT Image edit constraints: mask PNG with alpha matching the image; sides multiples of 16; long edge <= 3840; total pixels between 655,360 and 8.29 M; aspect ratio between 1:3 and 3:1; masking is prompt-guided.",
+      "boundary": "Verify current model IDs and prices in T0.11."
+    },
+    {
+      "id": "S39",
+      "publisher": "Artificial Analysis",
+      "url": "https://artificialanalysis.ai/image/leaderboard/editing",
+      "checked": "2026-09-30",
+      "claim": "GPT Image 2.5 Sunburst and Flare led the editing leaderboard on 2026-09-30.",
+      "boundary": "Leaderboards change weekly."
+    },
+    {
+      "id": "S40",
+      "publisher": "arXiv",
+      "url": "https://arxiv.org/abs/2310.11441",
+      "checked": "2026-09-30",
+      "claim": "Set-of-Mark prompting improves VLM grounding with numbered marks.",
+      "boundary": "Not tested on 2026 models specifically."
+    },
+    {
+      "id": "S41",
+      "publisher": "arXiv",
+      "url": "https://arxiv.org/html/2511.11438",
+      "checked": "2026-09-30",
+      "claim": "VP-Bench: boxes beat points; describing marks in text helps.",
+      "boundary": "—"
+    },
+    {
+      "id": "S42",
+      "publisher": "ComfyUI",
+      "url": "https://github.com/comfyorg/comfyui-crop-and-stitch",
+      "checked": "2026-09-30",
+      "claim": "Crop-and-stitch inpainting with context expansion and blending.",
+      "boundary": "—"
+    },
+    {
+      "id": "S43",
+      "publisher": "Figma",
+      "url": "https://www.figma.com/blog/how-figmas-multiplayer-technology-works/",
+      "checked": "2026-09-30",
+      "claim": "Server-authoritative, property-level last-writer-wins multiplayer.",
+      "boundary": "—"
+    },
+    {
+      "id": "S44",
+      "publisher": "Mozilla",
+      "url": "https://github.com/mozilla/uniffi-rs",
+      "checked": "2026-09-30",
+      "claim": "UniFFI 0.32.2 (2026-09-23).",
+      "boundary": "Pre-1.0."
+    },
+    {
+      "id": "S45",
+      "publisher": "NordSecurity",
+      "url": "https://github.com/NordSecurity/uniffi-bindgen-cs",
+      "checked": "2026-09-30",
+      "claim": "C# bindings support UniFFI 0.31 only.",
+      "boundary": "Reason for D2."
+    },
+    {
+      "id": "S46",
+      "publisher": "libvips",
+      "url": "https://github.com/libvips/libvips/releases",
+      "checked": "2026-10-01",
+      "claim": "libvips 8.18.7 is the latest stable (8.18 ChangeLog entry dated 20 Sep 2026), LGPL-2.1-or-later.",
+      "boundary": "Pyramid timings from a synthetic image on a 2-vCPU VM."
+    },
+    {
+      "id": "S47",
+      "publisher": "pdfium-binaries",
+      "url": "https://github.com/bblanchon/pdfium-binaries/releases",
+      "checked": "2026-09-30",
+      "claim": "PDFium 156.0.8076 binaries for Android arm64 and Windows x64.",
+      "boundary": "—"
+    },
+    {
+      "id": "S48",
+      "publisher": "linebender",
+      "url": "https://github.com/linebender/resvg",
+      "checked": "2026-09-30",
+      "claim": "resvg 0.48.1, Apache-2.0/MIT; static SVG only.",
+      "boundary": "Default resolver reads local files; replace it."
+    },
+    {
+      "id": "S49",
+      "publisher": "Google",
+      "url": "https://developers.google.com/speed/webp/faq",
+      "checked": "2026-09-22",
+      "claim": "WebP maximum 16,383 px per side.",
+      "boundary": "—"
+    },
+    {
+      "id": "S50",
+      "publisher": "Google Patents",
+      "url": "https://patents.google.com/patent/US10042469B2/en",
+      "checked": "2026-10-01",
+      "claim": "NVIDIA patent on predictive ink lines (active to about 2033).",
+      "boundary": "Not legal advice; review before selling."
+    },
+    {
+      "id": "S51",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/build/releases/agp-9-4-0-release-notes",
+      "checked": "2026-10-01",
+      "claim": "AGP 9.4.1 is the latest stable (2026-09-18; 9.4.0 was 2026-09-01); AGP 9.4 requires Gradle >= 9.6.0 and JDK >= 17.",
+      "boundary": "—"
+    },
+    {
+      "id": "S52",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/ndk/downloads",
+      "checked": "2026-10-01",
+      "claim": "NDK r30 (30.0.16248370) LTS.",
+      "boundary": "—"
+    },
+    {
+      "id": "S53",
+      "publisher": "releases.rs",
+      "url": "https://releases.rs/",
+      "checked": "2026-10-01",
+      "claim": "Rust stable 1.98.x; 1.99.0 due 2026-10-01.",
+      "boundary": "—"
+    },
+    {
+      "id": "S54",
+      "publisher": "Gradle",
+      "url": "https://gradle.org/releases/",
+      "checked": "2026-10-01",
+      "claim": "Gradle 9.8.0 (2026-09-24).",
+      "boundary": "—"
+    },
+    {
+      "id": "S55",
+      "publisher": "JetBrains",
+      "url": "https://youtrack.jetbrains.com/issue/CMP-1609",
+      "checked": "2026-09-30",
+      "claim": "Compose Multiplatform desktop has no pen pressure on Windows (open issue).",
+      "boundary": "Affects drawing on the laptop only."
+    },
+    {
+      "id": "S56",
+      "publisher": "Google",
+      "url": "https://developers.google.com/edge/mediapipe/solutions/vision/interactive_segmenter",
+      "checked": "2026-09-30",
+      "claim": "MediaPipe Interactive Segmenter takes point/stroke prompts.",
+      "boundary": "Latency on S23 Ultra unmeasured."
+    },
+    {
+      "id": "S57",
+      "publisher": "Qualcomm",
+      "url": "https://huggingface.co/qualcomm/MobileSam",
+      "checked": "2026-09-30",
+      "claim": "MobileSAM on-device timings on Snapdragon NPUs.",
+      "boundary": "8 Gen 2 not listed."
+    },
+    {
+      "id": "S58",
+      "publisher": "Krita",
+      "url": "https://docs.krita.org/en/reference_manual/preferences/tablet_settings.html",
+      "checked": "2026-09-30",
+      "claim": "Krita supports WinTab or Windows 8+ Pointer Input.",
+      "boundary": "—"
+    },
+    {
+      "id": "S59",
+      "publisher": "Affinity",
+      "url": "https://www.affinity.studio/blog/affinity-automation-scripting-claude",
+      "checked": "2026-09-30",
+      "claim": "Affinity added scripting and a Claude connector (2026-09-15).",
+      "boundary": "Pixel access via scripting unverified."
+    },
+    {
+      "id": "S60",
+      "publisher": "arXiv",
+      "url": "https://arxiv.org/pdf/2602.12241",
+      "checked": "2026-09-30",
+      "claim": "Moonshine v2 WER and latency figures.",
+      "boundary": "Measured on Apple M3, not the laptop."
+    },
+    {
+      "id": "S61",
+      "publisher": "LizardByte",
+      "url": "https://app.lizardbyte.dev/2026-08-16-introducing-libvirtualhid-and-virtual-hid-driver/",
+      "checked": "2026-09-30",
+      "claim": "Sunshine's pen path still uses synthetic pointer injection.",
+      "boundary": "—"
+    },
+    {
+      "id": "S62",
+      "publisher": "Android Developers",
+      "url": "https://developer.android.com/privacy-and-security/local-network-permission",
+      "checked": "2026-09-30",
+      "claim": "Local network permission rules for apps targeting API 37.",
+      "boundary": "—"
+    },
+    {
+      "id": "S63",
+      "publisher": "Topedia (summarizing Microsoft KB5083769)",
+      "url": "https://blog-en.topedia.com/2026/04/smart-app-control-in-windows-11-can-now-be-re-enabled-without-reinstalling/",
+      "checked": "2026-10-01",
+      "claim": "Since KB5083769 (2026-04-14; builds 26200.8246 and 26100.8246), Smart App Control can be turned on or off from Windows Security without reinstalling Windows.",
+      "boundary": "Secondary source; the laptop's build 26200.9457 is newer than 26200.8246."
+    },
+    {
+      "id": "S64",
+      "publisher": "Eric Lawrence (text/plain)",
+      "url": "https://textslashplain.com/2026/04/28/smart-app-control/",
+      "checked": "2026-10-01",
+      "claim": "Smart App Control verifies every loaded module and blocks unsigned binaries, including locally built programs and scripts, which causes friction on developer machines.",
+      "boundary": "Blog by a Microsoft engineer, not official documentation."
+    },
+    {
+      "id": "S65",
+      "publisher": "Microsoft",
+      "url": "https://github.com/microsoft/Windows-driver-samples",
+      "checked": "2026-10-01",
+      "claim": "Windows-driver-samples, which hosts the IddCx sample SudoVDA builds on, is licensed MS-PL.",
+      "boundary": "Applies to Microsoft-derived code in the SudoVDA fork only."
+    },
+    {
+      "id": "S66",
+      "publisher": "Anthropic",
+      "url": "https://platform.claude.com/docs/en/build-with-claude/vision-coordinates",
+      "checked": "2026-10-01",
+      "claim": "Claude works best with absolute pixel coordinates; avoid 0-1000 normalized coordinates; images are padded to a multiple of 28 px.",
+      "boundary": "—"
+    },
+    {
+      "id": "S67",
+      "publisher": "Anthropic",
+      "url": "https://code.claude.com/docs/en/channels-reference",
+      "checked": "2026-10-01",
+      "claim": "Custom channels load with `claude --dangerously-load-development-channels server:<name>`; the channel server uses stdio; Team and Enterprise orgs must enable channels.",
+      "boundary": "Research preview; may change."
+    },
+    {
+      "id": "S68",
+      "publisher": "crates.io (RustCrypto PAKEs)",
+      "url": "https://crates.io/crates/spake2",
+      "checked": "2026-10-01",
+      "claim": "spake2 is MIT OR Apache-2.0; newest is 0.5.0-pre.0 (2026-01-25), a pre-release, so pin the latest stable 0.4.x or choose a CPace crate.",
+      "boundary": "Choice and audit status recorded in T1.06b."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "task": "T0.03",
+  "baseline_requirement_count": 189,
+  "original_hardware_rows": 21,
+  "new_hardware_rows": 12,
+  "changed_top_level_sections": [
+    "hardware_truth",
+    "requirements"
+  ],
+  "changed_requirement_ids": [
+    "QUALITY-004",
+    "QUALITY-005"
+  ],
+  "allowed_requirement_fields": [
+    "impl_status",
+    "verify_status",
+    "evidence"
+  ],
+  "all_other_registry_content_semantically_unchanged": true,
+  "baseline_sha256": "adc925d8cfdc2a4a419f5e190eb30aff6190fcfd0181564d0d93e0d7655df96a"
+}

@@ -1,0 +1,80 @@
+{
+    "schema_version":  2,
+    "collected_utc":  "2026-10-01T23:41:15.1353055Z",
+    "read_only":  true,
+    "pc":  {
+               "manufacturer":  "HP",
+               "model":  "HP Spectre x360 Convertible 15-eb1xxx",
+               "cpu":  "11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz",
+               "cores":  4,
+               "logical_processors":  8,
+               "ram_bytes":  16801923072
+           },
+    "windows":  {
+                    "edition":  "Microsoft Windows 11 Home",
+                    "display_version":  "25H2",
+                    "build":  26200,
+                    "update_build_revision":  9457
+                },
+    "disk_c":  {
+                   "free_bytes":  51597021184,
+                   "total_bytes":  510577864704,
+                   "storage_warning_waived_by_owner":  true
+               },
+    "memory_integrity":  {
+                             "running":  true,
+                             "configured_registry":  1,
+                             "method":  "Win32_DeviceGuard.SecurityServicesRunning contains 2"
+                         },
+    "secure_boot":  {
+                        "enabled":  true,
+                        "method":  "Owner-confirmed administrator PowerShell Confirm-SecureBootUEFI",
+                        "confirmed_date":  "2026-10-01"
+                    },
+    "smart_app_control":  "off",
+    "developer_mode":  true,
+    "test_signing":  "untestable: bcdedit unavailable without elevation",
+    "graphics":  [
+                     {
+                         "name":  "Intel(R) Iris(R) Xe Graphics",
+                         "driver_version_components":  [
+                                                           32,
+                                                           0,
+                                                           101,
+                                                           7088
+                                                       ]
+                     }
+                 ],
+    "creative_apps_classic":  [
+
+                              ],
+    "creative_apps_store":  [
+
+                            ],
+    "paint":  [
+                  [
+                      11,
+                      2605,
+                      81,
+                      0
+                  ]
+              ],
+    "codec_extensions":  {
+                             "HEIF":  true,
+                             "HEVC":  true,
+                             "AV1":  true,
+                             "Webp":  true,
+                             "Raw":  true
+                         },
+    "documents_cloud_synced":  true,
+    "adb":  "37.0.1",
+    "wifi":  {
+                 "band_ghz":  5,
+                 "radio":  "802.11ax",
+                 "channel":  44,
+                 "status":  "verified active interface fields"
+             },
+    "usb_controllers":  [
+                            "Intel(R) USB 3.10 eXtensible Host Controller - 1.20 (Microsoft)"
+                        ]
+}

@@ -1,0 +1,431 @@
+{
+  "date": "2026-10-01",
+  "scope": "Development starter; six setup requirements remain in_progress/partial",
+  "successful_phases": {
+    "build-core": {
+      "receipt": "build-core-b6b2e22d3a324d9d82a754a08de8b6aa.log.json",
+      "receipt_sha256": "51a979453bb1fa43cfe73ee5cede41c8451d6ff7c8dcf9e6520974583303a382",
+      "log_sha256": "2471280be5ed6c7533367c1ddc7817aca85875f1eabaac786ce438a95fe6d1fb",
+      "exit_code": 0,
+      "elapsed_seconds": 0.81,
+      "sampled_peak_tree_working_set_bytes": 18104320,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "build-android": {
+      "receipt": "build-android-42c608a0edcc458abf369f4c32a33632.log.json",
+      "receipt_sha256": "b242a526da5f60b7aee6a969fc598bbc70aebe16e704833c527c73689f348225",
+      "log_sha256": "d175b53c2edec1ae2309775d203e0698c0c96e9e925474729e365ca357705cd4",
+      "exit_code": 0,
+      "elapsed_seconds": 71.979,
+      "sampled_peak_tree_working_set_bytes": 2040360960,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "build-desktop": {
+      "receipt": "build-desktop-b2890d4cbd014e6cb335727c8eac2369.log.json",
+      "receipt_sha256": "f6abe2f36d0da1fe59cfef8515275b2798ee06ae64ba82a538d2dbae49ab411f",
+      "log_sha256": "3647767fbb27cbfd688c9df03a028dd2ee251fa4a737f8fe6cadcfcbc0df6803",
+      "exit_code": 0,
+      "elapsed_seconds": 47.863,
+      "sampled_peak_tree_working_set_bytes": 1027985408,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "test-tools": {
+      "receipt": "test-tools-5b66afd50eb649a6a4d5b4e61c5698f1.log.json",
+      "receipt_sha256": "c7a4461fd121d274d16e7a1cd5b3bdad52ff35a71789ce75ff06362ccac8c57d",
+      "log_sha256": "1c6390384eb328bb8d413b1e1019ccdf9d44e502e8371a29143ae750709e15d2",
+      "exit_code": 0,
+      "elapsed_seconds": 1.874,
+      "sampled_peak_tree_working_set_bytes": 24064000,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "test-rust": {
+      "receipt": "test-rust-189075d8e1d342f797aa2ea2861e9696.log.json",
+      "receipt_sha256": "b4d866c9b7ab0a167a57fcd25232ea568e929ecbc35687ce68ab1356bff64da9",
+      "log_sha256": "b1a57cc4ee919d2711748d910f9b9d0df46f1b57fdec2d73804e97bf1fd8379e",
+      "exit_code": 0,
+      "elapsed_seconds": 5.928,
+      "sampled_peak_tree_working_set_bytes": 136609792,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "test-kotlin": {
+      "receipt": "test-kotlin-35ed212f55554bfa96d6c6d50d9d2623.log.json",
+      "receipt_sha256": "f371223cb7a0907b50a723f3196ddc1e137583a485a4e0540c2b696323545dc8",
+      "log_sha256": "77ff90ab2f1e924c1b868c5dc274d79fdd0c9d13f76cca692ea986f29a78c45a",
+      "exit_code": 0,
+      "elapsed_seconds": 63.967,
+      "sampled_peak_tree_working_set_bytes": 1158369280,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "lint-setup": {
+      "receipt": "lint-setup-a6dcf9409deb4103b1691ef650362668.log.json",
+      "receipt_sha256": "97274e985b94d44f715ea4c48b8beaf5f806a2426721f09e40f7a745db2f944c",
+      "log_sha256": "b5ccfe7dd9e4e77fdb5a7d71d8a5246a7d4827d47d24a019defd4de7a2a9e6c2",
+      "exit_code": 0,
+      "elapsed_seconds": 0.522,
+      "sampled_peak_tree_working_set_bytes": 28696576,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "lint-plan": {
+      "receipt": "lint-plan-aa49c61dec5e4294bb4a6a2a01212b06.log.json",
+      "receipt_sha256": "5021d0794fec8a6ec2478cf8aca920306eec184c454d24760193fa17dc848cbc",
+      "log_sha256": "b58c34402de2e5a9b7815a5811e7c8565a98fe991df64225cde2715746912c90",
+      "exit_code": 0,
+      "elapsed_seconds": 0.297,
+      "sampled_peak_tree_working_set_bytes": 21172224,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "lint-rust-format": {
+      "receipt": "lint-rust-format-a8efdf9166d14302bd9a50ecedb5e742.log.json",
+      "receipt_sha256": "5db6322cddfc96196190a1e9ecced0fa840181e24b530444a951fa17c39062a6",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_code": 0,
+      "elapsed_seconds": 0.426,
+      "sampled_peak_tree_working_set_bytes": 28999680,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "lint-rust-clippy": {
+      "receipt": "lint-rust-clippy-6058f3596fee4df28d70795de2958940.log.json",
+      "receipt_sha256": "7a1a35e3e7d8f72842bab10027e1be5fdc700f88e511ad88d315410832089ea1",
+      "log_sha256": "dab4e4707b2e6fdbdead361b4487be475974a047edea846dd92bac44f319f872",
+      "exit_code": 0,
+      "elapsed_seconds": 0.316,
+      "sampled_peak_tree_working_set_bytes": 29327360,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "lint-secrets": {
+      "receipt": "lint-secrets-3c5f16bb828f4cca9d64e7db3c320e7a.log.json",
+      "receipt_sha256": "cbca11c4d36ef14ae7155497c2abf614084c0b8ab0463e4fba3da56d778ea2df",
+      "log_sha256": "ff02cfbbbaa10f18418617edd131978df1cd419ade67ce2e661754192a03a969",
+      "exit_code": 0,
+      "elapsed_seconds": 1.211,
+      "sampled_peak_tree_working_set_bytes": 36569088,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "lint-kotlin": {
+      "receipt": "lint-kotlin-e939c2d2f5ca43d2913437e6c286b7e9.log.json",
+      "receipt_sha256": "88a2fea2e329e27c9f807cbf8e8280155512fe3a641121d1f23864d0e3c7fb6e",
+      "log_sha256": "668c9351bf2565784c7e86f05c83e08b21abbc9b1ffca4f26a6338d74d4632ec",
+      "exit_code": 0,
+      "elapsed_seconds": 92.56,
+      "sampled_peak_tree_working_set_bytes": 1493217280,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "license-rust": {
+      "receipt": "license-rust-a003c5b06f304bbeb0aca346bae1ce53.log.json",
+      "receipt_sha256": "f738a03cb0b7054c5493663890eb39b12e825278156456ae52539b581943cdb5",
+      "log_sha256": "7da8b4a66b0b25ea5946088330f046cf9d14a50dc3eb4283cfa3be394b008dfe",
+      "exit_code": 0,
+      "elapsed_seconds": 1.158,
+      "sampled_peak_tree_working_set_bytes": 28962816,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "license-gradle": {
+      "receipt": "license-gradle-89e79ddd5b814fbd87d1e51d1058f2a7.log.json",
+      "receipt_sha256": "34c78080eed184ee3e6305fcbd9b6ac941451c31a296f8b51302bedc9dd3bf2a",
+      "log_sha256": "6ca4333e0f386859b656c84ffb95154c708489bd96b10b2958dc6a0511234a67",
+      "exit_code": 0,
+      "elapsed_seconds": 26.597,
+      "sampled_peak_tree_working_set_bytes": 634560512,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "doctor": {
+      "receipt": "doctor-713d664d24ee42e8bb1a3213934c7de3.log.json",
+      "receipt_sha256": "54c872a769cd4c226c0766c4df0dff1040f90c0e64ac356068ec05d6c0604185",
+      "log_sha256": "b68e43b8130aa8e727f08f7033ece80ba15fd4fa94bc3d99b384b2204a5149c1",
+      "exit_code": 0,
+      "elapsed_seconds": 9.087,
+      "sampled_peak_tree_working_set_bytes": 143163392,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 120,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "hil-test": {
+      "receipt": "hil-test-b83674635fe04c4b88ccd63ddcba3fbe.log.json",
+      "receipt_sha256": "10b31c26f50638da53aafa316cdd64ee0e8bc8eac3b2a6eea8cb414f46158ae6",
+      "log_sha256": "9475af62f9ee5e953083ebbaeabde45c3d0a7d5187bcf28dc95f9c5325355094",
+      "exit_code": 0,
+      "elapsed_seconds": 110.907,
+      "sampled_peak_tree_working_set_bytes": 1915305984,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 2100,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "hil-android-instrumentation": {
+      "receipt": "hil-android-instrumentation-a1f244c1e1234015a0a553228d77fce2.log.json",
+      "receipt_sha256": "d1cad1ab9f1098edc7f1d44f8e78847ca2dcb5b60c8d09fcdebc4646021bf7d8",
+      "log_sha256": "b42a2a809cd89f5fcf75b6a7ac2389dee91e3b9c91154f1600a7e8b687980794",
+      "exit_code": 0,
+      "elapsed_seconds": 100.689,
+      "sampled_peak_tree_working_set_bytes": 1769127936,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 1500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "shared-focus-probes": {
+      "receipt": "shared-focus-probes-519edaffb1a84f049a7dff2869b13659.log.json",
+      "receipt_sha256": "a7fb1a44ae2ed52a2c22f5acc4081f111b8cbbf72797bbdc1dd17cbb484c7fe0",
+      "log_sha256": "cb515cc2a796ba3fc6e22f30d9495dbff7f86033e8a7eee83b91768868243dbf",
+      "exit_code": 0,
+      "elapsed_seconds": 1.462,
+      "sampled_peak_tree_working_set_bytes": 66109440,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 30,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "shared-focus-live-launch-1": {
+      "receipt": "shared-focus-live-launch-1-231aea8d23834f1d8483b94f875cc518.log.json",
+      "receipt_sha256": "aa81c58b790e1f6b90dc28c880f3b0465938a71b611d5ce5b770da7da4a4b96a",
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee",
+      "exit_code": 0,
+      "elapsed_seconds": 0.495,
+      "sampled_peak_tree_working_set_bytes": 19533824,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 15,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "shared-focus-live-foreground-1": {
+      "receipt": "shared-focus-live-foreground-1-8aedd6aca9b94881a4c1ef139f09f7d4.log.json",
+      "receipt_sha256": "35f682bafb32a04b9b4e4c1bbc270e8f9e31e003cc17aaf4ff27d14313e992b0",
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee",
+      "exit_code": 0,
+      "elapsed_seconds": 0.486,
+      "sampled_peak_tree_working_set_bytes": 19402752,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 15,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "apk-artifacts-final": {
+      "receipt": "apk-artifacts-final-a5a8cda5fd8b4d44b9d37921319b1415.log.json",
+      "receipt_sha256": "a69059508f8472f17e7e1ab46796c0a395f71d2e71308bb212fd89171aa3d7eb",
+      "log_sha256": "4f93631cd21e1d931a897370ddb395fcb0badfe136b0c430cfae846bd30754be",
+      "exit_code": 0,
+      "elapsed_seconds": 0.66,
+      "sampled_peak_tree_working_set_bytes": 18690048,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 45,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "scan-built-package-archives": {
+      "receipt": "scan-built-package-archives-b4dba07e7683453887a00d7c3197214a.log.json",
+      "receipt_sha256": "6c178b3caad9b264b9f69791d587429b4fd9927afa22c7e8320647f20ede2312",
+      "log_sha256": "a8ce2df795c952def6688a7b3aa61bbf4164f0e415d73cb0ffd47c3891c6b02c",
+      "exit_code": 0,
+      "elapsed_seconds": 5.686,
+      "sampled_peak_tree_working_set_bytes": 100278272,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 90,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "scan-retained-log-secrets": {
+      "receipt": "scan-retained-log-secrets-344bef7aaaf34b0e8467b25629804306.log.json",
+      "receipt_sha256": "0f9556e4eed341d94c52f45c858edf3dffaa22e8c30d7747d42dd22aca3667ee",
+      "log_sha256": "a3a80e1b63e78c269085d4d31c5e9a70fa50161fa20a44f116496e8c351b2c1b",
+      "exit_code": 0,
+      "elapsed_seconds": 3.419,
+      "sampled_peak_tree_working_set_bytes": 80588800,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 90,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "wrapper-default-directory-probe": {
+      "receipt": "wrapper-default-directory-probe-06f09b27b9a948f3a1de0123563228c1.log.json",
+      "receipt_sha256": "ec8a64701f95902f29b8a34c98f1a4d8fb381024aec76a83115ef0854afc21bb",
+      "log_sha256": "044c8c17ff95e753e012ce40ad9521de843a8821a2c58a22f34a7a90eaaba635",
+      "exit_code": 0,
+      "elapsed_seconds": 2.718,
+      "sampled_peak_tree_working_set_bytes": 30633984,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 25,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "installed-apk-digest": {
+      "receipt": "installed-apk-digest-e6bad1af973d48eaacd9aeb0fe06682f.log.json",
+      "receipt_sha256": "f7a5009c49f5ea7952899bae1875178b3f0dc9402b184b2d72f7c0156759a7cc",
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee",
+      "exit_code": 0,
+      "elapsed_seconds": 0.479,
+      "sampled_peak_tree_working_set_bytes": 19447808,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 120,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "final-source-and-evidence-scan": {
+      "receipt": "final-source-and-evidence-scan-fd8670fc5d904c7a8274d532fbffffa4.log.json",
+      "receipt_sha256": "daad3a8a82cb0b02d8027f8669411962262a95f28c5fd40bc4ac653f3c56f0f1",
+      "log_sha256": "8af5696b7de0c863d0aaeff20605938a3641c2285b05e6d61e775b5d5683a093",
+      "exit_code": 0,
+      "elapsed_seconds": 16.395,
+      "sampled_peak_tree_working_set_bytes": 87011328,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 60,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    "final-retained-log-secrets-scan": {
+      "receipt": "final-retained-log-secrets-scan-de3aed88bfc248eb8573772c759f3e47.log.json",
+      "receipt_sha256": "13e6154db82d9b865ef25a7a36b54ce025dbea50b6c61e291855c2ab90ee6856",
+      "log_sha256": "202c35a9ed5a50c454382223768fd95d373c26c9a2301a9ed3785f028829ed79",
+      "exit_code": 0,
+      "elapsed_seconds": 6.235,
+      "sampled_peak_tree_working_set_bytes": 83017728,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 60,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    }
+  },
+  "resources": {
+    "measured_at": "2026-10-01T16:06:08.1030450-07:00",
+    "physical_ram_bytes": 16801923072,
+    "usable_ram_bytes": 16801923072,
+    "free_ram_bytes": 1794428928,
+    "c_drive_bytes": 510577864704,
+    "c_drive_free_bytes": 52433113088,
+    "storage_warning_waived": true
+  },
+  "test_counts": {
+    "python_policy": 46,
+    "rust_windows_ffi": 1,
+    "rust_android_configured_runner_ffi": 1,
+    "android_activity_instrumentation": 1,
+    "kotlin_feature_unit_tests": 0
+  },
+  "application_license_census": {
+    "modules": 164,
+    "runtime_configurations": 4,
+    "bound_parent_poms": 1,
+    "first_party_output_bindings": 3,
+    "scope": "Resolved dependency metadata policy, not full bundled-native notices"
+  },
+  "android_lint_warnings": [
+    {
+      "id": "OldTargetApi",
+      "severity": "Warning"
+    },
+    {
+      "id": "ChromeOsAbiSupport",
+      "severity": "Warning"
+    },
+    {
+      "id": "DataExtractionRules",
+      "severity": "Warning"
+    },
+    {
+      "id": "MissingApplicationIcon",
+      "severity": "Warning"
+    },
+    {
+      "id": "UseTomlInstead",
+      "severity": "Warning"
+    },
+    {
+      "id": "UseTomlInstead",
+      "severity": "Warning"
+    },
+    {
+      "id": "UseTomlInstead",
+      "severity": "Warning"
+    },
+    {
+      "id": "UseTomlInstead",
+      "severity": "Warning"
+    },
+    {
+      "id": "UseTomlInstead",
+      "severity": "Warning"
+    }
+  ],
+  "screenshots": {
+    "created": 0,
+    "retained": 0,
+    "in_git": 0
+  },
+  "package_scan_copies_disposed": true,
+  "credential_incident": {
+    "occurred": true,
+    "retained_failure_log_sanitized": true,
+    "child_environment_hardened": true,
+    "credential_rotation_verified": false,
+    "sec_004_verification": "partial"
+  }
+}

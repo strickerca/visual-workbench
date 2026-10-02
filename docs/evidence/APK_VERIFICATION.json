@@ -1,0 +1,31 @@
+{
+  "artifact": "apps/android/build/outputs/apk/debug/android-debug.apk",
+  "apk_sha256": "7d54e4c45e7865b06152fa758b367e88e976c05b6d323858d42469b44fadf348",
+  "apk_bytes": 25697865,
+  "zipalign_16kb_exit_code": 0,
+  "libraries": [
+    {
+      "path": "lib/arm64-v8a/libandroidx.graphics.path.so",
+      "sha256": "41e9a793c43a0f4fddb19e33f346bace464f30f888ba7b9eaf96294ea115bfb6",
+      "load_alignments_bytes": [
+        16384,
+        16384,
+        16384
+      ],
+      "zip_compression": "stored"
+    },
+    {
+      "path": "lib/arm64-v8a/libvw_core.so",
+      "sha256": "3ba8e5053c78c47539a6eadab2469dd3e75c22662fa7770e8d0083dabf0d5211",
+      "load_alignments_bytes": [
+        16384,
+        16384,
+        16384,
+        16384
+      ],
+      "zip_compression": "stored"
+    }
+  ],
+  "artifact_check_only": true,
+  "native_16kb_device_execution_verified": false
+}

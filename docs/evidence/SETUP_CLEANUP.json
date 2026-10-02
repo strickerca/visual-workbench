@@ -1,0 +1,20 @@
+{
+  "text_probe_files": [
+    {
+      "task_owned_relative_path": ".local/check-shared-focus.ps1",
+      "source_sha256": "27f3d74e2973b5c401537c7b67c46c7f7e2642ee5b91bdcc44fb0bc5a93d29d0",
+      "disposed": true
+    },
+    {
+      "task_owned_relative_path": ".local/check-package-secrets.ps1",
+      "source_sha256": "2acfb12350c05ecc7e87d25f68cd996b9db58a32d28c374d71ac3b9aee5b9eb2",
+      "disposed": true
+    }
+  ],
+  "screenshots_created": 0,
+  "screenshots_retained": 0,
+  "screenshots_in_git": 0,
+  "package_scan_copies_disposed": true,
+  "native_device_fixtures_cleanup_verified": true,
+  "unrelated_files_preserved": true
+}

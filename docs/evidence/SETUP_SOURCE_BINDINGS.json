@@ -1,0 +1,700 @@
+{
+  "scope": "Current non-ignored Git source files, excludes this self-binding file",
+  "files": [
+    {
+      "path": ".cargo/config.toml",
+      "bytes": 367,
+      "sha256": "db0ef1dddd1b273925e3b0b6ec10c34d720dddd54939b8e51290f9c0d1b4ed26"
+    },
+    {
+      "path": ".gitattributes",
+      "bytes": 273,
+      "sha256": "25fd735d9ae51c8bc5aa47cfd708db75b24e3647a5085737844791043d96321d"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 202,
+      "sha256": "374a48a94855875ed82da5f64e8daa880e727b54bdc8a70662d576d62354bc4b"
+    },
+    {
+      "path": ".gitleaks.toml",
+      "bytes": 1543,
+      "sha256": "08b57cb72a51399f2004b2dd5a01be7b75a5b77b7065e35adc599fd7639145ee"
+    },
+    {
+      "path": "AGENTS.md",
+      "bytes": 2356,
+      "sha256": "2e5bb9a2cf7cdaa49d25c67dc32f85bff88233893d6cf2a6523b2e16aa35e9ae"
+    },
+    {
+      "path": "BUILD_SPECIFICATION.md",
+      "bytes": 30160,
+      "sha256": "c67aeacc81249e5bc8c8296de302b6115ecbf3819e66b5e9b940162cd4b12ace"
+    },
+    {
+      "path": "CLAUDE.md",
+      "bytes": 472,
+      "sha256": "2d9021d3ce9380f449c760bdc2b1e5b7dd3fecfe03c1fa48cc45a1c286867c62"
+    },
+    {
+      "path": "Cargo.lock",
+      "bytes": 1003,
+      "sha256": "5e9f514128de0e2d85060914f07b9abdf582cf808099f8c7ee175089bbc4006b"
+    },
+    {
+      "path": "Cargo.toml",
+      "bytes": 415,
+      "sha256": "50d14054ef6d61809f88d61eb3e73ef9811b1c3bc90fdad7eb47626df3db0cd2"
+    },
+    {
+      "path": "README.md",
+      "bytes": 8122,
+      "sha256": "e4c487837147889e8bda395945c4ef9a991c055eada476505574c09d250d8b89"
+    },
+    {
+      "path": "REQUIREMENTS.json",
+      "bytes": 41546,
+      "sha256": "7d965d02e3768f07c11721527ac5a297c7f1150159ec732f53484b098d79a082"
+    },
+    {
+      "path": "SOURCES.json",
+      "bytes": 8774,
+      "sha256": "6b0f07d1dd732846bdf9f40279252701fc9846759232523070dd2abc4d2f98ec"
+    },
+    {
+      "path": "apps/android/build.gradle.kts",
+      "bytes": 2067,
+      "sha256": "dae8f1ccbb2493b455f39fc49b410e79df4ed259860dc9af2d4ef686579293d8"
+    },
+    {
+      "path": "apps/android/gradle.lockfile",
+      "bytes": 8515,
+      "sha256": "67e958cfb50464f39e35a37daa4a3ba20b7e45ecbb7ad6c1dfc67e87f683ceca"
+    },
+    {
+      "path": "apps/android/src/androidTest/kotlin/com/visualworkbench/android/StartupInstrumentedTest.kt",
+      "bytes": 887,
+      "sha256": "bc7815e82e55133a4d6e80b91fdafe62b875fa57ec51a6d0e5d201234acc6473"
+    },
+    {
+      "path": "apps/android/src/main/AndroidManifest.xml",
+      "bytes": 617,
+      "sha256": "bc7e72fea7e481c53dd72a50f58be9b17ca54d6adbbb447ba6342c3354d10f33"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/MainActivity.kt",
+      "bytes": 1448,
+      "sha256": "af293ab06b7208f504698f46072ff6aa9e36e66101d71a38e6f6db8c80294fd1"
+    },
+    {
+      "path": "apps/build.gradle.kts",
+      "bytes": 21267,
+      "sha256": "0333b637af02773c5715569c237e1af5015b5a91df5d910465e15690cd48cc72"
+    },
+    {
+      "path": "apps/desktop/build.gradle.kts",
+      "bytes": 1400,
+      "sha256": "dc82f6159be308236077163565ee61af3f32bf54a028e2c348ab4623b18d0222"
+    },
+    {
+      "path": "apps/desktop/gradle.lockfile",
+      "bytes": 6351,
+      "sha256": "e2907e4ef1202cb27fa02d8c017a8b76d38d4f55fba46f2e09a970582b85293b"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt",
+      "bytes": 2389,
+      "sha256": "1833a2c28f52f9564dbb39eda77fb78905d45f8c7f47f19f863968bfd19a70a1"
+    },
+    {
+      "path": "apps/gradle.properties",
+      "bytes": 250,
+      "sha256": "ccd4f509dc03ee7061bd88915eaaa21d5030aa7cfe83caba0b16aa14c64f23cc"
+    },
+    {
+      "path": "apps/gradle/libs.versions.toml",
+      "bytes": 826,
+      "sha256": "a7f51dc6c4a1f8dd581eae35bae6cca79191bc66278396f2140443f88e35ca0c"
+    },
+    {
+      "path": "apps/gradle/wrapper/gradle-wrapper.jar",
+      "bytes": 47505,
+      "sha256": "7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d"
+    },
+    {
+      "path": "apps/gradle/wrapper/gradle-wrapper.properties",
+      "bytes": 348,
+      "sha256": "2a8ca535374517bba2e3e2882a23c4c990d5d25c976a4d2e709c4f3befd632fa"
+    },
+    {
+      "path": "apps/gradlew",
+      "bytes": 8678,
+      "sha256": "e01b5c97892572c82405c02b96a3382379100e7d825ce7c48883d95c26928750"
+    },
+    {
+      "path": "apps/gradlew.bat",
+      "bytes": 2788,
+      "sha256": "4e193538b4ddccbee0c05d6383731b647945c146d16d8fe243b4ff716867896f"
+    },
+    {
+      "path": "apps/settings-gradle.lockfile",
+      "bytes": 267,
+      "sha256": "5e2d075903b5cd264613e7538c7c51b1484fe2ed489d4ead3e6b4ba0cf3911c4"
+    },
+    {
+      "path": "apps/settings.gradle.kts",
+      "bytes": 256,
+      "sha256": "1ea7fc007e3c86793a125904832f503cb4c94cccfa5698b8cc59e19e79927b68"
+    },
+    {
+      "path": "apps/shared/build.gradle.kts",
+      "bytes": 283,
+      "sha256": "a4443618930eb8a78fa6929b54054c51b4023beb35879d5b813505d120b25520"
+    },
+    {
+      "path": "apps/shared/gradle.lockfile",
+      "bytes": 373,
+      "sha256": "38bc0b0148fd2e0136fba59d47a718e0b364c577252003a63ceb853f73b6f941"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/WorkbenchStartup.kt",
+      "bytes": 397,
+      "sha256": "ce05c4c477aa3eed6856f69867ddfc4b2071c99c21633852b9e0cc272ab3f4af"
+    },
+    {
+      "path": "build.ps1",
+      "bytes": 4203,
+      "sha256": "6e6c0c00fc80cbf7eda7ef8050f592ff3481bb885ccb8a26220605d3ddf6891e"
+    },
+    {
+      "path": "contracts/package.schema.json",
+      "bytes": 10783,
+      "sha256": "26ec83e776c58828a6daaf066a4dbf3943afe0de867a95504afbb8f6ad9c2841"
+    },
+    {
+      "path": "contracts/storage.sql",
+      "bytes": 8438,
+      "sha256": "cbc73b6ca2df5139ccb896e4061440565e70e2049bd240df87e338dc01cf1ebd"
+    },
+    {
+      "path": "contracts/vw_protocol.proto",
+      "bytes": 21571,
+      "sha256": "7fd52e440b4a670ceba482d12c123c14a443b7120bd87c959d206fb66acabfd5"
+    },
+    {
+      "path": "core/crates/vw-ai/Cargo.toml",
+      "bytes": 172,
+      "sha256": "e4e5e440ff3d433cd6377c7e0c3fb0afc93a1808a9fd43be653bdae5b7a3ae88"
+    },
+    {
+      "path": "core/crates/vw-ai/src/lib.rs",
+      "bytes": 124,
+      "sha256": "ef65a9f9c3fa887609a84b81733e89b156885d94c5292dea08292d2fadf86eb4"
+    },
+    {
+      "path": "core/crates/vw-assets/Cargo.toml",
+      "bytes": 176,
+      "sha256": "824c60cdd3e17d8316d6b745448da56cb843fe30d06cd74953a5115dbf7067b3"
+    },
+    {
+      "path": "core/crates/vw-assets/src/lib.rs",
+      "bytes": 128,
+      "sha256": "b7ea459719b6451e78e6456a64dc85f5f173593d89f3f66ca8807306ff1d7e2a"
+    },
+    {
+      "path": "core/crates/vw-ffi/Cargo.toml",
+      "bytes": 229,
+      "sha256": "17c1a40faa15bf04efbe5fcf94566d4c1ca4cccfe75fac39c60ae05cceb68320"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/lib.rs",
+      "bytes": 663,
+      "sha256": "879dc9c0f08dc7fdd8fdc60455e4aeab8e41949065bbd9ed2a1b2847a458e499"
+    },
+    {
+      "path": "core/crates/vw-geom/Cargo.toml",
+      "bytes": 174,
+      "sha256": "1977a9724db53043d226b4a225685192d9613ed19504e7ea14cfd7504813cb1f"
+    },
+    {
+      "path": "core/crates/vw-geom/src/lib.rs",
+      "bytes": 130,
+      "sha256": "07a030b5e6e04e031edad75e242d653d0b8dfc0f75b37a0db5c0cdabd1dd3b0f"
+    },
+    {
+      "path": "core/crates/vw-ink/Cargo.toml",
+      "bytes": 173,
+      "sha256": "8d037e21e17a86078f32e24f2cc168c47aa2a3f690f085762686bf74ae99e368"
+    },
+    {
+      "path": "core/crates/vw-ink/src/lib.rs",
+      "bytes": 119,
+      "sha256": "87a72ce856df5a8640b310161cbd07f720456cb17050e965ce6225a440e13e90"
+    },
+    {
+      "path": "core/crates/vw-model/Cargo.toml",
+      "bytes": 175,
+      "sha256": "96aa0cb3f6b1550e7ec9e9d9427cd1ea3c19a5728b688d53d42959b252e01152"
+    },
+    {
+      "path": "core/crates/vw-model/src/lib.rs",
+      "bytes": 118,
+      "sha256": "7607d3360354ecbfd6e5507df0cd8ff2bf03dc1a48be7ea37132437ac6328056"
+    },
+    {
+      "path": "core/crates/vw-net/Cargo.toml",
+      "bytes": 173,
+      "sha256": "2e0fdec3cae09e221dec8a254a3bed6d7363debc4311bdec15c14854f0d9d086"
+    },
+    {
+      "path": "core/crates/vw-net/src/lib.rs",
+      "bytes": 125,
+      "sha256": "be3735f4737304c93a8caf7b2af211f6b7d1610f18fe9b74052ee93991fea2ed"
+    },
+    {
+      "path": "core/crates/vw-ops/Cargo.toml",
+      "bytes": 173,
+      "sha256": "5a852d44f8013c7402fe952d8127660c4a0661e5798197e82018dd986342c15b"
+    },
+    {
+      "path": "core/crates/vw-ops/src/lib.rs",
+      "bytes": 139,
+      "sha256": "d9e04549dd2b28fda9596d0107e44bfa354a9f296a71b0242cff9399f7f9df08"
+    },
+    {
+      "path": "core/crates/vw-pdf/Cargo.toml",
+      "bytes": 173,
+      "sha256": "a4e6e46bc551ec054abf5d9ef52843f4f1c65837fd5a05d2a874f5b7df6f0e2c"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/lib.rs",
+      "bytes": 131,
+      "sha256": "9b136cf73a11fcc3935f55dc4070358c519554dff50f42b422538b159065a891"
+    },
+    {
+      "path": "core/crates/vw-pkg/Cargo.toml",
+      "bytes": 173,
+      "sha256": "51c580f467497759b0cfca06835b25bfc00aebd4de47b6c25194a6a50b8d3b9b"
+    },
+    {
+      "path": "core/crates/vw-pkg/src/lib.rs",
+      "bytes": 142,
+      "sha256": "c83f6b9887b5759698b96188ca848bce9fb25f363787e5b98cab2ecd949f0b73"
+    },
+    {
+      "path": "core/crates/vw-proto/Cargo.toml",
+      "bytes": 175,
+      "sha256": "34cd0220aec081335bd824023f6ebb19990c67d67ef5c3a598e1f97b98e0a6e2"
+    },
+    {
+      "path": "core/crates/vw-proto/src/lib.rs",
+      "bytes": 117,
+      "sha256": "2d1d78a6b998b32e420cb2d251438fbb409b0cdf2bdb93c5b23853c93559ad7d"
+    },
+    {
+      "path": "core/crates/vw-raster/Cargo.toml",
+      "bytes": 176,
+      "sha256": "5ae46377981d9d5c6c878561a699b42edb7f611b1b808bcda07f322d974308ce"
+    },
+    {
+      "path": "core/crates/vw-raster/src/lib.rs",
+      "bytes": 134,
+      "sha256": "339c7616c5bc355b730259467da87830debe12530f3c549656f12f6ebb8e14c0"
+    },
+    {
+      "path": "core/crates/vw-sim/Cargo.toml",
+      "bytes": 173,
+      "sha256": "a3bf6610a027cd06c6939f63bdb954ada10638f1aad8035ce86190d0c2319335"
+    },
+    {
+      "path": "core/crates/vw-sim/src/lib.rs",
+      "bytes": 133,
+      "sha256": "3b7c6086ee2f6429ec1dcb76428534230f1db6662b9c2ec3fce63ba0bd2addbb"
+    },
+    {
+      "path": "core/crates/vw-store/Cargo.toml",
+      "bytes": 175,
+      "sha256": "0d139571a8f2dd0f4fc247439777b7bb79e65e4d3059dede6d4bd06ca0705cea"
+    },
+    {
+      "path": "core/crates/vw-store/src/lib.rs",
+      "bytes": 119,
+      "sha256": "ad8759e93357bd0793dc6183689f67f6eee1ebe7a26842f7531ee65ff820f685"
+    },
+    {
+      "path": "core/crates/vw-svg/Cargo.toml",
+      "bytes": 173,
+      "sha256": "d9ee56d4d36de3843f2a45e33938d8e2740ed4111329db779cc0ed8f29a27dec"
+    },
+    {
+      "path": "core/crates/vw-svg/src/lib.rs",
+      "bytes": 122,
+      "sha256": "829e972d2f7b2bd7d62903bcb0afe6d6cf8b3aa9eca42faad6411a6318b6e986"
+    },
+    {
+      "path": "deny.toml",
+      "bytes": 695,
+      "sha256": "23329ef41917009c97d44c3b18b7fbd6ae0eaf61826e6eaa708e8bff89885318"
+    },
+    {
+      "path": "docs/BUILD_SPECIFICATION.md",
+      "bytes": 67089,
+      "sha256": "50f7975cc0d9a69099b0c418c1794685897cac7c6cf2241976be7d91f0425677"
+    },
+    {
+      "path": "docs/DECISIONS.md",
+      "bytes": 16231,
+      "sha256": "28ecf93e5f526e47a4fb16d749f5834bfdc45f6626221e84e14176938614ca6d"
+    },
+    {
+      "path": "docs/IMPLEMENTATION_PLAN.md",
+      "bytes": 48770,
+      "sha256": "6a7c425f20c3eff5c3dd23f095c8e1d1bb1adfd4906b8fb7c1da289db0245896"
+    },
+    {
+      "path": "docs/REQUIREMENTS.json",
+      "bytes": 186557,
+      "sha256": "adc925d8cfdc2a4a419f5e190eb30aff6190fcfd0181564d0d93e0d7655df96a"
+    },
+    {
+      "path": "docs/SETUP_ASSESSMENT.md",
+      "bytes": 15215,
+      "sha256": "d0e219470105f32cc4afde0020ed443fa3d689cffd7e52bef76e54989fb751d8"
+    },
+    {
+      "path": "docs/SOURCES.json",
+      "bytes": 22885,
+      "sha256": "8c1730e875df5158cdb239a98697a8b3603ba71551ed52586200920290932f13"
+    },
+    {
+      "path": "docs/TOOLCHAIN.md",
+      "bytes": 22370,
+      "sha256": "a5d757ef1c0166390f624fd470b057119c11cf81e98ad00b25be232ceb6b0be7"
+    },
+    {
+      "path": "docs/evidence/ANDROID_STARTUP.json",
+      "bytes": 194,
+      "sha256": "c528f255f3606e4be9ee6a9db0253cc5624af28e4216ef0e51f4f4ed5ce99eea"
+    },
+    {
+      "path": "docs/evidence/APK_VERIFICATION.json",
+      "bytes": 903,
+      "sha256": "6a73d010f0fa24c20cac7d8868880849a86f7b34ad1e466fd14bdfbf2d73faab"
+    },
+    {
+      "path": "docs/evidence/DESKTOP_STARTUP.json",
+      "bytes": 510,
+      "sha256": "a8df58124432be333b05c90cc524e8c0a482082ace20e8290380c990157fe819"
+    },
+    {
+      "path": "docs/evidence/PACKAGE_SECRET_SCAN.json",
+      "bytes": 1020,
+      "sha256": "5d797feb1a6714ab2fc8d992d17da761c7433517f069e03f38c2c0f0a0c4d71f"
+    },
+    {
+      "path": "docs/evidence/SETUP_CLEANUP.json",
+      "bytes": 654,
+      "sha256": "f9efd1ad4b0eeaa5a9b744a84f123869ceb0043331f4017a48211947e9c8e481"
+    },
+    {
+      "path": "docs/evidence/SETUP_METRICS.json",
+      "bytes": 18467,
+      "sha256": "332c6d0ae3c3fa3ea0a28f62af544c29ba0be565e9b2146f4412b5024500c3b9"
+    },
+    {
+      "path": "docs/evidence/SETUP_STARTUP.md",
+      "bytes": 15079,
+      "sha256": "d388feba797de262c0fb50411e683d0ac0b27bde98be81e141d25c6f82e575e2"
+    },
+    {
+      "path": "docs/evidence/SOURCE_PRESERVATION.json",
+      "bytes": 2110,
+      "sha256": "2e53fc9794eef5ceabd1d5b857b6c25bd891afd5dc8df2e7ebb80e1b7d83bc2e"
+    },
+    {
+      "path": "docs/evidence/T0.01.md",
+      "bytes": 1712,
+      "sha256": "208bd430bd4f45376341f4cb5f33ba57ef9ae99250c35ede4c01f7a1a821da87"
+    },
+    {
+      "path": "docs/evidence/T0.02.md",
+      "bytes": 2490,
+      "sha256": "dc71c9c534303b1684c96f077132a441908f079f7639b737a5f7f7cbd46b28d8"
+    },
+    {
+      "path": "docs/v1_requirement_ids.txt",
+      "bytes": 1081,
+      "sha256": "7b0b25f699f1ae8588db9dfcbb6f7b89bf1630bbb160e758a216d03867309542"
+    },
+    {
+      "path": "host-win/crates/vw-host-ffi/Cargo.toml",
+      "bytes": 234,
+      "sha256": "645644c61c36af5f6f10083b28611bb559ff768a4c113552cd5e99b47251261d"
+    },
+    {
+      "path": "host-win/crates/vw-host-ffi/src/lib.rs",
+      "bytes": 463,
+      "sha256": "dcbc8ac20dbd0bf4cdde30ca7fe9aae6c986f31ecea14a738e27887c456b5ed2"
+    },
+    {
+      "path": "host-win/crates/vw-host-win/Cargo.toml",
+      "bytes": 178,
+      "sha256": "a2eafbf1c11d3c6663c71af1e990d121d2f866925628d22b08ed4e19e84be41d"
+    },
+    {
+      "path": "host-win/crates/vw-host-win/src/lib.rs",
+      "bytes": 161,
+      "sha256": "333df4e372c2babba7bd71ac1ee97810a61e46cf28635a03df05c5ecd15e39d4"
+    },
+    {
+      "path": "prompts/phase-0/T0.01-toolchain.md",
+      "bytes": 14654,
+      "sha256": "8ae662d41e86cab696b297ea4a547999477182f5e65d55517bb442a04efebb1f"
+    },
+    {
+      "path": "prompts/phase-0/T0.02-repo-skeleton.md",
+      "bytes": 13637,
+      "sha256": "14c41822f296e503bd12c6906f507c81c6e4f249f81fe03fedb9d52ccf3650ca"
+    },
+    {
+      "path": "prompts/phase-0/T0.03-diagnostics.md",
+      "bytes": 12013,
+      "sha256": "06b3497d8cd386ddb000c1031c09968b909f7462c49c3722161d081539860723"
+    },
+    {
+      "path": "prompts/phase-0/T0.04-pen-probe.md",
+      "bytes": 12861,
+      "sha256": "2dd9cf8e098358b012042d7ab13116e290cd2b7dc98f00e79e200e9249fb9b69"
+    },
+    {
+      "path": "prompts/phase-0/T0.05-injection-probe.md",
+      "bytes": 11364,
+      "sha256": "5ea65065b951ea7aa4a085a20a10e575630a34e96ae593a8be74ef6967d71dfb"
+    },
+    {
+      "path": "prompts/phase-0/T0.06-transport-spike.md",
+      "bytes": 12356,
+      "sha256": "59ffb67b76a5ca77d0d79a21e96fc2b3f85d3a490937bce824d8f61fa36bb351"
+    },
+    {
+      "path": "prompts/phase-0/T0.07-video-spike.md",
+      "bytes": 10529,
+      "sha256": "e68a5fc5eade673a3a1d25d1ade5fe2abe9ad76c1a659e4eadb15d773ebb1f38"
+    },
+    {
+      "path": "prompts/phase-0/T0.08-sudovda-spike.md",
+      "bytes": 13902,
+      "sha256": "e85d3a33faf0b5c86006c4b04e03eb301c5a4e5770b4edc1da558a12d057c0f7"
+    },
+    {
+      "path": "prompts/phase-0/T0.09-image-spike.md",
+      "bytes": 11025,
+      "sha256": "76bce13d0e64ca5fcb820cd85c02877484d306aa6097d032476687334108e852"
+    },
+    {
+      "path": "prompts/phase-0/T0.10-stroke-spike.md",
+      "bytes": 11136,
+      "sha256": "5369df89c25f7b939d17da5114d42f6e91bea7c928b3c504d13b4ac775046a42"
+    },
+    {
+      "path": "prompts/phase-0/T0.11-gpt-image-spike.md",
+      "bytes": 12172,
+      "sha256": "10ccdadcfec52825c98be3c3fa3daed06ce9fa065b64e1712d0e40296fdd69e1"
+    },
+    {
+      "path": "prompts/phase-0/T0.12-gate-g0.md",
+      "bytes": 11035,
+      "sha256": "26f5f54d52fbfcbcbfe5eb417955e5773a2d3f326ac5d15f1ada4039cddf1403"
+    },
+    {
+      "path": "prompts/phase-1/T1.01-vw-geom.md",
+      "bytes": 10237,
+      "sha256": "07d40e85357db457f947190f719c0e773b3802c4e1da3894d4267f8fd15f8ff7"
+    },
+    {
+      "path": "prompts/phase-1/T1.02-model-ops.md",
+      "bytes": 11249,
+      "sha256": "937e244c6484fdd60a64a21a9a43da7dfb13a1abb0bea78c602d087a92c6578e"
+    },
+    {
+      "path": "prompts/phase-1/T1.03-vw-store.md",
+      "bytes": 10706,
+      "sha256": "3a9938008000f1ae38cb3187e09acca483224fd7dd5e0efa9ad141014b9f8bc6"
+    },
+    {
+      "path": "prompts/phase-1/T1.04-vw-ink.md",
+      "bytes": 9872,
+      "sha256": "59ba542aa8c3bb6260536fe2e04865781fb1a81af5e0dcbd5ef2d2d2261c3957"
+    },
+    {
+      "path": "prompts/phase-1/T1.05-vw-raster.md",
+      "bytes": 10841,
+      "sha256": "5c21c4b06fb9fc80bb5f3e02a02acaac569b8d8c213b78b4a0e21dd827bd363f"
+    },
+    {
+      "path": "prompts/phase-1/T1.06a-transport.md",
+      "bytes": 11662,
+      "sha256": "b59351fdfc1dc339fde9070a93743f7323cc5ac63cf8874237dac347127cf2cb"
+    },
+    {
+      "path": "prompts/phase-1/T1.06b-pairing.md",
+      "bytes": 12278,
+      "sha256": "e687bea556d7b380cb063a4aa39c952483ba9ee3b335e952a32ae22f762353cb"
+    },
+    {
+      "path": "prompts/phase-1/T1.07-ffi-shared.md",
+      "bytes": 10355,
+      "sha256": "6c91b2356b4215b77da403905f5cce4f355a695973bba1e0ef891dc473b152cc"
+    },
+    {
+      "path": "prompts/phase-1/T1.08a-android-canvas.md",
+      "bytes": 10906,
+      "sha256": "613924165843600cdc5749925224cf7ae90de4ca739cea771320ce3d9d0c8a60"
+    },
+    {
+      "path": "prompts/phase-1/T1.08b-android-tools.md",
+      "bytes": 10015,
+      "sha256": "20c315f8e3d975a8a03126fa801f260f8a9b74f82a8772e3ed2c7c538ed24f0d"
+    },
+    {
+      "path": "prompts/phase-1/T1.09-desktop-shell.md",
+      "bytes": 12184,
+      "sha256": "85ad229e0592db1f836fc9cc54adf0a4a61b6f202754689c790c277041ddc031"
+    },
+    {
+      "path": "prompts/phase-1/T1.10-live-sync.md",
+      "bytes": 14990,
+      "sha256": "0a47f785732132a12a29446278d9a83c78e8aecbe5b311d09cfc730d2ac7db0d"
+    },
+    {
+      "path": "prompts/phase-1/T1.11-import-export.md",
+      "bytes": 11377,
+      "sha256": "5325bdb07e0cda8b02fcb15d9c46aa9775644c8b1a7ed497bdeb043c48303b07"
+    },
+    {
+      "path": "prompts/phase-1/T1.12-phase1-acceptance.md",
+      "bytes": 10549,
+      "sha256": "d31d2a8beb8e9cf3fcbf9c18355ba74535041a98dc4306e0c3d3bcd579e668e1"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "bytes": 148,
+      "sha256": "7daa90fd3135f5361b3eee9595738b3d68b51893d94bd42b49be25d4acaa8263"
+    },
+    {
+      "path": "start.ps1",
+      "bytes": 2091,
+      "sha256": "52bcf26c59ed80f59f3e7f960d44f09de815bb008aefea015befcec6c772e112"
+    },
+    {
+      "path": "third_party/LICENSES",
+      "bytes": 41,
+      "sha256": "7a56800b8f8039afd10433ce0eb123434fb46469568641d8d15a332b3b673432"
+    },
+    {
+      "path": "tools/android-device.psm1",
+      "bytes": 14392,
+      "sha256": "73403825d3e1657bcfa13ed84a7c37d5cb95d9278824807ee6fdd6fe71d82e80"
+    },
+    {
+      "path": "tools/android-rust-runner.cmd",
+      "bytes": 285,
+      "sha256": "7e39f38da1f44401aa53762c377abb8fa10f3b992f9fd292b00a35f91af7f513"
+    },
+    {
+      "path": "tools/android-rust-runner.ps1",
+      "bytes": 850,
+      "sha256": "635299352b80cb25e11b34aaa17783f83bf21868fe4bcf9dc584800ded105636"
+    },
+    {
+      "path": "tools/check-desktop-startup.ps1",
+      "bytes": 3360,
+      "sha256": "860bbe6343cb56dd493e9b21f0863088d868febf8a4ab28d735ff2d3f8fa2013"
+    },
+    {
+      "path": "tools/check_android_artifacts.py",
+      "bytes": 3707,
+      "sha256": "07aa6eab53071771f08da359859b6a83ad3fdb9befb1551efce3a32f37ef9831"
+    },
+    {
+      "path": "tools/check_gradle_licenses.py",
+      "bytes": 12074,
+      "sha256": "6eaaa82d0001bbea5455370be3d96bb3def5b516ae36f2b321988ae4a3f16c9b"
+    },
+    {
+      "path": "tools/check_plan_coverage.py",
+      "bytes": 8144,
+      "sha256": "b7e3cfd1fd171579344614b704ab9fd06be5ac6b72dcbdf46dd2ad0c1f602555"
+    },
+    {
+      "path": "tools/check_setup.py",
+      "bytes": 7386,
+      "sha256": "978dfedf2068e0805a542370c4d84fbeadb4636be689b54282286557a60c8488"
+    },
+    {
+      "path": "tools/diagnostics/pc-diagnostics.ps1",
+      "bytes": 6447,
+      "sha256": "6d381f5773d7b3cc1b204cc105f864ec432ebd1dcbf997369691854b2656b6b8"
+    },
+    {
+      "path": "tools/diagnostics/phone-diagnostics.ps1",
+      "bytes": 3694,
+      "sha256": "724b873f6ea1f7c0b31f05392e949683d28471b67b9cb4751ddcb752c27ee0a1"
+    },
+    {
+      "path": "tools/doctor.ps1",
+      "bytes": 3738,
+      "sha256": "dc2950b86f3fbead5a35f4fde087dcbf2e3da90ef3e358d85605659e6886e06c"
+    },
+    {
+      "path": "tools/enter-dev.ps1",
+      "bytes": 880,
+      "sha256": "4c220549a4135ea6d0c1190a6aa212ea01ebbcdbbdf65fc5aa4f1ecd25af06ad"
+    },
+    {
+      "path": "tools/hello/Cargo.toml",
+      "bytes": 367,
+      "sha256": "71e3481fcf056cab715b968ddbc13489c065c0fb62c2e53a35c28a7cacea5dda"
+    },
+    {
+      "path": "tools/hello/README.md",
+      "bytes": 885,
+      "sha256": "4bb9e248ac990aafee49299a286f2920cda2d8e547268f96c005c64fbfc6e411"
+    },
+    {
+      "path": "tools/hello/src/lib.rs",
+      "bytes": 428,
+      "sha256": "34a0ecca23e63f3405b2d59214d6d965257b14785e754a243d19143ffe4a9650"
+    },
+    {
+      "path": "tools/hello/src/main.rs",
+      "bytes": 210,
+      "sha256": "7825d3283b5afc2ab837be4a8acd815773a3da9a91230e1ea81080544d8df650"
+    },
+    {
+      "path": "tools/hil-test.ps1",
+      "bytes": 4223,
+      "sha256": "55172e6061734af0fd24bf630b9919445948fa875ed7879bf6c94e8aa6d26c88"
+    },
+    {
+      "path": "tools/process.psm1",
+      "bytes": 18126,
+      "sha256": "d7fb0540ee75c8408f8851d9aae0054b465f2e82f5ec4d1e6e30ba3496cb7f8d"
+    },
+    {
+      "path": "tools/run_bounded.ps1",
+      "bytes": 630,
+      "sha256": "4801014d7b83d1b881fb69faa31c72e6267c31e0eaf00c1e3e2c9a44a0fab1bd"
+    },
+    {
+      "path": "tools/tests/runner_batch.cmd",
+      "bytes": 128,
+      "sha256": "ccadacaa979e3bd931dad0f0cd3a11bab7f1b0a11fdcaebd9abc9303c15b39eb"
+    },
+    {
+      "path": "tools/tests/test_setup_gates.py",
+      "bytes": 21030,
+      "sha256": "409d9cbe60949840cc07c5f9ce2025e1281d2239e3f789c04cb1aa440a1c43a5"
+    }
+  ]
+}

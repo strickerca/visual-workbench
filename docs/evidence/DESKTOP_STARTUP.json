@@ -1,0 +1,15 @@
+{
+  "visible_window": true,
+  "native_libraries_loaded": 2,
+  "windows_window_dpi": 168,
+  "windows_scale": 1.75,
+  "compose_density": 1.75,
+  "awt_scale_x": 1.75,
+  "awt_scale_y": 1.75,
+  "elapsed_seconds": 0.083,
+  "screenshot_count": 0,
+  "visual_sharpness_manually_verified": false,
+  "application_jar_sha256": "f5e40621a65f20431f71a311087b89aad1cd8dc69f4d6750cab611933d4c46f8",
+  "uses_owner_installed_jdk": true,
+  "readiness_elapsed_is_check_duration_not_full_application_launch": true
+}

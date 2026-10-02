@@ -1,0 +1,62 @@
+[
+  {
+    "file": "capture-1.png",
+    "width": 900,
+    "height": 600,
+    "sha256": "39a7955b58a528c74b0b720b7ba06f170dcd7ea3b239f4f2bde7ddc28c1f38f5",
+    "bytes": 1620788,
+    "png_crc_and_zlib_verified": true,
+    "quadrant_colors": [
+      [
+        240,
+        20,
+        20
+      ],
+      [
+        20,
+        200,
+        20
+      ],
+      [
+        20,
+        20,
+        240
+      ],
+      [
+        240,
+        220,
+        20
+      ]
+    ]
+  },
+  {
+    "file": "capture-2.png",
+    "width": 900,
+    "height": 600,
+    "sha256": "39a7955b58a528c74b0b720b7ba06f170dcd7ea3b239f4f2bde7ddc28c1f38f5",
+    "bytes": 1620788,
+    "png_crc_and_zlib_verified": true,
+    "quadrant_colors": [
+      [
+        240,
+        20,
+        20
+      ],
+      [
+        20,
+        200,
+        20
+      ],
+      [
+        20,
+        20,
+        240
+      ],
+      [
+        240,
+        220,
+        20
+      ]
+    ]
+  }
+]
