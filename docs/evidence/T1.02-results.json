@@ -1,0 +1,586 @@
+{
+  "schema": 1,
+  "task": "T1.02",
+  "date": "2026-10-02",
+  "baseline_commit": "74350d048ffa7453fa9d40bf6faf7fa572583884",
+  "source_bindings": [
+    {
+      "path": "core/crates/vw-model/Cargo.toml",
+      "sha256": "7c96993a860a82bef65cc00e9bc3234650481a5073ca29f1738e5b9452662f61"
+    },
+    {
+      "path": "core/crates/vw-model/src/ids.rs",
+      "sha256": "eabb8e3da222108670defe0be57d523f147a3fe2e8f9d9f61983e250622cbcd4"
+    },
+    {
+      "path": "core/crates/vw-model/src/lib.rs",
+      "sha256": "a3e664d34308295afb42702edfcd15a0231edb2d6269b1a118475be9e2a1bb2c"
+    },
+    {
+      "path": "core/crates/vw-model/src/order.rs",
+      "sha256": "7a38b9022e0fc5a0b5b13237748320534af0b2f1d0ed84a904b0bbc8c11b07c9"
+    },
+    {
+      "path": "core/crates/vw-model/src/state.rs",
+      "sha256": "9de77149dd67c8864260b3deaa5e39b1d3a371e47acc44a2908a134dfccde1e1"
+    },
+    {
+      "path": "core/crates/vw-model/src/validate.rs",
+      "sha256": "29cdfa8fe50b9930be5fe8838724d5b55abcbd7536918f1bf8651796f001f0d1"
+    },
+    {
+      "path": "core/crates/vw-model/tests/model_contract.rs",
+      "sha256": "9b1a1f6ffcf85cd99b72e9bb6727bfbaedff005666e1137a9c172d4c42c04eff"
+    },
+    {
+      "path": "core/crates/vw-ops/Cargo.toml",
+      "sha256": "8ab6c0bc4690b0cf55925ded46f3f15bca5336ca20511dd963f4de2bc32c8952"
+    },
+    {
+      "path": "core/crates/vw-ops/src/gesture.rs",
+      "sha256": "db812e7a9136e0afbbe6782f80322cf306bbe396be3b2cf7cc77956351f1206f"
+    },
+    {
+      "path": "core/crates/vw-ops/src/host.rs",
+      "sha256": "d982754701ab499ad00a44d0bec305f0936a6af31ca5f533fd15311da0ea69d2"
+    },
+    {
+      "path": "core/crates/vw-ops/src/lib.rs",
+      "sha256": "688965dfd9de3aa5da78d8bc10fd0ecee1df58bf4484335f2bcffc2d55765177"
+    },
+    {
+      "path": "core/crates/vw-ops/src/patch.rs",
+      "sha256": "1e28841e029b57a0861b95e3d7b4f20347c938a5640c242db61351252d925940"
+    },
+    {
+      "path": "core/crates/vw-ops/src/plan.rs",
+      "sha256": "ca0af5647216585ee81484f1aa124672f83d5270747e15ed535b32ee760d7c8c"
+    },
+    {
+      "path": "core/crates/vw-ops/src/replica.rs",
+      "sha256": "d31016a0d779fb6a86b1ae7f7435ed09bae55b921ec5dcf3c2a4507733067f78"
+    },
+    {
+      "path": "core/crates/vw-ops/src/undo.rs",
+      "sha256": "8070a482817c3ccc76591e701e4e114b5710e5863f543bfd4613b583a9e6f42c"
+    },
+    {
+      "path": "core/crates/vw-ops/tests/engine.rs",
+      "sha256": "650151bd1ceff441a44eed7851db29bab3373a42d3f91fb053ced09d888bf600"
+    },
+    {
+      "path": "core/crates/vw-ops/tests/root_owned.rs",
+      "sha256": "1d687c9020ec64b7e45900909bed486620e505efbf8961994ba457f27b4be502"
+    },
+    {
+      "path": "core/crates/vw-ops/tests/undo_recovery.rs",
+      "sha256": "e0187e328775caef4395fda464b65ca3f1495aa21d08e5efae6675d18cde65c0"
+    },
+    {
+      "path": "core/crates/vw-proto/build.rs",
+      "sha256": "1b27519d8b7c41bd0e6e9ebc28021703dd77124ee1ddbc60fb1f07b0f83bc8d6"
+    },
+    {
+      "path": "core/crates/vw-proto/Cargo.toml",
+      "sha256": "dc4fce6fb59ddd4adfcd1e72f544798c8443f445295835a7682ee51c8fcf1041"
+    },
+    {
+      "path": "core/crates/vw-proto/src/lib.rs",
+      "sha256": "cc36a280cc559aabb64b792be4c4e492d15d82b6dc56c8c82264b7cdb69b5a9a"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "72c3851154b2eae24a0f344cde2b35ec4a1a43c21847f4218abc22e0ee80e1eb"
+    },
+    {
+      "path": "contracts/vw_protocol.proto",
+      "sha256": "add05c93e7abec86b91805eb9294bc9997fe3a619912e022c12af01c7d720bab"
+    }
+  ],
+  "settings": {
+    "actual_model": "gpt-6-astra",
+    "actual_effort": "xhigh",
+    "recommended_model": "gpt-6-astra",
+    "recommended_effort": "max",
+    "changed_automatically": false
+  },
+  "platforms": {
+    "windows": "x86_64-pc-windows-msvc",
+    "android": "aarch64-linux-android",
+    "device_model": "SM-S918U",
+    "android_api": 36
+  },
+  "tests": {
+    "model_tests": 15,
+    "engine_tests": 25,
+    "replica_gesture_tests": 9,
+    "undo_recovery_tests": 12,
+    "total_per_platform": 61,
+    "property_cases_per_platform": 500,
+    "property_seed": "0x565701020500",
+    "fractional_insertions_per_platform": 51200,
+    "f64_exact_roundtrips_per_platform": 512,
+    "golden_state_hash": "3120769b42f577ffbedf8c0ac10cc176ae21b1f643ace65f625e979914952ee0",
+    "golden_verification": "Identical fixed-log assertion passes in both source-bound platform test executables; Android raw stdout is privacy-suppressed.",
+    "windows": {
+      "phase": "t102-windows-final",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 105.014,
+      "sampled_peak_tree_working_set_bytes": 467107840,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t102-windows-final-ace87b05e17c4f8dbc08f71965ee979d.log",
+      "compiler_telemetry_cleaned": true,
+      "parent_exit_grace_seconds": 5
+    },
+    "android": [
+      {
+        "phase": "hil-rust-cargo-test",
+        "exit_code": 0,
+        "parent_exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 50.576,
+        "sampled_peak_tree_working_set_bytes": 430235648,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 600,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "hil-rust-cargo-test-9790ea94ad6a42d3a1ba5f74d11fec77.log",
+        "compiler_telemetry_cleaned": true,
+        "parent_exit_grace_seconds": 5
+      },
+      {
+        "phase": "hil-rust-cargo-test",
+        "exit_code": 0,
+        "parent_exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 77.457,
+        "sampled_peak_tree_working_set_bytes": 292302848,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 600,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "hil-rust-cargo-test-235feeda84bc4e1abe3ac37aab61169a.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5
+      }
+    ],
+    "android_runtime_receipts": [
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "ed73f60d7ee65fc825adadc6ed63475d857e3be3b1df84ced019154ec9f91596",
+        "validated_count": 15,
+        "validation_succeeded": true,
+        "owned_device_directory": "/data/local/tmp/vw-tests/565e4b6fb9124d6f8d62ef6514af5c2b",
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "ef98f0755f881667801deeab1153ceb032e432c01163c2af272aee509896b7a3",
+        "validated_count": 15,
+        "validation_succeeded": true,
+        "owned_device_directory": "/data/local/tmp/vw-tests/9f77833ff4f942ae8e2300892cb278e0",
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "e8ee985eecf8c1712eb018905fa69851bd1a7af2f6f9ed6ef43707b50dddbf3c",
+        "validated_count": 25,
+        "validation_succeeded": true,
+        "owned_device_directory": "/data/local/tmp/vw-tests/64583e72c34c433bb38ae777b9e18371",
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "e7d16cd32fae53bd4f338c63b6efce1a91b4b44c018351a185f47bb9423742b2",
+        "validated_count": 9,
+        "validation_succeeded": true,
+        "owned_device_directory": "/data/local/tmp/vw-tests/d933e02fb6a64ce881882de694cec2e6",
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "1788f10885c7e1c874eeb2afe32f4cc07a93d840d24a146f9c8e9f7cf3bad0d7",
+        "validated_count": 12,
+        "validation_succeeded": true,
+        "owned_device_directory": "/data/local/tmp/vw-tests/24f908b3005a43ada17c2111c8d91dfb",
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0
+      }
+    ],
+    "final_android_executables": [
+      {
+        "path": "target/aarch64-linux-android/debug/deps/model_contract-cd3da80b7d8ad519",
+        "sha256": "ef98f0755f881667801deeab1153ceb032e432c01163c2af272aee509896b7a3"
+      },
+      {
+        "path": "target/aarch64-linux-android/debug/deps/engine-86c02ff24b15277c",
+        "sha256": "e8ee985eecf8c1712eb018905fa69851bd1a7af2f6f9ed6ef43707b50dddbf3c"
+      },
+      {
+        "path": "target/aarch64-linux-android/debug/deps/root_owned-b585e4005eccd4c6",
+        "sha256": "e7d16cd32fae53bd4f338c63b6efce1a91b4b44c018351a185f47bb9423742b2"
+      },
+      {
+        "path": "target/aarch64-linux-android/debug/deps/undo_recovery-0475ee6a028ba47c",
+        "sha256": "1788f10885c7e1c874eeb2afe32f4cc07a93d840d24a146f9c8e9f7cf3bad0d7"
+      }
+    ],
+    "clippy": {
+      "phase": "t102-clippy-final",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 7.259,
+      "sampled_peak_tree_working_set_bytes": 190820352,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t102-clippy-final-5e193e060c9f4f5980f07594e3f0af18.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    "rustdoc": {
+      "phase": "t102-rustdoc",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 21.957,
+      "sampled_peak_tree_working_set_bytes": 391184384,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 300,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t102-rustdoc-d4cd14543a6c424cb8dd60abf9dae87f.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    "formatting": {
+      "phase": "t102-format-check",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 1.513,
+      "sampled_peak_tree_working_set_bytes": 2711552,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 60,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t102-format-check-15382744d49946e18ce5d58a458f0401.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    "integration": {
+      "phase": "build-core",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 149.735,
+      "sampled_peak_tree_working_set_bytes": 2058043392,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "build-core-ddc5025a46cc4d3d9518347150ef7af5.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    "policy": {
+      "phase": "t102-policy",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 0.764,
+      "sampled_peak_tree_working_set_bytes": 7135232,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 60,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t102-policy-afb0a6164a2b425b932ee4ef0937c4da.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    "retained_initial_failures": [
+      {
+        "phase": "t102-model-tests",
+        "exit_code": 1,
+        "parent_exit_code": 101,
+        "failure_reason": "descendants survived parent exit",
+        "elapsed_seconds": 49.723,
+        "sampled_peak_tree_working_set_bytes": 492896256,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 240,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t102-model-tests-1e135aad15184282a19b5c0003822401.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5
+      },
+      {
+        "phase": "t102-windows-first",
+        "exit_code": 1,
+        "parent_exit_code": 101,
+        "failure_reason": "descendants survived parent exit",
+        "elapsed_seconds": 96.115,
+        "sampled_peak_tree_working_set_bytes": 565026816,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 300,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t102-windows-first-5c2bd27247ea4ba99d5c4de17225c68e.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5
+      },
+      {
+        "phase": "t102-clippy",
+        "exit_code": 1,
+        "parent_exit_code": 101,
+        "failure_reason": "descendants survived parent exit",
+        "elapsed_seconds": 35.974,
+        "sampled_peak_tree_working_set_bytes": 698245120,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 300,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t102-clippy-088e04951d334f4997a6f33bf89bbcae.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5
+      },
+      {
+        "phase": "t102-clippy",
+        "exit_code": 1,
+        "parent_exit_code": 101,
+        "failure_reason": "descendants survived parent exit",
+        "elapsed_seconds": 25.472,
+        "sampled_peak_tree_working_set_bytes": 643350528,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 300,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t102-clippy-ee75b24b917d4162b8d9a8944587ce27.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5
+      },
+      {
+        "phase": "t102-clippy",
+        "exit_code": 1,
+        "parent_exit_code": 101,
+        "failure_reason": "descendants survived parent exit",
+        "elapsed_seconds": 30.063,
+        "sampled_peak_tree_working_set_bytes": 657747968,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 300,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t102-clippy-29265bcf3abe4423bade5e1b80aab9f4.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5
+      },
+      {
+        "phase": "t102-clippy",
+        "exit_code": 101,
+        "parent_exit_code": 101,
+        "failure_reason": null,
+        "elapsed_seconds": 10.568,
+        "sampled_peak_tree_working_set_bytes": 213225472,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 300,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t102-clippy-54d28e510424438faeb2838606980036.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5
+      },
+      {
+        "phase": "t102-clippy-final",
+        "exit_code": 1,
+        "parent_exit_code": 101,
+        "failure_reason": "descendants survived parent exit",
+        "elapsed_seconds": 25.086,
+        "sampled_peak_tree_working_set_bytes": 614105088,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 300,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t102-clippy-final-cc88c2ec7d2f442eb69da8c9146452f3.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5
+      }
+    ]
+  },
+  "dependency_versions": {
+    "prost": {
+      "num": "0.14.4",
+      "license": "Apache-2.0",
+      "rust_version": "1.85",
+      "created_at": "2026-06-07T10:13:40.918481Z",
+      "checksum": "528ac67416ff8646872a3c02cad9cc4ee5dc9f9540c9b10771855c95cb2e5ae1",
+      "yanked": false,
+      "features": {
+        "default": [
+          "derive",
+          "std"
+        ],
+        "derive": [
+          "dep:prost-derive"
+        ],
+        "no-recursion-limit": [],
+        "std": []
+      }
+    },
+    "prost-build": {
+      "num": "0.14.4",
+      "license": "Apache-2.0",
+      "rust_version": "1.85",
+      "created_at": "2026-06-07T10:14:03.681322Z",
+      "checksum": "03da047801ff44bb6a4d407d4860c05fd70bb81714e6b2f3812603d5b145b042",
+      "yanked": false,
+      "features": {
+        "cleanup-markdown": [
+          "dep:pulldown-cmark",
+          "dep:pulldown-cmark-to-cmark"
+        ],
+        "default": [
+          "format"
+        ],
+        "format": [
+          "dep:prettyplease",
+          "dep:syn"
+        ]
+      }
+    },
+    "protoc-bin-vendored": {
+      "num": "3.2.0",
+      "license": "MIT",
+      "rust_version": null,
+      "created_at": "2025-07-21T04:37:11.529296Z",
+      "checksum": "d1c381df33c98266b5f08186583660090a4ffa0889e76c7e9a5e175f645a67fa",
+      "yanked": false,
+      "features": {}
+    },
+    "blake3": {
+      "num": "1.8.7",
+      "license": "CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception",
+      "rust_version": null,
+      "created_at": "2026-08-20T09:09:56.903547Z",
+      "checksum": "6d9e454fc11f76977dc803893aff6304ed33d6a26efae8696573bea74baa27ae",
+      "yanked": false,
+      "features": {
+        "default": [
+          "std"
+        ],
+        "digest": [
+          "dep:digest"
+        ],
+        "mmap": [
+          "std",
+          "dep:memmap2"
+        ],
+        "neon": [],
+        "no_avx2": [],
+        "no_avx512": [],
+        "no_neon": [],
+        "no_sse2": [],
+        "no_sse41": [],
+        "prefer_intrinsics": [],
+        "pure": [],
+        "rayon": [
+          "dep:rayon-core"
+        ],
+        "std": [
+          "constant_time_eq/std"
+        ],
+        "traits-preview": [
+          "dep:digest"
+        ],
+        "wasm32_simd": [],
+        "zeroize": [
+          "dep:zeroize",
+          "arrayvec/zeroize"
+        ]
+      }
+    }
+  },
+  "licenses": {
+    "rust": {
+      "phase": "license-rust",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 14.048,
+      "sampled_peak_tree_working_set_bytes": 134541312,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "license-rust-1540b7015fa44a30b05c62f9b0701482.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5
+    },
+    "gradle": {
+      "phase": "license-gradle",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 83.552,
+      "sampled_peak_tree_working_set_bytes": 630226944,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "license-gradle-ae8f6f9b9b1f44c29f36fd2a4b60f649.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 20
+    },
+    "modules": 184,
+    "runtime_configurations": 10,
+    "parent_poms": 1,
+    "policy_changed": false
+  },
+  "review": {
+    "mode": "parallel implementation with separate file ownership plus independent read-only source review",
+    "known_findings_remaining": 0,
+    "scope": "model, host conflicts, replica rebase, inverse history, gestures and regression tests; builds serialized by parent"
+  },
+  "cleanup": {
+    "screenshots_created": 0,
+    "android_owned_runs_disposed": 5,
+    "all_device_cleanup_confirmed": true
+  },
+  "boundaries": [
+    "In-memory engine; durable history, pending work and conflict persistence are T1.03.",
+    "HostSnapshot carries trusted internal inverse previews and complete acknowledgement bindings; bounded transport framing/history retention are T1.06a/T1.10.",
+    "No transport latency, app rendering, physical pen, AI proof execution, or phase gate acceptance."
+  ]
+}

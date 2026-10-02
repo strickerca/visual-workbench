@@ -91,9 +91,11 @@
       "scenarios": [
         "A01"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.02.md — shared canonical model and immutable asset metadata verified; blob-byte immutability/storage and real cross-device latency remain T1.03, T1.10 and T1.12."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "updated: mechanism defined by D1, D3 and D5"
     },
@@ -205,9 +207,11 @@
       "scenarios": [
         "A06"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.02.md — 500 seeded undo/redo sequences per platform and commit/cancel identities verified; actual app gestures and end-to-end cancellation remain T1.08b, T1.10 and T1.12."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -232,7 +236,9 @@
         "A07",
         "A13"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T1.02.md — capture session/frame/geometry and semantic binding round-trip on both platforms; evidence only, capture storage/import/export metadata remain downstream."
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -801,9 +807,11 @@
       "scenarios": [
         "A02"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.02.md — all 13 object representations and editable operations validated; brush/tool UI, font rendering and golden images remain T1.04, T1.05, T1.08b and T1.12."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -879,9 +887,11 @@
       "scenarios": [
         "A02"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.02.md — transform/style/shape property transactions and inverse behavior verified; interactive handles and streamed intermediate UI states remain T1.08b/T1.09/T1.10/T1.12."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "split: rotation moved to EDIT-012 (phase 3) so each gate can pass"
     },
@@ -3984,9 +3994,11 @@
       "scenarios": [
         "A25"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.02.md — offline queue/rebase, optimistic undo/redo and conflict retention pass simulation; durable conflict table and PC-off app open/edit/export/save remain T1.03, T1.08a, T1.10 and T1.12."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new"
     },
@@ -4066,9 +4078,11 @@
       "scenarios": [
         "A14"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.02.md — duplicate acknowledgements and atomic host sequencing pass simulation; durable sequencing/restart and finalized live transport remain T1.03, T1.06a, T1.10 and T1.12."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new (D3)"
     },
@@ -4092,9 +4106,11 @@
         "A02",
         "A06"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.02.md — 1,000 ms expiry, immediate cancel, stale-packet suppression and gesture identity pass; within-frame rendering and flash-free commit replacement remain T1.08b/T1.10/T1.12."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new (D3)"
     },
@@ -4948,9 +4964,11 @@
       "scenarios": [
         "A18"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.02.md — reserved/unknown document kinds fail with typed errors and mp4 metadata is accepted; storing/syncing actual video bytes remains T1.03/T1.06a/T1.10."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new (D18)"
     },

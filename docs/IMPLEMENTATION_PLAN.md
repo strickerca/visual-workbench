@@ -341,6 +341,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Ops and transactions per §4.4: host sequencing, idempotent txn IDs, LWW properties, the offline conflict rule with conflict records, fractional ordering with cycle checks.
   - Per-device undo/redo; provisional gesture state with expiry and cancel; canonical state hash.
 - **Acceptance:** property tests (undo/redo restore identical hashes over 500 random sequences); duplicate transactions are idempotent; a stale offline write produces a conflict record; gesture expiry and cancel are unit-tested.
+- **Execution checkpoint, 2026-10-02:** T1.02 implements the shared model, draft code generation, atomic host sequencing, offline conflict retention, optimistic replica/rebase, per-device inverse history and provisional gestures. Final verification and source-bound results are recorded in `docs/evidence/T1.02.md` and `T1.02-results.json`; broader requirements remain partial for storage, transport and app integration. Owner-requested parallel model/engine implementation and independent review used separate file ownership; heavy builds and S23 tests were serialized. The owner has ended overnight continuation: complete this slice, report results and pause before T1.03 (M, gpt-6-astra/max). Actual session is gpt-6-astra/xhigh; settings were not changed. No numbered phase gate or phase-end push is due.
 
 ### T1.03 — vw-store: SQLite project store and blobs
 - **Size:** M · **Depends on:** T1.02 · **Prompt:** `prompts/phase-1/T1.03-vw-store.md`

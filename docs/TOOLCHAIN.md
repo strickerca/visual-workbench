@@ -269,3 +269,31 @@ removed no preexisting versions. The required Rust licenses/sources/bans gate
 passes without policy changes; duplicate-version/unencountered-allowance warnings
 remain. The unchanged Android graph passes at 184 modules / ten configurations /
 one bound parent POM. Cargo.lock contains the resolved checksums.
+
+## T1.02 model and operation pins (2026-10-02)
+
+Official crates.io version metadata was checked before adding these stable,
+non-yanked pins; exact checksums are retained in Cargo.lock and task results:
+
+- [prost 0.14.4](https://crates.io/crates/prost/0.14.4) and
+  [prost-build 0.14.4](https://crates.io/crates/prost-build/0.14.4), Apache-2.0,
+  released 2026-06-07, Rust minimum 1.85. Generated draft protocol types use
+  ordered maps and strict Serde decoding.
+- [protoc-bin-vendored 3.2.0](https://crates.io/crates/protoc-bin-vendored/3.2.0),
+  MIT wrappers, released 2025-07-21. The Windows build-time executable reports
+  `libprotoc 31.1`; its separate upstream
+  [protobuf v31.1 license](https://github.com/protocolbuffers/protobuf/blob/v31.1/LICENSE)
+  has BSD-3-Clause terms. The compiler is a build tool, not an app runtime binary;
+  upstream explicitly assigns generated-code ownership to the input owner.
+- [BLAKE3 1.8.7](https://crates.io/crates/blake3/1.8.7), released 2026-08-20,
+  CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception. Default features are
+  disabled; `std` and `pure` select a portable implementation across PC/Android.
+
+Existing exact pins are reused for serde 1.0.229, serde_json 1.0.151,
+thiserror 2.0.21, getrandom 0.4.3 and proptest 1.11.0. Serde JSON enables
+`float_roundtrip`: a regression exposed a one-ULP reload change without it.
+UUIDv7 uses the existing OS random source; no UUID dependency was added.
+Resolution adds 33 packages and removes no previous package versions. The Rust
+license/source/ban gate and unchanged Gradle census (184 modules, ten runtime
+configurations, one bound parent POM) pass without policy changes. Duplicate
+version warnings remain, including hashbrown introduced by code generation.

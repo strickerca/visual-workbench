@@ -25,6 +25,13 @@ fall back to the reserved OnePlus. Physical owner gestures and manual gate decis
 remain unverified until performed; continue independent implementation while they
 are pending. Report each slice's result and next task/model/effort as work continues.
 
+Owner update (2026-10-02, awake): finish the current implementation slice and pause
+after reporting results, the next task, and its recommended model/effort so the
+owner can adjust settings. This supersedes the overnight no-pause cadence.
+Parallel agent implementation/review is explicitly authorized where it improves
+quality and efficiency; assign separate file ownership and serialize heavy builds
+and device tests. The S23 authorization and OnePlus reservation remain in force.
+
 The owner shares the IN2019 with another app development session. Backgrounding
 can be normal. Check actual foreground state, use bounded starter-only relaunches,
 and preserve the other app and its processes. Do not reset adb or the device to

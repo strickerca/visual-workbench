@@ -264,8 +264,15 @@ message Op {
     AddResult add_result = 25;
     UpdateResult update_result = 26;
     MaskOp mask_op = 27;
+    UndoTransaction undo_transaction = 28;
   }
 }
+
+// T1.02 additive draft extension. The host derives a new inverse transaction
+// from its accepted journal; clients cannot supply arbitrary restoration data.
+// Only the originating device may undo it. Redo is undoing that inverse's ID.
+// Properties another device wrote later are skipped and returned as notices.
+message UndoTransaction { Uuid target_txn_id = 1; }
 
 enum DocumentKind {
   DOCUMENT_KIND_UNSPECIFIED = 0;
@@ -502,7 +509,12 @@ message MaskOp {
   double amount = 4;  // pixels for expand/shrink/feather
 }
 
-message TxnAck { Uuid txn_id = 1; uint64 host_seq = 2; bytes state_hash = 3; }
+message TxnAck {
+  Uuid txn_id = 1;
+  uint64 host_seq = 2;
+  bytes state_hash = 3;
+  repeated string notices = 4;  // T1.02: skipped undo properties; no captured text
+}
 
 message TxnReject {
   Uuid txn_id = 1;
