@@ -1,13 +1,14 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-android', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-core', 'build-android', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
-    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles')][string]$HilMode = 'app',
+    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles', 'vdd')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
     [ValidateSet('normal', 'no-refresh', 'guards')][string]$WinPenScenario = 'normal',
-    [ValidatePattern('^[0-9a-f]{32}$')][string]$VideoRunId
+    [ValidatePattern('^[0-9a-f]{32}$')][string]$VideoRunId,
+    [ValidateSet('inventory','normal','watchdog')][string]$VddScenario='inventory'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -58,6 +59,12 @@ try {
             Run-Cargo 'build-video-pc' @('build', '--release', '--locked', '-p', 'vw-video-bench')
             Run-Step 'bind-video-pc-build' 'python.exe' @('tools/bench/video-pc/build_receipt.py', 'record', 'pc')
         }
+        'build-vdd-probe' {
+            Run-LicenseGate
+            Run-Step 'vdd-source-binding' 'python.exe' @('drivers/sudovda/check_source.py')
+            Run-Cargo 'build-vdd-probe' @('build', '--release', '--locked', '-p', 'vw-vdd-probe')
+            Run-Step 'bind-vdd-probe-build' 'python.exe' @('tools/vdd-probe/build_receipt.py', 'record')
+        }
         'build-video-android' {
             Run-LicenseGate
             Run-Gradle 'build-video-android' @(':video-bench:assembleDebug')
@@ -87,6 +94,10 @@ try {
         }
         'hil-test' {
             $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/hil-test.ps1', '-Mode', $HilMode, '-TimeoutSeconds', "$TimeoutSeconds")
+            if ($HilMode -eq 'vdd') {
+                $arguments += @('-VddScenario', $VddScenario)
+                if ($OwnerReady) { $arguments += '-OwnerReady' }
+            }
             if ($HilMode -in @('video-android', 'video-tiles')) {
                 if (-not $VideoRunId) { throw 'Decoder HIL requires -VideoRunId from the native capture run' }
                 $arguments += @('-VideoRunId', $VideoRunId)

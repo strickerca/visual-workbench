@@ -17,3 +17,5 @@
 *.ttf binary
 *.otf binary
 *.zip binary
+# Preserve pinned upstream bytes and its existing whitespace without rewriting it.
+drivers/sudovda/vendor/** -text -whitespace

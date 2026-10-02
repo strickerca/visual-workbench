@@ -1758,7 +1758,9 @@
       "scenarios": [
         "A17"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.08.md"
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",

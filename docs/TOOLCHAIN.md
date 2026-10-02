@@ -108,7 +108,7 @@ This inherited catalog lists future candidates and license claims. None of its e
 | androidx.heifwriter | latest stable | Apache-2.0 | Synthetic HEIF fixtures on the phone (T0.09) |
 | Kotlin MCP SDK (or TypeScript SDK sidecar) | latest stable | MIT/Apache-2.0 | MCP server (T2.09 decides) |
 | scrcpy (server + client) | 4.1 | Apache-2.0 (its Windows bundle's FFmpeg and libusb DLLs are LGPL; listed in `third_party/LICENSES`) | Android tunnel; uses the owner's adb, never a bundled one |
-| SudoVDA | latest commit, forked and pinned | SudoVDA's changes MIT or CC0 (README; no LICENSE file); Microsoft IddCx sample code MS-PL | Virtual monitor driver (separate package) |
+| SudoVDA | source commit a4b09fa2aa731a964d0cb5d139cb1e6240e4da12; incomplete vendor, 11 files hashed | SudoMaker CC0 option; Microsoft sample MS-PL; 2 EDID files withheld pending output provenance | T0.08: source-only preparation; missing x64 Spectre libraries; no driver build/install acceptance |
 
 ## Target apps and services (for compatibility testing)
 

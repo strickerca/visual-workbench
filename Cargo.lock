@@ -990,6 +990,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "vw-vdd-probe"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+ "windows",
+]
+
+[[package]]
 name = "vw-video-bench"
 version = "0.1.0"
 dependencies = [

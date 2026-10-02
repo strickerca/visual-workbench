@@ -129,6 +129,8 @@ results, retained failures and untested clauses. No TUNNEL requirement is passed
 - **Consequences:** no EV certificate (about €330+/yr) until distribution; then Microsoft attestation signing is required.
 - **Confidence:** 80% · **Status:** provisional (T0.08).
 
+- **2026-10-02 D11 preparation checkpoint (T0.08):** SudoVDA source is pinned at `a4b09fa2aa731a964d0cb5d139cb1e6240e4da12`; eleven reviewed files are retained, while two EDID files remain withheld because their output licensing is unresolved. The source build gate refuses the incomplete vendor. MSVC 14.50.35717 lacks x64 Spectre libraries; all three 10.0.28000.2526 NuGet hashes match. Running HVCI is confirmed; a fresh Secure Boot read and restore-point enumeration were unavailable. Independent Rust probe code handles the exact ABI and shared-watchdog constraints, but no driver was built, signed, installed or accepted. D11 and fallback selection remain provisional; no security setting or requirement was relaxed. See `docs/evidence/T0.08.md` and the driver source review/rollback plan.
+
 ## D12 — Android screen on the PC
 - **Decision:** pinned scrcpy 4.1 (Apache-2.0) for live view and control (bundled client window or own client); markup captures use lossless `screencap` and the accessibility tree, never the video.
 - **Consequences:** requires USB debugging (a developer/power feature). Uses the owner's installed adb; `adb.exe` is never bundled. scrcpy's LGPL DLLs (FFmpeg, libusb) are documented exceptions listed in `third_party/LICENSES`; their licenses are checked at build time (for example `avcodec_license()`).

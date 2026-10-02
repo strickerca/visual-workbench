@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "url": "https://github.com/SudoMaker/SudoVDA",
+  "commit": "a4b09fa2aa731a964d0cb5d139cb1e6240e4da12",
+  "complete_vendor": false,
+  "files": {
+    "Common/Include/AdapterOption.h": "5948e1cceb8d2e659328a056ada1ef7be7732dc65f845dd6ce96fcba0e8baa75",
+    "Common/Include/sudovda-ioctl.h": "dd924c9bd3918f75bdc1c1153ed16f23ae1658fde890d76f5f4f35397062dd73",
+    "README.md": "4eb82511c7e07056809bbda35ca7190551b8e3e604111eeff525fda51e011ea2",
+    "Virtual Display Driver (HDR)/SudoVDA.sln": "012f97c290c69b9e5cbed0e086b53b35f919029d84d548dbeb037b3dc5ad9dc1",
+    "Virtual Display Driver (HDR)/SudoVDA/Driver.cpp": "10a555cd3acd83ddd3deda51e321b8514b296b238df43e8a1249af4b0f458e48",
+    "Virtual Display Driver (HDR)/SudoVDA/Driver.h": "41b9fb6b227a43ca988af8ade5b420efa6093ca85f52444b479fe7c8a4e853d9",
+    "Virtual Display Driver (HDR)/SudoVDA/SudoVDA.filters": "69ac02df77374edf50832f97464c6781cdd74938699c1dd114821e5c2990f0ca",
+    "Virtual Display Driver (HDR)/SudoVDA/SudoVDA.inf": "78247e9455fccca65fa1745664fc60dfb76eb3d59737b71cb1b8b3007bd41817",
+    "Virtual Display Driver (HDR)/SudoVDA/SudoVDA.vcxproj": "3a80623d503632f06e28e22cbe3bdc3c7227b1e84142ad27727086f354594822",
+    "Virtual Display Driver (HDR)/SudoVDA/Trace.h": "3eca4dd904e24723e6c47546d91a7eb91f2c3e06323fb5a152c74174acd0f2d1",
+    "Virtual Display Driver (HDR)/option.txt": "67ebdd5ebcbd0f8b8ff5c7deff0811dcaf2c8fe40fff88b036de57fac2fd80b4"
+  },
+  "held_for_license_provenance": {
+    "Virtual Display Driver (HDR)/8K240HzHDR.edid": "b849def8d88ab29cd59475a93975a39c215b273ff15ea7c686609b233f8851bb",
+    "Virtual Display Driver (HDR)/SudoVDA/edid.h": "41993d6c0365b4b6f6dd97fa6d57d3687d3b399ff9e263e3fceb1b8be9b1df0e"
+  }
+}

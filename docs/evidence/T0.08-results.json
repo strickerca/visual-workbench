@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "task": "T0.08",
+  "formal_task_status": "FAIL",
+  "software_checkpoint_validated": true,
+  "model": "gpt-6-astra",
+  "reasoning_effort": "xhigh",
+  "preflight": {
+    "captured_utc": "2026-10-02T16:32:44.7912681Z",
+    "source_commit": "a4b09fa2aa731a964d0cb5d139cb1e6240e4da12",
+    "source_files_verified": 11,
+    "complete_vendor": false,
+    "msvc": "14.50.35717",
+    "spectre_x64_present": false,
+    "packages": [
+      {
+        "name": "Microsoft.Windows.WDK.x64",
+        "version": "10.0.28000.2526",
+        "sha256": "63c939fb5a79295bf40e941db592681272219b04edff095fe2f3d123e5579a90"
+      },
+      {
+        "name": "Microsoft.Windows.SDK.CPP",
+        "version": "10.0.28000.2526",
+        "sha256": "be1b419491607eae6f7c57844ebab39face9643c51e2af1d9176a3ba0d0b23fc"
+      },
+      {
+        "name": "Microsoft.Windows.SDK.CPP.x64",
+        "version": "10.0.28000.2526",
+        "sha256": "a9cae2a8c5da7f5dc5838ae6a76d06d0d2e2fdc3d8cfc69ca6c184e4b9193a00"
+      }
+    ],
+    "secure_boot": null,
+    "secure_boot_error": "0x80070005",
+    "hvci_running": true,
+    "hvci_error": null,
+    "restore_point_count": null,
+    "restore_point_error": "0x80131501",
+    "machine_changes_performed": false
+  },
+  "inventory": {
+    "active_paths": 2,
+    "driver_ioctls_sent": 0,
+    "mutated": false,
+    "schema": 1,
+    "sudovda_interfaces": 0
+  },
+  "inventory_elapsed_seconds": 0.34920989999999996,
+  "build_inputs_sha256": {
+    "Cargo.toml": "380dae59ec0a68a22f11a0e41bb54a73a367e6bcb6baf3cdb5c6000427355e58",
+    "Cargo.lock": "290ae1a90b1a875ab3dc0f61161dae36adf28e1b98a8b663910d2ca55c286529",
+    "rust-toolchain.toml": "7daa90fd3135f5361b3eee9595738b3d68b51893d94bd42b49be25d4acaa8263",
+    ".cargo/config.toml": "db0ef1dddd1b273925e3b0b6ec10c34d720dddd54939b8e51290f9c0d1b4ed26",
+    "deny.toml": "23329ef41917009c97d44c3b18b7fbd6ae0eaf61826e6eaa708e8bff89885318",
+    "build.ps1": "da163ff65595ec894c22a83ce0fb1dea2d784527fa07021ca183c2a8c4bb57e5",
+    "tools/vdd-probe/Cargo.toml": "4545e802ad0fc1cf9c76983e73911b7449627bc46053f281e47c74134fb2f2db",
+    "tools/vdd-probe/build_receipt.py": "93fe1161a8224c23bdccee4745871df742d4ba810f189fdba7750242e807cd22",
+    "target/release/vdd-probe.exe": "1930fe28f98991aa9d0202967f315c8a601df54e59a93bfecf2e0bd574d06435",
+    "tools/vdd-probe/src/lib.rs": "e4b21cb0e89a5ddc7a76de4ecafa73ddfbccea114798f53b630f4b3025d25751",
+    "tools/vdd-probe/src/main.rs": "f827f7f610d1d065932240433142408d2d90bd9512bcc1b15333f428761f41fe",
+    "tools/vdd-probe/src/platform.rs": "6185b1b8f45c8985eb724866baa69d8805d4ba4fece24613672d961759b98721"
+  },
+  "validation": {
+    "rust_actual_tests_passed": 3,
+    "python_tests_passed": 89,
+    "clippy_warnings_denied_passed": true,
+    "format_passed": true,
+    "powershell_files_syntax_checked": 4,
+    "plan_coverage_passed": true,
+    "gradle_license_modules": 181,
+    "gradle_runtime_configurations": 8,
+    "bound_parent_poms": 1,
+    "external_dependency_versions_changed": 0
+  },
+  "logs": {
+    "build": "t008-gated-probe-build-fixed-d1cecc576730435d8d397f235a5f3a85.log",
+    "tests": "t008-probe-tests-3a779183a6dc4e85a604da1c0a7dc108.log",
+    "clippy": "t008-probe-clippy-5975a571ba8c4efc95c58ec7c73f30bb.log",
+    "python": "t008-python-regressions-ee980b2ef855407ea374c2971471e39a.log",
+    "inventory": "t008-vdd-inventory-698e6c69bd7b41b78e789a42d351bfaa.log",
+    "build_preflight_expected_block": "t008-driver-preflight-hash-fixed-30259c582752493b8fa955b294aa4723.log"
+  },
+  "retained_failure_logs": [
+    "t008-driver-build-preflight-30fc78929651488e86a489a5b0afd47a.log",
+    "t008-driver-preflight-corrected-761ec430fd264c349bfd5b670c5ed48f.log",
+    "t008-probe-format-7719db077cee4ef3a5760425e2f893f6.log",
+    "t008-gated-probe-build-9063022779504708a244161de5fcc2b7.log"
+  ],
+  "verification_media": {
+    "created": 0,
+    "retained": 0
+  },
+  "driver_build_performed": false,
+  "driver_install_performed": false,
+  "signing_key_created": false,
+  "fallback_tested": false,
+  "hardware_normal_test_run": false,
+  "hardware_watchdog_test_run": false
+}

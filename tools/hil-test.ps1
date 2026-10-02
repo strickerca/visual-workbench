@@ -1,10 +1,11 @@
 param(
-    [ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles')][string]$Mode = 'app',
+    [ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles', 'vdd')][string]$Mode = 'app',
     [ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
     [ValidateSet('normal', 'no-refresh', 'guards')][string]$WinPenScenario = 'normal',
-    [ValidatePattern('^[0-9a-f]{32}$')][string]$VideoRunId
+    [ValidatePattern('^[0-9a-f]{32}$')][string]$VideoRunId,
+    [ValidateSet('inventory','normal','watchdog')][string]$VddScenario='inventory'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -13,6 +14,10 @@ Import-Module (Join-Path $PSScriptRoot 'process.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'android-device.psm1') -Force
 
 try {
+    if ($Mode -eq 'vdd') {
+        & (Join-Path $PSScriptRoot 'vdd-probe/run.ps1') -Scenario $VddScenario -OwnerReady:$OwnerReady
+        exit 0
+    }
     if ($Mode -eq 'video-pc') {
         & (Join-Path $PSScriptRoot 'bench/video-pc/run_pc.ps1') -Profile full
         exit 0

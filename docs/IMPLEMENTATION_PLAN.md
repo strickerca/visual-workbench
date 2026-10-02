@@ -278,6 +278,8 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - Crash test (kill the client → display removed); full uninstall including certificate removal.
 - **Acceptance:** works with Secure Boot and Memory Integrity on, or a documented failure with the VirtualDrivers VDD fallback tested.
 
+- **Execution checkpoint, 2026-10-02:** T0.08 is an incomplete software preparation checkpoint (`Status: FAIL`), with reviewed source hashes, an independent Rust probe and guarded preflight. Missing Spectre libraries, unresolved EDID output licensing, signing/install/uninstall deliverables, owner restore/security actions and live driver/fallback measurements remain open. DISPLAY-002 statuses are unchanged and D11 stays provisional. See `docs/evidence/T0.08.md`. Continue independent T0.09 (S, gpt-6.1-sol / xhigh); current gpt-6-astra / xhigh differs in model.
+
 ### T0.09 — Giant image spike and fixtures
 - **Size:** S · **Depends on:** T0.02 · **Prompt:** `prompts/phase-0/T0.09-image-spike.md`
 - **Requirements:** FORMAT-001 · **Informs:** D15, PERF-005, PERF-006
