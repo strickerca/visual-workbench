@@ -9,6 +9,7 @@ members = [
     "tools/pen-inject/harness",
     "tools/pen-inject/inject",
     "tools/bench/transport",
+    "tools/bench/video-pc",
 ]
 
 [workspace.package]

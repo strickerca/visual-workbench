@@ -37,6 +37,7 @@ EXPECTED_CONFIGURATIONS = frozenset({
     ":android:debugRuntimeClasspath", ":android:releaseRuntimeClasspath",
     ":desktop:runtimeClasspath", ":shared:desktopRuntimeClasspath",
     ":pen-probe:debugRuntimeClasspath", ":pen-probe:releaseRuntimeClasspath",
+    ":video-bench:debugRuntimeClasspath", ":video-bench:releaseRuntimeClasspath",
 })
 
 

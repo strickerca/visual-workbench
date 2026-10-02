@@ -62,6 +62,34 @@ Revision 2026-10-01. Each record: context, decision, alternatives considered, co
 - **Consequences:** Phase 3 needs no video codec; Phase 4 owns the HEVC pipeline. No GPL streaming code (D17), so the pipeline is written from OS APIs.
 - **Confidence:** 75% · **Status:** provisional (T0.07).
 
+### D9 measurement update — 2026-10-02 (T0.07)
+
+Retain the two-path design with implementation conditions, not product performance
+acceptance. Native Intel hardware HEVC at 24 Mbps, no-B/low-latency controls and
+one frame outstanding produced portrait/4K submit-to-output p95 of 43.576/40.910 ms.
+S23 hardware decode p95 was 8.831/13.039 ms. Capture interval tails and an observed
+IntelControlLib.dll_unloaded crash leave long-running host stability and 30 fps
+unproven. Separate diagnostic workers passed; a future streaming worker needs
+explicit restart/recovery validation. No driver or security setting was changed.
+
+WGC DirtyRegions reported the entire GDI source. Add measured pixel difference
+when region hints are coarse; do not assume they represent actual changed area.
+Tight derived regions matched 10%/25%, with JPEG encode p95 20.470/41.764 ms.
+Recorded tiles reached 17.872/18.695 fps over adb including phone decode/posting,
+but concurrent capture/encode is excluded. Live annotate still needs its complete
+STREAM-001 test, frame identity/geometry and an optimized readback/encoding path.
+
+For this generated 4K UI, PNG fast/Sub p95 11.947 ms was faster than QOI 25.494 ms;
+QOI was smaller (226,524 versus 411,337 bytes). Keep lossless freeze support and
+prefer measured PNG for this workload; other content and full freeze replacement
+remain unverified. The S23 advertises the QTI picture-order parameter but neither
+FEATURE_LowLatency nor the QTI low-latency parameter. Record requests separately
+from supported/applied behavior and use explicit monotonic Surface timestamps.
+
+See docs/evidence/T0.07.md and T0.07-results.json. STREAM/PERF statuses and targets
+remain unchanged. D9's architecture is retained with these measured conditions;
+integrated performance and the G0 owner decision remain open.
+
 ## D10 — Pen input into Windows apps
 - **Decision:** `InjectSyntheticPointerInput` with PT_PEN: pressure, tilt, barrel, eraser; hover as in-range without distance; ≥ 20 Hz keepalive while in contact; per-batch guards on foreground window, geometry, DPI, input session and integrity level.
 - **Known limits:** no hover distance, one barrel button, contacts cancel after about 1 s without refresh; injection cannot reach higher-integrity (admin) windows; WinTab-only apps get no pressure.

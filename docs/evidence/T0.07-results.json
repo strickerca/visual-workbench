@@ -1,0 +1,770 @@
+{
+  "schema": 1,
+  "task": "T0.07",
+  "date": "2026-10-02",
+  "device_model": "SM-S918U",
+  "android_release": 16,
+  "api_level": 36,
+  "pc_run_id": "b1929ee5f21241658cc24aa19de96244",
+  "decoder_run_id": "0be1c42f9a9c4372bbf6d31705d7dff1",
+  "tiles_run_id": "6ea6bcf8ea49405ab5d99b73717a3a83",
+  "pc_report_sha256": "56fe4a6c427843f39ccf7635355798b0d0fb3392dcd092445f4fe21b3c6d8a98",
+  "pc_build_inputs_sha256": {
+    "tools/bench/video-pc/src/lib.rs": "404f70242096d36df96fee7d310b7ad046b55991b18305033c33b713555897be",
+    "tools/bench/video-pc/src/main.rs": "d9974eaa196950a39f36e8e66bbc6e29bd23139edd989ed6862cd7a6b24419fe",
+    "tools/bench/video-pc/src/platform/encoder.rs": "efc060bc6c0a3e952fc2e16170b5e271823c3d6809cf9dcfc947a57eef5e9b0d",
+    "tools/bench/video-pc/src/platform.rs": "b003f880bfd1a3e92939b686d84009edded8c2255ec1682a2e2752ef5f9e1456",
+    "build.ps1": "80904223487bef51da641f855f418b9422de5466409138292eeae10daed1804f",
+    "tools/bench/video-pc/build_receipt.py": "5060b41376da97f0630577a8c1eba3a76e759e077b2e591a3bc5ebca9b512f02",
+    "Cargo.toml": "b40f4f7db6834d94c4bd688c73e74f8d53348adb99c65f6d93d8986013f803ac",
+    "Cargo.lock": "eeb3ac75cc4b12bf076990a5b9b9b47b0b109598eba40c450e0906558f4b35fa",
+    "rust-toolchain.toml": "7daa90fd3135f5361b3eee9595738b3d68b51893d94bd42b49be25d4acaa8263",
+    ".cargo/config.toml": "db0ef1dddd1b273925e3b0b6ec10c34d720dddd54939b8e51290f9c0d1b4ed26",
+    "deny.toml": "23329ef41917009c97d44c3b18b7fbd6ae0eaf61826e6eaa708e8bff89885318",
+    "tools/bench/video-pc/Cargo.toml": "9f2955d040460879afca6f80da69028df73f37db569bb285bf1d20eae4734ff3",
+    "target/release/video-pc.exe": "c54af94a918976f4ec2cc46a8ffeed2ff5c49741fa8d507b2aa7c957389ca89e"
+  },
+  "android_build_inputs_sha256": {
+    "tools/bench/video-android/src/main/AndroidManifest.xml": "e37e34685d23a6da2784200145d78c389ad05b655710e6d220edebd773ccd837",
+    "tools/bench/video-android/src/main/java/com/visualworkbench/videobench/TileReceiver.kt": "38c147f374cf07c8ed488a913eb2c2ace88738531af91af4cf4deb3968fa18c9",
+    "tools/bench/video-android/src/main/java/com/visualworkbench/videobench/VideoActivity.kt": "174e905f1233a809f395011d6a308490e92ecd6f1b8dcc6076bbd82c3894ea7d",
+    "build.ps1": "80904223487bef51da641f855f418b9422de5466409138292eeae10daed1804f",
+    "tools/bench/video-pc/build_receipt.py": "5060b41376da97f0630577a8c1eba3a76e759e077b2e591a3bc5ebca9b512f02",
+    "apps/build.gradle.kts": "8e9d1e5e14ad6e278e7933d7c4ed3b5fe66647c07a2e8711b88268b23d28c0cd",
+    "apps/settings.gradle.kts": "322b7a588ec61b5a639492df2929300f36d3aa1805a1ea0c3963ebdf68296f53",
+    "apps/gradle/libs.versions.toml": "a7f51dc6c4a1f8dd581eae35bae6cca79191bc66278396f2140443f88e35ca0c",
+    "apps/gradle.properties": "ccd4f509dc03ee7061bd88915eaaa21d5030aa7cfe83caba0b16aa14c64f23cc",
+    "tools/check_gradle_licenses.py": "4a7baffbb7f48316d5122d30386990d5c9161fff8fcb03618ce0d79283b6506d",
+    "tools/bench/video-android/build.gradle.kts": "4138cf9921f3a8498d261556471f82baaefd874ea8c900e6b1e5184c58b3afbd",
+    "tools/bench/video-android/gradle.lockfile": "0c9831fbcc1560ca7fcc65588a74525a6f39d7863f6100f9594b52977b236c42",
+    "tools/bench/video-android/build/outputs/apk/debug/video-bench-debug.apk": "3413dc8e84a1c2a6e532a3a9ff425f5372d2693b04612435c3ec22c70c52917b"
+  },
+  "hardware_hevc": [
+    {
+      "profile": "portrait",
+      "width": 1440,
+      "height": 3088,
+      "bitrate_bps": 24000000,
+      "warmup_frames": 10,
+      "capture_min_update_interval_100ns": 333333,
+      "async_inflight_limit": 1,
+      "cpu_pixel_copies_for_hevc": 0,
+      "nominal_media_fps": 30,
+      "encoded_frames": 130,
+      "encode_submit_to_output_ms": {
+        "count": 120,
+        "p50": 15.3497,
+        "p95": 43.5758,
+        "max": 139.69029999999998
+      },
+      "wgc_arrival_interval_ms": {
+        "count": 120,
+        "p50": 41.6886,
+        "p95": 108.3938,
+        "max": 475.0711
+      },
+      "encoder_family": "Intel hardware H265 MFT",
+      "controls": {
+        "async_mft": true,
+        "low_latency_control_accepted": true,
+        "zero_b_frames_control_accepted": true,
+        "constant_bitrate_mode_accepted": true,
+        "maximum_bitrate_control_accepted": true,
+        "d3d11_aware": true,
+        "software_fallback": false
+      }
+    },
+    {
+      "profile": "4k",
+      "width": 3840,
+      "height": 2160,
+      "bitrate_bps": 24000000,
+      "warmup_frames": 10,
+      "capture_min_update_interval_100ns": 333333,
+      "async_inflight_limit": 1,
+      "cpu_pixel_copies_for_hevc": 0,
+      "nominal_media_fps": 30,
+      "encoded_frames": 130,
+      "encode_submit_to_output_ms": {
+        "count": 120,
+        "p50": 18.767200000000003,
+        "p95": 40.910000000000004,
+        "max": 64.10770000000001
+      },
+      "wgc_arrival_interval_ms": {
+        "count": 120,
+        "p50": 41.6649,
+        "p95": 224.9667,
+        "max": 1008.313
+      },
+      "encoder_family": "Intel hardware H265 MFT",
+      "controls": {
+        "async_mft": true,
+        "low_latency_control_accepted": true,
+        "zero_b_frames_control_accepted": true,
+        "constant_bitrate_mode_accepted": true,
+        "maximum_bitrate_control_accepted": true,
+        "d3d11_aware": true,
+        "software_fallback": false
+      }
+    }
+  ],
+  "raster": [
+    {
+      "width": 2560,
+      "height": 1440,
+      "requested_dirty_percent": 10,
+      "captured_frames": 35,
+      "unchanged_frames_skipped": 1,
+      "jpeg_q85_tiles_encode_and_copy_ms": {
+        "count": 30,
+        "p50": 13.5501,
+        "p95": 20.470100000000002,
+        "max": 22.464100000000002
+      },
+      "encoded_bytes_per_frame": {
+        "count": 30,
+        "p50": 23389.0,
+        "p95": 23543.0,
+        "max": 23580.0
+      },
+      "reported_dirty_area_fraction_sum": {
+        "count": 30,
+        "p50": 1.0,
+        "p95": 1.0,
+        "max": 1.0
+      },
+      "encoded_dirty_area_fraction_sum": {
+        "count": 30,
+        "p50": 0.1,
+        "p95": 0.1,
+        "max": 0.1
+      },
+      "gpu_readback_ms": {
+        "count": 30,
+        "p50": 24.9593,
+        "p95": 60.6867,
+        "max": 61.927
+      },
+      "pixel_difference_ms": {
+        "count": 30,
+        "p50": 1.5981,
+        "p95": 4.4005,
+        "max": 7.4866
+      },
+      "lossless": []
+    },
+    {
+      "width": 2560,
+      "height": 1440,
+      "requested_dirty_percent": 25,
+      "captured_frames": 35,
+      "unchanged_frames_skipped": 1,
+      "jpeg_q85_tiles_encode_and_copy_ms": {
+        "count": 30,
+        "p50": 29.9333,
+        "p95": 41.7636,
+        "max": 42.3227
+      },
+      "encoded_bytes_per_frame": {
+        "count": 30,
+        "p50": 66760.0,
+        "p95": 70985.0,
+        "max": 71134.0
+      },
+      "reported_dirty_area_fraction_sum": {
+        "count": 30,
+        "p50": 1.0,
+        "p95": 1.0,
+        "max": 1.0
+      },
+      "encoded_dirty_area_fraction_sum": {
+        "count": 30,
+        "p50": 0.25,
+        "p95": 0.25,
+        "max": 0.25
+      },
+      "gpu_readback_ms": {
+        "count": 30,
+        "p50": 15.824499999999999,
+        "p95": 33.1207,
+        "max": 37.1321
+      },
+      "pixel_difference_ms": {
+        "count": 30,
+        "p50": 1.3034999999999999,
+        "p95": 2.3739999999999997,
+        "max": 2.76
+      },
+      "lossless": []
+    },
+    {
+      "width": 3840,
+      "height": 2160,
+      "requested_dirty_percent": 25,
+      "captured_frames": 35,
+      "unchanged_frames_skipped": 1,
+      "jpeg_q85_tiles_encode_and_copy_ms": {
+        "count": 30,
+        "p50": 72.0576,
+        "p95": 90.336,
+        "max": 109.55080000000001
+      },
+      "encoded_bytes_per_frame": {
+        "count": 30,
+        "p50": 124509.0,
+        "p95": 130837.0,
+        "max": 131038.0
+      },
+      "reported_dirty_area_fraction_sum": {
+        "count": 30,
+        "p50": 1.0,
+        "p95": 1.0,
+        "max": 1.0
+      },
+      "encoded_dirty_area_fraction_sum": {
+        "count": 30,
+        "p50": 0.25,
+        "p95": 0.25,
+        "max": 0.25
+      },
+      "gpu_readback_ms": {
+        "count": 30,
+        "p50": 40.4603,
+        "p95": 73.3906,
+        "max": 73.70500000000001
+      },
+      "pixel_difference_ms": {
+        "count": 30,
+        "p50": 2.8027,
+        "p95": 9.5281,
+        "max": 9.760299999999999
+      },
+      "lossless": [
+        {
+          "format": "PNG fast/Sub",
+          "encode_ms": {
+            "count": 10,
+            "p50": 8.2357,
+            "p95": 11.9466,
+            "max": 11.9466
+          },
+          "bytes": {
+            "count": 10,
+            "p50": 411337.0,
+            "p95": 411337.0,
+            "max": 411337.0
+          },
+          "exact_rgb_roundtrip": true
+        },
+        {
+          "format": "QOI",
+          "encode_ms": {
+            "count": 10,
+            "p50": 20.0322,
+            "p95": 25.4937,
+            "max": 25.4937
+          },
+          "bytes": {
+            "count": 10,
+            "p50": 226524.0,
+            "p95": 226524.0,
+            "max": 226524.0
+          },
+          "exact_rgb_roundtrip": true
+        }
+      ]
+    }
+  ],
+  "hardware_decoder": [
+    {
+      "profile": "portrait",
+      "decoder": "c2.qti.hevc.decoder",
+      "vendor_parameters_requested": [
+        "vendor.qti-ext-dec-picture-order.enable"
+      ],
+      "width": 1440,
+      "height": 3088,
+      "operating_rate_requested": 447.6684,
+      "input_frames": 130,
+      "output_frames": 130,
+      "warmup_frames": 10,
+      "render_callbacks": 130,
+      "native_render_timestamps_before_queue": 0,
+      "hardware_accelerated": true,
+      "low_latency_feature_declared": false,
+      "low_latency_requested": true,
+      "all_render_callbacks_observed": true,
+      "native_render_timing_valid": true,
+      "queue_to_output_ms": {
+        "count": 120,
+        "p50": 5.576458,
+        "p95": 8.830781,
+        "max": 9.747656
+      },
+      "queue_to_render_callback_ms": {
+        "count": 120,
+        "p50": 6.287343,
+        "p95": 10.482187,
+        "max": 11.924948
+      },
+      "queue_to_native_render_timestamp_ms": {
+        "count": 120,
+        "p50": 5.591041,
+        "p95": 8.867187,
+        "max": 9.778333
+      },
+      "raw_native_render_timestamp_delta_ms": [
+        4.953646,
+        3.665521,
+        3.77974,
+        4.043907,
+        4.132968,
+        3.978646,
+        5.328281,
+        4.807135,
+        4.185781,
+        4.342344,
+        5.527031,
+        5.554531,
+        4.048802,
+        5.685625,
+        7.281875,
+        4.891146,
+        5.089688,
+        4.563854,
+        6.721771,
+        4.474636,
+        5.017969,
+        4.401563,
+        4.382656,
+        4.899531,
+        4.506406,
+        4.66276,
+        4.541927,
+        5.908073,
+        5.061354,
+        5.845365,
+        4.784323,
+        4.485885,
+        4.554062,
+        4.040156,
+        6.175052,
+        4.377136,
+        6.188489,
+        5.368125,
+        6.467136,
+        6.948697,
+        5.982135,
+        5.099062,
+        4.926927,
+        5.162084,
+        6.882917,
+        4.16625,
+        4.964792,
+        4.684896,
+        4.939166,
+        5.994895,
+        6.930105,
+        4.603906,
+        5.044062,
+        5.199896,
+        6.844427,
+        5.338698,
+        5.47776,
+        4.397761,
+        4.81,
+        5.107968,
+        5.319323,
+        5.445729,
+        5.080469,
+        5.195781,
+        4.998541,
+        4.45927,
+        5.573542,
+        4.41125,
+        5.385053,
+        5.760416,
+        5.723021,
+        5.344844,
+        6.364479,
+        7.107031,
+        9.270625,
+        8.666667,
+        8.9075,
+        8.467968,
+        7.919166,
+        7.977917,
+        8.357031,
+        7.822604,
+        9.375781,
+        7.203177,
+        7.879635,
+        8.867187,
+        8.140521,
+        9.585677,
+        8.771146,
+        5.591041,
+        4.73151,
+        4.161302,
+        4.61823,
+        7.968854,
+        8.121875,
+        7.135209,
+        6.588177,
+        6.692188,
+        7.976823,
+        8.243802,
+        7.461041,
+        7.440052,
+        8.22474,
+        8.232761,
+        8.08875,
+        7.412604,
+        9.778333,
+        9.42323,
+        7.728803,
+        7.712657,
+        8.664323,
+        8.262812,
+        8.15625,
+        8.055469,
+        7.490677,
+        7.109427,
+        6.522292,
+        6.113438,
+        7.07375,
+        6.925833
+      ],
+      "report_sha256": "97744f8b5fe5772ece18ec3d3e69f3fdd842376a6f369fcaea9a53b1b35f3ed7"
+    },
+    {
+      "profile": "4k",
+      "decoder": "c2.qti.hevc.decoder",
+      "vendor_parameters_requested": [
+        "vendor.qti-ext-dec-picture-order.enable"
+      ],
+      "width": 3840,
+      "height": 2160,
+      "operating_rate_requested": 240,
+      "input_frames": 130,
+      "output_frames": 130,
+      "warmup_frames": 10,
+      "render_callbacks": 130,
+      "native_render_timestamps_before_queue": 0,
+      "hardware_accelerated": true,
+      "low_latency_feature_declared": false,
+      "low_latency_requested": true,
+      "all_render_callbacks_observed": true,
+      "native_render_timing_valid": true,
+      "queue_to_output_ms": {
+        "count": 120,
+        "p50": 10.240937,
+        "p95": 13.038594,
+        "max": 17.108437
+      },
+      "queue_to_render_callback_ms": {
+        "count": 120,
+        "p50": 12.193282,
+        "p95": 15.701562,
+        "max": 18.758021
+      },
+      "queue_to_native_render_timestamp_ms": {
+        "count": 120,
+        "p50": 10.302135,
+        "p95": 13.10026,
+        "max": 17.444687
+      },
+      "raw_native_render_timestamp_delta_ms": [
+        7.125677,
+        5.809844,
+        5.896094,
+        5.491458,
+        7.084531,
+        5.303593,
+        5.899114,
+        8.129844,
+        6.403489,
+        6.614636,
+        6.363593,
+        6.488541,
+        6.975677,
+        6.836094,
+        6.354584,
+        7.410417,
+        6.353489,
+        6.664375,
+        6.471927,
+        5.967761,
+        6.613854,
+        5.967292,
+        12.312292,
+        6.926615,
+        9.137448,
+        9.633333,
+        7.881511,
+        7.941823,
+        7.807396,
+        7.67526,
+        8.421458,
+        8.396562,
+        7.667344,
+        7.254583,
+        7.887552,
+        8.09,
+        7.421927,
+        7.439584,
+        6.326354,
+        6.324531,
+        6.196406,
+        6.364792,
+        7.65276,
+        8.723489,
+        7.686666,
+        11.063593,
+        8.43427,
+        8.878281,
+        13.077395,
+        12.691406,
+        11.4325,
+        11.958646,
+        16.709271,
+        7.642761,
+        11.153854,
+        12.41276,
+        11.11625,
+        11.032708,
+        12.018229,
+        11.645156,
+        11.206719,
+        10.189791,
+        10.955104,
+        12.692656,
+        11.469896,
+        12.892344,
+        9.059948,
+        10.92474,
+        10.028855,
+        10.951979,
+        11.811198,
+        11.754167,
+        10.063073,
+        10.302135,
+        11.090937,
+        11.202916,
+        12.545573,
+        9.531979,
+        11.519323,
+        11.110834,
+        12.008385,
+        11.565625,
+        14.592187,
+        11.91849,
+        13.25974,
+        12.195833,
+        17.444687,
+        11.287136,
+        12.014062,
+        8.578229,
+        7.043177,
+        12.261459,
+        11.864427,
+        13.123802,
+        11.597084,
+        10.730937,
+        11.54802,
+        11.508333,
+        11.906666,
+        10.429948,
+        11.058541,
+        7.6575,
+        7.367604,
+        10.056459,
+        11.159844,
+        10.722084,
+        10.912135,
+        13.258959,
+        13.10026,
+        12.84625,
+        11.98823,
+        12.532657,
+        9.431667,
+        11.5175,
+        11.083177,
+        9.855521,
+        11.233854,
+        11.262812,
+        11.585052,
+        12.087709
+      ],
+      "report_sha256": "43ad4f3f2522f6c62a36d6382e498691f6e5db6b4926aaa9ca035a69f51b646a"
+    }
+  ],
+  "usb_recorded_tiles": [
+    {
+      "changed_percent": 10,
+      "recorded_frames": 30,
+      "measured_frames": 120,
+      "warmup_frames": 10,
+      "initial_frame_excluded": 1,
+      "measured_payload_bytes": 2808672,
+      "elapsed_seconds": 6.7144288000126835,
+      "frames_per_second": 17.87195956263224,
+      "recording_sha256": "9cc0b439a7e72050b455edc315ea96ba151c7266205b8a76b63a214b6da96f02",
+      "send_to_decode_post_ack_ms": {
+        "count": 120,
+        "p50": 50.08069999166764,
+        "p95": 89.57690000534058,
+        "max": 111.45000002579764
+      },
+      "phone_decode_reconstruct_post_ms": {
+        "count": 120,
+        "p50": 24.183698,
+        "p95": 29.332083,
+        "max": 32.125833
+      },
+      "phone_posted_frames": 131,
+      "scope": "Recorded generated tiles cycled; actual adb delivery and phone decode/Surface posting; excludes simultaneous PC capture/encode and photon timing"
+    },
+    {
+      "changed_percent": 25,
+      "recorded_frames": 30,
+      "measured_frames": 120,
+      "warmup_frames": 10,
+      "initial_frame_excluded": 1,
+      "measured_payload_bytes": 7768468,
+      "elapsed_seconds": 6.418714200000977,
+      "frames_per_second": 18.69533309334473,
+      "recording_sha256": "72c7e767c0b93d4e9e3344dc30071cf0feca271d17dc607ff6b8420b7954316b",
+      "send_to_decode_post_ack_ms": {
+        "count": 120,
+        "p50": 49.484799994388595,
+        "p95": 83.92360000289045,
+        "max": 151.49379998911172
+      },
+      "phone_decode_reconstruct_post_ms": {
+        "count": 120,
+        "p50": 22.862657,
+        "p95": 31.63349,
+        "max": 34.488958
+      },
+      "phone_posted_frames": 131,
+      "scope": "Recorded generated tiles cycled; actual adb delivery and phone decode/Surface posting; excludes simultaneous PC capture/encode and photon timing"
+    }
+  ],
+  "phone_media_cleanup_confirmed": true,
+  "owned_reverse_mappings_removed": 2,
+  "known_limitations": [
+    "Multi-profile process previously faulted in IntelControlLib.dll_unloaded, c0000005; isolated worker success does not prove long-running driver stability",
+    "No pen-to-host-to-phone or photon measurement",
+    "No concurrent live capture/encode/network/render performance acceptance",
+    "Generated UI workload only; not real creative applications",
+    "No silent performance-target relaxation"
+  ],
+  "charging_stay_awake_left_enabled": true,
+  "verification_media_disposal": [
+    {
+      "run_id": "bbdb4cd5a8bf4a2d983de09aec5c3ea7",
+      "disposed_count": 2,
+      "retained_media_count": 0,
+      "media": [
+        {
+          "path": "4k/stream.h265",
+          "bytes": 382386,
+          "sha256": "4655f4632f567a688bdeeb8d2d62dabb3345d2fbaf39587414ecdfff8b8c6070"
+        },
+        {
+          "path": "portrait/stream.h265",
+          "bytes": 392903,
+          "sha256": "51fa123a12fe098c8e20b4b1a1032f4a837d60f4a5b4527625ebd4e54f50be2f"
+        }
+      ]
+    },
+    {
+      "run_id": "cea3a064a173489ca8445ccd833cd626",
+      "disposed_count": 5,
+      "retained_media_count": 0,
+      "media": [
+        {
+          "path": "generated-ui-preview.png",
+          "bytes": 411496,
+          "sha256": "7933e4381d55e6be07dd9e1fb66f990f46f93771c2e0531c79286f6c67d2e051"
+        },
+        {
+          "path": "tiles-10.vwt",
+          "bytes": 1167289,
+          "sha256": "b26a90c464adfc7dc5975f600acb80e84de84b18ac746c6ab7cc7a836a376eb3"
+        },
+        {
+          "path": "tiles-25.vwt",
+          "bytes": 1170146,
+          "sha256": "cc1d8c1655d808d661653c3f3fd1956faeb8a743086261923f82919ca20bd271"
+        },
+        {
+          "path": "4k/stream.h265",
+          "bytes": 464294,
+          "sha256": "23d8547a8d7af187b83b227a19697a4f331da488e7bfe803d5a4644b029302f7"
+        },
+        {
+          "path": "portrait/stream.h265",
+          "bytes": 368169,
+          "sha256": "514419952c7cdeb74a7b5c23d1416e7597164b6c5b0a0ff8ae485bf8f3e17b6c"
+        }
+      ]
+    },
+    {
+      "run_id": "01b020040bfd458899f19e4dd1ddf543",
+      "disposed_count": 3,
+      "retained_media_count": 0,
+      "media": [
+        {
+          "path": "tiles-10.vwt",
+          "bytes": 935188,
+          "sha256": "7e540b2523755e0f11de057eb179d96d9a52ba3fd3de9069f37df8af45c85dba"
+        },
+        {
+          "path": "4k/stream.h265",
+          "bytes": 10000034,
+          "sha256": "16b9967f1fade6ec93aef1d4c76188662094f704207a6b8a4b76e7e635ef6d2d"
+        },
+        {
+          "path": "portrait/stream.h265",
+          "bytes": 10000035,
+          "sha256": "525d4d318aaf0ee2f1e8515c344ba34d9d9e3c804860d44db423f5103cd91825"
+        }
+      ]
+    },
+    {
+      "run_id": "b1929ee5f21241658cc24aa19de96244",
+      "disposed_count": 5,
+      "retained_media_count": 0,
+      "media": [
+        {
+          "path": "4k/stream.h265",
+          "bytes": 10000034,
+          "sha256": "3bfd2fd237a3008622917172a9ede9997d9dbcd8ec4d2a4fd2afe7fa01cb9785"
+        },
+        {
+          "path": "portrait/stream.h265",
+          "bytes": 10000034,
+          "sha256": "3c2957726f1f4ddfc158ab5e4f646937ac31280739190e1007f9a04d5f4cec74"
+        },
+        {
+          "path": "raster-10/tiles-10.vwt",
+          "bytes": 935836,
+          "sha256": "9cc0b439a7e72050b455edc315ea96ba151c7266205b8a76b63a214b6da96f02"
+        },
+        {
+          "path": "raster-25/tiles-25.vwt",
+          "bytes": 2177184,
+          "sha256": "72c7e767c0b93d4e9e3344dc30071cf0feca271d17dc607ff6b8420b7954316b"
+        },
+        {
+          "path": "raster-4k/generated-ui-preview.png",
+          "bytes": 411337,
+          "sha256": "d29d718fdf1bd99afeb1c5d91400453e267f0a5230458b84bebc715116997975"
+        }
+      ]
+    }
+  ]
+}

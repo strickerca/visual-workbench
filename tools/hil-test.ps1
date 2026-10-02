@@ -1,9 +1,10 @@
 param(
-    [ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport')][string]$Mode = 'app',
+    [ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles')][string]$Mode = 'app',
     [ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
-    [ValidateSet('normal', 'no-refresh', 'guards')][string]$WinPenScenario = 'normal'
+    [ValidateSet('normal', 'no-refresh', 'guards')][string]$WinPenScenario = 'normal',
+    [ValidatePattern('^[0-9a-f]{32}$')][string]$VideoRunId
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -12,8 +13,22 @@ Import-Module (Join-Path $PSScriptRoot 'process.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'android-device.psm1') -Force
 
 try {
+    if ($Mode -eq 'video-pc') {
+        & (Join-Path $PSScriptRoot 'bench/video-pc/run_pc.ps1') -Profile full
+        exit 0
+    }
+    if ($Mode -eq 'video-android') {
+        if (-not $VideoRunId) { throw 'Decoder HIL requires the native VideoRunId' }
+        & (Join-Path $PSScriptRoot 'bench/video-android/run_android.ps1') -RunId $VideoRunId
+        exit 0
+    }
     if ($Mode -eq 'transport') {
         & (Join-Path $PSScriptRoot 'bench/transport/run_adb.ps1') -Profile full -TimeoutSeconds $TimeoutSeconds
+        exit 0
+    }
+    if ($Mode -eq 'video-tiles') {
+        if (-not $VideoRunId) { throw 'Tile HIL requires the native VideoRunId' }
+        & (Join-Path $PSScriptRoot 'bench/video-android/run_tiles.ps1') -RunId $VideoRunId -Profile full
         exit 0
     }
     if ($Mode -eq 'win-pen') {

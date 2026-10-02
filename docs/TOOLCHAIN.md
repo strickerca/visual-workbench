@@ -204,3 +204,20 @@ The authorized connected device is now SM-S918U (S23 Ultra), Android 16/API 36.
 Model-pinned HIL selection rejects other devices and ambiguous/offline matches.
 The owner enabled unattended testing and requested charging stay-awake; the
 setting was applied and verified while preserving its previous value locally.
+
+## T0.07 video benchmark pins (2026-10-02)
+
+The crates.io API reports image 0.25.10 as the current stable non-yanked release,
+with MIT OR Apache-2.0 license and Rust minimum 1.88.0. Pin `=0.25.10` with
+defaults disabled and only jpeg/png/qoi features. The benchmark reuses pinned
+windows 0.62.2, serde 1.0.229, serde_json 1.0.151 and thiserror 2.0.21. Windows
+capture, GPU conversion and hardware HEVC encoding use operating-system APIs.
+Resolved transitive licenses must pass the existing gate before the build.
+
+Resolution adds 19 packages and removes no existing package versions. The real
+Cargo license/source/ban gates passed; the retained duplicate-version warnings
+now also include miniz_oxide. No allowance changed. The Android diagnostic adds
+no explicit runtime library; the Gradle census remains 181 exact modules across
+eight runtime configurations, including video-bench debug/release, with one bound
+parent POM. See [image release](https://crates.io/crates/image/0.25.10) and the
+benchmark README for primary platform API references.

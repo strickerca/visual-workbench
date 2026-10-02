@@ -4104,7 +4104,9 @@
       "scenarios": [
         "A07"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.07.md"
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -4128,7 +4130,9 @@
       "scenarios": [
         "A08"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.07.md"
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -4753,7 +4757,9 @@
         "A08",
         "A27"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.07.md"
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -4777,7 +4783,9 @@
       "scenarios": [
         "A07"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.07.md"
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",

@@ -19,7 +19,10 @@ class DiagnosticParserTests(unittest.TestCase):
         result = subprocess.run(
             ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
              str(ROOT / "tools/tests/diagnostic-parser-fixtures.ps1")],
-            capture_output=True, text=True, env=environment, timeout=15, check=True)
+            # PowerShell startup can exceed 15 seconds under the bounded Gradle
+            # build's load. The enclosing test runner emits progress and owns the
+            # complete process tree; this remains a separate finite fixture limit.
+            capture_output=True, text=True, env=environment, timeout=60, check=True)
         cls.output = result.stdout
         cls.data = json.loads(result.stdout)
 

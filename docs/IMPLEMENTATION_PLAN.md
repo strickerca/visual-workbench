@@ -264,6 +264,8 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - A JPEG dirty-tile encode-time measurement for the D9 frame stream.
 - **Acceptance:** p50/p95 encode and decode latencies recorded; D9 confirmed or revised.
 
+- **Execution checkpoint, 2026-10-02:** T0.07 measurements completed with gaps on the PC and authorized S23. Isolated native workers and both 130-frame hardware decoder profiles passed; recorded 10%/25% dirty tiles reached 17.872/18.695 fps over adb including phone decode/posting. Coarse WGC regions, a retained Intel unloaded-library crash and unadvertised decoder low-latency controls remain limitations; no integrated stream/performance requirement passed. D9 updated; source-bound results and media disposal are in `docs/evidence/T0.07.md`. Next: T0.08 (M, gpt-6-astra / max); current session xhigh differs, and driver/security owner actions remain pending. Continue safe preparation and independent implementation.
+
 ### T0.08 — Virtual display spike (SudoVDA, Memory Integrity on)
 - **Size:** M · **Depends on:** T0.02 (and the NuGet cache from T0.01) · **Prompt:** `prompts/phase-0/T0.08-sudovda-spike.md`
 - **Informs:** D11, DISPLAY-002

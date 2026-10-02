@@ -1,12 +1,13 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-android', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-core', 'build-android', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
-    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport')][string]$HilMode = 'app',
+    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
-    [ValidateSet('normal', 'no-refresh', 'guards')][string]$WinPenScenario = 'normal'
+    [ValidateSet('normal', 'no-refresh', 'guards')][string]$WinPenScenario = 'normal',
+    [ValidatePattern('^[0-9a-f]{32}$')][string]$VideoRunId
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -52,6 +53,16 @@ try {
             Run-Step 'bind-pen-inject-build' 'python.exe' @('tools/pen-inject/build_receipt.py', 'record')
         }
         'build-desktop' { Run-LicenseGate; Run-Gradle 'build-desktop' @(':desktop:packageUberJarForCurrentOS') }
+        'build-video-pc' {
+            Run-LicenseGate
+            Run-Cargo 'build-video-pc' @('build', '--release', '--locked', '-p', 'vw-video-bench')
+            Run-Step 'bind-video-pc-build' 'python.exe' @('tools/bench/video-pc/build_receipt.py', 'record', 'pc')
+        }
+        'build-video-android' {
+            Run-LicenseGate
+            Run-Gradle 'build-video-android' @(':video-bench:assembleDebug')
+            Run-Step 'bind-video-android-build' 'python.exe' @('tools/bench/video-pc/build_receipt.py', 'record', 'android')
+        }
         'build-transport' {
             Run-LicenseGate
             Run-Cargo 'build-transport-host' @('build', '--release', '--locked', '-p', 'vw-transport-bench')
@@ -72,10 +83,14 @@ try {
             Run-Cargo 'lint-rust-format' @('fmt', '--all', '--', '--check')
             Run-Cargo 'lint-rust-clippy' @('clippy', '--workspace', '--all-targets', '--locked', '--', '-D', 'warnings')
             Run-Step 'lint-secrets' 'gitleaks.exe' @('dir', '.', '--config', '.gitleaks.toml', '--redact=100', '--no-banner')
-            Run-Gradle 'lint-kotlin' @(':android:lintDebug', ':shared:check', ':desktop:check', ':pen-probe:lintDebug')
+            Run-Gradle 'lint-kotlin' @(':android:lintDebug', ':shared:check', ':desktop:check', ':pen-probe:lintDebug', ':video-bench:lintDebug')
         }
         'hil-test' {
             $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/hil-test.ps1', '-Mode', $HilMode, '-TimeoutSeconds', "$TimeoutSeconds")
+            if ($HilMode -in @('video-android', 'video-tiles')) {
+                if (-not $VideoRunId) { throw 'Decoder HIL requires -VideoRunId from the native capture run' }
+                $arguments += @('-VideoRunId', $VideoRunId)
+            }
             if ($HilMode -eq 'win-pen') {
                 if (-not $OwnerReady) { throw 'Windows input HIL requires -OwnerReady after the owner reserves the desktop for testing' }
                 $arguments += @('-OwnerReady', '-WinPenScenario', $WinPenScenario)
