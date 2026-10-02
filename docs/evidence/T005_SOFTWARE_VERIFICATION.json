@@ -1,0 +1,659 @@
+{
+  "schema": 1,
+  "task": "T0.05",
+  "date": "2026-10-02",
+  "executor": {
+    "model": "gpt-6-astra",
+    "effort": "xhigh"
+  },
+  "baseline_commit": "c491d5569843084ac693df0eb7560dfea5c503ba",
+  "scope": "Software and owner-authorized Windows harness; full editor/elevation acceptance remains open.",
+  "source_sha256": {
+    "Cargo.lock": "e9f569bbd426daa5f578775f6572e1bc285b1b057c1c8c803a9046e763b7b967",
+    "Cargo.toml": "f2980bc055a52b58c1e317ffa0736d34344d5bc67b09b8361799d0245c73712a",
+    "build.ps1": "c12fd20a7925f5b583e5b35b73d5bdc640e6e71455726f15088fb9bc1ddc2493",
+    "docs/DECISIONS.md": "137cb6dc1d57d9957d3cea20650c9c4d10b744c579a73fed754a53aaf788ba6a",
+    "docs/IMPLEMENTATION_PLAN.md": "e9b2aba4de38ac8ca4a610636ff7fdae0404c96c196f0977bf5fc818c2e9d09b",
+    "docs/REQUIREMENTS.json": "d56403f2bf4ebe85b5eb4fbda2c6d6a13c39aa444063a99dd6903f6a28a187e0",
+    "docs/TOOLCHAIN.md": "54b56f29c9a721207aa2fef194615e27bc8c5d4cfc9ba0d8081371f6a5c01c41",
+    "docs/compat/injection-smoke.md": "81780a50266c7e6a786833d3fa60f5108d4f75ac469a24a895b01e18acca5a0c",
+    "docs/evidence/T0.05.md": "8009d29ffa67e01e664fcdd55966ad81fd3d59ac884195f8dfb24c60d7df3ccc",
+    "tools/hil-test.ps1": "4d77f01c91981321e21b71b098248ba6d367eb94d0a3137a41787fd2dcf4dbc3",
+    "tools/pen-inject/README.md": "6aaa65099aa2f9616f3a77c45dc5fc648390fbfbc777c1ddf7d459850ed0a7d2",
+    "tools/pen-inject/analyze.py": "4556888f50ec30587e88bdeb7dc017d9b980488f9b6cb8ab2995ec6d9ccc866d",
+    "tools/pen-inject/build_receipt.py": "27e91bf8a23491505a93d8c00276fc76e0142bece670513f9141c29bbeaa1ea7",
+    "tools/pen-inject/core/Cargo.toml": "bd55b61cda8a21874294eda367496a902615a3c5e8da20dccbf9ac3abd0cd858",
+    "tools/pen-inject/core/src/lib.rs": "c0d7a6fe2bde83532551ac14b8ad1c39c63e5e56cb793902c8d7c4c4cb076094",
+    "tools/pen-inject/core/src/platform.rs": "bc10015b13496d6e9e3124efae9fc5fd4e7827c196aa6884200da3410e74962b",
+    "tools/pen-inject/core/src/script.rs": "4200de94a9e480110f02c9b1607c8b8ffca1f6256d84f0ddb2dc6a6de90dcbc8",
+    "tools/pen-inject/guard_report.py": "766ed9ff398a1998ef2db53304ebf51a46c0a944ad2b3c8817d0b833e8b8a5a9",
+    "tools/pen-inject/harness/Cargo.toml": "05830bb2faf8dbb55c52b193c94d9b6bfc8bbfdcbc4651943eda05df1057660c",
+    "tools/pen-inject/harness/src/main.rs": "49705ac0084e55bffcac27f45b31565d95abc4cbdfea56ce0708caecc7f1937d",
+    "tools/pen-inject/harness/src/platform.rs": "dfce004f28e54024252c7ecdb8de0b2ce6e5317a3a3b6894cd321e3420ba1560",
+    "tools/pen-inject/hil-injection.ps1": "81364d28f42cf2fcf06c2c1b486905e913f3855805577dd26c31352810e55785",
+    "tools/pen-inject/inject/Cargo.toml": "664d19d64fd7d9932a3ba1eb055e7113f3e45c85a36e5b271968bcaf8a9fc41a",
+    "tools/pen-inject/inject/src/main.rs": "3c9528045436086341bf492e5f015dfb640011f0550933558fdd35210ad88194",
+    "tools/tests/test_pen_injection.py": "8c3b3ed507532a8595ea0e461237fd17bbfbc8f60a98ca0ec6b0bcaab6da2708"
+  },
+  "measurements": {
+    "normal": {
+      "directory": "win-pen-8c8a6434cd494acb8cb9aebaaae3af2a",
+      "report": {
+        "command_samples": 472,
+        "received_samples": 472,
+        "matched_samples": 469,
+        "missing_sequences": [
+          272,
+          339,
+          340
+        ],
+        "unmatched_received_samples": 3,
+        "received_order_preserved": true,
+        "field_mismatches": {
+          "pressure": 1,
+          "pen_flags": 66
+        },
+        "pressure_pairs": 65,
+        "pressure_expected": 65,
+        "pressure_pearson_r": 1.0,
+        "pressure_target_met": true,
+        "all_command_fields_matched": false,
+        "max_contact_interval_ms": 26.479999999999563,
+        "keepalive_target_met": true,
+        "guard_trials": "separate live test required",
+        "editor_compatibility": "separate owner test required",
+        "mode": "normal",
+        "harness_acceptance": false,
+        "input_sha256": {
+          "commands": "d328653fa52cc5514d66fc524159fb875808df71ef52cfd47b311431772786c5",
+          "received": "f9378ba78a336f6e3ed73b370679c7edaac5dac24c4cd61a23049a8da581a0ad"
+        }
+      },
+      "text_file_sha256": {
+        "build-receipt.json": "2313787206bb631e99c7c59770a929fef3a51b358698aa28850f4ca3e66efe6f",
+        "commands.csv": "d328653fa52cc5514d66fc524159fb875808df71ef52cfd47b311431772786c5",
+        "commands.session.json": "f823af3e044434224875755d12320e28a3921f38c0600e1fbe10a00a3769c8d6",
+        "comparison.json": "1f4ed3a154a221584c2ce66b6e97a8753e6b2a920ae7be6c5850cdd0003c5658",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "6a952456e8c02219c3b93c0172207e2ccec2204a571a6d3027cc9e2074994de9",
+        "target/received.csv": "f9378ba78a336f6e3ed73b370679c7edaac5dac24c4cd61a23049a8da581a0ad",
+        "target/receiver.json": "040be2b5bca894bdebb7e07fd1ea63b4282d874c5f039ab9173e4c0bf4d3bfda",
+        "target/target.json": "bcc9b51fa31e0da480b2863f59c8d38961f9db6d56f5b8e7d0392482b0c9dfa7"
+      },
+      "historical_gated_build": {
+        "schema": 1,
+        "sha256": {
+          "Cargo.toml": "f2980bc055a52b58c1e317ffa0736d34344d5bc67b09b8361799d0245c73712a",
+          "Cargo.lock": "e9f569bbd426daa5f578775f6572e1bc285b1b057c1c8c803a9046e763b7b967",
+          "rust-toolchain.toml": "7daa90fd3135f5361b3eee9595738b3d68b51893d94bd42b49be25d4acaa8263",
+          "deny.toml": "23329ef41917009c97d44c3b18b7fbd6ae0eaf61826e6eaa708e8bff89885318",
+          "build.ps1": "c12fd20a7925f5b583e5b35b73d5bdc640e6e71455726f15088fb9bc1ddc2493",
+          "tools/check_setup.py": "978dfedf2068e0805a542370c4d84fbeadb4636be689b54282286557a60c8488",
+          "tools/pen-inject/build_receipt.py": "27e91bf8a23491505a93d8c00276fc76e0142bece670513f9141c29bbeaa1ea7",
+          "tools/pen-inject/core/Cargo.toml": "bd55b61cda8a21874294eda367496a902615a3c5e8da20dccbf9ac3abd0cd858",
+          "tools/pen-inject/core/src/lib.rs": "c0d7a6fe2bde83532551ac14b8ad1c39c63e5e56cb793902c8d7c4c4cb076094",
+          "tools/pen-inject/core/src/platform.rs": "d2fd98906cd53bc9b07d999a4558fd90ecabf13f8e284adec56728716cfe8ac8",
+          "tools/pen-inject/core/src/script.rs": "4200de94a9e480110f02c9b1607c8b8ffca1f6256d84f0ddb2dc6a6de90dcbc8",
+          "tools/pen-inject/harness/Cargo.toml": "05830bb2faf8dbb55c52b193c94d9b6bfc8bbfdcbc4651943eda05df1057660c",
+          "tools/pen-inject/harness/src/main.rs": "49705ac0084e55bffcac27f45b31565d95abc4cbdfea56ce0708caecc7f1937d",
+          "tools/pen-inject/harness/src/platform.rs": "fb5caf366b076b024c9476e9b3f8b9774e733a46e5202f28088a31eb60722d37",
+          "tools/pen-inject/inject/Cargo.toml": "664d19d64fd7d9932a3ba1eb055e7113f3e45c85a36e5b271968bcaf8a9fc41a",
+          "tools/pen-inject/inject/src/main.rs": "ee51d6d9e210190cfffdebdf4dc5a9a6abe5c8d9c2f52676602de449263dce69",
+          "target/debug/pen-harness.exe": "54167c06a519240cd17615555d5435b3cccdae733b18b0bcf254217300d4228e",
+          "target/debug/pen-inject.exe": "4447f64f883617af44cd8f4d04a85f8118f69c978b38313e1531bd871393687c"
+        }
+      },
+      "source_binding_note": "Exact run-specific source/binary hashes; earlier runs are not attributed to final bytes."
+    },
+    "no-refresh": {
+      "directory": "win-pen-76a6ce6f661b4c2fbf17303523af1cdc",
+      "report": {
+        "command_samples": 472,
+        "received_samples": 473,
+        "matched_samples": 468,
+        "missing_sequences": [
+          272,
+          339,
+          340,
+          401
+        ],
+        "unmatched_received_samples": 5,
+        "received_order_preserved": false,
+        "field_mismatches": {
+          "pressure": 2,
+          "pen_flags": 66,
+          "pen_mask": 1,
+          "pointer_flags": 1
+        },
+        "pressure_pairs": 65,
+        "pressure_expected": 65,
+        "pressure_pearson_r": 1.0,
+        "pressure_target_met": true,
+        "all_command_fields_matched": false,
+        "max_contact_interval_ms": 1499.7519999999995,
+        "keepalive_target_met": false,
+        "guard_trials": "separate live test required",
+        "editor_compatibility": "separate owner test required",
+        "mode": "no-refresh",
+        "harness_acceptance": false,
+        "input_sha256": {
+          "commands": "c79d3487280e52a8a41754d92b4598e6ea618522f0baa259c0916bf940fb0edb",
+          "received": "935a4372671238f644093af66d7c13e5e21aba178d7c3a7c132f2d6f2ab40ced"
+        }
+      },
+      "text_file_sha256": {
+        "build-receipt.json": "5b6871abee7f7c5df9a4216d8e13835baedd83891604bba7a7ba88318c29ab1d",
+        "commands.csv": "c79d3487280e52a8a41754d92b4598e6ea618522f0baa259c0916bf940fb0edb",
+        "commands.session.json": "5d19a3d5d17b1371277778b9e83f3ba2dfc8e28ee43869a58929fa249e79a0a8",
+        "comparison.json": "fceb6fd0d91f8755134ce7ea7ce24a186b1683b097cc7af28e73768df3d5be04",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "4dafc0561a2358a671c11c2ddf7c038b0980d7d980141a2866c7af61affd0f95",
+        "target/received.csv": "935a4372671238f644093af66d7c13e5e21aba178d7c3a7c132f2d6f2ab40ced",
+        "target/receiver.json": "24a29ab7305c82e83f4f80aef848ab02ad8c7f0842ac31d6b6dfaa2a43b828ec",
+        "target/target.json": "52bf833e341e6f98ed17264eda3d88fb005980ed71a0db0f0ba7deee5768eb2c"
+      },
+      "historical_gated_build": {
+        "schema": 1,
+        "sha256": {
+          "Cargo.toml": "f2980bc055a52b58c1e317ffa0736d34344d5bc67b09b8361799d0245c73712a",
+          "Cargo.lock": "e9f569bbd426daa5f578775f6572e1bc285b1b057c1c8c803a9046e763b7b967",
+          "rust-toolchain.toml": "7daa90fd3135f5361b3eee9595738b3d68b51893d94bd42b49be25d4acaa8263",
+          "deny.toml": "23329ef41917009c97d44c3b18b7fbd6ae0eaf61826e6eaa708e8bff89885318",
+          "build.ps1": "c12fd20a7925f5b583e5b35b73d5bdc640e6e71455726f15088fb9bc1ddc2493",
+          "tools/check_setup.py": "978dfedf2068e0805a542370c4d84fbeadb4636be689b54282286557a60c8488",
+          "tools/pen-inject/build_receipt.py": "27e91bf8a23491505a93d8c00276fc76e0142bece670513f9141c29bbeaa1ea7",
+          "tools/pen-inject/core/Cargo.toml": "bd55b61cda8a21874294eda367496a902615a3c5e8da20dccbf9ac3abd0cd858",
+          "tools/pen-inject/core/src/lib.rs": "c0d7a6fe2bde83532551ac14b8ad1c39c63e5e56cb793902c8d7c4c4cb076094",
+          "tools/pen-inject/core/src/platform.rs": "fc593ef435fbc7d4f5fef5e0a272bff55c3e65323fa0059cd72667a0512941f5",
+          "tools/pen-inject/core/src/script.rs": "4200de94a9e480110f02c9b1607c8b8ffca1f6256d84f0ddb2dc6a6de90dcbc8",
+          "tools/pen-inject/harness/Cargo.toml": "05830bb2faf8dbb55c52b193c94d9b6bfc8bbfdcbc4651943eda05df1057660c",
+          "tools/pen-inject/harness/src/main.rs": "49705ac0084e55bffcac27f45b31565d95abc4cbdfea56ce0708caecc7f1937d",
+          "tools/pen-inject/harness/src/platform.rs": "6177d3eab4f68d21fb27d2d2a8b240b6d2767934b85a05162f43b702507e1336",
+          "tools/pen-inject/inject/Cargo.toml": "664d19d64fd7d9932a3ba1eb055e7113f3e45c85a36e5b271968bcaf8a9fc41a",
+          "tools/pen-inject/inject/src/main.rs": "6e0a0ee4a37809df76a07689c48ceac23db7afee881c5915738d801bf91ce588",
+          "target/debug/pen-harness.exe": "edb80556940a410610572720ff6d4be78e947b116965ced943151066c0d6b925",
+          "target/debug/pen-inject.exe": "25377427c4c0bdb1de7dd3208e255ca93dd02768d1054d0eef5904305a51e710"
+        }
+      },
+      "source_binding_note": "Exact run-specific source/binary hashes; earlier runs are not attributed to final bytes.",
+      "contact_end": {
+        "elapsed_native_ms": 500,
+        "event": "UP",
+        "pointer_flag_canceled": false,
+        "down_native_sequence": 341,
+        "up_native_sequence": 342
+      }
+    },
+    "guards": {
+      "directory": "win-pen-21857b562ea140478cbf595a7df28ba1",
+      "report": {
+        "live_trials": 100,
+        "mutations": {
+          "move": 25,
+          "resize": 25,
+          "minimize": 25,
+          "focus": 25
+        },
+        "guard_rejections": 100,
+        "latched_rejections": 100,
+        "sink_stray_samples": 0,
+        "observed_sink_target_met": true,
+        "scope": "Only the selected native target/sink are observed; this does not prove zero input to every other desktop window."
+      },
+      "text_file_sha256": {
+        "build-receipt.json": "0f9148fa32313afef1258cd69190133f79894c59c58b6c42d046d75826a085a4",
+        "commands.csv": "8dfa9df90de7560ad839eb5efb7b4b86629e9da6187b2b5ba4343284a9117e65",
+        "guard-comparison.json": "b2733cf98bc5ae3323ca3f3beea6354da7941ce86ff5448df2f6add5773ff171",
+        "sink-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sink-stdout.log": "6b9442c7cd0198fda8576e1bd1cc43043096e97a390244bc016b4ae8166697f3",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "957f1c39af641b6faeb9310b60c9645532d0362b3cce7db34221926aa1d95de4",
+        "sink/received.csv": "39d084733c7c036011c607668af471a001622b8ab2ba900434a36a405c1f99a9",
+        "sink/receiver.json": "b49345d5054bed839f240a86e3fde13b839d466a48652ed51ff8aab2541d5a69",
+        "sink/target.json": "061212cd26406b46c8809234fd07a9e7e0688eae8d71576cd877a46259e03707",
+        "target/received.csv": "543b05371c310422f26e82d0a4dff32b2ccd3ce8f22c882c0a2daa63b3fe86ee",
+        "target/receiver.json": "5c34faee3cf7c5da1e062f65826dcfc01b6ccc1c52dd4f0a4257f7afdb6f3901",
+        "target/target.json": "0f2429d802d82832ad27034290d4df3f00d491a661ca33b5fae54268ab496d80"
+      },
+      "historical_gated_build": {
+        "schema": 1,
+        "sha256": {
+          "Cargo.toml": "f2980bc055a52b58c1e317ffa0736d34344d5bc67b09b8361799d0245c73712a",
+          "Cargo.lock": "e9f569bbd426daa5f578775f6572e1bc285b1b057c1c8c803a9046e763b7b967",
+          "rust-toolchain.toml": "7daa90fd3135f5361b3eee9595738b3d68b51893d94bd42b49be25d4acaa8263",
+          "deny.toml": "23329ef41917009c97d44c3b18b7fbd6ae0eaf61826e6eaa708e8bff89885318",
+          "build.ps1": "c12fd20a7925f5b583e5b35b73d5bdc640e6e71455726f15088fb9bc1ddc2493",
+          "tools/check_setup.py": "978dfedf2068e0805a542370c4d84fbeadb4636be689b54282286557a60c8488",
+          "tools/pen-inject/build_receipt.py": "27e91bf8a23491505a93d8c00276fc76e0142bece670513f9141c29bbeaa1ea7",
+          "tools/pen-inject/core/Cargo.toml": "bd55b61cda8a21874294eda367496a902615a3c5e8da20dccbf9ac3abd0cd858",
+          "tools/pen-inject/core/src/lib.rs": "c0d7a6fe2bde83532551ac14b8ad1c39c63e5e56cb793902c8d7c4c4cb076094",
+          "tools/pen-inject/core/src/platform.rs": "bc10015b13496d6e9e3124efae9fc5fd4e7827c196aa6884200da3410e74962b",
+          "tools/pen-inject/core/src/script.rs": "4200de94a9e480110f02c9b1607c8b8ffca1f6256d84f0ddb2dc6a6de90dcbc8",
+          "tools/pen-inject/harness/Cargo.toml": "05830bb2faf8dbb55c52b193c94d9b6bfc8bbfdcbc4651943eda05df1057660c",
+          "tools/pen-inject/harness/src/main.rs": "49705ac0084e55bffcac27f45b31565d95abc4cbdfea56ce0708caecc7f1937d",
+          "tools/pen-inject/harness/src/platform.rs": "dfce004f28e54024252c7ecdb8de0b2ce6e5317a3a3b6894cd321e3420ba1560",
+          "tools/pen-inject/inject/Cargo.toml": "664d19d64fd7d9932a3ba1eb055e7113f3e45c85a36e5b271968bcaf8a9fc41a",
+          "tools/pen-inject/inject/src/main.rs": "3c9528045436086341bf492e5f015dfb640011f0550933558fdd35210ad88194",
+          "target/debug/pen-harness.exe": "d21a789693929aa422fd11487ed92d5b3b576546dc8283a7c1bd1cf52c1070c0",
+          "target/debug/pen-inject.exe": "6f0802f92287fd9470b4ccbbc143011d13861057f927fdbe1ca836b4899d615f"
+        }
+      },
+      "source_binding_note": "Exact run-specific source/binary hashes; earlier runs are not attributed to final bytes."
+    }
+  },
+  "retained_runs": [
+    {
+      "directory": "win-pen-0aca56f749b74323bad88541ada19a7a",
+      "text_file_sha256": {
+        "build-receipt.json": "0f9148fa32313afef1258cd69190133f79894c59c58b6c42d046d75826a085a4",
+        "commands.csv": "8dfa9df90de7560ad839eb5efb7b4b86629e9da6187b2b5ba4343284a9117e65",
+        "guard-comparison.json": "b2733cf98bc5ae3323ca3f3beea6354da7941ce86ff5448df2f6add5773ff171",
+        "sink-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sink-stdout.log": "6b9442c7cd0198fda8576e1bd1cc43043096e97a390244bc016b4ae8166697f3",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "957f1c39af641b6faeb9310b60c9645532d0362b3cce7db34221926aa1d95de4",
+        "sink/received.csv": "39d084733c7c036011c607668af471a001622b8ab2ba900434a36a405c1f99a9",
+        "sink/receiver.json": "b49345d5054bed839f240a86e3fde13b839d466a48652ed51ff8aab2541d5a69",
+        "sink/target.json": "ecbcd241e1c4595957d28abb435bfb53826b8659f6eab928da7910627c26a7e8",
+        "target/received.csv": "2524d78a8321f260cb609573e16d80ce8b51bb687695145db2084495e6bc7a61",
+        "target/receiver.json": "5c34faee3cf7c5da1e062f65826dcfc01b6ccc1c52dd4f0a4257f7afdb6f3901",
+        "target/target.json": "fea27264910d89cea9703fa1e669d9606e2ae380404ec09ea680697a73305e8d"
+      }
+    },
+    {
+      "directory": "win-pen-0adf6a7796194ecfa47884885f952e8d",
+      "text_file_sha256": {
+        "build-receipt.json": "5b6871abee7f7c5df9a4216d8e13835baedd83891604bba7a7ba88318c29ab1d",
+        "commands.csv": "73bde1f6c73a4f7ef051b8102c5d0f4b749414e772344c64a7745ce610d7181b",
+        "sink-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sink-stdout.log": "6b9442c7cd0198fda8576e1bd1cc43043096e97a390244bc016b4ae8166697f3",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "97a183de34cc36cc017784424320a709a118811cf62ead47ac92006e668c0aa4",
+        "sink/received.csv": "39d084733c7c036011c607668af471a001622b8ab2ba900434a36a405c1f99a9",
+        "sink/receiver.json": "b49345d5054bed839f240a86e3fde13b839d466a48652ed51ff8aab2541d5a69",
+        "sink/target.json": "e37bdf620b03a8c829c569fe79b3f2177e4a3c8634a30f440326bce3ad5118e5",
+        "target/received.csv": "5abe19920148bcfb50c073b55b4b4e31839743c5d077d7b36a5f043a6183ba64",
+        "target/receiver.json": "862d0de0aa5f30ee20bb915078d45c7b9d91c5f8cf4ae1902f06a3318a619c97",
+        "target/target.json": "704874c2fbfe1e2b6aaa213aeabd47122eee8d18841ed2852dc65d8db000beef"
+      }
+    },
+    {
+      "directory": "win-pen-21857b562ea140478cbf595a7df28ba1",
+      "text_file_sha256": {
+        "build-receipt.json": "0f9148fa32313afef1258cd69190133f79894c59c58b6c42d046d75826a085a4",
+        "commands.csv": "8dfa9df90de7560ad839eb5efb7b4b86629e9da6187b2b5ba4343284a9117e65",
+        "guard-comparison.json": "b2733cf98bc5ae3323ca3f3beea6354da7941ce86ff5448df2f6add5773ff171",
+        "sink-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sink-stdout.log": "6b9442c7cd0198fda8576e1bd1cc43043096e97a390244bc016b4ae8166697f3",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "957f1c39af641b6faeb9310b60c9645532d0362b3cce7db34221926aa1d95de4",
+        "sink/received.csv": "39d084733c7c036011c607668af471a001622b8ab2ba900434a36a405c1f99a9",
+        "sink/receiver.json": "b49345d5054bed839f240a86e3fde13b839d466a48652ed51ff8aab2541d5a69",
+        "sink/target.json": "061212cd26406b46c8809234fd07a9e7e0688eae8d71576cd877a46259e03707",
+        "target/received.csv": "543b05371c310422f26e82d0a4dff32b2ccd3ce8f22c882c0a2daa63b3fe86ee",
+        "target/receiver.json": "5c34faee3cf7c5da1e062f65826dcfc01b6ccc1c52dd4f0a4257f7afdb6f3901",
+        "target/target.json": "0f2429d802d82832ad27034290d4df3f00d491a661ca33b5fae54268ab496d80"
+      }
+    },
+    {
+      "directory": "win-pen-2a79adfc64d142acab4c73ae2b9a4a52",
+      "text_file_sha256": {
+        "build-receipt.json": "4ade35f55222dabe284fcb115560a884a2bc7d4aecaf28b6bf81d291f13a9993",
+        "commands.csv": "fb3e180bc6f39cce2442073eefab852cf1c97b5a8ec6b72af2eb9712eaaf2886",
+        "commands.session.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "c1191393215610547bdbd4b2914b2a32f78eba982b3485dfd7dd7e5dbdcf2a17",
+        "target/received.csv": "e63d0bc2c511ab30f53a4d5acb0f9ab615f61a955f9f004812f06d68993187ca",
+        "target/receiver.json": "93b5c7707812a57c8b7e3ab7c38b4e0954cb0dc946f16095cca056509f49eebe",
+        "target/target.json": "fb316d99351c6e5680f8115a932a1903e9b27eb27880224791db8fc8083248ae"
+      }
+    },
+    {
+      "directory": "win-pen-53e52311159f4c1d80fb3cb484480a36",
+      "text_file_sha256": {
+        "build-receipt.json": "90fd84ae93ccac1989d786f35cb80abc2b767d3ffa03af85d0022e708731611f",
+        "commands.csv": "14984115b9fb85c33824bb8f1491ca747e3758289da26fe6501f44a78f6da547",
+        "commands.session.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "3bc8e93ff0521f7a870d276688a9afbb81cfdbe9159c79b93a12ee5c91fc4bd5",
+        "target/received.csv": "1109b66a3d7e73f442526594c40ca56e271774e7d832fbb7bfe5bacc546e710c",
+        "target/receiver.json": "ea21a06403014b0ee60d84db76aca303f6856b77ae761a4225678b016171ca7b",
+        "target/target.json": "2b220a6b78b26599797880f275328892e2cf534b9166fd39bb9949d7e2690bad"
+      }
+    },
+    {
+      "directory": "win-pen-593419cb4ad14ee9a38ea17272c98825",
+      "text_file_sha256": {
+        "build-receipt.json": "bb1247bae78fb6967158fca93d5d2d6ccf1b10b72b418977504dda13d4d94580",
+        "commands.csv": "8dfa9df90de7560ad839eb5efb7b4b86629e9da6187b2b5ba4343284a9117e65",
+        "sink-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sink-stdout.log": "6b9442c7cd0198fda8576e1bd1cc43043096e97a390244bc016b4ae8166697f3",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "75f83dd1b7dc86faa3ae413709484c443894fae41b2f625c95385fe6324f7ca5",
+        "sink/received.csv": "39d084733c7c036011c607668af471a001622b8ab2ba900434a36a405c1f99a9",
+        "sink/receiver.json": "b49345d5054bed839f240a86e3fde13b839d466a48652ed51ff8aab2541d5a69",
+        "sink/target.json": "580edc3c624f50543b485c9193c0b6428d30ab2a198128a90d70e95964c2220f",
+        "target/received.csv": "f4a693905457d7df3036b518d867bd3534420ec963ff8840d34a3115ca05576c",
+        "target/receiver.json": "bb0bd8b3193e2e8bea88efb130715b831df54ae6fb782e1580b96b71177a8fbe",
+        "target/target.json": "a123b22c03747d7fa64be0bea02c057c168e0359c7cd52d8608fa37505a1e171"
+      }
+    },
+    {
+      "directory": "win-pen-73e698cee78b41c8879a638ba9e0af3a",
+      "text_file_sha256": {
+        "build-receipt.json": "5b6871abee7f7c5df9a4216d8e13835baedd83891604bba7a7ba88318c29ab1d",
+        "commands.csv": "0f51761f74d79d3f7b0c1bff354d73ab1847c5a323ed80c37c09d6f7b8381e11",
+        "commands.session.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "9feec4b3c3142686fd8e0d695843ec67c200f582b308679740be124ffe31375f",
+        "target/received.csv": "9bd92cd896f1b811fa7331bb6f7794bb86fae80c316794792ebd9178045b87dc",
+        "target/receiver.json": "8d771230ae3f70c8f408d1510ed77f8831f82290a4742124edd64afacb405064",
+        "target/target.json": "18c1720bfb56f31f95cbd7711f53898e21bff82bccf04f4230e064bf7efea5ff"
+      }
+    },
+    {
+      "directory": "win-pen-76a6ce6f661b4c2fbf17303523af1cdc",
+      "text_file_sha256": {
+        "build-receipt.json": "5b6871abee7f7c5df9a4216d8e13835baedd83891604bba7a7ba88318c29ab1d",
+        "commands.csv": "c79d3487280e52a8a41754d92b4598e6ea618522f0baa259c0916bf940fb0edb",
+        "commands.session.json": "5d19a3d5d17b1371277778b9e83f3ba2dfc8e28ee43869a58929fa249e79a0a8",
+        "comparison.json": "fceb6fd0d91f8755134ce7ea7ce24a186b1683b097cc7af28e73768df3d5be04",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "4dafc0561a2358a671c11c2ddf7c038b0980d7d980141a2866c7af61affd0f95",
+        "target/received.csv": "935a4372671238f644093af66d7c13e5e21aba178d7c3a7c132f2d6f2ab40ced",
+        "target/receiver.json": "24a29ab7305c82e83f4f80aef848ab02ad8c7f0842ac31d6b6dfaa2a43b828ec",
+        "target/target.json": "52bf833e341e6f98ed17264eda3d88fb005980ed71a0db0f0ba7deee5768eb2c"
+      }
+    },
+    {
+      "directory": "win-pen-8c8a6434cd494acb8cb9aebaaae3af2a",
+      "text_file_sha256": {
+        "build-receipt.json": "2313787206bb631e99c7c59770a929fef3a51b358698aa28850f4ca3e66efe6f",
+        "commands.csv": "d328653fa52cc5514d66fc524159fb875808df71ef52cfd47b311431772786c5",
+        "commands.session.json": "f823af3e044434224875755d12320e28a3921f38c0600e1fbe10a00a3769c8d6",
+        "comparison.json": "1f4ed3a154a221584c2ce66b6e97a8753e6b2a920ae7be6c5850cdd0003c5658",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "6a952456e8c02219c3b93c0172207e2ccec2204a571a6d3027cc9e2074994de9",
+        "target/received.csv": "f9378ba78a336f6e3ed73b370679c7edaac5dac24c4cd61a23049a8da581a0ad",
+        "target/receiver.json": "040be2b5bca894bdebb7e07fd1ea63b4282d874c5f039ab9173e4c0bf4d3bfda",
+        "target/target.json": "bcc9b51fa31e0da480b2863f59c8d38961f9db6d56f5b8e7d0392482b0c9dfa7"
+      }
+    },
+    {
+      "directory": "win-pen-aee39cfb60134670b20a02b285372127",
+      "text_file_sha256": {
+        "build-receipt.json": "4043d11fd5c6a3505e4a78411b02c39facd6057afa235f3ec1d0945971057bc9",
+        "commands.csv": "171badf159bb7542f48c69d78f8a115b2a09ce3563cf68b700f2e26b60e62d8c",
+        "commands.session.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "75f83dd1b7dc86faa3ae413709484c443894fae41b2f625c95385fe6324f7ca5",
+        "target/received.csv": "54db6183d4ff0531c0f92cba1b1cad6bac5feaa1819dcd029f6f89bc8417f735",
+        "target/receiver.json": "bb0bd8b3193e2e8bea88efb130715b831df54ae6fb782e1580b96b71177a8fbe",
+        "target/target.json": "ccbf2408ca9c012f69eb68e5d9f15a290db9b71d6d7e02fd40c87400f7be7617"
+      }
+    },
+    {
+      "directory": "win-pen-ec092d7bcc4140c38577b491cde58f43",
+      "text_file_sha256": {
+        "build-receipt.json": "2313787206bb631e99c7c59770a929fef3a51b358698aa28850f4ca3e66efe6f",
+        "commands.csv": "73bde1f6c73a4f7ef051b8102c5d0f4b749414e772344c64a7745ce610d7181b",
+        "sink-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sink-stdout.log": "6b9442c7cd0198fda8576e1bd1cc43043096e97a390244bc016b4ae8166697f3",
+        "target-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "target-stdout.log": "97a183de34cc36cc017784424320a709a118811cf62ead47ac92006e668c0aa4",
+        "sink/received.csv": "39d084733c7c036011c607668af471a001622b8ab2ba900434a36a405c1f99a9",
+        "sink/receiver.json": "b49345d5054bed839f240a86e3fde13b839d466a48652ed51ff8aab2541d5a69",
+        "sink/target.json": "39c2e13a793a51f3c46dd84dde74cf79c376aa3835c5f3e7322ebfa007b9ceeb",
+        "target/received.csv": "29368b91d372283a6263ce4bd2e4396d93e8d5e2168bf6e3d1bf15fd27e85f71",
+        "target/receiver.json": "862d0de0aa5f30ee20bb915078d45c7b9d91c5f8cf4ae1902f06a3318a619c97",
+        "target/target.json": "cb8dcd844910c5f567a0db63ad444965000a435dfa7c070560c9ce09258bf15f"
+      }
+    }
+  ],
+  "validation_receipts": [
+    {
+      "receipt": "t005-test-all-c4dcd2fbc4194dc1890812287106d481.log.json",
+      "sha256": "2135c50d87b282b47508a875889be06b0ef335a70bb3ed080cc8aa92c4f521de",
+      "result": {
+        "phase": "t005-test-all",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 184.243,
+        "sampled_peak_tree_working_set_bytes": 1449697280,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "t005-lint-all-c37917a7b2964220ad8b36c2c005f1a9.log.json",
+      "sha256": "744480d8d64696b13b423b729de1fdcd46eede7212d785eb3abf4fb9a3fa8f3b",
+      "result": {
+        "phase": "t005-lint-all",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 171.989,
+        "sampled_peak_tree_working_set_bytes": 2070683648,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "t005-final-python-9d663e7034ce4ca3a14f25c0b5fd5232.log.json",
+      "sha256": "702a094460b27be666b540b9a5126ed2c3354c94debf1955a59c875322a7ef1e",
+      "result": {
+        "phase": "t005-final-python",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 5.044,
+        "sampled_peak_tree_working_set_bytes": 32952320,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "t005-final-rust-tests-99ace23a35d04519a08dd249b603c9ff.log.json",
+      "sha256": "a1464d3d7810fc7fbcbee9726edea12dafb5ed79e3cff5eed9da15c5f8eed10c",
+      "result": {
+        "phase": "t005-final-rust-tests",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 14.962,
+        "sampled_peak_tree_working_set_bytes": 278331392,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "t005-final-clippy-319b03812a3540119ddfa2e783fd7921.log.json",
+      "sha256": "78542994f1b8ea53dd3c29df57cd082567079139a6a8c28e05289704d8d57f39",
+      "result": {
+        "phase": "t005-final-clippy",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 6.228,
+        "sampled_peak_tree_working_set_bytes": 88264704,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "t005-final-format-15dabc31ba9c49febac4bd6ca66b2e6f.log.json",
+      "sha256": "7631c408f50af1c484a108e8518beb6761413ba5d7391a581a840bb22f1c28c4",
+      "result": {
+        "phase": "t005-final-format",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 3.671,
+        "sampled_peak_tree_working_set_bytes": 46604288,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "t005-final-offline-plan-37e972f5cb324310a846340ab30e9397.log.json",
+      "sha256": "99176f0d75866492c85c18e222081374e065864d938dd6182c3a42dad9fb8b15",
+      "result": {
+        "phase": "t005-final-offline-plan",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 0.159,
+        "sampled_peak_tree_working_set_bytes": 2043904,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "t005-live-final-guards-bf7829c72ce0496486ad13f4217b47bb.log.json",
+      "sha256": "3d6b7c6ea7438bb41f452388fff5570c74287787f0b5de9cf097d4eca2670d28",
+      "result": {
+        "phase": "t005-live-final-guards",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 26.047,
+        "sampled_peak_tree_working_set_bytes": 277385216,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "license-gradle-88776d48fd044cc0813a3c381d5e4386.log.json",
+      "sha256": "ba9632747e1bda51c1ad51b3d59f40527c688a5a7f683841dbbdcb837e1ebe70",
+      "result": {
+        "phase": "license-gradle",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 46.768,
+        "sampled_peak_tree_working_set_bytes": 622010368,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "license-rust-cc8e07d9091e492f879e5ef613f73c15.log.json",
+      "sha256": "8f3591288b2b6e04cd220b9f0105e234e495d2399011d53d6bf20ef4359a503b",
+      "result": {
+        "phase": "license-rust",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 1.606,
+        "sampled_peak_tree_working_set_bytes": 2043904,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "build-pen-inject-2b1c6fd8ee99427d83d8ae1e1ed98983.log.json",
+      "sha256": "bca912efa672546fcd14e1b0965d2e998afdc5f3119f50dce7226fd416ba2fd6",
+      "result": {
+        "phase": "build-pen-inject",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 4.383,
+        "sampled_peak_tree_working_set_bytes": 133300224,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "t005-final-setup-26c28906176844aba81cc860ada7d9ea.log.json",
+      "sha256": "b7d038799bcbd76c254d4302ac27987de8e12d9597dc3987cb7933bfc1446502",
+      "result": {
+        "phase": "t005-final-setup",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 0.506,
+        "sampled_peak_tree_working_set_bytes": 2711552,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "t005-final-plan-coverage-11783e43ae94427dbd8a820ae6bc6814.log.json",
+      "sha256": "e4df82c7901496fafb6c6a558916e289093e47958d2fec172966dac102131d54",
+      "result": {
+        "phase": "t005-final-plan-coverage",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 0.507,
+        "sampled_peak_tree_working_set_bytes": 2707456,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "t005-final-source-secrets-3ba6ee375f9d46d4ae4d33a8a07b4f53.log.json",
+      "sha256": "79b9674ee000a7456870688a48b46dfc1533b457dcf7d0b1cef11015a8375f63",
+      "result": {
+        "phase": "t005-final-source-secrets",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 7.895,
+        "sampled_peak_tree_working_set_bytes": 88137728,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "t005-final-public-remote-33af1d26cb7c4c3ba177e6e38eede906.log.json",
+      "sha256": "7e84f5bdc7eb1e77c6604b0e0889198b3bfa23002204d363b3d679ca93719a06",
+      "result": {
+        "phase": "t005-final-public-remote",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 1.486,
+        "sampled_peak_tree_working_set_bytes": 2682880,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    },
+    {
+      "receipt": "t005-final-remote-main-ccb1ea52e99246b4b3972a3590bc031d.log.json",
+      "sha256": "253a6bbeb1207667f3372f4dc74607aa665fd12bfe96a38b74da0755485db64e",
+      "result": {
+        "phase": "t005-final-remote-main",
+        "exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 2.821,
+        "sampled_peak_tree_working_set_bytes": 43667456,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true
+      }
+    }
+  ],
+  "software_results": {
+    "python_tests": 82,
+    "rust_tests": 13,
+    "new_python_tests": 16,
+    "new_rust_tests": 8,
+    "powershell_scripts_parsed": 3,
+    "offline_plan_samples": 472,
+    "clippy_warnings_denied": true,
+    "rustfmt_passed": true,
+    "kotlin_feature_tests": "NO-SOURCE; unchanged Kotlin full checks preceded native fixes",
+    "dependency_census": {
+      "modules": 181,
+      "runtime_configurations": 6,
+      "bound_parent_poms": 1
+    }
+  },
+  "cleanup": {
+    "probe_processes_remaining": 0,
+    "screenshots_created": 0,
+    "screenshots_retained": 0,
+    "screenshots_disposed": 0,
+    "receipt": "No verification images created; owned harness windows/processes closed; text receipts retained."
+  },
+  "acceptance": {
+    "full_task": "incomplete",
+    "DEV-004": "in_progress/partial",
+    "D10": "provisional, dated revision recorded",
+    "G0": "open",
+    "untested": [
+      "editor compatibility",
+      "elevated-window guard/UIPI",
+      "individual eraser flag behavior",
+      "all-other-desktop-window stray input",
+      "phone/S23 physical behavior"
+    ]
+  }
+}

@@ -1,10 +1,12 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-android', 'build-pen-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-core', 'build-android', 'build-pen-probe', 'build-pen-inject', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
-    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'pen', 'pen-owner')][string]$HilMode = 'app',
+    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
-    [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600
+    [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
+    [switch]$OwnerReady,
+    [ValidateSet('normal', 'no-refresh', 'guards')][string]$WinPenScenario = 'normal'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -44,6 +46,11 @@ try {
         'build-core' { Run-LicenseGate; Run-Cargo 'build-core' @('build', '--workspace', '--locked') }
         'build-android' { Run-LicenseGate; Run-Gradle 'build-android' @(':android:assembleDebug') }
         'build-pen-probe' { Run-LicenseGate; Run-Gradle 'build-pen-probe' @(':pen-probe:assembleDebug', ':pen-probe:assembleDebugAndroidTest') }
+        'build-pen-inject' {
+            Run-LicenseGate
+            Run-Cargo 'build-pen-inject' @('build', '--locked', '-p', 'vw-pen-harness', '-p', 'vw-pen-inject')
+            Run-Step 'bind-pen-inject-build' 'python.exe' @('tools/pen-inject/build_receipt.py', 'record')
+        }
         'build-desktop' { Run-LicenseGate; Run-Gradle 'build-desktop' @(':desktop:packageUberJarForCurrentOS') }
         'run-desktop' { Run-LicenseGate; Run-Gradle 'run-desktop' @(':desktop:run') }
         'test-all' {
@@ -61,13 +68,17 @@ try {
         }
         'hil-test' {
             $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/hil-test.ps1', '-Mode', $HilMode, '-TimeoutSeconds', "$TimeoutSeconds")
+            if ($HilMode -eq 'win-pen') {
+                if (-not $OwnerReady) { throw 'Windows input HIL requires -OwnerReady after the owner reserves the desktop for testing' }
+                $arguments += @('-OwnerReady', '-WinPenScenario', $WinPenScenario)
+            }
             if ($HilMode -eq 'rust') {
                 if (-not $Crate) { throw 'Usage: build.ps1 hil-test rust <crate>' }
                 $arguments += @('-Crate', $Crate)
             }
             # Leave the child enough time to run its bounded build, replay and
             # device cleanup. An outer deadline must not preempt its finally block.
-            $hilBudget = if ($HilMode -in @('pen', 'pen-owner')) { $TimeoutSeconds * 6 + 600 } else { $TimeoutSeconds + 600 }
+            $hilBudget = if ($HilMode -in @('pen', 'pen-owner', 'win-pen')) { $TimeoutSeconds * 6 + 600 } else { $TimeoutSeconds + 600 }
             Run-Step 'hil-test' 'powershell.exe' $arguments -Limit $hilBudget
         }
     }

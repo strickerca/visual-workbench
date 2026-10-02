@@ -4622,9 +4622,11 @@
       "scenarios": [
         "A08"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T0.05.md: Native harness and guarded injector implemented; 65 pressure pairs r=1.000, 472 received samples, and 100 acknowledged guard trials with zero samples in the selected sink. Combined inverted/eraser flags and three lifecycle matches differ; full event-fidelity verification and editor/elevation acceptance remain open in T0.05, before T0.12/G0 closure."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },

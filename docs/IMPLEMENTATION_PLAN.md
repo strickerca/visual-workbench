@@ -242,6 +242,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - Runs against the harness, Paint, Krita (Windows 8+ Pointer Input), GIMP and Photopea in Edge (and Chrome if installed).
   - Results in `docs/compat/injection-smoke.md`, with screenshots of pressure-varying strokes; a dated D10 entry.
 - **Acceptance:** harness pressure tracks commanded pressure (Pearson r ≥ 0.95); each editor's result is recorded as yes, no or partial with evidence; 0 stray events in 100 guard trials.
+- **Execution checkpoint, 2026-10-02:** the host-only recorder, guarded injector, bounded HIL runner and strict analyzers are implemented. Owner-authorized native harness testing measured pressure r = 1.000 and a 26.480 ms maximum normal contact interval; combined inverted/eraser flags did not pass through. See `docs/evidence/T0.05.md` for live guard results and retained source-bound reports. Editor and elevation acceptance remain open; this checkpoint does not close T0.05, T4.03's dependency or G0. No phone was accessed. The next independent task is T0.06 (M, gpt-6-astra / xhigh), with physical transport measurements deferred while the phone is reserved.
 
 ### T0.06 — Transport spike
 - **Size:** M · **Depends on:** T0.02, T0.03 · **Prompt:** `prompts/phase-0/T0.06-transport-spike.md`

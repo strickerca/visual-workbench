@@ -1,7 +1,9 @@
 param(
-    [ValidateSet('app', 'rust', 'pen', 'pen-owner')][string]$Mode = 'app',
+    [ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen')][string]$Mode = 'app',
     [ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
-    [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600
+    [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
+    [switch]$OwnerReady,
+    [ValidateSet('normal', 'no-refresh', 'guards')][string]$WinPenScenario = 'normal'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -10,6 +12,12 @@ Import-Module (Join-Path $PSScriptRoot 'process.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'android-device.psm1') -Force
 
 try {
+    if ($Mode -eq 'win-pen') {
+        if (-not $OwnerReady) { throw 'Reserve the desktop with the owner before Windows input HIL' }
+        & (Join-Path $PSScriptRoot 'pen-inject\hil-injection.ps1') -OwnerReady -Scenario $WinPenScenario -TimeoutSeconds $TimeoutSeconds
+        # The PowerShell runner throws on failure; it does not set a native exit code.
+        exit 0
+    }
     . (Join-Path $PSScriptRoot 'enter-dev.ps1')
     if ($Mode -in @('pen', 'pen-owner')) {
         & (Join-Path $PSScriptRoot 'pen-trace\hil-pen.ps1') -Mode $Mode -TimeoutSeconds $TimeoutSeconds

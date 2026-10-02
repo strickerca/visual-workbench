@@ -96,6 +96,28 @@ name = "vw-pdf"
 version = "0.1.0"
 
 [[package]]
+name = "vw-pen-harness"
+version = "0.1.0"
+dependencies = [
+ "vw-pen-probe",
+ "windows",
+]
+
+[[package]]
+name = "vw-pen-inject"
+version = "0.1.0"
+dependencies = [
+ "vw-pen-probe",
+]
+
+[[package]]
+name = "vw-pen-probe"
+version = "0.1.0"
+dependencies = [
+ "windows",
+]
+
+[[package]]
 name = "vw-pkg"
 version = "0.1.0"
 

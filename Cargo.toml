@@ -5,6 +5,9 @@ members = [
     "host-win/crates/*",
     "tools/hello",
     "tools/diag-win",
+    "tools/pen-inject/core",
+    "tools/pen-inject/harness",
+    "tools/pen-inject/inject",
 ]
 
 [workspace.package]

@@ -63,6 +63,18 @@ The census uses Gradle's legacy, maintenance-mode `ArtifactResolutionQuery` API 
 
 The initial API 36 build failed AAR metadata checks: ten selected Compose 1.12.1 artifacts require compile SDK 37. The starter now reuses the already installed final API 37.0 revision 2 platform (`PreviewSdkInt=0`, no codename/beta). Target SDK remains 36 and minimum SDK remains 29. AGP 9.3 supports API 37; no preview, suppressed metadata check or plugin upgrade was needed. [AGP compatibility](https://developer.android.com/build/releases/agp-9-3-0-release-notes), [SDK setup](https://developer.android.com/about/versions/17/setup-sdk).
 
+### T0.05 Windows pen probe (2026-10-02)
+
+The three private probe crates reuse the exact `windows = 0.62.2` binding already
+selected for T0.03 under MIT OR Apache-2.0. Added features expose pointer input,
+window controls, token/process queries and window creation; no third-party
+package/version was added to Cargo.lock. First-party path dependencies are
+explicitly pinned to `=0.1.0`. The probe uses Rust 1.99.0, edition 2024, with the
+existing two-worker Cargo limit. `build-pen-inject` runs both license gates before
+compiling and binds the resulting two executable hashes to their source and
+manifests for warm HIL reuse. See `docs/evidence/T0.05.md` for measured results
+and remaining editor/integrity acceptance.
+
 ## Libraries
 
 This inherited catalog lists future candidates and license claims. None of its entries is recorded as selected, installed, resolved, or verified by this table. Owning phases must select exact versions, verify source and license evidence, and record the resolved dependency graph before using them. The starter UI dependency pins are listed separately in the build-tools table above.

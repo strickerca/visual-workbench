@@ -1,0 +1,17 @@
+[package]
+name = "vw-pen-inject"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "pen-inject"
+path = "src/main.rs"
+
+[dependencies]
+vw-pen-probe = { version = "=0.1.0", path = "../core" }

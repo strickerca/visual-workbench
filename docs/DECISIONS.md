@@ -67,6 +67,30 @@ Revision 2026-10-01. Each record: context, decision, alternatives considered, co
 - **Spike (T0.05):** verify pressure in a test harness window, Paint, Krita, GIMP and Photopea in a browser (Photoshop once installed).
 - **Confidence:** 80% · **Status:** provisional (T0.05).
 
+### D10 measurement update — 2026-10-02 (T0.05)
+
+Retain guarded PT_PEN injection as the provisional approach. On this host at
+168 DPI (175%), the normal harness run submitted and recorded 472 samples;
+all 65 pressure-ramp pairs matched (Pearson r = 1.000). Tilt on both axes,
+rotation and barrel fields matched; the maximum contact interval was 26.480 ms.
+The tested combined INVERTED | ERASER value (6) did not pass through: 66 matched
+samples had different pen flags, with three unmatched lifecycle samples and one
+pressure mismatch near that transition. Do not promise eraser compatibility yet.
+
+Revise the earlier approximate one-second timeout assumption for this host:
+with refresh withheld for 1500 ms, Windows emitted an automatic UP at 500 ms
+after DOWN, without POINTER_FLAG_CANCELED, and the next update began a new
+contact. Keep the >=20 Hz policy; the probe schedules 50 Hz and stops a normal
+run when a contact gap exceeds 50 ms. This is measured behavior, not a universal
+Windows timeout guarantee.
+
+Editor compatibility and elevated-window behavior remain unmeasured. The native
+guard experiment observes only its two owned harness windows and cannot prove
+absence of input to every other desktop window. D10 remains provisional and G0
+remains open. See [T0.05 evidence](evidence/T0.05.md) and the
+[compatibility matrix](compat/injection-smoke.md) for source bindings, guard
+results, retained failures and untested clauses. No TUNNEL requirement is passed.
+
 ## D11 — Virtual monitor
 - **Decision (provisional):** fork SudoVDA, build it from source with the WDK from NuGet, sign it with a project-only self-signed code-signing certificate, and install the certificate into LocalMachine Root and TrustedPublisher. After signing, the private key moves offline (a password-protected `.pfx` on removable media) and is deleted from the certificate store. Control by IOCTL with a watchdog. Secure Boot and Memory Integrity stay on (Memory Integrity is verified on).
 - **Licenses:** SudoVDA's own changes are MIT or CC0 per its README (the repository has no LICENSE file); the Microsoft IddCx sample code it builds on is MS-PL. MS-PL allows binary distribution under compatible terms, so the separately installed driver package is a documented exception to the D17 allow-list.
