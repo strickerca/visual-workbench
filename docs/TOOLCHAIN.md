@@ -297,3 +297,36 @@ Resolution adds 33 packages and removes no previous package versions. The Rust
 license/source/ban gate and unchanged Gradle census (184 modules, ten runtime
 configurations, one bound parent POM) pass without policy changes. Duplicate
 version warnings remain, including hashbrown introduced by code generation.
+
+## T1.03 storage pins (2026-10-02)
+
+Official registry metadata and release pages were checked before selecting stable,
+non-yanked versions. Cargo.lock retains exact transitive versions and checksums.
+
+| Crate | Exact pin | Declared license | Selected features |
+| --- | --- | --- | --- |
+| rusqlite | 0.40.2 | MIT | bundled; defaults disabled |
+| libsqlite3-sys | 0.38.2 (resolved) | MIT | bundled SQLite 3.53.2 |
+| zip | 8.6.0 | MIT | defaults disabled; stored ZIP/ZIP64 entries |
+| fs2 | 0.4.3 | MIT OR Apache-2.0 | filesystem capacity and advisory locks |
+| tempfile | 3.27.0 (reused) | MIT OR Apache-2.0 | atomic temporary-file publication |
+| rustix | 1.1.5 (reused) | Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT | fs, Android/Linux no-replace directory rename |
+
+BLAKE3 1.8.7, serde 1.0.229, serde_json 1.0.151 with float_roundtrip,
+thiserror 2.0.21 and development-only Windows 0.62.2 reuse existing exact pins.
+The Windows example uses the operating-system Media Foundation encoder and decoder
+to generate a 30-frame, 64x64, one-second H.264 MP4 fixture; no encoder executable
+is bundled. The same fixture bytes run through storage tests on Windows and S23.
+
+Sources: [rusqlite releases](https://github.com/rusqlite/rusqlite/releases),
+[rusqlite 0.40.2](https://crates.io/crates/rusqlite/0.40.2),
+[zip 8.6.0](https://crates.io/crates/zip/8.6.0),
+[fs2 0.4.3](https://crates.io/crates/fs2/0.4.3).
+SQLite's generated amalgamation reports **3.53.2** in sqlite3.h and is
+[public domain](https://www.sqlite.org/copyright.html). The MIT Rust wrapper
+license does not replace that upstream dedication. The existing license policy
+is unchanged. WAL with synchronous=NORMAL protects process-crash consistency;
+[SQLite documents](https://sqlite.org/pragma.html#pragma_synchronous) that power
+loss or OS failure may roll back recent commits. Portable project copies use
+[VACUUM INTO](https://www.sqlite.org/lang_vacuum.html), then remove labels and
+vacuum again before ZIP publication.

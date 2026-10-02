@@ -3,6 +3,7 @@ use crate::{
     patch::{self, Address, Change},
     plan,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use vw_model::{AssetId, DeviceId, Id, Object, Project, StateHash};
 use vw_proto::{
@@ -10,7 +11,11 @@ use vw_proto::{
     v1::{self, op::Kind},
 };
 
-#[derive(Debug, Clone)]
+const CHECKPOINT_PREFIX: &[u8] = b"VisualWorkbench.HostCheckpoint.v1\n";
+const MAX_CHECKPOINT_BYTES: usize = 256 * 1024 * 1024;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct WriteStamp {
     address: Address,
     device: DeviceId,
@@ -18,11 +23,14 @@ struct WriteStamp {
     wall_ms: i64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Record {
     transaction: v1::Transaction,
     ack: v1::TxnAck,
     changes: Vec<Change>,
+    accepted_at_ms: i64,
+    conflicts: Vec<v1::ConflictRecord>,
 }
 
 /// Result of an accepted transaction. A retry returns the original ack and no
@@ -47,7 +55,7 @@ pub struct HostSnapshot {
 
 /// Host-ordered in-memory engine. Every submission is applied to a private clone
 /// and installed only after validation, so rejection cannot partly mutate state.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct HostSequencer {
     host_device: DeviceId,
     project: Project,
@@ -62,7 +70,246 @@ pub struct HostSequencer {
     conflicts: Vec<v1::ConflictRecord>,
 }
 
+// A private remote deserializer keeps callers from bypassing the validated
+// checkpoint entry point via serde_json::from_slice::<HostSequencer>.
+#[derive(Deserialize)]
+#[serde(remote = "HostSequencer", deny_unknown_fields)]
+struct CheckpointState {
+    host_device: DeviceId,
+    project: Project,
+    sequence: u64,
+    revisions: BTreeMap<u64, StateHash>,
+    records: BTreeMap<Id, Record>,
+    writes: BTreeMap<String, WriteStamp>,
+    tombstones: BTreeMap<Id, Object>,
+    seen_ops: BTreeSet<(DeviceId, u64)>,
+    gestures: BTreeSet<(DeviceId, Id)>,
+    cancelled: BTreeSet<(DeviceId, Id)>,
+    conflicts: Vec<v1::ConflictRecord>,
+}
+
 impl HostSequencer {
+    /// The authoritative host identity persisted with this operation history.
+    pub const fn host_device(&self) -> &DeviceId {
+        &self.host_device
+    }
+
+    /// Exact accepted transaction/acknowledgement binding for storage audits,
+    /// without computing optimistic inverse previews for the entire history.
+    pub fn accepted_transaction(&self, id: &Id) -> Option<(&v1::Transaction, &v1::TxnAck)> {
+        self.records
+            .get(id)
+            .map(|record| (&record.transaction, &record.ack))
+    }
+
+    /// Original host receipt time, retained so persisted log metadata can be
+    /// checked against the checkpoint without reapplying its transactions.
+    pub fn accepted_at(&self, id: &Id) -> Option<i64> {
+        self.records.get(id).map(|record| record.accepted_at_ms)
+    }
+
+    /// Persist a versioned, checksummed checkpoint including retry, conflict,
+    /// undo and gesture guards. This contains project data; never log its bytes.
+    /// The storage layer must commit it atomically with its matching revision.
+    pub fn checkpoint_bytes(&self) -> Result<Vec<u8>, OpsError> {
+        let payload = serde_json::to_vec(&serde_json::to_value(self)?)?;
+        let length = CHECKPOINT_PREFIX.len() + 32 + payload.len();
+        if length > MAX_CHECKPOINT_BYTES {
+            return Err(OpsError::Invalid("checkpoint size"));
+        }
+        let mut bytes = Vec::with_capacity(length);
+        bytes.extend_from_slice(CHECKPOINT_PREFIX);
+        bytes.extend_from_slice(&AssetId::hash(&payload).bytes());
+        bytes.extend_from_slice(&payload);
+        Ok(bytes)
+    }
+
+    /// Restore private sequencing state without re-executing historical
+    /// transactions. Retained journal metadata is checked against its indexes;
+    /// the current project is fully validated and bound to the last revision.
+    /// Only this version's canonical bytes are accepted, rejecting duplicate or
+    /// unknown nested fields as well as accidental corruption. The checksum is
+    /// an integrity check, not authentication of an untrusted project archive.
+    pub fn from_checkpoint_bytes(bytes: &[u8]) -> Result<Self, OpsError> {
+        if bytes.len() > MAX_CHECKPOINT_BYTES {
+            return Err(OpsError::Invalid("checkpoint size"));
+        }
+        let body = bytes
+            .strip_prefix(CHECKPOINT_PREFIX)
+            .ok_or(OpsError::Invalid("checkpoint schema version"))?;
+        if body.len() < 32 {
+            return Err(OpsError::Invalid("checkpoint header"));
+        }
+        let (digest, payload) = body.split_at(32);
+        if AssetId::hash(payload).bytes().as_slice() != digest {
+            return Err(OpsError::Invalid("checkpoint checksum"));
+        }
+        let mut decoder = serde_json::Deserializer::from_slice(payload);
+        let host = CheckpointState::deserialize(&mut decoder)?;
+        decoder.end()?;
+        // This also rejects unknown fields in journal Address/Change values and
+        // duplicate JSON map keys, whose serde representation would be lossy.
+        if serde_json::to_vec(&serde_json::to_value(&host)?)?.as_slice() != payload {
+            return Err(OpsError::Invalid("noncanonical checkpoint"));
+        }
+        host.validate_checkpoint()?;
+        Ok(host)
+    }
+
+    fn validate_checkpoint(&self) -> Result<(), OpsError> {
+        let count =
+            usize::try_from(self.sequence).map_err(|_| OpsError::Invalid("checkpoint sequence"))?;
+        if self.records.len() != count
+            || self.revisions.len() != count.checked_add(1).ok_or(OpsError::CounterExhausted)?
+            || self.revisions.get(&self.sequence) != Some(&self.project.state_hash()?)
+        {
+            return Err(OpsError::Invalid("checkpoint revision binding"));
+        }
+        for (expected, sequence) in self.revisions.keys().enumerate() {
+            if *sequence != expected as u64 {
+                return Err(OpsError::Invalid("checkpoint revision continuity"));
+            }
+        }
+        let mut ordered = BTreeMap::new();
+        let mut devices = BTreeSet::from([self.host_device.clone()]);
+        for (id, record) in &self.records {
+            if Id::from_proto(record.transaction.txn_id.as_ref())? != *id
+                || record.ack.txn_id != record.transaction.txn_id
+                || record.ack.host_seq == 0
+                || record.ack.host_seq > self.sequence
+                || ordered.insert(record.ack.host_seq, (id, record)).is_some()
+            {
+                return Err(OpsError::Invalid("checkpoint transaction binding"));
+            }
+            devices.insert(DeviceId::try_from(record.transaction.device_id.clone())?);
+        }
+        let mut seen_ops = BTreeSet::new();
+        let mut gestures = BTreeSet::new();
+        let mut writes = BTreeMap::new();
+        let mut deleted = BTreeSet::new();
+        let mut conflicts = Vec::new();
+        let mut conflict_ids = BTreeSet::new();
+        for (index, (sequence, (id, record))) in ordered.into_iter().enumerate() {
+            let transaction = &record.transaction;
+            let device = DeviceId::try_from(transaction.device_id.clone())?;
+            let base = transaction
+                .base_revision
+                .as_ref()
+                .ok_or(OpsError::Invalid("checkpoint base revision"))?;
+            if sequence != index as u64 + 1
+                || Id::from_proto(transaction.project_id.as_ref())? != self.project.id
+                || transaction.created_at_wall_ms < 0
+                || record.accepted_at_ms < 0
+                || record.accepted_at_ms as u64 >= 1u64 << 48
+                || transaction.ops.is_empty()
+                || transaction.ops.len() > 4096
+                || base.host_seq >= sequence
+                || self
+                    .revisions
+                    .get(&base.host_seq)
+                    .map(|hash| hash.bytes().to_vec())
+                    != Some(base.state_hash.clone())
+                || self
+                    .revisions
+                    .get(&sequence)
+                    .map(|hash| hash.bytes().to_vec())
+                    != Some(record.ack.state_hash.clone())
+                || record
+                    .ack
+                    .notices
+                    .iter()
+                    .any(|notice| notice.len() > 1024 || notice.contains('\0'))
+            {
+                return Err(OpsError::Invalid("checkpoint record metadata"));
+            }
+            for operation in &transaction.ops {
+                let op_id = operation
+                    .op_id
+                    .as_ref()
+                    .ok_or(OpsError::Invalid("checkpoint operation identity"))?;
+                if op_id.device_id != device.as_str()
+                    || op_id.lamport == 0
+                    || !seen_ops.insert((device.clone(), op_id.lamport))
+                {
+                    return Err(OpsError::Invalid("checkpoint operation identity"));
+                }
+                validate_checkpoint_operation(operation, &device)?;
+                if let Some(Kind::UndoTransaction(inverse)) = &operation.kind {
+                    let target = self
+                        .records
+                        .get(&Id::from_proto(inverse.target_txn_id.as_ref())?)
+                        .ok_or(OpsError::Invalid("checkpoint inverse target"))?;
+                    if transaction.ops.len() != 1
+                        || target.transaction.device_id != transaction.device_id
+                        || target.ack.host_seq >= sequence
+                    {
+                        return Err(OpsError::Invalid("checkpoint inverse ownership"));
+                    }
+                }
+            }
+            if let Some(gesture) = &transaction.gesture_id
+                && !gestures.insert((device.clone(), Id::from_proto(Some(gesture))?))
+            {
+                return Err(OpsError::Invalid("checkpoint duplicate gesture"));
+            }
+            let mut addresses = BTreeSet::new();
+            for change in &record.changes {
+                validate_checkpoint_change(change)?;
+                if !addresses.insert(change.address.key()) {
+                    return Err(OpsError::Invalid("checkpoint duplicate journal address"));
+                }
+                if change.address.collection == "objects" && change.address.path.is_empty() {
+                    let object = Id::try_from(change.address.entity.clone())?;
+                    if change.after.is_none() {
+                        deleted.insert(object);
+                    } else {
+                        deleted.remove(&object);
+                    }
+                }
+                writes.insert(
+                    change.address.key(),
+                    WriteStamp {
+                        address: change.address.clone(),
+                        device: device.clone(),
+                        sequence,
+                        wall_ms: transaction.created_at_wall_ms,
+                    },
+                );
+            }
+            for conflict in &record.conflicts {
+                validate_checkpoint_conflict(
+                    conflict,
+                    id,
+                    record.accepted_at_ms,
+                    &device,
+                    &devices,
+                )?;
+                if !conflict_ids.insert(Id::from_proto(conflict.conflict_id.as_ref())?) {
+                    return Err(OpsError::Invalid("checkpoint duplicate conflict"));
+                }
+                conflicts.push(conflict.clone());
+            }
+        }
+        if seen_ops != self.seen_ops
+            || gestures != self.gestures
+            || writes != self.writes
+            || conflicts != self.conflicts
+            || !self.gestures.is_disjoint(&self.cancelled)
+            || deleted != self.tombstones.keys().cloned().collect()
+        {
+            return Err(OpsError::Invalid("checkpoint journal indexes"));
+        }
+        for (id, object) in &self.tombstones {
+            if self.project.objects.contains_key(id)
+                || Id::from_proto(object.state.object_id.as_ref())? != *id
+            {
+                return Err(OpsError::Invalid("checkpoint tombstone identity"));
+            }
+            vw_model::validate_object_state(&object.state)?;
+        }
+        Ok(())
+    }
+
     /// Establish revision zero for a validated project and an explicit host ID.
     pub fn new(project: Project, host_device: DeviceId) -> Result<Self, OpsError> {
         let hash = project.state_hash()?;
@@ -412,6 +659,8 @@ impl HostSequencer {
                 transaction,
                 ack: ack.clone(),
                 changes,
+                accepted_at_ms,
+                conflicts: conflicts.clone(),
             },
         );
         self.project = project;
@@ -540,6 +789,406 @@ impl HostSequencer {
         }
         Ok(applied)
     }
+}
+
+fn validate_checkpoint_operation(operation: &v1::Op, device: &DeviceId) -> Result<(), OpsError> {
+    let kind = operation
+        .kind
+        .as_ref()
+        .ok_or(OpsError::Invalid("checkpoint operation kind"))?;
+    let ids = match kind {
+        Kind::CreateDocument(value) => {
+            if value.schema_version != 1 || !(1..=4).contains(&value.kind) {
+                return Err(OpsError::Invalid("checkpoint document schema"));
+            }
+            if let Some(capture) = &value.capture {
+                vw_model::validate_capture(capture)?;
+            }
+            vec![value.document_id.as_ref()]
+        }
+        Kind::UpdateDocument(value) => vec![value.document_id.as_ref()],
+        Kind::AddAsset(value) => {
+            vw_model::validate_asset(value)?;
+            Vec::new()
+        }
+        Kind::CreateLayer(value) => vec![value.layer_id.as_ref(), value.document_id.as_ref()],
+        Kind::UpdateLayer(value) => vec![value.layer_id.as_ref()],
+        Kind::DeleteLayer(value) => vec![value.layer_id.as_ref()],
+        Kind::CreateObject(value) => {
+            let state = value
+                .state
+                .as_ref()
+                .ok_or(OpsError::Invalid("checkpoint object"))?;
+            vw_model::validate_object_state(state)?;
+            if state.created_by != device.as_str() {
+                return Err(OpsError::DeviceMismatch);
+            }
+            vec![value.document_id.as_ref()]
+        }
+        Kind::SetProperty(value) => {
+            if value
+                .value
+                .as_ref()
+                .and_then(|value| value.value.as_ref())
+                .is_none()
+            {
+                return Err(OpsError::Invalid("checkpoint property"));
+            }
+            vec![value.object_id.as_ref()]
+        }
+        Kind::DeleteObject(value) => vec![value.object_id.as_ref()],
+        Kind::Reorder(value) => {
+            vw_model::OrderKey::try_from(value.order_key.clone())?;
+            vec![value.object_id.as_ref(), value.layer_id.as_ref()]
+        }
+        Kind::Group(value) => {
+            let mut ids = vec![value.group_id.as_ref()];
+            ids.extend(value.object_ids.iter().map(Some));
+            ids
+        }
+        Kind::Ungroup(value) => vec![value.group_id.as_ref()],
+        Kind::SetInstruction(value) => {
+            let mut ids = vec![value.instruction_id.as_ref(), value.document_id.as_ref()];
+            ids.extend(value.target_object_ids.iter().map(Some));
+            ids
+        }
+        Kind::DeleteInstruction(value) => vec![value.instruction_id.as_ref()],
+        Kind::AddSemanticSnapshot(value) => {
+            vec![value.snapshot_id.as_ref(), value.document_id.as_ref()]
+        }
+        Kind::AddResult(value) => {
+            let mut ids = vec![value.result_id.as_ref(), value.document_id.as_ref()];
+            ids.extend(value.package_id.as_ref().map(Some));
+            ids
+        }
+        Kind::UpdateResult(value) => vec![value.result_id.as_ref()],
+        Kind::MaskOp(value) => {
+            let mut ids = vec![value.output_object_id.as_ref()];
+            ids.extend(value.input_object_ids.iter().map(Some));
+            ids
+        }
+        Kind::UndoTransaction(value) => vec![value.target_txn_id.as_ref()],
+    };
+    for id in ids {
+        Id::from_proto(id)?;
+    }
+    Ok(())
+}
+
+fn validate_checkpoint_change(change: &Change) -> Result<(), OpsError> {
+    let address = &change.address;
+    if !matches!(
+        address.collection.as_str(),
+        "documents"
+            | "assets"
+            | "layers"
+            | "objects"
+            | "groups"
+            | "instructions"
+            | "semantic_snapshots"
+            | "results"
+            | "mask_versions"
+    ) || address.path.len() > 16
+        || address.path.iter().any(|part| {
+            part.is_empty()
+                || part.len() > 64
+                || !part
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        })
+        || (change.before.is_none() && change.after.is_none())
+    {
+        return Err(OpsError::Invalid("checkpoint journal address"));
+    }
+    if address.collection == "assets" {
+        AssetId::try_from(address.entity.clone())?;
+    } else {
+        Id::try_from(address.entity.clone())?;
+    }
+    if !address.path.is_empty() && !valid_checkpoint_path(address) {
+        return Err(OpsError::Invalid("checkpoint journal property"));
+    }
+    if address.path.is_empty() {
+        for value in [change.before.as_ref(), change.after.as_ref()]
+            .into_iter()
+            .flatten()
+        {
+            validate_checkpoint_entity(address, value)?;
+        }
+    }
+    Ok(())
+}
+
+fn valid_checkpoint_path(address: &Address) -> bool {
+    let path: Vec<_> = address.path.iter().map(String::as_str).collect();
+    matches!(
+        (address.collection.as_str(), path.as_slice()),
+        ("documents", ["definition", "title"])
+            | ("layers", ["definition", "name" | "order_key"])
+            | ("layers", ["visible" | "locked" | "opacity" | "blend"])
+            | ("groups", ["parent"])
+            | ("instructions", ["updated_at_ms"])
+            | (
+                "instructions",
+                [
+                    "definition",
+                    "document_id"
+                        | "target_object_ids"
+                        | "role"
+                        | "text"
+                        | "entry_method"
+                        | "language",
+                ],
+            )
+            | ("instructions", ["definition", "instruction_id", "value"])
+            | ("results", ["status" | "acceptance_mask_asset_id"])
+            | (
+                "objects",
+                [
+                    "state",
+                    "order_key"
+                        | "layer_id"
+                        | "group_id"
+                        | "transform"
+                        | "role"
+                        | "locked"
+                        | "hidden"
+                        | "shape",
+                ],
+            )
+            | (
+                "objects",
+                [
+                    "state",
+                    "style",
+                    "width" | "screen_constant_width" | "has_fill" | "fill" | "stroke",
+                ],
+            )
+            | ("objects", ["state", "style", "stroke" | "fill", "rgba"])
+            | (
+                "objects",
+                [
+                    "state",
+                    "shape",
+                    "Stroke",
+                    "x" | "y" | "t_ms" | "pressure" | "tilt" | "orientation",
+                ],
+            )
+            | (
+                "objects",
+                [
+                    "state",
+                    "shape",
+                    "Stroke",
+                    "brush",
+                    "family"
+                        | "algorithm_version"
+                        | "base_width"
+                        | "pressure_curve"
+                        | "stabilization",
+                ],
+            )
+            | (
+                "objects",
+                [
+                    "state",
+                    "shape",
+                    "Line" | "Arrow" | "Polygon" | "SelectionVector",
+                    "points" | "closed",
+                ],
+            )
+            | (
+                "objects",
+                [
+                    "state",
+                    "shape",
+                    "Rect" | "Ellipse" | "Crop",
+                    "x" | "y" | "w" | "h",
+                ],
+            )
+            | (
+                "objects",
+                [
+                    "state",
+                    "shape",
+                    "Text",
+                    "text" | "font_family" | "font_size",
+                ],
+            )
+            | ("objects", ["state", "shape", "Text", "anchor", "x" | "y"])
+            | (
+                "objects",
+                [
+                    "state",
+                    "shape",
+                    "Marker",
+                    "number" | "element_eids" | "box",
+                ],
+            )
+            | ("objects", ["state", "shape", "Marker", "point", "x" | "y"])
+            | (
+                "objects",
+                ["state", "shape", "Marker", "box", "x" | "y" | "w" | "h"]
+            )
+            | (
+                "objects",
+                [
+                    "state",
+                    "shape",
+                    "SelectionRaster",
+                    "mask_asset_id" | "feather",
+                ],
+            )
+            | (
+                "objects",
+                [
+                    "state",
+                    "shape",
+                    "SelectionRaster",
+                    "bounds",
+                    "x" | "y" | "w" | "h",
+                ],
+            )
+            | ("objects", ["state", "shape", "ResultId", "value"])
+            | (
+                "objects",
+                [
+                    "state",
+                    "shape",
+                    "Adjustment",
+                    "brightness" | "contrast" | "levels",
+                ],
+            )
+    )
+}
+
+fn validate_checkpoint_entity(
+    address: &Address,
+    value: &serde_json::Value,
+) -> Result<(), OpsError> {
+    let wire_id = match address.collection.as_str() {
+        "objects" => {
+            let object: Object = serde_json::from_value(value.clone())?;
+            vw_model::validate_object_state(&object.state)?;
+            object.state.object_id
+        }
+        "documents" => {
+            let document: vw_model::Document = serde_json::from_value(value.clone())?;
+            document.definition.document_id
+        }
+        "layers" => {
+            let layer: vw_model::Layer = serde_json::from_value(value.clone())?;
+            Id::from_proto(layer.definition.document_id.as_ref())?;
+            vw_model::OrderKey::try_from(layer.definition.order_key)?;
+            layer.definition.layer_id
+        }
+        "groups" => {
+            let group: vw_model::Group = serde_json::from_value(value.clone())?;
+            Some(group.id.to_proto())
+        }
+        "instructions" => {
+            let instruction: vw_model::Instruction = serde_json::from_value(value.clone())?;
+            Id::from_proto(instruction.definition.document_id.as_ref())?;
+            instruction.definition.instruction_id
+        }
+        "semantic_snapshots" => {
+            let snapshot: vw_model::SemanticSnapshot = serde_json::from_value(value.clone())?;
+            Id::from_proto(snapshot.definition.document_id.as_ref())?;
+            snapshot.definition.snapshot_id
+        }
+        "results" => {
+            let result: vw_model::ResultCandidate = serde_json::from_value(value.clone())?;
+            Id::from_proto(result.definition.document_id.as_ref())?;
+            result.definition.result_id
+        }
+        "assets" => {
+            let asset: v1::AddAsset = serde_json::from_value(value.clone())?;
+            vw_model::validate_asset(&asset)?;
+            if asset.asset_id != address.entity {
+                return Err(OpsError::Invalid("checkpoint asset identity"));
+            }
+            return Ok(());
+        }
+        "mask_versions" => {
+            let versions: Vec<v1::MaskOp> = serde_json::from_value(value.clone())?;
+            for version in versions {
+                if Id::from_proto(version.output_object_id.as_ref())?.as_str() != address.entity {
+                    return Err(OpsError::Invalid("checkpoint mask identity"));
+                }
+                for input in &version.input_object_ids {
+                    Id::from_proto(Some(input))?;
+                }
+            }
+            return Ok(());
+        }
+        _ => return Err(OpsError::Invalid("checkpoint collection")),
+    };
+    if Id::from_proto(wire_id.as_ref())?.as_str() != address.entity {
+        return Err(OpsError::Invalid("checkpoint journal entity identity"));
+    }
+    Ok(())
+}
+
+fn validate_checkpoint_conflict(
+    value: &v1::ConflictRecord,
+    transaction: &Id,
+    accepted_at_ms: i64,
+    author: &DeviceId,
+    devices: &BTreeSet<DeviceId>,
+) -> Result<(), OpsError> {
+    let id = Id::from_proto(value.conflict_id.as_ref())?;
+    let object = Id::from_proto(value.object_id.as_ref())?;
+    let kept_device = DeviceId::try_from(value.kept_device.clone())?;
+    let other_device = DeviceId::try_from(value.other_device.clone())?;
+    if value.created_at_ms != accepted_at_ms
+        || !devices.contains(&kept_device)
+        || !devices.contains(&other_device)
+        || (&kept_device != author && &other_device != author)
+        || value.property.len() > 1024
+        || value.property.contains('\0')
+        || value.delete_vs_edit != value.edited_object.is_some()
+    {
+        return Err(OpsError::Invalid("checkpoint conflict metadata"));
+    }
+    let (collection, property) = value
+        .property
+        .split_once('.')
+        .ok_or(OpsError::Invalid("checkpoint conflict property"))?;
+    let mut address = Address {
+        collection: collection.into(),
+        entity: object.to_string(),
+        path: Vec::new(),
+    };
+    let matches = |address: &Address| -> Result<bool, OpsError> {
+        let digest =
+            AssetId::hash(format!("{transaction}:{}:{property}", address.key()).as_bytes()).bytes();
+        let mut entropy = [0; 10];
+        entropy.copy_from_slice(&digest[..10]);
+        Ok(Id::from_parts(accepted_at_ms as u64, entropy)? == id)
+    };
+    let ghost = matches(&address)?;
+    if property != "$entity" {
+        address.path = property.split('.').map(str::to_owned).collect();
+    }
+    if !ghost && !matches(&address)? {
+        return Err(OpsError::Invalid("checkpoint conflict identity"));
+    }
+    for property_value in [&value.kept_value, &value.other_value] {
+        let Some(v1::property_value::Value::Raw(bytes)) = property_value
+            .as_ref()
+            .and_then(|value| value.value.as_ref())
+        else {
+            return Err(OpsError::Invalid("checkpoint conflict value"));
+        };
+        let _: serde_json::Value = serde_json::from_slice(bytes)?;
+    }
+    if let Some(edited) = &value.edited_object {
+        vw_model::validate_object_state(edited)?;
+        if Id::from_proto(edited.object_id.as_ref())? != object {
+            return Err(OpsError::Invalid("checkpoint edited object identity"));
+        }
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]

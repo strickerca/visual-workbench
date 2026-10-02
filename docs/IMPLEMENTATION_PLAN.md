@@ -354,6 +354,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Crash-recovery tests (kill during write).
   - Migrations framework; `.vwbz` export/import (labels stripped).
 - **Acceptance:** kill-during-write tests never corrupt the store; a reopened store has an identical state hash; the disk reserve blocks caching and never touches originals.
+- **Execution checkpoint, 2026-10-02:** shared SQLite storage, immutable blobs, offline queue/conflicts, sequencer checkpoints, bounded caches, schema migrations and portable archives are implemented. `docs/evidence/T1.03.md` and `T1.03-results.json` bind the validation: 112 distinct Windows tests (111 in the full run, then the final 25-case cache suite) and 113 on physical SM-S918U; recovery passes after 1,000 Windows and 100 Android killed writers. Independent review is clear. CORE-008, FORMAT-003, SYNC-001 and HOOK-001 remain in_progress/partial for downstream app, transport and gate clauses. Actual session is gpt-6-astra/max. Pause after this slice; next is T1.04 (M, gpt-6-astra/max), which still requires the T0.10 dated D6 decision and owner pen comparison. No numbered phase gate or phase-end push is due.
 
 ### T1.04 — vw-ink: deterministic stroke modeling
 - **Size:** M · **Depends on:** T1.01, T0.10 decision · **Prompt:** `prompts/phase-1/T1.04-vw-ink.md`

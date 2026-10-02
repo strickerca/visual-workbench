@@ -117,7 +117,9 @@ function Invoke-VwAndroidCargoTest {
         # Host build scripts/proc macros can start MSVC's telemetry helper even
         # when the final executable targets Android. Use the same narrowly
         # verified helper cleanup as host Cargo builds; other survivors still fail.
-        $testRun = Invoke-VwProcess -FilePath 'cargo.exe' -ArgumentList @('+1.99.0', 'test', '--target', 'aarch64-linux-android', '-p', $Crate, '--locked', '--message-format=json-render-diagnostics', '--', '--test-threads=1') -WorkingDirectory $Device.Root -Phase 'hil-rust-cargo-test' -TimeoutSeconds $TimeoutSeconds -SensitiveCapture -CleanCompilerTelemetry
+        $cargoArguments = @('+1.99.0', 'test', '--target', 'aarch64-linux-android', '-p', $Crate, '--locked', '--message-format=json-render-diagnostics', '--', '--test-threads=1')
+        if ($Crate -eq 'vw-store') { $cargoArguments += '--nocapture' }
+        $testRun = Invoke-VwProcess -FilePath 'cargo.exe' -ArgumentList $cargoArguments -WorkingDirectory $Device.Root -Phase 'hil-rust-cargo-test' -TimeoutSeconds $TimeoutSeconds -SensitiveCapture -CleanCompilerTelemetry
         if ($testRun.ExitCode -ne 0) { throw "Rust Android Cargo test failed (exit $($testRun.ExitCode)); inspect the phase receipts" }
         $summaries = [regex]::Matches(($testRun.Lines -join "`n"), 'Cargo Android target runner: PASS \((\d+) actual tests\)')
         $passedTests = 0
@@ -127,6 +129,17 @@ function Invoke-VwAndroidCargoTest {
     } finally {
         foreach ($name in $previous.Keys) { [Environment]::SetEnvironmentVariable($name, $previous[$name], 'Process') }
     }
+}
+
+function Get-VwStoreCrashSummary {
+    param([string[]]$Lines)
+    $pattern = '(?m)^crash_recovery complete iterations=(\d+) stages=\[(\d+), (\d+), (\d+), (\d+), (\d+)\] interrupted=(\d+) committed=(\d+) in_transaction=(\d+) snapshot_runs=(\d+) elapsed_ms=(\d+) children_reaped=(\d+)\r?$'
+    $matchesFound = [regex]::Matches(($Lines -join "`n"), $pattern)
+    if ($matchesFound.Count -ne 1) { throw 'Storage crash harness omitted its unique numeric completion marker' }
+    $values = @(1..12 | ForEach-Object { [long]$matchesFound[0].Groups[$_].Value })
+    $stages = @($values[1..5])
+    if ($values[0] -ne 100 -or $values[11] -ne 100 -or ($stages | Measure-Object -Sum).Sum -ne 100 -or @($stages | Where-Object { $_ -le 0 }).Count -ne 0 -or $values[6] + $values[7] -ne 100 -or $values[7] -le 0 -or $values[8] -le 0 -or $values[8] -gt $values[6] -or $values[9] -le 0 -or $values[9] -ge 100 -or $values[10] -le 0) { throw 'Storage crash harness numeric coverage is inconsistent' }
+    return [ordered]@{ iterations = $values[0]; stages = $stages; interrupted = $values[6]; committed = $values[7]; interrupted_in_transaction = $values[8]; snapshot_runs = $values[9]; elapsed_ms = $values[10]; children_reaped = $values[11] }
 }
 
 function Invoke-VwAndroidRustExecutable {
@@ -151,6 +164,8 @@ function Invoke-VwAndroidRustExecutable {
     $validatedCount = 0
     $validationSucceeded = $false
     $cleanupConfirmed = $false
+    $ownedProcessesStopped = $false
+    $storageCrash = $null
     $executableHash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     try {
         Invoke-VwAdb -Device $Device -Arguments @('shell', 'mkdir', '-p', $ownedDeviceDirectory) -Phase 'hil-rust-directory' | Out-Null
@@ -184,6 +199,10 @@ function Invoke-VwAndroidRustExecutable {
         $passedTests = 0
         foreach ($summary in $summaries) { $passedTests += [int]$summary.Groups[1].Value }
         if ($summaries.Count -eq 0 -or $passedTests -eq 0) { throw 'Rust HIL ran zero actual passing tests or emitted no passing summary; acceptance remains pending' }
+        if ($file.Name -match '^crash_recovery-[0-9a-f]+$') {
+            $storageCrash = Get-VwStoreCrashSummary -Lines $testRun.Lines
+            Write-Host "Android storage recovery: PASS ($($storageCrash.iterations) kills; $($storageCrash.children_reaped) children reaped)"
+        }
         $validatedCount = $passedTests
         $validationSucceeded = $true
         Write-Host "Android Rust executable: PASS ($passedTests actual tests)"
@@ -191,6 +210,13 @@ function Invoke-VwAndroidRustExecutable {
     } finally {
         if ($ownedDeviceDirectory -match '^/data/local/tmp/vw-tests/[0-9a-f]{32}$') {
             try {
+                # The executable basename and directory are generated here.
+                # Kill only surviving processes whose argv starts with this
+                # exact owned binary path, including its crash-test children.
+                $processPattern = '^' + $ownedDeviceDirectory + '/(test|hello)( |$)'
+                $stopOwned = 'if pgrep -f ''{0}'' >/dev/null; then pkill -9 -f ''{0}'' || exit 1; else test $? -eq 1 || exit 1; fi; if pgrep -f ''{0}'' >/dev/null; then exit 1; else test $? -eq 1; fi' -f $processPattern
+                Invoke-VwAdb -Device $Device -Arguments @('shell', $stopOwned) -Phase 'hil-owned-process-cleanup' -Capture | Out-Null
+                $ownedProcessesStopped = $true
                 Invoke-VwAdb -Device $Device -Arguments @('shell', 'rm', '-rf', $ownedDeviceDirectory) -Phase 'hil-owned-test-cleanup' | Out-Null
                 Invoke-VwAdb -Device $Device -Arguments @('shell', ('[ ! -e ' + $ownedDeviceDirectory + ' ]')) -Phase 'hil-owned-test-cleanup-verify' -Capture | Out-Null
                 $cleanupConfirmed = $true
@@ -199,7 +225,7 @@ function Invoke-VwAndroidRustExecutable {
         $receiptDirectory = Join-Path ([IO.Path]::GetTempPath()) 'VisualWorkbench-setup-text-logs'
         [IO.Directory]::CreateDirectory($receiptDirectory) | Out-Null
         $receiptName = 'android-' + $Mode + '-runtime-' + [IO.Path]::GetFileName($ownedDeviceDirectory) + '.json'
-        [ordered]@{ mode = $Mode; device_model = $Device.Model; executable_sha256 = $executableHash; validated_count = $validatedCount; validation_succeeded = $validationSucceeded; owned_device_directory = $ownedDeviceDirectory; owned_device_cleanup_confirmed = $cleanupConfirmed; screenshots_created = 0 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $receiptDirectory $receiptName) -Encoding UTF8
+        [ordered]@{ mode = $Mode; device_model = $Device.Model; executable_sha256 = $executableHash; validated_count = $validatedCount; validation_succeeded = $validationSucceeded; storage_crash = $storageCrash; owned_device_directory = $ownedDeviceDirectory; owned_process_cleanup_confirmed = $ownedProcessesStopped; owned_device_cleanup_confirmed = $cleanupConfirmed; screenshots_created = 0 } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $receiptDirectory $receiptName) -Encoding UTF8
         Write-Host "Android $Mode text receipt: $receiptName"
         if ($validationSucceeded -and -not $cleanupConfirmed) { throw 'Android validation passed, but owned device cleanup could not be confirmed' }
     }

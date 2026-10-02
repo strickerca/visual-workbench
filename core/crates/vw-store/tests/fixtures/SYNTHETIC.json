@@ -1,0 +1,16 @@
+{
+  "synthetic": true,
+  "generator": "core/crates/vw-store/examples/generate_video.rs",
+  "codec": "H.264",
+  "container": "MP4",
+  "width": 64,
+  "height": 64,
+  "frames": 30,
+  "duration_ms": 1000,
+  "bytes": 2816,
+  "sha256": "7e58e0b597d62afbebf6217c494a59311d269c9e24c7058e71a09f9a711d4c80",
+  "blake3": "b491e1e9ef1c7a62611e895878799dbff1e8f61a389ab5df7d65ac979b3ec40c",
+  "validated_by": "Windows Media Foundation source reader decoded all 30 frames; T1.03 generation receipt",
+  "external_media": false,
+  "verification_screenshot": false
+}

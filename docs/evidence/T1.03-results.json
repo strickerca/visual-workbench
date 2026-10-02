@@ -1,0 +1,1952 @@
+{
+  "schema": 1,
+  "task": "T1.03",
+  "date": "2026-10-02",
+  "baseline_commit": "572e0e1805b3c37fd093a50a1710701178a1e625",
+  "branch": "task/t1.03-vw-store",
+  "source_bindings": [
+    {
+      "path": "Cargo.lock",
+      "sha256": "cce1c7292dbb0253e43fc884e6dbe1a94daa65c474486150c3949e14b885e09b"
+    },
+    {
+      "path": "build.ps1",
+      "sha256": "8e7b6f0e000c08898677e2093884368e75e1180394fdfc3c56b5e615fce44b0b"
+    },
+    {
+      "path": "contracts/storage.sql",
+      "sha256": "58c4ddb1f61e307591fdb9225b16e1007d6557c420cde80096deaad1fd411c4e"
+    },
+    {
+      "path": "core/crates/vw-ops/src/host.rs",
+      "sha256": "ee83894810586cec376558324a20243581f23f17e64d52f1ce33066a33f096e7"
+    },
+    {
+      "path": "core/crates/vw-ops/tests/checkpoint.rs",
+      "sha256": "445e2dfe7634c19f1f5ac41814a1c27e30c66e661df640c8ecaee86f85da2cc7"
+    },
+    {
+      "path": "core/crates/vw-store/Cargo.toml",
+      "sha256": "9fb925fc98b86023bcf0fe41349ee745740e46e10fbd4fe396d1ea56056e6a94"
+    },
+    {
+      "path": "core/crates/vw-store/examples/generate_video.rs",
+      "sha256": "226d5771eaaf1df49212f752477ce426d2cfa9db0b2ce9c511e4fc7e72e998f5"
+    },
+    {
+      "path": "core/crates/vw-store/examples/support/video_platform.rs",
+      "sha256": "1e6abd965d96c29f52112299a989402e8920853ccb1f2b39de32a7b80c684b7a"
+    },
+    {
+      "path": "core/crates/vw-store/migrations/001_draft.sql",
+      "sha256": "cbc73b6ca2df5139ccb896e4061440565e70e2049bd240df87e338dc01cf1ebd"
+    },
+    {
+      "path": "core/crates/vw-store/migrations/002_checkpoints.sql",
+      "sha256": "063c3d7af7e1225c924578c56468ca7dfa4e214e988a87d0484ab19c90e03b99"
+    },
+    {
+      "path": "core/crates/vw-store/src/archive.rs",
+      "sha256": "0d8ee4653aa82b4ef951cdcab83bc0b18ee1c5bb6c1d47c639e4f4253db33a3d"
+    },
+    {
+      "path": "core/crates/vw-store/src/blobs.rs",
+      "sha256": "74284cdca6e8514af9afe1b4a7cfffe18eb22a3d9b502a52760ba8b8aa5cabc3"
+    },
+    {
+      "path": "core/crates/vw-store/src/cache.rs",
+      "sha256": "fb49e37a7266b7df5fb8adfa4d57e2bf4d15816c8d99e6f3a41b2b8ad815665c"
+    },
+    {
+      "path": "core/crates/vw-store/src/database.rs",
+      "sha256": "50f752e1639cc6e73abbc07f7b96625c96e48bd539bd5e6fc7e2c15a9518ff7d"
+    },
+    {
+      "path": "core/crates/vw-store/src/lib.rs",
+      "sha256": "18d992b45b38e8ecbc9bf772d81455b39d75f3aa31e9a5bd83cf6f63c99a9472"
+    },
+    {
+      "path": "core/crates/vw-store/src/migrations.rs",
+      "sha256": "9787337a100c5e380b76d058193e6f1df512352e77c34358b26dce9058179f54"
+    },
+    {
+      "path": "core/crates/vw-store/src/projections.rs",
+      "sha256": "3cea43f246f19e2c787edfeb87ad1a62df53c6cca61ca7f60a2fcddd9414b2f3"
+    },
+    {
+      "path": "core/crates/vw-store/tests/archives.rs",
+      "sha256": "9a51eab637d92107999e6dde6c93faf9b98412da4cf501a15324dda14692bfdf"
+    },
+    {
+      "path": "core/crates/vw-store/tests/blobs_cache.rs",
+      "sha256": "de82789206efb3f2775ad3d81cd19d3e3baadbefb08ef06ccaa3c94a9cd59c95"
+    },
+    {
+      "path": "core/crates/vw-store/tests/crash_recovery.rs",
+      "sha256": "5bcf91d70b0164b3336f10e8e2ec16d101ba94bc670354b05b602d0847e9a28d"
+    },
+    {
+      "path": "core/crates/vw-store/tests/database.rs",
+      "sha256": "c10087077d7290c2bc4a18ffafc3af96b975f95026e76ddcc93877f0aef35322"
+    },
+    {
+      "path": "core/crates/vw-store/tests/fixtures/README.md",
+      "sha256": "ae6a2ce2a0ed30cee01213cce83ba7e272ef5342a2dad75b878ce5ff6779fe8d"
+    },
+    {
+      "path": "core/crates/vw-store/tests/fixtures/SYNTHETIC.json",
+      "sha256": "9814634f62772d5c3c885b37f38818267d4ef914c790dda3489a949e8e64b6e7"
+    },
+    {
+      "path": "core/crates/vw-store/tests/fixtures/short.mp4",
+      "sha256": "7e58e0b597d62afbebf6217c494a59311d269c9e24c7058e71a09f9a711d4c80"
+    },
+    {
+      "path": "core/crates/vw-store/tests/migrations.rs",
+      "sha256": "caa2f2d4d52dc00700eab5f929a91ae1d496c67be594f9250a2da5accc206f70"
+    },
+    {
+      "path": "core/crates/vw-store/tests/video.rs",
+      "sha256": "0ae69b2110755f3415ea6e58b5d6563e86acfc536a8f9a2789b17d8dd39ad331"
+    },
+    {
+      "path": "tools/android-device.psm1",
+      "sha256": "0a865643878992261c0a5772f106b6ea06ab756555ef48e00b97df9b1389a954"
+    },
+    {
+      "path": "tools/tests/store-crash-receipt-fixtures.ps1",
+      "sha256": "3b9ff0beca3823debd330016daf23092729f8eab1c83b03839cf7bbd6061f669"
+    }
+  ],
+  "settings": {
+    "actual_model": "gpt-6-astra",
+    "actual_effort": "max",
+    "changed_automatically": false
+  },
+  "platforms": {
+    "windows": "x86_64-pc-windows-msvc",
+    "android": "aarch64-linux-android",
+    "device_model": "SM-S918U",
+    "android_api": 36
+  },
+  "tests": {
+    "windows_full_run": {
+      "phase": "t103-windows-final",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 694.048,
+      "sampled_peak_tree_working_set_bytes": 514236416,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 4500,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t103-windows-final-7c10b65e9f3142f1bab26659842e0490.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "receipt_file": "t103-windows-final-7c10b65e9f3142f1bab26659842e0490.log.json",
+      "receipt_sha256": "8ff0ba7e186898a1491ba994f1c14e75ebc3424d30a9e5e6a806412952d5903b",
+      "log_sha256": "5e24f79ed11f02774a9f43c29e046ea48d0841d15db1e691ed3caa0d871c8168"
+    },
+    "windows_full_suites": {
+      "checkpoint": {
+        "passed": 6,
+        "ignored": 0,
+        "cases": [
+          "checkpoint_retains_retries_conflicts_tombstones_undo_and_gesture_guards",
+          "checkpoint_roundtrip_is_exact_for_revision_zero_and_float_payloads",
+          "corrupt_checksum_unknown_version_truncation_and_noncanonical_payloads_reject",
+          "recomputed_checksums_do_not_bypass_revision_record_or_index_validation",
+          "restored_write_ownership_makes_identical_future_conflict_and_undo_decisions",
+          "tombstones_and_conflict_payloads_remain_bound_to_accepted_history"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/checkpoint-12747bfbdf029b7a.exe"
+      },
+      "engine": {
+        "passed": 25,
+        "ignored": 0,
+        "cases": [
+          "another_device_cannot_undo_a_transaction",
+          "atomic_shape_replacement_checks_peer_owned_leaf_after_newer_own_sibling_write",
+          "authenticated_device_op_identity_base_hash_and_creator_are_validated",
+          "delete_beats_edit_in_either_arrival_order_and_retains_edited_object",
+          "delete_ignores_peer_value_fully_overwritten_by_later_own_write",
+          "delete_retains_peer_edit_despite_newer_own_write_to_another_property",
+          "deleted_object_reorder_is_preserved_as_a_conflict_without_resurrection",
+          "disjoint_stale_properties_merge_without_a_conflict",
+          "duplicate_ack_is_byte_identical_and_payload_reuse_is_rejected",
+          "equal_instruction_result_and_group_writes_preserve_peer_ownership",
+          "five_hundred_random_sequences_undo_and_redo_identical_hashes",
+          "fixed_op_log_has_identical_cross_platform_canonical_hash",
+          "full_shape_write_stamps_equal_sibling_fields_in_the_same_variant",
+          "group_cycles_and_cross_document_reorders_reject_atomically",
+          "immutable_assets_reject_metadata_replacement_and_duplicate_metadata_is_a_noop",
+          "instructions_semantics_results_and_mask_versions_are_journaled_and_reversible",
+          "latest_own_leaf_write_supersedes_older_opposing_shape_write",
+          "live_host_order_wins_even_when_wall_clock_is_earlier",
+          "nested_group_changes_respect_locked_descendants_and_layers",
+          "rejection_rolls_back_state_counters_and_gesture_reservation",
+          "stale_writes_use_later_wall_clock_and_ties_favor_host_in_both_orders",
+          "structural_undo_preserves_parent_of_peer_edited_object_and_reports_notice",
+          "undo_remembers_intervening_peer_write_after_an_own_overwrite",
+          "undo_skips_peer_properties_but_restores_independent_properties",
+          "value_equal_write_still_owns_the_property_for_conflicts_and_undo"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/engine-b8e6cb8bffbe5ed2.exe"
+      },
+      "root_owned": {
+        "passed": 9,
+        "ignored": 0,
+        "cases": [
+          "explicitly_discarding_pending_work_removes_its_inverse_chain_only",
+          "gesture_expiry_retains_sequence_watermarks_and_cancel_suppresses_late_packets",
+          "gesture_payloads_and_bindings_are_validated_without_mutation",
+          "replica_offline_pending_undo_redo_survives_rebase_and_reconnect",
+          "replica_optimistically_undoes_then_rebases_around_new_peer_write",
+          "replica_preserves_blocked_pending_and_rejects_forged_ack_atomically",
+          "replica_rejects_bad_operation_identity_and_reused_transaction_payload",
+          "two_replicas_rebase_interleaved_pending_and_acknowledgements",
+          "undo_manager_handles_lost_ack_and_repeated_local_delivery"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/root_owned-8ffcba2189000c98.exe"
+      },
+      "undo_recovery": {
+        "passed": 12,
+        "ignored": 0,
+        "cases": [
+          "acknowledgement_collisions_identity_and_impossible_inverse_order_are_atomic",
+          "host_order_overrides_conflicting_provisional_order_of_independent_edits",
+          "late_original_ack_does_not_resurrect_an_already_undone_edit",
+          "later_known_local_edit_remains_latest_while_earlier_receipt_is_missing",
+          "malformed_pending_registration_and_payload_collisions_are_atomic",
+          "missing_middle_inverse_receipt_is_replayed_in_host_order",
+          "offline_edit_undo_redo_survives_every_ack_delivery_permutation",
+          "receipts_without_local_registration_converge_in_every_delivery_order",
+          "rejected_pending_inverse_restores_cursor_and_discards_its_redo",
+          "rejecting_pending_ordinary_removes_dependent_inverses_but_preserves_other_edits",
+          "rejection_cannot_remove_accepted_history_or_accepted_inverse_dependencies",
+          "reversed_ordinary_acknowledgements_keep_latest_host_edit_on_top"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/undo_recovery-abe016fb098a539d.exe"
+      },
+      "archives": {
+        "passed": 12,
+        "ignored": 0,
+        "cases": [
+          "count_entry_total_metadata_and_ratio_limits_fail_before_publication",
+          "existing_files_and_directories_are_preserved_for_import_and_export",
+          "immutable_inventory_exports_historical_assets_outside_the_current_model",
+          "inconsistent_stored_sizes_are_rejected_before_extracting_declared_small_members",
+          "missing_corrupt_and_unreferenced_blob_members_are_rejected_atomically",
+          "missing_or_corrupt_originals_abort_export_without_publishing",
+          "pending_add_asset_retains_its_offline_original_and_queue_through_export",
+          "roundtrip_preserves_state_hash_blobs_and_source_but_strips_raw_labels_and_cache",
+          "symlink_special_file_and_crc_mismatch_are_rejected",
+          "traversal_absolute_paths_sidecars_directories_and_duplicate_names_are_rejected",
+          "zip64_entry_metadata_is_accepted_without_large_memory_allocations",
+          "zip64_extensible_sector_counts_toward_the_metadata_allocation_limit"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/archives-e4d5114de0533bf4.exe"
+      },
+      "blobs_cache": {
+        "passed": 24,
+        "ignored": 0,
+        "cases": [
+          "blob_layout_streaming_roundtrip_and_empty_asset",
+          "corruption_is_detected_and_original_is_never_overwritten",
+          "disk_corrupted_entry_is_not_read_or_deleted_as_owned_content",
+          "disk_duplicate_and_replacement_do_not_leak_accounting_or_old_files",
+          "disk_eviction_can_restore_drive_reserve_before_writing",
+          "disk_lock_excludes_other_managers_and_releases_on_drop",
+          "disk_lru_is_durable_and_eviction_preserves_originals_and_unknown_files",
+          "disk_oversize_and_invalid_keys_preserve_existing_cache",
+          "disk_reserve_exact_boundary_passes_and_one_byte_short_is_clear_low_space",
+          "eight_concurrent_writers_install_identical_original_once",
+          "externally_grown_cache_file_is_rejected_before_unbounded_allocation",
+          "invalid_free_space_response_fails_closed",
+          "malicious_manifest_path_is_rejected_before_outside_file_mutation",
+          "missing_cache_entry_after_interrupted_eviction_recovers_without_touching_unknowns",
+          "non_directory_shard_is_rejected_and_preserved",
+          "opening_under_reserve_allows_existing_reads_but_rejects_new_caching",
+          "ram_defaults_are_bytes_and_named_usage_is_exact",
+          "ram_invalid_oversize_and_overflow_requests_are_atomic",
+          "ram_lru_crosses_named_caches_and_touch_changes_order",
+          "ram_replacement_shrink_and_remove_have_no_double_accounting",
+          "reader_failure_leaves_no_partial_original_or_temp_file",
+          "real_space_query_reports_a_consistent_filesystem_capacity",
+          "reserve_formula_has_exact_decimal_floor_slope_and_ceiling",
+          "windows_junction_children_cannot_redirect_blobs_or_cache"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/blobs_cache-331713dfd136707b.exe"
+      },
+      "crash_recovery": {
+        "passed": 1,
+        "ignored": 1,
+        "cases": [
+          "crash_worker",
+          "random_process_kills_preserve_last_committed_state"
+        ],
+        "ignored_cases": [
+          "crash_worker"
+        ],
+        "executable": "target/debug/deps/crash_recovery-ae98bf4fff22a69e.exe"
+      },
+      "database": {
+        "passed": 15,
+        "ignored": 0,
+        "cases": [
+          "asset_metadata_columns_must_match_the_immutable_protobuf_definition",
+          "cancellation_survives_a_checkpoint_without_mutating_visible_state",
+          "corrupted_log_checkpoint_and_snapshot_bindings_are_rejected",
+          "elapsed_time_and_explicit_idle_checkpoints_limit_replay",
+          "failed_sqlite_writer_lock_preserves_log_and_in_memory_host",
+          "integer_overflow_rejections_leave_storage_and_retry_identity_unchanged",
+          "oversized_and_malformed_pending_payloads_fail_without_decoding_unbounded_bytes",
+          "oversized_asset_definition_and_object_state_are_rejected_before_decoding",
+          "pending_column_mismatches_and_deleted_or_modified_projections_fail_open",
+          "pending_queue_survives_restart_in_order_and_deletes_only_exact_acked_bytes",
+          "reopen_retains_exact_retry_ack_undo_and_conflict_records",
+          "rich_document_projections_preserve_full_capture_identity_and_model_types",
+          "source_selected_path_and_device_metadata_are_persisted_without_pairing_fields",
+          "transaction_count_checkpoint_replays_only_the_three_transaction_tail",
+          "writer_lock_is_exclusive_and_released_after_drop"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/database-7d93b3dbaaf35baf.exe"
+      },
+      "migrations": {
+        "passed": 6,
+        "ignored": 0,
+        "cases": [
+          "altered_schema_and_history_deleting_triggers_are_rejected_on_open",
+          "draft_migration_replays_history_preserves_hash_retries_labels_and_pending_queue",
+          "fresh_schema_and_numbered_migrations_produce_identical_sqlite_objects",
+          "future_schema_is_rejected_without_rewriting_version_or_project",
+          "incomplete_or_corrupted_drafts_fail_without_partial_schema_upgrade",
+          "orphan_historical_asset_failure_rolls_back_migration_before_committing_version_two"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/migrations-1fff3314d7f2f8b9.exe"
+      },
+      "video": {
+        "passed": 1,
+        "ignored": 0,
+        "cases": [
+          "generated_one_second_mp4_roundtrips_database_blob_and_archive"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/video-a2b8d42005be9523.exe"
+      }
+    },
+    "windows_full_passed": 111,
+    "windows_full_ignored": 1,
+    "windows_final_cache": {
+      "phase": "t103-cache-final",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 27.213,
+      "sampled_peak_tree_working_set_bytes": 395202560,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t103-cache-final-418101cc980346319f892949914b54f7.log",
+      "compiler_telemetry_cleaned": true,
+      "parent_exit_grace_seconds": 5,
+      "receipt_file": "t103-cache-final-418101cc980346319f892949914b54f7.log.json",
+      "receipt_sha256": "2ee7e0cdc111cd14829884ef46e50237bef016929ebc1f77780719faa47aa8a5",
+      "log_sha256": "2cb12a2bacd98e6ee874443f7b351a83362ee6077688103bd34345965f7d224a"
+    },
+    "windows_final_suites": {
+      "checkpoint": {
+        "passed": 6,
+        "ignored": 0,
+        "cases": [
+          "checkpoint_retains_retries_conflicts_tombstones_undo_and_gesture_guards",
+          "checkpoint_roundtrip_is_exact_for_revision_zero_and_float_payloads",
+          "corrupt_checksum_unknown_version_truncation_and_noncanonical_payloads_reject",
+          "recomputed_checksums_do_not_bypass_revision_record_or_index_validation",
+          "restored_write_ownership_makes_identical_future_conflict_and_undo_decisions",
+          "tombstones_and_conflict_payloads_remain_bound_to_accepted_history"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/checkpoint-12747bfbdf029b7a.exe"
+      },
+      "engine": {
+        "passed": 25,
+        "ignored": 0,
+        "cases": [
+          "another_device_cannot_undo_a_transaction",
+          "atomic_shape_replacement_checks_peer_owned_leaf_after_newer_own_sibling_write",
+          "authenticated_device_op_identity_base_hash_and_creator_are_validated",
+          "delete_beats_edit_in_either_arrival_order_and_retains_edited_object",
+          "delete_ignores_peer_value_fully_overwritten_by_later_own_write",
+          "delete_retains_peer_edit_despite_newer_own_write_to_another_property",
+          "deleted_object_reorder_is_preserved_as_a_conflict_without_resurrection",
+          "disjoint_stale_properties_merge_without_a_conflict",
+          "duplicate_ack_is_byte_identical_and_payload_reuse_is_rejected",
+          "equal_instruction_result_and_group_writes_preserve_peer_ownership",
+          "five_hundred_random_sequences_undo_and_redo_identical_hashes",
+          "fixed_op_log_has_identical_cross_platform_canonical_hash",
+          "full_shape_write_stamps_equal_sibling_fields_in_the_same_variant",
+          "group_cycles_and_cross_document_reorders_reject_atomically",
+          "immutable_assets_reject_metadata_replacement_and_duplicate_metadata_is_a_noop",
+          "instructions_semantics_results_and_mask_versions_are_journaled_and_reversible",
+          "latest_own_leaf_write_supersedes_older_opposing_shape_write",
+          "live_host_order_wins_even_when_wall_clock_is_earlier",
+          "nested_group_changes_respect_locked_descendants_and_layers",
+          "rejection_rolls_back_state_counters_and_gesture_reservation",
+          "stale_writes_use_later_wall_clock_and_ties_favor_host_in_both_orders",
+          "structural_undo_preserves_parent_of_peer_edited_object_and_reports_notice",
+          "undo_remembers_intervening_peer_write_after_an_own_overwrite",
+          "undo_skips_peer_properties_but_restores_independent_properties",
+          "value_equal_write_still_owns_the_property_for_conflicts_and_undo"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/engine-b8e6cb8bffbe5ed2.exe"
+      },
+      "root_owned": {
+        "passed": 9,
+        "ignored": 0,
+        "cases": [
+          "explicitly_discarding_pending_work_removes_its_inverse_chain_only",
+          "gesture_expiry_retains_sequence_watermarks_and_cancel_suppresses_late_packets",
+          "gesture_payloads_and_bindings_are_validated_without_mutation",
+          "replica_offline_pending_undo_redo_survives_rebase_and_reconnect",
+          "replica_optimistically_undoes_then_rebases_around_new_peer_write",
+          "replica_preserves_blocked_pending_and_rejects_forged_ack_atomically",
+          "replica_rejects_bad_operation_identity_and_reused_transaction_payload",
+          "two_replicas_rebase_interleaved_pending_and_acknowledgements",
+          "undo_manager_handles_lost_ack_and_repeated_local_delivery"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/root_owned-8ffcba2189000c98.exe"
+      },
+      "undo_recovery": {
+        "passed": 12,
+        "ignored": 0,
+        "cases": [
+          "acknowledgement_collisions_identity_and_impossible_inverse_order_are_atomic",
+          "host_order_overrides_conflicting_provisional_order_of_independent_edits",
+          "late_original_ack_does_not_resurrect_an_already_undone_edit",
+          "later_known_local_edit_remains_latest_while_earlier_receipt_is_missing",
+          "malformed_pending_registration_and_payload_collisions_are_atomic",
+          "missing_middle_inverse_receipt_is_replayed_in_host_order",
+          "offline_edit_undo_redo_survives_every_ack_delivery_permutation",
+          "receipts_without_local_registration_converge_in_every_delivery_order",
+          "rejected_pending_inverse_restores_cursor_and_discards_its_redo",
+          "rejecting_pending_ordinary_removes_dependent_inverses_but_preserves_other_edits",
+          "rejection_cannot_remove_accepted_history_or_accepted_inverse_dependencies",
+          "reversed_ordinary_acknowledgements_keep_latest_host_edit_on_top"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/undo_recovery-abe016fb098a539d.exe"
+      },
+      "archives": {
+        "passed": 12,
+        "ignored": 0,
+        "cases": [
+          "count_entry_total_metadata_and_ratio_limits_fail_before_publication",
+          "existing_files_and_directories_are_preserved_for_import_and_export",
+          "immutable_inventory_exports_historical_assets_outside_the_current_model",
+          "inconsistent_stored_sizes_are_rejected_before_extracting_declared_small_members",
+          "missing_corrupt_and_unreferenced_blob_members_are_rejected_atomically",
+          "missing_or_corrupt_originals_abort_export_without_publishing",
+          "pending_add_asset_retains_its_offline_original_and_queue_through_export",
+          "roundtrip_preserves_state_hash_blobs_and_source_but_strips_raw_labels_and_cache",
+          "symlink_special_file_and_crc_mismatch_are_rejected",
+          "traversal_absolute_paths_sidecars_directories_and_duplicate_names_are_rejected",
+          "zip64_entry_metadata_is_accepted_without_large_memory_allocations",
+          "zip64_extensible_sector_counts_toward_the_metadata_allocation_limit"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/archives-e4d5114de0533bf4.exe"
+      },
+      "blobs_cache": {
+        "passed": 25,
+        "ignored": 0,
+        "cases": [
+          "blob_layout_streaming_roundtrip_and_empty_asset",
+          "corruption_is_detected_and_original_is_never_overwritten",
+          "disk_corrupted_entry_is_not_read_or_deleted_as_owned_content",
+          "disk_duplicate_and_replacement_do_not_leak_accounting_or_old_files",
+          "disk_eviction_can_restore_drive_reserve_before_writing",
+          "disk_lock_excludes_other_managers_and_releases_on_drop",
+          "disk_lru_is_durable_and_eviction_preserves_originals_and_unknown_files",
+          "disk_oversize_and_invalid_keys_preserve_existing_cache",
+          "disk_reserve_exact_boundary_passes_and_one_byte_short_is_clear_low_space",
+          "eight_concurrent_writers_install_identical_original_once",
+          "externally_grown_cache_file_is_rejected_before_unbounded_allocation",
+          "invalid_free_space_response_fails_closed",
+          "malicious_manifest_path_is_rejected_before_outside_file_mutation",
+          "missing_cache_entry_after_interrupted_eviction_recovers_without_touching_unknowns",
+          "non_directory_shard_is_rejected_and_preserved",
+          "opening_under_reserve_allows_existing_reads_but_rejects_new_caching",
+          "post_publication_reserve_decline_reclaims_cache_or_reports_low_space",
+          "ram_defaults_are_bytes_and_named_usage_is_exact",
+          "ram_invalid_oversize_and_overflow_requests_are_atomic",
+          "ram_lru_crosses_named_caches_and_touch_changes_order",
+          "ram_replacement_shrink_and_remove_have_no_double_accounting",
+          "reader_failure_leaves_no_partial_original_or_temp_file",
+          "real_space_query_reports_a_consistent_filesystem_capacity",
+          "reserve_formula_has_exact_decimal_floor_slope_and_ceiling",
+          "windows_junction_children_cannot_redirect_blobs_or_cache"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/blobs_cache-331713dfd136707b.exe"
+      },
+      "crash_recovery": {
+        "passed": 1,
+        "ignored": 1,
+        "cases": [
+          "crash_worker",
+          "random_process_kills_preserve_last_committed_state"
+        ],
+        "ignored_cases": [
+          "crash_worker"
+        ],
+        "executable": "target/debug/deps/crash_recovery-ae98bf4fff22a69e.exe"
+      },
+      "database": {
+        "passed": 15,
+        "ignored": 0,
+        "cases": [
+          "asset_metadata_columns_must_match_the_immutable_protobuf_definition",
+          "cancellation_survives_a_checkpoint_without_mutating_visible_state",
+          "corrupted_log_checkpoint_and_snapshot_bindings_are_rejected",
+          "elapsed_time_and_explicit_idle_checkpoints_limit_replay",
+          "failed_sqlite_writer_lock_preserves_log_and_in_memory_host",
+          "integer_overflow_rejections_leave_storage_and_retry_identity_unchanged",
+          "oversized_and_malformed_pending_payloads_fail_without_decoding_unbounded_bytes",
+          "oversized_asset_definition_and_object_state_are_rejected_before_decoding",
+          "pending_column_mismatches_and_deleted_or_modified_projections_fail_open",
+          "pending_queue_survives_restart_in_order_and_deletes_only_exact_acked_bytes",
+          "reopen_retains_exact_retry_ack_undo_and_conflict_records",
+          "rich_document_projections_preserve_full_capture_identity_and_model_types",
+          "source_selected_path_and_device_metadata_are_persisted_without_pairing_fields",
+          "transaction_count_checkpoint_replays_only_the_three_transaction_tail",
+          "writer_lock_is_exclusive_and_released_after_drop"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/database-7d93b3dbaaf35baf.exe"
+      },
+      "migrations": {
+        "passed": 6,
+        "ignored": 0,
+        "cases": [
+          "altered_schema_and_history_deleting_triggers_are_rejected_on_open",
+          "draft_migration_replays_history_preserves_hash_retries_labels_and_pending_queue",
+          "fresh_schema_and_numbered_migrations_produce_identical_sqlite_objects",
+          "future_schema_is_rejected_without_rewriting_version_or_project",
+          "incomplete_or_corrupted_drafts_fail_without_partial_schema_upgrade",
+          "orphan_historical_asset_failure_rolls_back_migration_before_committing_version_two"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/migrations-1fff3314d7f2f8b9.exe"
+      },
+      "video": {
+        "passed": 1,
+        "ignored": 0,
+        "cases": [
+          "generated_one_second_mp4_roundtrips_database_blob_and_archive"
+        ],
+        "ignored_cases": [],
+        "executable": "target/debug/deps/video-a2b8d42005be9523.exe"
+      }
+    },
+    "windows_final_distinct_passed": 112,
+    "final_windows_executables": [
+      {
+        "suite": "checkpoint",
+        "path": "target/debug/deps/checkpoint-12747bfbdf029b7a.exe",
+        "sha256": "e7b083f271055fc0a4d00977f3ddae420f4cdf382fff86c8003b15b0264cad2c",
+        "receipt_file": "t103-windows-final-7c10b65e9f3142f1bab26659842e0490.log.json"
+      },
+      {
+        "suite": "engine",
+        "path": "target/debug/deps/engine-b8e6cb8bffbe5ed2.exe",
+        "sha256": "8fee72c2a3f887283385fe69b0a4a97cb9e4f62e5b1ddaa790e4837824738c70",
+        "receipt_file": "t103-windows-final-7c10b65e9f3142f1bab26659842e0490.log.json"
+      },
+      {
+        "suite": "root_owned",
+        "path": "target/debug/deps/root_owned-8ffcba2189000c98.exe",
+        "sha256": "00f720a0940612bbbc2d835456d65dc8af6bdad609f36712f4f76563817c80eb",
+        "receipt_file": "t103-windows-final-7c10b65e9f3142f1bab26659842e0490.log.json"
+      },
+      {
+        "suite": "undo_recovery",
+        "path": "target/debug/deps/undo_recovery-abe016fb098a539d.exe",
+        "sha256": "2c2aeb114b323b8c80276a2b6b925df2cb76366ebe3a20479950b4bd6aebd78b",
+        "receipt_file": "t103-windows-final-7c10b65e9f3142f1bab26659842e0490.log.json"
+      },
+      {
+        "suite": "archives",
+        "path": "target/debug/deps/archives-e4d5114de0533bf4.exe",
+        "sha256": "7bebc6f15030898dd97e708497a27e82d7203ade178e14f295c0596f5a85d37d",
+        "receipt_file": "t103-windows-final-7c10b65e9f3142f1bab26659842e0490.log.json"
+      },
+      {
+        "suite": "blobs_cache",
+        "path": "target/debug/deps/blobs_cache-331713dfd136707b.exe",
+        "sha256": "88a67d0b122d75108c2ac2a08ab4075d48be751906d41d9ccd84e47d304eceb8",
+        "receipt_file": "t103-cache-final-418101cc980346319f892949914b54f7.log.json"
+      },
+      {
+        "suite": "crash_recovery",
+        "path": "target/debug/deps/crash_recovery-ae98bf4fff22a69e.exe",
+        "sha256": "1f0956e6560a7d69626504326a18289dc8d032bf60d4a59aa4750755ebd3eb02",
+        "receipt_file": "t103-windows-final-7c10b65e9f3142f1bab26659842e0490.log.json"
+      },
+      {
+        "suite": "database",
+        "path": "target/debug/deps/database-7d93b3dbaaf35baf.exe",
+        "sha256": "463db1768395f35a189cb1f9d4521df437031a43dcdf1dc6ea1ff3ac2888bce0",
+        "receipt_file": "t103-windows-final-7c10b65e9f3142f1bab26659842e0490.log.json"
+      },
+      {
+        "suite": "migrations",
+        "path": "target/debug/deps/migrations-1fff3314d7f2f8b9.exe",
+        "sha256": "ed536b77015d870dccd47f1fec6698c57090485025c06eb94fa2d1aa77e2e541",
+        "receipt_file": "t103-windows-final-7c10b65e9f3142f1bab26659842e0490.log.json"
+      },
+      {
+        "suite": "video",
+        "path": "target/debug/deps/video-a2b8d42005be9523.exe",
+        "sha256": "bb934e92be4d8b4794b8448a16b175b2c552881245daed60eabb43aa4ea28358",
+        "receipt_file": "t103-windows-final-7c10b65e9f3142f1bab26659842e0490.log.json"
+      }
+    ],
+    "windows_crash": {
+      "iterations": 1000,
+      "stages": [
+        193,
+        206,
+        206,
+        197,
+        198
+      ],
+      "interrupted": 635,
+      "committed": 365,
+      "interrupted_in_transaction": 412,
+      "snapshot_runs": 485,
+      "elapsed_ms": 412871,
+      "children_reaped": 1000
+    },
+    "android": [
+      {
+        "phase": "hil-rust-cargo-test",
+        "exit_code": 0,
+        "parent_exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 155.306,
+        "sampled_peak_tree_working_set_bytes": 483667968,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 3600,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "hil-rust-cargo-test-f076a85f82ab4601854e99c996fb3815.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5,
+        "receipt_file": "hil-rust-cargo-test-f076a85f82ab4601854e99c996fb3815.log.json",
+        "receipt_sha256": "9a75d73ad8b98a0b01b1780c02dbe3e0f689d1f0a2208570a748bd117fda7149",
+        "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee"
+      },
+      {
+        "phase": "hil-rust-cargo-test",
+        "exit_code": 0,
+        "parent_exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 107.324,
+        "sampled_peak_tree_working_set_bytes": 323575808,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 1800,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "hil-rust-cargo-test-2ce199e2b49b4844bf2dfd83ea0d1010.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5,
+        "receipt_file": "hil-rust-cargo-test-2ce199e2b49b4844bf2dfd83ea0d1010.log.json",
+        "receipt_sha256": "29c5aa63a66f33b12d3270247de54818d0d9af19daf02404d1725012cb71605c",
+        "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee"
+      }
+    ],
+    "android_runtime_receipts": [
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "9d98a53fe0f53e01cefe04a99724a8ed9643d0a9066dccd38d9d4ae753e241b1",
+        "validated_count": 12,
+        "validation_succeeded": true,
+        "storage_crash": null,
+        "owned_device_directory": "/data/local/tmp/vw-tests/db0d2e487946407a86baf5583dcc255c",
+        "owned_process_cleanup_confirmed": true,
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0,
+        "receipt_file": "android-test-runtime-db0d2e487946407a86baf5583dcc255c.json",
+        "receipt_sha256": "a8e33405216565680e2e7b881c1e1e1bec543d7596b3912edccac4ed6aa98a92",
+        "suite": "archives"
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "6a05c294463d66d726ab54387a3a4a57ef39239fb4519d7751f9e6c5154fdf54",
+        "validated_count": 26,
+        "validation_succeeded": true,
+        "storage_crash": null,
+        "owned_device_directory": "/data/local/tmp/vw-tests/0717123dc9ef41cc87a0ea1f04dc7884",
+        "owned_process_cleanup_confirmed": true,
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0,
+        "receipt_file": "android-test-runtime-0717123dc9ef41cc87a0ea1f04dc7884.json",
+        "receipt_sha256": "d1e3aceada88279201cff0baa89f4229498a42e9377b4249ac2749e7433a4a57",
+        "suite": "blobs_cache"
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "b8e02b02a7d295ec57f9dcf8f265dbdfbb6bb947391eb037546d268cc59b3696",
+        "validated_count": 1,
+        "validation_succeeded": true,
+        "storage_crash": {
+          "iterations": 100,
+          "stages": [
+            24,
+            22,
+            15,
+            21,
+            18
+          ],
+          "interrupted": 64,
+          "committed": 36,
+          "interrupted_in_transaction": 37,
+          "snapshot_runs": 48,
+          "elapsed_ms": 17815,
+          "children_reaped": 100
+        },
+        "owned_device_directory": "/data/local/tmp/vw-tests/de628b32ac234c4b9745244dd5deb04b",
+        "owned_process_cleanup_confirmed": true,
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0,
+        "receipt_file": "android-test-runtime-de628b32ac234c4b9745244dd5deb04b.json",
+        "receipt_sha256": "844f1f248fdf48fde657eec0e5ae94762f34cd8661025597ac3ff195195231e5",
+        "suite": "crash_recovery"
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "26d963e05886136e6cb7a36ddeebf52226fdc2838d900cf63639d5a94355ee3b",
+        "validated_count": 15,
+        "validation_succeeded": true,
+        "storage_crash": null,
+        "owned_device_directory": "/data/local/tmp/vw-tests/6c4a1b14a6454b8c848b7c27583713f8",
+        "owned_process_cleanup_confirmed": true,
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0,
+        "receipt_file": "android-test-runtime-6c4a1b14a6454b8c848b7c27583713f8.json",
+        "receipt_sha256": "d8f99b290ab77e2ac55dc87ece9361404b38b243d140e7ed54c5122bf938a5c5",
+        "suite": "database"
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "c62d297724a5a1b1b3e8d2ed76b433d5f061bf716e979e2ecb88c2e603923166",
+        "validated_count": 6,
+        "validation_succeeded": true,
+        "storage_crash": null,
+        "owned_device_directory": "/data/local/tmp/vw-tests/d2ef4408b48d428f95d5c691f926657e",
+        "owned_process_cleanup_confirmed": true,
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0,
+        "receipt_file": "android-test-runtime-d2ef4408b48d428f95d5c691f926657e.json",
+        "receipt_sha256": "def20a684f3a9c3ef1739d388512a1e2b5ef41c7bc52ac4448b567cf7e62b605",
+        "suite": "migrations"
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "861f9884339fb02bf57b66dc50ebbe894448349b1a54edafe1d13eabc4f4efb8",
+        "validated_count": 1,
+        "validation_succeeded": true,
+        "storage_crash": null,
+        "owned_device_directory": "/data/local/tmp/vw-tests/dc64c65eb96a4ee985eac17ebf63df61",
+        "owned_process_cleanup_confirmed": true,
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0,
+        "receipt_file": "android-test-runtime-dc64c65eb96a4ee985eac17ebf63df61.json",
+        "receipt_sha256": "b1a1522aeadb653383b739add99fd0c3bf62dc12e94e4d47a60f23c3e24a8e7b",
+        "suite": "video"
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "80f17868ab3b954fca3d677a74d3560b4325aac39c140e3e2239d9be7e004434",
+        "validated_count": 6,
+        "validation_succeeded": true,
+        "storage_crash": null,
+        "owned_device_directory": "/data/local/tmp/vw-tests/827c10964b254378a8152aaa3041555e",
+        "owned_process_cleanup_confirmed": true,
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0,
+        "receipt_file": "android-test-runtime-827c10964b254378a8152aaa3041555e.json",
+        "receipt_sha256": "241e48f3bb53ad91926d97c1f8cb4f73865d3bd2b03f2fb53a45abe1d13b621f",
+        "suite": "checkpoint"
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "8673dbbc195b5846001be3a3cdd933e0f4e107f63448b8faacd81f7330b0d996",
+        "validated_count": 25,
+        "validation_succeeded": true,
+        "storage_crash": null,
+        "owned_device_directory": "/data/local/tmp/vw-tests/597e3360c09c466f973f9de94edae1cf",
+        "owned_process_cleanup_confirmed": true,
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0,
+        "receipt_file": "android-test-runtime-597e3360c09c466f973f9de94edae1cf.json",
+        "receipt_sha256": "6d5b2476ec7b9d012b709a9e9fd0041ff09b3f69b3f155ceac7fa65566a2cf30",
+        "suite": "engine"
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "54166ea582138a19008872d5dede1b997090529753470628d9a0539b67ba66ca",
+        "validated_count": 9,
+        "validation_succeeded": true,
+        "storage_crash": null,
+        "owned_device_directory": "/data/local/tmp/vw-tests/4ccf39441c974d7cb809adb79cb815a9",
+        "owned_process_cleanup_confirmed": true,
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0,
+        "receipt_file": "android-test-runtime-4ccf39441c974d7cb809adb79cb815a9.json",
+        "receipt_sha256": "2716f02e286b7a8d2f0e5c89cf75f530b836b59268f571443fa048aa00f5d4c2",
+        "suite": "root_owned"
+      },
+      {
+        "mode": "test",
+        "device_model": "SM-S918U",
+        "executable_sha256": "a425af85c5b28ba744217889f7d6aef242b5e3a98ac08d43f59834b9b6a0dd93",
+        "validated_count": 12,
+        "validation_succeeded": true,
+        "storage_crash": null,
+        "owned_device_directory": "/data/local/tmp/vw-tests/588381afab024e27ac2315d6a6aeac45",
+        "owned_process_cleanup_confirmed": true,
+        "owned_device_cleanup_confirmed": true,
+        "screenshots_created": 0,
+        "receipt_file": "android-test-runtime-588381afab024e27ac2315d6a6aeac45.json",
+        "receipt_sha256": "13b6c6c18cf04768e37f2e9b1d929c68203309b6389927e72a497a49fd39bc24",
+        "suite": "undo_recovery"
+      }
+    ],
+    "android_final_passed": 113,
+    "final_android_executables": [
+      {
+        "suite": "archives",
+        "path": "target/aarch64-linux-android/debug/deps/archives-2b26ee68ffa31faf",
+        "sha256": "9d98a53fe0f53e01cefe04a99724a8ed9643d0a9066dccd38d9d4ae753e241b1",
+        "validated_count": 12,
+        "receipt_file": "android-test-runtime-db0d2e487946407a86baf5583dcc255c.json"
+      },
+      {
+        "suite": "blobs_cache",
+        "path": "target/aarch64-linux-android/debug/deps/blobs_cache-2b37da2fef651945",
+        "sha256": "6a05c294463d66d726ab54387a3a4a57ef39239fb4519d7751f9e6c5154fdf54",
+        "validated_count": 26,
+        "receipt_file": "android-test-runtime-0717123dc9ef41cc87a0ea1f04dc7884.json"
+      },
+      {
+        "suite": "checkpoint",
+        "path": "target/aarch64-linux-android/debug/deps/checkpoint-94dd7eb0e728135f",
+        "sha256": "80f17868ab3b954fca3d677a74d3560b4325aac39c140e3e2239d9be7e004434",
+        "validated_count": 6,
+        "receipt_file": "android-test-runtime-827c10964b254378a8152aaa3041555e.json"
+      },
+      {
+        "suite": "crash_recovery",
+        "path": "target/aarch64-linux-android/debug/deps/crash_recovery-e5ae5d23fd232069",
+        "sha256": "b8e02b02a7d295ec57f9dcf8f265dbdfbb6bb947391eb037546d268cc59b3696",
+        "validated_count": 1,
+        "receipt_file": "android-test-runtime-de628b32ac234c4b9745244dd5deb04b.json"
+      },
+      {
+        "suite": "database",
+        "path": "target/aarch64-linux-android/debug/deps/database-88f69f8e92ad178b",
+        "sha256": "26d963e05886136e6cb7a36ddeebf52226fdc2838d900cf63639d5a94355ee3b",
+        "validated_count": 15,
+        "receipt_file": "android-test-runtime-6c4a1b14a6454b8c848b7c27583713f8.json"
+      },
+      {
+        "suite": "engine",
+        "path": "target/aarch64-linux-android/debug/deps/engine-86c02ff24b15277c",
+        "sha256": "8673dbbc195b5846001be3a3cdd933e0f4e107f63448b8faacd81f7330b0d996",
+        "validated_count": 25,
+        "receipt_file": "android-test-runtime-597e3360c09c466f973f9de94edae1cf.json"
+      },
+      {
+        "suite": "migrations",
+        "path": "target/aarch64-linux-android/debug/deps/migrations-c95e3bcede2b654b",
+        "sha256": "c62d297724a5a1b1b3e8d2ed76b433d5f061bf716e979e2ecb88c2e603923166",
+        "validated_count": 6,
+        "receipt_file": "android-test-runtime-d2ef4408b48d428f95d5c691f926657e.json"
+      },
+      {
+        "suite": "root_owned",
+        "path": "target/aarch64-linux-android/debug/deps/root_owned-b585e4005eccd4c6",
+        "sha256": "54166ea582138a19008872d5dede1b997090529753470628d9a0539b67ba66ca",
+        "validated_count": 9,
+        "receipt_file": "android-test-runtime-4ccf39441c974d7cb809adb79cb815a9.json"
+      },
+      {
+        "suite": "undo_recovery",
+        "path": "target/aarch64-linux-android/debug/deps/undo_recovery-0475ee6a028ba47c",
+        "sha256": "a425af85c5b28ba744217889f7d6aef242b5e3a98ac08d43f59834b9b6a0dd93",
+        "validated_count": 12,
+        "receipt_file": "android-test-runtime-588381afab024e27ac2315d6a6aeac45.json"
+      },
+      {
+        "suite": "video",
+        "path": "target/aarch64-linux-android/debug/deps/video-9fdaa3bf5683005b",
+        "sha256": "861f9884339fb02bf57b66dc50ebbe894448349b1a54edafe1d13eabc4f4efb8",
+        "validated_count": 1,
+        "receipt_file": "android-test-runtime-dc64c65eb96a4ee985eac17ebf63df61.json"
+      }
+    ],
+    "declared_cases": {
+      "windows": {
+        "checkpoint": {
+          "passed": [
+            "checkpoint_retains_retries_conflicts_tombstones_undo_and_gesture_guards",
+            "checkpoint_roundtrip_is_exact_for_revision_zero_and_float_payloads",
+            "corrupt_checksum_unknown_version_truncation_and_noncanonical_payloads_reject",
+            "recomputed_checksums_do_not_bypass_revision_record_or_index_validation",
+            "restored_write_ownership_makes_identical_future_conflict_and_undo_decisions",
+            "tombstones_and_conflict_payloads_remain_bound_to_accepted_history"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-ops/tests/checkpoint.rs",
+          "source_sha256": "445e2dfe7634c19f1f5ac41814a1c27e30c66e661df640c8ecaee86f85da2cc7"
+        },
+        "engine": {
+          "passed": [
+            "another_device_cannot_undo_a_transaction",
+            "atomic_shape_replacement_checks_peer_owned_leaf_after_newer_own_sibling_write",
+            "authenticated_device_op_identity_base_hash_and_creator_are_validated",
+            "delete_beats_edit_in_either_arrival_order_and_retains_edited_object",
+            "delete_ignores_peer_value_fully_overwritten_by_later_own_write",
+            "delete_retains_peer_edit_despite_newer_own_write_to_another_property",
+            "deleted_object_reorder_is_preserved_as_a_conflict_without_resurrection",
+            "disjoint_stale_properties_merge_without_a_conflict",
+            "duplicate_ack_is_byte_identical_and_payload_reuse_is_rejected",
+            "equal_instruction_result_and_group_writes_preserve_peer_ownership",
+            "five_hundred_random_sequences_undo_and_redo_identical_hashes",
+            "fixed_op_log_has_identical_cross_platform_canonical_hash",
+            "full_shape_write_stamps_equal_sibling_fields_in_the_same_variant",
+            "group_cycles_and_cross_document_reorders_reject_atomically",
+            "immutable_assets_reject_metadata_replacement_and_duplicate_metadata_is_a_noop",
+            "instructions_semantics_results_and_mask_versions_are_journaled_and_reversible",
+            "latest_own_leaf_write_supersedes_older_opposing_shape_write",
+            "live_host_order_wins_even_when_wall_clock_is_earlier",
+            "nested_group_changes_respect_locked_descendants_and_layers",
+            "rejection_rolls_back_state_counters_and_gesture_reservation",
+            "stale_writes_use_later_wall_clock_and_ties_favor_host_in_both_orders",
+            "structural_undo_preserves_parent_of_peer_edited_object_and_reports_notice",
+            "undo_remembers_intervening_peer_write_after_an_own_overwrite",
+            "undo_skips_peer_properties_but_restores_independent_properties",
+            "value_equal_write_still_owns_the_property_for_conflicts_and_undo"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-ops/tests/engine.rs",
+          "source_sha256": "650151bd1ceff441a44eed7851db29bab3373a42d3f91fb053ced09d888bf600"
+        },
+        "root_owned": {
+          "passed": [
+            "explicitly_discarding_pending_work_removes_its_inverse_chain_only",
+            "gesture_expiry_retains_sequence_watermarks_and_cancel_suppresses_late_packets",
+            "gesture_payloads_and_bindings_are_validated_without_mutation",
+            "replica_offline_pending_undo_redo_survives_rebase_and_reconnect",
+            "replica_optimistically_undoes_then_rebases_around_new_peer_write",
+            "replica_preserves_blocked_pending_and_rejects_forged_ack_atomically",
+            "replica_rejects_bad_operation_identity_and_reused_transaction_payload",
+            "two_replicas_rebase_interleaved_pending_and_acknowledgements",
+            "undo_manager_handles_lost_ack_and_repeated_local_delivery"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-ops/tests/root_owned.rs",
+          "source_sha256": "1d687c9020ec64b7e45900909bed486620e505efbf8961994ba457f27b4be502"
+        },
+        "undo_recovery": {
+          "passed": [
+            "acknowledgement_collisions_identity_and_impossible_inverse_order_are_atomic",
+            "host_order_overrides_conflicting_provisional_order_of_independent_edits",
+            "late_original_ack_does_not_resurrect_an_already_undone_edit",
+            "later_known_local_edit_remains_latest_while_earlier_receipt_is_missing",
+            "malformed_pending_registration_and_payload_collisions_are_atomic",
+            "missing_middle_inverse_receipt_is_replayed_in_host_order",
+            "offline_edit_undo_redo_survives_every_ack_delivery_permutation",
+            "receipts_without_local_registration_converge_in_every_delivery_order",
+            "rejected_pending_inverse_restores_cursor_and_discards_its_redo",
+            "rejecting_pending_ordinary_removes_dependent_inverses_but_preserves_other_edits",
+            "rejection_cannot_remove_accepted_history_or_accepted_inverse_dependencies",
+            "reversed_ordinary_acknowledgements_keep_latest_host_edit_on_top"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-ops/tests/undo_recovery.rs",
+          "source_sha256": "e0187e328775caef4395fda464b65ca3f1495aa21d08e5efae6675d18cde65c0"
+        },
+        "archives": {
+          "passed": [
+            "count_entry_total_metadata_and_ratio_limits_fail_before_publication",
+            "existing_files_and_directories_are_preserved_for_import_and_export",
+            "immutable_inventory_exports_historical_assets_outside_the_current_model",
+            "inconsistent_stored_sizes_are_rejected_before_extracting_declared_small_members",
+            "missing_corrupt_and_unreferenced_blob_members_are_rejected_atomically",
+            "missing_or_corrupt_originals_abort_export_without_publishing",
+            "pending_add_asset_retains_its_offline_original_and_queue_through_export",
+            "roundtrip_preserves_state_hash_blobs_and_source_but_strips_raw_labels_and_cache",
+            "symlink_special_file_and_crc_mismatch_are_rejected",
+            "traversal_absolute_paths_sidecars_directories_and_duplicate_names_are_rejected",
+            "zip64_entry_metadata_is_accepted_without_large_memory_allocations",
+            "zip64_extensible_sector_counts_toward_the_metadata_allocation_limit"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-store/tests/archives.rs",
+          "source_sha256": "9a51eab637d92107999e6dde6c93faf9b98412da4cf501a15324dda14692bfdf"
+        },
+        "blobs_cache": {
+          "passed": [
+            "blob_layout_streaming_roundtrip_and_empty_asset",
+            "corruption_is_detected_and_original_is_never_overwritten",
+            "disk_corrupted_entry_is_not_read_or_deleted_as_owned_content",
+            "disk_duplicate_and_replacement_do_not_leak_accounting_or_old_files",
+            "disk_eviction_can_restore_drive_reserve_before_writing",
+            "disk_lock_excludes_other_managers_and_releases_on_drop",
+            "disk_lru_is_durable_and_eviction_preserves_originals_and_unknown_files",
+            "disk_oversize_and_invalid_keys_preserve_existing_cache",
+            "disk_reserve_exact_boundary_passes_and_one_byte_short_is_clear_low_space",
+            "eight_concurrent_writers_install_identical_original_once",
+            "externally_grown_cache_file_is_rejected_before_unbounded_allocation",
+            "invalid_free_space_response_fails_closed",
+            "malicious_manifest_path_is_rejected_before_outside_file_mutation",
+            "missing_cache_entry_after_interrupted_eviction_recovers_without_touching_unknowns",
+            "non_directory_shard_is_rejected_and_preserved",
+            "opening_under_reserve_allows_existing_reads_but_rejects_new_caching",
+            "post_publication_reserve_decline_reclaims_cache_or_reports_low_space",
+            "ram_defaults_are_bytes_and_named_usage_is_exact",
+            "ram_invalid_oversize_and_overflow_requests_are_atomic",
+            "ram_lru_crosses_named_caches_and_touch_changes_order",
+            "ram_replacement_shrink_and_remove_have_no_double_accounting",
+            "reader_failure_leaves_no_partial_original_or_temp_file",
+            "real_space_query_reports_a_consistent_filesystem_capacity",
+            "reserve_formula_has_exact_decimal_floor_slope_and_ceiling",
+            "windows_junction_children_cannot_redirect_blobs_or_cache"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-store/tests/blobs_cache.rs",
+          "source_sha256": "de82789206efb3f2775ad3d81cd19d3e3baadbefb08ef06ccaa3c94a9cd59c95"
+        },
+        "crash_recovery": {
+          "passed": [
+            "random_process_kills_preserve_last_committed_state"
+          ],
+          "ignored": [
+            "crash_worker"
+          ],
+          "source": "core/crates/vw-store/tests/crash_recovery.rs",
+          "source_sha256": "5bcf91d70b0164b3336f10e8e2ec16d101ba94bc670354b05b602d0847e9a28d"
+        },
+        "database": {
+          "passed": [
+            "asset_metadata_columns_must_match_the_immutable_protobuf_definition",
+            "cancellation_survives_a_checkpoint_without_mutating_visible_state",
+            "corrupted_log_checkpoint_and_snapshot_bindings_are_rejected",
+            "elapsed_time_and_explicit_idle_checkpoints_limit_replay",
+            "failed_sqlite_writer_lock_preserves_log_and_in_memory_host",
+            "integer_overflow_rejections_leave_storage_and_retry_identity_unchanged",
+            "oversized_and_malformed_pending_payloads_fail_without_decoding_unbounded_bytes",
+            "oversized_asset_definition_and_object_state_are_rejected_before_decoding",
+            "pending_column_mismatches_and_deleted_or_modified_projections_fail_open",
+            "pending_queue_survives_restart_in_order_and_deletes_only_exact_acked_bytes",
+            "reopen_retains_exact_retry_ack_undo_and_conflict_records",
+            "rich_document_projections_preserve_full_capture_identity_and_model_types",
+            "source_selected_path_and_device_metadata_are_persisted_without_pairing_fields",
+            "transaction_count_checkpoint_replays_only_the_three_transaction_tail",
+            "writer_lock_is_exclusive_and_released_after_drop"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-store/tests/database.rs",
+          "source_sha256": "c10087077d7290c2bc4a18ffafc3af96b975f95026e76ddcc93877f0aef35322"
+        },
+        "migrations": {
+          "passed": [
+            "altered_schema_and_history_deleting_triggers_are_rejected_on_open",
+            "draft_migration_replays_history_preserves_hash_retries_labels_and_pending_queue",
+            "fresh_schema_and_numbered_migrations_produce_identical_sqlite_objects",
+            "future_schema_is_rejected_without_rewriting_version_or_project",
+            "incomplete_or_corrupted_drafts_fail_without_partial_schema_upgrade",
+            "orphan_historical_asset_failure_rolls_back_migration_before_committing_version_two"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-store/tests/migrations.rs",
+          "source_sha256": "caa2f2d4d52dc00700eab5f929a91ae1d496c67be594f9250a2da5accc206f70"
+        },
+        "video": {
+          "passed": [
+            "generated_one_second_mp4_roundtrips_database_blob_and_archive"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-store/tests/video.rs",
+          "source_sha256": "0ae69b2110755f3415ea6e58b5d6563e86acfc536a8f9a2789b17d8dd39ad331"
+        }
+      },
+      "android": {
+        "checkpoint": {
+          "passed": [
+            "checkpoint_retains_retries_conflicts_tombstones_undo_and_gesture_guards",
+            "checkpoint_roundtrip_is_exact_for_revision_zero_and_float_payloads",
+            "corrupt_checksum_unknown_version_truncation_and_noncanonical_payloads_reject",
+            "recomputed_checksums_do_not_bypass_revision_record_or_index_validation",
+            "restored_write_ownership_makes_identical_future_conflict_and_undo_decisions",
+            "tombstones_and_conflict_payloads_remain_bound_to_accepted_history"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-ops/tests/checkpoint.rs",
+          "source_sha256": "445e2dfe7634c19f1f5ac41814a1c27e30c66e661df640c8ecaee86f85da2cc7"
+        },
+        "engine": {
+          "passed": [
+            "another_device_cannot_undo_a_transaction",
+            "atomic_shape_replacement_checks_peer_owned_leaf_after_newer_own_sibling_write",
+            "authenticated_device_op_identity_base_hash_and_creator_are_validated",
+            "delete_beats_edit_in_either_arrival_order_and_retains_edited_object",
+            "delete_ignores_peer_value_fully_overwritten_by_later_own_write",
+            "delete_retains_peer_edit_despite_newer_own_write_to_another_property",
+            "deleted_object_reorder_is_preserved_as_a_conflict_without_resurrection",
+            "disjoint_stale_properties_merge_without_a_conflict",
+            "duplicate_ack_is_byte_identical_and_payload_reuse_is_rejected",
+            "equal_instruction_result_and_group_writes_preserve_peer_ownership",
+            "five_hundred_random_sequences_undo_and_redo_identical_hashes",
+            "fixed_op_log_has_identical_cross_platform_canonical_hash",
+            "full_shape_write_stamps_equal_sibling_fields_in_the_same_variant",
+            "group_cycles_and_cross_document_reorders_reject_atomically",
+            "immutable_assets_reject_metadata_replacement_and_duplicate_metadata_is_a_noop",
+            "instructions_semantics_results_and_mask_versions_are_journaled_and_reversible",
+            "latest_own_leaf_write_supersedes_older_opposing_shape_write",
+            "live_host_order_wins_even_when_wall_clock_is_earlier",
+            "nested_group_changes_respect_locked_descendants_and_layers",
+            "rejection_rolls_back_state_counters_and_gesture_reservation",
+            "stale_writes_use_later_wall_clock_and_ties_favor_host_in_both_orders",
+            "structural_undo_preserves_parent_of_peer_edited_object_and_reports_notice",
+            "undo_remembers_intervening_peer_write_after_an_own_overwrite",
+            "undo_skips_peer_properties_but_restores_independent_properties",
+            "value_equal_write_still_owns_the_property_for_conflicts_and_undo"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-ops/tests/engine.rs",
+          "source_sha256": "650151bd1ceff441a44eed7851db29bab3373a42d3f91fb053ced09d888bf600"
+        },
+        "root_owned": {
+          "passed": [
+            "explicitly_discarding_pending_work_removes_its_inverse_chain_only",
+            "gesture_expiry_retains_sequence_watermarks_and_cancel_suppresses_late_packets",
+            "gesture_payloads_and_bindings_are_validated_without_mutation",
+            "replica_offline_pending_undo_redo_survives_rebase_and_reconnect",
+            "replica_optimistically_undoes_then_rebases_around_new_peer_write",
+            "replica_preserves_blocked_pending_and_rejects_forged_ack_atomically",
+            "replica_rejects_bad_operation_identity_and_reused_transaction_payload",
+            "two_replicas_rebase_interleaved_pending_and_acknowledgements",
+            "undo_manager_handles_lost_ack_and_repeated_local_delivery"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-ops/tests/root_owned.rs",
+          "source_sha256": "1d687c9020ec64b7e45900909bed486620e505efbf8961994ba457f27b4be502"
+        },
+        "undo_recovery": {
+          "passed": [
+            "acknowledgement_collisions_identity_and_impossible_inverse_order_are_atomic",
+            "host_order_overrides_conflicting_provisional_order_of_independent_edits",
+            "late_original_ack_does_not_resurrect_an_already_undone_edit",
+            "later_known_local_edit_remains_latest_while_earlier_receipt_is_missing",
+            "malformed_pending_registration_and_payload_collisions_are_atomic",
+            "missing_middle_inverse_receipt_is_replayed_in_host_order",
+            "offline_edit_undo_redo_survives_every_ack_delivery_permutation",
+            "receipts_without_local_registration_converge_in_every_delivery_order",
+            "rejected_pending_inverse_restores_cursor_and_discards_its_redo",
+            "rejecting_pending_ordinary_removes_dependent_inverses_but_preserves_other_edits",
+            "rejection_cannot_remove_accepted_history_or_accepted_inverse_dependencies",
+            "reversed_ordinary_acknowledgements_keep_latest_host_edit_on_top"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-ops/tests/undo_recovery.rs",
+          "source_sha256": "e0187e328775caef4395fda464b65ca3f1495aa21d08e5efae6675d18cde65c0"
+        },
+        "archives": {
+          "passed": [
+            "count_entry_total_metadata_and_ratio_limits_fail_before_publication",
+            "existing_files_and_directories_are_preserved_for_import_and_export",
+            "immutable_inventory_exports_historical_assets_outside_the_current_model",
+            "inconsistent_stored_sizes_are_rejected_before_extracting_declared_small_members",
+            "missing_corrupt_and_unreferenced_blob_members_are_rejected_atomically",
+            "missing_or_corrupt_originals_abort_export_without_publishing",
+            "pending_add_asset_retains_its_offline_original_and_queue_through_export",
+            "roundtrip_preserves_state_hash_blobs_and_source_but_strips_raw_labels_and_cache",
+            "symlink_special_file_and_crc_mismatch_are_rejected",
+            "traversal_absolute_paths_sidecars_directories_and_duplicate_names_are_rejected",
+            "zip64_entry_metadata_is_accepted_without_large_memory_allocations",
+            "zip64_extensible_sector_counts_toward_the_metadata_allocation_limit"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-store/tests/archives.rs",
+          "source_sha256": "9a51eab637d92107999e6dde6c93faf9b98412da4cf501a15324dda14692bfdf"
+        },
+        "blobs_cache": {
+          "passed": [
+            "blob_layout_streaming_roundtrip_and_empty_asset",
+            "blob_symlink_shards_and_file_targets_are_rejected",
+            "cache_symlink_directory_cannot_redirect_eviction_or_writes",
+            "corruption_is_detected_and_original_is_never_overwritten",
+            "disk_corrupted_entry_is_not_read_or_deleted_as_owned_content",
+            "disk_duplicate_and_replacement_do_not_leak_accounting_or_old_files",
+            "disk_eviction_can_restore_drive_reserve_before_writing",
+            "disk_lock_excludes_other_managers_and_releases_on_drop",
+            "disk_lru_is_durable_and_eviction_preserves_originals_and_unknown_files",
+            "disk_oversize_and_invalid_keys_preserve_existing_cache",
+            "disk_reserve_exact_boundary_passes_and_one_byte_short_is_clear_low_space",
+            "eight_concurrent_writers_install_identical_original_once",
+            "externally_grown_cache_file_is_rejected_before_unbounded_allocation",
+            "invalid_free_space_response_fails_closed",
+            "malicious_manifest_path_is_rejected_before_outside_file_mutation",
+            "missing_cache_entry_after_interrupted_eviction_recovers_without_touching_unknowns",
+            "non_directory_shard_is_rejected_and_preserved",
+            "opening_under_reserve_allows_existing_reads_but_rejects_new_caching",
+            "post_publication_reserve_decline_reclaims_cache_or_reports_low_space",
+            "ram_defaults_are_bytes_and_named_usage_is_exact",
+            "ram_invalid_oversize_and_overflow_requests_are_atomic",
+            "ram_lru_crosses_named_caches_and_touch_changes_order",
+            "ram_replacement_shrink_and_remove_have_no_double_accounting",
+            "reader_failure_leaves_no_partial_original_or_temp_file",
+            "real_space_query_reports_a_consistent_filesystem_capacity",
+            "reserve_formula_has_exact_decimal_floor_slope_and_ceiling"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-store/tests/blobs_cache.rs",
+          "source_sha256": "de82789206efb3f2775ad3d81cd19d3e3baadbefb08ef06ccaa3c94a9cd59c95"
+        },
+        "crash_recovery": {
+          "passed": [
+            "random_process_kills_preserve_last_committed_state"
+          ],
+          "ignored": [
+            "crash_worker"
+          ],
+          "source": "core/crates/vw-store/tests/crash_recovery.rs",
+          "source_sha256": "5bcf91d70b0164b3336f10e8e2ec16d101ba94bc670354b05b602d0847e9a28d"
+        },
+        "database": {
+          "passed": [
+            "asset_metadata_columns_must_match_the_immutable_protobuf_definition",
+            "cancellation_survives_a_checkpoint_without_mutating_visible_state",
+            "corrupted_log_checkpoint_and_snapshot_bindings_are_rejected",
+            "elapsed_time_and_explicit_idle_checkpoints_limit_replay",
+            "failed_sqlite_writer_lock_preserves_log_and_in_memory_host",
+            "integer_overflow_rejections_leave_storage_and_retry_identity_unchanged",
+            "oversized_and_malformed_pending_payloads_fail_without_decoding_unbounded_bytes",
+            "oversized_asset_definition_and_object_state_are_rejected_before_decoding",
+            "pending_column_mismatches_and_deleted_or_modified_projections_fail_open",
+            "pending_queue_survives_restart_in_order_and_deletes_only_exact_acked_bytes",
+            "reopen_retains_exact_retry_ack_undo_and_conflict_records",
+            "rich_document_projections_preserve_full_capture_identity_and_model_types",
+            "source_selected_path_and_device_metadata_are_persisted_without_pairing_fields",
+            "transaction_count_checkpoint_replays_only_the_three_transaction_tail",
+            "writer_lock_is_exclusive_and_released_after_drop"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-store/tests/database.rs",
+          "source_sha256": "c10087077d7290c2bc4a18ffafc3af96b975f95026e76ddcc93877f0aef35322"
+        },
+        "migrations": {
+          "passed": [
+            "altered_schema_and_history_deleting_triggers_are_rejected_on_open",
+            "draft_migration_replays_history_preserves_hash_retries_labels_and_pending_queue",
+            "fresh_schema_and_numbered_migrations_produce_identical_sqlite_objects",
+            "future_schema_is_rejected_without_rewriting_version_or_project",
+            "incomplete_or_corrupted_drafts_fail_without_partial_schema_upgrade",
+            "orphan_historical_asset_failure_rolls_back_migration_before_committing_version_two"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-store/tests/migrations.rs",
+          "source_sha256": "caa2f2d4d52dc00700eab5f929a91ae1d496c67be594f9250a2da5accc206f70"
+        },
+        "video": {
+          "passed": [
+            "generated_one_second_mp4_roundtrips_database_blob_and_archive"
+          ],
+          "ignored": [],
+          "source": "core/crates/vw-store/tests/video.rs",
+          "source_sha256": "0ae69b2110755f3415ea6e58b5d6563e86acfc536a8f9a2789b17d8dd39ad331"
+        }
+      }
+    },
+    "ignored_private_worker_note": "crash_worker is declared #[ignore] and invoked by its parent; the Android privacy wrapper retains passed counts, numeric crash coverage and child cleanup rather than raw stdout.",
+    "canonical_op_log_hash": "3120769b42f577ffbedf8c0ac10cc176ae21b1f643ace65f625e979914952ee0",
+    "retained_initial_failures": [
+      {
+        "phase": "t103-fetch",
+        "exit_code": 101,
+        "parent_exit_code": 101,
+        "failure_reason": null,
+        "elapsed_seconds": 2.423,
+        "sampled_peak_tree_working_set_bytes": 2052096,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 180,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t103-fetch-0ce27d13021a4856bda30660af4a8adc.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5,
+        "receipt_file": "t103-fetch-0ce27d13021a4856bda30660af4a8adc.log.json",
+        "receipt_sha256": "9dc33ca705c34e76c80403bdedcefd3e629b7dc6b74fea790a249ebb881aa664",
+        "log_sha256": "12199dc64cad0ea922d2495f0e90ca305aa28180d800db89726b4bcbd936a84a"
+      },
+      {
+        "phase": "t103-clippy",
+        "exit_code": 101,
+        "parent_exit_code": 101,
+        "failure_reason": null,
+        "elapsed_seconds": 59.648,
+        "sampled_peak_tree_working_set_bytes": 692883456,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 600,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t103-clippy-0eed2d7b0bc4485fb290efc05ef695a1.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5,
+        "receipt_file": "t103-clippy-0eed2d7b0bc4485fb290efc05ef695a1.log.json",
+        "receipt_sha256": "8e1e7e195a953d9c949362798bf839ce1d2fc0760413614fd98ad2ea255e9b65",
+        "log_sha256": "c076f6f9f7f2cef189b9b8e38215d9bce199e9d60afa3a9424b3f0ea415019f3"
+      },
+      {
+        "phase": "t103-clippy",
+        "exit_code": 101,
+        "parent_exit_code": 101,
+        "failure_reason": null,
+        "elapsed_seconds": 11.178,
+        "sampled_peak_tree_working_set_bytes": 295415808,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 600,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t103-clippy-4ea1841fd8bb4fc1a182afa7826c6d3e.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5,
+        "receipt_file": "t103-clippy-4ea1841fd8bb4fc1a182afa7826c6d3e.log.json",
+        "receipt_sha256": "a87d5bc043b4f7c48b4cbfddd09eaccf0854ab3238025ada505f45ca41fd0c24",
+        "log_sha256": "7d8e148100bab77cd9837319a6d163656f0f51c0ee9e7d979d7962b81a9a0ce5"
+      },
+      {
+        "phase": "t103-clippy-final",
+        "exit_code": 101,
+        "parent_exit_code": 101,
+        "failure_reason": null,
+        "elapsed_seconds": 26.163,
+        "sampled_peak_tree_working_set_bytes": 364933120,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 600,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t103-clippy-final-7f879d719b4a491bacd7a54029614375.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5,
+        "receipt_file": "t103-clippy-final-7f879d719b4a491bacd7a54029614375.log.json",
+        "receipt_sha256": "627edc46a3b17764671027a46d8aac9b7a39a975914afa4edde3e2861a933c13",
+        "log_sha256": "d585661889578cce6091c4e2c513404fbedc10f65ee53b127d093b459af2e632"
+      },
+      {
+        "phase": "t103-format-check",
+        "exit_code": 1,
+        "parent_exit_code": 1,
+        "failure_reason": null,
+        "elapsed_seconds": 4.145,
+        "sampled_peak_tree_working_set_bytes": 76550144,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 60,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t103-format-check-e5e265a28cad4f98996dc0818447ec3c.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5,
+        "receipt_file": "t103-format-check-e5e265a28cad4f98996dc0818447ec3c.log.json",
+        "receipt_sha256": "cbec3c12cd1a1f5873c0620b10d738d8d1e11c81bdc44a48157dba9d8a9c9be9",
+        "log_sha256": "838f9e9ec9c65fa84be68c2e20f087b4a32c52a68dc97f5bb704e88c517ac2e9"
+      },
+      {
+        "phase": "t103-format-check",
+        "exit_code": 1,
+        "parent_exit_code": 1,
+        "failure_reason": null,
+        "elapsed_seconds": 5.376,
+        "sampled_peak_tree_working_set_bytes": 72093696,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 120,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t103-format-check-9cd34b2ad3bb4f9681ff5697a5ec0544.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5,
+        "receipt_file": "t103-format-check-9cd34b2ad3bb4f9681ff5697a5ec0544.log.json",
+        "receipt_sha256": "eeb586eb63cfd3ab880473b1d19b0d2d613b5e037ac39561c3d7fb111f62d300",
+        "log_sha256": "5461a95b8f6a0c550ded2f24b4000650223c799c0f22ee0e8ae6d833eb10b2bb"
+      },
+      {
+        "phase": "t103-staged-audit",
+        "exit_code": 1,
+        "parent_exit_code": 1,
+        "failure_reason": null,
+        "elapsed_seconds": 7.899,
+        "sampled_peak_tree_working_set_bytes": 31924224,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 240,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "t103-staged-audit-b8ed309676954f87a14610a2218f8632.log",
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5,
+        "receipt_file": "t103-staged-audit-b8ed309676954f87a14610a2218f8632.log.json",
+        "receipt_sha256": "e6cc79ea5fa231dfe2084ae716bffe36f50d73a3233cf8e303cebf978cb6c567",
+        "log_sha256": "4afedbb9f99c18b3dc7d3c5662114c1dff157983de0ada3a8c847829b1e06eea"
+      }
+    ],
+    "clippy": {
+      "phase": "t103-clippy-final",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 4.295,
+      "sampled_peak_tree_working_set_bytes": 100564992,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t103-clippy-final-b69587f68f03416a934e7a9fd710d79a.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "receipt_file": "t103-clippy-final-b69587f68f03416a934e7a9fd710d79a.log.json",
+      "receipt_sha256": "d2462318dd37b7f55a05a8b6c7af9d2b746354768a1392473bac62ceefe25288",
+      "log_sha256": "8e588c99596318a81e5a1fe540fc73be9ec35819cb80481998379591056ba27f"
+    },
+    "formatting": {
+      "phase": "t103-format-check",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 11.813,
+      "sampled_peak_tree_working_set_bytes": 74952704,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 120,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t103-format-check-06e54563e9e34d8ba0cb938056fea09d.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "receipt_file": "t103-format-check-06e54563e9e34d8ba0cb938056fea09d.log.json",
+      "receipt_sha256": "a70fae7320e450184d15b103d331d7498ed0cb2d7de06c6fc9b02f5726031af8",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "rustdoc": {
+      "phase": "t103-rustdoc",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 14.468,
+      "sampled_peak_tree_working_set_bytes": 304353280,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t103-rustdoc-e408a844737946aea58849cfcaa95fef.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "receipt_file": "t103-rustdoc-e408a844737946aea58849cfcaa95fef.log.json",
+      "receipt_sha256": "45cb7e181a67f889461b889cc9455d10702c479b05bdf6c91e40bcd135a620e4",
+      "log_sha256": "42391ebb768893e70ec4a147d4186c67f77be0c08908487974c02f93b87e8c29"
+    },
+    "policy": {
+      "phase": "t103-policy",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 6.653,
+      "sampled_peak_tree_working_set_bytes": 167124992,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 240,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t103-policy-6f7078ba600f40fd98d0db83a9b1a787.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "receipt_file": "t103-policy-6f7078ba600f40fd98d0db83a9b1a787.log.json",
+      "receipt_sha256": "77ac0d0a7ede2bc79bc20397ca2292d746a16d64726959cd381a0b7d7e2a79cb",
+      "log_sha256": "863319791bd14c8d942ad95b430d95699492cf57231451cb7c3ce8e63e4ba300"
+    },
+    "integration": {
+      "phase": "build-core",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 110.605,
+      "sampled_peak_tree_working_set_bytes": 529121280,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "build-core-3141cb16d12d483ea4f646dc9a526f8f.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "receipt_file": "build-core-3141cb16d12d483ea4f646dc9a526f8f.log.json",
+      "receipt_sha256": "a071d364a194c927b45714b3a547f144c790c15837d321e21aa7286c2ff99d86",
+      "log_sha256": "d455c0171528b349aa88f1522a3ee873db4a94530e9329ab6fe0e11ce94ae4a8"
+    },
+    "rust_license": {
+      "phase": "license-rust",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 13.859,
+      "sampled_peak_tree_working_set_bytes": 130600960,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "license-rust-fa6d731843ea462292ddbe9d92775e70.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "receipt_file": "license-rust-fa6d731843ea462292ddbe9d92775e70.log.json",
+      "receipt_sha256": "a80a94fc70a37b03db4c1d8fa1cae977de83872ee1dca2096da0637ee1b2f9bf",
+      "log_sha256": "8591dd742b16182bcc22032c5a095b5480982f01cc05f3b856d1cad086670b75"
+    },
+    "gradle_license": {
+      "phase": "license-gradle",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 86.651,
+      "sampled_peak_tree_working_set_bytes": 627052544,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "license-gradle-5534785fc79c4f3b8945d8526eb04b01.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 20,
+      "receipt_file": "license-gradle-5534785fc79c4f3b8945d8526eb04b01.log.json",
+      "receipt_sha256": "c204c8b937f0b588415f3dbaf520a9882c9a82e5756173cbfe417995c1bbeed2",
+      "log_sha256": "a1b9912142413e3732aa230ec7df0037f1117215add9da8bf29cb68ca2da0106"
+    },
+    "crash_receipt_fixtures": {
+      "phase": "t103-crash-receipt-fixtures",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 2.955,
+      "sampled_peak_tree_working_set_bytes": 105312256,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 120,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t103-crash-receipt-fixtures-1794d62156fd421f9273c3ad09d8a622.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "receipt_file": "t103-crash-receipt-fixtures-1794d62156fd421f9273c3ad09d8a622.log.json",
+      "receipt_sha256": "adaa258935cd8c90a1868559a7c46231d22a65d89ae469687fe414f4eaa3b84d",
+      "log_sha256": "579992b4c41fd66d6b12cac79b0fc1c154bfedcf3b5f5da3d2faf25a2966ea34"
+    },
+    "device_selection_fixtures": {
+      "phase": "t103-device-selection-fixtures",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 3.038,
+      "sampled_peak_tree_working_set_bytes": 115085312,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 120,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t103-device-selection-fixtures-7752c10f40024869afea3ea48fe71f2e.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "receipt_file": "t103-device-selection-fixtures-7752c10f40024869afea3ea48fe71f2e.log.json",
+      "receipt_sha256": "615bd8be7a386f8bb74648b7b48db4c0d1dcc0088f55429c0fef051bbfe002a2",
+      "log_sha256": "7ed02a7b9253e36a3517c7289ed8d75e107731d2cc18ccfacb9ddb0a1d839ab7"
+    },
+    "stay_awake_verification": {
+      "phase": "t103-stay-awake-verify",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 0.304,
+      "sampled_peak_tree_working_set_bytes": 4878336,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 30,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t103-stay-awake-verify-83553659ce5b4b7ca52a331d54b86dcb.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "receipt_file": "t103-stay-awake-verify-83553659ce5b4b7ca52a331d54b86dcb.log.json",
+      "receipt_sha256": "94dc358dcb6a7c2fc5b5799fc529d78ca5d73e49b3cf5f3d7636603ae9f04c9e",
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee"
+    },
+    "mp4_generation": {
+      "phase": "t103-mp4-fixture",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 44.514,
+      "sampled_peak_tree_working_set_bytes": 240193536,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "t103-mp4-fixture-d0c94794377f49459abe5293866e4d5b.log",
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "receipt_file": "t103-mp4-fixture-d0c94794377f49459abe5293866e4d5b.log.json",
+      "receipt_sha256": "824ca940c3ce1640ea1584a30857027cdf7a7ffd3128f8e74f70400bbb255f7d",
+      "log_sha256": "f199435e7a972c2b676feed6d127d55b0ef26d70063dcc06af502cb5df4113f5"
+    }
+  },
+  "source_coverage_notes": [
+    "The full Windows run precedes the final cache reserve correction. Its blobs/cache result is retained and superseded by the targeted final blobs/cache suite; final cache sources and executable bind to that targeted run.",
+    "The projections source had one reviewed whitespace-only change after the Windows compilation. The retained local review receipt records both tested and final hashes; this exporter verifies the final hash and retains the review attestation.",
+    "All final Android suites execute final code before one CRLF newline in blobs.rs was normalized to LF during packaging. The exact tested bytes can be reconstructed from the final source and the retained newline binding; no executable logic changed. Android stdout is privacy-suppressed; case counts, binary hashes, crash counters and cleanup are retained."
+  ],
+  "reviewed_format_only_binding": {
+    "path": "core/crates/vw-store/src/projections.rs",
+    "windows_tested_sha256": "18c5ba846ad4beb8739406220b4662c792cdb070dce46d24ba5efd981308bd97",
+    "final_sha256": "3cea43f246f19e2c787edfeb87ad1a62df53c6cca61ca7f60a2fcddd9414b2f3",
+    "only_change": "rustfmt line wrapping of one if-let condition; exact single replacement verified",
+    "logic_unchanged": true
+  },
+  "reviewed_line_ending_binding": {
+    "path": "core/crates/vw-store/src/blobs.rs",
+    "tested_sha256": "41a6648a1b2a1d7eb1d8e79957e7a0e2a1934d44e1c777c618c9d1ef9562c5f4",
+    "final_sha256": "74284cdca6e8514af9afe1b4a7cfffe18eb22a3d9b502a52760ba8b8aa5cabc3",
+    "normalized_lf_offsets": [
+      7267
+    ],
+    "bytes_before": 7269,
+    "bytes_after": 7268,
+    "only_change": "one CRLF newline normalized to LF by Git attributes",
+    "logic_unchanged": true,
+    "tested_platforms": [
+      "Windows",
+      "Android"
+    ]
+  },
+  "dependency_versions": {
+    "rusqlite": {
+      "num": "0.40.2",
+      "license": "MIT",
+      "rust_version": null,
+      "created_at": "2026-08-08T14:21:52.570893Z",
+      "checksum": "23f2a97da3e3873c73cb2a2e71b35c40ff95e0b1eefa8d72d8499a6928c3b5b3",
+      "yanked": false,
+      "features": {
+        "array": [
+          "vtab",
+          "pointer"
+        ],
+        "backup": [],
+        "blob": [],
+        "buildtime_bindgen": [
+          "libsqlite3-sys?/buildtime_bindgen",
+          "sqlite-wasm-rs?/bindgen"
+        ],
+        "bundled": [
+          "libsqlite3-sys?/bundled",
+          "modern_sqlite"
+        ],
+        "bundled-full": [
+          "modern-full",
+          "bundled"
+        ],
+        "bundled-sqlcipher": [
+          "libsqlite3-sys?/bundled-sqlcipher",
+          "bundled"
+        ],
+        "bundled-sqlcipher-vendored-openssl": [
+          "libsqlite3-sys?/bundled-sqlcipher-vendored-openssl",
+          "bundled-sqlcipher"
+        ],
+        "bundled-windows": [
+          "libsqlite3-sys?/bundled-windows"
+        ],
+        "cache": [
+          "hashlink"
+        ],
+        "collation": [],
+        "column_decltype": [],
+        "column_metadata": [
+          "libsqlite3-sys?/column_metadata"
+        ],
+        "csvtab": [
+          "csv",
+          "vtab"
+        ],
+        "default": [
+          "cache",
+          "ffi-sqlite-wasm-rs"
+        ],
+        "extra_check": [],
+        "fallible_uint": [],
+        "ffi-sqlite-wasm-rs": [
+          "dep:sqlite-wasm-rs"
+        ],
+        "functions": [],
+        "hooks": [],
+        "i128_blob": [],
+        "in_gecko": [
+          "modern_sqlite",
+          "libsqlite3-sys?/in_gecko"
+        ],
+        "limits": [],
+        "load_extension": [],
+        "loadable_extension": [
+          "libsqlite3-sys?/loadable_extension"
+        ],
+        "modern-full": [
+          "array",
+          "backup",
+          "blob",
+          "modern_sqlite",
+          "chrono",
+          "collation",
+          "column_metadata",
+          "column_decltype",
+          "csvtab",
+          "extra_check",
+          "functions",
+          "hooks",
+          "i128_blob",
+          "jiff",
+          "limits",
+          "load_extension",
+          "serde_json",
+          "serialize",
+          "series",
+          "time",
+          "trace",
+          "unlock_notify",
+          "url",
+          "uuid",
+          "vtab",
+          "window"
+        ],
+        "modern_sqlite": [
+          "libsqlite3-sys?/bundled_bindings"
+        ],
+        "pointer": [],
+        "preupdate_hook": [
+          "libsqlite3-sys?/preupdate_hook",
+          "hooks"
+        ],
+        "serialize": [],
+        "series": [
+          "vtab"
+        ],
+        "session": [
+          "libsqlite3-sys?/session",
+          "hooks"
+        ],
+        "sqlcipher": [
+          "libsqlite3-sys?/sqlcipher"
+        ],
+        "trace": [],
+        "unlock_notify": [
+          "libsqlite3-sys?/unlock_notify"
+        ],
+        "vtab": [],
+        "wasm32-wasi-vfs": [
+          "libsqlite3-sys?/wasm32-wasi-vfs"
+        ],
+        "window": [
+          "functions"
+        ],
+        "with-asan": [
+          "libsqlite3-sys?/with-asan"
+        ]
+      }
+    },
+    "zip": {
+      "num": "8.6.0",
+      "license": "MIT",
+      "rust_version": "1.88",
+      "created_at": "2026-04-25T19:11:11.854239Z",
+      "checksum": "2d04a6b5381502aa6087c94c669499eb1602eb9c5e8198e534de571f7154809b",
+      "yanked": false,
+      "features": {
+        "_arbitrary": [
+          "dep:arbitrary"
+        ],
+        "_bzip2_any": [],
+        "_deflate-any": [],
+        "aes-crypto": [
+          "dep:aes",
+          "dep:constant_time_eq",
+          "getrandom/std",
+          "dep:hmac",
+          "dep:pbkdf2",
+          "dep:sha1",
+          "dep:zeroize"
+        ],
+        "bzip2": [
+          "dep:bzip2",
+          "bzip2/default",
+          "_bzip2_any"
+        ],
+        "bzip2-rs": [
+          "dep:bzip2",
+          "bzip2/bzip2-sys",
+          "_bzip2_any"
+        ],
+        "chrono": [
+          "dep:chrono"
+        ],
+        "default": [
+          "aes-crypto",
+          "bzip2",
+          "deflate64",
+          "deflate",
+          "lzma",
+          "ppmd",
+          "time",
+          "zstd",
+          "xz"
+        ],
+        "deflate": [
+          "deflate-zopfli",
+          "deflate-flate2-zlib-rs"
+        ],
+        "deflate-flate2": [
+          "_deflate-any",
+          "dep:flate2"
+        ],
+        "deflate-flate2-zlib": [
+          "deflate-flate2",
+          "flate2/zlib"
+        ],
+        "deflate-flate2-zlib-ng": [
+          "deflate-flate2",
+          "flate2/zlib-ng"
+        ],
+        "deflate-flate2-zlib-ng-compat": [
+          "deflate-flate2",
+          "flate2/zlib-ng-compat"
+        ],
+        "deflate-flate2-zlib-rs": [
+          "deflate-flate2",
+          "flate2/zlib-rs"
+        ],
+        "deflate-zopfli": [
+          "dep:zopfli",
+          "_deflate-any"
+        ],
+        "deprecated-time": [],
+        "jiff-02": [
+          "dep:jiff"
+        ],
+        "legacy-zip": [
+          "bitstream-io"
+        ],
+        "lzma": [
+          "dep:lzma-rust2"
+        ],
+        "nt-time": [
+          "dep:nt-time"
+        ],
+        "ppmd": [
+          "dep:ppmd-rust"
+        ],
+        "time": [
+          "dep:time"
+        ],
+        "unreserved": [],
+        "xz": [
+          "dep:lzma-rust2"
+        ]
+      }
+    },
+    "fs2": {
+      "num": "0.4.3",
+      "license": "MIT/Apache-2.0",
+      "rust_version": null,
+      "created_at": "2018-01-06T20:18:30.565584Z",
+      "checksum": "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213",
+      "yanked": false,
+      "features": {}
+    }
+  },
+  "synthetic_video_fixture": {
+    "synthetic": true,
+    "generator": "core/crates/vw-store/examples/generate_video.rs",
+    "codec": "H.264",
+    "container": "MP4",
+    "width": 64,
+    "height": 64,
+    "frames": 30,
+    "duration_ms": 1000,
+    "bytes": 2816,
+    "sha256": "7e58e0b597d62afbebf6217c494a59311d269c9e24c7058e71a09f9a711d4c80",
+    "blake3": "b491e1e9ef1c7a62611e895878799dbff1e8f61a389ab5df7d65ac979b3ec40c",
+    "validated_by": "Windows Media Foundation source reader decoded all 30 frames; T1.03 generation receipt",
+    "external_media": false,
+    "verification_screenshot": false
+  },
+  "review": {
+    "mode": "parallel implementation with separate file ownership and independent read-only review; parent serialized builds",
+    "known_findings_remaining": 0
+  },
+  "cleanup": {
+    "screenshots_created": 0,
+    "android_owned_runs_disposed": 10,
+    "all_device_cleanup_confirmed": true,
+    "all_owned_device_process_cleanup_confirmed": true,
+    "windows_crash_children_reaped": 1000,
+    "android_crash_children_reaped": 100
+  },
+  "boundaries": [
+    "Storage library verification covers durable project state, operation history, pending work, immutable originals, cache budgets, migrations, crash recovery and bounded .vwbz import/export.",
+    "App UI integration, a PC-off end-to-end open/edit/export/save flow and live device transport remain downstream T1.08a/T1.10/T1.12 work.",
+    "The synthetic MP4 validates storage and archive retention; live asset synchronization remains T1.06a/T1.10 work. Timeline remains reserved, without a video-editing UI claim.",
+    "A18 and the T1.12 phase gate remain pending; no library-only check establishes end-to-end release acceptance."
+  ]
+}

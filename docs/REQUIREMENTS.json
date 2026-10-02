@@ -293,9 +293,11 @@
       "scenarios": [
         "A18"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.03.md — atomic history/checkpoint persistence, schema-1 forward migration and exact last-committed recovery pass Windows/S23 checks after 1000/100 killed writers; integrated app-kill recovery remains A18/T1.12 acceptance."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2121,9 +2123,11 @@
         "A10",
         "A19"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.03.md — RAM accounting/LRU defaults of 256/512 MiB, disk budgets, the exact decimal reserve formula, post-write space checks and original preservation pass Windows/S23 tests; app cache wiring, releasing RAM victims and the visible low-space state remain T1.08a/T1.10 and A10/A19/T1.12. GPU texture accounting belongs to FORMAT-002 in phase 3."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; the GPU texture budget is verified with the tile renderer in FORMAT-002 (phase 3)"
     },
@@ -3995,7 +3999,8 @@
         "A25"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — offline queue/rebase, optimistic undo/redo and conflict retention pass simulation; durable conflict table and PC-off app open/edit/export/save remain T1.03, T1.08a, T1.10 and T1.12."
+        "docs/evidence/T1.02.md — offline queue/rebase, optimistic undo/redo and conflict retention pass simulation; durable conflict table and PC-off app open/edit/export/save remain T1.03, T1.08a, T1.10 and T1.12.",
+        "docs/evidence/T1.03.md — pending queue, conflicts, retries and undo ownership persist through restart; PC-off app open/edit/export/save and finalized transport remain T1.08a/T1.10/T1.12."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4965,7 +4970,8 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — reserved/unknown document kinds fail with typed errors and mp4 metadata is accepted; storing/syncing actual video bytes remains T1.03/T1.06a/T1.10."
+        "docs/evidence/T1.02.md — reserved/unknown document kinds fail with typed errors and mp4 metadata is accepted; storing/syncing actual video bytes remains T1.03/T1.06a/T1.10.",
+        "docs/evidence/T1.03.md — generated synthetic MP4 bytes and metadata round-trip through database, blob storage and .vwbz; live asset sync remains T1.06a/T1.10 and A18/T1.12 acceptance. Timeline stays reserved; no video-editing UI is required by this hook."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
