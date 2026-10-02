@@ -42,6 +42,8 @@ val applicationLicenseConfigurations = listOf(
     ":android" to "releaseRuntimeClasspath",
     ":desktop" to "runtimeClasspath",
     ":shared" to "desktopRuntimeClasspath",
+    ":pen-probe" to "debugRuntimeClasspath",
+    ":pen-probe" to "releaseRuntimeClasspath",
 )
 val applicationLicenseDirectory = layout.buildDirectory.dir("reports/dependency-license")
 val generateApplicationLicenseReport = tasks.register("generateApplicationLicenseReport") {

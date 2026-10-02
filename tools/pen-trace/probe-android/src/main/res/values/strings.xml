@@ -1,0 +1,6 @@
+<resources>
+    <string name="click">Single click</string><string name="double_click">Double click</string>
+    <string name="left">Swipe left</string><string name="right">Swipe right</string>
+    <string name="up">Swipe up</string><string name="down">Swipe down</string>
+    <string name="cw">Circle clockwise</string><string name="ccw">Circle counterclockwise</string>
+</resources>

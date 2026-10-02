@@ -57,6 +57,8 @@ class PomCensusTests(unittest.TestCase):
             ":android:releaseRuntimeClasspath": [self.key],
             ":desktop:runtimeClasspath": [self.key],
             ":shared:desktopRuntimeClasspath": [self.key],
+            ":pen-probe:debugRuntimeClasspath": [self.key],
+            ":pen-probe:releaseRuntimeClasspath": [self.key],
         }
         self.report = {
             "format": "application-pom-census-v1",

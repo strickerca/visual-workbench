@@ -36,6 +36,7 @@ FORBIDDEN = re.compile(r"\b(?:A?GPL|LGPL|SSPL|BUSL|CC-BY-NC)(?:[-\s]|$)|General 
 EXPECTED_CONFIGURATIONS = frozenset({
     ":android:debugRuntimeClasspath", ":android:releaseRuntimeClasspath",
     ":desktop:runtimeClasspath", ":shared:desktopRuntimeClasspath",
+    ":pen-probe:debugRuntimeClasspath", ":pen-probe:releaseRuntimeClasspath",
 })
 
 

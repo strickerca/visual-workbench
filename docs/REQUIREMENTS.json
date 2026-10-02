@@ -654,7 +654,9 @@
       "scenarios": [
         "A03"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance."
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -681,7 +683,9 @@
       "scenarios": [
         "A08"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance."
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -763,9 +767,11 @@
         "A05",
         "A06"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T0.04.md: Probe recorder and bounded HIL replay implemented; physical OnePlus synthetic software checks are separate from S23 acceptance. At least 24 S23 owner traces, their replay, capability measurements and thermal session remain pending in T0.04. Public MotionEvent construction cannot reproduce nonzero actionButton; affected traces fail explicitly."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new: pen-trace fixtures"
     },
@@ -2917,7 +2923,8 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/T0.03.md: All nine PERF methods defined in PERF-template.md; 10-minute S23 thermal baseline T0.04, recovery baseline T0.06, dated target confirmation T0.12 pending."
+        "docs/evidence/T0.03.md: All nine PERF methods defined in PERF-template.md; 10-minute S23 thermal baseline T0.04, recovery baseline T0.06, dated target confirmation T0.12 pending.",
+        "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4589,9 +4596,11 @@
       "scenarios": [
         "A20"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T0.04.md: Probe recorder and bounded HIL replay implemented; physical OnePlus synthetic software checks are separate from S23 acceptance. At least 24 S23 owner traces, their replay, capability measurements and thermal session remain pending in T0.04. Public MotionEvent construction cannot reproduce nonzero actionButton; affected traces fail explicitly."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },

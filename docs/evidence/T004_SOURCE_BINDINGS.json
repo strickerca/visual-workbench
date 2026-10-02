@@ -1,0 +1,182 @@
+{
+  "task": "T0.04",
+  "base_commit": "81255141f8d06cf285f125da19620b2f1e8966a4",
+  "source_files": [
+    {
+      "path": "apps/build.gradle.kts",
+      "source_sha256": "b45e949940331fc2caa6cd2e858def59bbf56a17d35abad26664fd96708cb13b",
+      "bytes": 21359,
+      "git_blob_after_declared_filters": "72c197fd00da0eadb038a9edcb1c046378df1d60"
+    },
+    {
+      "path": "apps/settings.gradle.kts",
+      "source_sha256": "0e89a6804570af94e551378c1be625ac9be2c3111df961ff837d6db7bc2113e0",
+      "bytes": 354,
+      "git_blob_after_declared_filters": "4e93c4d7c7153b15500d7d0e777f2e9cea3cb760"
+    },
+    {
+      "path": "build.ps1",
+      "source_sha256": "5aae7469715501e04133c4af5d00b32fddd59360a3a5e6e4c192704109194271",
+      "bytes": 5067,
+      "git_blob_after_declared_filters": "e4b48ecf0814680f6ffbbdc42a19e2c5c16f131d"
+    },
+    {
+      "path": "docs/IMPLEMENTATION_PLAN.md",
+      "source_sha256": "40e26988e63af3f481df17ed77c46614588411083f704a6d374671eebd369eb7",
+      "bytes": 56434,
+      "git_blob_after_declared_filters": "ba03b865fb15345fa1c8eb787d5501c8947ed33c"
+    },
+    {
+      "path": "docs/REQUIREMENTS.json",
+      "source_sha256": "26b01677de627e5575e7fc002720e5c6a7b851dde653ac61c5aa8ab366d2bd5e",
+      "bytes": 197289,
+      "git_blob_after_declared_filters": "fa34a64ac5e17063fe2e46786ac6f04c08c7e836"
+    },
+    {
+      "path": "docs/TOOLCHAIN.md",
+      "source_sha256": "bccf427afb0e91105ceeecfd6162a2b805f167cc6bb021d0021b316be6fa2920",
+      "bytes": 24332,
+      "git_blob_after_declared_filters": "7e7df5e248687e59d07a6cd59980a3a95b6c23d8"
+    },
+    {
+      "path": "docs/evidence/T0.04.md",
+      "source_sha256": "c86367e157ae5b7d8fce89b3c83e5543f3b62e61209d086fc91c630be0fe1a7a",
+      "bytes": 11571,
+      "git_blob_after_declared_filters": "cff2d830e0ebab68769584f0c89e93037e5603da"
+    },
+    {
+      "path": "docs/evidence/T004_SOFTWARE_VERIFICATION.json",
+      "source_sha256": "544c70ac748cacab0a250eb6cad119bfea7b119a6b6265aab4bc543997bce8ad",
+      "bytes": 7076,
+      "git_blob_after_declared_filters": "ffefbbddb7cf82c6d392cc1db59e661c6fae6c49"
+    },
+    {
+      "path": "docs/evidence/hardware-truth.md",
+      "source_sha256": "e0893f7c4e9d95636d30ee97a98f577645b812c78102102a48285ae4ec3a1555",
+      "bytes": 9333,
+      "git_blob_after_declared_filters": "cad084aef56e9f84e9c3c1225dc301b188a0644a"
+    },
+    {
+      "path": "fixtures/traces/README.md",
+      "source_sha256": "138a814c09077b1798b4f3a1c0ed8dd33b7bfe87139b4408c0b4cf0268c1d119",
+      "bytes": 560,
+      "git_blob_after_declared_filters": "3fdcb0eb59fea92a774bb68d785f29e09b26854d"
+    },
+    {
+      "path": "tools/check_gradle_licenses.py",
+      "source_sha256": "6e371fb75de3ded64fe0d85ab1b3a8ef05bc4bfb444343ea512c665eeb852216",
+      "bytes": 12152,
+      "git_blob_after_declared_filters": "8eb2348833bfeb48c859408dd2639e3d92fdfc8f"
+    },
+    {
+      "path": "tools/hil-test.ps1",
+      "source_sha256": "d01ebc0ea7d2ff9bcf2cee32d7342f5c03c113487ad67ba4162b378d9bddc67e",
+      "bytes": 4423,
+      "git_blob_after_declared_filters": "53a132aee2a0f0ea62707688893bfc401eed8afe"
+    },
+    {
+      "path": "tools/pen-trace/README.md",
+      "source_sha256": "91eb50b0c4b220402c0162ee55197296479db05da7bf75bd2d63579bbe09c055",
+      "bytes": 8166,
+      "git_blob_after_declared_filters": "547f0b797501f654e2df0fd9d863747a90c7840c"
+    },
+    {
+      "path": "tools/pen-trace/collect-traces.ps1",
+      "source_sha256": "89b522b6dfbe79cf1a78cb0ea1b6d324363081b69ae260f70514cd2c787f0b75",
+      "bytes": 1734,
+      "git_blob_after_declared_filters": "f11a07c350fba68f26ca99f6b28a075501269948"
+    },
+    {
+      "path": "tools/pen-trace/hil-pen.ps1",
+      "source_sha256": "04019b7019fe4b61bb3b2054c585f20ea19de7b1ab1c05c2012bd14f755a3163",
+      "bytes": 5724,
+      "git_blob_after_declared_filters": "205b48f9cecef109f7a1a28b18e832ea4dc82ad7"
+    },
+    {
+      "path": "tools/pen-trace/probe-android/build.gradle.kts",
+      "source_sha256": "b96304e840b8867bc0f36e5176c5be184de5cd291b1e8fe76fa146bb0b9803dc",
+      "bytes": 775,
+      "git_blob_after_declared_filters": "d72c2bbced645da6bb4e225dc5deacd202e73a2e"
+    },
+    {
+      "path": "tools/pen-trace/probe-android/gradle.lockfile",
+      "source_sha256": "e7f9585776490e4bcc5907d6b2d62a6459834505eee4ecf96a7cefe1f150563e",
+      "bytes": 44354,
+      "git_blob_after_declared_filters": "361ba8a38fe594fde1c3a1ef62a3dcb4c1ee4e82"
+    },
+    {
+      "path": "tools/pen-trace/probe-android/src/androidTest/java/com/visualworkbench/penprobe/ReplayTest.kt",
+      "source_sha256": "4d7f1b01a45836b743c6e2c7fbce93318ea334946b52955e72b2632e7e9a7564",
+      "bytes": 17062,
+      "git_blob_after_declared_filters": "258b9936201415443f4d32795d551ad463ca1bd9"
+    },
+    {
+      "path": "tools/pen-trace/probe-android/src/main/AndroidManifest.xml",
+      "source_sha256": "969360594533c90913c17a97cc2a5efbfb9f5e2bcc1e1ba87f16deb29e8cd5e4",
+      "bytes": 889,
+      "git_blob_after_declared_filters": "12bf01affc9fd08fdc7403e2bc57df1fdc221dcf"
+    },
+    {
+      "path": "tools/pen-trace/probe-android/src/main/java/com/visualworkbench/penprobe/ProbeActivity.kt",
+      "source_sha256": "99ef77a0706da4f35ea3e015e0b649e068bc6aba498bbd11919076d0877de0d6",
+      "bytes": 6349,
+      "git_blob_after_declared_filters": "f7e2e410e373ae2a139b803daca0287919954e77"
+    },
+    {
+      "path": "tools/pen-trace/probe-android/src/main/java/com/visualworkbench/penprobe/ProbeSurface.kt",
+      "source_sha256": "905669e4a6ea475acd25eeca1b05f1144c31f8f4e5851e1edb27a2a71973dcb5",
+      "bytes": 3772,
+      "git_blob_after_declared_filters": "372be29fa8836a17ff57a4d64668bccbe6f9a443"
+    },
+    {
+      "path": "tools/pen-trace/probe-android/src/main/java/com/visualworkbench/penprobe/TraceRecorder.kt",
+      "source_sha256": "5ba18c91a8d7b082fdc2c3aaa1dd672e4430cf7ec1c6a8ca4f5cd9e7d72b9b63",
+      "bytes": 6308,
+      "git_blob_after_declared_filters": "a49d8c44bc48a6bbe79888f8d96bdadb7c490e54"
+    },
+    {
+      "path": "tools/pen-trace/probe-android/src/main/res/drawable/probe_icon.xml",
+      "source_sha256": "a4e037651141ed4c48933cef277896c25e48b8758e4b4ccc1aacbdaddcd106fc",
+      "bytes": 342,
+      "git_blob_after_declared_filters": "6554b2a77675dccf8d9aec6c60e966bb1af50da8"
+    },
+    {
+      "path": "tools/pen-trace/probe-android/src/main/res/values/strings.xml",
+      "source_sha256": "f8be3ba8e8dc4ad7b6f6d4566233617c58e281c68733da2132ba75898d0511ab",
+      "bytes": 384,
+      "git_blob_after_declared_filters": "4808a05857183bb416ecae4280492d0f3109df23"
+    },
+    {
+      "path": "tools/pen-trace/probe-android/src/main/res/xml/remote_actions.xml",
+      "source_sha256": "56b1e56897d9cd10acf2239e26615842510b622aefff069578ac3e36ec9e1022",
+      "bytes": 1141,
+      "git_blob_after_declared_filters": "7b41b518d997b9479099e88a32d67181e7e6fc71"
+    },
+    {
+      "path": "tools/pen-trace/thermal.ps1",
+      "source_sha256": "a6c98ce79f012421f2a79fc888328bf962d4620d153b351a1b3fdaaa16fb4c00",
+      "bytes": 3319,
+      "git_blob_after_declared_filters": "f9fe8e984f6ea601584748f35daf0d39cec88255"
+    },
+    {
+      "path": "tools/pen-trace/trace_tool.py",
+      "source_sha256": "8352205cdc3f57601dd297bd4aac5553fe5c10f02eb11042ef275ebb535305f1",
+      "bytes": 13403,
+      "git_blob_after_declared_filters": "406dc98e28566c5eabab04c15e243e9d36bad8cb"
+    },
+    {
+      "path": "tools/tests/test_pen_traces.py",
+      "source_sha256": "80522876617548a96e2c94b9f2c3784376a6f4ab75414f9c11321a069854d02e",
+      "bytes": 5412,
+      "git_blob_after_declared_filters": "b92bb0f181ac270e880de0c3e89b4e10a7871b53"
+    },
+    {
+      "path": "tools/tests/test_setup_gates.py",
+      "source_sha256": "4ea76db71f1512c077df510bd1b7662ae67e9641f3cd7d7b1d72195ae711cd9d",
+      "bytes": 21152,
+      "git_blob_after_declared_filters": "ea2ed79d3df45c59d072a975e1710324b62d7cb4"
+    }
+  ],
+  "self_excluded": "docs/evidence/T004_SOURCE_BINDINGS.json",
+  "line_endings": "Source hashes bind tested working bytes; git blobs apply the existing .gitattributes LF/CRLF rules."
+}

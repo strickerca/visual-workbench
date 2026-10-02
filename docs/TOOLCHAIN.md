@@ -148,3 +148,19 @@ No third-party PNG dependency was added: the small diagnostic encoder uses
 bounded uncompressed DEFLATE, with independent standard-library CRC/zlib decode.
 Windows GDI, DisplayConfig and Media Foundation remain OS APIs, not bundled DLLs.
 Hardware transform enumeration does not verify low-latency processing or profiles.
+
+## T0.04 pen-probe dependency (2026-10-01)
+
+The separate Android pen probe pins `androidx.graphics:graphics-core:1.0.4`.
+The [official stable release page](https://developer.android.com/jetpack/androidx/releases/graphics)
+and the exact Google Maven POM were checked. The POM declares Apache-2.0.
+The runtime dependency census now covers six configurations, including probe
+debug and release, with 181 exact modules and one bound parent POM. Its lockfile
+is `tools/pen-trace/probe-android/gradle.lockfile`. The existing AndroidX test
+runner/core 1.7.0 and ext-junit 1.3.0 pins are reused for instrumentation.
+The probe keeps min SDK 29, compile SDK 37 and target SDK 36. No Samsung Remote
+SDK is linked; Air Actions use declarative XML and ordinary Android KeyEvents.
+
+Graphics Core includes `libgraphics-core.so`; the Maven license gate checks its
+publisher metadata, while distribution-wide native notices remain part of the
+existing release license work. This diagnostic app is not a release package.

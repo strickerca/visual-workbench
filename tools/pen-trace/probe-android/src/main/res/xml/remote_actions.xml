@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<remote-actions version="1.2">
+    <action id="click" label="@string/click" priority="1" trigger_key="F1"><preference name="gesture" value="click" /></action>
+    <action id="double_click" label="@string/double_click" priority="2" trigger_key="F2"><preference name="gesture" value="double_click" /></action>
+    <action id="left" label="@string/left" priority="3" trigger_key="F3"><preference name="gesture" value="swipe_left" /></action>
+    <action id="right" label="@string/right" priority="4" trigger_key="F4"><preference name="gesture" value="swipe_right" /></action>
+    <action id="up" label="@string/up" priority="5" trigger_key="F5"><preference name="gesture" value="swipe_up" /></action>
+    <action id="down" label="@string/down" priority="6" trigger_key="F6"><preference name="gesture" value="swipe_down" /></action>
+    <action id="cw" label="@string/cw" priority="7" trigger_key="F7"><preference name="gesture" value="circle_cw" /></action>
+    <action id="ccw" label="@string/ccw" priority="8" trigger_key="F8"><preference name="gesture" value="circle_ccw" /></action>
+</remote-actions>

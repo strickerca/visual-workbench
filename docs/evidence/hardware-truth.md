@@ -57,3 +57,13 @@ Distinct HDR classification and gamut/colorimeter calibration are explicitly unt
 Evidence: pc-diagnostics.json, phone-diagnostics.txt, win-diagnostics.json and T003_SCREENSHOT_VERIFICATION.json.
 Synthetic screenshot PNGs were inspected and disposed; only text hash/pixel/cleanup receipts remain.
 No display device names, network names/addresses, input device paths/names or serials are retained.
+
+## T0.04 update — 2026-10-01
+
+The separate pen probe, private JSON recording, replay instrumentation and thermal
+logger are implemented. The connected test device remains the OnePlus IN2019;
+injected stylus events are software verification only. Zero S23 owner traces and
+zero ten-minute drawing sessions have been recorded in this task. Samsung
+pressure, hover, tilt/orientation signs, report rates, barrel/eraser behavior,
+Air Actions and Air Command interference remain unmeasured, as listed in T0.04.md.
+They are not classified as “not reported by device” without a physical S23 test.

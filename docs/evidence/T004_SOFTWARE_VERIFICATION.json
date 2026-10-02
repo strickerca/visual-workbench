@@ -1,0 +1,225 @@
+{
+  "task": "T0.04",
+  "date": "2026-10-01",
+  "overall_task_acceptance": "incomplete_physical_deliverables_missing",
+  "executor": {
+    "model": "gpt-6-astra",
+    "effort": "xhigh",
+    "verified_from_session_metadata": true
+  },
+  "software_checks": {
+    "test_all": "passed",
+    "python_tests": 66,
+    "new_trace_python_tests": 15,
+    "rust_tests": 5,
+    "kotlin_host_feature_tests": "NO-SOURCE",
+    "physical_device_instrumentation_tests": 3,
+    "lint_all": "passed",
+    "maven_license_modules": 181,
+    "runtime_configurations": 6,
+    "parent_poms": 1,
+    "license_gate": "passed_before_build",
+    "empty_owner_corpus_rejected_before_device_actions": true
+  },
+  "replay": {
+    "name": "synthetic-stylus",
+    "expected_samples": 8,
+    "received_samples": 8,
+    "expected_keys": 16,
+    "received_keys": 16,
+    "timestamp_shift_ns": 1018749664000000,
+    "max_timestamp_deviation_ns": 0,
+    "p95_timestamp_deviation_ns": 0,
+    "max_injection_submission_deviation_ns": 1000000,
+    "p95_injection_submission_deviation_ns": 0,
+    "field_mismatches": [],
+    "passed": true
+  },
+  "synthetic_timing_collection": {
+    "front_buffer_draw_callback": {
+      "count": 5,
+      "median_ms": 3.880334,
+      "p95_ms": 22.576376
+    },
+    "choreographer_callback": {
+      "count": 7,
+      "median_ms": 8.064293,
+      "p95_ms": 14.006324
+    }
+  },
+  "hardware_capability_evidence": false,
+  "physical_presentation_latency_measured": false,
+  "owner_s23_trace_count": 0,
+  "thermal_session_run": false,
+  "thermal_script_check": "PowerShell_syntax_only",
+  "public_api_limits": [
+    "nonzero actionButton cannot be constructed",
+    "nonzero classification replay unsupported",
+    "millisecond construction with one uptime rebase",
+    "device IDs/system flags may change"
+  ],
+  "device_cleanup_and_installation": {
+    "device_model": "IN2019",
+    "application": "com.visualworkbench.penprobe",
+    "apk_sha256": "624f6ec2364d14d2e0258a3ade9d43b196ab77315efc65914cd9a5571b28a057",
+    "installed_apk_matches": true,
+    "owned_processes_absent": [
+      "com.visualworkbench.penprobe",
+      "com.visualworkbench.penprobe.test"
+    ],
+    "other_app_stopped": false,
+    "adb_or_device_reset": false,
+    "screenshots_created": 0,
+    "screenshot_disposal": "not_applicable_no_images_created"
+  },
+  "artifacts": [
+    {
+      "path": "tools/pen-trace/probe-android/build/outputs/apk/debug/pen-probe-debug.apk",
+      "sha256": "624f6ec2364d14d2e0258a3ade9d43b196ab77315efc65914cd9a5571b28a057",
+      "size_bytes": 6440009
+    },
+    {
+      "path": "tools/pen-trace/probe-android/build/outputs/apk/androidTest/debug/pen-probe-debug-androidTest.apk",
+      "sha256": "5106e515fcbca56c41b3e5a24e3c3cd5e9d79e6ffe1b6187ea2341c3fc96166e",
+      "size_bytes": 940756
+    }
+  ],
+  "private_trace_bindings": [
+    {
+      "name": "last-replay-metrics.json",
+      "sha256": "c65941f40d781928bc054dcf3aa753a7e8dcba895ee8ae8f1b76abb140193a1a",
+      "size_bytes": 333
+    },
+    {
+      "name": "last-replay-source.json",
+      "sha256": "20bddb6b7a988312ae6f808dd6fda19ec6b01bb0da87cbb0a07410333df967af",
+      "size_bytes": 7059
+    },
+    {
+      "name": "last-replay.json",
+      "sha256": "7a0be78f1bd1be1d21d5f3463ee5b1ddc3f2a547d34feb41a2ce2bba06ce9fc3",
+      "size_bytes": 9116
+    },
+    {
+      "name": "replay-report.json",
+      "sha256": "4891f0c2d7e0fcaab9f9b7d8c3a4ce39271c239e11ac5b005c1b645cbf8b19aa",
+      "size_bytes": 419
+    }
+  ],
+  "requirement_scope_audit": [
+    {
+      "id": "PEN-013",
+      "fields": [
+        "evidence"
+      ]
+    },
+    {
+      "id": "PEN-014",
+      "fields": [
+        "evidence"
+      ]
+    },
+    {
+      "id": "PEN-017",
+      "fields": [
+        "evidence",
+        "impl_status",
+        "verify_status"
+      ]
+    },
+    {
+      "id": "QUALITY-004",
+      "fields": [
+        "evidence"
+      ]
+    },
+    {
+      "id": "DEV-003",
+      "fields": [
+        "evidence",
+        "impl_status",
+        "verify_status"
+      ]
+    }
+  ],
+  "passing_receipts": [
+    {
+      "phase": "t004-hil-fixed-layout",
+      "exit_code": 0,
+      "elapsed_seconds": 410.174,
+      "sampled_peak_tree_working_set_bytes": 1548206080,
+      "timeout_seconds": 1100,
+      "process_tree_cleanup_confirmed": true,
+      "log_file": "t004-hil-fixed-layout-c1768bdf18d745689aa54c2c59c8a901.log"
+    },
+    {
+      "phase": "t004-final-test-all",
+      "exit_code": 0,
+      "elapsed_seconds": 225.884,
+      "sampled_peak_tree_working_set_bytes": 1411190784,
+      "timeout_seconds": 1500,
+      "process_tree_cleanup_confirmed": true,
+      "log_file": "t004-final-test-all-0bf3e174760e46ccbd9a0b584e887337.log"
+    },
+    {
+      "phase": "t004-final-lint-all",
+      "exit_code": 0,
+      "elapsed_seconds": 196.699,
+      "sampled_peak_tree_working_set_bytes": 1811468288,
+      "timeout_seconds": 1500,
+      "process_tree_cleanup_confirmed": true,
+      "log_file": "t004-final-lint-all-25eb4b975d304857ac964f8b006cd880.log"
+    },
+    {
+      "phase": "t004-lock-completion",
+      "exit_code": 0,
+      "elapsed_seconds": 51.883,
+      "sampled_peak_tree_working_set_bytes": 628006912,
+      "timeout_seconds": 300,
+      "process_tree_cleanup_confirmed": true,
+      "log_file": "t004-lock-completion-e7ceae78048b4c9d9c8f9cfe6495cf18.log"
+    }
+  ],
+  "retained_failure_and_negative_receipts": [
+    {
+      "phase": "t004-license-pin",
+      "exit_code": 1,
+      "elapsed_seconds": 135.511,
+      "sampled_peak_tree_working_set_bytes": 951394304,
+      "timeout_seconds": 300,
+      "process_tree_cleanup_confirmed": true,
+      "log_file": "t004-license-pin-901894ee0a3c4a658810f883e8cbfb71.log"
+    },
+    {
+      "phase": "t004-probe-build",
+      "exit_code": 1,
+      "elapsed_seconds": 168.245,
+      "sampled_peak_tree_working_set_bytes": 1301712896,
+      "timeout_seconds": 300,
+      "process_tree_cleanup_confirmed": true,
+      "log_file": "t004-probe-build-29e36541be7a476b9b7dcd0c0081c7f3.log"
+    },
+    {
+      "phase": "t004-hil-first",
+      "exit_code": 1,
+      "elapsed_seconds": 243.086,
+      "sampled_peak_tree_working_set_bytes": 1553981440,
+      "timeout_seconds": 1100,
+      "process_tree_cleanup_confirmed": true,
+      "log_file": "t004-hil-first-973a24e8297943f6991d006a25540e0d.log"
+    },
+    {
+      "phase": "t004-owner-gate-negative",
+      "exit_code": 1,
+      "elapsed_seconds": 6.367,
+      "sampled_peak_tree_working_set_bytes": 95682560,
+      "timeout_seconds": 60,
+      "process_tree_cleanup_confirmed": true,
+      "log_file": "t004-owner-gate-negative-35b4168c7d1247f794c3239dfaaddb8a.log"
+    }
+  ],
+  "receipts_location": "external temporary VisualWorkbench-setup-text-logs directory",
+  "screenshots_created": 0,
+  "image_disposal": "not_applicable_no_images_created",
+  "publication": "local_task_commit_only_phase_0_in_progress"
+}

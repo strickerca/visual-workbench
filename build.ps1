@@ -1,8 +1,8 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-android', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-core', 'build-android', 'build-pen-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
-    [Parameter(Position = 1)][ValidateSet('app', 'rust')][string]$HilMode = 'app',
+    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'pen', 'pen-owner')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600
 )
@@ -43,12 +43,13 @@ try {
         'license-check' { Run-LicenseGate }
         'build-core' { Run-LicenseGate; Run-Cargo 'build-core' @('build', '--workspace', '--locked') }
         'build-android' { Run-LicenseGate; Run-Gradle 'build-android' @(':android:assembleDebug') }
+        'build-pen-probe' { Run-LicenseGate; Run-Gradle 'build-pen-probe' @(':pen-probe:assembleDebug', ':pen-probe:assembleDebugAndroidTest') }
         'build-desktop' { Run-LicenseGate; Run-Gradle 'build-desktop' @(':desktop:packageUberJarForCurrentOS') }
         'run-desktop' { Run-LicenseGate; Run-Gradle 'run-desktop' @(':desktop:run') }
         'test-all' {
             Run-Step 'test-tools' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/tests', '-v')
             Run-Cargo 'test-rust' @('test', '--workspace', '--locked')
-            Run-Gradle 'test-kotlin' @(':shared:allTests', ':android:testDebugUnitTest', ':desktop:test')
+            Run-Gradle 'test-kotlin' @(':shared:allTests', ':android:testDebugUnitTest', ':desktop:test', ':pen-probe:testDebugUnitTest')
         }
         'lint-all' {
             Run-Step 'lint-setup' 'python.exe' @('tools/check_setup.py', 'all')
@@ -56,7 +57,7 @@ try {
             Run-Cargo 'lint-rust-format' @('fmt', '--all', '--', '--check')
             Run-Cargo 'lint-rust-clippy' @('clippy', '--workspace', '--all-targets', '--locked', '--', '-D', 'warnings')
             Run-Step 'lint-secrets' 'gitleaks.exe' @('dir', '.', '--config', '.gitleaks.toml', '--redact=100', '--no-banner')
-            Run-Gradle 'lint-kotlin' @(':android:lintDebug', ':shared:check', ':desktop:check')
+            Run-Gradle 'lint-kotlin' @(':android:lintDebug', ':shared:check', ':desktop:check', ':pen-probe:lintDebug')
         }
         'hil-test' {
             $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/hil-test.ps1', '-Mode', $HilMode, '-TimeoutSeconds', "$TimeoutSeconds")
@@ -64,7 +65,10 @@ try {
                 if (-not $Crate) { throw 'Usage: build.ps1 hil-test rust <crate>' }
                 $arguments += @('-Crate', $Crate)
             }
-            Run-Step 'hil-test' 'powershell.exe' $arguments -Limit ($TimeoutSeconds + 600)
+            # Leave the child enough time to run its bounded build, replay and
+            # device cleanup. An outer deadline must not preempt its finally block.
+            $hilBudget = if ($HilMode -in @('pen', 'pen-owner')) { $TimeoutSeconds * 6 + 600 } else { $TimeoutSeconds + 600 }
+            Run-Step 'hil-test' 'powershell.exe' $arguments -Limit $hilBudget
         }
     }
     exit 0

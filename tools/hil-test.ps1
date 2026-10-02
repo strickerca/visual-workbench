@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('app', 'rust')][string]$Mode = 'app',
+    [ValidateSet('app', 'rust', 'pen', 'pen-owner')][string]$Mode = 'app',
     [ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600
 )
@@ -11,6 +11,10 @@ Import-Module (Join-Path $PSScriptRoot 'android-device.psm1') -Force
 
 try {
     . (Join-Path $PSScriptRoot 'enter-dev.ps1')
+    if ($Mode -in @('pen', 'pen-owner')) {
+        & (Join-Path $PSScriptRoot 'pen-trace\hil-pen.ps1') -Mode $Mode -TimeoutSeconds $TimeoutSeconds
+        exit $LASTEXITCODE
+    }
     $device = Get-VwAndroidDevice -Root $projectRoot
     if ($Mode -eq 'rust') {
         if (-not $Crate) { throw 'Specify -Crate for a Rust HIL test' }
