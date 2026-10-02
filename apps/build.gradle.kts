@@ -46,6 +46,8 @@ val applicationLicenseConfigurations = listOf(
     ":pen-probe" to "releaseRuntimeClasspath",
     ":video-bench" to "debugRuntimeClasspath",
     ":video-bench" to "releaseRuntimeClasspath",
+    ":image-bench" to "debugRuntimeClasspath",
+    ":image-bench" to "releaseRuntimeClasspath",
 )
 val applicationLicenseDirectory = layout.buildDirectory.dir("reports/dependency-license")
 val generateApplicationLicenseReport = tasks.register("generateApplicationLicenseReport") {

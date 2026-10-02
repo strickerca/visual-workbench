@@ -61,6 +61,8 @@ class PomCensusTests(unittest.TestCase):
             ":pen-probe:releaseRuntimeClasspath": [self.key],
             ":video-bench:debugRuntimeClasspath": [self.key],
             ":video-bench:releaseRuntimeClasspath": [self.key],
+            ":image-bench:debugRuntimeClasspath": [self.key],
+            ":image-bench:releaseRuntimeClasspath": [self.key],
         }
         self.report = {
             "format": "application-pom-census-v1",

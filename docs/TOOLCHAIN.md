@@ -221,3 +221,29 @@ no explicit runtime library; the Gradle census remains 181 exact modules across
 eight runtime configurations, including video-bench debug/release, with one bound
 parent POM. See [image release](https://crates.io/crates/image/0.25.10) and the
 benchmark README for primary platform API references.
+
+## T0.09 image benchmark pins (2026-10-02)
+
+- Standalone libvips Windows web build **8.18.7**, official stable release dated
+  2026-09-26. Archive `vips-dev-x64-web-8.18.7.zip`, 11365048 bytes, SHA-256
+  `3a122eb3d588690008216f786338e2f9329dba3c3c2768b5933cf7299d549241`.
+  CLI SHA-256 `713f52d657dcb041303eae9c34c05f323933fe4f201cde3fb4942936bc6b8727`.
+  The extracted LICENSE is LGPL-2.1. This portable measurement tool is neither
+  linked nor shipped. [Official release](https://github.com/libvips/build-win64-mxe/releases/tag/v8.18.7).
+- AndroidX **HeifWriter 1.1.0**, stable 2025-10-08, Apache-2.0. The source header
+  and exact resolved Maven POM were checked. The newer 1.2.0 beta is not selected.
+  [Official releases](https://developer.android.com/jetpack/androidx/releases/heifwriter),
+  [API](https://developer.android.com/reference/androidx/heifwriter/HeifWriter).
+  The resolved runtime license census passes **184 modules, 10 configurations,
+  one parent POM**, with no policy relaxation. Diagnostic dependencies are locked.
+- Development-only fixture tools reuse installed exact **NumPy 2.3.5**
+  ([BSD-3-Clause](https://github.com/numpy/numpy/blob/v2.3.5/LICENSE.txt)),
+  **Pillow 12.1.0** ([PIL/HPND](https://pillow.readthedocs.io/en/stable/about.html#license)),
+  **ReportLab 4.4.10** (installed distribution's `licenses/LICENSE` explicitly
+  contains BSD-3-Clause conditions), and **pypdf 6.8.0**
+  ([BSD-3-Clause](https://github.com/py-pdf/pypdf/blob/6.8.0/LICENSE)). They are not
+  application dependencies. The generator fails on differing versions.
+
+Android API references: [BitmapRegionDecoder](https://developer.android.com/reference/android/graphics/BitmapRegionDecoder)
+and [ImageDecoder](https://developer.android.com/reference/android/graphics/ImageDecoder).
+The benchmark APK requests largeHeap for the experiment, not for the product.

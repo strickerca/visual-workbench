@@ -152,6 +152,32 @@ results, retained failures and untested clauses. No TUNNEL requirement is passed
 - **Spike (T0.09):** timings and memory on the Spectre and the S23 Ultra.
 - **Confidence:** 85% · **Status:** provisional (T0.09).
 
+### D15 measurement revision — 2026-10-02
+
+T0.09 replaces the historical VM timing assumption with measurements on the
+actual laptop and S23. For the fixed 102.47 MB synthetic 16320x12240 JPEG,
+libvips 8.18.7 full decode took 2.82–3.38 s, 2040px thumbnail 2.26–2.79 s, and
+256px JPEG-Q90 DeepZoom pyramid 22.38–38.24 s (three observations each, two
+workers, OS caches unflushed). Peak CLI working set was 196.9 MiB. This simple
+all-JPEG spike does not implement the product's mixed WebP/JPEG pyramid.
+
+On SM-S918U, opening/decoding a 1024px JPEG region took 139–239 ms at the top,
+473–557 ms in the middle and 808–838 ms at the bottom; sample-size-eight full
+JPEG decoding took 845–862 ms. A 200 MP-dimension HEIF generated from a scaled
+small RGB pattern took 2.89–3.00 s to decode to 2040x1530, peaking at sampled
+PSS 702713856 bytes (670.16 MiB). Full-sized RGBA was skipped by the
+384 MiB allocation guard; the first full YUV-buffer generation strategy actually failed
+with OutOfMemoryError. The real owner camera fixture is absent.
+
+**Revision:** retain background pretiling and cached previews; direct repeated
+JPEG region decoding is not sufficient evidence for a 250 ms viewport target.
+Reduced-output HEIF decoding still has substantial internal memory cost. Keep
+full-resolution HEIF work on the paired PC pending bounded mobile evidence.
+The existing 1.5 s preview, 6 s pyramid and 700 MB phone targets remain unchanged
+and unpassed; no performance relaxation or gate acceptance is implied. T3.08
+must test the real mixed-format pipeline, full app/GPU memory and viewport fill.
+See `docs/evidence/T0.09.md` and its raw text-only measurements/failure receipts.
+
 ## D16 — PDF and SVG
 - **Decision:** PDFium (bundled per platform, BSD/Apache) via pdfium-render on both devices; true redaction via object removal, rasterization of affected areas, full rewrite and qpdf (Apache-2.0) cleanup, run in the PC worker process; on the phone without the PC, a redacted PDF export rasterizes every page; resvg with a deny-all resource resolver and bundled fonts.
 - **Alternatives:** MuPDF (AGPL — forbidden by D17); Android's platform PdfRenderer and Windows.Data.Pdf (two different engines → inconsistent rendering).

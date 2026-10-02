@@ -289,6 +289,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - libvips pyramid timing and memory on the laptop.
   - Android BitmapRegionDecoder timing per region (top vs bottom of a 200 MP JPEG) and HEIF decode memory on the phone.
 - **Acceptance:** numbers recorded; D15 confirmed or revised.
+- **Execution checkpoint, 2026-10-02:** T0.09 produces 19 hashed/provenanced synthetic fixtures and PC/S23 decoder measurements (`Status: PASS WITH GAPS`). Host fixtures reproduce byte-for-byte after correcting PDF image IDs; HEIF has 200 MP dimensions from a scaled small pattern. PC preview/pyramid and HEIF memory measurements miss or challenge existing targets; no target is relaxed. Full-size HEIF is guard-skipped and the real sanitized owner photo remains absent, so FORMAT-001 stays partial. See `docs/evidence/T0.09.md`. T0.10 (M, gpt-6-astra/max) is next in order but still blocked by T0.04 physical traces and owner comparison; T0.11 needs owner API setup, and G0 remains open. Continue independently eligible T1.01 (M, gpt-6-astra/max); actual gpt-6-astra/xhigh differs in effort.
 
 ### T0.10 — Stroke engine spike
 - **Size:** M · **Depends on:** T0.04 · **Prompt:** `prompts/phase-0/T0.10-stroke-spike.md`

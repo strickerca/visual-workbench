@@ -1,0 +1,204 @@
+{
+  "schema": 1,
+  "generator_sha256": "ea91b3969b0419ac8c15c171bc95c03602e3b1ec854eb9c500accac2678eb5a7",
+  "seed": 20016320,
+  "tools": {
+    "numpy": "2.3.5",
+    "Pillow": "12.1.0",
+    "reportlab": "4.4.10",
+    "pypdf": "6.8.0",
+    "libvips": "vips-8.18.7"
+  },
+  "files": [
+    {
+      "path": "200mp.jpg",
+      "bytes": 102470031,
+      "sha256": "0f0f91e3c85456672ecfd066bb385487d936337c77e15b63a30b73cfa7f7bee7",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "noise, gradients and text",
+      "width": 16320,
+      "height": 12240,
+      "seed": 20016320,
+      "jpeg_quality": 95
+    },
+    {
+      "path": "12mp-a.jpg",
+      "bytes": 6281437,
+      "sha256": "5e73e7f6b73f0150ffa1ea5b64e4b666248a124eef1034567bdc82619baa106f",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "noise, gradients and text",
+      "width": 4000,
+      "height": 3000,
+      "seed": 20016321,
+      "jpeg_quality": 95
+    },
+    {
+      "path": "12mp-b.jpg",
+      "bytes": 6281670,
+      "sha256": "f55051fd7f7e284fd8f01ca9627eda95dcfe39969f06ab86860ee6b86f748d60",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "noise, gradients and text",
+      "width": 4000,
+      "height": 3000,
+      "seed": 20016322,
+      "jpeg_quality": 95
+    },
+    {
+      "path": "long.png",
+      "bytes": 63988533,
+      "sha256": "e2e2850d633c0a5e579456a51cfd717b512b6c4b90166a3ad0081e24c27a5dcd",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "noise, gradients and text",
+      "width": 1440,
+      "height": 20000,
+      "seed": 20016323,
+      "jpeg_quality": null
+    },
+    {
+      "path": "pdf-image.png",
+      "bytes": 185,
+      "sha256": "fa3e2e61ef766aa6a4c0d3bb24396cbbca26dbd82c5b11bc4209624181adea51",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "generated blue image embedded in PDFs",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "path": "multipage.pdf",
+      "bytes": 3323,
+      "sha256": "7e2467c566ced1d6355f61c5afdb6e99d0c5be6ce065d230c78bcffa0a1b2491",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "3 pages with text, vectors, raster",
+      "pages": 3,
+      "encrypted": false,
+      "existing_annotations": false
+    },
+    {
+      "path": "password.pdf",
+      "bytes": 3868,
+      "sha256": "3335855be2220acb1432b3cac8d9391c16cd60ea5f48fb6d701d6e29ea69baf1",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "3 pages with text, vectors, raster; password vw-fixture",
+      "pages": 3,
+      "encrypted": true,
+      "existing_annotations": false
+    },
+    {
+      "path": "annotations.pdf",
+      "bytes": 3980,
+      "sha256": "c585c94394962c99cb0b86f0a480890f96c1b3cf3ce5760ed47b45d327e46931",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "3 pages with text, vectors, raster",
+      "pages": 3,
+      "encrypted": false,
+      "existing_annotations": true
+    },
+    {
+      "path": "simple.svg",
+      "bytes": 116,
+      "sha256": "34a10d7aa59f2259f34cb6869b3606eeb65d367fcc05bc54ea5dc9f0ac0eacf0",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "SVG sanitizer fixture; never execute scripts or resolve external references"
+    },
+    {
+      "path": "text.svg",
+      "bytes": 111,
+      "sha256": "d6a4b787108cb39d26d3ea59d1303a2a2da268556104f76d58828180f67d5c66",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "SVG sanitizer fixture; never execute scripts or resolve external references"
+    },
+    {
+      "path": "script.svg",
+      "bytes": 136,
+      "sha256": "beb9c76df61221ba772b38766fff6ddd7f60971db71b5bbf8db05a9672488d48",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "SVG sanitizer fixture; never execute scripts or resolve external references"
+    },
+    {
+      "path": "external.svg",
+      "bytes": 171,
+      "sha256": "e9163d0a23fb2c6c93e42239faf3b02aa11cb064090429158680e7fb57a0d6fa",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "SVG sanitizer fixture; never execute scripts or resolve external references"
+    },
+    {
+      "path": "huge-viewbox.svg",
+      "bytes": 112,
+      "sha256": "7d778482f596dbd0bb2e47244d2f9880cf0a2d1b2a215d55be78b3fd42cbedad",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "SVG bounds/resource rejection"
+    },
+    {
+      "path": "truncated.jpg",
+      "bytes": 100,
+      "sha256": "3e73a411824fb5918a6f3ac3c819d3e06ec6a00d0e85b1f6b93e166dc4e29a13",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "malformed truncated input; expected rejection",
+      "hostile": true
+    },
+    {
+      "path": "truncated.png",
+      "bytes": 100,
+      "sha256": "458982cf5af249657153d039fc5769cd306230b4901d40226081764208a808d9",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "malformed truncated input; expected rejection",
+      "hostile": true
+    },
+    {
+      "path": "declared-size-bomb.png",
+      "bytes": 66,
+      "sha256": "41813004a2d855577dd44e7834537c6a109c951d89555cd2487780c9baddeb4e",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "tiny payload with enormous declared dimensions; must reject before allocation",
+      "hostile": true
+    },
+    {
+      "path": "corrupt-xref.pdf",
+      "bytes": 3331,
+      "sha256": "754eff1d1bab5ff02a073f549c4883e6aaa5c6b989cf2e03c3c347795c0d1dab",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "invalid cross-reference offset; repair/rejection test",
+      "hostile": true
+    },
+    {
+      "path": "billion-laughs.svg",
+      "bytes": 592,
+      "sha256": "f2f9fe6656e500e2c5d40c17478bd1d02144d4db390e17e6e35aa56e13512707",
+      "provenance": "First-party synthetic fixture; fixtures/generate.py",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "entity expansion attack; reject DOCTYPE before parsing",
+      "hostile": true
+    },
+    {
+      "path": "200mp-f2170f8762ca43b4a7aea0d899c3c469.heic",
+      "bytes": 808545,
+      "sha256": "f18832aa8bfa1e05c13165684fffd89d831346c704ab18bf792cdd85c3c0aafe",
+      "provenance": "First-party synthetic pattern; S23 SM-S918U; AndroidX HeifWriter 1.1.0; tools/bench/image-android",
+      "license": "LicenseRef-VisualWorkbench-Proprietary",
+      "purpose": "200 MP output dimensions from scaled small RGB gradient; no independent 200 MP camera detail",
+      "width": 16320,
+      "height": 12240,
+      "pattern": "2040x1530 RGB: (16+x*220/2040,16+y*220/1530,80), scaled to 16320x12240",
+      "byte_reproducibility": "Not guaranteed across hardware codec/container runs",
+      "apk_sha256": "2ed4e309a049ce37e63ada926bbab4e9ed7c658153c30094b1defb46f46a196e"
+    }
+  ],
+  "malformed_files_rendered": false
+}

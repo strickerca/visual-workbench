@@ -1,0 +1,1193 @@
+{
+  "schema": 1,
+  "task": "T0.09",
+  "formal_task_status": "PASS WITH GAPS",
+  "model": "gpt-6-astra",
+  "reasoning_effort": "xhigh",
+  "pc": {
+    "schema": 1,
+    "fixture_sha256": "0f0f91e3c85456672ecfd066bb385487d936337c77e15b63a30b73cfa7f7bee7",
+    "source_dimensions": [
+      16320,
+      12240
+    ],
+    "libvips_executable_sha256": "713f52d657dcb041303eae9c34c05f323933fe4f201cde3fb4942936bc6b8727",
+    "version": "vips-8.18.7",
+    "memory_method": "Windows GetProcessMemoryInfo PeakWorkingSetSize retained process handle",
+    "timing_method": "wall time including process startup and output I/O; OS cache not flushed",
+    "tile_format": "JPEG Q90 at all levels, 256px, zero overlap; not the product mixed WebP/JPEG pipeline",
+    "measurements": [
+      {
+        "phase": "decode-0",
+        "elapsed_ms": 2864.6923000051174,
+        "peak_working_set_bytes": 153849856,
+        "peak_pagefile_bytes": 42975232,
+        "result": "127.649924"
+      },
+      {
+        "phase": "thumbnail-0",
+        "elapsed_ms": 2262.042800022755,
+        "peak_working_set_bytes": 142598144,
+        "peak_pagefile_bytes": 32014336,
+        "result": ""
+      },
+      {
+        "phase": "pyramid-0",
+        "elapsed_ms": 28387.542599986773,
+        "peak_working_set_bytes": 205783040,
+        "peak_pagefile_bytes": 97722368,
+        "result": "",
+        "tile_count": 4105
+      },
+      {
+        "phase": "decode-1",
+        "elapsed_ms": 3377.2234999923967,
+        "peak_working_set_bytes": 153845760,
+        "peak_pagefile_bytes": 42962944,
+        "result": "127.649924"
+      },
+      {
+        "phase": "thumbnail-1",
+        "elapsed_ms": 2792.388600006234,
+        "peak_working_set_bytes": 142721024,
+        "peak_pagefile_bytes": 32137216,
+        "result": ""
+      },
+      {
+        "phase": "pyramid-1",
+        "elapsed_ms": 38243.68159999722,
+        "peak_working_set_bytes": 199004160,
+        "peak_pagefile_bytes": 97357824,
+        "result": "",
+        "tile_count": 4105
+      },
+      {
+        "phase": "decode-2",
+        "elapsed_ms": 2817.018300003838,
+        "peak_working_set_bytes": 153858048,
+        "peak_pagefile_bytes": 42971136,
+        "result": "127.649924"
+      },
+      {
+        "phase": "thumbnail-2",
+        "elapsed_ms": 2327.929699997185,
+        "peak_working_set_bytes": 142622720,
+        "peak_pagefile_bytes": 32047104,
+        "result": ""
+      },
+      {
+        "phase": "pyramid-2",
+        "elapsed_ms": 22379.248300014297,
+        "peak_working_set_bytes": 206462976,
+        "peak_pagefile_bytes": 97669120,
+        "result": "",
+        "tile_count": 4105
+      }
+    ],
+    "completed": true,
+    "temporary_outputs_disposed": true,
+    "screenshots_created": 0,
+    "disposed_files": 12324
+  },
+  "android_binding": {
+    "schema": 1,
+    "run_id": "f2170f8762ca43b4a7aea0d899c3c469",
+    "device_model": "SM-S918U",
+    "apk_sha256": "2ed4e309a049ce37e63ada926bbab4e9ed7c658153c30094b1defb46f46a196e",
+    "jpeg_sha256": "0f0f91e3c85456672ecfd066bb385487d936337c77e15b63a30b73cfa7f7bee7",
+    "completed": true,
+    "device_files_disposed": true,
+    "screenshots_created": 0
+  },
+  "jpeg": {
+    "schema": 1,
+    "run_id": "f2170f8762ca43b4a7aea0d899c3c469",
+    "mode": "jpeg",
+    "completed": true,
+    "measurements": [
+      {
+        "operation": "jpeg-region-top-0",
+        "elapsed_ms": 239.01151,
+        "width": 1024,
+        "height": 1024,
+        "bitmap_allocation_bytes": 4194304,
+        "pss_baseline_kib": 61061,
+        "pss_sampled_peak_kib": 305477,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -5694573
+      },
+      {
+        "operation": "jpeg-region-middle-0",
+        "elapsed_ms": 556.917969,
+        "width": 1024,
+        "height": 1024,
+        "bitmap_allocation_bytes": 4194304,
+        "pss_baseline_kib": 76177,
+        "pss_sampled_peak_kib": 194899,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -394757
+      },
+      {
+        "operation": "jpeg-region-bottom-0",
+        "elapsed_ms": 837.667187,
+        "width": 1024,
+        "height": 1024,
+        "bitmap_allocation_bytes": 4194304,
+        "pss_baseline_kib": 88083,
+        "pss_sampled_peak_kib": 205338,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -10424463
+      },
+      {
+        "operation": "jpeg-sample8-0",
+        "elapsed_ms": 856.265625,
+        "width": 2040,
+        "height": 1530,
+        "bitmap_allocation_bytes": 12484800,
+        "pss_baseline_kib": 98058,
+        "pss_sampled_peak_kib": 110342,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -460041
+      },
+      {
+        "operation": "jpeg-region-top-1",
+        "elapsed_ms": 144.882344,
+        "width": 1024,
+        "height": 1024,
+        "bitmap_allocation_bytes": 4194304,
+        "pss_baseline_kib": 98090,
+        "pss_sampled_peak_kib": 197971,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -5694573
+      },
+      {
+        "operation": "jpeg-region-middle-1",
+        "elapsed_ms": 472.942396,
+        "width": 1024,
+        "height": 1024,
+        "bitmap_allocation_bytes": 4194304,
+        "pss_baseline_kib": 91211,
+        "pss_sampled_peak_kib": 198019,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -394757
+      },
+      {
+        "operation": "jpeg-region-bottom-1",
+        "elapsed_ms": 815.438958,
+        "width": 1024,
+        "height": 1024,
+        "bitmap_allocation_bytes": 4194304,
+        "pss_baseline_kib": 91251,
+        "pss_sampled_peak_kib": 198067,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -10424463
+      },
+      {
+        "operation": "jpeg-sample8-1",
+        "elapsed_ms": 845.070312,
+        "width": 2040,
+        "height": 1530,
+        "bitmap_allocation_bytes": 12484800,
+        "pss_baseline_kib": 91299,
+        "pss_sampled_peak_kib": 103611,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -460041
+      },
+      {
+        "operation": "jpeg-region-top-2",
+        "elapsed_ms": 138.971302,
+        "width": 1024,
+        "height": 1024,
+        "bitmap_allocation_bytes": 4194304,
+        "pss_baseline_kib": 91367,
+        "pss_sampled_peak_kib": 198679,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -5694573
+      },
+      {
+        "operation": "jpeg-region-middle-2",
+        "elapsed_ms": 481.063437,
+        "width": 1024,
+        "height": 1024,
+        "bitmap_allocation_bytes": 4194304,
+        "pss_baseline_kib": 91381,
+        "pss_sampled_peak_kib": 198219,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -394757
+      },
+      {
+        "operation": "jpeg-region-bottom-2",
+        "elapsed_ms": 808.031145,
+        "width": 1024,
+        "height": 1024,
+        "bitmap_allocation_bytes": 4194304,
+        "pss_baseline_kib": 91459,
+        "pss_sampled_peak_kib": 198278,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -10424463
+      },
+      {
+        "operation": "jpeg-sample8-2",
+        "elapsed_ms": 861.827239,
+        "width": 2040,
+        "height": 1530,
+        "bitmap_allocation_bytes": 12484800,
+        "pss_baseline_kib": 91506,
+        "pss_sampled_peak_kib": 103811,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -460041
+      }
+    ],
+    "large_heap_diagnostic": true,
+    "max_java_heap_bytes": 536870912,
+    "last_phase": "jpeg-sample8-2",
+    "input_sha256": "0f0f91e3c85456672ecfd066bb385487d936337c77e15b63a30b73cfa7f7bee7"
+  },
+  "heif_generation": {
+    "schema": 1,
+    "run_id": "f2170f8762ca43b4a7aea0d899c3c469",
+    "mode": "generate",
+    "completed": true,
+    "measurements": [],
+    "large_heap_diagnostic": true,
+    "max_java_heap_bytes": 536870912,
+    "input_bytes": 12484800,
+    "generation_strategy": "small_bitmap_scaled_by_writer_grid",
+    "pattern_width": 2040,
+    "pattern_height": 1530,
+    "available_system_bytes": 1615060992,
+    "available_java_heap_bytes": 531631072,
+    "last_phase": "heif-generated-hash",
+    "encode_ms": 1735.43828,
+    "output_sha256": "f18832aa8bfa1e05c13165684fffd89d831346c704ab18bf792cdd85c3c0aafe",
+    "output_bytes": 808545,
+    "width": 16320,
+    "height": 12240,
+    "pattern": "2040x1530 RGB: (16+x*220/2040,16+y*220/1530,80), scaled to 16320x12240"
+  },
+  "heif_decode": {
+    "schema": 1,
+    "run_id": "f2170f8762ca43b4a7aea0d899c3c469",
+    "mode": "heif",
+    "completed": true,
+    "measurements": [
+      {
+        "operation": "heif-target-0",
+        "elapsed_ms": 2995.059321,
+        "width": 2040,
+        "height": 1530,
+        "bitmap_allocation_bytes": 12484800,
+        "pss_baseline_kib": 35605,
+        "pss_sampled_peak_kib": 677657,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -8487343
+      },
+      {
+        "operation": "heif-target-1",
+        "elapsed_ms": 2897.306041,
+        "width": 2040,
+        "height": 1530,
+        "bitmap_allocation_bytes": 12484800,
+        "pss_baseline_kib": 61601,
+        "pss_sampled_peak_kib": 685571,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -8487343
+      },
+      {
+        "operation": "heif-target-2",
+        "elapsed_ms": 2886.363384,
+        "width": 2040,
+        "height": 1530,
+        "bitmap_allocation_bytes": 12484800,
+        "pss_baseline_kib": 71851,
+        "pss_sampled_peak_kib": 686244,
+        "memory_sampling_interval_ms": 100,
+        "center_pixel": -8487343
+      }
+    ],
+    "large_heap_diagnostic": true,
+    "max_java_heap_bytes": 536870912,
+    "last_phase": "heif-target-2",
+    "input_sha256": "f18832aa8bfa1e05c13165684fffd89d831346c704ab18bf792cdd85c3c0aafe",
+    "full_decode_estimate_bytes": 799027200,
+    "full_decode_budget_bytes": 402653184,
+    "full_decode_status": "skipped_memory_guard"
+  },
+  "apk_build_binding": {
+    "schema": 1,
+    "sha256": {
+      "build.ps1": "00aada2f7f61f11904e07bc4fb99a72ce6830f6651c5731762f4e5f9bfac5511",
+      "tools/bench/image/build_receipt.py": "4449412acc9f1669d47724373a139f36a03dbf9aefd2ecb77cb3a8fa851bdc40",
+      "tools/check_gradle_licenses.py": "c31051481ddad39b15cf2016b37aa3b840cdb6377fa59a54c54a4614aff625d1",
+      "apps/build.gradle.kts": "cb54c0d9e3ef46f29c212912037870ad599de5cc19f903011eb1f057e1ce8b55",
+      "apps/settings.gradle.kts": "fa8770a4268f43a322c42f9d8344986becc2556d0c343dda6da2b2562e068733",
+      "apps/gradle/libs.versions.toml": "a7f51dc6c4a1f8dd581eae35bae6cca79191bc66278396f2140443f88e35ca0c",
+      "apps/gradle.properties": "ccd4f509dc03ee7061bd88915eaaa21d5030aa7cfe83caba0b16aa14c64f23cc",
+      "tools/bench/image-android/build.gradle.kts": "89b6d41f714c787c3a2389330e3aaa923e64da2f4c1fa33202fb3ba996c26550",
+      "tools/bench/image-android/gradle.lockfile": "603dd943de17e922b46f6d9ee00dcdc56881fd42dbdefb647bebc2e0e9dac693",
+      "tools/bench/image-android/build/outputs/apk/debug/image-bench-debug.apk": "2ed4e309a049ce37e63ada926bbab4e9ed7c658153c30094b1defb46f46a196e",
+      "tools/bench/image-android/src/main/AndroidManifest.xml": "41500131aaf4fab71e8844a762fb835235fa09627788b25fd795b2bc976e134c",
+      "tools/bench/image-android/src/main/java/com/visualworkbench/imagebench/ImageActivity.kt": "d8dbb2333fe4b4b7049dca87290f0f536ebd3a333ff88ae4e45bac5509513c19"
+    }
+  },
+  "failed_buffer_generation": {
+    "schema": 1,
+    "run_id": "27cc49322d8d4c95bd83de3495ad9f8c",
+    "mode": "generate",
+    "completed": false,
+    "measurements": [],
+    "large_heap_diagnostic": true,
+    "max_java_heap_bytes": 536870912,
+    "input_bytes": 299635200,
+    "estimated_input_buffers_bytes": 898905600,
+    "available_system_bytes": 1740390400,
+    "available_java_heap_bytes": 531631072,
+    "error_type": "OutOfMemoryError"
+  },
+  "failed_buffer_binding": {
+    "schema": 1,
+    "run_id": "27cc49322d8d4c95bd83de3495ad9f8c",
+    "device_model": "SM-S918U",
+    "apk_sha256": "61f78b90ea5b4ebf4d3717e4db08b2a0b5457763d7adbfced5f77470aea4673a",
+    "jpeg_sha256": "0f0f91e3c85456672ecfd066bb385487d936337c77e15b63a30b73cfa7f7bee7",
+    "completed": false,
+    "device_files_disposed": true,
+    "screenshots_created": 0
+  },
+  "failed_buffer_build_binding": {
+    "schema": 1,
+    "sha256": {
+      "build.ps1": "3d75b0c38c81e82a2e4ec1f10fe5a6a021df160712ec3012d70995f758993ed6",
+      "tools/bench/image/build_receipt.py": "4449412acc9f1669d47724373a139f36a03dbf9aefd2ecb77cb3a8fa851bdc40",
+      "tools/check_gradle_licenses.py": "c31051481ddad39b15cf2016b37aa3b840cdb6377fa59a54c54a4614aff625d1",
+      "apps/build.gradle.kts": "cb54c0d9e3ef46f29c212912037870ad599de5cc19f903011eb1f057e1ce8b55",
+      "apps/settings.gradle.kts": "fa8770a4268f43a322c42f9d8344986becc2556d0c343dda6da2b2562e068733",
+      "apps/gradle/libs.versions.toml": "a7f51dc6c4a1f8dd581eae35bae6cca79191bc66278396f2140443f88e35ca0c",
+      "apps/gradle.properties": "ccd4f509dc03ee7061bd88915eaaa21d5030aa7cfe83caba0b16aa14c64f23cc",
+      "tools/bench/image-android/build.gradle.kts": "75729b6f10d465f8eeabbc39b1ddd565f562f8861f7905486525d1594b50ee5d",
+      "tools/bench/image-android/gradle.lockfile": "603dd943de17e922b46f6d9ee00dcdc56881fd42dbdefb647bebc2e0e9dac693",
+      "tools/bench/image-android/build/outputs/apk/debug/image-bench-debug.apk": "61f78b90ea5b4ebf4d3717e4db08b2a0b5457763d7adbfced5f77470aea4673a",
+      "tools/bench/image-android/src/main/AndroidManifest.xml": "41500131aaf4fab71e8844a762fb835235fa09627788b25fd795b2bc976e134c",
+      "tools/bench/image-android/src/main/java/com/visualworkbench/imagebench/ImageActivity.kt": "decbf0723d7e148d4e1a5df94416f5eb8ab4f414af8d8abf4e9ac2afdc22d1bb"
+    }
+  },
+  "timed_out_poll_binding": {
+    "schema": 1,
+    "run_id": "75447c533a9e44c3ab5b1584180e0b46",
+    "device_model": "SM-S918U",
+    "apk_sha256": "da4632e05c9fa62d46817b7d2994e21a63f39c05fce9f949524d2ca723e369d6",
+    "jpeg_sha256": "0f0f91e3c85456672ecfd066bb385487d936337c77e15b63a30b73cfa7f7bee7",
+    "completed": false,
+    "device_files_disposed": true,
+    "screenshots_created": 0
+  },
+  "failed_generator_intermediate_cleanup": {
+    "task": "T0.09",
+    "file": "fixtures/generated/t009-v1/200mp.ppm",
+    "sha256": "881012878383cc64e2d6493bbb8571f3c4c4447ef1f956b1053341a282402bc2",
+    "bytes": 599270419,
+    "reason": "Failed generator intermediate; not a retained input fixture",
+    "disposed": true
+  },
+  "fixture_reproduction": {
+    "schema": 1,
+    "matched_output_count": 18,
+    "generator_sha256": "ea91b3969b0419ac8c15c171bc95c03602e3b1ec854eb9c500accac2678eb5a7",
+    "reproduction_outputs_disposed": true,
+    "disposed_files": 57,
+    "corrected_pdf_fixture_count": 4,
+    "benchmark_jpeg_bytes_unchanged": true,
+    "files": [
+      {
+        "path": "200mp.jpg",
+        "sha256": "0f0f91e3c85456672ecfd066bb385487d936337c77e15b63a30b73cfa7f7bee7"
+      },
+      {
+        "path": "12mp-a.jpg",
+        "sha256": "5e73e7f6b73f0150ffa1ea5b64e4b666248a124eef1034567bdc82619baa106f"
+      },
+      {
+        "path": "12mp-b.jpg",
+        "sha256": "f55051fd7f7e284fd8f01ca9627eda95dcfe39969f06ab86860ee6b86f748d60"
+      },
+      {
+        "path": "long.png",
+        "sha256": "e2e2850d633c0a5e579456a51cfd717b512b6c4b90166a3ad0081e24c27a5dcd"
+      },
+      {
+        "path": "pdf-image.png",
+        "sha256": "fa3e2e61ef766aa6a4c0d3bb24396cbbca26dbd82c5b11bc4209624181adea51"
+      },
+      {
+        "path": "multipage.pdf",
+        "sha256": "7e2467c566ced1d6355f61c5afdb6e99d0c5be6ce065d230c78bcffa0a1b2491"
+      },
+      {
+        "path": "password.pdf",
+        "sha256": "3335855be2220acb1432b3cac8d9391c16cd60ea5f48fb6d701d6e29ea69baf1"
+      },
+      {
+        "path": "annotations.pdf",
+        "sha256": "c585c94394962c99cb0b86f0a480890f96c1b3cf3ce5760ed47b45d327e46931"
+      },
+      {
+        "path": "simple.svg",
+        "sha256": "34a10d7aa59f2259f34cb6869b3606eeb65d367fcc05bc54ea5dc9f0ac0eacf0"
+      },
+      {
+        "path": "text.svg",
+        "sha256": "d6a4b787108cb39d26d3ea59d1303a2a2da268556104f76d58828180f67d5c66"
+      },
+      {
+        "path": "script.svg",
+        "sha256": "beb9c76df61221ba772b38766fff6ddd7f60971db71b5bbf8db05a9672488d48"
+      },
+      {
+        "path": "external.svg",
+        "sha256": "e9163d0a23fb2c6c93e42239faf3b02aa11cb064090429158680e7fb57a0d6fa"
+      },
+      {
+        "path": "huge-viewbox.svg",
+        "sha256": "7d778482f596dbd0bb2e47244d2f9880cf0a2d1b2a215d55be78b3fd42cbedad"
+      },
+      {
+        "path": "truncated.jpg",
+        "sha256": "3e73a411824fb5918a6f3ac3c819d3e06ec6a00d0e85b1f6b93e166dc4e29a13"
+      },
+      {
+        "path": "truncated.png",
+        "sha256": "458982cf5af249657153d039fc5769cd306230b4901d40226081764208a808d9"
+      },
+      {
+        "path": "declared-size-bomb.png",
+        "sha256": "41813004a2d855577dd44e7834537c6a109c951d89555cd2487780c9baddeb4e"
+      },
+      {
+        "path": "corrupt-xref.pdf",
+        "sha256": "754eff1d1bab5ff02a073f549c4883e6aaa5c6b989cf2e03c3c347795c0d1dab"
+      },
+      {
+        "path": "billion-laughs.svg",
+        "sha256": "f2f9fe6656e500e2c5d40c17478bd1d02144d4db390e17e6e35aa56e13512707"
+      }
+    ]
+  },
+  "pdf_reproduction_failure": {
+    "schema": 1,
+    "cause": "ReportLab filename-based image XObject IDs",
+    "matched": 14,
+    "mismatched": [
+      "multipage.pdf",
+      "password.pdf",
+      "annotations.pdf",
+      "corrupt-xref.pdf"
+    ],
+    "baseline": {
+      "schema": 1,
+      "generator_sha256": "a55739d40fb48ede8ba15cfe2c21e8bf477d5eaf1161de8c7cb8372f156401fe",
+      "seed": 20016320,
+      "tools": {
+        "numpy": "2.3.5",
+        "Pillow": "12.1.0",
+        "reportlab": "4.4.10",
+        "pypdf": "6.8.0",
+        "libvips": "vips-8.18.7"
+      },
+      "files": [
+        {
+          "path": "200mp.jpg",
+          "bytes": 102470031,
+          "sha256": "0f0f91e3c85456672ecfd066bb385487d936337c77e15b63a30b73cfa7f7bee7",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "noise, gradients and text",
+          "width": 16320,
+          "height": 12240,
+          "seed": 20016320,
+          "jpeg_quality": 95
+        },
+        {
+          "path": "12mp-a.jpg",
+          "bytes": 6281437,
+          "sha256": "5e73e7f6b73f0150ffa1ea5b64e4b666248a124eef1034567bdc82619baa106f",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "noise, gradients and text",
+          "width": 4000,
+          "height": 3000,
+          "seed": 20016321,
+          "jpeg_quality": 95
+        },
+        {
+          "path": "12mp-b.jpg",
+          "bytes": 6281670,
+          "sha256": "f55051fd7f7e284fd8f01ca9627eda95dcfe39969f06ab86860ee6b86f748d60",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "noise, gradients and text",
+          "width": 4000,
+          "height": 3000,
+          "seed": 20016322,
+          "jpeg_quality": 95
+        },
+        {
+          "path": "long.png",
+          "bytes": 63988533,
+          "sha256": "e2e2850d633c0a5e579456a51cfd717b512b6c4b90166a3ad0081e24c27a5dcd",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "noise, gradients and text",
+          "width": 1440,
+          "height": 20000,
+          "seed": 20016323,
+          "jpeg_quality": null
+        },
+        {
+          "path": "pdf-image.png",
+          "bytes": 185,
+          "sha256": "fa3e2e61ef766aa6a4c0d3bb24396cbbca26dbd82c5b11bc4209624181adea51",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "generated blue image embedded in PDFs",
+          "width": 64,
+          "height": 64
+        },
+        {
+          "path": "multipage.pdf",
+          "bytes": 3325,
+          "sha256": "e29101fa232fba2cfeca602f746afdf91e96ad0c33126972041f9e1883a88127",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "3 pages with text, vectors, raster",
+          "pages": 3,
+          "encrypted": false,
+          "existing_annotations": false
+        },
+        {
+          "path": "password.pdf",
+          "bytes": 3870,
+          "sha256": "32dc6c9b830c74ae60dea1de0d29c9d635ab758e02cc244eb2f612d30a64055b",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "3 pages with text, vectors, raster; password vw-fixture",
+          "pages": 3,
+          "encrypted": true,
+          "existing_annotations": false
+        },
+        {
+          "path": "annotations.pdf",
+          "bytes": 3982,
+          "sha256": "368cbe5a3a887f5299c6addfd45563d1e6990862bbe0bfbaa9f0ecf53107c88d",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "3 pages with text, vectors, raster",
+          "pages": 3,
+          "encrypted": false,
+          "existing_annotations": true
+        },
+        {
+          "path": "simple.svg",
+          "bytes": 116,
+          "sha256": "34a10d7aa59f2259f34cb6869b3606eeb65d367fcc05bc54ea5dc9f0ac0eacf0",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "SVG sanitizer fixture; never execute scripts or resolve external references"
+        },
+        {
+          "path": "text.svg",
+          "bytes": 111,
+          "sha256": "d6a4b787108cb39d26d3ea59d1303a2a2da268556104f76d58828180f67d5c66",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "SVG sanitizer fixture; never execute scripts or resolve external references"
+        },
+        {
+          "path": "script.svg",
+          "bytes": 136,
+          "sha256": "beb9c76df61221ba772b38766fff6ddd7f60971db71b5bbf8db05a9672488d48",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "SVG sanitizer fixture; never execute scripts or resolve external references"
+        },
+        {
+          "path": "external.svg",
+          "bytes": 171,
+          "sha256": "e9163d0a23fb2c6c93e42239faf3b02aa11cb064090429158680e7fb57a0d6fa",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "SVG sanitizer fixture; never execute scripts or resolve external references"
+        },
+        {
+          "path": "huge-viewbox.svg",
+          "bytes": 112,
+          "sha256": "7d778482f596dbd0bb2e47244d2f9880cf0a2d1b2a215d55be78b3fd42cbedad",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "SVG bounds/resource rejection"
+        },
+        {
+          "path": "truncated.jpg",
+          "bytes": 100,
+          "sha256": "3e73a411824fb5918a6f3ac3c819d3e06ec6a00d0e85b1f6b93e166dc4e29a13",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "malformed truncated input; expected rejection",
+          "hostile": true
+        },
+        {
+          "path": "truncated.png",
+          "bytes": 100,
+          "sha256": "458982cf5af249657153d039fc5769cd306230b4901d40226081764208a808d9",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "malformed truncated input; expected rejection",
+          "hostile": true
+        },
+        {
+          "path": "declared-size-bomb.png",
+          "bytes": 66,
+          "sha256": "41813004a2d855577dd44e7834537c6a109c951d89555cd2487780c9baddeb4e",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "tiny payload with enormous declared dimensions; must reject before allocation",
+          "hostile": true
+        },
+        {
+          "path": "corrupt-xref.pdf",
+          "bytes": 3333,
+          "sha256": "3b31358d9c892390d1571c99907530a7e66de0cffe8235ad5666c0ada8a9b0ca",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "invalid cross-reference offset; repair/rejection test",
+          "hostile": true
+        },
+        {
+          "path": "billion-laughs.svg",
+          "bytes": 592,
+          "sha256": "f2f9fe6656e500e2c5d40c17478bd1d02144d4db390e17e6e35aa56e13512707",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "entity expansion attack; reject DOCTYPE before parsing",
+          "hostile": true
+        }
+      ],
+      "malformed_files_rendered": false
+    },
+    "reproduction": {
+      "schema": 1,
+      "generator_sha256": "a55739d40fb48ede8ba15cfe2c21e8bf477d5eaf1161de8c7cb8372f156401fe",
+      "seed": 20016320,
+      "tools": {
+        "numpy": "2.3.5",
+        "Pillow": "12.1.0",
+        "reportlab": "4.4.10",
+        "pypdf": "6.8.0",
+        "libvips": "vips-8.18.7"
+      },
+      "files": [
+        {
+          "path": "200mp.jpg",
+          "bytes": 102470031,
+          "sha256": "0f0f91e3c85456672ecfd066bb385487d936337c77e15b63a30b73cfa7f7bee7",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "noise, gradients and text",
+          "width": 16320,
+          "height": 12240,
+          "seed": 20016320,
+          "jpeg_quality": 95
+        },
+        {
+          "path": "12mp-a.jpg",
+          "bytes": 6281437,
+          "sha256": "5e73e7f6b73f0150ffa1ea5b64e4b666248a124eef1034567bdc82619baa106f",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "noise, gradients and text",
+          "width": 4000,
+          "height": 3000,
+          "seed": 20016321,
+          "jpeg_quality": 95
+        },
+        {
+          "path": "12mp-b.jpg",
+          "bytes": 6281670,
+          "sha256": "f55051fd7f7e284fd8f01ca9627eda95dcfe39969f06ab86860ee6b86f748d60",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "noise, gradients and text",
+          "width": 4000,
+          "height": 3000,
+          "seed": 20016322,
+          "jpeg_quality": 95
+        },
+        {
+          "path": "long.png",
+          "bytes": 63988533,
+          "sha256": "e2e2850d633c0a5e579456a51cfd717b512b6c4b90166a3ad0081e24c27a5dcd",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "noise, gradients and text",
+          "width": 1440,
+          "height": 20000,
+          "seed": 20016323,
+          "jpeg_quality": null
+        },
+        {
+          "path": "pdf-image.png",
+          "bytes": 185,
+          "sha256": "fa3e2e61ef766aa6a4c0d3bb24396cbbca26dbd82c5b11bc4209624181adea51",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "generated blue image embedded in PDFs",
+          "width": 64,
+          "height": 64
+        },
+        {
+          "path": "multipage.pdf",
+          "bytes": 3323,
+          "sha256": "2ac76fea1543f039628e60fe48568acefe780a9e0912ee4a22b54389b5171712",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "3 pages with text, vectors, raster",
+          "pages": 3,
+          "encrypted": false,
+          "existing_annotations": false
+        },
+        {
+          "path": "password.pdf",
+          "bytes": 3868,
+          "sha256": "7cc5fdc845ee28c38eaf1f57cb31abcfbf9ee4c2cd7ed85551aca5704d0c458b",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "3 pages with text, vectors, raster; password vw-fixture",
+          "pages": 3,
+          "encrypted": true,
+          "existing_annotations": false
+        },
+        {
+          "path": "annotations.pdf",
+          "bytes": 3980,
+          "sha256": "7ed2352772d0158057666bbe2dae244f199cce8e5699ab8ad94ceee600325f3a",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "3 pages with text, vectors, raster",
+          "pages": 3,
+          "encrypted": false,
+          "existing_annotations": true
+        },
+        {
+          "path": "simple.svg",
+          "bytes": 116,
+          "sha256": "34a10d7aa59f2259f34cb6869b3606eeb65d367fcc05bc54ea5dc9f0ac0eacf0",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "SVG sanitizer fixture; never execute scripts or resolve external references"
+        },
+        {
+          "path": "text.svg",
+          "bytes": 111,
+          "sha256": "d6a4b787108cb39d26d3ea59d1303a2a2da268556104f76d58828180f67d5c66",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "SVG sanitizer fixture; never execute scripts or resolve external references"
+        },
+        {
+          "path": "script.svg",
+          "bytes": 136,
+          "sha256": "beb9c76df61221ba772b38766fff6ddd7f60971db71b5bbf8db05a9672488d48",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "SVG sanitizer fixture; never execute scripts or resolve external references"
+        },
+        {
+          "path": "external.svg",
+          "bytes": 171,
+          "sha256": "e9163d0a23fb2c6c93e42239faf3b02aa11cb064090429158680e7fb57a0d6fa",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "SVG sanitizer fixture; never execute scripts or resolve external references"
+        },
+        {
+          "path": "huge-viewbox.svg",
+          "bytes": 112,
+          "sha256": "7d778482f596dbd0bb2e47244d2f9880cf0a2d1b2a215d55be78b3fd42cbedad",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "SVG bounds/resource rejection"
+        },
+        {
+          "path": "truncated.jpg",
+          "bytes": 100,
+          "sha256": "3e73a411824fb5918a6f3ac3c819d3e06ec6a00d0e85b1f6b93e166dc4e29a13",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "malformed truncated input; expected rejection",
+          "hostile": true
+        },
+        {
+          "path": "truncated.png",
+          "bytes": 100,
+          "sha256": "458982cf5af249657153d039fc5769cd306230b4901d40226081764208a808d9",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "malformed truncated input; expected rejection",
+          "hostile": true
+        },
+        {
+          "path": "declared-size-bomb.png",
+          "bytes": 66,
+          "sha256": "41813004a2d855577dd44e7834537c6a109c951d89555cd2487780c9baddeb4e",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "tiny payload with enormous declared dimensions; must reject before allocation",
+          "hostile": true
+        },
+        {
+          "path": "corrupt-xref.pdf",
+          "bytes": 3331,
+          "sha256": "914f58d47cce91b796a4513bd8c907a6dbaab959e79b95e6a6135f36c635ea6d",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "invalid cross-reference offset; repair/rejection test",
+          "hostile": true
+        },
+        {
+          "path": "billion-laughs.svg",
+          "bytes": 592,
+          "sha256": "f2f9fe6656e500e2c5d40c17478bd1d02144d4db390e17e6e35aa56e13512707",
+          "provenance": "First-party synthetic fixture; fixtures/generate.py",
+          "license": "LicenseRef-VisualWorkbench-Proprietary",
+          "purpose": "entity expansion attack; reject DOCTYPE before parsing",
+          "hostile": true
+        }
+      ],
+      "malformed_files_rendered": false
+    }
+  },
+  "vips_runtime_sha256": {
+    "vips-dev-8.18/bin/vips.exe": "713f52d657dcb041303eae9c34c05f323933fe4f201cde3fb4942936bc6b8727",
+    "vips-dev-8.18/bin/vipsedit.exe": "788a5bb4d4d855d486fcf8eb471d2e9ec6cc54f128dec3ca309e42d0f83ce331",
+    "vips-dev-8.18/bin/vipsheader.exe": "fbdcf6ff9d33c79223c69040444790350439a5b1c5eb8db64017fbaa632054bb",
+    "vips-dev-8.18/bin/vipsthumbnail.exe": "7ec5a59df6bdb02a3272c745217f5a112db3b4c6946595c8bb990ebe7ac81d18",
+    "vips-dev-8.18/bin/libaom.dll": "aaca18312104606e0e162b346636651cc2f2853fe6ae075d457198c14fa5047e",
+    "vips-dev-8.18/bin/libarchive-13.dll": "c5b15ad0b74f39e79f583dfb0b58a1a99a71d1e7639fc5a648f3974743c4b6f9",
+    "vips-dev-8.18/bin/libc++.dll": "1994597b48abb9ea494f43d4e5b7ae53267a7858e25d068260864667771683dc",
+    "vips-dev-8.18/bin/libcairo-2.dll": "3f07c11fe7cd180a3650d2aec5d533ced04e6e27ccdbe30bbdbbcb6be06857bb",
+    "vips-dev-8.18/bin/libcgif-0.dll": "f6ffa745c3ff1e5e0b3bd7a0df8976dc532a39f385c605e5c5b37eaaab5b7763",
+    "vips-dev-8.18/bin/libexif-12.dll": "a3ec1040052bf6189a0c5ae7979db80ed7a263c4129a0a5129972265a0deb952",
+    "vips-dev-8.18/bin/libexpat-1.dll": "b960c03868d8f3d21c0e40a0c2d8b3704d4833bdee216fb617db720d06b315a3",
+    "vips-dev-8.18/bin/libffi-8.dll": "203b0b53062221bdbcefe3d82720db52b99a38c0f87b742de46d7accebce207d",
+    "vips-dev-8.18/bin/libfontconfig-1.dll": "59cd7552c3a130e872e58fcc4c762180703857b92098dfc8b760cace6d081d87",
+    "vips-dev-8.18/bin/libfreetype-6.dll": "b1bc712a8099dfbf60c31b2c87ce1b83632d7bf5ba455fd490348c60625f50ec",
+    "vips-dev-8.18/bin/libfribidi-0.dll": "21be07e6dbfcbaa8c6d308d554ef7536b01e3d21f0d72ba03f4de28f1df3e908",
+    "vips-dev-8.18/bin/libgio-2.0-0.dll": "b9cb469131059b7bc84fadebeb43c49464dbf5e73d46c0c96ffbaa8e7d823f59",
+    "vips-dev-8.18/bin/libglib-2.0-0.dll": "fa5a7a698bf7ecd6767b373467346bb574a794eb8647383df6149f9c5f39417e",
+    "vips-dev-8.18/bin/libgmodule-2.0-0.dll": "066d04d888c2e453a64568ea867b20c6e1fc34b8d37282b14c909aa35941f25e",
+    "vips-dev-8.18/bin/libgobject-2.0-0.dll": "d2a6a5b3fe463ecabb9ca5b62ea86d55ace0d316e334663e3ccdebbdd4c72234",
+    "vips-dev-8.18/bin/libharfbuzz-0.dll": "3b57e52b04349356e6e495c4cbfd9e2a4510cc955b912d8c92a7c953e480d275",
+    "vips-dev-8.18/bin/libheif.dll": "b80079ed81adc7dda7a0ef9971e2b2546b718b912f5c0410c4ca6538a2f9ffa5",
+    "vips-dev-8.18/bin/libhwy.dll": "a0fb9ad8520f407f98dbdcd179265afe8509e30a7b727a79b1ac1ab9e0937b24",
+    "vips-dev-8.18/bin/libimagequant.dll": "991175c70c0ce41293bb83656abf2f51db9aaf7bcb16349e1ace12b8a779ca18",
+    "vips-dev-8.18/bin/libjpeg-62.dll": "e797f624df8d058b98d621750a2b8a0f78464d23c1416ece8959515ea926dae3",
+    "vips-dev-8.18/bin/liblcms2-2.dll": "04a46c6cc52cab5a5ddb4d985e4cbd31283a690f6843fe1e810f77e2a2df3e7b",
+    "vips-dev-8.18/bin/libpango-1.0-0.dll": "5d91c9b18832eb6669ff4384fae3aaceeee0698cbde1847f94146f3f3ab47689",
+    "vips-dev-8.18/bin/libpangocairo-1.0-0.dll": "24ca2b7106abb8a8171aa1e9c73a8066d7f12368d9bf696339cd6b87bf5b412f",
+    "vips-dev-8.18/bin/libpangoft2-1.0-0.dll": "000d8d57bc3513d6c241c59997f96c44f0cb4d977fd87e31a53607ded8dc3d29",
+    "vips-dev-8.18/bin/libpixman-1-0.dll": "ed893588fee47353fec5cf4a1775236e1a3e2272a24a3c4e89a5c96e230f5064",
+    "vips-dev-8.18/bin/libpng16-16.dll": "461610d0b8d4afe82b2372786e0a9b66bce6376e16e33b79855a7f5dab4e7477",
+    "vips-dev-8.18/bin/librsvg-2-2.dll": "97e5acf33963ed2848a6ba3e7d851caee9d3c94e0abdae60d757ac23e3069f75",
+    "vips-dev-8.18/bin/libsharpyuv-0.dll": "429a6c855be9004a3f9cfe3745c1a4ded9a618ffd8969eca6a44d522852c236c",
+    "vips-dev-8.18/bin/libtiff-6.dll": "029256630dfa91c70459e2d6ce00f8241307f221a751a6c91420e620a50ac660",
+    "vips-dev-8.18/bin/libuhdr.dll": "243e7febade1e700353854fc407020ac65008752b9bb8fcbb574ee8970a69b8c",
+    "vips-dev-8.18/bin/libunwind.dll": "cada28244c3d5dc816f7c3d10667c38941d741452a8657b0f4948efee4ac345d",
+    "vips-dev-8.18/bin/libvips-42.dll": "4d3a83e136eb6f63fa8f4062e8343f87bfdc65afaab2eb30175d9ac844b88555",
+    "vips-dev-8.18/bin/libvips-cpp-42.dll": "85651dbfbd2b489d2a87da9778855ac7a2c7cd998be0d9e1ed6777c092e70aeb",
+    "vips-dev-8.18/bin/libwebp-7.dll": "27d8dc57e63fa2ac5798628d7fa3e044cc06d7dd2c005fd8a8b719c09f1a432e",
+    "vips-dev-8.18/bin/libwebpdemux-2.dll": "d16119ec43a1b428f5cd85f37fd180e1bc05069d3e42235f74a50608b35c12de",
+    "vips-dev-8.18/bin/libwebpmux-3.dll": "dc4ab500a11c6f8cf9689a22f1bcfda3f5db456306e25460872ba61c2cbca6b1",
+    "vips-dev-8.18/bin/libxml2-16.dll": "75bf149ed95fee1b9d8672e83bc7e515c451b65648c7d62dbdb3743e2f6cc02f",
+    "vips-dev-8.18/bin/libz1.dll": "40484b21bcce8db31d247974777bdc423e445baaa63fcfa091bab07e3245b959"
+  },
+  "first_successful_grid_run": {
+    "binding": {
+      "schema": 1,
+      "run_id": "d98db9c3605a4ea4a41932b580efef97",
+      "device_model": "SM-S918U",
+      "apk_sha256": "da4632e05c9fa62d46817b7d2994e21a63f39c05fce9f949524d2ca723e369d6",
+      "jpeg_sha256": "0f0f91e3c85456672ecfd066bb385487d936337c77e15b63a30b73cfa7f7bee7",
+      "completed": true,
+      "device_files_disposed": true,
+      "screenshots_created": 0
+    },
+    "jpeg": {
+      "schema": 1,
+      "run_id": "d98db9c3605a4ea4a41932b580efef97",
+      "mode": "jpeg",
+      "completed": true,
+      "measurements": [
+        {
+          "operation": "jpeg-region-top-0",
+          "elapsed_ms": 265.47625,
+          "width": 1024,
+          "height": 1024,
+          "bitmap_allocation_bytes": 4194304,
+          "pss_baseline_kib": 58557,
+          "pss_sampled_peak_kib": 294088,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -5694573
+        },
+        {
+          "operation": "jpeg-region-middle-0",
+          "elapsed_ms": 558.517291,
+          "width": 1024,
+          "height": 1024,
+          "bitmap_allocation_bytes": 4194304,
+          "pss_baseline_kib": 64392,
+          "pss_sampled_peak_kib": 185304,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -394757
+        },
+        {
+          "operation": "jpeg-region-bottom-0",
+          "elapsed_ms": 831.650937,
+          "width": 1024,
+          "height": 1024,
+          "bitmap_allocation_bytes": 4194304,
+          "pss_baseline_kib": 74392,
+          "pss_sampled_peak_kib": 195300,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -10424463
+        },
+        {
+          "operation": "jpeg-sample8-0",
+          "elapsed_ms": 865.397395,
+          "width": 2040,
+          "height": 1530,
+          "bitmap_allocation_bytes": 12484800,
+          "pss_baseline_kib": 84372,
+          "pss_sampled_peak_kib": 96604,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -460041
+        },
+        {
+          "operation": "jpeg-region-top-1",
+          "elapsed_ms": 143.621459,
+          "width": 1024,
+          "height": 1024,
+          "bitmap_allocation_bytes": 4194304,
+          "pss_baseline_kib": 84372,
+          "pss_sampled_peak_kib": 195296,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -5694573
+        },
+        {
+          "operation": "jpeg-region-middle-1",
+          "elapsed_ms": 484.189114,
+          "width": 1024,
+          "height": 1024,
+          "bitmap_allocation_bytes": 4194304,
+          "pss_baseline_kib": 84444,
+          "pss_sampled_peak_kib": 195348,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -394757
+        },
+        {
+          "operation": "jpeg-region-bottom-1",
+          "elapsed_ms": 815.97474,
+          "width": 1024,
+          "height": 1024,
+          "bitmap_allocation_bytes": 4194304,
+          "pss_baseline_kib": 84488,
+          "pss_sampled_peak_kib": 195395,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -10424463
+        },
+        {
+          "operation": "jpeg-sample8-1",
+          "elapsed_ms": 847.672499,
+          "width": 2040,
+          "height": 1530,
+          "bitmap_allocation_bytes": 12484800,
+          "pss_baseline_kib": 84523,
+          "pss_sampled_peak_kib": 96836,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -460041
+        },
+        {
+          "operation": "jpeg-region-top-2",
+          "elapsed_ms": 135.184271,
+          "width": 1024,
+          "height": 1024,
+          "bitmap_allocation_bytes": 4194304,
+          "pss_baseline_kib": 84604,
+          "pss_sampled_peak_kib": 195320,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -5694573
+        },
+        {
+          "operation": "jpeg-region-middle-2",
+          "elapsed_ms": 468.492032,
+          "width": 1024,
+          "height": 1024,
+          "bitmap_allocation_bytes": 4194304,
+          "pss_baseline_kib": 84652,
+          "pss_sampled_peak_kib": 195286,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -394757
+        },
+        {
+          "operation": "jpeg-region-bottom-2",
+          "elapsed_ms": 809.042448,
+          "width": 1024,
+          "height": 1024,
+          "bitmap_allocation_bytes": 4194304,
+          "pss_baseline_kib": 84708,
+          "pss_sampled_peak_kib": 195356,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -10424463
+        },
+        {
+          "operation": "jpeg-sample8-2",
+          "elapsed_ms": 831.103541,
+          "width": 2040,
+          "height": 1530,
+          "bitmap_allocation_bytes": 12484800,
+          "pss_baseline_kib": 84752,
+          "pss_sampled_peak_kib": 97020,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -460041
+        }
+      ],
+      "large_heap_diagnostic": true,
+      "max_java_heap_bytes": 536870912,
+      "last_phase": "jpeg-sample8-2",
+      "input_sha256": "0f0f91e3c85456672ecfd066bb385487d936337c77e15b63a30b73cfa7f7bee7"
+    },
+    "generate": {
+      "schema": 1,
+      "run_id": "d98db9c3605a4ea4a41932b580efef97",
+      "mode": "generate",
+      "completed": true,
+      "measurements": [],
+      "large_heap_diagnostic": true,
+      "max_java_heap_bytes": 536870912,
+      "input_bytes": 12484800,
+      "generation_strategy": "small_bitmap_scaled_by_writer_grid",
+      "pattern_width": 2040,
+      "pattern_height": 1530,
+      "available_system_bytes": 1541693440,
+      "available_java_heap_bytes": 531631072,
+      "last_phase": "heif-generated-hash",
+      "encode_ms": 1839.139583,
+      "output_sha256": "f18832aa8bfa1e05c13165684fffd89d831346c704ab18bf792cdd85c3c0aafe",
+      "output_bytes": 808545,
+      "width": 16320,
+      "height": 12240,
+      "pattern": "2040x1530 RGB: (16+x*220/2040,16+y*220/1530,80), scaled to 16320x12240"
+    },
+    "heif": {
+      "schema": 1,
+      "run_id": "d98db9c3605a4ea4a41932b580efef97",
+      "mode": "heif",
+      "completed": true,
+      "measurements": [
+        {
+          "operation": "heif-target-0",
+          "elapsed_ms": 2884.025416,
+          "width": 2040,
+          "height": 1530,
+          "bitmap_allocation_bytes": 12484800,
+          "pss_baseline_kib": 34340,
+          "pss_sampled_peak_kib": 665323,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -8487343
+        },
+        {
+          "operation": "heif-target-1",
+          "elapsed_ms": 3270.75578,
+          "width": 2040,
+          "height": 1530,
+          "bitmap_allocation_bytes": 12484800,
+          "pss_baseline_kib": 59819,
+          "pss_sampled_peak_kib": 684020,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -8487343
+        },
+        {
+          "operation": "heif-target-2",
+          "elapsed_ms": 2904.235311,
+          "width": 2040,
+          "height": 1530,
+          "bitmap_allocation_bytes": 12484800,
+          "pss_baseline_kib": 70488,
+          "pss_sampled_peak_kib": 694340,
+          "memory_sampling_interval_ms": 100,
+          "center_pixel": -8487343
+        }
+      ],
+      "large_heap_diagnostic": true,
+      "max_java_heap_bytes": 536870912,
+      "last_phase": "heif-target-2",
+      "input_sha256": "f18832aa8bfa1e05c13165684fffd89d831346c704ab18bf792cdd85c3c0aafe",
+      "full_decode_estimate_bytes": 799027200,
+      "full_decode_budget_bytes": 402653184,
+      "full_decode_status": "skipped_memory_guard"
+    }
+  },
+  "first_successful_grid_build_binding": {
+    "schema": 1,
+    "sha256": {
+      "build.ps1": "3d75b0c38c81e82a2e4ec1f10fe5a6a021df160712ec3012d70995f758993ed6",
+      "tools/bench/image/build_receipt.py": "4449412acc9f1669d47724373a139f36a03dbf9aefd2ecb77cb3a8fa851bdc40",
+      "tools/check_gradle_licenses.py": "c31051481ddad39b15cf2016b37aa3b840cdb6377fa59a54c54a4614aff625d1",
+      "apps/build.gradle.kts": "cb54c0d9e3ef46f29c212912037870ad599de5cc19f903011eb1f057e1ce8b55",
+      "apps/settings.gradle.kts": "fa8770a4268f43a322c42f9d8344986becc2556d0c343dda6da2b2562e068733",
+      "apps/gradle/libs.versions.toml": "a7f51dc6c4a1f8dd581eae35bae6cca79191bc66278396f2140443f88e35ca0c",
+      "apps/gradle.properties": "ccd4f509dc03ee7061bd88915eaaa21d5030aa7cfe83caba0b16aa14c64f23cc",
+      "tools/bench/image-android/build.gradle.kts": "d2bb741585ca66d2b71c600998dc5d924df9dc4b530fc24088b35ac950ede32e",
+      "tools/bench/image-android/gradle.lockfile": "603dd943de17e922b46f6d9ee00dcdc56881fd42dbdefb647bebc2e0e9dac693",
+      "tools/bench/image-android/build/outputs/apk/debug/image-bench-debug.apk": "da4632e05c9fa62d46817b7d2994e21a63f39c05fce9f949524d2ca723e369d6",
+      "tools/bench/image-android/src/main/AndroidManifest.xml": "41500131aaf4fab71e8844a762fb835235fa09627788b25fd795b2bc976e134c",
+      "tools/bench/image-android/src/main/java/com/visualworkbench/imagebench/ImageActivity.kt": "9e7faae7c6e6b31417f84d291d37725ebfbac5edaae2c191882e70d2c89a1ffa"
+    }
+  },
+  "failed_lint": {
+    "errors": 1,
+    "warnings": 6,
+    "issue": "RestrictedApi on inherited WriterBase.close; replaced with public AutoCloseable contract",
+    "log": "t009-image-lint-d69580030c9348bc9be21cc9c0f2d230.log"
+  },
+  "scripts_sha256": {
+    "fixtures/generate.py": "ea91b3969b0419ac8c15c171bc95c03602e3b1ec854eb9c500accac2678eb5a7",
+    "fixtures/verify.py": "47b4dd650f7b5c3ca9056bd535d28ef2eab514d6cb6b9d6b852ddbe06bbdc539",
+    "tools/bench/image/pc.py": "beb2acfc185e54a1705a255581357a147bd8aaadde2d85a085c098454e010ac9",
+    "tools/bench/image/fetch_vips.py": "391352fd745e69984b7e09065caff9f69b2af19e20a2514522f853f356d9e983",
+    "tools/bench/image/run_pc.ps1": "ddf0bd7cad11eccc7730a96c567c3e1d6972252e42fef62542f826641b854644",
+    "tools/bench/image-android/run_android.ps1": "7a2e81c3805184c0949d2253ae4194fb93b2a3675cc56d315126c7257300afd6"
+  },
+  "verification": {
+    "python_tests_passed": 93,
+    "gradle_license_modules": 184,
+    "gradle_runtime_configurations": 10,
+    "gradle_parent_poms": 1,
+    "android_lint_errors": 0,
+    "android_lint_warnings": 6,
+    "real_owner_photo": "absent; skipped",
+    "screenshots_created": 0,
+    "scope": "Decoder/CLI spike; no product renderer acceptance"
+  },
+  "superseded_heif_cleanup": {
+    "schema": 1,
+    "file": "200mp-d98db9c3605a4ea4a41932b580efef97.heic",
+    "sha256": "f18832aa8bfa1e05c13165684fffd89d831346c704ab18bf792cdd85c3c0aafe",
+    "disposed": true,
+    "reason": "Superseded synthetic HEIF from pre-lint APK; final APK fixture retained"
+  },
+  "initial_staged_scan": {
+    "result": "false positive on password.pdf SHA-256 map field",
+    "verified_against_fixture_bytes": true,
+    "policy_relaxed": false,
+    "correction": "Path and SHA-256 stored in separate record fields"
+  }
+}

@@ -2046,9 +2046,11 @@
       "scenarios": [
         "A10"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T0.09.md"
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2074,7 +2076,9 @@
       "scenarios": [
         "A10"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.09.md"
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -4811,7 +4815,9 @@
       "scenarios": [
         "A10"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.09.md"
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -4835,7 +4841,9 @@
       "scenarios": [
         "A10"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.09.md"
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",

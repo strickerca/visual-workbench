@@ -1,8 +1,8 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-android', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-core', 'build-android', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
-    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles', 'vdd')][string]$HilMode = 'app',
+    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
@@ -70,6 +70,11 @@ try {
             Run-Gradle 'build-video-android' @(':video-bench:assembleDebug')
             Run-Step 'bind-video-android-build' 'python.exe' @('tools/bench/video-pc/build_receipt.py', 'record', 'android')
         }
+        'build-image-android' {
+            Run-LicenseGate
+            Run-Gradle 'build-image-android' @(':image-bench:assembleDebug', ':image-bench:lintDebug')
+            Run-Step 'bind-image-android-build' 'python.exe' @('tools/bench/image/build_receipt.py', 'record')
+        }
         'build-transport' {
             Run-LicenseGate
             Run-Cargo 'build-transport-host' @('build', '--release', '--locked', '-p', 'vw-transport-bench')
@@ -90,7 +95,7 @@ try {
             Run-Cargo 'lint-rust-format' @('fmt', '--all', '--', '--check')
             Run-Cargo 'lint-rust-clippy' @('clippy', '--workspace', '--all-targets', '--locked', '--', '-D', 'warnings')
             Run-Step 'lint-secrets' 'gitleaks.exe' @('dir', '.', '--config', '.gitleaks.toml', '--redact=100', '--no-banner')
-            Run-Gradle 'lint-kotlin' @(':android:lintDebug', ':shared:check', ':desktop:check', ':pen-probe:lintDebug', ':video-bench:lintDebug')
+            Run-Gradle 'lint-kotlin' @(':android:lintDebug', ':shared:check', ':desktop:check', ':pen-probe:lintDebug', ':video-bench:lintDebug', ':image-bench:lintDebug')
         }
         'hil-test' {
             $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/hil-test.ps1', '-Mode', $HilMode, '-TimeoutSeconds', "$TimeoutSeconds")

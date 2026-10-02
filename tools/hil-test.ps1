@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles', 'vdd')][string]$Mode = 'app',
+    [ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$Mode = 'app',
     [ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
@@ -14,6 +14,14 @@ Import-Module (Join-Path $PSScriptRoot 'process.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'android-device.psm1') -Force
 
 try {
+    if ($Mode -eq 'image-pc') {
+        & (Join-Path $PSScriptRoot 'bench/image/run_pc.ps1')
+        exit 0
+    }
+    if ($Mode -eq 'image-android') {
+        & (Join-Path $PSScriptRoot 'bench/image-android/run_android.ps1')
+        exit 0
+    }
     if ($Mode -eq 'vdd') {
         & (Join-Path $PSScriptRoot 'vdd-probe/run.ps1') -Scenario $VddScenario -OwnerReady:$OwnerReady
         exit 0

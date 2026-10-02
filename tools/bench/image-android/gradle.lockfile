@@ -1,0 +1,11 @@
+# This is a Gradle generated file for dependency locking.
+# Manual edits can break the build and are not advised.
+# This file is expected to be part of source control.
+# To regenerate this file, run: ./gradlew :image-bench:dependencies --write-locks
+androidx.annotation:annotation-jvm:1.8.1=debugRuntimeClasspath,releaseRuntimeClasspath
+androidx.annotation:annotation:1.8.1=debugRuntimeClasspath,releaseRuntimeClasspath
+androidx.heifwriter:heifwriter:1.1.0=debugRuntimeClasspath,releaseRuntimeClasspath
+org.jetbrains.kotlin:kotlin-stdlib:2.4.20=debugRuntimeClasspath,releaseRuntimeClasspath
+org.jetbrains:annotations:13.0=debugRuntimeClasspath,releaseRuntimeClasspath
+org.jspecify:jspecify:1.0.0=debugRuntimeClasspath,releaseRuntimeClasspath
+empty=
