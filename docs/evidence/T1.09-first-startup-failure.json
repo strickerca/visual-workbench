@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "kind": "desktop-startup-run",
+  "run_id": "a2c000f0da6743ebbda3567cf8b300c0",
+  "status": "failed",
+  "failure_phase": "desktop-startup",
+  "failure_code": null,
+  "assertions": null,
+  "process_runs": [
+    {
+      "exit_code": 0,
+      "phase": "desktop-source-check",
+      "process_tree_cleanup_confirmed": true,
+      "elapsed_seconds": 2.31
+    },
+    {
+      "exit_code": 0,
+      "phase": "desktop-pinned-check",
+      "process_tree_cleanup_confirmed": true,
+      "elapsed_seconds": 2.587
+    },
+    {
+      "exit_code": 1,
+      "phase": "desktop-startup",
+      "process_tree_cleanup_confirmed": true,
+      "elapsed_seconds": 3.258
+    },
+    {
+      "exit_code": 1,
+      "phase": "packaged-child",
+      "process_tree_cleanup_confirmed": true,
+      "captured_bytes": 751,
+      "elapsed_seconds": 0.761,
+      "capture_overflow": false,
+      "capture_byte_limit": 1048576
+    }
+  ],
+  "cleanup": {
+    "private_raw_text_disposed": true,
+    "owned_process_trees": true,
+    "runtime_leases_released": true
+  },
+  "ordinary_preferences_and_native_cache_may_initialize": true,
+  "project_actions_requested": false,
+  "firewall_actions_requested": false,
+  "screenshots_created": 0,
+  "visual_acceptance": false,
+  "release_acceptance": false
+}

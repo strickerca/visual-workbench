@@ -1,0 +1,342 @@
+{
+  "schema": 1,
+  "kind": "phase1-normal-android-delivery",
+  "date": "2026-10-03",
+  "model": "IN2019",
+  "status": "passed",
+  "failure_phase": null,
+  "process_runs": [
+    {
+      "phase": "normal-app-native-inventory",
+      "exit_code": 0,
+      "log": "normal-app-native-inventory-34ec328f1a774df3b410df2aabf30fe8.log",
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee",
+      "elapsed_seconds": 0.796,
+      "process_tree_cleanup_confirmed": true
+    },
+    {
+      "phase": "normal-app-manifest",
+      "exit_code": 0,
+      "log": "normal-app-manifest-2c86ef6fb2ed44738c6359d642aadebb.log",
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee",
+      "elapsed_seconds": 1.714,
+      "process_tree_cleanup_confirmed": true
+    },
+    {
+      "phase": "normal-app-signature",
+      "exit_code": 0,
+      "log": "normal-app-signature-5b9be51e16434914a0088bbba511f6e8.log",
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee",
+      "elapsed_seconds": 0.926,
+      "process_tree_cleanup_confirmed": true
+    },
+    {
+      "phase": "normal-app-current-user",
+      "exit_code": 0,
+      "log": "normal-app-current-user-1308d6862d874875a4600b3520fae859.log",
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee",
+      "elapsed_seconds": 0.253,
+      "process_tree_cleanup_confirmed": true
+    },
+    {
+      "phase": "normal-app-install",
+      "exit_code": 0,
+      "log": "normal-app-install-6086d8c8ddea456598d1c3aeb7eee680.log",
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee",
+      "elapsed_seconds": 5.345,
+      "process_tree_cleanup_confirmed": true
+    },
+    {
+      "phase": "normal-app-installed-path",
+      "exit_code": 0,
+      "log": "normal-app-installed-path-97560b849ba84b9e84a5c45ed6693ebb.log",
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee",
+      "elapsed_seconds": 0.129,
+      "process_tree_cleanup_confirmed": true
+    },
+    {
+      "phase": "normal-app-installed-hash",
+      "exit_code": 0,
+      "log": "normal-app-installed-hash-757bf1ca82f94600bd61b31bbc4e8fa2.log",
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee",
+      "elapsed_seconds": 0.244,
+      "process_tree_cleanup_confirmed": true
+    }
+  ],
+  "source_binding_receipt": "T1.10-keystore-app-tests.json",
+  "source_binding_verified": true,
+  "apk": {
+    "apk_bytes": 163271410,
+    "apk_sha256": "2d4e5df3148587a24efe73e036832ce894f1c1fa5bb7c6b2e6456022e05f45b5",
+    "extracted_files": 0,
+    "libraries": [
+      {
+        "bytes": 10096,
+        "crc32": "9734baa0",
+        "elf_class": 64,
+        "elf_machine": "AArch64",
+        "elf_type": "ET_DYN",
+        "entry": "lib/arm64-v8a/libandroidx.graphics.path.so",
+        "loads": [
+          {
+            "alignment": 16384,
+            "file_bytes": 7232,
+            "flags": 5,
+            "memory_bytes": 7232,
+            "offset": 0,
+            "virtual_address": 0
+          },
+          {
+            "alignment": 16384,
+            "file_bytes": 912,
+            "flags": 6,
+            "memory_bytes": 912,
+            "offset": 7232,
+            "virtual_address": 23616
+          },
+          {
+            "alignment": 16384,
+            "file_bytes": 0,
+            "flags": 6,
+            "memory_bytes": 16,
+            "offset": 8144,
+            "virtual_address": 40912
+          }
+        ],
+        "sha256": "41e9a793c43a0f4fddb19e33f346bace464f30f888ba7b9eaf96294ea115bfb6",
+        "zip_alignment_bytes": 16384,
+        "zip_alignment_remainder": 0,
+        "zip_data_offset": 38322176,
+        "zip_method": "stored"
+      },
+      {
+        "bytes": 212392,
+        "crc32": "a316297e",
+        "elf_class": 64,
+        "elf_machine": "AArch64",
+        "elf_type": "ET_DYN",
+        "entry": "lib/arm64-v8a/libgraphics-core.so",
+        "loads": [
+          {
+            "alignment": 16384,
+            "file_bytes": 198352,
+            "flags": 5,
+            "memory_bytes": 198352,
+            "offset": 0,
+            "virtual_address": 0
+          },
+          {
+            "alignment": 16384,
+            "file_bytes": 11704,
+            "flags": 6,
+            "memory_bytes": 11704,
+            "offset": 198352,
+            "virtual_address": 214736
+          },
+          {
+            "alignment": 16384,
+            "file_bytes": 88,
+            "flags": 6,
+            "memory_bytes": 3224,
+            "offset": 210056,
+            "virtual_address": 242824
+          }
+        ],
+        "sha256": "a4d95a792921a6e42a65034bce4b7c75ed832fc7c11a87b63efa958244c34f88",
+        "zip_alignment_bytes": 16384,
+        "zip_alignment_remainder": 0,
+        "zip_data_offset": 38338560,
+        "zip_method": "stored"
+      },
+      {
+        "bytes": 32528,
+        "crc32": "d0c539eb",
+        "elf_class": 64,
+        "elf_machine": "AArch64",
+        "elf_type": "ET_DYN",
+        "entry": "lib/arm64-v8a/libimage_processing_util_jni.so",
+        "loads": [
+          {
+            "alignment": 16384,
+            "file_bytes": 29472,
+            "flags": 5,
+            "memory_bytes": 29472,
+            "offset": 0,
+            "virtual_address": 0
+          },
+          {
+            "alignment": 16384,
+            "file_bytes": 992,
+            "flags": 6,
+            "memory_bytes": 3296,
+            "offset": 29472,
+            "virtual_address": 45856
+          },
+          {
+            "alignment": 16384,
+            "file_bytes": 0,
+            "flags": 6,
+            "memory_bytes": 4,
+            "offset": 30464,
+            "virtual_address": 63232
+          }
+        ],
+        "sha256": "0292b063fafccf734472cbb59588e756c2dbca907c72021ba6fbf126385508a2",
+        "zip_alignment_bytes": 16384,
+        "zip_alignment_remainder": 0,
+        "zip_data_offset": 38551552,
+        "zip_method": "stored"
+      },
+      {
+        "bytes": 165992,
+        "crc32": "4a9198f2",
+        "elf_class": 64,
+        "elf_machine": "AArch64",
+        "elf_type": "ET_DYN",
+        "entry": "lib/arm64-v8a/libjnidispatch.so",
+        "loads": [
+          {
+            "alignment": 16384,
+            "file_bytes": 152376,
+            "flags": 5,
+            "memory_bytes": 152376,
+            "offset": 0,
+            "virtual_address": 0
+          },
+          {
+            "alignment": 16384,
+            "file_bytes": 1708,
+            "flags": 6,
+            "memory_bytes": 3816,
+            "offset": 162712,
+            "virtual_address": 179096
+          }
+        ],
+        "sha256": "ddfc6c965bbe366615c000ec1f06552ddf0bb2b4f9d921d0bff8c75b3cb2ca4c",
+        "zip_alignment_bytes": 16384,
+        "zip_alignment_remainder": 0,
+        "zip_data_offset": 38584320,
+        "zip_method": "stored"
+      },
+      {
+        "bytes": 4896,
+        "crc32": "ded2c2ba",
+        "elf_class": 64,
+        "elf_machine": "AArch64",
+        "elf_type": "ET_DYN",
+        "entry": "lib/arm64-v8a/libsurface_util_jni.so",
+        "loads": [
+          {
+            "alignment": 16384,
+            "file_bytes": 2480,
+            "flags": 5,
+            "memory_bytes": 2480,
+            "offset": 0,
+            "virtual_address": 0
+          },
+          {
+            "alignment": 16384,
+            "file_bytes": 568,
+            "flags": 6,
+            "memory_bytes": 1616,
+            "offset": 2480,
+            "virtual_address": 18864
+          }
+        ],
+        "sha256": "a5c9d1928ea92ec7a94dff8cf666e7739cd734198b9f0ae1d4e28ea3c86516ba",
+        "zip_alignment_bytes": 16384,
+        "zip_alignment_remainder": 0,
+        "zip_data_offset": 38764544,
+        "zip_method": "stored"
+      },
+      {
+        "bytes": 123813496,
+        "crc32": "bbd2eb4d",
+        "elf_class": 64,
+        "elf_machine": "AArch64",
+        "elf_type": "ET_DYN",
+        "entry": "lib/arm64-v8a/libvw_core.so",
+        "loads": [
+          {
+            "alignment": 16384,
+            "file_bytes": 10596112,
+            "flags": 4,
+            "memory_bytes": 10596112,
+            "offset": 0,
+            "virtual_address": 0
+          },
+          {
+            "alignment": 16384,
+            "file_bytes": 17455104,
+            "flags": 5,
+            "memory_bytes": 17455104,
+            "offset": 10596160,
+            "virtual_address": 10612544
+          },
+          {
+            "alignment": 16384,
+            "file_bytes": 806904,
+            "flags": 6,
+            "memory_bytes": 817344,
+            "offset": 28051264,
+            "virtual_address": 28084032
+          },
+          {
+            "alignment": 16384,
+            "file_bytes": 28656,
+            "flags": 6,
+            "memory_bytes": 41448,
+            "offset": 28858168,
+            "virtual_address": 28907320
+          }
+        ],
+        "sha256": "370d02aaeca6a9b6013713e2605df002e2e3b90fc2a29cdd6e0c7f0d16199908",
+        "zip_alignment_bytes": 16384,
+        "zip_alignment_remainder": 0,
+        "zip_data_offset": 38780928,
+        "zip_method": "stored"
+      }
+    ],
+    "limits": {
+      "max_apk_bytes": 2147483648,
+      "max_entries": 65534,
+      "max_libraries": 128,
+      "max_library_bytes": 536870912,
+      "max_load_memory_bytes": 1073741824,
+      "max_metadata_bytes": 33554432,
+      "max_name_bytes": 1024,
+      "max_program_headers": 128
+    },
+    "required_libraries": [
+      "libjnidispatch.so",
+      "libvw_core.so"
+    ],
+    "runtime_16k_verified": false,
+    "schema": "vw-apk-native-inventory-v1",
+    "signature_verified": false,
+    "status": "PASS",
+    "zip_entries": 522
+  },
+  "signature_verified": true,
+  "installed_apk_hash_verified": true,
+  "normal_app_foreground": true,
+  "normal_app_instrumentation_run": false,
+  "other_apps_stopped": false,
+  "adb_server_reset": false,
+  "verification_images_created": 0,
+  "build": {
+    "log": "validate-phase1-normal-android-delivery-e5084126cdeb408886d8da63f9fc7624.log",
+    "log_sha256": "99951df80e1d609b8e562148a88fa3735521108e826d5c006024ea6641b75aa2",
+    "elapsed_seconds": 285.895,
+    "sampled_peak_tree_working_set_bytes": 2817638400,
+    "contained_in_windows_job": true,
+    "process_tree_cleanup_confirmed": true,
+    "output_streams_completed": true
+  },
+  "startup_log_sha256": {
+    "phase1-normal-app-launch-1-efb61afe1b63487a81df8d1b192e5f85.log": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee",
+    "phase1-normal-app-foreground-1-c164b6f8f3bd4dc9b0ad7a2b735572f4.log": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee"
+  },
+  "delivery_harness_sha256": "ba1e6b61e1eff74e91e170c1ee04ec90756fd55f23892971095236727f337390",
+  "first_attempt": "T1.12-normal-android-first-failure.json"
+}

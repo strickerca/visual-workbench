@@ -415,3 +415,19 @@ The unchanged Kotlin app graph still passes its 220-module/12-configuration
 runtime license census. PowerShell 7.2+ is required only for the test harness;
 the installed bundled pwsh runtime is reused. Android native binaries target
 arm64-v8a/API 29 using the pinned NDK 30.0.16248370.
+
+## T1.07–T1.11 app boundary pins (2026-10-03)
+
+The integrated apps select UniFFI 0.32.2, JNA 5.19.1 under its Apache-2.0
+option, kotlinx-coroutines 1.9.0, CameraX 1.6.2, and ZXing core 3.5.4.
+The final isolated Android app build passed Rust license/source/ban policy and
+the resolved Gradle census of **261 modules, twelve runtime configurations and
+five bound parent POMs**. Native notice files and immutable source/hash records
+are retained under `third_party/notices` and `third_party/LICENSES`; their scope
+and remaining release attribution work are in `docs/THIRD_PARTY_NOTICES.md`.
+
+The app preserves the independently built Rust `.so` bytes in its APK so the
+runtime verifier can compare the actual packaged library with the build input.
+Every packaged native library passes the static ELF/ZIP alignment verifier.
+The successful physical IN2019 app run covers Android 11, not a 16 KiB page-size
+runtime or S23 acceptance. No existing dependency pin was upgraded for this run.

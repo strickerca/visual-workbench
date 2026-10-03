@@ -425,6 +425,8 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - `apps/shared` KMP module (commonMain with no Android-only or JDK-only imports, plus an enforcing check); Gradle tasks invoking cargo-ndk and the Windows build.
 - **Acceptance:** a smoke test creates a project, draws a stroke and exports from both Android and desktop through the bindings, matching the Rust golden; the alignment check passes; the commonMain import check passes and is proven to fail on a violation.
 
+- **Execution checkpoint, 2026-10-03:** T1.07 generated/native wrappers pass on Windows and IN2019 with matching state/PNG bytes, 100,000 samples, cancellation and owned cleanup. The guarded commonMain import boundary passes its negative fixture; HOOK-002 passes that exact criterion. Native alignment is checked without claiming a 16 KB runtime device. See `docs/evidence/T1.07.md` and its two exact receipts. Continue T1.08a (L, gpt-6-astra/max); actual session matches.
+
 ### T1.08a — Android app: shell, stylus input, canvas, wet ink
 - **Size:** L · **Depends on:** T1.04, T1.05, T1.07 · **Prompt:** `prompts/phase-1/T1.08a-android-canvas.md`
 - **Requirements:** PEN-003, PEN-015, PEN-001, CORE-004, UX-006, PERF-001, SYNC-001
@@ -435,6 +437,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Front-buffered wet ink with prediction using the core geometry; pen, highlighter and marker; undo/redo.
   - Offline local projects through vw-store.
 - **Acceptance:** PERF-001 measured (≤ 25 ms p95 target); injected-event tests of the gesture map, palm/cancel and the generic profile pass; the app works in airplane mode.
+- **Execution checkpoint, 2026-10-03:** integrated app source and the isolated physical IN2019 run pass 65 total instrumentation cases shared across T1.08a/T1.08b and synthetic T1.10/T1.11 coverage. Exact APK/native binding and owned cleanup pass. `docs/evidence/T1.08a.md` and `T1.08-app-tests.json` record the repaired native-packaging/import-readiness failures, limits and counts. S23 presentation timing, owner gestures, airplane-mode acceptance and large-image display remain open. Continue T1.08b (M, gpt-6.1-sol/xhigh); actual session remains gpt-6-astra/max under the full-continuation instruction.
 
 ### T1.08b — Android app: shapes, text, selection, brush settings, layout
 - **Size:** M · **Depends on:** T1.08a · **Prompt:** `prompts/phase-1/T1.08b-android-tools.md`
@@ -444,6 +447,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Brush settings: Bézier pressure-curve editor with live preview stored per brush; stabilization slider; hover width cursor.
   - Layout per §4.17: tool rail (mirrored for left-handed use, movable), status bar, context bar; dark and light themes; 48 dp targets; reduced motion; contrast check.
 - **Acceptance:** phone text matches the export golden at 1:1; every tool creates editable objects; the curve editor and stabilization change replayed-fixture output; both themes pass WCAG AA contrast.
+- **Execution checkpoint, 2026-10-03:** native tool/reopen/text-golden, pressure/stabilization, saved-preference, declared contrast and exercised touch-target cases pass in the same 65-case IN2019 run. Full rendered accessibility, physical hover, owner layout and cross-device acceptance remain open. See `docs/evidence/T1.08b.md`; applicable requirements remain partial. Continue T1.09 (L, gpt-6-astra/xhigh), with the session still gpt-6-astra/max. Gates remain pending; software continuation is explicitly authorized.
 
 ### T1.09 — Desktop app: window, canvas, PC editing, pairing, shortcuts
 - **Size:** L · **Depends on:** T1.06b, T1.07, T1.08b · **Prompt:** `prompts/phase-1/T1.09-desktop-shell.md`
@@ -458,6 +462,8 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Placeholders for the instruction panel and transfer shelf, labelled "not available yet" (never inert).
 - **Acceptance:** all three window modes keep state; the window reports the Windows display scale and evidence screenshots are crisp; objects can be selected, moved, resized and recolored with the mouse, each as one undo step; pairing with the pair-cli phone binary succeeds; every command has a shortcut.
 
+- **Execution checkpoint, 2026-10-03:** T1.09 actual packaged desktop startup draws a frame, confirms PMv2 at density 1.75 / DPI 168 and exits through ordinary cleanup. The initial redirected-native-cache failure is retained; canonical-root/handle repairs pass 19 targeted cases and the final aggregate passes 96 desktop cases. `docs/evidence/T1.09.md` binds actual build/startup artifacts. Visual, window-mode, interaction and pairing acceptance remain open. Continue T1.10 (L, gpt-6-astra/max); actual session matches.
+
 ### T1.10 — Phone pairing and live sync integration
 - **Size:** L · **Depends on:** T1.06b, T1.08b, T1.09 · **Prompt:** `prompts/phase-1/T1.10-live-sync.md`
 - **Requirements:** CORE-003, CORE-005, CORE-007, SYNC-005, SYNC-001, PERF-002, CONNECT-001, CONNECT-002, CONNECT-003, EDIT-001, EDIT-004, UX-005
@@ -469,6 +475,8 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Offline phone work with a forced conflict; temporary firewall rules, removed at the end.
 - **Acceptance:** A02 and A06 pass on hardware; PERF-002 measured; unplugging mid-gesture produces no duplicate; pairing and editing work over tethering with Developer options off, and over Wi-Fi with the router's internet unplugged; the route-safety check runs on every tether connection; the phone's trust list is Keystore-wrapped and no key material is in projects or exports; the forced conflict writes a conflicts row; camera independence verified with the phone.
 
+- **Execution checkpoint, 2026-10-03:** T1.10 native sessions, provisional gestures, recovery, durable blobs and platform trust adapters are integrated. Aggregate simulation passes all 10,000 fault seeds; the 68-case isolated IN2019 app increment includes real Keystore encryption/tamper refusal and native loopback pairing/revocation persistence. These are not live cross-device or physical reconnect/performance acceptance. `docs/evidence/T1.10.md` and its exact receipt retain limits; task requirements remain partial. Continue T1.11 (M, gpt-6-astra/xhigh); actual session remains gpt-6-astra/max.
+
 ### T1.11 — Import, export and handoff basics
 - **Size:** M · **Depends on:** T1.05, T1.08b, T1.09, T1.10 · **Prompt:** `prompts/phase-1/T1.11-import-export.md`
 - **Requirements:** EXPORT-006, FORMAT-005, CORE-006, HOOK-001, SYNC-001, UX-005
@@ -478,11 +486,14 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Revision and resolution shown on export.
 - **Acceptance:** tested into Claude desktop, ChatGPT desktop, a browser chat and Claude Code (A13, partial; Christian runs the Claude Code paste himself); a `.mp4` asset syncs with an identical hash; in airplane mode the phone exports a marked PNG; SYNCED, SYNCING, RECONNECTING, OFFLINE (n pending) and EXPORT READY each observed on both devices.
 
+- **Execution checkpoint, 2026-10-03:** T1.11 import/export, clipboard formats, drag and Android share/camera/provider paths are integrated and exercised by native/JVM/isolated-app fixtures. Real recipient apps, owner clipboard workflows, airplane mode and full status observations remain pending. See `docs/evidence/T1.11.md`; task requirements remain partial. Continue T1.12 (S, gpt-6-astra/max), matching the actual session, as a software/gap checkpoint under owner authorization; G0/G1 remain pending.
+
 ### T1.12 — Phase 1 acceptance run
 - **Size:** S · **Depends on:** T0.12 and every Phase 1 task · **Prompt:** `prompts/phase-1/T1.12-phase1-acceptance.md`
 - **Requirements:** CORE-001, CORE-002, CORE-003, CORE-005, PEN-001, PEN-003
 - **Deliverables:** scripted A01, A02 and A06 runs with evidence; PERF-001/002 numbers; corrected statuses for every phase ≤ 1 requirement; a list of gaps; an installable APK and desktop app image; `docs/QUICKSTART.md`.
 - **Acceptance:** Gate G1 — recorded as pending until Christian confirms daily use after a day with the build.
+- **Execution checkpoint, 2026-10-03:** T1.12 closes the current software checkpoint: aggregate tests pass 458 ordinary Rust, two release simulator and 99 JUnit cases; all 10,000 simulation seeds pass; aggregate lint/license checks pass after retained repairs. The final 68-case IN2019 app suite passes with cleanup, the normal APK is signature/hash verified and installed/foregrounded, and the packaged desktop draws and shuts down cleanly. `docs/evidence/T1.12.md` reconciles exact evidence and limits. G0/G1, physical/manual scenarios and S23 performance remain pending. Publish the validated Phase 1 checkpoint under standing authorization, then continue T2.01 (M, gpt-6-astra/xhigh) under the explicit full-continuation instruction; actual session remains gpt-6-astra/max.
 
 ---
 

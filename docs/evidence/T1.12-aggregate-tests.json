@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "kind": "phase1-aggregate-software-tests",
+  "date": "2026-10-03",
+  "command": "build.ps1 test-all -TimeoutSeconds 1200",
+  "status": "passed",
+  "elapsed_seconds": 984.6279923,
+  "sampled_peak_tree_working_set_bytes": 2477264896,
+  "logs": [
+    {
+      "name": "validate-phase1-aggregate-tests-577ab0a9403c46b78342aa4b1f479013.log",
+      "sha256": "ac3d685c12ba3dc9e313ace490d3fa42e4f39d670fe730fb9760c71524b4e1ea"
+    },
+    {
+      "name": "test-rust-e02bf164f8da45809bee521146c97054.log",
+      "sha256": "7361dbf2fa22048b0c1bf84c6d0182f4b5fd97cc81a16ead15bc9f1f717402b0"
+    },
+    {
+      "name": "test-rust-simulation-443b68f9238a49918a8bdf01bfce741f.log",
+      "sha256": "06c38d9ae4a248e9419f8fb6255599a519a353e817c7ce7f92ea9d34a3b17755"
+    }
+  ],
+  "rust_ordinary": {
+    "passed": 458,
+    "failed": 0,
+    "ignored": 3,
+    "suites": 78,
+    "ignored_entries": [
+      "fifty_megapixel_png16_spool_marked_export_with_256mib_budget (separately passed in T1.05)",
+      "crash_worker (private child entry point; public controller passed)",
+      "sync_checkpoint_crash_worker (private child entry point; public controller passed)"
+    ]
+  },
+  "simulator": {
+    "tests_passed": 2,
+    "seeds": 10000,
+    "accepted_transactions": 120000,
+    "stale_input_discarded": 20000,
+    "elapsed_tests_seconds": 156.04
+  },
+  "junit": [
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.ConnectionAssistanceTest.xml",
+      "sha256": "2e49c624bb5a484c97022fe750eeb3953410684397d6226f3796ef0f356c352f",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopCoherenceTest.xml",
+      "sha256": "bfc0d415d21b7f921bc51da37165e0e50e7276f5254371c54355e2c74e098d6b",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopInkTest.xml",
+      "sha256": "96d6be68e5c992d9f5970db291aa291e693db573cece5185450eabefc8c939dd",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopNativeRuntimeTest.xml",
+      "sha256": "e7568d4440432bfec1509c0720605f704a1f95565edcb4a5ffdc1a90e634305a",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopRenderTest.xml",
+      "sha256": "0928ed070370b05ddbdf1f1a2d2eacac3b043c3da66a9cbce2e72469de84fcc1",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopSessionsTest.xml",
+      "sha256": "cde07e3e24d67e75349b648220744d31b57cbfc4c5566737eee2fdbf3743de07",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopStateTest.xml",
+      "sha256": "057ab0628cfa7414660d3b92a1e9bedc34287edb276b5c4363b9ecab900c3ab2",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopTransferTest.xml",
+      "sha256": "0c9ef538197f71cc7c6c72c233f0a2c1aa9c2f25999d801a54282f225020f647",
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.NativeRuntimeAnchorTest.xml",
+      "sha256": "bd34c0bb1270b18e987710e645a131c4bc0527c32052d73d90afc3e91e89d698",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DesktopCoreSmokeTest.xml",
+      "sha256": "f089e1b7a2d6235063f1af6ae0da57fb7d988fa16e9eff7331826a7ab833a0ac",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.PairingQrTest.xml",
+      "sha256": "ca1bb229ced8a125744c2e7019f16d3119d6c7a5a7efc0e8c0265fa56ca0afbd",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "binding_limit": "Exact logs/reports; this aggregate command did not capture a pre-build source inventory. Separately bound app/native receipts retain their own source inventories.",
+  "device_tests_in_this_command": false,
+  "verification_images_created": 0
+}

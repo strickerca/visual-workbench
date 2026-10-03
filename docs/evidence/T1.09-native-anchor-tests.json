@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "kind": "desktop-native-anchor-regression",
+  "status": "passed",
+  "suites": [
+    {
+      "suite": "NativeRuntimeAnchorTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_sha256": "3885231f7ab3820fb80f13dfacbb913e714a32ccea455379440df3c28989f373"
+    },
+    {
+      "suite": "DesktopNativeRuntimeTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_sha256": "4a6493d536c85ed62b981420018230d10b30664b664ad735cd2628dca6b3502b"
+    }
+  ],
+  "fixed_directory_access": "FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES",
+  "synthetic_native_binaries_executed": false,
+  "actual_windows_handle_tests": true,
+  "elapsed_seconds": 52.1679329,
+  "peak_tree_working_set_bytes": 1128996864,
+  "log": "test-native-anchor-sharing-repair-196c565032d247d0ad8f1dbd78f5d5a5.log",
+  "prior_failed_log": "test-native-runtime-anchor-d9b0538b698943de977deca2fa11b23b.log",
+  "prior_failure": "Windows metadata-only directory handle allowed rename; actual sharing-mode probe confirmed list-directory access is required",
+  "screenshots_created": 0
+}

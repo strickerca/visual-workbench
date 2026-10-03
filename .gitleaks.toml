@@ -5,7 +5,14 @@ useDefault = true
 
 [[allowlists]]
 description = "Generated build output and preserved input packages are not source"
-paths = ['''(^|/)(target|build|\.gradle|\.kotlin|\.local|\.git|fixtures-private|generated)/''']
+paths = ['''(^|/)(target|build|build-hil|\.gradle|\.kotlin|\.local|\.git|fixtures-private|generated)/''']
+
+[[allowlists]]
+description = "Exact source SHA-256 entries whose Kotlin filenames contain Api; reviewed Phase 1 binding receipts"
+condition = "AND"
+paths = ['''(^|/)docs/evidence/T1\.(07|08|10)[A-Za-z0-9.-]*\.json$''']
+regexTarget = "line"
+regexes = ['''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/(CoreApi|SessionApi|StreamingApi)\.kt": "[0-9a-f]{64}",?\s*$''']
 
 [[rules]]
 id = "vw-evidence-ip-address"

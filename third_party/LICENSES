@@ -1,4 +1,29 @@
 {
   "schema_version": 1,
-  "files": []
+  "files": [
+    {
+      "path": "notices/JNA-5.19.1-LICENSE.txt",
+      "license": "Apache-2.0",
+      "source_url": "https://raw.githubusercontent.com/java-native-access/jna/5.19.1/LICENSE",
+      "sha256": "07c938b23950ab7d47a24ef35f9f5da3a05ae164278dc959ad6994135ed59ff1"
+    },
+    {
+      "path": "notices/JNA-5.19.1-Apache-2.0.txt",
+      "license": "Apache-2.0",
+      "source_url": "https://raw.githubusercontent.com/java-native-access/jna/5.19.1/AL2.0",
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    },
+    {
+      "path": "notices/JNA-libffi-LICENSE.txt",
+      "license": "MIT",
+      "source_url": "https://raw.githubusercontent.com/java-native-access/jna/5.19.1/native/libffi/LICENSE",
+      "sha256": "2c9c2acb9743e6b007b91350475308aee44691d96aa20eacef8e199988c8c388"
+    },
+    {
+      "path": "notices/libyuv-LICENSE.txt",
+      "license": "BSD-3-Clause",
+      "source_url": "https://chromium.googlesource.com/libyuv/libyuv/+/aa6cedb39c87910b4c28e5c71c2121fc45fd234b/LICENSE?format=TEXT",
+      "sha256": "2b2cc1180c7e6988328ad2033b04b80117419db9c4c584918bbb3cfec7e9364f"
+    }
+  ]
 }

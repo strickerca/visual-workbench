@@ -2,6 +2,10 @@
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
 # To regenerate this file, run: ./gradlew :shared:dependencies --write-locks
+net.java.dev.jna:jna:5.19.1=desktopRuntimeClasspath
 org.jetbrains.kotlin:kotlin-stdlib:2.4.20=desktopRuntimeClasspath
-org.jetbrains:annotations:13.0=desktopRuntimeClasspath
+org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.9.0=desktopRuntimeClasspath
+org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.9.0=desktopRuntimeClasspath
+org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0=desktopRuntimeClasspath
+org.jetbrains:annotations:23.0.0=desktopRuntimeClasspath
 empty=

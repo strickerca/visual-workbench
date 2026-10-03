@@ -16,7 +16,9 @@ class StartupInstrumentedTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             assertEquals(Lifecycle.State.RESUMED, scenario.state)
             scenario.onActivity { activity ->
-                // Activity creation loads vw_core. Missing/wrong-ABI artifacts fail before here.
+                // Invoke the packaged core explicitly, regardless of whether
+                // local identity/project initialization has completed yet.
+                assertTrue(activity.editor.core.newId(System.currentTimeMillis().toULong()).matches(Regex("[0-9a-f-]{36}")))
                 assertTrue(activity.window.decorView.isShown)
             }
         }

@@ -460,6 +460,37 @@ impl ProjectStore {
         integrity(&self.connection)
     }
 
+    /// Validate against the current authority without advancing it. Transport
+    /// uses this before acquiring new originals; commit revalidates after I/O.
+    pub fn validate_transaction(
+        &self,
+        txn: &v1::Transaction,
+        authenticated: &DeviceId,
+        accepted_at_ms: i64,
+    ) -> Result<Acceptance, StoreError> {
+        bounded_encode(txn)?;
+        let mut candidate = self.host.clone();
+        let acceptance = candidate.submit(txn.clone(), authenticated, accepted_at_ms)?;
+        if candidate.project().canonical_bytes()?.len() > MAX_PAYLOAD {
+            return Err(StoreError::Invalid("snapshot size"));
+        }
+        sql_u64(acceptance.ack.host_seq)?;
+        sql_u64(
+            txn.base_revision
+                .as_ref()
+                .ok_or(StoreError::Invalid("base revision"))?
+                .host_seq,
+        )?;
+        for op in &txn.ops {
+            sql_u64(
+                op.op_id
+                    .as_ref()
+                    .ok_or(StoreError::Invalid("op ID"))?
+                    .lamport,
+            )?;
+        }
+        Ok(acceptance)
+    }
     /// Persist one host acceptance, its exact ack, conflict records, projections
     /// and any due checkpoint in the same SQLite transaction. Rejections and
     /// SQL failures leave both the database and the in-memory host unchanged.

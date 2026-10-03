@@ -6,6 +6,7 @@ dependencyResolutionManagement {
 }
 rootProject.name = "visual-workbench-apps"
 include(":shared", ":android", ":desktop")
+include(":bindings-core", ":bindings-host")
 include(":pen-probe")
 project(":pen-probe").projectDir = file("../tools/pen-trace/probe-android")
 include(":video-bench")

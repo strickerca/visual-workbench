@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "kind": "phase1-aggregate-lint",
+  "date": "2026-10-03",
+  "status": "passed",
+  "command": "build.ps1 lint-all -TimeoutSeconds 1200",
+  "attempts": [
+    {
+      "log": "validate-phase1-aggregate-lint-6d46f3a0f1664433b6f4b6e7aaa770fe.log",
+      "log_sha256": "d1889cb3bec8898833d260de5d9a696a803d0b993b91c9971dc04d2936005b50",
+      "known_issue": "source-hash receipt false positives",
+      "exit_code": 1,
+      "elapsed_seconds": 104.637,
+      "sampled_peak_tree_working_set_bytes": 2117783552,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    {
+      "log": "validate-phase1-aggregate-lint-receipts-154220513c2940b3bd3fe904d048c6a1.log",
+      "log_sha256": "594c6bb03a00305934775284c4a191b1b6180b7760143627a521efe1739d4d07",
+      "known_issue": "public Android fcntlInt unavailable at minimum API 29",
+      "exit_code": 1,
+      "elapsed_seconds": 230.233,
+      "sampled_peak_tree_working_set_bytes": 2754699264,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    },
+    {
+      "log": "validate-phase1-lint-api29-bf09603d7b364129ba80512e74aab174.log",
+      "log_sha256": "7ba4f3aad68b204e1359deeea8dff314d2ddcf2f77ea55e336e2ea24f13d7798",
+      "known_issue": null,
+      "exit_code": 0,
+      "elapsed_seconds": 301.274,
+      "sampled_peak_tree_working_set_bytes": 2878771200,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true
+    }
+  ],
+  "lint_reports": [
+    {
+      "path": "apps/android/build/reports/lint-results-debug.xml",
+      "sha256": "386da115682310f3876a161882dcf5c12e0f0717584da5d7ccf9adcc1d45a79c",
+      "errors": 0,
+      "warnings": 29
+    },
+    {
+      "path": "tools/pen-trace/probe-android/build/reports/lint-results-debug.xml",
+      "sha256": "de81528fb3db1d7c4cfb66b6a402e26c0637a7101ffff17014264a10e2c4de63",
+      "errors": 0,
+      "warnings": 7
+    },
+    {
+      "path": "tools/bench/video-android/build/reports/lint-results-debug.xml",
+      "sha256": "774c29b7432cd28d0ab7cdcf37e42a7cb0e4aaf72c143b48d61c1616fa2bb6df",
+      "errors": 0,
+      "warnings": 16
+    },
+    {
+      "path": "tools/bench/image-android/build/reports/lint-results-debug.xml",
+      "sha256": "2fa46a687a9254474c46b799bc3cd9be10b97848e368a0d15a687d24a9d4dec9",
+      "errors": 0,
+      "warnings": 6
+    }
+  ],
+  "checks": [
+    "setup policy",
+    "189-requirement/66-task/26-prompt plan coverage",
+    "rustfmt workspace",
+    "Clippy workspace all targets with warnings denied",
+    "gitleaks directory scan",
+    "Android/shared/desktop/probe/video/image Gradle lint/check tasks"
+  ],
+  "source_review": [
+    "exact three Api filename SHA-256 fields in generated binding receipts are not keys",
+    "borrowed PFD through fixed libc variadic fcntl preserves flags and ownership; no hidden Android API or new dependency"
+  ],
+  "limits": [
+    "API 29 runtime acceptance remains untested",
+    "Kotlin/compiler and lint warnings remain; no lint error baseline or disabled check added"
+  ]
+}

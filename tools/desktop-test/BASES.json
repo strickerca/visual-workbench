@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "patch_applied": false,
+  "files": {
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": {
+      "source_sha256": "180e50c7e3d5f78192a1222111279590c3208a1f97ec61841cd48e57d7ffc259",
+      "proposed_lf_sha256": "faeb7e6d390c8e4f7c1ea18bea5c3338b25848b4ff234145e89b62261a3b5f83"
+    },
+    "apps/desktop/build.gradle.kts": {
+      "source_sha256": "4ca216d018b3f2fbd3674fcaedf5e482301063f3b2a89e7fde2b9b7adbecbded",
+      "proposed_lf_sha256": "9fb11b1435a234ff65cf05f9bc473052502747354d2131817bd56c1b1754c033"
+    },
+    "build.ps1": {
+      "source_sha256": "6e9ba8745c3b52c029c22291f56917f7c017530470f915fc7d375ea50c7053ba",
+      "proposed_lf_sha256": "fc12c2df7772c3444fc1a6a680499d9cb504ba18439fb0c953eeddf3ec13a3a1"
+    }
+  }
+}

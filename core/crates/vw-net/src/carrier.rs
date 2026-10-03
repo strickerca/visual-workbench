@@ -7,7 +7,9 @@ use crate::{
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName};
 use std::{
     collections::BTreeMap,
+    future::Future,
     net::SocketAddr,
+    pin::Pin,
     sync::{
         Arc, Mutex as StdMutex,
         atomic::{AtomicBool, Ordering},
@@ -478,6 +480,12 @@ pub struct CarrierReceiver {
     ingress: crate::ingress::Ingress,
     life: Arc<Lifetime>,
     peer: AuthenticatedPeer,
+    // Receive is raced against timers and application commands. Keep both the
+    // popped result and each live policy check here, so cancelling that future
+    // neither loses a reliable frame nor restarts a slow blocking check.
+    pending: Option<Result<Frame>>,
+    authorization: Option<Pin<Box<dyn Future<Output = Result<()>> + Send>>>,
+    read_authorized: bool,
 }
 impl CarrierReceiver {
     pub const fn peer(&self) -> &AuthenticatedPeer {
@@ -485,19 +493,38 @@ impl CarrierReceiver {
     }
     pub async fn receive(&mut self) -> Result<Frame> {
         self.life.check()?;
-        if let Err(error) = self.peer.authorize_async().await {
-            self.life.fail(NetError::Authentication);
-            return Err(error);
+        if self.pending.is_none() {
+            if !self.read_authorized {
+                self.authorize_receive().await?;
+                self.read_authorized = true;
+            }
+            self.pending = Some(bounded(self.ingress.receive()).await.and_then(|r| r));
+            self.read_authorized = false;
         }
-        let result = bounded(self.ingress.receive()).await.and_then(|r| r);
-        if let Err(error) = self.peer.authorize_async().await {
-            self.life.fail(NetError::Authentication);
-            return Err(error);
-        }
+        // Revocation may occur while ingress is idle. Always check again after
+        // dequeue, including when a previous caller left this result pending.
+        self.authorize_receive().await?;
+        self.life.check()?;
+        // There must be no suspension between taking and returning the result.
+        let result = self.pending.take().ok_or(NetError::Carrier)?;
         // A discarded predictive chain is recoverable by a fresh keyframe; do
         // not disconnect reliable OPS/CONTROL or input solely for this notice.
         if result.is_err() && !matches!(result, Err(NetError::KeyframeRequired)) {
             self.life.fail(NetError::Carrier);
+        }
+        result
+    }
+    async fn authorize_receive(&mut self) -> Result<()> {
+        let check = self.authorization.get_or_insert_with(|| {
+            let peer = self.peer.clone();
+            Box::pin(async move { peer.authorize_async().await })
+        });
+        let result = check.as_mut().await;
+        self.authorization = None;
+        if result.is_err() {
+            self.pending = None;
+            self.read_authorized = false;
+            self.life.fail(NetError::Authentication);
         }
         result
     }
@@ -573,6 +600,9 @@ impl TcpCarrier {
                 ingress,
                 life,
                 peer,
+                pending: None,
+                authorization: None,
+                read_authorized: false,
             },
         })
     }
@@ -753,6 +783,9 @@ impl QuicCarrier {
                 ingress,
                 life,
                 peer,
+                pending: None,
+                authorization: None,
+                read_authorized: false,
             },
         })
     }
@@ -776,3 +809,7 @@ impl QuicCarrier {
 #[cfg(test)]
 #[path = "duplex_tests.rs"]
 mod duplex_tests;
+
+#[cfg(test)]
+#[path = "carrier_cancellation_tests.rs"]
+mod cancellation_tests;

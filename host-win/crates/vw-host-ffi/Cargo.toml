@@ -12,3 +12,39 @@ workspace = true
 [lib]
 name = "vw_host"
 crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+uniffi = { version = "=0.32.2", default-features = false }
+thiserror = "=2.0.21"
+tokio = { version = "=1.53.1", default-features = false, features = ["sync"] }
+vw-raster = { version = "=0.1.0", path = "../../../core/crates/vw-raster" }
+vw-model = { version = "=0.1.0", path = "../../../core/crates/vw-model" }
+png = "=0.18.1"
+blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+fs2 = "=0.4.3"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = [
+    "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Storage_FileSystem", "Win32_System_DataExchange",
+    "Win32_System_Memory", "Win32_System_Threading", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging",
+    "Win32_Security",
+    "Win32_Security_Cryptography",
+    "Win32_System_JobObjects",
+    "Win32_System_Pipes",
+    "Win32_System_IO",
+    "Win32_System_Com",
+    "Win32_System_SystemInformation",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_UI_Shell",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_Ndis",
+    "Win32_Networking_WinSock",
+] }
+
+[dev-dependencies]
+moxcms = "=0.8.1"
+tempfile = "=3.27.0"
+tokio = { version = "=1.53.1", default-features = false, features = ["rt", "macros", "time"] }

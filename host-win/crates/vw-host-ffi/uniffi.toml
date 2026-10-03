@@ -1,0 +1,7 @@
+# UniFFI 0.32 --config uses the global configuration schema.
+[defaults.bindings.kotlin]
+package_name = "com.visualworkbench.bindings.host"
+cdylib_name = "vw_host"
+generate_immutable_records = true
+kotlin_target_version = "2.4.20"
+disable_java_cleaner = true

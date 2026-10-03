@@ -1,8 +1,8 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-shared', 'test-apps', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'build-desktop-distribution', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
-    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'pairing', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
+    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'pairing', 'shared-ffi', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
@@ -39,6 +39,15 @@ function Run-LicenseGate {
     if ($version.ExitCode -ne 0 -or ($version.Lines -join "`n") -notmatch '\b0\.20\.2\b') { throw 'cargo-deny must match the pinned version 0.20.2' }
     Run-Cargo 'license-rust' @('deny', 'check', 'licenses', 'sources', 'bans')
     Run-Gradle 'license-gradle' @('checkDependencyLicenses')
+}
+
+function Build-NativeWindows {
+    Run-Cargo 'build-native-windows' @('build', '--locked', '-p', 'vw-ffi', '-p', 'vw-host-ffi', '--features', 'vw-ffi/bindgen,vw-ffi/fixtures')
+}
+
+function Build-NativeAndroid {
+    . (Join-Path $projectRoot 'tools/enter-dev.ps1')
+    Run-Cargo 'build-native-android' @('ndk', '-t', 'arm64-v8a', '--platform', '29', '-o', 'target/android-jni', 'build', '--locked', '-p', 'vw-ffi')
 }
 
 try {
@@ -78,6 +87,24 @@ try {
             Run-Cargo 'build-pairing-android' @('ndk', '-t', 'arm64-v8a', '--platform', '29', 'build', '--locked', '-p', 'vw-pair-cli')
             Run-Step 'bind-pairing-build' 'python.exe' @('tools/pair-cli/build_receipt.py', 'record')
         }
+        'build-ffi' {
+            Run-LicenseGate
+            Build-NativeWindows
+            Build-NativeAndroid
+            Run-Step 'prepare-ffi-golden' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/ffi-test/generate-golden.ps1')
+            Run-Gradle 'build-shared-bindings' @(':shared:generateCoreBindings', ':shared:generateHostBindings', ':shared:checkCommonMainImports', ':shared:checkImportGuardFixtures', ':shared:checkAndroidNativeAlignment')
+        }
+        'test-ffi' {
+            Run-Cargo 'test-ffi-native' @('test', '--locked', '-p', 'vw-ffi', '-p', 'vw-host-ffi', '--all-targets', '--', '--test-threads=2')
+            Run-Cargo 'lint-ffi-native' @('clippy', '--locked', '-p', 'vw-ffi', '-p', 'vw-host-ffi', '--all-targets', '--features', 'vw-ffi/bindgen,vw-ffi/fixtures', '--', '-D', 'warnings')
+            Run-Cargo 'format-ffi-native' @('fmt', '-p', 'vw-ffi', '-p', 'vw-host-ffi', '--', '--check')
+        }
+        'test-shared' {
+            Run-Gradle 'test-shared-kotlin' @(':shared:desktopTest')
+        }
+        'test-apps' {
+            Run-Gradle 'test-apps-kotlin' @(':shared:desktopTest', ':desktop:test', ':android:testDebugUnitTest')
+        }
         'build-ai' {
             Run-LicenseGate
             Run-Cargo 'build-ai-spike' @('build', '--locked', '-p', 'vw-ai-spike')
@@ -89,7 +116,14 @@ try {
             Run-Cargo 'format-ai-spike' @('fmt', '-p', 'vw-ai-spike', '--', '--check')
         }
         'build-core' { Run-LicenseGate; Run-Cargo 'build-core' @('build', '--workspace', '--locked') }
-        'build-android' { Run-LicenseGate; Run-Gradle 'build-android' @(':android:assembleDebug') }
+        'build-android' {
+            Run-LicenseGate
+            Build-NativeWindows
+            Build-NativeAndroid
+            Run-Step 'test-apk-verifier' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/ffi-test', '-p', 'test_apk.py', '-v')
+            Run-Gradle 'build-android' @(':android:assembleDebug', ':android:assembleDebugAndroidTest')
+            Run-Step 'verify-android-native-packaging' 'python.exe' @('tools/ffi-test/check_apk.py', 'apps/android/build/outputs/apk/debug/android-debug.apk')
+        }
         'build-stroke-core' {
             Run-LicenseGate
             Run-Cargo 'build-stroke-windows' @('build', '--release', '--locked', '-p', 'vw-stroke-spike', '-p', 'vw-stroke-jni')
@@ -111,7 +145,20 @@ try {
             Run-Cargo 'build-pen-inject' @('build', '--locked', '-p', 'vw-pen-harness', '-p', 'vw-pen-inject')
             Run-Step 'bind-pen-inject-build' 'python.exe' @('tools/pen-inject/build_receipt.py', 'record')
         }
-        'build-desktop' { Run-LicenseGate; Run-Gradle 'build-desktop' @(':desktop:packageUberJarForCurrentOS') }
+        'build-desktop' { Run-LicenseGate; Build-NativeWindows; Run-Gradle 'build-desktop' @(':desktop:packageUberJarForCurrentOS') }
+        'build-desktop-distribution' {
+            # The fresh nonce invalidates any prior receipt even when a new
+            # build later fails. Source is checked again after all compilation.
+            Run-Step 'desktop-build-begin' 'python.exe' @('tools/desktop-test/reports.py','begin','--root',$projectRoot)
+            $desktopBuild = Get-Content -LiteralPath (Join-Path $projectRoot '.local/desktop-test-build-start.json') -Raw | ConvertFrom-Json
+            if ($desktopBuild.nonce -cnotmatch '^[0-9a-f]{32}$') { throw 'Desktop build receipt refused' }
+            Run-LicenseGate
+            Build-NativeWindows
+            Run-Gradle 'build-desktop-distribution' @(':desktop:createDistributable',
+                ('-PvwNativeDir=' + (Join-Path $projectRoot 'target/debug')),
+                '-PvwDesktopSmokeConsole=true', ('-PvwDesktopBuildId=' + $desktopBuild.nonce))
+            Run-Step 'desktop-build-record' 'python.exe' @('tools/desktop-test/reports.py','record','--root',$projectRoot)
+        }
         'build-video-pc' {
             Run-LicenseGate
             Run-Cargo 'build-video-pc' @('build', '--release', '--locked', '-p', 'vw-video-bench')
@@ -140,13 +187,17 @@ try {
             Run-Cargo 'build-transport-android' @('ndk', '-t', 'arm64-v8a', '--platform', '29', 'build', '--release', '--locked', '-p', 'vw-transport-bench')
             Run-Step 'bind-transport-build' 'python.exe' @('tools/bench/transport/build_receipt.py', 'record')
         }
-        'run-desktop' { Run-LicenseGate; Run-Gradle 'run-desktop' @(':desktop:run') }
+        'run-desktop' { Run-LicenseGate; Build-NativeWindows; Run-Gradle 'run-desktop' @(':desktop:run') }
         'test-all' {
             Run-Step 'test-ai-verifier' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/ai-spike/tests', '-p', 'test_*.py', '-v')
             Run-Step 'test-tools' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/tests', '-v')
             Run-Step 'test-device-selection' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/device-selection-fixtures.ps1')
             Run-Step 'test-store-crash-receipt' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/store-crash-receipt-fixtures.ps1')
-            Run-Cargo 'test-rust' @('test', '--workspace', '--locked')
+            Run-Cargo 'test-rust' @('test', '--workspace', '--exclude', 'vw-sim', '--locked', '--', '--test-threads=2')
+            # Run the complete 10,000-seed simulator in its measured optimized
+            # configuration, with compilation on its own progress budget.
+            Run-Cargo 'build-rust-simulation' @('test', '--no-run', '--release', '--locked', '-p', 'vw-sim')
+            Run-Cargo 'test-rust-simulation' @('test', '--release', '--locked', '-p', 'vw-sim', '--', '--nocapture', '--test-threads=2')
             Run-Gradle 'test-kotlin' @(':shared:allTests', ':android:testDebugUnitTest', ':desktop:test', ':pen-probe:testDebugUnitTest')
         }
         'lint-all' {
@@ -158,6 +209,24 @@ try {
             Run-Gradle 'lint-kotlin' @(':android:lintDebug', ':shared:check', ':desktop:check', ':pen-probe:lintDebug', ':video-bench:lintDebug', ':image-bench:lintDebug')
         }
         'hil-test' {
+            if ($HilMode -eq 'app') {
+                if ($TimeoutSeconds -lt 60 -or $TimeoutSeconds -gt 3600) { throw 'App HIL phase timeout must be between 60 and 3600 seconds' }
+                Run-LicenseGate
+                . (Join-Path $projectRoot 'tools/enter-dev.ps1')
+                Run-Step 'test-app-hil-reports' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/app-test', '-p', 'test_*.py', '-v') -Limit 120
+                Run-Step 'test-app-hil-staging' 'pwsh.exe' @('-NoProfile', '-File', 'tools/app-test/test_stage.ps1') -Limit 60
+                Run-Step 'test-app-hil-native-inventory' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/ffi-test', '-p', 'test_apk.py', '-v') -Limit 120
+            }
+            if ($HilMode -eq 'shared-ffi') {
+                if ($TimeoutSeconds -lt 60 -or $TimeoutSeconds -gt 3600) { throw 'Shared FFI phase timeout must be between 60 and 3600 seconds' }
+                Run-LicenseGate
+                . (Join-Path $projectRoot 'tools/enter-dev.ps1')
+                # Run synthetic parser/package-inventory fixtures before any
+                # device work. Native inputs and reviewed goldens must already
+                # exist; this mode never builds native code or regenerates them.
+                Run-Step 'test-shared-ffi-reports' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/ffi-test', '-p', 'test_shared_reports.py', '-v') -Limit 120
+                Run-Step 'test-shared-ffi-package-inventory' 'pwsh.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/ffi-test/test_package_inventory.ps1') -Limit 120
+            }
             $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/hil-test.ps1', '-Mode', $HilMode, '-TimeoutSeconds', "$TimeoutSeconds")
             if ($HilMode -eq 'vdd') {
                 $arguments += @('-VddScenario', $VddScenario)
@@ -177,8 +246,14 @@ try {
             }
             # Leave the child enough time to run its bounded build, replay and
             # device cleanup. An outer deadline must not preempt its finally block.
-            $hilBudget = if ($HilMode -in @('pen', 'pen-owner', 'win-pen')) { $TimeoutSeconds * 6 + 600 } else { $TimeoutSeconds + 600 }
-            Run-Step 'hil-test' 'powershell.exe' $arguments -Limit $hilBudget
+            $hilBudget = if ($HilMode -eq 'app') { $TimeoutSeconds * 2 + 2100 } elseif ($HilMode -eq 'shared-ffi') {
+                # Match tools/hil-test.ps1: three Gradle phases, 300s task
+                # inventory, 1800s auxiliary work, 300s inner cleanup, then
+                # another 300s for the dispatcher's process-tree cleanup.
+                $TimeoutSeconds * 3 + 300 + 1800 + 600
+            } elseif ($HilMode -in @('pen', 'pen-owner', 'win-pen')) { $TimeoutSeconds * 6 + 600 } else { $TimeoutSeconds + 600 }
+            $hilShell = if ($HilMode -in @('app', 'shared-ffi')) { 'pwsh.exe' } else { 'powershell.exe' }
+            Run-Step 'hil-test' $hilShell $arguments -Limit $hilBudget
         }
     }
     exit 0

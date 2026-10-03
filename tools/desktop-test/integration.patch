@@ -1,0 +1,155 @@
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
+@@ -8,6 +8,7 @@
+ import androidx.compose.runtime.*
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.drawWithContent
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.input.key.*
+ import androidx.compose.ui.platform.LocalDensity
+@@ -25,7 +26,10 @@
+ 
+ private val accent=Color(0xff81e0c8)
+ private val palette=listOf(0x78dcc8ffu,0xffd580ffu,0xf68282ffu,0x91b7ffffu,0xffffffffu,0x182535ffu)
+-fun main() {
++fun main(args: Array<String>) {
++    // Refuse unknown/duplicate arguments before native, preference or UI work.
++    require(args.isEmpty() || args.contentEquals(arrayOf("--startup-smoke"))) { "Unsupported desktop argument" }
++    val startupSmoke = args.contentEquals(arrayOf("--startup-smoke"))
+     val started=System.nanoTime()
+     val local=Path.of(System.getenv("LOCALAPPDATA")?:error("LOCALAPPDATA unavailable"))
+     val nativeRuntime=DesktopNativeRuntime.prepare(local)
+@@ -45,7 +49,29 @@
+         var prior by remember{mutableStateOf(if(saved.mode==WindowMode.Fullscreen)WindowMode.Windowed else saved.mode)}
+         var floating by remember{mutableStateOf(saved.copy(mode=WindowMode.Windowed))};var dialog by remember{mutableStateOf<Command?>(null)}
+         var quitting by remember{mutableStateOf(false)};var dpiText by remember{mutableStateOf("Checking display scale…")};var startupMs by remember{mutableStateOf<Long?>(null)}
+-        fun quit(){if(!quitting){quitting=true;scope.launch{withContext(NonCancellable){try{assistance.close()}finally{try{controller.close()}finally{try{sessions.close()}finally{try{host.shutdown()}finally{host.destroy();exitApplication()}}}}}}}}
++        fun quit() {
++            if (!quitting) {
++                quitting = true
++                scope.launch { withContext(NonCancellable) {
++                    var clean = false
++                    try {
++                        try { assistance.close() } finally {
++                            try { controller.close() } finally {
++                                try { sessions.close() } finally {
++                                    try { host.shutdown() } finally { host.destroy() }
++                                }
++                            }
++                        }
++                        clean = true
++                    } finally {
++                        if (startupSmoke) println(if (clean)
++                            "VW_DESKTOP_EXIT startup_smoke=true cleanup=complete"
++                            else "VW_DESKTOP_EXIT startup_smoke=true cleanup=failed")
++                        exitApplication()
++                    }
++                } }
++            }
++        }
+         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
+         Window(onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
+             onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,dialog!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen)?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{dialog=it},{quit()});true}?:false}) {
+@@ -65,7 +91,23 @@
+             DisposableEffect(window,controller){val drop=DesktopDropTarget(window.contentPane,controller);val focus=object:java.awt.event.WindowAdapter(){override fun windowDeactivated(event:java.awt.event.WindowEvent){controller.cancelInput()}};window.addWindowListener(focus);onDispose{window.removeWindowListener(focus);controller.cancelInput();drop.close()}}
+             val density=LocalDensity.current.density
+             LaunchedEffect(density,state.position){try{val info=host.windowDpiInfo(window.windowHandle.toULong());dpiText="Windows ${info.windowDpi} DPI · Compose ${"%.2f".format(density)}× · PMv2 ${info.windowPerMonitorV2}"}catch(_:Exception){dpiText="Display DPI query unavailable"}}
+-            LaunchedEffect(Unit){withFrameNanos{};startupMs=(System.nanoTime()-started)/1_000_000;println("VW_DESKTOP_READY startup_ms=$startupMs composeDensity=$density pmv2=${dpi.perMonitorV2}")}
++            val firstDraw = remember { CompletableDeferred<Unit>() }
++            LaunchedEffect(Unit) {
++                if (startupSmoke) {
++                    // The actual EditorShell draw must return; the next frame
++                    // callback moves the readiness effect out of that draw.
++                    firstDraw.await()
++                    withFrameNanos { }
++                } else withFrameNanos { }
++                startupMs = (System.nanoTime() - started) / 1_000_000
++                if (startupSmoke) {
++                    val info = host.windowDpiInfo(window.windowHandle.toULong())
++                    check(info.windowPerMonitorV2 && info.windowDpi > 0u) { "Window DPI readiness failed" }
++                    println("VW_DESKTOP_READY startup_ms=$startupMs composeDensity=$density pmv2=${dpi.perMonitorV2}")
++                    println("VW_DESKTOP_SMOKE_FRAME window_dpi=${info.windowDpi} window_pmv2=${info.windowPerMonitorV2} drawn=true")
++                    quit()
++                } else println("VW_DESKTOP_READY startup_ms=$startupMs composeDensity=$density pmv2=${dpi.perMonitorV2}")
++            }
+             LaunchedEffect(state){snapshotFlow{Triple(state.placement,state.size,state.position)}.debounce(350).collect{(placement,size,position)->
+                 if(placement==WindowPlacement.Floating){val p=position as? WindowPosition.Absolute;floating=SavedWindow(WindowMode.Windowed,size.width.value,size.height.value,p?.x?.value,p?.y?.value)}
+                 val snapshot=floating.copy(mode=placement.mode());withContext(Dispatchers.IO){preferences.saveWindow(snapshot)}
+@@ -78,7 +120,10 @@
+                 Menu("Workbench"){for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
+             }
+             MaterialTheme(colors=darkColors(primary=accent,secondary=Color(0xffe8bb75),background=Color(0xff101720),surface=Color(0xff18222e))){
+-                EditorShell(controller,editor,dpiText,quitting,::action)
++                Box(Modifier.fillMaxSize().drawWithContent {
++                    drawContent()
++                    if (startupSmoke) firstDraw.complete(Unit)
++                }) { EditorShell(controller,editor,dpiText,quitting,::action) }
+                 if(editor.exportOpen&&editor.document!=null)ExportDialog(controller,editor,::save)
+                 if(editor.pasteOpen)PasteDialog(controller,editor)
+                 if(dialog==Command.Pairing)SessionDialog(sessions,controller,assistance){dialog=null}
+--- a/apps/desktop/build.gradle.kts
++++ b/apps/desktop/build.gradle.kts
+@@ -26,6 +26,8 @@
+             packageName = "VisualWorkbenchDev"
+             packageVersion = "0.0.1"
+             modules("java.desktop", "java.logging", "jdk.unsupported")
++            // Explicit diagnostic packaging only; ordinary builds keep a GUI launcher.
++            windows { console = providers.gradleProperty("vwDesktopSmokeConsole").orNull == "true" }
+         }
+     }
+ }
+@@ -58,3 +60,23 @@
+     }
+ }
+ sourceSets.named("main") { resources.srcDir(packageConnectionRuntime) }
++
++// A successful central package build must contain this exact fresh receipt ID.
++// No build ID is emitted for ordinary desktop builds.
++val desktopBuildId = providers.gradleProperty("vwDesktopBuildId")
++val packageDesktopBuildReceipt = tasks.register("packageDesktopBuildReceipt") {
++    inputs.property("receiptId", desktopBuildId.orElse(""))
++    val output = layout.buildDirectory.dir("generated/desktopBuildReceipt")
++    outputs.dir(output)
++    doLast {
++        val id = desktopBuildId.orNull
++        check(id == null || id.matches(Regex("[0-9a-f]{32}"))) { "Invalid desktop build receipt" }
++        val directory = output.get().asFile
++        directory.mkdirs()
++        val marker = directory.resolve("vw-desktop-build.id")
++        if (id == null) {
++            check(!marker.exists() || marker.delete()) { "Could not remove old desktop build receipt" }
++        } else marker.writeText(id + "\n", Charsets.US_ASCII)
++    }
++}
++sourceSets.named("main") { resources.srcDir(packageDesktopBuildReceipt) }
+--- a/build.ps1
++++ b/build.ps1
+@@ -1,6 +1,6 @@
+ param(
+     [Parameter(Position = 0)]
+-    [ValidateSet('build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-shared', 'test-apps', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
++    [ValidateSet('build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-shared', 'test-apps', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'build-desktop-distribution', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+     [string]$Command = 'doctor',
+     [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'pairing', 'shared-ffi', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
+     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
+@@ -146,6 +146,19 @@
+             Run-Step 'bind-pen-inject-build' 'python.exe' @('tools/pen-inject/build_receipt.py', 'record')
+         }
+         'build-desktop' { Run-LicenseGate; Build-NativeWindows; Run-Gradle 'build-desktop' @(':desktop:packageUberJarForCurrentOS') }
++        'build-desktop-distribution' {
++            # The fresh nonce invalidates any prior receipt even when a new
++            # build later fails. Source is checked again after all compilation.
++            Run-Step 'desktop-build-begin' 'python.exe' @('tools/desktop-test/reports.py','begin','--root',$projectRoot)
++            $desktopBuild = Get-Content -LiteralPath (Join-Path $projectRoot '.local/desktop-test-build-start.json') -Raw | ConvertFrom-Json
++            if ($desktopBuild.nonce -cnotmatch '^[0-9a-f]{32}$') { throw 'Desktop build receipt refused' }
++            Run-LicenseGate
++            Build-NativeWindows
++            Run-Gradle 'build-desktop-distribution' @(':desktop:createDistributable',
++                ('-PvwNativeDir=' + (Join-Path $projectRoot 'target/debug')),
++                '-PvwDesktopSmokeConsole=true', ('-PvwDesktopBuildId=' + $desktopBuild.nonce))
++            Run-Step 'desktop-build-record' 'python.exe' @('tools/desktop-test/reports.py','record','--root',$projectRoot)
++        }
+         'build-video-pc' {
+             Run-LicenseGate
+             Run-Cargo 'build-video-pc' @('build', '--release', '--locked', '-p', 'vw-video-bench')

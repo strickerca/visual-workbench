@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'pairing', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$Mode = 'app',
+    [ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'pairing', 'shared-ffi', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$Mode = 'app',
     [ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
@@ -14,6 +14,32 @@ Import-Module (Join-Path $PSScriptRoot 'process.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'android-device.psm1') -Force
 
 try {
+    if ($Mode -eq 'app') {
+        if ($TimeoutSeconds -lt 60 -or $TimeoutSeconds -gt 3600) { throw 'App HIL phase timeout must be between 60 and 3600 seconds' }
+        $run = Invoke-VwProcess -FilePath 'pwsh.exe' -ArgumentList @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/app-test/run_android.ps1',
+            '-ExpectedModel', 'IN2019', '-TimeoutSeconds', "$TimeoutSeconds", '-Execute'
+        ) -WorkingDirectory $projectRoot -Phase 'hil-app-isolated' -TimeoutSeconds ($TimeoutSeconds * 2 + 1800) -ParentExitGraceSeconds 20 -RedactValues @($projectRoot, $env:USERPROFILE)
+        if ($run.ExitCode -ne 0) { throw 'Isolated app HIL assertions, APK binding or owned cleanup failed' }
+        exit 0
+    }
+    if ($Mode -eq 'shared-ffi') {
+        if ($TimeoutSeconds -lt 60 -or $TimeoutSeconds -gt 3600) { throw 'Shared FFI phase timeout must be between 60 and 3600 seconds' }
+        # Cold configuration on this host has measured 130 seconds; keep task
+        # inventory separate from test execution with a realistic upper bound.
+        $inventorySeconds = 300
+        # The child inventories actual AGP tasks before its three bounded
+        # Gradle phases. Reserve the nine 120s parser/packaging checks, device
+        # selection and process overhead separately, plus owned cleanup time.
+        $runnerBudget = $TimeoutSeconds * 3 + $inventorySeconds + 1800 + 300
+        $run = Invoke-VwProcess -FilePath 'pwsh.exe' -ArgumentList @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+            'tools/ffi-test/run_shared_android.ps1', '-ExpectedModel', 'IN2019',
+            '-TimeoutSeconds', "$TimeoutSeconds", '-InventoryTimeoutSeconds', "$inventorySeconds"
+        ) -WorkingDirectory $projectRoot -Phase 'hil-shared-ffi' -TimeoutSeconds $runnerBudget -ParentExitGraceSeconds 20 -RedactValues @($projectRoot, $env:USERPROFILE)
+        if ($run.ExitCode -ne 0) { throw 'Shared FFI assertions, provenance, packaging or owned cleanup failed' }
+        exit 0
+    }
     if ($Mode -eq 'pairing') {
         $run = Invoke-VwProcess -FilePath 'pwsh.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/pair-cli/run_adb.ps1', '-TimeoutSeconds', '180') -WorkingDirectory $projectRoot -Phase 'hil-pairing-adb' -TimeoutSeconds 480
         if ($run.ExitCode -ne 0) { throw 'Pairing HIL or its owned cleanup failed' }
@@ -69,41 +95,7 @@ try {
         if (-not $Crate) { throw 'Specify -Crate for a Rust HIL test' }
         $passedTests = Invoke-VwAndroidCargoTest -Device $device -Crate $Crate -TimeoutSeconds $TimeoutSeconds
         Write-Host "HIL Rust: PASS ($passedTests actual tests through the configured Cargo target runner); crate $Crate"
-    } else {
-        $apk = Join-Path $projectRoot 'apps\android\build\outputs\apk\debug\android-debug.apk'
-        if (-not (Test-Path -LiteralPath $apk -PathType Leaf)) { throw 'Build the Android APK with build-android before app HIL' }
-        Invoke-VwAdb -Device $device -Arguments @('install', '-r', $apk) -Phase 'hil-apk-install' | Out-Null
-        Start-VwAndroidStarter -Device $device -PhasePrefix 'hil-app'
-        Write-Host 'HIL app install/launch/foreground: PASS.'
-        $previousSerial = [Environment]::GetEnvironmentVariable('ANDROID_SERIAL', 'Process')
-        try {
-            [Environment]::SetEnvironmentVariable('ANDROID_SERIAL', $device.Serial, 'Process')
-            $testStart = Get-Date
-            $instrumentation = Invoke-VwProcess -FilePath (Join-Path $projectRoot 'apps\gradlew.bat') -ArgumentList @(':android:connectedDebugAndroidTest', '--console=plain', '--no-daemon', '--no-parallel', '--no-configuration-cache', '--rerun-tasks') -WorkingDirectory (Join-Path $projectRoot 'apps') -Phase 'hil-android-instrumentation' -TimeoutSeconds $TimeoutSeconds -RedactValues @($device.Serial, $projectRoot, $env:USERPROFILE)
-            if ($instrumentation.ExitCode -ne 0) { throw "Android instrumentation failed (exit $($instrumentation.ExitCode))" }
-            $reportRoot = Join-Path $projectRoot 'apps\android\build\outputs\androidTest-results\connected'
-            $testCount = 0
-            $reports = @(Get-ChildItem -LiteralPath $reportRoot -Filter 'TEST-*.xml' -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -ge $testStart.AddSeconds(-2) })
-            foreach ($report in $reports) {
-                [xml]$result = Get-Content -Raw -LiteralPath $report.FullName
-                foreach ($suite in $result.SelectNodes('//testsuite')) {
-                    if ([int]$suite.failures -ne 0 -or [int]$suite.errors -ne 0) { throw 'Fresh instrumentation report contains failures or errors' }
-                    $tests = [int]$suite.GetAttribute('tests')
-                    $skipped = if ($suite.HasAttribute('skipped')) { [int]$suite.GetAttribute('skipped') } else { @($suite.SelectNodes('./testcase/skipped')).Count }
-                    if ($skipped -lt 0 -or $skipped -gt $tests) { throw 'Fresh instrumentation report contains inconsistent skipped-test counts' }
-                    $testCount += $tests - $skipped
-                }
-            }
-            if ($testCount -eq 0) { throw 'Instrumentation produced no actual passed tests or no fresh result report; acceptance remains pending' }
-            Write-Host "HIL Android instrumentation: PASS ($testCount actual passed tests). S23 Ultra/S Pen and performance acceptance remain pending."
-            # AGP's connected-test runner removes its installed application after testing.
-            # Restore the current built APK so the authorized startup run leaves the app open.
-            Invoke-VwAdb -Device $device -Arguments @('install', '-r', $apk) -Phase 'hil-apk-restore-after-tests' | Out-Null
-            Start-VwAndroidStarter -Device $device -PhasePrefix 'hil-app-restored'
-            Write-Host 'HIL starter restored and foreground: PASS.'
-        } finally {
-            [Environment]::SetEnvironmentVariable('ANDROID_SERIAL', $previousSerial, 'Process')
-        }
+
     }
     exit 0
 } catch {

@@ -181,6 +181,35 @@ pub mod desktop {
         closed: bool,
     }
     impl MdnsDiscovery {
+        /// Browse only on explicitly selected interfaces, without advertising a
+        /// listener. Numeric addresses are hints and never establish app trust.
+        pub fn browse_on(addresses: &[SocketAddr]) -> Result<Self> {
+            if addresses.is_empty()
+                || addresses.len() > 8
+                || addresses
+                    .iter()
+                    .any(|address| address.ip().is_unspecified() || address.ip().is_multicast())
+            {
+                return Err(PairingError::Invalid("discovery interfaces"));
+            }
+            let daemon = ServiceDaemon::new().map_err(|_| PairingError::Connection)?;
+            let service = Self {
+                daemon,
+                fullname: None,
+                closed: false,
+            };
+            service
+                .daemon
+                .disable_interface(IfKind::All)
+                .map_err(|_| PairingError::Connection)?;
+            for address in addresses {
+                service
+                    .daemon
+                    .enable_interface(selected_interface(*address)?)
+                    .map_err(|_| PairingError::Connection)?;
+            }
+            Ok(service)
+        }
         /// Advertise/browse only explicitly selected local interfaces. No admin
         /// changes or firewall commands are issued by this adapter.
         pub fn start(advertisement: &Advertisement) -> Result<Self> {
@@ -196,10 +225,15 @@ pub mod desktop {
                 .map_err(|_| PairingError::Connection)?;
             let addresses: Vec<IpAddr> =
                 advertisement.endpoints.iter().map(SocketAddr::ip).collect();
-            for address in &addresses {
+            let interfaces = advertisement
+                .endpoints
+                .iter()
+                .map(|address| selected_interface(*address))
+                .collect::<Result<Vec<_>>>()?;
+            for interface in &interfaces {
                 service
                     .daemon
-                    .enable_interface(IfKind::Addr(*address))
+                    .enable_interface(interface.clone())
                     .map_err(|_| PairingError::Connection)?;
             }
             let txt = advertisement.txt();
@@ -212,7 +246,7 @@ pub mod desktop {
                 txt.as_slice(),
             )
             .map_err(|_| PairingError::Connection)?;
-            info.set_interfaces(addresses.into_iter().map(IfKind::Addr).collect());
+            info.set_interfaces(interfaces);
             service.fullname = Some(info.get_fullname().to_owned());
             service
                 .daemon
@@ -301,6 +335,17 @@ pub mod desktop {
         fn drop(&mut self) {
             let _ = self.close();
         }
+    }
+    fn selected_interface(address: SocketAddr) -> Result<IfKind> {
+        if let SocketAddr::V6(address) = address {
+            if address.scope_id() != 0 {
+                return Ok(IfKind::IndexV6(address.scope_id()));
+            }
+            if address.ip().is_unicast_link_local() {
+                return Err(PairingError::Invalid("discovery IPv6 scope"));
+            }
+        }
+        Ok(IfKind::Addr(address.ip()))
     }
     impl fmt::Debug for MdnsDiscovery {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

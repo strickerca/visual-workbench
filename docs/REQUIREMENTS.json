@@ -120,7 +120,8 @@
         "A01"
       ],
       "evidence": [
-        "docs/evidence/T1.01.md — shared camera and transforms verified on Windows/S23; receiving camera invariance across 100 peer edits and explicit default-off follow/match remain T1.09, T1.10 and T1.12."
+        "docs/evidence/T1.01.md — shared camera and transforms verified on Windows/S23; receiving camera invariance across 100 peer edits and explicit default-off follow/match remain T1.09, T1.10 and T1.12.",
+        "docs/evidence/T1.09.md - Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -150,9 +151,11 @@
       "scenarios": [
         "A02"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "updated: selection edits stream from Phase 2"
     },
@@ -179,9 +182,11 @@
         "A01",
         "A06"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.08a.md - Local project/edit/export paths execute in the isolated app; airplane-mode input-to-present measurement and trace acceptance remain pending."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -208,7 +213,8 @@
         "A06"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — 500 seeded undo/redo sequences per platform and commit/cancel identities verified; actual app gestures and end-to-end cancellation remain T1.08b, T1.10 and T1.12."
+        "docs/evidence/T1.02.md — 500 seeded undo/redo sequences per platform and commit/cancel identities verified; actual app gestures and end-to-end cancellation remain T1.08b, T1.10 and T1.12.",
+        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -238,7 +244,8 @@
       ],
       "evidence": [
         "docs/evidence/T1.02.md — capture session/frame/geometry and semantic binding round-trip on both platforms; evidence only, capture storage/import/export metadata remain downstream.",
-        "docs/evidence/T1.05.md — PNG iTXt and JPEG/WebP XMP include revision, original hash, dimensions/settings and supplied capture IDs; capture persistence/end-to-end and app integration remain open."
+        "docs/evidence/T1.05.md — PNG iTXt and JPEG/WebP XMP include revision, original hash, dimensions/settings and supplied capture IDs; capture persistence/end-to-end and app integration remain open.",
+        "docs/evidence/T1.11.md - Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -269,7 +276,8 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/T1.06a.md — All 10,000 fault seeds converge and native recovery tests pass; app lifecycle/replication integration remains T1.10."
+        "docs/evidence/T1.06a.md — All 10,000 fault seeds converge and native recovery tests pass; app lifecycle/replication integration remains T1.10.",
+        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -384,7 +392,8 @@
         "A01"
       ],
       "evidence": [
-        "docs/evidence/T1.04.md — Monotonic Bezier curves and stabilization are replay-tested; editable persisted settings and hover cursor remain for T1.08b/T1.12."
+        "docs/evidence/T1.04.md — Monotonic Bezier curves and stabilization are replay-tested; editable persisted settings and hover cursor remain for T1.08b/T1.12.",
+        "docs/evidence/T1.08b.md - Per-brush settings persist and native pressure/stabilization fixtures pass; physical hover behavior remains deferred."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -412,9 +421,11 @@
       "scenarios": [
         "A01"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.08a.md - IN2019 injected input tests pass for pen/finger routing and the saved finger-drawing option; physical owner/S23 acceptance remains pending."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -730,9 +741,11 @@
       "scenarios": [
         "A06"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.08a.md - Generic capability/input, palm and cancellation fixtures pass in the actual IN2019 app; S23 hardware-specific behavior remains deferred."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new (D19)"
     },
@@ -818,7 +831,9 @@
         "A02"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — all 13 object representations and editable operations validated; brush/tool UI, font rendering and golden images remain T1.04, T1.05, T1.08b and T1.12."
+        "docs/evidence/T1.02.md — all 13 object representations and editable operations validated; brush/tool UI, font rendering and golden images remain T1.04, T1.05, T1.08b and T1.12.",
+        "docs/evidence/T1.08b.md - Editable tool/reopen and Android-versus-native text outline golden cases pass; cross-device UI acceptance remains pending.",
+        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -898,7 +913,10 @@
         "A02"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — transform/style/shape property transactions and inverse behavior verified; interactive handles and streamed intermediate UI states remain T1.08b/T1.09/T1.10/T1.12."
+        "docs/evidence/T1.02.md — transform/style/shape property transactions and inverse behavior verified; interactive handles and streamed intermediate UI states remain T1.08b/T1.09/T1.10/T1.12.",
+        "docs/evidence/T1.08b.md - Injected Android select/move/resize/undo cases pass with native revision binding; physical two-device intermediate-state streaming remains pending.",
+        "docs/evidence/T1.09.md - Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open.",
+        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1625,7 +1643,8 @@
       ],
       "evidence": [
         "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
-        "docs/evidence/T1.06b.md — Native QR/code/discovery and IN2019 ADB QR pairing pass; app QR/discovery and physical route scenarios remain T1.10."
+        "docs/evidence/T1.06b.md — Native QR/code/discovery and IN2019 ADB QR pairing pass; app QR/discovery and physical route scenarios remain T1.10.",
+        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1653,7 +1672,8 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/T1.06b.md — Both TLS carriers and IN2019 ADB operation exchange work in the CLI; app reconnect, tether/Wi-Fi and timing acceptance remain T1.10."
+        "docs/evidence/T1.06b.md — Both TLS carriers and IN2019 ADB operation exchange work in the CLI; app reconnect, tether/Wi-Fi and timing acceptance remain T1.10.",
+        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1684,7 +1704,8 @@
         "A19"
       ],
       "evidence": [
-        "docs/evidence/T1.06b.md — DPAPI, expiry/reuse/replay, code lockout and live revocation pass; Android Keystore and real-app flows remain T1.10."
+        "docs/evidence/T1.06b.md — DPAPI, expiry/reuse/replay, code lockout and live revocation pass; Android Keystore and real-app flows remain T1.10.",
+        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2196,7 +2217,8 @@
         "A11"
       ],
       "evidence": [
-        "docs/evidence/T1.05.md — PNG8/16, JPEG and WebP native codec tests pass on Windows/IN2019, including exact PNG alpha/depth round trips; app integration remains T1.11."
+        "docs/evidence/T1.05.md — PNG8/16, JPEG and WebP native codec tests pass on Windows/IN2019, including exact PNG alpha/depth round trips; app integration remains T1.11.",
+        "docs/evidence/T1.11.md - Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2579,9 +2601,11 @@
       "scenarios": [
         "A13"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.11.md - Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2732,9 +2756,11 @@
       "scenarios": [
         "A18"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.09.md - Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2756,9 +2782,11 @@
       "scenarios": [
         "A18"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.08b.md - Movable/mirrored tool rail is integrated; complete portrait/landscape owner reachability review remains pending."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2780,9 +2808,11 @@
       "scenarios": [
         "A18"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.08b.md - Declared theme text-pair contrast passes; all rendered controls and reduced-motion acceptance remain pending."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2804,9 +2834,12 @@
       "scenarios": [
         "A18"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.08b.md - Exercised project actions pass 48 dp assertions; all PC shortcuts and whole-product touch-target acceptance remain pending.",
+        "docs/evidence/T1.09.md - Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2829,9 +2862,12 @@
       "scenarios": [
         "A18"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open.",
+        "docs/evidence/T1.11.md - Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; words for later features are verified by those features' requirements"
     },
@@ -2853,9 +2889,11 @@
       "scenarios": [
         "A01"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.08a.md - Injected gesture and generic surface cases pass; full physical gesture/layout acceptance remains pending."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },
@@ -4038,7 +4076,10 @@
       ],
       "evidence": [
         "docs/evidence/T1.02.md — offline queue/rebase, optimistic undo/redo and conflict retention pass simulation; durable conflict table and PC-off app open/edit/export/save remain T1.03, T1.08a, T1.10 and T1.12.",
-        "docs/evidence/T1.03.md — pending queue, conflicts, retries and undo ownership persist through restart; PC-off app open/edit/export/save and finalized transport remain T1.08a/T1.10/T1.12."
+        "docs/evidence/T1.03.md — pending queue, conflicts, retries and undo ownership persist through restart; PC-off app open/edit/export/save and finalized transport remain T1.08a/T1.10/T1.12.",
+        "docs/evidence/T1.08a.md - Native app create/edit/reopen/export and synthetic peer state fences pass; PC-off and real paired conflict scenarios remain pending.",
+        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open.",
+        "docs/evidence/T1.11.md - Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4151,7 +4192,8 @@
         "A06"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — 1,000 ms expiry, immediate cancel, stale-packet suppression and gesture identity pass; within-frame rendering and flash-free commit replacement remain T1.08b/T1.10/T1.12."
+        "docs/evidence/T1.02.md — 1,000 ms expiry, immediate cancel, stale-packet suppression and gesture identity pass; within-frame rendering and flash-free commit replacement remain T1.08b/T1.10/T1.12.",
+        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4819,9 +4861,10 @@
         "A02"
       ],
       "evidence": [
-        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged."
+        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
+        "docs/evidence/T1.10.md - Live preview and echo diagnostics are implemented; no drawing-latency acceptance measurement was made. Verification remains not_tested."
       ],
-      "impl_status": "not_started",
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new"
@@ -5028,7 +5071,8 @@
       ],
       "evidence": [
         "docs/evidence/T1.02.md — reserved/unknown document kinds fail with typed errors and mp4 metadata is accepted; storing/syncing actual video bytes remains T1.03/T1.06a/T1.10.",
-        "docs/evidence/T1.03.md — generated synthetic MP4 bytes and metadata round-trip through database, blob storage and .vwbz; live asset sync remains T1.06a/T1.10 and A18/T1.12 acceptance. Timeline stays reserved; no video-editing UI is required by this hook."
+        "docs/evidence/T1.03.md — generated synthetic MP4 bytes and metadata round-trip through database, blob storage and .vwbz; live asset sync remains T1.06a/T1.10 and A18/T1.12 acceptance. Timeline stays reserved; no video-editing UI is required by this hook.",
+        "docs/evidence/T1.11.md - Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5053,9 +5097,12 @@
       "scenarios": [
         "A20"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.07.md - commonMain guard and four violation/parser fixtures pass; both native Kotlin wrappers pass on Windows/IN2019. Integrated slice closure and final fixture re-run are pending.",
+        "docs/evidence/T1.07.md - commonMain platform-import guard passes and deliberate violations fail; final Windows/IN2019 native golden and cancellation rerun passed. This requirement is only the import guard, not broader product acceptance."
+      ],
+      "impl_status": "implemented",
+      "verify_status": "passed",
       "owner_decision": "explicit",
       "v1_note": "new (iPad later)"
     },

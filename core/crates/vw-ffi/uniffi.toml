@@ -1,0 +1,15 @@
+# UniFFI 0.32 --config uses the global configuration schema.
+[defaults.bindings.kotlin]
+package_name = "com.visualworkbench.bindings.core"
+cdylib_name = "vw_core"
+generate_immutable_records = true
+kotlin_target_version = "2.4.20"
+disable_java_cleaner = true
+
+# Generated objects implement AutoCloseable.close() for handle disposal.
+# Keep the asynchronous worker shutdown distinct from that synchronous method.
+[defaults.bindings.kotlin.rename]
+"ProjectSession.close" = "close_session"
+"LiveSession.close" = "close_session"
+"PairingServer.close" = "close_session"
+"SessionDiscovery.close" = "close_session"
