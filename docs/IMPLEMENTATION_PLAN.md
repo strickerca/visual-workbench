@@ -329,6 +329,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
 - **Requirements:** QUALITY-004
 - **Deliverables:** a consolidated Phase 0 summary; a dated DECISIONS.md entry confirming or adjusting every PERF target (loosened targets need Christian's OK); checks that dated D6, D7, D9, D10, D11 and D15 entries exist; corrected statuses for every phase-0 requirement; the G0 decision; a list of carry-overs into Phase 1.
 - **Acceptance:** Gate G0 recorded, confirmed by Christian.
+- **Execution checkpoint, 2026-10-02:** the recorded-evidence reconciliation is complete in `docs/evidence/T0.12.md` and its source-bound results. G0 remains BLOCKED: six spikes are incomplete, physical baselines/current-main gate health and owner confirmation are absent. All twelve phase-0 requirements remain in_progress/partial and all nine PERF targets are retained unchanged. The dated PERF proposal and chronological hardware update record the carryovers. Independent software continues under the owner's full-continuation instruction; this does not conclude Phase 0 or waive T1.12's gate dependency.
 
 **Gate G0:** hardware-truth.md complete; D6, D7, D9, D10, D11 and D15 confirmed or revised with evidence; PERF targets confirmed or adjusted (QUALITY-004); toolchain pinned; license gate working.
 

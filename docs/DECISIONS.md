@@ -215,3 +215,29 @@ See `docs/evidence/T0.09.md` and its raw text-only measurements/failure receipts
 ## D19 — Pen devices
 - **Decision:** all input goes through a stylus abstraction built on standard Android `MotionEvent` axes with per-device capability flags. Samsung specifics (Air Actions, declared through manifest meta-data so they arrive as ordinary KeyEvents) are optional modules; the proprietary S Pen Remote SDK is not used. Tuned and tested on the S23 Ultra; any Android stylus works; the iPad app later reuses the core.
 - **Confidence:** 85% · **Status:** accepted.
+
+## PERF targets after Phase 0 — 2026-10-02 proposal, awaiting owner confirmation
+
+The T0.12 reconciliation recommends retaining all nine original targets. Component
+measurements expose engineering work; they do not establish replacement product
+targets. No target or requirement acceptance text is relaxed. G0 remains BLOCKED
+and this proposal is not owner approval. See [T0.12](evidence/T0.12.md) for the
+original methods, source-bound comparisons and remaining physical baselines.
+
+| Requirement | Target retained |
+|---|---|
+| PERF-001 | Local ink at most 25 ms p95 using the prescribed presentation method. |
+| PERF-002 | Remote markup at most 50 ms p95 over USB and 80 ms p95 over 5 GHz Wi-Fi. |
+| PERF-003 | Pen-to-host-to-phone at most 80 ms p95 over USB, with immediate ghost ink. |
+| PERF-004 | Freeze a 4K window within 300 ms over USB. |
+| PERF-005 | PC preview within 1.5 s, full pyramid within 6 s, phone screen fill within 250 ms. |
+| PERF-006 | PC working set at most 1,200,000,000 B and phone PSS at most 700,000,000 B. |
+| PERF-007 | Resume sync within 2 s after the new carrier is available, with zero duplicate commits. |
+| PERF-008 | Selection crop within 1 s; full 200 MP PNG within 20 s and cancellable. |
+| PERF-009 | Zero changed exterior pixels on every composite; local 12 MP processing within 2 s excluding model time. |
+
+The owner authorizes provisional software progression while S23 checks are
+deferred and applicable OnePlus testing continues. Final D6/D7/D9/D10/D11/D15
+confirmation, physical/manual acceptance and gate approval retain their recorded
+boundaries. The missing thermal method reconciliation is work to complete before
+collecting a baseline, not permission to relabel 30-second samples as 1 Hz data.

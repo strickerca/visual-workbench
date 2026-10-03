@@ -784,7 +784,8 @@
         "A06"
       ],
       "evidence": [
-        "docs/evidence/T0.04.md: Probe recorder and bounded HIL replay implemented; physical OnePlus synthetic software checks are separate from S23 acceptance. At least 24 S23 owner traces, their replay, capability measurements and thermal session remain pending in T0.04. Public MotionEvent construction cannot reproduce nonzero actionButton; affected traces fail explicitly."
+        "docs/evidence/T0.04.md: Probe recorder and bounded HIL replay implemented; physical OnePlus synthetic software checks are separate from S23 acceptance. At least 24 S23 owner traces, their replay, capability measurements and thermal session remain pending in T0.04. Public MotionEvent construction cannot reproduce nonzero actionButton; affected traces fail explicitly.",
+        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2069,7 +2070,8 @@
         "A10"
       ],
       "evidence": [
-        "docs/evidence/T0.09.md"
+        "docs/evidence/T0.09.md",
+        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2959,7 +2961,8 @@
       "evidence": [
         "docs/evidence/T0.03.md: All nine PERF methods defined in PERF-template.md; 10-minute S23 thermal baseline T0.04, recovery baseline T0.06, dated target confirmation T0.12 pending.",
         "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
-        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged."
+        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
+        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3011,7 +3014,8 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/T0.03.md: Dated PC/IN2019 hardware facts and explicit untestable S23 states; all remaining hardware-dependent requirements still require named-device/OS/app evidence in their owning phases."
+        "docs/evidence/T0.03.md: Dated PC/IN2019 hardware facts and explicit untestable S23 states; all remaining hardware-dependent requirements still require named-device/OS/app evidence in their owning phases.",
+        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3066,7 +3070,8 @@
       ],
       "evidence": [
         "docs/evidence/T0.02.md",
-        "docs/evidence/SETUP_STARTUP.md"
+        "docs/evidence/SETUP_STARTUP.md",
+        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4385,7 +4390,8 @@
       ],
       "evidence": [
         "docs/evidence/T0.02.md",
-        "docs/evidence/SETUP_STARTUP.md"
+        "docs/evidence/SETUP_STARTUP.md",
+        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4412,7 +4418,8 @@
       ],
       "evidence": [
         "docs/evidence/T0.02.md",
-        "docs/evidence/SETUP_STARTUP.md"
+        "docs/evidence/SETUP_STARTUP.md",
+        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4565,7 +4572,8 @@
       ],
       "evidence": [
         "docs/evidence/T0.02.md",
-        "docs/evidence/SETUP_STARTUP.md"
+        "docs/evidence/SETUP_STARTUP.md",
+        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4592,7 +4600,8 @@
       ],
       "evidence": [
         "docs/evidence/T0.01.md",
-        "docs/evidence/SETUP_STARTUP.md"
+        "docs/evidence/SETUP_STARTUP.md",
+        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4621,7 +4630,8 @@
       ],
       "evidence": [
         "docs/evidence/T0.02.md",
-        "docs/evidence/SETUP_STARTUP.md"
+        "docs/evidence/SETUP_STARTUP.md",
+        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4649,7 +4659,8 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/T0.04.md: Probe recorder and bounded HIL replay implemented; physical OnePlus synthetic software checks are separate from S23 acceptance. At least 24 S23 owner traces, their replay, capability measurements and thermal session remain pending in T0.04. Public MotionEvent construction cannot reproduce nonzero actionButton; affected traces fail explicitly."
+        "docs/evidence/T0.04.md: Probe recorder and bounded HIL replay implemented; physical OnePlus synthetic software checks are separate from S23 acceptance. At least 24 S23 owner traces, their replay, capability measurements and thermal session remain pending in T0.04. Public MotionEvent construction cannot reproduce nonzero actionButton; affected traces fail explicitly.",
+        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4675,7 +4686,8 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/T0.05.md: Native harness and guarded injector implemented; 65 pressure pairs r=1.000, 472 received samples, and 100 acknowledged guard trials with zero samples in the selected sink. Combined inverted/eraser flags and three lifecycle matches differ; full event-fidelity verification and editor/elevation acceptance remain open in T0.05, before T0.12/G0 closure."
+        "docs/evidence/T0.05.md: Native harness and guarded injector implemented; 65 pressure pairs r=1.000, 472 received samples, and 100 acknowledged guard trials with zero samples in the selected sink. Combined inverted/eraser flags and three lifecycle matches differ; full event-fidelity verification and editor/elevation acceptance remain open in T0.05, before T0.12/G0 closure.",
+        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",

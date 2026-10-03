@@ -1,0 +1,1666 @@
+{
+  "schema": 1,
+  "task": "T0.12",
+  "date": "2026-10-02",
+  "timezone": "America/Phoenix",
+  "review_clock_utc": "2026-10-03T01:33:42Z",
+  "baseline_commit": "30e8ea87200a580e3662d25c3b75aaec1ce35e77",
+  "reviewed_branch": "task/t1.05-raster",
+  "status": "FAIL",
+  "scope": "committed_evidence_reconciliation_only",
+  "gate": {
+    "id": "G0",
+    "status": "BLOCKED",
+    "approved": false,
+    "owner_confirmation_recorded": false,
+    "all_dependencies_accepted": false,
+    "main_integration_verified": false,
+    "formal_acceptance_completed": false
+  },
+  "authorizations": {
+    "software_progression_under_provisional_designs": true,
+    "IN2019_applicable_testing_authorized": true,
+    "S23_work_deferred": true,
+    "shared_phone_backgrounding_expected": true,
+    "storage_warning_waived": true,
+    "new_hardware_inventory_performed": false,
+    "performance_relaxation_authorized": false,
+    "device_permission_is_not_product_acceptance": true
+  },
+  "acceptance_checks": {
+    "all_eleven_evidence_files_accounted_for": "PASS",
+    "dated_six_decision_entries_exist": "PASS",
+    "six_decisions_finally_confirmed": "INCOMPLETE",
+    "dated_PERF_after_Phase0_decision": "MISSING",
+    "phase0_requirement_status_review": "COMPLETE_WITH_NO_STATUS_CHANGES",
+    "physical_thermal_baseline": "MISSING",
+    "physical_recovery_baseline": "MISSING",
+    "current_main_gate_health": "NOT_RUN",
+    "owner_G0_confirmation": "NOT_RECORDED"
+  },
+  "spike_status_counts": {
+    "PASS": 0,
+    "PASS WITH GAPS": 5,
+    "FAIL": 6
+  },
+  "spikes": [
+    {
+      "task": "T0.01",
+      "source": "docs/evidence/T0.01.md",
+      "recorded_status": "PASS WITH GAPS",
+      "measurements": {
+        "startup_device": "IN2019",
+        "android_release": 11,
+        "windows_dpi": 168,
+        "desktop_scale": 1.75,
+        "windows_and_android_rust_hello": "built_and_run",
+        "starter_apps": "built_and_launched"
+      },
+      "open_conditions": [
+        "S23/S Pen startup acceptance",
+        "16KB page-size runtime",
+        "owner text-sharpness check",
+        "WDK/Spectre installation prerequisites"
+      ],
+      "measurement_repeated_in_reconciliation": false
+    },
+    {
+      "task": "T0.02",
+      "source": "docs/evidence/T0.02.md",
+      "recorded_status": "PASS WITH GAPS",
+      "measurements": {
+        "policy_tests": 46,
+        "windows_rust_abi_tests": 1,
+        "android_rust_abi_tests": 1,
+        "android_activity_tests": 1,
+        "kotlin_feature_test_cases": 0,
+        "license_negative_fixtures": "Cargo and Gradle rejected forbidden dependencies"
+      },
+      "open_conditions": [
+        "current-tree gate health",
+        "complete bundled license/notices inventory",
+        "T0.02 credential exposure owner rotation/remediation unverified"
+      ],
+      "measurement_repeated_in_reconciliation": false
+    },
+    {
+      "task": "T0.03",
+      "source": "docs/evidence/T0.03.md",
+      "recorded_status": "PASS WITH GAPS",
+      "measurements": {
+        "hardware_spec_topics": 21,
+        "additional_inventory_rows": 12,
+        "python_tests": 51,
+        "rust_tests": 5,
+        "runner_checks": 5,
+        "synthetic_window_pixels": [
+          900,
+          600
+        ],
+        "tested_dpi": [
+          168,
+          96
+        ],
+        "verification_screenshots_disposed": 4,
+        "secure_boot": "True, owner-reported elevated command",
+        "hvci_running": true
+      },
+      "open_conditions": [
+        "physical pen capabilities",
+        "thermal and recovery baselines",
+        "calibrated color/HDR",
+        "test-signing",
+        "portable creative-app inventory"
+      ],
+      "measurement_repeated_in_reconciliation": false
+    },
+    {
+      "task": "T0.04",
+      "source": "docs/evidence/T0.04.md",
+      "recorded_status": "FAIL",
+      "measurements": {
+        "device": "IN2019",
+        "android_api": 30,
+        "instrumentation_tests": 3,
+        "replayed_motion_samples": 8,
+        "replayed_key_events": 16,
+        "max_rebased_error_ns": 0,
+        "maximum_submission_lateness_ms": 1,
+        "front_draw_ms": {
+          "n": 5,
+          "p50": 3.880334,
+          "p95": 22.576376
+        },
+        "choreographer_ms": {
+          "n": 7,
+          "p50": 8.064293,
+          "p95": 14.006324
+        },
+        "s23_owner_traces": 0,
+        "prompt_trace_categories": 24,
+        "requirement_minimum_owner_traces": 20,
+        "physical_thermal_sessions": 0
+      },
+      "open_conditions": [
+        "physical S23 trace corpus/calibration",
+        "ten-minute pen thermal baseline",
+        "hardware button/eraser/hover/rate/Air Actions",
+        "synthetic callbacks do not prove PERF-001"
+      ],
+      "measurement_repeated_in_reconciliation": false
+    },
+    {
+      "task": "T0.05",
+      "source": "docs/evidence/T0.05.md",
+      "recorded_status": "FAIL",
+      "measurements": {
+        "pressure_pairs": 65,
+        "pressure_pearson_r": 1.0,
+        "pressure_target_minimum_r": 0.95,
+        "normal_samples_submitted": 472,
+        "normal_samples_received": 472,
+        "normal_coordinate_lifecycle_matches": 469,
+        "unmatched_commands": 3,
+        "max_normal_contact_interval_ms": 26.48,
+        "guard_trials": 100,
+        "guard_trials_per_condition": 25,
+        "guard_native_down_acknowledgements": 100,
+        "expected_guard_rejections": 100,
+        "latched_guard_rejections": 100,
+        "selected_unintended_sink_events": 0,
+        "no_refresh_duration_ms": 1499.752,
+        "observed_automatic_up_ms": 500,
+        "editor_browser_rows_completed": 0,
+        "editor_browser_rows_required": 5
+      },
+      "open_conditions": [
+        "editor/browser matrix",
+        "elevated/UIPI trial",
+        "lost inverted/eraser flags and unmatched events",
+        "guard/inject race and selected-sink observation boundary"
+      ],
+      "measurement_repeated_in_reconciliation": false
+    },
+    {
+      "task": "T0.06",
+      "source": "docs/evidence/T0.06.md",
+      "recorded_status": "FAIL",
+      "measurements": {
+        "device": "SM-S918U",
+        "android_release": 16,
+        "api_level": 36,
+        "adb": {
+          "echo": [
+            {
+              "bytes": 64,
+              "rtt": {
+                "count": 1000,
+                "min_ms": 0.8562500000000001,
+                "p50_ms": 9.703125,
+                "p95_ms": 40.272864999999996,
+                "p99_ms": 64.194219,
+                "max_ms": 138.047239,
+                "jitter_mean_absolute_successive_delta_ms": 8.966930880880875
+              },
+              "raw_sample_count": 1000
+            },
+            {
+              "bytes": 4096,
+              "rtt": {
+                "count": 1000,
+                "min_ms": 1.3582290000000001,
+                "p50_ms": 8.016250000000001,
+                "p95_ms": 32.896041000000004,
+                "p99_ms": 74.415573,
+                "max_ms": 132.709843,
+                "jitter_mean_absolute_successive_delta_ms": 7.4285174264264295
+              },
+              "raw_sample_count": 1000
+            },
+            {
+              "bytes": 1048576,
+              "rtt": {
+                "count": 1000,
+                "min_ms": 53.62375,
+                "p50_ms": 70.393645,
+                "p95_ms": 133.26484399999998,
+                "p99_ms": 222.76401,
+                "max_ms": 314.596718,
+                "jitter_mean_absolute_successive_delta_ms": 19.31912622522524
+              },
+              "raw_sample_count": 1000
+            }
+          ],
+          "bulk_bytes": 268435456,
+          "bulk_elapsed_ms": 7898.893226,
+          "bulk_mib_per_second": 32.40960381099345,
+          "payloads_verified": true
+        },
+        "adb_source_boundary": "full measurements before QUIC timeout repair; original artifact binding retained",
+        "windows_loopback": {
+          "echo": [
+            {
+              "bytes": 64,
+              "rtt": {
+                "count": 1000,
+                "min_ms": 0.08839999999999999,
+                "p50_ms": 0.12430000000000001,
+                "p95_ms": 0.16670000000000001,
+                "p99_ms": 0.205,
+                "max_ms": 0.2807,
+                "jitter_mean_absolute_successive_delta_ms": 0.014109709709709702
+              },
+              "raw_sample_count": 1000
+            },
+            {
+              "bytes": 4096,
+              "rtt": {
+                "count": 1000,
+                "min_ms": 0.1678,
+                "p50_ms": 0.21760000000000002,
+                "p95_ms": 0.287,
+                "p99_ms": 0.3235,
+                "max_ms": 0.4113,
+                "jitter_mean_absolute_successive_delta_ms": 0.023527327327327326
+              },
+              "raw_sample_count": 1000
+            },
+            {
+              "bytes": 1048576,
+              "rtt": {
+                "count": 1000,
+                "min_ms": 12.7052,
+                "p50_ms": 14.1773,
+                "p95_ms": 16.9171,
+                "p99_ms": 25.4252,
+                "max_ms": 89.3507,
+                "jitter_mean_absolute_successive_delta_ms": 1.8577980980980964
+              },
+              "raw_sample_count": 1000
+            }
+          ],
+          "bulk_bytes": 268435456,
+          "bulk_elapsed_ms": 2838.8127,
+          "bulk_mib_per_second": 90.17854541794884,
+          "payloads_verified": true,
+          "datagrams": {
+            "bytes": 1024,
+            "scheduled_hz": 120,
+            "sent": 1200,
+            "received": 1200,
+            "duplicate_echoes": 0,
+            "missing_roundtrip_echoes": 0,
+            "loss_fraction": 0.0,
+            "rtt": {
+              "count": 1200,
+              "min_ms": 0.12769999999999998,
+              "p50_ms": 0.4484,
+              "p95_ms": 0.6252,
+              "p99_ms": 1.1016000000000001,
+              "max_ms": 3.0378,
+              "jitter_mean_absolute_successive_delta_ms": 0.0861296080066723
+            },
+            "send_lateness": {
+              "count": 1200,
+              "min_ms": 0.32533300000000004,
+              "p50_ms": 7.664567,
+              "p95_ms": 15.820966999999998,
+              "p99_ms": 16.624799999999997,
+              "max_ms": 30.5565,
+              "jitter_mean_absolute_successive_delta_ms": 7.4936693969974995
+            }
+          }
+        },
+        "physical_carriers_measured": 1,
+        "required_carriers": 3,
+        "physical_recovery_trials": 0
+      },
+      "open_conditions": [
+        "USB tethering QUIC",
+        "5 GHz Wi-Fi QUIC",
+        "physical cable/Wi-Fi recovery",
+        "Windows inbound firewall experiment",
+        "background foreground-service comparison (optional, skipped)",
+        "echo RTT is not remote presentation latency",
+        "loopback is not physical carrier validation"
+      ],
+      "measurement_repeated_in_reconciliation": false
+    },
+    {
+      "task": "T0.07",
+      "source": "docs/evidence/T0.07.md",
+      "recorded_status": "PASS WITH GAPS",
+      "measurements": {
+        "hardware_hevc": [
+          {
+            "profile": "portrait",
+            "width": 1440,
+            "height": 3088,
+            "bitrate_bps": 24000000,
+            "warmup_frames": 10,
+            "capture_min_update_interval_100ns": 333333,
+            "async_inflight_limit": 1,
+            "cpu_pixel_copies_for_hevc": 0,
+            "nominal_media_fps": 30,
+            "encoded_frames": 130,
+            "encode_submit_to_output_ms": {
+              "count": 120,
+              "p50": 15.3497,
+              "p95": 43.5758,
+              "max": 139.69029999999998
+            },
+            "wgc_arrival_interval_ms": {
+              "count": 120,
+              "p50": 41.6886,
+              "p95": 108.3938,
+              "max": 475.0711
+            },
+            "encoder_family": "Intel hardware H265 MFT",
+            "controls": {
+              "async_mft": true,
+              "low_latency_control_accepted": true,
+              "zero_b_frames_control_accepted": true,
+              "constant_bitrate_mode_accepted": true,
+              "maximum_bitrate_control_accepted": true,
+              "d3d11_aware": true,
+              "software_fallback": false
+            }
+          },
+          {
+            "profile": "4k",
+            "width": 3840,
+            "height": 2160,
+            "bitrate_bps": 24000000,
+            "warmup_frames": 10,
+            "capture_min_update_interval_100ns": 333333,
+            "async_inflight_limit": 1,
+            "cpu_pixel_copies_for_hevc": 0,
+            "nominal_media_fps": 30,
+            "encoded_frames": 130,
+            "encode_submit_to_output_ms": {
+              "count": 120,
+              "p50": 18.767200000000003,
+              "p95": 40.910000000000004,
+              "max": 64.10770000000001
+            },
+            "wgc_arrival_interval_ms": {
+              "count": 120,
+              "p50": 41.6649,
+              "p95": 224.9667,
+              "max": 1008.313
+            },
+            "encoder_family": "Intel hardware H265 MFT",
+            "controls": {
+              "async_mft": true,
+              "low_latency_control_accepted": true,
+              "zero_b_frames_control_accepted": true,
+              "constant_bitrate_mode_accepted": true,
+              "maximum_bitrate_control_accepted": true,
+              "d3d11_aware": true,
+              "software_fallback": false
+            }
+          }
+        ],
+        "raster": [
+          {
+            "width": 2560,
+            "height": 1440,
+            "requested_dirty_percent": 10,
+            "captured_frames": 35,
+            "unchanged_frames_skipped": 1,
+            "jpeg_q85_tiles_encode_and_copy_ms": {
+              "count": 30,
+              "p50": 13.5501,
+              "p95": 20.470100000000002,
+              "max": 22.464100000000002
+            },
+            "encoded_bytes_per_frame": {
+              "count": 30,
+              "p50": 23389.0,
+              "p95": 23543.0,
+              "max": 23580.0
+            },
+            "reported_dirty_area_fraction_sum": {
+              "count": 30,
+              "p50": 1.0,
+              "p95": 1.0,
+              "max": 1.0
+            },
+            "encoded_dirty_area_fraction_sum": {
+              "count": 30,
+              "p50": 0.1,
+              "p95": 0.1,
+              "max": 0.1
+            },
+            "gpu_readback_ms": {
+              "count": 30,
+              "p50": 24.9593,
+              "p95": 60.6867,
+              "max": 61.927
+            },
+            "pixel_difference_ms": {
+              "count": 30,
+              "p50": 1.5981,
+              "p95": 4.4005,
+              "max": 7.4866
+            },
+            "lossless": []
+          },
+          {
+            "width": 2560,
+            "height": 1440,
+            "requested_dirty_percent": 25,
+            "captured_frames": 35,
+            "unchanged_frames_skipped": 1,
+            "jpeg_q85_tiles_encode_and_copy_ms": {
+              "count": 30,
+              "p50": 29.9333,
+              "p95": 41.7636,
+              "max": 42.3227
+            },
+            "encoded_bytes_per_frame": {
+              "count": 30,
+              "p50": 66760.0,
+              "p95": 70985.0,
+              "max": 71134.0
+            },
+            "reported_dirty_area_fraction_sum": {
+              "count": 30,
+              "p50": 1.0,
+              "p95": 1.0,
+              "max": 1.0
+            },
+            "encoded_dirty_area_fraction_sum": {
+              "count": 30,
+              "p50": 0.25,
+              "p95": 0.25,
+              "max": 0.25
+            },
+            "gpu_readback_ms": {
+              "count": 30,
+              "p50": 15.824499999999999,
+              "p95": 33.1207,
+              "max": 37.1321
+            },
+            "pixel_difference_ms": {
+              "count": 30,
+              "p50": 1.3034999999999999,
+              "p95": 2.3739999999999997,
+              "max": 2.76
+            },
+            "lossless": []
+          },
+          {
+            "width": 3840,
+            "height": 2160,
+            "requested_dirty_percent": 25,
+            "captured_frames": 35,
+            "unchanged_frames_skipped": 1,
+            "jpeg_q85_tiles_encode_and_copy_ms": {
+              "count": 30,
+              "p50": 72.0576,
+              "p95": 90.336,
+              "max": 109.55080000000001
+            },
+            "encoded_bytes_per_frame": {
+              "count": 30,
+              "p50": 124509.0,
+              "p95": 130837.0,
+              "max": 131038.0
+            },
+            "reported_dirty_area_fraction_sum": {
+              "count": 30,
+              "p50": 1.0,
+              "p95": 1.0,
+              "max": 1.0
+            },
+            "encoded_dirty_area_fraction_sum": {
+              "count": 30,
+              "p50": 0.25,
+              "p95": 0.25,
+              "max": 0.25
+            },
+            "gpu_readback_ms": {
+              "count": 30,
+              "p50": 40.4603,
+              "p95": 73.3906,
+              "max": 73.70500000000001
+            },
+            "pixel_difference_ms": {
+              "count": 30,
+              "p50": 2.8027,
+              "p95": 9.5281,
+              "max": 9.760299999999999
+            },
+            "lossless": [
+              {
+                "format": "PNG fast/Sub",
+                "encode_ms": {
+                  "count": 10,
+                  "p50": 8.2357,
+                  "p95": 11.9466,
+                  "max": 11.9466
+                },
+                "bytes": {
+                  "count": 10,
+                  "p50": 411337.0,
+                  "p95": 411337.0,
+                  "max": 411337.0
+                },
+                "exact_rgb_roundtrip": true
+              },
+              {
+                "format": "QOI",
+                "encode_ms": {
+                  "count": 10,
+                  "p50": 20.0322,
+                  "p95": 25.4937,
+                  "max": 25.4937
+                },
+                "bytes": {
+                  "count": 10,
+                  "p50": 226524.0,
+                  "p95": 226524.0,
+                  "max": 226524.0
+                },
+                "exact_rgb_roundtrip": true
+              }
+            ]
+          }
+        ],
+        "hardware_decoder": [
+          {
+            "profile": "portrait",
+            "decoder": "c2.qti.hevc.decoder",
+            "width": 1440,
+            "height": 3088,
+            "input_frames": 130,
+            "output_frames": 130,
+            "warmup_frames": 10,
+            "render_callbacks": 130,
+            "hardware_accelerated": true,
+            "low_latency_feature_declared": false,
+            "low_latency_requested": true,
+            "queue_to_output_ms": {
+              "count": 120,
+              "p50": 5.576458,
+              "p95": 8.830781,
+              "max": 9.747656
+            },
+            "queue_to_render_callback_ms": {
+              "count": 120,
+              "p50": 6.287343,
+              "p95": 10.482187,
+              "max": 11.924948
+            },
+            "queue_to_native_render_timestamp_ms": {
+              "count": 120,
+              "p50": 5.591041,
+              "p95": 8.867187,
+              "max": 9.778333
+            }
+          },
+          {
+            "profile": "4k",
+            "decoder": "c2.qti.hevc.decoder",
+            "width": 3840,
+            "height": 2160,
+            "input_frames": 130,
+            "output_frames": 130,
+            "warmup_frames": 10,
+            "render_callbacks": 130,
+            "hardware_accelerated": true,
+            "low_latency_feature_declared": false,
+            "low_latency_requested": true,
+            "queue_to_output_ms": {
+              "count": 120,
+              "p50": 10.240937,
+              "p95": 13.038594,
+              "max": 17.108437
+            },
+            "queue_to_render_callback_ms": {
+              "count": 120,
+              "p50": 12.193282,
+              "p95": 15.701562,
+              "max": 18.758021
+            },
+            "queue_to_native_render_timestamp_ms": {
+              "count": 120,
+              "p50": 10.302135,
+              "p95": 13.10026,
+              "max": 17.444687
+            }
+          }
+        ],
+        "recorded_tiles": [
+          {
+            "changed_percent": 10,
+            "recorded_frames": 30,
+            "measured_frames": 120,
+            "warmup_frames": 10,
+            "initial_frame_excluded": 1,
+            "measured_payload_bytes": 2808672,
+            "elapsed_seconds": 6.7144288000126835,
+            "frames_per_second": 17.87195956263224,
+            "send_to_decode_post_ack_ms": {
+              "count": 120,
+              "p50": 50.08069999166764,
+              "p95": 89.57690000534058,
+              "max": 111.45000002579764
+            },
+            "phone_decode_reconstruct_post_ms": {
+              "count": 120,
+              "p50": 24.183698,
+              "p95": 29.332083,
+              "max": 32.125833
+            },
+            "phone_posted_frames": 131,
+            "scope": "Recorded generated tiles cycled; actual adb delivery and phone decode/Surface posting; excludes simultaneous PC capture/encode and photon timing"
+          },
+          {
+            "changed_percent": 25,
+            "recorded_frames": 30,
+            "measured_frames": 120,
+            "warmup_frames": 10,
+            "initial_frame_excluded": 1,
+            "measured_payload_bytes": 7768468,
+            "elapsed_seconds": 6.418714200000977,
+            "frames_per_second": 18.69533309334473,
+            "send_to_decode_post_ack_ms": {
+              "count": 120,
+              "p50": 49.484799994388595,
+              "p95": 83.92360000289045,
+              "max": 151.49379998911172
+            },
+            "phone_decode_reconstruct_post_ms": {
+              "count": 120,
+              "p50": 22.862657,
+              "p95": 31.63349,
+              "max": 34.488958
+            },
+            "phone_posted_frames": 131,
+            "scope": "Recorded generated tiles cycled; actual adb delivery and phone decode/Surface posting; excludes simultaneous PC capture/encode and photon timing"
+          }
+        ]
+      },
+      "open_conditions": [
+        "Multi-profile process previously faulted in IntelControlLib.dll_unloaded, c0000005; isolated worker success does not prove long-running driver stability",
+        "No pen-to-host-to-phone or photon measurement",
+        "No concurrent live capture/encode/network/render performance acceptance",
+        "Generated UI workload only; not real creative applications",
+        "No silent performance-target relaxation",
+        "requested phone controls are not proven applied"
+      ],
+      "measurement_repeated_in_reconciliation": false
+    },
+    {
+      "task": "T0.08",
+      "source": "docs/evidence/T0.08.md",
+      "recorded_status": "FAIL",
+      "measurements": {
+        "upstream_source_files_verified": 11,
+        "rust_tests": 3,
+        "python_tests": 89,
+        "sudovda_interfaces": 0,
+        "display_paths": 2,
+        "driver_ioctls": 0,
+        "machine_mutations": 0,
+        "driver_build_performed": false,
+        "driver_install_performed": false,
+        "signing_key_created": false,
+        "fallback_tested": false,
+        "fresh_secure_boot_result": null,
+        "fresh_secure_boot_error": "0x80070005",
+        "hvci_running": true,
+        "spectre_x64_present": false
+      },
+      "open_conditions": [
+        "incomplete vendor/EDID licensing",
+        "Spectre compiler component",
+        "driver source and rollback validation",
+        "owner/admin restore-point, signing, install/watchdog/uninstall",
+        "offline key custody and fallback"
+      ],
+      "measurement_repeated_in_reconciliation": false
+    },
+    {
+      "task": "T0.09",
+      "source": "docs/evidence/T0.09.md",
+      "recorded_status": "PASS WITH GAPS",
+      "measurements": {
+        "fixture_count": 19,
+        "host_reproduction_matches": 18,
+        "host_reproduction_expected": 18,
+        "jpeg_pixels": 199756800,
+        "jpeg_dimensions": [
+          16320,
+          12240
+        ],
+        "jpeg_bytes": 102470031,
+        "pc_version": "vips-8.18.7",
+        "pc_measurements": [
+          {
+            "phase": "decode-0",
+            "elapsed_ms": 2864.6923000051174,
+            "peak_working_set_bytes": 153849856,
+            "peak_pagefile_bytes": 42975232,
+            "result": "127.649924"
+          },
+          {
+            "phase": "thumbnail-0",
+            "elapsed_ms": 2262.042800022755,
+            "peak_working_set_bytes": 142598144,
+            "peak_pagefile_bytes": 32014336,
+            "result": ""
+          },
+          {
+            "phase": "pyramid-0",
+            "elapsed_ms": 28387.542599986773,
+            "peak_working_set_bytes": 205783040,
+            "peak_pagefile_bytes": 97722368,
+            "result": "",
+            "tile_count": 4105
+          },
+          {
+            "phase": "decode-1",
+            "elapsed_ms": 3377.2234999923967,
+            "peak_working_set_bytes": 153845760,
+            "peak_pagefile_bytes": 42962944,
+            "result": "127.649924"
+          },
+          {
+            "phase": "thumbnail-1",
+            "elapsed_ms": 2792.388600006234,
+            "peak_working_set_bytes": 142721024,
+            "peak_pagefile_bytes": 32137216,
+            "result": ""
+          },
+          {
+            "phase": "pyramid-1",
+            "elapsed_ms": 38243.68159999722,
+            "peak_working_set_bytes": 199004160,
+            "peak_pagefile_bytes": 97357824,
+            "result": "",
+            "tile_count": 4105
+          },
+          {
+            "phase": "decode-2",
+            "elapsed_ms": 2817.018300003838,
+            "peak_working_set_bytes": 153858048,
+            "peak_pagefile_bytes": 42971136,
+            "result": "127.649924"
+          },
+          {
+            "phase": "thumbnail-2",
+            "elapsed_ms": 2327.929699997185,
+            "peak_working_set_bytes": 142622720,
+            "peak_pagefile_bytes": 32047104,
+            "result": ""
+          },
+          {
+            "phase": "pyramid-2",
+            "elapsed_ms": 22379.248300014297,
+            "peak_working_set_bytes": 206462976,
+            "peak_pagefile_bytes": 97669120,
+            "result": "",
+            "tile_count": 4105
+          }
+        ],
+        "pc_method": "wall time including process startup and output I/O; OS cache not flushed",
+        "pc_tile_format": "JPEG Q90 at all levels, 256px, zero overlap; not the product mixed WebP/JPEG pipeline",
+        "heif_target_measurements": [
+          {
+            "operation": "heif-target-0",
+            "elapsed_ms": 2995.059321,
+            "width": 2040,
+            "height": 1530,
+            "bitmap_allocation_bytes": 12484800,
+            "pss_baseline_kib": 35605,
+            "pss_sampled_peak_kib": 677657,
+            "memory_sampling_interval_ms": 100,
+            "center_pixel": -8487343
+          },
+          {
+            "operation": "heif-target-1",
+            "elapsed_ms": 2897.306041,
+            "width": 2040,
+            "height": 1530,
+            "bitmap_allocation_bytes": 12484800,
+            "pss_baseline_kib": 61601,
+            "pss_sampled_peak_kib": 685571,
+            "memory_sampling_interval_ms": 100,
+            "center_pixel": -8487343
+          },
+          {
+            "operation": "heif-target-2",
+            "elapsed_ms": 2886.363384,
+            "width": 2040,
+            "height": 1530,
+            "bitmap_allocation_bytes": 12484800,
+            "pss_baseline_kib": 71851,
+            "pss_sampled_peak_kib": 686244,
+            "memory_sampling_interval_ms": 100,
+            "center_pixel": -8487343
+          }
+        ],
+        "heif_peak_pss_bytes": 702713856,
+        "phone_pss_target_bytes": 700000000,
+        "heif_full_decode_estimate_bytes": 799027200,
+        "heif_full_decode_budget_bytes": 402653184,
+        "heif_full_decode_status": "skipped_memory_guard",
+        "heif_generation_strategy": "small_bitmap_scaled_by_writer_grid",
+        "pc_benchmark_outputs_disposed": 12324
+      },
+      "open_conditions": [
+        "PC preview and pyramid targets missed in CLI workload",
+        "owner camera photo absent",
+        "full HEIF guarded skip",
+        "product screen-fill/GPU/memory/export absent",
+        "earlier YUV OutOfMemoryError retained"
+      ],
+      "measurement_repeated_in_reconciliation": false
+    },
+    {
+      "task": "T0.10",
+      "source": "docs/evidence/T0.10.md",
+      "recorded_status": "FAIL",
+      "measurements": {
+        "native_tests_each_platform": 22,
+        "cross_platform_geometry_goldens": 16,
+        "android_instrumentation_tests": 3,
+        "wet_dry_identical_pixels": 32768,
+        "append_cpu_samples": 12800,
+        "append_cpu_p95_us": {
+          "IN2019": 1.354,
+          "Windows": 5.3
+        },
+        "append_excludes": [
+          "JNI",
+          "rendering",
+          "display"
+        ],
+        "google_ink_failed_build_attempts": [
+          {
+            "variant": "upstream",
+            "elapsed_seconds": 186.458,
+            "passed": false,
+            "source_modified": false,
+            "cleanup_confirmed": true
+          },
+          {
+            "variant": "msvc-cxx20",
+            "elapsed_seconds": 114.61,
+            "passed": false,
+            "source_modified": false,
+            "cleanup_confirmed": true
+          },
+          {
+            "variant": "msvc-short-output",
+            "elapsed_seconds": 425.335,
+            "passed": false,
+            "source_modified": false,
+            "cleanup_confirmed": true
+          },
+          {
+            "variant": "msvc-math-defines",
+            "elapsed_seconds": 440.484,
+            "passed": false,
+            "source_modified": false,
+            "cleanup_confirmed": true
+          }
+        ],
+        "D6_decided": false
+      },
+      "open_conditions": [
+        "owner preference",
+        "S23 latency and recorded pen traces",
+        "successful Windows Google Ink build",
+        "build wall time is not exhaustion of four-hour effort budget"
+      ],
+      "measurement_repeated_in_reconciliation": false
+    },
+    {
+      "task": "T0.11",
+      "source": "docs/evidence/T0.11.md",
+      "recorded_status": "FAIL",
+      "measurements": {
+        "windows_rust_tests": 28,
+        "IN2019_rust_tests": 27,
+        "independent_python_tests": 10,
+        "mock_cases": [
+          {
+            "case": "color",
+            "source_dimensions": [
+              384,
+              256
+            ],
+            "local_processing_ms": 3730,
+            "changed_outside": 0,
+            "outside_pixels": 92426,
+            "provider_semantics_verified": false,
+            "original_file_unchanged": true
+          },
+          {
+            "case": "object",
+            "source_dimensions": [
+              384,
+              256
+            ],
+            "local_processing_ms": 3554,
+            "changed_outside": 0,
+            "outside_pixels": 92426,
+            "provider_semantics_verified": false,
+            "original_file_unchanged": true
+          },
+          {
+            "case": "text",
+            "source_dimensions": [
+              384,
+              256
+            ],
+            "local_processing_ms": 3802,
+            "changed_outside": 0,
+            "outside_pixels": 92426,
+            "provider_semantics_verified": false,
+            "original_file_unchanged": true
+          },
+          {
+            "case": "border",
+            "source_dimensions": [
+              384,
+              256
+            ],
+            "local_processing_ms": 3273,
+            "changed_outside": 0,
+            "outside_pixels": 95550,
+            "provider_semantics_verified": false,
+            "original_file_unchanged": true
+          },
+          {
+            "case": "small",
+            "source_dimensions": [
+              384,
+              256
+            ],
+            "local_processing_ms": 3092,
+            "changed_outside": 0,
+            "outside_pixels": 97629,
+            "provider_semantics_verified": false,
+            "original_file_unchanged": true
+          }
+        ],
+        "live_requests": 0,
+        "credentials_read": false,
+        "spend_microusd": 0,
+        "verification_images_disposed": 72
+      },
+      "open_conditions": [
+        "owner photos and real model semantics",
+        "account access and quotas",
+        "real API latency and billing",
+        "12MP optimized local processing",
+        "S23 acceptance",
+        "G0 and final product gates",
+        "local budget estimate is not guaranteed provider billing ceiling"
+      ],
+      "measurement_repeated_in_reconciliation": false
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D6",
+      "dated_followup": "2026-10-02",
+      "final_acceptance": false,
+      "position": "provisional Rust algorithm1; no final engine selection",
+      "open_condition": "owner2of3 stroke preference, no-worse physical latency and Windows build rule unresolved"
+    },
+    {
+      "id": "D7",
+      "dated_followup": "2026-10-02",
+      "final_acceptance": false,
+      "position": "USB tether then5GHzWiFi thenadb order retained",
+      "open_condition": "two physical carriers and physical recovery unmeasured"
+    },
+    {
+      "id": "D9",
+      "dated_followup": "2026-10-02",
+      "final_acceptance": false,
+      "position": "JPEG tile and HEVC paths retained with exact-diff and driver-recovery work",
+      "open_condition": "sustained live pipeline, actual controls and complete latency unknown"
+    },
+    {
+      "id": "D10",
+      "dated_followup": "2026-10-02",
+      "final_acceptance": false,
+      "position": "guarded PT_PEN retained; observed500ms automaticUP supersedes approximate1s",
+      "open_condition": "editor/UIPI, lost eraser flags and unmatched events"
+    },
+    {
+      "id": "D11",
+      "dated_followup": "2026-10-02",
+      "final_acceptance": false,
+      "position": "source and protocol preparation only",
+      "open_condition": "EDID licensing, compiler, driver install/watchdog/uninstall/fallback and owner/admin security steps"
+    },
+    {
+      "id": "D15",
+      "dated_followup": "2026-10-02",
+      "final_acceptance": false,
+      "position": "pretiling and cached previews retained; measured22.38to38.24s replaces old estimate",
+      "open_condition": "actual product performance, owner image and bounded full-resolution mobile HEIF"
+    }
+  ],
+  "performance": [
+    {
+      "id": "PERF-001",
+      "phase": 1,
+      "original_acceptance": [
+        "<= 25 ms p95 (240 fps camera or input-to-present timestamps)."
+      ],
+      "impl_status": "not_started",
+      "verify_status": "not_tested",
+      "recommendation": "confirm_unchanged",
+      "final_target_decision_recorded": false,
+      "owner_relaxation_approval": false,
+      "acceptance_passed_by_this_review": false
+    },
+    {
+      "id": "PERF-002",
+      "phase": 1,
+      "original_acceptance": [
+        "<= 50 ms p95 over USB; <= 80 ms p95 over 5 GHz Wi-Fi."
+      ],
+      "impl_status": "not_started",
+      "verify_status": "not_tested",
+      "recommendation": "confirm_unchanged",
+      "final_target_decision_recorded": false,
+      "owner_relaxation_approval": false,
+      "acceptance_passed_by_this_review": false
+    },
+    {
+      "id": "PERF-003",
+      "phase": 4,
+      "original_acceptance": [
+        "Pen to host render to phone <= 80 ms p95 over USB; ghost ink immediate."
+      ],
+      "impl_status": "not_started",
+      "verify_status": "not_tested",
+      "recommendation": "confirm_unchanged",
+      "final_target_decision_recorded": false,
+      "owner_relaxation_approval": false,
+      "acceptance_passed_by_this_review": false
+    },
+    {
+      "id": "PERF-004",
+      "phase": 3,
+      "original_acceptance": [
+        "<= 300 ms for a 4K window over USB."
+      ],
+      "impl_status": "not_started",
+      "verify_status": "not_tested",
+      "recommendation": "confirm_unchanged",
+      "final_target_decision_recorded": false,
+      "owner_relaxation_approval": false,
+      "acceptance_passed_by_this_review": false
+    },
+    {
+      "id": "PERF-005",
+      "phase": 3,
+      "original_acceptance": [
+        "Preview <= 1.5 s; full pyramid <= 6 s on the PC; phone screen fill <= 250 ms."
+      ],
+      "impl_status": "not_started",
+      "verify_status": "not_tested",
+      "recommendation": "confirm_unchanged",
+      "final_target_decision_recorded": false,
+      "owner_relaxation_approval": false,
+      "acceptance_passed_by_this_review": false
+    },
+    {
+      "id": "PERF-006",
+      "phase": 3,
+      "original_acceptance": [
+        "PC <= 1.2 GB working set; phone <= 700 MB PSS."
+      ],
+      "impl_status": "not_started",
+      "verify_status": "not_tested",
+      "recommendation": "confirm_unchanged",
+      "final_target_decision_recorded": false,
+      "owner_relaxation_approval": false,
+      "acceptance_passed_by_this_review": false
+    },
+    {
+      "id": "PERF-007",
+      "phase": 3,
+      "original_acceptance": [
+        "Sync resumes <= 2 s after the new carrier becomes available (for USB tethering, from when tethering is switched back on); 0 duplicate commits. (Replayed host input after a switch is TUNNEL-008, Phase 4.)"
+      ],
+      "impl_status": "not_started",
+      "verify_status": "not_tested",
+      "recommendation": "confirm_unchanged",
+      "final_target_decision_recorded": false,
+      "owner_relaxation_approval": false,
+      "acceptance_passed_by_this_review": false
+    },
+    {
+      "id": "PERF-008",
+      "phase": 3,
+      "original_acceptance": [
+        "Selection crop <= 1 s; full 200 MP PNG <= 20 s and cancellable."
+      ],
+      "impl_status": "not_started",
+      "verify_status": "not_tested",
+      "recommendation": "confirm_unchanged",
+      "final_target_decision_recorded": false,
+      "owner_relaxation_approval": false,
+      "acceptance_passed_by_this_review": false
+    },
+    {
+      "id": "PERF-009",
+      "phase": 2,
+      "original_acceptance": [
+        "0 changed pixels outside the dilated mask on every composite; local processing <= 2 s for 12 MP excluding model time."
+      ],
+      "impl_status": "not_started",
+      "verify_status": "not_tested",
+      "recommendation": "confirm_unchanged",
+      "final_target_decision_recorded": false,
+      "owner_relaxation_approval": false,
+      "acceptance_passed_by_this_review": false
+    }
+  ],
+  "target_acceptance_text_modified": false,
+  "phase0_requirements": [
+    {
+      "id": "PEN-017",
+      "phase": 0,
+      "impl_status": "in_progress",
+      "verify_status": "partial",
+      "acceptance": [
+        "A recorder exports traces (all axes, timestamps, buttons, hover) as JSON.",
+        "Instrumentation replays traces with pressure, tilt, hover and buttons.",
+        "At least 20 owner-recorded traces are stored in fixtures/."
+      ],
+      "recommended_status_change": "none",
+      "remaining": "T0.04 physical owner corpus: at least20 traces; prompt24categories retained."
+    },
+    {
+      "id": "FORMAT-001",
+      "phase": 0,
+      "impl_status": "in_progress",
+      "verify_status": "partial",
+      "acceptance": [
+        "fixtures/ holds generator scripts with fixed seeds plus SHA-256 lists for a 16320x12240 JPEG, a 1440x20000 screenshot, multipage PDFs, SVGs and malformed files, each with a provenance note; generated files over 10 MB live in git-ignored fixtures/generated/.",
+        "A real 200 MP S23 Ultra photo (JPEG, plus HEIF if the camera produces one) lives in git-ignored fixtures-private/ with location data removed; tests that need it skip with a clear message when it is absent."
+      ],
+      "recommended_status_change": "none",
+      "remaining": "T0.09 real privately stored GPS-stripped200MP owner camera input, HEIF if available."
+    },
+    {
+      "id": "QUALITY-004",
+      "phase": 0,
+      "impl_status": "in_progress",
+      "verify_status": "partial",
+      "acceptance": [
+        "Every PERF requirement has a documented measurement method, tools, sample count and environment fields (docs/evidence/PERF-template.md).",
+        "Phase 0 records baselines for phone battery temperature over a 10-minute pen session and for carrier recovery time after unplug/replug and a Wi-Fi drop.",
+        "Gate G0 records the confirmed or adjusted PERF targets in a dated DECISIONS.md entry."
+      ],
+      "recommended_status_change": "none",
+      "remaining": "T0.04 thermal, T0.06 physical recovery, method reconciliation and dated G0 PERF decision."
+    },
+    {
+      "id": "QUALITY-005",
+      "phase": 0,
+      "impl_status": "in_progress",
+      "verify_status": "partial",
+      "acceptance": [
+        "Every hardware-dependent requirement records device, OS build, app version and result; untested is never shown as passed."
+      ],
+      "recommended_status_change": "none",
+      "remaining": "Actual device/build/app/result records for all outstanding hardware clauses; reconcile stale inventory."
+    },
+    {
+      "id": "QUALITY-007",
+      "phase": 0,
+      "impl_status": "in_progress",
+      "verify_status": "partial",
+      "acceptance": [
+        "Every v1 ID exists in REQUIREMENTS.json.",
+        "Controls for unimplemented features are hidden or labelled 'not available', never inert."
+      ],
+      "recommended_status_change": "none",
+      "remaining": "Final app controls functional or hidden/labelled unavailable; preserve all original IDs."
+    },
+    {
+      "id": "LIC-001",
+      "phase": 0,
+      "impl_status": "in_progress",
+      "verify_status": "partial",
+      "acceptance": [
+        "The dependency tree passes the license gate; LGPL appears only as dynamically linked, replaceable libraries on Windows.",
+        "Only these documented exceptions exist, each listed with file hashes in third_party/LICENSES: the unmodified bundled Java runtime (GPL-2.0 WITH Classpath-exception-2.0); the separately installed driver package (MIT/CC0 changes on MS-PL Microsoft sample code); LGPL DLLs loaded by the separately bundled scrcpy executable."
+      ],
+      "recommended_status_change": "none",
+      "remaining": "Complete shipping inventory and licensing conditions, unresolved EDID excluded; packaging review."
+    },
+    {
+      "id": "LIC-002",
+      "phase": 0,
+      "impl_status": "in_progress",
+      "verify_status": "partial",
+      "acceptance": [
+        "Adding a GPL crate or Gradle dependency fails the build with a clear message (A28)."
+      ],
+      "recommended_status_change": "none",
+      "remaining": "Current integrated build negative-fixture/A28 verification and cleanup."
+    },
+    {
+      "id": "SEC-004",
+      "phase": 0,
+      "impl_status": "in_progress",
+      "verify_status": "partial",
+      "acceptance": [
+        "An automated scan of logs, packages, evidence and the repo finds no API keys, pairing secrets, MCP tokens or signing keys.",
+        "From Phase 0, docs/evidence/ is also scanned for device identifiers (IP and MAC addresses, adb serial numbers, user names in paths); screenshots and recordings are checked by hand and QR codes and identifiers are blurred before commit."
+      ],
+      "recommended_status_change": "none",
+      "remaining": "Owner rotation/remediation of historical credential exposure unverified; complete logs/packages/evidence and exact-byte scans."
+    },
+    {
+      "id": "DEV-001",
+      "phase": 0,
+      "impl_status": "in_progress",
+      "verify_status": "partial",
+      "acceptance": [
+        "TOOLCHAIN.md lists exact installed versions verified against official release pages; builds use only those."
+      ],
+      "recommended_status_change": "none",
+      "remaining": "Current pin/build consistency and missing driver compiler prerequisites."
+    },
+    {
+      "id": "DEV-002",
+      "phase": 0,
+      "impl_status": "in_progress",
+      "verify_status": "partial",
+      "acceptance": [
+        "build-core, build-android, build-desktop, test-all, lint-all, license-check and hil-test run successfully on the laptop."
+      ],
+      "recommended_status_change": "none",
+      "remaining": "Current-main complete entrypoint health with actual case counts and artifact bindings."
+    },
+    {
+      "id": "DEV-003",
+      "phase": 0,
+      "impl_status": "in_progress",
+      "verify_status": "partial",
+      "acceptance": [
+        "hil-test installs the APK, replays pen traces and collects metrics without manual steps."
+      ],
+      "recommended_status_change": "none",
+      "remaining": "Real owner/S23 corpus unattended replay and metrics in T0.04."
+    },
+    {
+      "id": "DEV-004",
+      "phase": 0,
+      "impl_status": "in_progress",
+      "verify_status": "partial",
+      "acceptance": [
+        "The harness logs WM_POINTER pen pressure, tilt and flags for every injected event."
+      ],
+      "recommended_status_change": "none",
+      "remaining": "T0.05 unmatched commands, eraser-transition discrepancies and complete native/editor/elevated observations."
+    }
+  ],
+  "requirement_status_mutations": [],
+  "baseline_gaps": {
+    "thermal_sessions_recorded": 0,
+    "thermal_method_conflict": {
+      "T0_04_runner": {
+        "duration_seconds": 600,
+        "sample_interval_seconds": 30,
+        "sample_count": 21
+      },
+      "PERF_template": {
+        "duration_seconds": 600,
+        "sample_interval_seconds": 1,
+        "sample_count": 601,
+        "sessions": 3
+      }
+    },
+    "physical_recovery_trials_recorded": 0,
+    "required_recovery_method": {
+      "unplug_replug_trials": 10,
+      "wifi_drop_trials": 10,
+      "switch_trials_each_direction": 10,
+      "clock_start": "new carrier available; USB tether explicitly reenabled",
+      "duplicate_commits_target": 0
+    }
+  },
+  "hardware_reconciliation": {
+    "spec_topics_covered": 21,
+    "additional_rows": 12,
+    "table_has_results_or_explicit_unknowns": true,
+    "stale_rows": [
+      "initial S23 unavailable text predates measured S23 runs",
+      "phone video decode pending text predates T0.07",
+      "initial image codec facts predate T0.09 runtime probes"
+    ],
+    "current_connection_claim": null,
+    "secure_boot": "earlier owner elevated True; later unelevated access denied is not False",
+    "unresolved": [
+      "S23 physical pen axes/calibration/buttons/eraser/hover/rate/AirActions",
+      "physical presentation latency",
+      "thermal/recovery baselines",
+      "calibrated gamut/HDR",
+      "actual negotiated USB speed",
+      "complete creative-app inventory",
+      "test-signing and safe driver rollback under current security settings"
+    ]
+  },
+  "health_this_reconciliation": {
+    "test-all": "NOT_RUN",
+    "lint-all": "NOT_RUN",
+    "license-check": "NOT_RUN",
+    "hil-test": "NOT_RUN"
+  },
+  "retained_failure_sources": [
+    {
+      "task": "T0.02",
+      "failure": "credential exposure; owner remediation unverified"
+    },
+    {
+      "task": "T0.04",
+      "failure": "replay/status reflow failure before repair"
+    },
+    {
+      "task": "T0.05",
+      "failure": "native ack/timeouts and flag discrepancies"
+    },
+    {
+      "task": "T0.06",
+      "failure": "QUIC idle timeout and bounded scan timeout"
+    },
+    {
+      "task": "T0.07",
+      "failure": "IntelControlLib unloaded access violation and corrected timestamp measurement"
+    },
+    {
+      "task": "T0.08",
+      "failure": "incomplete vendor/license/compiler preflight blocks"
+    },
+    {
+      "task": "T0.09",
+      "failure": "YUV OutOfMemoryError and PDF reproducibility repair"
+    },
+    {
+      "task": "T0.10",
+      "failure": "four failed Google Ink Windows builds and Android lifecycle failures"
+    },
+    {
+      "task": "T0.11",
+      "failure": "SHA formatting, float resize, lint and initial zero-test rejection before repairs"
+    }
+  ],
+  "privacy": {
+    "verification_images_created": 0,
+    "verification_images_copied": 0,
+    "historical_disposal_is_not_retained_image_availability": true,
+    "credentials_read": false,
+    "paid_calls": 0,
+    "device_serials_or_network_addresses_included": false,
+    "owner_photos_included": false
+  },
+  "publication": {
+    "staged": false,
+    "committed": false,
+    "pushed": false,
+    "remote_parity_checked": false,
+    "phase_concluded": false
+  },
+  "source_bindings": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 5764,
+      "sha256": "8d64db58b7d4a04f8b47a001e7ac6f4aa07565ad48dc9a6cc6ca23aaadfbf22f",
+      "git_blob": "2917b851c42c98aae38b587a4474889ee15b5e00",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "8d64db58b7d4a04f8b47a001e7ac6f4aa07565ad48dc9a6cc6ca23aaadfbf22f"
+    },
+    {
+      "path": "docs/BUILD_SPECIFICATION.md",
+      "bytes": 67089,
+      "sha256": "50f7975cc0d9a69099b0c418c1794685897cac7c6cf2241976be7d91f0425677",
+      "git_blob": "00d703cbecadbd888f3c45a8ec35e4066e9b2eb6",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "50f7975cc0d9a69099b0c418c1794685897cac7c6cf2241976be7d91f0425677"
+    },
+    {
+      "path": "docs/IMPLEMENTATION_PLAN.md",
+      "bytes": 64571,
+      "sha256": "e9d6accf87931df66dc5d48535543222b22e2b46557ea2baaf4889e3f8c0ab85",
+      "git_blob": "1086a3393c91df07a3b13b636f4b0666fce659c2",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "e9d6accf87931df66dc5d48535543222b22e2b46557ea2baaf4889e3f8c0ab85"
+    },
+    {
+      "path": "docs/DECISIONS.md",
+      "bytes": 23770,
+      "sha256": "ed4e5578ad6b9cc591d86afe2ddd8fcd1d45b4437917209ee654f803ac3db4bb",
+      "git_blob": "80d288f39f71ccf321db87578959d5321acd9a3c",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "ed4e5578ad6b9cc591d86afe2ddd8fcd1d45b4437917209ee654f803ac3db4bb"
+    },
+    {
+      "path": "docs/REQUIREMENTS.json",
+      "bytes": 198472,
+      "sha256": "e2f4186a9773e915bddb9abb849f743674c8a2168123b26155f34db7c18b1c59",
+      "git_blob": "6a5204e64eb738968e141b5022c9de0264ff7029",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "e2f4186a9773e915bddb9abb849f743674c8a2168123b26155f34db7c18b1c59"
+    },
+    {
+      "path": "docs/evidence/hardware-truth.md",
+      "bytes": 10849,
+      "sha256": "e0c18884f00e328c61f42e7e51d17338ab683e117b9fdf7fe0d33fdad5e0eac2",
+      "git_blob": "348ff05d4a8a30071f570d394ff68c00ba32308c",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "e0c18884f00e328c61f42e7e51d17338ab683e117b9fdf7fe0d33fdad5e0eac2"
+    },
+    {
+      "path": "docs/evidence/PERF-template.md",
+      "bytes": 11039,
+      "sha256": "f5d1e9d5efb8778a5e5b19525e8c9c966b8af5f83de6ca697624642c3680560e",
+      "git_blob": "d4f05bd14b1e5fd8eaf4ad772593e59082073583",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "f5d1e9d5efb8778a5e5b19525e8c9c966b8af5f83de6ca697624642c3680560e"
+    },
+    {
+      "path": "prompts/phase-0/T0.12-gate-g0.md",
+      "bytes": 11572,
+      "sha256": "ac32db401767768c513b6b5eab9dc0bf900f2ccb10beb23d9cc9d764b691ba79",
+      "git_blob": "0e3983fb5e007d8ce2437f24edcc5dc1ee5f8fec",
+      "reviewed_checkout_encoding": "UTF-8 with CRLF checkout conversion",
+      "git_sha256": "e268e3b5dac24ccbe30f27aee859daf1b5b8b94994d360bc0836ef4b6984546d"
+    },
+    {
+      "path": "docs/evidence/T0.01.md",
+      "bytes": 1712,
+      "sha256": "208bd430bd4f45376341f4cb5f33ba57ef9ae99250c35ede4c01f7a1a821da87",
+      "git_blob": "98aba6cd40711c8118661f8b1414fad38cd575a9",
+      "reviewed_checkout_encoding": "UTF-8 with CRLF checkout conversion",
+      "git_sha256": "da0c20f2458eee4c568cae049a2fd6585abbe5cfa8fe27db1bd0b98b07ef1290"
+    },
+    {
+      "path": "docs/evidence/T0.02.md",
+      "bytes": 2490,
+      "sha256": "dc71c9c534303b1684c96f077132a441908f079f7639b737a5f7f7cbd46b28d8",
+      "git_blob": "d4cfb7ddc71fda53523edd45afd39dad05d1e9f0",
+      "reviewed_checkout_encoding": "UTF-8 with CRLF checkout conversion",
+      "git_sha256": "aaba5f7dd74533b6abb2430f889676a30bef36fd3a09e8e29b69d95c84267979"
+    },
+    {
+      "path": "docs/evidence/T0.03.md",
+      "bytes": 16036,
+      "sha256": "ec1a7c52d29f77fcc2bae7e8a517a920a8b9ddb848fd4ecf6b9921347d5558e7",
+      "git_blob": "98fd7b6e95bb7ec3199153809692fbc2789def19",
+      "reviewed_checkout_encoding": "UTF-8 with CRLF checkout conversion",
+      "git_sha256": "2d9d099f76b389c98949c72ad046b9398f5f11fd910af40cdaead69859c4176c"
+    },
+    {
+      "path": "docs/evidence/T0.04.md",
+      "bytes": 12124,
+      "sha256": "f0dee644ace411bc52a75b50ba14dc7a3072562fd47ca5cf1bded0040e4fdc46",
+      "git_blob": "0f63092ff113fd5957fe74d671d3bf3ce0dfd03d",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "f0dee644ace411bc52a75b50ba14dc7a3072562fd47ca5cf1bded0040e4fdc46"
+    },
+    {
+      "path": "docs/evidence/T0.05.md",
+      "bytes": 11344,
+      "sha256": "8009d29ffa67e01e664fcdd55966ad81fd3d59ac884195f8dfb24c60d7df3ccc",
+      "git_blob": "a6d2f24563827d730a575d4bb695c6442d7062fb",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "8009d29ffa67e01e664fcdd55966ad81fd3d59ac884195f8dfb24c60d7df3ccc"
+    },
+    {
+      "path": "docs/evidence/T0.06.md",
+      "bytes": 8590,
+      "sha256": "0c6fb0e71a09cec2e61f09a400a938df1f55c8221b47bea2ffc697225ca8f1eb",
+      "git_blob": "ea683b4bc8c779c392c0d8fe59ed1c6e51a196ad",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "0c6fb0e71a09cec2e61f09a400a938df1f55c8221b47bea2ffc697225ca8f1eb"
+    },
+    {
+      "path": "docs/evidence/T0.07.md",
+      "bytes": 12637,
+      "sha256": "d5c0ab86af362206a3fbfac87d3d9ff236dcd35e815b186f0f4ba8f7c749e9a8",
+      "git_blob": "617e01e322642274f58f2b4d5fec6617f714170a",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "d5c0ab86af362206a3fbfac87d3d9ff236dcd35e815b186f0f4ba8f7c749e9a8"
+    },
+    {
+      "path": "docs/evidence/T0.08.md",
+      "bytes": 8443,
+      "sha256": "0dfa58b6b91a53e93c9029ce26262737d67114d9d8f0f590275ae30ca60bef4f",
+      "git_blob": "37ad19d59689d404bd824c5e1a475671899be30d",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "0dfa58b6b91a53e93c9029ce26262737d67114d9d8f0f590275ae30ca60bef4f"
+    },
+    {
+      "path": "docs/evidence/T0.09.md",
+      "bytes": 10564,
+      "sha256": "dee0b3a29536af08dd71ec92f43cc42131e35fcc728dca8b66c34fcb6385b771",
+      "git_blob": "ce9a6a11826487a625d752ce0a2fa3f0f63852d9",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "dee0b3a29536af08dd71ec92f43cc42131e35fcc728dca8b66c34fcb6385b771"
+    },
+    {
+      "path": "docs/evidence/T0.10.md",
+      "bytes": 5920,
+      "sha256": "1d80ca01239e16ccb3c7177760d7e28b25f44d65c063142d81299d85f4e964c0",
+      "git_blob": "15a1be26085d106dbf8c8c7e9f43ad6f0c682c19",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "1d80ca01239e16ccb3c7177760d7e28b25f44d65c063142d81299d85f4e964c0"
+    },
+    {
+      "path": "docs/evidence/T0.11.md",
+      "bytes": 8062,
+      "sha256": "f06e9561aafb1b8260b2404b612fad4be0605c813a48a5f85838f48b64f84bb8",
+      "git_blob": "463dc4b701d950108c48139ae292b427a3be6728",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "f06e9561aafb1b8260b2404b612fad4be0605c813a48a5f85838f48b64f84bb8"
+    },
+    {
+      "path": "docs/evidence/T0.06-results.json",
+      "bytes": 10005,
+      "sha256": "c434dd3d18c92dd8025868f950ff696c664bed19ac29daf1de894d58f7a88105",
+      "git_blob": "16c37eb5135bc24cab5f11ed40f53d5e44e422e8",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "c434dd3d18c92dd8025868f950ff696c664bed19ac29daf1de894d58f7a88105"
+    },
+    {
+      "path": "docs/evidence/T0.07-results.json",
+      "bytes": 21601,
+      "sha256": "518fe4cf5e488b54dd9ca8698392fe46fecf7003722bba7e6328caff39ce21bd",
+      "git_blob": "eea09092bdb92459b34b7d21f8a4d787adeb126b",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "518fe4cf5e488b54dd9ca8698392fe46fecf7003722bba7e6328caff39ce21bd"
+    },
+    {
+      "path": "docs/evidence/T0.08-results.json",
+      "bytes": 4095,
+      "sha256": "5817a48ba9e7e80323bde642d61e52963fc3fff5ece03888aa4d3230fe4b1051",
+      "git_blob": "ab115ae7366250799c0fc926052ec521b78c5b76",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "5817a48ba9e7e80323bde642d61e52963fc3fff5ece03888aa4d3230fe4b1051"
+    },
+    {
+      "path": "docs/evidence/T0.09-results.json",
+      "bytes": 49153,
+      "sha256": "99b0075c87c339b90298197e5bba2652c4828518d377d61bde03de2cb37ae2e6",
+      "git_blob": "fdc311cb27234f99d8533ac9b53741629ebd3700",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "99b0075c87c339b90298197e5bba2652c4828518d377d61bde03de2cb37ae2e6"
+    },
+    {
+      "path": "docs/evidence/T0.10-results.json",
+      "bytes": 6211,
+      "sha256": "475e3b86b4edbd1e035b4a5b3e9119b178c157bd454b2d7e6583276b3667373b",
+      "git_blob": "3af5f4459388c11a9596c87c84ae54102738e700",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "475e3b86b4edbd1e035b4a5b3e9119b178c157bd454b2d7e6583276b3667373b"
+    },
+    {
+      "path": "docs/evidence/T0.11-results.json",
+      "bytes": 45420,
+      "sha256": "aceacab015042ce9edfd913f6d489bb9f65e6e6f73fce179cdcbf11c4be97b51",
+      "git_blob": "02dbae394b03a9aa89a5d3bd7072e7f495d163a2",
+      "reviewed_checkout_encoding": "exact Git blob bytes",
+      "git_sha256": "aceacab015042ce9edfd913f6d489bb9f65e6e6f73fce179cdcbf11c4be97b51"
+    }
+  ],
+  "markdown_sha256": "9b086900d0002b4ad3778333436cd42daa3d6bdfb692b3138d10383da1a86e08",
+  "output_validation": {
+    "method": "parse JSON; check exact ID/task sets and original acceptance snapshots; compare committed input Git blobs and raw SHA256; check Markdown SHA256 and git diff --check",
+    "software_or_hardware_test_run": false,
+    "status": "PASS",
+    "spike_rows_checked": 11,
+    "phase0_rows_checked": 12,
+    "original_PERF_acceptance_texts_checked": 9,
+    "source_hashes_checked": 25,
+    "markdown_hash_checked": true,
+    "utf8_and_trailing_whitespace_checked": true,
+    "narrow_identifier_patterns_checked": true,
+    "complete_secret_gate_run": false,
+    "initial_check_failure": "Overbroad IPv4 pattern matched an Intel driver version prefix; exact-boundary pattern corrected and both outputs rechecked.",
+    "untracked_diff_boundary": "git diff --check does not inspect untracked output contents; inline Python checked UTF-8 and all trailing whitespace explicitly."
+  },
+  "parent_followup": {
+    "date": "2026-10-02",
+    "plan_checkpoint_added": true,
+    "performance_decision": "proposal_retaining_all_nine_targets_awaiting_owner_confirmation",
+    "hardware_truth": "chronological_decoder_results_and_current_device_scope_reconciled",
+    "phase0_evidence_links_appended": [
+      "DEV-001",
+      "DEV-002",
+      "DEV-003",
+      "DEV-004",
+      "FORMAT-001",
+      "LIC-001",
+      "LIC-002",
+      "PEN-017",
+      "QUALITY-004",
+      "QUALITY-005",
+      "QUALITY-007",
+      "SEC-004"
+    ],
+    "requirement_statuses_changed": false,
+    "acceptance_text_changed": false,
+    "G0": "BLOCKED",
+    "new_gate_health_run": false,
+    "thermal_sampling_code_reconciled": false,
+    "source_bindings_verified_against_baseline": true,
+    "plan_coverage": "PASS:189 requirements,66 tasks,26 prompts"
+  }
+}

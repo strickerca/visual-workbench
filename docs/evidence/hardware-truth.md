@@ -4,7 +4,9 @@ Collected 2026-10-01. These are capability/snapshot facts, not product acceptanc
 The first 21 rows preserve BUILD_SPECIFICATION §2.1's row names and order.
 Secure Boot is owner-confirmed True from administrator PowerShell.
 The connected IN2019 is a shared startup device; no foreground/app/reset action was taken.
-All S23/S Pen observations remain untestable until the actual target is available.
+At this initial snapshot, S23/S Pen observations were unavailable. The table is
+dated historical evidence; later updates below record S23 diagnostics/codec tests
+and the owner's latest device instruction. No physical S Pen acceptance is implied.
 
 PC command: powershell -NoProfile -ExecutionPolicy Bypass -File tools/diagnostics/pc-diagnostics.ps1 -OutFile docs/evidence/pc-diagnostics.json -OwnerSecureBootAnswer True
 
@@ -68,10 +70,10 @@ pressure, hover, tilt/orientation signs, report rates, barrel/eraser behavior,
 Air Actions and Air Command interference remain unmeasured, as listed in T0.04.md.
 They are not classified as “not reported by device” without a physical S23 test.
 
-## Authorized S23 update, 2026-10-02
+## Historical authorized S23 update, 2026-10-02
 
-The S23 is now connected and authorized for this project. Earlier OnePlus entries
-remain historical startup evidence; they do not describe the current target.
+At this checkpoint the S23 was connected and authorized for this project. Earlier
+OnePlus entries remained historical startup evidence for that run.
 Read-only S23 diagnostics reported SM-S918U, Samsung, Android 16/API 36,
 build BP4A.251205.006, security patch 2026-09-05, One UI raw value 80500 and
 chipset identifier kalama. `wm` reports 1080 x 2316 rendering size and density
@@ -83,7 +85,7 @@ The static input parser returned zero pen-device entries. This is inconclusive,
 not evidence that the S23 lacks a pen. Physical pressure, hover, tilt, buttons,
 Air Actions and the ten-minute thermal baseline still need T0.04 owner input.
 The one-time battery temperature was 32.5 degrees C; it is not a sustained-load
-baseline. S23 video decode measurements remain pending T0.07.
+baseline. Video decode was then pending; T0.07 subsequently measured it as below.
 
 The owner requested charging stay-awake. `svc power stayon true` was applied;
 `stay_on_while_plugged_in` read back 15, with `mWakefulness=Awake` and
@@ -93,3 +95,20 @@ interface was present. See T0.06.md for the real adb TCP measurement and gaps.
 
 Text-only diagnostic receipt: s23-sanitized-hardware-facts-678c7f1173d24aaca86f8b8a37946cfa.log.
 No serial, network identifier, screen capture or other app content is retained here.
+
+## Phase 0 reconciliation and current device scope — 2026-10-02
+
+T0.07 subsequently ran the S23 hardware HEVC decoder for both 1440x3088 and
+3840x2160 profiles (130 outputs each, including ten warmups). T0.09 ran generated
+JPEG/HEIF decoder probes. These results supersede the earlier pending-codec
+statements for those specific workloads only; low-latency control effectiveness,
+4:4:4, sustained integrated presentation and physical S Pen behavior remain open.
+See [T0.07](T0.07.md), [T0.09](T0.09.md) and [T0.12](T0.12.md) for exact results,
+source bindings, retained failures and capacity boundaries.
+
+The latest owner instruction takes the S23 away and defers checks requiring it.
+The shared OnePlus IN2019 is authorized again for applicable software tests,
+selected explicitly without fallback. This is the current testing scope, not a
+new hardware inventory. Historical S23 stay-awake and display facts do not assert
+its present connection or settings. OnePlus tests never certify S23/S Pen or
+target-device performance. Physical thermal/recovery baselines remain absent.
