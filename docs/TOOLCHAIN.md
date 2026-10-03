@@ -373,3 +373,28 @@ recorded with source URLs in `tools/ai-spike/config/openai-2026-10-02.json`.
 Account access and actual paid calls are unverified; the default configuration
 has no cost estimate and cannot send. The offline kernels use local
 synthetic images, and do not read credentials or issue network requests.
+
+## T1.05 raster and text pins (2026-10-02)
+
+Exact stable releases were checked against official registry metadata and the
+locked graph passed the existing license/source/ban policy:
+
+| Dependency | Exact version | License / selected behavior |
+| --- | --- | --- |
+| [tiny-skia](https://crates.io/crates/tiny-skia/0.12.0) | 0.12.0 | BSD-3-Clause; defaults off, std only, no SIMD |
+| [rustybuzz](https://crates.io/crates/rustybuzz/0.20.1) | 0.20.1 | MIT; OpenType shaping with ttf-parser 0.25.1 |
+| [unicode-bidi](https://crates.io/crates/unicode-bidi/0.3.18) | 0.3.18 | MIT OR Apache-2.0 |
+| [unicode-script](https://crates.io/crates/unicode-script/0.5.8) | 0.5.8 | MIT OR Apache-2.0 |
+| [libwebp-sys](https://crates.io/crates/libwebp-sys/0.14.4) | 0.14.4 | MIT wrapper, bundled libwebp 1.6.0 BSD-3-Clause; defaults off |
+
+Existing exact image 0.25.10 (PNG/JPEG/WebP), png 0.18.1, moxcms 0.8.1,
+libm 0.2.16, serde 1.0.229, serde_json 1.0.151 and thiserror 2.0.21 pins are
+reused. No existing locked version was upgraded. Generated sRGB ICC dates are
+fixed; supplied profiles retain their bytes. Libwebp's native lossy encoder is
+outside the byte-identical golden boundary.
+
+Inter, Noto Sans and Noto Sans Mono are bundled from Google Fonts commit
+`9710da1eacb3be272583c3224dcb70f9da6eadbb`, with SHA-256/source URLs in
+`core/crates/vw-raster/fonts/PROVENANCE.json` and individual SIL OFL notices.
+These are licensed product assets, not verification screenshots. The libwebp
+COPYING/PATENTS and source binding remain under the crate's `licenses/`.

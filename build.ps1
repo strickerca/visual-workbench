@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-core', 'build-raster', 'test-raster', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
     [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
@@ -45,6 +45,15 @@ try {
     switch ($Command) {
         'doctor' { Run-Step 'doctor' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/doctor.ps1', '-Strict') }
         'license-check' { Run-LicenseGate }
+        'build-raster' {
+            Run-LicenseGate
+            Run-Cargo 'build-raster' @('build', '--locked', '-p', 'vw-raster', '--all-targets')
+        }
+        'test-raster' {
+            Run-Cargo 'test-raster' @('test', '--locked', '-p', 'vw-raster')
+            Run-Cargo 'lint-raster' @('clippy', '--locked', '-p', 'vw-raster', '--all-targets', '--', '-D', 'warnings')
+            Run-Cargo 'format-raster' @('fmt', '-p', 'vw-raster', '--', '--check')
+        }
         'build-ai' {
             Run-LicenseGate
             Run-Cargo 'build-ai-spike' @('build', '--locked', '-p', 'vw-ai-spike')

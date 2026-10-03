@@ -19,3 +19,8 @@
 *.zip binary
 # Preserve pinned upstream bytes and its existing whitespace without rewriting it.
 drivers/sudovda/vendor/** -text -whitespace
+# Preserve the exact upstream font/native-library notice bytes.
+core/crates/vw-raster/fonts/inter-OFL.txt -text -whitespace
+core/crates/vw-raster/fonts/notosans-OFL.txt -text -whitespace
+core/crates/vw-raster/fonts/notosansmono-OFL.txt -text -whitespace
+core/crates/vw-raster/licenses/libwebp-COPYING -text -whitespace

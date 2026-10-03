@@ -390,6 +390,8 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Revision and asset-hash metadata in exports; golden tests.
 - **Acceptance:** byte-exact goldens on both platforms; oversize WebP refused with alternatives; clean exports equal source pixels.
 
+- **Execution checkpoint, 2026-10-02:** T1.05 native raster software passes 62 tests on Windows and IN2019, with nine matching PNG/layout goldens. The explicit Windows 50MP PNG16 scratch/marked-export test passes and cleans its temporary files. Strict lint/format and license gates pass; three inspected verification images were disposed. `docs/evidence/T1.05.md` and results retain source/artifact bindings, failures, measured memory and remaining buffered/app/S23 boundaries. The eight task requirements remain in_progress/partial. Continue T1.06a (L, gpt-6-astra/max) and T1.06b (M, gpt-6-astra/max) software under owner authorization; G0/G1 and physical-link acceptance stay pending. No phase-end push is due.
+
 ### T1.06a — vw-proto and vw-net transport: protocol, carriers, simulation
 - **Size:** L · **Depends on:** T1.02, T0.06 · **Prompt:** `prompts/phase-1/T1.06a-transport.md`
 - **Requirements:** CONNECT-004, CONNECT-005, CORE-007, DEV-005, SYNC-004, CONNECT-001, CONNECT-002

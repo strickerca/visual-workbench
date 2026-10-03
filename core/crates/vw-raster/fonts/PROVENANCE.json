@@ -1,0 +1,24 @@
+{
+  "source_commit": "9710da1eacb3be272583c3224dcb70f9da6eadbb",
+  "retrieved_utc": "2026-10-02",
+  "fonts": [
+    {
+      "file": "Inter.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/9710da1eacb3be272583c3224dcb70f9da6eadbb/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf",
+      "sha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
+      "license": "inter-OFL.txt"
+    },
+    {
+      "file": "NotoSans.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/9710da1eacb3be272583c3224dcb70f9da6eadbb/ofl/notosans/NotoSans%5Bwdth%2Cwght%5D.ttf",
+      "sha256": "bfb7bb691513f12e734dc346c03a03f784912432d7e3fa8e56efcf906fe86b3d",
+      "license": "notosans-OFL.txt"
+    },
+    {
+      "file": "NotoSansMono.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/9710da1eacb3be272583c3224dcb70f9da6eadbb/ofl/notosansmono/NotoSansMono%5Bwdth%2Cwght%5D.ttf",
+      "sha256": "2cb2adb378a8f574213e23df697050b83c54c27df465a2015552740b2769a081",
+      "license": "notosansmono-OFL.txt"
+    }
+  ]
+}

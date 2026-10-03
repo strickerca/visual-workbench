@@ -237,10 +237,11 @@
         "A13"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — capture session/frame/geometry and semantic binding round-trip on both platforms; evidence only, capture storage/import/export metadata remain downstream."
+        "docs/evidence/T1.02.md — capture session/frame/geometry and semantic binding round-trip on both platforms; evidence only, capture storage/import/export metadata remain downstream.",
+        "docs/evidence/T1.05.md — PNG iTXt and JPEG/WebP XMP include revision, original hash, dimensions/settings and supplied capture IDs; capture persistence/end-to-end and app integration remain open."
       ],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance limited to Phase 1 exports and capture records; packages are verified by PKG-001 and EXPORT-008"
     },
@@ -2157,9 +2158,11 @@
       "scenarios": [
         "A10"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.05.md — Native exports bind original hash/revision/dimensions and reject preview-only input; T1.11 app preflight/reporting remains open."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2182,9 +2185,11 @@
       "scenarios": [
         "A11"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.05.md — PNG8/16, JPEG and WebP native codec tests pass on Windows/IN2019, including exact PNG alpha/depth round trips; app integration remains T1.11."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "split: BMP and TIFF moved to FORMAT-013 (phase 3) so each gate can pass"
     },
@@ -2309,9 +2314,11 @@
       "scenarios": [
         "A11"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.05.md — Typed dimension, depth, alpha, profile and memory refusals pass native tests without scaling; T1.11 still owns user-visible alternatives and conversion choices."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2333,9 +2340,11 @@
       "scenarios": [
         "A11"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.05.md — Native tests cover all eight orientations, exact retained ICC, explicit sRGB conversion and provenance, hostile ICC admission; OS capture/import integration remains T1.11 and later capture tasks."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2431,9 +2440,11 @@
       "scenarios": [
         "A13"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.05.md — Clean PNG full/region samples, including hidden RGB and alpha, are exact in native Windows/IN2019 tests; T1.11 still owns app handoff and UI-free output integration."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2455,9 +2466,11 @@
       "scenarios": [
         "A13"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.05.md — Visible annotations render at source resolution with nine byte-exact PNG/layout goldens on Windows/IN2019; app export wiring and full scenario coverage remain T1.11/T1.12."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -4737,7 +4750,8 @@
         "A01"
       ],
       "evidence": [
-        "docs/evidence/T1.04.md — Sixteen algorithm-1 synthetic geometry goldens match Windows and IN2019; recorded S Pen traces and T1.05 export goldens remain open."
+        "docs/evidence/T1.04.md — Sixteen algorithm-1 synthetic geometry goldens match Windows and IN2019; recorded S Pen traces and T1.05 export goldens remain open.",
+        "docs/evidence/T1.05.md — Nine committed PNG/layout hashes match Windows and IN2019, alongside T1.04 geometry goldens; recorded S Pen fixtures and final scenario/device acceptance remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
