@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "verified_on": "2026-10-02",
+  "endpoint": "https://api.openai.com/v1/images/edits",
+  "model": "gpt-image-2.5-sunburst-2026-09-08",
+  "model_ids": ["gpt-image-2.5-sunburst", "gpt-image-2.5-sunburst-2026-09-08", "gpt-image-2.5-flare", "gpt-image-2.5-flare-2026-09-08"],
+  "quality": "low",
+  "qualities": ["low", "medium", "high", "xhigh", "max"],
+  "capabilities": {
+    "mask_support": "alpha_png_guidance",
+    "max_long_edge": 3840,
+    "min_pixels": 655360,
+    "max_pixels": 8294400,
+    "size_multiple": 16,
+    "max_aspect_ratio": 3,
+    "formats": ["png", "jpeg", "webp"],
+    "max_image_bytes_exclusive": 50000000,
+    "max_mask_bytes_exclusive": 4000000,
+    "experimental_above_pixels": 3686400
+  },
+  "prices": {"text_input_usd_per_million": 5, "image_input_usd_per_million": 8, "image_output_usd_per_million": 30},
+  "token_estimate": null,
+  "spike_budget_microusd": 2000000,
+  "daily_soft_budget_microusd": 5000000,
+  "timeout_seconds": 180,
+  "max_response_bytes": 100000000,
+  "rate_limits": {"free": "unsupported", "tier_1": {"tokens_per_minute": 100000, "images_per_minute": 5}, "account_access": "unverified; organization verification may be required"},
+  "sources": [
+    "https://developers.openai.com/api/docs/guides/image-generation",
+    "https://developers.openai.com/api/reference/cli/resources/images/methods/edit",
+    "https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst",
+    "https://developers.openai.com/api/docs/models/gpt-image-2.5-flare",
+    "https://developers.openai.com/api/docs/pricing"
+  ],
+  "uncertainties": [
+    "The guide describes image and mask files below 50MB; the edits reference states masks below 4MB. This configuration enforces the stricter decimal 4MB cap.",
+    "The guide recommends usage for GPT Image 2.5 billing, while the generated reference still labels usage GPT Image 1 only. Missing or inconsistent usage is treated as unresolved cost.",
+    "Token rates do not establish an exact per-image quote or a maximum charge. Live send requires an operator-supplied token estimate. The local reservation guard is not a provider-enforced billing cap.",
+    "Direct Images API requests do not receive the documented cached-input discount. No cache discount is applied.",
+    "The API account, organization verification, current account-specific quotas and five owner-photo edits are unverified."
+  ]
+}

@@ -13,6 +13,7 @@ members = [
     "tools/vdd-probe",
     "tools/stroke-spike",
     "tools/stroke-spike/native",
+    "tools/ai-spike",
 ]
 
 [workspace.package]

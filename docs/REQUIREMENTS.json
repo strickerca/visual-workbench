@@ -3664,7 +3664,9 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged."
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "explicit",
@@ -3691,7 +3693,9 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged."
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -3718,7 +3722,9 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged."
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -4952,7 +4958,9 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged."
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",

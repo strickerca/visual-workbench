@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-core', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
     [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
@@ -45,6 +45,16 @@ try {
     switch ($Command) {
         'doctor' { Run-Step 'doctor' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/doctor.ps1', '-Strict') }
         'license-check' { Run-LicenseGate }
+        'build-ai' {
+            Run-LicenseGate
+            Run-Cargo 'build-ai-spike' @('build', '--locked', '-p', 'vw-ai-spike')
+        }
+        'test-ai' {
+            Run-Step 'test-ai-verifier' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/ai-spike/tests', '-p', 'test_*.py', '-v')
+            Run-Cargo 'test-ai-spike' @('test', '--locked', '-p', 'vw-ai-spike')
+            Run-Cargo 'lint-ai-spike' @('clippy', '--locked', '-p', 'vw-ai-spike', '--all-targets', '--', '-D', 'warnings')
+            Run-Cargo 'format-ai-spike' @('fmt', '-p', 'vw-ai-spike', '--', '--check')
+        }
         'build-core' { Run-LicenseGate; Run-Cargo 'build-core' @('build', '--workspace', '--locked') }
         'build-android' { Run-LicenseGate; Run-Gradle 'build-android' @(':android:assembleDebug') }
         'build-stroke-core' {
@@ -99,6 +109,7 @@ try {
         }
         'run-desktop' { Run-LicenseGate; Run-Gradle 'run-desktop' @(':desktop:run') }
         'test-all' {
+            Run-Step 'test-ai-verifier' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/ai-spike/tests', '-p', 'test_*.py', '-v')
             Run-Step 'test-tools' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/tests', '-v')
             Run-Step 'test-device-selection' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/device-selection-fixtures.ps1')
             Run-Step 'test-store-crash-receipt' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/store-crash-receipt-fixtures.ps1')

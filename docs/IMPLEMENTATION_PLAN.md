@@ -322,6 +322,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - A Rust CLI: image + mask + prompt → crop-and-stitch → edit request → composite → proof (changed_outside), with timings and a running cost total capped at $2.
   - Five test edits on the owner's photos: a color change, an object removal, a sign-text change, a mask touching the border, and a mask under 100×100 px.
 - **Acceptance:** `changed_outside` = 0 for all edits, confirmed independently; limits and prices recorded in `docs/evidence/T0.11.md`; the API key stays in Credential Manager.
+- **Execution checkpoint, 2026-10-02:** local crop/stitch/proof, request adapter and cost guards are implemented. All five synthetic mock cases independently preserve the exterior; 28 Windows Rust, 27 IN2019 native and10 Python tests pass after correcting normalized-float resizing. `docs/evidence/T0.11.md` and its results retain exact source/artifact bindings, failures and disposal of 72 verification images. No live API call, credential read or spend occurred; owner-photo/model/latency/billing acceptance remains open, so the measurement spike stays incomplete. Requirement statuses are unchanged. Continue the G0 gap report and T1.05 software under owner authorization.
 
 ### T0.12 — Phase 0 gate review
 - **Size:** S · **Depends on:** T0.01–T0.11 · **Prompt:** `prompts/phase-0/T0.12-gate-g0.md`

@@ -354,3 +354,22 @@ These are isolated diagnostic inputs, not product dependencies. The four bounded
 attempts are recorded in `docs/evidence/T0.10-results.json`; none produced the
 Windows core target. The provisional shared Rust engine remains the implemented
 candidate, with final D6 pending.
+
+## T0.11 image-edit spike pins (2026-10-02)
+
+The spike adds [sha2 **0.11.0**](https://crates.io/crates/sha2/0.11.0) and
+[base64 **0.23.1**](https://crates.io/crates/base64/0.23.1), stable releases with
+MIT OR Apache-2.0 terms checked against official registry metadata. Cargo.lock
+adds eight external packages and does not replace existing versions. It reuses
+image **0.25.10** (PNG/JPEG), moxcms **0.8.1**, windows **0.62.2** (WinHTTP and
+Credential Manager), fs2 **0.4.3**, tempfile **3.27.0**, serde **1.0.229**,
+serde_json **1.0.151** and thiserror **2.0.21**.
+
+The Rust license/source/ban gate passes. Android dependencies are unchanged:
+the application license gate still resolves **220 exact modules**, twelve runtime
+configurations and one bound parent POM. Published OpenAI image-edit capabilities,
+model snapshots, quality and rates were checked on official documentation and
+recorded with source URLs in `tools/ai-spike/config/openai-2026-10-02.json`.
+Account access and actual paid calls are unverified; the default configuration
+has no cost estimate and cannot send. The offline kernels use local
+synthetic images, and do not read credentials or issue network requests.
