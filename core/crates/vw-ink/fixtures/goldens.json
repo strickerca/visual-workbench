@@ -1,0 +1,118 @@
+{
+  "algorithm_version": 1,
+  "provenance": "synthetic-only; no owner/device recording",
+  "fixtures": [
+    {
+      "name": "synthetic_dot",
+      "samples": 1,
+      "polygons": 1,
+      "vertices": 16,
+      "geometry_hash": "ad2bc8e07e978958db1c17cd0c8f634758dcef8b03c152c7d9fc8bb7e10cc409"
+    },
+    {
+      "name": "synthetic_straight",
+      "samples": 8,
+      "polygons": 15,
+      "vertices": 124,
+      "geometry_hash": "be08a4c61d7674732867d643eb2b0ff13c2de7069fa3e66a693c48057c37af3c"
+    },
+    {
+      "name": "synthetic_pressure",
+      "samples": 10,
+      "polygons": 17,
+      "vertices": 142,
+      "geometry_hash": "0fa99257b34f60daec985722887f8228e4256b73ed9db3ab9ffa5f6b31895a99"
+    },
+    {
+      "name": "synthetic_circle",
+      "samples": 65,
+      "polygons": 129,
+      "vertices": 1036,
+      "geometry_hash": "30381501cd1cce8e8f2b9d53feea61bdf88c3110fc0af573c8cdb08c57f2dbfa"
+    },
+    {
+      "name": "synthetic_handwriting",
+      "samples": 19,
+      "polygons": 37,
+      "vertices": 300,
+      "geometry_hash": "eca816f3a24ef12c2fe2aadcfb97e22581a780a7b208bd69e5b8a9656d333f90"
+    },
+    {
+      "name": "synthetic_fast_line",
+      "samples": 128,
+      "polygons": 255,
+      "vertices": 2044,
+      "geometry_hash": "74ed218351d06fd6ee05e8a94b721f00e67394692117eb01b1bcde2248b0f184"
+    },
+    {
+      "name": "synthetic_stationary_pressure",
+      "samples": 7,
+      "polygons": 3,
+      "vertices": 48,
+      "geometry_hash": "6f80fd3b5476f72fd0bb30ac07a33e37ba119aa63ad49c7444b278e516bcf63b"
+    },
+    {
+      "name": "synthetic_equal_timestamps",
+      "samples": 4,
+      "polygons": 7,
+      "vertices": 60,
+      "geometry_hash": "119f8f48941c6212ffde9d4199c08351be7df0913ce698c298d7511fc9ed1235"
+    },
+    {
+      "name": "synthetic_negative_fractional",
+      "samples": 12,
+      "polygons": 23,
+      "vertices": 188,
+      "geometry_hash": "67411070a4afed94939ef5e473b2df8bb98c894e942e1d218f2bc00f9043e49a"
+    },
+    {
+      "name": "synthetic_highlighter_flat",
+      "samples": 4,
+      "polygons": 3,
+      "vertices": 12,
+      "geometry_hash": "1e74a9d4c7a67515bd2146e194bb3bd74622986dc7ecb5cf9f5829d5ed81be89"
+    },
+    {
+      "name": "synthetic_highlighter_corner",
+      "samples": 3,
+      "polygons": 3,
+      "vertices": 13,
+      "geometry_hash": "2d89c748a794a54535d77bdc0ad0f2b7807b958a4983a52c6db4858923077833"
+    },
+    {
+      "name": "synthetic_vector_eraser",
+      "samples": 3,
+      "polygons": 5,
+      "vertices": 56,
+      "geometry_hash": "31507ae9f5c923295e029da8dfd8b5fed9c3be7f756b8a9bcf3340a3621245a2"
+    },
+    {
+      "name": "synthetic_large_coordinates",
+      "samples": 2,
+      "polygons": 3,
+      "vertices": 32,
+      "geometry_hash": "9b965e63682d19e40047b15cde80e137287b96add2b86feb491a293d82bc133a"
+    },
+    {
+      "name": "synthetic_zero_pressure",
+      "samples": 2,
+      "polygons": 0,
+      "vertices": 0,
+      "geometry_hash": "f80d8b10eb0803f743ba9ab9e2c49514eda9131830830d577d16ade1a4d150f3"
+    },
+    {
+      "name": "synthetic_quantization_edge",
+      "samples": 3,
+      "polygons": 5,
+      "vertices": 34,
+      "geometry_hash": "0c8fe013e79b886aa366d23c20125511721533f3f99050d65f4f8775651a85ed"
+    },
+    {
+      "name": "synthetic_marker_curve",
+      "samples": 20,
+      "polygons": 39,
+      "vertices": 332,
+      "geometry_hash": "32c15aef027cd184cbb45bb42ed5c77f0955779741d10fd8585e66caba5527e8"
+    }
+  ]
+}

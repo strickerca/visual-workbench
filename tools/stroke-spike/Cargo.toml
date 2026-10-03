@@ -1,5 +1,5 @@
 [package]
-name = "vw-ink"
+name = "vw-stroke-spike"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,16 +9,9 @@ publish = false
 [lints]
 workspace = true
 
-[lib]
-test = false
-
 [dependencies]
-vw-model = { path = "../vw-model", version = "=0.1.0" }
-vw-proto = { path = "../vw-proto", version = "=0.1.0" }
+vw-ink = { path = "../../core/crates/vw-ink", version = "=0.1.0" }
+vw-proto = { path = "../../core/crates/vw-proto", version = "=0.1.0" }
 libm = { version = "=0.2.16", default-features = false }
-thiserror = "=2.0.21"
 serde = { version = "=1.0.229", features = ["derive"] }
-
-[dev-dependencies]
 serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
-proptest = { version = "=1.11.0", default-features = false, features = ["std"] }

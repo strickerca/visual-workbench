@@ -39,6 +39,7 @@ EXPECTED_CONFIGURATIONS = frozenset({
     ":pen-probe:debugRuntimeClasspath", ":pen-probe:releaseRuntimeClasspath",
     ":video-bench:debugRuntimeClasspath", ":video-bench:releaseRuntimeClasspath",
     ":image-bench:debugRuntimeClasspath", ":image-bench:releaseRuntimeClasspath",
+    ":stroke-spike:debugRuntimeClasspath", ":stroke-spike:releaseRuntimeClasspath",
 })
 
 

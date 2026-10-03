@@ -312,6 +312,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - Owner feel test (blind A/B across three stroke types).
   - An attempt to build google/ink's C++ core for Windows, time-boxed to 4 hours.
 - **Acceptance:** a D6 decision recorded under the D6 rule, with numbers and the owner's preference.
+- **Execution checkpoint, 2026-10-02:** the Rust/JNI and Jetpack Ink comparison builds and all three instrumentation tests pass on IN2019. Four source-pinned Windows Google Ink attempts remain unsuccessful; the last reaches an upstream constexpr/MSVC incompatibility after 137/205 actions. `docs/evidence/T0.10.md` and `T0.10-results.json` retain actual attempts, timings and cleanup. Owner preferences, recorded S Pen traces, S23 presentation latency and final D6 remain pending; the spike is incomplete. Continue provisional Rust software under the owner instruction; no phase gate is closed.
 
 ### T0.11 — GPT Image round-trip spike
 - **Size:** S · **Depends on:** T0.02, T0.09, owner API key · **Prompt:** `prompts/phase-0/T0.11-gpt-image-spike.md`
@@ -375,6 +376,8 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Geometry quantized to 1/256 px.
   - Golden tests from recorded traces, identical on Windows and Android builds.
 - **Acceptance:** goldens are byte-identical across `x86_64-pc-windows-msvc` and `aarch64-linux-android` (Android goldens run on the device via `hil-test rust`).
+
+- **Execution checkpoint, 2026-10-02:** T1.04 implements the provisional Rust D6 candidate under the owner's full-continuation instruction. Twenty-one engine tests and one JNI registry test pass on Windows and physical IN2019; sixteen synthetic geometry hashes match exactly, three real Android instrumentation tests pass, and CPU append p95 is 1.354 us on IN2019 (5.300 us on Windows). `docs/evidence/T1.04.md` and `T1.04-results.json` retain exact source/artifact bindings, corrected Android 11 lifecycle failures and cleanup. PEN-001, PEN-002 and DEV-006 remain in_progress/partial for app, export and physical clauses. Owner traces, S23 presentation latency and final D6 selection remain deferred; G0/G1 are open. Continue T0.11 (S) and T1.05 (M), both gpt-6-astra/max, matching the current session. No phase-end push is due yet.
 
 ### T1.05 — vw-raster: exports
 - **Size:** M · **Depends on:** T1.02, T1.04 · **Prompt:** `prompts/phase-1/T1.05-vw-raster.md`

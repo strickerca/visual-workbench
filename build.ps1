@@ -1,8 +1,8 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-android', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-core', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
-    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
+    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
@@ -47,6 +47,21 @@ try {
         'license-check' { Run-LicenseGate }
         'build-core' { Run-LicenseGate; Run-Cargo 'build-core' @('build', '--workspace', '--locked') }
         'build-android' { Run-LicenseGate; Run-Gradle 'build-android' @(':android:assembleDebug') }
+        'build-stroke-core' {
+            Run-LicenseGate
+            Run-Cargo 'build-stroke-windows' @('build', '--release', '--locked', '-p', 'vw-stroke-spike', '-p', 'vw-stroke-jni')
+        }
+        'build-stroke' {
+            Run-LicenseGate
+            Run-Cargo 'build-stroke-windows' @('build', '--release', '--locked', '-p', 'vw-stroke-spike', '-p', 'vw-stroke-jni')
+            . (Join-Path $projectRoot 'tools/enter-dev.ps1')
+            Run-Cargo 'build-stroke-android-native' @('ndk', '-t', 'arm64-v8a', '--platform', '29', 'build', '--release', '--locked', '-p', 'vw-stroke-spike', '-p', 'vw-stroke-jni')
+            $nativeDirectory = Join-Path $projectRoot 'tools/stroke-spike/android/build/generated/jniLibs/arm64-v8a'
+            New-Item -ItemType Directory -Force -Path $nativeDirectory | Out-Null
+            Copy-Item -LiteralPath (Join-Path $projectRoot 'target/aarch64-linux-android/release/libvw_stroke_jni.so') -Destination $nativeDirectory
+            Run-Gradle 'build-stroke-android-app' @(':stroke-spike:assembleDebug', ':stroke-spike:assembleDebugAndroidTest', ':stroke-spike:lintDebug')
+            Run-Step 'bind-stroke-build' 'python.exe' @('tools/stroke-spike/build_receipt.py', 'record')
+        }
         'build-pen-probe' { Run-LicenseGate; Run-Gradle 'build-pen-probe' @(':pen-probe:assembleDebug', ':pen-probe:assembleDebugAndroidTest') }
         'build-pen-inject' {
             Run-LicenseGate

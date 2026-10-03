@@ -1,0 +1,16 @@
+[package]
+name = "vw-stroke-jni"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+vw-ink = { path = "../../../core/crates/vw-ink", version = "=0.1.0" }
+
+[lints]
+workspace = true

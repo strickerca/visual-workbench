@@ -330,3 +330,27 @@ is unchanged. WAL with synchronous=NORMAL protects process-crash consistency;
 loss or OS failure may roll back recent commits. Portable project copies use
 [VACUUM INTO](https://www.sqlite.org/lang_vacuum.html), then remove labels and
 vacuum again before ZIP publication.
+
+## T0.10 / T1.04 stroke comparison pins (2026-10-02)
+
+The shared Rust engine reuses libm **0.2.16**, serde **1.0.229**, thiserror
+**2.0.21**, BLAKE3 **1.8.7** with pure/std, and development-only proptest
+**1.11.0**. The primitive-only JNI bridge adds no JNI dependency. Exact local
+crate versions and registry checksums remain in Cargo.lock.
+
+The Android comparison adds stable [Jetpack Ink **1.0.0**](https://developer.android.com/jetpack/androidx/releases/ink)
+authoring/brush/strokes and [input-motionprediction **1.0.0**](https://developer.android.com/jetpack/androidx/releases/input),
+all Apache-2.0. It reuses graphics-core **1.0.4**, AndroidX test runner/core
+**1.7.0** and ext:junit **1.3.0**. `tools/stroke-spike/android/gradle.lockfile`
+locks the new configurations. The application POM census expanded from ten to
+twelve runtime configurations and passed with **220 exact modules** and one
+bound parent POM; Rust licenses/sources/bans passed with the existing policy.
+
+The Windows feasibility probe separately pins [google/ink `jetpack-1.0.0`](https://github.com/google/ink/tree/jetpack-1.0.0)
+at `994e034c9a6e0747386360275058feb7dcac7762` and the official
+[Bazel 7.7.1 Windows x64 executable](https://github.com/bazelbuild/bazel/releases/tag/7.7.1),
+SHA-256 `6d9fb21e806cf4f4e61bfa2bc865df4900ffdc1e9ea90ca1016ba70367ef0de4`.
+These are isolated diagnostic inputs, not product dependencies. The four bounded
+attempts are recorded in `docs/evidence/T0.10-results.json`; none produced the
+Windows core target. The provisional shared Rust engine remains the implemented
+candidate, with final D6 pending.

@@ -1,0 +1,1031 @@
+{
+  "schema": 1,
+  "task": "T1.04",
+  "related_spike": "T0.10",
+  "date": "2026-10-02",
+  "baseline_commit": "c48b89cf8c762de2a51d0edf5b40e73af4fe8a7f",
+  "algorithm_version": 1,
+  "candidate": "provisional Rust; D6 owner decision pending",
+  "windows_tests": {
+    "engine": 21,
+    "jni": 1
+  },
+  "oneplus_native": [
+    {
+      "mode": "test",
+      "device_model": "IN2019",
+      "executable_sha256": "18dd9c06477e478f4b31979ec2afa6760ed8344ef25aab1efbc06da484d326ae",
+      "validated_count": 21,
+      "validation_succeeded": true,
+      "storage_crash": null,
+      "owned_process_cleanup_confirmed": true,
+      "owned_device_cleanup_confirmed": true,
+      "screenshots_created": 0,
+      "receipt_file": "android-test-runtime-e55a75d9c3f44e26b57dd6ece1812944.json",
+      "receipt_sha256": "2dfe4befbd25d98ed0d08e46a486335407aaf1b9940d1ba169790ebb59a5fe3c"
+    },
+    {
+      "mode": "test",
+      "device_model": "IN2019",
+      "executable_sha256": "ca082e2d2154c401eb1d9da5415ba767a38ee0635b7583344d5e00b8722d7ec7",
+      "validated_count": 1,
+      "validation_succeeded": true,
+      "storage_crash": null,
+      "owned_process_cleanup_confirmed": true,
+      "owned_device_cleanup_confirmed": true,
+      "screenshots_created": 0,
+      "receipt_file": "android-test-runtime-7d5c4fc3ac6647beb1b416fcd836ff13.json",
+      "receipt_sha256": "10dafe141a62abe3d167c672cb93c611af68aba7d3cc880e0c78e78a3d6df7c0"
+    }
+  ],
+  "windows_cpu": {
+    "algorithm_version": 1,
+    "provenance": "synthetic CPU append cost; excludes renderer/JNI/display latency",
+    "samples_measured": 12800,
+    "repetitions": 100,
+    "p50_ns": 2200,
+    "p95_ns": 5300,
+    "max_ns": 1365600,
+    "target_p95_ns": 20000,
+    "meets_target": true
+  },
+  "oneplus_cpu": {
+    "algorithm_version": 1,
+    "provenance": "synthetic CPU append cost; excludes renderer/JNI/display latency",
+    "samples_measured": 12800,
+    "repetitions": 100,
+    "p50_ns": 1302,
+    "p95_ns": 1354,
+    "max_ns": 78177,
+    "target_p95_ns": 20000,
+    "meets_target": true
+  },
+  "synthetic_goldens": {
+    "algorithm_version": 1,
+    "provenance": "synthetic-only; no owner/device recording",
+    "fixtures": [
+      {
+        "name": "synthetic_dot",
+        "samples": 1,
+        "polygons": 1,
+        "vertices": 16,
+        "geometry_hash": "ad2bc8e07e978958db1c17cd0c8f634758dcef8b03c152c7d9fc8bb7e10cc409"
+      },
+      {
+        "name": "synthetic_straight",
+        "samples": 8,
+        "polygons": 15,
+        "vertices": 124,
+        "geometry_hash": "be08a4c61d7674732867d643eb2b0ff13c2de7069fa3e66a693c48057c37af3c"
+      },
+      {
+        "name": "synthetic_pressure",
+        "samples": 10,
+        "polygons": 17,
+        "vertices": 142,
+        "geometry_hash": "0fa99257b34f60daec985722887f8228e4256b73ed9db3ab9ffa5f6b31895a99"
+      },
+      {
+        "name": "synthetic_circle",
+        "samples": 65,
+        "polygons": 129,
+        "vertices": 1036,
+        "geometry_hash": "30381501cd1cce8e8f2b9d53feea61bdf88c3110fc0af573c8cdb08c57f2dbfa"
+      },
+      {
+        "name": "synthetic_handwriting",
+        "samples": 19,
+        "polygons": 37,
+        "vertices": 300,
+        "geometry_hash": "eca816f3a24ef12c2fe2aadcfb97e22581a780a7b208bd69e5b8a9656d333f90"
+      },
+      {
+        "name": "synthetic_fast_line",
+        "samples": 128,
+        "polygons": 255,
+        "vertices": 2044,
+        "geometry_hash": "74ed218351d06fd6ee05e8a94b721f00e67394692117eb01b1bcde2248b0f184"
+      },
+      {
+        "name": "synthetic_stationary_pressure",
+        "samples": 7,
+        "polygons": 3,
+        "vertices": 48,
+        "geometry_hash": "6f80fd3b5476f72fd0bb30ac07a33e37ba119aa63ad49c7444b278e516bcf63b"
+      },
+      {
+        "name": "synthetic_equal_timestamps",
+        "samples": 4,
+        "polygons": 7,
+        "vertices": 60,
+        "geometry_hash": "119f8f48941c6212ffde9d4199c08351be7df0913ce698c298d7511fc9ed1235"
+      },
+      {
+        "name": "synthetic_negative_fractional",
+        "samples": 12,
+        "polygons": 23,
+        "vertices": 188,
+        "geometry_hash": "67411070a4afed94939ef5e473b2df8bb98c894e942e1d218f2bc00f9043e49a"
+      },
+      {
+        "name": "synthetic_highlighter_flat",
+        "samples": 4,
+        "polygons": 3,
+        "vertices": 12,
+        "geometry_hash": "1e74a9d4c7a67515bd2146e194bb3bd74622986dc7ecb5cf9f5829d5ed81be89"
+      },
+      {
+        "name": "synthetic_highlighter_corner",
+        "samples": 3,
+        "polygons": 3,
+        "vertices": 13,
+        "geometry_hash": "2d89c748a794a54535d77bdc0ad0f2b7807b958a4983a52c6db4858923077833"
+      },
+      {
+        "name": "synthetic_vector_eraser",
+        "samples": 3,
+        "polygons": 5,
+        "vertices": 56,
+        "geometry_hash": "31507ae9f5c923295e029da8dfd8b5fed9c3be7f756b8a9bcf3340a3621245a2"
+      },
+      {
+        "name": "synthetic_large_coordinates",
+        "samples": 2,
+        "polygons": 3,
+        "vertices": 32,
+        "geometry_hash": "9b965e63682d19e40047b15cde80e137287b96add2b86feb491a293d82bc133a"
+      },
+      {
+        "name": "synthetic_zero_pressure",
+        "samples": 2,
+        "polygons": 0,
+        "vertices": 0,
+        "geometry_hash": "f80d8b10eb0803f743ba9ab9e2c49514eda9131830830d577d16ade1a4d150f3"
+      },
+      {
+        "name": "synthetic_quantization_edge",
+        "samples": 3,
+        "polygons": 5,
+        "vertices": 34,
+        "geometry_hash": "0c8fe013e79b886aa366d23c20125511721533f3f99050d65f4f8775651a85ed"
+      },
+      {
+        "name": "synthetic_marker_curve",
+        "samples": 20,
+        "polygons": 39,
+        "vertices": 332,
+        "geometry_hash": "32c15aef027cd184cbb45bb42ed5c77f0955779741d10fd8585e66caba5527e8"
+      }
+    ]
+  },
+  "instrumentation": {
+    "schema": 1,
+    "run_id": "94d35c012a2a42e7974c471063c46ccb",
+    "complete": true,
+    "hardware_pen_acceptance": false,
+    "verification_image_files": 0,
+    "results": [
+      {
+        "name": "cancel_switch_and_late_jetpack_clear_without_commit",
+        "passed": true
+      },
+      {
+        "name": "both_engines_synthetic_motion_dispatch_and_completion",
+        "passed": true
+      },
+      {
+        "name": "native_prediction_isolated_wet_dry_32768_pixels_identical",
+        "passed": true
+      }
+    ],
+    "callbacks": {
+      "schema": 1,
+      "measurement": "input timestamp to callback; excludes display presentation",
+      "clock_resolution_ns": 1000000,
+      "hardware_pen_acceptance": false,
+      "dropped_records": 0,
+      "records": [
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "native_append_and_path",
+          "delay_ns": 0
+        },
+        {
+          "engine": "rust",
+          "phase": "front_buffer_draw_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "rust",
+          "phase": "multi_buffer_draw_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 1000000
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "jetpack",
+          "phase": "authoring_input_callback",
+          "delay_ns": 0
+        },
+        {
+          "engine": "jetpack",
+          "phase": "finished_stroke_callback",
+          "delay_ns": 2000000
+        }
+      ]
+    }
+  },
+  "license_census": {
+    "modules": 220,
+    "runtime_configurations": 12,
+    "bound_parent_poms": 1
+  },
+  "execution_receipts": [
+    {
+      "phase": "ink-windows-tests-final",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 11.334,
+      "sampled_peak_tree_working_set_bytes": 268271616,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "ink-windows-tests-final-5e100f0b393f4f06a1bff3f7933181f9.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "log_sha256": "49fb38953248ed4a2cefafa0f5e0b5e2310f0b2eb8fa12b61019c60e3beb8176"
+    },
+    {
+      "phase": "ink-clippy-final",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 15.79,
+      "sampled_peak_tree_working_set_bytes": 230842368,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "ink-clippy-final-5b531dd49bf94e538d356239d45647f8.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "log_sha256": "f95969ec5921ae5f9b36609f05f30fa7508bcfeacf241350ba6f40ebbf1820b1"
+    },
+    {
+      "phase": "ink-format-final",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 10.729,
+      "sampled_peak_tree_working_set_bytes": 46657536,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "ink-format-final-f288dae02ad04ef9b9e7137732fa0d7d.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "phase": "build-stroke-android-app",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 140.448,
+      "sampled_peak_tree_working_set_bytes": 1623523328,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "build-stroke-android-app-9cf7e293aba242b9a800ba3a445a7d5c.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 20,
+      "log_sha256": "782964b109499e3f626b3f6a30db7e083e803acabc4b2d1cb93b1b5a2c7c6879"
+    },
+    {
+      "phase": "license-rust",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 18.199,
+      "sampled_peak_tree_working_set_bytes": 138522624,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "license-rust-8a18d6619efb4eb3b68e38e76bc44eb5.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "log_sha256": "d44a8999e8dbff55a5f3774db41556ffb0ea9fea6c2039f26367fad880574b4e"
+    },
+    {
+      "phase": "license-gradle",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 75.77,
+      "sampled_peak_tree_working_set_bytes": 668192768,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "license-gradle-f0d536b918c14a69a190a5bfa5aec725.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 20,
+      "log_sha256": "5231ce9e04b30cc00b4e3a6d0d4a34b59003d28f074d78d32a07deb52fa851c8"
+    },
+    {
+      "phase": "hil-test",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 24.738,
+      "sampled_peak_tree_working_set_bytes": 122216448,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 900,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "hil-test-eb96c483912f4651be2f298cfd459cd8.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "log_sha256": "bb4ea06cf3bdb63e00ec1807aea92aa0f329a134434f4176deed8d951549bdd2"
+    },
+    {
+      "phase": "hil-rust-cargo-test",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 34.425,
+      "sampled_peak_tree_working_set_bytes": 197820416,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "hil-rust-cargo-test-3768788fcd424277876a51b20973594e.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee"
+    },
+    {
+      "phase": "hil-rust-cargo-test",
+      "exit_code": 0,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "elapsed_seconds": 19.731,
+      "sampled_peak_tree_working_set_bytes": 255311872,
+      "sampling_interval_seconds": 2,
+      "timeout_seconds": 600,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "hil-rust-cargo-test-259ef455f92d4fe093de67700ae32859.log",
+      "surviving_processes_before_cleanup": [],
+      "compiler_telemetry_cleaned": false,
+      "parent_exit_grace_seconds": 5,
+      "log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee"
+    }
+  ],
+  "retained_device_failures": [
+    {
+      "reason": "Jetpack Clear completion stalled before surface readiness",
+      "instrumentation_sha256": "d20f73e769970a0ffcd47b23f372ff4e7e34e11c44f74490b8b05ed2a00b40e9",
+      "report": {
+        "schema": 1,
+        "run_id": "740cb6c82a0149be8da3e8e466b9de6b",
+        "complete": false,
+        "hardware_pen_acceptance": false,
+        "verification_image_files": 0,
+        "results": [
+          {
+            "name": "both_engines_synthetic_motion_dispatch_and_completion",
+            "passed": true
+          },
+          {
+            "name": "native_prediction_isolated_wet_dry_32768_pixels_identical",
+            "passed": true
+          }
+        ],
+        "callbacks": {
+          "schema": 1,
+          "measurement": "input timestamp to callback; excludes display presentation",
+          "clock_resolution_ns": 1000000,
+          "hardware_pen_acceptance": false,
+          "dropped_records": 0,
+          "records": [
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 2000000
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "native_append_and_path",
+              "delay_ns": 0
+            },
+            {
+              "engine": "rust",
+              "phase": "front_buffer_draw_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "rust",
+              "phase": "multi_buffer_draw_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 3000000
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 0
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "jetpack",
+              "phase": "authoring_input_callback",
+              "delay_ns": 1000000
+            },
+            {
+              "engine": "jetpack",
+              "phase": "finished_stroke_callback",
+              "delay_ns": 10000000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "reason": "Jetpack Android 11 render-thread assertion after detach/reattach",
+      "instrumentation_sha256": "961f2f04abed1e56faeb4c3664784b6d173c936b5c1cf0e6335f3d27d8aebba3",
+      "report": null
+    }
+  ],
+  "source_sha256": {
+    ".cargo/config.toml": "db0ef1dddd1b273925e3b0b6ec10c34d720dddd54939b8e51290f9c0d1b4ed26",
+    "Cargo.lock": "e55b045068d800782922559405f6842536cd7d5a41e65a0dcfaffd4eeff6dd36",
+    "Cargo.toml": "2b4ff6216c2cff1556164eacd4ad254edb3b1feb69e4a998c71c7b5e49f54509",
+    "apps/build.gradle.kts": "338d75566e5698c13e186ebb69b1fa622d333f74bad4d0124e3dc8e2ffad708e",
+    "apps/gradle.properties": "ccd4f509dc03ee7061bd88915eaaa21d5030aa7cfe83caba0b16aa14c64f23cc",
+    "apps/gradle/libs.versions.toml": "a7f51dc6c4a1f8dd581eae35bae6cca79191bc66278396f2140443f88e35ca0c",
+    "apps/settings.gradle.kts": "ada3e2d9a51176dc83e4c38b194e06f86f104541d0c5426756b9d65955fa7f09",
+    "build.ps1": "2cb8cbba136c5e8defaa76cd2334c9aa6978914931b888bd3f394a2a8c930b51",
+    "contracts/package.schema.json": "26ec83e776c58828a6daaf066a4dbf3943afe0de867a95504afbb8f6ad9c2841",
+    "contracts/storage.sql": "58c4ddb1f61e307591fdb9225b16e1007d6557c420cde80096deaad1fd411c4e",
+    "contracts/vw_protocol.proto": "add05c93e7abec86b91805eb9294bc9997fe3a619912e022c12af01c7d720bab",
+    "core/crates/vw-geom/Cargo.toml": "790824919672be04a06bfc9fbdf7a73b85fb09af972a4e24308f29cc8bf5d9cc",
+    "core/crates/vw-geom/benches/transforms.rs": "d2ec3438972c9275df54112c7ffb1930c605f66b60707bccdf4889b42614e87f",
+    "core/crates/vw-geom/src/affine.rs": "17242ad2d7b6da561e8fd437147f6d948e74c80e62d0fb640ddf5b3d4c9ccb9a",
+    "core/crates/vw-geom/src/asset.rs": "4f3171c4ccfa9622fcb4904d4ee531e31fd8d5934b6a4c8b060c1f50458e24ad",
+    "core/crates/vw-geom/src/capture.rs": "e46ac64de787b5cec3b000edee555186a7c2b034c162efdaff9238a77a0d2ad4",
+    "core/crates/vw-geom/src/display.rs": "a873404257faa9f8cc82f3069ec3d6f06774611ba502587884acb21e176afdb2",
+    "core/crates/vw-geom/src/lens.rs": "dce2d505efd589ad5c152298cfa0ae2e58c365568252cedfeaa148755c7724ba",
+    "core/crates/vw-geom/src/lib.rs": "7a0b2525fb30b776690b1b18d3221990747c4c5742e02b177266b40696901ca1",
+    "core/crates/vw-geom/tests/known_answers.rs": "20481078b41b12b095ffe5f5ec23dfa4bba1400b8321a9fec827ab7349c5ec42",
+    "core/crates/vw-geom/tests/properties.rs": "492348baf9f3ceaf86c5d41edb0d0406b09ab72a15b285f4c0a494a21a57c53e",
+    "core/crates/vw-ink/Cargo.toml": "0dc50f0e47ee022a8c93a4fc21f9dfd1f3ba6c8b5eacfd8c542ec9c56aad2d97",
+    "core/crates/vw-ink/README.md": "bc04fa6879f3228764883bf94471cdda35d2fb57165f44bc8bc196c4c545fb07",
+    "core/crates/vw-ink/fixtures/goldens.json": "6928c21fb2968a3fab620dbb62acd21f23e3e41085611bd9590d0f2d3379fe43",
+    "core/crates/vw-ink/fixtures/synthetic.rs": "93581cae82a8815bdd1bf095bcb28ca4f173a5c5e1e9d31b53fe205708e7bd68",
+    "core/crates/vw-ink/src/brush.rs": "a9e3970773d91ecdf603e5fd871fd027fb30a69cae8a0888f918968bcd8dd8f0",
+    "core/crates/vw-ink/src/builder.rs": "c26b1042c56121aed6c85a542c249d11ffbbb3bf7ea4fc39b6ae051042af1757",
+    "core/crates/vw-ink/src/geometry.rs": "bab073a12bfb58f339e112f17e9e59a6bf01dbe913deaed2116b3c281107ce4e",
+    "core/crates/vw-ink/src/lib.rs": "6942ee1fbb8ed34594027aaa6c13185ab33b278fc3fd444b6ed1a41653ac4f42",
+    "core/crates/vw-ink/tests/engine.rs": "c8200301f03ab110117308bade6b2be130a85da439ac0b39fe0e72c1b2008693",
+    "core/crates/vw-model/Cargo.toml": "7c96993a860a82bef65cc00e9bc3234650481a5073ca29f1738e5b9452662f61",
+    "core/crates/vw-model/src/ids.rs": "eabb8e3da222108670defe0be57d523f147a3fe2e8f9d9f61983e250622cbcd4",
+    "core/crates/vw-model/src/lib.rs": "a3e664d34308295afb42702edfcd15a0231edb2d6269b1a118475be9e2a1bb2c",
+    "core/crates/vw-model/src/order.rs": "7a38b9022e0fc5a0b5b13237748320534af0b2f1d0ed84a904b0bbc8c11b07c9",
+    "core/crates/vw-model/src/state.rs": "9de77149dd67c8864260b3deaa5e39b1d3a371e47acc44a2908a134dfccde1e1",
+    "core/crates/vw-model/src/validate.rs": "29cdfa8fe50b9930be5fe8838724d5b55abcbd7536918f1bf8651796f001f0d1",
+    "core/crates/vw-model/tests/model_contract.rs": "9b1a1f6ffcf85cd99b72e9bb6727bfbaedff005666e1137a9c172d4c42c04eff",
+    "core/crates/vw-proto/Cargo.toml": "dc4fce6fb59ddd4adfcd1e72f544798c8443f445295835a7682ee51c8fcf1041",
+    "core/crates/vw-proto/build.rs": "1b27519d8b7c41bd0e6e9ebc28021703dd77124ee1ddbc60fb1f07b0f83bc8d6",
+    "core/crates/vw-proto/src/lib.rs": "cc36a280cc559aabb64b792be4c4e492d15d82b6dc56c8c82264b7cdb69b5a9a",
+    "rust-toolchain.toml": "7daa90fd3135f5361b3eee9595738b3d68b51893d94bd42b49be25d4acaa8263",
+    "tools/check_gradle_licenses.py": "8b2dfe408e05267b5b3f7c689f69286ef21e75344747a57688de215b0276e075",
+    "tools/hil-test.ps1": "35561e11c48b3fdc249986f29fdd2f32819e8ca46efdcf82fda290ab43a8fedc",
+    "tools/stroke-spike/Cargo.toml": "ed81de1ce034f968c4da0bc530d8a9153cce70ad36aabf9f67c263644d177171",
+    "tools/stroke-spike/README.md": "562759c20eaf788e5b1629ad8b39308b7dca13c031c7f276aba0ea687d808ab5",
+    "tools/stroke-spike/android/build.gradle.kts": "0e130c0e8b5d30053137330135211b365399180557f6951d0fd8c835d4aa3da4",
+    "tools/stroke-spike/android/gradle.lockfile": "5afa41c0aa5d93c6d71a441d0622b57916750f0eccc6c8626dea9bd9b778b81c",
+    "tools/stroke-spike/android/src/androidTest/java/com/visualworkbench/strokespike/StrokeInstrumentedTest.kt": "01c08075ce81621978b1c3ec20d155b354bcda1897053b6e808d9ed94ab5bf0b",
+    "tools/stroke-spike/android/src/main/AndroidManifest.xml": "c14a6a2489898299b2f0ec5d16654890b422677abab193ebd2e983519aab337c",
+    "tools/stroke-spike/android/src/main/java/com/visualworkbench/strokespike/JetpackInkSurface.kt": "fb2e04fa6b069bb35e26ce410cbe53e0d41d709ed786090e49fda55937661555",
+    "tools/stroke-spike/android/src/main/java/com/visualworkbench/strokespike/NativeInk.kt": "406b64274a472e52356934de149a0befcb0ff892221fbf2bc546c653efb36927",
+    "tools/stroke-spike/android/src/main/java/com/visualworkbench/strokespike/RustInkSurface.kt": "a29d0cc0c73e6c0dcb8fedb47338befdb7064c96baa79e01e9c8a64c0de583c2",
+    "tools/stroke-spike/android/src/main/java/com/visualworkbench/strokespike/StrokeActivity.kt": "eeb2e87e8c90605229a53ca8529779b3afd29af6df354706db8091c079678015",
+    "tools/stroke-spike/android/src/main/java/com/visualworkbench/strokespike/StrokeMetrics.kt": "00831949349cecc189161a8cfed8e39452131ca206c7d7f98decd782b7a5b1f6",
+    "tools/stroke-spike/build_receipt.py": "c0a4c3a0c92e65e7881f564ff55cbd575929f8947922f4c2ff14c4222c6c8784",
+    "tools/stroke-spike/hil-stroke.ps1": "7825c9393a960008607ba0c5e40c9cbe7d1e2f40eb11fca9300dfe211f9356fc",
+    "tools/stroke-spike/native/Cargo.toml": "1fa7fba36bee7e24aa5f34deb4f7532336b294e40b91ba272b73df3d4c8ca8fd",
+    "tools/stroke-spike/native/src/ffi.rs": "82217eaf3e5ab923cef7cfac7f05f60e16122662eadea4423437b38d8e8a67b8",
+    "tools/stroke-spike/native/src/lib.rs": "01242dd7a983104a66af8917ae0e6ed6c9ff9f1e1d8a4a5214b71287ac65b51e",
+    "tools/stroke-spike/src/main.rs": "faee2f989d099b54f08a51d0730e68ae2dde1f0e6f3b3040b68b91a54587cc51",
+    "tools/stroke-spike/try-google-ink.ps1": "e3e927ef541208b97eaeb71e75e76be43adca13daf45b73c2d8d9ad0980364d0",
+    "tools/tests/test_setup_gates.py": "fa922465a6546f69425c77de3c2df282070171703b07f7542e8df38afb562897"
+  },
+  "artifact_sha256": {
+    "target/aarch64-linux-android/release/libvw_stroke_jni.so": "4c210de409692252ee178cac027dc94da1625b49df33e4f9fa6f84be2dd9344d",
+    "target/aarch64-linux-android/release/vw-stroke-spike": "35d3fd0f053ec9a6dc635f1a1a090bba3e2ee317b1b37b90838e0e135c556f35",
+    "target/release/vw-stroke-spike.exe": "168e35d9fd9b1c4907f04547d579a3a6f0f2fe64efe633804791c145e9c11ece",
+    "tools/stroke-spike/android/build/outputs/apk/androidTest/debug/stroke-spike-debug-androidTest.apk": "067f1e3a726de17c21d4ec9ecb80dd8f349bef9f36255821e42f69fcd224c9ed",
+    "tools/stroke-spike/android/build/outputs/apk/debug/stroke-spike-debug.apk": "667948942308fd3eacdfb50a330a10fd386890e975375b25d7a67a3ec20c4df1"
+  },
+  "verification_images": {
+    "created_on_disk": 0,
+    "in_memory_test_pixels": 32768,
+    "bitmap_buffers_recycled": true
+  },
+  "unverified": [
+    "owner S Pen traces",
+    "S23 contact-to-present latency",
+    "blind owner preference",
+    "final D6 choice",
+    "application UI and exports",
+    "phase gates"
+  ]
+}

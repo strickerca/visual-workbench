@@ -349,9 +349,11 @@
       "scenarios": [
         "A06"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.04.md — Provisional pressure-driven geometry and synthetic cancellation pass on Windows/IN2019; physical palm/S Pen and app diagnostics remain for T1.08a/T1.12."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "split: hover moved to PEN-013, tilt/orientation to PEN-014"
     },
@@ -378,9 +380,11 @@
       "scenarios": [
         "A01"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.04.md — Monotonic Bezier curves and stabilization are replay-tested; editable persisted settings and hover cursor remain for T1.08b/T1.12."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -4714,9 +4718,11 @@
       "scenarios": [
         "A01"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.04.md — Sixteen algorithm-1 synthetic geometry goldens match Windows and IN2019; recorded S Pen traces and T1.05 export goldens remain open."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },
@@ -4739,7 +4745,9 @@
         "A01",
         "A27"
       ],
-      "evidence": [],
+      "evidence": [
+        "docs/evidence/T0.10.md — Synthetic callback and native CPU timings exclude display presentation; S23 input-to-present p95 and owner comparison remain deferred, with the 25 ms target unchanged."
+      ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",

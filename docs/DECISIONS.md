@@ -43,6 +43,25 @@ Revision 2026-10-01. Each record: context, decision, alternatives considered, co
 - **Consequences:** a deterministic stroke algorithm to write and golden-test; no "pop" between wet and dry ink (acceptance ≤ 0.5 px difference).
 - **Confidence:** 70% · **Status:** provisional (T0.10).
 
+### D6 software checkpoint — 2026-10-02
+
+Continue the Rust algorithm-1 candidate for software integration under the owner's
+full-continuation instruction. Sixteen synthetic geometry goldens are identical
+on Windows x64 and the physical OnePlus IN2019 (Android 11/API 30); 21 engine tests
+and one JNI test pass on each. Three real Android comparison tests pass, including
+32,768 identical wet/dry pixels in memory. Native append CPU p95 is 5.300 us on
+Windows and 1.354 us on IN2019, excluding JNI/rendering/display. Callback timing
+from the two authoring paths measures different stages and is not comparable
+contact-to-present latency. Android 11 pre-layout and reattachment failures were
+fixed and retained in the evidence.
+
+No owner handwriting/circle/fast-line preference has been recorded, and no S23
+presentation-latency comparison or owner-recorded trace parity was performed.
+Google Ink Windows feasibility attempts are recorded in `docs/evidence/T0.10.md`.
+The original two-of-three preference/latency/build rule is unchanged. D6 remains
+provisional; software integration, a Windows core build, or IN2019 timing alone
+cannot select either engine or pass PERF-001. See `docs/evidence/T1.04.md`.
+
 ## D7 — Transport
 - **Context:** adb forward/reverse carries TCP only (no UDP), so QUIC can't run over adb; USB tethering gives a real IP link but may take over the PC's internet route; the default path must not require developer mode (possible future product).
 - **Decision (provisional):** one framed protobuf protocol over two carriers: QUIC (quinn: reliable streams plus datagrams) on Wi-Fi or USB tethering, and a TCP multiplexer over adb as a developer/power option. Default order: USB tethering → Wi-Fi → adb. Route safety check on the PC.

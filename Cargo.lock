@@ -1574,6 +1574,15 @@ version = "0.1.0"
 [[package]]
 name = "vw-ink"
 version = "0.1.0"
+dependencies = [
+ "libm",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "vw-model",
+ "vw-proto",
+]
 
 [[package]]
 name = "vw-model"
@@ -1669,6 +1678,24 @@ dependencies = [
  "vw-proto",
  "windows",
  "zip",
+]
+
+[[package]]
+name = "vw-stroke-jni"
+version = "0.1.0"
+dependencies = [
+ "vw-ink",
+]
+
+[[package]]
+name = "vw-stroke-spike"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "serde",
+ "serde_json",
+ "vw-ink",
+ "vw-proto",
 ]
 
 [[package]]
