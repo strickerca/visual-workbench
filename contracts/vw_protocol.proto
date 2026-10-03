@@ -1,4 +1,10 @@
-// Visual Workbench wire protocol — DRAFT v1 (2026-10-01).
+// Visual Workbench wire protocol — v1.2 (T1.06a/T1.10, 2026-10-02).
+// Changelog: additive connection IDs, exact sync receipt/time bindings, bounded
+// checkpoint transfer manifests, and windowed blob acknowledgements. Existing
+// Transaction, TxnAck and model messages retain their schema/checkpoint encoding.
+// Minor 2 adds reliable preview-generation admission/retirement. Minor 1 peers
+// must upgrade; generation zero cannot participate in the lifecycle protocol.
+// PairingProof/PakeMessage/PairingResult are implemented by T1.06b.
 // Finalized in task T1.06a (pairing messages in T1.06b). Both ends are the Rust core (vw-proto, prost), so the
 // schema is Rust-to-Rust; Kotlin never parses these messages directly.
 //
@@ -29,6 +35,7 @@ enum Channel {
 message Envelope {
   Channel channel = 1;
   uint64 seq = 2;  // per-channel, per-sender sequence
+  Uuid connection_id = 3; // negotiated on this authenticated TLS connection only
   oneof body {
     Hello hello = 10;
     HelloAck hello_ack = 11;
@@ -53,11 +60,15 @@ message Envelope {
     GestureCancel gesture_cancel = 31;
     CursorUpdate cursor_update = 32;
     ViewportOutline viewport_outline = 33;
+    GestureCancel gesture_abort = 34; // CONTROL: reliable cancellation
+    GestureRepair gesture_repair = 35; // CONTROL: recover omitted sample deltas
+    GestureReplay gesture_replay = 36; // CONTROL: minor 2 opening or bounded requested replay
 
     BlobRequest blob_request = 40;
     BlobChunk blob_chunk = 41;
     TileRequest tile_request = 42;
     Tile tile = 43;
+    BlobAck blob_ack = 44;
 
     StreamControl stream_control = 50;
     FrameTiles frame_tiles = 51;
@@ -135,6 +146,7 @@ message Hello {
   string app_version = 5;
   repeated string capabilities = 6;  // e.g. "frame_tiles", "video_hevc", "remote_input", "ghost_ink"
   string device_label = 7;           // user-chosen label only; never a hardware or account identifier
+  Uuid connection_id = 8;           // fresh UUIDv7; echoed by HelloAck
 }
 
 message HelloAck {
@@ -142,6 +154,7 @@ message HelloAck {
   uint32 protocol_minor = 2;
   repeated string capabilities = 3;
   string reason = 4;  // set when not accepted
+  Uuid connection_id = 5;
 }
 
 message Ping { uint64 nonce = 1; int64 t_sent_ns = 2; }
@@ -167,6 +180,8 @@ message SessionState {
   int64 connected_since_ms = 2;
   Uuid open_project_id = 3;
   Revision host_revision = 4;
+  bool sync_complete = 5; // client has durably installed this revision and all required blobs
+  uint32 pending_txns = 6; // local durable outbox, including blocked edits
 }
 
 enum Capability {
@@ -522,11 +537,24 @@ message TxnReject {
   string message = 3;
 }
 
-message SyncRequest { uint64 since_host_seq = 1; Uuid project_id = 2; }
+message SyncRequest {
+  uint64 since_host_seq = 1; Uuid project_id = 2;
+  bytes state_hash = 3; // required v1.1: bind the requested base, not sequence alone
+  uint32 max_transactions = 4; // 1..256; response is also byte bounded
+}
 
-message AckedTransaction { uint64 host_seq = 1; bytes state_hash = 2; Transaction txn = 3; }
+message AckedTransaction {
+  uint64 host_seq = 1; bytes state_hash = 2; Transaction txn = 3;
+  TxnAck ack = 4; int64 accepted_at_ms = 5;
+}
 
-message SyncBatch { repeated AckedTransaction txns = 1; bool complete = 2; }
+message SyncBatch {
+  repeated AckedTransaction txns = 1; bool complete = 2;
+  Uuid project_id = 3; Revision base = 4; Revision revision = 5;
+  // Unknown/mismatched bases receive a manifest. The checkpoint travels through
+  // bounded BLOB windows; verify its BLAKE3 before restoring vw-ops state.
+  string checkpoint_asset_id = 6; uint64 checkpoint_size = 7;
+}
 
 message RebaseNotice {
   // Host -> phone: these pending transactions were applied on a newer base; the phone re-applies
@@ -573,9 +601,22 @@ message GestureUpdate {
   repeated PointD handle_positions = 6;
   double slider_value = 7;
   ObjectState preview_state = 8;      // for shapes and handle drags
+  uint32 sample_offset = 9; // first raw sample in stroke_delta; gaps request repair
+  Uuid target_object_id = 10; // existing object for transform/style previews
+  Affine preview_transform = 11;
+  Style preview_style = 12;
+  uint64 generation = 13; // minor 2: sender-local, strictly increasing CONTROL openings
 }
 
-message GestureCancel { Uuid gesture_id = 1; string reason = 2; }
+message GestureRepair { Uuid gesture_id = 1; uint32 first_sample = 2; uint32 max_samples = 3; uint64 generation = 4; }
+// Minor 2: open=true is the sole admission of a new provisional generation.
+// All other replay and EPHEMERAL updates require that generation to remain open.
+message GestureReplay { GestureUpdate update = 1; bool open = 2; }
+
+// On reliable CONTROL GestureAbort, committed=true retires only the preview;
+// committed=false also cancels the authored gesture. EPHEMERAL cancellation is
+// not a retirement authority. Generation is scoped to the authenticated epoch.
+message GestureCancel { Uuid gesture_id = 1; string reason = 2; uint64 generation = 3; bool committed = 4; }
 
 message CursorUpdate {
   Uuid document_id = 1;
@@ -609,6 +650,11 @@ message TileRequest {
   uint32 tx = 3;
   uint32 ty = 4;
   uint32 priority = 5;
+}
+
+message BlobAck {
+  string asset_id = 1; uint64 next_offset = 2;
+  bool verified = 3; // true only after full length and BLAKE3 verification
 }
 
 message Tile {

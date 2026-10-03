@@ -94,6 +94,12 @@ impl HostSequencer {
         &self.host_device
     }
 
+    /// An authenticated replacement checkpoint must retain every durable
+    /// cancellation guard, including guards that do not change the revision.
+    pub fn cancellations_are_subset_of(&self, newer: &Self) -> bool {
+        self.cancelled.is_subset(&newer.cancelled)
+    }
+
     /// Exact accepted transaction/acknowledgement binding for storage audits,
     /// without computing optimistic inverse previews for the entire history.
     pub fn accepted_transaction(&self, id: &Id) -> Option<(&v1::Transaction, &v1::TxnAck)> {
@@ -106,6 +112,15 @@ impl HostSequencer {
     /// checked against the checkpoint without reapplying its transactions.
     pub fn accepted_at(&self, id: &Id) -> Option<i64> {
         self.records.get(id).map(|record| record.accepted_at_ms)
+    }
+
+    /// Borrow accepted journal bindings without deriving inverse previews.
+    /// Entries are keyed by transaction ID; consumers needing host order sort
+    /// by the acknowledgement's sequence.
+    pub fn accepted_transactions(&self) -> impl Iterator<Item = (&v1::Transaction, &v1::TxnAck)> {
+        self.records
+            .values()
+            .map(|record| (&record.transaction, &record.ack))
     }
 
     /// Persist a versioned, checksummed checkpoint including retry, conflict,
@@ -377,6 +392,12 @@ impl HostSequencer {
         }
         self.cancelled.insert((device, gesture));
         Ok(())
+    }
+    /// Borrow the accepted/cancelled authority without serializing a checkpoint.
+    /// Preview expiry or retirement never modifies this durable authority.
+    pub fn gesture_closed(&self, device: &DeviceId, gesture: &Id) -> bool {
+        let key = (device.clone(), gesture.clone());
+        self.gestures.contains(&key) || self.cancelled.contains(&key)
     }
     /// Accept using the authenticated transport identity and the host's receipt
     /// time. Client wall time is used only for stale property conflict resolution.

@@ -402,6 +402,8 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - `vw-sim` deterministic fault simulation (drop, duplicate, reorder, partition, offline).
 - **Acceptance:** 10,000 seeded simulation runs converge with zero lost or duplicated transactions; MEDIA keeps latest-frame semantics under 2× overload on both carriers on hardware; ops exchange over tethering and adb on hardware. CONNECT-001/002 stay partial until T1.10.
 
+- **Execution checkpoint, 2026-10-02:** T1.06a protocol v1.2, TCP/QUIC, durable resync and bounded blob transport pass 74 ordinary Windows and 58 IN2019 tests. The 10,000-seed simulation converges in 222.96 seconds with no lost/duplicate edits or replayed INPUT. ADB TLS synthetic OPS exchange passes. Physical MEDIA overload/tether checks remain open. See `docs/evidence/T1.06a.md`, `T1.06b.md` and shared results; task requirements remain in_progress/partial under provisional continuation.
+
 ### T1.06b — Pairing, trust store, discovery and route safety
 - **Size:** M · **Depends on:** T1.06a · **Prompt:** `prompts/phase-1/T1.06b-pairing.md`
 - **Requirements:** CONNECT-003, SEC-003, CONNECT-001, CONNECT-002
@@ -411,6 +413,8 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - DNS-SD with a rotating DiscoveryId; route safety API (Windows).
   - `tools/pair-cli` (PC console plus an adb-pushed phone binary) for hardware tests before the apps exist.
 - **Acceptance:** unit tests for expiry, reuse, replay, lockout, revoked refusal and TXT contents pass; hardware pairing with pair-cli over tethering succeeds and a revoked peer is refused; no key material in project files.
+
+- **Execution checkpoint, 2026-10-02:** T1.06b QR/SPAKE2, DPAPI, lockout, revocation, discovery and route APIs are implemented. IN2019 ADB QR pairing, exact synthetic OPS acknowledgment and refusal after revocation pass with cleanup. Keystore, app flows, project/export secret scans, tethering and security acceptance remain open. Continue T1.07 (M, gpt-6-astra/max), matching the current session; no phase-end push is due. See `docs/evidence/T1.06a.md`, `T1.06b.md` and shared results; task requirements remain in_progress/partial under provisional continuation.
 
 ### T1.07 — vw-ffi and the Kotlin shared module
 - **Size:** M · **Depends on:** T1.02, T1.03, T1.04, T1.05 · **Prompt:** `prompts/phase-1/T1.07-ffi-shared.md`

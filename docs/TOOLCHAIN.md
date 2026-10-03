@@ -398,3 +398,20 @@ Inter, Noto Sans and Noto Sans Mono are bundled from Google Fonts commit
 `core/crates/vw-raster/fonts/PROVENANCE.json` and individual SIL OFL notices.
 These are licensed product assets, not verification screenshots. The libwebp
 COPYING/PATENTS and source binding remain under the crate's `licenses/`.
+
+## T1.06 transport and pairing pins (2026-10-02)
+
+The locked graph adds stable [spake2 0.4.0](https://docs.rs/spake2/0.4.0/spake2/)
+(MIT OR Apache-2.0), [mdns-sd 0.21.3](https://github.com/keepsimple1/mdns-sd/releases/tag/v0.21.3)
+(MIT OR Apache-2.0), and tokio-rustls 0.26.6 (MIT OR Apache-2.0).
+The 0.5.0-pre SPAKE2 preview is not selected. Upstream documents audit/timing
+limitations for 0.4.0; testing is not a cryptographic audit.
+
+Existing quinn 0.11.12, rustls 0.23.45, ring 0.17.14, rcgen 0.14.10,
+tokio 1.53.1 and bytes 1.12.1 exact pins are reused. QUIC and TCP TLS use ring,
+TLS 1.3 and no resumption/zero-RTT. The lock update adds 24 external packages
+without upgrading/removing prior versions; Rust license/source/ban checks pass.
+The unchanged Kotlin app graph still passes its 220-module/12-configuration
+runtime license census. PowerShell 7.2+ is required only for the test harness;
+the installed bundled pwsh runtime is reused. Android native binaries target
+arm64-v8a/API 29 using the pinned NDK 30.0.16248370.

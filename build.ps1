@@ -1,8 +1,8 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-raster', 'test-raster', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
-    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
+    [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'pairing', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
@@ -53,6 +53,30 @@ try {
             Run-Cargo 'test-raster' @('test', '--locked', '-p', 'vw-raster')
             Run-Cargo 'lint-raster' @('clippy', '--locked', '-p', 'vw-raster', '--all-targets', '--', '-D', 'warnings')
             Run-Cargo 'format-raster' @('fmt', '-p', 'vw-raster', '--', '--check')
+        }
+        'build-network' {
+            Run-LicenseGate
+            Run-Cargo 'build-network' @('build', '--locked', '-p', 'vw-net', '-p', 'vw-sim', '-p', 'vw-host-win', '-p', 'vw-pair-cli', '--features', 'vw-net/mdns', '--all-targets')
+        }
+        'test-network' {
+            Run-Cargo 'test-network-core' @('test', '--locked', '-p', 'vw-net', '-p', 'vw-host-win', '--features', 'vw-net/mdns', '--', '--nocapture')
+            Run-Cargo 'test-recovered-outbox' @('test', '--locked', '-p', 'vw-ops', '--test', 'recovered_outbox')
+            Run-Cargo 'test-sync-storage' @('test', '--locked', '-p', 'vw-store', '--test', 'sync_recovery', '--test', 'authenticated_checkpoint', '--', '--nocapture')
+            # Keep optimized compilation separate from the 10-minute simulation
+            # budget. Debug validation of 20 seeds exceeds that projected target.
+            Run-Cargo 'build-network-simulation' @('test', '--no-run', '--release', '--locked', '-p', 'vw-sim', '--lib')
+            Run-Cargo 'test-network-simulation' @('test', '--release', '--locked', '-p', 'vw-sim', '--lib', '--', '--nocapture')
+            Run-Cargo 'lint-network' @('clippy', '--locked', '-p', 'vw-net', '-p', 'vw-sim', '-p', 'vw-host-win', '-p', 'vw-pair-cli', '--features', 'vw-net/mdns', '--all-targets', '--', '-D', 'warnings')
+            Run-Cargo 'format-network' @('fmt', '-p', 'vw-proto', '-p', 'vw-ops', '-p', 'vw-store', '-p', 'vw-net', '-p', 'vw-sim', '-p', 'vw-host-win', '-p', 'vw-pair-cli', '--', '--check')
+        }
+        'build-pairing' {
+            Run-LicenseGate
+            Run-Step 'test-pairing-build-binding' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/pair-cli/tests', '-v')
+            Run-Step 'snapshot-pairing-source' 'python.exe' @('tools/pair-cli/build_receipt.py', 'begin')
+            Run-Cargo 'build-pairing-windows' @('build', '--locked', '-p', 'vw-pair-cli')
+            . (Join-Path $projectRoot 'tools/enter-dev.ps1')
+            Run-Cargo 'build-pairing-android' @('ndk', '-t', 'arm64-v8a', '--platform', '29', 'build', '--locked', '-p', 'vw-pair-cli')
+            Run-Step 'bind-pairing-build' 'python.exe' @('tools/pair-cli/build_receipt.py', 'record')
         }
         'build-ai' {
             Run-LicenseGate

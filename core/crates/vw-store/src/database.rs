@@ -38,6 +38,105 @@ pub struct ProjectStore {
 }
 
 impl ProjectStore {
+    /// Bootstrap a new mirror in an absent, caller-owned staging directory.
+    /// Authentication comes from the pinned carrier, never a project field.
+    /// The caller must verify/install all required originals before publishing
+    /// this directory to its project list. Existing paths are never replaced.
+    pub fn create_authenticated_checkpoint(
+        path: &Path,
+        bytes: &[u8],
+        authenticated_host: &DeviceId,
+        local_device: &DeviceId,
+        now_ms: i64,
+    ) -> Result<Self, StoreError> {
+        if now_ms < 0 {
+            return Err(StoreError::Invalid("creation time"));
+        }
+        let host = HostSequencer::from_checkpoint_bytes(bytes)?;
+        if host.host_device() != authenticated_host
+            || host.project().canonical_bytes()?.len() > MAX_PAYLOAD
+        {
+            return Err(StoreError::Invalid("authenticated bootstrap identity/size"));
+        }
+        let revision = host.revision()?;
+        let seq = sql_u64(revision.host_seq)?;
+        fs::create_dir(path)?;
+        blobs::check_directory(path)?;
+        let root = path.canonicalize()?;
+        let lock = lock_project(&root)?;
+        let mut connection = connect(&root, true)?;
+        connection.execute_batch(migrations::SCHEMA)?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        tx.execute("INSERT INTO meta(key,value) VALUES ('host_device',?1),('project_id',?2),('local_device',?3)",params![host.host_device().as_str(),host.project().id.as_str(),local_device.as_str()])?;
+        let mut accepted = host.accepted_transactions().collect::<Vec<_>>();
+        accepted.sort_by_key(|(_, ack)| ack.host_seq);
+        for (txn, ack) in accepted {
+            let id = Id::from_proto(txn.txn_id.as_ref())?;
+            let accepted_at = host
+                .accepted_at(&id)
+                .ok_or(StoreError::Invalid("checkpoint receipt time"))?;
+            let base = txn
+                .base_revision
+                .as_ref()
+                .ok_or(StoreError::Invalid("checkpoint base"))?;
+            for op in &txn.ops {
+                sql_u64(
+                    op.op_id
+                        .as_ref()
+                        .ok_or(StoreError::Invalid("op ID"))?
+                        .lamport,
+                )?;
+                if let Some(v1::op::Kind::AddAsset(asset)) = &op.kind {
+                    super::projections::persist_asset(&tx, asset)?;
+                }
+            }
+            let hash: [u8; 32] = ack
+                .state_hash
+                .as_slice()
+                .try_into()
+                .map_err(|_| StoreError::Invalid("checkpoint receipt hash"))?;
+            let hash = blake3::Hash::from_bytes(hash).to_hex().to_string();
+            tx.execute("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",params![sql_u64(ack.host_seq)?,id.as_str(),txn.device_id,sql_u64(base.host_seq)?,optional_uuid(txn.gesture_id.as_ref())?,bounded_encode(txn)?,hash,txn.created_at_wall_ms,accepted_at,bounded_encode(ack)?])?;
+        }
+        super::projections::persist(&tx, host.project(), seq, now_ms)?;
+        for conflict in host.conflicts() {
+            write_conflict(&tx, conflict)?;
+        }
+        write_snapshot(&tx, &host, now_ms)?;
+        verify_prefix(&tx, &host, seq)?;
+        super::projections::verify_assets(&tx, host.project())?;
+        super::projections::verify(&tx, host.project(), seq)?;
+        integrity(&tx)?;
+        tx.commit()?;
+        blobs::ensure_directory(&root.join("blobs"))?;
+        blobs::ensure_directory(&root.join("cache"))?;
+        Ok(Self {
+            root,
+            connection,
+            host,
+            _lock: lock,
+            last_snapshot_seq: revision.host_seq,
+            last_snapshot_ms: now_ms,
+            replayed_transactions: 0,
+        })
+    }
+
+    /// The local editing identity is separate from the authoritative sequencer.
+    /// Older locally created projects use their host identity unchanged.
+    pub fn local_device(&self) -> Result<DeviceId, StoreError> {
+        let value: Option<String> = self
+            .connection
+            .query_row(
+                "SELECT value FROM meta WHERE key='local_device'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(match value {
+            Some(value) => DeviceId::try_from(value)?,
+            None => self.host.host_device().clone(),
+        })
+    }
     /// Create at an absent caller-selected path. Asset bytes may arrive later;
     /// their immutable metadata already belongs to the project state.
     pub fn create(
@@ -146,6 +245,213 @@ impl ProjectStore {
     pub fn revision(&self) -> Result<v1::Revision, StoreError> {
         Ok(self.host.revision()?)
     }
+    /// Validated complete sequencing state for authenticated transport resume.
+    pub fn checkpoint_bytes(&self) -> Result<Vec<u8>, StoreError> {
+        Ok(self.host.checkpoint_bytes()?)
+    }
+
+    /// All immutable originals retained by the accepted journal, including
+    /// assets currently hidden by undo. A replica must transfer this inventory
+    /// before reporting that the complete project is available offline.
+    pub fn retained_assets(&self) -> Result<std::collections::BTreeMap<AssetId, u64>, StoreError> {
+        super::projections::verify_assets(&self.connection, self.host.project())?;
+        let mut query = self
+            .connection
+            .prepare("SELECT asset_id,byte_size FROM assets ORDER BY asset_id")?;
+        let mut rows = query.query([])?;
+        let mut assets = std::collections::BTreeMap::new();
+        while let Some(row) = rows.next()? {
+            let id = AssetId::try_from(row.get::<_, String>(0)?)?;
+            let size = u64::try_from(row.get::<_, i64>(1)?)
+                .map_err(|_| StoreError::Corrupt("asset byte size"))?;
+            if size == 0 || assets.insert(id, size).is_some() {
+                return Err(StoreError::Corrupt("asset inventory"));
+            }
+        }
+        Ok(assets)
+    }
+
+    /// An owned temporary file in checked project-private storage. Android
+    /// applications cannot assume the process-default temporary path is usable.
+    /// The returned handle removes only its own file when dropped.
+    pub fn transfer_file(&self) -> Result<tempfile::NamedTempFile, StoreError> {
+        blobs::check_directory(&self.root)?;
+        let cache = self.root.join("cache");
+        blobs::check_directory(&cache)?;
+        let directory = cache.join("session-transfers-v1");
+        blobs::ensure_directory(&directory)?;
+        Ok(tempfile::Builder::new()
+            .prefix("transfer-")
+            .tempfile_in(directory)?)
+    }
+
+    /// Local authoritative identity, persisted in the verified checkpoint.
+    pub fn host_device(&self) -> &DeviceId {
+        self.host.host_device()
+    }
+
+    /// Accepted bindings for restoring application undo cursors without replay
+    /// or quadratic generation of every transaction's inverse preview.
+    pub fn accepted_transactions(&self) -> impl Iterator<Item = (&v1::Transaction, &v1::TxnAck)> {
+        self.host.accepted_transactions()
+    }
+
+    /// Install a host-authenticated, validated checkpoint and acknowledge only
+    /// exact matching pending transactions in the same SQLite commit. The caller
+    /// must obtain `authenticated_host` from its pinned transport, not a payload.
+    /// Existing accepted history must be an exact prefix; stale, foreign and
+    /// divergent histories cannot replace local durable state.
+    pub fn install_authenticated_checkpoint(
+        &mut self,
+        bytes: &[u8],
+        authenticated_host: &DeviceId,
+        now_ms: i64,
+    ) -> Result<usize, StoreError> {
+        self.install_authenticated_checkpoint_observed(bytes, authenticated_host, now_ms, |_| {})
+    }
+
+    /// Diagnostic transaction boundaries for the process-crash regression.
+    /// Observers have the same no-panic/no-blocking contract as commit observers.
+    pub fn install_authenticated_checkpoint_observed<F: FnMut(CommitStage)>(
+        &mut self,
+        bytes: &[u8],
+        authenticated_host: &DeviceId,
+        now_ms: i64,
+        mut observer: F,
+    ) -> Result<usize, StoreError> {
+        if now_ms < 0 || authenticated_host != self.host.host_device() {
+            return Err(StoreError::Invalid(
+                "authenticated checkpoint identity/time",
+            ));
+        }
+        let candidate = HostSequencer::from_checkpoint_bytes(bytes)?;
+        if candidate.host_device() != authenticated_host
+            || candidate.project().id != self.project().id
+        {
+            return Err(StoreError::Invalid("authenticated checkpoint project/host"));
+        }
+        let previous = self.host.revision()?;
+        let revision = candidate.revision()?;
+        if revision.host_seq < previous.host_seq
+            || (revision.host_seq == previous.host_seq && revision != previous)
+            || !candidate.conflicts().starts_with(self.host.conflicts())
+            || !self.host.cancellations_are_subset_of(&candidate)
+            || candidate.project().canonical_bytes()?.len() > MAX_PAYLOAD
+        {
+            return Err(StoreError::Invalid("stale or divergent checkpoint"));
+        }
+        let snapshot = candidate.snapshot()?;
+        let mut ordered = snapshot.accepted.values().collect::<Vec<_>>();
+        ordered.sort_by_key(|(_, ack)| ack.host_seq);
+        if previous.host_seq == 0
+            && revision.host_seq > 0
+            && ordered
+                .first()
+                .and_then(|(txn, _)| txn.base_revision.as_ref())
+                != Some(&previous)
+        {
+            return Err(StoreError::Invalid("checkpoint initial state"));
+        }
+        let seq = sql_u64(revision.host_seq)?;
+        let old_seq = sql_u64(previous.host_seq)?;
+        // Monotonic checkpoint bookkeeping even if the caller's wall clock moves back.
+        let snapshot_time = now_ms.max(self.last_snapshot_ms);
+        observer(CommitStage::Prepared);
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        migrations::verify_schema(&tx, 2)?;
+        check_all_column_bounds(&tx)?;
+        check_payload_bounds(&tx)?;
+        let durable_seq: i64 =
+            tx.query_row("SELECT COALESCE(MAX(host_seq),0) FROM op_log", [], |row| {
+                row.get(0)
+            })?;
+        if durable_seq != old_seq {
+            return Err(StoreError::Corrupt("untracked accepted log tail"));
+        }
+        verify_prefix(&tx, &self.host, old_seq)?;
+        // Also compare every original receipt/time to the incoming prefix, not
+        // just the visible-state hash (different histories can have the same state).
+        verify_prefix(&tx, &candidate, old_seq)?;
+        if read_conflicts(&tx)? != self.host.conflicts() {
+            return Err(StoreError::Corrupt("conflict projection"));
+        }
+        super::projections::verify_assets(&tx, self.host.project())?;
+        super::projections::verify(&tx, self.host.project(), old_seq)?;
+        let pending = validate_pending(&tx, self.host.project())?;
+        let mut acknowledged = Vec::new();
+        for txn in &pending {
+            let id = Id::from_proto(txn.txn_id.as_ref())?;
+            if let Some((accepted, _)) = candidate.accepted_transaction(&id) {
+                if bounded_encode(txn)? != bounded_encode(accepted)? {
+                    return Err(StoreError::Invalid(
+                        "pending checkpoint transaction collision",
+                    ));
+                }
+                acknowledged.push(txn);
+            }
+        }
+        for (txn, ack) in ordered
+            .into_iter()
+            .filter(|(_, ack)| ack.host_seq > previous.host_seq)
+        {
+            let id = Id::from_proto(txn.txn_id.as_ref())?;
+            let accepted_at = candidate
+                .accepted_at(&id)
+                .ok_or(StoreError::Invalid("checkpoint receipt time"))?;
+            let base = txn
+                .base_revision
+                .as_ref()
+                .ok_or(StoreError::Invalid("checkpoint base"))?;
+            for op in &txn.ops {
+                sql_u64(
+                    op.op_id
+                        .as_ref()
+                        .ok_or(StoreError::Invalid("op ID"))?
+                        .lamport,
+                )?;
+                // Preserve originals introduced then removed before this checkpoint.
+                if let Some(v1::op::Kind::AddAsset(asset)) = &op.kind {
+                    super::projections::persist_asset(&tx, asset)?;
+                }
+            }
+            let hash: [u8; 32] = ack
+                .state_hash
+                .as_slice()
+                .try_into()
+                .map_err(|_| StoreError::Invalid("checkpoint receipt hash"))?;
+            let hash = blake3::Hash::from_bytes(hash).to_hex().to_string();
+            tx.execute("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+                params![sql_u64(ack.host_seq)?,id.as_str(),txn.device_id,sql_u64(base.host_seq)?,optional_uuid(txn.gesture_id.as_ref())?,bounded_encode(txn)?,hash,txn.created_at_wall_ms,accepted_at,bounded_encode(ack)?])?;
+        }
+        observer(CommitStage::LogWritten);
+        super::projections::persist(&tx, candidate.project(), seq, snapshot_time)?;
+        for conflict in &candidate.conflicts()[self.host.conflicts().len()..] {
+            write_conflict(&tx, conflict)?;
+        }
+        write_snapshot(&tx, &candidate, snapshot_time)?;
+        let mut removed = 0;
+        for txn in acknowledged {
+            removed += tx.execute(
+                "DELETE FROM pending_txns WHERE txn_id=?1 AND txn=?2",
+                params![uuid(txn.txn_id.as_ref())?, bounded_encode(txn)?],
+            )?;
+        }
+        verify_prefix(&tx, &candidate, seq)?;
+        super::projections::verify_assets(&tx, candidate.project())?;
+        super::projections::verify(&tx, candidate.project(), seq)?;
+        validate_pending(&tx, candidate.project())?;
+        integrity(&tx)?;
+        observer(CommitStage::BeforeCommit);
+        tx.commit()?;
+        self.host = candidate;
+        self.last_snapshot_seq = revision.host_seq;
+        self.last_snapshot_ms = snapshot_time;
+        self.replayed_transactions = 0;
+        observer(CommitStage::Committed);
+        Ok(removed)
+    }
     /// Number of operations replayed after the newest checkpoint on this open.
     pub const fn replayed_transactions(&self) -> u64 {
         self.replayed_transactions
@@ -239,6 +545,11 @@ impl ProjectStore {
         self.last_snapshot_ms = now_ms;
         Ok(())
     }
+    /// Query durable acceptance/cancellation without cloning a checkpoint.
+    pub fn gesture_closed(&self, device: &DeviceId, gesture: &Id) -> bool {
+        self.host.gesture_closed(device, gesture)
+    }
+
     /// Persist cancellation before accepting any later commit with this gesture.
     pub fn cancel_gesture(
         &mut self,
@@ -321,8 +632,9 @@ impl ProjectStore {
     pub fn pending(&self) -> Result<Vec<v1::Transaction>, StoreError> {
         validate_pending(&self.connection, self.project())
     }
-    /// Remove only the exact queued transaction named by a matching host ack.
-    /// The caller applies its authenticated sync batch before acknowledging.
+    /// Remove only the exact queued transaction already present with this exact
+    /// receipt in the durable accepted log. A network receipt by itself cannot
+    /// remove the only durable copy of an offline edit.
     pub fn acknowledge_pending(
         &mut self,
         txn: &v1::Transaction,
@@ -332,10 +644,33 @@ impl ProjectStore {
             return Err(StoreError::Invalid("pending ack"));
         }
         let id = uuid(txn.txn_id.as_ref())?;
-        Ok(self.connection.execute(
+        let bytes = bounded_encode(txn)?;
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        migrations::verify_schema(&tx, 2)?;
+        let durable: Option<(Vec<u8>, Vec<u8>)> = tx
+            .query_row("SELECT txn,ack FROM op_log WHERE txn_id=?1", [&id], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .optional()?;
+        let Some((accepted, receipt)) = durable else {
+            return Err(StoreError::Invalid("pending ack has no durable acceptance"));
+        };
+        if accepted != bytes {
+            return Ok(false);
+        }
+        if receipt != bounded_encode(ack)? {
+            return Err(StoreError::Invalid(
+                "pending ack differs from durable receipt",
+            ));
+        }
+        let removed = tx.execute(
             "DELETE FROM pending_txns WHERE txn_id=?1 AND txn=?2",
-            params![id, bounded_encode(txn)?],
-        )? == 1)
+            params![id, bytes],
+        )? == 1;
+        tx.commit()?;
+        Ok(removed)
     }
     pub fn conflicts(&self) -> Result<Vec<v1::ConflictRecord>, StoreError> {
         read_conflicts(&self.connection)

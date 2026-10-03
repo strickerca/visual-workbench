@@ -14,6 +14,7 @@ members = [
     "tools/stroke-spike",
     "tools/stroke-spike/native",
     "tools/ai-spike",
+    "tools/pair-cli",
 ]
 
 [workspace.package]

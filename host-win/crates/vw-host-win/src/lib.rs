@@ -1,4 +1,6 @@
-//! Future module stub for Windows platform services.
-//! Product behavior is implemented and verified by the owning later task.
+//! Windows app-level platform adapters. No project API stores trust material.
 
 #![cfg(target_os = "windows")]
+
+pub mod routes;
+pub mod trust;

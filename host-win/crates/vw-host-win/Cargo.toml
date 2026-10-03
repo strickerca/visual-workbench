@@ -8,3 +8,11 @@ publish = false
 
 [lints]
 workspace = true
+
+[target.'cfg(windows)'.dependencies]
+vw-net = { path = "../../../core/crates/vw-net", version = "=0.1.0" }
+vw-model = { path = "../../../core/crates/vw-model", version = "=0.1.0" }
+zeroize = "=1.9.0"
+fs2 = "=0.4.3"
+tempfile = "=3.27.0"
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_UI_Shell", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Networking_WinSock"] }

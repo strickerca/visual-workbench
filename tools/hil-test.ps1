@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$Mode = 'app',
+    [ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'pairing', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$Mode = 'app',
     [ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
     [ValidateRange(1, 86400)][int]$TimeoutSeconds = 600,
     [switch]$OwnerReady,
@@ -14,6 +14,11 @@ Import-Module (Join-Path $PSScriptRoot 'process.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'android-device.psm1') -Force
 
 try {
+    if ($Mode -eq 'pairing') {
+        $run = Invoke-VwProcess -FilePath 'pwsh.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/pair-cli/run_adb.ps1', '-TimeoutSeconds', '180') -WorkingDirectory $projectRoot -Phase 'hil-pairing-adb' -TimeoutSeconds 480
+        if ($run.ExitCode -ne 0) { throw 'Pairing HIL or its owned cleanup failed' }
+        exit 0
+    }
     if ($Mode -eq 'stroke') {
         & (Join-Path $PSScriptRoot 'stroke-spike/hil-stroke.ps1') -TimeoutSeconds $TimeoutSeconds
         exit 0

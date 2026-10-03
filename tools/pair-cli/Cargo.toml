@@ -1,0 +1,26 @@
+[package]
+name = "vw-pair-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+vw-net = { path = "../../core/crates/vw-net", version = "=0.1.0" }
+vw-model = { path = "../../core/crates/vw-model", version = "=0.1.0" }
+vw-ops = { path = "../../core/crates/vw-ops", version = "=0.1.0" }
+vw-proto = { path = "../../core/crates/vw-proto", version = "=0.1.0" }
+tokio = { version = "=1.53.1", features = ["rt", "net", "time", "io-util", "macros", "sync"] }
+zeroize = "=1.9.0"
+thiserror = "=2.0.21"
+
+[target.'cfg(windows)'.dependencies]
+vw-host-win = { path = "../../host-win/crates/vw-host-win", version = "=0.1.0" }
+
+[[bin]]
+name = "pair-cli"
+path = "src/main.rs"

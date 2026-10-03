@@ -8,3 +8,30 @@ publish = false
 
 [lints]
 workspace = true
+
+[features]
+test-support = []
+mdns = ["dep:mdns-sd"]
+
+[dependencies]
+vw-model = { path = "../vw-model", version = "=0.1.0" }
+vw-ops = { path = "../vw-ops", version = "=0.1.0" }
+vw-proto = { path = "../vw-proto", version = "=0.1.0" }
+vw-store = { path = "../vw-store", version = "=0.1.0" }
+quinn = { version = "=0.11.12", default-features = false, features = ["runtime-tokio", "rustls-ring"] }
+rustls = { version = "=0.23.45", default-features = false, features = ["std", "ring"] }
+tokio-rustls = { version = "=0.26.6", default-features = false, features = ["ring"] }
+tokio = { version = "=1.53.1", features = ["rt", "net", "time", "io-util", "macros", "sync"] }
+bytes = "=1.12.1"
+blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+thiserror = "=2.0.21"
+ring = "=0.17.14"
+zeroize = "=1.9.0"
+spake2 = "=0.4.0"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+rcgen = { version = "=0.14.10", default-features = false, features = ["crypto", "ring"] }
+mdns-sd = { version = "=0.21.3", optional = true, default-features = false }
+
+[dev-dependencies]
+tempfile = "=3.27.0"

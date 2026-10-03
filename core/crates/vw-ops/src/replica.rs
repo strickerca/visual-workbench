@@ -51,6 +51,62 @@ impl Replica {
     pub fn pending(&self) -> &[PendingTransaction] {
         &self.pending
     }
+    /// Restore a transaction from the durable local outbox after the verified
+    /// host base advanced. Preserve its original bytes/base for exact retry and
+    /// conflict semantics; failed optimistic replays remain visibly blocked.
+    /// This is recovery, not admission of a newly authored stale-base edit.
+    pub fn queue_recovered(&mut self, transaction: v1::Transaction) -> Result<(), OpsError> {
+        if transaction.device_id != self.device.as_str() {
+            return Err(OpsError::DeviceMismatch);
+        }
+        if Id::from_proto(transaction.project_id.as_ref())? != self.authoritative.id {
+            return Err(OpsError::Invalid("project identity"));
+        }
+        let base = transaction
+            .base_revision
+            .as_ref()
+            .ok_or(OpsError::RevisionMismatch)?;
+        if base.host_seq > self.revision.host_seq
+            || base.state_hash.len() != 32
+            || (base.host_seq == self.revision.host_seq && base != &self.revision)
+        {
+            return Err(OpsError::RevisionMismatch);
+        }
+        let id = Id::from_proto(transaction.txn_id.as_ref())?;
+        if let Some(old) = self
+            .pending
+            .iter()
+            .find(|p| p.transaction.txn_id == transaction.txn_id)
+        {
+            return if old.transaction.encode_to_vec() == transaction.encode_to_vec() {
+                Ok(())
+            } else {
+                Err(OpsError::IdCollision)
+            };
+        }
+        if self.authoritative_inverses.contains_key(&id) {
+            return Err(OpsError::IdCollision);
+        }
+        if self.pending.len() >= 4096 || transaction.ops.is_empty() || transaction.ops.len() > 4096
+        {
+            return Err(OpsError::Invalid("pending queue bounds"));
+        }
+        validate_transaction(&transaction)?;
+        let mut pending = self.pending.clone();
+        pending.push(PendingTransaction {
+            transaction,
+            blocked_reason: None,
+        });
+        let (visible, inverses) = replay(
+            &self.authoritative,
+            &mut pending,
+            self.authoritative_inverses.clone(),
+        )?;
+        self.pending = pending;
+        self.visible = visible;
+        self.inverse_previews = inverses;
+        Ok(())
+    }
     /// Explicitly abandon rejected/cancelled local work and its inverse chain.
     /// Other dependent edits remain queued with a blocked reason after replay.
     /// This never cancels work already accepted by the host.

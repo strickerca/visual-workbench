@@ -268,9 +268,11 @@
       "scenarios": [
         "A14"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.06a.md — All 10,000 fault seeds converge and native recovery tests pass; app lifecycle/replication integration remains T1.10."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -1622,10 +1624,11 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged."
+        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
+        "docs/evidence/T1.06b.md — Native QR/code/discovery and IN2019 ADB QR pairing pass; app QR/discovery and physical route scenarios remain T1.10."
       ],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "updated: tethering added so normal use needs no developer mode (owner: may monetize later)"
     },
@@ -1649,9 +1652,11 @@
       "scenarios": [
         "A14"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.06b.md — Both TLS carriers and IN2019 ADB operation exchange work in the CLI; app reconnect, tether/Wi-Fi and timing acceptance remain T1.10."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -1678,9 +1683,11 @@
       "scenarios": [
         "A19"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.06b.md — DPAPI, expiry/reuse/replay, code lockout and live revocation pass; Android Keystore and real-app flows remain T1.10."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -1703,10 +1710,11 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged."
+        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
+        "docs/evidence/T1.06a.md — Latest-only MEDIA and bounded queue tests pass; physical 2x-overload rendering on both carriers remains open."
       ],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -1730,9 +1738,11 @@
       "scenarios": [
         "A14"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.06a.md — Fresh-connection invalidation and durable resync tests pass; app carrier switching and hardware reconnect measurements remain open."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -4112,7 +4122,8 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — duplicate acknowledgements and atomic host sequencing pass simulation; durable sequencing/restart and finalized live transport remain T1.03, T1.06a, T1.10 and T1.12."
+        "docs/evidence/T1.02.md — duplicate acknowledgements and atomic host sequencing pass simulation; durable sequencing/restart and finalized live transport remain T1.03, T1.06a, T1.10 and T1.12.",
+        "docs/evidence/T1.06a.md — Duplicate receipts and transaction replay preserve exactly-once accepted history in simulation/native tests; full application scenario acceptance remains pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4558,9 +4569,11 @@
       "scenarios": [
         "A19"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.06b.md — TLS-bound proofs, durable lockout and revocation pass; project/export secret scan, app Keystore and production-security acceptance remain open."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },
@@ -4725,9 +4738,11 @@
       "scenarios": [
         "A14"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T1.06a.md — 10,000 seeds pass in 222.96 seconds with exact replay/no-loss invariants; full app/gate coverage remains open."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },

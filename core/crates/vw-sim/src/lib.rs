@@ -1,2 +1,3 @@
-//! Future module stub for deterministic sync simulation.
-//! Product behavior is implemented and verified by the owning later task.
+//! Deterministic faults around the actual transaction/replica and wire engines.
+mod faults;
+pub use faults::{Report, SimError, run};
