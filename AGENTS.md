@@ -44,6 +44,27 @@ gates pending. Do not invent pen measurements, preferences or gate approval.
 This supersedes the awake pause cadence and the earlier OnePlus reservation.
 Parallel implementation remains authorized; preserve other apps and processes.
 
+Owner update (2026-10-03): the S23 Ultra is connected again. Use SM-S918U
+explicitly for applicable Android validation and delivery, without device fallback.
+The released IN2019 authorization remains available for separately selected tests.
+Preserve other apps and Android profiles. Test package installation, instrumentation
+and cleanup must target owner user 0; refuse ambiguous existing test installations.
+Keep physical S Pen gestures, latency, provider quality and owner gates pending
+unless the corresponding acceptance was actually performed.
+
+Owner executor update (2026-10-03): continue the full plan with gpt-6.1-sol / xhigh.
+This overrides the plan's model/effort recommendations. Verify each executor's
+actual session; an existing executor whose effort differs must report that
+limitation. New delegated coding uses the requested Sol/xhigh settings. Do not
+resume a superseded max-effort coding executor or silently change app settings.
+
+Owner scope confirmation (2026-10-03): follow D20's Krita/Paint milestone M4-KP.
+Prioritize the capture/DPI, transport and frame/input ownership needed for T4.01,
+T4.03, T4.04 and the active Krita/Paint subsets of T4.07/T4.08, then personal-use
+packaging and focused acceptance. Preserve broader Phase 3 candidates without
+making them new milestone prerequisites. Keep deferred Phase 4 tasks and Phase 5
+deferred; this scope confirmation does not pass M4-KP, G4 or earlier product gates.
+
 The owner shares the IN2019 with another app development session. Backgrounding
 can be normal. Check actual foreground state, use bounded starter-only relaunches,
 and preserve the other app and its processes. Do not reset adb or the device to

@@ -69,7 +69,7 @@ public sealed interface Shape {
     public data class Text(public val anchor: Point, public val text: String, public val font: String, public val size: Double, public val outline: List<Outline> = emptyList()) : Shape
     public data class Marker(public val number: UInt, public val point: Point, public val rectangle: Rect?) : Shape
     public data class Guide(public val rectangle: Rect) : Shape
-    public data class Result(public val assetId: String) : Shape
+    public data class Result(public val assetId: String, public val resultId: String = "") : Shape
     public data object Adjustment : Shape
 }
 public data class RenderItem(public val objectId: String, public val layerId: String, public val layerOpacity: Double, public val layerBlend: String, public val bounds: Rect, public val contours: Contours, public val transform: Transform, public val style: ObjectStyle, public val shape: Shape, public val locked: Boolean)

@@ -140,6 +140,7 @@ kotlin {
             dependencies {
                 implementation(project(":bindings-core"))
                 implementation("net.java.dev.jna:jna:5.19.1@aar")
+                implementation("org.rustls:rustls-platform-verifier:0.2.0")
             }
         }
         val desktopMain by getting {
@@ -157,12 +158,16 @@ kotlin {
         }
         getByName("androidDeviceTest") {
             kotlin.srcDir("src/jvmTest/kotlin")
+            // The Android KMP device source set does not inherit commonTest.
+            // Exercise the same platform-neutral interaction contracts here.
+            kotlin.srcDir("src/commonTest/kotlin")
             resources.srcDir(repository.resolve("tools/ffi-test/fixtures"))
             dependencies {
                 implementation("androidx.test:runner:1.7.0")
                 implementation("androidx.test:core:1.7.0")
                 implementation("androidx.test.ext:junit:1.3.0")
                 implementation("junit:junit:4.13.2")
+                implementation(kotlin("test-junit"))
             }
         }
     }

@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "date": "2026-10-03",
+  "command": "build.ps1 lint-all -TimeoutSeconds 1800",
+  "run": {
+    "log": "phase2-final-s23-lint-all-d734a2318a114926bffa26d367168ea4.log",
+    "log_sha256": "0e0e12cd69988734d6f4fe26d8f06baa2ac3820eb3c4052f2f5d7cddab54003d",
+    "metadata_sha256": "3f1d3b5a3cc91fdbd2c558ea4ed8315cfd15500325257710b88e6dc2d4fb6f8d",
+    "exit_code": 0,
+    "elapsed_seconds": 338.472,
+    "sampled_peak_tree_working_set_bytes": 3313147904,
+    "contained_in_windows_job": true,
+    "process_tree_cleanup_confirmed": true,
+    "output_streams_completed": true,
+    "parent_exit_code": 0,
+    "failure_reason": null,
+    "survivors_before_cleanup_count": 0,
+    "survivors_before_cleanup_names": [],
+    "compiler_telemetry_cleaned": false,
+    "pre_cleanup_survivor_classification": "none"
+  },
+  "checks": [
+    "setup",
+    "plan coverage",
+    "rustfmt",
+    "strict workspace clippy",
+    "redacted secret scan",
+    "Android lint",
+    "shared and desktop checks",
+    "probe lint"
+  ],
+  "product_gate_passed": false
+}

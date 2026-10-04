@@ -27,8 +27,9 @@ internal class NativeRuntimeFailure(message: String) : Exception(message)
  * A cache is published with a final readiness marker, never by overwriting an
  * existing file. Windows DLLs may remain loaded after close: close releases
  * our read leases only and deliberately does not remove cache directories. */
-internal class DesktopNativeRuntime private constructor(val directory: Path, private val leases: List<AutoCloseable>) : AutoCloseable {
+internal class DesktopNativeRuntime private constructor(val directory: Path, private val leases: List<AutoCloseable>, private val packaged: Map<String,String>) : AutoCloseable {
     private val closed = AtomicBoolean(false)
+    fun packagedHash(name: String): String = packaged[name] ?: throw NativeRuntimeFailure("Unknown packaged native helper")
     fun activate() {
         check(!closed.get())
         // This property belongs only to this JVM. Include the prior path after
@@ -45,7 +46,7 @@ internal class DesktopNativeRuntime private constructor(val directory: Path, pri
         if (closed.compareAndSet(false, true)) leases.asReversed().forEach { runCatching { it.close() } }
     }
     companion object {
-        private val names = setOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe")
+        private val names = setOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
         private const val MAX_FILE = 256L * 1024 * 1024
         private const val MAX_TOTAL = 512L * 1024 * 1024
         private const val MANIFEST = "vw-native-runtime.sha256"
@@ -64,7 +65,7 @@ internal class DesktopNativeRuntime private constructor(val directory: Path, pri
                 val runtime = prepareAt(anchor.directory.resolve("native-runtime"), resources, guard)
                 try {
                     anchor.verify()
-                    return DesktopNativeRuntime(runtime.directory, listOf(anchor, runtime))
+                    return DesktopNativeRuntime(runtime.directory, listOf(anchor, runtime), runtime.packaged)
                 } catch (error: Exception) { runtime.close(); throw error }
             } catch (error: Exception) { anchor.close(); throw error }
         }
@@ -146,7 +147,7 @@ internal class DesktopNativeRuntime private constructor(val directory: Path, pri
                     }
                     if (hex(hash.digest()) != entry.sha256) throw NativeRuntimeFailure("A native cache file failed its exact hash check.")
                 }
-                return DesktopNativeRuntime(directory, pinned.toList())
+                return DesktopNativeRuntime(directory, pinned.toList(), entries.associate { it.name to it.sha256 })
             } catch (error: Exception) {
                 pinned.asReversed().forEach { runCatching { it.close() } }
                 // Only this call's newly-created, never-loaded files can be
@@ -170,14 +171,14 @@ internal class DesktopNativeRuntime private constructor(val directory: Path, pri
         private data class CreatedFile(val path: Path, val key: Any?)
         private fun parseManifest(bytes: ByteArray): List<Entry> {
             if (bytes.size !in 1..4096 || bytes.any { it.toInt() !in 10..126 || it.toInt() in 11..31 }) throw NativeRuntimeFailure("The native runtime manifest is invalid.")
-            val pattern = Regex("([0-9a-f]{64}) ([1-9][0-9]{0,8}) (vw_core\\.dll|vw_host\\.dll|vw-connection-helper\\.exe)")
+            val pattern = Regex("([0-9a-f]{64}) ([1-9][0-9]{0,8}) (vw_core\\.dll|vw_host\\.dll|vw-connection-helper\\.exe|vw-capture-helper\\.exe)")
             val entries = bytes.toString(Charsets.US_ASCII).lineSequence().filter(String::isNotEmpty).map { line ->
                 val match = pattern.matchEntire(line) ?: throw NativeRuntimeFailure("The native runtime manifest is invalid.")
                 val size = match.groupValues[2].toLong()
                 if (size !in 1..MAX_FILE) throw NativeRuntimeFailure("A native runtime file exceeds its admission limit.")
                 Entry(match.groupValues[1], size, match.groupValues[3])
             }.toList()
-            if (entries.size != 3 || entries.map { it.name }.toSet() != names || entries.sumOf { it.bytes } > MAX_TOTAL) throw NativeRuntimeFailure("The native runtime inventory is incomplete or exceeds its bound.")
+            if (entries.size != 4 || entries.map { it.name }.toSet() != names || entries.sumOf { it.bytes } > MAX_TOTAL) throw NativeRuntimeFailure("The native runtime inventory is incomplete or exceeds its bound.")
             return entries
         }
         private fun ensureDirectories(path: Path, guard: NativeFileGuard, pinned: MutableList<AutoCloseable>) {
@@ -221,7 +222,7 @@ internal interface NativeRuntimeKernel : StdCallLibrary {
 internal class WindowsNativeFileGuard : NativeAnchorGuard {
     private val kernel: NativeRuntimeKernel = Native.load("kernel32", NativeRuntimeKernel::class.java)
     override fun check(path: Path) {
-        val flags = kernel.GetFileAttributesW(WString(path.toString()))
+        val flags = kernel.GetFileAttributesW(WString(nativeGuardPath(path)))
         if (flags == -1 || flags and 0x400 != 0) throw NativeRuntimeFailure("A native runtime path is missing or is a reparse point.")
     }
     override fun pin(path: Path): AutoCloseable {
@@ -240,7 +241,7 @@ internal class WindowsNativeFileGuard : NativeAnchorGuard {
         check(path)
         // OPEN_REPARSE_POINT means a racing junction is opened as the link,
         // then refused by the handle-based attribute check, never followed.
-        val handle = kernel.CreateFileW(WString(path.toString()), access, share, null, 3, flags or 0x00200000, null)
+        val handle = kernel.CreateFileW(WString(nativeGuardPath(path)), access, share, null, 3, flags or 0x00200000, null)
         if (handle == null || Pointer.nativeValue(handle) == -1L) throw NativeRuntimeFailure("A native runtime file could not be pinned against replacement.")
         val canonical: Path
         try {

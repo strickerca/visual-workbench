@@ -22,7 +22,7 @@ pub use session::{
 pub use sync::{HostSync, SyncReceiver, SyncResponse};
 
 pub const PROTOCOL_MAJOR: u32 = 1;
-pub const PROTOCOL_MINOR: u32 = 2;
+pub const PROTOCOL_MINOR: u32 = 4;
 pub const CARRIER_ORDER: [vw_proto::v1::Carrier; 3] = [
     vw_proto::v1::Carrier::QuicTether,
     vw_proto::v1::Carrier::QuicWifi,
@@ -58,5 +58,7 @@ pub enum NetError {
 }
 pub type Result<T> = std::result::Result<T, NetError>;
 
+#[cfg(test)]
+mod focus_protocol_tests;
 #[cfg(test)]
 mod tests;

@@ -152,12 +152,11 @@ private fun NOutline.common(): Outline = when(this) {
 }
 private fun DrawShape.common(): Shape = when(this) {
     is DrawShape.Stroke -> Shape.Stroke(family); is DrawShape.Line -> Shape.Line(points.map { it.common() }); is DrawShape.Arrow -> Shape.Arrow(points.map { it.common() }); is DrawShape.Rectangle -> Shape.Rectangle(rectangle.common()); is DrawShape.Ellipse -> Shape.Ellipse(rectangle.common()); is DrawShape.Polygon -> Shape.Polygon(points.map { it.common() },closed)
-    is DrawShape.Text -> Shape.Text(anchor.common(),text,font,size,outline.map { it.common() }); is DrawShape.Marker -> Shape.Marker(number,point.common(),rectangle?.common()); is DrawShape.Guide -> Shape.Guide(rectangle.common()); is DrawShape.Result -> Shape.Result(assetId); is DrawShape.Adjustment -> Shape.Adjustment
+    is DrawShape.Text -> Shape.Text(anchor.common(),text,font,size,outline.map { it.common() }); is DrawShape.Marker -> Shape.Marker(number,point.common(),rectangle?.common()); is DrawShape.Guide -> Shape.Guide(rectangle.common()); is DrawShape.Result -> Shape.Result(assetId,resultId); is DrawShape.Adjustment -> Shape.Adjustment
 }
 private fun NRender.common(): RenderList = RenderList(revision.common(),items.map { RenderItem(it.objectId,it.layerId,it.layerOpacity,it.layerBlend,it.bounds.common(),it.strokeContours.common(),it.transform.common(),it.style.common(),it.shape.common(),it.locked) })
 internal fun nativeRenderItem(item: com.visualworkbench.bindings.core.RenderItem): RenderItem = RenderItem(item.objectId,item.layerId,item.layerOpacity,item.layerBlend,item.bounds.common(),item.strokeContours.common(),item.transform.common(),item.style.common(),item.shape.common(),item.locked)
 internal fun nativeProjectHandle(project: WorkbenchProject): ProjectSession = (project as? NativeProject)?.handle ?: throw SessionFailure(SessionFailureKind.Invalid)
-internal fun wrapNativeProject(project: ProjectSession): WorkbenchProject = NativeProject(project)
 private fun EditOptions.native(): NEditOptions = NEditOptions(transactionId,documentId,deviceId,lamport,createdAtMs)
 private fun Shape.newNative(): NewShape = when(this) {
     is Shape.Line -> NewShape.Line(points.map { it.native() }); is Shape.Arrow -> NewShape.Arrow(points.map { it.native() }); is Shape.Rectangle -> NewShape.Rectangle(rectangle.native()); is Shape.Ellipse -> NewShape.Ellipse(rectangle.native()); is Shape.Text -> NewShape.Text(anchor.native(),text,font,size)
@@ -171,3 +170,6 @@ private fun EditCommand.native(): NEdit = when(this) {
 private fun ImageFormat.native(): NFormat = when(this) { ImageFormat.Png8 -> NFormat.Png8; ImageFormat.Png16 -> NFormat.Png16; is ImageFormat.Jpeg -> NFormat.Jpeg(quality); ImageFormat.WebpLossless -> NFormat.WebpLossless; is ImageFormat.WebpLossy -> NFormat.WebpLossy(quality) }
 
 internal fun nativeStrokeHandle(stroke: WorkbenchStroke): StrokeGesture = (stroke as? NativeStroke)?.handle ?: throw SessionFailure(SessionFailureKind.Invalid)
+
+/** Ownership transfers only at the caller's cancellation-safe handoff. */
+internal fun wrapNativeProject(handle: ProjectSession): WorkbenchProject = NativeProject(handle)

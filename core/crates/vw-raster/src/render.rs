@@ -161,6 +161,24 @@ pub(crate) fn render_buffer(
             }
             continue;
         }
+        let replacement = objects.iter().try_fold(false, |found, (_, object)| {
+            if let Some(Shape::ResultId(id)) = &object.state.shape {
+                let candidate = project
+                    .results
+                    .get(&Id::from_proto(Some(id))?)
+                    .ok_or(RasterError::MissingAsset)?;
+                Ok::<bool, RasterError>(found || crate::materialized_result::identifies(candidate)?)
+            } else {
+                Ok(found)
+            }
+        })?;
+        if replacement
+            && (objects.len() != 1 || layer.definition.kind != "result" || layer.blend != "normal")
+        {
+            return Err(RasterError::Unsupported(
+                "materialized result requires one dedicated normal-blend layer",
+            ));
+        }
         let mut layer_image = blank_like(source)?;
         for (_, object) in objects {
             crate::source::check_cancel(cancelled)?;
@@ -181,13 +199,21 @@ pub(crate) fn render_buffer(
                 }
                 let id = Id::from_proto(Some(id))?;
                 let candidate = project.results.get(&id).ok_or(RasterError::MissingAsset)?;
-                if candidate.acceptance_mask_asset_id.is_some() || candidate.status == "partial" {
+                if !replacement
+                    && (candidate.acceptance_mask_asset_id.is_some()
+                        || candidate.status == "partial")
+                {
                     return Err(RasterError::Unsupported(
                         "partial result acceptance requires a materialized accepted composite",
                     ));
                 }
-                if !matches!(candidate.status.as_str(), "ready" | "accepted") {
+                if !matches!(candidate.status.as_str(), "ready" | "accepted")
+                    && !(replacement && candidate.status == "partial")
+                {
                     return Err(RasterError::Unsupported("result is not ready or accepted"));
+                }
+                if replacement {
+                    crate::materialized_result::validate(candidate, &source.source_asset)?;
                 }
                 let asset = if candidate.definition.composite_asset_id.is_empty() {
                     &candidate.definition.output_asset_id
@@ -247,8 +273,31 @@ pub(crate) fn render_buffer(
                     .ok_or(RasterError::MissingAsset)?;
                 validate_asset_metadata(&image, metadata, "resolved asset metadata")?;
                 image.validate()?;
-                if image.icc != source.icc {
+                if replacement
+                    && source.icc.is_none()
+                    && options.assume_untagged_srgb
+                    && image.icc.as_deref()
+                        == Some(crate::pixels::standard_srgb_profile()?.as_slice())
+                {
+                    // The proof used this explicit untagged-sRGB assumption.
+                    // Equal color meaning needs no lossy round-trip transform.
+                    image.icc = None;
+                } else if image.icc != source.icc {
                     image.convert_profile(source.icc.as_deref(), options.assume_untagged_srgb)?;
+                }
+                if replacement {
+                    crate::materialized_result::replace(
+                        &mut result,
+                        &image,
+                        state
+                            .transform
+                            .as_ref()
+                            .ok_or(RasterError::Invalid("transform"))?,
+                        origin,
+                        layer.opacity,
+                        cancelled,
+                    )?;
+                    continue;
                 }
                 composite_transformed(
                     &mut layer_image,
@@ -286,6 +335,9 @@ pub(crate) fn render_buffer(
                 ));
             }
             composite(&mut layer_image, &overlay, 1.0, false);
+        }
+        if replacement {
+            continue;
         }
         composite(
             &mut result,

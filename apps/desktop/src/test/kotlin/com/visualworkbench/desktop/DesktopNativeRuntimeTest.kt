@@ -17,7 +17,7 @@ class DesktopNativeRuntimeTest {
     @Test fun exactRuntimeIsPreparedBeforeAnyLoadAndClosePreservesLoadedFilePaths() {
         val files = runtimeResources(); val guard = MemoryFileGuard()
         val runtime = DesktopNativeRuntime.prepareAt(root(), files, guard)
-        assertEquals(root().nameCount + 7, guard.live) // ancestors including volume root, cache, and five exact files
+        assertEquals(root().nameCount + 8, guard.live) // ancestors including volume root, cache, and six exact files
         for (name in runtimeNames) assertArrayEquals(files.bytes.getValue("win32-x86-64/$name"), Files.readAllBytes(runtime.directory.resolve(name)))
         assertTrue(Files.isRegularFile(runtime.directory.resolve("owner")))
         assertTrue(Files.isRegularFile(runtime.directory.resolve("ready")))
@@ -76,7 +76,7 @@ class DesktopNativeRuntimeTest {
     private fun root(): Path = temporary.root.toPath().toAbsolutePath().normalize().resolve("runtime")
     private fun assertFailure(block: () -> Unit) { try { block(); fail("unverified runtime accepted") } catch (_: NativeRuntimeFailure) { } }
 }
-private val runtimeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe")
+private val runtimeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
 private class MapNativeResources(val bytes: MutableMap<String, ByteArray>) : NativeResources {
     override fun open(name: String) = bytes[name]?.let(::ByteArrayInputStream)
 }

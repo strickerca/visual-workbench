@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "provider": {
+    "schema": 1,
+    "kind": "open_ai_image_edits",
+    "verified_on": "2026-10-02",
+    "endpoint": "https://api.openai.com/v1/images/edits",
+    "model": "gpt-image-2.5-sunburst-2026-09-08",
+    "quality": "low",
+    "capabilities": {
+      "mask_support": "alpha_png_guidance",
+      "max_long_edge": 3840,
+      "min_pixels": 655360,
+      "max_pixels": 8294400,
+      "size_multiple": 16,
+      "max_aspect_ratio": 3,
+      "formats": ["png"],
+      "max_image_bytes_exclusive": 50000000,
+      "max_mask_bytes_exclusive": 4000000,
+      "experimental_above_pixels": 3686400
+    },
+    "prices": {
+      "text_input_microusd_per_million": 5000000,
+      "image_input_microusd_per_million": 8000000,
+      "image_output_microusd_per_million": 30000000
+    },
+    "timeout_seconds": 180,
+    "max_response_bytes": 100000000
+  },
+  "expires_on": "2026-11-02",
+  "provenance": "Preserved T0.11 configuration verified 2026-10-02: https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst and https://developers.openai.com/api/docs/pricing. Not freshly reverified. Operator-provided token estimates are required; rates do not establish a per-image quote or charge ceiling. Account access and actual billing remain unverified.",
+  "daily_soft_budget_microusd": 5000000
+}

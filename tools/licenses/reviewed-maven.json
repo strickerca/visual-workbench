@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "artifacts": [
+    {
+      "coordinate": "org.rustls:rustls-platform-verifier:0.2.0",
+      "extension": "aar",
+      "bytes": 10295,
+      "sha256": "aa021794230fbc2f0be355999e2cf67398dd563de066a2e17001ffbd0b69101b",
+      "pom_sha256": "78dcb69a1a20e91e72017de9a67104bba1874a7ecc8e6dcdfb2fe1a85de6b362",
+      "artifact_source_url": "https://raw.githubusercontent.com/rustls/rustls-platform-verifier/maven-archive/android-release-support/maven/org/rustls/rustls-platform-verifier/0.2.0/rustls-platform-verifier-0.2.0.aar",
+      "pom_source_url": "https://raw.githubusercontent.com/rustls/rustls-platform-verifier/maven-archive/android-release-support/maven/org/rustls/rustls-platform-verifier/0.2.0/rustls-platform-verifier-0.2.0.pom",
+      "upstream_source_commit": "252e25161a91af476cbea620e29d277592d27ec7",
+      "selected_license": "MIT",
+      "license_source_url": "https://raw.githubusercontent.com/rustls/rustls-platform-verifier/252e25161a91af476cbea620e29d277592d27ec7/LICENSE-MIT",
+      "notices": [
+        {
+          "path": "third_party/notices/rustls-platform-verifier-android-0.2.0-LICENSE-MIT.txt",
+          "sha256": "1c7cf76689c837a68ed8d704994e52a0f2940c087958f860d17f3186afbdcc0c"
+        },
+        {
+          "path": "third_party/notices/rustls-platform-verifier-android-0.2.0-LICENSE-APACHE.txt",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "reason": "The exact upstream Maven POM omits a license block; pinned upstream source declares MIT OR Apache-2.0. The project selects MIT and retains both upstream notices. No other artifact/version or byte sequence inherits this record.",
+      "reviewed_on": "2026-10-03",
+      "native_libraries": [],
+      "classes": [
+        "org/rustls/platformverifier/CertificateVerifier.class",
+        "org/rustls/platformverifier/StatusCode.class",
+        "org/rustls/platformverifier/VerificationResult.class"
+      ]
+    }
+  ]
+}

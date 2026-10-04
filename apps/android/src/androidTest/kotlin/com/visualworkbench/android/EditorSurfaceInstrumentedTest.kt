@@ -20,6 +20,9 @@ import java.io.File
 /** Actual app SurfaceView MotionEvents + native persistence; synthetic input only. */
 @RunWith(AndroidJUnit4::class)
 class EditorSurfaceInstrumentedTest {
+    private fun ready(activity: MainActivity): Boolean = !activity.editor.busy && activity.editor.pending == 0 &&
+        !activity.editor.instructionEditor.state.value.busy && !activity.editor.semanticEditor.state.value.busy
+
     private fun await(scenario: ActivityScenario<MainActivity>, phase: String, predicate: (MainActivity) -> Boolean) {
         val deadline = SystemClock.uptimeMillis() + 45_000
         var nextProgress = SystemClock.uptimeMillis() + 5_000
@@ -42,6 +45,9 @@ class EditorSurfaceInstrumentedTest {
         return null
     }
     private fun gesture(scenario: ActivityScenario<MainActivity>, tool: EditorTool, points: List<Point>, cancel: Boolean = false, finger: Boolean = false) {
+        // The real input gate also waits for the instruction/semantic refreshes
+        // that share the native project worker after an edit.
+        await(scenario, "input-ready-$tool", ::ready)
         scenario.onActivity { activity ->
             val editor = activity.editor; editor.chooseTool(tool)
             val surface = requireNotNull(canvas(activity.window.decorView))
@@ -57,7 +63,7 @@ class EditorSurfaceInstrumentedTest {
                 try { assertTrue(surface.dispatchTouchEvent(event)) } finally { event.recycle() }
             }
         }
-        await(scenario, "gesture-$tool") { it.editor.pending == 0 }
+        await(scenario, "gesture-$tool", ::ready)
     }
     private fun withCanvas(body: (ActivityScenario<MainActivity>, String) -> Unit) {
         var ownedProject: String? = null
@@ -67,7 +73,7 @@ class EditorSurfaceInstrumentedTest {
             try {
                 await(scenario, "startup") { !it.editor.busy }
                 scenario.onActivity { it.editor.newCanvas() }
-                await(scenario, "new-project-and-background") { !it.editor.busy && it.editor.scene?.background != null && canvas(it.window.decorView)?.holder?.surface?.isValid == true }
+                await(scenario, "new-project-and-background") { ready(it) && it.editor.scene?.background != null && canvas(it.window.decorView)?.holder?.surface?.isValid == true }
                 scenario.onActivity { ownedProject = requireNotNull(it.editor.info).projectId; assertNull(it.editor.blockingMessage) }
                 body(scenario, requireNotNull(ownedProject))
             } finally {

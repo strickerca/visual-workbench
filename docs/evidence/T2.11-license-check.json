@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "date": "2026-10-03",
+  "command": "build.ps1 license-check -TimeoutSeconds 1200",
+  "run": {
+    "log": "phase2-final-s23-license-check-c2458f35c26c47d4a5a8d99f73d0f8ad.log",
+    "log_sha256": "e3be50f5456fc021ff0d9be04c56274f2a62c0dd4574ab8d6414ac1267a79dcc",
+    "metadata_sha256": "7ef3eba557646e4f0100cd4643610326d88fd8d8411e11069af2167f68876214",
+    "exit_code": 0,
+    "elapsed_seconds": 45.432,
+    "sampled_peak_tree_working_set_bytes": 853508096,
+    "contained_in_windows_job": true,
+    "process_tree_cleanup_confirmed": true,
+    "output_streams_completed": true,
+    "parent_exit_code": 0,
+    "failure_reason": null,
+    "survivors_before_cleanup_count": 0,
+    "survivors_before_cleanup_names": [],
+    "compiler_telemetry_cleaned": false,
+    "pre_cleanup_survivor_classification": "none"
+  },
+  "checks": [
+    "offline artifact policy",
+    "npm policy",
+    "cargo-deny licenses/sources/bans",
+    "Gradle dependency licenses"
+  ]
+}

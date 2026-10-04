@@ -16,9 +16,17 @@ Import-Module (Join-Path $PSScriptRoot 'android-device.psm1') -Force
 try {
     if ($Mode -eq 'app') {
         if ($TimeoutSeconds -lt 60 -or $TimeoutSeconds -gt 3600) { throw 'App HIL phase timeout must be between 60 and 3600 seconds' }
+        $expectedModel = $env:VW_ANDROID_EXPECTED_MODEL
+        if (-not $expectedModel) {
+            $selectionFile = Join-Path $projectRoot '.local/android-target.json'
+            if (Test-Path -LiteralPath $selectionFile -PathType Leaf) {
+                $expectedModel = (Get-Content -Raw -LiteralPath $selectionFile | ConvertFrom-Json).model
+            }
+        }
+        if ($expectedModel -cnotin @('IN2019', 'SM-S918U')) { throw 'App HIL requires an explicitly authorized device model; no fallback.' }
         $run = Invoke-VwProcess -FilePath 'pwsh.exe' -ArgumentList @(
             '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/app-test/run_android.ps1',
-            '-ExpectedModel', 'IN2019', '-TimeoutSeconds', "$TimeoutSeconds", '-Execute'
+            '-ExpectedModel', $expectedModel, '-TimeoutSeconds', "$TimeoutSeconds", '-Execute'
         ) -WorkingDirectory $projectRoot -Phase 'hil-app-isolated' -TimeoutSeconds ($TimeoutSeconds * 2 + 1800) -ParentExitGraceSeconds 20 -RedactValues @($projectRoot, $env:USERPROFILE)
         if ($run.ExitCode -ne 0) { throw 'Isolated app HIL assertions, APK binding or owned cleanup failed' }
         exit 0

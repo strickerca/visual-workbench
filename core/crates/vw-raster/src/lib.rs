@@ -2,6 +2,7 @@
 //! Streaming PNG can use a caller-owned private scratch file.
 mod export;
 mod ffi;
+mod materialized_result;
 mod metadata;
 mod pixels;
 mod render;
@@ -13,7 +14,7 @@ pub use export::{
     export, preflight,
 };
 pub use ffi::webp_encoder_version;
-pub use pixels::{DecodeLimits, DecodedImage, Pixels, decode};
+pub use pixels::{DecodeLimits, DecodedImage, Pixels, decode, standard_srgb_profile};
 pub use render::{AssetResolver, RenderOptions, render_document};
 pub use source::{BorrowedSource, JpegSpool, PngSpool, RasterSource, SourceInfo, SpoolLimits};
 pub use stream::{

@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "kind": "retained-phase2-hil-failures",
+  "failures": [
+    {
+      "receipt_sha256": "7cad2e5e11c8d9a417d34068063c629562bd0e4ef648c5bd2994a55e94a04a87",
+      "model": "IN2019",
+      "status": "failed",
+      "failure_phase": "app-hil-collect",
+      "failure_code": "test_failed_skipped_or_ignored",
+      "cleanup": {
+        "process_trees": true,
+        "owned_packages": true,
+        "private_work_disposed": true
+      },
+      "assertions_completed": false,
+      "observed_case_statuses": 304
+    },
+    {
+      "receipt_sha256": "9d5db08f0116a65de8b33d0397c35f6835356dc18ee83d9d79535e235c9a83db",
+      "model": "IN2019",
+      "status": "failed",
+      "failure_phase": "app-hil-adb-client",
+      "failure_code": null,
+      "cleanup": {
+        "process_trees": true,
+        "owned_packages": true,
+        "private_work_disposed": true
+      },
+      "assertions_completed": false,
+      "observed_case_statuses": 0
+    },
+    {
+      "receipt_sha256": "8235dbf8b675edf25d32bbfd17d3f3a5a12e48fa83c294fa3b9d65acbaf4d00b",
+      "model": "SM-S918U",
+      "status": "failed",
+      "failure_phase": "app-hil-owner-users",
+      "failure_code": null,
+      "cleanup": {
+        "process_trees": true,
+        "owned_packages": true,
+        "private_work_disposed": true
+      },
+      "assertions_completed": false,
+      "observed_case_statuses": 0
+    }
+  ],
+  "earlier_instrumentation_summary": "149 of 152 passing; canonical isolated fixture identity repaired, followed by154 passing S23 cases",
+  "failures_not_relabelled": true,
+  "private_raw_output_disposed": true,
+  "verification_images_created": 0
+}

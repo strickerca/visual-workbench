@@ -31,6 +31,13 @@ docs/evidence/T1.08-*.json -text -whitespace
 docs/evidence/T1.09-*.json -text -whitespace
 docs/evidence/T1.10-*.json -text -whitespace
 docs/evidence/T1.12-*.json -text -whitespace
+docs/evidence/T2.*.json -text -whitespace
+# These metadata bytes are bound by the recorded S23 source inventory.
+apps/gradle/wrapper/gradle-wrapper.properties -text -whitespace
+tools/ffi-test/android-inventory.json -text -whitespace
+tools/licenses/node-runtime.json -text -whitespace
+tools/licenses/reviewed-maven.json -text -whitespace
+tools/licenses/reviewed-npm.json -text -whitespace
 # Unified-diff context includes meaningful space-only lines.
 tools/app-test/integration.patch -whitespace
 tools/desktop-test/integration.patch -whitespace

@@ -28,6 +28,7 @@ internal class DesktopLiveLink(
     private val status: (SessionStatus?) -> Unit,
     private val previews: (PeerFrame?) -> Unit,
     private val warning: (String) -> Unit,
+    private val beforeClose: suspend () -> Unit = {},
 ) {
     private var nextEpoch = 0L
     private var current: LiveAttachment? = null
@@ -126,6 +127,7 @@ internal class DesktopLiveLink(
     suspend fun close() = withContext(NonCancellable) {
         val prior = current
         current = null
+        try { beforeClose() } finally {
         previews(null)
         status(null)
         statusJob?.cancelAndJoin(); statusJob = null
@@ -133,6 +135,7 @@ internal class DesktopLiveLink(
         finishes.toList().forEach { it.cancelAndJoin() }
         finishes.clear()
         prior?.link?.close()
+        }
     }
 }
 

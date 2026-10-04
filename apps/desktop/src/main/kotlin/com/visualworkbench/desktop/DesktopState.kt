@@ -6,12 +6,12 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.Properties
 
-enum class Tool { Select, Pan, Pen, Rectangle, Ellipse, Line, Arrow, Text }
+enum class Tool { Select, Pan, Pen, Rectangle, Ellipse, Line, Arrow, Text, Callout }
 enum class WindowMode { Windowed, Maximized, Fullscreen }
 enum class Command(val label: String, val shortcut: String) {
     Import("Import file", "Ctrl+I"), Open("Open project", "Ctrl+O"), Export("Export image", "Ctrl+E"), Copy("Copy image…", "Ctrl+Shift+C"), Paste("Paste image…", "Ctrl+V"), Close("Close project", "Ctrl+W"), Quit("Quit", "Alt+F4"),
     Undo("Undo", "Ctrl+Z"), Redo("Redo", "Ctrl+Shift+Z"), Delete("Delete selection", "Delete"), SelectAll("Select all", "Ctrl+A"), ClearSelection("Clear selection", "Escape"),
-    Select("Select tool", "V"), Pan("Pan tool", "H"), Pen("Pen tool", "P"), Rectangle("Rectangle tool", "R"), Ellipse("Ellipse tool", "E"), Line("Line tool", "L"), Arrow("Arrow tool", "A"), Text("Text tool", "T"),
+    Select("Select tool", "V"), Pan("Pan tool", "H"), Pen("Pen tool", "P"), Rectangle("Rectangle tool", "R"), Ellipse("Ellipse tool", "E"), Line("Line tool", "L"), Arrow("Arrow tool", "A"), Text("Text tool", "T"), Callout("Numbered marker", "M"),
     Fit("Fit document", "F"), ActualPixels("Actual pixels", "Ctrl+1"), ZoomIn("Zoom in", "+"), ZoomOut("Zoom out", "-"), Windowed("Windowed", "Ctrl+Alt+1"), Maximized("Maximized", "Ctrl+Alt+2"), Fullscreen("Fullscreen", "F11"),
     FollowPeer("Follow peer", "Ctrl+Alt+F"), MatchPeer("Match peer view", "Ctrl+Alt+M"), PeerOutline("Peer viewport outline", "Ctrl+Alt+V"), Pairing("Pair devices", "Ctrl+P"), Settings("Settings", "Ctrl+,"), Diagnostics("Diagnostics", "F12"), Instructions("Edit instruction", "Enter"), CycleMarker("Next marker", "Tab"),
     Color("Next color", "C"), WidthUp("Increase width", "]"), WidthDown("Decrease width", "["), NudgeLeft("Nudge left (Shift=10)", "Left"), NudgeRight("Nudge right (Shift=10)", "Right"), NudgeUp("Nudge up (Shift=10)", "Up"), NudgeDown("Nudge down (Shift=10)", "Down")

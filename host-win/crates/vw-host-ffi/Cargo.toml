@@ -14,6 +14,7 @@ name = "vw_host"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+vw-capture = { version = "=0.1.0", path = "../../../core/crates/vw-capture" }
 uniffi = { version = "=0.32.2", default-features = false }
 thiserror = "=2.0.21"
 tokio = { version = "=1.53.1", default-features = false, features = ["sync"] }

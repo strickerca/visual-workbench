@@ -14,6 +14,100 @@ use vw_proto::{
 const CHECKPOINT_PREFIX: &[u8] = b"VisualWorkbench.HostCheckpoint.v1\n";
 const MAX_CHECKPOINT_BYTES: usize = 256 * 1024 * 1024;
 
+/// Internal admission meter, NOT a journal export API. serde streams borrowed
+/// fields through a fixed-size lexical state; only bounded ID serialization
+/// temporaries are created. Each JSON byte costs four bytes, and each string,
+/// key, array/object or scalar costs 256 bytes for heap/value/collection slack.
+/// Callers separately multiply this one-representation charge by the maximum
+/// simultaneously materialized stages in their operation. In particular a
+/// million tiny numbers cannot hide behind a small JSON-byte count.
+pub(crate) struct WorkspaceEstimate {
+    amount: u64,
+    limit: u64,
+    exceeded: bool,
+    quoted: bool,
+    escaped: bool,
+    scalar: bool,
+}
+impl WorkspaceEstimate {
+    pub(crate) fn new(limit: u64) -> Self {
+        Self {
+            amount: 4096,
+            limit,
+            exceeded: limit < 4096,
+            quoted: false,
+            escaped: false,
+            scalar: false,
+        }
+    }
+    pub(crate) fn value<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), OpsError> {
+        if self.exceeded {
+            return Ok(());
+        }
+        self.scalar = false;
+        match serde_json::to_writer(&mut *self, value) {
+            Ok(()) => Ok(()),
+            Err(_) if self.exceeded => Ok(()),
+            Err(error) => Err(error.into()),
+        }
+    }
+    pub(crate) fn finish(&self) -> u64 {
+        if self.exceeded {
+            self.limit.saturating_add(1)
+        } else {
+            self.amount
+        }
+    }
+    fn charge(&mut self, amount: u64) -> std::io::Result<()> {
+        self.amount = self.amount.saturating_add(amount);
+        if self.amount > self.limit {
+            self.exceeded = true;
+            return Err(std::io::Error::other("workspace admission bound"));
+        }
+        Ok(())
+    }
+}
+impl std::io::Write for WorkspaceEstimate {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.charge((bytes.len() as u64).saturating_mul(4))?;
+        for &byte in bytes {
+            if self.quoted {
+                if self.escaped {
+                    self.escaped = false;
+                } else if byte == b'\\' {
+                    self.escaped = true;
+                } else if byte == b'"' {
+                    self.quoted = false;
+                }
+            } else {
+                match byte {
+                    b'"' => {
+                        self.charge(256)?;
+                        self.quoted = true;
+                        self.scalar = false;
+                    }
+                    b'[' | b'{' => {
+                        self.charge(256)?;
+                        self.scalar = false;
+                    }
+                    b']' | b'}' | b',' | b':' | b' ' | b'\n' | b'\r' | b'\t' => {
+                        self.scalar = false;
+                    }
+                    _ if !self.scalar => {
+                        self.charge(256)?;
+                        self.scalar = true;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WriteStamp {
@@ -89,9 +183,31 @@ struct CheckpointState {
 }
 
 impl HostSequencer {
+    /// Conservative single-representation workspace charge for admission by
+    /// callers which clone/hash this state. Includes private journal values,
+    /// tombstones, conflicts and collection overhead, not only visible pixels.
+    /// Stops at limit and returns limit+1 without exporting or retaining JSON.
+    pub fn workspace_estimate_bytes(&self, limit: u64) -> Result<u64, OpsError> {
+        let mut estimate = WorkspaceEstimate::new(limit);
+        estimate.value(self)?;
+        Ok(estimate.finish())
+    }
+
     /// The authoritative host identity persisted with this operation history.
     pub const fn host_device(&self) -> &DeviceId {
         &self.host_device
+    }
+
+    /// Borrowed admission for newly authored transactions, before speculative
+    /// host/replica/history cloning. No JSON or checkpoint buffer is retained.
+    /// Uses the same node/byte accounting as canonical workspace admission.
+    pub fn transaction_workspace_estimate_bytes(
+        transaction: &v1::Transaction,
+        limit: u64,
+    ) -> Result<u64, OpsError> {
+        let mut estimate = WorkspaceEstimate::new(limit);
+        estimate.value(transaction)?;
+        Ok(estimate.finish())
     }
 
     /// An authenticated replacement checkpoint must retain every durable

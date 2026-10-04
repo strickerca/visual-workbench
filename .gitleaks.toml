@@ -14,6 +14,43 @@ paths = ['''(^|/)docs/evidence/T1\.(07|08|10)[A-Za-z0-9.-]*\.json$''']
 regexTarget = "line"
 regexes = ['''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/(CoreApi|SessionApi|StreamingApi)\.kt": "[0-9a-f]{64}",?\s*$''']
 
+[[allowlists]]
+description = "Exact Phase 2 source hash pairs independently matched to their files; no general hash or key exemption"
+condition = "AND"
+paths = ['''(^|/)docs/evidence/T2\.11-app-tests\.json$''']
+regexTarget = "line"
+regexes = [
+  '''^\s*"apps/android/src/main/kotlin/com/visualworkbench/android/editor/ProviderKeyDialog\.kt": "82b29061104563401d046b95105a2c0b4d4dc300cc78726ecb0a9c379cd776bd",?\s*$''',
+  '''^\s*"apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/ProviderCredentialsInstrumentedTest\.kt": "d02236e8618992d5233319c26608a1906baa88cb1ed572ab508e728e5731da37",?\s*$''',
+  '''^\s*"apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/AndroidProviderKeyStore\.kt": "1f8764841dfaa87ec8c55aa65d50f81aa5e8974f76b9c94a70b755306b8e727d",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/AgentCaptureApi\.kt": "3948a8a6708e0a066992569fdb51f9f9ccb1cccf16f499782bf8963fdbcce16a",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/AiEditsApi\.kt": "7f7f93e1751ffcd6c83271e3581738acef50859a11ecf9691e008d175b33ed6d",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureDeliveryApi\.kt": "6ccba25754dc12462dcb365d0ebbd6833392871d0a5f7ee590c722d45d25e4ca",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureImportsApi\.kt": "0f3f1ef0f065530734110c715d09b67c37f368551271bc822196041dacb087b0",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CoreApi\.kt": "d5e9c2b251c4b8dddf8f8f23f9ba7e08f9e9052312ca44fc269fecb408c2ff7f",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/EraserApi\.kt": "f686a510ec0186e4a9ca75c091557ddb6cfc9688780ec0459b2ebde8c79f5ef6",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/FocusApi\.kt": "ee2cffb80b6159df04033a92228cb8f8d7045ddba16ef437e35ab36db057e903",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/InstructionsApi\.kt": "9276b961f4fc6aa5841817dbed8ece316bbcbde9835f7dd3b4c35e361cf893da",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/MaskApi\.kt": "896bf5fb43e2b1385cbd04fd73fbaedf4a9263e4b24371209e3c2b1164e839de",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/McpInboxApi\.kt": "b5198553566ff743e7063f969577561dce45771f7e6d34505cbc390c87c650de",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/OsImagesApi\.kt": "1c3d18048e7b59fcd042467f3ad93d22827bd48342e60855cbcfc4559cdfcdf7",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PackagesApi\.kt": "acf4ffc18e2820e2f330e695dfc9a0fa9f3caa9224f12997e233af8ae478aef0",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SemanticUiApi\.kt": "051312acf7d25e1f7e08ccc6e994994cfeaaf70f4d089155f7b86f849311ad17",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SemanticsApi\.kt": "139da215cb7e055a7c79ff4eab090f591926c98390076650fc9b3f7589bdc56c",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionApi\.kt": "02d839ceea10f752747f5583e0f8cdc528b754628e53b285f53df0bcae94dfd8",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/StreamingApi\.kt": "07b0bccbc0bf3a493e968f579101dd2cc84dc0aebc2c6ae5227fa32a08f3669c",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/WorkflowApi\.kt": "92ae94685bc9594c863db9d81b62ce2dbd769544bf331f5b2d647635820c26ee",?\s*$''',
+  '''^\s*"core/crates/vw\-ai\-provider/src/secret\.rs": "c956539975120d546ab8f793deaf5161b61876c3456c5730bf842aa2f743535a",?\s*$''',
+  '''^\s*"third_party/notices/npm\-path\-key\-3\.1\.1\-license\.txt": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0",?\s*$''',
+]
+
+[[allowlists]]
+description = "Exact public nodejs/release-keys Git commit, independently verified on the publisher repository"
+condition = "AND"
+paths = ['''(^|/)tools/licenses/node-runtime\.json$''']
+regexTarget = "line"
+regexes = ['''^\s*"release_keys_commit": "481637f813e912c4aa3622d7964ab426c97b8e8d",?\s*$''']
+
 [[rules]]
 id = "vw-evidence-ip-address"
 description = "Network addresses must be removed from evidence"

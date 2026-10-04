@@ -1,4 +1,5 @@
 import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import java.security.MessageDigest
 import javax.xml.XMLConstants
 import javax.xml.parsers.DocumentBuilderFactory
@@ -52,6 +53,7 @@ val applicationLicenseConfigurations = listOf(
     ":stroke-spike" to "releaseRuntimeClasspath",
 )
 val applicationLicenseDirectory = layout.buildDirectory.dir("reports/dependency-license")
+fun repositoryLicensePolicy(): java.io.File = rootProject.projectDir.parentFile.resolve("tools/licenses/reviewed-maven.json")
 val generateApplicationLicenseReport = tasks.register("generateApplicationLicenseReport") {
     outputs.dir(applicationLicenseDirectory)
     outputs.upToDateWhen { false }
@@ -211,6 +213,12 @@ val generateApplicationLicenseReport = tasks.register("generateApplicationLicens
         }
         val copiedCoordinates = linkedSetOf<String>()
         val copiedPomBytes = linkedMapOf<String, ByteArray>()
+        val reviewedPolicy = JsonSlurper().parse(repositoryLicensePolicy()) as Map<*, *>
+        check(reviewedPolicy["schema"] == 1) { "Invalid reviewed Maven artifact policy" }
+        val reviewedArtifacts = (reviewedPolicy["artifacts"] as List<*>).map { it as Map<*, *> }
+        check(reviewedArtifacts.map { it["coordinate"] }.distinct().size == reviewedArtifacts.size) {
+            "Duplicate reviewed Maven artifact coordinates"
+        }
         fun copyPom(key: String, bytes: ByteArray): Map<String, Any> {
             val parts = key.split(':')
             check(parts.size == 3 && parts.none { it.isBlank() }) { "Invalid exact POM coordinate: $key" }
@@ -242,6 +250,31 @@ val generateApplicationLicenseReport = tasks.register("generateApplicationLicens
             linkedMapOf<String, Any>().apply {
                 putAll(copyPom(key, bytes))
                 put("configurations", configurationCensus.filterValues { key in it }.keys.sorted())
+                reviewedArtifacts.singleOrNull { it["coordinate"] == key }?.let { policy ->
+                    check(policy["pom_sha256"] == sha256(bytes)) { "Reviewed Maven POM changed: $key" }
+                    val extension = policy["extension"] as String
+                    check(extension == "aar") { "Unsupported reviewed Maven artifact kind" }
+                    val exact = project.configurations.detachedConfiguration(project.dependencies.create("$key@$extension"))
+                    exact.isTransitive = false
+                    val artifacts = exact.resolvedConfiguration.resolvedArtifacts
+                    check(artifacts.size == 1) { "Expected one exact reviewed artifact: $key" }
+                    val artifact = artifacts.single()
+                    val selected = artifact.moduleVersion.id
+                    check("${selected.group}:${selected.name}:${selected.version}" == key && artifact.extension == extension) {
+                        "Reviewed artifact resolved to a different component: $key"
+                    }
+                    val expectedBytes = (policy["bytes"] as Number).toLong()
+                    check(artifact.file.length() == expectedBytes && expectedBytes in 1..16L * 1024 * 1024) {
+                        "Reviewed Maven artifact size changed: $key"
+                    }
+                    val artifactBytes = artifact.file.readBytes()
+                    check(sha256(artifactBytes) == policy["sha256"]) { "Reviewed Maven artifact changed: $key" }
+                    val relativePath = "artifacts/${sha256(key.toByteArray(Charsets.UTF_8))}.$extension"
+                    val destination = reportDirectory.resolve(relativePath)
+                    check(destination.parentFile.mkdirs() || destination.parentFile.isDirectory)
+                    destination.writeBytes(artifactBytes)
+                    put("reviewedArtifactPath", relativePath)
+                }
             }
         }.sortedBy { "${it["moduleName"]}:${it["moduleVersion"]}" }
         check(copiedCoordinates == componentIds.keys) { "Application graph and copied POM census do not match" }

@@ -1,8 +1,9 @@
 # Visual Workbench quick start
 
 This guide describes the current development app. Check `docs/evidence/` for
-the tested build and outstanding checks. OnePlus testing does not establish
-S23 Ultra/S Pen performance or daily-use acceptance.
+the tested build and outstanding checks. Current isolated app tests also run on
+the S23 Ultra; neither automated phone suite establishes physical S Pen
+performance or daily-use acceptance.
 
 1. **Open an image.** On Windows, choose **File → Import file** (`Ctrl+I`)
    or drop a PNG, JPEG or WebP into the window. On the phone, choose **Photos**,
@@ -50,6 +51,9 @@ cable reconnects. Route changes and Windows firewall changes require a separate
 review; do not apply an unrelated machine-wide fix. Disconnecting leaves saved
 projects available offline. Revoking a pairing requires pairing again later.
 
-Screenshot capture, instruction packages and image-model editing are introduced
-by later implementation slices. Their availability and verification are recorded
-separately from this markup workflow.
+The Phase 2 build adds foreground-window capture, region selection and masks,
+instruction packages, local MCP tools and explicit image-edit requests. Configure
+agent connections using [MCP setup](MCP_SETUP.md). Review capture grants and
+prepared results before sending anything. Image providers require your own
+configured credentials; local regression tests do not verify their output quality
+or billing. The task evidence records remaining acceptance for each feature.

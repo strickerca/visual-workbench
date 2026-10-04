@@ -49,8 +49,16 @@ The test APK receives the same directory/header validation for any native payloa
 it contains, without requiring duplicate Rust/JNA libraries. Rust library bytes
 must match the prebuilt input. Static alignment does not prove 16 KiB runtime use.
 
-Only the explicitly authorized physical IN2019 on the existing matching adb
-server is selected. Other profiles cause refusal. No server restart, device reset,
+Only the explicitly pinned authorized physical IN2019 or SM-S918U on the existing
+matching adb server is selected; there is no device fallback. User 0 must be current.
+Other profiles are preserved. Before each install, an exact global package-manager
+absence response is required for that HIL package, including packages registered
+in other profiles. Empty output, permission errors and an existing package refuse
+the run. Installs, instrumentation, force-stop and uninstall are scoped to user 0.
+The global absence check follows the [AOSP package dump contract](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/services/core/java/com/android/server/pm/DumpHelper.java);
+user-scoped uninstall follows the [Android package-manager command documentation](https://developer.android.com/tools/adb).
+Sixteen offline fixtures cover owner/multiple-profile inventories and ambiguous,
+existing or refused global-package responses. No server restart, device reset,
 network mapping, global setting, blanket permission grant or competing-app stop
 is used. Installs have neither replacement nor downgrade flags. After both
 installs succeed and installed APK hashes match the signed artifacts, direct
@@ -59,7 +67,7 @@ relaunch on foreground contention; a contested UI assertion remains inconclusive
 
 ## Assertion and evidence boundary
 
-`inventory.json` explicitly names all 65 current methods. Every Kotlin test source
+`inventory.json` explicitly names all 154 current methods. Every Kotlin test source
 is parsed before the build; additions, removals, skips, unusual test declaration
 shapes or parameterization require a reviewed inventory/parser update. This
 prevents a new test from silently avoiding the evidence contract. The same source
@@ -69,7 +77,7 @@ and Android Rust library are included. Native directory properties are pinned
 with explicit canonical `-P` arguments; unbound environment overrides refuse.
 This binds the generator inputs without claiming a new compiler-provenance run.
 
-Passing requires all 65 distinct test start/success pairs, consistent exact
+Passing requires all 154 distinct test start/success pairs, consistent exact
 `current`/`numtests` counters, no failed/ignored/assumption statuses, no extra or
 missing methods, one matching `OK (N tests)` summary and final instrumentation
 code `-1`. Printed success prose alone never establishes a pass. Direct adb

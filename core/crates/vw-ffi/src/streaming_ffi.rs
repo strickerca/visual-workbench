@@ -181,6 +181,13 @@ pub async fn create_file_image_project(
     options: CreateFileImageProject,
     cancellation: Arc<Cancellation>,
 ) -> Result<Arc<ProjectSession>> {
+    create_file_project_inner(options, cancellation, None).await
+}
+pub(crate) async fn create_file_project_inner(
+    options: CreateFileImageProject,
+    cancellation: Arc<Cancellation>,
+    capture: Option<crate::capture_import::ValidatedCapture>,
+) -> Result<Arc<ProjectSession>> {
     validate_path(&options.path)?;
     validate_path(&options.source_path)?;
     limits(
@@ -242,13 +249,18 @@ pub async fn create_file_image_project(
             },
         )?;
         scratch.close()?;
+        if let Some(capture) = &capture {
+            capture.verify_source(&info, &bytes)?;
+        }
         let mut project = Project::new(project_id, options.title.clone(), device.clone());
         let (width, height) = if info.orientation_applied >= 5 {
             (info.height, info.width)
         } else {
             (info.width, info.height)
         };
-        let format = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        let format = if vw_codec_os::is_heic(&bytes) {
+            "heic"
+        } else if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
             "png"
         } else if bytes.starts_with(&[0xff, 0xd8]) {
             "jpeg"
@@ -273,9 +285,16 @@ pub async fn create_file_image_project(
                 .into(),
                 icc_profile: info.icc.unwrap_or_default(),
                 byte_size: bytes.len() as u64,
-                source: "import".into(),
+                source: if capture.is_some() {
+                    "capture"
+                } else {
+                    "import"
+                }
+                .into(),
+                captured_at_ms: capture
+                    .as_ref()
+                    .map_or(0, |value| value.info().captured_at_ms),
                 metadata_json: "{}".into(),
-                ..Default::default()
             },
         );
         project.documents.insert(
@@ -283,11 +302,15 @@ pub async fn create_file_image_project(
             Document {
                 definition: pb::CreateDocument {
                     document_id: Some(document_id.to_proto()),
-                    kind: pb::DocumentKind::Image as i32,
+                    kind: if capture.is_some() {
+                        pb::DocumentKind::Capture
+                    } else {
+                        pb::DocumentKind::Image
+                    } as i32,
+                    capture: capture.as_ref().map(|value| value.info()),
                     schema_version: 1,
                     title: options.title,
                     primary_asset_id: info.source_asset.to_string(),
-                    ..Default::default()
                 },
                 pages: vec![],
                 created_at_ms: options.now_ms,
@@ -597,6 +620,17 @@ fn preflight_file(
     } else {
         asset.byte_size + profile + 32 * 1024 * 1024 + u64::from(region.width) * 64
     };
+    let source_decode = if matches!(asset.format.as_str(), "heic" | "heif") {
+        u64::from(width.div_ceil(64) * 64)
+            .checked_mul(u64::from(height.div_ceil(64) * 64))
+            .and_then(|n| n.checked_mul(64))
+            .and_then(|n| n.checked_add(asset.byte_size.checked_mul(5)?))
+            .and_then(|n| n.checked_add(32 * 1024 * 1024))
+            .ok_or(TransferError::Backpressure)?
+    } else {
+        0
+    };
+    let estimate = estimate.max(source_decode);
     memory(estimate, budget)?;
     Ok(FilePreflight {
         width: region.width,
@@ -872,7 +906,9 @@ fn attach_file(
             } else {
                 (info.width, info.height)
             };
-            definition.format = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+            definition.format = if vw_codec_os::is_heic(&bytes) {
+                "heic"
+            } else if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
                 "png"
             } else if bytes.starts_with(&[0xff, 0xd8]) {
                 "jpeg"
@@ -1014,7 +1050,7 @@ fn validate_mp4(file: &mut File, size: u64, cancel: &Cancellation) -> TransferRe
     Ok(())
 }
 
-fn open_input(path: &Path, limit: u64) -> TransferResult<(File, u64)> {
+pub(crate) fn open_input(path: &Path, limit: u64) -> TransferResult<(File, u64)> {
     check_components(path)?;
     let mut options = OpenOptions::new();
     options.read(true);
@@ -1256,12 +1292,13 @@ fn with_source<R>(
     let remaining = budget
         .checked_sub(bytes.len() as u64)
         .ok_or(CoreError::Backpressure)?;
-    let image = vw_raster::decode(
+    let image = crate::os_images::decode(
         bytes,
         vw_raster::DecodeLimits {
             max_memory_bytes: remaining,
             ..limits.decode
         },
+        &|| cancel.is_cancelled(),
     )
     .map_err(transfer_raster_error)?;
     cancel.check()?;
@@ -1360,13 +1397,14 @@ impl AssetResolver for ResultAssets<'_> {
             .budget
             .checked_sub(bytes.len() as u64)
             .ok_or(vw_raster::RasterError::Allocation)?;
-        vw_raster::decode(
+        crate::os_images::decode(
             &bytes,
             vw_raster::DecodeLimits {
                 max_encoded_bytes: INPUT_LIMIT as usize,
                 max_pixels: 50_000_000,
                 max_memory_bytes: remaining,
             },
+            &|| self.cancel.is_cancelled(),
         )
     }
 }

@@ -21,7 +21,7 @@ import check_apk
 MAIN = "com.visualworkbench.android.hil"
 TEST = MAIN + ".test"
 RUNNER = "androidx.test.runner.AndroidJUnitRunner"
-CASE = re.compile(r"com\.visualworkbench\.android\.[A-Za-z][A-Za-z0-9_]*#[A-Za-z][A-Za-z0-9_]*\Z")
+CASE = re.compile(r"com\.visualworkbench\.android(?:\.(?:capture|editor|instructions))?\.[A-Za-z][A-Za-z0-9_]*#[A-Za-z][A-Za-z0-9_]*\Z")
 MAX_OUTPUT = 8 * 1024 * 1024
 require = common.require
 Rejected = common.Rejected
@@ -72,13 +72,14 @@ def binding_inputs(root: Path, environment: dict | None = None) -> dict[str, Pat
 def inventory(root: Path) -> dict[str, str]:
     binding_inputs(root)
     required = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "build.ps1", "tools/hil-test.ps1",
-                "tools/process.psm1", "tools/android-device.psm1", "apps/build.gradle.kts",
+                "tools/process.psm1", "tools/android-device.psm1", "tools/mcp-build.ps1", "tools/check_npm_licenses.py",
+                "mcp/package.json", "mcp/package-lock.json", "third_party/LICENSES", "apps/build.gradle.kts",
                 "apps/settings.gradle.kts", "apps/gradle.properties", "apps/gradlew.bat", "apps/android/build.gradle.kts",
                 "apps/android/gradle.lockfile", "apps/shared/build.gradle.kts", "apps/shared/gradle.lockfile",
                 "target/android-jni/arm64-v8a/libvw_core.so", "target/debug/vw_core.dll", "target/debug/vw-bindgen.exe"]
     paths = {root / p for p in required}
     for tree in ("core/crates", "contracts", "apps/android/src", "apps/shared/src", "apps/gradle",
-                 "apps/bindings-core", "tools/app-test", "tools/ffi-test", "third_party/notices"):
+                 "apps/bindings-core", "tools/app-test", "tools/ffi-test", "third_party/notices", "tools/licenses"):
         for path in common.files_under(root / tree):
             if path.suffix not in (".pyc", ".log") and "build-hil" not in path.parts:
                 paths.add(path)
@@ -254,7 +255,7 @@ def instrumentation(text: str, expected: list[str]) -> dict:
         else:
             # Only the documented stream values may have continuation lines.
             # Ignore their prose, never use a printed PASS as test authority.
-            require(not line.strip() or last_field == "stream" or in_result and not final,
+            require(not line.strip() or last_field in ("stream", "stack") or in_result and not final,
                     "unexpected_instrumentation_output")
     require(not fields and active is None and set(completed) == wanted and len(completed) == len(expected),
             "incomplete_test_run")
@@ -269,7 +270,17 @@ def failure_observation(text: str, expected: list[str]) -> dict:
     known = set(expected)
     fields = {}
     observed = []
+    source_frames = []
+    exception_kind = None
     for line in text.splitlines():
+        # Retain only an exact known test class's Kotlin line numbers, never
+        # exception messages, assertion values, local paths or arbitrary frames.
+        frame = re.fullmatch(r"\s*at (com\.visualworkbench\.[A-Za-z0-9_.$]+)\.[A-Za-z0-9_$<>]+\(([A-Za-z0-9_]+)\.kt:([0-9]{1,6})\)", line)
+        if frame and len(source_frames) < 16:
+            source_frames.append((frame[1].split("$")[0], frame[2], int(frame[3])))
+        kind = re.match(r"INSTRUMENTATION_STATUS: stack=(java\.lang\.(?:AssertionError|IllegalArgumentException|IllegalStateException)|org\.junit\.ComparisonFailure)(?::|$)", line)
+        if kind:
+            exception_kind = kind[1]
         if line.startswith("INSTRUMENTATION_STATUS: ") and "=" in line:
             key, value = line[len("INSTRUMENTATION_STATUS: "):].split("=", 1)
             if key in ("class", "test"):
@@ -278,8 +289,19 @@ def failure_observation(text: str, expected: list[str]) -> dict:
             identity = fields.get("class", "") + "#" + fields.get("test", "")
             code = line[len("INSTRUMENTATION_STATUS_CODE: "):]
             if identity in known and code in ("-4", "-3", "-2", "-1", "0", "1") and len(observed) < 2048:
-                observed.append({"case": identity, "status_code": int(code)})
+                observation = {"case": identity, "status_code": int(code)}
+                if int(code) < 0:
+                    cls = fields["class"]
+                    lines = sorted({n for owner, stem, n in source_frames
+                                    if owner == cls and stem == cls.rsplit(".", 1)[-1]})
+                    if lines:
+                        observation["test_source_lines"] = lines
+                    if exception_kind:
+                        observation["exception_kind"] = exception_kind
+                observed.append(observation)
             fields = {}
+            source_frames = []
+            exception_kind = None
     return {"raw_output_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
             "observed_statuses": observed, "assertions_passed": False}
 

@@ -1,0 +1,18 @@
+[package]
+name = "vw-codec-os"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "LicenseRef-VisualWorkbench-Proprietary"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror = "=2.0.21"
+vw-model = { path = "../vw-model", version = "=0.1.0" }
+vw-raster = { path = "../vw-raster", version = "=0.1.0" }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = ["Win32_Foundation", "Win32_Graphics_Imaging", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }

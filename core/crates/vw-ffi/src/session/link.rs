@@ -22,6 +22,13 @@ use vw_net::{
 };
 use vw_proto::v1::{self as pb, envelope::Body};
 
+#[path = "focus.rs"]
+mod focus;
+pub use focus::{FocusSignal, PeerMarkerFocus};
+#[path = "agent_capture.rs"]
+mod agent_capture;
+pub use agent_capture::AgentCaptureDisplay;
+
 pub(super) const MAX_TRANSFER: u64 = 64 * 1024 * 1024;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
 pub enum AppCarrier {
@@ -136,9 +143,13 @@ pub struct LiveSession {
     previews: Arc<Mutex<super::preview::Previews>>,
     project: Weak<ProjectSession>,
     local: DeviceId,
+    focus: Arc<focus::FocusHub>,
+    agent_capture: Arc<agent_capture::CaptureStatusHub>,
 }
 impl Drop for LiveSession {
     fn drop(&mut self) {
+        self.focus.stop();
+        self.agent_capture.stop();
         self.runtime.stop();
     }
 }
@@ -362,6 +373,8 @@ impl LiveSession {
     }
     pub async fn close(&self) -> SessionResult<()> {
         self.closed.store(true, Ordering::Release);
+        self.focus.stop();
+        self.agent_capture.stop();
         self.runtime.close().await
     }
 }
@@ -386,6 +399,8 @@ pub(super) fn hello(device: DeviceId) -> LocalHello {
             "preview_lifecycle_v2".into(),
             "original_upload_v1".into(),
             "new_shape_preview_v1".into(),
+            "marker_focus_v1".into(),
+            agent_capture::CAPABILITY.into(),
         ]),
     }
 }
@@ -526,6 +541,10 @@ impl SessionService {
                 let (commands, receive) = mpsc::channel(32);
                 let epoch = Arc::new(AtomicU64::new(0));
                 let incoming_epoch = epoch.clone();
+                let focus = focus::FocusHub::new(initial.project.clone());
+                let incoming_focus = focus.clone();
+                let agent_capture = agent_capture::CaptureStatusHub::new(host);
+                let incoming_capture = agent_capture.clone();
                 let previews = Arc::new(Mutex::new(super::preview::Previews::default()));
                 let incoming_previews = previews.clone();
                 let project_ref = Arc::downgrade(&project);
@@ -542,6 +561,8 @@ impl SessionService {
                         commands: receive,
                         epoch: incoming_epoch,
                         previews: incoming_previews,
+                        focus: incoming_focus,
+                        agent_capture: incoming_capture,
                     })
                     .await;
                 });
@@ -555,6 +576,8 @@ impl SessionService {
                     previews,
                     project: project_ref,
                     local: local_identity,
+                    focus,
+                    agent_capture,
                 }))
             })
             .await
@@ -671,6 +694,8 @@ struct Driver {
     commands: mpsc::Receiver<super::preview::Command>,
     epoch: Arc<AtomicU64>,
     previews: Arc<Mutex<super::preview::Previews>>,
+    focus: Arc<focus::FocusHub>,
+    agent_capture: Arc<agent_capture::CaptureStatusHub>,
 }
 async fn drive(mut driver: Driver) {
     let local = hello(driver.local.clone());
@@ -690,6 +715,8 @@ async fn drive(mut driver: Driver) {
             commands,
             epoch,
             previews,
+            focus,
+            agent_capture,
             ..
         } = &mut driver;
         match connection {
@@ -699,6 +726,7 @@ async fn drive(mut driver: Driver) {
                     "preview_lifecycle_v2",
                     "original_upload_v1",
                     "new_shape_preview_v1",
+                    "marker_focus_v1",
                 ]
                 .iter()
                 .any(|capability| !connection.session().capabilities().contains(*capability))
@@ -728,6 +756,8 @@ async fn drive(mut driver: Driver) {
                         host: matches!(route, Route::Host(_)),
                         incoming: &mut incoming,
                         previews,
+                        focus,
+                        agent_capture,
                     },
                 )
                 .await
@@ -775,6 +805,7 @@ async fn drive(mut driver: Driver) {
         tokio::time::sleep(delay).await;
         delay = (delay * 2).min(Duration::from_secs(2));
     }
+    driver.focus.stop();
     publish(&driver.status, |s| {
         s.status = SyncStatus::Offline;
         s.carrier = None;
@@ -863,6 +894,8 @@ struct Connected<'a> {
     host: bool,
     incoming: &'a mut Option<Incoming>,
     previews: &'a Arc<Mutex<super::preview::Previews>>,
+    focus: &'a Arc<focus::FocusHub>,
+    agent_capture: &'a Arc<agent_capture::CaptureStatusHub>,
 }
 async fn connected(connection: SecureConnection, context: Connected<'_>) -> SessionResult<()> {
     if !connection
@@ -882,8 +915,18 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         host,
         incoming,
         previews,
+        focus,
+        agent_capture,
     } = context;
     let active_epoch = ConnectionEpoch::enter(epoch.clone())?;
+    let _focus_epoch = focus.activate(active_epoch.value)?;
+    let _capture_epoch = agent_capture.activate(
+        active_epoch.value,
+        connection
+            .session()
+            .capabilities()
+            .contains(agent_capture::CAPABILITY),
+    )?;
     let (sender, mut receive) = connection.into_duplex()?;
     let _closing = Closing(sender.clone());
     let start = Instant::now();
@@ -963,6 +1006,8 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
                         }sender.enqueue(Body::BlobAck(ack))?;
                     },
                     Body::ViewportOutline(view)=>{if view.corners.len()!=4||view.corners.iter().any(|p|!p.x.is_finite()||!p.y.is_finite()){return Err(SessionError::Invalid);}let id=Id::from_proto(view.document_id.as_ref()).map_err(|_|SessionError::Invalid)?;publish(status,|s|s.peer_viewport=Some(PeerViewport{document_id:id.to_string(),corners:view.corners.into_iter().map(|p|crate::Point{x:p.x,y:p.y}).collect()}));},
+                    Body::MarkerFocus(value)=>focus.receive(value,active_epoch.value)?,
+                    Body::AgentCaptureStatus(value)=>agent_capture.receive(value,active_epoch.value)?,
                     Body::GestureUpdate(update)=>receive_preview(project,peer,&sender,previews,*update,false,false).await?,
                     Body::GestureReplay(replay)=>receive_preview(project,peer,&sender,previews,replay.update.ok_or(SessionError::Invalid)?,true,replay.open).await?,
                     Body::GestureRepair(request)=>{let reply=previews.lock().map_err(|_|SessionError::Worker)?.repair(request)?;if let Some(reply)=reply{sender.enqueue(reply)?;}},
@@ -986,6 +1031,8 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
             return Err(SessionError::Timeout);
         }
         echo.tick(&sender)?;
+        focus.flush(&sender)?;
+        agent_capture.flush(&sender)?;
         fill(&sender, &mut outbound)?;
         let updates = {
             let mut previews = previews.lock().map_err(|_| SessionError::Worker)?;

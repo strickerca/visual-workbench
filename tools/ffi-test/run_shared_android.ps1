@@ -206,7 +206,7 @@ try {
     [Environment]::SetEnvironmentVariable('VW_ANDROID_EXPECTED_MODEL', 'IN2019', 'Process')
     Run-Parser 'shared-ffi-mark-android' @('mark', '--state', $state, '--phase', 'android')
     $connectedStarted = $true
-    Run-SharedGradle 'shared-ffi-android-golden' @(':shared:connectedAndroidTest', '-Pandroid.testInstrumentationRunnerArguments.class=com.visualworkbench.shared.AndroidCoreSmokeTest') | Out-Null
+    Run-SharedGradle 'shared-ffi-android-golden' @(':shared:connectedAndroidTest') | Out-Null
     # The APK was packaged a second time by --rerun-tasks. A changed hash is
     # inconclusive until rebound; APK timestamps/signatures can differ while
     # embedded native/golden bytes still match. Cleanup uses the actual final APK.

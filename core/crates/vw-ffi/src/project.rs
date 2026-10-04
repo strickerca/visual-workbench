@@ -387,14 +387,18 @@ pub async fn create_image_project(
         let doc_id = Id::try_from(options.document_id)?;
         let layer_id = Id::try_from(options.layer_id)?;
         let device = DeviceId::try_from(options.device_id)?;
-        let image = vw_raster::decode(&options.source, decode_limits())?;
+        let image = crate::os_images::decode(&options.source, decode_limits(), &|| {
+            cancellation.is_cancelled()
+        })?;
         let mut project = Project::new(project_id, options.title.clone(), device.clone());
         let (width, height) = if image.orientation_applied >= 5 {
             (image.height, image.width)
         } else {
             (image.width, image.height)
         };
-        let format = if options.source.starts_with(b"\x89PNG\r\n\x1a\n") {
+        let format = if vw_codec_os::is_heic(&options.source) {
+            "heic"
+        } else if options.source.starts_with(b"\x89PNG\r\n\x1a\n") {
             "png"
         } else if options.source.starts_with(&[0xff, 0xd8]) {
             "jpeg"

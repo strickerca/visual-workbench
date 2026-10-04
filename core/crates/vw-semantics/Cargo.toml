@@ -1,0 +1,24 @@
+[package]
+name = "vw-semantics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+test = false
+
+[dependencies]
+vw-model = { path = "../vw-model", version = "=0.1.0" }
+vw-ops = { path = "../vw-ops", version = "=0.1.0" }
+vw-proto = { path = "../vw-proto", version = "=0.1.0" }
+vw-geom = { path = "../vw-geom", version = "=0.1.0" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
+thiserror = "=2.0.21"
+libm = { version = "=0.2.16", default-features = false }
+zstd = { version = "=0.13.3", default-features = false }

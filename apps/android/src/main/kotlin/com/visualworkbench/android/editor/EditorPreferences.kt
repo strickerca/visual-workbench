@@ -6,9 +6,9 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 internal enum class EditorTool(val label: String, val shortLabel: String) {
-    Pen("Pen", "Pen"), Highlighter("Highlighter", "High"), Marker("Marker", "Mark"),
+    Pen("Pen", "Pen"), Highlighter("Highlighter", "High"), Marker("Marker brush", "Mark"), Callout("Numbered marker", "1 2"),
     Line("Line", "Line"), Arrow("Arrow", "Arrow"), Rectangle("Rectangle", "Rect"),
-    Ellipse("Ellipse", "Oval"), Text("Text", "Text"), Eraser("Object eraser", "Erase"), Select("Select and transform", "Select"),
+    Ellipse("Ellipse", "Oval"), Text("Text", "Text"), Eraser("Eraser modes", "Erase"), Select("Select and transform", "Select"),
 }
 
 internal data class PressureCurve(val x1: Float = 0.25f, val y1: Float = 0.25f, val x2: Float = 0.75f, val y2: Float = 0.75f) {

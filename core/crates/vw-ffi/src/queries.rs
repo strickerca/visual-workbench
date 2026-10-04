@@ -463,6 +463,7 @@ fn draw_shape(object: &pb::ObjectState, project: &Project) -> Result<DrawShape> 
         },
         Shape::ResultId(id) => DrawShape::Result {
             asset_id: result_asset(project, id)?,
+            result_id: Id::from_proto(Some(id))?.to_string(),
         },
         Shape::Adjustment(_) => DrawShape::Adjustment,
     })
@@ -618,6 +619,7 @@ impl ProjectSession {
 struct Assets<'a> {
     blobs: &'a vw_store::BlobStore,
     budget: u64,
+    cancel: &'a Cancellation,
 }
 impl AssetResolver for Assets<'_> {
     fn image(&self, asset: &str) -> std::result::Result<DecodedImage, vw_raster::RasterError> {
@@ -662,13 +664,14 @@ impl AssetResolver for Assets<'_> {
             .budget
             .checked_sub(bytes.len() as u64)
             .ok_or(vw_raster::RasterError::Allocation)?;
-        vw_raster::decode(
+        crate::os_images::decode(
             &bytes,
             vw_raster::DecodeLimits {
                 max_encoded_bytes: limit,
                 max_pixels: 50_000_000,
                 max_memory_bytes: budget,
             },
+            &|| self.cancel.is_cancelled(),
         )
     }
 }
@@ -690,6 +693,7 @@ pub(crate) fn export(
     let assets = Assets {
         blobs: &state.blobs,
         budget: options.memory_budget_bytes,
+        cancel: cancellation,
     };
     let source = assets.image(&definition.primary_asset_id)?;
     cancellation.check()?;
@@ -706,6 +710,7 @@ pub(crate) fn export(
         let result_assets = Assets {
             blobs: &state.blobs,
             budget: remaining,
+            cancel: cancellation,
         };
         let pixels = vw_raster::render_document(
             &source,

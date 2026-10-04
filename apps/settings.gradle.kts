@@ -2,7 +2,15 @@ pluginManagement {
     repositories { google(); mavenCentral(); gradlePluginPortal() }
 }
 dependencyResolutionManagement {
-    repositories { google(); mavenCentral() }
+    repositories {
+        google(); mavenCentral()
+        exclusiveContent {
+            forRepository {
+                maven { url = uri("https://github.com/rustls/rustls-platform-verifier/raw/maven-archive/android-release-support/maven/") }
+            }
+            filter { includeGroup("org.rustls") }
+        }
+    }
 }
 rootProject.name = "visual-workbench-apps"
 include(":shared", ":android", ":desktop")

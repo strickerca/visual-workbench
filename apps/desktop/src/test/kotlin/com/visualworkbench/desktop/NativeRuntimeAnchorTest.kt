@@ -160,6 +160,43 @@ class NativeRuntimeAnchorTest {
         } finally { anchor.lease.close() }
     }
 
+    @Test fun longNativeGuardPathsAreExplicitWithoutChangingTheShortAnchorNamespace() {
+        windows()
+        val short = Path.of("C:\\synthetic\\Visual Workbench")
+        assertEquals(short.toString(), nativeGuardPath(short))
+        val long = short.resolve("x".repeat(120)).resolve("y".repeat(120)).resolve("owned.bin")
+        assertTrue(long.toString().length >= 260)
+        assertEquals("\\\\?\\" + long, nativeGuardPath(long))
+        failure { nativeGuardPath(long.resolve("..")) }
+        failure { nativeGuardPath(Path.of("relative").resolve("x".repeat(260))) }
+    }
+
+    @Test fun realLongWindowsPinsStillRefuseWritesAndReplacement() {
+        windows()
+        val root = temporary.newFolder("long-guard").toPath().toRealPath()
+        val directory = Files.createDirectories(root.resolve("x".repeat(120)).resolve("y".repeat(120)))
+        val file = directory.resolve("owned.bin")
+        assertTrue(file.toString().length >= 260)
+        Files.write(file, byteArrayOf(1, 2, 3))
+        val guard = WindowsNativeFileGuard()
+        try {
+            guard.check(directory); guard.check(file)
+            guard.pinDirectory(directory).use {
+                guard.pin(file).use {
+                    assertArrayEquals(byteArrayOf(1, 2, 3), Files.readAllBytes(file))
+                    ioFailure { Files.write(file, byteArrayOf(4)) }
+                    ioFailure { Files.delete(file) }
+                    ioFailure { Files.move(directory, directory.resolveSibling("replacement")) }
+                }
+            }
+            Files.write(file, byteArrayOf(4))
+            assertArrayEquals(byteArrayOf(4), Files.readAllBytes(file))
+        } finally {
+            // JUnit's java.io.File cleanup may itself use legacy path limits.
+            Files.walk(root).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach { Files.delete(it) } }
+        }
+    }
+
     private fun local(): Path = temporary.newFolder().toPath().toAbsolutePath().normalize()
     private fun windows() { assumeTrue(System.getProperty("os.name").startsWith("Windows")) }
     private fun failure(block: () -> Any?) { try { block(); fail("Unsafe cache path was accepted") } catch (_: NativeRuntimeFailure) { } }
@@ -194,7 +231,7 @@ class NativeRuntimeAnchorTest {
         }
     }
     private fun resources(opened: (String) -> Unit = {}): NativeResources {
-        val names = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe")
+        val names = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
         val bytes = names.associate { "win32-x86-64/$it" to "Synthetic unexecuted bytes".toByteArray() }.toMutableMap()
         bytes["vw-native-runtime.sha256"] = names.joinToString("\n", postfix = "\n") { name ->
             val data = bytes.getValue("win32-x86-64/$name")

@@ -36,6 +36,7 @@ REQUIRED = (
     "apps/bindings-core/build.gradle.kts", "apps/bindings-host/build.gradle.kts",
     "apps/gradle/libs.versions.toml", "apps/gradle/wrapper/gradle-wrapper.properties",
     "tools/process.psm1", "tools/android-device.psm1", "tools/ffi-test/check_apk.py",
+    "tools/mcp-build.ps1", "tools/check_npm_licenses.py", "mcp/package.json", "mcp/package-lock.json", "third_party/LICENSES",
     "tools/ffi-test/fixtures/ffi-golden.properties", "tools/ffi-test/fixtures/ffi-golden.json",
     "target/debug/vw_core.dll", "target/debug/vw_host.dll", "target/debug/vw-bindgen.exe",
     "target/android-jni/arm64-v8a/libvw_core.so",
@@ -44,7 +45,7 @@ TREES = (
     "core/crates", "host-win/crates", "contracts", "apps/shared/src", "tools/ffi-test",
     # Include module lockfiles as well as their required build scripts. A lock
     # appearing, disappearing or changing after begin also changes the inventory.
-    "apps/bindings-core", "apps/bindings-host",
+    "apps/bindings-core", "apps/bindings-host", "tools/licenses", "third_party/notices",
 )
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -201,7 +202,8 @@ def parse_junit(data: bytes) -> list[tuple[str, str]]:
     return passed
 
 
-def fresh_results(root: Path, before: dict, started_ns: int, expected: tuple[str, str]) -> dict:
+def fresh_results(root: Path, before: dict, started_ns: int, expected: tuple[str, str],
+                  required_cases: set[tuple[str, str]] | None = None) -> dict:
     current = report_inventory(root)
     all_passed: set[tuple[str, str]] = set()
     hashes = []
@@ -215,6 +217,8 @@ def fresh_results(root: Path, before: dict, started_ns: int, expected: tuple[str
         all_passed.update(passed)
         hashes.append(record["sha256"])
     require(expected in all_passed, "required_golden_not_passed")
+    if required_cases is not None:
+        require(all_passed == required_cases, "required_case_inventory")
     require(bool(all_passed), "zero_actual_tests")
     # Never copy suite properties, filenames, output, stack traces or device IDs.
     return {"actual_passed_tests": len(all_passed), "required_golden": ".".join(expected),
@@ -235,8 +239,10 @@ def mark(root: Path, state: dict, phase: str) -> dict:
 def collect(root: Path, state: dict) -> dict:
     require(state.get("schema") == 1 and set(state.get("phases", {})) == set(EXPECTED), "missing_phase")
     require(source_inventory(root) == state["source_sha256"], "source_drift")
+    android_cases = android_inventory(root)
     result = {phase: fresh_results(root / REPORT_ROOTS[phase], state["phases"][phase]["before"],
-              state["phases"][phase]["started_ns"], expected) for phase, expected in EXPECTED.items()}
+              state["phases"][phase]["started_ns"], expected,
+              android_cases if phase == "android" else None) for phase, expected in EXPECTED.items()}
     properties = (root / "tools/ffi-test/fixtures/ffi-golden.properties").read_text(encoding="ascii")
     fixture = {}
     for key in ("state_hash", "export_blake3"):
@@ -249,6 +255,36 @@ def collect(root: Path, state: dict) -> dict:
             "limits": ["No S23/S Pen or target performance acceptance", "No UI foreground or provider acceptance",
                        "Source and binary hashes were co-observed; this is not a compiler provenance receipt",
                        "Pass requires the runner's separate process, package and temporary-work cleanup checks"]}
+
+
+def android_inventory(root: Path) -> set[tuple[str, str]]:
+    value = bounded_json(root / "tools/ffi-test/android-inventory.json")
+    expected = value.get("expected_tests")
+    require(value.get("schema") == 1 and isinstance(expected, list) and 1 <= len(expected) <= 1024,
+            "android_case_inventory")
+    require(all(isinstance(row, list) and len(row) == 2 and all(isinstance(part, str) for part in row) and
+                re.fullmatch(r"com\.visualworkbench\.shared\.[A-Za-z][A-Za-z0-9_]*Test", row[0]) and
+                re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", row[1]) for row in expected), "android_case_identity")
+    require(expected == sorted(map(list, set(map(tuple, expected)))), "android_case_duplicate")
+    actual = set()
+    # Match all three explicit device source roots in shared/build.gradle.kts.
+    # A missing, added or duplicated case must not silently pass the receipt.
+    for source_set in ("androidDeviceTest", "jvmTest", "commonTest"):
+        for path in files_under(root / "apps/shared/src" / source_set, 1024):
+            require(path.suffix == ".kt", "android_test_source")
+            text = path.read_text(encoding="utf-8-sig")
+            owners = re.findall(r"\bclass ([A-Za-z0-9_]+Test)\b", text)
+            methods = re.findall(r"@Test\s+(?:public\s+)?fun\s+([A-Za-z0-9_]+)\s*\(", text)
+            if not owners and "@Test" not in text:
+                continue  # Shared fixture helpers have no test declarations.
+            require(len(owners) == 1 and methods and text.count("@Test") == len(methods) and
+                    re.search(r"(?m)^package com\.visualworkbench\.shared\s*$", text) is not None and
+                    not re.search(r"@(?:Ignore|Parameterized)|\bAssume\.", text), "android_test_declaration")
+            cases = [("com.visualworkbench.shared." + owners[0], method) for method in methods]
+            require(len(set(cases)) == len(cases) and not actual.intersection(cases), "android_test_duplicate")
+            actual.update(cases)
+    require(actual == set(map(tuple, expected)), "android_test_inventory_drift")
+    return actual
 
 
 def apk_info(root: Path, since_ns: int) -> dict:

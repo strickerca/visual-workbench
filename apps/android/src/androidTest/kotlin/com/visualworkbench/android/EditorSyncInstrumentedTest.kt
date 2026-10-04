@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.UUID
 
 /** Real controller/scene lifecycle with synthetic native contracts. These tests
  * are not network, renderer parity, latency or physical-pen acceptance. */
@@ -235,14 +234,66 @@ class EditorSyncInstrumentedTest {
         }
     }
 
+    @Test fun grantIndicatorUsesActualLinkCollectorAndRetiresBeforeProjectClose() = runBlocking {
+        val api = CaptureStatusFake()
+        fixture(capture = { api }) { editor, core, link ->
+            connect(editor)
+            withContext(Dispatchers.Main) { api.emit(AgentCaptureStatus(2uL, 1uL, true, 2u, false, 30_000u)) }
+            waitUntil { editor.agentCapture.state.value.activeGrantCount == 2u }
+            withContext(Dispatchers.Main) {
+                assertTrue(agentCaptureStatusText(editor.agentCapture.state.value).contains("enabled"))
+                link.updates.value = link.status().copy(sequence = 2uL, status = SyncStatus.Offline)
+            }
+            waitUntil { editor.connection?.status == SyncStatus.Offline }
+            withContext(Dispatchers.Main) { assertFalse(editor.agentCapture.state.value.known) }
+            val prior = core.current
+            withContext(Dispatchers.Main) { editor.navigate(WorkbenchScreen.Projects) }
+            waitUntil { prior.closed }
+            withContext(Dispatchers.Main) {
+                assertFalse(editor.agentCapture.state.value.known)
+                assertEquals(0, api.activeWaits)
+                assertTrue(link.events.indexOf("link-close") < link.events.indexOf("project-close"))
+            }
+        }
+    }
+    @Test fun grantIndicatorReplacesSnapshotsAndKeepsRevokedCaptureVisibleWhileItSettles() = runBlocking {
+        val api = CaptureStatusFake()
+        fixture(capture = { api }) { editor, _, _ ->
+            connect(editor)
+            for (value in listOf(AgentCaptureStatus(2uL, 1uL, true, 3u, true, 10_000u),
+                AgentCaptureStatus(3uL, 1uL, true, 0u, true, 0u), AgentCaptureStatus(4uL, 1uL, true))) {
+                withContext(Dispatchers.Main) { api.emit(value) }
+                waitUntil { editor.agentCapture.state.value == value }
+            }
+            withContext(Dispatchers.Main) {
+                assertEquals("PC agent capture: no active grants", agentCaptureStatusText(editor.agentCapture.state.value))
+                assertEquals(0, api.publications)
+            }
+        }
+    }
+    private class CaptureStatusFake : WorkbenchAgentCaptureStatus {
+        private val updates = kotlinx.coroutines.channels.Channel<AgentCaptureStatus>(kotlinx.coroutines.channels.Channel.CONFLATED)
+        private var current = AgentCaptureStatus(1uL, 1uL)
+        var activeWaits = 0; var publications = 0
+        fun emit(value: AgentCaptureStatus) { current = value; updates.trySend(value) }
+        override fun status() = current
+        override suspend fun waitStatus(afterSequence: ULong): AgentCaptureStatus {
+            activeWaits++
+            try { while (true) { val value = updates.receive(); if (value.sequence > afterSequence) return value } }
+            finally { activeWaits-- }
+        }
+        override fun publish(value: LocalAgentCaptureSummary) { publications++; error("Phone indicator cannot publish grants") }
+    }
+
     private suspend fun connect(editor: EditorController) {
         withContext(Dispatchers.Main) { editor.pairing.enter() }
         waitUntil { !editor.pairing.working }
         withContext(Dispatchers.Main) { editor.pairing.choosePeer("synthetic-peer"); editor.pairing.sessionAddress = "192.0.2.1:443"; editor.connectCurrent() }
         waitUntil { editor.connection != null && !editor.busy }
     }
-    private suspend fun fixture(action: suspend (EditorController, FakeCore, FakeLink) -> Unit) {
-        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as Application
+    private suspend fun fixture(capture: (ProjectLink) -> WorkbenchAgentCaptureStatus = ::agentCaptureStatus, action: suspend (EditorController, FakeCore, FakeLink) -> Unit) {
+        val base = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as Application
+        val app = IsolatedEditorApplication(base)
         val events = mutableListOf<String>(); val link = FakeLink(events); val core = FakeCore(events)
         val sessions = object : SessionLifecycleInstrumentedTest.FakeSessions() {
             override suspend fun pairedDevices() = listOf(PairedDevice("synthetic-peer", "a".repeat(64), 1uL, null))
@@ -250,15 +301,27 @@ class EditorSyncInstrumentedTest {
             override suspend fun host(project: WorkbenchProject, peer: String, endpoints: List<SessionEndpoint>) = link
         }
         val store = ViewModelStore()
-        val editor = withContext(Dispatchers.Main) { EditorController(app, core) { _, _ -> sessions }.also { store.put("sync", it) } }
+        var editor: EditorController? = null
         try {
-            waitUntil { !editor.busy }
-            withContext(Dispatchers.Main) { editor.viewport(200, 200, 1f); editor.newCanvas() }
-            waitUntil { !editor.busy && editor.scene?.background != null }
-            action(editor, core, link)
+            editor = withContext(Dispatchers.Main) { EditorController(app, core, capture) { _, _ -> sessions }.also { store.put("sync", it) } }
+            val current = checkNotNull(editor)
+            try {
+                waitUntil { !current.busy }
+                withContext(Dispatchers.Main) { current.viewport(200, 200, 1f); current.newCanvas() }
+                waitUntil { !current.busy && current.scene?.background != null }
+                action(current, core, link)
+            } finally {
+                withContext(NonCancellable + Dispatchers.Main) { store.clear() }
+                withContext(NonCancellable) { withTimeout(10_000) { checkNotNull(current.scope.coroutineContext[Job]).join() } }
+            }
         } finally {
             withContext(NonCancellable + Dispatchers.Main) { store.clear() }
-            withContext(NonCancellable) { withTimeout(10_000) { checkNotNull(editor.scope.coroutineContext[Job]).join() } }
+            withContext(NonCancellable) {
+                // No files/preferences retire unless every entered editor owner
+                // has actually settled. A timeout intentionally retains them.
+                editor?.let { withTimeout(10_000) { checkNotNull(it.scope.coroutineContext[Job]).join() } }
+                withContext(Dispatchers.IO) { app.close() }
+            }
         }
     }
     private suspend fun waitUntil(check: () -> Boolean) = withTimeout(10_000) { while (!withContext(Dispatchers.Main) { check() }) delay(10) }
@@ -266,8 +329,9 @@ class EditorSyncInstrumentedTest {
 
     private class FakeCore(private val events: MutableList<String>) : WorkbenchCore {
         lateinit var current: FakeProject
-        override fun newId(unixMs: ULong) = UUID.randomUUID().toString()
-        override fun newDeviceId() = UUID.randomUUID().toString()
+        private val identities = workbenchCore()
+        override fun newId(unixMs: ULong): String = identities.newId(unixMs)
+        override fun newDeviceId(): String = identities.newDeviceId()
         override suspend fun create(options: CreateProject): WorkbenchProject = FakeProject(options, events).also { current = it }
         override suspend fun open(path: String): WorkbenchProject = throw CoreFailure(CoreFailureKind.Unsupported)
         override suspend fun layoutText(text: String, font: String, size: Float): TextLayout = error("unused")

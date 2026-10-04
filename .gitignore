@@ -25,3 +25,5 @@ __pycache__/
 !.env.example
 *.p12
 *.p8
+
+**/node_modules/

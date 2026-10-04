@@ -25,13 +25,15 @@ import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.*
 
-internal enum class WorkbenchScreen { Projects, Canvas, Settings, Diagnostics, Pairing }
+internal enum class WorkbenchScreen { Projects, Canvas, Settings, Diagnostics, Pairing, Instructions }
 internal data class TextDraft(val objectId: String?, val anchor: Point, val text: String = "", val font: String = "Inter", val size: Double = 32.0)
 internal enum class ImportOutcome { Imported, Cancelled, Retained }
 internal data class CameraCapture(val token: String, val bytes: Long)
 
 /** UI state lives on Main; native/storage work is suspendable and input queues are bounded. */
 internal class EditorController @JvmOverloads constructor(application: Application, val core: WorkbenchCore = workbenchCore(),
+    captureStatusFactory: (ProjectLink) -> WorkbenchAgentCaptureStatus = ::agentCaptureStatus,
+    private val captureArrivalQuery: suspend (WorkbenchProject, ULong) -> ReceivedCapture? = { p, after -> p.receivedCapture(after) },
     sessionFactory: suspend (android.content.Context, String) -> WorkbenchSessions = ::createAndroidSessions) : AndroidViewModel(application), CanvasGestureSink {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val repository = ProjectRepository(application, core)
@@ -44,6 +46,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var refreshJob: Job? = null
     private var refreshQueue: Channel<Unit>? = null
     val pairing = PairingController(application, scope, { repository.deviceId }, { message = it }, sessionFactory)
+    val agentCapture = AgentCaptureObserver(scope, captureStatusFactory)
+    val captureArrivals = CaptureArrivals(scope, captureArrivalQuery)
     private var link: ProjectLink? = null
     private var linkChanges: Job? = null
     private var peerWorker: Job? = null
@@ -116,6 +120,22 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var erased = emptySet<String>()
     private var transientShape: DrawObject? = null
     private var gesture: ToolGesture? = null
+    private var selectionPointer = false
+    private var eraserPointer = false
+    val selections = SelectionController(application, scope, core, {
+        val current = project
+        if (!disposing && current != null && document != null) refresh(current, current.info(), epoch)
+    })
+    val erasers = EraserController(core, scope, selections) { receipt ->
+        val current = project
+        if (!disposing && current != null && document != null) {
+            selected?.let { id -> if (receipt != null) {
+                if (id in receipt.replacements) selected = receipt.replacements[id]
+                else if (id in receipt.removed) selected = null
+            } }
+            refresh(current, current.info(), epoch)
+        }
+    }
     private val strokes = LinkedHashSet<StrokeRun>()
     private var previewJob: Job? = null
     private var previewHandle: WorkbenchStroke? = null
@@ -127,15 +147,98 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private val pendingPreviews = LinkedHashMap<String, DrawObject>()
     private val pendingTransforms = LinkedHashMap<String, Map<String, Transform>>()
     private val pendingErases = LinkedHashMap<String, Set<String>>()
+    private val captureOwner = com.visualworkbench.android.capture.CaptureOwner<com.visualworkbench.android.capture.CaptureRuntime> { it.close() }
+    val instructionEditor = InstructionEditor(scope, mutations,
+        { val p = project; val d = document; if (p != null && d != null && !disposing) InstructionAttachment(p, d) else null },
+        { newId() },
+        { current -> val next = current.info(); WorkflowMetadata(newId(), repository.deviceId,
+            repository.instructionLamport(next.nextLamport), System.currentTimeMillis()) },
+        { receipt -> val current = project; if (current != null && !disposing) refresh(current, receipt.revision, epoch) },
+        InstructionEntryMethod.PhoneKeyboard, localFocused = ::localInstructionFocused)
+    val semanticEditor = SemanticEditor(scope, mutations,
+        { val p = project; val d = document; if (p != null && d != null && !disposing) InstructionAttachment(p, d) else null },
+        { !disposing && !busy && !ai.state.value.open && pending == 0 && gesture == null && strokes.isEmpty() &&
+            !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy &&
+            instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) },
+        { current -> val next = current.info(); WorkflowMetadata(newId(), repository.deviceId,
+            repository.instructionLamport(next.nextLamport), System.currentTimeMillis()) },
+        { receipt -> val current = project; if (current != null && !disposing) refresh(current, receipt.revision, epoch) },
+        { placement -> instructionEditor.place(placement.point, placement.style, placement.bounds, placement.elementEids,
+            placement.snapshotId, placement.binding) }, interactionChanged = ::instructionInteractionChanged)
+    private val instructionAdmission = com.visualworkbench.android.instructions.InstructionFocusAdmission { instructionInteractionChanged() }
+    val instructionFocus = InstructionFocusController(scope, instructionEditor,
+        { val p = project; val d = document; if (p != null && d != null && !disposing) InstructionAttachment(p, d) else null },
+        { !disposing && !busy && !semanticEditor.state.value.busy && pending == 0 && gesture == null && strokes.isEmpty() &&
+            !ai.state.value.open && instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) &&
+            screen in setOf(WorkbenchScreen.Canvas, WorkbenchScreen.Instructions) },
+        { id, peer -> selected = id; if (peer) screen = WorkbenchScreen.Instructions; publish() }, selectedObject = { selected })
+    private fun localInstructionFocused(field: InstructionField) { instructionFocus.localField(field) }
+    internal var captureAdmissionVersion by mutableStateOf(0L); private set
+    fun instructionInteractionChanged() { captureAdmissionVersion++; instructionFocus.interactionChanged() }
+    internal fun instructionModal(owner: com.visualworkbench.android.instructions.InstructionFocusModal, active: Boolean) { instructionAdmission.modal(owner, active) }
+    internal fun clearInstructionModals() { instructionAdmission.clear() }
+    fun editInstruction() {
+        if (document == null) { message = "Open a document first."; return }
+        cancelTool(); screen = WorkbenchScreen.Instructions
+        selected?.let(instructionEditor::focusObject) ?: instructionEditor.focusGlobal()
+    }
+    private var aiRetiring=false
+    private fun aiAttachment(): AiAttachment? = if(aiRetiring||disposing)null else project?.let{p->document?.let{AiAttachment(p,it,epoch)}}
+    private fun aiPoses():Map<String,Transform> = peerObjects.asSequence().filter{it.item.shape is Shape.Result}.take(9)
+        .associate{it.item.objectId to it.item.transform}+pendingTransforms.values.fold(emptyMap<String,Transform>()){a,b->a+b}+transformed
+    val aiService=AiServiceController(scope,application.noBackupFilesDir.absolutePath){path,initialize->
+        AndroidProviderRuntime.initialize(application);createAiService(path,initialize)
+    }
+    val ai: AiEditorController<AiBitmap> = AiEditorController(scope,core,aiService,::aiAttachment,mutations,
+        metadata={owned->val next=owned.project.info();WorkflowMetadata(newId(),repository.deviceId,repository.instructionLamport(next.nextLamport),System.currentTimeMillis())},
+        refreshAfterMutation={owned->if(owned.sameProject(aiAttachment()))refresh(owned.project,owned.project.info(),epoch)},
+        image=::aiReadBitmap,abandonImage=AiBitmap::abandon,
+        canOperate={!disposing&&!busy&&pending==0&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy})
+    val aiResults=AiResultController(scope,core,::aiAttachment,{camera},::aiPoses,image=::aiReadBitmap,abandonImage=AiBitmap::abandon)
+    fun aiKeyStore():AndroidProviderKeyStore = AndroidProviderRuntime.initialize(getApplication())
+    private fun aiFrame()=aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),camera,aiPoses())}
+    private fun aiResultReady()=document?.render?.items?.none{it.shape is Shape.Result}!=false||aiFrame()!=null
+    fun openAi(){
+        if(disposing||busy||pending!=0||document==null||textDraft!=null||showBrush||showContext||blockingMessage!=null)return
+        if(instructionEditor.hasUnsaved()){message="Save or discard the instruction draft before opening AI review.";return}
+        cancelTool();ai.open();instructionInteractionChanged()
+    }
+    fun hideAi(){ai.hide();instructionInteractionChanged()}
+    private fun mayCloseAi():Boolean{
+        if(!ai.needsDecision())return true
+        message="Save the paid Result or explicitly discard its review before replacing or closing this project."
+        if(!instructionEditor.hasUnsaved()){ai.open();instructionInteractionChanged()}
+        return false
+    }
+    private suspend fun retireAi(){
+        aiRetiring=true
+        try{if(disposing)ai.close()else ai.detach()}
+        finally{try{if(disposing)aiResults.close()else aiResults.detach()}finally{if(disposing)aiService.close()}}
+    }
     private val preferencesWriter: Job
 
     init {
+        scope.launch { aiResults.state.collect { publish() } }
         preferencesWriter = scope.launch {
             for (settings in preferencesQueue) try { preferencesStore.write(settings) }
             catch (_: Exception) { message = "Settings could not be saved. Try changing the setting again." }
         }
         scope.launch {
-            try { repository.initialize(); preferences = preferencesStore.read(); refreshProjects(); refreshCaptures() }
+            try {
+                repository.initialize(); preferences = preferencesStore.read(); refreshProjects(); refreshCaptures()
+                if (disposing || !kotlinx.coroutines.currentCoroutineContext().isActive) return@launch
+                val owner = com.visualworkbench.android.capture.CaptureRuntime(core, repository.deviceId,
+                    repository::checkedPath, { repository.lamport() }) { captured, warning ->
+                    // This callback consumes the delivered handle. The saved
+                    // project can be opened from Projects without stealing focus
+                    // from the application whose screen the owner captured.
+                    withContext(NonCancellable) { captured.close() }
+                    if (!disposing) { refreshProjects(); message = warning ?: "Capture saved in Projects."; publish() }
+                }
+                captureOwner.install(owner, { !disposing }) { candidate ->
+                    com.visualworkbench.android.capture.CaptureRuntime.installed.compareAndSet(null, candidate)
+                }
+            }
             catch (error: Exception) { report(error) }
             finally { busy = false }
         }
@@ -198,7 +301,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     fun settings(value: EditorPreferences) {
         preferences = value; preferencesQueue.trySend(value); publish()
     }
-    fun chooseTool(value: EditorTool) { cancelTool(); tool = value; showContext = false; hoverPoint = null; publish() }
+    fun chooseTool(value: EditorTool) {
+        if (value == EditorTool.Eraser) {
+            chooseEraser(if (erasers.state.value.mode == EraserMode.Stroke) EraserChoice.Stroke else EraserChoice.Object); return
+        }
+        cancelTool(); erasers.tools.drawing(); tool = value; showContext = false; hoverPoint = null; publish()
+    }
+    fun chooseEraser(value: EraserChoice) { cancelTool(); erasers.tools.choose(value, selected); showContext = false; hoverPoint = null; publish() }
+    fun stopErasing() { cancelTool(); erasers.tools.drawing(); publish() }
     fun displayedBrush(): BrushPreference {
         val style = selectedStyleDraft ?: if (tool == EditorTool.Select) objects.firstOrNull { it.item.objectId == selected }?.item?.style else null
         return if (style == null) preferences.brush(tool) else preferences.brush(tool).copy(width = style.width.coerceIn(.25, 256.0), colorArgb = EditorDrawing.argb(style.rgba).toLong() and 0xffffffffL)
@@ -231,6 +341,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         } else { previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null }
     }
     fun navigate(next: WorkbenchScreen) {
+        captureNavigationGeneration++ // Explicit navigation invalidates any staged arrival before suspension.
+        if(next==WorkbenchScreen.Projects&&!mayCloseAi())return
+        if (next == WorkbenchScreen.Projects && instructionEditor.hasUnsaved()) {
+            message = "Save or discard the instruction draft before closing this project."; screen = WorkbenchScreen.Instructions; return
+        }
         if (transferJob != null) { message = "Finish or cancel the image transfer before leaving this screen."; return }
         cancelTool(); diagnostics.background(); showContext = false
         if (screen == WorkbenchScreen.Pairing && next != WorkbenchScreen.Pairing) pairing.leave()
@@ -239,14 +354,34 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             if (pending != 0) { message = "Finishing the current edit. Try returning to projects in a moment."; return }
             busy = true
             scope.launch {
-                try { mutations.withLock { closeCurrent() }; refreshProjects(); screen = next }
+                var instructionSeal = false
+                try {
+                    val closed = mutations.withLock {
+                        if (!instructionEditor.sealIfClean()) {
+                            message = "Save or discard the instruction draft before closing this project."
+                            screen = WorkbenchScreen.Instructions; false
+                        } else {
+                            instructionSeal = true; closeCurrent(); true
+                        }
+                    }
+                    if (closed) { refreshProjects(); screen = next }
+                }
                 catch (error: Exception) { report(error) }
-                finally { busy = false }
+                finally {
+                    if (instructionSeal && !disposing) {
+                        instructionEditor.detach(); instructionEditor.resume(); semanticEditor.resumeAfterReplacement(); instructionEditor.refresh(); instructionFocus.revisionChanged()
+                    }
+                    busy = false
+                }
             }
         } else screen = next
     }
-    fun returnFromSettings() { screen = if (project == null) WorkbenchScreen.Projects else WorkbenchScreen.Canvas }
+    fun returnFromSettings() { captureNavigationGeneration++; screen = if (project == null) WorkbenchScreen.Projects else WorkbenchScreen.Canvas }
     fun onBackground() {
+        captureNavigationGeneration++
+        ai.background();instructionInteractionChanged()
+        instructionFocus.sharing(false); instructionFocus.following(false)
+        selections.background(); erasers.interaction.cancelOperation()
         cancelTool(); finishRemotePreview(sliderLink, sliderGesture, true)
         sliderGesture = null; sliderLink = null; sliderRevision = null; selectedStyleDraft = null; showBrush = false
         pairing.leave(); diagnostics.background(); hoverPoint = null; publish()
@@ -297,15 +432,25 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     fun open(id: String) = openRequest { repository.open(id) }
     private fun openRequest(knownSrgb: Boolean = false, transfer: Boolean = false, load: suspend () -> WorkbenchProject): Job? {
-        if (disposing || busy || pending != 0) return null
+        if(!mayCloseAi())return null
+        if (instructionEditor.hasUnsaved()) {
+            message = "Save or discard the instruction draft before opening another project."; screen = WorkbenchScreen.Instructions; return null
+        }
+        if (disposing || busy || pending != 0 || instructionEditor.state.value.busy) return null
         busy = true; cancelTool()
         val job = scope.launch {
+            var instructionSeal = false
             try {
                 val opened=mutations.withLock {
                     if(disposing)return@withLock false
+                    if (!instructionEditor.sealIfClean()) {
+                        message = "Save or discard the instruction draft before opening another project."
+                        screen = WorkbenchScreen.Instructions; return@withLock false
+                    }
+                    instructionSeal = true
                     closeCurrent()
                     val next=load()
-                    if(disposing){next.close();false}else{project=next;true}
+                    if(disposing){next.close();false}else{project=next;aiRetiring=false;true}
                 }
                 if(!opened)return@launch
                 val current = checkNotNull(project)
@@ -313,9 +458,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 info = current.info()
                 val doc = info?.documentIds?.firstOrNull() ?: error("This project has no image document")
                 val snapshot = current.document(doc)
-                val drawing = withContext(Dispatchers.Default) { snapshot.render.items.map(EditorDrawing::objectPath) }
+                val drawing = prepareEditorObjects(core, snapshot.render.items)
                 if (disposing || token != epoch || current !== project) return@launch
                 document = snapshot; info = snapshot.render.revision; objects = drawing
+                instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
                 observeProject(current, token)
                 colorAssumed = knownSrgb; screen = WorkbenchScreen.Canvas; cameraFitted = false
                 fit(); loadBackground()
@@ -324,16 +470,113 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 if (transfer) message = rasterFailure(error, importing = true) else report(error)
             }
             catch (error: Exception) { report(error) }
-            finally { busy = false; if (transfer) { transferLabel = null; transferJob = null }; publish() }
+            finally {
+                if (instructionSeal && !disposing) {
+                    instructionEditor.detach(); instructionEditor.resume(); semanticEditor.resumeAfterReplacement(); instructionEditor.refresh(); instructionFocus.revisionChanged()
+                }
+                busy = false; if (transfer) { transferLabel = null; transferJob = null }; publish()
+            }
         }
         if (transfer) transferJob = job.takeIf { it.isActive }
         return job
     }
 
+    private var captureOpenWork: Job? = null
+    private var failedCaptureOpen: ULong? = null
+    private var captureNavigationGeneration = 0L
+    private var navigationContactActive = false
+    override fun navigationContact(active: Boolean) {
+        if (navigationContactActive == active) return
+        navigationContactActive = active
+        captureNavigationGeneration++
+        instructionInteractionChanged()
+    }
+    private fun receivedCaptureIdle(ownInstructions: Boolean = false, ownSemantics: Boolean = false): Boolean = !disposing && !navigationContactActive && pending == 0 && gesture == null && strokes.isEmpty() &&
+        !ai.state.value.open && !instructionEditor.hasUnsaved() && (ownInstructions || !instructionEditor.state.value.busy) && (ownSemantics || !semanticEditor.state.value.busy) &&
+        !selections.state.value.active && !erasers.state.value.active &&
+        instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null)
+    internal fun canOpenReceivedCapture(): Boolean = !busy && captureOpenWork == null && receivedCaptureIdle()
+    internal fun autoOpenReceivedCapture(value: ReceivedCapture): Boolean =
+        screen == WorkbenchScreen.Canvas && failedCaptureOpen != value.createdHostSeq && canOpenReceivedCapture()
+
+    /** Prepare display bytes before changing any UI document. Both mutation and
+     * refresh owners are held, so an old snapshot cannot replace this document. */
+    internal fun openReceivedCapture(value: ReceivedCapture) {
+        if (!canOpenReceivedCapture() || !value.originalVerified || value.createdHostSeq == 0uL || captureArrivals.state.value != value) return
+        val current = project ?: return
+        val token = epoch
+        val navigation = captureNavigationGeneration
+        val enteredScreen = screen
+        busy = true
+        val nextWork = scope.launch(start = CoroutineStart.LAZY) {
+            try {
+                mutations.withLock {
+                    refreshMutex.withLock capture@{
+                        var sealed = false
+                        var staged: Bitmap? = null
+                        try {
+                            fun stillOwned() = !disposing && project === current && epoch == token &&
+                                captureNavigationGeneration == navigation && screen == enteredScreen && captureArrivals.state.value == value
+                            if (!stillOwned() || !receivedCaptureIdle() || !instructionEditor.sealIfClean()) return@capture
+                            sealed = true
+                            val latest = captureArrivalQuery(current, value.createdHostSeq - 1uL)
+                            if (latest == null || !latest.originalVerified || latest.createdHostSeq != value.createdHostSeq ||
+                                latest.sourceAssetId != value.sourceAssetId || latest.frameId != value.frameId ||
+                                latest.captureSessionId != value.captureSessionId || latest.geometryRevision != value.geometryRevision ||
+                                latest.binding.documentId != value.binding.documentId) {
+                                failedCaptureOpen = value.createdHostSeq; captureArrivals.changed(current, token); return@capture
+                            }
+                            val next = current.document(value.binding.documentId)
+                            val drawing = prepareEditorObjects(core, next.render.items)
+                            staged = captureDisplayBitmap(current.background(next.documentId, memoryBudgetBytes = 96uL * 1024uL * 1024uL, assumeUntaggedSrgb = false))
+                            val checked = current.info()
+                            if (!stillOwned() || !receivedCaptureIdle(ownInstructions = true) || checked.hostSeq != next.render.revision.hostSeq ||
+                                checked.stateHash != next.render.revision.stateHash) return@capture
+                            semanticEditor.detach(); instructionEditor.detach(); selections.detach(); erasers.detach(); retireAi()
+                            // Modal entry may run while the owners above settle.
+                            if (!stillOwned() || !receivedCaptureIdle(ownInstructions = true, ownSemantics = true)) return@capture
+                            cancelTool(); invalidateExport(); clearPeerObjects(); aiRetiring = false
+                            document = next; info = next.render.revision; objects = drawing; selected = null
+                            background = staged; staged = null; blockingMessage = null; needsColorConsent = false; colorAssumed = false
+                            screen = WorkbenchScreen.Canvas; cameraFitted = false; fit()
+                            captureArrivals.acknowledge(value); failedCaptureOpen = null
+                            message = "Received lossless capture. Its exact original is saved in this project."
+                            publish()
+                        } finally {
+                            staged?.recycle()
+                            withContext(NonCancellable) {
+                                if (sealed && !disposing) {
+                                    if (project === current && epoch == token) aiRetiring = false
+                                    instructionEditor.detach(); instructionEditor.resume(); semanticEditor.resumeAfterReplacement()
+                                    instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (_: Exception) {
+                failedCaptureOpen = value.createdHostSeq
+                message = "The capture original is saved, but display preparation failed or exceeded this phone's limit. The current document is unchanged. Open capture retries."
+            }
+        }
+        captureOpenWork = nextWork
+        nextWork.invokeOnCompletion {
+            // Includes cancellation before the coroutine body starts.
+            if (captureOpenWork === nextWork) { captureOpenWork = null; busy = false; publish() }
+        }
+        nextWork.start()
+    }
     private suspend fun closeCurrent() {
         withContext(NonCancellable) {
         exportReady = null
         exportPreflight = null; checkedExport = null
+        erasers.detach(); selections.detach()
+        instructionFocus.detach()
+        semanticEditor.detach()
+        instructionEditor.detach()
+        retireAi()
+        captureArrivals.detach(); failedCaptureOpen = null
         epoch++; refreshAdmission.reset()
         changesJob?.cancelAndJoin(); changesJob = null
         refreshQueue?.close(); refreshQueue = null
@@ -355,6 +598,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
 
     private fun observeProject(current: WorkbenchProject, token: Long) {
+        captureArrivals.bind(current, token, checkNotNull(info).hostSeq)
         val queue = Channel<Unit>(Channel.CONFLATED)
         refreshQueue = queue
         refreshJob = scope.launch {
@@ -370,6 +614,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 current.changes.collect { change ->
                     if (change.kind in setOf(ChangeKind.Committed, ChangeKind.Opened) && token == epoch && current === project && change.project.projectId == info?.projectId &&
                         refreshAdmission.observe(change.sequence)) {
+                        captureArrivals.changed(current, token)
+                        erasers.observe(change); selections.observe(change)
                         clearPeerObjects(); publish()
                         invalidateExport(); queue.trySend(Unit)
                     }
@@ -398,6 +644,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     val created = if (role.isHost) sessions.host(current, peer, endpoints) else sessions.connect(current, peer, endpoints)
                     if (disposing || project !== current) { withContext(NonCancellable) { created.close() }; return@withLock }
                     link = created; observeLink(created, current, epoch, ++linkEpoch)
+                    instructionFocus.attach(created)
                     message = if (role.isHost) "Listening for the paired computer on the selected phone address." else "Connecting to the paired computer."
                 }
             } catch (cancel: CancellationException) { throw cancel }
@@ -423,6 +670,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private fun observeLink(created: ProjectLink, current: WorkbenchProject, token: Long, generation: Long) {
         clearPeerObjects()
         connection = created.status(); lastViewport = null
+        agentCapture.attach(created)
         linkChanges = scope.launch {
             try {
                 created.changes.collect { status ->
@@ -430,6 +678,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     if (connection?.let { status.sequence <= it.sequence } == true) return@collect
                     val before = connection
                     connection = status
+                    agentCapture.connectionChanged(status)
                     if (before?.status != status.status || before?.carrier != status.carrier ||
                         status.status == SyncStatus.Reconnecting || status.status == SyncStatus.Offline) clearPeerObjects()
                     if (before?.status != status.status) lastViewport = null
@@ -453,7 +702,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     if (requested != null && connection?.status in setOf(SyncStatus.Syncing, SyncStatus.Synced)) {
                         val preview = created.peerPreviews(requested.documentId)
                         if (lastSequence != preview.sequence) {
-                            val drawing = withContext(Dispatchers.Default) { preview.items.map(EditorDrawing::objectPath) }
+                            val drawing = prepareEditorObjects(core, preview.items)
                             // A returned query belongs to both a visible revision and
                             // a connected status generation. Neither later OPS nor an
                             // offline/reconnect transition may resurrect its overlay.
@@ -481,6 +730,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
 
     private suspend fun detachLink() {
         withContext(NonCancellable) {
+        agentCapture.detach()
+        instructionFocus.detach()
         linkEpoch++; followPeer = false
         linkChanges?.cancelAndJoin(); linkChanges = null
         peerWorker?.cancelAndJoin(); peerWorker = null
@@ -586,21 +837,27 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         publish()
     }
     private fun publish() {
+        ai.changed()
         val doc = document ?: return
+        project?.let { selections.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera); erasers.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera) }
         if (camera.viewportWidth <= 1 || camera.viewportHeight <= 1) return
+        aiResults.request()
+        val resultFrame=aiFrame()
         val savedIds = objects.mapTo(HashSet()) { it.item.objectId }
-        val peerById = peerObjects.associateBy { it.item.objectId }
+        val admittedPeers=peerObjects.filter{aiAdmitResultPreview(doc,it.item)}
+        val peerById = admittedPeers.associateBy { it.item.objectId }
         // Existing objects keep their canonical stacking position. Local
         // transforms and erasures below still override the remote replacement.
         val visibleObjects = objects.map { peerById[it.item.objectId] ?: it }
         val localProvisional = (strokes.mapNotNull { it.drawing } + pendingPreviews.values).filter { it.item.objectId !in savedIds } + listOfNotNull(transientShape)
         val localIds = localProvisional.mapTo(HashSet()) { it.item.objectId }
-        val provisional = localProvisional + peerObjects.filter { it.item.objectId !in savedIds && it.item.objectId !in localIds }
+        val provisional = localProvisional + admittedPeers.filter { it.item.objectId !in savedIds && it.item.objectId !in localIds }
         val allTransforms = pendingTransforms.values.fold(emptyMap<String, Transform>()) { a, b -> a + b } + transformed
         val allErased = pendingErases.values.fold(emptySet<String>()) { a, b -> a + b } + erased
         val next = CanvasScene(++sceneRevision, doc, background, camera, core.cameraMatrix(camera), visibleObjects,
             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
-            connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty())
+            connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
+            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady())
         scene = next; canvasSink?.invoke(next)
         val viewport = PeerViewport(doc.documentId, core.mapPoints(camera, true, listOf(Point(0.0, 0.0),
             Point(camera.viewportWidth, 0.0), Point(camera.viewportWidth, camera.viewportHeight), Point(0.0, camera.viewportHeight))))
@@ -634,17 +891,25 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                                    val item: RenderItem? = null, val resizeAnchor: Point? = null,
                                    val previewId: String? = null, val link: ProjectLink? = null, var previewSequence: UInt = 0u,
                                    val revision: ProjectInfo? = null, val newObjectId: String? = null,
-                                   val createdAtMs: Long = System.currentTimeMillis())
+                                   val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false)
 
     override fun beginTool(sample: PenSample, capabilities: StylusCapabilities) {
+        if(ai.state.value.open||!aiResultReady())return
         cancelTool(); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
-        if (busy || blockingMessage != null || background == null || strokes.size >= 3) {
+        if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || background == null || strokes.size >= 3) {
             if (strokes.size >= 3) message = "The save queue is full. Wait for the current strokes to finish."
             return
         }
         val current = project ?: return
+        when (erasers.tools.route(sample.tool == PointerTool.Eraser)) {
+            EraserInputRoute.Selection -> { selectionPointer = selections.interaction.begin(Point(sample.x, sample.y), camera); return }
+            EraserInputRoute.Eraser -> { eraserPointer = erasers.interaction.begin(Point(sample.x, sample.y), camera, sample.tool == PointerTool.Eraser); return }
+            EraserInputRoute.Blocked -> return
+            EraserInputRoute.Editor -> Unit
+        }
         this.capabilities = capabilities; hoverPoint = null
-        val activeTool = if (sample.tool == PointerTool.Eraser) EditorTool.Eraser else tool
+        val activeTool = tool
+        if (activeTool == EditorTool.Eraser) return // all erasers use the guarded route above
         try {
             val layer = selectedLayer(); val brush = preferences.brush(activeTool); val first = toDocument(sample, camera)
             var run: StrokeRun? = null
@@ -676,10 +941,17 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 }
                 if (item == null) item = scene?.let { EditorDrawing.hit(it, Point(sample.x, sample.y), 8 * density)?.item }
                 selected = item?.objectId
+                instructionFocus.localSelection(selected)
+                if (item?.shape is Shape.Marker) item?.objectId?.let(instructionEditor::focusObject)
+            }
+            if (activeTool == EditorTool.Select && item?.shape is Shape.Guide) {
+                selected = item.objectId
+                message = "Use pixel selection tools to edit coverage; guides keep their source coordinates."
+                publish(); return
             }
             val newShape = activeTool in listOf(EditorTool.Line, EditorTool.Arrow, EditorTool.Rectangle, EditorTool.Ellipse)
             gesture = ToolGesture(activeTool, camera, first, Point(sample.x, sample.y), layer, brush, run, item, anchor,
-                if (item != null || newShape) newId() else null, link, revision = info, newObjectId = if (newShape) newId() else null)
+                if (item != null || newShape) newId() else null, link, revision = info, newObjectId = if (newShape || activeTool == EditorTool.Callout) newId() else null, semanticModifier = sample.buttons and android.view.MotionEvent.BUTTON_STYLUS_PRIMARY != 0)
             eraserLast = if (activeTool == EditorTool.Eraser) Point(sample.x, sample.y) else null
             if (activeTool == EditorTool.Text) {
                 val hit = scene?.let { EditorDrawing.hit(it, Point(sample.x, sample.y), 8 * density)?.item }
@@ -691,6 +963,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
 
     override fun extendTool(samples: List<PenSample>) {
+        if (eraserPointer) { samples.forEach { erasers.interaction.append(Point(it.x, it.y)) }; return }
+        if (selectionPointer) { samples.forEach { selections.interaction.append(Point(it.x, it.y)) }; return }
         val active = gesture ?: return
         if (samples.isEmpty()) return
         try {
@@ -701,6 +975,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             }
             val end = toDocument(samples.last(), active.camera)
             when (active.tool) {
+                EditorTool.Callout -> {
+                    active.semanticEnd = end
+                    transientShape = semanticDropBox(active.first, end, core.cameraMatrix(active.camera))?.let { previewShape(Shape.Rectangle(it), active) }
+                }
                 EditorTool.Line, EditorTool.Arrow, EditorTool.Rectangle, EditorTool.Ellipse -> {
                     val shape = shape(active.tool, active.first, end)
                     if (shape != null) {
@@ -717,6 +995,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         val next = Point(sample.x, sample.y)
                         erased = erased + EditorDrawing.eraseHits(snapshot.copy(hidden = erased), eraserLast ?: next, next,
                             max(4 * density, (active.brush.width * camera.scale / 2).toFloat()))
+                        // Numbered markers own linked instructions and numbering.
+                        // The explicit marker delete workflow must retire both.
+                        val markers = objects.filter { it.item.shape is Shape.Marker }.map { it.item.objectId }.toSet()
+                        if (erased.any { it in markers }) message = "Use Delete marker in Instructions to remove a numbered marker and its linked instruction."
+                        erased = erased - markers
                         eraserLast = next
                     }
                     require(erased.size <= 512) { "Erase at most 512 objects in one gesture; this unfinished erase was canceled." }
@@ -740,12 +1023,24 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
 
     override fun finishTool(samples: List<PenSample>) {
+        if (eraserPointer) { samples.forEach { erasers.interaction.append(Point(it.x, it.y)) }; eraserPointer = false; erasers.interaction.finish(); return }
+        if (selectionPointer) { samples.forEach { selections.interaction.append(Point(it.x, it.y)) }; selectionPointer = false; selections.interaction.finish(); return }
         val active = gesture ?: return
         extendTool(samples)
         if (gesture !== active) return
         gesture = null
         val run = active.stroke
         if (run != null) { run.finished = true; run.prediction = null; run.queue.close(); return }
+        if (active.tool == EditorTool.Callout) {
+            if (active.revision?.hostSeq == info?.hostSeq && active.revision?.stateHash == info?.stateHash) {
+                screen = WorkbenchScreen.Instructions
+                val end = active.semanticEnd
+                transientShape = null
+                val box = semanticDropBox(active.first, end, core.cameraMatrix(active.camera))
+                semanticEditor.place(active.first, ObjectStyle(EditorDrawing.rgba(active.brush.colorArgb), active.brush.width), core.cameraMatrix(active.camera), box, active.semanticModifier)
+            } else message = "The document changed. Place the marker again on the current revision."
+            publish(); return
+        }
         val commands = when (active.tool) {
             EditorTool.Line, EditorTool.Arrow, EditorTool.Rectangle, EditorTool.Ellipse -> transientShape?.let {
                 listOf(EditCommand.Create(it.item.objectId, active.layer.id, it.item.shape, it.item.style, it.item.transform))
@@ -762,6 +1057,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
 
     override fun cancelTool() {
+        eraserPointer = false; erasers.interaction.cancelGesture()
+        selectionPointer = false; selections.interaction.cancelGesture()
         gesture?.let { active -> finishRemotePreview(active.link, active.previewId, true) }
         gesture?.stroke?.let { run -> run.canceled.set(true); cancelNative(run.native); run.queue.close(); run.drawing = null }
         gesture = null; transientShape = null; erased = emptySet(); transformed = emptyMap(); eraserLast = null; publish()
@@ -906,13 +1203,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val ticket = refreshAdmission.capture()
         val doc = document ?: return
         val next = current.document(doc.documentId)
-        val drawing = withContext(Dispatchers.Default) { next.render.items.map(EditorDrawing::objectPath) }
+        val drawing = prepareEditorObjects(core, next.render.items)
         if (token != epoch || project !== current || disposing || !refreshAdmission.accepts(ticket)) return
         // The document and its own revision are one native snapshot. Host sequence
         // alone cannot order optimistic edits sharing the same accepted base.
         if (document?.render?.revision != next.render.revision) clearPeerObjects()
         info = next.render.revision
         document = next; objects = drawing
+        instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
         if (exportReady?.matches(info, document) != true) exportReady = null
         if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq) { exportPreflight = null; checkedExport = null }
         if (objects.none { it.item.objectId == selected }) selected = null
@@ -947,7 +1245,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val text = item.shape as? Shape.Text ?: return
         textDraft = TextDraft(item.objectId, text.anchor, text.text, text.font, text.size)
     }
-    fun deleteSelected() { selected?.let { edit(listOf(EditCommand.Delete(it))) }; showContext = false }
+    fun deleteSelected() {
+        selected?.let { id ->
+            if (objects.any { it.item.objectId == id && it.item.shape is Shape.Marker }) {
+                screen = WorkbenchScreen.Instructions; instructionEditor.deleteMarker(id)
+            } else edit(listOf(EditCommand.Delete(id)))
+        }
+        showContext = false
+    }
 
     override fun undo() = undoRedo(false)
     override fun redo() = undoRedo(true)
@@ -1162,6 +1467,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     override fun onCleared() {
         disposing = true
+        captureOwner.close()
         importReadiness.close()
         incomingJob?.cancel()
         transferJob?.cancel()
@@ -1177,7 +1483,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 // can miss a project returned while the ViewModel is clearing.
                 try {
                     incomingJob?.join()
-                    try { connectionJob?.cancelAndJoin(); mutations.withLock { closeCurrent() } }
+                    try { connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin(); mutations.withLock { closeCurrent() } }
                     finally {
                         try { pairing.close() }
                         finally {

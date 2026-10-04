@@ -1,0 +1,17 @@
+{
+  "name": "@visual-workbench/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": { "node": "24.21.0" },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.3.0",
+    "@modelcontextprotocol/core": "2.3.0",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1"
+  },
+  "devDependencies": { "@modelcontextprotocol/client": "2.3.0" },
+  "overrides": { "@modelcontextprotocol/core": "2.3.0" },
+  "scripts": { "test": "node --test test/*.test.mjs", "start": "node src/main.mjs" }
+}

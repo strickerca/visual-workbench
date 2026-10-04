@@ -21,7 +21,7 @@ private val streamSlots = Semaphore(4)
 
 /** Unlike a cancellable dispatcher return, this waits until the native producer
  * has released scratch handles before reporting cancellation to its caller. */
-private suspend fun <T> settledStream(release: suspend (T) -> Unit = {}, block: suspend (Cancellation) -> T): T {
+internal suspend fun <T> settledStream(release: suspend (T) -> Unit = {}, block: suspend (Cancellation) -> T): T {
     if (!streamSlots.tryAcquire()) throw CoreFailure(CoreFailureKind.Backpressure)
     try {
         val token = Cancellation()

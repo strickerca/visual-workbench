@@ -5,12 +5,59 @@ import com.visualworkbench.shared.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
 import org.junit.Assert.*
 import org.junit.Test
 import java.nio.file.Path
 import java.util.concurrent.Executors
+import java.util.ArrayDeque
+import kotlin.coroutines.CoroutineContext
 
 class DesktopCoherenceTest {
+    private class HeldDispatch(private val delegate: CoroutineDispatcher) : CoroutineDispatcher() {
+        private val lock = Any(); private val pending = ArrayDeque<Pair<CoroutineContext, Runnable>>(); private var held = false
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            val queue = synchronized(lock) { if (held) { pending.addLast(context to block); true } else false }
+            if (!queue) delegate.dispatch(context, block)
+        }
+        fun hold() { synchronized(lock) { check(!held); held = true } }
+        fun releaseOne() { val next = synchronized(lock) { check(held); pending.removeFirst() }; delegate.dispatch(next.first, next.second) }
+        fun releaseAll() { val jobs = synchronized(lock) { held = false; pending.toList().also { pending.clear() } }; jobs.forEach { delegate.dispatch(it.first, it.second) } }
+    }
+    @Test fun queuedProjectCloseRechecksAiSendAdmissionBeforeRetiringTheProject() {
+        Executors.newSingleThreadExecutor { r -> Thread(r, "vw-ai-close-test").apply { isDaemon = true } }.asCoroutineDispatcher().use { dispatcher ->
+            runBlocking(dispatcher) {
+                val held = HeldDispatch(dispatcher); val scope = CoroutineScope(coroutineContext + SupervisorJob() + held)
+                val f = ControllerFixture(scope); var closes = 0
+                try {
+                    withTimeout(10000) {
+                        f.start(); f.editor.instructionEditor.state.first { !it.busy }
+                        f.project.beforeClose = { closes++ }
+                        val before = checkNotNull(f.editor.state.value.document)
+                        held.hold()
+                        // Real controller admission passes before any Send; the
+                        // queued close cannot acquire its edit mutex yet.
+                        f.editor.closeProject(); assertFalse(f.editor.state.value.busy)
+                        val send = checkNotNull(f.editor.ai.send("never-sent-fixture", 0uL, false))
+                        assertTrue(f.editor.ai.needsDecision())
+                        assertEquals(AiStage.Sending, f.editor.ai.state.value.busy)
+                        held.releaseOne() // close runs; actual Send remains held.
+                        f.editor.state.first { !it.busy && it.message.orEmpty().contains("Save the paid Result") }
+                        assertEquals(before, f.editor.state.value.document); assertEquals(0, closes)
+                        assertFalse(send.isCompleted)
+                        // No request/credentials/provider exists in this fixture.
+                        // Its held Send later refuses, after the close decision.
+                        held.releaseAll(); send.join()
+                        f.editor.closeProject(); f.editor.state.first { !it.busy && it.document == null }
+                        assertEquals(1, closes)
+                    }
+                } finally {
+                    held.releaseAll()
+                    withContext(NonCancellable) { try { f.editor.close() } finally { scope.cancel() } }
+                }
+            }
+        }
+    }
     @Test fun focusedControlsAndDialogTextKeepOrdinaryKeys(){
         // Tab/Enter/arrows/letters are ordinary: controls own them before any
         // editor shortcut; dialogs own modified keys too (e.g. Ctrl+A in text).
@@ -291,7 +338,15 @@ private class ControllerFixture(val scope:CoroutineScope){
     },LocationPolicy(Path.of("fixture"),true,"fixture"),"owner")
     suspend fun start(){editor.viewport(100.0,100.0);editor.open(Path.of("fixture"));idle(7u);withTimeout(5000){editor.state.first{it.background!=null};project.changes.subscriptionCount.first{it>0}};ready();editor.select("object")}
     suspend fun idle(sequence:ULong){withTimeout(5000){editor.state.first{!it.busy&&it.document?.render?.revision?.hostSeq==sequence}}}
-    fun ready(){val state=editor.state.value;editor.canvasPrepared(checkNotNull(state.document).binding(state.projectEpoch))}
+    suspend fun ready(){
+        val state=withTimeout(5000){
+            combine(editor.state,editor.instructionEditor.state,editor.semanticEditor.state){view,instructions,semantics->
+                view.takeIf{!it.busy&&!instructions.busy&&!semantics.busy&&it.document!=null&&it.background!=null}
+            }.first{it!=null}
+        }
+        val current=checkNotNull(state)
+        editor.canvasPrepared(checkNotNull(current.document).binding(current.projectEpoch))
+    }
 }
 private fun fixture(block:suspend(ControllerFixture)->Unit){
     Executors.newSingleThreadExecutor{r->Thread(r,"vw-desktop-test").apply{isDaemon=true}}.asCoroutineDispatcher().use{dispatcher->

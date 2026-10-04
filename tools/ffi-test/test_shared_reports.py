@@ -24,6 +24,8 @@ class SharedReportsTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="vw-shared-report-fixture-")
         self.root = Path(self.temp.name)
+        for name in ("androidDeviceTest", "jvmTest", "commonTest"):
+            (self.root / "apps/shared/src" / name).mkdir(parents=True)
 
     def tearDown(self):
         self.temp.cleanup()
@@ -127,6 +129,11 @@ class SharedReportsTests(unittest.TestCase):
         fixture = self.root / "tools/ffi-test/fixtures/ffi-golden.properties"
         fixture.parent.mkdir(parents=True)
         fixture.write_text("state_hash=" + "a" * 64 + "\nexport_blake3=" + "b" * 64 + "\n")
+        inventory = self.root / "tools/ffi-test/android-inventory.json"
+        inventory.write_text(json.dumps({"schema": 1, "expected_tests": [list(reports.EXPECTED["android"])]}))
+        source = self.root / "apps/shared/src/androidDeviceTest/AndroidCoreSmokeTest.kt"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("package com.visualworkbench.shared\nclass AndroidCoreSmokeTest { @Test public fun rustGoldenAndBoundary() {} }")
         with patch.object(reports, "source_inventory", return_value={"fixture": "digest"}):
             state = reports.begin(self.root)
             for phase in reports.EXPECTED:
@@ -139,6 +146,54 @@ class SharedReportsTests(unittest.TestCase):
         self.assertEqual(result["golden"]["state_hash"], "a" * 64)
         self.assertEqual({p: x["actual_passed_tests"] for p, x in result["platforms"].items()}, {"android": 1, "desktop": 1})
         self.assertNotIn("private", json.dumps(result))
+
+    def test_golden_alone_cannot_stand_in_for_required_android_cases(self):
+        self.report(junit())
+        expected = reports.EXPECTED["android"]
+        with self.assertRaisesRegex(reports.Rejected, "required_case_inventory"):
+            reports.fresh_results(self.root, {}, 0, expected,
+                                  {expected, ("com.visualworkbench.shared.KeysTest", "encrypted")})
+
+    def test_android_source_census_refuses_added_test_or_skip(self):
+        inventory = self.root / "tools/ffi-test/android-inventory.json"
+        inventory.parent.mkdir(parents=True)
+        inventory.write_text(json.dumps({"schema": 1, "expected_tests": [list(reports.EXPECTED["android"])]}))
+        source = self.root / "apps/shared/src/androidDeviceTest/AndroidCoreSmokeTest.kt"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        text = "package com.visualworkbench.shared\nclass AndroidCoreSmokeTest { @Test public fun rustGoldenAndBoundary() {} }"
+        source.write_text(text)
+        self.assertEqual(reports.android_inventory(self.root), {reports.EXPECTED["android"]})
+        for changed in (text.replace("@Test", "@Ignore @Test"), text.replace(" {} }", " {} @Test fun added() {} }")):
+            source.write_text(changed)
+            with self.assertRaises(reports.Rejected):
+                reports.android_inventory(self.root)
+
+    def test_device_inventory_includes_jvm_and_common_cases_and_rejects_duplicates(self):
+        inventory = self.root / "tools/ffi-test/android-inventory.json"
+        inventory.parent.mkdir(parents=True)
+        cases = []
+        for source_set, name in (("androidDeviceTest", "DeviceTest"), ("jvmTest", "JvmTest"),
+                                 ("commonTest", "CommonTest")):
+            path = self.root / "apps/shared/src" / source_set / (name + ".kt")
+            path.write_text(f"package com.visualworkbench.shared\nclass {name} {{ @Test fun contract() {{}} }}")
+            cases.append(["com.visualworkbench.shared." + name, "contract"])
+        inventory.write_text(json.dumps({"schema": 1, "expected_tests": sorted(cases)}))
+        self.assertEqual(reports.android_inventory(self.root), set(map(tuple, cases)))
+        duplicate = self.root / "apps/shared/src/jvmTest/Duplicate.kt"
+        duplicate.write_text("package com.visualworkbench.shared\nclass CommonTest { @Test fun contract() {} }")
+        with self.assertRaisesRegex(reports.Rejected, "android_test_duplicate"):
+            reports.android_inventory(self.root)
+
+    def test_device_inventory_refuses_omitted_common_case(self):
+        inventory = self.root / "tools/ffi-test/android-inventory.json"
+        inventory.parent.mkdir(parents=True)
+        inventory.write_text(json.dumps({"schema": 1, "expected_tests": [list(reports.EXPECTED["android"])]}))
+        (self.root / "apps/shared/src/androidDeviceTest/AndroidCoreSmokeTest.kt").write_text(
+            "package com.visualworkbench.shared\nclass AndroidCoreSmokeTest { @Test fun rustGoldenAndBoundary() {} }")
+        (self.root / "apps/shared/src/commonTest/CommonTest.kt").write_text(
+            "package com.visualworkbench.shared\nclass CommonTest { @Test fun contract() {} }")
+        with self.assertRaisesRegex(reports.Rejected, "android_test_inventory_drift"):
+            reports.android_inventory(self.root)
 
     def test_apk_must_be_single_self_targeting_library_instrumentation(self):
         output = self.root / "apps/shared/build/outputs/apk/androidTest"

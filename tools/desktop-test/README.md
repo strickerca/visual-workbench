@@ -43,7 +43,8 @@ firewall rule or automatic permission approval is part of this candidate.
 
 ## Readiness and shutdown
 
-Only no arguments (ordinary launch) or exactly `--startup-smoke` are accepted.
+No arguments (ordinary launch), exactly `--startup-smoke`, exactly
+`--mcp-runtime-smoke`, or the bridge's exact `--mcp-minimized` request are accepted.
 Unknown and duplicate arguments fail before local/native initialization.
 Smoke mode uses the same packaged native-byte verification, core facade,
 host service, device identity, preferences, project-location selection,
@@ -56,6 +57,17 @@ cannot emit the success marker. The runner also requires exit code zero, both
 output streams closed, and an empty owned Windows Job. A missing frame/DPI
 query or stalled shutdown fails under the bounded deadline rather than being
 called a slow success.
+
+After building the app image, `pwsh -NoProfile -File tools/desktop-test/run.ps1
+-Execute -Mode mcp -TimeoutSeconds 180` exercises the same startup and frame
+checks plus the packaged MCP service. It refuses a duplicate application-owner
+claim, awaits actual bundled-runtime readiness, checks idempotent start, then
+stops, restarts and stops the service. The exact fourth marker is accepted only
+in MCP mode and only after both owned service instances have closed. No grants,
+capture, package publication, external client or Send is requested; those remain
+separate acceptance checks. The duplicate-owner check probes the actual lock
+from the running process; it is not a second-process launch test. The default
+`-Mode startup` still checks ordinary startup and shutdown without starting MCP.
 
 `main_to_drawn_frame_ms` starts inside JVM `main`, so it excludes launcher/JVM
 startup and is not a cold-start measurement. The process receipt separately
@@ -78,6 +90,8 @@ The bounded parser hashes source, build/lock/generator inputs, every packaged
 app-image file (including Java runtime and transitive native libraries), and
 each original native binary. It streams every packaged core/host/helper
 resource and compares exact size/SHA256 plus the runtime manifest. It checks
+every MCP resource against its complete manifest, so a packaging tool's omitted
+resource or an unlisted runtime file fails before application launch. It checks
 the main class and a confined launcher classpath/JVM-option allowlist. JAR
 central-directory bounds are checked before the ZIP library allocates its
 metadata. Unknown launch/environment overrides and stale build IDs fail.

@@ -24,6 +24,162 @@
       "license": "BSD-3-Clause",
       "source_url": "https://chromium.googlesource.com/libyuv/libyuv/+/aa6cedb39c87910b4c28e5c71c2121fc45fd234b/LICENSE?format=TEXT",
       "sha256": "2b2cc1180c7e6988328ad2033b04b80117419db9c4c584918bbb3cfec7e9364f"
+    },
+    {
+      "path": "notices/zstd-sys-2.1.0-LICENSE.txt",
+      "license": "BSD-3-Clause",
+      "source_url": "https://docs.rs/crate/zstd-sys/2.1.0+zstd.1.5.7/source/LICENSE",
+      "sha256": "ce4868c8e4ebe47a7d4b3c93dbf6b802033e5ae2fa7638098173f80836daac60"
+    },
+    {
+      "path": "notices/zstd-bindings-BSD-3-Clause.txt",
+      "license": "BSD-3-Clause",
+      "source_url": "https://docs.rs/crate/zstd-sys/2.1.0+zstd.1.5.7/source/LICENSE.BSD-3-Clause",
+      "sha256": "bf7017a73a95ea63bf3716b13ec2bcd79c92942356e3408c6fb66332bad6d977"
+    },
+    {
+      "path": "notices/zstd-1.5.7-LICENSE.txt",
+      "license": "BSD-3-Clause",
+      "source_url": "https://docs.rs/crate/zstd-sys/2.1.0+zstd.1.5.7/source/zstd/LICENSE",
+      "sha256": "7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8"
+    },
+    {
+      "path": "notices/rustls-platform-verifier-android-0.2.0-LICENSE-MIT.txt",
+      "license": "MIT",
+      "source_url": "https://raw.githubusercontent.com/rustls/rustls-platform-verifier/252e25161a91af476cbea620e29d277592d27ec7/LICENSE-MIT",
+      "sha256": "1c7cf76689c837a68ed8d704994e52a0f2940c087958f860d17f3186afbdcc0c"
+    },
+    {
+      "path": "notices/rustls-platform-verifier-android-0.2.0-LICENSE-APACHE.txt",
+      "license": "Apache-2.0",
+      "source_url": "https://raw.githubusercontent.com/rustls/rustls-platform-verifier/252e25161a91af476cbea620e29d277592d27ec7/LICENSE-APACHE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "notices/npm-modelcontextprotocol-client-2.3.0-LICENSE.txt",
+      "license": "Apache-2.0",
+      "source_url": "https://registry.npmjs.org/@modelcontextprotocol/client/-/client-2.3.0.tgz",
+      "sha256": "0382b0057770ca05e9c350a50aa3b1c1fea84da0bc81d723bf00b9aa841be58a"
+    },
+    {
+      "path": "notices/npm-modelcontextprotocol-core-2.3.0-LICENSE.txt",
+      "license": "Apache-2.0",
+      "source_url": "https://registry.npmjs.org/@modelcontextprotocol/core/-/core-2.3.0.tgz",
+      "sha256": "0382b0057770ca05e9c350a50aa3b1c1fea84da0bc81d723bf00b9aa841be58a"
+    },
+    {
+      "path": "notices/npm-modelcontextprotocol-server-2.3.0-LICENSE.txt",
+      "license": "Apache-2.0",
+      "source_url": "https://registry.npmjs.org/@modelcontextprotocol/server/-/server-2.3.0.tgz",
+      "sha256": "0382b0057770ca05e9c350a50aa3b1c1fea84da0bc81d723bf00b9aa841be58a"
+    },
+    {
+      "path": "notices/npm-ajv-8.17.1-LICENSE.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/ajv/-/ajv-8.17.1.tgz",
+      "sha256": "a05350a88e318e4f5f2c2a1ff1e2e88daa4dd38e6e78b71cccae422bdc762cc3"
+    },
+    {
+      "path": "notices/npm-ajv-formats-3.0.1-LICENSE.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/ajv-formats/-/ajv-formats-3.0.1.tgz",
+      "sha256": "9df3bb69929a3b650ed73b3bfa1756725aaff0ac296461605753547004eafeaf"
+    },
+    {
+      "path": "notices/npm-cross-spawn-7.0.6-LICENSE.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/cross-spawn/-/cross-spawn-7.0.6.tgz",
+      "sha256": "aaa78451b6fecd1b9c4594c796c133c0e90cad100372ff8bc6de615e9ef9adf1"
+    },
+    {
+      "path": "notices/npm-eventsource-3.0.7-LICENSE.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/eventsource/-/eventsource-3.0.7.tgz",
+      "sha256": "f683a72ffe6a9675b5507af22fe0f448d8c8de3da1e14f139d370a7e6a54a23e"
+    },
+    {
+      "path": "notices/npm-eventsource-parser-3.1.1-LICENSE.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/eventsource-parser/-/eventsource-parser-3.1.1.tgz",
+      "sha256": "835eb611a23301b27115ca1be9f754c876e643ceb7fe63049c6b50609a1cafeb"
+    },
+    {
+      "path": "notices/npm-fast-deep-equal-3.1.3-LICENSE.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz",
+      "sha256": "7bf9b2de73a6b356761c948d0e9eeb4be6c1270bd04c79cd489c1e400ffdfc1a"
+    },
+    {
+      "path": "notices/npm-fast-uri-3.1.8-LICENSE.txt",
+      "license": "BSD-3-Clause",
+      "source_url": "https://registry.npmjs.org/fast-uri/-/fast-uri-3.1.8.tgz",
+      "sha256": "b010b0dfdfdb23d7396e03b82cd4621fc9bb8f95d6b0aea70b9c24e12074c786"
+    },
+    {
+      "path": "notices/npm-isexe-2.0.0-LICENSE.txt",
+      "license": "ISC",
+      "source_url": "https://registry.npmjs.org/isexe/-/isexe-2.0.0.tgz",
+      "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b"
+    },
+    {
+      "path": "notices/npm-jose-6.2.12-LICENSE.md.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/jose/-/jose-6.2.12.tgz",
+      "sha256": "8078b0829d6c3e9ecde2f003e1966e4cad3efc6e7a640efbab0313cc166b1af1"
+    },
+    {
+      "path": "notices/npm-json-schema-traverse-1.0.0-LICENSE.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/json-schema-traverse/-/json-schema-traverse-1.0.0.tgz",
+      "sha256": "7bf9b2de73a6b356761c948d0e9eeb4be6c1270bd04c79cd489c1e400ffdfc1a"
+    },
+    {
+      "path": "notices/npm-path-key-3.1.1-license.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/path-key/-/path-key-3.1.1.tgz",
+      "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0"
+    },
+    {
+      "path": "notices/npm-pkce-challenge-5.0.1-LICENSE.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/pkce-challenge/-/pkce-challenge-5.0.1.tgz",
+      "sha256": "feb87a2e0c305de3464cc44077da5393c52d8ca6362d37427157d04ec6f4510d"
+    },
+    {
+      "path": "notices/npm-require-from-string-2.0.2-license.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/require-from-string/-/require-from-string-2.0.2.tgz",
+      "sha256": "6ee0feb1f6ef996ff5a68600f8cf98909cf412d39ef3cdceaefd87d636fa1b7f"
+    },
+    {
+      "path": "notices/npm-shebang-command-2.0.0-license.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/shebang-command/-/shebang-command-2.0.0.tgz",
+      "sha256": "69dee148a2cc470554dfa7142e830662062394d0fe67cddd379aba90dc60d6b3"
+    },
+    {
+      "path": "notices/npm-shebang-regex-3.0.0-license.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/shebang-regex/-/shebang-regex-3.0.0.tgz",
+      "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0"
+    },
+    {
+      "path": "notices/npm-which-2.0.2-LICENSE.txt",
+      "license": "ISC",
+      "source_url": "https://registry.npmjs.org/which/-/which-2.0.2.tgz",
+      "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b"
+    },
+    {
+      "path": "notices/npm-zod-4.6.5-LICENSE.txt",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/zod/-/zod-4.6.5.tgz",
+      "sha256": "3f1189b28e3866e0d979968d466b78f813f76827cfdca1fbb124cc0a5c8841f8"
+    },
+    {
+      "path": "notices/Node-24.21.0-LICENSE.txt",
+      "license": "MIT",
+      "source_url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-win-x64.zip",
+      "sha256": "ed34dd8e3f0a78dbaf00d0444ce8e285b015b765379c2e17880455f70370f8e9"
     }
   ]
 }

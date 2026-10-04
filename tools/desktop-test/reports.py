@@ -22,16 +22,21 @@ MAX_FILES = 4096
 MAX_TOTAL = 4 * 1024**3
 MAX_FILE = 1024**3
 MAX_JSON = 8 * 1024**2
-NATIVES = ("vw-connection-helper.exe", "vw_core.dll", "vw_host.dll")
+NATIVES = ("vw-capture-helper.exe", "vw-connection-helper.exe", "vw_core.dll", "vw_host.dll")
 INPUTS = (*NATIVES, "vw-bindgen.exe")
 BEGIN = ".local/desktop-test-build-start.json"
 BUILT = ".local/desktop-test-build.json"
 NONCE_RESOURCE = "vw-desktop-build.id"
+MCP_MANIFEST = "vw-mcp-server.sha256"
+MCP_REQUIRED = frozenset(("vw-mcp-host.exe", "vw-mcp-package.exe", "vw-codex-host.exe", "node.exe",
+    "mcp/src/main.mjs", "mcp/codex/main.mjs", "mcp/codex/client.mjs", "mcp/codex/package.mjs",
+    "mcp/codex/process.mjs", "mcp/codex/schema.mjs", "mcp/codex/schema-worker.mjs", "mcp/codex/image-profiles.json"))
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 NONCE = re.compile(r"[0-9a-f]{32}\Z")
 READY = re.compile(r"VW_DESKTOP_READY startup_ms=([0-9]{1,8}) composeDensity=([0-9]+(?:\.[0-9]+)?) pmv2=true\Z")
 FRAME = re.compile(r"VW_DESKTOP_SMOKE_FRAME window_dpi=([0-9]{1,4}) window_pmv2=true drawn=true\Z")
 EXIT = "VW_DESKTOP_EXIT startup_smoke=true cleanup=complete"
+MCP = "VW_DESKTOP_MCP cycles=2 duplicate_owner=refused grants=0 sends=0 cleanup=complete"
 
 
 class Rejected(ValueError):
@@ -157,11 +162,12 @@ def environment_ok(environment: dict | None = None) -> None:
 def sources(root: Path) -> dict:
     required = ("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "deny.toml", ".cargo/config.toml",
                 "build.ps1", "tools/process.psm1", "tools/check_setup.py", "tools/enter-dev.ps1",
+                "tools/mcp-build.ps1", "tools/check_npm_licenses.py", "tools/stage_mcp_runtime.py", "third_party/LICENSES",
                 "apps/gradlew.bat", "apps/build.gradle.kts", "apps/settings.gradle.kts", "apps/gradle.properties")
     selected = {root / p for p in required}
     for tree in ("core/crates", "host-win/crates", "contracts", "apps/desktop/src", "apps/shared/src",
                  "apps/gradle", "apps/bindings-core", "apps/bindings-host", "tools/desktop-test",
-                 "tools/ffi-test", "third_party/notices"):
+                 "tools/ffi-test", "third_party/notices", "mcp", "tools/licenses"):
         selected.update(files(root / tree, source=True))
     # License and dependency graph inputs include every configured app module.
     for path in files(root / "apps", source=True):
@@ -189,8 +195,9 @@ def jar_admission(path: Path) -> None:
 
 def packaged_resources(directory: Path, native: dict, nonce: str) -> None:
     expected = {"win32-x86-64/" + name: native[name] for name in NATIVES}
-    markers = {NONCE_RESOURCE, "vw-native-runtime.sha256", "com/visualworkbench/desktop/MainKt.class"}
+    markers = {NONCE_RESOURCE, "vw-native-runtime.sha256", "com/visualworkbench/desktop/MainKt.class", MCP_MANIFEST}
     seen = set()
+    mcp_files, mcp_bytes, mcp_manifest = {}, 0, None
     jars = sorted((directory / "app").glob("*.jar"))
     require(1 <= len(jars) <= 256, "jar_count")
     for jar in jars:
@@ -201,14 +208,21 @@ def packaged_resources(directory: Path, native: dict, nonce: str) -> None:
             for entry in archive.infolist():
                 require(entry.filename not in names, "jar_duplicate")
                 names.add(entry.filename)
-                if entry.filename not in expected and entry.filename not in markers:
+                mcp_file = entry.filename.startswith("mcp-server/") and not entry.is_dir()
+                if entry.filename not in expected and entry.filename not in markers and not mcp_file:
                     continue
                 require(entry.filename not in seen and not entry.flag_bits & 1, "resource_duplicate")
                 seen.add(entry.filename)
                 limit = expected.get(entry.filename, {}).get("bytes", 4096)
-                if entry.filename.endswith("MainKt.class"):
+                if entry.filename.endswith("MainKt.class") or entry.filename == MCP_MANIFEST:
                     limit = 4 * 1024**2
-                require(0 < entry.file_size <= limit, "resource_size")
+                if mcp_file:
+                    require(len(mcp_files) < 20000, "mcp_resource_count")
+                    relative_name(entry.filename.removeprefix("mcp-server/"))
+                    limit = 256 * 1024**2
+                    mcp_bytes += entry.file_size
+                    require(mcp_bytes <= 1024**3, "mcp_resource_bytes")
+                require((0 if mcp_file else 1) <= entry.file_size <= limit, "resource_size")
                 sha = hashlib.sha256()
                 count = 0
                 body = bytearray()
@@ -217,7 +231,7 @@ def packaged_resources(directory: Path, native: dict, nonce: str) -> None:
                         count += len(chunk)
                         require(count <= limit, "resource_size")
                         sha.update(chunk)
-                        if entry.filename in (NONCE_RESOURCE, "vw-native-runtime.sha256"):
+                        if entry.filename in (NONCE_RESOURCE, "vw-native-runtime.sha256", MCP_MANIFEST):
                             body.extend(chunk)
                 require(count == entry.file_size, "resource_size")
                 if entry.filename in expected:
@@ -227,7 +241,24 @@ def packaged_resources(directory: Path, native: dict, nonce: str) -> None:
                 elif entry.filename == "vw-native-runtime.sha256":
                     wanted = "".join(f"{native[n]['sha256']} {native[n]['bytes']} {n}\n" for n in sorted(NATIVES))
                     require(body == wanted.encode("ascii"), "native_manifest_binding")
-    require(seen == set(expected) | markers, "packaged_resources_missing")
+                elif entry.filename == MCP_MANIFEST:
+                    mcp_manifest = bytes(body)
+                elif mcp_file:
+                    mcp_files[entry.filename.removeprefix("mcp-server/")] = {"bytes": count, "sha256": sha.hexdigest()}
+    require(seen == set(expected) | markers | {"mcp-server/" + name for name in mcp_files}, "packaged_resources_missing")
+    require(mcp_manifest is not None and all(b == 10 or 32 <= b < 127 for b in mcp_manifest), "mcp_manifest")
+    declared, case_names = {}, set()
+    for line in mcp_manifest.decode("ascii").splitlines():
+        parts = line.split(" ", 2)
+        require(len(parts) == 3 and HASH.fullmatch(parts[0]) is not None and
+                re.fullmatch(r"0|[1-9][0-9]{0,9}", parts[1]) is not None, "mcp_manifest")
+        sha, size, name = parts[0], int(parts[1]), parts[2]
+        relative_name(name)
+        require(len(declared) < 20000 and size <= 256 * 1024**2 and name.lower() not in case_names,
+                "mcp_manifest")
+        case_names.add(name.lower())
+        declared[name] = {"bytes": size, "sha256": sha}
+    require(MCP_REQUIRED <= declared.keys() and declared == mcp_files, "mcp_resource_binding")
 
 
 def launcher_config(directory: Path, inventory: dict) -> None:
@@ -336,13 +367,21 @@ def check(root: Path) -> dict:
     return built
 
 
-def startup(text: str) -> dict:
+def startup(text: str, mode: str = "startup") -> dict:
+    require(mode in ("startup", "mcp"), "startup_mode")
     require(len(text.encode("utf-8")) <= 1024**2 and "\0" not in text, "startup_output_size")
     markers = [line for line in text.splitlines() if "VW_DESKTOP_" in line]
-    require(len(markers) == 3, "startup_marker_count")
+    require(len(markers) == (4 if mode == "mcp" else 3), "startup_marker_count")
     ready = READY.fullmatch(markers[0])
     frame = FRAME.fullmatch(markers[1])
-    require(ready is not None and frame is not None and markers[2] == EXIT, "startup_marker_order")
+    require(ready is not None and frame is not None and markers[-1] == EXIT, "startup_marker_order")
+    if mode == "mcp":
+        failure = re.fullmatch(r"VW_DESKTOP_MCP failed=true stage=([a-z_]+)", markers[2])
+        if failure and failure[1] in {"unknown", "bundle_parents", "bundle_manifest", "bundle_extract",
+                "bundle_markers", "bundle_inventory", "bundle_verify", "service_root", "catalog", "inbox",
+                "capture_helper", "host_ready", "coordinator"}:
+            raise Rejected("mcp_" + failure[1])
+        require(markers[2] == MCP, "mcp_lifecycle")
     elapsed = int(ready[1])
     density = float(ready[2])
     dpi = int(frame[1])
@@ -351,7 +390,9 @@ def startup(text: str) -> dict:
     return {"main_to_drawn_frame_ms": elapsed, "compose_density": density, "window_dpi": dpi,
             "process_pmv2": True, "window_pmv2": True, "compose_draw_returned": True,
             "ordinary_quit_cleanup": True, "cold_start_or_performance_acceptance": False,
-            "visual_acceptance": False}
+            "visual_acceptance": False, "mcp_lifecycle_checked": mode == "mcp",
+            "mcp_service_cycles": 2 if mode == "mcp" else 0,
+            "external_client_or_send_acceptance": False}
 
 
 def process_receipt(value: dict) -> dict:
@@ -377,6 +418,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--log", type=Path)
     parser.add_argument("--process", type=Path)
+    parser.add_argument("--mode", choices=("startup", "mcp"), default="startup")
     args = parser.parse_args()
     try:
         root = plain(args.root, True)
@@ -396,7 +438,7 @@ def main() -> int:
             built = check(root)
             plain(args.log)
             require(args.log.stat().st_size <= 1024**2, "startup_output_size")
-            observation = startup(args.log.read_text(encoding="utf-8-sig"))
+            observation = startup(args.log.read_text(encoding="utf-8-sig"), args.mode)
             run = process_receipt(bounded_json(args.process))
             save(args.output, {"schema": 1, "status": "passed", "kind": "desktop-startup", "build": built,
                               "observation": observation, "process": run, "ordinary_local_initialization": True,

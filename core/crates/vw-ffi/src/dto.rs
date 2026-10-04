@@ -238,6 +238,7 @@ pub enum DrawShape {
     },
     Result {
         asset_id: String,
+        result_id: String,
     },
     Adjustment,
 }

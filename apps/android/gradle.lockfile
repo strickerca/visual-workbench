@@ -138,4 +138,5 @@ org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.7.3=debugRuntimeClasspath
 org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3=debugRuntimeClasspath,releaseRuntimeClasspath
 org.jetbrains:annotations:23.0.0=debugRuntimeClasspath,releaseRuntimeClasspath
 org.jspecify:jspecify:1.0.0=debugRuntimeClasspath,releaseRuntimeClasspath
+org.rustls:rustls-platform-verifier:0.2.0=debugRuntimeClasspath,releaseRuntimeClasspath
 empty=

@@ -25,6 +25,11 @@ android {
         ndk { abiFilters += "arm64-v8a" }
     }
     buildFeatures { compose = true }
+    buildTypes {
+        getByName("release") {
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
     packaging {
         jniLibs.useLegacyPackaging = false
         // Preserve the independently built core bytes for the APK binding check.
@@ -47,6 +52,7 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.6.2")
     implementation("androidx.camera:camera-view:1.6.2")
     implementation("com.google.zxing:core:3.5.4")
+    testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test:core:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")

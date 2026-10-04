@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="workbench_capture_label">Visual Workbench capture</string>
+    <string name="workbench_capture_description">Only when you choose Capture, Visual Workbench reads a screenshot and the current screen\'s accessibility information for your local project. Ordinary accessibility events are ignored. You can disable this optional service at any time.</string>
+</resources>

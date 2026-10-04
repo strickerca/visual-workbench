@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-shared', 'test-apps', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'build-desktop-distribution', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-editor', 'lint-editor', 'test-shared', 'test-apps', 'test-mcp', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'build-desktop-distribution', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
     [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'pairing', 'shared-ffi', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
@@ -14,6 +14,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
 Import-Module (Join-Path $projectRoot 'tools\process.psm1') -Force
+. (Join-Path $projectRoot 'tools/mcp-build.ps1')
 
 function Run-Step {
     param([string]$Phase, [string]$Executable, [string[]]$Arguments, [string]$Directory = $projectRoot, [int]$Limit = $TimeoutSeconds, [int]$ExitGraceSeconds = 5)
@@ -35,6 +36,7 @@ function Run-Gradle {
 
 function Run-LicenseGate {
     Run-Step 'license-offline-policy' 'python.exe' @('tools/check_setup.py', 'all')
+    Run-Step 'license-npm-policy' 'python.exe' @('tools/check_npm_licenses.py')
     $version = Invoke-VwProcess -FilePath 'cargo.exe' -ArgumentList @('+1.99.0', 'deny', '--version') -WorkingDirectory $projectRoot -Phase 'license-cargo-deny-version' -TimeoutSeconds 30 -Capture
     if ($version.ExitCode -ne 0 -or ($version.Lines -join "`n") -notmatch '\b0\.20\.2\b') { throw 'cargo-deny must match the pinned version 0.20.2' }
     Run-Cargo 'license-rust' @('deny', 'check', 'licenses', 'sources', 'bans')
@@ -42,7 +44,7 @@ function Run-LicenseGate {
 }
 
 function Build-NativeWindows {
-    Run-Cargo 'build-native-windows' @('build', '--locked', '-p', 'vw-ffi', '-p', 'vw-host-ffi', '--features', 'vw-ffi/bindgen,vw-ffi/fixtures')
+    Run-Cargo 'build-native-windows' @('build', '--locked', '-p', 'vw-ffi', '-p', 'vw-host-ffi', '-p', 'vw-capture', '--features', 'vw-ffi/bindgen,vw-ffi/fixtures')
 }
 
 function Build-NativeAndroid {
@@ -54,6 +56,13 @@ try {
     switch ($Command) {
         'doctor' { Run-Step 'doctor' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/doctor.ps1', '-Strict') }
         'license-check' { Run-LicenseGate }
+        { $_ -in @('test-editor','lint-editor') } {
+            Run-LicenseGate
+            $editorPackages = @('-p','vw-mask','-p','vw-ai','-p','vw-ai-provider','-p','vw-instructions','-p','vw-semantics','-p','vw-package','-p','vw-ink','-p','vw-ops','-p','vw-ffi','-p','vw-ai-platform','-p','vw-raster','-p','vw-net','-p','vw-capture','-p','vw-codec-os','-p','vw-host-ffi','-p','vw-mcp-native')
+            if ($Command -eq 'test-editor') { Run-Cargo 'test-editor-native' (@('test','--locked','--no-fail-fast') + $editorPackages + @('--features','vw-ffi/fixtures','--','--test-threads=2')) }
+            Run-Cargo 'lint-editor-native' (@('clippy','--locked','--keep-going') + $editorPackages + @('--all-targets','--features','vw-ffi/fixtures','--','-D','warnings'))
+            Run-Cargo 'format-editor-native' (@('fmt') + $editorPackages + @('--','--check'))
+        }
         'build-raster' {
             Run-LicenseGate
             Run-Cargo 'build-raster' @('build', '--locked', '-p', 'vw-raster', '--all-targets')
@@ -102,8 +111,9 @@ try {
         'test-shared' {
             Run-Gradle 'test-shared-kotlin' @(':shared:desktopTest')
         }
+        'test-mcp' { Run-LicenseGate; Test-McpRuntime }
         'test-apps' {
-            Run-Gradle 'test-apps-kotlin' @(':shared:desktopTest', ':desktop:test', ':android:testDebugUnitTest')
+            Run-Gradle 'test-apps-kotlin' @(':shared:desktopTest', ':desktop:test', ':android:testDebugUnitTest', '--continue')
         }
         'build-ai' {
             Run-LicenseGate
@@ -154,9 +164,12 @@ try {
             if ($desktopBuild.nonce -cnotmatch '^[0-9a-f]{32}$') { throw 'Desktop build receipt refused' }
             Run-LicenseGate
             Build-NativeWindows
+            $mcpResources = Build-McpServerResources $desktopBuild.nonce
             Run-Gradle 'build-desktop-distribution' @(':desktop:createDistributable',
                 ('-PvwNativeDir=' + (Join-Path $projectRoot 'target/debug')),
+                ('-PvwMcpServerResources=' + $mcpResources),
                 '-PvwDesktopSmokeConsole=true', ('-PvwDesktopBuildId=' + $desktopBuild.nonce))
+            Complete-McpApplicationImage $desktopBuild.nonce
             Run-Step 'desktop-build-record' 'python.exe' @('tools/desktop-test/reports.py','record','--root',$projectRoot)
         }
         'build-video-pc' {
@@ -191,7 +204,10 @@ try {
         'test-all' {
             Run-Step 'test-ai-verifier' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/ai-spike/tests', '-p', 'test_*.py', '-v')
             Run-Step 'test-tools' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/tests', '-v')
+            Run-Step 'test-desktop-reports' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/desktop-test', '-p', 'test_reports.py', '-v')
+            Test-McpRuntime
             Run-Step 'test-device-selection' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/device-selection-fixtures.ps1')
+            Run-Step 'test-app-device-scope' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/app-hil-device-fixtures.ps1')
             Run-Step 'test-store-crash-receipt' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/store-crash-receipt-fixtures.ps1')
             Run-Cargo 'test-rust' @('test', '--workspace', '--exclude', 'vw-sim', '--locked', '--', '--test-threads=2')
             # Run the complete 10,000-seed simulator in its measured optimized
@@ -215,6 +231,7 @@ try {
                 . (Join-Path $projectRoot 'tools/enter-dev.ps1')
                 Run-Step 'test-app-hil-reports' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/app-test', '-p', 'test_*.py', '-v') -Limit 120
                 Run-Step 'test-app-hil-staging' 'pwsh.exe' @('-NoProfile', '-File', 'tools/app-test/test_stage.ps1') -Limit 60
+                Run-Step 'test-app-device-scope' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/app-hil-device-fixtures.ps1') -Limit 60
                 Run-Step 'test-app-hil-native-inventory' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/ffi-test', '-p', 'test_apk.py', '-v') -Limit 120
             }
             if ($HilMode -eq 'shared-ffi') {

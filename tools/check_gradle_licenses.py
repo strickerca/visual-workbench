@@ -41,6 +41,48 @@ EXPECTED_CONFIGURATIONS = frozenset({
     ":image-bench:debugRuntimeClasspath", ":image-bench:releaseRuntimeClasspath",
     ":stroke-spike:debugRuntimeClasspath", ":stroke-spike:releaseRuntimeClasspath",
 })
+REPOSITORY = pathlib.Path(__file__).resolve().parents[1]
+
+
+def reviewed_artifact_licenses(key: str, module: dict, directory: pathlib.Path) -> list[dict]:
+    """Use reviewed upstream notices only for an exact POM and resolved artifact.
+
+    This supplements an omitted Maven license block, never overrides one. New
+    coordinates, bytes or notices need an explicit source-controlled review.
+    The ordinary SPDX allowlist still applies to the returned declaration.
+    """
+    policy = json.loads((REPOSITORY / "tools/licenses/reviewed-maven.json").read_text(encoding="utf-8"))
+    if policy.get("schema") != 1 or not isinstance(policy.get("artifacts"), list):
+        raise ValueError("Invalid reviewed Maven artifact policy")
+    keys = [row.get("coordinate") for row in policy["artifacts"]]
+    if len(keys) != len(set(keys)):
+        raise ValueError("Duplicate reviewed Maven coordinates")
+    row = next((row for row in policy["artifacts"] if row["coordinate"] == key), None)
+    if row is None:
+        return []
+    if module.get("pomSha256") != row["pom_sha256"]:
+        raise ValueError(f"Reviewed Maven POM changed: {key}")
+    relative = "artifacts/" + hashlib.sha256(key.encode()).hexdigest() + "." + row["extension"]
+    if module.get("reviewedArtifactPath") != relative:
+        raise ValueError(f"Reviewed Maven artifact path is missing or unbound: {key}")
+    root = directory.resolve(strict=True)
+    artifact = (root / relative).resolve(strict=True)
+    if not artifact.is_relative_to(root) or not artifact.is_file():
+        raise ValueError(f"Reviewed Maven artifact escaped its report: {key}")
+    if artifact.stat().st_size != row["bytes"] or artifact.stat().st_size > 16 * 1024 * 1024:
+        raise ValueError(f"Reviewed Maven artifact size changed: {key}")
+    if hashlib.sha256(artifact.read_bytes()).hexdigest() != row["sha256"]:
+        raise ValueError(f"Reviewed Maven artifact changed: {key}")
+    notices = row["notices"]
+    if not isinstance(notices, list) or not notices:
+        raise ValueError(f"Reviewed Maven notices are missing: {key}")
+    for notice in notices:
+        path = (REPOSITORY / notice["path"]).resolve(strict=True)
+        if not path.is_relative_to((REPOSITORY / "third_party/notices").resolve(strict=True)) or not path.is_file():
+            raise ValueError(f"Reviewed Maven notice path escaped: {key}")
+        if hashlib.sha256(path.read_bytes()).hexdigest() != notice["sha256"]:
+            raise ValueError(f"Reviewed Maven notice changed: {key}")
+    return [{"spdxLicense": row["selected_license"], "moduleLicenseUrl": row["license_source_url"]}]
 
 
 def read_pom_report(report: object, directory: pathlib.Path) -> dict:
@@ -166,7 +208,13 @@ def read_pom_report(report: object, directory: pathlib.Path) -> dict:
             referenced_parents.add(parent_key)
             licenses, declared_parent = parents[parent_key]
             license_source = parent_key
-        annotated.append({**module, "moduleLicenses": licenses, "licenseSourcePom": license_source})
+        reviewed = False
+        if not licenses and declared_parent is None:
+            licenses = reviewed_artifact_licenses(key, module, report_directory)
+            reviewed = bool(licenses)
+        annotated.append({**module, "moduleLicenses": licenses,
+                          "licenseSourcePom": None if reviewed else license_source,
+                          "licenseSourceReviewedArtifact": key if reviewed else None})
     if seen != expected:
         raise ValueError("Application graph and copied POM metadata census do not match")
     if referenced_parents != set(parents):

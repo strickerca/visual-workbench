@@ -48,6 +48,18 @@ internal class ProjectRepository(context: Context, val core: WorkbenchCore) {
         return first.toULong()
     }
 
+    /** Reserve the largest admitted instruction transaction without reusing a
+     * counter when a remote/optimistic revision advanced the local minimum. */
+    fun instructionLamport(minimum: ULong, count: Int = 1024): ULong {
+        require(count in 1..1024 && minimum <= Long.MAX_VALUE.toULong())
+        while (true) {
+            val observed = next.get()
+            val first = maxOf(observed, minimum.toLong())
+            check(first > 0 && first <= reservedUntil - count) { "Reopen the app to reserve another operation counter range" }
+            if (next.compareAndSet(observed, first + count)) return first.toULong()
+        }
+    }
+
     suspend fun list(): List<LocalProject> = withContext(Dispatchers.IO) {
         root.listFiles()?.filter { it.isDirectory && it.name.matches(Regex("[0-9a-fA-F-]{36}")) && File(it, "project.sqlite").isFile }
             ?.sortedByDescending { it.lastModified() }?.take(1024)?.mapNotNull { folder ->

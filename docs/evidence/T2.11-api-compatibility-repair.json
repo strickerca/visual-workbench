@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "date": "2026-10-03",
+  "source_manifest_sha256": "40bdbbf5c0a9d0c8ea9770c89649dae8bd55d8c7d51ae7f205e571f4c33aec1d",
+  "files": [
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/capture/CaptureService.kt",
+      "before_sha256": "4e00cd278e229f5ab79313e6b561bf26c56f3e36f1469a9e3b17e9a90bc26aee",
+      "after_sha256": "adf06eb08371aa328030a79f9326a3eed056cafab904503f143bdd0dde2948dc"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/instructions/OnDeviceDictation.kt",
+      "before_sha256": "71079b04f87e2de8256aca2e59e5bd7fc9f635279f1bc62e056cf98aac9bcade",
+      "after_sha256": "bbd2cb0706097b236b29ea261a17a8a8628843414013683fa9462b9454084fa3"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/capture/CaptureEntrypoints.kt",
+      "before_sha256": "e2eb1e51a8bc5bbb74e20d1752b7184675450111e2b34f5fbc1c15698d2ea6ae",
+      "after_sha256": "4e8ddeed298c18d3ef5d32c3f385bcc7860cd73578bd94adbd5686bf34fcd7a1"
+    }
+  ],
+  "validation": {
+    "lint": {
+      "log": "phase2-final-s23-lint-all-d734a2318a114926bffa26d367168ea4.log",
+      "log_sha256": "0e0e12cd69988734d6f4fe26d8f06baa2ac3820eb3c4052f2f5d7cddab54003d",
+      "metadata_sha256": "3f1d3b5a3cc91fdbd2c558ea4ed8315cfd15500325257710b88e6dc2d4fb6f8d",
+      "exit_code": 0,
+      "elapsed_seconds": 338.472,
+      "sampled_peak_tree_working_set_bytes": 3313147904,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "survivors_before_cleanup_count": 0,
+      "survivors_before_cleanup_names": [],
+      "compiler_telemetry_cleaned": false,
+      "pre_cleanup_survivor_classification": "none"
+    },
+    "jvm": {
+      "log": "phase2-final-s23-test-apps-25e3eaa5ec85413784aa22cc9c6c2aca.log",
+      "log_sha256": "7a874703beb18fe7bafa0c91b07567bce98f5b8ceff404a55ac5176af91150c4",
+      "metadata_sha256": "87b18cd3d44d8076759399ade76a979e649ff46ca28de2d466cc6d61aba27890",
+      "exit_code": 0,
+      "elapsed_seconds": 218.788,
+      "sampled_peak_tree_working_set_bytes": 2881331200,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "survivors_before_cleanup_count": 0,
+      "survivors_before_cleanup_names": [],
+      "compiler_telemetry_cleaned": false,
+      "pre_cleanup_survivor_classification": "none"
+    },
+    "s23_app_receipt_sha256": "1998e31777fe33e6a35144c81a07ce6afcf9accc98bc5c490b5c848d091b4a06"
+  },
+  "minimum_android_api_changed": false,
+  "cloud_speech_fallback_added": false,
+  "new_api_warnings_suppressed": false,
+  "verification_images_created": 0
+}

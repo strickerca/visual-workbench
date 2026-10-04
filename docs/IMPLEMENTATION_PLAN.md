@@ -15,6 +15,11 @@ Revision 2026-10-01. Companion to BUILD_SPECIFICATION.md v2.0 and REQUIREMENTS.j
 
 **Requirement status.** A task that delivers only part of a requirement sets it to `in_progress` / `partial` and names the open clauses and the task that closes them. Only the last task that lists a requirement may set it to `passed`, and that task is always in the requirement's own phase. Each phase's acceptance task may correct the status of any requirement up to its phase, including setting `passed` when its own run verifies every clause. A P2 or P3 requirement Christian defers in a dated DECISIONS.md entry (`impl_status` deferred, `verify_status` not_applicable) does not block its scenarios. Every gate task depends, directly or through other tasks, on the last listing task of each requirement its scenarios check. `tools/check_plan_coverage.py` checks all of this.
 
+**Owner Phase 4 scope update, 2026-10-03:** prioritize the free Krita/Paint
+remote-edit milestone M4-KP described below and in D20. Expanded Phase 4 features
+are deferred until the owner resumes them. This supersedes blanket continuation
+for those deferred features; retain original requirements and pending full gates.
+
 ## Owner actions (things only Christian can do)
 
 **Owner continuation update, 2026-10-02:** continue implementation through the
@@ -26,6 +31,17 @@ dependency, finalize a decision, pass a gate or relax a target. Keep per-task
 results and open clauses explicit. S23/S Pen comparisons, owner preferences,
 external credentials and manual acceptance remain separate outstanding work.
 Use isolated worktrees for independent tasks and serialize builds/device runs.
+
+**Owner continuation update, 2026-10-03:** the S23 Ultra is connected again.
+Select SM-S918U explicitly for applicable tests and delivery; preserve other apps
+and profiles. The previous IN2019 authorization remains available when separately
+selected. Continue every software phase without slice pauses, using Sol 6.1
+(`gpt-6.1-sol`) / `xhigh`, which overrides the recommendation tables below.
+Verify actual executor settings and report any existing-session mismatch.
+Publish validated phase software checkpoints under the standing Git policy while
+keeping hardware, provider, installed-client and owner acceptance gaps explicit.
+Continuous implementation is authorized despite those pending gate dependencies;
+publication and proceeding with software do not pass a product gate.
 
 | When | Action |
 |---|---|
@@ -49,7 +65,7 @@ Use isolated worktrees for independent tasks and serialize builds/device runs.
 | T1.11 | Make sure Claude desktop and ChatGPT desktop are installed and signed in. Run the Claude Code paste test in your own terminal. Expect your clipboard to be replaced during the tests. |
 | T1.12 | Do the manual scenario steps (about 20 minutes) and approve the firewall rule for the installed app. Use the build for a day, then reopen the session (`claude --continue`) and report back. |
 | Phase 2 | Start Claude Code with `claude --dangerously-load-development-channels server:vw` for push tests; keep Codex current; enable the Visual Workbench accessibility service on the phone (and allow restricted settings if Android asks); in your own Compose apps' debug builds, enable `testTagsAsResourceId`. |
-| Phase 4 | Install Photoshop 27.9.1 if you want Photoshop support (Creative Cloud); install Affinity (free). |
+| Phase 4 first milestone | Use the free Krita website installer and existing Microsoft Paint. Perform S23 pressure/feel and target-change tests; no Photoshop, other-editor or driver installation is required. See D20. |
 | Phase 5 | Create and safely store the Android release signing key. Before any distribution: code-signing certificates (Authenticode; EV for driver attestation). |
 
 ## Repository layout
@@ -148,7 +164,7 @@ for repeated merge/push approval.
 | 1 | Markup core: daily use | 2.5–3.5 weeks | G1 | A01, A02, A06 | — |
 | 2 | Your two first wins (W1 GPT Image, W2 app screens) | 2–3 weeks | G2 | A13, A21, A22, A23, A24, A26, A29 | A06 |
 | 3 | Precision, capture, sync | 3–4 weeks | G3 | A03, A04, A05, A07, A10, A11, A12, A14, A25 | A01, A02, A21 |
-| 4 | Remote pen editing and virtual monitor | 3–4 weeks | G4 | A08, A15, A16, A17, A27 | A14 |
+| 4 | Krita + Paint first milestone; expanded scope deferred (D20) | Re-estimate after dependency review | M4-KP checkpoint; full G4 pending | Focused A08/A27 checks on harness, Krita and Paint | Disconnect/reconnect safety; full A14 later |
 | 5 | Verification, Android tunnel, release | 2–3 weeks | G5 | A09, A18, A19, A20, A28, A30 | A10, A15, A21, A24, plus every scenario once on the release build |
 
 ### Recommended Codex settings
@@ -161,7 +177,7 @@ For maximum quality, Astra 6 leads every phase and Sol 6.1 handles the bounded t
 | 1 — Markup core | Astra 6 (`gpt-6-astra`) | `max` | Establish deterministic geometry, transactions, crash recovery, pairing, and synchronization. |
 | 2 — Image editing and agent handoff | Astra 6 (`gpt-6-astra`) | `xhigh` | Integrate semantic capture, image providers, instruction packages, and agent interfaces. |
 | 3 — Precision, capture, sync | Astra 6 (`gpt-6-astra`) | `max` | Handle frame identity, coordinate correctness, giant images, redaction, and offline conflicts. |
-| 4 — Remote pen and virtual monitor | Astra 6 (`gpt-6-astra`) | `max` | Coordinate native input guards, video feedback, driver lifecycle, and editor behavior. |
+| 4 — Krita + Paint first milestone | Sol 6.1 (`gpt-6.1-sol`) | `xhigh` | Current owner executor choice; integrate streaming, guarded input and focused editor behavior. Driver and other-editor work is deferred. |
 | 5 — Verification and release | Astra 6 (`gpt-6-astra`) | `xhigh` | Complete remaining integrations and assemble release evidence across the product. |
 
 ### Task model and effort exceptions
@@ -174,10 +190,10 @@ Every task inherits its phase default unless listed below. Sol means `gpt-6.1-so
 | 1 | **Sol / xhigh:** T1.08b Android editing tools and layout. **Astra / xhigh:** T1.09 desktop shell, T1.11 import/export integration. |
 | 2 | **Sol / xhigh:** T2.04 markers and instruction UI. **Sol / high:** T2.05 voice and handwriting entry. **Astra / max:** T2.03 crop-and-stitch proof, T2.06 semantic capture, T2.08 package compiler, T2.09 MCP server, T2.11 acceptance. |
 | 3 | **Sol / xhigh:** T3.05 additional selection tools and tilt. **Astra / xhigh:** T3.01 capture picker, T3.03 loupe, T3.06 assisted selection, T3.07 document editing controls, T3.10 additional formats and color. |
-| 4 | **Astra / xhigh:** T4.02 lossless text tiles, T4.07 editor compatibility and Krita bridge, T4.08 shortcut destinations. |
+| 4 | **Sol / xhigh:** active T4.01, T4.03, T4.04, T4.07 (Krita/Paint remote input only), T4.08 (essential controls only), and the M4-KP checkpoint. Deferred tasks are retained below for traceability. |
 | 5 | **Sol / xhigh:** T5.02 additional image adapters, T5.04 Air Actions. **Astra / max:** T5.01 verification loop, T5.06 release packaging, T5.07 full acceptance. |
 
-The assignments resolve all 66 tasks: 35 Astra/max, 21 Astra/xhigh, 7 Sol/xhigh, and 3 Sol/high. Every phase gate receives Astra/max.
+The original recommendation assignments covered all 66 tasks. The owner executor update overrides those recommendations with Sol/xhigh; D20 narrows active Phase 4 work. Verify actual session settings and report mismatches. Retained task IDs do not authorize deferred work.
 
 Higher effort is assigned to unresolved contracts involving dropped delta updates, unreliable offline clocks, integer bounds in storage, package-path validation, proof enforcement, and stale remote input. It still requires validation and does not establish hardware acceptance.
 
@@ -515,6 +531,9 @@ Prompts are written after G1. Tasks and acceptance are fixed now.
 | T2.10 Push adapters, fallbacks, staging | M | T2.09 | AGENT-002, AGENT-003, AGENT-004, EXPORT-005, EXPORT-007, EXPORT-009, EXPORT-010, PEN-012 | Claude Code channel (the stdio bridge is the channel server); Codex App Server push with a runtime schema check; two-step clipboard and drag; transfer shelf; large-file fallback; nothing sends without explicit action. |
 | T2.11 Phase 2 acceptance | S | T2.01–T2.10 | (verification of the above) | A13, A21, A22, A23, A24, A26, A29 on real apps, plus the A06 re-run → Gate G2. |
 
+
+- **Phase 2 software checkpoint, 2026-10-03:** T2.01–T2.11 source is integrated. Aggregate validation passes 776 Rust and 339 JVM cases plus all 10,000 simulation seeds; the separate 50 MP PNG16 export lane and 154/154 isolated S23 cases pass. Final lint/licenses, exact-hash normal S23 delivery and fresh packaged MCP startup/shutdown pass. CAPTURE-001 paired capture now appends to the retained journal and existing OPS/BLOB link; the earlier replacement defect and validation failures remain documented. `docs/evidence/T2.11.md` and its public text receipts retain counts, hashes, cleanup and limits. G0/G1/G2 and all 46 Phase 2 requirement acceptance statuses remain partial/pending; real apps, providers, physical inputs and owner scenarios were not substituted by software fixtures. Automatically publish this validated software checkpoint under the owner's Git policy. The owner directly confirmed D20's Krita/Paint milestone; prioritize T3.01 capture/DPI (M), necessary transport/frame/input lifecycle components and active T4.01/T4.03/T4.04/T4.07/T4.08 work using gpt-6.1-sol/xhigh, without slice pauses. Preserve broader Phase 3 candidates and deferred Phase 4 scope; this checkpoint does not start Phase 5 or pass M4-KP.
+
 ## Phase 3 — Precision, capture, sync
 
 | Task | Size | Depends on | Requirements | Deliverables and acceptance |
@@ -532,19 +551,86 @@ Prompts are written after G1. Tasks and acceptance are fixed now.
 | T3.11 Offline rebase, conflict review, carrier switching, phone AI sends | L | T2.11 | SYNC-002, SYNC-003, PERF-007, AIEDIT-007 | Rebase at scale and the conflict review-and-swap UI per §4.4; USB ↔ Wi-Fi switching ≤ 2 s; the W1 loop from the phone alone; A14, A25. |
 | T3.12 Phase 3 acceptance | S | T3.01–T3.11 | (verification) | A03, A04, A05, A07, A10, A11, A12, A14, A25, plus the A01, A02 and A21 re-runs → Gate G3. |
 
-## Phase 4 — Remote pen editing and virtual monitor
+## Phase 4 — First milestone: remote pen editing in Krita and Paint
+
+**Owner-approved scope, 2026-10-03 (D20):** deliver one usable Windows/Android
+remote-edit product with two free editor targets: Krita and Microsoft Paint.
+Krita is the primary pressure-sensitive drawing target; Paint supports basic
+remote drawing and shortcuts, with its installed-version pressure behavior
+measured and documented. Use an existing physical Windows display and one
+validated USB carrier first. No paid editor, AI API, cloud service, custom editor
+plugin or virtual-display driver is needed for this milestone.
+
+**Execution priority:** review the necessary capture, physical-pixel/DPI mapping,
+paired transport, frame identity, input ownership and lifecycle dependencies;
+then T4.01 -> T4.03 -> T4.04 -> the Krita/Paint subset of T4.07 -> the essential
+controls subset of T4.08 -> milestone checkpoint M4-KP. T4.07 and T4.08 may be
+implemented independently after guarded input is integrated; serialize heavy
+builds and device/editor input tests. Continue using the recorded Sol/xhigh
+executor choice, verifying actual settings rather than changing them.
+
+The original full-task dependencies below remain the dependency graph for G4.
+For M4-KP, record an evidence-backed dependency checklist and validate the exact
+shared components it uses. The owner's existing software-progression exception
+allows work while hardware-only evidence is pending; it does not waive failed
+required software or hardware checks for declaring the milestone usable.
+Unrelated PDF/SVG, giant-image, additional-format or paid-provider work is not a
+new M4-KP prerequisite. Preserve existing earlier-phase work and open gates.
+
+### Milestone acceptance and delivery (M4-KP)
+
+1. Installable Android APK and Windows app image, artifact hashes, third-party
+   notices and a short setup guide. Open Krita or Paint, connect the S23, select
+   the target window, explicitly grant control, draw, erase, navigate, undo/redo
+   and save through the editor. Confirm a practical owner drawing session.
+2. T4.01 keeps the existing HEVC target of at least 30 fps and PERF-003's USB
+   pen-to-host-to-phone latency of at most 80 ms p95. Measure on the S23; record
+   actual carrier/codec/version and retained failures. No silent fallback or
+   performance relaxation; ghost ink must also meet PERF-001.
+3. Harness pressure correlation at least 0.95; visibly pressure-sensitive Krita
+   strokes using Windows 8+ Pointer Input. Record hover, conditional tilt, eraser,
+   barrel button and shortcut results per tool/version. Paint pressure remains a
+   measured compatibility result; basic Paint drawing must work without it.
+4. Zero stray events in 100 target-change trials, no freeze on pen contact, and
+   visible grant/pause state on both devices. Check expiry/revoke, move, resize,
+   minimize, focus switch, higher-integrity refusal, phone backgrounding and link
+   loss. Disconnect/reconnect invalidates the input session, releases held input
+   and delivers zero stale events; control requires a fresh valid grant.
+5. Local ghost ink fades using acknowledged input sequences and expires within
+   500 ms. Verify focused A08/A27 behavior in the harness and Krita, plus Paint
+   drawing/control. Essential palettes name the destination and offer undo/redo,
+   brush/eraser, brush size and canvas navigation with tested editor shortcuts.
+6. Record affected software/lint/license checks, hardware measurements, editor
+   compatibility and remaining gaps in text evidence. Keep verification images
+   outside Git and dispose of them after inspection. A compiling APK or a
+   passing harness alone does not pass M4-KP.
+
+M4-KP is a focused usable-build checkpoint, not full G4 or G5 acceptance. The
+full carrier-switch A14 re-run, A15/A16 Photoshop, A17 virtual monitor and broader
+editor acceptance remain deferred. Do not report those scenarios as passed or
+use M4-KP to satisfy the original T4.09 dependency of Phase 5 automatically.
+Minimal milestone packaging is independent of the full T5.06 release bundle;
+public distribution signing/certificates remain separate, with no purchase or
+security-setting change required for this personal milestone.
+
+### Retained tasks and deferred scope
+
+**Do not automatically start deferred work after M4-KP.** Report the usable build
+and remaining gaps; additional Phase 4 scope resumes only on a later owner
+instruction. The same deferral applies to repeat editor installations or spikes
+in earlier tasks when they exist solely to support deferred Phase 4 features.
 
 | Task | Size | Depends on | Requirements | Deliverables and acceptance |
 |---|---|---|---|---|
-| T4.01 HEVC streaming pipeline | L | T3.12, T0.07 | STREAM-002, PERF-003 | WGC → Quick Sync HEVC low-latency → MEDIA → MediaCodec low-latency → SurfaceView; ≥ 30 fps; frames report last_input_seq_applied; PERF-003 measured. |
-| T4.02 Lossless text tiles | M | T4.01 | STREAM-003 | Dirty-region lossless refinement after 500 ms idle; decoded static regions hash-equal to source. |
-| T4.03 Injection, guards, control grant | L | T4.01, T0.05 | TUNNEL-004, TUNNEL-006, TUNNEL-008, SEC-002, CAPTURE-005 | Pen/mouse/keyboard injection with the §4.11 tilt conversion; per-batch guards; control-grant state machine; 0 stray events in 100 trials; no stale input after reconnects or carrier switches; A08. |
-| T4.04 Ghost ink | M | T4.03 | GHOST-001, GHOST-002 | Local echo overlay with input-sequence fade rules; A27. |
-| T4.05 Virtual monitor integration | L | T0.08, T4.01 | DISPLAY-001, DISPLAY-002, DISPLAY-003, DISPLAY-004 | Signed SudoVDA install/uninstall in the app; modes; negative-origin and rotated mapping on hardware; watchdog recovery; A17. |
-| T4.06 Photoshop: drawing, dual view, UXP bridge | L | T4.03, T4.05, owner installs Photoshop | ADOBE-001, ADOBE-005, ADOBE-006, ADOBE-007, ADOBE-008 | Pressure in Photoshop 27.9.1; New Window on the virtual display; UXP plugin via UPIA; pixel/selection/layer commands with explicit IDs; A15, A16. |
-| T4.07 Free and web editors; Krita bridge; compatibility matrix | M | T4.03 | EDITOR-001, EDITOR-002, EDITOR-003, EDITOR-004, ADOBE-002, ADOBE-003, ADOBE-004, LIC-004 | Krita, GIMP, Affinity, Photopea, Paint (and Illustrator only if installed) tested; Krita GPL bridge in `bridges/krita`; matrix in `docs/compat/`. |
-| T4.08 Shortcut palettes and command destinations | S | T4.03 | EDITOR-005, TUNNEL-009 | Visible command destination; app-aware undo/redo; per-editor palettes. |
-| T4.09 Phase 4 acceptance | S | T4.01–T4.08 | (verification) | A08, A15, A16, A17, A27, plus the A14 re-run → Gate G4. |
+| T4.01 HEVC streaming pipeline (active) | L | T3.12, T0.07 | STREAM-002, PERF-003 | WGC -> Quick Sync HEVC low-latency -> MEDIA -> MediaCodec low-latency -> SurfaceView; at least 30 fps; frames report last_input_seq_applied; PERF-003 measured on the S23. |
+| T4.02 Lossless text tiles (deferred) | M | T4.01 | STREAM-003 | Retained for a later owner-selected milestone: lossless refinement after 500 ms idle; decoded static regions hash-equal to source. Reconsider if preview text/fine-detail quality needs improvement. |
+| T4.03 Injection, guards, control grant (active) | L | T4.01, T0.05 | TUNNEL-004, TUNNEL-006, TUNNEL-008, SEC-002, CAPTURE-005 | Pen/mouse/keyboard injection with conditional tilt conversion; per-batch guards; control grant and lifecycle cleanup; 0 stray events in 100 trials; no stale input after disconnect/reconnect. Full carrier-switch coverage remains required for full G4. |
+| T4.04 Ghost ink (active) | M | T4.03 | GHOST-001, GHOST-002 | Local echo overlay with input-sequence fade rules; focused A27 in harness/Krita, and Paint behavior recorded. |
+| T4.05 Virtual monitor integration (deferred) | L | T0.08, T4.01 | DISPLAY-001, DISPLAY-002, DISPLAY-003, DISPLAY-004 | Retain signed driver install/uninstall, display modes, negative-origin/rotated mapping, watchdog recovery and A17 for a later milestone. Existing physical-display capture remains active. |
+| T4.06 Photoshop: drawing, dual view, UXP bridge (deferred) | L | T4.03, T4.05, owner installs Photoshop | ADOBE-001, ADOBE-005, ADOBE-006, ADOBE-007 | Photoshop drawing, New Window on a virtual display, UXP pixel/selection/layer commands and A15/A16 are deferred. No paid Adobe installation or subscription is part of M4-KP. |
+| T4.07 Krita and Paint compatibility; other editors and bridge deferred | M | T4.03 | EDITOR-001, EDITOR-002, EDITOR-003, EDITOR-004, ADOBE-002, ADOBE-003, ADOBE-004, ADOBE-008, LIC-004 | Active: Krita remote pen using Windows 8+ Pointer Input, Paint drawing/control, per-version/tool compatibility records and honest layered/multiview limits. Deferred: Krita pixel/layer GPL plugin, GIMP, Affinity, Photopea/other web editors, Illustrator and plugin packaging. EDITOR-001 stays partial if only its pen clause is verified. |
+| T4.08 Essential Krita/Paint controls; broader palettes deferred | S | T4.03 | EDITOR-005, TUNNEL-009 | Active: visible command destination, correct undo/redo, brush/eraser, brush size and canvas navigation for Krita/Paint. Other editor palettes and their acceptance are deferred; preserve full requirement clauses and report partial coverage. |
+| T4.09 Full Phase 4 acceptance (deferred) | S | T4.01–T4.08 | (verification) | Original full G4 remains pending: A08, A15, A16, A17, A27 and A14 re-run. Deliver and assess M4-KP separately using the focused checklist above; do not erase or relabel full-gate acceptance. |
 
 ## Phase 5 — Verification, Android tunnel, release
 

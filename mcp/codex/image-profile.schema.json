@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Build-owned Codex image preprocessing receipts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "profiles"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "profiles": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "binarySha256",
+          "schemaSha256",
+          "model",
+          "detail",
+          "maxDimension",
+          "patchSize",
+          "maxPatches",
+          "verifiedAtMs",
+          "expiresAtMs",
+          "evidenceSha256"
+        ],
+        "properties": {
+          "version": {
+            "const": 1
+          },
+          "binarySha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "schemaSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "detail": {
+            "enum": [
+              "high",
+              "original",
+              "omitted"
+            ]
+          },
+          "maxDimension": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16384
+          },
+          "patchSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1024
+          },
+          "maxPatches": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "verifiedAtMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expiresAtMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "evidenceSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  }
+}

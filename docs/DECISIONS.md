@@ -241,3 +241,47 @@ deferred and applicable OnePlus testing continues. Final D6/D7/D9/D10/D11/D15
 confirmation, physical/manual acceptance and gate approval retain their recorded
 boundaries. The missing thermal method reconciliation is work to complete before
 collecting a baseline, not permission to relabel 30-second samples as 1 Hz data.
+
+## D20 — Phase 4 first usable milestone: Krita and Paint
+
+- **Date:** 2026-10-03.
+- **Status:** owner-approved scope decision; implementation and acceptance pending.
+- **Authorization:** the owner selected the recommended first milestone using
+  Krita and Paint and explicitly asked to change the plan to defer the rest.
+- **Decision:** M4-KP delivers the existing-display remote-edit workflow on
+  Windows and the S23 Ultra with the free Krita website download and installed
+  Microsoft Paint. Active slices are T4.01, T4.03, T4.04, the remote-input and
+  compatibility subset of T4.07, and the essential-controls subset of T4.08,
+  followed by focused hardware acceptance and personal-use packaging.
+- **Dependencies:** validate the capture, coordinate/DPI, transport, frame/input
+  identity and lifecycle components used by M4-KP. Retain the original full-gate
+  dependency graph. Unrelated earlier-phase feature completion is not a new
+  milestone dependency, and existing work/evidence is preserved.
+- **Deferred:** T4.02 lossless text tiles; T4.05 virtual monitor/driver; T4.06
+  Photoshop/UXP/dual view; the Krita pixel/layer plugin and GPL bridge package;
+  GIMP, Affinity, Photopea/other web editors and Illustrator integrations;
+  broader editor shortcut palettes; expanded carrier-switch acceptance and the
+  original full T4.09/G4 acceptance. Resume deferred work only on a later owner
+  instruction. No paid editor, API, service or new certificate purchase is needed
+  for the first personal-use milestone.
+- **Requirement accounting:** fully deferred Phase 4 IDs are STREAM-003,
+  DISPLAY-001 through DISPLAY-004, ADOBE-001, ADOBE-002, ADOBE-005 through
+  ADOBE-007, EDITOR-002 through EDITOR-004 and LIC-004. Their ledger statuses are
+  deferred/not_applicable for M4-KP; their IDs, original priorities, phases,
+  acceptance and existing evidence remain intact. ADOBE-001 is P1: this explicit
+  owner scope decision defers it for the milestone, not a passed full-release
+  gate. EDITOR-001, EDITOR-005 and TUNNEL-009 retain both included and deferred
+  clauses in milestone_scope and cannot pass in full from subset testing.
+- **Acceptance:** keep existing 30 fps, PERF-001/PERF-003, pressure-correlation,
+  100-trial input guards, grant expiry and ghost-fade targets. Krita must show
+  pressure-sensitive strokes; Paint must support basic drawing/control, and its
+  pressure support is measured per version/tool. Backgrounding/reconnect must
+  release held input, invalidate old sessions and require a valid fresh grant.
+- **Gate boundary:** M4-KP is a usable-build checkpoint. G0–G5 and their original
+  scenarios are not passed by this decision; Phase 5 does not automatically gain
+  a completed T4.09 dependency. Full-release signing and distribution remain
+  separate. Requirements are retained, not deleted or silently weakened.
+- **Sources:** [free Krita downloads](https://krita.org/en/download/) and
+  [Windows Pointer Input settings](https://docs.krita.org/en/reference_manual/preferences/tablet_settings.html).
+  Synthetic Windows pen compatibility still requires our end-to-end tests.
+- **Execution guidance:** [Phase 4 milestone and acceptance](IMPLEMENTATION_PLAN.md#phase-4--first-milestone-remote-pen-editing-in-krita-and-paint).

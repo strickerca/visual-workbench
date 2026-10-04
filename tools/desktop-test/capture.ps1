@@ -1,7 +1,8 @@
 #requires -Version 7.2
 [CmdletBinding()]
 param([Parameter(Mandatory)][string]$ProjectRoot,[Parameter(Mandatory)][string]$PrivateDirectory,
-    [Parameter(Mandatory)][string]$RunId,[ValidateRange(15,300)][int]$TimeoutSeconds=90)
+    [Parameter(Mandatory)][string]$RunId,[ValidateRange(15,300)][int]$TimeoutSeconds=90,
+    [ValidateSet('startup','mcp')][string]$Mode='startup')
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $result=$null
@@ -21,7 +22,8 @@ try {
     Import-Module (Join-Path $ProjectRoot 'tools/process.psm1')
     Import-Module (Join-Path $PSScriptRoot 'capture.psm1')
     $launcher=Join-Path $ProjectRoot 'apps/desktop/build/compose/binaries/main/app/VisualWorkbenchDev/VisualWorkbenchDev.exe'
-    $result=Invoke-VwBoundedDesktopChild -Executable $launcher -Arguments @('--startup-smoke') -WorkingDirectory $ProjectRoot -TimeoutSeconds $TimeoutSeconds
+    $launchArgument=if($Mode -eq 'mcp'){'--mcp-runtime-smoke'}else{'--startup-smoke'}
+    $result=Invoke-VwBoundedDesktopChild -Executable $launcher -Arguments @($launchArgument) -WorkingDirectory $ProjectRoot -TimeoutSeconds $TimeoutSeconds
     function Save-Bytes([string]$Name,[byte[]]$Value){
         if($Name -notin @('startup.txt','process.json') -or $Value.Length -gt 1MB){throw 'Capture output refused.'}
         $stream=[IO.File]::Open((Join-Path $PrivateDirectory $Name),[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)

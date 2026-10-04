@@ -39,7 +39,7 @@ compose.desktop {
 val runtimeRepository = rootProject.projectDir.parentFile
 val runtimeNativeDirectory = providers.gradleProperty("vwNativeDir").map { file(it) }.orElse(runtimeRepository.resolve("target/debug"))
 val packageConnectionRuntime = tasks.register("packageConnectionRuntime") {
-    val nativeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe")
+    val nativeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
     inputs.files(nativeNames.map { name -> runtimeNativeDirectory.map { it.resolve(name) } })
     val output = layout.buildDirectory.dir("generated/connectionRuntimeResources")
     outputs.dir(output)
@@ -56,6 +56,7 @@ val packageConnectionRuntime = tasks.register("packageConnectionRuntime") {
         directory.mkdirs()
         directory.resolve("win32-x86-64").mkdirs()
         runtimeNativeDirectory.get().resolve("vw-connection-helper.exe").copyTo(directory.resolve("win32-x86-64/vw-connection-helper.exe"), overwrite = true)
+        runtimeNativeDirectory.get().resolve("vw-capture-helper.exe").copyTo(directory.resolve("win32-x86-64/vw-capture-helper.exe"), overwrite = true)
         directory.resolve("vw-native-runtime.sha256").writeText(records.joinToString("\n", postfix = "\n"), Charsets.US_ASCII)
     }
 }
@@ -80,3 +81,26 @@ val packageDesktopBuildReceipt = tasks.register("packageDesktopBuildReceipt") {
     }
 }
 sourceSets.named("main") { resources.srcDir(packageDesktopBuildReceipt) }
+
+// MCP server resources are produced offline from a bounded staged production
+// runtime BEFORE the application JAR; the final bridge is built AFTER jpackage.
+// This property is an explicit build-owner input, never a runtime override.
+val mcpServerResources = providers.gradleProperty("vwMcpServerResources").map { file(it) }
+val admitMcpServerResources = tasks.register("admitMcpServerResources") {
+    inputs.property("enabled", mcpServerResources.isPresent)
+    if (mcpServerResources.isPresent) inputs.dir(mcpServerResources)
+    doLast {
+        if (mcpServerResources.isPresent) {
+            val folder = mcpServerResources.get()
+            check(folder.isDirectory && folder.canonicalFile == folder.absoluteFile.normalize()) { "MCP resources require a canonical private generated directory" }
+            val manifest = folder.resolve("vw-mcp-server.sha256")
+            check(manifest.isFile && manifest.length() in 1..(4L * 1024 * 1024)) { "Missing generated MCP server inventory" }
+            check(folder.resolve("mcp-server").isDirectory) { "Missing generated MCP server payload" }
+            // Runtime admission verifies every byte and rejects unlisted files.
+            // Packaging must not add arbitrary classpath resources from this path.
+            check(folder.listFiles()!!.map { it.name }.toSet() == setOf("mcp-server", "vw-mcp-server.sha256")) { "Unexpected MCP resource roots" }
+        }
+    }
+}
+if (mcpServerResources.isPresent) sourceSets.named("main") { resources.srcDir(mcpServerResources) }
+tasks.named("processResources") { dependsOn(admitMcpServerResources) }

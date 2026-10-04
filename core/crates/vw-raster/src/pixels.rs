@@ -351,7 +351,7 @@ pub(crate) fn gray_alpha<T: Copy>(p: &[T]) -> Vec<T> {
         .flat_map(|p| [p[0], p[3]])
         .collect()
 }
-pub(crate) fn standard_srgb_profile() -> Result<Vec<u8>, RasterError> {
+pub fn standard_srgb_profile() -> Result<Vec<u8>, RasterError> {
     let mut bytes = moxcms::ColorProfile::new_srgb()
         .encode()
         .map_err(|_| RasterError::Color)?;

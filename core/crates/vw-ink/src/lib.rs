@@ -11,6 +11,7 @@
 
 mod brush;
 mod builder;
+pub mod eraser;
 mod geometry;
 
 pub use brush::{Brush, BrushFamily, PressureCurve, Sample};

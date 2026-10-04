@@ -60,7 +60,13 @@ pub(crate) fn item_bytes(item: &RenderItem) -> Result<usize> {
             string(&mut n, text)?;
             string(&mut n, font)?;
         }
-        DrawShape::Result { asset_id } => string(&mut n, asset_id)?,
+        DrawShape::Result {
+            asset_id,
+            result_id,
+        } => {
+            string(&mut n, asset_id)?;
+            string(&mut n, result_id)?;
+        }
         _ => {}
     }
     Ok(n)

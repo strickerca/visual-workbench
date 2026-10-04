@@ -1,0 +1,221 @@
+{
+  "schema": 1,
+  "kind": "phase2-aggregate-software-validation",
+  "date": "2026-10-03",
+  "status": "passed",
+  "command": "build.ps1 test-all -TimeoutSeconds 1800",
+  "full_run": {
+    "log": "phase2-resume-sparse-fixed-test-all-b0d11422cf3648a580b5de26fe02af62.log",
+    "log_sha256": "94dc16a5359161a7e3f6c9ec28406385d765c82c68ae19b2c80736c0ffb28736",
+    "metadata_sha256": "cf4260c2201a91ffc2eb59ff8b4fd34f50121f72d7733937e89da1612ac530c6",
+    "exit_code": 0,
+    "elapsed_seconds": 1157.239,
+    "sampled_peak_tree_working_set_bytes": 2694914048,
+    "contained_in_windows_job": true,
+    "process_tree_cleanup_confirmed": true,
+    "output_streams_completed": true,
+    "parent_exit_code": 0,
+    "failure_reason": null,
+    "survivors_before_cleanup_count": 0,
+    "survivors_before_cleanup_names": [],
+    "compiler_telemetry_cleaned": false,
+    "pre_cleanup_survivor_classification": "none"
+  },
+  "rust": {
+    "passed": 776,
+    "failed": 0,
+    "ignored_in_aggregate": [
+      "crash_worker",
+      "fifty_megapixel_png16_spool_marked_export_with_256mib_budget",
+      "crash_worker",
+      "sync_checkpoint_crash_worker"
+    ],
+    "run": {
+      "log": "test-rust-2e53f160ee024462a2b40297039e8454.log",
+      "log_sha256": "53c8cdb8478fc09f0c2ac059cb99d61ea7d307c553be30478d800962cb6157ab",
+      "metadata_sha256": "e31f0b507d6fa04cd142c048840e1f146d79fed455bad968fbdbe0947e85d0db",
+      "exit_code": 0,
+      "elapsed_seconds": 607.155,
+      "sampled_peak_tree_working_set_bytes": 522502144,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "survivors_before_cleanup_count": 1,
+      "survivors_before_cleanup_names": [
+        "vctip"
+      ],
+      "compiler_telemetry_cleaned": true,
+      "pre_cleanup_survivor_classification": "verified_msvc_telemetry"
+    }
+  },
+  "simulation": {
+    "passed_cases": 2,
+    "seeds": 10000,
+    "run": {
+      "log": "test-rust-simulation-4951184217bc42e185efff293e9007d2.log",
+      "log_sha256": "4fde1211e995075c302f769947842d83755625b1b051e0f40b447e03f9c2aa14",
+      "metadata_sha256": "6f21a293e356df4ad38d784a3060f866670371141a74768761a046f8b59df894",
+      "exit_code": 0,
+      "elapsed_seconds": 135.428,
+      "sampled_peak_tree_working_set_bytes": 53833728,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "survivors_before_cleanup_count": 0,
+      "survivors_before_cleanup_names": [],
+      "compiler_telemetry_cleaned": false,
+      "pre_cleanup_survivor_classification": "none"
+    }
+  },
+  "jvm": {
+    "passed": 339,
+    "components": {
+      "shared": {
+        "passed": 126,
+        "report_files": 19,
+        "xml_sha256": {
+          "TEST-com.visualworkbench.shared.AgentCaptureObserverTest.xml": "b70dd3344f98a480c1f8c55120de31e0f2aa117e5dddbe6664ee9368d2063bd2",
+          "TEST-com.visualworkbench.shared.AiCandidateRecoveryTest.xml": "1afecab8245f045d12e67d2acffae4822692e04b5a100547529e16875820bd9c",
+          "TEST-com.visualworkbench.shared.AiInteractionTest.xml": "fceef87177fa0322f76a8a0437531b396fb3eca8131acb2e08746338b78f54db",
+          "TEST-com.visualworkbench.shared.AiOwnershipTest.xml": "6175a2a1db5cd64881297cce00818f0a6723ffd27e019b1140830cc253ba0eb8",
+          "TEST-com.visualworkbench.shared.CaptureArrivalsTest.xml": "d0a73222441b4dadfedb3a98d53f9ce5efc043ac0a04adc61294189a9de040bb",
+          "TEST-com.visualworkbench.shared.DesktopCoreSmokeTest.xml": "37e4ec6e9ad00639aac2352f61900fc2d4d2ca44aa6f0fc0422ceabf71574f53",
+          "TEST-com.visualworkbench.shared.EraserContractTest.xml": "f086345d27e88f56d7e0361777495be957e9badb79f76a9784507ee5f087f799",
+          "TEST-com.visualworkbench.shared.EraserInteractionTest.xml": "8e847ea64905b0b24eea7ebfdb3ba5ddcdf7ad136e61be96b5177433a00d019d",
+          "TEST-com.visualworkbench.shared.InstructionEditorTest.xml": "a4e8a4e553b1c41b23ec148fe28af8939682474a30e7496990a7a33dc43d8f74",
+          "TEST-com.visualworkbench.shared.InstructionFocusControllerTest.xml": "ce53c6f3e50a2471295491cc6a3d12baeaae56f0d9cd81147ad3425a07d9832b",
+          "TEST-com.visualworkbench.shared.MarkerFocusFollowerTest.xml": "00ec035aa0deb0c6fdd117e2e5645e1cb85321202805307e8098531e2f57bc53",
+          "TEST-com.visualworkbench.shared.MaskContractTest.xml": "f77ee18e5f62a406203d903897e1f4da89159082377b504f235ae3c9b612b277",
+          "TEST-com.visualworkbench.shared.McpInboxAdmissionTest.xml": "00110bad6a7a3da9a64d54a40f90a89596ef1681f0d6a860605659f74fd74c35",
+          "TEST-com.visualworkbench.shared.PackageOwnershipTest.xml": "bc5351918172556108923ad7682bcca032440307d86d4c61ab4da4831c465849",
+          "TEST-com.visualworkbench.shared.PairingQrTest.xml": "43ad28f4e8c7b1de407831504fb7dd5690d18ef8622b7f73f748f774d277b329",
+          "TEST-com.visualworkbench.shared.SelectionInteractionTest.xml": "a2ddf06788e218af60ccdfa729bcabed496cccd585d8784e203d7978b7dfefb5",
+          "TEST-com.visualworkbench.shared.SemanticDropTest.xml": "f7ee046da6420695e0ba3d7de727802f49043aae73d1cc806960cb0d99afee2c",
+          "TEST-com.visualworkbench.shared.SemanticEditorTest.xml": "7e27fb4f55513d5d0851c4324cf7cdb0456335bbf3090a1ff1e7096d949b9224",
+          "TEST-com.visualworkbench.shared.WorkflowOwnershipTest.xml": "2850d4a0ea1876264b91d259070db530e590e88a217c217a79d61c80213b1b45"
+        }
+      },
+      "android_unit": {
+        "passed": 6,
+        "report_files": 2,
+        "xml_sha256": {
+          "TEST-com.visualworkbench.android.capture.CaptureAdmissionTest.xml": "93badfb57e9dbaa9277069583a31d47cae867e049e1cf5e21e62233de5020aba",
+          "TEST-com.visualworkbench.android.capture.CaptureOwnerTest.xml": "8612bb3493939b97e1d0d0672b752d8eba671c2ee9d1aa23d42c82083c4f4105"
+        }
+      },
+      "desktop": {
+        "passed": 207,
+        "report_files": 26,
+        "xml_sha256": {
+          "TEST-com.visualworkbench.desktop.AiEditorOwnershipTest.xml": "4b7c1c61fa8fb1d27f5c261b59418897ca32663aaecea9b89ef73559306d9187",
+          "TEST-com.visualworkbench.desktop.AiResultPainterTest.xml": "9e1ab2905f7b81fc870b3df7a048d8b85ea39c505451f4bf3afd0c01dc910b5e",
+          "TEST-com.visualworkbench.desktop.AiServiceControllerTest.xml": "7c092f078abbdbbeb4201a032a06cd26c9c90c5bf2c000802d564b1b9d46654b",
+          "TEST-com.visualworkbench.desktop.AiViewGeometryTest.xml": "e05c2ca952ac28c180413c653a4495460acfc235057bcc2245a50e67f9487226",
+          "TEST-com.visualworkbench.desktop.capture.CaptureAdmissionTest.xml": "7155d360c75bbfa3c98918e5961ea4b9c859ddeb9723db64c39c2ab920a62015",
+          "TEST-com.visualworkbench.desktop.ConnectionAssistanceTest.xml": "d7b154a68767cf99a74ee3377db34c72a87779c633d9f6f58fa92728a98b7b0d",
+          "TEST-com.visualworkbench.desktop.DesktopCoherenceTest.xml": "0f77d01e3fd2d2ecca2dfb59d5152d7b1b2cc2369af2c15ef0db08dbfff73c8f",
+          "TEST-com.visualworkbench.desktop.DesktopInkTest.xml": "ae7e4fdd966c6c50e51c26dccb51a50584ccafdfc56195aabb47d867748e2145",
+          "TEST-com.visualworkbench.desktop.DesktopInstructionFocusAdmissionTest.xml": "2316edb617894a248772ffe000524ce0c06b62610480950c0ccb515b82fd9a4a",
+          "TEST-com.visualworkbench.desktop.DesktopInstructionFocusTest.xml": "0cf7956f8cd5d70620edcc8d7f4f9e974572768e3c1ca7e1164960fce22f5ece",
+          "TEST-com.visualworkbench.desktop.DesktopNativeRuntimeTest.xml": "55e1e6e8490c328d425ee8867c1d6131ea00f588ebbd0f8b44de3d2690641f2f",
+          "TEST-com.visualworkbench.desktop.DesktopRenderTest.xml": "26a3ce9af24990f520671ac064d315dbdc37972b66447f40b48743b547ccc7b9",
+          "TEST-com.visualworkbench.desktop.DesktopSessionsTest.xml": "3e16617142accd086a46e5adc5d726fa4598deb174f1aa076fefe98c15c82bb3",
+          "TEST-com.visualworkbench.desktop.DesktopStateTest.xml": "7baa3aea63ec254191176f7ceaafdb377e79cf1a96cda3ce24f2f6c5a3805f4b",
+          "TEST-com.visualworkbench.desktop.DesktopTransferTest.xml": "c953a5c843e371320295ed0f9089f7834b7a3dc8f444bb33be2b99ab38d45dfd",
+          "TEST-com.visualworkbench.desktop.EraserGeometryTest.xml": "e571b51d74b6b0a5a03eb0b93defde2b168c45d59e25dcb466ab6fcd948fecc0",
+          "TEST-com.visualworkbench.desktop.instructions.WindowsInstructionFieldTest.xml": "98f91a5d0b46e1fa2a936c695738f442f79418398f1b7dcfc5fd62150f155d11",
+          "TEST-com.visualworkbench.desktop.mcp.CodexHandoffTest.xml": "609310f5ae76049afe61679fcff24e7702564f05c56de2298bb7739b8c93decc",
+          "TEST-com.visualworkbench.desktop.mcp.McpCoordinatorTest.xml": "16325d37e6fadb7724233aef118066eb66716483326e4e0b3691d2ea2167c3e0",
+          "TEST-com.visualworkbench.desktop.mcp.McpGrantTelemetryTest.xml": "878177b6c12d9222485760af09d2ac53d643c395f4744e926b8105bb915d5186",
+          "TEST-com.visualworkbench.desktop.mcp.McpJsonTest.xml": "39a20e6bc98ac5fa10b9623993a42fb6f6ca8345651692ed3fc36e4fea8a805b",
+          "TEST-com.visualworkbench.desktop.mcp.McpOwnerWorkTest.xml": "882dffc87f89ef808b228653ea477049560791f44e190b20279d08c015029daf",
+          "TEST-com.visualworkbench.desktop.mcp.McpProcessTest.xml": "af1d485cc500471ae078f6fe40708702e51d7049a0503d540f4f08feb5cba57b",
+          "TEST-com.visualworkbench.desktop.mcp.McpStartupTest.xml": "bd943172b67ed67d3120f4dbffe8518af79e77ca4c928b3f5a505b5e928361c0",
+          "TEST-com.visualworkbench.desktop.NativeRuntimeAnchorTest.xml": "1269247c0cea110e7a365dcdcbcdd9c659037138b074baa4c5483d02724498e2",
+          "TEST-com.visualworkbench.desktop.SelectionControllerTest.xml": "2c55dda2ea7d047a3b6d959bc8bee720ba65eb8c394d3debda8c8a408bf660c2"
+        }
+      }
+    },
+    "run": {
+      "log": "test-kotlin-5bea38a30b974bbe99cd2a5ae614b0b8.log",
+      "log_sha256": "ae1b12ead71ed788488bbb9b3851269010995a3ad8d2023ec3fc53f4b03a35fd",
+      "metadata_sha256": "1c85f079f472baf1e77e2130548b1db3f2fbddcd03d6468e6e535bf684c9c9ad",
+      "exit_code": 0,
+      "elapsed_seconds": 233.473,
+      "sampled_peak_tree_working_set_bytes": 2639843328,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "survivors_before_cleanup_count": 0,
+      "survivors_before_cleanup_names": [],
+      "compiler_telemetry_cleaned": false,
+      "pre_cleanup_survivor_classification": "none"
+    }
+  },
+  "jvm_post_api_repair": {
+    "passed": 339,
+    "failed": 0,
+    "skipped": 0,
+    "run": {
+      "log": "phase2-final-s23-test-apps-25e3eaa5ec85413784aa22cc9c6c2aca.log",
+      "log_sha256": "7a874703beb18fe7bafa0c91b07567bce98f5b8ceff404a55ac5176af91150c4",
+      "metadata_sha256": "87b18cd3d44d8076759399ade76a979e649ff46ca28de2d466cc6d61aba27890",
+      "exit_code": 0,
+      "elapsed_seconds": 218.788,
+      "sampled_peak_tree_working_set_bytes": 2881331200,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "survivors_before_cleanup_count": 0,
+      "survivors_before_cleanup_names": [],
+      "compiler_telemetry_cleaned": false,
+      "pre_cleanup_survivor_classification": "none"
+    }
+  },
+  "supplemental_fifty_megapixel_png16": {
+    "passed": 1,
+    "pixels": 50000000,
+    "admission_budget_bytes": 268435456,
+    "estimated_budget_assertion_passed": true,
+    "target_device_rss_measured": false,
+    "whole_process_tree_peak_includes_compilation": true,
+    "scratch_prefix_remaining": 0,
+    "run": {
+      "log": "phase2-fifty-megapixel-png16-special-lane-638a674e20294c2db572bab712556c91.log",
+      "log_sha256": "a2cd2418a1a23a87a5d5279d93e4664cc87557edae2c24321b14d8556258b5fc",
+      "metadata_sha256": "3f3ffbd07cb25db351794248ecd999dc4654e65006336742c129fb5e5723a113",
+      "exit_code": 0,
+      "elapsed_seconds": 277.89,
+      "sampled_peak_tree_working_set_bytes": 373813248,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "parent_exit_code": 0,
+      "failure_reason": null,
+      "survivors_before_cleanup_count": 0,
+      "survivors_before_cleanup_names": [],
+      "compiler_telemetry_cleaned": false,
+      "pre_cleanup_survivor_classification": "none"
+    }
+  },
+  "supplemental_owner_profile_scope": {
+    "offline_fixtures_passed": 16,
+    "app_hil_passed": 154,
+    "source_bound_app_receipt_sha256": "1998e31777fe33e6a35144c81a07ce6afcf9accc98bc5c490b5c848d091b4a06",
+    "model": "SM-S918U",
+    "profile_count": 2,
+    "other_profiles_modified": false,
+    "owned_package_cleanup_confirmed": true
+  },
+  "source_boundary": "Aggregate native sources are unchanged. Later owner-profile HIL tooling and three Android API compatibility boundaries were verified by offline fixtures, final lint, fresh339 JVM cases and a fresh complete isolated S23 app suite. The final app receipt binds actual current source; the original aggregate run remains separately identified.",
+  "gates_passed": [],
+  "verification_images_created": 0
+}

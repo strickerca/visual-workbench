@@ -250,6 +250,12 @@ impl ProjectStore {
         Ok(self.host.checkpoint_bytes()?)
     }
 
+    /// Read-only canonical workspace admission, with no checkpoint allocation.
+    /// Includes private retained sequencing history; returns limit+1 on overflow.
+    pub fn workspace_estimate_bytes(&self, limit: u64) -> Result<u64, StoreError> {
+        Ok(self.host.workspace_estimate_bytes(limit)?)
+    }
+
     /// All immutable originals retained by the accepted journal, including
     /// assets currently hidden by undo. A replica must transfer this inventory
     /// before reporting that the complete project is available offline.

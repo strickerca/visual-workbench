@@ -1,0 +1,21 @@
+[package]
+name = "vw-ai-platform"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+vw-ai = { path = "../vw-ai", version = "=0.1.0" }
+vw-ai-provider = { path = "../vw-ai-provider", version = "=0.1.0" }
+zeroize = "=1.9.0"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security_Credentials"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = { version = "=0.22.4", default-features = false }

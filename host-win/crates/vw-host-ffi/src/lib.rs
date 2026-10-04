@@ -1,6 +1,8 @@
 //! Windows-only host services. UniFFI futures enqueue bounded work; PNG parsing,
 //! Win32 calls and clipboard waits run on a dedicated native worker.
 mod binding;
+mod capture;
+pub use capture::*;
 mod connection_assist;
 pub use connection_assist::*;
 mod dib;

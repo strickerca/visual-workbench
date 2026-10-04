@@ -44,7 +44,8 @@
       "partial",
       "not_applicable"
     ],
-    "evidence": "Paths under docs/evidence/ added when verification runs"
+    "evidence": "Paths under docs/evidence/ added when verification runs",
+    "milestone_scope": "Optional owner-approved milestone inclusion/deferral and decision reference. Subset verification cannot pass a full requirement; not_applicable for a deferred milestone is not full-gate acceptance."
   },
   "counts": {
     "requirements": 189,
@@ -656,9 +657,12 @@
         "A09",
         "A13"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -861,9 +865,12 @@
         "A13",
         "A22"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.04.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -942,9 +949,12 @@
       "scenarios": [
         "A06"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.01.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -968,9 +978,12 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.01.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "split: ellipse and polygon selections moved to EDIT-013 (phase 3) so each gate can pass"
     },
@@ -994,9 +1007,12 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.01.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -1020,9 +1036,12 @@
         "A21",
         "A22"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.04.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -1074,9 +1093,12 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.03.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -1203,9 +1225,12 @@
       "scenarios": [
         "A23"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.06.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "split: the window/monitor/region picker moved to CAPTURE-007 (phase 3) so each gate can pass"
     },
@@ -1328,9 +1353,12 @@
       "scenarios": [
         "A18"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.06.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "split: source feedback loops (the scrcpy window on a streamed display) moved to CAPTURE-008 (phase 5), where that source exists"
     },
@@ -1455,9 +1483,12 @@
         "A19",
         "A29"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.09.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -1617,7 +1648,15 @@
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
-      "v1_note": "updated: full per-editor shortcut palettes are EDITOR-005 (P2)"
+      "v1_note": "updated: full per-editor shortcut palettes are EDITOR-005 (P2)",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "partial",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "included": "Visible destination and app-aware undo/redo for the workbench, Krita and Paint.",
+        "deferred": "Photoshop shortcut verification, even if later installed, until scope is resumed.",
+        "note": "No full requirement pass from milestone subset testing."
+      }
     },
     {
       "id": "CONNECT-001",
@@ -1789,10 +1828,16 @@
         "A17"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "v1-accepted",
-      "v1_note": "unchanged intent; acceptance made measurable"
+      "v1_note": "unchanged intent; acceptance made measurable",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "DISPLAY-002",
@@ -1816,10 +1861,16 @@
       "evidence": [
         "docs/evidence/T0.08.md"
       ],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "v1-accepted",
-      "v1_note": "updated: self-signed UMDF route for personal use; Microsoft attestation (EV) before distribution"
+      "v1_note": "updated: self-signed UMDF route for personal use; Microsoft attestation (EV) before distribution",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "DISPLAY-003",
@@ -1843,10 +1894,16 @@
         "A17"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "v1-accepted",
-      "v1_note": "unchanged intent; acceptance made measurable"
+      "v1_note": "unchanged intent; acceptance made measurable",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "DISPLAY-004",
@@ -1869,10 +1926,16 @@
         "A17"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "v1-accepted",
-      "v1_note": "unchanged intent; acceptance made measurable"
+      "v1_note": "unchanged intent; acceptance made measurable",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "ADOBE-001",
@@ -1895,10 +1958,16 @@
         "A08"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "explicit",
-      "v1_note": "updated: requires the owner to install Photoshop (not installed on 2026-10-01)"
+      "v1_note": "updated: requires the owner to install Photoshop (not installed on 2026-10-01)",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "ADOBE-002",
@@ -1921,10 +1990,16 @@
         "A08"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "explicit",
-      "v1_note": "re-scoped: owner did not select Illustrator; no UXP before spring 2027"
+      "v1_note": "re-scoped: owner did not select Illustrator; no UXP before spring 2027",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "ADOBE-003",
@@ -2000,10 +2075,16 @@
         "A15"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "v1-accepted",
-      "v1_note": "updated: Photoshop only"
+      "v1_note": "updated: Photoshop only",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "ADOBE-006",
@@ -2027,10 +2108,16 @@
         "A16"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "v1-accepted",
-      "v1_note": "unchanged intent; acceptance made measurable"
+      "v1_note": "unchanged intent; acceptance made measurable",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "ADOBE-007",
@@ -2053,10 +2140,16 @@
         "A16"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "v1-accepted",
-      "v1_note": "unchanged intent; acceptance made measurable"
+      "v1_note": "unchanged intent; acceptance made measurable",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "ADOBE-008",
@@ -2296,9 +2389,12 @@
         "A10",
         "A21"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.06.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "split: AVIF moved to FORMAT-014 (phase 3); RAW/DNG moved to FORMAT-012"
     },
@@ -2525,9 +2621,12 @@
         "A13",
         "A21"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.01.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2552,9 +2651,12 @@
         "A13",
         "A22"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2576,9 +2678,12 @@
       "scenarios": [
         "A13"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2627,9 +2732,12 @@
       "scenarios": [
         "A13"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2653,9 +2761,12 @@
       "scenarios": [
         "A22"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2678,9 +2789,12 @@
       "scenarios": [
         "A13"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2706,9 +2820,12 @@
         "A22",
         "A23"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "widened: Codex-only became Claude Code + Codex + MCP + chat clipboard"
     },
@@ -2732,9 +2849,12 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.03.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -2917,9 +3037,12 @@
       "scenarios": [
         "A24"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.04.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },
@@ -3158,9 +3281,12 @@
       "scenarios": [
         "A24"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.04.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new"
     },
@@ -3182,9 +3308,12 @@
       "scenarios": [
         "A24"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.04.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new"
     },
@@ -3208,9 +3337,12 @@
       "scenarios": [
         "A24"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.05.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new"
     },
@@ -3232,9 +3364,12 @@
       "scenarios": [
         "A24"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.05.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new"
     },
@@ -3281,9 +3416,12 @@
         "A23",
         "A26"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.06.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new: semantic capture"
     },
@@ -3308,9 +3446,12 @@
         "A22",
         "A26"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.06.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new: semantic capture"
     },
@@ -3332,9 +3473,12 @@
       "scenarios": [
         "A23"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.06.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new: semantic capture"
     },
@@ -3360,9 +3504,12 @@
       "scenarios": [
         "A26"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.07.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new: semantic capture"
     },
@@ -3386,9 +3533,13 @@
       "scenarios": [
         "A22"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.07.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new: semantic capture"
     },
@@ -3412,9 +3563,13 @@
       "scenarios": [
         "A22"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.07.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },
@@ -3460,9 +3615,12 @@
       "scenarios": [
         "A22"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },
@@ -3488,9 +3646,12 @@
         "A22",
         "A23"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new: model-aware packages"
     },
@@ -3514,9 +3675,12 @@
       "scenarios": [
         "A22"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new: model-aware packages"
     },
@@ -3540,9 +3704,12 @@
       "scenarios": [
         "A22"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },
@@ -3571,9 +3738,12 @@
         "A22",
         "A23"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.09.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new"
     },
@@ -3598,9 +3768,12 @@
       "scenarios": [
         "A22"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new"
     },
@@ -3624,9 +3797,12 @@
       "scenarios": [
         "A23"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new"
     },
@@ -3651,9 +3827,12 @@
         "A13",
         "A23"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new"
     },
@@ -3678,9 +3857,12 @@
       "scenarios": [
         "A29"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.09.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },
@@ -3731,10 +3913,12 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged."
+        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
+        "docs/evidence/T2.02.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "explicit",
       "v1_note": "new (W1)"
     },
@@ -3760,10 +3944,12 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged."
+        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
+        "docs/evidence/T2.03.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new: crop-and-stitch with proof"
     },
@@ -3789,10 +3975,12 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged."
+        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
+        "docs/evidence/T2.03.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new: crop-and-stitch with proof"
     },
@@ -3814,9 +4002,12 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.02.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },
@@ -3839,9 +4030,12 @@
         "A19",
         "A21"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.02.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },
@@ -4273,10 +4467,16 @@
         "A08"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "default-accepted",
-      "v1_note": "new: lossless text tiles"
+      "v1_note": "new: lossless text tiles",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "STREAM-004",
@@ -4329,7 +4529,15 @@
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "explicit",
-      "v1_note": "new"
+      "v1_note": "new",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "partial",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "included": "Krita remote pen with Windows 8+ Pointer Input and measured pressure.",
+        "deferred": "Krita pixel/layer socket plugin and bridge packaging.",
+        "note": "No full requirement pass from milestone subset testing."
+      }
     },
     {
       "id": "EDITOR-002",
@@ -4352,10 +4560,16 @@
         "A08"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "explicit",
-      "v1_note": "new"
+      "v1_note": "new",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "EDITOR-003",
@@ -4378,10 +4592,16 @@
         "A08"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "explicit",
-      "v1_note": "new"
+      "v1_note": "new",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "EDITOR-004",
@@ -4404,10 +4624,16 @@
         "A08"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "explicit",
-      "v1_note": "new"
+      "v1_note": "new",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "EDITOR-005",
@@ -4431,7 +4657,15 @@
       "impl_status": "not_started",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
-      "v1_note": "new"
+      "v1_note": "new",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "partial",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "included": "Essential Krita/Paint palettes and tested shortcuts.",
+        "deferred": "Photoshop, GIMP, Affinity, Photopea and other-editor palettes.",
+        "note": "No full requirement pass from milestone subset testing."
+      }
     },
     {
       "id": "LIC-001",
@@ -4537,10 +4771,16 @@
         "A28"
       ],
       "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "deferred",
+      "verify_status": "not_applicable",
       "owner_decision": "default-accepted",
-      "v1_note": "new"
+      "v1_note": "new",
+      "milestone_scope": {
+        "milestone": "M4-KP",
+        "disposition": "deferred",
+        "decision": "docs/DECISIONS.md#d20--phase-4-first-usable-milestone-krita-and-paint",
+        "note": "Outside the owner-approved first milestone; retained for later owner resumption. Full-gate acceptance remains pending."
+      }
     },
     {
       "id": "SEC-001",
@@ -4561,9 +4801,12 @@
       "scenarios": [
         "A29"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T2.09.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },
@@ -5043,10 +5286,12 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged."
+        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
+        "docs/evidence/T2.03.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },

@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$ProjectRoot = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)),
-    [ValidateSet('IN2019')][string]$ExpectedModel = 'IN2019',
+    [ValidateSet('IN2019', 'SM-S918U')][string]$ExpectedModel = 'IN2019',
     [ValidateRange(60,3600)][int]$TimeoutSeconds = 1200,
     [switch]$Execute
 )
@@ -14,6 +14,7 @@ $ProjectRoot = [IO.Path]::GetFullPath($ProjectRoot)
 Import-Module (Join-Path $ProjectRoot 'tools/process.psm1')
 Import-Module (Join-Path $ProjectRoot 'tools/android-device.psm1')
 Import-Module (Join-Path $PSScriptRoot 'stage.psm1')
+Import-Module (Join-Path $PSScriptRoot 'device.psm1')
 $packages = @('com.visualworkbench.android.hil', 'com.visualworkbench.android.hil.test')
 $runId = [Guid]::NewGuid().ToString('N')
 $temporaryParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
@@ -29,6 +30,7 @@ $receipt = [ordered]@{
     status='failed'; failure_phase='setup'; failure_code=$null; assertions=$null; artifacts=$null; process_runs=@()
     source_sha256=$null; instrumentation_observation=$null
     isolated_application=$true; normal_app_tested=$false; normal_app_modified=$false
+    device_scope=[ordered]@{owner_user=0;profile_count=$null;global_package_absence_verified=$false;other_profiles_modified=$false;cleanup_owner_user_only=$true}
     cleanup=[ordered]@{process_trees=$false; owned_packages=$false; private_work_disposed=$false}
 }
 function Assert-PlainPath([string]$Path, [switch]$Directory) {
@@ -112,6 +114,10 @@ function Owned-Package([string]$Package,[string]$ExpectedHash) {
     $lines=@($v.Lines|Where-Object{$_.Trim()})
     return $lines.Count -eq 1 -and $lines[0] -match '^([0-9a-f]{64})\s+' -and $Matches[1] -ceq $ExpectedHash
 }
+function Assert-GlobalPackageAbsent([string]$Package) {
+    $v=Adb 'app-hil-global-package-absence' @('shell','dumpsys','package',$Package)
+    if(-not (Test-VwAppHilPackageAbsent -Package $Package -Lines $v.Lines)){throw 'Existing or unknown global HIL package preserved; refusing run.'}
+}
 function Cleanup-Packages {
     $ok=$true
     foreach($key in @('test','main')){
@@ -126,7 +132,7 @@ function Cleanup-Packages {
             # Matching installed bytes bind the previously verified signer too.
             if(-not (Owned-Package $package $artifact.sha256)){$ok=$false;continue}
             Adb 'app-hil-stop-owned-package' @('shell','am','force-stop','--user','0',$package) | Out-Null
-            $v=Adb 'app-hil-remove-owned-package' @('uninstall',$package) 60
+            $v=Adb 'app-hil-remove-owned-package' @('uninstall','--user','0',$package) 60
             if(($v.Lines -join "`n").Trim() -cne 'Success' -or $null -ne (Package-Path $package)){$ok=$false}
         }catch{$ok=$false}
     }
@@ -173,13 +179,14 @@ try {
     $phase='app-hil-device-selection'
     $device=Get-VwAndroidDevice -Root $ProjectRoot -ExpectedModel $ExpectedModel
     $users=Adb 'app-hil-owner-users' @('shell','pm','list','users')
-    $entries=@($users.Lines|Where-Object{$_ -match 'UserInfo\{'})
-    if($entries.Count -ne 1 -or $entries[0] -notmatch 'UserInfo\{0:'){throw 'Other device profiles preserved; sole owner user required.'}
+    $receipt.device_scope.profile_count=Get-VwAppHilProfileCount -Lines $users.Lines
     $current=Adb 'app-hil-current-user' @('shell','am','get-current-user')
     if(($current.Lines -join "`n").Trim() -cne '0'){throw 'Owner user must be current.'}
-    foreach($package in $packages){if($null -ne (Package-Path $package)){throw 'Preexisting HIL package preserved; refusing run.'};$absent[$package]=$true}
+    foreach($package in $packages){Assert-GlobalPackageAbsent $package;if($null -ne (Package-Path $package)){throw 'Preexisting HIL package preserved; refusing run.'};$absent[$package]=$true}
+    $receipt.device_scope.global_package_absence_verified=$true
     foreach($key in @('main','test')){
         $package=if($key -ceq 'main'){$packages[0]}else{$packages[1]}
+        Assert-GlobalPackageAbsent $package
         if($null -ne (Package-Path $package)){throw 'HIL package appeared before install; preserving it.'}
         $attempted[$package]=$true
         $v=Adb ('app-hil-install-'+$key) @('install','--user','0','-t',$apks.$key.path) 120
@@ -231,5 +238,5 @@ try {
     }
 }
 if($receipt.status -ne 'passed'){exit 1}
-Write-Host 'Isolated app instrumentation: PASS. Normal app, S23/S Pen and performance acceptance remain pending.'
+Write-Host "Isolated app instrumentation on ${ExpectedModel}: PASS. Normal app, physical S Pen and performance acceptance remain pending."
 exit 0

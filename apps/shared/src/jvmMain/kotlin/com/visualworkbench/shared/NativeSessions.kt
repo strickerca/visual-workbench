@@ -131,7 +131,12 @@ private class NativeConfirmation(private val handle: NConfirmation, private val 
     override suspend fun decline() { close() }
     override suspend fun close() { releaseNative { closeMutex.withLock { if (closed.compareAndSet(false, true)) try { handle.decline() } catch (error: SessionException) { if (error !is SessionException.Closed) throw sessionFailure(error) } finally { handle.destroy(); owner.remove(this@NativeConfirmation) } } } }
 }
-private class NativeLink(private val handle: LiveSession, private val owner: SessionOwner) : ProjectLink, OwnedSession {
+private class NativeLink(private val handle: LiveSession, private val owner: SessionOwner) : ProjectLink, OwnedSession, NativeFocusAccess {
+    override fun focusHandle(): LiveSession {
+        owner.checkOpen()
+        if (closed.get()) throw SessionFailure(SessionFailureKind.Closed)
+        return handle
+    }
     private val closed = AtomicBoolean(false)
     private val closeMutex = Mutex()
     override val endpoints: List<SessionEndpoint> get() = handle.endpoints().map { it.common() }

@@ -3,6 +3,7 @@
 param(
     [string]$ProjectRoot=(Split-Path -Parent (Split-Path -Parent $PSScriptRoot)),
     [ValidateRange(15,300)][int]$TimeoutSeconds=90,
+    [ValidateSet('startup','mcp')][string]$Mode='startup',
     [switch]$Execute
 )
 Set-StrictMode -Version Latest
@@ -22,7 +23,7 @@ $created=$false;$lease=$null;$phase='setup';$passed=$false;$treesClean=$true;$pr
 $receipt=[ordered]@{schema=1;kind='desktop-startup-run';run_id=$runId;status='failed';failure_phase='setup';
     failure_code=$null;assertions=$null;process_runs=@();cleanup=$null;
     ordinary_preferences_and_native_cache_may_initialize=$true;project_actions_requested=$false;
-    firewall_actions_requested=$false;screenshots_created=0;visual_acceptance=$false;release_acceptance=$false}
+    firewall_actions_requested=$false;screenshots_created=0;visual_acceptance=$false;release_acceptance=$false;mode=$Mode}
 function Assert-Plain([string]$Path,[bool]$Directory){
     $item=Get-Item -LiteralPath ([IO.Path]::GetFullPath($Path)) -Force
     if($item.PSIsContainer -ne $Directory){throw 'Path type refused.'}
@@ -46,9 +47,10 @@ function Run-Owned([string]$Name,[string]$Executable,[string[]]$Arguments,[int]$
             # Only the fixed wrapper's short status words reach the outer helper.
             # Application stdout/stderr never enters its unbounded line reader.
             $expectedLauncher=Join-Path $ProjectRoot 'apps/desktop/build/compose/binaries/main/app/VisualWorkbenchDev/VisualWorkbenchDev.exe'
-            if($Executable -cne $expectedLauncher -or $Arguments.Count -ne 1 -or $Arguments[0] -cne '--startup-smoke'){throw 'Packaged invocation refused.'}
+            $expectedArgument=if($Mode -eq 'mcp'){'--mcp-runtime-smoke'}else{'--startup-smoke'}
+            if($Executable -cne $expectedLauncher -or $Arguments.Count -ne 1 -or $Arguments[0] -cne $expectedArgument){throw 'Packaged invocation refused.'}
             $Executable=Join-Path $PSHOME 'pwsh.exe'
-            $Arguments=@('-NoProfile','-NonInteractive','-File',(Join-Path $PSScriptRoot 'capture.ps1'),'-ProjectRoot',$ProjectRoot,'-PrivateDirectory',$private,'-RunId',$runId,'-TimeoutSeconds',[string]$Seconds)
+            $Arguments=@('-NoProfile','-NonInteractive','-File',(Join-Path $PSScriptRoot 'capture.ps1'),'-ProjectRoot',$ProjectRoot,'-PrivateDirectory',$private,'-RunId',$runId,'-TimeoutSeconds',[string]$Seconds,'-Mode',$Mode)
             $Seconds+=30
         }
         $result=Invoke-VwProcess -FilePath $Executable -ArgumentList $Arguments -WorkingDirectory $ProjectRoot -Phase $Name -TimeoutSeconds $Seconds -ParentExitGraceSeconds 10 -Capture
@@ -100,8 +102,9 @@ try{
     if($before.nonce -cne $pinned.nonce -or
         (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $private 'before.json')).Hash -cne
         (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $private 'pinned.json')).Hash){throw 'Build changed before launch.'}
-    Run-Owned 'desktop-startup' (Join-Path $distribution 'VisualWorkbenchDev.exe') @('--startup-smoke') $TimeoutSeconds | Out-Null
-    Parse 'desktop-collect' @('collect','--log',(Join-Path $private 'startup.txt'),'--process',(Join-Path $private 'process.json'),'--output',(Join-Path $private 'report.json'))
+    $launchArgument=if($Mode -eq 'mcp'){'--mcp-runtime-smoke'}else{'--startup-smoke'}
+    Run-Owned 'desktop-startup' (Join-Path $distribution 'VisualWorkbenchDev.exe') @($launchArgument) $TimeoutSeconds | Out-Null
+    Parse 'desktop-collect' @('collect','--mode',$Mode,'--log',(Join-Path $private 'startup.txt'),'--process',(Join-Path $private 'process.json'),'--output',(Join-Path $private 'report.json'))
     $receipt.assertions=Get-Content -LiteralPath (Join-Path $private 'report.json') -Raw | ConvertFrom-Json -AsHashtable
     $passed=$true
 }catch{

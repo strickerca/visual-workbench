@@ -1,23 +1,43 @@
 //! Shared UniFFI boundary. Storage and input run on distinct bounded core-owned workers.
+mod os_images;
+pub use os_images::*;
+mod ai_edit;
 mod camera;
+pub use ai_edit::*;
 mod creation;
 mod dto;
 mod editor;
 mod gesture;
+mod instructions;
+mod packages;
 mod payload;
+pub use packages::*;
 mod project;
+mod semantic_ui;
+pub use semantic_ui::*;
+mod capture_delivery;
+mod capture_import;
+pub use capture_delivery::*;
 mod queries;
+mod semantics;
 mod streaming_ffi;
+pub use capture_import::*;
 mod worker;
+mod workflow;
 pub use streaming_ffi::*;
 pub mod session;
 pub use camera::*;
 pub use dto::*;
 pub use gesture::*;
+pub use instructions::*;
 pub use project::*;
 pub use queries::layout_text;
+pub use semantics::*;
 pub use session::*;
 pub use worker::Cancellation;
+pub use workflow::*;
+mod eraser;
+pub use eraser::*;
 
 uniffi::setup_scaffolding!();
 
@@ -97,3 +117,6 @@ pub fn generate_device_id() -> Result<String> {
 pub extern "C" fn vw_toolchain_smoke_version() -> u32 {
     binding_contract_version()
 }
+
+mod masks;
+pub use masks::*;

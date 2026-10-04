@@ -1,0 +1,446 @@
+{
+  "schema": 1,
+  "kind": "retained-failed-validation-attempts",
+  "date": "2026-10-03",
+  "attempts": [
+    {
+      "status": "failed",
+      "run": {
+        "log": "phase2-resume-full-test-all-549dd13cc750417aa6870a7834d3e3b2.log",
+        "log_sha256": "acff88cd8d885edf1b689cf8edf87db3c8bff9e7d80bfcc1ef83c56f8a0a5b74",
+        "metadata_sha256": "1c4b54f016c2b495d9b6f4d403cb76a3d44dcd3068e85755366dd033bddbc194",
+        "exit_code": 1,
+        "elapsed_seconds": 716.411,
+        "sampled_peak_tree_working_set_bytes": 2599686144,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "parent_exit_code": 1,
+        "failure_reason": null,
+        "survivors_before_cleanup_count": 0,
+        "survivors_before_cleanup_names": [],
+        "compiler_telemetry_cleaned": false,
+        "pre_cleanup_survivor_classification": "none"
+      },
+      "cause": "The Windows sparse-file integrity fixture attempted a 1 GiB allocation and failed with OS error 112.",
+      "repair": "Only the fixture now marks its owned file sparse with FSCTL_SET_SPARSE before extending it; the complete aggregate suite then passed."
+    },
+    {
+      "status": "failed",
+      "run": {
+        "log": "phase2-final-s23-lint-all-490e303f4e57481c84917d9577558533.log",
+        "log_sha256": "6d167881fb13274e22da2fc36da0711c3f9392423a8dbd446a50420732002df0",
+        "metadata_sha256": "763bc64ca0d79207e7d0b17a92260f9905de4496e62fb6e181c339b226929b9f",
+        "exit_code": 1,
+        "elapsed_seconds": 191.701,
+        "sampled_peak_tree_working_set_bytes": 2407878656,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "parent_exit_code": 1,
+        "failure_reason": null,
+        "survivors_before_cleanup_count": 0,
+        "survivors_before_cleanup_names": [],
+        "compiler_telemetry_cleaned": false,
+        "pre_cleanup_survivor_classification": "none"
+      },
+      "cause": "The redacted secret scan flagged 44 recorded source SHA256 entries and one public Node publisher commit.",
+      "repair": "All 22 distinct file/hash pairs were verified against actual source bytes. Only exact path-plus-line exemptions and the exact public commit line were added."
+    },
+    {
+      "status": "failed",
+      "run": {
+        "log": "phase2-final-s23-lint-all-c0eafda9973d40d59d96cbb4023756c4.log",
+        "log_sha256": "aa9026f0f17f9333ee1808c25ccb2d9b331c8a634d3d5ddcf83a9481c0be79a1",
+        "metadata_sha256": "fd8d71f97f25c4f89e8379dc76bc37e159349ebf1cfb0cdd062564cac6edb392",
+        "exit_code": 1,
+        "elapsed_seconds": 410.277,
+        "sampled_peak_tree_working_set_bytes": 3259473920,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "parent_exit_code": 1,
+        "failure_reason": null,
+        "survivors_before_cleanup_count": 0,
+        "survivors_before_cleanup_names": [],
+        "compiler_telemetry_cleaned": false,
+        "pre_cleanup_survivor_classification": "none"
+      },
+      "cause": "Android lint reported 12 errors across screenshot API30, on-device speech API31 and the pre-API34 tile launch.",
+      "repair": "Three narrowly reviewed files now use typed SDK refusal, API-specific helper boundaries and one legacy-call suppression guarded below API34; final lint, JVM and S23 app tests passed."
+    },
+    {
+      "status": "failed",
+      "run": {
+        "log": "phase2-final-serialized-checks-9663099641894bc4827d1c1cba4eb76b.log",
+        "log_sha256": "96df6d9d6d2b67b654bd5c3ac1eeadd7188225b8f4d61795e0943594489c6a5b",
+        "metadata_sha256": "83e90e898983663a7d4d6cdbc969505eb71eb76bd06de6ebf746faba0444b278",
+        "exit_code": 1,
+        "elapsed_seconds": 605.279,
+        "sampled_peak_tree_working_set_bytes": 3418066944,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "parent_exit_code": 1,
+        "failure_reason": null,
+        "survivors_before_cleanup_count": 0,
+        "survivors_before_cleanup_names": [],
+        "compiler_telemetry_cleaned": false,
+        "pre_cleanup_survivor_classification": "none"
+      },
+      "cause": "The isolated app built successfully, but private APK staging did not complete before any device selection, installation or instrumentation. The verified main APK was 220849835 bytes while available space was 168775680 bytes.",
+      "repair": "After all owned build processes retired, only 204 reproducible project debug-symbol files were reclaimed. Unchanged-source license and JVM passes were reused; the complete S23 suite and remaining delivery checks were then rerun."
+    },
+    {
+      "status": "failed",
+      "run": {
+        "log": "phase2-final-s23-desktop-distribution-bb023fddb0a74aedbfbb2fc91226088f.log",
+        "log_sha256": "655c2c20adb0f7def823056736c6536abe0ebe8d491be9a53467eec61a49b777",
+        "metadata_sha256": "ec4c2e4759bd7f4fee7090ab9f12352cbd73574ef4644fd3b4a82795d8c5ea0f",
+        "exit_code": 1,
+        "elapsed_seconds": 165.826,
+        "sampled_peak_tree_working_set_bytes": 1628205056,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "parent_exit_code": 1,
+        "failure_reason": null,
+        "survivors_before_cleanup_count": 0,
+        "survivors_before_cleanup_names": [],
+        "compiler_telemetry_cleaned": false,
+        "pre_cleanup_survivor_classification": "none"
+      },
+      "cause": "Desktop processResources could not copy bundled node.exe because the disk filled. The Android build, isolated S23 suite and normal delivery had already passed.",
+      "repair": "After the whole failed queue retired, 18 reproducible debug-symbol files and 13 generated stage/resources children of seven known canonical MCP nonces were removed. Text inventories and all source, private candidates and distributions were preserved. Only desktop packaging and its smoke check were retried."
+    },
+    {
+      "status": "failed",
+      "run": {
+        "log": "phase2-final-s23-desktop-mcp-b2f8db742675498b8445c3b85eb67409.log",
+        "log_sha256": "2705dd5e4863a2de15cc4bd791978e639856ddd091eb04d4d7b596b794d09bd9",
+        "metadata_sha256": "f411c05a2fb6824013dfdc3e17dee901349f5c325ca6d51316aabef190fe945f",
+        "exit_code": 1,
+        "elapsed_seconds": 179.306,
+        "sampled_peak_tree_working_set_bytes": 789868544,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "parent_exit_code": 1,
+        "failure_reason": null,
+        "survivors_before_cleanup_count": 0,
+        "survivors_before_cleanup_names": [],
+        "compiler_telemetry_cleaned": false,
+        "pre_cleanup_survivor_classification": "none"
+      },
+      "cause": "The packaged child exited normally, but the strict collector refused its mcp_unknown lifecycle result. Raw output was disposed; the exact exception was not retained.",
+      "repair": "The exact fresh bundle ready manifest was verified against the packaged resource hash before retrying only MCP on the same image. No assertions, deadlines, source or security checks were changed."
+    },
+    {
+      "status": "failed",
+      "run": {
+        "log": "phase2-final-s23-desktop-mcp-b480bdbf08fe4f6ca1f243bcc06997ea.log",
+        "log_sha256": "6546a7b6b2966aa2303ccecacf10c8a60298187fa7a889855898eaed2522b9ba",
+        "metadata_sha256": "78ee77cf44b18ee35ca82ca16959b519b2e4183c58da609fc3e0d2d11aad42d7",
+        "exit_code": 1,
+        "elapsed_seconds": 140.534,
+        "sampled_peak_tree_working_set_bytes": 784617472,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "parent_exit_code": 1,
+        "failure_reason": null,
+        "survivors_before_cleanup_count": 0,
+        "survivors_before_cleanup_names": [],
+        "compiler_telemetry_cleaned": false,
+        "pre_cleanup_survivor_classification": "none"
+      },
+      "cause": "The same-image warm run again returned mcp_unknown. The child exited normally and all owned cleanup passed.",
+      "repair": "A read-only stage diagnostic was prepared rather than changing the test assertions or repeating a rebuild."
+    },
+    {
+      "status": "failed",
+      "run": {
+        "log": "phase2-final-s23-desktop-mcp-20453eb4718b43c29f68fc3871c04fb9.log",
+        "log_sha256": "401dbbef1387e6c44a9de0a37dec251b5f44c7b4372a6522c007462c6c646bc4",
+        "metadata_sha256": "ffc3112242690245bf07d599688d59358b982a8b48f2385d0a989542722f5b8e",
+        "exit_code": 1,
+        "elapsed_seconds": 196.484,
+        "sampled_peak_tree_working_set_bytes": 786190336,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "parent_exit_code": 1,
+        "failure_reason": null,
+        "survivors_before_cleanup_count": 0,
+        "survivors_before_cleanup_names": [],
+        "compiler_telemetry_cleaned": false,
+        "pre_cleanup_survivor_classification": "none"
+      },
+      "cause": "The packaged lifecycle again returned mcp_unknown; the initial diagnostic selector refused multiple matching jpackage processes before attaching to any JVM.",
+      "repair": "Diagnostic selection was restricted to the single exact packaged JVM child. Its bounded stack and I/O samples showed real path-verification work; the subsequent same-source/image run passed all original assertions and deadlines."
+    }
+  ],
+  "earlier_hil_failures": "T2.11-retained-hil-failures.json",
+  "exact_scan_repair": {
+    "status": "reviewed exact false positives",
+    "finding_count": 45,
+    "source_hash_pairs": 22,
+    "all_source_hashes_matched_current_files": true,
+    "public_commit_source": "https://github.com/nodejs/release-keys/commit/481637f813e912c4aa3622d7964ab426c97b8e8d",
+    "general_key_exemption_added": false,
+    "general_evidence_exemption_added": false
+  },
+  "synthetic_detection_control": {
+    "synthetic_detection_control_passed": true,
+    "exact_rule": "vw-mcp-token",
+    "relative_snapshot_scan": true,
+    "ignored_parent_did_not_suppress_control": true,
+    "owned_control_files_disposed": true,
+    "verification_images_created": 0
+  },
+  "apk_staging_failure": {
+    "status": "failed",
+    "receipt_sha256": "fb8124763cc5cbec9626007e325048e87ed61b8b38bcd65f736bb3f5723de417",
+    "failure_phase": "app-hil-discover-apks",
+    "cleanup": {
+      "process_trees": true,
+      "owned_packages": true,
+      "private_work_disposed": true
+    },
+    "device_selection_or_instrumentation_started": false
+  },
+  "owned_rebuildable_symbol_cleanup": {
+    "count": 204,
+    "bytes": 865738752,
+    "containment_verified": true,
+    "all_owned_symbols_disposed": true,
+    "source_or_runtime_binaries_removed": false
+  },
+  "desktop_package_recovery": {
+    "failed_inner_build": {
+      "log": "build-desktop-distribution-2d55ee247e664b23965b69dc2e05a34c.log",
+      "log_sha256": "057c0f564baa6600f97bba2a9e510c3641ce36894c9b8f2c34efe674f84ec531",
+      "metadata_sha256": "a0adec9bc1d54f1256fe852bce58ce891a19f9ffb51acfcd62adfafaaac00b48",
+      "exit_code": 1,
+      "elapsed_seconds": 72.271,
+      "sampled_peak_tree_working_set_bytes": 1433513984,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "parent_exit_code": 1,
+      "failure_reason": null,
+      "survivors_before_cleanup_count": 0,
+      "survivors_before_cleanup_names": [],
+      "compiler_telemetry_cleaned": false,
+      "pre_cleanup_survivor_classification": "none"
+    },
+    "failed_queue": {
+      "log": "phase2-final-serialized-checks-resume-staging-ec2b0262752149f6bc6e690e1f5d31c6.log",
+      "log_sha256": "d9354c068b805c066927fb808d23ddb02a67ef84eda42e21f761b18dbe408437",
+      "metadata_sha256": "8b3d4b189e9e80c0ca3d8775045b57232fa2a21e4fd5672806b8c5c32e424d5a",
+      "exit_code": 1,
+      "elapsed_seconds": 828.021,
+      "sampled_peak_tree_working_set_bytes": 3216797696,
+      "contained_in_windows_job": true,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "parent_exit_code": 1,
+      "failure_reason": null,
+      "survivors_before_cleanup_count": 0,
+      "survivors_before_cleanup_names": [],
+      "compiler_telemetry_cleaned": false,
+      "pre_cleanup_survivor_classification": "none"
+    },
+    "symbol_count": 18,
+    "symbol_bytes": 573726720.0,
+    "generated_stage_targets": 13,
+    "stage_bytes": 1447891560.0,
+    "exact_owned_containment_and_disposal_verified": true,
+    "text_inventories_preserved": true,
+    "source_private_candidates_or_distributions_removed": false
+  },
+  "failed_packaged_mcp_smokes": [
+    {
+      "status": "failed",
+      "receipt_sha256": "2c2ee54b2e8e41c2e36b6cf4b79c50f537538e1deafac1dad30a73203550990b",
+      "failure_phase": "desktop-collect",
+      "failure_code": "mcp_unknown",
+      "process_runs": [
+        {
+          "elapsed_seconds": 3.562,
+          "exit_code": 0,
+          "process_tree_cleanup_confirmed": true,
+          "phase": "desktop-source-check"
+        },
+        {
+          "elapsed_seconds": 3.698,
+          "exit_code": 0,
+          "process_tree_cleanup_confirmed": true,
+          "phase": "desktop-pinned-check"
+        },
+        {
+          "elapsed_seconds": 165.293,
+          "exit_code": 0,
+          "process_tree_cleanup_confirmed": true,
+          "phase": "desktop-startup"
+        },
+        {
+          "capture_overflow": false,
+          "phase": "packaged-child",
+          "process_tree_cleanup_confirmed": true,
+          "exit_code": 0,
+          "elapsed_seconds": 162.66,
+          "capture_byte_limit": 1048576,
+          "captured_bytes": 226
+        },
+        {
+          "elapsed_seconds": 3.625,
+          "exit_code": 1,
+          "process_tree_cleanup_confirmed": true,
+          "phase": "desktop-collect"
+        }
+      ],
+      "cleanup": {
+        "private_raw_text_disposed": true,
+        "owned_process_trees": true,
+        "runtime_leases_released": true
+      }
+    },
+    {
+      "status": "failed",
+      "receipt_sha256": "c203f3b6d1fe990ea47d3c975751ae06508ed4cba21309681bd8af4349fdb178",
+      "failure_phase": "desktop-collect",
+      "failure_code": "mcp_unknown",
+      "process_runs": [
+        {
+          "phase": "desktop-source-check",
+          "process_tree_cleanup_confirmed": true,
+          "exit_code": 0,
+          "elapsed_seconds": 2.743
+        },
+        {
+          "phase": "desktop-pinned-check",
+          "process_tree_cleanup_confirmed": true,
+          "exit_code": 0,
+          "elapsed_seconds": 2.685
+        },
+        {
+          "phase": "desktop-startup",
+          "process_tree_cleanup_confirmed": true,
+          "exit_code": 0,
+          "elapsed_seconds": 129.831
+        },
+        {
+          "capture_byte_limit": 1048576,
+          "elapsed_seconds": 127.872,
+          "process_tree_cleanup_confirmed": true,
+          "captured_bytes": 226,
+          "exit_code": 0,
+          "phase": "packaged-child",
+          "capture_overflow": false
+        },
+        {
+          "phase": "desktop-collect",
+          "process_tree_cleanup_confirmed": true,
+          "exit_code": 1,
+          "elapsed_seconds": 2.814
+        }
+      ],
+      "cleanup": {
+        "owned_process_trees": true,
+        "private_raw_text_disposed": true,
+        "runtime_leases_released": true
+      }
+    },
+    {
+      "status": "failed",
+      "receipt_sha256": "7f271f446d5970cd5002feec7f885c98e49ba8b576b782d24103bc3c5fd76dc1",
+      "failure_phase": "desktop-collect",
+      "failure_code": "mcp_unknown",
+      "process_runs": [
+        {
+          "process_tree_cleanup_confirmed": true,
+          "phase": "desktop-source-check",
+          "exit_code": 0,
+          "elapsed_seconds": 6.117
+        },
+        {
+          "process_tree_cleanup_confirmed": true,
+          "phase": "desktop-pinned-check",
+          "exit_code": 0,
+          "elapsed_seconds": 6.949
+        },
+        {
+          "process_tree_cleanup_confirmed": true,
+          "phase": "desktop-startup",
+          "exit_code": 0,
+          "elapsed_seconds": 174.456
+        },
+        {
+          "capture_overflow": false,
+          "phase": "packaged-child",
+          "captured_bytes": 226,
+          "elapsed_seconds": 169.569,
+          "process_tree_cleanup_confirmed": true,
+          "exit_code": 0,
+          "capture_byte_limit": 1048576
+        },
+        {
+          "process_tree_cleanup_confirmed": true,
+          "phase": "desktop-collect",
+          "exit_code": 1,
+          "elapsed_seconds": 3.56
+        }
+      ],
+      "cleanup": {
+        "owned_process_trees": true,
+        "runtime_leases_released": true,
+        "private_raw_text_disposed": true
+      }
+    }
+  ],
+  "same_image_warm_readiness": {
+    "schema": 1,
+    "failed_receipt": "bc2c4c1aeba74165bbf7cd6b393dcbd1.json",
+    "failure_code": "mcp_unknown",
+    "same_packaged_distribution": true,
+    "ready_manifest_sha256": "2d4cd49409bf4652ee0027b337b254598c86aab4b2aade498291c62d5129ae3a",
+    "exact_ready_manifest_matched": true,
+    "retry_rebuild_requested": false,
+    "assertions_or_budgets_changed": false
+  },
+  "read_only_packaged_jvm_diagnostic": {
+    "source_changed": false,
+    "heap_requested": false,
+    "other_processes_targeted": false,
+    "samples": [
+      {
+        "elapsed_seconds": 15.6,
+        "user_time_100ns": 79218750,
+        "kernel_time_100ns": 219687500,
+        "read_bytes": 92774207,
+        "write_bytes": 273797,
+        "runtime_ancestor_verification_frame_observed": true
+      },
+      {
+        "elapsed_seconds": 42.6,
+        "user_time_100ns": 103750000,
+        "kernel_time_100ns": 458593750,
+        "read_bytes": 208460182,
+        "write_bytes": 297080,
+        "runtime_ancestor_verification_frame_observed": true
+      },
+      {
+        "elapsed_seconds": 68.9,
+        "user_time_100ns": 126093750,
+        "kernel_time_100ns": 695781250,
+        "read_bytes": 319391469,
+        "write_bytes": 320190,
+        "runtime_ancestor_verification_frame_observed": true
+      }
+    ],
+    "limits": "Invasive read-only diagnostics, not startup or input latency acceptance. The exact failure exception was not retained. Final same-source/image software check passed unchanged assertions and deadlines."
+  },
+  "failures_relabelled_as_passed": false,
+  "verification_images_created": 0
+}

@@ -17,7 +17,7 @@ import kotlin.math.max
 
 /** Immutable after publication to the render thread. Paths use a local f64 origin. */
 internal data class DrawObject(val item: RenderItem, val origin: Point, val path: Path,
-                               val solid: Boolean, val head: Path? = null)
+                               val solid: Boolean, val head: Path? = null, val marker: MarkerPaint? = null)
 internal data class CanvasScene(
     val revision: Long,
     val document: DocumentSnapshot,
@@ -34,6 +34,8 @@ internal data class CanvasScene(
     val density: Float = 1f,
     val dark: Boolean = true,
     val peerViewport: List<Point> = emptyList(),
+    val aiResults: Map<String,AiResultImage<AiBitmap>> = emptyMap(),
+    val resultDisplayReady: Boolean = true,
 )
 
 internal object EditorDrawing {
@@ -83,6 +85,7 @@ internal object EditorDrawing {
     fun objectPath(item: RenderItem): DrawObject {
         val shape = item.shape
         val origin = when (shape) {
+            is Shape.Result -> Point(0.0,0.0)
             is Shape.Text -> shape.anchor
             is Shape.Stroke -> Point(item.contours.x.firstOrNull()?.toDouble()?.div(256) ?: 0.0,
                 item.contours.y.firstOrNull()?.toDouble()?.div(256) ?: 0.0)
@@ -103,6 +106,7 @@ internal object EditorDrawing {
         }
         fun rect(r: Rect) = RectF(0f, 0f, r.width.toFloat(), r.height.toFloat())
         val path = when (shape) {
+            is Shape.Result -> Path() // Pixels own this shape; never fabricate a vector outline.
             is Shape.Stroke -> contourPath(item.contours, origin)
             is Shape.Text -> outlinePath(shape.outline)
             is Shape.Line -> poly(shape.points)
@@ -148,20 +152,40 @@ internal object EditorDrawing {
 
     private fun drawObject(canvas: Canvas, scene: CanvasScene, obj: DrawObject) {
         val item = obj.item
+        if(item.shape is Shape.Result){
+            val pixels=scene.aiResults[item.objectId]?:error("Unadmitted Result frame")
+            drawAiResult(canvas,item,pixels,scene.matrix,scene.transformed[item.objectId]?:item.transform);return
+        }
+        obj.marker?.let { marker -> marker.draw(canvas, scene, obj); return }
         val save = canvas.save()
-        canvas.concat(matrix(localMatrix(scene, obj)))
+        val objectMatrix = compose(scene.transformed[item.objectId] ?: item.transform,
+            Transform(e = obj.origin.x, f = obj.origin.y))
+        val constantOutline = !obj.solid && item.style.screenConstantWidth
+        // A constant-screen outline is stroked after the complete object
+        // affine. Only the camera may scale its document-space width here.
+        val path = if (constantOutline) Path(obj.path).apply { transform(matrix(objectMatrix)) } else obj.path
+        canvas.concat(matrix(if (constantOutline) scene.matrix else compose(scene.matrix, objectMatrix)))
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = argb(item.style.rgba); strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND
             strokeWidth = (if (item.style.screenConstantWidth) item.style.width / scene.camera.scale else item.style.width).toFloat()
         }
         val fill = item.style.fill
-        if (!obj.solid && fill != null) {
+        val filledShape = item.shape is Shape.Rectangle || item.shape is Shape.Ellipse || item.shape is Shape.Polygon
+        if (!obj.solid && filledShape && fill != null) {
             paint.color = argb(fill); paint.style = Paint.Style.FILL
-            canvas.drawPath(obj.path, paint); paint.color = argb(item.style.rgba)
+            canvas.drawPath(path, paint); paint.color = argb(item.style.rgba)
         }
-        paint.style = if (obj.solid) Paint.Style.FILL else Paint.Style.STROKE
-        canvas.drawPath(obj.path, paint)
-        obj.head?.let { paint.style = Paint.Style.FILL; canvas.drawPath(it, paint) }
+        // Canonical erased strokes are fill-only compound polygons. Width
+        // zero must skip the outline, not request Android's one-pixel hairline.
+        if (obj.solid || item.style.width > 0.0) {
+            paint.style = if (obj.solid) Paint.Style.FILL else Paint.Style.STROKE
+            canvas.drawPath(path, paint)
+        }
+        obj.head?.let {
+            paint.style = Paint.Style.FILL
+            val head = if (constantOutline) Path(it).apply { transform(matrix(objectMatrix)) } else it
+            canvas.drawPath(head, paint)
+        }
         canvas.restoreToCount(save)
     }
 
@@ -172,17 +196,28 @@ internal object EditorDrawing {
         canvas.concat(matrix(scene.matrix))
         canvas.clipRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat())
         canvas.drawColor(android.graphics.Color.WHITE)
-        scene.background?.let { canvas.drawBitmap(it, 0f, 0f, Paint(Paint.FILTER_BITMAP_FLAG)) }
+        // The page is presentation only. Put source and all object layers in
+        // one transparent stack so Result replacement preserves source alpha.
         canvas.restoreToCount(pageSave)
         val clipSave = canvas.save()
         val page = Path().apply { addRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat(), Path.Direction.CW) }
         page.transform(matrix(scene.matrix)); canvas.clipPath(page)
+        if(!scene.resultDisplayReady){canvas.restoreToCount(clipSave);return}
+        val documentLayer=canvas.saveLayer(null,null)
+        val sourceSave=canvas.save()
+        canvas.concat(matrix(scene.matrix))
+        scene.background?.let{canvas.drawBitmap(it,0f,0f,Paint(Paint.FILTER_BITMAP_FLAG))}
+        canvas.restoreToCount(sourceSave)
         val combined = (scene.objects + scene.provisional).filter { it.item.objectId !in scene.hidden }
         val orderedLayers = (scene.document.layers.map { it.id } + combined.map { it.item.layerId }).distinct()
         val grouped = combined.groupBy { it.item.layerId }
         for (layerId in orderedLayers) {
             val objects = grouped[layerId] ?: continue
             val first = objects.firstOrNull() ?: continue
+            if(first.item.shape is Shape.Result){
+                require(objects.size==1)
+                drawObject(canvas,scene,first);continue
+            }
             val layer = Paint().apply {
                 alpha = (first.item.layerOpacity.coerceIn(0.0, 1.0) * 255).toInt()
                 blendMode = if (first.item.layerBlend == "multiply") BlendMode.MULTIPLY else BlendMode.SRC_OVER
@@ -191,6 +226,7 @@ internal object EditorDrawing {
             objects.forEach { drawObject(canvas, scene, it) }
             canvas.restoreToCount(save)
         }
+        canvas.restoreToCount(documentLayer)
         canvas.restoreToCount(clipSave)
         if (scene.peerViewport.size == 4) {
             val points = scene.peerViewport.map { map(scene.matrix, it) }
@@ -220,7 +256,9 @@ internal object EditorDrawing {
 
     /** Geometry hit testing, never the native conservative AABB alone. */
     fun hit(scene: CanvasScene, screen: Point, radius: Float): DrawObject? = scene.objects.asReversed().firstOrNull { obj ->
-        if (obj.item.locked || obj.item.objectId in scene.hidden) false else {
+        if (obj.item.locked || obj.item.objectId in scene.hidden) false
+        else if(obj.item.shape is Shape.Result) aiResultHit(scene,obj.item,screen,radius) else if (obj.marker != null) obj.marker.hit(scene, obj, screen, radius)
+        else {
             val path = Path()
             if (obj.solid) path.set(obj.path) else Paint().apply {
                 style = if (obj.item.style.fill != null) Paint.Style.FILL_AND_STROKE else Paint.Style.STROKE

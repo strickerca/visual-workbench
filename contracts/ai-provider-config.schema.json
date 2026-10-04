@@ -1,0 +1,178 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "kind": {
+          "const": "open_ai_image_edits"
+        },
+        "verified_on": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "endpoint": {
+          "const": "https://api.openai.com/v1/images/edits"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "quality": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mask_support": {
+              "const": "alpha_png_guidance"
+            },
+            "max_long_edge": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16384
+            },
+            "min_pixels": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20000000
+            },
+            "max_pixels": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20000000
+            },
+            "size_multiple": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16384
+            },
+            "max_aspect_ratio": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "formats": {
+              "const": [
+                "png"
+              ]
+            },
+            "max_image_bytes_exclusive": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 67108864
+            },
+            "max_mask_bytes_exclusive": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 67108864
+            },
+            "experimental_above_pixels": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 18446744073709551615
+            }
+          },
+          "required": [
+            "mask_support",
+            "max_long_edge",
+            "min_pixels",
+            "max_pixels",
+            "size_multiple",
+            "max_aspect_ratio",
+            "formats",
+            "max_image_bytes_exclusive",
+            "max_mask_bytes_exclusive",
+            "experimental_above_pixels"
+          ]
+        },
+        "prices": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "text_input_microusd_per_million": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 18446744073709551615
+            },
+            "image_input_microusd_per_million": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 18446744073709551615
+            },
+            "image_output_microusd_per_million": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 18446744073709551615
+            }
+          },
+          "required": [
+            "text_input_microusd_per_million",
+            "image_input_microusd_per_million",
+            "image_output_microusd_per_million"
+          ]
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300
+        },
+        "max_response_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000000
+        }
+      },
+      "required": [
+        "schema",
+        "kind",
+        "verified_on",
+        "endpoint",
+        "model",
+        "quality",
+        "capabilities",
+        "prices",
+        "timeout_seconds",
+        "max_response_bytes"
+      ]
+    },
+    "expires_on": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "provenance": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "daily_soft_budget_microusd": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000000
+    }
+  },
+  "required": [
+    "schema",
+    "provider",
+    "expires_on",
+    "provenance",
+    "daily_soft_budget_microusd"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Visual Workbench AI configuration v1",
+  "description": "Native validation additionally checks Gregorian dates, expiry interval, UTF-8 byte bounds, provider capability cross-fields and model quality admission. Values are dated estimates, never a charge cap."
+}

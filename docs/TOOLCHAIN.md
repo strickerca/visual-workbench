@@ -106,7 +106,8 @@ This inherited catalog lists future candidates and license claims. None of its e
 | androidx.ink | 1.0.0 (stable only; 1.1.0-alpha09 is a preview with a breaking brush API rename; the JVM build ships no Windows native) | Apache-2.0 | D6 spike comparison |
 | androidx.camera (CameraX) + ZXing core | latest stable | Apache-2.0 | QR scanning for pairing (no ML Kit) |
 | androidx.heifwriter | latest stable | Apache-2.0 | Synthetic HEIF fixtures on the phone (T0.09) |
-| Kotlin MCP SDK (or TypeScript SDK sidecar) | latest stable | MIT/Apache-2.0 | MCP server (T2.09 decides) |
+| TypeScript MCP SDK (`core`, `server`; test `client`) | 2.3.0 | Apache-2.0 with retained upstream MIT notices | T2.09 sidecar; exact 20-package build/test lock, nine production packages; `tools/licenses/reviewed-npm.json` |
+| Node.js (Windows x64, project-local) | 24.21.0 | MIT and full bundled notices | Signed upstream archive verified; executable, license and 1,926 npm tool files pinned by `tools/licenses/node-runtime.json`; setup in `MCP_SETUP.md` |
 | scrcpy (server + client) | 4.1 | Apache-2.0 (its Windows bundle's FFmpeg and libusb DLLs are LGPL; listed in `third_party/LICENSES`) | Android tunnel; uses the owner's adb, never a bundled one |
 | SudoVDA | source commit a4b09fa2aa731a964d0cb5d139cb1e6240e4da12; incomplete vendor, 11 files hashed | SudoMaker CC0 option; Microsoft sample MS-PL; 2 EDID files withheld pending output provenance | T0.08: source-only preparation; missing x64 Spectre libraries; no driver build/install acceptance |
 

@@ -28,12 +28,32 @@ def proof():
 
 
 class Reports(unittest.TestCase):
+    def test_mcp_requires_its_exact_lifecycle_marker_and_requested_mode(self):
+        value = GOOD.replace(r.EXIT, r.MCP + "\n" + r.EXIT)
+        self.assertEqual(r.startup(value, "mcp")["mcp_service_cycles"], 2)
+        self.assertFalse(r.startup(value, "mcp")["external_client_or_send_acceptance"])
+        for text, mode in ((GOOD, "mcp"), (value, "startup"),
+                           (value.replace("cycles=2", "cycles=1"), "mcp"),
+                           (value.replace("grants=0", "grants=1"), "mcp"),
+                           (value.replace("sends=0", "sends=1"), "mcp"),
+                           (value.replace(r.MCP, "VW_DESKTOP_MCP failed=true"), "mcp"),
+                           (value + r.MCP, "mcp"), (value, "unknown")):
+            with self.subTest(mode=mode, text=text), self.assertRaises(r.Rejected):
+                r.startup(text, mode)
+
     def test_normal_readiness_and_exit(self):
         value = r.startup("ordinary logger line\n" + GOOD)
         self.assertEqual(value["main_to_drawn_frame_ms"], 812)
         self.assertEqual(value["window_dpi"], 192)
         self.assertFalse(value["visual_acceptance"])
         self.assertFalse(value["cold_start_or_performance_acceptance"])
+
+    def test_mcp_failure_retains_only_fixed_nonsecret_stage(self):
+        value = GOOD.replace(r.EXIT, "VW_DESKTOP_MCP failed=true stage=bundle_inventory\n" + r.EXIT)
+        with self.assertRaisesRegex(r.Rejected, "^mcp_bundle_inventory$"):
+            r.startup(value, "mcp")
+        with self.assertRaisesRegex(r.Rejected, "^mcp_lifecycle$"):
+            r.startup(value.replace("bundle_inventory", "private_value"), "mcp")
 
     def test_missing_duplicate_out_of_order_markers(self):
         lines = GOOD.splitlines()
@@ -146,6 +166,13 @@ class Distribution(unittest.TestCase):
         self.contents["com/visualworkbench/desktop/MainKt.class"] = b"synthetic class, never loaded"
         self.contents["vw-native-runtime.sha256"] = "".join(
             f"{self.native[n]['sha256']} {self.native[n]['bytes']} {n}\n" for n in sorted(r.NATIVES)).encode()
+        # Include a vendor metadata file to reproduce a Gradle-default exclusion.
+        self.mcp = {name: ("synthetic-" + name).encode() for name in r.MCP_REQUIRED}
+        self.mcp["mcp/node_modules/vendor/.gitattributes"] = b"fixture metadata"
+        self.contents[r.MCP_MANIFEST] = "".join(
+            f"{hashlib.sha256(body).hexdigest()} {len(body)} {name}\n"
+            for name, body in sorted(self.mcp.items())).encode()
+        self.contents.update({"mcp-server/" + name: body for name, body in self.mcp.items()})
         self.jar()
 
     def jar(self, duplicate=False):
@@ -166,6 +193,32 @@ class Distribution(unittest.TestCase):
     def test_stale_nonce_rejected(self):
         with self.assertRaisesRegex(r.Rejected, "stale_distribution"):
             r.distribution(self.root, "b" * 32)
+
+    def test_missing_mcp_vendor_resource_refused_before_launch(self):
+        self.contents.pop("mcp-server/mcp/node_modules/vendor/.gitattributes")
+        self.jar()
+        with self.assertRaisesRegex(r.Rejected, "mcp_resource_binding"):
+            r.distribution(self.root, self.nonce)
+
+    def test_mcp_payload_hash_is_checked_not_only_manifest(self):
+        self.contents["mcp-server/node.exe"] = b"substituted runtime"
+        self.jar()
+        with self.assertRaisesRegex(r.Rejected, "mcp_resource_binding"):
+            r.distribution(self.root, self.nonce)
+
+    def test_unlisted_mcp_resource_refused(self):
+        self.contents["mcp-server/extra.mjs"] = b"unlisted"
+        self.jar()
+        with self.assertRaisesRegex(r.Rejected, "mcp_resource_binding"):
+            r.distribution(self.root, self.nonce)
+
+    def test_duplicate_and_traversing_mcp_manifest_refused(self):
+        original = self.contents[r.MCP_MANIFEST]
+        for suffix in (original.splitlines()[0] + b"\n", b"0" * 64 + b" 1 ../escape\n"):
+            self.contents[r.MCP_MANIFEST] = original + suffix
+            self.jar()
+            with self.subTest(suffix=suffix), self.assertRaises(r.Rejected):
+                r.distribution(self.root, self.nonce)
 
     def test_native_resource_not_just_manifest_is_hashed(self):
         self.contents["win32-x86-64/vw_core.dll"] = b"wrong"

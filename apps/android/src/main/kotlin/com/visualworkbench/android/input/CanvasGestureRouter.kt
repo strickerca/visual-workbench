@@ -10,6 +10,7 @@ internal interface CanvasGestureSink {
     fun extendTool(samples: List<PenSample>)
     fun finishTool(samples: List<PenSample>)
     fun cancelTool()
+    fun navigationContact(active: Boolean) {}
     fun pan(dx: Double, dy: Double)
     fun pinch(previousX: Double, previousY: Double, nextX: Double, nextY: Double, scale: Double, radians: Double)
     fun undo()
@@ -24,6 +25,11 @@ internal class CanvasGestureRouter(private val sink: CanvasGestureSink, private 
     private var fingerStroke = false
     private var lastFrame: PointerFrame? = null
     private var navigationStart: PointerFrame? = null
+        set(value) {
+            val changed = (field == null) != (value == null)
+            field = value
+            if (changed) sink.navigationContact(value != null)
+        }
     private var maximumFingers = 0
     private var moved = false
     private var contextShown = false

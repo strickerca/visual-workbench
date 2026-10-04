@@ -1,0 +1,3636 @@
+{
+  "schema": 1,
+  "kind": "desktop-startup-run",
+  "run_id": "25b47bc74b6e4df68556de1fc81987e6",
+  "status": "passed",
+  "failure_phase": null,
+  "failure_code": null,
+  "assertions": {
+    "build": {
+      "build_target": "build-desktop-distribution",
+      "distribution": {
+        "console_launcher": true,
+        "files": {
+          "VisualWorkbenchDev.exe": {
+            "bytes": 537600,
+            "sha256": "52a7e4d750b83e96950447ab0afb3e75d4597bc786910185826a5dfdb11ab23e"
+          },
+          "app/.jpackage.xml": {
+            "bytes": 300,
+            "sha256": "d2c21a4750b21cc37980b81e92bcbabf157d2ac3edc62170a6c2287f3f4ad873"
+          },
+          "app/VisualWorkbenchDev.cfg": {
+            "bytes": 4828,
+            "sha256": "169990f7ead9ffbc0eb3ca6b24cd6fcadf66a13f92e41b7a804d51ea037f61ab"
+          },
+          "app/animation-core-desktop-1.12.1-e9420621a5a999d679c6cbd2f1a42.jar": {
+            "bytes": 397123,
+            "sha256": "d988b6b7d867146825a9da38e1522fc50580aa14986ab22a8b724fcdcef17875"
+          },
+          "app/animation-desktop-1.12.1-fdae3e449cd09fba75baf68dd23ffc.jar": {
+            "bytes": 463865,
+            "sha256": "755ca81764d5aae7afb2d5f72e3253a44a1cc9c0f890d1dcc319f0eb8f00736b"
+          },
+          "app/annotation-jvm-1.9.1-1d6a04b3b9847638d0529df8ef76a.jar": {
+            "bytes": 60577,
+            "sha256": "1e343917ebf27ba96fe4dc52b1cad7fd32b738fbc6355bb6cd5b3b305d7212d0"
+          },
+          "app/annotations-23.0.0-8484cd17d040d837983323f760b2c660.jar": {
+            "bytes": 29371,
+            "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05"
+          },
+          "app/atomicfu-jvm-0.28.0-70921245a0aed3c3e3d17c34ca3dbd87.jar": {
+            "bytes": 48578,
+            "sha256": "39576ec46b83412ff7a2909d24cccbba90400e91f9aa67b250309bc0872ecf52"
+          },
+          "app/bindings-core-feecff83f22212ede06daeea2d6af83.jar": {
+            "bytes": 1570461,
+            "sha256": "92b697539c7341f0054595015fdd2f6e7285bb5de4a849c8cccc85fe71c35d69"
+          },
+          "app/bindings-host-6341fa2aff9b443433565a6b19dbdd79.jar": {
+            "bytes": 440889,
+            "sha256": "0f30e2bac1eaf3e988dcb117cfbe4f1df1410a32f0dc172cbb20e3cb8f231337"
+          },
+          "app/collection-jvm-1.5.0-4421442c114a4f8c8fe587cf2d668237.jar": {
+            "bytes": 877998,
+            "sha256": "70b35924e4babcdffa37d0e575ee039c56a2d97123342624c48b603233704341"
+          },
+          "app/core-3.5.4-23cc13611f7f222b9988220fa28a115.jar": {
+            "bytes": 610364,
+            "sha256": "71de5d89341b5fcf5dd89da7f44e84d825d0e084cdf3ec77c9abe26b0f0ceb13"
+          },
+          "app/core-common-2.2.0-2212d240dfe1e8a7598ee117ccc316d.jar": {
+            "bytes": 11657,
+            "sha256": "65308a06b1c00ee186cb9e19321383f043b993813f1522c47f4a3e3303bdba41"
+          },
+          "app/desktop-6fc78122f888fcc4ef8a274c8295de1.jar": {
+            "bytes": 46300740,
+            "sha256": "b91fb58d4562f0f6e34c933b7f8c966f9561e504262ce61d47d3740e72cc9d6f"
+          },
+          "app/desktop-jvm-1.12.1-4ae609894295d208af37cd66a73dcb.jar": {
+            "bytes": 9333,
+            "sha256": "adaea6ec630420712dcfd52a356b46aef603129ca7f76cba204569112fa80e1c"
+          },
+          "app/foundation-desktop-1.12.1-af970f7348edc832f57bd29a9aceaf.jar": {
+            "bytes": 4741167,
+            "sha256": "e1dc29cd9de2f1628a741866a112eedc62fec43bc548d0e4f434bf31207fd1e3"
+          },
+          "app/foundation-layout-desktop-1.12.1-a74242b69b6ea3e0269ad27af719fbe5.jar": {
+            "bytes": 679331,
+            "sha256": "57b54c104bae9eea0e90bb26487f8b64ead09a473f1b32cbed8579084f485e7b"
+          },
+          "app/icudtl.dat": {
+            "bytes": 10468208,
+            "sha256": "9ae98c06cbb0ea43c5cd6b5725310c008c65e46072421a1118cb88e1de9a8b92"
+          },
+          "app/jbr-api-1.9.0-4ae6ce27bcafb233efdbf54395d03.jar": {
+            "bytes": 50453,
+            "sha256": "7e37284e33b5b304ee6174dcaa92db949b257cc4c8991ca865e7daf5113d8279"
+          },
+          "app/jna-5.19.1-cf327da3e9cf5a5d77c8a4354032929.jar": {
+            "bytes": 1950853,
+            "sha256": "4fb141dd8ef6b0585ffceea4bc49602fbc6312fa977e2c488794ea3e6aafecae"
+          },
+          "app/jspecify-1.0.0-9133aba420d0ca3b01dbb6ae9992cf6.jar": {
+            "bytes": 3819,
+            "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab"
+          },
+          "app/kotlin-stdlib-2.4.20-99b8b084c36f4bb0ecfbfcbce05dd1c2.jar": {
+            "bytes": 1853314,
+            "sha256": "2226de463d309d4a5500a481320b3dea515a6981dcae1def531fbc158884e25f"
+          },
+          "app/kotlinx-coroutines-core-jvm-1.9.0-7c86c3f6dbf92d46634a45f7727a3f6.jar": {
+            "bytes": 1463587,
+            "sha256": "ad89c2892235e670f222d819cb3d81188143cb19a05b59df9889ae4269f5c70a"
+          },
+          "app/kotlinx-coroutines-swing-1.9.0-306070691d4c995786916b28d04e9290.jar": {
+            "bytes": 8907,
+            "sha256": "ce506d82f3642651a39fc706f3d2928d846772a64c92e749f018d7f0f216826f"
+          },
+          "app/kotlinx-serialization-core-jvm-1.7.3-58c2ba33122ceccf1b35147f3db945f8.jar": {
+            "bytes": 390987,
+            "sha256": "f0adde45864144475385cf4aa7e0b7feb27f61fcf9472665ed98cc971b06b1eb"
+          },
+          "app/lifecycle-common-jvm-2.11.0-14b667ae927764855aedc4f3c099.jar": {
+            "bytes": 65749,
+            "sha256": "e6a66e67b9f63a0fb6344f165c1d872376e5fe6d235bffb138af45122cf452a9"
+          },
+          "app/lifecycle-runtime-compose-desktop-2.11.0-b176c793de60d9c31bc2ae3987f7d29e.jar": {
+            "bytes": 52000,
+            "sha256": "d5336753ea4d5881ccfb8b0613e034eb241f0d8b4349536df1cd0ec86cf63664"
+          },
+          "app/lifecycle-runtime-compose-desktop-2.9.6-497e8fcabac8a5f5ee68cb2a1c8e70a4.jar": {
+            "bytes": 452,
+            "sha256": "31c3c4b6dea38f078c46829dee2c43abba2bf8757b7ee8a0f660f31217364898"
+          },
+          "app/lifecycle-runtime-desktop-2.11.0-f14af19f336c43981285f2b83ea88f.jar": {
+            "bytes": 52884,
+            "sha256": "09f75a4a8d763cee5d6af36f422139a0205d3f6df2e2c5288cae42836f0b36ea"
+          },
+          "app/lifecycle-viewmodel-compose-desktop-2.11.0-9b8cf0a583b9f95d6c80da92f398b5.jar": {
+            "bytes": 34551,
+            "sha256": "1b4c58125c7b3693444f40c8ab76881d17fa74726860c24872a3dec3e0fad34b"
+          },
+          "app/lifecycle-viewmodel-desktop-2.11.0-f82f9216259467601fb180d915a6b118.jar": {
+            "bytes": 61420,
+            "sha256": "175c349266ccbb6a2036615725b7066ee3f3319665c98af42206ab3a582a43c3"
+          },
+          "app/lifecycle-viewmodel-savedstate-desktop-2.11.0-32f127f2f7fce65ea95a871fd81b1a2.jar": {
+            "bytes": 60307,
+            "sha256": "ca21720ce7f370cb21cabb5329b959eda624107ec06282e3bdc92582917b1d27"
+          },
+          "app/material-desktop-1.12.1-921af98aef5117e3c225b2aa7fe7b5d9.jar": {
+            "bytes": 1474003,
+            "sha256": "0c1dd397b45a7cd830234ddf30d253b586259e726a5cd816cca2e79119a47fa2"
+          },
+          "app/material-ripple-desktop-1.12.1-14de3de9fc704811971ae5fc7fe212a.jar": {
+            "bytes": 77289,
+            "sha256": "06ac72a5f57b2e724ea129efbc71973a27a9e1ceeb7f568281dcb0d1ef4448fd"
+          },
+          "app/navigationevent-compose-desktop-1.1.0-6370d5c46488f619be7b5e63333545d2.jar": {
+            "bytes": 4677,
+            "sha256": "0514f5d5c14de3b422c48a4eaf1d9dd2ce265041339e4c51ce30db8da1690874"
+          },
+          "app/navigationevent-compose-desktop-1.1.1-7c81c6a8aa54e8beed4bae895cb91.jar": {
+            "bytes": 31752,
+            "sha256": "1d7d20d7826a2cc63ace9862cddd8a7085a11a3ea2cff258c28b3d58e57f143b"
+          },
+          "app/navigationevent-desktop-1.1.1-5d6b5b7abab9bd6abdc6485ffd91541.jar": {
+            "bytes": 45586,
+            "sha256": "4c92508d4bd3b9cafb2785e8211057d39ed8465b529660223864a19625cedb5b"
+          },
+          "app/runtime-annotation-jvm-1.12.1-4190aa9d3047cacca43687b075ca9f41.jar": {
+            "bytes": 9379,
+            "sha256": "e291a6ae01ab71a7f48a568ec9744c6bf9b3f46ef72fbcdeb28c3407ae531c5e"
+          },
+          "app/runtime-desktop-1.12.1-1f10feae5687d5ddef2226983a95b8e.jar": {
+            "bytes": 1948637,
+            "sha256": "ed390d7bf7bdba951359d127f4c1ddd223f535f5a6a63078c5c5ac6b6924eb08"
+          },
+          "app/runtime-desktop-1.12.1-b7d07b28974ce573c251fcf21c78ac5.jar": {
+            "bytes": 4865,
+            "sha256": "9a40fb9ac9b98a1b2d8be51ce57dbcf733e768fa06a9e4859a1775cb52bf6806"
+          },
+          "app/runtime-retain-desktop-1.12.1-1a6731c44f232c5d9e1fb10edac28de.jar": {
+            "bytes": 53421,
+            "sha256": "9b7e62a7df333c33eff9e1a6d6c2508a4d8fe4b7a43778075538fe3da4bc4485"
+          },
+          "app/runtime-saveable-desktop-1.12.1-20894c61e27fb5db944c2ca8876eb2.jar": {
+            "bytes": 53815,
+            "sha256": "069949667409ab6de21053f9fdbff0869ae2a1f70a7212cdb89e7d409fd2552c"
+          },
+          "app/runtime-saveable-desktop-1.12.1-b997262ae4482c23c7c8a0c47e846924.jar": {
+            "bytes": 4919,
+            "sha256": "d81973dced223d6aea7bf9f6d4ead285494c656ea003b59072babefd25470c7b"
+          },
+          "app/savedstate-compose-desktop-1.3.6-8de11644e97845eaa45d9e74fdec755.jar": {
+            "bytes": 438,
+            "sha256": "0f3d045c5fd7e1301ab6c38cd0778067b0484cf39acac1233be71a723a6a8075"
+          },
+          "app/savedstate-compose-desktop-1.4.0-84ed9710e312be7017fd7498fe747a.jar": {
+            "bytes": 15494,
+            "sha256": "c02a98b0c2b35cdde245c0bfe6e7ff453c7b6d06a5eb8681d25b7f54b874ea48"
+          },
+          "app/savedstate-desktop-1.4.0-e2a50762f9c6de234b04b12926df6b3.jar": {
+            "bytes": 82073,
+            "sha256": "e965ed7a011be83a271ac7d82249a776368479ee3a2b07948c3445b51d640856"
+          },
+          "app/shared-desktop-6eed8adb31a1d9beb23d8d6102d9af.jar": {
+            "bytes": 18016681,
+            "sha256": "584968fdd5df6deb75852af77da469b87325f1949b3c1cb30bc2791327ecc706"
+          },
+          "app/skiko-awt-0.150.1-68b78f48c75f4f82c8e747df5df4883a.jar": {
+            "bytes": 1261676,
+            "sha256": "bb610ada28509ebee3a623c0469aff3665689fbec73d118055f3dbf5a37211f5"
+          },
+          "app/skiko-awt-runtime-windows-x64-0.150.1-9ce72d41809faa5a5e18b51a0de9c2e.jar": {
+            "bytes": 293,
+            "sha256": "0a0b00e632db61c6abf379f0f58245ac8f96efdc1247d10e1afbead33cee906b"
+          },
+          "app/skiko-windows-x64.dll": {
+            "bytes": 14109696,
+            "sha256": "5061ffbbfbad9fc8c6c8e0c1741b674c863293d3d071b061db9e6e0fc3ef1d38"
+          },
+          "app/skiko-windows-x64.dll.sha256": {
+            "bytes": 64,
+            "sha256": "37666ec76678b7766e712e071953fd46c6b288ac7f451e6bff7ecf6e2c0e4fa9"
+          },
+          "app/ui-desktop-1.12.1-c4ace5714b95bdaa8dfbefbef8c45514.jar": {
+            "bytes": 3715560,
+            "sha256": "eaee42812c81cf1f1a925088bd7e847a343decbc3ccb1682f00f203123a51a17"
+          },
+          "app/ui-geometry-desktop-1.12.1-29a565e9b56c42fc9a78ad6247868345.jar": {
+            "bytes": 61135,
+            "sha256": "2cde44d95ba21654dcced3a3098bdd171b3ef5b17ef7fc6cec0d25983dbc9fa0"
+          },
+          "app/ui-graphics-desktop-1.12.1-6fa07bde255e7be1447cd8eabce6901d.jar": {
+            "bytes": 644904,
+            "sha256": "92fddd7609d77a803f7083b1b7dd5a651cba10be27c105361a5d0b3894932085"
+          },
+          "app/ui-text-desktop-1.12.1-5e3686245ced4825d1d811c323ec58fb.jar": {
+            "bytes": 727188,
+            "sha256": "672331d7e1440f2406f6a9b6d3d61475316cf622d0dbbe910e47bdbd69861c38"
+          },
+          "app/ui-tooling-preview-desktop-1.12.1-3548dd9011fded88e7f44967f5c29e4.jar": {
+            "bytes": 27737,
+            "sha256": "19f5005baa27dfbf3f435feed44dfba9c938ba386ac6753d00a67a270cd72231"
+          },
+          "app/ui-unit-desktop-1.12.1-7ef6fe1b7eef6348891d94869166a6f7.jar": {
+            "bytes": 91734,
+            "sha256": "7c4998f1224f241dbe88fa59701d697d598fe8979a4acaed717b8365d4cd9300"
+          },
+          "app/ui-util-desktop-1.12.1-8f9524bdc94dc578c1cf5d640b48d99.jar": {
+            "bytes": 23303,
+            "sha256": "bb81e9748c9bcadeaeb99bab647e21442e62e253a3a497a213c68e040cb2b385"
+          },
+          "runtime/bin/api-ms-win-core-console-l1-1-0.dll": {
+            "bytes": 22072,
+            "sha256": "88ace577a9c51061cb7d1a36babbbefa48212fadc838ffde98fdfff60de18386"
+          },
+          "runtime/bin/api-ms-win-core-console-l1-2-0.dll": {
+            "bytes": 22056,
+            "sha256": "c062477ad3bfdc57b0cc402179637a214dab5045c8d644592c7decca7d18aa50"
+          },
+          "runtime/bin/api-ms-win-core-datetime-l1-1-0.dll": {
+            "bytes": 22056,
+            "sha256": "1bd81dfd19204b44662510d9054852fb77c9f25c1088d647881c9b976cc16818"
+          },
+          "runtime/bin/api-ms-win-core-debug-l1-1-0.dll": {
+            "bytes": 21944,
+            "sha256": "591358eb4d1531e9563ee0813e4301c552ce364c912ce684d16576eabf195dc3"
+          },
+          "runtime/bin/api-ms-win-core-errorhandling-l1-1-0.dll": {
+            "bytes": 22096,
+            "sha256": "d56ce7b1cd76108ad6c137326ec694a14c99d48c3d7b0ace8c3ff4d9bcee3ce8"
+          },
+          "runtime/bin/api-ms-win-core-fibers-l1-1-0.dll": {
+            "bytes": 22072,
+            "sha256": "91d249d7bc0e38ef6bcb17158b1fdc6dd8888dc086615c9b8b750b87e52a5fb3"
+          },
+          "runtime/bin/api-ms-win-core-fibers-l1-1-1.dll": {
+            "bytes": 22072,
+            "sha256": "fc9d86cec621383eab636ebc87ddd3f5c19a3cb2a33d97be112c051d0b275429"
+          },
+          "runtime/bin/api-ms-win-core-file-l1-1-0.dll": {
+            "bytes": 26152,
+            "sha256": "1ca895aba4e7435563a6b43e85eba67a0f8c74aa6a6a94d0fc48fa35535e2585"
+          },
+          "runtime/bin/api-ms-win-core-file-l1-2-0.dll": {
+            "bytes": 22056,
+            "sha256": "4cadbc0c39da7c6722206fdcebd670abe5b8d261e7b041dd94f9397a89d1990d"
+          },
+          "runtime/bin/api-ms-win-core-file-l2-1-0.dll": {
+            "bytes": 21960,
+            "sha256": "93c624b366ba16c643fc8933070a26f03b073ad0cf7f80173266d67536c61989"
+          },
+          "runtime/bin/api-ms-win-core-handle-l1-1-0.dll": {
+            "bytes": 21944,
+            "sha256": "39095f59c41d76ec81bb2723d646fde4c148e7cc3402f4980d2ade95cb9c84f9"
+          },
+          "runtime/bin/api-ms-win-core-heap-l1-1-0.dll": {
+            "bytes": 22072,
+            "sha256": "8f105771b236dbcb859de271f0a6822ce1cb79c36988dd42c9e3f6f55c5f7eb9"
+          },
+          "runtime/bin/api-ms-win-core-interlocked-l1-1-0.dll": {
+            "bytes": 22072,
+            "sha256": "53b25e753ca785bf8b695d89dde5818a318890211dc992a89146f16658f0b606"
+          },
+          "runtime/bin/api-ms-win-core-kernel32-legacy-l1-1-1.dll": {
+            "bytes": 22080,
+            "sha256": "a9b13a1cd1b8c19b0c6b4afcd5bb0dd29c0e2288231ac9e6db8510094ce68ba6"
+          },
+          "runtime/bin/api-ms-win-core-libraryloader-l1-1-0.dll": {
+            "bytes": 22056,
+            "sha256": "7f39ba298b41e4963047341288cab36b6a241835ee11ba4ad70f44dacd40906c"
+          },
+          "runtime/bin/api-ms-win-core-localization-l1-2-0.dll": {
+            "bytes": 22080,
+            "sha256": "6ee44dd0d8510dc024c9f7c79b1b9fa88c987b26b6beb6653ddd11751c34e5dc"
+          },
+          "runtime/bin/api-ms-win-core-memory-l1-1-0.dll": {
+            "bytes": 22056,
+            "sha256": "0512a35316ec9180437f86696a84c5c06a7e4e82e050055a656e5bf9fca206f9"
+          },
+          "runtime/bin/api-ms-win-core-namedpipe-l1-1-0.dll": {
+            "bytes": 22096,
+            "sha256": "c05f1fffe3b5a2738ea54ce9485cca026fb9635f982626fba1e1dcc531897273"
+          },
+          "runtime/bin/api-ms-win-core-processenvironment-l1-1-0.dll": {
+            "bytes": 21968,
+            "sha256": "c4eca98c3c67b6395d5b005b00ac1eb0318b86b23aa71035a44c2b1602befba9"
+          },
+          "runtime/bin/api-ms-win-core-processthreads-l1-1-0.dll": {
+            "bytes": 22096,
+            "sha256": "5ccb89e93d67bc3288d4e84649c5346e66e15e3d7cd65d989daf3f4cb584be9a"
+          },
+          "runtime/bin/api-ms-win-core-processthreads-l1-1-1.dll": {
+            "bytes": 22072,
+            "sha256": "4ad565a8ba3ef0ea8ab87221ad11f83ee0bc844ce236607958406663b407333e"
+          },
+          "runtime/bin/api-ms-win-core-profile-l1-1-0.dll": {
+            "bytes": 22080,
+            "sha256": "7809160932f44e59b021699f5bc68799eb7293ee1fa926d6fcca3c3445302e61"
+          },
+          "runtime/bin/api-ms-win-core-rtlsupport-l1-1-0.dll": {
+            "bytes": 21960,
+            "sha256": "9dc1e91e71c7c054854bd1487cb4e6946d82c9f463430f1c4e8d1471005172b1"
+          },
+          "runtime/bin/api-ms-win-core-string-l1-1-0.dll": {
+            "bytes": 22056,
+            "sha256": "60fc31d2a0c634412f529dba76af3b9bf991352877c6dae528186d3935704cfd"
+          },
+          "runtime/bin/api-ms-win-core-synch-l1-1-0.dll": {
+            "bytes": 22056,
+            "sha256": "3a72b4f29f39a265d32ad12f0ce15dbf60129c840e10d84d427829ede45e78ad"
+          },
+          "runtime/bin/api-ms-win-core-synch-l1-2-0.dll": {
+            "bytes": 22080,
+            "sha256": "efc1e4460984a73cf47a3def033af1c8f3b1dbc1a56cd27781d3aacf3e3330cb"
+          },
+          "runtime/bin/api-ms-win-core-sysinfo-l1-1-0.dll": {
+            "bytes": 22072,
+            "sha256": "b203d862ddef1dd62bf623fc866c7f7a9c317c1c2ae30d1f52cb41f955b5698e"
+          },
+          "runtime/bin/api-ms-win-core-sysinfo-l1-2-0.dll": {
+            "bytes": 22080,
+            "sha256": "2703635d835396afd0f138d7c73751afe7e33a24f4225d08c1690b0a371932c0"
+          },
+          "runtime/bin/api-ms-win-core-timezone-l1-1-0.dll": {
+            "bytes": 22056,
+            "sha256": "33f4fddc181066fce06b2227bded813f95e94ed1f3d785e982c6b6b56c510c57"
+          },
+          "runtime/bin/api-ms-win-core-util-l1-1-0.dll": {
+            "bytes": 21944,
+            "sha256": "6eda016742a6171205a387a14b3c0b331841567740376f56768f8c151724207d"
+          },
+          "runtime/bin/api-ms-win-crt-conio-l1-1-0.dll": {
+            "bytes": 22056,
+            "sha256": "b762061b688aae679afe788904d2c9970f74a7dac98f3b42463d08f25e483d3f"
+          },
+          "runtime/bin/api-ms-win-crt-convert-l1-1-0.dll": {
+            "bytes": 26056,
+            "sha256": "ebb2ae5535a64f65daeab8235585114fc9dd2cf1a49f5852d446250b998b6ae4"
+          },
+          "runtime/bin/api-ms-win-crt-environment-l1-1-0.dll": {
+            "bytes": 22080,
+            "sha256": "17d63275d00bdd8670422b95bd264c532998e0a1b041079e54fce4b6b7a55819"
+          },
+          "runtime/bin/api-ms-win-crt-filesystem-l1-1-0.dll": {
+            "bytes": 22056,
+            "sha256": "9a9e2a65a281644e368d0f272b95ba5f6b445d1c35910d06056c5ebeb77402db"
+          },
+          "runtime/bin/api-ms-win-crt-heap-l1-1-0.dll": {
+            "bytes": 22096,
+            "sha256": "bab9ac3ec83e380ae51e4295ef3bf2c738627812d3a49d1e713661abbc8dc57a"
+          },
+          "runtime/bin/api-ms-win-crt-locale-l1-1-0.dll": {
+            "bytes": 22080,
+            "sha256": "bd14c67ea28e21d6257ad780a37122c9b5773f69e693f5db6bffaee4d839526e"
+          },
+          "runtime/bin/api-ms-win-crt-math-l1-1-0.dll": {
+            "bytes": 30248,
+            "sha256": "606d66d82db562ea7979179d06486a0f94d079941d26b80a1e2c49d29959df6f"
+          },
+          "runtime/bin/api-ms-win-crt-multibyte-l1-1-0.dll": {
+            "bytes": 30248,
+            "sha256": "95f49efbe8107786733fa7c474025cf3fee0ac632f240367b296c736d06572aa"
+          },
+          "runtime/bin/api-ms-win-crt-private-l1-1-0.dll": {
+            "bytes": 75328,
+            "sha256": "1bc82bed6143d2bf1b6b08a7809f4a5e29317d6fddd338a7da3c0223522e4bbf"
+          },
+          "runtime/bin/api-ms-win-crt-process-l1-1-0.dll": {
+            "bytes": 22096,
+            "sha256": "f6156b1020380ec4f0e48577ebedaaef5fb1ab1f337d8b4e72e6a33a7567a9cc"
+          },
+          "runtime/bin/api-ms-win-crt-runtime-l1-1-0.dll": {
+            "bytes": 26152,
+            "sha256": "c5902934d026d7e15fbe9917d474f3322846a41a25e66f4b2b1f758801879f4b"
+          },
+          "runtime/bin/api-ms-win-crt-stdio-l1-1-0.dll": {
+            "bytes": 26168,
+            "sha256": "a9c5a153d8c0286f9b41a2b1c65854ad9e6471b8755b7de87bae4470e60bcab6"
+          },
+          "runtime/bin/api-ms-win-crt-string-l1-1-0.dll": {
+            "bytes": 26176,
+            "sha256": "25b8f83a7767211b11132775a0e27a45aa4ec8ab4e6572599f9c172ae3606b40"
+          },
+          "runtime/bin/api-ms-win-crt-time-l1-1-0.dll": {
+            "bytes": 22096,
+            "sha256": "7c7f6393f06de11750adb09cc5698ae55cd9fb27b2e51e207286feb1b5b2b156"
+          },
+          "runtime/bin/api-ms-win-crt-utility-l1-1-0.dll": {
+            "bytes": 21952,
+            "sha256": "d8ba5f17b9ffcbf3aeaf3fa1da226832d2fa90f81acce0cd669464e76ce434ac"
+          },
+          "runtime/bin/awt.dll": {
+            "bytes": 1484928,
+            "sha256": "6fd29b7267eb02df00229b44f34d561be1e56b313ada754bcea1acf7c3562a83"
+          },
+          "runtime/bin/fontmanager.dll": {
+            "bytes": 1030264,
+            "sha256": "2cd3b5ebc97aff79685c34024ef13a3880aed9c26bb9d82c673ee765b134b6a5"
+          },
+          "runtime/bin/freetype.dll": {
+            "bytes": 560760,
+            "sha256": "213a2ed1d5130ce40b5d3b8495fd41d9841c844da1116fd3a2b4eab85259c20c"
+          },
+          "runtime/bin/java.dll": {
+            "bytes": 122488,
+            "sha256": "9b484b6a703e890292ab3bdb43c81c17eac1eecce585a28205d32ae42c3bc049"
+          },
+          "runtime/bin/javajpeg.dll": {
+            "bytes": 180856,
+            "sha256": "bc96c9e9e4a3eb21b06a5f3107229d411415ecc686c10219421626f8a1871147"
+          },
+          "runtime/bin/jawt.dll": {
+            "bytes": 21624,
+            "sha256": "a3a888fed957b49b88cd42ceea4335123ea4ca50fcfaf60f88ab961bdbd6289e"
+          },
+          "runtime/bin/jimage.dll": {
+            "bytes": 34424,
+            "sha256": "8123408896077c9fcdcb0d5809d5bdf6e96a3e3a1a15bec2dc7432f68b42acf4"
+          },
+          "runtime/bin/jli.dll": {
+            "bytes": 89720,
+            "sha256": "1e189c727f043e924cb8779b673702ba836faa7c9e752e2743b69cde70a2c1fb"
+          },
+          "runtime/bin/jsound.dll": {
+            "bytes": 61048,
+            "sha256": "a0fa7096c74f91b8213eecd457422f3a4e5ec8f8a6e3fccc9b1a0be1036fde5f"
+          },
+          "runtime/bin/lcms.dll": {
+            "bytes": 260728,
+            "sha256": "ece80974504b25cfabd0d3a1860db0f17935d83a6010511dd47b21f0f0353d46"
+          },
+          "runtime/bin/mlib_image.dll": {
+            "bytes": 521344,
+            "sha256": "4dcd756b9d4405ada3786d69a1d2bdc9fc9ce770c8401d0a382d178fdcabc4e1"
+          },
+          "runtime/bin/msvcp140.dll": {
+            "bytes": 575056,
+            "sha256": "a4c2229bdc2a2a630acdc095b4d86008e5c3e3bc7773174354f3da4f5beb9cde"
+          },
+          "runtime/bin/net.dll": {
+            "bytes": 60024,
+            "sha256": "da8fe694d71e287cb1c74d478d8854f55d6ea26aba17e58050b772a0a7ef79d8"
+          },
+          "runtime/bin/nio.dll": {
+            "bytes": 80504,
+            "sha256": "50cddbcea627390ed9dee80da7ca9d1942c4c7b1e3f138276693d487a6dd589c"
+          },
+          "runtime/bin/prefs.dll": {
+            "bytes": 25728,
+            "sha256": "3c64fee48d8cf5d4ac97bbc10d335b2aae48ac539a1434d740d7a1d51e840e4c"
+          },
+          "runtime/bin/server/jvm.dll": {
+            "bytes": 13919872,
+            "sha256": "3df13bd73c7dbeef26693cef664b4ede84649720f7a12f0203215a65656d25f4"
+          },
+          "runtime/bin/splashscreen.dll": {
+            "bytes": 216696,
+            "sha256": "d5b0ccbc32429dbb1617d88bbd4adb471a4debd5a9dd3967b8b7484e6fc9214a"
+          },
+          "runtime/bin/syslookup.dll": {
+            "bytes": 28792,
+            "sha256": "0702917a944d3b779881b3c5da4cf50a6c94903a60883eac868696723e551221"
+          },
+          "runtime/bin/ucrtbase.dll": {
+            "bytes": 1361448,
+            "sha256": "2e5fb14b7bf8540278f3614a12f0226e56a7cc9e64b81cbd976c6fcf2f71cbfb"
+          },
+          "runtime/bin/vcruntime140.dll": {
+            "bytes": 119888,
+            "sha256": "02c6aa0e6e624411a9f19b0360a7865ab15908e26024510e5c38a9c08362c35a"
+          },
+          "runtime/bin/vcruntime140_1.dll": {
+            "bytes": 49640,
+            "sha256": "7dd9aa02e271c68ca6d5f18d651d23a15d7259715af43326578f7dde27f37637"
+          },
+          "runtime/bin/verify.dll": {
+            "bytes": 54912,
+            "sha256": "dd1d4af0d2c1348f29a143c358922be9d071addbf0d103d15910332cf3b74a58"
+          },
+          "runtime/bin/zip.dll": {
+            "bytes": 87168,
+            "sha256": "a9ae352e10a098403f497ea69442818be1148a737792a21a7d568a4836d2dc06"
+          },
+          "runtime/conf/jaxp.properties": {
+            "bytes": 7302,
+            "sha256": "7d95c49465d0c836d608d02856d3b097934dfb5dc4bd2279affaf337d045b708"
+          },
+          "runtime/conf/logging.properties": {
+            "bytes": 2732,
+            "sha256": "b62d2733ab99556b108a1951d894c5a8d76b1ac7a00c02c388f9eb9be046c56f"
+          },
+          "runtime/conf/net.properties": {
+            "bytes": 7504,
+            "sha256": "56dd1f6095c189c1052f6baa32e457efc09de4832e19cdb82bb236dc8abfee9f"
+          },
+          "runtime/conf/security/java.policy": {
+            "bytes": 2294,
+            "sha256": "d51bcab7ed301caeff3779a5e777e6019864cecee5e2abc102ef991b0de77af2"
+          },
+          "runtime/conf/security/java.security": {
+            "bytes": 73067,
+            "sha256": "7eff0eef66774d0c6a07f6c69fae02d8a7dff9b2ef3d7751af9af87a4dda33e6"
+          },
+          "runtime/conf/security/policy/README.txt": {
+            "bytes": 2390,
+            "sha256": "6da0747334b0fea7592fd92614b2bbc8b126535e129b1fee483774d914e98eb5"
+          },
+          "runtime/conf/security/policy/limited/default_US_export.policy": {
+            "bytes": 146,
+            "sha256": "758b930a526fc670ab7537f8c26321527050a31f5f42149a2dda623c56a0a1a9"
+          },
+          "runtime/conf/security/policy/limited/default_local.policy": {
+            "bytes": 647,
+            "sha256": "2b2627548e61316150d47ffc3e6cad465ca05b3cccd4785eb7d21aa7baa0f441"
+          },
+          "runtime/conf/security/policy/limited/exempt_local.policy": {
+            "bytes": 566,
+            "sha256": "8c3d7648abcd95a272ce12db870082937f4d7f6878d730d83cb7fbb31eb8b2c9"
+          },
+          "runtime/conf/security/policy/unlimited/default_US_export.policy": {
+            "bytes": 146,
+            "sha256": "758b930a526fc670ab7537f8c26321527050a31f5f42149a2dda623c56a0a1a9"
+          },
+          "runtime/conf/security/policy/unlimited/default_local.policy": {
+            "bytes": 193,
+            "sha256": "8d8a318e6d90dfd7e26612d2b6385aa704f686ca6134c551f8928418d92b851a"
+          },
+          "runtime/conf/sound.properties": {
+            "bytes": 1210,
+            "sha256": "299c2360b6155eb28990ec49cd21753f97e43442fe8fab03e04f3e213df43a66"
+          },
+          "runtime/legal/java.base/ADDITIONAL_LICENSE_INFO": {
+            "bytes": 2114,
+            "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916"
+          },
+          "runtime/legal/java.base/ASSEMBLY_EXCEPTION": {
+            "bytes": 1514,
+            "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33"
+          },
+          "runtime/legal/java.base/LICENSE": {
+            "bytes": 19274,
+            "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726"
+          },
+          "runtime/legal/java.base/aes.md": {
+            "bytes": 1444,
+            "sha256": "45c6d4da48325edfbff3dcf71c704e504c057904435ed23c6d57046d551eb69d"
+          },
+          "runtime/legal/java.base/asm.md": {
+            "bytes": 1582,
+            "sha256": "683be15695bd248272d60f5b7fbe5e126a935ea6bf231a624a9aa164733e1d1d"
+          },
+          "runtime/legal/java.base/c-libutl.md": {
+            "bytes": 1556,
+            "sha256": "bef40679922d6fdfb7e4ddb223ad6722300f6054ba737bbf6188d60fcec517f9"
+          },
+          "runtime/legal/java.base/cldr.md": {
+            "bytes": 9601,
+            "sha256": "19515e14a240e022640e95b61b5095127fa9690755950b4a2b0a02e783e08163"
+          },
+          "runtime/legal/java.base/icu.md": {
+            "bytes": 30197,
+            "sha256": "1bf28459c6e0af9f3429f4f8becd1668d6544055f8df240277456bc4b3d8a752"
+          },
+          "runtime/legal/java.base/public_suffix.md": {
+            "bytes": 17783,
+            "sha256": "861de1e4992a7d28f1de25c73cd50d26a94779ebd749c0643fecfa56442c3429"
+          },
+          "runtime/legal/java.base/siphash.md": {
+            "bytes": 8256,
+            "sha256": "5a792b5a74ad2a5f3d6a7ad8b7a841116e58a772c18bc6e392320a365b222c76"
+          },
+          "runtime/legal/java.base/unicode.md": {
+            "bytes": 9078,
+            "sha256": "6f72f10d166b2c2e8a395e03e734c5afc852b59aeca73ced124f6b9c96268d53"
+          },
+          "runtime/legal/java.base/wepoll.md": {
+            "bytes": 1454,
+            "sha256": "3ac2992770080453b98c42afa807ba4b2c1738ef756b92a55c645f55e7df48f0"
+          },
+          "runtime/legal/java.base/zlib.md": {
+            "bytes": 1010,
+            "sha256": "c9c70c36a1f0325e8788771906202d42ba6ab4205caca44ec0f665707e83226b"
+          },
+          "runtime/legal/java.datatransfer/ADDITIONAL_LICENSE_INFO": {
+            "bytes": 49,
+            "sha256": "ebf9777bd307ed789ceabf282a9aca168c391c7f48e15a60939352efb3ea33f9"
+          },
+          "runtime/legal/java.datatransfer/ASSEMBLY_EXCEPTION": {
+            "bytes": 44,
+            "sha256": "b998cda101e5a1ebcfb5ff9cddd76ed43a2f2169676592d428b7c0d780665f2a"
+          },
+          "runtime/legal/java.datatransfer/LICENSE": {
+            "bytes": 33,
+            "sha256": "86e0516b888276a492b19f9a84f5a866ed36925fae1510b3a94a0b6213e69192"
+          },
+          "runtime/legal/java.desktop/ADDITIONAL_LICENSE_INFO": {
+            "bytes": 49,
+            "sha256": "ebf9777bd307ed789ceabf282a9aca168c391c7f48e15a60939352efb3ea33f9"
+          },
+          "runtime/legal/java.desktop/ASSEMBLY_EXCEPTION": {
+            "bytes": 44,
+            "sha256": "b998cda101e5a1ebcfb5ff9cddd76ed43a2f2169676592d428b7c0d780665f2a"
+          },
+          "runtime/legal/java.desktop/LICENSE": {
+            "bytes": 33,
+            "sha256": "86e0516b888276a492b19f9a84f5a866ed36925fae1510b3a94a0b6213e69192"
+          },
+          "runtime/legal/java.desktop/colorimaging.md": {
+            "bytes": 167,
+            "sha256": "04d61e3e8e71dd452ebe52008af5378d9f6640d14578aeb515dc5375973b0189"
+          },
+          "runtime/legal/java.desktop/freetype.md": {
+            "bytes": 30465,
+            "sha256": "553e804baecb7de7129d77c7259a6b70037d1893f1c600b41b35201695fb7758"
+          },
+          "runtime/legal/java.desktop/giflib.md": {
+            "bytes": 1689,
+            "sha256": "206aab89ec75968e48a6a1ed6df7d8b9bfb7aea12cbe4c9345d93e5d97460a25"
+          },
+          "runtime/legal/java.desktop/harfbuzz.md": {
+            "bytes": 3629,
+            "sha256": "5ec7cba7f8e7fc3a089213140aab6fa1b3bd5bf8a91bf8bddb3b8d315fc5f7d0"
+          },
+          "runtime/legal/java.desktop/jpeg.md": {
+            "bytes": 3474,
+            "sha256": "c1dfb9719a71ad9f861f8728550542d681e25c8ef40e6393606e6e2a0c1d653a"
+          },
+          "runtime/legal/java.desktop/lcms.md": {
+            "bytes": 2654,
+            "sha256": "843f9f6fa9c3f8109fcf4d5fe74caf7f2ae8e9bcd92238e4aff2d428c932b24b"
+          },
+          "runtime/legal/java.desktop/libpng.md": {
+            "bytes": 7519,
+            "sha256": "f73afb394792f3aeecd959e89487603677a430e56b44eba596d8b572accfd540"
+          },
+          "runtime/legal/java.desktop/mesa3d.md": {
+            "bytes": 5732,
+            "sha256": "63f4e6f75caebbccb95d903fb43e46ac7111b3624d0a34f146b276d7d9e7b152"
+          },
+          "runtime/legal/java.logging/ADDITIONAL_LICENSE_INFO": {
+            "bytes": 49,
+            "sha256": "ebf9777bd307ed789ceabf282a9aca168c391c7f48e15a60939352efb3ea33f9"
+          },
+          "runtime/legal/java.logging/ASSEMBLY_EXCEPTION": {
+            "bytes": 44,
+            "sha256": "b998cda101e5a1ebcfb5ff9cddd76ed43a2f2169676592d428b7c0d780665f2a"
+          },
+          "runtime/legal/java.logging/LICENSE": {
+            "bytes": 33,
+            "sha256": "86e0516b888276a492b19f9a84f5a866ed36925fae1510b3a94a0b6213e69192"
+          },
+          "runtime/legal/java.prefs/ADDITIONAL_LICENSE_INFO": {
+            "bytes": 49,
+            "sha256": "ebf9777bd307ed789ceabf282a9aca168c391c7f48e15a60939352efb3ea33f9"
+          },
+          "runtime/legal/java.prefs/ASSEMBLY_EXCEPTION": {
+            "bytes": 44,
+            "sha256": "b998cda101e5a1ebcfb5ff9cddd76ed43a2f2169676592d428b7c0d780665f2a"
+          },
+          "runtime/legal/java.prefs/LICENSE": {
+            "bytes": 33,
+            "sha256": "86e0516b888276a492b19f9a84f5a866ed36925fae1510b3a94a0b6213e69192"
+          },
+          "runtime/legal/java.xml/ADDITIONAL_LICENSE_INFO": {
+            "bytes": 49,
+            "sha256": "ebf9777bd307ed789ceabf282a9aca168c391c7f48e15a60939352efb3ea33f9"
+          },
+          "runtime/legal/java.xml/ASSEMBLY_EXCEPTION": {
+            "bytes": 44,
+            "sha256": "b998cda101e5a1ebcfb5ff9cddd76ed43a2f2169676592d428b7c0d780665f2a"
+          },
+          "runtime/legal/java.xml/LICENSE": {
+            "bytes": 33,
+            "sha256": "86e0516b888276a492b19f9a84f5a866ed36925fae1510b3a94a0b6213e69192"
+          },
+          "runtime/legal/java.xml/bcel.md": {
+            "bytes": 11196,
+            "sha256": "cd578186ad93de46cca29ec8ace2b11f9da751987f3f140e6095c528596cc8c1"
+          },
+          "runtime/legal/java.xml/dom.md": {
+            "bytes": 3761,
+            "sha256": "6686e8877667584a3a7c07344baadca1a03e29f677162d87c3c0811e990d1148"
+          },
+          "runtime/legal/java.xml/jcup.md": {
+            "bytes": 1448,
+            "sha256": "8d5dcfdf50455a3c34c753a98f21e953248af200415a9084e3f102cb6c43b8bf"
+          },
+          "runtime/legal/java.xml/xalan.md": {
+            "bytes": 13477,
+            "sha256": "c27eb875da4be683d4d7422be986e5e30f636ede31958ff1d39f9cd6109e7a00"
+          },
+          "runtime/legal/java.xml/xerces.md": {
+            "bytes": 11848,
+            "sha256": "4a6bf6b367193ee68681cb2d9fed30ffc5d62dd2d477bd62e0271707d71b3244"
+          },
+          "runtime/legal/jdk.crypto.ec/ADDITIONAL_LICENSE_INFO": {
+            "bytes": 49,
+            "sha256": "ebf9777bd307ed789ceabf282a9aca168c391c7f48e15a60939352efb3ea33f9"
+          },
+          "runtime/legal/jdk.crypto.ec/ASSEMBLY_EXCEPTION": {
+            "bytes": 44,
+            "sha256": "b998cda101e5a1ebcfb5ff9cddd76ed43a2f2169676592d428b7c0d780665f2a"
+          },
+          "runtime/legal/jdk.crypto.ec/LICENSE": {
+            "bytes": 33,
+            "sha256": "86e0516b888276a492b19f9a84f5a866ed36925fae1510b3a94a0b6213e69192"
+          },
+          "runtime/legal/jdk.unsupported/ADDITIONAL_LICENSE_INFO": {
+            "bytes": 49,
+            "sha256": "ebf9777bd307ed789ceabf282a9aca168c391c7f48e15a60939352efb3ea33f9"
+          },
+          "runtime/legal/jdk.unsupported/ASSEMBLY_EXCEPTION": {
+            "bytes": 44,
+            "sha256": "b998cda101e5a1ebcfb5ff9cddd76ed43a2f2169676592d428b7c0d780665f2a"
+          },
+          "runtime/legal/jdk.unsupported/LICENSE": {
+            "bytes": 33,
+            "sha256": "86e0516b888276a492b19f9a84f5a866ed36925fae1510b3a94a0b6213e69192"
+          },
+          "runtime/lib/classlist": {
+            "bytes": 78927,
+            "sha256": "bee5fb44a1db38097034c3e6f85af40c76df6da815f75d5fe782ff0d296081c0"
+          },
+          "runtime/lib/fontconfig.bfc": {
+            "bytes": 4836,
+            "sha256": "c7e2e76b908cb6330823e698889943c162e9861a4575501cbb59c9b830158ab0"
+          },
+          "runtime/lib/fontconfig.properties.src": {
+            "bytes": 12612,
+            "sha256": "74e6c464ae1e63983ada241869fdc66ef8c28cef403ee2301e0a90db9555b00c"
+          },
+          "runtime/lib/jawt.lib": {
+            "bytes": 1682,
+            "sha256": "af64af138d14b9fd0849d7f66ad6b529a4e5ec9c25476557bf6b3d65a8ac6884"
+          },
+          "runtime/lib/jrt-fs.jar": {
+            "bytes": 110124,
+            "sha256": "45fc41e80103af6ac9e9dd1403c9228271b77a9719f262e96a800486b9646952"
+          },
+          "runtime/lib/jvm.cfg": {
+            "bytes": 29,
+            "sha256": "aa9efb969444c1484e29adecab55a122458090616e766b2f1230ef05bc3867e0"
+          },
+          "runtime/lib/jvm.lib": {
+            "bytes": 1190266,
+            "sha256": "58fbee0f29d91056c2b251a11627d1c090f19a877ec254eb02ecb02d1477d50a"
+          },
+          "runtime/lib/modules": {
+            "bytes": 53334358,
+            "sha256": "79f200d79769f7289a9d99b35bd6f80857f5f848245ea73254c813580c80bad6"
+          },
+          "runtime/lib/psfont.properties.ja": {
+            "bytes": 3793,
+            "sha256": "5a4bd51b969bf187ff86d94f4a71fdfbfa602762975fa3c73d264b4575f7c78f"
+          },
+          "runtime/lib/psfontj2d.properties": {
+            "bytes": 11390,
+            "sha256": "780c565d5af3ee6f68b887b75c041cdf46a0592f67012f12eeb691283e92630a"
+          },
+          "runtime/lib/security/blocked.certs": {
+            "bytes": 2527,
+            "sha256": "583500b76965eb54b03493372989ab4d3426f85462d1db232c5ae6706a4d6c58"
+          },
+          "runtime/lib/security/cacerts": {
+            "bytes": 153428,
+            "sha256": "98d34a90fca2688ef5674862d2a484e09e5ca25d2f07c5d654aa28f1581f3419"
+          },
+          "runtime/lib/security/default.policy": {
+            "bytes": 11380,
+            "sha256": "69790a79bb9d4bef6b544c1878410bfa0c6a92171834c188772a0ba1ca8c0d95"
+          },
+          "runtime/lib/security/public_suffix_list.dat": {
+            "bytes": 229254,
+            "sha256": "37e71e43c8605f29b9072f152d0ea4708735cdf335a5b68b2bc2f875760806c3"
+          },
+          "runtime/lib/tzdb.dat": {
+            "bytes": 102956,
+            "sha256": "5906b44e25a8a730131d7ba1beb5d15af27043f6536f1a169ca8a5d8b8bed8f8"
+          },
+          "runtime/lib/tzmappings": {
+            "bytes": 22190,
+            "sha256": "b41575b332809b37ad423bdca30c7c48cdef3d82f82fa9d534781a6f15d6a2ab"
+          },
+          "runtime/release": {
+            "bytes": 141,
+            "sha256": "44dcec689de5b6d11773d41a97509ce2968609ca8f47916a1a48f706408230af"
+          },
+          "vw-app-image.sha256": {
+            "bytes": 23405,
+            "sha256": "303ce7c7d8ee5986ebffab1bdf7a2dcfd0f419828a5c0791a5bad4f3e83685ed"
+          },
+          "vw-mcp.exe": {
+            "bytes": 2085376,
+            "sha256": "ff75bc9767732f5e10427afb947e61b2972ebdbe68222b4dcc070ca53a7d8e50"
+          }
+        },
+        "launcher": "VisualWorkbenchDev.exe",
+        "native_inputs": {
+          "vw-bindgen.exe": {
+            "bytes": 13779968,
+            "sha256": "9d97b8ea1368c4b7268574f3f9967ae2668acc2983bfbd415e3911553e5a60b1"
+          },
+          "vw-capture-helper.exe": {
+            "bytes": 2330112,
+            "sha256": "b82d0ecfec5e07896fc36c321b58a5ace5ccaaae70d17bf50eda4d0bdd05a1cb"
+          },
+          "vw-connection-helper.exe": {
+            "bytes": 2149888,
+            "sha256": "66630fa7273bb6037301905e5882d565a48da9ff21497348996f0919dfd48461"
+          },
+          "vw_core.dll": {
+            "bytes": 43003392,
+            "sha256": "cdd38193143d8ad7e6a13ceda762bade3249fb514c6f99f167c5c9f77ca1cbe9"
+          },
+          "vw_host.dll": {
+            "bytes": 6738944,
+            "sha256": "0496e8191a713a80a251dfcd5cb2f3daa5313ff46d97efbce727d58906f0f8cf"
+          }
+        },
+        "relative_directory": "apps/desktop/build/compose/binaries/main/app/VisualWorkbenchDev",
+        "total_bytes": 195497979
+      },
+      "kind": "desktop-distribution",
+      "nonce": "f5d19ff9d27447a784f0b7aa95481982",
+      "recorded_ns": 1791084382092106300,
+      "schema": 1,
+      "source": {
+        ".cargo/config.toml": {
+          "bytes": 367,
+          "sha256": "db0ef1dddd1b273925e3b0b6ec10c34d720dddd54939b8e51290f9c0d1b4ed26"
+        },
+        "Cargo.lock": {
+          "bytes": 94726,
+          "sha256": "4b2da6859b8e21e6b77bcf38941ccc583e362cc8dfdacb135883860ae79bfea6"
+        },
+        "Cargo.toml": {
+          "bytes": 750,
+          "sha256": "926e65a8241e89a2f7d55568069536f4ffec5b2cd248e149d9fa252133698ab0"
+        },
+        "apps/android/build.gradle.kts": {
+          "bytes": 2846,
+          "sha256": "fadeb4f3faf427cd1f71a760af9889383a60d2f0658b03fac7a250fef301a525"
+        },
+        "apps/android/gradle.lockfile": {
+          "bytes": 12518,
+          "sha256": "9d2bf489ad15abe84e6f45f16d0c2ac17842db4c9204d9c461c1b37dee7dba97"
+        },
+        "apps/bindings-core/build.gradle.kts": {
+          "bytes": 1409,
+          "sha256": "df8d7bd2b772135958239d1c7e1d41b08cd633107313fe5743116642d5e2e6cc"
+        },
+        "apps/bindings-core/gradle.lockfile": {
+          "bytes": 4532,
+          "sha256": "829862d39f6e1a234d085d653c83ad86d87cca625c4ed88b2ed3ed23e42ceb22"
+        },
+        "apps/bindings-host/build.gradle.kts": {
+          "bytes": 1110,
+          "sha256": "b99850128955332831e4f82eaab83923d4ee602bb04097b028f22b7a69679fe1"
+        },
+        "apps/bindings-host/gradle.lockfile": {
+          "bytes": 4532,
+          "sha256": "920aa0f303a50e94a2299e933739a6659701552c735c6164d99211801dbebf50"
+        },
+        "apps/build.gradle.kts": {
+          "bytes": 24181,
+          "sha256": "d069c9c1d5092667c7db34421317846208811dc0ec1f3d02acf894d6938781c5"
+        },
+        "apps/desktop/build.gradle.kts": {
+          "bytes": 6146,
+          "sha256": "d7b1a24f335ff2747035b225ea0becd09cc42ca73b494fd84e7c180d27da5cf3"
+        },
+        "apps/desktop/gradle.lockfile": {
+          "bytes": 6511,
+          "sha256": "c646800b3725a7fc64afec26d2e91288661eaafa604c30b2f0f68f623760678c"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiCompareCanvas.kt": {
+          "bytes": 6224,
+          "sha256": "063f344096c0eddc3f341f62efffd44d0e2fb25c828ae74482b34d92feb68847"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiEditorController.kt": {
+          "bytes": 27868,
+          "sha256": "02ee607678065ddfb019b9976d8561ff1d67613d59bb742cdaa817a0605f7d75"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiEditorOverlay.kt": {
+          "bytes": 1379,
+          "sha256": "7a903a3eea83c90ae925ca1037f2cd8d0660d8cf188079c5180bd5999a3be664"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiEstimateInput.kt": {
+          "bytes": 2042,
+          "sha256": "91cba683ee5303aa40721681b970428723e00ceed088b7c5ad0182ccb474d404"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiKeyDialog.kt": {
+          "bytes": 4294,
+          "sha256": "61fc5253940bbbe6c08f0ba938ee66115da853cde9b7c0de45015c9b111e0cc6"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiLatestTask.kt": {
+          "bytes": 1909,
+          "sha256": "1e607a836772243372a2a18c5a11fc521b0fdf80940187891d2ba530faf96982"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiPixels.kt": {
+          "bytes": 3632,
+          "sha256": "b4659fe2a6a4f16604bc178d4427f95d477416b1e326e390e696e63a64cec5f8"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiResultController.kt": {
+          "bytes": 10152,
+          "sha256": "d5678b2ca8be90e8e7876f016a6f61ed7b036d463bc0709030cb34005a131cee"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiResultPainter.kt": {
+          "bytes": 2163,
+          "sha256": "b825bd281917c3030a298fd0568168c8c1f192a92e9be40ffc15128e414eb338"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiServiceController.kt": {
+          "bytes": 10613,
+          "sha256": "f603198a29b204a4ce7d7b2d34ef6ed7b98a92f1bb8eca807ff7fcb7f1b78e77"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiViewGeometry.kt": {
+          "bytes": 8589,
+          "sha256": "39edf532a995aa14fad4da3d74b3ef78984e01c4480c1ea703e5a02228ca8675"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiWorkspace.kt": {
+          "bytes": 15590,
+          "sha256": "f8eb496664b6e245fa2e383663fff8d1454593badaf78028262b811fe180e1c9"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/ConnectionAssistance.kt": {
+          "bytes": 22063,
+          "sha256": "01f03a15b39993b994a39fddd5af6884e4b87a75331b3f0c477c378284d3ef33"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/ConnectionAssistancePanel.kt": {
+          "bytes": 6576,
+          "sha256": "d871e110b065d5544382bc6621c432151b4b4508d1b559d46a61dc8608a8b905"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopDnd.kt": {
+          "bytes": 8155,
+          "sha256": "c80fccd02921a4fddcee376e0ca47fd455d56f9085f57730cf4c3a30855b7fb7"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopInk.kt": {
+          "bytes": 6409,
+          "sha256": "f9ddf44c80fb42b44bf5f8d98d6cf43f7c2ac57f7b14a7c57f6581d75dc00fe8"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopLiveLink.kt": {
+          "bytes": 10587,
+          "sha256": "9569d0b298872f212e7711535b6676f9ce40ad8334785ac676989b2a54201a60"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopNativeRuntime.kt": {
+          "bytes": 20094,
+          "sha256": "d3175cf31df41124f584431a9bdacd7d8756a4056e033c9c89e163b7571c3637"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopSessions.kt": {
+          "bytes": 12880,
+          "sha256": "68562a7bbd92e754d51b21a44ed4403a4ddb9061ea48e3d77757f39845e4addc"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopState.kt": {
+          "bytes": 8131,
+          "sha256": "7264feb5393eca885daa30c91d2eec0e670da8c8361325a94bcb158755dbfa1a"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopTransfers.kt": {
+          "bytes": 21446,
+          "sha256": "c1847306cc05de63e08c4703fa8ef313973a0bc27a28cdd574172a68925ec9e6"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt": {
+          "bytes": 16422,
+          "sha256": "ec058d6a9687ae149b3e58e5d20f85c0c93fbdafcb89984df9bfc76efc116724"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt": {
+          "bytes": 60293,
+          "sha256": "b0cfaae859acd6c6ac0d4c64f4821c1ae4d43cca9e72b21bf1468627f57692e3"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EraserController.kt": {
+          "bytes": 1375,
+          "sha256": "3fb17e0f871500539d5b63d9ef8df0c8857babac6932ee448b1972a9db0f8035"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EraserGeometry.kt": {
+          "bytes": 7061,
+          "sha256": "4d87a0549cca9b1afd982d4108e3b318cf95c2849d27884f5d584ad55944865f"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EraserOverlay.kt": {
+          "bytes": 1957,
+          "sha256": "ab605808e009c2340a7c1ccd463458bb178826cd974019badeff04a55f890931"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EraserPanel.kt": {
+          "bytes": 2842,
+          "sha256": "940ae5d09c5a3aa7a7eb15d2033d7e631690083dbec04650fea0ec2afd116271"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/ExportDialog.kt": {
+          "bytes": 8730,
+          "sha256": "f90e879a29df0c17e22b12ed397a9849edb12dfe84697653f1aa15848d68d487"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/HostHandoff.kt": {
+          "bytes": 6289,
+          "sha256": "fac3503e2ccb7a3c6e4ab4917bb51db8948da9e8e0e4934a2204fa25078dc1ac"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": {
+          "bytes": 37861,
+          "sha256": "9200d9744f74e30827c1af31b65710cbf83c74efa1c0044df32ecdb4ddffa768"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/NativeRuntimeAnchor.kt": {
+          "bytes": 6218,
+          "sha256": "5232d6e942fac1e5a984972243c6043f78e4ce091342ea243139ed7918ab424b"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/SelectionController.kt": {
+          "bytes": 6228,
+          "sha256": "ce12dcd5e7219bc8eae0d62b6665f0a9931d96e9301571f8a7a29d380b7e75f0"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/SelectionOverlay.kt": {
+          "bytes": 4470,
+          "sha256": "f37cec6863636d6f903ee3c1b31a96689f99301bef51a60b0cae55be4998eccc"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/SelectionPanel.kt": {
+          "bytes": 4289,
+          "sha256": "6527b0b65e5720557efa94995b836aaab94b46c6e6ab41a767787bac0ee0515e"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/SessionDialog.kt": {
+          "bytes": 15926,
+          "sha256": "85d694285c869a4e1f7f5b3a019c390f16feb1bec6f0c0ebf493bc1702c96fca"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureAdmission.kt": {
+          "bytes": 942,
+          "sha256": "aaee53f67642bf51d3eba3bd01c50ac73358e4a975b4178aaf3899d7458c736c"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureSettings.kt": {
+          "bytes": 1260,
+          "sha256": "c90f12c8cccd59fe86187da2e709990d458e605dfbc1ed46936691ddd848d226"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/DesktopCaptureController.kt": {
+          "bytes": 9637,
+          "sha256": "187d50d48410777b983793d2bcf2bb5b4d0423209168a96e177c64c448d4b945"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/instructions/InstructionFocusAdmission.kt": {
+          "bytes": 820,
+          "sha256": "e34dd8d01227331a74ed21db7dc123745711ec84bb1a845797bd1c674c16aaad"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/instructions/InstructionFocusControls.kt": {
+          "bytes": 1470,
+          "sha256": "80933761a591ceabaca9bac1b3f0ab0f18f5e2d86a057f800ccf72febd356fa0"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/instructions/InstructionsPanel.kt": {
+          "bytes": 6503,
+          "sha256": "598bb4dadfc237ecbc29a68c643b21a8986c70825323875042477057160d495d"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/instructions/WindowsInstructionField.kt": {
+          "bytes": 2924,
+          "sha256": "d4ef9553e6f761c891882b9fc2be40950133540144b6a6aa75e256ffc3ada359"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/CodexHandoff.kt": {
+          "bytes": 18607,
+          "sha256": "b90c4a3223b5eabb8d63715e053db1fc5972ca3e53c35cf429ae99c9a1cea022"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/CodexPanel.kt": {
+          "bytes": 6556,
+          "sha256": "f3630846a03c63d7c49ea6583fd1cb60fd820b7329037419f612d432084032be"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/DesktopAppOwner.kt": {
+          "bytes": 8806,
+          "sha256": "dc9aabe04558fc768e194ac561a19c230e58a2e9a1009172c3da1fc32439ab7d"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/DesktopMcpBundle.kt": {
+          "bytes": 8600,
+          "sha256": "922870c05fe02b7cbdc68cfaf92d5bd6daf136f483b5af5027baef1c0ef4dbc0"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/DesktopMcpCoordinator.kt": {
+          "bytes": 17805,
+          "sha256": "22bfa779a2ff013ff65774e9ea09b955c2b553df5bedbcb0da15be2081f2b45d"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/DesktopMcpHost.kt": {
+          "bytes": 12588,
+          "sha256": "e923b0481844842d3016109ccf5d44338f4e3e5ec0f83698815f0236077e43ef"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/DesktopMcpLifetime.kt": {
+          "bytes": 7842,
+          "sha256": "c1be1d9105eec72efb7ba8ffd405253a8181106df272003628680734c8c5aac8"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/DesktopMcpService.kt": {
+          "bytes": 4564,
+          "sha256": "dfcafcb0dbdabf50b9ef87742d3d1b893528b9bb71e69b3e38e5c7c4ee7cb8cb"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpCaptureEngine.kt": {
+          "bytes": 9424,
+          "sha256": "d6b49e223fb520e42dd979f6170b377ab9a3895b2862262129a797ccb7c788c4"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpCompareExport.kt": {
+          "bytes": 1039,
+          "sha256": "b719aaf8ac279f8f70f1c2ca00f4785d22f2e7adfef964024f865b6eed983c11"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpComparePanel.kt": {
+          "bytes": 6900,
+          "sha256": "27080c5b3e004003e87576cfabc5da6d2831d95cb2da376607166c82957ec18e"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpConnection.kt": {
+          "bytes": 1869,
+          "sha256": "cf9b3f7f34ff88e97c357efc3d6e310058c448fc996a633f6feb9a5b1d2a2e4d"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpGrantTelemetry.kt": {
+          "bytes": 1693,
+          "sha256": "a7c68d730622fb44646ead961f881a88692d37bb495a27a76c6d173f586d3004"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpJson.kt": {
+          "bytes": 4714,
+          "sha256": "182b2b81ed327cccf8ef6da9ba029f8e620c9c08159d454e51c64ca6526274ef"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpModalOwner.kt": {
+          "bytes": 1933,
+          "sha256": "0d40819baca554467e2f90f7e5172e66a403f571aeb8c0486f9381b5934117a2"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpOwnerWork.kt": {
+          "bytes": 2224,
+          "sha256": "d997a719ff5d204ad7f0fc4c5959bff9eac35385a63aae6a54d08a692beb0685"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpRuntime.kt": {
+          "bytes": 3226,
+          "sha256": "f8d79a7cea8f95ead9f4ab18b46a653924fa67b12b4a4aa6afd0821395acb428"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpRuntimeSmoke.kt": {
+          "bytes": 1689,
+          "sha256": "7f0b70e9fb7d0c86e150dd81cf7d96268aa22b25ac880b7b1d470c0d4d12d1d2"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpSettingsPanel.kt": {
+          "bytes": 10337,
+          "sha256": "9578d4a836feb4f57f0c2ec16e8eec16960504b3e3feeccaaa0a7baf7dfe1cdb"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpUiTasks.kt": {
+          "bytes": 1388,
+          "sha256": "20d548ec1e24432346b70b7f031a91830ef326fe777590acdcd6e9e3336dcd81"
+        },
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/semantics/SemanticPanel.kt": {
+          "bytes": 4676,
+          "sha256": "c5b9e0a55dac261990e257ad865807f21cf618d58b55e07ba1de859d441e7a15"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/AiEditorOwnershipTest.kt": {
+          "bytes": 19341,
+          "sha256": "f290ad10fc965be964681e4067c2422384cbca37c8c5219daacbc1a4649c5372"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/AiResultPainterTest.kt": {
+          "bytes": 1597,
+          "sha256": "228145799b4b416e77b77367420c021e7bb147a2c46ba6ac511f9b64f73e922b"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/AiServiceControllerTest.kt": {
+          "bytes": 11500,
+          "sha256": "678d5301f516158a586cde8ee48356ddeb5d7a72779d488d54c6ed658a4e13b7"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/AiViewGeometryTest.kt": {
+          "bytes": 5886,
+          "sha256": "da30e66fae5c31cda1acc1e5f1e64786738438e7d60c3af4be1da2dcf024afca"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/ConnectionAssistanceTest.kt": {
+          "bytes": 16034,
+          "sha256": "2828529f0cbf9e1e8b06de24418abe3e4f5478c6b508463288e304a36393ca2a"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopCoherenceTest.kt": {
+          "bytes": 23646,
+          "sha256": "f92c7811b95ce2e16625ea15d22909b5a2424f52a6a81baf8d1d685e0438015b"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopInkTest.kt": {
+          "bytes": 9398,
+          "sha256": "f8bb671014582130432ddbcbe1473967fcba208845539fb218a2ab24d002bc17"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopInstructionFocusAdmissionTest.kt": {
+          "bytes": 1403,
+          "sha256": "7bce11bf32942d13a237d7d61a309fd57255d128538064664715d18dacf48c53"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopInstructionFocusTest.kt": {
+          "bytes": 2785,
+          "sha256": "ca38b3edb45936bb33fb2c7cc306d66f976546dc7890db617372088153b8bac6"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt": {
+          "bytes": 7262,
+          "sha256": "053b7a560cedd70be12acad91011e49aad2606891011b334ec219f44489f4db6"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopRenderTest.kt": {
+          "bytes": 4768,
+          "sha256": "02d0eb83b0549b5dc2ec93d8ce5bbce657683172a438164737748acb7ab92b0f"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopSessionsTest.kt": {
+          "bytes": 13822,
+          "sha256": "1bb6eec0b067bd7c0de66ded7e65e6388881939a0db2ae973e93e11065f95478"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopStateTest.kt": {
+          "bytes": 2977,
+          "sha256": "cc49e9e01d67e41feb182cc98e9fc7f5efe188cc6ba25e3ee2361048d4b4d107"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopTransferTest.kt": {
+          "bytes": 24586,
+          "sha256": "508a22611b0d122b3e7414fa7fd017e32cafd59a638a6eb996b3abdc1931c9c1"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/EraserGeometryTest.kt": {
+          "bytes": 2438,
+          "sha256": "d2617e6410970b004ed0be22718c0da8244dadf5fb772beac851d41881faa9e0"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/NativeRuntimeAnchorTest.kt": {
+          "bytes": 13242,
+          "sha256": "92ea6006a414ea02e45c3596edc2eb28ef72e056546562c8f27bfa5260f176f0"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/SelectionControllerTest.kt": {
+          "bytes": 7817,
+          "sha256": "197929aabc29a076069ad69594183941ebc0bc514f871382757f5938ea43a37d"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureAdmissionTest.kt": {
+          "bytes": 3209,
+          "sha256": "4b3c48c4f806680ff0af8dbf96a2d3f835c85cf7cfb3a2ae313d2e9d350ac07c"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/instructions/WindowsInstructionFieldTest.kt": {
+          "bytes": 1771,
+          "sha256": "154ee4af934571c7c3084a7af16feb523b26f70d8e860b84fb42bfbdec657fb6"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/CodexHandoffTest.kt": {
+          "bytes": 7367,
+          "sha256": "dd3a113d3d73245ca06d18b2e904f19ae914b9579fbb7a763adf865e244782c6"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpCoordinatorTest.kt": {
+          "bytes": 16366,
+          "sha256": "0a46cc6bb4d15ddf6835cd69f64aa401270c66e85025cd5768d9b2e49e2d8566"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpGrantTelemetryTest.kt": {
+          "bytes": 2552,
+          "sha256": "d041c94bf4ded9839469d8c1380e7549073dac522a711b8e95cdab0af0e971f1"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpJsonTest.kt": {
+          "bytes": 1063,
+          "sha256": "556538526fb0c27ac5d1396411af8679f6e403d19328af68fcaa0d4e4206384d"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpOwnerWorkTest.kt": {
+          "bytes": 3396,
+          "sha256": "98ab08e9c5014e2f295ab48acdf3f7330b8221a504917ee29fb490ea86a338b2"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpProcessTest.kt": {
+          "bytes": 2220,
+          "sha256": "5f6d35f26ec77b28757f401ddf1c4f2cea4fe7437bb78767e01fc06695c7836f"
+        },
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpStartupTest.kt": {
+          "bytes": 10754,
+          "sha256": "f03b50bb02d842e8edd4ebf9a81ddba1574b5e84d9f16b90f672e42079c45377"
+        },
+        "apps/gradle.properties": {
+          "bytes": 250,
+          "sha256": "ccd4f509dc03ee7061bd88915eaaa21d5030aa7cfe83caba0b16aa14c64f23cc"
+        },
+        "apps/gradle/libs.versions.toml": {
+          "bytes": 826,
+          "sha256": "a7f51dc6c4a1f8dd581eae35bae6cca79191bc66278396f2140443f88e35ca0c"
+        },
+        "apps/gradle/wrapper/gradle-wrapper.jar": {
+          "bytes": 47505,
+          "sha256": "7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d"
+        },
+        "apps/gradle/wrapper/gradle-wrapper.properties": {
+          "bytes": 348,
+          "sha256": "2a8ca535374517bba2e3e2882a23c4c990d5d25c976a4d2e709c4f3befd632fa"
+        },
+        "apps/gradlew.bat": {
+          "bytes": 2788,
+          "sha256": "4e193538b4ddccbee0c05d6383731b647945c146d16d8fe243b4ff716867896f"
+        },
+        "apps/settings.gradle.kts": {
+          "bytes": 975,
+          "sha256": "210e06a8b68380f4e5fc90f7a595a735ead5108320826ad69e39fe6ae25edfc9"
+        },
+        "apps/shared/build.gradle.kts": {
+          "bytes": 10194,
+          "sha256": "788b06b34f8a555ce63fb80c5df5feb825d506692ccd4b2bdff0cbbbff62b82b"
+        },
+        "apps/shared/gradle.lockfile": {
+          "bytes": 47793,
+          "sha256": "8b0614f3b26f7a26ad9a39eb9f64af8e377364886dd785801b8863776b3e5c65"
+        },
+        "apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/AndroidCoreSmokeTest.kt": {
+          "bytes": 973,
+          "sha256": "2b6d91f5e71d1118e75eaf8091a5c044d65dfd5903909923f1a09c9bb62a4a2d"
+        },
+        "apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/OsImageAdmissionInstrumentedTest.kt": {
+          "bytes": 1330,
+          "sha256": "7b04cb608a3f5e87b607c7059f5287c9465f10a00196d64db0db2864439cbd3c"
+        },
+        "apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/ProviderCredentialsInstrumentedTest.kt": {
+          "bytes": 6450,
+          "sha256": "d02236e8618992d5233319c26608a1906baa88cb1ed572ab508e728e5731da37"
+        },
+        "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/AndroidDescriptor.kt": {
+          "bytes": 1122,
+          "sha256": "0ffd401e3d48b3c7a4f0ce613ab511af4996c9d6228b6defe14c91cfcc6da5c9"
+        },
+        "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/AndroidOsImages.kt": {
+          "bytes": 4064,
+          "sha256": "b048b44396af68332a89a196694e2498d3bed9382a3268be66e52d635779950d"
+        },
+        "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/AndroidProviderKeyStore.kt": {
+          "bytes": 13685,
+          "sha256": "1f8764841dfaa87ec8c55aa65d50f81aa5e8974f76b9c94a70b755306b8e727d"
+        },
+        "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/AndroidProviderRuntime.kt": {
+          "bytes": 1366,
+          "sha256": "df52f2a20ae675534ba0bf7e85d2be82cbeaf22b2cecffba4e99ce5732e7513e"
+        },
+        "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/AndroidSessions.kt": {
+          "bytes": 677,
+          "sha256": "e53463865fb514ff19990b586720b35f1efd5d9cce2ad3e0798743cac6f657c1"
+        },
+        "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/AndroidTrustStore.kt": {
+          "bytes": 7491,
+          "sha256": "4c55ad08d5f497fa2365290c55d3691304dcb0b3337e6774e76571d9db4e0551"
+        },
+        "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/NativeLibrary.kt": {
+          "bytes": 138,
+          "sha256": "7e8cd2161cad34439e4ad8f1e3c3a7e6d10c6c96748bbad8907e6c299f1d911c"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/AgentCaptureApi.kt": {
+          "bytes": 1678,
+          "sha256": "3948a8a6708e0a066992569fdb51f9f9ccb1cccf16f499782bf8963fdbcce16a"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/AgentCaptureObserver.kt": {
+          "bytes": 3668,
+          "sha256": "5330f8b07216db6fbaaa61c7a59eb6dd164a5cce48842279a2028ba070e71e19"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/AiEditsApi.kt": {
+          "bytes": 8572,
+          "sha256": "7f7f93e1751ffcd6c83271e3581738acef50859a11ecf9691e008d175b33ed6d"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/AiInteraction.kt": {
+          "bytes": 5407,
+          "sha256": "d2e5e78cf92b772aa0d4b4dfb5a264201ba314c919970532d8c87ed28412bb2f"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureArrivals.kt": {
+          "bytes": 3390,
+          "sha256": "cfbc5e38dbd47c0ed12300717e3145c74b02833bc545f86a1bf9e5206a0d0354"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureDeliveryApi.kt": {
+          "bytes": 1786,
+          "sha256": "6ccba25754dc12462dcb365d0ebbd6833392871d0a5f7ee590c722d45d25e4ca"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureImportsApi.kt": {
+          "bytes": 1170,
+          "sha256": "0f3f1ef0f065530734110c715d09b67c37f368551271bc822196041dacb087b0"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CoreApi.kt": {
+          "bytes": 9840,
+          "sha256": "d5e9c2b251c4b8dddf8f8f23f9ba7e08f9e9052312ca44fc269fecb408c2ff7f"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/EditorSupport.kt": {
+          "bytes": 1736,
+          "sha256": "811d61c44102ec62f6915404a0ecf5d3785a0d1e364222376aba1baa2d62ba89"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/EraserApi.kt": {
+          "bytes": 2547,
+          "sha256": "f686a510ec0186e4a9ca75c091557ddb6cfc9688780ec0459b2ebde8c79f5ef6"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/EraserInteraction.kt": {
+          "bytes": 22075,
+          "sha256": "ab6d7fcb8e0681db574c5d939534b0786087b893179c94307dec58e321cedac5"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/FocusApi.kt": {
+          "bytes": 1367,
+          "sha256": "ee2cffb80b6159df04033a92228cb8f8d7045ddba16ef437e35ab36db057e903"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/InstructionEditor.kt": {
+          "bytes": 19983,
+          "sha256": "ef50364c3105d78a8fa2875f3e41590cf0143f1dc3489a20824365909d9f42fd"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/InstructionFocusController.kt": {
+          "bytes": 12065,
+          "sha256": "8d49ab85fcc2e6c11b534eb8b48a835715a1188bdb13f32a49fc8789a3ccd72f"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/InstructionsApi.kt": {
+          "bytes": 4040,
+          "sha256": "9276b961f4fc6aa5841817dbed8ece316bbcbde9835f7dd3b4c35e361cf893da"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/MarkerFocusFollower.kt": {
+          "bytes": 6319,
+          "sha256": "ab72eade10f74c7c549fb64a04e0da1a699cec930fb3f8727ded9319046ea2d2"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/MaskApi.kt": {
+          "bytes": 6829,
+          "sha256": "896bf5fb43e2b1385cbd04fd73fbaedf4a9263e4b24371209e3c2b1164e839de"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/McpInboxAdmission.kt": {
+          "bytes": 782,
+          "sha256": "fd6204644345e5c2f1acf64d34c393693bfb6daf1049e79e309660b2a8ce5617"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/McpInboxApi.kt": {
+          "bytes": 3020,
+          "sha256": "b5198553566ff743e7063f969577561dce45771f7e6d34505cbc390c87c650de"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/OsImagesApi.kt": {
+          "bytes": 702,
+          "sha256": "1c3d18048e7b59fcd042467f3ad93d22827bd48342e60855cbcfc4559cdfcdf7"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PackagesApi.kt": {
+          "bytes": 3801,
+          "sha256": "acf4ffc18e2820e2f330e695dfc9a0fa9f3caa9224f12997e233af8ae478aef0"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SelectionInteraction.kt": {
+          "bytes": 27423,
+          "sha256": "42c55473f865ec2e40536407ed4a795dc2c2d4f695020d4dd0d84b37fc6890ee"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SemanticDrop.kt": {
+          "bytes": 988,
+          "sha256": "3b1b290a20e28be55c0ce94b5911050e9d2d4acd6fb17a47e817967d2eb39f96"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SemanticEditor.kt": {
+          "bytes": 13311,
+          "sha256": "a774065db25c1944475a86a33e8f24afc275ba7b6838a8c93467d3e49af3da94"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SemanticUiApi.kt": {
+          "bytes": 1543,
+          "sha256": "051312acf7d25e1f7e08ccc6e994994cfeaaf70f4d089155f7b86f849311ad17"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SemanticsApi.kt": {
+          "bytes": 4465,
+          "sha256": "139da215cb7e055a7c79ff4eab090f591926c98390076650fc9b3f7589bdc56c"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionApi.kt": {
+          "bytes": 7732,
+          "sha256": "02d839ceea10f752747f5583e0f8cdc528b754628e53b285f53df0bcae94dfd8"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/StreamingApi.kt": {
+          "bytes": 3651,
+          "sha256": "07b0bccbc0bf3a493e968f579101dd2cc84dc0aebc2c6ae5227fa32a08f3669c"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/WorkbenchStartup.kt": {
+          "bytes": 397,
+          "sha256": "ce05c4c477aa3eed6856f69867ddfc4b2071c99c21633852b9e0cc272ab3f4af"
+        },
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/WorkflowApi.kt": {
+          "bytes": 1762,
+          "sha256": "92ae94685bc9594c863db9d81b62ce2dbd769544bf331f5b2d647635820c26ee"
+        },
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/EraserInteractionTest.kt": {
+          "bytes": 12430,
+          "sha256": "d32eb568694ea195b96537d70fd46cc12beec40766cafc38ff40c33af66dc721"
+        },
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/SelectionInteractionTest.kt": {
+          "bytes": 14356,
+          "sha256": "3129d1dcb91440484765e9f859f3d9fcee6e5bc5dd980ef26184ec4adc62b453"
+        },
+        "apps/shared/src/desktopMain/kotlin/com/visualworkbench/shared/DesktopSessions.kt": {
+          "bytes": 382,
+          "sha256": "e295f6f26e089039346436c1409731a423b4d5105424dc8a351ecfe890ebddb5"
+        },
+        "apps/shared/src/desktopMain/kotlin/com/visualworkbench/shared/NativeLibrary.kt": {
+          "bytes": 525,
+          "sha256": "edb5571a84bea6feb0cbaacad558e66bd6bcb7a5d6fd42ad8d9ec8c10b13c1b3"
+        },
+        "apps/shared/src/desktopTest/kotlin/com/visualworkbench/shared/DesktopCoreSmokeTest.kt": {
+          "bytes": 698,
+          "sha256": "4fea9651cea2bf05b2e5c424f056560ffbd6243fce3af2a2fe4b20fc909f08f3"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/AiOwnership.kt": {
+          "bytes": 1154,
+          "sha256": "43d19c8076c6c041edb6bf62c0e8c351c54e3c78dbecd0b8d535e2d2e99fed9f"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeAgentCapture.kt": {
+          "bytes": 1800,
+          "sha256": "6be1db624c52c9369cf895398fd73f64e9b67ebaa5c76795103b1bfcaa61a9e3"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeAiEdits.kt": {
+          "bytes": 11172,
+          "sha256": "053587da2f29c64761572a3693806c327fc5159c4796e6f8709676e50cf29bf2"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCaptureDelivery.kt": {
+          "bytes": 2343,
+          "sha256": "880c4583f217a2737cef04501d814e2e3728bfb22b54fea8d2229f80697d4ae1"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCaptureImports.kt": {
+          "bytes": 1490,
+          "sha256": "2e86610bc1215feb876c5b8bc845f9673547ce3f335d765f0f64eab076a44ad1"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt": {
+          "bytes": 14511,
+          "sha256": "f595ebe081d11eba05d62af8880e35ddd3f42f681b5dcb8774feb34f7e992a88"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeEraser.kt": {
+          "bytes": 1467,
+          "sha256": "4724889b7c0aa230262ad4c4bf1c47f50f145cbe39b744844450d50b4f5aa14f"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeFocus.kt": {
+          "bytes": 2431,
+          "sha256": "115bc97e60bd2b61456a69cf601535f5e360bedc657ad4c2c767c9d793204a0d"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeInstructions.kt": {
+          "bytes": 6684,
+          "sha256": "14095ae3d33adeed9585b336d408f3226618c90ce63c4d3b3821064554534625"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeMasks.kt": {
+          "bytes": 10241,
+          "sha256": "ba512986a66b589a4cf21abdd7de14e1343c0263e81a4a4fead699e158590935"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeMcpInbox.kt": {
+          "bytes": 4864,
+          "sha256": "c9104a8c5419c159cb14bc33fc33d9e24fc7fa01dfcff782d6a7a89d34f54fc2"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeOsImages.kt": {
+          "bytes": 1508,
+          "sha256": "dc31a51ba69f4eb8d6d52145af4c06f2257717f1645a87a2fa778f7d2fecfcc8"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeOwnership.kt": {
+          "bytes": 3504,
+          "sha256": "a1b2c04a7becf90ffb3e6002b5217551c7428be444fa5a7ca7a342b006e4a62d"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativePackages.kt": {
+          "bytes": 6219,
+          "sha256": "b578a484f08e8aab3b45acc6b3d68ef2eac9e0c146ea76d95876701b1edac6b6"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeSemanticUi.kt": {
+          "bytes": 2664,
+          "sha256": "893f170a270b692dfd5f43b135e45701e4636e36b817128d3d844ec7bdd08f75"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeSemantics.kt": {
+          "bytes": 6464,
+          "sha256": "212c5515f8f86a4119f7ad91d679305d13890eb570552aa09ca02761dc2a70e5"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeSessions.kt": {
+          "bytes": 16694,
+          "sha256": "d5cdfc46b2701d7ffe5c70fa97a8250654a87db1e987b64517f9eda7ba72916d"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeStreaming.kt": {
+          "bytes": 8035,
+          "sha256": "8499027ffaf2d313f14895297a8300311ff12149792d358b9a06eb40bdbdd0f8"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeWorkflows.kt": {
+          "bytes": 5832,
+          "sha256": "eea23c1bb339a19954b55d97ddad995ee294831714d4d22aab788dfa320ca5d8"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/PackageOwnership.kt": {
+          "bytes": 2421,
+          "sha256": "633ad45bfec590de25b94b141f1985213b7c38aff68b3ea416e3d5e0cca924e8"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/SessionPlatform.kt": {
+          "bytes": 3344,
+          "sha256": "bb7f49b1b7036cfebb3e428f303928effe7d04e77eb91490013863513413051e"
+        },
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/WorkflowOwnership.kt": {
+          "bytes": 1650,
+          "sha256": "f1fe89dc5b9753a0698bc77ca8b3b432ebf981ef88ae407b894b348acbf9d006"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/AgentCaptureObserverTest.kt": {
+          "bytes": 8142,
+          "sha256": "e4866b84bda29bf8f976379027e16bebf44617417437637a62823835aa005d92"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/AiCandidateRecoveryTest.kt": {
+          "bytes": 5304,
+          "sha256": "09cbb6311fcff5c29d4fe52883b9c9dd2ee3d84f709008769e0fe012d49d2b26"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/AiInteractionTest.kt": {
+          "bytes": 4027,
+          "sha256": "ca1213484e7a0aaafcb26d10a5b7bdf4415994f4807095ca41c1e6fcb85894f8"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/AiOwnershipTest.kt": {
+          "bytes": 2712,
+          "sha256": "06a34699e781666c153a32860e72611d7e3d1a7499800b391c1e886a6ff1082c"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureArrivalsTest.kt": {
+          "bytes": 5583,
+          "sha256": "a806ca75ecb1db248a40651c683315eee98dcec3cc054d0fc7e4840de0c9a918"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CoreSmokeContract.kt": {
+          "bytes": 11604,
+          "sha256": "24f0487c64648b5829c2b8f3ab73cb99c40cabf02c6e9c9ac647383ec4326ff2"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/EraserContractTest.kt": {
+          "bytes": 2556,
+          "sha256": "aa98803fd81fd7d5d82c97f837a5fed6fb1f1795fc821363808407d47809a89f"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/InstructionEditorTest.kt": {
+          "bytes": 16656,
+          "sha256": "e617b0f30398fbb7f608a5e83b6aa34cd81f1feb7b47b76329d60cbc0e9b8444"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/InstructionFocusControllerTest.kt": {
+          "bytes": 16408,
+          "sha256": "e657cca7526fe0830193b26952084b7b21f03066366e2779708f601068cc7257"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/MarkerFocusFollowerTest.kt": {
+          "bytes": 9740,
+          "sha256": "f72924346e2f8686705153faf30dea7439a4b3f2ecbab61921fb438f92e73e9e"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/MaskContractTest.kt": {
+          "bytes": 7520,
+          "sha256": "b102780caddfbd7cbeb68131b4d82abc97cb4cb477b2b4c76b1b7c90520aecd3"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/McpInboxAdmissionTest.kt": {
+          "bytes": 1047,
+          "sha256": "12792c9ff4191287c23ef0ff9a2aa2d87c1c08a9d62b2fef5ccba4cb626bcb29"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PackageOwnershipTest.kt": {
+          "bytes": 3533,
+          "sha256": "def6ce09e822338a3f5029202b81e39766346e034540b882e0e790b37f6b02fe"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PairingQrTest.kt": {
+          "bytes": 742,
+          "sha256": "4e09d8f8c5686b4c7affa5d3219beb529f176c1e2cc8b0b517657537ffbff4ec"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/SemanticDropTest.kt": {
+          "bytes": 994,
+          "sha256": "d3af6113cbb29ef5a0fa98daf2426e86886014ee13fe6d3d234a8db0942e40e7"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/SemanticEditorTest.kt": {
+          "bytes": 12073,
+          "sha256": "b5cba17e69a591330cdbe9619e90da3308bce72898d3901b172e0643538e54a3"
+        },
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/WorkflowOwnershipTest.kt": {
+          "bytes": 5779,
+          "sha256": "331aff4b0bdb8e4aba545d5ecbb986bd4b28bb9beb8f3ce3b957bb38bfe96b61"
+        },
+        "build.ps1": {
+          "bytes": 21077,
+          "sha256": "c687bf4528bee5da72948a5c00aec9ef088b869678137bede6a764f66cb4092e"
+        },
+        "contracts/ai-provider-config.schema.json": {
+          "bytes": 4789,
+          "sha256": "917c3fe26a0ecbffd5c21c14a4a2100f9eefbe9bec9ce83c3deed7e2e53a778b"
+        },
+        "contracts/package.schema.json": {
+          "bytes": 10783,
+          "sha256": "26ec83e776c58828a6daaf066a4dbf3943afe0de867a95504afbb8f6ad9c2841"
+        },
+        "contracts/storage.sql": {
+          "bytes": 11972,
+          "sha256": "58c4ddb1f61e307591fdb9225b16e1007d6557c420cde80096deaad1fd411c4e"
+        },
+        "contracts/vw_protocol.proto": {
+          "bytes": 26151,
+          "sha256": "2dee7cd2e10d1e6d5e5c52b3905309571f380910f4ac74c051fb3b5c50d274be"
+        },
+        "core/crates/vw-ai-platform/Cargo.toml": {
+          "bytes": 581,
+          "sha256": "1ede72f17d66c511134ab82bdf36c3086b524a1b0b42d4ff187d6ac40d952fc8"
+        },
+        "core/crates/vw-ai-platform/README.md": {
+          "bytes": 10566,
+          "sha256": "31dd40ef9c9756670807ca8c65c0ae0b5ab2030e2858f602286ba65061d9fb9c"
+        },
+        "core/crates/vw-ai-platform/src/android.rs": {
+          "bytes": 8698,
+          "sha256": "f06896719c7597bfd74c76b965e27cf688e53a0dad0d0cf20f43e7f1cb799ac1"
+        },
+        "core/crates/vw-ai-platform/src/lib.rs": {
+          "bytes": 1771,
+          "sha256": "19641011e1728761a69fbe003e69025949f7e8d85e138a8682e7c78d1d2b4269"
+        },
+        "core/crates/vw-ai-platform/src/windows.rs": {
+          "bytes": 7850,
+          "sha256": "3d3cfaf49d8e3f33c40f1b507afc933b29ac4ee81c9a9232e0402d8918899854"
+        },
+        "core/crates/vw-ai-provider/Cargo.toml": {
+          "bytes": 1067,
+          "sha256": "8f8c221bb81f8e40853c6bf389dbd735cab316a50478f4e3d27b4da746e55607"
+        },
+        "core/crates/vw-ai-provider/README.md": {
+          "bytes": 9525,
+          "sha256": "5349b290efa318e383cf939a2e391441733f0f387c79a5359a844030d620354a"
+        },
+        "core/crates/vw-ai-provider/src/http.rs": {
+          "bytes": 10570,
+          "sha256": "731b74283d4305184fe9393fb03ef6d0be9416369cf0008adaa2a2c23cbbf3c5"
+        },
+        "core/crates/vw-ai-provider/src/lib.rs": {
+          "bytes": 7922,
+          "sha256": "444f9bc35100dab47d18e70280807bc664a86d9b01d997d6645fc737d6364536"
+        },
+        "core/crates/vw-ai-provider/src/secret.rs": {
+          "bytes": 2124,
+          "sha256": "c956539975120d546ab8f793deaf5161b61876c3456c5730bf842aa2f743535a"
+        },
+        "core/crates/vw-ai-provider/src/tests.rs": {
+          "bytes": 15940,
+          "sha256": "6df54ef2f062cfa4f6f2368f2dd1aa8c9e9a8d97acac36a25248d6d0a4b7ca32"
+        },
+        "core/crates/vw-ai-provider/src/tests/fixtures.rs": {
+          "bytes": 11712,
+          "sha256": "d9d106d9206d8b1e7fec4764d93011c33f3c16c167eb313d07ab88cc4702a2b7"
+        },
+        "core/crates/vw-ai-provider/src/trust.rs": {
+          "bytes": 2548,
+          "sha256": "f9f4885d0abb551a12f2a76e2576ce1f84c9cc8f6be89119ec986a4d623651ca"
+        },
+        "core/crates/vw-ai-provider/src/worker.rs": {
+          "bytes": 3403,
+          "sha256": "6a1897e36ec7908ca688840d4e398f5860a86401d9e7773c56ba8db5fe7fc876"
+        },
+        "core/crates/vw-ai/Cargo.toml": {
+          "bytes": 935,
+          "sha256": "48e6f39bd2b8d96b3d2b804c34614ca8d16ce315f5b710c7049a07b5d457d8d8"
+        },
+        "core/crates/vw-ai/README.md": {
+          "bytes": 11214,
+          "sha256": "587e43a13432231c44c5ae5b8f6c8d41129da454b40d16c599c14af0f4da246d"
+        },
+        "core/crates/vw-ai/src/budget.rs": {
+          "bytes": 25686,
+          "sha256": "219b15fa16f8b9b603f4c939e457cbd3dabbc5fd396dcd8c06208470666fa67d"
+        },
+        "core/crates/vw-ai/src/config.rs": {
+          "bytes": 6359,
+          "sha256": "742aa1cf63e87bcfd0f20fa282dbebfa9619cd0f5dd8e9470165647f231d4c83"
+        },
+        "core/crates/vw-ai/src/geometry.rs": {
+          "bytes": 4519,
+          "sha256": "0e283d37ba49067682144f28083c908eb1ea598763db43820de60d82a47a926f"
+        },
+        "core/crates/vw-ai/src/lib.rs": {
+          "bytes": 5013,
+          "sha256": "0dc2fa7256ac1322917dd19131c7a518832bd49804108a946cab0fffcc49fa66"
+        },
+        "core/crates/vw-ai/src/memory.rs": {
+          "bytes": 2391,
+          "sha256": "e3d95c7b8af27d8e8274a6915ab3744efb66f89e0a4d6d11018f2f5cd72ba383"
+        },
+        "core/crates/vw-ai/src/metrics.rs": {
+          "bytes": 4868,
+          "sha256": "12922bf47b4e4a5f994960deaced88bbe8a63b6b5f75a2bfd68827d7f5b34b11"
+        },
+        "core/crates/vw-ai/src/pixels.rs": {
+          "bytes": 13398,
+          "sha256": "adff44ceb79c45a7f71284f01c64a1dbc6e5c6908e202d575051449b4ba80635"
+        },
+        "core/crates/vw-ai/src/pixels/resample.rs": {
+          "bytes": 3644,
+          "sha256": "7cf4517cb02c37f91bb51fbcb6705e84563ff0a376a74937786e8a858f8e7768"
+        },
+        "core/crates/vw-ai/src/pixels/resample_tests.rs": {
+          "bytes": 2105,
+          "sha256": "80217128ad3a22930feaf9c85f29642c15d526b3fce2149aaeeb793267aeae59"
+        },
+        "core/crates/vw-ai/src/proof.rs": {
+          "bytes": 6066,
+          "sha256": "a69197f1bbdf291a2be12883a4e8e5905029a7493dc8dfb539023fa3a786104b"
+        },
+        "core/crates/vw-ai/src/request.rs": {
+          "bytes": 32793,
+          "sha256": "e200d1d78b800ed7b29ff1a53c6c05859a29083d6065a42fe084f7752f472e7f"
+        },
+        "core/crates/vw-ai/tests/admission.rs": {
+          "bytes": 4232,
+          "sha256": "43e2de23af17b0cda85567f7c35f02a8fe7069b958696fa222db584f86f8644c"
+        },
+        "core/crates/vw-ai/tests/budget.rs": {
+          "bytes": 16845,
+          "sha256": "7e75eb702c3ac9e2a0bda002c9def018e81b8d02c3bc4bfd8ed04c5373cbc3b4"
+        },
+        "core/crates/vw-ai/tests/common/mod.rs": {
+          "bytes": 4657,
+          "sha256": "a80cb5aff7ac0f56cb1f1a0d2d979d5e79373540b0698ca4de480d592f0bf02d"
+        },
+        "core/crates/vw-ai/tests/contracts.rs": {
+          "bytes": 17752,
+          "sha256": "b31b0e3c5652a831635552ae302e0d23226c54329f74044f48a45622dd558ead"
+        },
+        "core/crates/vw-ai/tests/ledger_integrity.rs": {
+          "bytes": 11563,
+          "sha256": "d121d3c0ccde83ec714c27e14f5d428bdc06ba2631a7e5adc7d79fe15b7436fd"
+        },
+        "core/crates/vw-ai/tests/memory.rs": {
+          "bytes": 4648,
+          "sha256": "8cf96e4493faf70e8309670dcaa47a725afa678371f6cbe60dd42e085254a9bf"
+        },
+        "core/crates/vw-ai/tests/properties.rs": {
+          "bytes": 3628,
+          "sha256": "fb97cdbf00334f4a7c793e9bf9cf205bdbe87c0b1fa2f3b824bb4fc3e1a526a8"
+        },
+        "core/crates/vw-assets/Cargo.toml": {
+          "bytes": 176,
+          "sha256": "824c60cdd3e17d8316d6b745448da56cb843fe30d06cd74953a5115dbf7067b3"
+        },
+        "core/crates/vw-assets/src/lib.rs": {
+          "bytes": 128,
+          "sha256": "b7ea459719b6451e78e6456a64dc85f5f173593d89f3f66ca8807306ff1d7e2a"
+        },
+        "core/crates/vw-capture/Cargo.toml": {
+          "bytes": 1308,
+          "sha256": "07d4f5aee931fd0d9160b6a09885373787342172a91b08c5212ba65dd2046b43"
+        },
+        "core/crates/vw-capture/src/admission.rs": {
+          "bytes": 6251,
+          "sha256": "d3203330aa6426a4eaa46f86d4c99f8639affb2d51a898effa3794bdf9f4fa61"
+        },
+        "core/crates/vw-capture/src/bin/helper.rs": {
+          "bytes": 3442,
+          "sha256": "90df11a2d5d3ddabc4840b59a023ae6d968d0ac101b6bd32cab7084f4989d524"
+        },
+        "core/crates/vw-capture/src/fixed_target.rs": {
+          "bytes": 740,
+          "sha256": "a7866e2eea64f8b6efa1efb683377baa852554f2591d1384313614ea4c7cdd02"
+        },
+        "core/crates/vw-capture/src/image.rs": {
+          "bytes": 3724,
+          "sha256": "bd54be9bbbc39643bf752669fb86c3067ca630ffa64d8749f7d7948f7558ba95"
+        },
+        "core/crates/vw-capture/src/lib.rs": {
+          "bytes": 4584,
+          "sha256": "5181a614f296663e97748f56504c8a2e12ea8a18dd13f454007b20b757fc6dbb"
+        },
+        "core/crates/vw-capture/src/process.rs": {
+          "bytes": 8592,
+          "sha256": "98632e94031eab0368b3f4c0c349faafddc1070e19db7cdb9f17fd7184f9f044"
+        },
+        "core/crates/vw-capture/src/windows/hotkey.rs": {
+          "bytes": 3817,
+          "sha256": "fd893446e1db37e157af9b82e61eefde7b06ac299f65d8e3717cde79c50a9092"
+        },
+        "core/crates/vw-capture/src/windows/mod.rs": {
+          "bytes": 6934,
+          "sha256": "22147f817eb38d2822b1276b41c66358333223f7c329554d0f27ba210b4936c3"
+        },
+        "core/crates/vw-capture/src/windows/uia.rs": {
+          "bytes": 10489,
+          "sha256": "b43c43f8eef633612b523497af7e0fc0240f33dd580005c1e4a5b4fb8789e239"
+        },
+        "core/crates/vw-capture/src/windows/wgc.rs": {
+          "bytes": 10786,
+          "sha256": "f8a571b664b190f7936beb83875f046be8e345e35bb49e8167e7ff3572d736b7"
+        },
+        "core/crates/vw-capture/tests/admission.rs": {
+          "bytes": 3066,
+          "sha256": "9f1ade56717baa06be8b0fa51dd53c0fe2090e93f1d0b226653669aebdfecb9b"
+        },
+        "core/crates/vw-capture/tests/fixed_target.rs": {
+          "bytes": 1600,
+          "sha256": "3fd2bdbf86f87400b3d12bf29a857c98361a0ae07ca1ce35af9a5c7a56b0f4a2"
+        },
+        "core/crates/vw-capture/tests/png.rs": {
+          "bytes": 2557,
+          "sha256": "004510b4bef521bfa1142fc01f3cfde60cee53c4052457cdcbdc6064a825ac50"
+        },
+        "core/crates/vw-codec-os/Cargo.toml": {
+          "bytes": 546,
+          "sha256": "61df6db275d2d44fe6f9017c0476c5780ec5620529ba3f58fa2b337f807735fe"
+        },
+        "core/crates/vw-codec-os/src/container.rs": {
+          "bytes": 13772,
+          "sha256": "6ef7cee791465d880059e4ace8822811bd95b61dc23d6333b853991cf7f42bed"
+        },
+        "core/crates/vw-codec-os/src/hevc.rs": {
+          "bytes": 7551,
+          "sha256": "f2b5b091fa8fdcf23a2a98a4fe72bd1c972de7bc8d3abfdbca6278a8a1bafc91"
+        },
+        "core/crates/vw-codec-os/src/lib.rs": {
+          "bytes": 3336,
+          "sha256": "bcb9f0e36e219d9bbf8718157f5681b49cb7888f26d9214a379e26b63031aa1d"
+        },
+        "core/crates/vw-codec-os/src/windows.rs": {
+          "bytes": 6671,
+          "sha256": "a3f6de7c97da101fa293e31da57740e17a2088ed2ff5e0e7c4fef4c4af559603"
+        },
+        "core/crates/vw-codec-os/tests/admission.rs": {
+          "bytes": 7131,
+          "sha256": "14800e2b2760795f99a57bbca40015d96016eea3bae4b09463abe7d77b0899d8"
+        },
+        "core/crates/vw-ffi/Cargo.toml": {
+          "bytes": 2362,
+          "sha256": "76f15714e52e691318b0c6873ac5cb68f2df5ce69904cb9f2604e5bb683fa9da"
+        },
+        "core/crates/vw-ffi/README.md": {
+          "bytes": 15169,
+          "sha256": "fe55e92ffca454ca6acc3b00fb68db6a97c86ab9907efa168bd5db00aafaf533"
+        },
+        "core/crates/vw-ffi/T1.10-INTEGRATION.md": {
+          "bytes": 6141,
+          "sha256": "c367f1a0741e48ca4599ded7edef2c183edb5ec025312f260c2213018d717115"
+        },
+        "core/crates/vw-ffi/src/ai_edit.rs": {
+          "bytes": 4601,
+          "sha256": "551dc0b8705d789baf32edf82f596d14d375c4a0d1da6dd01099d49e650bcc4a"
+        },
+        "core/crates/vw-ffi/src/ai_edit/admission.rs": {
+          "bytes": 4927,
+          "sha256": "bdb64e753b887b0158deadeecf34e1231e923d8aa5fe03e60c98c07b043f25d2"
+        },
+        "core/crates/vw-ffi/src/ai_edit/android.rs": {
+          "bytes": 476,
+          "sha256": "35e5d45466cb39015d7774ba60d6f1955782ca097e82079e73c7025c99195b6e"
+        },
+        "core/crates/vw-ffi/src/ai_edit/configuration.rs": {
+          "bytes": 7154,
+          "sha256": "1c674c25d4bd3337f39bfc25ef909128fd3981ad5d108aace606749f4f1e2d90"
+        },
+        "core/crates/vw-ffi/src/ai_edit/context.rs": {
+          "bytes": 4977,
+          "sha256": "209812370888f89e5fb738300db16d5fa71cba98c61c7247294e39735aa41974"
+        },
+        "core/crates/vw-ffi/src/ai_edit/dto.rs": {
+          "bytes": 7060,
+          "sha256": "edaec221613dd419fbc021fac512e4d11f22e9e82269cc24472041b96aa7dd0d"
+        },
+        "core/crates/vw-ffi/src/ai_edit/owner.rs": {
+          "bytes": 10031,
+          "sha256": "19d2758f977edb79f202bd7e954d7f1c5d2f7fa7cea2d9c2c2507bc00a623e3d"
+        },
+        "core/crates/vw-ffi/src/ai_edit/pixels.rs": {
+          "bytes": 8398,
+          "sha256": "d98f80d87919f812c65b7932f82e917d4e378c473933d37841556c9f15081bb8"
+        },
+        "core/crates/vw-ffi/src/ai_edit/prepare.rs": {
+          "bytes": 8368,
+          "sha256": "d73534f690fd8fb76ddafdd8759f9dbb26f17ebccd14fbbe4042659784e70343"
+        },
+        "core/crates/vw-ffi/src/ai_edit/private.rs": {
+          "bytes": 7426,
+          "sha256": "0b6aade9498a360b72dec2c85e01b893f590af3c69beee26ae09f6a25012cc66"
+        },
+        "core/crates/vw-ffi/src/ai_edit/provider-2026-10-02.json": {
+          "bytes": 1313,
+          "sha256": "7379213d1c4559f8b172336f9d6cb313346bb21b042d519a829eac0d030cd26b"
+        },
+        "core/crates/vw-ffi/src/ai_edit/request.rs": {
+          "bytes": 18158,
+          "sha256": "f36e6caccf891a32df14d88a139bdab6bb099faaf3646ebbe4da518e53996f20"
+        },
+        "core/crates/vw-ffi/src/ai_edit/result.rs": {
+          "bytes": 22879,
+          "sha256": "3e1f9bbcb9d67f7e169cfa71198de76cd17f616cd1756030b15fc8894c4e0a10"
+        },
+        "core/crates/vw-ffi/src/ai_edit/tests.rs": {
+          "bytes": 27245,
+          "sha256": "cb0fb343bc04ecdbddbc6b1730043619d3e504f09eb2547f29ab74c889cbb1a8"
+        },
+        "core/crates/vw-ffi/src/bin/bindgen.rs": {
+          "bytes": 49,
+          "sha256": "f7a2dd11fb370e9595bdfa6c32fc41a9b67a60bbab06ec711cb7a03eb873ffa6"
+        },
+        "core/crates/vw-ffi/src/bin/ffi-golden.rs": {
+          "bytes": 1847,
+          "sha256": "0112c4fa1a9f6638f5d4890d3ca084b4053877b99805b116f32f267a55209c33"
+        },
+        "core/crates/vw-ffi/src/camera.rs": {
+          "bytes": 1148,
+          "sha256": "b7680c10b4315b91372eb5f46b3a0380a68cd8300d31105abaf9cb53d43e0747"
+        },
+        "core/crates/vw-ffi/src/capture_delivery.rs": {
+          "bytes": 27407,
+          "sha256": "914785bc17cd86c4c9167a17fee26b5f0af05f578fd123672e18e3f09a34244c"
+        },
+        "core/crates/vw-ffi/src/capture_import.rs": {
+          "bytes": 6490,
+          "sha256": "9f49bff1ef5774ef03fca5f0dfe044d280977a5f73f9f17aca0e27e093cf33ba"
+        },
+        "core/crates/vw-ffi/src/creation.rs": {
+          "bytes": 4690,
+          "sha256": "3083a585eaa68e057eb654128b94a7d6ee1b836c2e1bc5fc08770d9f643a2ec8"
+        },
+        "core/crates/vw-ffi/src/dto.rs": {
+          "bytes": 7380,
+          "sha256": "d18207b1746970e60bb5a3db75245b6e247515e381d9bfc8457115e3d8d77e41"
+        },
+        "core/crates/vw-ffi/src/editor.rs": {
+          "bytes": 26198,
+          "sha256": "d197a21c7f280125051bde4e035d5057061dbfe78e8903de822da97cb626193f"
+        },
+        "core/crates/vw-ffi/src/eraser.rs": {
+          "bytes": 15499,
+          "sha256": "381197712fe2780877163cc3710846f3172216c91fd90c395a355856e5f8dd55"
+        },
+        "core/crates/vw-ffi/src/gesture.rs": {
+          "bytes": 20780,
+          "sha256": "b05a5c0f335ac3dbce194fac7644743d170ea08c3e0b6160ebb76345c75ff39e"
+        },
+        "core/crates/vw-ffi/src/instructions.rs": {
+          "bytes": 13465,
+          "sha256": "818bf97799b6d656d130e2a0453a854e6953db2767c4575caf8a3e887608124a"
+        },
+        "core/crates/vw-ffi/src/instructions/draft.rs": {
+          "bytes": 11632,
+          "sha256": "da746d56f2b3978d81bb5ae696924dafaf6113f52c9982b68c0e91a11fbfa092"
+        },
+        "core/crates/vw-ffi/src/instructions/dto.rs": {
+          "bytes": 4212,
+          "sha256": "ace93297af9d52ef731d77a068b51e30260639d74e52c435d89cdbff60d96ce6"
+        },
+        "core/crates/vw-ffi/src/lib.rs": {
+          "bytes": 2958,
+          "sha256": "6d915db26a6daf71597e048f3e7f0db5e36f66abcb736933492b81a8c5d74c7b"
+        },
+        "core/crates/vw-ffi/src/masks.rs": {
+          "bytes": 21465,
+          "sha256": "41e5d36cd90d6d54a9739486ffc23ef0dc8066388f451f3bc55f19c936f96fb8"
+        },
+        "core/crates/vw-ffi/src/masks/ai_bridge.rs": {
+          "bytes": 3972,
+          "sha256": "193ba0793faf4d396922b72a6c224f016790e8327cc1235b77a114f7df1f3001"
+        },
+        "core/crates/vw-ffi/src/masks/dto.rs": {
+          "bytes": 4705,
+          "sha256": "dc6fd677b2906aac17a9576608a1aa3a0bb5d2f743401fe38fd867ddbf7cdc6a"
+        },
+        "core/crates/vw-ffi/src/masks/edit.rs": {
+          "bytes": 15272,
+          "sha256": "47c09e2f85587eb9e3ca240c6e6c69f9bbc2c17ff13d099b6a7803a068e67477"
+        },
+        "core/crates/vw-ffi/src/masks/export.rs": {
+          "bytes": 13543,
+          "sha256": "dd13b278c15b748286fe6ea5ea3d14e1690d0eb4b2b67dcb017a35444525901d"
+        },
+        "core/crates/vw-ffi/src/os_images.rs": {
+          "bytes": 7092,
+          "sha256": "d59cd41ef5f650b124eb0e58206cd4b2b4012ac2c30ea86ad19451615ff4071e"
+        },
+        "core/crates/vw-ffi/src/packages.rs": {
+          "bytes": 3328,
+          "sha256": "9ce167ce2d449d0fec8eb25db5194b282b0a4dd723b0d7525a6ad072f627b01b"
+        },
+        "core/crates/vw-ffi/src/packages/catalog.rs": {
+          "bytes": 24467,
+          "sha256": "f95df7749fb7090b8abbca427031a9793108ab3f02450ebc9785f71f4255661d"
+        },
+        "core/crates/vw-ffi/src/packages/catalog_tests.rs": {
+          "bytes": 15464,
+          "sha256": "05ab532c296782cb372a177984010da2496e42dc72199c10e32328b74d4c49d4"
+        },
+        "core/crates/vw-ffi/src/packages/compile.rs": {
+          "bytes": 7046,
+          "sha256": "8133dc6b914c9ce01538e0c08987bda92cde615ed794863d61e103752dcfd536"
+        },
+        "core/crates/vw-ffi/src/packages/dto.rs": {
+          "bytes": 6063,
+          "sha256": "ccc75980df4a78314bfec958ab0d482f0f386f71e71c9a8f6a60ad3fa9e9c55f"
+        },
+        "core/crates/vw-ffi/src/packages/files.rs": {
+          "bytes": 9128,
+          "sha256": "968e45e31de278c9e8e35951ca75eceb9ed4570c009dfb515f564b3f8bf03289"
+        },
+        "core/crates/vw-ffi/src/packages/inbox.rs": {
+          "bytes": 12759,
+          "sha256": "56163a5c0bbb31be777a6f41525647107fe83908e65ab18b95b3c176674fada0"
+        },
+        "core/crates/vw-ffi/src/packages/inbox/pixels.rs": {
+          "bytes": 5578,
+          "sha256": "224836c13999c45f78f8360dcb940b2f9af8ff1620ae8a5a44e643d0c430e1d3"
+        },
+        "core/crates/vw-ffi/src/packages/inbox/storage.rs": {
+          "bytes": 18821,
+          "sha256": "7cda55e749420dc9bdb596e1b6767a0478cd90a146cfae2d13f5629c7d8778d9"
+        },
+        "core/crates/vw-ffi/src/packages/inbox/tests.rs": {
+          "bytes": 15042,
+          "sha256": "9310142eaa8796a2b0413c66134fb4bf6d177b441af872f5fd68b2369f7ccb5d"
+        },
+        "core/crates/vw-ffi/src/packages/retirement.rs": {
+          "bytes": 3702,
+          "sha256": "03cd77f29f39cd2b1544918ea2055e8ea33d1287d9ec50019b26bb421a7a88fe"
+        },
+        "core/crates/vw-ffi/src/payload.rs": {
+          "bytes": 4817,
+          "sha256": "1fd9e0f13cacc0df26fd437d7896201eddb2c5c82b1c0565aac5e80cf65cd5e4"
+        },
+        "core/crates/vw-ffi/src/project.rs": {
+          "bytes": 18935,
+          "sha256": "1db5492afddefe4607fdb703ddae0a835644d821cffd8c9ee884e008455f2fa7"
+        },
+        "core/crates/vw-ffi/src/queries.rs": {
+          "bytes": 30443,
+          "sha256": "477b0ce9998aac7acf50a3d028b451c0894e80acbd2e4052c12993fd70d808af"
+        },
+        "core/crates/vw-ffi/src/semantic_ui.rs": {
+          "bytes": 13189,
+          "sha256": "e109ab392a7c29e76990be4bdb7c6d06c218694ef37c2f9e78bf88b795331faf"
+        },
+        "core/crates/vw-ffi/src/semantics.rs": {
+          "bytes": 15804,
+          "sha256": "2c68841a58a033b0e5dfe41df53af51580bcbc3d01e2e9eebb843616d937892e"
+        },
+        "core/crates/vw-ffi/src/semantics/dto.rs": {
+          "bytes": 3189,
+          "sha256": "59fa6400c17b9171be4c6a1ed301571bce85de3c080dc2fbfffc70bb9383439f"
+        },
+        "core/crates/vw-ffi/src/session.rs": {
+          "bytes": 3919,
+          "sha256": "98220af3e1c6f6ae12ffc755c7e1d3ccb95b27204de016cae0415e6f5ff319a9"
+        },
+        "core/crates/vw-ffi/src/session/agent_capture.rs": {
+          "bytes": 16001,
+          "sha256": "73fe5f72568b8a681e613b265b48194c3ede2f4185bb89adc940c1b3eaefd086"
+        },
+        "core/crates/vw-ffi/src/session/agent_capture_tests.rs": {
+          "bytes": 9056,
+          "sha256": "00fae27d2f58f6fa3d33e13cf3f354062971400e7b28c79fedc839814af89d7b"
+        },
+        "core/crates/vw-ffi/src/session/bootstrap.rs": {
+          "bytes": 17000,
+          "sha256": "ff454bfaf95fd178918093493a3a9fcc3cc0c943ae18bc0255ce8a600aaefea5"
+        },
+        "core/crates/vw-ffi/src/session/discovery.rs": {
+          "bytes": 11051,
+          "sha256": "63497a6ee7599808467ff40a4e9b581205ca8bf0bbef8f30ed98bf4e34ac5dd1"
+        },
+        "core/crates/vw-ffi/src/session/focus.rs": {
+          "bytes": 17249,
+          "sha256": "9589726a12883ae7be95038499c610f38a00e579a8b335b47c6d62045e1c5cb8"
+        },
+        "core/crates/vw-ffi/src/session/focus_tests.rs": {
+          "bytes": 13102,
+          "sha256": "d6afb9e0ff6416e47c744b30808f1d76950ca805ef67ef79b393829c0efbdce0"
+        },
+        "core/crates/vw-ffi/src/session/integration.rs": {
+          "bytes": 6156,
+          "sha256": "5d35bcf46d236663161c76e58de5611a930dbaadce6eb00446797ab0de5e8a7b"
+        },
+        "core/crates/vw-ffi/src/session/link.rs": {
+          "bytes": 61894,
+          "sha256": "d473caceabd9110d941fc2a6197cec6f1fe638dbfbed301fcd5a16e5605b6ac4"
+        },
+        "core/crates/vw-ffi/src/session/pairing.rs": {
+          "bytes": 8105,
+          "sha256": "5569bfc83d48afcb280d070eb3217d8fdc926fe9726409da048076215fb93bc3"
+        },
+        "core/crates/vw-ffi/src/session/preview.rs": {
+          "bytes": 64631,
+          "sha256": "aa7b90cadaff6d29a224504c84ee14ff934f86fdf68030dc4a1fe46ca56f5872"
+        },
+        "core/crates/vw-ffi/src/session/replication.rs": {
+          "bytes": 12162,
+          "sha256": "b4c36c84cd61e66997f0ac95bef26e4ae447d7f5f1ca6dd7578ef887427ac55d"
+        },
+        "core/crates/vw-ffi/src/session/runtime.rs": {
+          "bytes": 5930,
+          "sha256": "68b15d247e736098f919fe224bf5938f5642a5886ec5b6a3e9554f15136858e8"
+        },
+        "core/crates/vw-ffi/src/session/trust.rs": {
+          "bytes": 5338,
+          "sha256": "56e8bbd0d77fd0f9b151c84759ae33213d37c59faae0cc51876f497e680c086c"
+        },
+        "core/crates/vw-ffi/src/streaming_ffi.rs": {
+          "bytes": 62211,
+          "sha256": "baa1561f0f15c25dcf18b1f27ecd2c3bf760fcc685051fdc0a10aec9868381ca"
+        },
+        "core/crates/vw-ffi/src/worker.rs": {
+          "bytes": 10409,
+          "sha256": "1f2085c78cc4b83da53bba23ea640c25fe64ff9cf75b1d3e9fde41c1f39efaf9"
+        },
+        "core/crates/vw-ffi/src/workflow.rs": {
+          "bytes": 15727,
+          "sha256": "2a91e0dbaf43aa6286aa1f7e8b7dfc63fcc13685e828f6c2ba7e287bf6dc7838"
+        },
+        "core/crates/vw-ffi/tests/capture_delivery.rs": {
+          "bytes": 24149,
+          "sha256": "a13816e1bac83db89811377de7cab49ba471052760e1f7b37605f9b1320e053a"
+        },
+        "core/crates/vw-ffi/tests/eraser.rs": {
+          "bytes": 18140,
+          "sha256": "8d057c770757df16436beef27c9c8f626e8f8d45aaa1648f247599bde8e28109"
+        },
+        "core/crates/vw-ffi/tests/lifecycle.rs": {
+          "bytes": 16310,
+          "sha256": "18721595fe8b8e6f180294a761d870ac267bdf1151b7eb6f8ae2af76185c1a56"
+        },
+        "core/crates/vw-ffi/tests/mask_admission.rs": {
+          "bytes": 8822,
+          "sha256": "4127ee53644a864ecadb4fa0473bad24f2bd0fc16abc32b24743ebe2d8e5bbed"
+        },
+        "core/crates/vw-ffi/tests/masks.rs": {
+          "bytes": 22919,
+          "sha256": "66900bd5d0b222da6caba816600614b93a0f52705f3565b23ff9d9abd67201c6"
+        },
+        "core/crates/vw-ffi/tests/semantic_ui.rs": {
+          "bytes": 18821,
+          "sha256": "c45ab79133347e39f9162ab1c6c91b5697ed5334474b6f5405cfa38711b8a7ee"
+        },
+        "core/crates/vw-ffi/tests/sessions.rs": {
+          "bytes": 28489,
+          "sha256": "0a487f22917cc3942e28b36803276578e68fc358a35bef7da28b46ba2d728409"
+        },
+        "core/crates/vw-ffi/tests/streaming_ffi.rs": {
+          "bytes": 15921,
+          "sha256": "4e686d6c983f00453240db453239749224f66b582ff2752044d6e9c40c076a89"
+        },
+        "core/crates/vw-ffi/tests/support/mod.rs": {
+          "bytes": 3176,
+          "sha256": "d1b04d69224421018d52763c775b04f4d1c28729642f8539bac27ebbfb508ecc"
+        },
+        "core/crates/vw-ffi/tests/workflows.rs": {
+          "bytes": 24385,
+          "sha256": "9473ab5685d8c58fc3772f92a347c65467d791a482037e16c8c97112a113e8bc"
+        },
+        "core/crates/vw-ffi/uniffi.toml": {
+          "bytes": 607,
+          "sha256": "f54b690fd3a84c95f12f40facb2052518590e01e8c953655e703deb4cf1dabd9"
+        },
+        "core/crates/vw-geom/Cargo.toml": {
+          "bytes": 675,
+          "sha256": "790824919672be04a06bfc9fbdf7a73b85fb09af972a4e24308f29cc8bf5d9cc"
+        },
+        "core/crates/vw-geom/benches/transforms.rs": {
+          "bytes": 533,
+          "sha256": "d2ec3438972c9275df54112c7ffb1930c605f66b60707bccdf4889b42614e87f"
+        },
+        "core/crates/vw-geom/src/affine.rs": {
+          "bytes": 10037,
+          "sha256": "17242ad2d7b6da561e8fd437147f6d948e74c80e62d0fb640ddf5b3d4c9ccb9a"
+        },
+        "core/crates/vw-geom/src/asset.rs": {
+          "bytes": 6688,
+          "sha256": "4f3171c4ccfa9622fcb4904d4ee531e31fd8d5934b6a4c8b060c1f50458e24ad"
+        },
+        "core/crates/vw-geom/src/capture.rs": {
+          "bytes": 6178,
+          "sha256": "e46ac64de787b5cec3b000edee555186a7c2b034c162efdaff9238a77a0d2ad4"
+        },
+        "core/crates/vw-geom/src/display.rs": {
+          "bytes": 5009,
+          "sha256": "a873404257faa9f8cc82f3069ec3d6f06774611ba502587884acb21e176afdb2"
+        },
+        "core/crates/vw-geom/src/lens.rs": {
+          "bytes": 4270,
+          "sha256": "dce2d505efd589ad5c152298cfa0ae2e58c365568252cedfeaa148755c7724ba"
+        },
+        "core/crates/vw-geom/src/lib.rs": {
+          "bytes": 4021,
+          "sha256": "7a0b2525fb30b776690b1b18d3221990747c4c5742e02b177266b40696901ca1"
+        },
+        "core/crates/vw-geom/tests/known_answers.rs": {
+          "bytes": 9971,
+          "sha256": "20481078b41b12b095ffe5f5ec23dfa4bba1400b8321a9fec827ab7349c5ec42"
+        },
+        "core/crates/vw-geom/tests/properties.rs": {
+          "bytes": 6338,
+          "sha256": "492348baf9f3ceaf86c5d41edb0d0406b09ab72a15b285f4c0a494a21a57c53e"
+        },
+        "core/crates/vw-ink/Cargo.toml": {
+          "bytes": 627,
+          "sha256": "0dc50f0e47ee022a8c93a4fc21f9dfd1f3ba6c8b5eacfd8c542ec9c56aad2d97"
+        },
+        "core/crates/vw-ink/README.md": {
+          "bytes": 3469,
+          "sha256": "bc04fa6879f3228764883bf94471cdda35d2fb57165f44bc8bc196c4c545fb07"
+        },
+        "core/crates/vw-ink/fixtures/goldens.json": {
+          "bytes": 3443,
+          "sha256": "6928c21fb2968a3fab620dbb62acd21f23e3e41085611bd9590d0f2d3379fe43"
+        },
+        "core/crates/vw-ink/fixtures/synthetic.rs": {
+          "bytes": 6873,
+          "sha256": "93581cae82a8815bdd1bf095bcb28ca4f173a5c5e1e9d31b53fe205708e7bd68"
+        },
+        "core/crates/vw-ink/src/brush.rs": {
+          "bytes": 7713,
+          "sha256": "a9e3970773d91ecdf603e5fd871fd027fb30a69cae8a0888f918968bcd8dd8f0"
+        },
+        "core/crates/vw-ink/src/builder.rs": {
+          "bytes": 15898,
+          "sha256": "c26b1042c56121aed6c85a542c249d11ffbbb3bf7ea4fc39b6ae051042af1757"
+        },
+        "core/crates/vw-ink/src/eraser.rs": {
+          "bytes": 19259,
+          "sha256": "080a0ae6bdb78c9e5c8dfaab8030d59542770f85d26d3a54382d8f321eef1b81"
+        },
+        "core/crates/vw-ink/src/geometry.rs": {
+          "bytes": 9071,
+          "sha256": "bab073a12bfb58f339e112f17e9e59a6bf01dbe913deaed2116b3c281107ce4e"
+        },
+        "core/crates/vw-ink/src/lib.rs": {
+          "bytes": 2135,
+          "sha256": "ac4035c1c6ab72e92c3a742d5caf11d7d46888881724c2545b5c61b1ef410a3c"
+        },
+        "core/crates/vw-ink/tests/engine.rs": {
+          "bytes": 22686,
+          "sha256": "c8200301f03ab110117308bade6b2be130a85da439ac0b39fe0e72c1b2008693"
+        },
+        "core/crates/vw-ink/tests/eraser.rs": {
+          "bytes": 12245,
+          "sha256": "4d445e28f4a211289a6957cb041d802fea1afb42f8d29da97038c2cfbac85d36"
+        },
+        "core/crates/vw-instructions/Cargo.toml": {
+          "bytes": 584,
+          "sha256": "962dd4f9ab57084a0fcd1a07cc26a8b50d6e8ddbc39631f94a781dfa8bac4c6b"
+        },
+        "core/crates/vw-instructions/README.md": {
+          "bytes": 9041,
+          "sha256": "3cf84ec48f7453d44f3642a243a2b0e2196d28ced0b087815ead8a9cb9c799f4"
+        },
+        "core/crates/vw-instructions/src/entry.rs": {
+          "bytes": 4628,
+          "sha256": "2b55af7f928df5a0335387750b67adff9f6ba5405c2a159ae6e4f22d412c696b"
+        },
+        "core/crates/vw-instructions/src/export.rs": {
+          "bytes": 12591,
+          "sha256": "954b35f769e1c20c699618be168f582dc2e445d3feb96c705f1f3f1b64468962"
+        },
+        "core/crates/vw-instructions/src/focus.rs": {
+          "bytes": 7652,
+          "sha256": "b70076566f701ef3fd1a7a0d8ee09135f9c8e842c6bc39d2593749f4258554e0"
+        },
+        "core/crates/vw-instructions/src/lib.rs": {
+          "bytes": 4880,
+          "sha256": "c0e64b6949e778bd6e6cb2e4f3ee66fbce7ced4127b085795756dc7364b218fc"
+        },
+        "core/crates/vw-instructions/src/plan.rs": {
+          "bytes": 14971,
+          "sha256": "1c27442d5e390d8e6d512b8754f1fec0d3722c70f374ece784b3def66cb111df"
+        },
+        "core/crates/vw-instructions/src/view.rs": {
+          "bytes": 9683,
+          "sha256": "15f887b8f9fb8ffc2c99e2442c12bd0d39379875c36ab304de1897846d20ff60"
+        },
+        "core/crates/vw-instructions/tests/common/mod.rs": {
+          "bytes": 4528,
+          "sha256": "47d0550a314560881bdfc1ed8fe8524b5bdf6a4bd606aa9918c3a94fe433004e"
+        },
+        "core/crates/vw-instructions/tests/entry_admission.rs": {
+          "bytes": 2628,
+          "sha256": "25cb04549d8d52becd2dfcf21772320138f65b69d24b4c50eabfd7f8f193fc96"
+        },
+        "core/crates/vw-instructions/tests/entry_focus.rs": {
+          "bytes": 9622,
+          "sha256": "0453b016ba6b3a147981b32412f82cecff717aa70264b025ac5b030a73fff742"
+        },
+        "core/crates/vw-instructions/tests/export.rs": {
+          "bytes": 6024,
+          "sha256": "cbf5d2f628b86b179ee0a5ce49b440008eeb2f57825d0d169e1b4bc32c2252fc"
+        },
+        "core/crates/vw-instructions/tests/workflow.rs": {
+          "bytes": 11854,
+          "sha256": "5549e052101ac4d022ccd41c809c8d9ad79844a80d133c395bd48bd17cd562b9"
+        },
+        "core/crates/vw-mask/Cargo.toml": {
+          "bytes": 492,
+          "sha256": "f44ff6d4f28e05c4abb1c614ae29dc8fdf6e19d044c51b3cf0da593052c72e65"
+        },
+        "core/crates/vw-mask/README.md": {
+          "bytes": 7626,
+          "sha256": "621dd505fe8c627b945680313ea1f5bf88a15fb2d7b938ca26a09f014db31dda"
+        },
+        "core/crates/vw-mask/examples/mask-golden.rs": {
+          "bytes": 1360,
+          "sha256": "eb94d983a246cbb3039b30493b4b3875f1da4c2bc3c2a12998462d53c35f3c8b"
+        },
+        "core/crates/vw-mask/src/coverage.rs": {
+          "bytes": 11828,
+          "sha256": "a95ca80126309188d99a1964bd930f008c12d2408959cf4d082a568b33358f64"
+        },
+        "core/crates/vw-mask/src/export.rs": {
+          "bytes": 3891,
+          "sha256": "4784b624511545d662bd62e8c0900fa5976354228aaf417dea284866910d79de"
+        },
+        "core/crates/vw-mask/src/lib.rs": {
+          "bytes": 18729,
+          "sha256": "c7fa4697b14e0ad790c6cbc08465809dd415e8d89bf431a1f0c9f84a7df27ee0"
+        },
+        "core/crates/vw-mask/src/morphology.rs": {
+          "bytes": 6909,
+          "sha256": "12ee634db851c6b78cf8685d7b6cd80f508793f363fa17a92b3a5c6dd9c255a0"
+        },
+        "core/crates/vw-mask/tests/known_answers.rs": {
+          "bytes": 12700,
+          "sha256": "a2ba5608bcc605aef7436d01b16185a22a1b55f30dea840cbf0cd92512a7f87f"
+        },
+        "core/crates/vw-mask/tests/properties.rs": {
+          "bytes": 7319,
+          "sha256": "27d0ddcaf18de0dd353e18438645d4057251f38997b7e3081f10483db5b2274f"
+        },
+        "core/crates/vw-model/Cargo.toml": {
+          "bytes": 576,
+          "sha256": "7c96993a860a82bef65cc00e9bc3234650481a5073ca29f1738e5b9452662f61"
+        },
+        "core/crates/vw-model/src/ids.rs": {
+          "bytes": 7141,
+          "sha256": "eabb8e3da222108670defe0be57d523f147a3fe2e8f9d9f61983e250622cbcd4"
+        },
+        "core/crates/vw-model/src/lib.rs": {
+          "bytes": 1689,
+          "sha256": "a3e664d34308295afb42702edfcd15a0231edb2d6269b1a118475be9e2a1bb2c"
+        },
+        "core/crates/vw-model/src/order.rs": {
+          "bytes": 2476,
+          "sha256": "7a38b9022e0fc5a0b5b13237748320534af0b2f1d0ed84a904b0bbc8c11b07c9"
+        },
+        "core/crates/vw-model/src/state.rs": {
+          "bytes": 6035,
+          "sha256": "9de77149dd67c8864260b3deaa5e39b1d3a371e47acc44a2908a134dfccde1e1"
+        },
+        "core/crates/vw-model/src/validate.rs": {
+          "bytes": 22200,
+          "sha256": "29cdfa8fe50b9930be5fe8838724d5b55abcbd7536918f1bf8651796f001f0d1"
+        },
+        "core/crates/vw-model/tests/model_contract.rs": {
+          "bytes": 27721,
+          "sha256": "9b1a1f6ffcf85cd99b72e9bb6727bfbaedff005666e1137a9c172d4c42c04eff"
+        },
+        "core/crates/vw-net/Cargo.toml": {
+          "bytes": 1304,
+          "sha256": "d6a1904b1fe5a906e95eec96dbe697e0afa107fbaabd2c1050d9fb6b945e27c0"
+        },
+        "core/crates/vw-net/README.md": {
+          "bytes": 6222,
+          "sha256": "1afa6f171673c321d498623f7e3827677d8061506eabf9a90468be3e8de604d7"
+        },
+        "core/crates/vw-net/src/blob.rs": {
+          "bytes": 5705,
+          "sha256": "c27996c161c3e6a5db4cff538dd515473b3055162a91239dec172408b714c951"
+        },
+        "core/crates/vw-net/src/carrier.rs": {
+          "bytes": 30359,
+          "sha256": "cf669e5b62c3b15ad93c8079802944f994ac1cab83a5bc1b60310646a8e07dd6"
+        },
+        "core/crates/vw-net/src/carrier_authorization.rs": {
+          "bytes": 4302,
+          "sha256": "66c5d0a26f0052e0896715f6d6256616ddff2b5ed8e9d6ea7e5441644f51abb9"
+        },
+        "core/crates/vw-net/src/carrier_cancellation_tests.rs": {
+          "bytes": 6536,
+          "sha256": "83ae26689e578a6399011d247b4b96cb63bf0fa78bcadf1b0e21f3b1aacdcdf3"
+        },
+        "core/crates/vw-net/src/connection.rs": {
+          "bytes": 10799,
+          "sha256": "ea99125654c97e945eedaba318418d3f403bfbd80c35f6d8c00b9aef17c40097"
+        },
+        "core/crates/vw-net/src/discovery.rs": {
+          "bytes": 14059,
+          "sha256": "427d112fe1c1536d1a6fa1d50fd4473e1efd6628b39121e77ddb51cbbb8739f1"
+        },
+        "core/crates/vw-net/src/duplex_tests.rs": {
+          "bytes": 8914,
+          "sha256": "71d1beb883cfa24d388bdbc5b4f5d6af1fbb734235d24ab68cb78495a024571c"
+        },
+        "core/crates/vw-net/src/focus_protocol_tests.rs": {
+          "bytes": 1458,
+          "sha256": "7b0dce61924d6a1c11f489891973db59a0f8055be364f55d873268c706414aef"
+        },
+        "core/crates/vw-net/src/frame.rs": {
+          "bytes": 3889,
+          "sha256": "9f790dedc899587e471207076d12a0514360319c7639f64ed4660ceeff9953ea"
+        },
+        "core/crates/vw-net/src/ingress.rs": {
+          "bytes": 15690,
+          "sha256": "9108d673b0bb9e0a50343217ee8e562232d819921aa10c8c5b693e3fae265855"
+        },
+        "core/crates/vw-net/src/lib.rs": {
+          "bytes": 2106,
+          "sha256": "36b8b84ca837159c92b9e48cf2f4b35165f879bca0a80ab8a0569f4e712cfcd9"
+        },
+        "core/crates/vw-net/src/pairing/identity.rs": {
+          "bytes": 5330,
+          "sha256": "91ea70c68078fa9bbc25c4d9e8d24a6796663b0e2ee4782913c0fd096fb6cfcb"
+        },
+        "core/crates/vw-net/src/pairing/mod.rs": {
+          "bytes": 2006,
+          "sha256": "0d50adc2c933dd4f49f065f0982a101a7d93a327d920afca8bc5375cea64036a"
+        },
+        "core/crates/vw-net/src/pairing/offer.rs": {
+          "bytes": 12892,
+          "sha256": "1662648f68debc79759e142d3f71f69da66589542e4dfa8d89fb655a3365a283"
+        },
+        "core/crates/vw-net/src/pairing/pake.rs": {
+          "bytes": 5145,
+          "sha256": "f182daee8300d4d47e39ab3d120ebaadd46a175641df5dd6917c6b608fbc4204"
+        },
+        "core/crates/vw-net/src/pairing/protocol.rs": {
+          "bytes": 11864,
+          "sha256": "04f1a7db470f778036bd80743c623df6d80d4a43225733509ea3782b1706a715"
+        },
+        "core/crates/vw-net/src/pairing/store.rs": {
+          "bytes": 11728,
+          "sha256": "6066fc6684a97dbf1c8ecdc52186a7db75e3657b374f934463fdf08eea8ab582"
+        },
+        "core/crates/vw-net/src/pairing/tests.rs": {
+          "bytes": 22873,
+          "sha256": "87a9b67333925f379f9b16d77500ddb854d1213cc8a003fea43e03bf56a35f35"
+        },
+        "core/crates/vw-net/src/pairing/tls.rs": {
+          "bytes": 15993,
+          "sha256": "f42d89be044df6c2915df3cd2657670b4ca7c7d67c4c69ea17edad23b7fafeec"
+        },
+        "core/crates/vw-net/src/replay.rs": {
+          "bytes": 2990,
+          "sha256": "09144e6a2c3216439747c98377d9d02bda6d8172073d4f481eecafe2048d2ba0"
+        },
+        "core/crates/vw-net/src/route.rs": {
+          "bytes": 6575,
+          "sha256": "7fbec604011e9966b422ae809f654c1e848afaba62136fcce2744ae4060c7ecf"
+        },
+        "core/crates/vw-net/src/session.rs": {
+          "bytes": 21063,
+          "sha256": "09f5d7338dc190719ab3d972c3cde460047660a678cc8265101e80e2b3a9348c"
+        },
+        "core/crates/vw-net/src/sync.rs": {
+          "bytes": 12608,
+          "sha256": "2899a0c283493de7df26379087c70f1c81bd4621c3ae6ea57852b0c47d67db1f"
+        },
+        "core/crates/vw-net/src/tests.rs": {
+          "bytes": 30592,
+          "sha256": "3a9de21109881c63b1ae7c7dfa8981a5b9d56a49266ca6bf928fdee351c0351a"
+        },
+        "core/crates/vw-ops/Cargo.toml": {
+          "bytes": 570,
+          "sha256": "8ab6c0bc4690b0cf55925ded46f3f15bca5336ca20511dd963f4de2bc32c8952"
+        },
+        "core/crates/vw-ops/src/gesture.rs": {
+          "bytes": 4411,
+          "sha256": "db812e7a9136e0afbbe6782f80322cf306bbe396be3b2cf7cc77956351f1206f"
+        },
+        "core/crates/vw-ops/src/host.rs": {
+          "bytes": 60585,
+          "sha256": "55cc01eea519e57ef78b8a92fd1dd2659a106b70ff0cbd3e14ef425ded446cd3"
+        },
+        "core/crates/vw-ops/src/lib.rs": {
+          "bytes": 1383,
+          "sha256": "688965dfd9de3aa5da78d8bc10fd0ecee1df58bf4484335f2bcffc2d55765177"
+        },
+        "core/crates/vw-ops/src/patch.rs": {
+          "bytes": 5175,
+          "sha256": "1e28841e029b57a0861b95e3d7b4f20347c938a5640c242db61351252d925940"
+        },
+        "core/crates/vw-ops/src/plan.rs": {
+          "bytes": 18582,
+          "sha256": "ca0af5647216585ee81484f1aa124672f83d5270747e15ed535b32ee760d7c8c"
+        },
+        "core/crates/vw-ops/src/replica.rs": {
+          "bytes": 13918,
+          "sha256": "b1b4feec909bf9f2e915a36dc91d14748bed17eba020092d923a9f87f24e75b8"
+        },
+        "core/crates/vw-ops/src/undo.rs": {
+          "bytes": 15551,
+          "sha256": "8070a482817c3ccc76591e701e4e114b5710e5863f543bfd4613b583a9e6f42c"
+        },
+        "core/crates/vw-ops/tests/checkpoint.rs": {
+          "bytes": 14056,
+          "sha256": "445e2dfe7634c19f1f5ac41814a1c27e30c66e661df640c8ecaee86f85da2cc7"
+        },
+        "core/crates/vw-ops/tests/engine.rs": {
+          "bytes": 35700,
+          "sha256": "650151bd1ceff441a44eed7851db29bab3373a42d3f91fb053ced09d888bf600"
+        },
+        "core/crates/vw-ops/tests/recovered_outbox.rs": {
+          "bytes": 2660,
+          "sha256": "d04aeac0fd0b4c9357481bcf35c847b9e5e9d13b6a94b1d66d5de71dd7db3d29"
+        },
+        "core/crates/vw-ops/tests/root_owned.rs": {
+          "bytes": 13144,
+          "sha256": "1d687c9020ec64b7e45900909bed486620e505efbf8961994ba457f27b4be502"
+        },
+        "core/crates/vw-ops/tests/undo_recovery.rs": {
+          "bytes": 15086,
+          "sha256": "e0187e328775caef4395fda464b65ca3f1495aa21d08e5efae6675d18cde65c0"
+        },
+        "core/crates/vw-package/Cargo.toml": {
+          "bytes": 751,
+          "sha256": "d5a9e3212ffc51ae4a16113768310c13faa516e7b63254c7a7a6bdb3b6fff0ac"
+        },
+        "core/crates/vw-package/README.md": {
+          "bytes": 10197,
+          "sha256": "f5fa136950a5c06264d2f2fd84d90bb76b13ac11f86ed730e96a02e398f50753"
+        },
+        "core/crates/vw-package/src/admission.rs": {
+          "bytes": 6753,
+          "sha256": "b3804ce91900faf7fd1a548cc2aa8f880d1da110b65d6d5fa136efea3758d074"
+        },
+        "core/crates/vw-package/src/bounded.rs": {
+          "bytes": 3366,
+          "sha256": "3f058a7493cd39e644dd69002aa7db4b3f69c6b13089c5d6370c2c23142748f6"
+        },
+        "core/crates/vw-package/src/compiler.rs": {
+          "bytes": 19427,
+          "sha256": "0a361b3e757e5ef192d9c8f1c7fa21bdaa19e245bfe3d364ec151f9639d0f480"
+        },
+        "core/crates/vw-package/src/config.rs": {
+          "bytes": 6167,
+          "sha256": "2e84e88f63410e444b60115f9c3aab39cee192340592fecd4fd4ef312a41ce3b"
+        },
+        "core/crates/vw-package/src/geometry.rs": {
+          "bytes": 3784,
+          "sha256": "e40145106d0d5138659163287648a17b53bc91ef497d75f310487ba9da0e6840"
+        },
+        "core/crates/vw-package/src/goldens.rs": {
+          "bytes": 2653,
+          "sha256": "ea2adccfe1b33f0ffb33310d17e7e64547c366c738e6e29f8eb0beb3825ae3d8"
+        },
+        "core/crates/vw-package/src/image_receipt.rs": {
+          "bytes": 4357,
+          "sha256": "222072e43ab8a8acf8d841bfe64779d0a52ae8d533d3acf2d7974e0cd9215e2c"
+        },
+        "core/crates/vw-package/src/lib.rs": {
+          "bytes": 1757,
+          "sha256": "b7957897cf37475e52cf4c73a26a743c58440a6eb5e7a47c33e10a2bfe6ddeaa"
+        },
+        "core/crates/vw-package/src/manifest.rs": {
+          "bytes": 4675,
+          "sha256": "c0e57ede396aac603f50c306da2137e1ed30c7f0419ade3ab64a1fbef42e01d7"
+        },
+        "core/crates/vw-package/src/pixels.rs": {
+          "bytes": 7524,
+          "sha256": "113763865b492a020453854ce3664c492739316ddec41998d25ad8a6935bc6f5"
+        },
+        "core/crates/vw-package/src/prompt.rs": {
+          "bytes": 8173,
+          "sha256": "ad666e35e6ec966f5c1a8c2e2e5df5ba9d9ba4ca4da02e08326085521e98303b"
+        },
+        "core/crates/vw-package/src/verify.rs": {
+          "bytes": 16323,
+          "sha256": "7d6e96e020adf4e2effadd59c7007588b0e9375f7b850f93e979384905fbe73c"
+        },
+        "core/crates/vw-package/tests/admission.rs": {
+          "bytes": 5234,
+          "sha256": "2656eca499cf3d625194dda8a65ef9b253bfa2a07fd687e5518b4abd1157dfdc"
+        },
+        "core/crates/vw-package/tests/common/mod.rs": {
+          "bytes": 6884,
+          "sha256": "b09ed5165f1ccbf0e008e0713481a5313c598a9379a1fa295a66e8ce7f2f66d4"
+        },
+        "core/crates/vw-package/tests/integrity.rs": {
+          "bytes": 11409,
+          "sha256": "51975a65448169993161807839db6127f0b8dcde3049165b64fa7b29c6005843"
+        },
+        "core/crates/vw-package/tests/semantics.rs": {
+          "bytes": 3023,
+          "sha256": "9441e41b69edc9e798ba7ef634f6a05224b7e788dac37c9cdb4b1ad8aa081164"
+        },
+        "core/crates/vw-package/tests/workflow.rs": {
+          "bytes": 8195,
+          "sha256": "1da66c61f4b7bdd36b354470af652dbe41dc8a44b4a530d1643e218bffd7ba99"
+        },
+        "core/crates/vw-pdf/Cargo.toml": {
+          "bytes": 173,
+          "sha256": "a4e6e46bc551ec054abf5d9ef52843f4f1c65837fd5a05d2a874f5b7df6f0e2c"
+        },
+        "core/crates/vw-pdf/src/lib.rs": {
+          "bytes": 131,
+          "sha256": "9b136cf73a11fcc3935f55dc4070358c519554dff50f42b422538b159065a891"
+        },
+        "core/crates/vw-pkg/Cargo.toml": {
+          "bytes": 173,
+          "sha256": "51c580f467497759b0cfca06835b25bfc00aebd4de47b6c25194a6a50b8d3b9b"
+        },
+        "core/crates/vw-pkg/src/lib.rs": {
+          "bytes": 142,
+          "sha256": "c83f6b9887b5759698b96188ca848bce9fb25f363787e5b98cab2ecd949f0b73"
+        },
+        "core/crates/vw-proto/Cargo.toml": {
+          "bytes": 362,
+          "sha256": "dc4fce6fb59ddd4adfcd1e72f544798c8443f445295835a7682ee51c8fcf1041"
+        },
+        "core/crates/vw-proto/build.rs": {
+          "bytes": 969,
+          "sha256": "9983d88a37bfd0402c7ac4b579133966d12af4cfcfbf5423a1759e84551f2552"
+        },
+        "core/crates/vw-proto/src/lib.rs": {
+          "bytes": 466,
+          "sha256": "cc36a280cc559aabb64b792be4c4e492d15d82b6dc56c8c82264b7cdb69b5a9a"
+        },
+        "core/crates/vw-raster/Cargo.toml": {
+          "bytes": 929,
+          "sha256": "d749f5a59b030372e4b957c060724b572774afdddd018f3598606ff3e93c327c"
+        },
+        "core/crates/vw-raster/README.md": {
+          "bytes": 14694,
+          "sha256": "320a99f6a6717b1858e2f0c0044d5323b9044f4b0b4c65e790ec7b3ff782e5a0"
+        },
+        "core/crates/vw-raster/examples/generate_goldens.rs": {
+          "bytes": 416,
+          "sha256": "2658a9bc58ffc7fe00a747132c04bae45414f16e92ffdfd139185f0127b6c150"
+        },
+        "core/crates/vw-raster/examples/inspect_fixtures.rs": {
+          "bytes": 1602,
+          "sha256": "5d95292be958c39915765ec8b45e87fce4522cca257fa2067a994584b190f5ed"
+        },
+        "core/crates/vw-raster/fonts/Inter.ttf": {
+          "bytes": 876576,
+          "sha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+        },
+        "core/crates/vw-raster/fonts/NotoSans.ttf": {
+          "bytes": 2049096,
+          "sha256": "bfb7bb691513f12e734dc346c03a03f784912432d7e3fa8e56efcf906fe86b3d"
+        },
+        "core/crates/vw-raster/fonts/NotoSansMono.ttf": {
+          "bytes": 1708408,
+          "sha256": "2cb2adb378a8f574213e23df697050b83c54c27df465a2015552740b2769a081"
+        },
+        "core/crates/vw-raster/fonts/PROVENANCE.json": {
+          "bytes": 1059,
+          "sha256": "e8ded1c7e7279d7e10fe339337556cf8c49babafa613171efb32c50a0df9cd83"
+        },
+        "core/crates/vw-raster/fonts/inter-OFL.txt": {
+          "bytes": 4377,
+          "sha256": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57"
+        },
+        "core/crates/vw-raster/fonts/notosans-OFL.txt": {
+          "bytes": 4396,
+          "sha256": "cee9892f9f0cc8fe882c9e9537ee6a89621d86ee7ceaf70b02e2b2b1c25c061a"
+        },
+        "core/crates/vw-raster/fonts/notosansmono-OFL.txt": {
+          "bytes": 4396,
+          "sha256": "cee9892f9f0cc8fe882c9e9537ee6a89621d86ee7ceaf70b02e2b2b1c25c061a"
+        },
+        "core/crates/vw-raster/licenses/SOURCES.md": {
+          "bytes": 1208,
+          "sha256": "ea3d01ce6aef04774fda1de6a2188b39212f7b0af346d3d9b0a80395c2a3a3f2"
+        },
+        "core/crates/vw-raster/licenses/libwebp-COPYING": {
+          "bytes": 1496,
+          "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf"
+        },
+        "core/crates/vw-raster/licenses/libwebp-PATENTS": {
+          "bytes": 1436,
+          "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c"
+        },
+        "core/crates/vw-raster/src/export.rs": {
+          "bytes": 14156,
+          "sha256": "415d0a01315c19f977941a68591f9ecae8df84b2d3c6f172bef7cf1e94449439"
+        },
+        "core/crates/vw-raster/src/ffi.rs": {
+          "bytes": 3066,
+          "sha256": "ed7bcf1d5551b14e50e8dd3a5361a738f98cd42adffdff91a2a0f50508c7beee"
+        },
+        "core/crates/vw-raster/src/lib.rs": {
+          "bytes": 3116,
+          "sha256": "8e136179a37f41f92fe6f8c3a258662e61ce7a47906612ffeb058fdc638eebeb"
+        },
+        "core/crates/vw-raster/src/materialized_result.rs": {
+          "bytes": 6950,
+          "sha256": "f4ffa9cf2a5b56d4663864ba29ec4ee6132209ffc797a4bec67afa72c08206fb"
+        },
+        "core/crates/vw-raster/src/metadata.rs": {
+          "bytes": 2883,
+          "sha256": "3e8f1878096f788d4d2ad6ed3eb7d3d19960596c2fea7cb3b18ef8c53c0a2c84"
+        },
+        "core/crates/vw-raster/src/pixels.rs": {
+          "bytes": 21519,
+          "sha256": "9a0303d550be0eefb821089c8843fd32219de0978eac322cc0bc3b05f74e1322"
+        },
+        "core/crates/vw-raster/src/render.rs": {
+          "bytes": 29489,
+          "sha256": "0ecd71b2cdd006a946aabb47b473b18ec4f674a945c1ce8a4a2d9651221fa374"
+        },
+        "core/crates/vw-raster/src/source.rs": {
+          "bytes": 31225,
+          "sha256": "37a5ff91be37f36edd1ecab2d3d5280b2f71e912a42d99975c14b78928112855"
+        },
+        "core/crates/vw-raster/src/stream.rs": {
+          "bytes": 21922,
+          "sha256": "857bd6cb5a8aa710aa16a9df1cd9c4046b7c2a22ac07a61395100ee631cdfda5"
+        },
+        "core/crates/vw-raster/src/text.rs": {
+          "bytes": 10442,
+          "sha256": "4f377388bc628922a65dfdfa52fb9830be3904049f563cbbd07b3f5b875e6280"
+        },
+        "core/crates/vw-raster/tests/color_admission.rs": {
+          "bytes": 10846,
+          "sha256": "2dab8fb9bb64eb33355cd069ebe3bb6bc2f39271aa07c3c1c09019bd31885d70"
+        },
+        "core/crates/vw-raster/tests/formats.rs": {
+          "bytes": 15680,
+          "sha256": "d532e5389d439196d3b15234d8f8658e50af562fb9168bee6e31660041825613"
+        },
+        "core/crates/vw-raster/tests/goldens.json": {
+          "bytes": 796,
+          "sha256": "d590c5abc8b29e76088328a0c3a3f8b05d0a1203b2b2ac25a8d0ac1ff99186c3"
+        },
+        "core/crates/vw-raster/tests/goldens.rs": {
+          "bytes": 484,
+          "sha256": "414647949a3f73d5609a6520f82e14bc93ce9ca0c8758329507475b24ad03b9a"
+        },
+        "core/crates/vw-raster/tests/profile_budget.rs": {
+          "bytes": 8198,
+          "sha256": "e1707874cf3955c0dc56da7e76b46eb4da11a85e107fe013cde553ae5b4e145d"
+        },
+        "core/crates/vw-raster/tests/rendering.rs": {
+          "bytes": 14602,
+          "sha256": "259fbb8a571482ed78096b8da99f2447774588b29f0d7254c810628bed5858f4"
+        },
+        "core/crates/vw-raster/tests/streaming.rs": {
+          "bytes": 30791,
+          "sha256": "858b91907ee618d8f5df1d9974202486dd02115097eb18d2aa759c27c25b7df3"
+        },
+        "core/crates/vw-raster/tests/support/golden.rs": {
+          "bytes": 1791,
+          "sha256": "7539cc8d23c0aab26e8945addff91e64d8ab10469c85aa27ebccb835c1ba21a2"
+        },
+        "core/crates/vw-raster/tests/support/mod.rs": {
+          "bytes": 8583,
+          "sha256": "2ee9710745a366b77cc36e4b598f5858e0495b0743f8c226e849583e3b38db89"
+        },
+        "core/crates/vw-raster/tests/text.rs": {
+          "bytes": 3587,
+          "sha256": "9cef5b5240ca2ff36cf701c1a31d69154f55a951b943a1f1fcad4d42471bb0ad"
+        },
+        "core/crates/vw-raster/tests/visibility_admission.rs": {
+          "bytes": 7813,
+          "sha256": "cdbcc9be74447fa85b6dbd01e09d98352087f48817d9aa80d4bb33472dbdc6ab"
+        },
+        "core/crates/vw-semantics/Cargo.toml": {
+          "bytes": 695,
+          "sha256": "8353c7c4de99dc1e0f295768158742b29ee6904f4693cf56c8372eb1f8290b46"
+        },
+        "core/crates/vw-semantics/README.md": {
+          "bytes": 8367,
+          "sha256": "5270b92a82bf32c59bc5996cb4b7e87a60868aec62c6e4afde33f783a6069a8f"
+        },
+        "core/crates/vw-semantics/src/binding.rs": {
+          "bytes": 10775,
+          "sha256": "03b986c18b836135cb9a2e500820763bcce1f33f3fcdec4f45f72fab466dae17"
+        },
+        "core/crates/vw-semantics/src/codec.rs": {
+          "bytes": 3486,
+          "sha256": "19463c7f4ec61890d99465441895f115b2df38bb81c670ea25c4335f97c71686"
+        },
+        "core/crates/vw-semantics/src/export.rs": {
+          "bytes": 5125,
+          "sha256": "e3595886117d236b06759600185c4d8f4988d84061fcece5171037b677719591"
+        },
+        "core/crates/vw-semantics/src/lib.rs": {
+          "bytes": 2503,
+          "sha256": "566e0fdb90c19c2ec5af87bcc64d6562d2f88d4072871511945cc89cf27a3e34"
+        },
+        "core/crates/vw-semantics/src/snap.rs": {
+          "bytes": 4521,
+          "sha256": "f3e795643f1447f019030b16beb461e1acf6416929769699ba4c66b6bec1e014"
+        },
+        "core/crates/vw-semantics/src/snapshot.rs": {
+          "bytes": 12670,
+          "sha256": "8607b73496109b58d172b2fae7e7f1bfad3ee6d1b968658c4608421318d4f3a6"
+        },
+        "core/crates/vw-semantics/tests/capture_rebind.rs": {
+          "bytes": 1705,
+          "sha256": "653cc21e5f919ca24b498eec68776f3a3a80500f69cbbe98f197f0a859b3a7cb"
+        },
+        "core/crates/vw-semantics/tests/codec.rs": {
+          "bytes": 4023,
+          "sha256": "e64494211cf66a9b1ee4908c35e034676f9ca5d9e1a8a04f27eb3379b458354b"
+        },
+        "core/crates/vw-semantics/tests/common/mod.rs": {
+          "bytes": 4620,
+          "sha256": "64feb979f35a5771e590d4e54bd0cba0a2f372ebe66bcddfd126f44679102890"
+        },
+        "core/crates/vw-semantics/tests/snap_export.rs": {
+          "bytes": 7528,
+          "sha256": "7a0dde525f613474d78f9e3175b02ecb93c9a501301eeca2d0b399e1042b052b"
+        },
+        "core/crates/vw-semantics/tests/workflow.rs": {
+          "bytes": 10498,
+          "sha256": "c65256f55ca6b3b60caddf8f2ac4178eeee2c1e00776da7fb1f029c95abc1c56"
+        },
+        "core/crates/vw-sim/Cargo.toml": {
+          "bytes": 456,
+          "sha256": "57f34c7dac4fb2873027785d4f2ed0406ea23fb81847115a890eaa5461b7bf23"
+        },
+        "core/crates/vw-sim/src/faults.rs": {
+          "bytes": 17111,
+          "sha256": "8c08f4c172303f4b359c22fc85d0872cd6831c955d711d3a0929596175d1a02c"
+        },
+        "core/crates/vw-sim/src/lib.rs": {
+          "bytes": 134,
+          "sha256": "377d311b6eae82bb456e196bf3d35dee8758f8fbd13c46ac7e67700645722bd1"
+        },
+        "core/crates/vw-sim/src/main.rs": {
+          "bytes": 1060,
+          "sha256": "c018c24d156b6eed98c4f8cebab816ee5996361bd54da33477c9908a298d5cc3"
+        },
+        "core/crates/vw-store/Cargo.toml": {
+          "bytes": 1074,
+          "sha256": "9fb925fc98b86023bcf0fe41349ee745740e46e10fbd4fe396d1ea56056e6a94"
+        },
+        "core/crates/vw-store/examples/generate_video.rs": {
+          "bytes": 558,
+          "sha256": "226d5771eaaf1df49212f752477ce426d2cfa9db0b2ce9c511e4fc7e72e998f5"
+        },
+        "core/crates/vw-store/examples/support/video_platform.rs": {
+          "bytes": 4783,
+          "sha256": "1e6abd965d96c29f52112299a989402e8920853ccb1f2b39de32a7b80c684b7a"
+        },
+        "core/crates/vw-store/migrations/001_draft.sql": {
+          "bytes": 8438,
+          "sha256": "cbc73b6ca2df5139ccb896e4061440565e70e2049bd240df87e338dc01cf1ebd"
+        },
+        "core/crates/vw-store/migrations/002_checkpoints.sql": {
+          "bytes": 2362,
+          "sha256": "063c3d7af7e1225c924578c56468ca7dfa4e214e988a87d0484ab19c90e03b99"
+        },
+        "core/crates/vw-store/src/archive.rs": {
+          "bytes": 21715,
+          "sha256": "0d8ee4653aa82b4ef951cdcab83bc0b18ee1c5bb6c1d47c639e4f4253db33a3d"
+        },
+        "core/crates/vw-store/src/blobs.rs": {
+          "bytes": 7268,
+          "sha256": "74284cdca6e8514af9afe1b4a7cfffe18eb22a3d9b502a52760ba8b8aa5cabc3"
+        },
+        "core/crates/vw-store/src/cache.rs": {
+          "bytes": 22562,
+          "sha256": "fb49e37a7266b7df5fb8adfa4d57e2bf4d15816c8d99e6f3a41b2b8ad815665c"
+        },
+        "core/crates/vw-store/src/database.rs": {
+          "bytes": 46136,
+          "sha256": "3cc662d136b810b58861695007a150293a23f4a0f5735205f08be3695b1e317b"
+        },
+        "core/crates/vw-store/src/lib.rs": {
+          "bytes": 1236,
+          "sha256": "18d992b45b38e8ecbc9bf772d81455b39d75f3aa31e9a5bd83cf6f63c99a9472"
+        },
+        "core/crates/vw-store/src/migrations.rs": {
+          "bytes": 7184,
+          "sha256": "9787337a100c5e380b76d058193e6f1df512352e77c34358b26dce9058179f54"
+        },
+        "core/crates/vw-store/src/projections.rs": {
+          "bytes": 12823,
+          "sha256": "3cea43f246f19e2c787edfeb87ad1a62df53c6cca61ca7f60a2fcddd9414b2f3"
+        },
+        "core/crates/vw-store/tests/archives.rs": {
+          "bytes": 24587,
+          "sha256": "9a51eab637d92107999e6dde6c93faf9b98412da4cf501a15324dda14692bfdf"
+        },
+        "core/crates/vw-store/tests/authenticated_checkpoint.rs": {
+          "bytes": 6587,
+          "sha256": "940179474310f14d1c8bfb8329cc3906e1973280dfbad9ee199932e2607dd469"
+        },
+        "core/crates/vw-store/tests/blobs_cache.rs": {
+          "bytes": 24047,
+          "sha256": "de82789206efb3f2775ad3d81cd19d3e3baadbefb08ef06ccaa3c94a9cd59c95"
+        },
+        "core/crates/vw-store/tests/crash_recovery.rs": {
+          "bytes": 16764,
+          "sha256": "5bcf91d70b0164b3336f10e8e2ec16d101ba94bc670354b05b602d0847e9a28d"
+        },
+        "core/crates/vw-store/tests/database.rs": {
+          "bytes": 27807,
+          "sha256": "c10087077d7290c2bc4a18ffafc3af96b975f95026e76ddcc93877f0aef35322"
+        },
+        "core/crates/vw-store/tests/fixtures/README.md": {
+          "bytes": 947,
+          "sha256": "ae6a2ce2a0ed30cee01213cce83ba7e272ef5342a2dad75b878ce5ff6779fe8d"
+        },
+        "core/crates/vw-store/tests/fixtures/SYNTHETIC.json": {
+          "bytes": 550,
+          "sha256": "9814634f62772d5c3c885b37f38818267d4ef914c790dda3489a949e8e64b6e7"
+        },
+        "core/crates/vw-store/tests/fixtures/short.mp4": {
+          "bytes": 2816,
+          "sha256": "7e58e0b597d62afbebf6217c494a59311d269c9e24c7058e71a09f9a711d4c80"
+        },
+        "core/crates/vw-store/tests/migrations.rs": {
+          "bytes": 12803,
+          "sha256": "caa2f2d4d52dc00700eab5f929a91ae1d496c67be594f9250a2da5accc206f70"
+        },
+        "core/crates/vw-store/tests/sync_recovery.rs": {
+          "bytes": 19769,
+          "sha256": "79ee6994e1155fd37be9d60cbeb50459cc58e2cdf970a048d7e8be2567c61840"
+        },
+        "core/crates/vw-store/tests/video.rs": {
+          "bytes": 2381,
+          "sha256": "0ae69b2110755f3415ea6e58b5d6563e86acfc536a8f9a2789b17d8dd39ad331"
+        },
+        "core/crates/vw-svg/Cargo.toml": {
+          "bytes": 173,
+          "sha256": "d9ee56d4d36de3843f2a45e33938d8e2740ed4111329db779cc0ed8f29a27dec"
+        },
+        "core/crates/vw-svg/src/lib.rs": {
+          "bytes": 122,
+          "sha256": "829e972d2f7b2bd7d62903bcb0afe6d6cf8b3aa9eca42faad6411a6318b6e986"
+        },
+        "deny.toml": {
+          "bytes": 1059,
+          "sha256": "8a134af786ba9090553738d6b8bea905eb56400e83f3d01b838ced22d0b9f25f"
+        },
+        "host-win/crates/vw-host-ffi/CONNECTION_ASSISTANCE.md": {
+          "bytes": 11967,
+          "sha256": "fa7552dc0141c6f30462be5d8823aa0556c0df21e633e8a58300fb8de741731e"
+        },
+        "host-win/crates/vw-host-ffi/Cargo.toml": {
+          "bytes": 1679,
+          "sha256": "b1a69243769a9cba1f1880cfa77b158596891cd7aea2f88da73cef3091e8ef3a"
+        },
+        "host-win/crates/vw-host-ffi/README.md": {
+          "bytes": 13499,
+          "sha256": "4191ef4c4dc4887d8cb634b988bd96a58fdc20347ecc8d8682252928388929d6"
+        },
+        "host-win/crates/vw-host-ffi/src/bin/vw-connection-helper.rs": {
+          "bytes": 213,
+          "sha256": "9b2315e1694c924d22a65bfbda460e457d14c95a0eeca2377473032d4cfdef0f"
+        },
+        "host-win/crates/vw-host-ffi/src/binding.rs": {
+          "bytes": 6806,
+          "sha256": "d7d6a55483e74ec9b9c8cdc4e40e8c293aa2bc15f237135c6ffbc033aa87ba23"
+        },
+        "host-win/crates/vw-host-ffi/src/capture.rs": {
+          "bytes": 12037,
+          "sha256": "b59f727f5fb0846ba02f45289b0652ae0bad288269894aee4dda68e5c47970b8"
+        },
+        "host-win/crates/vw-host-ffi/src/capture_fixed.rs": {
+          "bytes": 923,
+          "sha256": "a3b1735a8fd51774217d7c8c54a5d9214fbf626637539dafa12e2245ecd1d97c"
+        },
+        "host-win/crates/vw-host-ffi/src/connection_assist/adb.rs": {
+          "bytes": 17034,
+          "sha256": "cc7d1a34693f37170400551db2a78a9b2e7f5299fee3e9a86b9dcb9db1fe9252"
+        },
+        "host-win/crates/vw-host-ffi/src/connection_assist/adb/tests.rs": {
+          "bytes": 7610,
+          "sha256": "a09d96c8a9be589d539086bf4eeb842dd85e1d5c12024bc194b6918dee27d45b"
+        },
+        "host-win/crates/vw-host-ffi/src/connection_assist/mod.rs": {
+          "bytes": 6886,
+          "sha256": "df2d567d281d267cc32b2a9a765f778a80d35e79c2bff36d1b82d2c3dba63318"
+        },
+        "host-win/crates/vw-host-ffi/src/connection_assist/routes.rs": {
+          "bytes": 10009,
+          "sha256": "fa4e4cfb5ad7a6704a73ae9a09a913378cd59dba77c8fe651fb6c35b45692001"
+        },
+        "host-win/crates/vw-host-ffi/src/connection_assist/routes/tests.rs": {
+          "bytes": 6290,
+          "sha256": "c23e27475587c95dedc401ec091cfe8e161b9e783ba2ad4da90d2e1d11ca0003"
+        },
+        "host-win/crates/vw-host-ffi/src/connection_assist/unsupported.rs": {
+          "bytes": 545,
+          "sha256": "fb6ce9b2a0b37bf7217c80017ec31516e9a64c44758d84dc559894704c8a4226"
+        },
+        "host-win/crates/vw-host-ffi/src/connection_assist/windows.rs": {
+          "bytes": 9179,
+          "sha256": "2a1015a1b634ac5a027dda6822706b813f57a9b3890dbca16489cb2311b473bf"
+        },
+        "host-win/crates/vw-host-ffi/src/connection_assist/windows/elevation.rs": {
+          "bytes": 17221,
+          "sha256": "d62a368766025167833a395ff78edc7fde2b211e17f4e738062ed0e4456a7d9f"
+        },
+        "host-win/crates/vw-host-ffi/src/connection_assist/windows/process.rs": {
+          "bytes": 11563,
+          "sha256": "d79c62f9ceca45213edbf929d32bbf506f4c94dd61d55ec463db7daa52839854"
+        },
+        "host-win/crates/vw-host-ffi/src/dib.rs": {
+          "bytes": 14589,
+          "sha256": "d57bc5ce139364e3952fad126c7296697975475d57a5e27b24aac2e062f9c6c2"
+        },
+        "host-win/crates/vw-host-ffi/src/drag.rs": {
+          "bytes": 22536,
+          "sha256": "3835a0ff7598f44a9fc9e4eedc0bf79647fd332070f91f8a6ce78c69313af0ee"
+        },
+        "host-win/crates/vw-host-ffi/src/handoff_tests.rs": {
+          "bytes": 35923,
+          "sha256": "7984d32ec45344c3030721e561dbc4b84c1fcfeced31ab5e14fefbbc2c624d6e"
+        },
+        "host-win/crates/vw-host-ffi/src/lib.rs": {
+          "bytes": 9281,
+          "sha256": "4d08a0673e87b4198dc42938fceff385c696b72121bac33529cecd5addccfd9b"
+        },
+        "host-win/crates/vw-host-ffi/src/operation.rs": {
+          "bytes": 4265,
+          "sha256": "972a9c9e12fe9db6cb1d3b50c6938c69081e2a7584122f76289ce76a5eb2d954"
+        },
+        "host-win/crates/vw-host-ffi/src/platform.rs": {
+          "bytes": 21474,
+          "sha256": "aa545dd0125407c1d863906fdbd902c07594d0bf7832386d865ce68148565147"
+        },
+        "host-win/crates/vw-host-ffi/src/tests.rs": {
+          "bytes": 14615,
+          "sha256": "601ee5dce916ea702c5c245bc3e63cf20b56d4c311a2b3e01c3c9faa437c21f5"
+        },
+        "host-win/crates/vw-host-ffi/src/unsupported.rs": {
+          "bytes": 1161,
+          "sha256": "3c4e961bd8954169efdc81eb14dcd90de7998691a534972148a4a17ae54bc7c4"
+        },
+        "host-win/crates/vw-host-ffi/src/worker.rs": {
+          "bytes": 25561,
+          "sha256": "8e133bb0d781ab908c9df105d68143233583587cdbeb09d6b94a321d1dffe11a"
+        },
+        "host-win/crates/vw-host-ffi/uniffi.toml": {
+          "bytes": 258,
+          "sha256": "4965dbe1c4c9131d7d99334d970db1e66a08ae8d6a32ea244f209d3d6a4801b1"
+        },
+        "host-win/crates/vw-host-win/Cargo.toml": {
+          "bytes": 729,
+          "sha256": "10b37d5bd485a13e8b6c9072cd3fdff165524d4329874ffafb933ed3cea39212"
+        },
+        "host-win/crates/vw-host-win/src/lib.rs": {
+          "bytes": 143,
+          "sha256": "e0b13fb02ada800dfc47f9c48b4a0c7755d9d9bccc278e958c90a307ff267b92"
+        },
+        "host-win/crates/vw-host-win/src/routes.rs": {
+          "bytes": 3256,
+          "sha256": "55822db9dc499595e01df10949224f8871926af586e3b7a931bdb80f379b98b3"
+        },
+        "host-win/crates/vw-host-win/src/trust.rs": {
+          "bytes": 19441,
+          "sha256": "bcc21963d382456893e14335848c96fda0d546c30313dc9d9822567adf0eb689"
+        },
+        "mcp/DEPENDENCIES.md": {
+          "bytes": 3700,
+          "sha256": "81f4cbb86f6593a3e76700a10452e7354ae6c03802bbf9da0b80692768a49688"
+        },
+        "mcp/INTEGRATION.md": {
+          "bytes": 4826,
+          "sha256": "af695412feb6b991648ec79a4f29f2718b4a90f20c537c788df9a51e0fcf9650"
+        },
+        "mcp/R3-INTEGRATION.md": {
+          "bytes": 2718,
+          "sha256": "64f0cf9c5c82c089c410c61bf0ec1371d869e76f7718cde14b51dfc4a0773384"
+        },
+        "mcp/R4-INTEGRATION.md": {
+          "bytes": 2082,
+          "sha256": "232b93187906332bb774eb89dd93985221933e11f5a59d952cb1a7e764ff366a"
+        },
+        "mcp/README.md": {
+          "bytes": 7113,
+          "sha256": "669539b209c980970a71012694c656de740482e85ebeca1c9c51359b1c50e75d"
+        },
+        "mcp/codex/README.md": {
+          "bytes": 12009,
+          "sha256": "09aa72eba969eb675a1377dfcead73c94c5616c5acf3d4eb35bc5709bd68dc08"
+        },
+        "mcp/codex/client.mjs": {
+          "bytes": 8138,
+          "sha256": "088c8644cb05ef99320246906a56196a9b7f1914ff58d8ac052bcdee8c93ae94"
+        },
+        "mcp/codex/image-profile.schema.json": {
+          "bytes": 2004,
+          "sha256": "57f85be54b0ee8b81dcde1c0eab82921d25410749d97233016a21d2f748138c6"
+        },
+        "mcp/codex/image-profiles.json": {
+          "bytes": 28,
+          "sha256": "8b3c1e7eec658e8672930ab541c94c868dd179181794a02e2958980b73967201"
+        },
+        "mcp/codex/main.mjs": {
+          "bytes": 6027,
+          "sha256": "5233cb3303ecfbb94fcb5b9446d14417687e8d54588e9d82f6729dac8d0d7157"
+        },
+        "mcp/codex/package.mjs": {
+          "bytes": 3272,
+          "sha256": "56f5f4a354df9105924b6cf439a850154b2ed81e02f9d37b7ce7f0ec4f5ec70b"
+        },
+        "mcp/codex/process.mjs": {
+          "bytes": 4114,
+          "sha256": "ca028677d406e4a222eb787bca878fa0b19e6ae2d0d445b44b2718b360dc377c"
+        },
+        "mcp/codex/schema-worker.mjs": {
+          "bytes": 2941,
+          "sha256": "45b78931f54cf1c77e738dec1af315a5ddb35cffde9dd949059642ac4b062f96"
+        },
+        "mcp/codex/schema.mjs": {
+          "bytes": 4731,
+          "sha256": "7754bedb3a1690d2616be4dc5c581c138321a407f55d904ea78b1eee727e7cef"
+        },
+        "mcp/codex/test_contract.mjs": {
+          "bytes": 10116,
+          "sha256": "33dd6ee87392c784bb86a855f7a9406c9a6a739abf2a29d4e78e9817a2496b41"
+        },
+        "mcp/native/Cargo.toml": {
+          "bytes": 1343,
+          "sha256": "0380a3c177b35fe81308a2ee97e93d807a9d8e5d91919bbde8756ae1d694620a"
+        },
+        "mcp/native/build.rs": {
+          "bytes": 1116,
+          "sha256": "09b6a2b9edac690398a4bd3824019ee4aaacdd7656bd014df63c87da0685acba"
+        },
+        "mcp/native/src/app_image.rs": {
+          "bytes": 11347,
+          "sha256": "f222aa6d8fa1ae1ad82ee0b7fd93e66fca4f1e32aad3efb8bf96683de78751a4"
+        },
+        "mcp/native/src/app_launch.rs": {
+          "bytes": 7458,
+          "sha256": "24825f2373a59eeb6c828aeba6895f9fdf7e91d6afb8aae39f3cb7d2a456b9a8"
+        },
+        "mcp/native/src/bin/bridge.rs": {
+          "bytes": 3996,
+          "sha256": "c19433b58d11ebb2799a73ff8876e6379d89eba29b2147148b1c6675592b70a4"
+        },
+        "mcp/native/src/bin/codex.rs": {
+          "bytes": 13211,
+          "sha256": "5624d14f9795d38ef0db1faca3e3127e5ec156d947b035d27ef755e7f45c7745"
+        },
+        "mcp/native/src/bin/host.rs": {
+          "bytes": 18844,
+          "sha256": "026c0c92ebbce6c521a48bc745d92f68041a9085b8d0e088dea32382029e4f55"
+        },
+        "mcp/native/src/bin/package.rs": {
+          "bytes": 836,
+          "sha256": "bbc343208077ffb4a5f6e37daf151ba570dfd5b09dc767f223fa8460f1511045"
+        },
+        "mcp/native/src/framing.rs": {
+          "bytes": 5085,
+          "sha256": "a48d50c08e000083690545c518ee62c17c1941f672b5c312da2292c0fa5a0441"
+        },
+        "mcp/native/src/lib.rs": {
+          "bytes": 589,
+          "sha256": "1e4d8ff639cafb433153f1f4f581b48778153cffd4807896bfa791c66554b376"
+        },
+        "mcp/native/src/package_reader.rs": {
+          "bytes": 3989,
+          "sha256": "a4277b6aeef018cdb79e0a873a4fcb11b420f86f4f0832d4379f6de3fd0567a6"
+        },
+        "mcp/native/src/windows.rs": {
+          "bytes": 12756,
+          "sha256": "0a6b2474aa8dc77b2c3138d1d9817282d9be5baecd1fc2a1b9c150997f8a2180"
+        },
+        "mcp/native/src/write_deadline.rs": {
+          "bytes": 5951,
+          "sha256": "aa1eb7580298710702c5506c2210b846b36054f4da28417491763f29adc9bd3f"
+        },
+        "mcp/native/tests/package_reader.rs": {
+          "bytes": 6056,
+          "sha256": "12dad00dcd67ca373db787d8ccbeba0644cc07d80a9c9fa1ac7b282e1a4c6106"
+        },
+        "mcp/package-lock.json": {
+          "bytes": 9068,
+          "sha256": "0f8e19aa27ac0de7708f72b9638889f3d3f6bf03442628f81129082cd69b2402"
+        },
+        "mcp/package.json": {
+          "bytes": 533,
+          "sha256": "d39d08dc35b5228f5c0cc3c43d110168655cb0367c1361563a3f67288b8834d8"
+        },
+        "mcp/package_runtime.py": {
+          "bytes": 7639,
+          "sha256": "0060e8a7754f9a1a0930704732109511d147649476efe637d04708dfb2904f5d"
+        },
+        "mcp/src/bounds.mjs": {
+          "bytes": 2862,
+          "sha256": "a7e2d8c26754c559e4bfb6f74ce746dff6b8295cd7b7f0358c612f461b81e2c9"
+        },
+        "mcp/src/frames.mjs": {
+          "bytes": 3990,
+          "sha256": "8e906805443749229267e26e447d64d2506c2da7588b379b6aa176587243b1c7"
+        },
+        "mcp/src/grants.mjs": {
+          "bytes": 1676,
+          "sha256": "5a1f8286ec8636ba5e63179fcc23f8d53cd5105ac79d75163210e094dd232031"
+        },
+        "mcp/src/http.mjs": {
+          "bytes": 4859,
+          "sha256": "1b04a6d423b1ed9217affa1c863cc6a0774901074be9404260b78ddb1ba9818e"
+        },
+        "mcp/src/main.mjs": {
+          "bytes": 5495,
+          "sha256": "b6f447e2cd28b14c68a9218d40d4979444c1a7c85cc3d684f86d2135926412ae"
+        },
+        "mcp/src/owner.mjs": {
+          "bytes": 2595,
+          "sha256": "a7643249b2d58dec4a7ed3e1fd5b42adac6c458870a7f37c3c2bc81a0109a79f"
+        },
+        "mcp/src/packages.mjs": {
+          "bytes": 13842,
+          "sha256": "b637646cc8927007cf32ffe81a8ae8d0f525943189de906959b0cf36818f77fc"
+        },
+        "mcp/src/server.mjs": {
+          "bytes": 5038,
+          "sha256": "abfcc98e6d7818079e31ffe76762b07393da978b80195371aef99992c667f16b"
+        },
+        "mcp/test/bounds.test.mjs": {
+          "bytes": 5079,
+          "sha256": "7ba059588517955c8fe355f29b2fa50eac3be9daa6cc569a08cb0cc0d77fa909"
+        },
+        "mcp/test/http.test.mjs": {
+          "bytes": 1086,
+          "sha256": "767984be601070c8cb02d482c105bc9ab06c826f2f2842a9c48a75263fd10dc9"
+        },
+        "mcp/test/packages.test.mjs": {
+          "bytes": 8742,
+          "sha256": "e8ffa161c9e30f1aba7ad454a4ee327e9e4e167728cd6ac56f3ebcf88d786518"
+        },
+        "mcp/test/protocol.test.mjs": {
+          "bytes": 2633,
+          "sha256": "58096e0c06b266b86907f0cf1825e0cc1c191c420298973995bf435c82b2ceb4"
+        },
+        "mcp/test/startup.test.mjs": {
+          "bytes": 3017,
+          "sha256": "850db0f5f936a4936db6e6104110191a109fa595608c7f360f7e659dd4966752"
+        },
+        "mcp/test_package_runtime.py": {
+          "bytes": 4420,
+          "sha256": "2b44c9ab1dea2910224113fd87b9093e9188f610ecb8cc9b85c2619b15d247f0"
+        },
+        "rust-toolchain.toml": {
+          "bytes": 148,
+          "sha256": "7daa90fd3135f5361b3eee9595738b3d68b51893d94bd42b49be25d4acaa8263"
+        },
+        "third_party/LICENSES": {
+          "bytes": 8339,
+          "sha256": "995a9cdab4cce93dde51de4d67051aede52c3dac6573c2c267722b6b1cb3824e"
+        },
+        "third_party/notices/JNA-5.19.1-Apache-2.0.txt": {
+          "bytes": 10174,
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        "third_party/notices/JNA-5.19.1-LICENSE.txt": {
+          "bytes": 797,
+          "sha256": "07c938b23950ab7d47a24ef35f9f5da3a05ae164278dc959ad6994135ed59ff1"
+        },
+        "third_party/notices/JNA-libffi-LICENSE.txt": {
+          "bytes": 1132,
+          "sha256": "2c9c2acb9743e6b007b91350475308aee44691d96aa20eacef8e199988c8c388"
+        },
+        "third_party/notices/Node-24.21.0-LICENSE.txt": {
+          "bytes": 160555,
+          "sha256": "ed34dd8e3f0a78dbaf00d0444ce8e285b015b765379c2e17880455f70370f8e9"
+        },
+        "third_party/notices/libyuv-LICENSE.txt": {
+          "bytes": 1506,
+          "sha256": "2b2cc1180c7e6988328ad2033b04b80117419db9c4c584918bbb3cfec7e9364f"
+        },
+        "third_party/notices/npm-ajv-8.17.1-LICENSE.txt": {
+          "bytes": 1090,
+          "sha256": "a05350a88e318e4f5f2c2a1ff1e2e88daa4dd38e6e78b71cccae422bdc762cc3"
+        },
+        "third_party/notices/npm-ajv-formats-3.0.1-LICENSE.txt": {
+          "bytes": 1074,
+          "sha256": "9df3bb69929a3b650ed73b3bfa1756725aaff0ac296461605753547004eafeaf"
+        },
+        "third_party/notices/npm-cross-spawn-7.0.6-LICENSE.txt": {
+          "bytes": 1105,
+          "sha256": "aaa78451b6fecd1b9c4594c796c133c0e90cad100372ff8bc6de615e9ef9adf1"
+        },
+        "third_party/notices/npm-eventsource-3.0.7-LICENSE.txt": {
+          "bytes": 1087,
+          "sha256": "f683a72ffe6a9675b5507af22fe0f448d8c8de3da1e14f139d370a7e6a54a23e"
+        },
+        "third_party/notices/npm-eventsource-parser-3.1.1-LICENSE.txt": {
+          "bytes": 1098,
+          "sha256": "835eb611a23301b27115ca1be9f754c876e643ceb7fe63049c6b50609a1cafeb"
+        },
+        "third_party/notices/npm-fast-deep-equal-3.1.3-LICENSE.txt": {
+          "bytes": 1074,
+          "sha256": "7bf9b2de73a6b356761c948d0e9eeb4be6c1270bd04c79cd489c1e400ffdfc1a"
+        },
+        "third_party/notices/npm-fast-uri-3.1.8-LICENSE.txt": {
+          "bytes": 1813,
+          "sha256": "b010b0dfdfdb23d7396e03b82cd4621fc9bb8f95d6b0aea70b9c24e12074c786"
+        },
+        "third_party/notices/npm-isexe-2.0.0-LICENSE.txt": {
+          "bytes": 765,
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b"
+        },
+        "third_party/notices/npm-jose-6.2.12-LICENSE.md.txt": {
+          "bytes": 1079,
+          "sha256": "8078b0829d6c3e9ecde2f003e1966e4cad3efc6e7a640efbab0313cc166b1af1"
+        },
+        "third_party/notices/npm-json-schema-traverse-1.0.0-LICENSE.txt": {
+          "bytes": 1074,
+          "sha256": "7bf9b2de73a6b356761c948d0e9eeb4be6c1270bd04c79cd489c1e400ffdfc1a"
+        },
+        "third_party/notices/npm-modelcontextprotocol-client-2.3.0-LICENSE.txt": {
+          "bytes": 12227,
+          "sha256": "0382b0057770ca05e9c350a50aa3b1c1fea84da0bc81d723bf00b9aa841be58a"
+        },
+        "third_party/notices/npm-modelcontextprotocol-core-2.3.0-LICENSE.txt": {
+          "bytes": 12227,
+          "sha256": "0382b0057770ca05e9c350a50aa3b1c1fea84da0bc81d723bf00b9aa841be58a"
+        },
+        "third_party/notices/npm-modelcontextprotocol-server-2.3.0-LICENSE.txt": {
+          "bytes": 12227,
+          "sha256": "0382b0057770ca05e9c350a50aa3b1c1fea84da0bc81d723bf00b9aa841be58a"
+        },
+        "third_party/notices/npm-path-key-3.1.1-license.txt": {
+          "bytes": 1109,
+          "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0"
+        },
+        "third_party/notices/npm-pkce-challenge-5.0.1-LICENSE.txt": {
+          "bytes": 1057,
+          "sha256": "feb87a2e0c305de3464cc44077da5393c52d8ca6362d37427157d04ec6f4510d"
+        },
+        "third_party/notices/npm-require-from-string-2.0.2-license.txt": {
+          "bytes": 1128,
+          "sha256": "6ee0feb1f6ef996ff5a68600f8cf98909cf412d39ef3cdceaefd87d636fa1b7f"
+        },
+        "third_party/notices/npm-shebang-command-2.0.0-license.txt": {
+          "bytes": 1116,
+          "sha256": "69dee148a2cc470554dfa7142e830662062394d0fe67cddd379aba90dc60d6b3"
+        },
+        "third_party/notices/npm-shebang-regex-3.0.0-license.txt": {
+          "bytes": 1109,
+          "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0"
+        },
+        "third_party/notices/npm-which-2.0.2-LICENSE.txt": {
+          "bytes": 765,
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b"
+        },
+        "third_party/notices/npm-zod-4.6.5-LICENSE.txt": {
+          "bytes": 1072,
+          "sha256": "3f1189b28e3866e0d979968d466b78f813f76827cfdca1fbb124cc0a5c8841f8"
+        },
+        "third_party/notices/rustls-platform-verifier-android-0.2.0-LICENSE-APACHE.txt": {
+          "bytes": 11357,
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        },
+        "third_party/notices/rustls-platform-verifier-android-0.2.0-LICENSE-MIT.txt": {
+          "bytes": 1066,
+          "sha256": "1c7cf76689c837a68ed8d704994e52a0f2940c087958f860d17f3186afbdcc0c"
+        },
+        "third_party/notices/zstd-1.5.7-LICENSE.txt": {
+          "bytes": 1549,
+          "sha256": "7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8"
+        },
+        "third_party/notices/zstd-bindings-BSD-3-Clause.txt": {
+          "bytes": 1614,
+          "sha256": "bf7017a73a95ea63bf3716b13ec2bcd79c92942356e3408c6fb66332bad6d977"
+        },
+        "third_party/notices/zstd-sys-2.1.0-LICENSE.txt": {
+          "bytes": 1501,
+          "sha256": "ce4868c8e4ebe47a7d4b3c93dbf6b802033e5ae2fa7638098173f80836daac60"
+        },
+        "tools/check_npm_licenses.py": {
+          "bytes": 7346,
+          "sha256": "6844ee44e8424279c221f2351f9816d64d21b8780511501abadd6224b2593a00"
+        },
+        "tools/check_setup.py": {
+          "bytes": 7386,
+          "sha256": "978dfedf2068e0805a542370c4d84fbeadb4636be689b54282286557a60c8488"
+        },
+        "tools/desktop-test/BASES.json": {
+          "bytes": 772,
+          "sha256": "c8ef9704f6ec3d10722064599ad4bee42ff7f4237d404cd54ec0dc12c7ad87b6"
+        },
+        "tools/desktop-test/README.md": {
+          "bytes": 10432,
+          "sha256": "b33c875c796b5229103fb7236774dfd9db16645bd9e23c06ca11a7f01c16612b"
+        },
+        "tools/desktop-test/capture.ps1": {
+          "bytes": 2769,
+          "sha256": "f0a00a66be0da3a7e186754357d71053882f0662dcc20264c5add0c8351bc128"
+        },
+        "tools/desktop-test/capture.psm1": {
+          "bytes": 8470,
+          "sha256": "612fe3448fff51eaf8748d78c6f618aec7b63f61f0451b60b073b97bf3e4fba9"
+        },
+        "tools/desktop-test/integration.patch": {
+          "bytes": 11495,
+          "sha256": "b39e0ad933771391185c94faf5705161298c1099f980b36d2ba4f08b7e0a472d"
+        },
+        "tools/desktop-test/lease.psm1": {
+          "bytes": 4750,
+          "sha256": "20afdabba2c4eb0808d84ee7170c4486b0b443efde84ada60c23a6e0161d4503"
+        },
+        "tools/desktop-test/reports.py": {
+          "bytes": 23126,
+          "sha256": "7478988e62a4ab44075ecdd0a19cc1e40df5f54cfaff7e01ecdd6e3842f30e75"
+        },
+        "tools/desktop-test/run.ps1": {
+          "bytes": 10237,
+          "sha256": "bb946cf11d32c2b94746a5f7011c7d5c190e741a04ccc4fd3b10c908f9c9d14e"
+        },
+        "tools/desktop-test/test_capture.ps1": {
+          "bytes": 4504,
+          "sha256": "8e7e35782898d714638d890585ebe5a96e40e503ad6e702a41dec49a8941416c"
+        },
+        "tools/desktop-test/test_lease.ps1": {
+          "bytes": 3027,
+          "sha256": "320f56ff4086d6934f85121e4044e9804c49f6509f9cb2a72d8c8bf50040245d"
+        },
+        "tools/desktop-test/test_reports.py": {
+          "bytes": 16457,
+          "sha256": "e92b31c59d7eac07b7beb719e412770af4d105358cc273bf77bfe7eac88a4d4e"
+        },
+        "tools/enter-dev.ps1": {
+          "bytes": 880,
+          "sha256": "4c220549a4135ea6d0c1190a6aa212ea01ebbcdbbdf65fc5aa4f1ecd25af06ad"
+        },
+        "tools/ffi-test/SHARED_ANDROID_RUNNER.md": {
+          "bytes": 9057,
+          "sha256": "e26d9b264906588da52696856c546ea80b04d190b46f7cf885915806ae8b6801"
+        },
+        "tools/ffi-test/android-inventory.json": {
+          "bytes": 19384,
+          "sha256": "d1584e354ae730369f9d15a203b7773e17311ec9069d6cdc0d4f49fdf1dc72cc"
+        },
+        "tools/ffi-test/check-alignment.ps1": {
+          "bytes": 845,
+          "sha256": "47df9c6c99a251da66b0020dca1495bac3daf3b1395b43ac82dca6972737ba61"
+        },
+        "tools/ffi-test/check_apk.py": {
+          "bytes": 13844,
+          "sha256": "4db8dd74db51ad526cd56efcdf3555c733ceb5e801ebc80ba32c9dd55f9430cc"
+        },
+        "tools/ffi-test/check_imports.py": {
+          "bytes": 2344,
+          "sha256": "ecd4d855d817fe2a0f28030e458df1c06caf643e416b4fdff296dc4ddb1bd144"
+        },
+        "tools/ffi-test/fixtures/README.md": {
+          "bytes": 732,
+          "sha256": "05d620241d365e13bd1a2ecc212d8b59565ecf93648ff19b85e8911a173d32b4"
+        },
+        "tools/ffi-test/fixtures/ffi-golden.json": {
+          "bytes": 2164,
+          "sha256": "96cb370933e4810273c8a2a646d5bc62876a77b4baf03cbe86d10c26cbeb149f"
+        },
+        "tools/ffi-test/fixtures/ffi-golden.properties": {
+          "bytes": 4645,
+          "sha256": "780513cd6f550a08e3ddd664e9756756104dc168e27634c91fd8e4e2fc8113f7"
+        },
+        "tools/ffi-test/generate-golden.ps1": {
+          "bytes": 3407,
+          "sha256": "077ac1a1d9c04de55154c38a2aa0e3e5db760b1ae1edd93b20f5ed7e60b85904"
+        },
+        "tools/ffi-test/run_shared_android.ps1": {
+          "bytes": 17962,
+          "sha256": "e0ae54523b25c8207ca20cc29f5cad3166c1393e4fd2b82e33fce8fc4402595a"
+        },
+        "tools/ffi-test/shared_reports.py": {
+          "bytes": 20159,
+          "sha256": "0e4ed7eede8ff9c8f8a413dd5953e05aac1e46553ccdb519a5a9d66530f6788e"
+        },
+        "tools/ffi-test/test_apk.py": {
+          "bytes": 13841,
+          "sha256": "24407983064138cdeea9caea2bb43f9ecf167e468fcaecbd192864b9848299e7"
+        },
+        "tools/ffi-test/test_imports.py": {
+          "bytes": 1131,
+          "sha256": "4231aa5e26c3269451c08a4c6419e3f560b100fe957f49d33b65b91d39924f08"
+        },
+        "tools/ffi-test/test_package_inventory.ps1": {
+          "bytes": 3850,
+          "sha256": "7dd0e00eb3d1e7135a5732d2588edee7c1069f74b4f9e1a091d6165ea4a8f967"
+        },
+        "tools/ffi-test/test_shared_reports.py": {
+          "bytes": 13577,
+          "sha256": "de55bd2c00ce992f12ebf006e07b54d9fb61660a2e7ee7bbc79cdb1205edc27c"
+        },
+        "tools/licenses/node-runtime.json": {
+          "bytes": 351814,
+          "sha256": "041635dc83e78ba17536d0a44b217436c26309479e6cbb03b60b301d305b2f1a"
+        },
+        "tools/licenses/reviewed-maven.json": {
+          "bytes": 2024,
+          "sha256": "5f025f5b3b36d529e0a512dfc81a16fd36dd35f7cf98e3f0b37c4e0a0514c3ed"
+        },
+        "tools/licenses/reviewed-npm.json": {
+          "bytes": 13660,
+          "sha256": "86ae894d4b830b153b59be0dbc2d37ccc860a24942070851e20bafe8851e5f1e"
+        },
+        "tools/mcp-build.ps1": {
+          "bytes": 5885,
+          "sha256": "663a13fc6db01fa47d99518dd046daa37a2b60e4cf78db0e8238273e72d16ec1"
+        },
+        "tools/process.psm1": {
+          "bytes": 20651,
+          "sha256": "297dac153231078e219f7d5ac0baee52dc8175565eb4cc7e39a433b7d13f5546"
+        },
+        "tools/stage_mcp_runtime.py": {
+          "bytes": 2585,
+          "sha256": "dfbe2de61af0b8c3e93564ff03532d001507ae41b2eaa4512d0a16955a1af08b"
+        }
+      },
+      "started_ns": 1791084102438758100,
+      "task": ":desktop:createDistributable"
+    },
+    "firewall_changed": false,
+    "installed_or_signed": false,
+    "kind": "desktop-startup",
+    "observation": {
+      "cold_start_or_performance_acceptance": false,
+      "compose_density": 1.75,
+      "compose_draw_returned": true,
+      "external_client_or_send_acceptance": false,
+      "main_to_drawn_frame_ms": 2466,
+      "mcp_lifecycle_checked": true,
+      "mcp_service_cycles": 2,
+      "ordinary_quit_cleanup": true,
+      "process_pmv2": true,
+      "visual_acceptance": false,
+      "window_dpi": 168,
+      "window_pmv2": true
+    },
+    "ordinary_local_initialization": true,
+    "process": {
+      "capture_byte_limit": 1048576,
+      "capture_overflow": false,
+      "captured_bytes": 267,
+      "contained_in_windows_job": true,
+      "elapsed_seconds": 86.676,
+      "exit_code": 0,
+      "output_streams_completed": true,
+      "process_tree_cleanup_confirmed": true
+    },
+    "schema": 1,
+    "screenshots_created": 0,
+    "status": "passed"
+  },
+  "process_runs": [
+    {
+      "exit_code": 0,
+      "process_tree_cleanup_confirmed": true,
+      "phase": "desktop-source-check",
+      "elapsed_seconds": 2.784
+    },
+    {
+      "exit_code": 0,
+      "process_tree_cleanup_confirmed": true,
+      "phase": "desktop-pinned-check",
+      "elapsed_seconds": 2.586
+    },
+    {
+      "exit_code": 0,
+      "process_tree_cleanup_confirmed": true,
+      "phase": "desktop-startup",
+      "elapsed_seconds": 88.478
+    },
+    {
+      "phase": "packaged-child",
+      "elapsed_seconds": 86.676,
+      "capture_overflow": false,
+      "capture_byte_limit": 1048576,
+      "exit_code": 0,
+      "process_tree_cleanup_confirmed": true,
+      "captured_bytes": 267
+    },
+    {
+      "exit_code": 0,
+      "process_tree_cleanup_confirmed": true,
+      "phase": "desktop-collect",
+      "elapsed_seconds": 2.578
+    }
+  ],
+  "cleanup": {
+    "runtime_leases_released": true,
+    "owned_process_trees": true,
+    "private_raw_text_disposed": true
+  },
+  "ordinary_preferences_and_native_cache_may_initialize": true,
+  "project_actions_requested": false,
+  "firewall_actions_requested": false,
+  "screenshots_created": 0,
+  "visual_acceptance": false,
+  "release_acceptance": false,
+  "mode": "mcp",
+  "verification_images_created": 0,
+  "original_receipt_sha256": "3c6a8c5c83b901ae74cd19c2c5d4113fb96943f7d29d115142f80d3f4e29cc65",
+  "source_boundary": "Fresh final Phase 2 packaged distribution; synthetic SDK/runtime smoke, no installed external-client acceptance."
+}

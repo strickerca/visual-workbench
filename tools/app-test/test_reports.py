@@ -33,6 +33,14 @@ def manifest(test=False):
 
 
 class InstrumentationCases(unittest.TestCase):
+    def test_reviewed_nested_packages_pass_and_unknown_packages_refuse(self):
+        for package in ("capture", "editor", "instructions"):
+            case = A.replace("android.", "android." + package + ".")
+            self.assertEqual(reports.instrumentation(passed((case,)), [case])["actual_passed_tests"], 1)
+        for package in ("foreign", "editor.nested", "capture.."):
+            case = A.replace("android.", "android." + package + ".")
+            self.assertIsNone(reports.CASE.fullmatch(case))
+
     def refused(self, text, expected=(A, B)):
         with self.assertRaises(reports.Rejected):
             reports.instrumentation(text, list(expected))
@@ -91,6 +99,20 @@ class InstrumentationCases(unittest.TestCase):
         report = reports.failure_observation(text, [A, B])
         self.assertEqual(report["observed_statuses"], [{"case": A, "status_code": -2}])
         self.assertNotIn("secret", json.dumps(report))
+
+    def test_failure_diagnosis_retains_only_known_test_lines(self):
+        cls = A.split("#")[0]
+        stem = cls.rsplit(".", 1)[-1]
+        stack = ("INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: secret personal text\n"
+                 f"\tat {cls}.example({stem}.kt:27)\n"
+                 "\tat unknown.private.Class.call(Private.kt:81)\n")
+        text = block(A, 1, 2, -2).replace("INSTRUMENTATION_STATUS_CODE:", stack + "INSTRUMENTATION_STATUS_CODE:")
+        report = reports.failure_observation(text, [A, B])
+        self.assertEqual(report["observed_statuses"], [{"case": A, "status_code": -2,
+            "test_source_lines": [27], "exception_kind": "java.lang.AssertionError"}])
+        self.assertNotIn("personal", json.dumps(report))
+        self.assertNotIn("Private", json.dumps(report))
+        self.refused(text)
 
 
 class ArtifactCases(unittest.TestCase):

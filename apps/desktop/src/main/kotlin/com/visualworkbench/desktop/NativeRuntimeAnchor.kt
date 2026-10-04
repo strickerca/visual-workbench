@@ -97,3 +97,15 @@ internal fun nativeCanonicalDosPath(value: String): Path {
     return path
 }
 private fun Char.isAsciiDrive(): Boolean = this in 'A'..'Z' || this in 'a'..'z'
+
+/** Packaged jpackage launchers need not opt into longPathAware. Keep the
+ * app-data namespace lookup unchanged, but address long canonical DOS paths
+ * explicitly instead of depending on a machine-wide registry/manifest opt-in. */
+internal fun nativeGuardPath(path: Path): String {
+    val value = path.toString()
+    if (value.length < 260) return value
+    val extended = "\\\\?\\" + value
+    if (extended.length >= 32767 || nativeCanonicalDosPath(extended) != path)
+        throw NativeRuntimeFailure("The native runtime path is not a bounded canonical DOS path.")
+    return extended
+}

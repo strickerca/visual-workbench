@@ -63,6 +63,8 @@ message Envelope {
     GestureCancel gesture_abort = 34; // CONTROL: reliable cancellation
     GestureRepair gesture_repair = 35; // CONTROL: recover omitted sample deltas
     GestureReplay gesture_replay = 36; // CONTROL: minor 2 opening or bounded requested replay
+    MarkerFocus marker_focus = 37; // CONTROL: minor 3, authenticated connection-local hint
+    AgentCaptureStatus agent_capture_status = 38; // CONTROL: minor 4, agent_capture_status_v1 display only
 
     BlobRequest blob_request = 40;
     BlobChunk blob_chunk = 41;
@@ -613,6 +615,17 @@ message GestureRepair { Uuid gesture_id = 1; uint32 first_sample = 2; uint32 max
 // All other replay and EPHEMERAL updates require that generation to remain open.
 message GestureReplay { GestureUpdate update = 1; bool open = 2; }
 
+// Requires marker_focus_v1 and protocol minor 3. Empty marker_id explicitly
+// clears focus. No canonical state, text, camera action or instruction payload.
+// sequence is monotonic per authenticated connection; never replay on reconnect.
+message MarkerFocus {
+  Uuid project_id = 1;
+  Uuid document_id = 2;
+  Revision revision = 3; // Exact visible hash AND accepted host sequence.
+  Uuid marker_id = 4;
+  uint64 sequence = 5;
+}
+
 // On reliable CONTROL GestureAbort, committed=true retires only the preview;
 // committed=false also cancels the authored gesture. EPHEMERAL cancellation is
 // not a retirement authority. Generation is scoped to the authenticated epoch.
@@ -799,4 +812,17 @@ message ErrorMsg {
   string code = 1;
   string message = 2;
   bool retryable = 3;
+}
+
+// Separate display telemetry, never a GrantUpdate or authority. Both peers must
+// negotiate agent_capture_status_v1. No agent, selector, token or free text.
+// Receiver-issued probe nonce binds a response to a <=3s receiver-clock window.
+message AgentCaptureStatus {
+  bool probe = 1; // receiver -> Windows authoritative host; all other data zero
+  uint64 nonce = 2; // positive monotonic per authenticated connection
+  uint64 sequence = 3; // host response sequence; zero for probe
+  bool known = 4; // false is unknown, never implicitly inactive
+  uint32 active_grant_count = 5; // <=64; complete snapshot
+  bool active_capture = 6; // can remain true while revoked work settles
+  uint32 remaining_ms = 7; // <=600000, longest current grant; no wall clock
 }

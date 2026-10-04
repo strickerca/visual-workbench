@@ -28,6 +28,28 @@ pub struct Replica {
 }
 
 impl Replica {
+    /// Borrow and account all authoritative/visible, pending and inverse
+    /// state without cloning it or exposing its retained journal contents.
+    /// This is a one-representation charge; callers budget clone concurrency.
+    pub fn workspace_estimate_bytes(&self, limit: u64) -> Result<u64, OpsError> {
+        let mut estimate = crate::host::WorkspaceEstimate::new(limit);
+        estimate.value(&(
+            &self.device,
+            &self.authoritative,
+            &self.revision,
+            &self.visible,
+            &self.inverse_previews,
+            &self.authoritative_inverses,
+        ))?;
+        for pending in &self.pending {
+            estimate.value(&(&pending.transaction, &pending.blocked_reason))?;
+            if estimate.finish() > limit {
+                break;
+            }
+        }
+        Ok(estimate.finish())
+    }
+
     /// Start from a hash-verified snapshot; pending transactions are device-owned.
     pub fn new(device: DeviceId, snapshot: HostSnapshot) -> Result<Self, OpsError> {
         validate_snapshot(&snapshot)?;
