@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-editor', 'lint-editor', 'test-shared', 'test-apps', 'test-mcp', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'build-desktop-distribution', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-remote-helpers', 'test-remote-helpers', 'build-remote-integration', 'build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-editor', 'lint-editor', 'test-shared', 'test-apps', 'test-mcp', 'build-ai', 'test-ai', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'build-desktop-distribution', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
     [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'pairing', 'shared-ffi', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
@@ -8,13 +8,16 @@ param(
     [switch]$OwnerReady,
     [ValidateSet('normal', 'no-refresh', 'guards')][string]$WinPenScenario = 'normal',
     [ValidatePattern('^[0-9a-f]{32}$')][string]$VideoRunId,
-    [ValidateSet('inventory','normal','watchdog')][string]$VddScenario='inventory'
+    [ValidateSet('inventory','normal','watchdog')][string]$VddScenario='inventory',
+    [string]$RemoteEditorCatalog,
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$RemoteEditorCatalogSha256
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
 Import-Module (Join-Path $projectRoot 'tools\process.psm1') -Force
 . (Join-Path $projectRoot 'tools/mcp-build.ps1')
+. (Join-Path $projectRoot 'tools/ffi-test/core-unit.ps1')
 
 function Run-Step {
     param([string]$Phase, [string]$Executable, [string[]]$Arguments, [string]$Directory = $projectRoot, [int]$Limit = $TimeoutSeconds, [int]$ExitGraceSeconds = 5)
@@ -28,9 +31,22 @@ function Run-Cargo {
     if ($result.ExitCode -ne 0) { throw "$Phase failed (exit $($result.ExitCode)); see its retained external text log" }
 }
 
+# Build-owner asset admission only. No product runtime path override exists.
+function Get-RemoteEditorCatalogArguments {
+    param([string]$Path,[string]$Digest,[string]$ProjectRoot)
+    if ([bool]$Path -ne [bool]$Digest) { throw 'Root-admitted editor catalog path and SHA256 must be supplied together' }
+    if (-not $Path) { return @() }
+    if ($Digest -cnotmatch '^[0-9a-f]{64}$') { throw 'Invalid root-admitted editor catalog SHA256' }
+    if ($Path.IndexOf([char]0) -ge 0 -or ([IO.Path]::IsPathRooted($Path) -and -not [IO.Path]::IsPathFullyQualified($Path))) { throw 'Ambiguous editor catalog path' }
+    $absolute=[IO.Path]::GetFullPath($Path,$ProjectRoot)
+    if ($absolute -cnotmatch '^[A-Za-z]:\\' -or $absolute.Substring(2).Contains(':')) { throw 'Editor catalog requires an ordinary absolute local path' }
+    return @(('-PvwRemoteEditorCatalog=' + $absolute), ('-PvwRemoteEditorCatalogSha256=' + $Digest))
+}
+
 function Run-Gradle {
     param([string]$Phase, [string[]]$Tasks)
-    $gradleArguments = $Tasks + @('--console=plain', '--no-daemon', '--no-configuration-cache', '--no-build-cache', '--no-parallel', '--rerun-tasks')
+    $catalogArguments = @(Get-RemoteEditorCatalogArguments $RemoteEditorCatalog $RemoteEditorCatalogSha256 $projectRoot)
+    $gradleArguments = $Tasks + $catalogArguments + @('--console=plain', '--no-daemon', '--no-configuration-cache', '--no-build-cache', '--no-parallel', '--rerun-tasks')
     Run-Step $Phase (Join-Path $projectRoot 'apps\gradlew.bat') $gradleArguments (Join-Path $projectRoot 'apps') -ExitGraceSeconds 20
 }
 
@@ -44,7 +60,7 @@ function Run-LicenseGate {
 }
 
 function Build-NativeWindows {
-    Run-Cargo 'build-native-windows' @('build', '--locked', '-p', 'vw-ffi', '-p', 'vw-host-ffi', '-p', 'vw-capture', '--features', 'vw-ffi/bindgen,vw-ffi/fixtures')
+    Run-Cargo 'build-native-windows' @('build', '--locked', '-p', 'vw-ffi', '-p', 'vw-host-ffi', '-p', 'vw-capture', '-p', 'vw-remote-host', '--features', 'vw-ffi/bindgen,vw-ffi/fixtures')
 }
 
 function Build-NativeAndroid {
@@ -62,6 +78,16 @@ try {
             if ($Command -eq 'test-editor') { Run-Cargo 'test-editor-native' (@('test','--locked','--no-fail-fast') + $editorPackages + @('--features','vw-ffi/fixtures','--','--test-threads=2')) }
             Run-Cargo 'lint-editor-native' (@('clippy','--locked','--keep-going') + $editorPackages + @('--all-targets','--features','vw-ffi/fixtures','--','-D','warnings'))
             Run-Cargo 'format-editor-native' (@('fmt') + $editorPackages + @('--','--check'))
+        }
+        'build-remote-helpers' {
+            Run-LicenseGate
+            Run-Cargo 'build-remote-helpers' @('build','--locked','-p','vw-remote','-p','vw-remote-host','--all-targets')
+        }
+        'test-remote-helpers' {
+            Run-LicenseGate
+            Run-Cargo 'test-remote-helpers' @('test','--locked','-p','vw-remote','-p','vw-remote-host','-p','vw-capture','--all-targets','--','--test-threads=2')
+            Run-Cargo 'lint-remote-helpers' @('clippy','--locked','-p','vw-remote','-p','vw-remote-host','-p','vw-capture','--all-targets','--','-D','warnings')
+            Run-Cargo 'format-remote-helpers' @('fmt','-p','vw-remote','-p','vw-remote-host','-p','vw-capture','--','--check')
         }
         'build-raster' {
             Run-LicenseGate
@@ -96,6 +122,20 @@ try {
             Run-Cargo 'build-pairing-android' @('ndk', '-t', 'arm64-v8a', '--platform', '29', 'build', '--locked', '-p', 'vw-pair-cli')
             Run-Step 'bind-pairing-build' 'python.exe' @('tools/pair-cli/build_receipt.py', 'record')
         }
+        'build-remote-integration' {
+            # Root alone runs this serialized opt-in build. NativeWindows builds
+            # both DLLs, connection/capture/HEVC/input helpers and owned harness.
+            Run-LicenseGate
+            Build-NativeWindows
+            Build-NativeAndroid
+            Run-Step 'remote-integration-ffi-golden' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/ffi-test/generate-golden.ps1')
+            Run-Gradle 'remote-integration-shared-bindings' @(':shared:generateCoreBindings', ':shared:generateHostBindings', ':shared:checkCommonMainImports', ':shared:checkImportGuardFixtures', ':shared:checkAndroidNativeAlignment')
+            Run-Gradle 'remote-integration-artifacts' @(':desktop:remoteIntegrationClasspath', ':android:assembleDebug', ':android:assembleDebugAndroidTest', '-PvwAndroidHil=true', '-PvwRemoteIntegration=true', ('-PvwNativeDir=' + (Join-Path $projectRoot 'target/debug')))
+            Run-Step 'remote-integration-native-packaging' 'python.exe' @('tools/ffi-test/check_apk.py', 'apps/android/build-remote-integration/outputs/apk/debug/android-debug.apk')
+            Run-Step 'remote-integration-entrypoint-preflight' 'python.exe' @('tools/remote-edit/android_entrypoint_preflight.py', '--apk-test', 'apps/android/build-remote-integration/outputs/apk/androidTest/debug/android-debug-androidTest.apk', '--contract', 'tools/remote-edit/remote_instrumentation_contract.json', '--selection', 'com.visualworkbench.android.remote.RemoteNormalPathInstrumentedTest')
+            # Inventory, explicit route selection and device execution are
+            # separate owner-run steps; this build never installs or launches.
+        }
         'build-ffi' {
             Run-LicenseGate
             Build-NativeWindows
@@ -104,7 +144,11 @@ try {
             Run-Gradle 'build-shared-bindings' @(':shared:generateCoreBindings', ':shared:generateHostBindings', ':shared:checkCommonMainImports', ':shared:checkImportGuardFixtures', ':shared:checkAndroidNativeAlignment')
         }
         'test-ffi' {
-            Run-Cargo 'test-ffi-native' @('test', '--locked', '-p', 'vw-ffi', '-p', 'vw-host-ffi', '--all-targets', '--', '--test-threads=2')
+            # A final-target link argument preserves other packages/bins and Android.
+            Run-Step 'test-ffi-core-census' 'pwsh.exe' @('-NoProfile', '-File', 'tools/ffi-test/test_core_unit_census.ps1')
+            Invoke-VwCoreUnitTest -ProjectRoot $projectRoot -Limit $TimeoutSeconds
+            Run-Cargo 'test-ffi-integration' @('test', '--locked', '-p', 'vw-ffi', '--test', '*', '--', '--test-threads=2')
+            Run-Cargo 'test-ffi-host' @('test', '--locked', '-p', 'vw-host-ffi', '--all-targets', '--', '--test-threads=2')
             Run-Cargo 'lint-ffi-native' @('clippy', '--locked', '-p', 'vw-ffi', '-p', 'vw-host-ffi', '--all-targets', '--features', 'vw-ffi/bindgen,vw-ffi/fixtures', '--', '-D', 'warnings')
             Run-Cargo 'format-ffi-native' @('fmt', '-p', 'vw-ffi', '-p', 'vw-host-ffi', '--', '--check')
         }

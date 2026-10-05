@@ -1,0 +1,309 @@
+{
+  "schema": 1,
+  "milestone": "M4-KP",
+  "checkpoint": "native-foundation",
+  "status": "in_progress",
+  "acceptance_passed": false,
+  "gates_passed": [],
+  "source_sha256": {
+    "core/crates/vw-remote/Cargo.toml": "79c486ada6eac7585b7b6deceabb1470fa996ae1eb3d2e722a447c121aaec80a",
+    "host-win/crates/vw-remote-host/src/platform/native_guard.rs": "65ad4981f8efbbcc03852e4044d2a46aa8993b7b1ac968b1753e305a1dfd3b66",
+    "host-win/crates/vw-remote-host/src/platform/guard.rs": "3bfe26192e815d3654dfbce2df83e18efc2da481d329e2e6fe64ab79dd5ffe5a",
+    "host-win/crates/vw-remote-host/src/platform/encoder.rs": "4b97d586915a9ae74ece369b2644450776243b5cb7972158e170d71d11ab9757",
+    "host-win/crates/vw-host-ffi/src/editor_identity/pe.rs": "d7e20cdd98b82248cbc25ea86d89aa8e411433520791ad3592404855140d0520",
+    "host-win/crates/vw-remote-host/src/contact.rs": "25cee5accd1126ea54ab592254954ac1a566bbe7c4b758777f8296bb75dfcdae",
+    "host-win/crates/vw-remote-host/src/bin/hevc.rs": "795aa480bdac0b079560dced2dfdde9ead49333162dfcb67af0f9f42a38835a9",
+    "core/crates/vw-remote/src/wire.rs": "1c8e2d836e5aed5965bf40c6274fc22cea5c90e2ae8612de1c72a31dff51e9b8",
+    "Cargo.lock": "4724f43d7c476697f56e968237777ed0253a3abe68bb7e475f8b61297cd64734",
+    "core/crates/vw-remote/src/applied.rs": "7250cca08b500382bb09ab46134fc6aed471b7a416611dd4bb90ca241fd002f9",
+    "host-win/crates/vw-remote-host/Cargo.toml": "eb72da478b47395c6d3aa79bd83cc68717bcf43ba867fe819a6845ff380e6acb",
+    "core/crates/vw-remote/tests/admission.rs": "d3c0cd5bb78452b4102336a083bef783af83d6882ef46920e47f0ec818715c38",
+    "host-win/crates/vw-remote-host/src/retirement.rs": "b38cae848de7025dfad1940f0efe17b15a6be0af78e8f12b1946aad3634fa02d",
+    "host-win/crates/vw-remote-host/src/platform/mod.rs": "2bafa192fdd661f3f4c748e62edd3ef52ecdf8f74ab87977959b3f06185a4517",
+    "host-win/crates/vw-remote-host/src/platform/video.rs": "10c396faed89934e509e4130cd593ddeb216ed320613720f5e437abdd3aedbb4",
+    "host-win/crates/vw-remote-host/src/process.rs": "7289eae3b3bd910e8b61b99756c040c41d91b6e9d47f3876e047864bc2d38367",
+    "host-win/crates/vw-remote-host/src/platform/input.rs": "bb7c4f52f48cce04f4b2764cadda0c98f543d87378ed240d29e64350385b0ee0",
+    "core/crates/vw-remote/src/profile.rs": "8a78be7ff6e04444ce343fc9e659618f744223a8ffad23edd63a9df5f2faae6f",
+    "host-win/crates/vw-remote-host/src/startup.rs": "9a8c8a8b82074c457306814e0d33ef6b3c73f5e7fa0aa42129ef4e9e6a753155",
+    "build.ps1": "bc972333045424f3f5751f488c7e071d125da21981e8346d25dfae0be0ed9d35",
+    "host-win/crates/vw-host-ffi/src/editor_identity.rs": "59c5f320c4e9a175cb1304fafb36ab92558a906b0f9f90e096be08cb189e71eb",
+    "host-win/crates/vw-remote-host/src/platform/shortcuts.rs": "32d7b55e71f903db21fe199f27dbc1a061ab839a5eaf7efffb56044a8c263b0d",
+    "host-win/crates/vw-remote-host/src/bin/input.rs": "5a372e0b4d3b2f139398ff7c1760b2bafaa358d4fb2274706d46838ad2de5842",
+    "host-win/crates/vw-host-ffi/Cargo.toml": "8b63f5615b28322f897eaeb291d7e70b0084b4b9b172abc0ea3f3f697e4c5eb9",
+    "core/crates/vw-remote/src/lib.rs": "665a62b86b34f94d9f1c81e8238efe97c7186869706e131b69b60340b65ef4df",
+    "core/crates/vw-remote/src/annexb.rs": "82bc845c0d5200a067cd642cb1614636629f7bd5a11eeea24b1f893dc8a90f14",
+    "host-win/crates/vw-remote-host/src/process/windows.rs": "9fa056c71121fae14abf17d90b29920363a768469629f888956d852d91ac9cd7",
+    "host-win/crates/vw-remote-host/src/lib.rs": "a09797b269d851e353d6098b42fc91b7d7d7002a8aa7970dbf6ddc59c3cea3d0",
+    "host-win/crates/vw-host-ffi/src/capture.rs": "75df026bb821a9117702b2df322f77b8c82df09c4f8dfc039996baf0c26c30a2"
+  },
+  "identity": {
+    "license_reused_same_manifest": true,
+    "license_log": "m4-editor-native-license-windows-import-4010a6d516b54a5d8adf4300fd153e75.log",
+    "output_streams_completed": true,
+    "format_log": "m4-editor-native-format-pe-fixtures-ff8400840605494c808739c4fbe425c1.log",
+    "inner_phases": [
+      {
+        "phase": "test-ffi-native",
+        "log": "test-ffi-native-8c8dc1aa223e4fe9a81e964d89253667.log",
+        "exit_code": 0,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true
+      },
+      {
+        "phase": "lint-ffi-native",
+        "log": "lint-ffi-native-20b37fbcc649403ab62c4ac82d279662.log",
+        "exit_code": 0,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true
+      },
+      {
+        "phase": "format-ffi-native",
+        "log": "format-ffi-native-e3d7f95f67b2428da9eaffcd58943913.log",
+        "exit_code": 0,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true
+      }
+    ],
+    "process_tree_cleanup_confirmed": true,
+    "tests": {
+      "passed": 238,
+      "failed": 0,
+      "ignored": 0,
+      "suites": 12,
+      "identity_cases": 16
+    },
+    "test_log": "m4-editor-native-test-ffi-pe-fixtures-f4dc268575014a549521f808253d5f7a.log"
+  },
+  "helpers": {
+    "tests": {
+      "suites": 5,
+      "ignored": 0,
+      "failed": 0,
+      "passed": 28
+    },
+    "format_check_passed": true,
+    "license_checks_passed": true,
+    "inner_phases": [
+      {
+        "output_streams_completed": true,
+        "process_tree_cleanup_confirmed": true,
+        "log": "license-offline-policy-c29dc8ff3eee4205b129450404c64619.log",
+        "phase": "license-offline-policy",
+        "exit_code": 0
+      },
+      {
+        "output_streams_completed": true,
+        "process_tree_cleanup_confirmed": true,
+        "log": "license-npm-policy-cd54f5bb582446618ca92b9eac656798.log",
+        "phase": "license-npm-policy",
+        "exit_code": 0
+      },
+      {
+        "output_streams_completed": true,
+        "process_tree_cleanup_confirmed": true,
+        "log": "license-cargo-deny-version-4676a8fedb154507a408234693163254.log",
+        "phase": "license-cargo-deny-version",
+        "exit_code": 0
+      },
+      {
+        "output_streams_completed": true,
+        "process_tree_cleanup_confirmed": true,
+        "log": "license-rust-2a14b6574c084c40bc6b78c00d4a3897.log",
+        "phase": "license-rust",
+        "exit_code": 0
+      },
+      {
+        "output_streams_completed": true,
+        "process_tree_cleanup_confirmed": true,
+        "log": "license-gradle-459e1a7ba7f74cb29c91aa731cf8af57.log",
+        "phase": "license-gradle",
+        "exit_code": 0
+      },
+      {
+        "output_streams_completed": true,
+        "process_tree_cleanup_confirmed": true,
+        "log": "test-remote-helpers-341b93651d52431faaebfa7691151c60.log",
+        "phase": "test-remote-helpers",
+        "exit_code": 0
+      },
+      {
+        "output_streams_completed": true,
+        "process_tree_cleanup_confirmed": true,
+        "log": "lint-remote-helpers-f89c833c06ac46619b550b85d13cef7f.log",
+        "phase": "lint-remote-helpers",
+        "exit_code": 0
+      },
+      {
+        "output_streams_completed": true,
+        "process_tree_cleanup_confirmed": true,
+        "log": "format-remote-helpers-fc71e7cda37c48989d142296ca0c78c1.log",
+        "phase": "format-remote-helpers",
+        "exit_code": 0
+      }
+    ],
+    "test_log": "m4-native-helpers-test-r1-lint-73cd5da0a05c4278a2542fad9dfd5c77.log",
+    "output_streams_completed": true,
+    "format_log": "m4-native-helper-format-r1-lint-1af1d89baf374f3ab12df6a8b05ed083.log",
+    "process_tree_cleanup_confirmed": true,
+    "strict_clippy_passed": true
+  },
+  "helper_build": {
+    "status": "passed",
+    "inner_phases": [
+      {
+        "log": "license-offline-policy-74b428b067dc47fc9f25363d0b944243.log",
+        "exit_code": 0,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "phase": "license-offline-policy"
+      },
+      {
+        "log": "license-npm-policy-f3273f6eff174c1e9c9a2d12bf1feeed.log",
+        "exit_code": 0,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "phase": "license-npm-policy"
+      },
+      {
+        "log": "license-cargo-deny-version-c38a3c111021424a86fb08296df03971.log",
+        "exit_code": 0,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "phase": "license-cargo-deny-version"
+      },
+      {
+        "log": "license-rust-3e3f5a1b65c44f83857d65d9fa420918.log",
+        "exit_code": 0,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "phase": "license-rust"
+      },
+      {
+        "log": "license-gradle-fd5581cda7754ab88e3084cf6a314509.log",
+        "exit_code": 0,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "phase": "license-gradle"
+      },
+      {
+        "log": "build-remote-helpers-be132b382d9d4be0947958f6cd86bba2.log",
+        "exit_code": 0,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "phase": "build-remote-helpers"
+      }
+    ],
+    "artifacts": [
+      {
+        "profile": "debug",
+        "source_receipt": "m4-native-helper-build-r1-lint.json",
+        "bytes": 2080256,
+        "name": "vw-hevc-helper.exe",
+        "sha256": "42f6ead05a9cbfc35a3ac1012f1b83acc8742a718522f3a9682218e79f7450c9"
+      },
+      {
+        "profile": "debug",
+        "source_receipt": "m4-native-helper-build-r1-lint.json",
+        "bytes": 2948608,
+        "name": "vw-input-helper.exe",
+        "sha256": "35f126a3672e49e5e499b6589dc3c9c8490c2923ad05f48ee987f750c113e4ae"
+      }
+    ],
+    "log": "m4-build-native-helpers-r1-lint-644072e50e8e4992bc4f39ce3bcac625.log",
+    "process_tree_cleanup_confirmed": true,
+    "output_streams_completed": true
+  },
+  "retained_failure_receipts": [
+    {
+      "retained": true,
+      "receipt_name": "m4-native-identity-check-failure-windows-import.json",
+      "recorded_status": "failed",
+      "logs": [
+        "m4-editor-native-format-windows-import-89aec84732c34105b0cc3ec1ea5caa2c.log",
+        "m4-editor-native-license-windows-import-4010a6d516b54a5d8adf4300fd153e75.log",
+        "m4-editor-native-test-ffi-windows-import-436a339156a94eefa0764f7f2783e39a.log"
+      ]
+    },
+    {
+      "retained": true,
+      "receipt_name": "m4-native-identity-check-sync-range.json",
+      "recorded_status": "failed",
+      "logs": [
+        "m4-editor-native-format-sync-range-2447cf8ccc5c44d2820355766a273697.log",
+        "m4-editor-native-test-ffi-sync-range-620d35fb3e4c4ecfb0d5a87da9c13ee3.log",
+        "m4-editor-native-license-windows-import-4010a6d516b54a5d8adf4300fd153e75.log"
+      ]
+    },
+    {
+      "retained": true,
+      "receipt_name": "m4-native-identity-check-fixtures.json",
+      "recorded_status": "failed",
+      "logs": [
+        "m4-editor-native-format-fixtures-241c2e04db084ff3a29947e8aa3ff92b.log",
+        "m4-editor-native-test-ffi-fixtures-e0bdd7166a9b4ddf9b6344ee1eadb28a.log",
+        "m4-editor-native-license-windows-import-4010a6d516b54a5d8adf4300fd153e75.log"
+      ]
+    },
+    {
+      "retained": true,
+      "receipt_name": "m4-native-helper-check-r1-format-failure.json",
+      "recorded_status": "failed",
+      "logs": [
+        "m4-native-helper-format-r1-30eb44d765f9449d96c08773383b8e48.log"
+      ]
+    },
+    {
+      "retained": true,
+      "receipt_name": "m4-native-helper-format-r1-syntax.json",
+      "recorded_status": "failed",
+      "logs": [
+        "m4-native-helper-format-r1-syntax-a9dc82a971e84d6f8b28ae54049ab9a6.log"
+      ]
+    },
+    {
+      "retained": true,
+      "receipt_name": "m4-native-helper-check-r1-rect.json",
+      "recorded_status": "failed",
+      "logs": [
+        "m4-native-helper-format-r1-rect-949988d040c549259316f4bf43ab0db4.log",
+        "m4-native-helpers-test-r1-rect-2658f6b1972746d29a7391f5536829f3.log"
+      ]
+    },
+    {
+      "retained": true,
+      "receipt_name": "m4-native-helper-check-r1-ipc.json",
+      "recorded_status": "failed",
+      "logs": [
+        "m4-native-helper-format-r1-ipc-bc7e839698a6480f956a3f23bf53665b.log",
+        "m4-native-helpers-test-r1-ipc-43f8510631f24346b36ca69b36eb750e.log"
+      ]
+    }
+  ],
+  "hardware": {
+    "production_input_run": false,
+    "editor_actions_verified": [],
+    "codec_run": false,
+    "ghost_latency_passed": false,
+    "fps_passed": false,
+    "usb_latency_passed": false,
+    "owner_drawing_passed": false,
+    "pressure_passed": false
+  },
+  "verification_images": {
+    "disposal": "No verification images created for this checkpoint.",
+    "retained": 0,
+    "created": 0,
+    "staged": 0
+  },
+  "executor": {
+    "requested_effort": "xhigh",
+    "coding_lanes_verified": [
+      "formats_xhigh",
+      "documents_xhigh"
+    ],
+    "root_actual_effort": "max",
+    "root_scope": "coordination, source admission, review and validation",
+    "requested_model": "gpt-6.1-sol"
+  },
+  "source_binding_scope": "Completed native foundation checkpoint; subsequent helper HIL, protocol and app changes have separate receipts."
+}

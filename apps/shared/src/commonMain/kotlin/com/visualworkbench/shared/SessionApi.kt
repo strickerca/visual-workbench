@@ -44,7 +44,7 @@ public expect suspend fun localSessionAddresses(): List<LocalSessionAddress>
 public expect fun encodePairingQr(qr: ByteArray): String
 public expect fun decodePairingQr(text: String): ByteArray
 public data class PairedDevice(public val deviceId: String, public val fingerprint: String, public val pairedAtMs: ULong, public val revokedAtMs: ULong?)
-public enum class SessionFailureKind { Invalid, Backpressure, Closed, Cancelled, Authentication, Expired, LockedOut, Declined, Storage, Timeout, Transport, Worker }
+public enum class SessionFailureKind { Invalid, Backpressure, Closed, Cancelled, Authentication, Expired, LockedOut, Declined, Storage, Timeout, Transport, Worker, RemoteUnavailable, RemoteRetirementPending, RemotePartialInput }
 public class SessionFailure(public val kind: SessionFailureKind) : Exception(kind.name)
 public enum class SessionCarrier { QuicTether, QuicWifi, TcpAdb }
 public data class SessionEndpoint(public val carrier: SessionCarrier, public val address: String)

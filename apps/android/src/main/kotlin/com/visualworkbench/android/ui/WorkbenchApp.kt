@@ -143,6 +143,7 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
         }
         }
     }
+    if(editor.remoteOpen)editor.remoteCapability?.let{remote->com.visualworkbench.android.remote.RemoteEditPanel(remote,editor::remoteClosed)}
     AiEditorOverlay(editor)
     if (editor.showBrush) BrushDialog(editor.tool, editor.displayedBrush(), editor.brushPreview, editor::brush) { editor.brushDialog(false) }
     editor.textDraft?.let { draft -> TextEditor(draft, editor.busy || editor.pending != 0, editor::saveText, editor::dismissText) }

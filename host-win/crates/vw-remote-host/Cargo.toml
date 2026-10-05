@@ -1,0 +1,74 @@
+[package]
+name = "vw-remote-host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = []
+integration-carrier-fault = []
+
+[lints]
+workspace = true
+
+[dependencies]
+vw-remote = { version = "=0.1.0", path = "../../../core/crates/vw-remote" }
+vw-capture = { version = "=0.1.0", path = "../../../core/crates/vw-capture" }
+vw-host-ffi = { version = "=0.1.0", path = "../vw-host-ffi" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+ring = "=0.17.14"
+png = "=0.18.1"
+blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = [
+
+    "Foundation", "Graphics_Capture", "Graphics_DirectX_Direct3D11",
+    "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation",
+    "Win32_System_Com", "Win32_System_LibraryLoader", "Win32_System_Variant", "Win32_System_Ole",
+    "Win32_System_WinRT_Graphics_Capture", "Win32_System_WinRT_Direct3D11",
+    "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Dwm", "Win32_Security", "Win32_System_Threading", "Win32_System_Performance",
+    "Win32_System_JobObjects", "Win32_System_WindowsProgramming", "Win32_UI_Input_Pointer", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Controls",
+    "Win32_Storage_Packaging_Appx", "Win32_UI_Accessibility", "Win32_Storage_FileSystem", "Win32_System_Pipes", "Win32_System_IO",
+] }
+windows-sys = { version = "=0.61.2", features = [
+    "Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem",
+    "Win32_System_Threading", "Win32_System_JobObjects", "Win32_System_Pipes", "Win32_System_IO"
+] }
+
+[[bin]]
+name = "vw-hevc-helper"
+path = "src/bin/hevc.rs"
+
+[[bin]]
+name = "vw-input-helper"
+path = "src/bin/input.rs"
+
+[[bin]]
+name = "vw-remote-guard-hil"
+path = "src/bin/guard_hil.rs"
+
+[[bin]]
+name = "vw-editor-probe"
+path = "src/bin/editor_probe.rs"
+
+[[bin]]
+name = "vw-editor-probe-runner"
+path = "src/bin/editor_probe_runner.rs"
+
+[[bin]]
+name = "vw-editor-effect-hil"
+path = "src/bin/editor_effect.rs"
+
+[[bin]]
+name = "vw-editor-effect-runner"
+path = "src/bin/editor_effect_runner.rs"
+
+[[bin]]
+name = "vw-editor-frame-runner"
+path = "src/bin/editor_frame_runner.rs"

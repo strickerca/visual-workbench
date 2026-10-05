@@ -125,6 +125,8 @@ internal fun PairingScreen(editor: EditorController) {
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Connect current project") }
         editor.connection?.let { status ->
             Text(editor.connectionLabel())
+            Button(onClick=editor::openRemoteComputer,enabled=status.carrier==SessionCarrier.QuicTether&&!editor.busy,modifier=Modifier.heightIn(min=48.dp)){Text("Remote Krita / Paint")}
+            Text("Remote input uses the selected USB tether route and a separate grant on the computer.",style=MaterialTheme.typography.caption)
             if (status.echoSamples > 0u) Text("Echo RTT p50 ${status.echoRttP50Ms?.let { "%.1f".format(it) } ?: "—"} ms · p95 ${status.echoRttP95Ms?.let { "%.1f".format(it) } ?: "—"} ms (${status.echoSamples} samples)", style = MaterialTheme.typography.caption)
             TextButton(onClick = editor::disconnect, modifier = Modifier.heightIn(min = 48.dp)) { Text("Disconnect") }
         }

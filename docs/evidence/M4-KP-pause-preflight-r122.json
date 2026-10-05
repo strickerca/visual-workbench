@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "status": "unavailable",
+  "kind": "final pause-held retry device preflight",
+  "source_map_sha256": "519a55f3c12626d899727a6e2b430c43af3ff20d89d82d6b2d2b80813cb453d3",
+  "component_proof_sha256": "45592f360b37b4fa9e1b4b4a01b61182345464c57d2ed1dc8037345c67cb8286",
+  "private_refusal_receipt_sha256": "5e264e8620d344d5ca0e9c1bca90614836ca21aed68885252cdd19120de09434",
+  "failure_phase": "authorized S23 device selection",
+  "adb_device_count": 0,
+  "compilers_executed": false,
+  "artifact_inventory_created": false,
+  "retained_parent_invoked": false,
+  "phone_install_attempted": false,
+  "input_attempted": false,
+  "focused_parser_cases_passed": 135,
+  "corrected_lifecycle_device_acceptance": false,
+  "milestone_passed": false,
+  "screenshots_created": 0
+}

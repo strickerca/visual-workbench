@@ -1,4 +1,8 @@
 import java.security.MessageDigest
+import java.io.File
+import java.nio.file.Files as NioFiles
+import java.nio.file.LinkOption as NioLinkOption
+import org.gradle.api.tasks.compile.JavaCompile
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -9,6 +13,7 @@ kotlin { jvmToolchain(21) }
 sourceSets.main { resources.srcDir(rootProject.file("../third_party/notices")) }
 dependencies {
     implementation(project(":shared"))
+    implementation(project(":bindings-core"))
     implementation(project(":bindings-host"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material)
@@ -39,7 +44,7 @@ compose.desktop {
 val runtimeRepository = rootProject.projectDir.parentFile
 val runtimeNativeDirectory = providers.gradleProperty("vwNativeDir").map { file(it) }.orElse(runtimeRepository.resolve("target/debug"))
 val packageConnectionRuntime = tasks.register("packageConnectionRuntime") {
-    val nativeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
+    val nativeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-hevc-helper.exe", "vw-input-helper.exe")
     inputs.files(nativeNames.map { name -> runtimeNativeDirectory.map { it.resolve(name) } })
     val output = layout.buildDirectory.dir("generated/connectionRuntimeResources")
     outputs.dir(output)
@@ -57,10 +62,53 @@ val packageConnectionRuntime = tasks.register("packageConnectionRuntime") {
         directory.resolve("win32-x86-64").mkdirs()
         runtimeNativeDirectory.get().resolve("vw-connection-helper.exe").copyTo(directory.resolve("win32-x86-64/vw-connection-helper.exe"), overwrite = true)
         runtimeNativeDirectory.get().resolve("vw-capture-helper.exe").copyTo(directory.resolve("win32-x86-64/vw-capture-helper.exe"), overwrite = true)
+        for(name in listOf("vw-hevc-helper.exe","vw-input-helper.exe"))runtimeNativeDirectory.get().resolve(name).copyTo(directory.resolve("win32-x86-64/$name"),overwrite=true)
         directory.resolve("vw-native-runtime.sha256").writeText(records.joinToString("\n", postfix = "\n"), Charsets.US_ASCII)
     }
 }
 sourceSets.named("main") { resources.srcDir(packageConnectionRuntime) }
+
+// Optional exact root-admitted editor catalog. This is a build-owner asset, never
+// a runtime file override. Native current evidence still decides every action.
+val remoteEditorCatalog=providers.gradleProperty("vwRemoteEditorCatalog").map{file(it)}
+val remoteEditorCatalogSha256=providers.gradleProperty("vwRemoteEditorCatalogSha256")
+val packageRemoteEditorCatalog=tasks.register("packageRemoteEditorCatalog") {
+    inputs.property("enabled",remoteEditorCatalog.isPresent)
+    inputs.property("sha256",remoteEditorCatalogSha256.orElse(""))
+    if(remoteEditorCatalog.isPresent)inputs.file(remoteEditorCatalog)
+    val output=layout.buildDirectory.dir("generated/remoteEditorCatalogResources")
+    outputs.dir(output)
+    doLast {
+        check(remoteEditorCatalog.isPresent==remoteEditorCatalogSha256.isPresent){"Editor catalog path and admitted SHA256 must be supplied together"}
+        val directory=output.get().asFile.absoluteFile.normalize()
+        check(directory.toPath().startsWith(layout.buildDirectory.get().asFile.absoluteFile.normalize().toPath())){"Editor catalog output escaped the task build directory"}
+        for(part in generateSequence(directory){it.parentFile}.toList().asReversed()) {
+            val path=part.toPath()
+            if(NioFiles.exists(path,NioLinkOption.NOFOLLOW_LINKS)) {
+                check(NioFiles.isDirectory(path,NioLinkOption.NOFOLLOW_LINKS)&&part.canonicalFile==part.absoluteFile.normalize()){"Editor catalog output namespace is redirected"}
+            } else {
+                check(part.mkdir()){"Editor catalog output directory could not be created"}
+                check(part.canonicalFile==part.absoluteFile.normalize()){"Editor catalog output namespace changed"}
+            }
+        }
+        val names=setOf("vw-remote-editor-catalog.json","vw-remote-editor-catalog.sha256")
+        check(directory.listFiles()?.all{it.isFile&&it.name in names&&it.canonicalFile==it.absoluteFile.normalize()}==true){"Unexpected generated editor catalog entries"}
+        if(!remoteEditorCatalog.isPresent) {
+            for(name in names){val stale=directory.resolve(name);check(!stale.exists()||stale.delete()){"Could not remove stale generated editor catalog"}}
+        } else {
+            val expected=remoteEditorCatalogSha256.get();check(expected.matches(Regex("[a-f0-9]{64}"))){"Invalid admitted editor catalog SHA256"}
+            val source=remoteEditorCatalog.get()
+            check(source.isFile&&source.canonicalFile==source.absoluteFile.normalize()&&source.length() in 1..(32L*1024)){"Editor catalog must be a canonical bounded admitted file"}
+            val bytes=source.inputStream().use{it.readNBytes(32*1024+1)}
+            check(bytes.size in 1..(32*1024)){"Editor catalog changed beyond its bound"}
+            val actual=MessageDigest.getInstance("SHA-256").digest(bytes).joinToString(""){"%02x".format(it.toInt() and 255)}
+            check(actual==expected){"Editor catalog differs from its root-admitted SHA256"}
+            directory.resolve("vw-remote-editor-catalog.json").writeBytes(bytes)
+            directory.resolve("vw-remote-editor-catalog.sha256").writeText("$actual ${bytes.size} vw-remote-editor-catalog.json\n",Charsets.US_ASCII)
+        }
+    }
+}
+sourceSets.named("main"){resources.srcDir(packageRemoteEditorCatalog)}
 
 // A successful central package build must contain this exact fresh receipt ID.
 // No build ID is emitted for ordinary desktop builds.
@@ -104,3 +152,30 @@ val admitMcpServerResources = tasks.register("admitMcpServerResources") {
 }
 if (mcpServerResources.isPresent) sourceSets.named("main") { resources.srcDir(mcpServerResources) }
 tasks.named("processResources") { dependsOn(admitMcpServerResources) }
+
+// Root serializes compilation first. The finite runner reads this fresh classpath
+// receipt and starts Java directly in an owned Job; it never builds while live.
+val integrationMainJava = tasks.named<JavaCompile>(sourceSets.main.get().compileJavaTaskName)
+tasks.register("remoteIntegrationClasspath") {
+    dependsOn(tasks.named("classes"))
+    val destination=layout.buildDirectory.file("remote-integration-classpath.txt")
+    outputs.file(destination)
+    outputs.upToDateWhen { false } // Re-evaluate this cheap receipt against actual current task/artifact state.
+    doLast {
+        check(providers.gradleProperty("vwRemoteIntegration").orNull=="true")
+        val javaCompile = integrationMainJava.get()
+        val noJavaOutput = javaCompile.state.executed && javaCompile.state.noSource && javaCompile.source.isEmpty
+        val declaredJavaOutput = javaCompile.destinationDirectory.get().asFile.absoluteFile.normalize()
+        val entries = sourceSets.main.get().runtimeClasspath.files.filter { entry ->
+            // Only this exact declared output may be omitted after actual
+            // NO-SOURCE execution. Every other missing artifact still fails.
+            if (noJavaOutput && entry.absoluteFile.normalize() == declaredJavaOutput) false
+            else {
+                check(entry.exists()) { "Missing integration classpath entry: $entry" }
+                true
+            }
+        }
+        check(entries.isNotEmpty()) { "Empty integration classpath" }
+        destination.get().asFile.writeText(entries.joinToString(File.pathSeparator) { it.path },Charsets.UTF_8)
+    }
+}

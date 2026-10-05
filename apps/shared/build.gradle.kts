@@ -72,22 +72,22 @@ val generateCoreBindings = tasks.register<Exec>("generateCoreBindings") {
     val library = nativeDirectory.map { it.resolve("vw_core.dll") }
     val generator = nativeDirectory.map { it.resolve("vw-bindgen.exe") }
     inputs.file(library); inputs.file(generator); inputs.file(repository.resolve("core/crates/vw-ffi/uniffi.toml"))
-    inputs.property("generatedJvmBoundary", 1)
+    inputs.property("generatedJvmBoundary", 2)
     outputs.dir(layout.buildDirectory.dir("generated/uniffi/core"))
     doFirst {
         cleanGeneratedBindings("core")
-        commandLine(generator.get().absolutePath,"generate","--library",library.get().absolutePath,"--language","kotlin","--config",repository.resolve("core/crates/vw-ffi/uniffi.toml").absolutePath,"--out-dir",layout.buildDirectory.dir("generated/uniffi/core").get().asFile.absolutePath,"--no-format")
+        commandLine(generator.get().absolutePath,"generate","--library",library.get().absolutePath,"--crate","vw_core","--language","kotlin","--config",repository.resolve("core/crates/vw-ffi/uniffi.toml").absolutePath,"--out-dir",layout.buildDirectory.dir("generated/uniffi/core").get().asFile.absolutePath,"--no-format")
     }
     doLast { assertGeneratedBindings("core") }
 }
 val generateHostBindings = tasks.register<Exec>("generateHostBindings") {
     val library = nativeDirectory.map { it.resolve("vw_host.dll") }
     inputs.file(library); inputs.file(nativeDirectory.map { it.resolve("vw-bindgen.exe") }); inputs.file(repository.resolve("host-win/crates/vw-host-ffi/uniffi.toml"))
-    inputs.property("generatedJvmBoundary", 1)
+    inputs.property("generatedJvmBoundary", 2)
     outputs.dir(layout.buildDirectory.dir("generated/uniffi/host"))
     doFirst {
         cleanGeneratedBindings("host")
-        commandLine(nativeDirectory.get().resolve("vw-bindgen.exe").absolutePath,"generate","--library",library.get().absolutePath,"--language","kotlin","--config",repository.resolve("host-win/crates/vw-host-ffi/uniffi.toml").absolutePath,"--out-dir",layout.buildDirectory.dir("generated/uniffi/host").get().asFile.absolutePath,"--no-format")
+        commandLine(nativeDirectory.get().resolve("vw-bindgen.exe").absolutePath,"generate","--library",library.get().absolutePath,"--crate","vw_host","--language","kotlin","--config",repository.resolve("host-win/crates/vw-host-ffi/uniffi.toml").absolutePath,"--out-dir",layout.buildDirectory.dir("generated/uniffi/host").get().asFile.absolutePath,"--no-format")
     }
     doLast { assertGeneratedBindings("host") }
 }

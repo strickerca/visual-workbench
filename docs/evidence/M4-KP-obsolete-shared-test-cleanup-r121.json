@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "status": "removed-exact-obsolete-intermediates",
+  "assessment_sha256": "1633504622f988d626ab429cee6becee03fb01d5131ed907b20ce294c05ffa41",
+  "files": [
+    {
+      "path": "apps/shared/build/intermediates/merged_native_libs/androidDeviceTest/mergeAndroidDeviceTestNativeLibs/out/lib/arm64-v8a/libvw_core.so",
+      "bytes": 178524472,
+      "sha256": "841c6267f836bf3d51504081348eaa7a87b03227d3956dc481932cb74ad2ac20"
+    },
+    {
+      "path": "apps/shared/build/intermediates/stripped_native_libs/androidDeviceTest/stripAndroidDeviceTestDebugSymbols/out/lib/arm64-v8a/libvw_core.so",
+      "bytes": 178524472,
+      "sha256": "841c6267f836bf3d51504081348eaa7a87b03227d3956dc481932cb74ad2ac20"
+    }
+  ],
+  "logical_bytes_reclaimed": 357048944,
+  "disk_free_before": 662016000,
+  "disk_free_after": 1019076608,
+  "preserved_apk_sha256": "569ca3c916e5008ace82ef17e6d0fb44204fa71037b1a4a70a5f79e2dc2df76b",
+  "preserved_entry_sha256": "841c6267f836bf3d51504081348eaa7a87b03227d3956dc481932cb74ad2ac20",
+  "no_active_project_or_compiler_processes": true,
+  "failure_receipts_and_drafts_preserved": true
+}

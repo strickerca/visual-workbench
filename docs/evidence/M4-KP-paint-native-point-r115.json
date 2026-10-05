@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "task": "T4.07",
+  "kind": "Paint native point diagnostic; not editor acceptance",
+  "source_map_sha256": "aeb4104d61a887827334674ffce810bd761dc36cb86d1f36a2faf9395992d132",
+  "receipt_sha256": "219387aac9557a9666de54f378a076ffeaa11a447a6a3bf51de76bb6fa6b4990",
+  "status": "diagnostic-observed",
+  "input_sent": false,
+  "actual_owners_retired": true,
+  "native_api_results": [
+    {
+      "api": "CUIAutomation",
+      "hit_class": "Image",
+      "hit_type": 50006,
+      "hit_rect": [
+        699,
+        165,
+        42,
+        42
+      ],
+      "lookup_completed": false,
+      "lookup_error": "InvalidDataException:native-child-bound",
+      "phase": "rooted-destination-3",
+      "elapsed_ms": 55
+    },
+    {
+      "api": "CUIAutomation8",
+      "hit_class": "Image",
+      "hit_type": 50006,
+      "hit_rect": [
+        699,
+        165,
+        42,
+        42
+      ],
+      "lookup_completed": false,
+      "lookup_error": "InvalidDataException:native-child-bound",
+      "phase": "rooted-destination-3",
+      "elapsed_ms": 27
+    }
+  ],
+  "finding": "Both native APIs hit a XAML Image at the Brush center. Existing production and experiment require exact Button equality. Exact bounded ancestor identity remains to be proven; rooted diagnostic traversal hit its own child bound.",
+  "guard_weakened": false,
+  "milestone_passed": false,
+  "images_disposed": true,
+  "disposal_receipt_sha256": "763a84bc39204c936d2ad9d509f7a91703df5b598b00ad97f4a14f9360e376c6"
+}

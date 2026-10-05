@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "kind": "owned-rebuildable-Cargo-symbol-disposal",
+  "status": "completed",
+  "private_planned_receipt_sha256": "32bc074d6f3d4550e4497c7c6142f6a0249a2ffd063eafbf9010e55d92a0751e",
+  "private_completion_receipt_sha256": "93cfc7d5262dd80664e65c8e78557658488adf06dd41c0c69e6f755459ea1322",
+  "file_count": 62,
+  "disposed_bytes": 1170481152,
+  "bound_source_paths_preserved": 143,
+  "protected_artifacts_preserved": 17,
+  "prior_failed_ffi_changed_artifacts": [
+    {
+      "path": "target/debug/vw_core.dll",
+      "build_sha256": "3aee50f66311ce117f0ea889199b7904ee286c22595259ef61d6a65522d508c7",
+      "current_sha256": "dbd62c08755627e4fa2b42443937dda48aa8e43178fde76ed54b075035d5d8cc"
+    },
+    {
+      "path": "target/debug/vw_host.dll",
+      "build_sha256": "e88ad2c20a1671bf78a19363f7bb54a5cf5bd4825e6440fc8cde30addd013773",
+      "current_sha256": "c58833553ecd84c7ce2f27de05642b14da96d0845aa69705db688f49e9131455"
+    }
+  ],
+  "fresh_runtime_build_required": true,
+  "recursive_delete": false,
+  "sources_evidence_executables_payloads_and_fingerprints_preserved": true,
+  "unrelated_files_deleted": false,
+  "verification_images_created": 0
+}

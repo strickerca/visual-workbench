@@ -507,17 +507,20 @@ fn paste_is_explicit_read_only_and_bad_preferred_png_does_not_fall_back() -> Tes
             format: ClipboardImageFormat::Png,
             sequence: 8,
         });
-        assert!(matches!(
-            host.read_clipboard_image(
+        let rejected = host
+            .read_clipboard_image(
                 ClipboardReadOptions {
                     format: ClipboardReadFormat::PreferPng,
-                    assume_untagged_srgb: true
+                    assume_untagged_srgb: true,
                 },
-                HostOperation::new()
+                HostOperation::new(),
             )
-            .await,
-            Err(HostError::InvalidPng)
-        ));
+            .await;
+        assert!(
+            matches!(rejected, Err(HostError::InvalidPng)),
+            "preferred PNG rejection actual error: {:?}",
+            rejected.as_ref().err()
+        );
         assert_eq!(state.reads.load(Ordering::Acquire), 2);
         assert!(state.png.lock().map_err(|_| "png")?.is_empty());
         assert!(state.dib.lock().map_err(|_| "dib")?.is_empty());

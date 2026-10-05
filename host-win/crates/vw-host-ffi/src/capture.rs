@@ -3,8 +3,11 @@
 //! admission slot or private-output ownership before actual termination.
 use std::sync::{Arc, Mutex};
 use vw_capture as capture;
+#[path = "editor_identity.rs"]
+pub(crate) mod editor_identity;
 #[path = "capture_fixed.rs"]
 mod fixed_target;
+pub use editor_identity::*;
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum CaptureError {
@@ -254,6 +257,8 @@ impl CaptureService {
             capture_session_id,
             output_directory: private_output_directory,
             limits: capture::Limits::default(),
+            diagnostic_color_stage: false,
+            diagnostic_alpha_region: None,
         });
         owned(cancel.clone(), move || {
             match capture::process::run(&helper, request, cancel)? {

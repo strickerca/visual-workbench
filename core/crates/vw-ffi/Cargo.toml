@@ -15,6 +15,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 bindgen = ["uniffi/cli"]
+integration-carrier-fault = ["vw-remote-host/integration-carrier-fault"]
 fixtures = ["tokio/rt", "tokio/macros"]
 
 [dependencies]
@@ -31,6 +32,7 @@ tempfile = "=3.27.0"
 zeroize = "=1.9.0"
 blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
 vw-net = { version = "=0.1.0", path = "../vw-net" }
+vw-remote = { version = "=0.1.0", path = "../vw-remote" }
 vw-model = { version = "=0.1.0", path = "../vw-model" }
 vw-geom = { version = "=0.1.0", path = "../vw-geom" }
 vw-proto = { version = "=0.1.0", path = "../vw-proto" }
@@ -49,6 +51,7 @@ png = "=0.18.1"
 rustix = { version = "=1.1.5", features = ["fs"] }
 
 [target.'cfg(windows)'.dependencies]
+vw-remote-host = { version = "=0.1.0", path = "../../../host-win/crates/vw-remote-host" }
 vw-host-win = { version = "=0.1.0", path = "../../../host-win/crates/vw-host-win" }
 vw-net = { version = "=0.1.0", path = "../vw-net", features = ["mdns"] }
 

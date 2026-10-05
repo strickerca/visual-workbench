@@ -77,6 +77,9 @@ message Envelope {
     VideoFrame video_frame = 52;
     FreezeRequest freeze_request = 53;
     LosslessFrame lossless_frame = 54;
+    // Minor-5 capture_stream_v1 tags 55/56 remain reserved for its separate candidate.
+    RemoteControl remote_control = 57; // CONTROL: minor6 remote_edit_v1
+    RemoteVideoConfig remote_video_config = 58; // CONTROL: exact native codec/config scope
 
     InputEvent input_event = 60;
     InputStatus input_status = 61;
@@ -731,7 +734,15 @@ message VideoFrame {
   bool keyframe = 5;
   int64 pts_ns = 6;
   bytes annexb = 7;
-  uint64 last_input_seq_applied = 8;  // drives ghost-ink fading (§4.11); 0 when no remote input
+  uint64 last_input_seq_applied = 8;  // successful host injection, NOT editor renderer proof
+  RemoteScope remote_scope = 9;
+  uint64 config_generation = 10;
+  Uuid input_session_id = 11; // binds the acknowledgment to the exact grant
+  uint32 coded_width = 12;
+  uint32 coded_height = 13;
+  uint32 visible_width = 14;
+  uint32 visible_height = 15;
+  uint64 captured_qpc_100ns = 16; // actual compositor capture time, never receipt time
 }
 
 message FreezeRequest { Uuid capture_session_id = 1; uint64 frame_id = 2; }
@@ -768,8 +779,12 @@ message PenEvent {
   float tilt_y = 6;    // degrees, -90..90; positive = tilted toward the user
   float rotation = 7;  // degrees, 0..359; 0 unless the stylus reports barrel twist
   bool barrel = 8;
-  bool eraser = 9;
+  bool eraser = 9; // legacy projection; minor6 exact flags use bit4 only
   int64 t_ns = 10;
+  // Present ONLY for negotiated minor6 remote_edit_v1 + InputEvent.remote_scope.
+  // Exact Windows PEN_FLAG bits: BARREL1, INVERTED2, ERASER4; never force2|4.
+  // Presence distinguishes an exact zero flag value from a legacy projection.
+  optional uint32 native_pen_flags = 11;
 }
 
 message MouseEvent {
@@ -792,18 +807,26 @@ message InputEvent {
   Uuid input_session_id = 1;
   Uuid capture_session_id = 2;
   uint32 geometry_revision = 3;
-  uint64 input_seq = 4;  // increments per event within the input session
+  uint64 input_seq = 4;  // nonpredicted events only; native sender owns sequence
+  RemoteScope remote_scope = 5;
+  uint64 request_nonce = 6; // remote finite command only; zero for pen/legacy
   oneof event {
     PenEvent pen = 10;
     MouseEvent mouse = 11;
-    KeyEvent key = 12;
+    KeyEvent key = 12; // held/unpaired arbitrary keys are refused by M4
+    RemoteFiniteInput finite = 13;
   }
 }
 
 message InputStatus {
   Uuid input_session_id = 1;
   string state = 2;   // active | paused | rejected
-  string reason = 3;  // e.g. target_changed, geometry_stale, elevated_target, session_expired
+  string reason = 3;  // legacy status or closed remote code
+  RemoteScope remote_scope = 4;
+  uint64 input_seq = 5;
+  uint64 accepted_qpc_100ns = 6; // actual successful native injection only
+  uint32 editor_action = 7; // finite enum ordinal+1; zero for other finite input
+  uint64 request_nonce = 8; // host palette request correlation; zero for phone action
 }
 
 // ---------------------------------------------------------------------------
@@ -825,4 +848,48 @@ message AgentCaptureStatus {
   uint32 active_grant_count = 5; // <=64; complete snapshot
   bool active_capture = 6; // can remain true while revoked work settles
   uint32 remaining_ms = 7; // <=600000, longest current grant; no wall clock
+}
+
+// Minor6 remote_edit_v1. Envelope connection_id is authentication authority;
+// connection_epoch is an additional native producer/control retirement fence.
+message RemoteScope {
+  uint64 connection_epoch = 1;
+  Uuid capture_session_id = 2;
+  uint64 source_generation = 3;
+  Uuid target_token = 4;
+  uint32 geometry_revision = 5;
+}
+message RemoteControl {
+  RemoteScope scope = 1;
+  uint64 sequence = 2;
+  string action = 3; // start|stop|request_control|grant|pause|revoke|background|keyframe
+  bytes selected_target_json = 4; // host-issued native identity, <=8KiB
+  Uuid input_session_id = 5;
+  string reason = 6; // bounded closed status code, never captured free text
+  bytes shortcut_state_json = 7; // optional native admitted profile/focus evidence
+  uint64 request_nonce = 8; // command_request only; no input sequence authority
+  uint32 editor_action = 9; // command_request only; finite admitted ordinal+1
+  uint64 command_input_seq = 11; // authority only; exact settled finite input, never a new input grant
+  string selected_destination_label = 10; // start only; display metadata <=2KiB, never input/profile authority
+}
+message RemoteVideoConfig {
+  RemoteScope scope = 1;
+  uint64 generation = 2;
+  uint32 visible_width = 3;
+  uint32 visible_height = 4;
+  uint32 coded_width = 5;
+  uint32 coded_height = 6;
+  bytes vps = 7;
+  bytes sps = 8;
+  bytes pps = 9;
+  bytes encoder_capabilities_json = 10;
+}
+message RemoteFiniteInput {
+  string kind = 1; // click|wheel|shortcut
+  double x = 2; double y = 3; // exact displayed F-space
+  uint32 button = 4; // click: 1 left|2 right, no held state
+  int32 wheel_delta = 5;
+  uint32 editor_action = 6; // finite admitted RemoteEditorAction ordinal+1
+  string profile_digest = 7;
+  string focus_runtime_hash = 8;
 }

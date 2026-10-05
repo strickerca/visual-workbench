@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "operation": "m4-kp-jni-publication-failure",
+  "status": "failed-after-successful-compile",
+  "source_count": 222,
+  "source_map_sha256": "aeb4104d61a887827334674ffce810bd761dc36cb86d1f36a2faf9395992d132",
+  "compiler": {
+    "source_leases_held_through_output_hash": true,
+    "elapsed_seconds": 157.882,
+    "output_streams_completed": true,
+    "witness_sha256": "caa943780dee38d2a2e2a593a0369332a2636d8d9c34cacce0990c5a6536257c",
+    "process_tree_cleanup_confirmed": true,
+    "output_hash_captured_before_next_command": true,
+    "exit_code": 0
+  },
+  "failure": {
+    "process_tree_cleanup_confirmed": true,
+    "phase": "JNI publication",
+    "output_streams_completed": true,
+    "message": "Access to the path is denied.",
+    "outer_receipt_sha256": "0721b45f80e9baba1fabcd782b9eea84debc1a2efb451f5387c87ce3c7289006",
+    "inner_receipt_sha256": "d0b14e70a703574e0f054f88e2ffb7cc06c95810e2bca61ca73c0efde7fc7104",
+    "operation": "File.Move temporary over existing destination"
+  },
+  "current_output": {
+    "each_bytes": 182900168,
+    "compiled_and_existing_jni_and_retained_temporary_sha256": "196e410c1f682bf50565a32f924764380d87be75c7f5e12fb8eb03967b621505",
+    "identical_bytes_verified": true,
+    "publication_success_claimed": false
+  },
+  "recovery": "Verify existing identical JNI bytes against the retained producing witness and continue only remaining packaging stages. Do not repeat successful compiler or license phases.",
+  "device_actions": false,
+  "milestone_passed": false,
+  "verification_images_created": 0
+}

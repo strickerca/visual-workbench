@@ -8,6 +8,11 @@ val vwAndroidHilValue = providers.gradleProperty("vwAndroidHil").orNull
 check(vwAndroidHilValue == null || vwAndroidHilValue == "true") { "vwAndroidHil must be absent or exactly true" }
 val vwAndroidHil = vwAndroidHilValue == "true"
 if (vwAndroidHil) layout.buildDirectory.set(layout.projectDirectory.dir("build-hil"))
+val remoteIntegrationValue=providers.gradleProperty("vwRemoteIntegration").orNull
+check(remoteIntegrationValue==null||remoteIntegrationValue=="true")
+val remoteIntegration=remoteIntegrationValue=="true"
+check(!remoteIntegration||vwAndroidHil) { "Real remote integration requires the isolated HIL application" }
+if(remoteIntegration)layout.buildDirectory.set(layout.projectDirectory.dir("build-remote-integration"))
 android {
     namespace = "com.visualworkbench.android"
     compileSdk = 37
@@ -36,6 +41,19 @@ android {
         jniLibs.keepDebugSymbols += "**/libvw_core.so"
     }
     sourceSets.getByName("main").assets.srcDir(rootProject.file("../third_party/notices"))
+    if(remoteIntegration) {
+        // This opt-in source graph has its own real integration census. The
+        // ordinary166-case app HIL source set and artifacts stay unchanged.
+        sourceSets.getByName("debug").kotlin.directories.add("src/remoteIntegration/kotlin")
+        sourceSets.getByName("debug").manifest.srcFile("src/remoteIntegration/AndroidManifest.xml")
+        // Built-in Kotlin has its own source directory set. Replace both test
+        // sets explicitly only in this opt-in variant for the exact one-case census.
+        sourceSets.getByName("androidTest").java.directories.clear()
+        sourceSets.getByName("androidTest").kotlin.directories.apply {
+            clear()
+            add("src/remoteIntegrationTest/kotlin")
+        }
+    }
 }
 dependencies {
     implementation(project(":shared"))

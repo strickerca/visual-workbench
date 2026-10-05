@@ -1,0 +1,715 @@
+{
+  "schema": 1,
+  "status": "diagnostic-and-owned-cache-disposal-completed",
+  "temp_shape_query": {
+    "schema": 1,
+    "toolchain": "1.99.0",
+    "std_temp_trailing_backslash": true,
+    "diagnostic_source_sha256": "2a2d4b5bc84fc0a447c7fb2c432e70d7e055c3e3c03d69b276fe0796b288c9be",
+    "diagnostic_binary_sha256": "daaefafb8eff155bfe9a70c14dc96b10e16f4d36018869e1432e8147875e1671",
+    "process_phases": [
+      {
+        "phase": "m4-temp-shape-compile",
+        "exit_code": 0,
+        "parent_exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 0.417,
+        "sampled_peak_tree_working_set_bytes": 16089088,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 45,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "m4-temp-shape-compile-bb8180273e034de88daa7a7de5dccff2.log",
+        "surviving_processes_before_cleanup": [],
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5
+      },
+      {
+        "phase": "m4-temp-shape-query",
+        "exit_code": 0,
+        "parent_exit_code": 0,
+        "failure_reason": null,
+        "elapsed_seconds": 0.125,
+        "sampled_peak_tree_working_set_bytes": 2707456,
+        "sampling_interval_seconds": 2,
+        "timeout_seconds": 10,
+        "contained_in_windows_job": true,
+        "process_tree_cleanup_confirmed": true,
+        "output_streams_completed": true,
+        "log_file": "m4-temp-shape-query-619437de300342bd8cea457468c214dd.log",
+        "surviving_processes_before_cleanup": [],
+        "compiler_telemetry_cleaned": false,
+        "parent_exit_grace_seconds": 5
+      }
+    ],
+    "actual_temp_path_published": false,
+    "input_sent": false,
+    "images_created": 0
+  },
+  "temp_shape_repair_manifest_sha256": "de54328bc9e2d2051e3c981d4969da2176e859c2862ebf0c9033bce3831bb262",
+  "temp_shape_repair": "Remove exactly one OS-supplied non-drive-root trailing separator, then retain existing strict namespace checks",
+  "temp_shape_repair_execution_pass_claimed": false,
+  "cache_disposal": {
+    "schema": 1,
+    "status": "completed",
+    "plan_sha256": "d94f8edb56f12b425d5402ff12611897e94f60a2ef0009e27334d22d108fdcae",
+    "selected_files_disposed": [
+      {
+        "relative_path": "target/debug/deps/vw_core-45c5d084f4739f81.pdb",
+        "sha256_before_disposal": "1ac688ac38c33ff48e07e3816ae6197747a966129eacca1f76e040673bd2efce",
+        "bytes": 85733376,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/vw_core-5618b7af18de356c.pdb",
+        "sha256_before_disposal": "bace2073d1968868a7c9552dd894ff316c2b0a83d02490b8796fe0ef34908925",
+        "bytes": 85422080,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/vw_core-3910fd6b7851f042.pdb",
+        "sha256_before_disposal": "da50b7ff29e0f1132dbdddca54ade8f0ee706bab4178f586a94c2b13935fcd20",
+        "bytes": 82726912,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/capture_delivery-1a879694dd333472.pdb",
+        "sha256_before_disposal": "50d99a90492e0ed04dbd1beccdabdfffd1f4871fb19b5a9bfbebed1948eefaf6",
+        "bytes": 77443072,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/capture_delivery-c7839336f69a00c8.pdb",
+        "sha256_before_disposal": "5dff5f4a3bc775f19874a60c1e69ffe34bb8acd2d12256eda9a37c6a56d713dc",
+        "bytes": 77328384,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/capture_delivery-4700e77f5bd86f9c.pdb",
+        "sha256_before_disposal": "3075e4450f94c74a4e6ed2e16ada1565feb37aabd4e44d5ca3411fb4b4ef8d2e",
+        "bytes": 75051008,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/eraser-5b7f650c3d01a669.pdb",
+        "sha256_before_disposal": "46bdcc3a9fa63ecb4d205407387283edf8c21f4ef2045e0ae386720a1de0c00c",
+        "bytes": 52326400,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/eraser-0b443c4d8a290e91.pdb",
+        "sha256_before_disposal": "164edaa9a41d873ce99f8f7e32e8c5fcfa4f37150cbd9adde754e82acb5432d5",
+        "bytes": 52203520,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/eraser-de0381db21022a95.pdb",
+        "sha256_before_disposal": "5d46061b98b367f7e0235416e6fc7151ee7b8972477985bc4d9d2a4a97ae3544",
+        "bytes": 51032064,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/lifecycle-9b20f99cf6eaf234.pdb",
+        "sha256_before_disposal": "62128ee42d1d5c167cd9ee63794fbccb81459ec11296a221849326e7d151ec95",
+        "bytes": 51015680,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/lifecycle-be8ec1f13e0101a0.pdb",
+        "sha256_before_disposal": "1b5e42147f2e359041c276b853d44fc9a1f8f67342494ff0138ab068e4410021",
+        "bytes": 50909184,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/lifecycle-3a2e8f5e08af6cba.pdb",
+        "sha256_before_disposal": "f4fd9d1778e805c0608e6c5a2d7dd3890da0218e66bd756c03f06566ee304ef2",
+        "bytes": 49729536,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/mask_admission-024949ca3934404c.pdb",
+        "sha256_before_disposal": "4e3fb5bf79309178e003e7b0668280795b597a6dc0716bc12909389968d6b13c",
+        "bytes": 36982784,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/mask_admission-04854a312b0ec173.pdb",
+        "sha256_before_disposal": "354f19cb45864c414e42288ee44899d7200833dde09f7b807282c73572b55e7d",
+        "bytes": 36876288,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/mask_admission-9b884eda7cdbf725.pdb",
+        "sha256_before_disposal": "f3163970392d50a0d508b33a6639d24880f7c794f4bfbf3386935bbd63e51269",
+        "bytes": 35672064,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/masks-593f667087863d9b.pdb",
+        "sha256_before_disposal": "1a3fbcb30af7219aaed10eb4c5029355b0e62b54ed6695b021c0aa8df362befd",
+        "bytes": 50663424,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/masks-46177642d9389134.pdb",
+        "sha256_before_disposal": "64aead3225bd6aa6754c2234a0fd6be36139c9e1475c43edd729b8cda783d545",
+        "bytes": 50556928,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/masks-f988df00e75c6374.pdb",
+        "sha256_before_disposal": "9a2f1db13cb01b2ef87b9af27d217a21b2b213f22861cb659786d77ebf7d8200",
+        "bytes": 49352704,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/semantic_ui-411acea165fc88f5.pdb",
+        "sha256_before_disposal": "f4ccecfc905412a347919f31e191fc0e852986373429472aaf51ba00d7702a32",
+        "bytes": 48082944,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/semantic_ui-1245eee0f6ea1d49.pdb",
+        "sha256_before_disposal": "abe2c372bc873c566a8ffe91cfd7e7fcd3172ba527aa584f8976becc414502bc",
+        "bytes": 47951872,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/semantic_ui-43adf746bae9e758.pdb",
+        "sha256_before_disposal": "bb51504675db91e057c14139ce752c3c50585245d2cc8f13daded64c99c85828",
+        "bytes": 46772224,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/sessions-246948fc52f84034.pdb",
+        "sha256_before_disposal": "6ce9cf2387ccb75d7133b6d58052aac80cae87b453dd7ccba242864e84a886a6",
+        "bytes": 78909440,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/sessions-1a4a5a6d3c16f59b.pdb",
+        "sha256_before_disposal": "29836bc4f17db05a7125d617bdb9de50bffc4f75f01a76f889ccc8bbd38e3778",
+        "bytes": 78794752,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/sessions-5d5640aef3b96653.pdb",
+        "sha256_before_disposal": "043791df887857e4025d12bd3dda3107d913237fada58b590ffbbe59ad379109",
+        "bytes": 76509184,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/streaming_ffi-347be395735585e4.pdb",
+        "sha256_before_disposal": "c547e7e5e33cea0e6138db219e84735a8bc41f5c443613e2aa8b3a4130734aab",
+        "bytes": 50614272,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/streaming_ffi-3c6936f0168baac0.pdb",
+        "sha256_before_disposal": "52e39e91b0c1674c0a4a7f3e7dcbefb2c7e9dee3afb74123b7dc991f62b261f4",
+        "bytes": 50491392,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/streaming_ffi-9c0c1739dabc8605.pdb",
+        "sha256_before_disposal": "250c5a1b89c01e58cdf9bdf21b26f0e8fed6944fbbbaaf9e4111f44b5a0a7328",
+        "bytes": 49295360,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/workflows-dd50a1a13d22692a.pdb",
+        "sha256_before_disposal": "ddf3da70f8d08457ecd5f8286d0d3ef31e195246fc4953f6082f1d1e3a4a098f",
+        "bytes": 48549888,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/workflows-5c2a4aca6ca61edd.pdb",
+        "sha256_before_disposal": "3b2a3dc41fefeac56d607ae1dfbf87e11af44af6f389da4882c11d4a6f5e281a",
+        "bytes": 48443392,
+        "disposed": true
+      },
+      {
+        "relative_path": "target/debug/deps/workflows-7df0b23c817d2285.pdb",
+        "sha256_before_disposal": "fcf9378c13720eeafaf15cb0aba94f6071596e970c916c2b13afbcc1d989e756",
+        "bytes": 47255552,
+        "disposed": true
+      }
+    ],
+    "disposed_count": 30,
+    "disposed_bytes": 1722695680,
+    "paired_executables_and_fingerprints_preserved": true,
+    "newest_symbols_preserved": true,
+    "bound_source_paths_preserved": 120,
+    "sources_evidence_and_payloads_preserved": true,
+    "recursive_delete": false,
+    "verification_images_created": 0
+  },
+  "cache_provenance": [
+    {
+      "relative_path": "target/debug/deps/vw_core-45c5d084f4739f81.pdb",
+      "bytes": 85733376,
+      "sha256": "1ac688ac38c33ff48e07e3816ae6197747a966129eacca1f76e040673bd2efce",
+      "package": "vw-ffi",
+      "target_kind": "unit-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-45c5d084f4739f81/test-lib-vw_core.json",
+      "fingerprint_sha256": "85e6487dc5f583ce9488cff8b7beafea4e5a12d5cd95a8e1c19ea7e88a6bfc06",
+      "paired_executable_relative_path": "target/debug/deps/vw_core-45c5d084f4739f81.exe",
+      "paired_executable_sha256": "dea2d987ec38e55d53c82ca5f1a84dbf199385743d7b008e9c8a0e2b94829dea",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/vw_core-2557cb82c053f91a.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_core-5618b7af18de356c.pdb",
+      "bytes": 85422080,
+      "sha256": "bace2073d1968868a7c9552dd894ff316c2b0a83d02490b8796fe0ef34908925",
+      "package": "vw-ffi",
+      "target_kind": "unit-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-5618b7af18de356c/test-lib-vw_core.json",
+      "fingerprint_sha256": "df298f996ab135033bdd042dc5dd61e7d025652237c894571acf1725b76cb471",
+      "paired_executable_relative_path": "target/debug/deps/vw_core-5618b7af18de356c.exe",
+      "paired_executable_sha256": "a4846eac301ec46503b815616b3e2851bc593bc403a321d21354077658745945",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/vw_core-2557cb82c053f91a.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_core-3910fd6b7851f042.pdb",
+      "bytes": 82726912,
+      "sha256": "da50b7ff29e0f1132dbdddca54ade8f0ee706bab4178f586a94c2b13935fcd20",
+      "package": "vw-ffi",
+      "target_kind": "unit-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-3910fd6b7851f042/test-lib-vw_core.json",
+      "fingerprint_sha256": "8b5308e679c6d91d060c01fa31084968f4026e3855b3dcf5dd6cb8c56abcc716",
+      "paired_executable_relative_path": "target/debug/deps/vw_core-3910fd6b7851f042.exe",
+      "paired_executable_sha256": "9aece1df3e34328e30e73c0e979ffa1c1d86983199d68638e832f4e8f7c9648a",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/vw_core-2557cb82c053f91a.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/capture_delivery-1a879694dd333472.pdb",
+      "bytes": 77443072,
+      "sha256": "50d99a90492e0ed04dbd1beccdabdfffd1f4871fb19b5a9bfbebed1948eefaf6",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-1a879694dd333472/test-integration-test-capture_delivery.json",
+      "fingerprint_sha256": "325128ecb1dc0e83846b5e38777fa31e384314d81a1be5b6fa47d3c46c7c3d5f",
+      "paired_executable_relative_path": "target/debug/deps/capture_delivery-1a879694dd333472.exe",
+      "paired_executable_sha256": "aead6906ab582fecb1ee1189c8a9b2064b6a2a6db6388e23c45e14f5e03283c8",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/capture_delivery-2a74ce19c204bc78.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/capture_delivery-c7839336f69a00c8.pdb",
+      "bytes": 77328384,
+      "sha256": "5dff5f4a3bc775f19874a60c1e69ffe34bb8acd2d12256eda9a37c6a56d713dc",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-c7839336f69a00c8/test-integration-test-capture_delivery.json",
+      "fingerprint_sha256": "92ae028763da7ef133722e3d7b59dd7f00b8d750c3d298b8eaf06b75d006b3e7",
+      "paired_executable_relative_path": "target/debug/deps/capture_delivery-c7839336f69a00c8.exe",
+      "paired_executable_sha256": "fb030a3a45795271ffb3ba033da69c1d423469757fc711cbe81baa2be9efb206",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/capture_delivery-2a74ce19c204bc78.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/capture_delivery-4700e77f5bd86f9c.pdb",
+      "bytes": 75051008,
+      "sha256": "3075e4450f94c74a4e6ed2e16ada1565feb37aabd4e44d5ca3411fb4b4ef8d2e",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-4700e77f5bd86f9c/test-integration-test-capture_delivery.json",
+      "fingerprint_sha256": "bb21c81590e98987458ea41ec7bff76b0a978243f2711b42421c0ff91937ad73",
+      "paired_executable_relative_path": "target/debug/deps/capture_delivery-4700e77f5bd86f9c.exe",
+      "paired_executable_sha256": "ad5de3ad63790ed65fee0775e1139366ed31631e669a3decf6f4bcecfa394af9",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/capture_delivery-2a74ce19c204bc78.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/eraser-5b7f650c3d01a669.pdb",
+      "bytes": 52326400,
+      "sha256": "46bdcc3a9fa63ecb4d205407387283edf8c21f4ef2045e0ae386720a1de0c00c",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-5b7f650c3d01a669/test-integration-test-eraser.json",
+      "fingerprint_sha256": "7daed27d7679ee372d432a17c971283f352fff168a7bfbe4704b3f6d5a0e7134",
+      "paired_executable_relative_path": "target/debug/deps/eraser-5b7f650c3d01a669.exe",
+      "paired_executable_sha256": "d8a417974cdf4526b45aec3fdda2d340f8db89c71006badb186f8191a4beba38",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/eraser-18a3d4990e881733.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/eraser-0b443c4d8a290e91.pdb",
+      "bytes": 52203520,
+      "sha256": "164edaa9a41d873ce99f8f7e32e8c5fcfa4f37150cbd9adde754e82acb5432d5",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-0b443c4d8a290e91/test-integration-test-eraser.json",
+      "fingerprint_sha256": "54a01ca39052463c5695def0dfbb1d31e8dfccc41367b9a178949cb617ba9b4c",
+      "paired_executable_relative_path": "target/debug/deps/eraser-0b443c4d8a290e91.exe",
+      "paired_executable_sha256": "a93ed3c329030b02e98b9389a0b64fde690b7a1f09e948b7850f0ab644f3fc42",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/eraser-18a3d4990e881733.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/eraser-de0381db21022a95.pdb",
+      "bytes": 51032064,
+      "sha256": "5d46061b98b367f7e0235416e6fc7151ee7b8972477985bc4d9d2a4a97ae3544",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-de0381db21022a95/test-integration-test-eraser.json",
+      "fingerprint_sha256": "abbbc4f7e9642cbbc5693193a67425d3add8592043cf57addf9bc60654052eda",
+      "paired_executable_relative_path": "target/debug/deps/eraser-de0381db21022a95.exe",
+      "paired_executable_sha256": "88549521ac7a8fbe03219bba1c2a5682937979661c84e591e52ab96a1a26e9d7",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/eraser-18a3d4990e881733.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/lifecycle-9b20f99cf6eaf234.pdb",
+      "bytes": 51015680,
+      "sha256": "62128ee42d1d5c167cd9ee63794fbccb81459ec11296a221849326e7d151ec95",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-9b20f99cf6eaf234/test-integration-test-lifecycle.json",
+      "fingerprint_sha256": "28a23df5b3589df1d94bfb6d614c102a916c2235779c11d5b8e9e3cd5389f6fa",
+      "paired_executable_relative_path": "target/debug/deps/lifecycle-9b20f99cf6eaf234.exe",
+      "paired_executable_sha256": "f6e3afe61f9b59e32a54f3952c2e944bc3f88f9f12b3f5d7deaa75dc6416f870",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/lifecycle-05618b526c568c8e.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/lifecycle-be8ec1f13e0101a0.pdb",
+      "bytes": 50909184,
+      "sha256": "1b5e42147f2e359041c276b853d44fc9a1f8f67342494ff0138ab068e4410021",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-be8ec1f13e0101a0/test-integration-test-lifecycle.json",
+      "fingerprint_sha256": "c1ed8c4e5839afe6606a9aea128c6a9a23e02083d857292d71922d4a7496fc8b",
+      "paired_executable_relative_path": "target/debug/deps/lifecycle-be8ec1f13e0101a0.exe",
+      "paired_executable_sha256": "ceadb6cf7073c94848f7c02ced977e287e7e251708150638677bda10d68b475f",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/lifecycle-05618b526c568c8e.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/lifecycle-3a2e8f5e08af6cba.pdb",
+      "bytes": 49729536,
+      "sha256": "f4fd9d1778e805c0608e6c5a2d7dd3890da0218e66bd756c03f06566ee304ef2",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-3a2e8f5e08af6cba/test-integration-test-lifecycle.json",
+      "fingerprint_sha256": "8e0d5d7501ec4981526dcc3445a5c52c4e94f73fb54f3d1fe0709fcdefbd05b8",
+      "paired_executable_relative_path": "target/debug/deps/lifecycle-3a2e8f5e08af6cba.exe",
+      "paired_executable_sha256": "215e44a5571a8331f6dd3383c29e78ede4af496fc823088d4700ef346ac63bda",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/lifecycle-05618b526c568c8e.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/mask_admission-024949ca3934404c.pdb",
+      "bytes": 36982784,
+      "sha256": "4e3fb5bf79309178e003e7b0668280795b597a6dc0716bc12909389968d6b13c",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-024949ca3934404c/test-integration-test-mask_admission.json",
+      "fingerprint_sha256": "c96ae00ec772b23ea8d5a5c88ef5c2fa490d1e3a3c21684f82b976a65d5c0828",
+      "paired_executable_relative_path": "target/debug/deps/mask_admission-024949ca3934404c.exe",
+      "paired_executable_sha256": "2dd3fa1c389b61caf78b5d316c0ca2e4cb38ae1c337e3f1a8a56d7650f67cc87",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/mask_admission-7e126f264e8249e9.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/mask_admission-04854a312b0ec173.pdb",
+      "bytes": 36876288,
+      "sha256": "354f19cb45864c414e42288ee44899d7200833dde09f7b807282c73572b55e7d",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-04854a312b0ec173/test-integration-test-mask_admission.json",
+      "fingerprint_sha256": "2473c849742f0c0726f256ea68a85bd48a41b88485785669bb5f0128627f1867",
+      "paired_executable_relative_path": "target/debug/deps/mask_admission-04854a312b0ec173.exe",
+      "paired_executable_sha256": "7db7d3afd72ae9510d4afdf17d6444f96fbeee6180ffb348e4f428d450ef782b",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/mask_admission-7e126f264e8249e9.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/mask_admission-9b884eda7cdbf725.pdb",
+      "bytes": 35672064,
+      "sha256": "f3163970392d50a0d508b33a6639d24880f7c794f4bfbf3386935bbd63e51269",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-9b884eda7cdbf725/test-integration-test-mask_admission.json",
+      "fingerprint_sha256": "1bce81f3b25370b72a5f90921aef68a8379848503045a40a206703c2c537cbac",
+      "paired_executable_relative_path": "target/debug/deps/mask_admission-9b884eda7cdbf725.exe",
+      "paired_executable_sha256": "f063216bb7742bcb11641c1f3825f7935415f66abb79f2479219efad06f8a57b",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/mask_admission-7e126f264e8249e9.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/masks-593f667087863d9b.pdb",
+      "bytes": 50663424,
+      "sha256": "1a3fbcb30af7219aaed10eb4c5029355b0e62b54ed6695b021c0aa8df362befd",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-593f667087863d9b/test-integration-test-masks.json",
+      "fingerprint_sha256": "37cf0d4e03ac3f8e72046c0afad18a2bf045cfad88ee260492ae8e4a2bdb282c",
+      "paired_executable_relative_path": "target/debug/deps/masks-593f667087863d9b.exe",
+      "paired_executable_sha256": "4a462af83c6aa841dce01c898afcdc433f24d2fb705e453d5172bd1445e677b5",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/masks-af8f7829c3d15033.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/masks-46177642d9389134.pdb",
+      "bytes": 50556928,
+      "sha256": "64aead3225bd6aa6754c2234a0fd6be36139c9e1475c43edd729b8cda783d545",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-46177642d9389134/test-integration-test-masks.json",
+      "fingerprint_sha256": "085da76f3d216acc6aee11eec9099aa0177e0371ec8bce8294990fa7d0ecd037",
+      "paired_executable_relative_path": "target/debug/deps/masks-46177642d9389134.exe",
+      "paired_executable_sha256": "bcbb9b1f4330055f356643a6c638627ef115322b252032f015e464f947d1d5c3",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/masks-af8f7829c3d15033.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/masks-f988df00e75c6374.pdb",
+      "bytes": 49352704,
+      "sha256": "9a2f1db13cb01b2ef87b9af27d217a21b2b213f22861cb659786d77ebf7d8200",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-f988df00e75c6374/test-integration-test-masks.json",
+      "fingerprint_sha256": "090bae33dc8edab5b88863019d202740cf4232aea2e9f6795f126741f920d81f",
+      "paired_executable_relative_path": "target/debug/deps/masks-f988df00e75c6374.exe",
+      "paired_executable_sha256": "1663bca1a86394ab1bd8e804bc56726dc31fc31d3655bc925b73dc950663b579",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/masks-af8f7829c3d15033.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/semantic_ui-411acea165fc88f5.pdb",
+      "bytes": 48082944,
+      "sha256": "f4ccecfc905412a347919f31e191fc0e852986373429472aaf51ba00d7702a32",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-411acea165fc88f5/test-integration-test-semantic_ui.json",
+      "fingerprint_sha256": "ae868bdcbbd2bb5fc1df5d7f21d572ce963b11ca9e283d1406c493f965666520",
+      "paired_executable_relative_path": "target/debug/deps/semantic_ui-411acea165fc88f5.exe",
+      "paired_executable_sha256": "bc6d5628efd45c62a1c462b177a53727f43ecda70183d0b336bcd1b053fb74a6",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/semantic_ui-f3d59b33e637e806.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/semantic_ui-1245eee0f6ea1d49.pdb",
+      "bytes": 47951872,
+      "sha256": "abe2c372bc873c566a8ffe91cfd7e7fcd3172ba527aa584f8976becc414502bc",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-1245eee0f6ea1d49/test-integration-test-semantic_ui.json",
+      "fingerprint_sha256": "eab36bee3be67e8b7bfd1fd5b55f790ed48bce41ef2e74fd95bc34b87a7e9094",
+      "paired_executable_relative_path": "target/debug/deps/semantic_ui-1245eee0f6ea1d49.exe",
+      "paired_executable_sha256": "5f05903272ab0ac3f30fed2df6686967c2e13378c0a1462fda8c8542197ba33c",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/semantic_ui-f3d59b33e637e806.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/semantic_ui-43adf746bae9e758.pdb",
+      "bytes": 46772224,
+      "sha256": "bb51504675db91e057c14139ce752c3c50585245d2cc8f13daded64c99c85828",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-43adf746bae9e758/test-integration-test-semantic_ui.json",
+      "fingerprint_sha256": "25b17bebd0c10d01f6b81fe9ea3d2c728da70bd956f0f741295b59c9732c3f7c",
+      "paired_executable_relative_path": "target/debug/deps/semantic_ui-43adf746bae9e758.exe",
+      "paired_executable_sha256": "2f61f213b8621b00e4162eec650a8e982df6dc0e2e1d7ff4ff552063a40b17b4",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/semantic_ui-f3d59b33e637e806.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/sessions-246948fc52f84034.pdb",
+      "bytes": 78909440,
+      "sha256": "6ce9cf2387ccb75d7133b6d58052aac80cae87b453dd7ccba242864e84a886a6",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-246948fc52f84034/test-integration-test-sessions.json",
+      "fingerprint_sha256": "14c6a16ad0deb90e1d50785c64275e14ce190f7a90069e3e76afc3c91404160b",
+      "paired_executable_relative_path": "target/debug/deps/sessions-246948fc52f84034.exe",
+      "paired_executable_sha256": "794861b0f9ead689e30119eba71fb66148564022c6740b9c1761149c61c347af",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/sessions-35f9c32eaf86dd89.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/sessions-1a4a5a6d3c16f59b.pdb",
+      "bytes": 78794752,
+      "sha256": "29836bc4f17db05a7125d617bdb9de50bffc4f75f01a76f889ccc8bbd38e3778",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-1a4a5a6d3c16f59b/test-integration-test-sessions.json",
+      "fingerprint_sha256": "c443cb9274a57856e65742743b97bd538aa32f994c42c11de6b9bbdd242003af",
+      "paired_executable_relative_path": "target/debug/deps/sessions-1a4a5a6d3c16f59b.exe",
+      "paired_executable_sha256": "3023849bb3c531430ca6d7fcf4042eea01100f941ea38916d484c8990e10894f",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/sessions-35f9c32eaf86dd89.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/sessions-5d5640aef3b96653.pdb",
+      "bytes": 76509184,
+      "sha256": "043791df887857e4025d12bd3dda3107d913237fada58b590ffbbe59ad379109",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-5d5640aef3b96653/test-integration-test-sessions.json",
+      "fingerprint_sha256": "5d6f8fa2f19ab35a3b5c18b93053c73610409a71d89b73a678f31694fc7dd802",
+      "paired_executable_relative_path": "target/debug/deps/sessions-5d5640aef3b96653.exe",
+      "paired_executable_sha256": "c4d456ded57704ffddbb18cfa54ed2479c5b9e4af81e86e65cb470e385e7ec44",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/sessions-35f9c32eaf86dd89.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/streaming_ffi-347be395735585e4.pdb",
+      "bytes": 50614272,
+      "sha256": "c547e7e5e33cea0e6138db219e84735a8bc41f5c443613e2aa8b3a4130734aab",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-347be395735585e4/test-integration-test-streaming_ffi.json",
+      "fingerprint_sha256": "76fa697a91fb1d02c3dcb3b2280ea379ad853c68902de15c74f7705506a31706",
+      "paired_executable_relative_path": "target/debug/deps/streaming_ffi-347be395735585e4.exe",
+      "paired_executable_sha256": "fb32827558d3358ddcadf3572b634d371d5984a51a8c7312fdc8bb4664bc6ec6",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/streaming_ffi-ff541b7bc144dbdb.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/streaming_ffi-3c6936f0168baac0.pdb",
+      "bytes": 50491392,
+      "sha256": "52e39e91b0c1674c0a4a7f3e7dcbefb2c7e9dee3afb74123b7dc991f62b261f4",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-3c6936f0168baac0/test-integration-test-streaming_ffi.json",
+      "fingerprint_sha256": "524d04ff837b2c796c44a9ee2dcbd05740b1f28335ea2e4c2c2e5911f6eb9ab6",
+      "paired_executable_relative_path": "target/debug/deps/streaming_ffi-3c6936f0168baac0.exe",
+      "paired_executable_sha256": "e897d4051f08bfffa8f9540e82db30a358a85e7c9b93790de2ffd0fcf1f54d35",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/streaming_ffi-ff541b7bc144dbdb.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/streaming_ffi-9c0c1739dabc8605.pdb",
+      "bytes": 49295360,
+      "sha256": "250c5a1b89c01e58cdf9bdf21b26f0e8fed6944fbbbaaf9e4111f44b5a0a7328",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-9c0c1739dabc8605/test-integration-test-streaming_ffi.json",
+      "fingerprint_sha256": "891974f51afef29750a70f105804146d1ec7052bf7544e8b04d59675c58aaf7f",
+      "paired_executable_relative_path": "target/debug/deps/streaming_ffi-9c0c1739dabc8605.exe",
+      "paired_executable_sha256": "bd0f1bb66c0dfbffd2e3d2563dc6934a1a5c8171b4b5a095df0d383ebff2e0b4",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/streaming_ffi-ff541b7bc144dbdb.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/workflows-dd50a1a13d22692a.pdb",
+      "bytes": 48549888,
+      "sha256": "ddf3da70f8d08457ecd5f8286d0d3ef31e195246fc4953f6082f1d1e3a4a098f",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-dd50a1a13d22692a/test-integration-test-workflows.json",
+      "fingerprint_sha256": "79999312ffe8f2d66d6c08d7a53caec7ee84ad02ebd5d68a276dccaf9856b97f",
+      "paired_executable_relative_path": "target/debug/deps/workflows-dd50a1a13d22692a.exe",
+      "paired_executable_sha256": "b068184b6e047507b520ef728bcf1aeb6ec3c2c56a51285822cd12c95a910656",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/workflows-062fba4168cf7d62.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/workflows-5c2a4aca6ca61edd.pdb",
+      "bytes": 48443392,
+      "sha256": "3b2a3dc41fefeac56d607ae1dfbf87e11af44af6f389da4882c11d4a6f5e281a",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-5c2a4aca6ca61edd/test-integration-test-workflows.json",
+      "fingerprint_sha256": "306b4a918f24b94a7308791da80d64453e55468125c2afdc66fd8c3ccca8343e",
+      "paired_executable_relative_path": "target/debug/deps/workflows-5c2a4aca6ca61edd.exe",
+      "paired_executable_sha256": "7328f604ad3fdf5e718cbc77f554816abe158e97c6297a5b3b064432a0730706",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/workflows-062fba4168cf7d62.pdb"
+    },
+    {
+      "relative_path": "target/debug/deps/workflows-7df0b23c817d2285.pdb",
+      "bytes": 47255552,
+      "sha256": "fcf9378c13720eeafaf15cb0aba94f6071596e970c916c2b13afbcc1d989e756",
+      "package": "vw-ffi",
+      "target_kind": "integration-test",
+      "fingerprint_relative_path": "target/debug/.fingerprint/vw-ffi-7df0b23c817d2285/test-integration-test-workflows.json",
+      "fingerprint_sha256": "1cb59dd60e6edfe977f10b658fc3423fa57041e7ea87523758c897da17a4be13",
+      "paired_executable_relative_path": "target/debug/deps/workflows-7df0b23c817d2285.exe",
+      "paired_executable_sha256": "b0e51d83f09d295671e89ffebacf27f1f392033ed5290fa2d185ec0b148dc282",
+      "paired_executable_preserved": true,
+      "superseded_by_relative_path": "target/debug/deps/workflows-062fba4168cf7d62.pdb"
+    }
+  ],
+  "preserved_newest_symbols": [
+    {
+      "relative_path": "target/debug/deps/vw_core-2557cb82c053f91a.pdb",
+      "bytes": 85577728,
+      "sha256": "f1c1027480396c465f3c5bb4ea9554ecb8a439f99430b2de5318598fd3b930d5"
+    },
+    {
+      "relative_path": "target/debug/deps/capture_delivery-2a74ce19c204bc78.pdb",
+      "bytes": 77320192,
+      "sha256": "1a3f53d9e3f20cab980399c9e52ce5bce3d9f5dccea452e049bb6436e055c60a"
+    },
+    {
+      "relative_path": "target/debug/deps/eraser-18a3d4990e881733.pdb",
+      "bytes": 52178944,
+      "sha256": "92170f753f51c5484ac0fe2482c51f593e317d31aa5144a802af2bd948004f52"
+    },
+    {
+      "relative_path": "target/debug/deps/lifecycle-05618b526c568c8e.pdb",
+      "bytes": 50876416,
+      "sha256": "a2113934222490cc224a166303c04b75838beb14f1aceaf4e0d744afb64cc099"
+    },
+    {
+      "relative_path": "target/debug/deps/mask_admission-7e126f264e8249e9.pdb",
+      "bytes": 36843520,
+      "sha256": "0d07eafd1504d7a5a9e7a6ec0d8817bcd3dbbaa263102ff3c0ac307319b16b48"
+    },
+    {
+      "relative_path": "target/debug/deps/masks-af8f7829c3d15033.pdb",
+      "bytes": 50524160,
+      "sha256": "57dcf0cd8253c624cdc5cd1e1c010b75658dc6dbadd4a0d4c00bfa277b0db6be"
+    },
+    {
+      "relative_path": "target/debug/deps/semantic_ui-f3d59b33e637e806.pdb",
+      "bytes": 47935488,
+      "sha256": "ca1b4a66be0de8a26160ef72d819d82e97fd1367a50dca57ef501879355a1f4b"
+    },
+    {
+      "relative_path": "target/debug/deps/sessions-35f9c32eaf86dd89.pdb",
+      "bytes": 78778368,
+      "sha256": "f9e9679734bf56e718e00183ec46f42ed4aec33fd817a3d8ee575e675a08adbf"
+    },
+    {
+      "relative_path": "target/debug/deps/streaming_ffi-ff541b7bc144dbdb.pdb",
+      "bytes": 50483200,
+      "sha256": "a894cacbd4c350dec802c79de5535580a94e2cf422d2ea50bad61696eaf09fc8"
+    },
+    {
+      "relative_path": "target/debug/deps/workflows-062fba4168cf7d62.pdb",
+      "bytes": 48418816,
+      "sha256": "8a176f9059fcf666c232dbb39a4a2b1db92590546a9b2cae5be4aaadebceedbc"
+    }
+  ],
+  "retired_validation_owners": [
+    {
+      "receipt": "m4-editor-frame-r1-helpers-check.json",
+      "sha256": "4a004d96fc31a4bfea8a37f50518e934a5d539854d0155879dacf18e1ebea820",
+      "actual_jobs_and_streams_retired": true
+    },
+    {
+      "receipt": "m4-editor-frame-r2-helpers-check.json",
+      "sha256": "d04f25e14827bae709626cba4c141b696935308ebacf47bb8b6ed47341f2ba35",
+      "actual_jobs_and_streams_retired": true
+    },
+    {
+      "receipt": "m4-source-frame-r4-ffi-check.json",
+      "sha256": "28e3acddf0f07109a0dc1262d85b8567ff4b1189d5bdb86500916ed4d081ad27",
+      "actual_jobs_and_streams_retired": true
+    }
+  ],
+  "source_and_production_payloads_preserved": true,
+  "recursive_delete": false,
+  "fixture_repair_admitted_but_validation_pending": true,
+  "build_tasks_remaining": 6,
+  "milestone_passed": false,
+  "verification_images_created": 0
+}

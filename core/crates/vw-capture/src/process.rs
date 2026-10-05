@@ -100,6 +100,8 @@ pub fn run(helper: &LockedHelper, request: Request, cancel: Arc<Cancellation>) -
             value.limits.validate()?;
             value.limits.capture_ms + 2000
         }
+        // Only the retained suspended harness parent owns canvas fixtures.
+        Request::CanvasFixture(_) => return Err(Error::Invalid),
         Request::Tree(value) => {
             value.limits.validate()?;
             value.limits.tree_ms + 1000
@@ -198,7 +200,7 @@ pub fn run(helper: &LockedHelper, request: Request, cancel: Arc<Cancellation>) -
         let bytes = captured?;
         let response: Response = serde_json::from_slice(&bytes).map_err(|_| Error::Invalid)?;
         match response {
-            Response::Refused { error } => Err(error),
+            Response::Refused { error, .. } => Err(error),
             response => Ok(response),
         }
     })();

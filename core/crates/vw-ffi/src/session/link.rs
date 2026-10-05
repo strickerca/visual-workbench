@@ -28,6 +28,12 @@ pub use focus::{FocusSignal, PeerMarkerFocus};
 #[path = "agent_capture.rs"]
 mod agent_capture;
 pub use agent_capture::AgentCaptureDisplay;
+#[path = "remote_edit.rs"]
+mod remote_edit;
+pub use remote_edit::{
+    RemoteAcknowledgment, RemoteCommandResult, RemoteDisplay, RemoteFrame, RemoteInputAdmitted,
+    RemoteRuntimeFiles, RemoteWindow, remote_helpers_retirement_count,
+};
 
 pub(super) const MAX_TRANSFER: u64 = 64 * 1024 * 1024;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
@@ -92,10 +98,11 @@ pub(super) enum Listener {
 }
 impl Listener {
     async fn accept(&self) -> SessionResult<CarrierIo> {
-        Ok(match self {
-            Self::Tcp(listener, tls) => CarrierIo::Tcp(TcpCarrier::accept(listener, tls).await?),
-            Self::Quic(listener) => CarrierIo::Quic(listener.accept().await?),
-        })
+        match self {
+            Self::Tcp(listener, tls) => TcpCarrier::accept(listener, tls).await.map(CarrierIo::Tcp),
+            Self::Quic(listener) => listener.accept().await.map(CarrierIo::Quic),
+        }
+        .map_err(incoming_handshake_error)
     }
 }
 pub(super) enum Route {
@@ -145,11 +152,13 @@ pub struct LiveSession {
     local: DeviceId,
     focus: Arc<focus::FocusHub>,
     agent_capture: Arc<agent_capture::CaptureStatusHub>,
+    remote: Arc<remote_edit::RemoteHub>,
 }
 impl Drop for LiveSession {
     fn drop(&mut self) {
         self.focus.stop();
         self.agent_capture.stop();
+        self.remote.stop();
         self.runtime.stop();
     }
 }
@@ -375,6 +384,9 @@ impl LiveSession {
         self.closed.store(true, Ordering::Release);
         self.focus.stop();
         self.agent_capture.stop();
+        // Seal and retire real producers before carrier/runtime close completes.
+        // Typed pending keeps this foreign owner retryable and its leases held.
+        self.remote.close()?;
         self.runtime.close().await
     }
 }
@@ -401,6 +413,7 @@ pub(super) fn hello(device: DeviceId) -> LocalHello {
             "new_shape_preview_v1".into(),
             "marker_focus_v1".into(),
             agent_capture::CAPABILITY.into(),
+            vw_remote::CAPABILITY.into(),
         ]),
     }
 }
@@ -545,6 +558,8 @@ impl SessionService {
                 let incoming_focus = focus.clone();
                 let agent_capture = agent_capture::CaptureStatusHub::new(host);
                 let incoming_capture = agent_capture.clone();
+                let remote = remote_edit::RemoteHub::new(host);
+                let incoming_remote = remote.clone();
                 let previews = Arc::new(Mutex::new(super::preview::Previews::default()));
                 let incoming_previews = previews.clone();
                 let project_ref = Arc::downgrade(&project);
@@ -563,6 +578,7 @@ impl SessionService {
                         previews: incoming_previews,
                         focus: incoming_focus,
                         agent_capture: incoming_capture,
+                        remote: incoming_remote,
                     })
                     .await;
                 });
@@ -578,6 +594,7 @@ impl SessionService {
                     local: local_identity,
                     focus,
                     agent_capture,
+                    remote,
                 }))
             })
             .await
@@ -614,7 +631,9 @@ pub(super) async fn establish(
                 accepts.spawn(async move {
                     Ok::<_, SessionError>((
                         carrier,
-                        SecureConnection::server(listener.accept().await?, &local).await?,
+                        SecureConnection::server(listener.accept().await?, &local)
+                            .await
+                            .map_err(incoming_handshake_error)?,
                     ))
                 });
             }
@@ -696,6 +715,7 @@ struct Driver {
     previews: Arc<Mutex<super::preview::Previews>>,
     focus: Arc<focus::FocusHub>,
     agent_capture: Arc<agent_capture::CaptureStatusHub>,
+    remote: Arc<remote_edit::RemoteHub>,
 }
 async fn drive(mut driver: Driver) {
     let local = hello(driver.local.clone());
@@ -717,6 +737,7 @@ async fn drive(mut driver: Driver) {
             previews,
             focus,
             agent_capture,
+            remote,
             ..
         } = &mut driver;
         match connection {
@@ -758,6 +779,7 @@ async fn drive(mut driver: Driver) {
                         previews,
                         focus,
                         agent_capture,
+                        remote,
                     },
                 )
                 .await
@@ -789,10 +811,7 @@ async fn drive(mut driver: Driver) {
                         s.peer_viewport = None;
                     });
                 }
-                if matches!(
-                    error,
-                    SessionError::Authentication | SessionError::Storage | SessionError::Closed
-                ) {
+                if terminal_establish_failure(matches!(route, Route::Host(_)), &error) {
                     break;
                 }
             }
@@ -805,12 +824,30 @@ async fn drive(mut driver: Driver) {
         tokio::time::sleep(delay).await;
         delay = (delay * 2).min(Duration::from_secs(2));
     }
+    driver.remote.stop();
     driver.focus.stop();
     publish(&driver.status, |s| {
         s.status = SyncStatus::Offline;
         s.carrier = None;
         s.peer_viewport = None;
     });
+}
+// This boundary contains incoming carrier setup and protocol Hello/HelloAck,
+// not project filesystem operations. Preserve network Io as transport failure
+// before the generic application conversion loses that provenance. Explicit
+// NetError::Store and authentication errors keep their original categories.
+fn incoming_handshake_error(error: vw_net::NetError) -> SessionError {
+    match error {
+        vw_net::NetError::Io(_) => SessionError::Transport,
+        other => other.into(),
+    }
+}
+// A rejected incoming peer is not ownership loss of the reusable host listener.
+// Every retry still performs pinned TLS authentication; client refusal and local
+// Closed/Storage terminal behavior remain unchanged, as does bounded backoff.
+fn terminal_establish_failure(host: bool, error: &SessionError) -> bool {
+    matches!(error, SessionError::Storage | SessionError::Closed)
+        || (!host && matches!(error, SessionError::Authentication))
 }
 fn failure(error: &SessionError) -> &'static str {
     match error {
@@ -896,6 +933,7 @@ struct Connected<'a> {
     previews: &'a Arc<Mutex<super::preview::Previews>>,
     focus: &'a Arc<focus::FocusHub>,
     agent_capture: &'a Arc<agent_capture::CaptureStatusHub>,
+    remote: &'a Arc<remote_edit::RemoteHub>,
 }
 async fn connected(connection: SecureConnection, context: Connected<'_>) -> SessionResult<()> {
     if !connection
@@ -917,6 +955,7 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         previews,
         focus,
         agent_capture,
+        remote,
     } = context;
     let active_epoch = ConnectionEpoch::enter(epoch.clone())?;
     let _focus_epoch = focus.activate(active_epoch.value)?;
@@ -927,9 +966,19 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
             .capabilities()
             .contains(agent_capture::CAPABILITY),
     )?;
+    let negotiated_remote = connection
+        .session()
+        .capabilities()
+        .contains(vw_remote::CAPABILITY);
     let (sender, mut receive) = connection.into_duplex()?;
     let _closing = Closing(sender.clone());
     let start = Instant::now();
+    let _remote_epoch = remote.activate(
+        active_epoch.value,
+        negotiated_remote && carrier == AppCarrier::QuicTether,
+        sender.clone(),
+        start,
+    )?;
     let mut interval = tokio::time::interval(Duration::from_nanos(8_333_334));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut outbound = BTreeMap::<String, Outbound>::new();
@@ -961,7 +1010,10 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         }
         tokio::select! {
             body=receive.receive(start.elapsed().as_millis().min(u128::from(u64::MAX))as u64)=>{
-                let Receive::Deliver(body)=body? else{continue;};last_receive=Instant::now();
+                let body=match body {Ok(value)=>value,
+                    Err(vw_net::NetError::KeyframeRequired) if negotiated_remote=>{remote.recover()?;continue;},
+                    Err(error)=>return Err(error.into())};
+                let Receive::Deliver(body)=body else{continue;};last_receive=Instant::now();
                 match body{
                     Body::Ping(ping)=>{let received=wall_ns()?;sender.enqueue(Body::Pong(pb::Pong{nonce:ping.nonce,t_sent_ns:ping.t_sent_ns,t_recv_ns:received,t_reply_ns:wall_ns()?}))?;},
                     Body::Pong(pong)=>echo.receive(pong,status)?,
@@ -1008,6 +1060,10 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
                     Body::ViewportOutline(view)=>{if view.corners.len()!=4||view.corners.iter().any(|p|!p.x.is_finite()||!p.y.is_finite()){return Err(SessionError::Invalid);}let id=Id::from_proto(view.document_id.as_ref()).map_err(|_|SessionError::Invalid)?;publish(status,|s|s.peer_viewport=Some(PeerViewport{document_id:id.to_string(),corners:view.corners.into_iter().map(|p|crate::Point{x:p.x,y:p.y}).collect()}));},
                     Body::MarkerFocus(value)=>focus.receive(value,active_epoch.value)?,
                     Body::AgentCaptureStatus(value)=>agent_capture.receive(value,active_epoch.value)?,
+                    body @ (Body::RemoteControl(_)|Body::RemoteVideoConfig(_))=>remote.receive(body,active_epoch.value)?,
+                    Body::VideoFrame(value) if value.remote_scope.is_some()=>remote.receive(Body::VideoFrame(value),active_epoch.value)?,
+                    Body::InputEvent(value) if value.remote_scope.is_some()=>remote.receive(Body::InputEvent(value),active_epoch.value)?,
+                    Body::InputStatus(value) if value.remote_scope.is_some()=>remote.receive(Body::InputStatus(value),active_epoch.value)?,
                     Body::GestureUpdate(update)=>receive_preview(project,peer,&sender,previews,*update,false,false).await?,
                     Body::GestureReplay(replay)=>receive_preview(project,peer,&sender,previews,replay.update.ok_or(SessionError::Invalid)?,true,replay.open).await?,
                     Body::GestureRepair(request)=>{let reply=previews.lock().map_err(|_|SessionError::Worker)?.repair(request)?;if let Some(reply)=reply{sender.enqueue(reply)?;}},
@@ -1033,6 +1089,7 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         echo.tick(&sender)?;
         focus.flush(&sender)?;
         agent_capture.flush(&sender)?;
+        remote.flush()?;
         fill(&sender, &mut outbound)?;
         let updates = {
             let mut previews = previews.lock().map_err(|_| SessionError::Worker)?;
@@ -1444,5 +1501,70 @@ mod command_epoch_tests {
         epoch.store(u64::MAX - 1, Ordering::Release);
         assert!(ConnectionEpoch::enter(epoch.clone()).is_err());
         assert!(finish(epoch.load(Ordering::Acquire)).is_none());
+    }
+}
+
+#[cfg(test)]
+mod listener_admission_tests {
+    use super::{SessionError, terminal_establish_failure};
+    #[test]
+    fn rejected_incoming_peer_does_not_retire_host_listener() {
+        assert!(!terminal_establish_failure(
+            true,
+            &SessionError::Authentication
+        ));
+        assert!(terminal_establish_failure(
+            false,
+            &SessionError::Authentication
+        ));
+    }
+    #[test]
+    fn local_terminal_failures_remain_terminal_on_both_routes() {
+        for host in [false, true] {
+            assert!(terminal_establish_failure(host, &SessionError::Closed));
+            assert!(terminal_establish_failure(host, &SessionError::Storage));
+            assert!(!terminal_establish_failure(host, &SessionError::Timeout));
+            assert!(!terminal_establish_failure(host, &SessionError::Transport));
+            assert!(!terminal_establish_failure(host, &SessionError::Invalid));
+        }
+    }
+}
+
+#[cfg(test)]
+mod incoming_handshake_provenance_tests {
+    use super::{SessionError, incoming_handshake_error, terminal_establish_failure};
+    #[test]
+    fn reset_broken_pipe_and_truncated_handshake_remain_retryable_transport() {
+        for kind in [
+            std::io::ErrorKind::ConnectionReset,
+            std::io::ErrorKind::BrokenPipe,
+            std::io::ErrorKind::UnexpectedEof,
+        ] {
+            let mapped = incoming_handshake_error(vw_net::NetError::Io(std::io::Error::from(kind)));
+            assert!(matches!(mapped, SessionError::Transport));
+            assert!(!terminal_establish_failure(true, &mapped));
+        }
+    }
+    #[test]
+    fn explicit_store_io_and_generic_application_io_remain_storage() {
+        let stored = vw_net::NetError::Store(vw_store::StoreError::Io(std::io::Error::from(
+            std::io::ErrorKind::PermissionDenied,
+        )));
+        let mapped = incoming_handshake_error(stored);
+        assert!(matches!(mapped, SessionError::Storage));
+        assert!(terminal_establish_failure(true, &mapped));
+        let generic = SessionError::from(vw_net::NetError::Io(std::io::Error::from(
+            std::io::ErrorKind::BrokenPipe,
+        )));
+        assert!(matches!(generic, SessionError::Storage));
+    }
+    #[test]
+    fn incoming_authentication_and_closed_policies_are_not_weakened() {
+        let mapped = incoming_handshake_error(vw_net::NetError::Authentication);
+        assert!(matches!(mapped, SessionError::Authentication));
+        assert!(!terminal_establish_failure(true, &mapped));
+        assert!(terminal_establish_failure(false, &mapped));
+        assert!(terminal_establish_failure(true, &SessionError::Closed));
+        assert!(terminal_establish_failure(false, &SessionError::Closed));
     }
 }

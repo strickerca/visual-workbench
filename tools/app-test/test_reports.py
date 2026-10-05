@@ -34,10 +34,10 @@ def manifest(test=False):
 
 class InstrumentationCases(unittest.TestCase):
     def test_reviewed_nested_packages_pass_and_unknown_packages_refuse(self):
-        for package in ("capture", "editor", "instructions"):
+        for package in ("capture", "editor", "instructions", "remote"):
             case = A.replace("android.", "android." + package + ".")
             self.assertEqual(reports.instrumentation(passed((case,)), [case])["actual_passed_tests"], 1)
-        for package in ("foreign", "editor.nested", "capture.."):
+        for package in ("foreign", "editor.nested", "capture..", "remote.nested", "remote..", "remotely"):
             case = A.replace("android.", "android." + package + ".")
             self.assertIsNone(reports.CASE.fullmatch(case))
 
@@ -164,6 +164,19 @@ class ArtifactCases(unittest.TestCase):
                 path.write_text(invalid)
                 with self.assertRaises(reports.Rejected):
                     reports.cases(root)
+
+    def test_remote_inventory_preserves_phase2_154_and_matches_all_source_methods(self):
+        root = Path(__file__).resolve().parents[2]
+        declared = reports.common.bounded_json(root / "tools/app-test/inventory.json")["expected_tests"]
+        reviewed_remote = ['com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#actual_callback_thread_is_retained_until_it_joins_and_old_callback_cannot_ack', 'com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#blocked_configuration_retains_permit_and_surface_until_actual_join', 'com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#blocked_surface_release_retains_its_io_worker_and_permit_until_join', 'com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#borrowed_surface_survives_actual_owned_wrapper_retirement', 'com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#failed_release_stays_owned_and_explicit_close_retries_same_engine', 'com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#first_frame_requires_idr_and_scope_generation_must_match', 'com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#input_bytes_are_copied_and_au_size_is_bounded', 'com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#policy_rejects_oversize_config_odd_coded_geometry_and_unbounded_padding', 'com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#pts_release_render_callback_and_enqueue_times_remain_distinct', 'com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#same_config_recovery_has_fresh_owner_and_rejects_delta_start', 'com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#stale_pts_frame_ticket_and_expired_input_refuse', 'com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#successful_surface_callback_returns_exact_ticket_without_editor_effect_claim']
+        remote = [case for case in declared if ".remote." in case]
+        baseline = [case for case in declared if ".remote." not in case]
+        self.assertEqual(len(declared), 166)
+        self.assertEqual(remote, reviewed_remote)
+        self.assertEqual(len(baseline), 154)
+        self.assertEqual(hashlib.sha256(json.dumps(baseline, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest(), 'ece5b64a5fb3d6ef2abe01944fed1a19771acf479ff852a5843aa7ded2b75e72')
+        self.assertEqual(reports.cases(root), declared)
+        self.assertEqual(reports.instrumentation(passed(tuple(declared)), declared)["actual_passed_tests"], 166)
 
     def test_discovery_refuses_normal_output_and_split_metadata(self):
         with tempfile.TemporaryDirectory() as directory:

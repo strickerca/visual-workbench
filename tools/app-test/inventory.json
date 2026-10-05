@@ -154,6 +154,18 @@
     "com.visualworkbench.android.instructions.InstructionEntryInstrumentedTest#unavailableOnDeviceProviderDoesNotConstructAFallback",
     "com.visualworkbench.android.instructions.InstructionFocusAdmissionInstrumentedTest#actualTextBrushContextAndBlockingStatesEachRefusePeerAdmission",
     "com.visualworkbench.android.instructions.InstructionFocusAdmissionInstrumentedTest#exportPickerHandoffStaysSealedWhenDialogDismissesAndReleaseIsIdempotent",
-    "com.visualworkbench.android.instructions.InstructionRoundTripInstrumentedTest#markerInstructionRoleEntryUndoAndReopenRetainCanonicalIdentity"
+    "com.visualworkbench.android.instructions.InstructionRoundTripInstrumentedTest#markerInstructionRoleEntryUndoAndReopenRetainCanonicalIdentity",
+    "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#actual_callback_thread_is_retained_until_it_joins_and_old_callback_cannot_ack",
+    "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#blocked_configuration_retains_permit_and_surface_until_actual_join",
+    "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#blocked_surface_release_retains_its_io_worker_and_permit_until_join",
+    "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#borrowed_surface_survives_actual_owned_wrapper_retirement",
+    "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#failed_release_stays_owned_and_explicit_close_retries_same_engine",
+    "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#first_frame_requires_idr_and_scope_generation_must_match",
+    "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#input_bytes_are_copied_and_au_size_is_bounded",
+    "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#policy_rejects_oversize_config_odd_coded_geometry_and_unbounded_padding",
+    "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#pts_release_render_callback_and_enqueue_times_remain_distinct",
+    "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#same_config_recovery_has_fresh_owner_and_rejects_delta_start",
+    "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#stale_pts_frame_ticket_and_expired_input_refuse",
+    "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#successful_surface_callback_returns_exact_ticket_without_editor_effect_claim"
   ]
 }

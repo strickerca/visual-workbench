@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "status": "failed",
+  "source_map_sha256": "aeb4104d61a887827334674ffce810bd761dc36cb86d1f36a2faf9395992d132",
+  "editors": [
+    {
+      "watched_settings_restored": true,
+      "validated_input_receipt_count": 4,
+      "editor": "krita",
+      "input_attempt_count": 4,
+      "owned_editor_process_job_and_io_retired": true,
+      "status": "failed",
+      "actual_effect_owners_retired": true,
+      "native_receipt_sha256": "f21662d6200fdee118f5b397385af761a1eb04921305e567424d58c8168c88c8",
+      "failure": "causal-pixels-and-settings-restoration-required",
+      "causal_draw_undo_redo_pixels": false,
+      "final_pixels_restored": false
+    },
+    {
+      "watched_settings_restored": true,
+      "validated_input_receipt_count": 4,
+      "editor": "paint",
+      "input_attempt_count": 4,
+      "owned_editor_process_job_and_io_retired": true,
+      "status": "failed",
+      "actual_effect_owners_retired": true,
+      "native_receipt_sha256": "38407e7e5543336e408608150ee744477a10ad162d0a6d09dc9c3f985da1e257",
+      "failure": "causal-pixels-and-settings-restoration-required",
+      "causal_draw_undo_redo_pixels": false,
+      "final_pixels_restored": true
+    }
+  ],
+  "image_analysis": {
+    "schema": 1,
+    "status": "inspected-failed-exact-comparison",
+    "krita": {
+      "watched_settings_restored": true,
+      "drawn_vs_redone": {
+        "different_pixels": 640,
+        "bounds": [
+          885,
+          561,
+          967,
+          643
+        ]
+      },
+      "undone_equals_restored": true,
+      "baseline_vs_undone": {
+        "different_pixels": 320,
+        "bounds": [
+          84,
+          0,
+          166,
+          41
+        ]
+      }
+    },
+    "paint": {
+      "owned_blank_bmp": "all white 800x600",
+      "baseline_equals_undone_equals_restored": true,
+      "watched_settings_restored": true,
+      "drawn_vs_redone": {
+        "different_pixels": 10,
+        "bounds": [
+          397,
+          297,
+          401,
+          301
+        ]
+      }
+    },
+    "interpretation": "Editor-rendered brush preview/hover outlines contaminate exact frame comparison; WGC native cursor capture already disabled",
+    "reviewer_inspected_all_10_png_and_fixture": true,
+    "acceptance": false,
+    "no_hash_masking": true
+  },
+  "image_count": 11,
+  "images_inspected": true,
+  "images_disposed": true,
+  "image_disposal_receipt_sha256": "6020ef228e2bd6cce87ff8039906bbbd9f51eb34d36fe60d9341a5aece4c2f95",
+  "next_fix": "Normalize hover through already-selected guarded Brush action before each sample; retain whole-image exact hashes",
+  "milestone_passed": false
+}

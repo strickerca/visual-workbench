@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "status": "unavailable",
+  "phase": "device-selection",
+  "expected_model": "SM-S918U",
+  "matching_authorized_device_available": false,
+  "app_launched": false,
+  "capture_started": false,
+  "input_granted": false,
+  "oneplus_accessed": false,
+  "settings_changed": false,
+  "verification_images_created": 0,
+  "build_snapshot_sha256": "35bd382551763db9fc07e5140a577b27f91dacc2a82bb604239677548b3061cd",
+  "raw_selection_log_sha256": "1dbed0d743c3234c8816b9b4555bd215f23aef3903153398a628cb96b5d718ee",
+  "selection_metadata": {
+    "phase": "hil-device-selection",
+    "exit_code": 0,
+    "parent_exit_code": 0,
+    "failure_reason": null,
+    "elapsed_seconds": 0.213,
+    "sampled_peak_tree_working_set_bytes": 4968448,
+    "sampling_interval_seconds": 2,
+    "timeout_seconds": 30,
+    "contained_in_windows_job": true,
+    "process_tree_cleanup_confirmed": true,
+    "output_streams_completed": true,
+    "log_file": "hil-device-selection-f5ca613cb4d74806ba4ebed5716bf788.log",
+    "surviving_processes_before_cleanup": [],
+    "compiler_telemetry_cleaned": false,
+    "parent_exit_grace_seconds": 5
+  },
+  "milestone_passed": false
+}

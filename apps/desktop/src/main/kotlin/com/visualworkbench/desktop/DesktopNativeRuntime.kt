@@ -29,6 +29,21 @@ internal class NativeRuntimeFailure(message: String) : Exception(message)
  * our read leases only and deliberately does not remove cache directories. */
 internal class DesktopNativeRuntime private constructor(val directory: Path, private val leases: List<AutoCloseable>, private val packaged: Map<String,String>) : AutoCloseable {
     private val closed = AtomicBoolean(false)
+    private var retirementFence:(()->Unit)?=null
+    private var remoteCatalog:DesktopRemoteCatalog?=null
+    private var catalogAttempted=false
+    @Synchronized internal fun packagedRemoteCatalog(
+        resources:NativeResources=NativeResources{DesktopNativeRuntime::class.java.classLoader.getResourceAsStream(it)},
+        guard:NativeFileGuard=WindowsNativeFileGuard(),
+    ):DesktopRemoteCatalog? {
+        check(!closed.get())
+        if(!catalogAttempted) {
+            remoteCatalog=DesktopRemoteCatalog.prepare(directory.parent.parent.resolve("remote-editor-catalog"),resources,guard)
+            catalogAttempted=true
+        }
+        return remoteCatalog
+    }
+    @Synchronized fun armRetirementFence(fence:()->Unit){check(!closed.get()&&retirementFence==null);retirementFence=fence}
     fun packagedHash(name: String): String = packaged[name] ?: throw NativeRuntimeFailure("Unknown packaged native helper")
     fun activate() {
         check(!closed.get())
@@ -42,11 +57,14 @@ internal class DesktopNativeRuntime private constructor(val directory: Path, pri
         System.setProperty("uniffi.component.vw_core.libraryOverride", directory.resolve("vw_core.dll").toString())
         System.setProperty("uniffi.component.vw_host.libraryOverride", directory.resolve("vw_host.dll").toString())
     }
-    override fun close() {
+    @Synchronized override fun close() {
+        if(closed.get())return
+        retirementFence?.invoke()
+        remoteCatalog?.close()
         if (closed.compareAndSet(false, true)) leases.asReversed().forEach { runCatching { it.close() } }
     }
     companion object {
-        private val names = setOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
+        private val names = setOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-hevc-helper.exe", "vw-input-helper.exe")
         private const val MAX_FILE = 256L * 1024 * 1024
         private const val MAX_TOTAL = 512L * 1024 * 1024
         private const val MANIFEST = "vw-native-runtime.sha256"
@@ -171,14 +189,14 @@ internal class DesktopNativeRuntime private constructor(val directory: Path, pri
         private data class CreatedFile(val path: Path, val key: Any?)
         private fun parseManifest(bytes: ByteArray): List<Entry> {
             if (bytes.size !in 1..4096 || bytes.any { it.toInt() !in 10..126 || it.toInt() in 11..31 }) throw NativeRuntimeFailure("The native runtime manifest is invalid.")
-            val pattern = Regex("([0-9a-f]{64}) ([1-9][0-9]{0,8}) (vw_core\\.dll|vw_host\\.dll|vw-connection-helper\\.exe|vw-capture-helper\\.exe)")
+            val pattern = Regex("([0-9a-f]{64}) ([1-9][0-9]{0,8}) (vw_core\\.dll|vw_host\\.dll|vw-connection-helper\\.exe|vw-capture-helper\\.exe|vw-hevc-helper\\.exe|vw-input-helper\\.exe)")
             val entries = bytes.toString(Charsets.US_ASCII).lineSequence().filter(String::isNotEmpty).map { line ->
                 val match = pattern.matchEntire(line) ?: throw NativeRuntimeFailure("The native runtime manifest is invalid.")
                 val size = match.groupValues[2].toLong()
                 if (size !in 1..MAX_FILE) throw NativeRuntimeFailure("A native runtime file exceeds its admission limit.")
                 Entry(match.groupValues[1], size, match.groupValues[3])
             }.toList()
-            if (entries.size != 4 || entries.map { it.name }.toSet() != names || entries.sumOf { it.bytes } > MAX_TOTAL) throw NativeRuntimeFailure("The native runtime inventory is incomplete or exceeds its bound.")
+            if (entries.size != 6 || entries.map { it.name }.toSet() != names || entries.sumOf { it.bytes } > MAX_TOTAL) throw NativeRuntimeFailure("The native runtime inventory is incomplete or exceeds its bound.")
             return entries
         }
         private fun ensureDirectories(path: Path, guard: NativeFileGuard, pinned: MutableList<AutoCloseable>) {

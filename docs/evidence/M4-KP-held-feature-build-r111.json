@@ -1,0 +1,198 @@
+{
+  "schema": 1,
+  "operation": "m4-kp-held-feature-build",
+  "status": "passed",
+  "source_map_sha256": "aeb4104d61a887827334674ffce810bd761dc36cb86d1f36a2faf9395992d132",
+  "source_count": 222,
+  "source_preserved_after": true,
+  "build_receipt_sha256": "3b02419d0f7c24a1b000b484c28bb2b168b0a2027354649b6c83d582ca833f76",
+  "artifact_snapshot_sha256": "5e5315a986583285538ca894db4fb5317cc8982dfa1b7d3442333645264de4b4",
+  "feature_proof_sha256": "a4b945275572ed3ee69352c42a2b542bfb9a7f4f57e1dde92d0194f2db32b81d",
+  "phase_count": 18,
+  "retained_successful_phases": 14,
+  "fresh_phases": 4,
+  "phases": [
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 0.293,
+      "phase": "license-offline-policy",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 0.253,
+      "phase": "license-npm-policy",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 0.64,
+      "phase": "license-cargo-deny-version",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 5.481,
+      "phase": "license-rust",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 26.608,
+      "phase": "license-gradle",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 48.723,
+      "phase": "m4-held-build-r103-7c614cc376bd4a429352bbcbf71a723e-host_core-producer",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 0.445,
+      "phase": "m4-held-feature-r97-7c614cc376bd4a429352bbcbf71a723e-host_core-toolchain",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 46.012,
+      "phase": "m4-held-feature-r97-7c614cc376bd4a429352bbcbf71a723e-host_core-compile",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 22.741,
+      "phase": "m4-held-build-r103-7c614cc376bd4a429352bbcbf71a723e-host_input-producer",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 0.197,
+      "phase": "m4-held-feature-r97-7c614cc376bd4a429352bbcbf71a723e-host_input-toolchain",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 20.307,
+      "phase": "m4-held-feature-r97-7c614cc376bd4a429352bbcbf71a723e-host_input-compile",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 0.189,
+      "phase": "m4-held-feature-r109-bd447fe18c74449ea2fadfbdfc29e6ae-android_core-toolchain",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 0.138,
+      "phase": "m4-held-feature-r109-bd447fe18c74449ea2fadfbdfc29e6ae-android_core-ndk-environment",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 157.882,
+      "phase": "m4-held-feature-r109-bd447fe18c74449ea2fadfbdfc29e6ae-android_core-compile",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 4.227,
+      "phase": "m4-held-build-r103-acb132c0b57143b882e642d6f157a3d0-verify-existing-jni",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 250.062,
+      "phase": "remote-integration-artifacts",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 1.236,
+      "phase": "remote-integration-native-packaging",
+      "output_streams_completed": true
+    },
+    {
+      "process_tree_cleanup_confirmed": true,
+      "exit_code": 0,
+      "elapsed_seconds": 0.564,
+      "phase": "remote-integration-entrypoint-preflight",
+      "output_streams_completed": true
+    }
+  ],
+  "android_main": {
+    "path": "apps/android/build-remote-integration/outputs/apk/debug/android-debug.apk",
+    "bytes": 225848230,
+    "sha256": "0cb7139cf3ac89b3ef934441cfb4b8953a0a0339bcf86a256ac039257241d1ad"
+  },
+  "android_test": {
+    "path": "apps/android/build-remote-integration/outputs/apk/androidTest/debug/android-debug-androidTest.apk",
+    "bytes": 1006759,
+    "sha256": "0934e12a0eb7df7edd6ce016d0c19804acaffad923f76ed062e64ba32a3a9938"
+  },
+  "native_runtime": [
+    {
+      "path": "target/debug/vw_core.dll",
+      "bytes": 46524928,
+      "sha256": "3dcef045df2a65cd9d7e6004f8bd36c9372cfe6b147e6be86f218361968e4a6f"
+    },
+    {
+      "path": "target/debug/vw_host.dll",
+      "bytes": 7004672,
+      "sha256": "23a8a3c691d528c2e738d04c26450189906d32e3f6e0228af44546a931210613"
+    },
+    {
+      "path": "target/debug/vw-connection-helper.exe",
+      "bytes": 2147328,
+      "sha256": "50913a5390943ef42b728018e1d14f14762f7e6186f32a9ca3b6fd1fa83057a2"
+    },
+    {
+      "path": "target/debug/vw-capture-helper.exe",
+      "bytes": 2392064,
+      "sha256": "2c2ddbdcd3925b1a41ac1039bf05ddea67a9521a6666853aff0032f52d42f4ec"
+    },
+    {
+      "path": "target/debug/vw-hevc-helper.exe",
+      "bytes": 2104832,
+      "sha256": "883128e25b9e00411c8d2840fb8aaca9258a928c2292534194dc9a1f6b002cfa"
+    },
+    {
+      "path": "target/debug/vw-input-helper.exe",
+      "bytes": 4423680,
+      "sha256": "673e7cffc5ef498d95daacf44c1fc61dcbf96d2030f348caff222db48230cf46"
+    }
+  ],
+  "fixture_feature": "integration-carrier-fault",
+  "ordinary_personal_delivery": false,
+  "device_acceptance": false,
+  "milestone_passed": false,
+  "finish_repair": {
+    "corrected_argv_count": 39,
+    "finish_script_sha256": "7964b20a090d9dac429187a1a283e8ff66b35a38e67651d042b8ca942f5029ab",
+    "corrected_collector_exit_code": 0,
+    "compiler_or_packaging_repeated": false,
+    "initial_collector_exit_code": 2,
+    "independent_review": "clear",
+    "cause": "PowerShell concatenation combined each witness argument array into one string"
+  },
+  "verification_images_created": 0
+}

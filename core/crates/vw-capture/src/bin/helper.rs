@@ -35,6 +35,10 @@ fn run() -> Result<()> {
     let request: Request = serde_json::from_slice(&request).map_err(|_| Error::Invalid)?;
     let remaining = match &request {
         Request::Capture(value) => value.limits.validate()?.capture_ms + 1000,
+        Request::CanvasFixture(value) => {
+            value.validate()?;
+            value.capture.limits.capture_ms + 1000
+        }
         Request::Tree(value) => value.limits.validate()?.tree_ms + 50,
     };
     deadline.store(
@@ -53,21 +57,47 @@ fn run() -> Result<()> {
             .map_err(|_| Error::Platform)?;
         }
         let cancel = Cancellation::default();
+        let mut color_depth = None;
+        let mut alpha_summary = None;
         let result = match request {
-            Request::Capture(value) => windows::capture(value, &cancel).map(Response::Frame),
+            Request::Capture(value) => windows::capture_fixture_diagnostic(
+                value,
+                &cancel,
+                &mut color_depth,
+                &mut alpha_summary,
+            )
+            .map(Response::Frame),
+            Request::CanvasFixture(value) => {
+                windows::capture_canvas_fixture(value, &cancel, &mut color_depth)
+                    .map(Response::CanvasFixture)
+            }
             Request::Tree(value) => windows::collect(value, &cancel).map(Response::Tree),
         };
         // SAFETY: paired successful RoInitialize on this thread.
         unsafe {
             ::windows::Win32::System::WinRT::RoUninitialize();
         }
-        result.unwrap_or_else(|error| Response::Refused { error })
+        result.unwrap_or_else(|error| Response::Refused {
+            error,
+            color_depth: if error == Error::ColorDepth {
+                color_depth
+            } else {
+                None
+            },
+            alpha_summary: if error == Error::ColorDepth {
+                alpha_summary
+            } else {
+                None
+            },
+        })
     };
     #[cfg(not(windows))]
     let response = {
         let _ = request;
         Response::Refused {
             error: Error::Unsupported,
+            color_depth: None,
+            alpha_summary: None,
         }
     };
     struct Capped {

@@ -1,0 +1,524 @@
+{
+  "schema": 1,
+  "status": "completed",
+  "purpose": "dispose only superseded hashed project Cargo test executable caches",
+  "cutoff_utc": "2026-10-04T14:35:00.0000000Z",
+  "file_count": 84,
+  "bytes": 1496500736,
+  "files": [
+    {
+      "relative_path": "target/debug/deps/admission-589e4cd1ba2832f8.exe",
+      "bytes": 2456064,
+      "sha256": "b0d1d4a2d2d44eba1623e29227ca359e8e4e251ce431d68f1308b91b516e7db1",
+      "modified_utc": "2026-10-04T01:14:26.0885454Z"
+    },
+    {
+      "relative_path": "target/debug/deps/admission-71d0abc2e25694b4.exe",
+      "bytes": 1212416,
+      "sha256": "42c1377d033ef0e113a1225101b20cef28a1ac730da106d5f23fc98d3b92d6cf",
+      "modified_utc": "2026-10-04T14:16:40.7664279Z"
+    },
+    {
+      "relative_path": "target/debug/deps/admission-79935b213edfec56.exe",
+      "bytes": 1223680,
+      "sha256": "78ef5225a9f44c3f3bbc131ea3b75b423f40d1b311f3e6911cdea3c8505d14a7",
+      "modified_utc": "2026-10-03T15:07:04.7026067Z"
+    },
+    {
+      "relative_path": "target/debug/deps/admission-87dcaab9357ac161.exe",
+      "bytes": 8546816,
+      "sha256": "e66ebe9ee57a65ad0a60b33fbfb7ddd59574c605d78845c98f0b3d3ff627a617",
+      "modified_utc": "2026-10-03T15:08:03.7817059Z"
+    },
+    {
+      "relative_path": "target/debug/deps/admission-b35773379ec9a901.exe",
+      "bytes": 1227264,
+      "sha256": "832455fe841eeda6d681d3220d0bfe1df0b3c2115655753e1fdbab9ac6d3d8c0",
+      "modified_utc": "2026-10-04T01:14:05.4754279Z"
+    },
+    {
+      "relative_path": "target/debug/deps/admission-c29f02e5d5532572.exe",
+      "bytes": 17446400,
+      "sha256": "78a51fe2ffe345e988aff4e5419924889cacb64eb444731d2d65e7669f7ba809",
+      "modified_utc": "2026-10-04T01:17:07.1078734Z"
+    },
+    {
+      "relative_path": "target/debug/deps/admission-c905967c7e6e07da.exe",
+      "bytes": 2451968,
+      "sha256": "1a609b0ecda8d1c34d38057e7e1c967f28792113540311326c007bee461578b3",
+      "modified_utc": "2026-10-03T15:07:54.5864710Z"
+    },
+    {
+      "relative_path": "target/debug/deps/admission-c963ffd112dd3005.exe",
+      "bytes": 1613824,
+      "sha256": "0f2898197cf302f4cc463934b5449855210eeefda3e250a9fc91b2d9e6b54c91",
+      "modified_utc": "2026-10-04T13:54:29.8293956Z"
+    },
+    {
+      "relative_path": "target/debug/deps/admission-e0f6b8ebf8f61fbc.exe",
+      "bytes": 8582656,
+      "sha256": "b93e4e35cc6e77658cefb04f651b0ce6cba6cfbb870abe45c3ecae244eb1fe75",
+      "modified_utc": "2026-10-04T01:17:02.7376625Z"
+    },
+    {
+      "relative_path": "target/debug/deps/admission-f29dfa380e810c82.exe",
+      "bytes": 17411584,
+      "sha256": "6a8898d189e632f69b897596e811037ccf0b386a4c53cc501ad78cb5e5a40d6e",
+      "modified_utc": "2026-10-03T15:46:12.2947074Z"
+    },
+    {
+      "relative_path": "target/debug/deps/capture_delivery-1a879694dd333472.exe",
+      "bytes": 31304704,
+      "sha256": "aead6906ab582fecb1ee1189c8a9b2064b6a2a6db6388e23c45e14f5e03283c8",
+      "modified_utc": "2026-10-04T09:31:58.2138828Z"
+    },
+    {
+      "relative_path": "target/debug/deps/capture_delivery-26c8e2d55b9afcc6.exe",
+      "bytes": 30870528,
+      "sha256": "afc59fc9ff78059b2c7305d63f808f7e74ae9c4e7f4cf837a6e7fde5de1cb0b8",
+      "modified_utc": "2026-10-03T15:46:48.9911092Z"
+    },
+    {
+      "relative_path": "target/debug/deps/capture_delivery-2a74ce19c204bc78.exe",
+      "bytes": 31339008,
+      "sha256": "6c0f212ab78a01a0eab094dcc1735c8d40312d50a7e98e6d0a7d4f04712a58ec",
+      "modified_utc": "2026-10-04T14:01:18.3839947Z"
+    },
+    {
+      "relative_path": "target/debug/deps/capture_delivery-4700e77f5bd86f9c.exe",
+      "bytes": 30876672,
+      "sha256": "ad5de3ad63790ed65fee0775e1139366ed31631e669a3decf6f4bcecfa394af9",
+      "modified_utc": "2026-10-04T04:26:54.5168144Z"
+    },
+    {
+      "relative_path": "target/debug/deps/capture_delivery-c7839336f69a00c8.exe",
+      "bytes": 31311872,
+      "sha256": "fb030a3a45795271ffb3ba033da69c1d423469757fc711cbe81baa2be9efb206",
+      "modified_utc": "2026-10-04T08:38:29.1872912Z"
+    },
+    {
+      "relative_path": "target/debug/deps/capture_delivery-d268c74cad41b293.exe",
+      "bytes": 30865920,
+      "sha256": "3cc15662e58954862f18f599f0a1557613e5b1f05c7786406eccefc7a7f39eb2",
+      "modified_utc": "2026-10-04T01:13:43.5354058Z"
+    },
+    {
+      "relative_path": "target/debug/deps/eraser-00ca03c27673169e.exe",
+      "bytes": 1003520,
+      "sha256": "9e545834c6e6c976408f333aaa76ce0b7f15f83ff3de6c28b12b6a88283b5320",
+      "modified_utc": "2026-10-04T01:16:58.1525994Z"
+    },
+    {
+      "relative_path": "target/debug/deps/eraser-081ce5b5defaad7c.exe",
+      "bytes": 23203840,
+      "sha256": "9a7794fd276caf6a6a6ee6a108290882c36f134f5e3d3a2c476ddb08d7d30cae",
+      "modified_utc": "2026-10-04T01:13:02.8823589Z"
+    },
+    {
+      "relative_path": "target/debug/deps/eraser-0b443c4d8a290e91.exe",
+      "bytes": 23175680,
+      "sha256": "a93ed3c329030b02e98b9389a0b64fde690b7a1f09e948b7850f0ab644f3fc42",
+      "modified_utc": "2026-10-04T08:38:22.4424863Z"
+    },
+    {
+      "relative_path": "target/debug/deps/eraser-18a3d4990e881733.exe",
+      "bytes": 23162368,
+      "sha256": "2db638fab153b54fbb427b89b77cd10754f04e1df4dd1862bf9a9d7c9078238b",
+      "modified_utc": "2026-10-04T14:01:21.0216429Z"
+    },
+    {
+      "relative_path": "target/debug/deps/eraser-5b7f650c3d01a669.exe",
+      "bytes": 23162368,
+      "sha256": "d8a417974cdf4526b45aec3fdda2d340f8db89c71006badb186f8191a4beba38",
+      "modified_utc": "2026-10-04T09:31:55.0103066Z"
+    },
+    {
+      "relative_path": "target/debug/deps/eraser-de0381db21022a95.exe",
+      "bytes": 23171072,
+      "sha256": "88549521ac7a8fbe03219bba1c2a5682937979661c84e591e52ab96a1a26e9d7",
+      "modified_utc": "2026-10-04T04:26:55.3482996Z"
+    },
+    {
+      "relative_path": "target/debug/deps/eraser-e52611fe86eb07f4.exe",
+      "bytes": 997888,
+      "sha256": "0a70d3c14456e1aca5e95a05a0c89296215a750ab5b95d6a0550a9cf9b10957e",
+      "modified_utc": "2026-10-03T15:08:22.8278238Z"
+    },
+    {
+      "relative_path": "target/debug/deps/eraser-ff908ec3fee5595c.exe",
+      "bytes": 23165440,
+      "sha256": "06b8240195bef1020ddbcecf671628114320fb7d849bc1393f5974be4c505687",
+      "modified_utc": "2026-10-03T15:46:47.8334022Z"
+    },
+    {
+      "relative_path": "target/debug/deps/guard_regressions-8788117cfc591ba3.exe",
+      "bytes": 763392,
+      "sha256": "431b200c3678b73d7514d19533500cf25267f0d6e26cc3b00710c378f466ad87",
+      "modified_utc": "2026-10-04T10:18:15.4112011Z"
+    },
+    {
+      "relative_path": "target/debug/deps/guard_regressions-da1e2456da4cfc61.exe",
+      "bytes": 763392,
+      "sha256": "77cc28642fbde8aa82dcb122c785996e1d572a156463d61c2a0ca812b19c375d",
+      "modified_utc": "2026-10-04T06:35:35.2442167Z"
+    },
+    {
+      "relative_path": "target/debug/deps/guard_regressions-dc1c0995254e4225.exe",
+      "bytes": 763392,
+      "sha256": "87dc0c74fe367f280cad4076cf4a8722f50e8ab6143704bd9bd86f119a9929e2",
+      "modified_utc": "2026-10-04T08:52:15.0583340Z"
+    },
+    {
+      "relative_path": "target/debug/deps/guard_regressions-ffd6195eeb1d1c8a.exe",
+      "bytes": 763392,
+      "sha256": "02299ddef582a73c6a430223a9354c61583650fd45e5404f70ecb1b127cd57f6",
+      "modified_utc": "2026-10-04T08:20:45.6525613Z"
+    },
+    {
+      "relative_path": "target/debug/deps/lifecycle-05618b526c568c8e.exe",
+      "bytes": 22803456,
+      "sha256": "c626b9d7130dd235fd6253e31f165d70e23df4c0feb5ffb8ca6e1898e3571aaf",
+      "modified_utc": "2026-10-04T14:01:13.8682661Z"
+    },
+    {
+      "relative_path": "target/debug/deps/lifecycle-39df24fbc3b3416c.exe",
+      "bytes": 22843904,
+      "sha256": "0c6b699324adb3906631e462e3b62d83ddf9746cac972ac32ef6e1de6545dbfa",
+      "modified_utc": "2026-10-04T01:13:56.1006872Z"
+    },
+    {
+      "relative_path": "target/debug/deps/lifecycle-3a2e8f5e08af6cba.exe",
+      "bytes": 22816256,
+      "sha256": "215e44a5571a8331f6dd3383c29e78ede4af496fc823088d4700ef346ac63bda",
+      "modified_utc": "2026-10-04T04:27:02.7030534Z"
+    },
+    {
+      "relative_path": "target/debug/deps/lifecycle-9b20f99cf6eaf234.exe",
+      "bytes": 22803456,
+      "sha256": "f6e3afe61f9b59e32a54f3952c2e944bc3f88f9f12b3f5d7deaa75dc6416f870",
+      "modified_utc": "2026-10-04T09:32:02.3235927Z"
+    },
+    {
+      "relative_path": "target/debug/deps/lifecycle-be8ec1f13e0101a0.exe",
+      "bytes": 22816256,
+      "sha256": "ceadb6cf7073c94848f7c02ced977e287e7e251708150638677bda10d68b475f",
+      "modified_utc": "2026-10-04T08:38:23.0708898Z"
+    },
+    {
+      "relative_path": "target/debug/deps/lifecycle-d09df126caa369b4.exe",
+      "bytes": 22810112,
+      "sha256": "73fceeb2673ca5effde6002ad5159cb6fc27e119c29ee12017b25f1d4b344b57",
+      "modified_utc": "2026-10-03T15:46:51.8199165Z"
+    },
+    {
+      "relative_path": "target/debug/deps/mask_admission-024949ca3934404c.exe",
+      "bytes": 11185664,
+      "sha256": "2dd3fa1c389b61caf78b5d316c0ca2e4cb38ae1c337e3f1a8a56d7650f67cc87",
+      "modified_utc": "2026-10-04T09:31:52.0326901Z"
+    },
+    {
+      "relative_path": "target/debug/deps/mask_admission-04854a312b0ec173.exe",
+      "bytes": 11197440,
+      "sha256": "7db7d3afd72ae9510d4afdf17d6444f96fbeee6180ffb348e4f428d450ef782b",
+      "modified_utc": "2026-10-04T08:38:18.5501134Z"
+    },
+    {
+      "relative_path": "target/debug/deps/mask_admission-4843e2c9b5bed053.exe",
+      "bytes": 11187200,
+      "sha256": "e80e98bbe9732f098a1438bcde336170fe812d5433232a8c06c27440f8a5f77b",
+      "modified_utc": "2026-10-03T15:46:38.5921761Z"
+    },
+    {
+      "relative_path": "target/debug/deps/mask_admission-7e126f264e8249e9.exe",
+      "bytes": 11185664,
+      "sha256": "e4caa66335b5adfc47a1872574df72b46d904d8c5bf44f920b002c3d04cb58d3",
+      "modified_utc": "2026-10-04T14:01:14.8216523Z"
+    },
+    {
+      "relative_path": "target/debug/deps/mask_admission-912fe207d8d603a0.exe",
+      "bytes": 11191296,
+      "sha256": "3ebf4872bb7380852565e081079550a6a9693ea86fa9b79cb5efda7a3102095e",
+      "modified_utc": "2026-10-04T01:12:51.7380559Z"
+    },
+    {
+      "relative_path": "target/debug/deps/mask_admission-9b884eda7cdbf725.exe",
+      "bytes": 11196416,
+      "sha256": "f063216bb7742bcb11641c1f3825f7935415f66abb79f2479219efad06f8a57b",
+      "modified_utc": "2026-10-04T04:26:41.6877571Z"
+    },
+    {
+      "relative_path": "target/debug/deps/masks-46177642d9389134.exe",
+      "bytes": 22072320,
+      "sha256": "bcbb9b1f4330055f356643a6c638627ef115322b252032f015e464f947d1d5c3",
+      "modified_utc": "2026-10-04T08:38:15.9194940Z"
+    },
+    {
+      "relative_path": "target/debug/deps/masks-593f667087863d9b.exe",
+      "bytes": 22060032,
+      "sha256": "4a462af83c6aa841dce01c898afcdc433f24d2fb705e453d5172bd1445e677b5",
+      "modified_utc": "2026-10-04T09:31:50.1669037Z"
+    },
+    {
+      "relative_path": "target/debug/deps/masks-86caa9ca719192cf.exe",
+      "bytes": 22058496,
+      "sha256": "a0bd38a2cf0eba592736430c4c44faf581385e430d3a4e07be29b646b5d7b7ed",
+      "modified_utc": "2026-10-03T15:46:50.8351785Z"
+    },
+    {
+      "relative_path": "target/debug/deps/masks-af8f7829c3d15033.exe",
+      "bytes": 22060032,
+      "sha256": "945972eff890069dba9cbf484e65e1a0d3a856800d5b289f8ca7f22ddd2eecac",
+      "modified_utc": "2026-10-04T14:01:08.5627232Z"
+    },
+    {
+      "relative_path": "target/debug/deps/masks-d071331ca14ca75d.exe",
+      "bytes": 22100992,
+      "sha256": "ac5645327944c68cc251cb34862af5f9e01f86db0f44b7cb0e0e72a1f008af52",
+      "modified_utc": "2026-10-04T01:13:32.9722610Z"
+    },
+    {
+      "relative_path": "target/debug/deps/masks-f988df00e75c6374.exe",
+      "bytes": 22067200,
+      "sha256": "1663bca1a86394ab1bd8e804bc56726dc31fc31d3655bc925b73dc950663b579",
+      "modified_utc": "2026-10-04T04:26:48.4837630Z"
+    },
+    {
+      "relative_path": "target/debug/deps/semantic_ui-1245eee0f6ea1d49.exe",
+      "bytes": 16052736,
+      "sha256": "5f05903272ab0ac3f30fed2df6686967c2e13378c0a1462fda8c8542197ba33c",
+      "modified_utc": "2026-10-04T08:38:15.8654781Z"
+    },
+    {
+      "relative_path": "target/debug/deps/semantic_ui-411acea165fc88f5.exe",
+      "bytes": 16040448,
+      "sha256": "bc6d5628efd45c62a1c462b177a53727f43ecda70183d0b336bcd1b053fb74a6",
+      "modified_utc": "2026-10-04T09:32:01.0626487Z"
+    },
+    {
+      "relative_path": "target/debug/deps/semantic_ui-43adf746bae9e758.exe",
+      "bytes": 16051200,
+      "sha256": "2f61f213b8621b00e4162eec650a8e982df6dc0e2e1d7ff4ff552063a40b17b4",
+      "modified_utc": "2026-10-04T04:27:01.1539814Z"
+    },
+    {
+      "relative_path": "target/debug/deps/semantic_ui-7d8f581490b9f0c3.exe",
+      "bytes": 16081920,
+      "sha256": "dee089268e870f9e0ab98fc1f4d106ec5b3f492da2bfc6901c71c75fccf4d926",
+      "modified_utc": "2026-10-04T01:13:14.3027316Z"
+    },
+    {
+      "relative_path": "target/debug/deps/semantic_ui-ce381fd6e3b4e1a8.exe",
+      "bytes": 16046080,
+      "sha256": "dad5a91797df9398006f2677c826b8dde5f8f58a8647324ae4eaa9cf4d395d96",
+      "modified_utc": "2026-10-03T15:46:53.8864804Z"
+    },
+    {
+      "relative_path": "target/debug/deps/semantic_ui-f3d59b33e637e806.exe",
+      "bytes": 16040448,
+      "sha256": "bfc23e8c29a494f36fcc970f5bd89c1b54d0f3552bff6a1c7bbe90eaa373899f",
+      "modified_utc": "2026-10-04T14:01:21.5859361Z"
+    },
+    {
+      "relative_path": "target/debug/deps/sessions-0d20ba3c32807563.exe",
+      "bytes": 32081408,
+      "sha256": "96819875f793579741a6520464388dc8213a9f6d11f4d674d8118fd524ab57b3",
+      "modified_utc": "2026-10-04T01:12:50.5634679Z"
+    },
+    {
+      "relative_path": "target/debug/deps/sessions-1a4a5a6d3c16f59b.exe",
+      "bytes": 32534016,
+      "sha256": "3023849bb3c531430ca6d7fcf4042eea01100f941ea38916d484c8990e10894f",
+      "modified_utc": "2026-10-04T08:38:27.1964254Z"
+    },
+    {
+      "relative_path": "target/debug/deps/sessions-246948fc52f84034.exe",
+      "bytes": 32528384,
+      "sha256": "794861b0f9ead689e30119eba71fb66148564022c6740b9c1761149c61c347af",
+      "modified_utc": "2026-10-04T09:31:53.6176683Z"
+    },
+    {
+      "relative_path": "target/debug/deps/sessions-309b61d169c165c6.exe",
+      "bytes": 32094720,
+      "sha256": "a3b3562075e051e247502b32672e772cb64b97d1b45acb94890c462390ab22eb",
+      "modified_utc": "2026-10-03T15:46:45.3620211Z"
+    },
+    {
+      "relative_path": "target/debug/deps/sessions-35f9c32eaf86dd89.exe",
+      "bytes": 32565760,
+      "sha256": "8b6fd33f4aed798b84e69aed22875407ea61f42ce29f77ff410ebb5bc418852b",
+      "modified_utc": "2026-10-04T14:01:17.5418204Z"
+    },
+    {
+      "relative_path": "target/debug/deps/sessions-5d5640aef3b96653.exe",
+      "bytes": 32097280,
+      "sha256": "c4d456ded57704ffddbb18cfa54ed2479c5b9e4af81e86e65cb470e385e7ec44",
+      "modified_utc": "2026-10-04T04:27:08.8113520Z"
+    },
+    {
+      "relative_path": "target/debug/deps/streaming_ffi-347be395735585e4.exe",
+      "bytes": 22757888,
+      "sha256": "fb32827558d3358ddcadf3572b634d371d5984a51a8c7312fdc8bb4664bc6ec6",
+      "modified_utc": "2026-10-04T09:31:59.6199593Z"
+    },
+    {
+      "relative_path": "target/debug/deps/streaming_ffi-3c6936f0168baac0.exe",
+      "bytes": 22769664,
+      "sha256": "e897d4051f08bfffa8f9540e82db30a358a85e7c9b93790de2ffd0fcf1f54d35",
+      "modified_utc": "2026-10-04T08:38:19.5179961Z"
+    },
+    {
+      "relative_path": "target/debug/deps/streaming_ffi-68b29ede50b1f1ab.exe",
+      "bytes": 22764544,
+      "sha256": "46d8c0e562648dd7e8c8abbb278d0cd53508bbc55c66353362d9006572739d36",
+      "modified_utc": "2026-10-03T15:46:41.4514607Z"
+    },
+    {
+      "relative_path": "target/debug/deps/streaming_ffi-9c0c1739dabc8605.exe",
+      "bytes": 22767616,
+      "sha256": "bd0f1bb66c0dfbffd2e3d2563dc6934a1a5c8171b4b5a095df0d383ebff2e0b4",
+      "modified_utc": "2026-10-04T04:27:09.1220205Z"
+    },
+    {
+      "relative_path": "target/debug/deps/streaming_ffi-c98c270693acc4c6.exe",
+      "bytes": 22798336,
+      "sha256": "144b63854d8a6f66d409c3c91910cf8d9bd272f8c25d13e1f2a9e224a9195b3a",
+      "modified_utc": "2026-10-04T01:12:55.5796984Z"
+    },
+    {
+      "relative_path": "target/debug/deps/streaming_ffi-ff541b7bc144dbdb.exe",
+      "bytes": 22757376,
+      "sha256": "7f88d8aa4cfb080cc6de3f646c1fb761848213841a13c3d3d83e7b1457e83405",
+      "modified_utc": "2026-10-04T14:01:10.6244005Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_core-2557cb82c053f91a.exe",
+      "bytes": 34504704,
+      "sha256": "d2bfef48fcf21c45912defda31ab26efa436d7346e399eaf100b421eba77bdf5",
+      "modified_utc": "2026-10-04T14:01:06.8934884Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_core-3910fd6b7851f042.exe",
+      "bytes": 34005504,
+      "sha256": "9aece1df3e34328e30e73c0e979ffa1c1d86983199d68638e832f4e8f7c9648a",
+      "modified_utc": "2026-10-04T04:27:38.6892008Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_core-45c5d084f4739f81.exe",
+      "bytes": 34501120,
+      "sha256": "dea2d987ec38e55d53c82ca5f1a84dbf199385743d7b008e9c8a0e2b94829dea",
+      "modified_utc": "2026-10-04T09:31:49.3241408Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_core-5618b7af18de356c.exe",
+      "bytes": 34454016,
+      "sha256": "a4846eac301ec46503b815616b3e2851bc593bc403a321d21354077658745945",
+      "modified_utc": "2026-10-04T08:38:12.2861814Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_core-ba1b4f1d62280511.exe",
+      "bytes": 34029056,
+      "sha256": "431669d4bef6a1b6fc57f1ece7fe6fe14dd59e83cb870c4ea443539eb4b5134e",
+      "modified_utc": "2026-10-04T01:15:11.7708452Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_core-edf937c88dbba9fc.exe",
+      "bytes": 33996288,
+      "sha256": "c00ef19e4e7f654c4486538840e02655f8f75e1bf056c08ce87b8fc70af1d5cb",
+      "modified_utc": "2026-10-03T15:46:43.9952926Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_host-03415dcd884b146d.exe",
+      "bytes": 7441920,
+      "sha256": "fe2e7c216ba4e2d568e1e2daa318adc02cc435adc2eaa30122a8f4b66ea36a53",
+      "modified_utc": "2026-10-04T04:52:12.5867705Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_host-732648861ca86e51.exe",
+      "bytes": 7442432,
+      "sha256": "bc0328dee14f56db18deea8a52aadb0746751af18a6c20830840585193cfc0e7",
+      "modified_utc": "2026-10-04T08:01:36.5798962Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_host-819f4c46b2f7fefe.exe",
+      "bytes": 7270912,
+      "sha256": "8f69e5bb80165b241c4ad2208dbcfd685e93b2622be30dbac64dfc7d4e4390b4",
+      "modified_utc": "2026-10-03T15:07:13.8585221Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_host-8a126fe74f5233c9.exe",
+      "bytes": 7314432,
+      "sha256": "40a0bf777e968b1660c7f72b6e4acbd5b2cef236f02e3eba2146ea0b30a69ff1",
+      "modified_utc": "2026-10-04T01:14:19.3175857Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_remote_host-0f37733388951429.exe",
+      "bytes": 1738240,
+      "sha256": "6c81e6e49b381bd041893095b89e0425110782e6be65eb0edf468d5ef637cc04",
+      "modified_utc": "2026-10-04T05:13:18.0434586Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_remote_host-5ba8f7df0708fe96.exe",
+      "bytes": 2274816,
+      "sha256": "e62bd5befa9c8b5bdc9ee5fcdb36268dd0bad5c9b195549a0db9960bfa781d50",
+      "modified_utc": "2026-10-04T08:52:13.2988028Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_remote_host-b3c59b00950eb10b.exe",
+      "bytes": 2314240,
+      "sha256": "a88c5bb3a27224168fdb344af11ab2735b6b7551b4cb945be6198748092ec7c7",
+      "modified_utc": "2026-10-04T10:18:06.4234100Z"
+    },
+    {
+      "relative_path": "target/debug/deps/vw_remote-51421ccf1398b193.exe",
+      "bytes": 1829376,
+      "sha256": "804af630c986bc5825c08b21377639348f3aba8cb263474cadaaa2001938e0db",
+      "modified_utc": "2026-10-04T13:54:27.8444739Z"
+    },
+    {
+      "relative_path": "target/debug/deps/workflows-062fba4168cf7d62.exe",
+      "bytes": 16200192,
+      "sha256": "169eb753290ee2c54992c906531f77e1d1336d3c2dbde556bdd89be88c011e0a",
+      "modified_utc": "2026-10-04T14:01:12.1604603Z"
+    },
+    {
+      "relative_path": "target/debug/deps/workflows-5c2a4aca6ca61edd.exe",
+      "bytes": 16212992,
+      "sha256": "7328f604ad3fdf5e718cbc77f554816abe158e97c6297a5b3b064432a0730706",
+      "modified_utc": "2026-10-04T08:38:25.9440743Z"
+    },
+    {
+      "relative_path": "target/debug/deps/workflows-7df0b23c817d2285.exe",
+      "bytes": 16211968,
+      "sha256": "b0e51d83f09d295671e89ffebacf27f1f392033ed5290fa2d185ec0b148dc282",
+      "modified_utc": "2026-10-04T04:26:51.1954877Z"
+    },
+    {
+      "relative_path": "target/debug/deps/workflows-97f46b10058a03cb.exe",
+      "bytes": 16205312,
+      "sha256": "7f4ac8544c99072f1165211dae5f75bca2c2d8840fcd79fbee62ef192bfd67e6",
+      "modified_utc": "2026-10-03T15:46:31.2971720Z"
+    },
+    {
+      "relative_path": "target/debug/deps/workflows-dd50a1a13d22692a.exe",
+      "bytes": 16200192,
+      "sha256": "b068184b6e047507b520ef728bcf1aeb6ec3c2c56a51285822cd12c95a910656",
+      "modified_utc": "2026-10-04T09:31:56.6120147Z"
+    },
+    {
+      "relative_path": "target/debug/deps/workflows-ede522509d34ec62.exe",
+      "bytes": 16229888,
+      "sha256": "e83f556df7eb9d3b46c01aa12d7948dfeec816bf5c0568c29816674fd17d013a",
+      "modified_utc": "2026-10-04T01:12:39.1542906Z"
+    }
+  ],
+  "recursive_delete": false,
+  "exact_containment_verified": true,
+  "reparse_points_refused": true,
+  "active_cache_consumer_and_compiler_count": 0,
+  "protected_runtime_artifact_count": 16,
+  "source_count": 143,
+  "files_disposed": true,
+  "source_preserved_after": true,
+  "protected_runtime_artifacts_preserved_after": true,
+  "verification_images_created": 0
+}

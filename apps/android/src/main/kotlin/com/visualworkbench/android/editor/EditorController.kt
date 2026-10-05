@@ -49,6 +49,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     val agentCapture = AgentCaptureObserver(scope, captureStatusFactory)
     val captureArrivals = CaptureArrivals(scope, captureArrivalQuery)
     private var link: ProjectLink? = null
+    var remoteCapability by mutableStateOf<WorkbenchRemoteEdit?>(null); private set
+    var remoteOpen by mutableStateOf(false); private set
+    fun openRemoteComputer(){
+        if(connection?.carrier!=SessionCarrier.QuicTether){message="Connect the selected USB tether route first.";return}
+        try{remoteCapability=remoteCapability?:remoteEdit(checkNotNull(link));remoteOpen=true}
+        catch(_:Exception){message="Remote editing is unavailable on this authenticated link."}
+    }
+    fun remoteClosed(){remoteOpen=false;remoteCapability=null}
     private var linkChanges: Job? = null
     private var peerWorker: Job? = null
     private var connectionJob: Job? = null
@@ -378,6 +386,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     fun returnFromSettings() { captureNavigationGeneration++; screen = if (project == null) WorkbenchScreen.Projects else WorkbenchScreen.Canvas }
     fun onBackground() {
+        remoteCapability?.seal("background")
         captureNavigationGeneration++
         ai.background();instructionInteractionChanged()
         instructionFocus.sharing(false); instructionFocus.following(false)
@@ -735,9 +744,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         linkEpoch++; followPeer = false
         linkChanges?.cancelAndJoin(); linkChanges = null
         peerWorker?.cancelAndJoin(); peerWorker = null
-        val previous = link; link = null
+        val previous = link; remoteCapability?.seal("connection_retired")
         connection = null; clearPeerObjects(); lastViewport = null
         if (previous != null) withContext(NonCancellable) { previous.close() }
+        // Pending close retains the actual Link and UI capability for retry.
+        if(link===previous){link=null;remoteCapability=null;remoteOpen=false}
         }
     }
     fun disconnect() {
@@ -1467,6 +1478,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     override fun onCleared() {
         disposing = true
+        remoteCapability?.let{it.seal("background");retireRemoteEditLater(it)}
         captureOwner.close()
         importReadiness.close()
         incomingJob?.cancel()

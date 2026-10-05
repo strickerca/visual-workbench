@@ -67,12 +67,50 @@ pub fn publish_png(
     limits: Limits,
     cancel: &Cancellation,
 ) -> Result<(String, u64)> {
+    publish_named_png(
+        directory,
+        width,
+        height,
+        rgba,
+        limits,
+        cancel,
+        "capture.png",
+    )
+}
+#[cfg(windows)]
+pub(crate) fn publish_canvas_png(
+    directory: &Path,
+    width: u32,
+    height: u32,
+    rgba: &[u8],
+    limits: Limits,
+    cancel: &Cancellation,
+) -> Result<(String, u64)> {
+    publish_named_png(
+        directory,
+        width,
+        height,
+        rgba,
+        limits,
+        cancel,
+        "capture-canvas.png",
+    )
+}
+fn publish_named_png(
+    directory: &Path,
+    width: u32,
+    height: u32,
+    rgba: &[u8],
+    limits: Limits,
+    cancel: &Cancellation,
+    filename: &str,
+) -> Result<(String, u64)> {
     if rgba.len() != limits.image(width, height)? {
         return Err(Error::Invalid);
     }
     plain(directory, true)?;
     cancel.check()?;
-    let path = directory.join("capture.png");
+    let path = directory.join(filename);
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(windows)]

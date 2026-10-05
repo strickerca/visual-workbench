@@ -189,6 +189,40 @@ class Distribution(unittest.TestCase):
         self.assertEqual(result["launcher"], r.EXE)
         self.assertEqual(result["native_inputs"], self.native)
         self.assertIn("runtime/lib/modules", result["files"])
+        self.assertEqual(set(r.NATIVES), {"vw-capture-helper.exe", "vw-connection-helper.exe",
+            "vw-hevc-helper.exe", "vw-input-helper.exe", "vw_core.dll", "vw_host.dll"})
+        self.assertEqual(set(result["native_inputs"]), set(r.NATIVES) | {"vw-bindgen.exe"})
+
+    def test_remote_helpers_are_required_and_payload_hashes_are_bound(self):
+        original = self.contents.copy()
+        for helper in ("vw-hevc-helper.exe", "vw-input-helper.exe"):
+            for mode, code in (("missing", "packaged_resources_missing"), ("substituted", "native_resource_binding")):
+                with self.subTest(helper=helper, mode=mode):
+                    self.contents = original.copy()
+                    name = "win32-x86-64/" + helper
+                    if mode == "missing":
+                        self.contents.pop(name)
+                    else:
+                        self.contents[name] = b"substituted remote helper"
+                    self.jar()
+                    with self.assertRaisesRegex(r.Rejected, code):
+                        r.distribution(self.root, self.nonce)
+
+    def test_remote_native_manifest_is_closed_to_exact_six_files(self):
+        self.contents["vw-native-runtime.sha256"] += b"0" * 64 + b" 1 vw-extra-helper.exe\n"
+        self.jar()
+        with self.assertRaisesRegex(r.Rejected, "native_manifest_binding"):
+            r.distribution(self.root, self.nonce)
+
+    def test_unlisted_or_wrong_case_workbench_native_resource_is_refused(self):
+        original = self.contents.copy()
+        for name in ("vw-extra-helper.exe", "VW-HEVC-HELPER.EXE"):
+            with self.subTest(name=name):
+                self.contents = original.copy()
+                self.contents["win32-x86-64/" + name] = b"unlisted native"
+                self.jar()
+                with self.assertRaisesRegex(r.Rejected, "native_resource_unlisted"):
+                    r.distribution(self.root, self.nonce)
 
     def test_stale_nonce_rejected(self):
         with self.assertRaisesRegex(r.Rejected, "stale_distribution"):

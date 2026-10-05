@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "kind": "held pause failed evidence validation",
+  "source_map_sha256": "df237c99bbf74bede90973f25826078492d7baede28980cab9ee9124a0f230c8",
+  "receipt_sha256": "9c4d2d1d9c72b9d4b970555cb8fb265ef06684778e5bc8938f4b05e6e1bd40c7",
+  "failure_phase": "validate-held-lifecycle-release",
+  "grant_confirmed": true,
+  "grant_diagnostic": {
+    "stage": "ready",
+    "code": "none",
+    "grant": "confirmed",
+    "witness": "armed",
+    "display_available": false,
+    "status": "unavailable",
+    "reason": "unavailable",
+    "acceptance": false
+  },
+  "render_count": 3,
+  "render_records_validated": true,
+  "receiver_counts": [
+    1,
+    17,
+    1,
+    0,
+    0,
+    0
+  ],
+  "host_retired": true,
+  "phone_retired": true,
+  "input_retired": true,
+  "process_cleanup": true,
+  "packages_cleanup": true,
+  "private_work_disposed": true,
+  "observed_lifecycle_field_count": 9,
+  "missing_required_field": "remote_lifecycle_native_prefix_sha256",
+  "deterministic_defect": "Producer emits sha256 field; two readers exclude digits in key pattern, discarding required field. Strict lifecycle_shape rejects nine-field record.",
+  "causal_release_acceptance": false,
+  "screenshots_created": 0
+}

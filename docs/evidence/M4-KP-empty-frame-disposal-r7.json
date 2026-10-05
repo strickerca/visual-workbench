@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "kind": "M4-KP-empty-frame-r7-TEMP-disposal",
+  "private_receipt_sha256": "5b3fbc47b9ae4dc31884b5c1f62449bb5eae20fcc9efa9f3e31206001256d29a",
+  "source_receipt_sha256": "7c7e84c340ce58556b1a83f7953aa4e0f1a8058860633bf1b1b37497da276af6",
+  "marker_sha256": "ac088c526c7164168050203596b51ef58726b1ba1fac51a17142a0fb0dced76d",
+  "marker_owner_matched": true,
+  "resolved_direct_temp_child": true,
+  "all_ancestors_plain": true,
+  "outer_native_editor_and_io_retired": true,
+  "image_count": 0,
+  "images_inspected": 0,
+  "image_files_disposed": 0,
+  "empty_owned_sample_removed": true,
+  "empty_owned_temp_removed": true,
+  "verification_images_created": 0,
+  "images_available_for_review": false,
+  "recursive_delete_performed": false,
+  "unrelated_files_deleted": false,
+  "supersedes_prior_marker_disposal_pending": true
+}

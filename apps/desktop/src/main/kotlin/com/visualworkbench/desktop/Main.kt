@@ -54,6 +54,8 @@ fun main(args: Array<String>) {
     }
     Runtime.getRuntime().addShutdownHook(Thread({appOwner.close();appAnchor.close()},"vw-app-owner-release"))
     val core=workbenchCore()
+    nativeRuntime.armRetirementFence(::assertRemoteEditRetired)
+    val remoteCatalog=try{nativeRuntime.packagedRemoteCatalog()}catch(_:NativeRuntimeFailure){null}
     val preferences=DesktopPreferences(local.resolve("Visual Workbench/settings.properties"));val saved=preferences.window();val device=preferences.device(core)
     val documents=FileSystemView.getFileSystemView().defaultDirectory.toPath()
     val clouds=listOf("OneDrive","OneDriveConsumer","OneDriveCommercial","DROPBOX").mapNotNull{System.getenv(it)?.takeIf(String::isNotBlank)?.let{v->Path.of(v)}}
@@ -66,6 +68,13 @@ fun main(args: Array<String>) {
         val capture=remember{com.visualworkbench.desktop.capture.DesktopCaptureController(scope,core,captureService,location.path,device,
             controller::captureDestination,controller::report)}
         var captureSettings by remember{mutableStateOf(false)}
+        var remoteView by remember{mutableStateOf<WorkbenchRemoteEdit?>(null)}
+        fun openRemoteView(){
+            try{val remote=controller.remoteCapability()
+                configureRemoteEditRuntime(remote,nativeRuntime.directory.resolve("vw-hevc-helper.exe").toString(),nativeRuntime.packagedHash("vw-hevc-helper.exe"),nativeRuntime.directory.resolve("vw-input-helper.exe").toString(),nativeRuntime.packagedHash("vw-input-helper.exe"),remoteCatalog?.path?.toString(),remoteCatalog?.sha256)
+                remoteView=remote
+            }catch(_:Exception){controller.report("Remote editing requires an authenticated USB tether link and the packaged helpers.")}
+        }
         var captureFocusLease by remember { mutableStateOf<AutoCloseable?>(null) }
         fun captureDialog(value: Boolean) {
             if (value && !captureSettings) captureFocusLease = controller.instructionPicker()
@@ -102,6 +111,9 @@ fun main(args: Array<String>) {
                 scope.launch { withContext(NonCancellable) {
                     var clean = false
                     try {
+                        remoteView?.let{it.seal("owner_pause");it.close()}
+                        // Retire link-owned helpers before foreign parent teardown.
+                        controller.close();assertRemoteEditRetired()
                         try { codex.close() } finally { codexModal.close()
                         try { mcpTasks.close() } finally { try { mcp.close() } finally {
                         mcpModal.close()
@@ -120,7 +132,8 @@ fun main(args: Array<String>) {
                         if (startupSmoke) println(if (clean)
                             "VW_DESKTOP_EXIT startup_smoke=true cleanup=complete"
                             else "VW_DESKTOP_EXIT startup_smoke=true cleanup=failed")
-                        exitApplication()
+                        if(clean){nativeRuntime.close();exitApplication()}
+                        else{quitting=false;controller.report("Shutdown is pending. Owners remain held; retry Quit after retirement.")}
                     }
                 } }
             }
@@ -140,7 +153,7 @@ fun main(args: Array<String>) {
         mcpState.owner?.let{McpCaptureIndicator(it)}
         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
-            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||dialog!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
+            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
             fun file(command:Command){controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,command.label,FileDialog.LOAD)
                 try{chooser.directory=(if(command==Command.Import)documents else location.path).toString();if(command==Command.Open)chooser.file="project.sqlite";chooser.isVisible=true
                     val filename=chooser.file?:return;val chosen=Path.of(chooser.directory,filename)
@@ -218,7 +231,7 @@ fun main(args: Array<String>) {
                 Menu("Edit"){for(c in listOf(Command.Undo,Command.Redo,Command.Delete,Command.SelectAll,Command.ClearSelection,Command.Color,Command.WidthUp,Command.WidthDown,Command.NudgeLeft,Command.NudgeRight,Command.NudgeUp,Command.NudgeDown))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
                 Menu("Tools"){for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout,Command.CycleMarker,Command.Instructions))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
                 Menu("View"){for(c in listOf(Command.Fit,Command.ActualPixels,Command.ZoomIn,Command.ZoomOut,Command.Windowed,Command.Maximized,Command.Fullscreen,Command.FollowPeer,Command.MatchPeer,Command.PeerOutline))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
-                Menu("Workbench"){Item("Send package to Codex",onClick={controller.cancelInput();codexModal.settings();mcpModal.dismiss()});Item("Local agents and Compare",onClick={controller.cancelInput();mcpModal.settings();codexModal.dismiss()});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Foreground capture…",enabled=captureProtected,onClick={captureDialog(true)})}
+                Menu("Workbench"){Item("Remote Krita / Paint…",enabled=editor.sync?.carrier==SessionCarrier.QuicTether,onClick={openRemoteView()});Item("Send package to Codex",onClick={controller.cancelInput();codexModal.settings();mcpModal.dismiss()});Item("Local agents and Compare",onClick={controller.cancelInput();mcpModal.settings();codexModal.dismiss()});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Foreground capture…",enabled=captureProtected,onClick={captureDialog(true)})}
             }
             MaterialTheme(colors=darkColors(primary=accent,secondary=Color(0xffe8bb75),background=Color(0xff101720),surface=Color(0xff18222e))){
                 Box(Modifier.fillMaxSize().drawWithContent {
@@ -243,6 +256,7 @@ fun main(args: Array<String>) {
                 }
                 mcpCompare?.let{receipt->mcpState.owner?.let{owner->McpComparePanel(owner,receipt,{mcpModal.dismiss()},::saveMcp)}}
                 AiEditorOverlay(controller)
+                remoteView?.let{remote->com.visualworkbench.desktop.remote.RemoteEditPanel(remote){remoteView=null}}
                 if(captureSettings)com.visualworkbench.desktop.capture.CaptureSettings(capture){captureDialog(false)}
                 if(editor.exportOpen&&editor.document!=null)ExportDialog(controller,editor,::save)
                 if(editor.pasteOpen)PasteDialog(controller,editor)

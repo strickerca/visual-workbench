@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "operation": "owned-empty-frame-attempt-disposal",
+  "source_receipt_sha256": "453c9bd6b7e11c98dc2006c82b1f12457da25e703c91b1b508d23b66cdac2821",
+  "marker_sha256": "2c8fe9d6ed2f789982723c9aea61f07ca40d37b2954da7331290b2bcf015ddf2",
+  "marker_owner_matched": true,
+  "resolved_direct_temp_child": true,
+  "all_ancestors_plain": true,
+  "outer_native_editor_and_io_retired": true,
+  "image_count": 0,
+  "images_inspected": 0,
+  "image_files_disposed": 0,
+  "empty_owned_sample_removed": true,
+  "empty_owned_temp_removed": true,
+  "verification_images_created": 0,
+  "images_available_for_review": false,
+  "recursive_delete_performed": false,
+  "unrelated_files_deleted": false,
+  "private_disposal_receipt_sha256": "58cdbf199d1037b74c3b0c4cc77e6482b38670a0a8083527467784278c1628ca",
+  "historical_source_checkpoint": true
+}

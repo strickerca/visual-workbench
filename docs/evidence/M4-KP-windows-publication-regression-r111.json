@@ -1,0 +1,80 @@
+{
+  "build_execution": false,
+  "artifact_mutation": false,
+  "operation": "scratch-windows-publication-regression",
+  "device_actions": false,
+  "runtime": ".NET 10.0.11",
+  "schema": 1,
+  "cases": [
+    {
+      "old_handle": "original",
+      "method": "Move",
+      "hresult": -2147024891,
+      "succeeded": false,
+      "destination": "original",
+      "sharing": "Read",
+      "backup_exists": false,
+      "stage_exists": true,
+      "exception_type": "System.UnauthorizedAccessException"
+    },
+    {
+      "old_handle": "original",
+      "method": "Move",
+      "hresult": -2147024891,
+      "succeeded": false,
+      "destination": "original",
+      "sharing": "ReadDelete",
+      "backup_exists": false,
+      "stage_exists": true,
+      "exception_type": "System.UnauthorizedAccessException"
+    },
+    {
+      "old_handle": null,
+      "method": "Move",
+      "hresult": null,
+      "succeeded": true,
+      "destination": "replacement",
+      "sharing": "None",
+      "backup_exists": false,
+      "stage_exists": false,
+      "exception_type": null
+    },
+    {
+      "old_handle": "original",
+      "method": "Replace",
+      "hresult": -2147024864,
+      "succeeded": false,
+      "destination": "original",
+      "sharing": "Read",
+      "backup_exists": false,
+      "stage_exists": true,
+      "exception_type": "System.IO.IOException"
+    },
+    {
+      "old_handle": "original",
+      "method": "Replace",
+      "hresult": null,
+      "succeeded": true,
+      "destination": "replacement",
+      "sharing": "ReadDelete",
+      "backup_exists": true,
+      "stage_exists": false,
+      "exception_type": null
+    },
+    {
+      "old_handle": null,
+      "method": "Replace",
+      "hresult": null,
+      "succeeded": true,
+      "destination": "replacement",
+      "sharing": "None",
+      "backup_exists": true,
+      "stage_exists": false,
+      "exception_type": null
+    }
+  ],
+  "status": "passed-six-expected-outcomes",
+  "source_receipt_sha256": "2f4870f540bd133b23b3324134216c499a38c3a7181134acb57e5ddaf219f37a",
+  "test_script_sha256": "5c1420ec31e9365a4e9ff03ebecb115a88505ad40d36eff4ece4fc335c834c50",
+  "retained_failure_receipt_sha256": "66cd8b1fa021440a4e041e10be56d1fae36e0dddf4a62a3fb0f2ec8320541af2"
+}

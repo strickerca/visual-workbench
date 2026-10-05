@@ -422,6 +422,8 @@ fn input_requires_fresh_grant_geometry_sequence_and_activity() {
         capture_session_id: Some(id(2).to_proto()),
         geometry_revision: 3,
         input_seq: 1,
+        remote_scope: None,
+        request_nonce: 0,
         event: Some(pb::input_event::Event::Mouse(pb::MouseEvent::default())),
     };
     assert!(!guard.accept(&event, 0).unwrap());

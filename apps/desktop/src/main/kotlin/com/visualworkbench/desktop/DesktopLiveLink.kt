@@ -8,7 +8,8 @@ internal class LiveAttachment(val epoch: Long, val link: ProjectLink) {
     var status = link.status(); private set
     var previewEpoch = 0L; private set
     var lastFrame: PeerFrame? = null
-    val acceptsPreviews: Boolean get() = status.status in setOf(SyncStatus.Syncing, SyncStatus.Synced)
+    var retiring=false
+    val acceptsPreviews: Boolean get() = !retiring && status.status in setOf(SyncStatus.Syncing, SyncStatus.Synced)
 
     fun observe(value: SessionStatus) {
         if (value.status != status.status || value.carrier != status.carrier) {
@@ -35,7 +36,7 @@ internal class DesktopLiveLink(
     private var statusJob: Job? = null
     private var previewJob: Job? = null
     private val finishes = linkedSetOf<Job>()
-    fun attachment(): LiveAttachment? = current
+    fun attachment(): LiveAttachment? = current?.takeUnless{it.retiring}
 
     suspend fun install(link: ProjectLink, checkTether: suspend () -> Unit) {
         close()
@@ -126,7 +127,7 @@ internal class DesktopLiveLink(
 
     suspend fun close() = withContext(NonCancellable) {
         val prior = current
-        current = null
+        prior?.retiring=true
         try { beforeClose() } finally {
         previews(null)
         status(null)
@@ -135,6 +136,8 @@ internal class DesktopLiveLink(
         finishes.toList().forEach { it.cancelAndJoin() }
         finishes.clear()
         prior?.link?.close()
+        // Actual close failure preserves the owner; new admission stays sealed.
+        if(current===prior)current=null
         }
     }
 }

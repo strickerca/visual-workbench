@@ -32,6 +32,7 @@ docs/evidence/T1.09-*.json -text -whitespace
 docs/evidence/T1.10-*.json -text -whitespace
 docs/evidence/T1.12-*.json -text -whitespace
 docs/evidence/T2.*.json -text -whitespace
+docs/evidence/M4-KP*.json -text -whitespace
 # These metadata bytes are bound by the recorded S23 source inventory.
 apps/gradle/wrapper/gradle-wrapper.properties -text -whitespace
 tools/ffi-test/android-inventory.json -text -whitespace

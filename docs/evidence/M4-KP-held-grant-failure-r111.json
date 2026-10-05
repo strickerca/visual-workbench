@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "status": "failed",
+  "operation": "s23-pause-held-grant-boundary",
+  "source_map_sha256": "aeb4104d61a887827334674ffce810bd761dc36cb86d1f36a2faf9395992d132",
+  "native_receipt_sha256": "bff1fd6737fd5da687a5bb81b31c59a6fbe0a10384f61171f15902aa23d6673b",
+  "wrapper_receipt_sha256": "3e17dcd99f62326df14be6d1829280280c2f30223b0218332ca60f92aff2e852",
+  "initial_render_observed_count": 1,
+  "carrier_status": "SYNCED",
+  "host_failure": "session_other",
+  "grant_attempted": true,
+  "grant_confirmed": null,
+  "input_attempted": null,
+  "failure_boundary": "grant or held-only witness arm; existing diagnostic cannot distinguish",
+  "input_retirement_confirmed": true,
+  "phone_actual_retirement": true,
+  "host_actual_retirement": true,
+  "process_cleanup": true,
+  "owned_packages_cleanup": true,
+  "private_work_disposed": true,
+  "milestone_passed": false,
+  "images_created": 0
+}

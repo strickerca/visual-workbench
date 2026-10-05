@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "test_namespace": "Lcom/visualworkbench/android/",
+  "selection": "com.visualworkbench.android.remote.RemoteNormalPathInstrumentedTest",
+  "methods": ["realUsbOwnedWgcHevcControllerRendersBackgroundAndReconnects"],
+  "runner": "Landroidx/test/ext/junit/runners/AndroidJUnit4;"
+}

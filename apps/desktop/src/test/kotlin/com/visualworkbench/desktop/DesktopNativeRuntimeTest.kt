@@ -17,7 +17,7 @@ class DesktopNativeRuntimeTest {
     @Test fun exactRuntimeIsPreparedBeforeAnyLoadAndClosePreservesLoadedFilePaths() {
         val files = runtimeResources(); val guard = MemoryFileGuard()
         val runtime = DesktopNativeRuntime.prepareAt(root(), files, guard)
-        assertEquals(root().nameCount + 8, guard.live) // ancestors including volume root, cache, and six exact files
+        assertEquals(root().nameCount + 10, guard.live) // ancestors including volume root, cache, and eight exact files
         for (name in runtimeNames) assertArrayEquals(files.bytes.getValue("win32-x86-64/$name"), Files.readAllBytes(runtime.directory.resolve(name)))
         assertTrue(Files.isRegularFile(runtime.directory.resolve("owner")))
         assertTrue(Files.isRegularFile(runtime.directory.resolve("ready")))
@@ -73,10 +73,18 @@ class DesktopNativeRuntimeTest {
         assertFailure { DesktopNativeRuntime.prepareAt(child, runtimeResources(), guard) }
         assertEquals(0, guard.live); assertFalse(Files.exists(ancestor.resolve("not-created")))
     }
+    @Test fun pendingRemoteRetirementKeepsEveryRuntimeLeaseUntilActualRetry() {
+        val guard=MemoryFileGuard();val runtime=DesktopNativeRuntime.prepareAt(root(),runtimeResources(),guard)
+        var pending=true;runtime.armRetirementFence{if(pending)throw NativeRuntimeFailure("retirement pending")}
+        val owned=guard.live
+        try{assertFailure{runtime.close()};assertEquals(owned,guard.live);assertTrue(owned>0)
+            pending=false;runtime.close();assertEquals(0,guard.live)
+        }finally{pending=false;runtime.close()}
+    }
     private fun root(): Path = temporary.root.toPath().toAbsolutePath().normalize().resolve("runtime")
     private fun assertFailure(block: () -> Unit) { try { block(); fail("unverified runtime accepted") } catch (_: NativeRuntimeFailure) { } }
 }
-private val runtimeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
+private val runtimeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-hevc-helper.exe", "vw-input-helper.exe")
 private class MapNativeResources(val bytes: MutableMap<String, ByteArray>) : NativeResources {
     override fun open(name: String) = bytes[name]?.let(::ByteArrayInputStream)
 }

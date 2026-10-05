@@ -1,6 +1,64 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use super::*;
 static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+// This entire parent file is a #[cfg(test)] child. The Windows-only helper
+// changes only the newly created, owned fixture file, never a volume/device.
+#[cfg(windows)]
+mod sparse_fixture {
+    use std::{
+        ffi::c_void,
+        fs::File,
+        io,
+        os::windows::{fs::MetadataExt, io::AsRawHandle},
+    };
+
+    // Pinned windows-sys 0.61.2 System::Ioctl::FSCTL_SET_SPARSE = 590020.
+    const FSCTL_SET_SPARSE: u32 = 0x0009_00c4;
+    const FILE_ATTRIBUTE_SPARSE_FILE: u32 = 0x200;
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        // SAFETY: matches kernel32 DeviceIoControl's HANDLE/DWORD/LPVOID/
+        // DWORD/LPVOID/DWORD/LPDWORD/LPOVERLAPPED -> BOOL ABI.
+        fn DeviceIoControl(
+            file: *mut c_void,
+            control: u32,
+            input: *mut c_void,
+            input_bytes: u32,
+            output: *mut c_void,
+            output_bytes: u32,
+            returned: *mut u32,
+            overlapped: *mut c_void,
+        ) -> i32;
+    }
+    pub(super) fn mark(file: &File) -> io::Result<()> {
+        let mut returned = 0;
+        // SAFETY: the borrowed fixture File keeps its valid synchronous handle
+        // alive throughout the call; no ownership is transferred. A NULL input
+        // with zero bytes sets sparse=true. No output or overlapped IO is used;
+        // returned is a valid live DWORD pointer required for synchronous IO.
+        let ok = unsafe {
+            DeviceIoControl(
+                file.as_raw_handle(),
+                FSCTL_SET_SPARSE,
+                std::ptr::null_mut(),
+                0,
+                std::ptr::null_mut(),
+                0,
+                &mut returned,
+                std::ptr::null_mut(),
+            )
+        };
+        if ok == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        if file.metadata()?.file_attributes() & FILE_ATTRIBUTE_SPARSE_FILE == 0 {
+            return Err(io::Error::other("owned fixture did not become sparse"));
+        }
+        Ok(())
+    }
+}
+
 fn id(n: u8) -> String {
     vw_model::Id::from_parts(1_790_985_600_000, [n; 10])
         .unwrap()
@@ -371,7 +429,10 @@ fn retained_orphan_bytes_count_against_quota_without_allocating_them() {
     let root = dir.path().join("mcp-inbox-v1");
     std::fs::create_dir(root.join("incoming-synthetic")).unwrap();
     let f = std::fs::File::create(root.join("incoming-synthetic/partial")).unwrap();
+    #[cfg(windows)]
+    sparse_fixture::mark(&f).unwrap();
     f.set_len(DISK_LIMIT + 1).unwrap();
+    assert_eq!(f.metadata().unwrap().len(), DISK_LIMIT + 1);
     drop(f);
     let before = png([1, 2, 3, 255], false);
     assert!(matches!(

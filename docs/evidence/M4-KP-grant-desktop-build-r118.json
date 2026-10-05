@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "kind": "affected desktop grant diagnostics build",
+  "source_map_sha256": "df237c99bbf74bede90973f25826078492d7baede28980cab9ee9124a0f230c8",
+  "source_count": 222,
+  "status": "passed",
+  "proof_sha256": "66024486628dfbe8a9b388ba20f97d1b121c7b84b0979ce5115c623032a21ae6",
+  "desktop_check_sha256": "db6a69ebf00ce46737e5923f15df89811e0dd1b7397cf138f7fa012733c43424",
+  "elapsed_seconds": 49.336,
+  "jvm_five": {
+    "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.RemoteIntegrationPublicationTest.xml",
+    "sha256": "5c3ecec97648223ba37135af632ecd09852df75916f129df4db1818f6d0eb234",
+    "tests": [
+      "grantDiagnosticsWithholdUnknownTextAndKeepWitnessDistinct",
+      "grantErrorsKeepTypedInvalidAndAuthentication",
+      "grantSnapshotAndOutputFailuresCannotReplaceOriginatingError",
+      "rejectedNativeGrantRemainsUnknownAndPreservesDisplayReason",
+      "witnessFailureCannotErasePreviouslyConfirmedGrant"
+    ]
+  },
+  "native_android_compiled": false,
+  "historical_feature_proof": {
+    "name": "m4-held-build-r103-acb132c0b57143b882e642d6f157a3d0-feature-proof.json",
+    "sha256": "a4b945275572ed3ee69352c42a2b542bfb9a7f4f57e1dde92d0194f2db32b81d"
+  },
+  "full_product_rebuilt": false,
+  "device_acceptance": false
+}

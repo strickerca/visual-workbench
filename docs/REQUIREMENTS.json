@@ -1329,8 +1329,10 @@
       "scenarios": [
         "A08"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -1516,8 +1518,10 @@
       "scenarios": [
         "A08"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -1566,8 +1570,10 @@
       "scenarios": [
         "A08"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -1619,8 +1625,10 @@
       "scenarios": [
         "A14"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -1644,8 +1652,10 @@
       "scenarios": [
         "A09"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "updated: full per-editor shortcut palettes are EDITOR-005 (P2)",
@@ -2021,8 +2031,10 @@
       "scenarios": [
         "A08"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "re-scoped: remote surface only"
@@ -2046,8 +2058,10 @@
         "A08",
         "A20"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -2169,8 +2183,10 @@
       "scenarios": [
         "A15"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -4216,8 +4232,10 @@
       "scenarios": [
         "A27"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new: ghost ink"
@@ -4242,8 +4260,10 @@
       "scenarios": [
         "A27"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new: ghost ink"
@@ -4439,9 +4459,10 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/T0.07.md"
+        "docs/evidence/T0.07.md",
+        "docs/evidence/M4-KP.md"
       ],
-      "impl_status": "not_started",
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new (D9)"
@@ -4525,8 +4546,10 @@
       "scenarios": [
         "A08"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "explicit",
       "v1_note": "new",
@@ -4653,8 +4676,10 @@
       "scenarios": [
         "A09"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new",
@@ -4828,8 +4853,10 @@
       "scenarios": [
         "A08"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/M4-KP.md"
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new"
@@ -5132,9 +5159,10 @@
         "A27"
       ],
       "evidence": [
-        "docs/evidence/T0.07.md"
+        "docs/evidence/T0.07.md",
+        "docs/evidence/M4-KP.md"
       ],
-      "impl_status": "not_started",
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new"

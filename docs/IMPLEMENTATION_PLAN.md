@@ -579,6 +579,284 @@ new M4-KP prerequisite. Preserve existing earlier-phase work and open gates.
 
 ### Milestone acceptance and delivery (M4-KP)
 
+**Owner device/progress update, 2026-10-03:** continue the build while the owner
+has the S23 away. Use explicitly selected IN2019 for applicable Android checks
+and defer S23-specific physical/performance acceptance until its return. Report
+the remaining build-task count after each completion: T4.01, T4.03, T4.04, the
+active Krita/Paint subset of T4.07, essential T4.08 and personal-use packaging
+are six build tasks. Required capture/DPI/transport dependencies are included in
+their implementation; unrelated deferred tasks are excluded. Source freezes or
+partial foundations do not decrement this count. Build-task completion requires
+integrated source and appropriate software validation; it does not pass pending
+device, editor, practical drawing or product-gate acceptance.
+
+**Owner device update, 2026-10-04:** the S23 Ultra is connected again; run needed
+project tests on explicitly selected SM-S918U. Separately selected IN2019 tests
+remain authorized. The six-task counting rule and pending physical/performance
+acceptance above remain unchanged; renewed device availability is not acceptance.
+
+**Integration software checkpoint, 2026-10-04:** the shared-parser correction
+passes 254 native tests with strict lint/format; the separate real-render receipt
+parser passes seven cases. The latest startup/observation helper check passes
+62 cases, strict lint/format and all five fresh license gates, preserving its
+115-path source snapshot and confirming actual nested/outer Job and stream
+retirement. The guard harness now requires a new balanced click/release in the
+owned target, so automatic focus cannot start it. The previous 68/100 live attempt
+remains failed. The measured S23 route response requires a narrow text-format
+parser correction before the real USB run. See `docs/evidence/M4-KP.md` and the
+immutable progress receipts. Full app integration/build validation is next (L)
+with Sol/xhigh feature work; six build tasks remain and physical/editor/performance
+acceptance is pending.
+
+The subsequent S23 route parser passes 23 pure cases. The first full integration
+build failed at desktop compilation because the test host's generated core APIs
+were absent from its direct compile dependencies. Native Windows/Android and
+shared-binding stages passed; final app/APK artifacts did not. All 11 nested
+phases and the outer Job retired with streams complete and 115 source paths
+preserved. Retain `docs/evidence/M4-KP-integration-build-r17-failure.json` and
+admit a separate dependency/warning repair before the next build. No build task
+or product gate is completed by these successful subphases.
+
+The separate dependency/warning correction subsequently passed the full
+integration build, including desktop compilation, both isolated Android test
+APKs and native-packaging verification. All 12 nested phases and the outer Job
+retired with completed streams and all 115 source paths preserved. Exact artifact
+bindings are retained in `docs/evidence/M4-KP-integration-build-r18.json`.
+Fresh native helper/app checks and live Windows/S23 validation follow. This build
+did not install or launch an app and does not complete a build task or product
+gate; six build tasks remain.
+
+The fresh native helper run passed 62 cases, strict lint/format and five license
+gates. The normal app check then completed 391 cases with five failures in shared
+cancellation identity and desktop runtime-anchor fixtures. Android's six unit
+cases passed; the complete run remains failed, with actual process/stream cleanup
+and 115 source paths preserved. Separate query-only owned blank Paint/Krita
+observations passed and retired without input or images. Paint's installed
+package identity and selected-root tree were verified; Krita's unnamed numeric
+candidates do not establish size authority. Retain the app failure and editor
+observation receipts; repair the actual app-check failures and measure editor
+effects before enabling reviewed control profiles. The 15 active milestone
+requirement records are now in_progress; their verification statuses, acceptance
+clauses, prior evidence and all deferred records remain unchanged. Six build
+tasks remain.
+
+The separately reviewed R19 app repair passes all 392 shared/desktop/Android
+unit cases, including the new cancellation-during-retirement regression; all
+Jobs/streams retired with the 120-path source snapshot preserved. The original
+five failures remain retained in their immutable receipt and private XML reports.
+New source-retention/frame harness fixtures then passed all 73 native cases after
+a test-only UUIDv7 correction, but the strict run remains failed on two lint
+diagnostics; formatting was not reached. Both attempts are retained; equivalent
+lint and OS temporary-directory shape corrections have been admitted. A separate
+FFI attempt stopped on actual StorageFull while allocating its large orphan
+fixture, then a secondary poisoned mutex. The reviewed test-only sparse-file
+repair preserves the logical quota input and all refusal assertions; all 254
+FFI cases, strict lint and formatting now pass with actual Job/stream retirement
+and 121 source paths preserved. Only obsolete owned test debug-symbol cache was
+disposed of, preserving executables, fingerprints, current symbols, source,
+evidence and production payloads. The fresh helper check passes 75 cases,
+strict lint/format and five license gates; the current full integration build
+passes all 12 nested phases with the same 121 source paths preserved and actual
+Job/stream retirement. Original failures and disposal receipts remain retained.
+Source-only capture sampling and editor observations grant no palette authority.
+The selected S23's real USB run reached its controller but failed at the 30-second
+render callback deadline with zero render records; USB routing passed. Actual OS
+process/stream cleanup, isolated-package removal and private-work disposal passed.
+Internal runtime retirement and final profile preservation remain unobserved.
+Add retained stage diagnostics before retrying. See the R20 build/helper and USB
+failure receipts in docs/evidence. Six build tasks remain.
+
+The R23 checkpoint passes 80 native helper cases, strict lint/format, fresh
+license gates and the complete twelve-stage integration build with all 123
+bound source paths preserved. The real selected-S23 USB run then reached a
+configured host stream and a Ready hardware decoder but failed at the unchanged
+render-callback deadline with zero rendered frames. OS Jobs/streams retired,
+isolated packages were removed and private work was disposed of. The retained
+diagnostics distinguish decoder readiness from actual render delivery. The
+reviewed R24 repair retains the exact first keyframe through asynchronous decoder
+startup within the original three-second deadline; affected validation is next.
+See the R23 helper/build and USB-failure receipts in docs/evidence.
+
+The corrected input-free Paint query measured size, zoom and canvas state but
+could not identify the brush/style, so it grants no control-profile authority.
+An unattended, exact-owned blank Krita run passed bind, foreground rebind and
+tool/settings observation, then received the typed capture refusal ColorDepth.
+No image or input was produced. Its empty owned TEMP marker/sample was disposed
+of after actual native/editor/outer retirement. The original refusal is retained;
+diagnose its color stage without relaxing capture predicates. Reviewed explicit
+unattended guard readiness is now admitted: an actual guarded software click,
+new balanced receiver pair, released buttons and exact foreground remain
+mandatory before the unchanged 100 trials. Physical human/S Pen provenance stays
+separate. Six build tasks remain; these diagnostics and source repairs complete
+no build task or product gate. Continue without requesting owner input.
+
+The R24 affected run subsequently passes all 400 JVM cases (including eight
+new decoder-startup cases), 80 strict native cases and all twelve integration
+build stages with 125 source paths preserved and actual Job/stream retirement.
+The unattended Windows guard passes 103 cases and all 100 target-change trials:
+each trial preserves all six sink categories and retires its old input owner,
+with 200 distinct old/fresh session identities. Readiness comes from an actual
+guarded software click and a newly observed balanced receiver pair. This closes
+that scoped software guard check, not physical mouse/S Pen or editor fidelity.
+The matching S23 USB run still records no native-validated render; it now reaches
+RecoveryRequired(RenderedIdentity), rather than remaining Ready as in R23.
+Retain this failure and diagnose the actual callback predicate before another
+phone run. All owned test packages, OS processes/streams and private work retired.
+See the R24 app/helper/build, unattended-guard and USB-failure receipts. Six
+build tasks remain. The empty R7 capture TEMP cleanup is separately retained in
+docs/evidence/M4-KP-empty-frame-disposal-r7.json.
+
+The R28 diagnostic checkpoint passes 101 native helper/capture cases, 254 FFI
+cases, 409 JVM cases across 55 retained XML reports, 31 diagnostic grammar
+cases and all twelve integration build stages. Strict lint/format and fresh
+license checks pass. The complete 131-path source map is preserved through
+those runs, with actual build Jobs and output streams retired. The subsequent
+selected-S23 tether run measures exactly one failing render predicate: codec
+render time precedes the actual phone-local release request (mask 16). Media PTS
+matches and callback enqueue delay is 20.766302 ms; the other clock differences
+are clamped diagnostics, not exact measured offsets. Zero native-validated
+renders are recorded. OS processes/streams, isolated user-0 packages and private
+work are cleaned up; internal decoder/host retirement and the final profile
+inventory comparison are not proved by this failed run. Do not retry unchanged
+source or substitute phone readiness for actual render delivery.
+
+The matching owned blank Krita frame run identifies ColorDepth's nonopaque-pixel
+stage with alpha 228. Its monitor color-space and texture descriptor checks
+pass, but pixel location, count and cause remain unknown. The original opaque
+pixel predicate remains intact; no image or input is produced. Actual editor,
+native and outer Jobs/streams retire, and the exact empty owned TEMP/sample is
+disposed of nonrecursively. The R28 helper/FFI/app/grammar/build, USB failure,
+blank-frame failure and disposal receipts are retained in docs/evidence.
+
+Reviewed R30 local Surface timestamp scheduling and the Paint query R2 reader
+are now admitted with 132 source bindings. Their affected native check passes
+103 cases, strict lint/format and fresh licenses. Fresh JVM checks pass 414
+cases across 56 retained XML reports, including all five local scheduling cases.
+These sources are not yet a hardware or editor-effect pass. Continue the
+retained finite-input owner, production controls/catalog and bounded private
+alpha-location diagnostic under Sol/xhigh feature execution, with the root
+remaining Sol/max for administrative admission/review/validation. Six build
+tasks remain; physical pen, performance and owner acceptance remain separate.
+
+The retained finite-input owner and its terminal correction are composed with
+136 source bindings before any runtime execution. Independent review found and
+corrected the original Pending-to-immediate-Complete child-exit gap; a reported
+Pending must now remain alive through exact Stop/Stopped. The affected native
+run passes all 138 cases but fails strict clippy on one nested conditional.
+Its failure and actual Job/stream retirement are retained in
+docs/evidence/M4-KP-finite-check-r31-lint-failure.json. The narrow ordered
+let-chain correction is admitted for a fresh check, without a lint waiver or
+new style-only tests. Input-capable editor effects remain blocked until their
+separate terminal-rendezvous consumer and actual outer retention are integrated.
+This foundation completes no build task; six remain.
+
+The R33 affected rerun passes all 138 native cases, strict clippy, formatting and
+fresh license checks. The matching FFI run passes all 254 cases and strict checks.
+Both preserve all 136 source bindings and retire the actual nested/outer Jobs and
+output streams; their receipts are M4-KP-finite-helper-check-r33.json and
+M4-KP-finite-ffi-check-r33.json in docs/evidence. A fresh helper build also passes
+its six stages. The next checks use these exact binaries for unattended guard
+trials, followed by corrected capture diagnostics and the integrated S23 path.
+The corrected R32/R35 alpha diagnostic is subsequently admitted with 137 source
+bindings. All 156 affected native cases, strict lint, formatting and fresh
+license checks pass; no opaque-pixel predicate is relaxed. The full integration
+build then fails MSVC LNK1140 while linking vw_core.dll. Its five license stages,
+exact source map, failed log hash and actual Job/stream retirement are retained
+in docs/evidence/M4-KP-integration-build-r35-link-failure.json. The subsequent
+narrow Windows/MSVC cdylib-only PDB correction passes the full integration rebuild
+with 143 source bindings, 183 affected native cases and all 12 build stages.
+Its Windows binaries and isolated Android APKs are bound in
+docs/evidence/M4-KP-integration-build-r37.json. The later FFI run fails the separate
+Windows lib-test PDB limit and a parallel archive write fails OS112. That failed
+run changes core/host DLL bytes, so another successful build is required before
+phone testing. Its failure and actual retirement are retained in
+docs/evidence/M4-KP-ffi-r37-link-and-space-failure.json. Only resolved project
+symbol files were disposed of, preserving sources, evidence, payloads,
+executables and fingerprints; the text disposal receipt records counts and hashes.
+
+The matching R33 unattended guard run passes 103 cases, all 100 target-change
+trials, actual balanced software readiness and receiver input, and zero sink
+events, with all owned processes/streams retired. The read-only Paint controls
+query completes and retires but remains semantically incomplete: primary brush
+and slider thumb witnesses are Unknown. Its 275438 us whole-harness measurement
+does not establish the production 180 ms budget. Both results are retained in
+docs/evidence/M4-KP-guard-unattended-r33.json and
+docs/evidence/M4-KP-paint-controls-query-r33.json. The S23 tether route is freshly
+confirmed Up without settings changes or OnePlus access. Six build tasks remain;
+editor effects, integrated streaming and physical/performance/owner acceptance
+remain pending.
+
+The R37 input-free Krita capture diagnoses 84 nonopaque pixels, all outside the
+freshly verified opaque canvas. The original full-client color-depth refusal is
+preserved; no cause, canvas-only capture pass or editor effect is inferred.
+All editor/native/outer Jobs and streams retire, no images are created, and the
+exact empty owned temporary fixture is disposed of. Paint's corrected primitive
+query now observes the brush primary button, size/zoom thumbs, settings digest
+and frame witness. Undo/Redo are Known disabled on the blank fixture. Its
+246444 us isolated query still does not pass the production 180 ms budget.
+Source review identifies three runtime repairs: UI command refusal and
+post-request lifecycle fencing, synchronous remote-owner publication versus
+close, and delayed MEDIA frames from recognized retired video scopes. These are
+being reviewed and combined before the next affected checks. The retained editor
+effect owner also requires exact owned-request binding before any input run.
+Six build tasks remain; feature executors remain Sol/xhigh, root Sol/max performs
+administration/review/validation, and independent review uses Astra/xhigh.
+
+The retained private owner compiles and passes all 69 contract cases with exact
+owned-request and wrapped-invocation binding. Its first actual no-input lifecycle
+runs stop before native binding because the ordinary ancestor lease cannot open
+Paint's protected installation directory. Both setup failures preserve the actual
+root/editor/process/Job/stream retirement evidence and send no input; they do not
+validate the finite owner's actual OS lifecycle. The explicit InstalledPaint
+launch path is being corrected without changing Windows permissions or native
+package/source authority.
+
+The earlier R37 claim that `/PDB:NONE` omits a PDB is corrected by the observed
+MSF7 file named `NONE` and Microsoft's linker documentation. That flag names the
+output; `/DEBUG:NONE` is the documented omission option. The original successful
+12-stage build and all failure receipts remain intact. The narrow ordered source
+repair and fresh build are required before delivery; the text-only correction is
+docs/evidence/M4-KP-pdb-flag-correction-r37.json. Six build tasks remain.
+
+The explicit InstalledPaint launch path now passes three actual no-input lifecycle
+cases: a foreign owned-request PID is refused before start, a wrong-image native
+request completes safely with its exact editor retained, and the valid observation
+completes. All effect/root/editor Jobs and output readers retire; the original
+R6/R7 setup failures remain preserved. This is actual input-free ownership evidence,
+not accepted-input release or editor/history restoration.
+
+The ordered runtime/linker repairs are admitted with 151 source bindings. Fresh
+strict helper checks pass 183 native cases, FFI checks pass 265 cases (including
+all eleven retired-MEDIA/source-epoch regressions), the pure artifact parser passes
+26 cases, and JVM checks pass 433 cases across 59 retained XML reports. The selected
+lib-unit executable is the exact Cargo-reported test artifact with the same SHA256
+before actual execution. The private actual linker trace confirms explicit
+/OPT:REF,NOICF, /DEBUG and final /DEBUG:NONE; there is no CodeView record, matching
+PDB or new NONE file. Type13 POGO metadata remains, so an empty PE debug directory
+is not claimed. A failed administrative projection that assumed otherwise is
+retained separately; product tests did not fail. Exact named-PDB and superseded
+project test-executable disposal receipts retain hashes and preserved payloads.
+
+The next source cohort adds a distinct verified-editor-canvas fixture and the
+common finite Krita adapter. Independent review found a late final target query
+that could cross the same 3s capture budget and a disabled Undo/Redo post-action
+query that could prevent restoration. Both receive ordered source corrections
+before runtime. Full-client opacity, native source/grant and actual input-release
+predicates remain enforced. Six integrated build tasks remain; final artifact
+rebuild, S23 software integration, causal editor/profile checks and personal-use
+packaging are pending. Physical pen, performance and owner acceptance remain
+separate. Feature coding is Sol/xhigh; root Sol/max remains administration,
+review and validation, with independent Astra/xhigh source review.
+
+The current160 source cohort passes 222 native helper cases, strict formatting
+and warnings-denied lint, all five fresh license checks, 31 pure render diagnostic
+cases and all 12 integration-build stages. The first Krita digest import and
+catalog Gradle namespace failures remain retained; narrow ordered corrections
+resolve them. The exact build artifacts are bound to this cohort. No editor input
+or phone execution is claimed from these checks. Live causal editor restoration,
+matching final app/FFI checks, S23 integration and personal-use packaging remain
+pending. Six integrated build tasks remain, with physical acceptance separate.
+
 1. Installable Android APK and Windows app image, artifact hashes, third-party
    notices and a short setup guide. Open Krita or Paint, connect the S23, select
    the target window, explicitly grant control, draw, erase, navigate, undo/redo
@@ -666,3 +944,19 @@ in earlier tasks when they exist solely to support deferred Phase 4 features.
 | 13 | Smart App Control blocks locally built programs | High if on | High | T0.01 checks first; Christian turns it off for development (reversible since April 2026); sign every binary before any distribution | Smart App Control is on or in evaluation |
 | 14 | Windows Firewall silently blocks QUIC on tether or Wi-Fi links (often classified Public) | Medium | Medium | Temporary rules in development, an installer rule limited to the local subnet, and a firewall check before declaring a carrier failed | A carrier times out while adb works |
 | 15 | Parallel tasks in one folder or unmerged dependencies corrupt shared files (REQUIREMENTS.json, DECISIONS.md) | Medium | Medium | Start from `main` with dependencies merged; one task per folder; worktrees for parallel tasks | A merge conflict in a shared doc |
+
+Unattended continuation: the ordered R45/R46 canvas implementation passed 198 native cases plus strict checks against 153 exact source paths; the private common owner R11 and canvas orchestration contracts passed 84 and 60 cases respectively. These results do not prove live editor causality or device behavior. The independently reviewed R9/R12 Krita finite-input implementation was then admitted against 155 source paths, but its first helper build failed before test execution with E0432 (missing direct sha2 import dependency). The complete failure receipt is M4-KP-krita-compile-failure-r12.json; every actual build Job and output reader retired, and all 155 source paths were preserved. A narrow source repair is pending. Six integrated milestone build tasks remain, with physical acceptance separate.
+
+Owner-requested pause checkpoint, 2026-10-04: finish the current held-lifecycle
+parser correction and focused S23 retry, then commit, integrate into main and
+push the reviewed source/text checkpoint. Pause further implementation until a
+new owner request. The latest state supersedes earlier running counts: streaming
+startup/recovery software has passed actual initial/background/reconnect S23
+renders; five build tasks remain (T4.03, T4.04, active T4.07, essential T4.08,
+personal packaging). Physical pen/performance and owner acceptance are separate.
+See docs/M4_KP_CHECKPOINT.md and docs/evidence/M4-KP.md. The lifecycle key parser
+now preserves the producer's required sha256 field; its 135 focused checks pass.
+Unbuilt R106/R107/R119 editor candidates and the narrowed validation/build drafts
+remain preserved locally, not admitted as completed work. Use the owner's chosen
+model/effort without overrides; do not commandeer the OnePlus. No deferred
+editor, driver or Phase 5 work is authorized by this checkpoint.

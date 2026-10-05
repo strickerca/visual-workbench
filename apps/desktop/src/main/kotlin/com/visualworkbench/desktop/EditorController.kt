@@ -41,6 +41,10 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     private var wetCommitted:String?=null
     private val live=DesktopLiveLink(scope,{mutable.value.document?.binding(generation)},::sessionStatus,
         {frame->update{it.copy(peerFrame=frame)}},::report,::detachInstructionFocus)
+    internal fun remoteCapability():WorkbenchRemoteEdit {
+        check(mutable.value.sync?.carrier==SessionCarrier.QuicTether){"Remote editing requires the selected USB tether route"}
+        return remoteEdit(checkNotNull(live.attachment()).link)
+    }
     internal fun publishAgentCaptureStatus(value:LocalAgentCaptureSummary) {
         val attached=live.attachment()?:return
         try { agentCaptureStatus(attached.link).publish(value) }

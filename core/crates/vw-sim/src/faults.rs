@@ -271,6 +271,8 @@ pub fn run(seed: u64) -> Result<Report> {
         capture_session_id: Some(capture.to_proto()),
         geometry_revision: 1,
         input_seq: 1,
+        remote_scope: None,
+        request_nonce: 0,
         event: Some(pb::input_event::Event::Key(pb::KeyEvent {
             ..Default::default()
         })),

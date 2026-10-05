@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "status": "completed",
+  "purpose": "dispose named PDB build-cache output after text-only inspection",
+  "relative_path": "NONE",
+  "bytes": 128929792,
+  "sha256": "c67c518060061c7361dd91f9c5bfef1c4b9e99d67a90021ea550c6cadaa8f864",
+  "exact_containment_verified": true,
+  "regular_ancestor_and_file_verified": true,
+  "active_compiler_count": 0,
+  "recursive_delete": false,
+  "source_count": 143,
+  "files_disposed": true,
+  "verification_images_created": 0,
+  "source_preserved_after": true
+}

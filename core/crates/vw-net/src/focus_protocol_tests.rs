@@ -6,7 +6,7 @@ use vw_proto::v1 as pb;
 
 #[test]
 fn current_minor_explicitly_refuses_legacy_hellos_and_acks() {
-    assert_eq!(PROTOCOL_MINOR, 4);
+    assert_eq!(PROTOCOL_MINOR, 6);
     let a = LocalHello {
         device: DeviceId::from_bytes([1; 16]),
         platform: pb::Platform::Windows,

@@ -4,6 +4,8 @@ mod binding;
 mod capture;
 pub use capture::*;
 mod connection_assist;
+#[cfg(any(windows, test))]
+pub mod editor_paint_package;
 pub use connection_assist::*;
 mod dib;
 mod drag;

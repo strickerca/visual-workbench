@@ -11,7 +11,7 @@ use ::windows::Win32::{
     UI::{HiDpi::*, WindowsAndMessaging::*},
 };
 pub use uia::collect;
-pub use wgc::capture;
+pub use wgc::{capture, capture_canvas_fixture, capture_diagnostic, capture_fixture_diagnostic};
 pub(crate) fn api<T>(value: ::windows::core::Result<T>) -> Result<T> {
     value.map_err(|_| Error::Platform)
 }

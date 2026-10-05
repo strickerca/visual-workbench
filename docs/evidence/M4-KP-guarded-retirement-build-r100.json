@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "scope": "R99 guarded noncontact retirement; affected Windows validation",
+  "source_map_sha256": "aeb4104d61a887827334674ffce810bd761dc36cb86d1f36a2faf9395992d132",
+  "source_count": 222,
+  "source_preserved_after": true,
+  "elapsed_seconds": 69.39,
+  "phase_count": 14,
+  "all_build_processes_and_readers_retired": true,
+  "retirement_tests_per_configuration": 10,
+  "configurations": [
+    "default",
+    "integration-carrier-fault"
+  ],
+  "lint_warnings_denied": true,
+  "format_check": true,
+  "ordinary_artifacts": {
+    "vw-input-helper": {
+      "path": "target/debug/vw-input-helper.exe",
+      "bytes": 4418560,
+      "sha256": "c5f0c4d170cfc1cd2f9f9dc91dced95bff89273b4c40b6a5f251d5774b996341"
+    },
+    "vw-hevc-helper": {
+      "path": "target/debug/vw-hevc-helper.exe",
+      "bytes": 2104832,
+      "sha256": "883128e25b9e00411c8d2840fb8aaca9258a928c2292534194dc9a1f6b002cfa"
+    },
+    "vw-remote-guard-hil": {
+      "path": "target/debug/vw-remote-guard-hil.exe",
+      "bytes": 2723328,
+      "sha256": "9429703225ca78ab6d69ab647c671408bafe19ee8a8c9b74d0d5cf9595e6659e"
+    },
+    "vw-editor-probe": {
+      "path": "target/debug/vw-editor-probe.exe",
+      "bytes": 3407360,
+      "sha256": "281c9d90c7bfa5b00ebef4540015a5328bbf4b376170c17f1907160adf9017c9"
+    },
+    "vw-editor-probe-runner": {
+      "path": "target/debug/vw-editor-probe-runner.exe",
+      "bytes": 1888768,
+      "sha256": "22126d51bb119ea55fc08671d9c5547f55cb9f063a27950d4552c032b23dbb61"
+    },
+    "vw-editor-effect-hil": {
+      "path": "target/debug/vw-editor-effect-hil.exe",
+      "bytes": 3677696,
+      "sha256": "24909b09ba5596fabd328a066f8a244bc35ac91ba9177d0ee02529b92acbc741"
+    },
+    "vw-editor-effect-runner": {
+      "path": "target/debug/vw-editor-effect-runner.exe",
+      "bytes": 1888768,
+      "sha256": "6d7be0a84f664367d317efa215753aa13c01e7728535f0cfeb2a4b5d091377bd"
+    },
+    "vw-editor-frame-runner": {
+      "path": "target/debug/vw-editor-frame-runner.exe",
+      "bytes": 4241920,
+      "sha256": "df4459325a28f92197623800dd4fded288fe272444bbc89fb4e6c4c675a9376b"
+    }
+  },
+  "receipt_sha256": "85a1e678ac47d2f0a02715b1fc94ce68dab24128fc1d9839fa7d2fb6fab6bcd1",
+  "producer_witness_sha256": "06866fe076bb74863310ad3780f721dc14ebcb7a7e6671e916b129b71c6854f1",
+  "prior_preflight_failure_preserved": true,
+  "android_jvm_rebuilt": false,
+  "device_actions": false,
+  "input_acceptance": false,
+  "physical_acceptance": false
+}

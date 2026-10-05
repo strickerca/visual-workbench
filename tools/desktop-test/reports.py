@@ -22,7 +22,8 @@ MAX_FILES = 4096
 MAX_TOTAL = 4 * 1024**3
 MAX_FILE = 1024**3
 MAX_JSON = 8 * 1024**2
-NATIVES = ("vw-capture-helper.exe", "vw-connection-helper.exe", "vw_core.dll", "vw_host.dll")
+NATIVES = ("vw-capture-helper.exe", "vw-connection-helper.exe", "vw-hevc-helper.exe",
+           "vw-input-helper.exe", "vw_core.dll", "vw_host.dll")
 INPUTS = (*NATIVES, "vw-bindgen.exe")
 BEGIN = ".local/desktop-test-build-start.json"
 BUILT = ".local/desktop-test-build.json"
@@ -209,6 +210,10 @@ def packaged_resources(directory: Path, native: dict, nonce: str) -> None:
                 require(entry.filename not in names, "jar_duplicate")
                 names.add(entry.filename)
                 mcp_file = entry.filename.startswith("mcp-server/") and not entry.is_dir()
+                # The six Workbench native files form a closed packaged set.
+                # Independent Skiko/dependency resources remain outside this namespace.
+                if entry.filename.casefold().startswith("win32-x86-64/vw") and entry.filename.lower().endswith((".exe", ".dll")):
+                    require(entry.filename in expected, "native_resource_unlisted")
                 if entry.filename not in expected and entry.filename not in markers and not mcp_file:
                     continue
                 require(entry.filename not in seen and not entry.flag_bits & 1, "resource_duplicate")

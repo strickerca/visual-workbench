@@ -65,14 +65,52 @@ packaging and focused acceptance. Preserve broader Phase 3 candidates without
 making them new milestone prerequisites. Keep deferred Phase 4 tasks and Phase 5
 deferred; this scope confirmation does not pass M4-KP, G4 or earlier product gates.
 
+Owner device/progress update (2026-10-03): the S23 Ultra is being taken away.
+Defer further S23-specific tests until the owner returns. The OnePlus/IN2019 is
+explicitly authorized for applicable app tests; select it by model without
+falling back to another device. Continue build work and suitable Windows/offline
+validation. Keep earlier S23 evidence bound to its exact source and artifacts;
+OnePlus results do not pass S23 pen or performance acceptance. After each active
+milestone build task completes, state how many build tasks remain. Track the
+five active Phase 4 implementation tasks plus personal-use packaging, with
+physical S23 acceptance separate and pending. Foundations and source-only
+freezes do not complete a build task.
+
 The owner shares the IN2019 with another app development session. Backgrounding
 can be normal. Check actual foreground state, use bounded starter-only relaunches,
 and preserve the other app and its processes. Do not reset adb or the device to
 recover a focus change. A persistently contested UI run is inconclusive.
 
+Owner device update (2026-10-04): the S23 Ultra is connected again and needed
+project tests are authorized. Select SM-S918U explicitly with no fallback. The
+IN2019 authorization remains available for separately selected applicable tests.
+Preserve other apps/profiles and retain each result's actual source/artifact/device
+binding. Physical S Pen gestures, target-device performance and owner acceptance
+remain pending until measured. Continue reporting the remaining six scoped build
+tasks as actual integrated and software-validated tasks complete.
+
+Owner unattended update (2026-10-04): the owner is going to sleep and requests
+continuation without further input. Automate applicable setup, builds, diagnostics
+and interaction in exact task-owned blank editor/test windows within the already
+authorized milestone. Use an explicit unattended harness mode for automated
+readiness; preserve actual target, foreground, balanced-input, grant, lifecycle
+and retirement predicates. Record automated interaction separately from physical
+human gestures. Continue independent work when a physical S Pen measurement or
+owner drawing acceptance is unavailable; those checks remain pending. Do not
+request further foreground or desktop-reservation replies during this run.
+
 Use Rust edition 2024, private unpublished proprietary crates, rustfmt and clippy
 with warnings denied. No unwrap/expect/panic in libraries; isolate unsafe code in
 FFI/platform modules and explain each unsafe operation with a SAFETY comment.
+
+Latest owner checkpoint instruction (2026-10-04): finish the current lifecycle
+parser correction and focused validation, then pause, commit, integrate into
+main, push, and provide a continuation handoff. Do not start further milestone
+implementation during this pause. For this milestone use only the explicitly
+selected connected S23 (SM-S918U); do not commandeer the OnePlus/IN2019. This
+supersedes the older device authorizations above. Keep the owner's selected
+model and effort without overrides. Preserve unfinished candidates, worktrees,
+failure receipts and pending owners. Resume only when the owner requests it.
 Use explicit Kotlin API mode in shared code and keep commonMain platform-neutral.
 Keep Windows DPI and capture math in physical pixels with Per-Monitor-V2 awareness.
 

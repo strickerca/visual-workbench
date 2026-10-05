@@ -105,6 +105,21 @@ impl Drop for BytePermit {
     }
 }
 
+// Completed bounded replies keep their reservation until the awaiting caller
+// actually takes ownership. An unpolled or cancelled result remains accounted
+// for; field order destroys a discarded result before releasing its permit.
+struct BudgetedReply<T> {
+    result: HostResult<T>,
+    bytes: BytePermit,
+}
+impl<T> BudgetedReply<T> {
+    fn take(self) -> HostResult<T> {
+        let Self { result, bytes } = self;
+        drop(bytes);
+        result
+    }
+}
+
 pub(crate) struct RequestContext {
     shared: Arc<Shared>,
     operation: Arc<HostOperation>,
@@ -142,7 +157,7 @@ enum Command {
     Clipboard {
         png: Vec<u8>,
         context: RequestContext,
-        reply: oneshot::Sender<HostResult<ClipboardReceipt>>,
+        reply: oneshot::Sender<BudgetedReply<ClipboardReceipt>>,
         _bytes: BytePermit,
     },
     ClipboardImage {
@@ -150,13 +165,13 @@ enum Command {
         binding: ExportBinding,
         options: DibOptions,
         context: RequestContext,
-        reply: oneshot::Sender<HostResult<ClipboardImageReceipt>>,
+        reply: oneshot::Sender<BudgetedReply<ClipboardImageReceipt>>,
         _bytes: BytePermit,
     },
     ClipboardRead {
         options: ClipboardReadOptions,
         context: RequestContext,
-        reply: oneshot::Sender<HostResult<ClipboardImport>>,
+        reply: oneshot::Sender<BudgetedReply<ClipboardImport>>,
         _bytes: BytePermit,
     },
     DragStage {
@@ -182,17 +197,45 @@ impl Command {
             Self::Window { reply, .. } => {
                 let _ = reply.send(Err(error));
             }
-            Self::Clipboard { context, reply, .. } => {
+            Self::Clipboard {
+                png,
+                context,
+                reply,
+                _bytes,
+                ..
+            } => {
                 context.operation.finish(false);
-                let _ = reply.send(Err(error));
+                drop(png);
+                let _ = reply.send(BudgetedReply {
+                    result: Err(error),
+                    bytes: _bytes,
+                });
             }
-            Self::ClipboardImage { context, reply, .. } => {
+            Self::ClipboardImage {
+                png,
+                context,
+                reply,
+                _bytes,
+                ..
+            } => {
                 context.operation.finish(false);
-                let _ = reply.send(Err(error));
+                drop(png);
+                let _ = reply.send(BudgetedReply {
+                    result: Err(error),
+                    bytes: _bytes,
+                });
             }
-            Self::ClipboardRead { context, reply, .. } => {
+            Self::ClipboardRead {
+                context,
+                reply,
+                _bytes,
+                ..
+            } => {
                 context.operation.finish(false);
-                let _ = reply.send(Err(error));
+                let _ = reply.send(BudgetedReply {
+                    result: Err(error),
+                    bytes: _bytes,
+                });
             }
             Self::DragStage { context, reply, .. } => {
                 context.operation.finish(false);
@@ -231,8 +274,11 @@ impl Command {
             } => {
                 let result = prepare_and_publish(&png, &context, backend);
                 context.operation.finish(result.is_ok());
-                let _ = reply.send(result);
-                drop(_bytes);
+                drop(png);
+                let _ = reply.send(BudgetedReply {
+                    result,
+                    bytes: _bytes,
+                });
             }
             Self::ClipboardImage {
                 png,
@@ -244,8 +290,11 @@ impl Command {
             } => {
                 let result = prepare_image(&png, binding, options, &context, backend);
                 context.operation.finish(result.is_ok());
-                let _ = reply.send(result);
-                drop(_bytes);
+                drop(png);
+                let _ = reply.send(BudgetedReply {
+                    result,
+                    bytes: _bytes,
+                });
             }
             Self::ClipboardRead {
                 options,
@@ -255,8 +304,10 @@ impl Command {
             } => {
                 let result = read_image(options, &context, backend);
                 context.operation.finish(result.is_ok());
-                let _ = reply.send(result);
-                drop(_bytes);
+                let _ = reply.send(BudgetedReply {
+                    result,
+                    bytes: _bytes,
+                });
             }
             Self::DragStage {
                 source,
@@ -464,7 +515,7 @@ impl HostService {
                 reply,
                 _bytes: bytes,
             })?;
-            self.response(received).await
+            self.response_budgeted(received).await
         }
         .await;
         if result.is_err() {
@@ -492,7 +543,7 @@ impl HostService {
                 reply,
                 _bytes: bytes,
             })?;
-            self.response(received).await
+            self.response_budgeted(received).await
         }
         .await;
         if result.is_err() {
@@ -600,7 +651,7 @@ impl HostService {
                 reply,
                 _bytes: bytes,
             })?;
-            self.response(received).await
+            self.response_budgeted(received).await
         }
         .await;
         if result.is_err() {
@@ -636,6 +687,19 @@ impl HostService {
             TrySendError::Full(_) => HostError::Busy,
             TrySendError::Disconnected(_) => HostError::WorkerUnavailable,
         })
+    }
+    async fn response_budgeted<T>(
+        &self,
+        receiver: oneshot::Receiver<BudgetedReply<T>>,
+    ) -> HostResult<T> {
+        let reply = receiver.await.map_err(|_| {
+            if self.shared.closed.load(Ordering::Acquire) {
+                HostError::Closed
+            } else {
+                HostError::WorkerUnavailable
+            }
+        })?;
+        reply.take()
     }
     async fn response<T>(&self, receiver: oneshot::Receiver<HostResult<T>>) -> HostResult<T> {
         receiver.await.map_err(|_| {
@@ -781,6 +845,101 @@ mod tests {
         drop(b);
         drop(c);
         assert_eq!(state.pending_bytes.load(Ordering::Acquire), 0);
+        Ok(())
+    }
+    fn isolated_service() -> HostService {
+        let (sender, _) = mpsc::sync_channel(MAX_QUEUE);
+        HostService {
+            sender,
+            shared: Arc::new(Shared {
+                closed: AtomicBool::new(false),
+                pending_bytes: AtomicUsize::new(0),
+            }),
+            completion: Mutex::new(None),
+        }
+    }
+    #[test]
+    fn completed_bounded_read_releases_before_immediate_successor_admission() -> HostResult<()> {
+        use std::{
+            future::Future,
+            task::{Context, Poll, Waker},
+        };
+        let host = isolated_service();
+        let bytes = BytePermit::acquire(&host.shared, MAX_PENDING_BYTES)?;
+        let (sender, receiver) = oneshot::channel();
+        let mut response = Box::pin(host.response_budgeted(receiver));
+        let mut cx = Context::from_waker(Waker::noop());
+        assert!(matches!(response.as_mut().poll(&mut cx), Poll::Pending));
+        assert!(
+            sender
+                .send(BudgetedReply {
+                    result: Err::<(), _>(HostError::InvalidPng),
+                    bytes
+                })
+                .is_ok()
+        );
+        // A queued reply remains charged until the consumer actually polls it.
+        assert!(matches!(
+            BytePermit::acquire(&host.shared, MAX_PENDING_BYTES),
+            Err(HostError::Busy)
+        ));
+        assert_eq!(
+            response.as_mut().poll(&mut cx),
+            Poll::Ready(Err(HostError::InvalidPng))
+        );
+        // No worker thread is allowed a scheduling turn between completion and reuse.
+        let next = BytePermit::acquire(&host.shared, MAX_PENDING_BYTES)?;
+        drop(next);
+        assert_eq!(host.shared.pending_bytes.load(Ordering::Acquire), 0);
+        Ok(())
+    }
+    struct ChargedResult(Arc<Shared>);
+    impl Drop for ChargedResult {
+        fn drop(&mut self) {
+            assert_eq!(
+                self.0.pending_bytes.load(Ordering::Acquire),
+                MAX_PENDING_BYTES
+            );
+        }
+    }
+    #[test]
+    fn abandoned_completed_result_drops_payload_before_byte_reservation() -> HostResult<()> {
+        let host = isolated_service();
+        let bytes = BytePermit::acquire(&host.shared, MAX_PENDING_BYTES)?;
+        let (sender, receiver) = oneshot::channel();
+        assert!(
+            sender
+                .send(BudgetedReply {
+                    result: Ok(ChargedResult(host.shared.clone())),
+                    bytes,
+                })
+                .is_ok()
+        );
+        assert!(matches!(
+            BytePermit::acquire(&host.shared, 1),
+            Err(HostError::Busy)
+        ));
+        drop(receiver);
+        assert_eq!(host.shared.pending_bytes.load(Ordering::Acquire), 0);
+        Ok(())
+    }
+    #[test]
+    fn cancelled_receiver_keeps_payload_charged_until_failed_send_is_disposed() -> HostResult<()> {
+        let host = isolated_service();
+        let bytes = BytePermit::acquire(&host.shared, MAX_PENDING_BYTES)?;
+        let (sender, receiver) = oneshot::channel();
+        drop(receiver);
+        let unsent = sender.send(BudgetedReply {
+            result: Ok(ChargedResult(host.shared.clone())),
+            bytes,
+        });
+        assert!(unsent.is_err());
+        assert!(matches!(
+            BytePermit::acquire(&host.shared, 1),
+            Err(HostError::Busy)
+        ));
+        drop(unsent);
+        assert_eq!(host.shared.pending_bytes.load(Ordering::Acquire), 0);
         Ok(())
     }
 }

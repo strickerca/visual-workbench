@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "milestone": "M4-KP",
+  "checkpoint": "remote-protocol-R1-R2",
+  "status": "software_checks_passed",
+  "source_binding_scope": "Historical exact protocol R1/R2 plus legacy-fixture R2; subsequent composition requires new checks.",
+  "source_sha256": {
+    "contracts/vw_protocol.proto": "0300f2e9cb163404fa40d3b37a796cf08ddd70181098fc11cdd74ba7be3d1872",
+    "core/crates/vw-net/src/focus_protocol_tests.rs": "c98a986582de429c42f43340de13edc081b4478759d97e3c3156f62fd8478b07",
+    "core/crates/vw-net/src/lib.rs": "539728a45c709a411987cad98de8bf3e4e5ab60e795dd119352eefc6999a3799",
+    "core/crates/vw-net/src/remote_protocol_tests.rs": "073c20e5c571b6d301dda4a2f64cf40ee710e4e9186e5a742c5c1ace088f7648",
+    "core/crates/vw-net/src/session.rs": "a6de2957924b64180d2908ba3b1c51673dd3cccebf9c7ade982b9c8d816306d0",
+    "core/crates/vw-net/src/tests.rs": "1ce264c1168f081c7035862fe2ad5b4ca5053c0e3728f6e6444f7326f7500dca",
+    "core/crates/vw-sim/src/faults.rs": "aada7e28ecdfaceeb6ebe42ea7155a9fb6e7490bb1c07ac69104b0ece8354b75"
+  },
+  "tests_passed": 88,
+  "tests_failed": 0,
+  "ignored_top_level_entries": 1,
+  "ignored_entry": {
+    "name": "sync_checkpoint_crash_worker",
+    "reason": "Private worker invoked by the owning process-death recovery fixture; not an unexecuted acceptance scenario."
+  },
+  "new_remote_protocol_cases_passed": 8,
+  "simulation": {
+    "seeds": 10000,
+    "accepted": 120000,
+    "stale_input_discarded": 20000,
+    "dropped_packets": 328295,
+    "duplicated_packets": 330343,
+    "duplicate_receipts": 181765
+  },
+  "strict_clippy_warnings_denied": true,
+  "formatting_passed": true,
+  "bounded_phases": [
+    {
+      "phase": "m4-remote-protocol-network-r2",
+      "exit_code": 0,
+      "elapsed_seconds": 414.609,
+      "sampled_peak_tree_working_set_bytes": 1227751424,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "m4-remote-protocol-network-r2-4dc568046faa4405a61a7e3409c967ae.log"
+    },
+    {
+      "phase": "test-network-core",
+      "exit_code": 0,
+      "elapsed_seconds": 77.871,
+      "sampled_peak_tree_working_set_bytes": 799584256,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "test-network-core-72dfe08e0e4f40c587d33457d8f8efd3.log"
+    },
+    {
+      "phase": "test-recovered-outbox",
+      "exit_code": 0,
+      "elapsed_seconds": 19.813,
+      "sampled_peak_tree_working_set_bytes": 694546432,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "test-recovered-outbox-9e43a42b671f48c19e510a98e0954d1f.log"
+    },
+    {
+      "phase": "test-sync-storage",
+      "exit_code": 0,
+      "elapsed_seconds": 32.919,
+      "sampled_peak_tree_working_set_bytes": 1037074432,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "test-sync-storage-45715849b185401a81226d284b40f07b.log"
+    },
+    {
+      "phase": "build-network-simulation",
+      "exit_code": 0,
+      "elapsed_seconds": 92.161,
+      "sampled_peak_tree_working_set_bytes": 560758784,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "build-network-simulation-bcff1ce8e75c470382ea339084ab45bc.log"
+    },
+    {
+      "phase": "test-network-simulation",
+      "exit_code": 0,
+      "elapsed_seconds": 154.994,
+      "sampled_peak_tree_working_set_bytes": 54276096,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "test-network-simulation-85fa46f8e65e45ab82ed50e960fc2abd.log"
+    },
+    {
+      "phase": "lint-network",
+      "exit_code": 0,
+      "elapsed_seconds": 33.387,
+      "sampled_peak_tree_working_set_bytes": 849027072,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "lint-network-56100f2d6df84b388168baa8d95e6b89.log"
+    },
+    {
+      "phase": "format-network",
+      "exit_code": 0,
+      "elapsed_seconds": 1.443,
+      "sampled_peak_tree_working_set_bytes": 2572288,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "format-network-72b5468ffeb84711a1e3f67827fb1cd7.log"
+    }
+  ],
+  "normal_app_remote_edit_verified": false,
+  "hardware_pen_flags_verified": false,
+  "device_performance_verified": false,
+  "editor_actions_verified": false,
+  "milestone_passed": false,
+  "gates_passed": [],
+  "remaining_build_tasks": 6,
+  "verification_images_created": 0,
+  "verification_images_retained": 0
+}

@@ -315,6 +315,7 @@ impl Session {
         if !self.active {
             return Err(NetError::Invalid("disconnected session"));
         }
+        remote_capability(&self.capabilities, &body)?;
         let channel = channel_for(&body);
         let index = channel as usize;
         let seq = self.next[index]
@@ -477,6 +478,7 @@ impl Session {
             return Ok(Receive::Discard);
         }
         let body = frame.envelope.body.ok_or(NetError::Invalid("body"))?;
+        remote_capability(&self.capabilities, &body)?;
         let index = frame.channel as usize;
         if matches!(frame.channel, v1::Channel::Ephemeral | v1::Channel::Media) {
             let key = (frame.channel as i32, latest_key(&body)?);
@@ -564,4 +566,172 @@ pub(crate) fn latest_key(body: &Body) -> Result<String> {
         _ => return Err(NetError::Invalid("latest key")),
     };
     Ok(format!("{prefix}:{}", Id::from_proto(id)?))
+}
+
+fn remote_scope(scope: &Option<v1::RemoteScope>) -> Result<()> {
+    let s = scope.as_ref().ok_or(NetError::Invalid("remote scope"))?;
+    if s.connection_epoch & 1 == 0 || s.source_generation == 0 || s.geometry_revision == 0 {
+        return Err(NetError::Invalid("remote scope generation"));
+    }
+    Id::from_proto(s.capture_session_id.as_ref())?;
+    Id::from_proto(s.target_token.as_ref())?;
+    Ok(())
+}
+fn remote_capability(capabilities: &BTreeSet<String>, body: &Body) -> Result<()> {
+    let remote = matches!(body, Body::RemoteControl(_) | Body::RemoteVideoConfig(_))
+        || matches!(body,Body::VideoFrame(v) if v.remote_scope.is_some())
+        || matches!(body,Body::InputEvent(v) if v.remote_scope.is_some())
+        || matches!(body,Body::InputStatus(v) if v.remote_scope.is_some());
+    if remote && !capabilities.contains("remote_edit_v1") {
+        return Err(NetError::Invalid("remote edit not negotiated"));
+    }
+    match body {
+        Body::RemoteControl(v) => {
+            remote_scope(&v.scope)?;
+            if v.sequence == 0
+                || !matches!(
+                    v.action.as_str(),
+                    "start"
+                        | "stop"
+                        | "request_control"
+                        | "grant"
+                        | "pause"
+                        | "revoke"
+                        | "background"
+                        | "keyframe"
+                        | "command_request"
+                        | "command_refused"
+                        | "authority"
+                        | "retired"
+                )
+                || v.selected_destination_label.len() > 2048
+                || v.selected_destination_label.chars().any(char::is_control)
+                || (v.action != "start" && !v.selected_destination_label.is_empty())
+                || v.selected_target_json.len() > 8192
+                || v.shortcut_state_json.len() > 16384
+                || !crate::remote_reason_allowed(&v.reason)
+                || (v.action == "authority") != (v.command_input_seq > 0)
+                || if matches!(v.action.as_str(), "command_request" | "command_refused") {
+                    v.request_nonce == 0 || !(1..=16).contains(&v.editor_action)
+                } else if v.action == "authority" {
+                    !(1..=16).contains(&v.editor_action)
+                } else {
+                    v.request_nonce != 0 || v.editor_action != 0
+                }
+            {
+                return Err(NetError::Invalid("remote control fields"));
+            }
+        }
+        Body::RemoteVideoConfig(v) => {
+            remote_scope(&v.scope)?;
+            if v.generation != 1
+                || v.visible_width == 0
+                || v.visible_height == 0
+                || v.coded_width > 4096
+                || v.coded_height > 4096
+                || v.coded_width % 2 != 0
+                || v.coded_height % 2 != 0
+                || v.coded_width < v.visible_width
+                || v.coded_height < v.visible_height
+                || v.coded_width - v.visible_width > 1
+                || v.coded_height - v.visible_height > 1
+                || v.vps.is_empty()
+                || v.sps.is_empty()
+                || v.pps.is_empty()
+                || v.vps.len() + v.sps.len() + v.pps.len() > 8192
+                || v.encoder_capabilities_json.len() > 4096
+            {
+                return Err(NetError::Invalid("remote config fields"));
+            }
+        }
+        Body::VideoFrame(v) => {
+            if v.remote_scope.is_some() {
+                remote_scope(&v.remote_scope)?;
+                let s = v
+                    .remote_scope
+                    .as_ref()
+                    .ok_or(NetError::Invalid("remote scope"))?;
+                if v.capture_session_id != s.capture_session_id
+                    || v.codec != "hevc"
+                    || v.config_generation != 1
+                    || v.frame_id == 0
+                    || v.annexb.is_empty()
+                    || v.annexb.len() > 6 * 1024 * 1024
+                    || v.captured_qpc_100ns == 0
+                    || u64::try_from(v.pts_ns).ok() != v.captured_qpc_100ns.checked_mul(100)
+                    || v.last_input_seq_applied > 0 && v.input_session_id.is_none()
+                {
+                    return Err(NetError::Invalid("remote frame fields"));
+                }
+            } else if v.config_generation != 0
+                || v.input_session_id.is_some()
+                || v.coded_width != 0
+                || v.coded_height != 0
+                || v.visible_width != 0
+                || v.visible_height != 0
+                || v.captured_qpc_100ns != 0
+            {
+                return Err(NetError::Invalid("remote frame lacks scope"));
+            }
+        }
+        Body::InputStatus(v) => {
+            if v.remote_scope.is_some() {
+                remote_scope(&v.remote_scope)?;
+                Id::from_proto(v.input_session_id.as_ref())?;
+                if v.input_seq == 0
+                    || !(1..=16).contains(&v.editor_action)
+                    || !crate::remote_reason_allowed(&v.reason)
+                    || !matches!(v.state.as_str(), "injected" | "refused" | "sealed_partial")
+                    || (v.state == "injected") != (v.accepted_qpc_100ns > 0)
+                    || v.state == "injected" && !v.reason.is_empty()
+                    || v.state == "sealed_partial" && v.reason != "partial_input"
+                {
+                    return Err(NetError::Invalid("remote injection receipt"));
+                }
+            } else if v.input_seq != 0
+                || v.accepted_qpc_100ns != 0
+                || v.editor_action != 0
+                || v.request_nonce != 0
+            {
+                return Err(NetError::Invalid("remote receipt lacks scope"));
+            }
+        }
+        Body::InputEvent(v) => {
+            if v.remote_scope.is_some() {
+                remote_scope(&v.remote_scope)?;
+            }
+            if v.request_nonce != 0
+                && (!remote
+                    || !matches!(v.event.as_ref(), Some(v1::input_event::Event::Finite(f)) if f.kind == "shortcut"))
+            {
+                return Err(NetError::Invalid("remote command nonce variant"));
+            }
+            match v.event.as_ref() {
+                Some(v1::input_event::Event::Pen(p)) => {
+                    if remote {
+                        let flags = p
+                            .native_pen_flags
+                            .ok_or(NetError::Invalid("exact remote pen flags absent"))?;
+                        if flags & !7 != 0
+                            || p.barrel != (flags & 1 != 0)
+                            || p.eraser != (flags & 4 != 0)
+                        {
+                            return Err(NetError::Invalid("exact remote pen flags invalid"));
+                        }
+                    } else if p.native_pen_flags.is_some() {
+                        return Err(NetError::Invalid("remote flags lack scope"));
+                    }
+                }
+                Some(v1::input_event::Event::Finite(f)) => {
+                    if !remote || !matches!(f.kind.as_str(), "click" | "wheel" | "shortcut") {
+                        return Err(NetError::Invalid("finite remote action scope"));
+                    }
+                }
+                _ if remote => return Err(NetError::Invalid("remote input variant")),
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }

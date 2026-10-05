@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "operation": "owned-editor-point-and-focus-diagnostics",
+  "status": "diagnostics-observed",
+  "source_map_sha256": "aeb4104d61a887827334674ffce810bd761dc36cb86d1f36a2faf9395992d132",
+  "paint": {
+    "input_sent": false,
+    "focused_control": "Microsoft.UI.Xaml.Controls.MenuBarItem",
+    "identity_and_foreground_before_after": true,
+    "managed_uia_hit_matches_brush": false,
+    "actual_owners_retired": true,
+    "held_neutral_keys_before_after": 0,
+    "receipt_sha256": "c4304b4ae05129d120309db54c6b0034191ce22f03798b5f2a6fb0f16b335ee0",
+    "point_native_root_exact": true,
+    "native_uia_provider_comparison_pending": true,
+    "managed_uia_hit_classes": [
+      "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "MSPaintApp"
+    ]
+  },
+  "krita": {
+    "accepted_balanced_input": true,
+    "focused_canvas_after": false,
+    "selected_brush_clicks": 1,
+    "focused_class_before": "KisOpenGLCanvas2",
+    "actual_owners_retired": true,
+    "held_neutral_keys_before_after": 0,
+    "receipt_sha256": "fe53c5d03f8685ef13ef016385c3ea8d2ee5359932f4f802ee0f18be45209a49",
+    "exact_brush_hit_before_after": true,
+    "focused_class_after": "KoToolBoxScrollArea",
+    "focused_canvas_before": true
+  },
+  "image_cleanup": {
+    "images_disposed": true,
+    "owned_blank_bitmap_count": 1,
+    "disposal_receipt_sha256": "b6059d08d311565977560087312288b55d2b41110e2182f0142a7f22b0b67889"
+  },
+  "drawing_undo_redo_acceptance": false,
+  "physical_acceptance": false,
+  "milestone_passed": false
+}

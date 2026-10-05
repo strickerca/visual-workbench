@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "status": "failure-retained",
+  "build_receipt": {
+    "name": "m4-held-build-r103-7c614cc376bd4a429352bbcbf71a723e-build.json",
+    "sha256": "45838bb4cb3adcf975d043b63957f874ea23fde41c4f9a9ee7d637e832a5b137"
+  },
+  "source_map_sha256": "aeb4104d61a887827334674ffce810bd761dc36cb86d1f36a2faf9395992d132",
+  "actual_android_compiler": {
+    "exit_code": 0,
+    "process_tree_cleanup_confirmed": true,
+    "output_streams_completed": true,
+    "elapsed_seconds": 36.29
+  },
+  "passed_producing_roles": [
+    "host_core",
+    "host_input"
+  ],
+  "failure": "cargo-ndk 4.1.2 consumes CompilerArtifact JSON internally and prints human progress. The producing-record parser therefore observed zero records after actual Android compiler exit 0.",
+  "diagnosis_source": "Installed cargo-ndk-4.1.2/src/cargo.rs forces json-render-diagnostics and collects CompilerArtifact without forwarding it.",
+  "diagnosis_source_sha256": "3ad7f012a4098c438454f1a330c5dd474d9e54b59e2d71082fd90be0ecd1e35a",
+  "next_step": "Bound NDK environment export and direct pinned Cargo producing step; preserve passed license and Windows phase evidence.",
+  "outer_process_retired": true,
+  "outer_output_joined": true,
+  "ordinary_archive_files": 859,
+  "packaging_executed": false,
+  "device_actions": false,
+  "milestone_passed": false
+}

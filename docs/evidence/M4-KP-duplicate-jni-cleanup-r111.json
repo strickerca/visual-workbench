@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "operation": "remove-redundant-failed-jni-staging-copies",
+  "status": "passed",
+  "files_removed": 2,
+  "logical_bytes": 365800336,
+  "removed_paths": [
+    "target/android-jni/arm64-v8a/libvw_core.so.bd447fe18c74449ea2fadfbdfc29e6ae.r109-new",
+    ".local/m4-held-feature-r109-bd447fe18c74449ea2fadfbdfc29e6ae-android_core-jni-before.so"
+  ],
+  "each_sha256": "196e410c1f682bf50565a32f924764380d87be75c7f5e12fb8eb03967b621505",
+  "retained_exact_feature_copy_preserved": true,
+  "failure_receipts_preserved": true,
+  "compiler_cache_removed": false,
+  "assessment_sha256": "57699e2a23c51ebb2c193565f53cdc91368f3326cd17cb09c3170b23ac52acc2",
+  "free_bytes_before": 375844864,
+  "free_bytes_after": 741654528,
+  "images_removed": 0
+}

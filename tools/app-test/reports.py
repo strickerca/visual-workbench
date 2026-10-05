@@ -21,7 +21,7 @@ import check_apk
 MAIN = "com.visualworkbench.android.hil"
 TEST = MAIN + ".test"
 RUNNER = "androidx.test.runner.AndroidJUnitRunner"
-CASE = re.compile(r"com\.visualworkbench\.android(?:\.(?:capture|editor|instructions))?\.[A-Za-z][A-Za-z0-9_]*#[A-Za-z][A-Za-z0-9_]*\Z")
+CASE = re.compile(r"com\.visualworkbench\.android(?:\.(?:capture|editor|instructions|remote))?\.[A-Za-z][A-Za-z0-9_]*#[A-Za-z][A-Za-z0-9_]*\Z")
 MAX_OUTPUT = 8 * 1024 * 1024
 require = common.require
 Rejected = common.Rejected

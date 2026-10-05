@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "kind": "ordinary artifacts restored after device preflight refusal",
+  "receipt_sha256": "60be3c37b630283a697085d32272aabe07bb18c7961a2c1589a67fe9d4b4c1d4",
+  "source_map_sha256": "519a55f3c12626d899727a6e2b430c43af3ff20d89d82d6b2d2b80813cb453d3",
+  "restoration_path_count": 16,
+  "ordinary_archive_final_hashes_verified": true,
+  "old_generated_classes_restored": true,
+  "new_feature_classes_removed_from_ordinary_classpath": true,
+  "feature_bytes_preserved": true,
+  "current_retry_created_owners": false,
+  "prior_owners_retirement_verified": true,
+  "ordinary_software_revalidated": false,
+  "device_actions": false,
+  "compilers_executed": false
+}

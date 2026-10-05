@@ -43,6 +43,12 @@ pub enum SessionError {
     Transport,
     #[error("session worker unavailable")]
     Worker,
+    #[error("remote edit is unavailable on this platform or package")]
+    RemoteUnavailable,
+    #[error("remote edit retirement pending; sealed owner retained")]
+    RemoteRetirementPending,
+    #[error("remote edit partial input; held global key state is unknown")]
+    RemotePartialInput,
 }
 pub type SessionResult<T> = std::result::Result<T, SessionError>;
 impl From<vw_net::pairing::PairingError> for SessionError {

@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "task": "T4.07",
+  "kind": "Paint exact native brush ancestry diagnostic",
+  "source_map_sha256": "aeb4104d61a887827334674ffce810bd761dc36cb86d1f36a2faf9395992d132",
+  "receipt_sha256": "4f8defd336ff05f206f95d7c48571e781c9f4bc9f8371a04baddc49da725c194",
+  "input_sent": false,
+  "actual_owners_retired": true,
+  "native_api_results": [
+    {
+      "api": "CUIAutomation",
+      "completed": true,
+      "error": null,
+      "hit_class": "Image",
+      "hit_has_input_patterns": false,
+      "exact_button_runtime_matched": true,
+      "expected_parent_depth": 1,
+      "destination_contains_point": true,
+      "direct_equality": false,
+      "elapsed_ms": 39
+    },
+    {
+      "api": "CUIAutomation8",
+      "completed": true,
+      "error": null,
+      "hit_class": "Image",
+      "hit_has_input_patterns": false,
+      "exact_button_runtime_matched": true,
+      "expected_parent_depth": 1,
+      "destination_contains_point": true,
+      "direct_equality": false,
+      "elapsed_ms": 12
+    }
+  ],
+  "finding": "Both native APIs hit the passive Image child whose immediate parent is the exact currently observed Brush Button/PrimaryButton. Direct equality rejects this legitimate destination.",
+  "production_fix_validated": false,
+  "milestone_passed": false,
+  "images_disposed": true,
+  "disposal_receipt_sha256": "f3b498167c933b2e8adb766bdfdf55aad766bdb3d7023913359cd690a1dd915a"
+}

@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "operation": "remove-verified-obsolete-android-generated-outputs",
+  "status": "passed",
+  "deleted_generated_files": 5975,
+  "deleted_logical_bytes": 1317538840.0,
+  "observed_free_bytes_delta": 1329876992,
+  "protected_source_and_artifact_hashes_verified": 1123,
+  "inventory_sha256": "b338c311b1a8d13ca379728d63a7440f0fa070d55d226c66730bca846403892a",
+  "targets": [
+    "apps/android/build/intermediates",
+    "apps/android/build-hil/intermediates",
+    "apps/android/build/outputs/apk/debug/android-debug.apk",
+    "apps/android/build/outputs/apk/androidTest/debug/android-debug-androidTest.apk",
+    "apps/android/build-hil/outputs/apk/debug/android-debug.apk",
+    "apps/android/build-hil/outputs/apk/androidTest/debug/android-debug-androidTest.apk"
+  ],
+  "current_remote_integration_artifacts_preserved": true,
+  "failure_receipts_and_candidates_preserved": true,
+  "worktrees_preserved": true,
+  "verification_images_deleted": 0,
+  "acceptance_claimed": false
+}

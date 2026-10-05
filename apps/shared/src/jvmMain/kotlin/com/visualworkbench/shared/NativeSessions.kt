@@ -49,6 +49,9 @@ internal fun sessionFailure(error: SessionException): SessionFailure = SessionFa
     is SessionException.Timeout -> SessionFailureKind.Timeout
     is SessionException.Transport -> SessionFailureKind.Transport
     is SessionException.Worker -> SessionFailureKind.Worker
+    is SessionException.RemoteUnavailable -> SessionFailureKind.RemoteUnavailable
+    is SessionException.RemoteRetirementPending -> SessionFailureKind.RemoteRetirementPending
+    is SessionException.RemotePartialInput -> SessionFailureKind.RemotePartialInput
 })
 private suspend fun <T> sessionCall(block: suspend () -> T): T = withContext(Dispatchers.Default) { try { block() } catch (error: SessionException) { throw sessionFailure(error) } }
 private fun <T> sessionNow(block: () -> T): T = try { block() } catch (error: SessionException) { throw sessionFailure(error) }
@@ -66,18 +69,22 @@ internal suspend fun <T : Any, R : OwnedSession> acquireOwned(owner: SessionOwne
 internal class SessionOwner {
     private val closed = AtomicBoolean(false)
     private val children = ConcurrentHashMap.newKeySet<OwnedSession>()
+    private var parentOwner:Any?=null
+    @Synchronized fun retainParent(parent:Any){check(parentOwner==null);parentOwner=parent}
+    @Synchronized fun releaseParent(){check(children.isEmpty());parentOwner=null}
     @Synchronized fun <T : OwnedSession> adopt(child: T): T { checkOpen(); children.add(child); return child }
     fun remove(child: OwnedSession) { children.remove(child) }
     fun checkOpen() { if (closed.get()) throw SessionFailure(SessionFailureKind.Closed) }
     suspend fun close() {
-        val active = synchronized(this) { if (!closed.compareAndSet(false, true)) return; children.toList() }
-        var failed = false
-        for (child in active) try { child.close() } catch (_: Exception) { failed = true }
-        if (failed) throw SessionFailure(SessionFailureKind.Worker)
+        val active = synchronized(this) { closed.set(true); children.toList() }
+        var failed = false;var pending=false
+        for (child in active) try { child.close() } catch (error: Exception) { failed = true;if(error is SessionFailure&&error.kind==SessionFailureKind.RemoteRetirementPending)pending=true }
+        if (failed) throw SessionFailure(if(pending)SessionFailureKind.RemoteRetirementPending else SessionFailureKind.Worker)
     }
 }
 private class NativeSessions(private val handle: SessionService) : WorkbenchSessions {
-    private val owner = SessionOwner()
+    private val retired=AtomicBoolean(false)
+    private val owner = SessionOwner().also{it.retainParent(this)}
     private val closed = AtomicBoolean(false)
     private val closeMutex = Mutex()
     override suspend fun localDevice(): SessionDevice = sessionCall { owner.checkOpen(); handle.localDevice().let { SessionDevice(it.deviceId, it.fingerprint) } }
@@ -94,7 +101,7 @@ private class NativeSessions(private val handle: SessionService) : WorkbenchSess
     override suspend fun host(project: WorkbenchProject, peer: String, endpoints: List<SessionEndpoint>): ProjectLink = acquireOwned(owner, { owner.checkOpen(); handle.hostProject(nativeProjectHandle(project), peer, endpoints.map { it.native() }) }, { NativeLink(it, owner) }, { try { it.closeSession() } finally { it.destroy() } })
     override suspend fun connect(project: WorkbenchProject, peer: String, endpoints: List<SessionEndpoint>): ProjectLink = acquireOwned(owner, { owner.checkOpen(); handle.connectProject(nativeProjectHandle(project), peer, endpoints.map { it.native() }) }, { NativeLink(it, owner) }, { try { it.closeSession() } finally { it.destroy() } })
     override suspend fun receiveProject(path: String, peer: String, endpoints: List<SessionEndpoint>, expectedProjectId: String?, maxBlobBytes: ULong): WorkbenchProject = acquireNative({ owner.checkOpen(); handle.receiveProject(ReceiveProjectOptions(path, peer, endpoints.map { it.native() }, expectedProjectId, maxBlobBytes), it) }, { owner.checkOpen(); wrapNativeProject(it) }, { try { it.closeSession() } finally { it.destroy() } })
-    override suspend fun close() { releaseNative { closeMutex.withLock { if (closed.compareAndSet(false, true)) try { owner.close() } finally { handle.destroy() } } } }
+    override suspend fun close() { releaseNative { closeMutex.withLock { if (!retired.get()) { closed.set(true); owner.close();handle.destroy();retired.set(true);owner.releaseParent() } } } }
 }
 private class NativeDiscovery(private val handle: NDiscovery, private val owner: SessionOwner) : SessionDiscovery, OwnedSession {
     private val closed=AtomicBoolean(false)
@@ -131,13 +138,17 @@ private class NativeConfirmation(private val handle: NConfirmation, private val 
     override suspend fun decline() { close() }
     override suspend fun close() { releaseNative { closeMutex.withLock { if (closed.compareAndSet(false, true)) try { handle.decline() } catch (error: SessionException) { if (error !is SessionException.Closed) throw sessionFailure(error) } finally { handle.destroy(); owner.remove(this@NativeConfirmation) } } } }
 }
-private class NativeLink(private val handle: LiveSession, private val owner: SessionOwner) : ProjectLink, OwnedSession, NativeFocusAccess {
+private class NativeLink(private val handle: LiveSession, private val owner: SessionOwner) : ProjectLink, OwnedSession, NativeFocusAccess, NativeRemoteAccess {
+    private val closed = AtomicBoolean(false)
+    private val remoteOwner=RemoteOwnerPublication<NativeRemoteEdit>(closed){it.isRetired()}
+    private val retired=AtomicBoolean(false)
+    override fun remoteEditHandle():WorkbenchRemoteEdit =
+        remoteOwner.acquire(owner::checkOpen){NativeRemoteEdit(handle,this)}
     override fun focusHandle(): LiveSession {
         owner.checkOpen()
         if (closed.get()) throw SessionFailure(SessionFailureKind.Closed)
         return handle
     }
-    private val closed = AtomicBoolean(false)
     private val closeMutex = Mutex()
     override val endpoints: List<SessionEndpoint> get() = handle.endpoints().map { it.common() }
     override val changes: Flow<SessionStatus> = flow {
@@ -155,7 +166,16 @@ private class NativeLink(private val handle: LiveSession, private val owner: Ses
     } }
     override suspend fun finishPreview(gestureId: String, cancel: Boolean) { sessionCall { handle.finishPreview(gestureId, cancel) } }
     override suspend fun peerPreviews(documentId: String): PeerPreviews = sessionCall { handle.peerPreviews(documentId).let { PeerPreviews(it.sequence, it.gestureIds, it.items.map(::nativeRenderItem)) } }
-    override suspend fun close() { releaseNative { closeMutex.withLock { if (closed.compareAndSet(false, true)) try { handle.closeSession() } finally { handle.destroy(); owner.remove(this@NativeLink) } } } }
+    override suspend fun close() { releaseNative { closeMutex.withLock { if (!retired.get()) {
+        // Seal/publication share one synchronous fence. Construction either
+        // finishes and is captured here, or sees Closed before creating an owner.
+        val activeRemote=remoteOwner.seal()
+        // No publication monitor is held across actual decoder/helper retirement.
+        // Pending close retains this child, captured foreign owner and parent.
+        activeRemote?.close()
+        try { handle.closeSession() } catch(error:SessionException) { throw sessionFailure(error) }
+        handle.destroy();retired.set(true);owner.remove(this@NativeLink)
+    } } } }
 }
 private fun SessionEndpoint.native(): NEndpoint = NEndpoint(when (carrier) { SessionCarrier.QuicTether -> AppCarrier.QUIC_TETHER; SessionCarrier.QuicWifi -> AppCarrier.QUIC_WIFI; SessionCarrier.TcpAdb -> AppCarrier.TCP_ADB }, address)
 private fun NEndpoint.common(): SessionEndpoint = SessionEndpoint(carrier.common(), address)

@@ -1,0 +1,492 @@
+{
+  "schema": 1,
+  "kind": "M4-KP-render-identity-r28-app-check",
+  "status": "passed",
+  "private_receipt_sha256": "245a9cb350f11832573d0d126f086026bafa71b41ad0801990c6a45fe9cb76a2",
+  "source_sha256": {
+    "Cargo.lock": "2f73177ddb59a8cf0cbcf4e888ef5725fff269f6b7d679bb75d8384af74dfe78",
+    "apps/android/build.gradle.kts": "98c6b19b9dd7cbe3a6bb39cac1f3b40715a737a33b8c1da7077d4ec48e32a826",
+    "apps/android/src/androidTest/kotlin/com/visualworkbench/android/remote/RemoteDecoderInstrumentedTest.kt": "348bbf9de08d7f38193e5d0181b8e4f87b9691e9c77d99559a5d6489ac6afc05",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt": "644b4f30ae1a80120220b51621ec00bfb82e1029d120c4d791060d612e3da21d",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteDecoderStartup.kt": "7a91ee796c25ea4199dde68f523f77f6d6164918a9e273db83619176889b3743",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditController.kt": "b5d3235259be9aea4ebb6654aa9096c73e08c170bcfd012693f83aa1b27435a0",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditPanel.kt": "f1b6cc2b71a6ffad926929e80facdd92f27a167312cbdd3dec718c8466e0c813",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditorPalettePanel.kt": "14f601751cd2abc4c2c178a39609896229d55a3c81ee92a49a25a33f24637749",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteGhostOverlay.kt": "b26c4a5546bfc84cc189b59a58c23946fedea70c946eea32527be9b27c5d55d1",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteHardwareDecoder.kt": "3e2f031aa2a4a14095226e46f41cac67735152ea5d927c549a9c06d049a63144",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteSurfaceView.kt": "57b6be420505cdea09e8ea0101c40a96b5af1a67a49a72135e383a17e669d51b",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/ui/PairingScreen.kt": "1015abafba2b4e8f125778dd3fffb61da4a2a8248a5926d6a5dc98142059d866",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt": "d47d979a6f260fda6f0ac2176f152f21cb2e021afade92126e033628de2ced65",
+    "apps/android/src/remoteIntegration/AndroidManifest.xml": "e17d2e4cb95e7006a222048b647dc08fad39ec036f5d0d4c1ad682ea0f850901",
+    "apps/android/src/remoteIntegration/kotlin/com/visualworkbench/android/remote/RemoteIntegrationActivity.kt": "d9465cf14beabb5d79c9aebdb923f486e6c727770e033a26ca4a9e604e8922b9",
+    "apps/android/src/remoteIntegrationTest/kotlin/com/visualworkbench/android/remote/RemoteNormalPathInstrumentedTest.kt": "7f17c9cf3a5bee2c3a5ba437be4b735e8a74d86d88943672ea8a5c1bd1dec6f6",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/remote/DecoderRenderIdentityTest.kt": "7a6c5022a49415b0b54ea1d9fb7ad87d074ae25a075f028ca40fe70762aeab53",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/remote/RemoteDecoderStartupTest.kt": "d21cccfe88ca6c7c333b5e877f8c3f0a7214326ddf99457cf9c7b16597bde036",
+    "apps/desktop/build.gradle.kts": "628d5a34604a05f331e70a37c8c426cd090ad95e11d16cfd7293610da65a0247",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopLiveLink.kt": "7df86a68033f6588cd43e2e137523ffc86d7c1f21134a011f780b038b92ca0c4",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopNativeRuntime.kt": "1ce6a34a060dcb061b8fc9ef52ea929e0cf41cf3f18dc3598c279ac428ed1cc0",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt": "471a49850c7d8deb48a1ba3669174747cb3c44d80f3a695d294176c24ae45596",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": "a5a1c026506c5843c7f2acf8b9b39bbdb2776e8a2b4a4bc9dfae862a8fbd57e8",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/RemoteIntegrationHost.kt": "1ecb7fbcc6057b392fdbfa4616bbaa57b2e8183b4f3da42a8018659acf41c40f",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/remote/RemoteEditPanel.kt": "45b74795379ff4a60f33b15249987c17cf796167ca6feec91e35e09f14188641",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/remote/RemoteEditorPalettePanel.kt": "d56d63b73d090d8df951c39906661568ce414de9a165c6ec43ee4c7a683602c2",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt": "5ce9a3f029435bc1c969cb199bc89b744ff5cc1ae38318ac6fbccf290466fcda",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/NativeRuntimeAnchorTest.kt": "1232395605b7123a4f391f24610cf42c5886085e8806ef227eafc29d81410249",
+    "apps/shared/build.gradle.kts": "4e39dd97070f186947dd25ca775d262845132700955c76b7a13a261537fa974c",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEchoTiming.kt": "ba5c207ffddfe6348a7e2220302b7f07c067293ae9e14eb22ac88427a343a138",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditApi.kt": "26907317a6b5693716d71361b68453d6db1125df5256a35768a234614441cdff",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditController.kt": "126b6a360ee823f1a64464de30045accb4d2c3412cdd7840e8cc1da711b9d67c",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditorCompatibility.kt": "c1bc54078194638303090583db2928597785e4c4f84ea830d8ad104945cafdb1",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditorPalette.kt": "86563f2a8ee04701e7eba0c9f3bc19272242c394e55cee01122c39aa52c02afe",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditorProfileEvidence.kt": "7820d9b57dc6095ac4c8ce19dd900dedf35d8d9cadd2843b79813f4676c1b98d",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteGhostInk.kt": "d4768fd221d8ad2d2e44cb7cd0c41eb733bfd2902d8696fa138c6006bc54f10b",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionApi.kt": "c4c2c7625fcb546f636d6620009f58a00ecde851e89823e3d6861f6c92e67741",
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemoteEditCompositionTest.kt": "c3d1ebee7c387073e2f4623e18f6ab53b2e83b646b286f58322cd971f1427711",
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemoteEditorCompatibilityTest.kt": "9e96cc7f5bc8f65bc04ff2ced60f8f43fb141db011ba542e128929c3134ff2dd",
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemoteEditorPaletteTest.kt": "9c00665991a91e1623c217cd468e407c4b17bee7d6c134b29061932615bc30bd",
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemoteGhostInkTest.kt": "a5037a9a2a85446fc080b0b970230096f00323ad36c5f8f96b28e064f541cda3",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeRemoteEdit.kt": "9ec033ca6606bfa3aed59e0a83e9a71f4387b504ee52ee2ee9ff64f0b048897b",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeSessions.kt": "3d5e4972ed2d994181f7130c45ec267906b8896117edd16f5857cb2f6211d3fd",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/RemoteConsumerOwnership.kt": "4d725e2760b240889cdd64a1c4ea96e1fbf322398a1e8b1dd44afb6e1dc0b306",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/RemoteNativeJson.kt": "272d210337d747115fa50a9b03a5429a06cd3e6b8ee531d57f158c3e8815aed7",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/RemoteConsumerOwnershipTest.kt": "347f1371a821b19a1d110908fd9adce1a0b18e4ff4720bc050d08a7b155b28dd",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/RemoteNativeCompositionTest.kt": "37b55df5563404eba400a273ce314c1b558d2cb65fabd113345aa125b754d1d8",
+    "build.ps1": "23e044b749973022fb5efd8fb44d9f5346b490300f8c1933159008e3a8714e8c",
+    "contracts/vw_protocol.proto": "3574da06e538c5137446f9b5e4c01e4f5c0f213191b4ab7dec7d9263654cea5d",
+    "core/crates/vw-capture/src/bin/helper.rs": "f2dee79ef406a71a28e6024299edc8ba70cdec6823cdad7518ae8812db4cca32",
+    "core/crates/vw-capture/src/lib.rs": "ab5f20dbda8c944e564f407a96d499c2b3bcca447cb688dc2a3450df37819a1a",
+    "core/crates/vw-capture/src/process.rs": "771808e284ce9bb7ebe6380c3d9b2fe5634885dd20e81065826002c70104cf3a",
+    "core/crates/vw-capture/src/windows/mod.rs": "6a3e2f88b06bd440fcaac447a86945651ef9c9457e12a37d54e8aa02bce35b7d",
+    "core/crates/vw-capture/src/windows/wgc.rs": "c8fb0b2481a6dcc16f071c227e378d5892e7fd98f73c7d06c2b1e0edb8cda84f",
+    "core/crates/vw-ffi/Cargo.toml": "3f7ef733a2b8a20fb25cb686d46f0142bdc6e6818bba2cda7e2d743550402840",
+    "core/crates/vw-ffi/src/packages/inbox/tests.rs": "037b9562a062ca43de34e9b994f47bba1e408414b425868e10277db6c3449cf1",
+    "core/crates/vw-ffi/src/session.rs": "39b97f58aa858fb5f404cf6d1f9d720a337e5f678687e41ab6c2140fc168a1f4",
+    "core/crates/vw-ffi/src/session/focus_tests.rs": "38b609e63367e03304f768943c2f8e7c9057b63dcb58e11e373911e6ef5a3e8c",
+    "core/crates/vw-ffi/src/session/link.rs": "776eac7a3adacf4797f10232109c11fec0dd292b6f9bd5a2fd1530a5291c885d",
+    "core/crates/vw-ffi/src/session/remote_commands.rs": "81e4a299c747b6c8c7ddbd8ae33ebe22c4d0d0af077f3a9d160e0ad12ba72d68",
+    "core/crates/vw-ffi/src/session/remote_edit.rs": "5c0313e52fc82d2cb092a33bcae524eb65f6ed370326b5022851c2a07af810ac",
+    "core/crates/vw-ffi/src/session/remote_host.rs": "b10f93c59b8f863f818f88c7be5ada089efdf77f75e5dfa8115da5793ca87410",
+    "core/crates/vw-net/src/focus_protocol_tests.rs": "c98a986582de429c42f43340de13edc081b4478759d97e3c3156f62fd8478b07",
+    "core/crates/vw-net/src/lib.rs": "3532e9c66441d7b09cbbfe912f400cab8648012137b404e896956b5ba41d5690",
+    "core/crates/vw-net/src/remote_protocol_tests.rs": "498bb1399b46635c03b5afa2ce8382a8e8f721bc1cb221e39946ec262d1ae55f",
+    "core/crates/vw-net/src/session.rs": "01897a2d0b688f6c65221995d827c21a28f9b1033b1dd062621d9cd8369c983a",
+    "core/crates/vw-net/src/tests.rs": "9abda3b1eed82273445e2a3be744e76ae31c36a1777f26ca0dc90881cbb3ff39",
+    "core/crates/vw-remote/Cargo.toml": "79c486ada6eac7585b7b6deceabb1470fa996ae1eb3d2e722a447c121aaec80a",
+    "core/crates/vw-remote/src/annexb.rs": "82bc845c0d5200a067cd642cb1614636629f7bd5a11eeea24b1f893dc8a90f14",
+    "core/crates/vw-remote/src/applied.rs": "7250cca08b500382bb09ab46134fc6aed471b7a416611dd4bb90ca241fd002f9",
+    "core/crates/vw-remote/src/lib.rs": "665a62b86b34f94d9f1c81e8238efe97c7186869706e131b69b60340b65ef4df",
+    "core/crates/vw-remote/src/profile.rs": "427e095f600a613d05ae7cf87933c057ed20de027b559bae9492f61c0523d052",
+    "core/crates/vw-remote/src/profile/live.rs": "d4fd938a3a88bd921484a71ea4b308bda0d3ae19c6ce5ab5c78d1382d79da5f0",
+    "core/crates/vw-remote/src/wire.rs": "1c8e2d836e5aed5965bf40c6274fc22cea5c90e2ae8612de1c72a31dff51e9b8",
+    "core/crates/vw-remote/tests/admission.rs": "d3c0cd5bb78452b4102336a083bef783af83d6882ef46920e47f0ec818715c38",
+    "core/crates/vw-sim/src/faults.rs": "6e9056d574d7c18fb72db198ce9d6ff47134639a8d28ac458489b09cb7bd807d",
+    "host-win/crates/vw-host-ffi/Cargo.toml": "132cbad7c4805344e7d3e17b7889aee9b6b27a1894f98b452ca5361cbfe423a9",
+    "host-win/crates/vw-host-ffi/src/capture.rs": "66079232db853d40392c9e209e0b6c617ab04d068c322af6a22c5335e067c192",
+    "host-win/crates/vw-host-ffi/src/editor_identity.rs": "29b840fa0b26c5e101975a6d2396b52dd6735d6e7353b1a659787c7d4184b5f5",
+    "host-win/crates/vw-host-ffi/src/editor_identity/pe.rs": "d7e20cdd98b82248cbc25ea86d89aa8e411433520791ad3592404855140d0520",
+    "host-win/crates/vw-host-ffi/src/editor_paint_package.rs": "b2d762d899b77f06ff5d27d4c0ee43e6c1e05cc29712716a17b645e16a96252e",
+    "host-win/crates/vw-host-ffi/src/editor_paint_package/native.rs": "b1d2be068a8ac6bdb9a45b09dbd127cebc74f660730863a02b2a7589b57b1182",
+    "host-win/crates/vw-host-ffi/src/lib.rs": "74c51837b7d2d630da673b21382850147c887fe7d1826ea6fc5f3accaf1e1203",
+    "host-win/crates/vw-remote-host/Cargo.toml": "376dded5a5ff8140f77ab774d3ede86ec624ae74b3c7b1a88cc9d504d4d1b95c",
+    "host-win/crates/vw-remote-host/src/bin/editor_effect.rs": "44641aedac9e38bd4eda32d18402876478d3de8d97477e10f5db28f976cba238",
+    "host-win/crates/vw-remote-host/src/bin/editor_effect_runner.rs": "508efa78e48d6b1409c699a7d949366f742cc9c612112812c8f213997d7fab9c",
+    "host-win/crates/vw-remote-host/src/bin/editor_frame_runner.rs": "60a21bde5e6d7b22a6f77792b5ce1412dde63cf55b27dc079ac093f6c35d9bc5",
+    "host-win/crates/vw-remote-host/src/bin/editor_probe.rs": "38cccdca89259b951856bd0937a89b36200144c1c2a308dcb906c30165b5d367",
+    "host-win/crates/vw-remote-host/src/bin/editor_probe_runner.rs": "8530fa4e9b1561452fb40c001cddf5ffc2c5eebf939317dfcc6e7d5571244593",
+    "host-win/crates/vw-remote-host/src/bin/guard_hil.rs": "7cfd3c852b6d4fb65a2451e0c60685c41bc2da5bfb38b6e22647403c80ab19b6",
+    "host-win/crates/vw-remote-host/src/bin/hevc.rs": "795aa480bdac0b079560dced2dfdde9ead49333162dfcb67af0f9f42a38835a9",
+    "host-win/crates/vw-remote-host/src/bin/input.rs": "5a372e0b4d3b2f139398ff7c1760b2bafaa358d4fb2274706d46838ad2de5842",
+    "host-win/crates/vw-remote-host/src/contact.rs": "25cee5accd1126ea54ab592254954ac1a566bbe7c4b758777f8296bb75dfcdae",
+    "host-win/crates/vw-remote-host/src/editor_effect.rs": "bad860d3cb92d44f0eed788f3f65022f9e9d266d668b47d1d1db64221ffb6c29",
+    "host-win/crates/vw-remote-host/src/editor_effect/restoration.rs": "2ee8f5d0a925d97ae248232f63808daf85f69b2113511145611bf669686135a0",
+    "host-win/crates/vw-remote-host/src/editor_probe.rs": "82ef243e74895cc52acc37423a65ef17bf436f313474e36020146ddab49f6511",
+    "host-win/crates/vw-remote-host/src/editor_probe/paint.rs": "d0c5d420b2106da609f8444d007d867c1be17de10289aa05fc218ff9242ef444",
+    "host-win/crates/vw-remote-host/src/editor_probe/uia.rs": "9e307609bf6589743fb533887f85d6885147f6f71225bfc5c7ee2ffac8e2062f",
+    "host-win/crates/vw-remote-host/src/editor_probe/uia/controls.rs": "5c211dd5863bc07a755ee8852cf89027d39e7168dfe883d70951a39a1f0c27cf",
+    "host-win/crates/vw-remote-host/src/editor_probe_runner.rs": "c912b42513079b8de93ea378e01b8840d60686393b8644d4be58f20ed83838f0",
+    "host-win/crates/vw-remote-host/src/editor_probe_runner/frame.rs": "15ec49131e3864ea4e6ae8ef2ef8846872a9a3f31eefe1cfcd4d9c6c9ef6ac41",
+    "host-win/crates/vw-remote-host/src/editor_probe_runner/frame/metrics.rs": "a2ae671e2162ee09364d93e8063f4dd06b9ea8777858a1e747c53cb185690f7c",
+    "host-win/crates/vw-remote-host/src/editor_source.rs": "65e245c76d55c250f8a4573dce80ed9fb1f1812799a2fe74f099599ccd40eccf",
+    "host-win/crates/vw-remote-host/src/hil.rs": "7cd43498703b4019d124df8e778cac86cae9664152f78536dda92c48228c65b4",
+    "host-win/crates/vw-remote-host/src/lib.rs": "49d9b582d7c07fbceda6fad6c1dd45ea8011e38d5ea2ffefce690290fbb11c6a",
+    "host-win/crates/vw-remote-host/src/picker.rs": "8d57a523c60db678dc94649c2d0580222344ca8343b0d4c2dfa4a8eb9920708d",
+    "host-win/crates/vw-remote-host/src/platform/encoder.rs": "4b97d586915a9ae74ece369b2644450776243b5cb7972158e170d71d11ab9757",
+    "host-win/crates/vw-remote-host/src/platform/guard.rs": "3bfe26192e815d3654dfbce2df83e18efc2da481d329e2e6fe64ab79dd5ffe5a",
+    "host-win/crates/vw-remote-host/src/platform/input.rs": "97fb71825c87c0e99795111150a5c370e727e58cc6647f33915fca4004af4a5d",
+    "host-win/crates/vw-remote-host/src/platform/mod.rs": "17607e16f827934c8414b8d62c61102ae9c23f4d7e4ecf8e58160b8b753b0003",
+    "host-win/crates/vw-remote-host/src/platform/native_guard.rs": "65ad4981f8efbbcc03852e4044d2a46aa8993b7b1ac968b1753e305a1dfd3b66",
+    "host-win/crates/vw-remote-host/src/platform/shortcuts.rs": "aae6279d0ce690a20357f6ebccdbae26215a29beb5f2f3db502d4edd9002da9b",
+    "host-win/crates/vw-remote-host/src/platform/shortcuts/observer.rs": "84978f8ae40c2390b54dbfc45e305571da0d44d582b8582da15048f6cfc991ea",
+    "host-win/crates/vw-remote-host/src/platform/shortcuts/paint_controls.rs": "4d4b64d75e3f23629e44bfb5c5fdaefe198a24d3e8861605395939c2293e8668",
+    "host-win/crates/vw-remote-host/src/platform/video.rs": "10c396faed89934e509e4130cd593ddeb216ed320613720f5e437abdd3aedbb4",
+    "host-win/crates/vw-remote-host/src/process.rs": "e8f450dafa28b430dc826dc28423460d815e9fb0664416fdb78c76d6c00ee5bb",
+    "host-win/crates/vw-remote-host/src/process/windows.rs": "d2ae59ad2454145fa2752a00d764ad9f62fa8ab08efc21bcc793cde9773d1356",
+    "host-win/crates/vw-remote-host/src/retirement.rs": "b38cae848de7025dfad1940f0efe17b15a6be0af78e8f12b1946aad3634fa02d",
+    "host-win/crates/vw-remote-host/src/startup.rs": "9a8c8a8b82074c457306814e0d33ef6b3c73f5e7fa0aa42129ef4e9e6a753155",
+    "host-win/crates/vw-remote-host/tests/guard_regressions.rs": "28ffc4747001c9038b04832db8ecd0f8d45085336dc8d22dc71dba8185e15a37",
+    "tools/app-test/inventory.json": "1775402e912a7e48e1ded629ece12cbb32ff0538d8624277609606a37085122e",
+    "tools/app-test/reports.py": "20f2f515d569eab2d96080d01dbaebe19abc052427ef98ca547ffcb5877a5434",
+    "tools/app-test/test_reports.py": "649806e028d13572e91437329f8c95938a422edaf9ad346c4f473626cb833eab",
+    "tools/desktop-test/reports.py": "c103bbff49bc76cbec2d0e44a86f240c3d6d677f05bbb714ffcfeb45fb10fd0a",
+    "tools/desktop-test/test_reports.py": "388c4eb916eac80ab1050503d0d724599ca4ac4026190e9019059f7ed7f4c37e",
+    "tools/remote-edit/hil-guard.ps1": "87474685796a1ef0b9205272f2917526e053b5f1b0b7332dc7ec59742926a6a2",
+    "tools/remote-edit/integration.ps1": "55dfcf506f85ed0735eec6ba95c361b105f4a7069f525e2fda9f42c9adcf5b58",
+    "tools/remote-edit/integration_artifacts.py": "91eb7d3246ac6e3127050aada9ce43061223211a5bd1d9f8c025d9c87125f7cd",
+    "tools/remote-edit/integration_reports.py": "5a22bb30d9a87a33d746501e4751118fc77d763f5b72d5f27ed458bf2a61faa2",
+    "tools/remote-edit/test_integration_diagnostics.ps1": "e88867b6faa5812d55430c396923b80efc4b304be89573f4150b53f390350146",
+    "tools/remote-edit/test_integration_reports.py": "4d019544dacd5127c46ebe402699895d678740f8c08e6eb64f51536b7c106463"
+  },
+  "source_preserved_after": true,
+  "process_phases": [
+    {
+      "phase": "m4-diagnostics-r28-apps-check",
+      "exit_code": 0,
+      "elapsed_seconds": 211.995,
+      "sampled_peak_tree_working_set_bytes": 2904821760,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "m4-diagnostics-r28-apps-check-7121810d22ed47889bfb50f33f389f03.log"
+    },
+    {
+      "phase": "test-apps-kotlin",
+      "exit_code": 0,
+      "elapsed_seconds": 210.008,
+      "sampled_peak_tree_working_set_bytes": 2726170624,
+      "process_tree_cleanup_confirmed": true,
+      "output_streams_completed": true,
+      "log_file": "test-apps-kotlin-8a5410d6770a492b9cc766505bfcbc4e.log"
+    }
+  ],
+  "suite_counts": [
+    {
+      "scope": "shared",
+      "suites": 25,
+      "tests": 178,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "scope": "desktop",
+      "suites": 26,
+      "tests": 208,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "scope": "android",
+      "suites": 4,
+      "tests": 23,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "tests": 409,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "private_report_bindings": [
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.AgentCaptureObserverTest.xml",
+      "bytes": 1350,
+      "sha256": "5005febdbd485a1d314243909a2ea1a88ad82d157667c0855b187f4d9e0a21cb"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.AiCandidateRecoveryTest.xml",
+      "bytes": 652,
+      "sha256": "ac7ebf080c6c3471e742d68f59094d45eed08c7d4bdaa956b25a9c173286ea2d"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.AiInteractionTest.xml",
+      "bytes": 773,
+      "sha256": "6f87d4c1a54cee04c696a32b4df6f40ddaefca9a5c46a0e7b565b00ffa9da056"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.AiOwnershipTest.xml",
+      "bytes": 757,
+      "sha256": "1748397ef8c4adeb70d10d93824561f077616c22a936e0862820edbce63f666c"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.CaptureArrivalsTest.xml",
+      "bytes": 1141,
+      "sha256": "73a0fa540f151844d6fb86892f75f7f733ec8f78d8764efe728eee70ce93b03c"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.DesktopCoreSmokeTest.xml",
+      "bytes": 1147,
+      "sha256": "cddf7474758afb329aba1898a91517dccace231c46e950b36d05b6f05fc6beab"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.EraserContractTest.xml",
+      "bytes": 928,
+      "sha256": "9070700b77b63967146e4e362dcfc1f2e50e5c3befb93d3ec3c6b252f44d45d1"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.EraserInteractionTest.xml",
+      "bytes": 2677,
+      "sha256": "620726be3e5c430dd910b4bd4686f1d3aeac83064e1f0cf217cd703e06f111ec"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.InstructionEditorTest.xml",
+      "bytes": 2524,
+      "sha256": "9e7de65f4865a17a4d84a1a99887c11337cf1b80eb353d2b0b943573afa1ffbc"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.InstructionFocusControllerTest.xml",
+      "bytes": 2642,
+      "sha256": "53f989bab7d361a0a475b43c111e1cad010fa47976cb43f5aa2e117f2a78ed8f"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.MarkerFocusFollowerTest.xml",
+      "bytes": 1963,
+      "sha256": "4bc6de728af206e197c7637ae0120e5c3c109b44417f83bc12d0aff78b0a5b8d"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.MaskContractTest.xml",
+      "bytes": 1369,
+      "sha256": "d2e15198e50d28778d2064e01a7b157b8dcadb140f0b4d2f2142cd91a0be9f0b"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.McpInboxAdmissionTest.xml",
+      "bytes": 794,
+      "sha256": "d7ab2f5753998fcddf46c848aa257cca05fd932eb3602b47a82d4a83d2e65392"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.PackageOwnershipTest.xml",
+      "bytes": 950,
+      "sha256": "8f737c03a6b255a2d7863cb1155f61a0945ed6648f5817f8069b7cb5f494a60a"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.PairingQrTest.xml",
+      "bytes": 615,
+      "sha256": "3f0a147cebb0cabc5667203b63e4bbcfe22100374ebcd88f2edec943fb22bea5"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.RemoteConsumerOwnershipTest.xml",
+      "bytes": 2505,
+      "sha256": "da80da5a6a9b2de32f32278cc70b4574bc6ad1b4cefcd0804f44b9a58e6ce4a7"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.RemoteEditCompositionTest.xml",
+      "bytes": 1729,
+      "sha256": "fe027a093cd775e546b9c320f26485a6cba8d73d24cdcbdbf72b96c6af2c93f3"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.RemoteEditorCompatibilityTest.xml",
+      "bytes": 1513,
+      "sha256": "c28aa31638bd7124f22d8ae9ee4391927957fe82033cccd518536c924b420d61"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.RemoteEditorPaletteTest.xml",
+      "bytes": 1634,
+      "sha256": "e2a3b2d6c120bc18133ebe47f8451a078fa705db6b5fe6235e4d13957ca2339c"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.RemoteGhostInkTest.xml",
+      "bytes": 2044,
+      "sha256": "d14e26a062dedc97a603b13bb49d597a4de049639d12e796e089aa1ff857db9f"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.RemoteNativeCompositionTest.xml",
+      "bytes": 1377,
+      "sha256": "0955edaae165069c3816783d42d992acb0548bc3b10c5c4b0746169d42c5a9c5"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.SelectionInteractionTest.xml",
+      "bytes": 2607,
+      "sha256": "01971b70aeeb33053a40736ab5f940892054fb38a5400c43b9ece70a7d721688"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.SemanticDropTest.xml",
+      "bytes": 792,
+      "sha256": "8a8ae3bab2b7b4d419f8020e7b1c3b0096c7e3c846d3076db1cac02f95573cb6"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.SemanticEditorTest.xml",
+      "bytes": 2293,
+      "sha256": "42352d504ebc7a0d5777f341ea87bfc7b366f03a51a9b04322fc2dedbdfcd864"
+    },
+    {
+      "private_name": "shared/TEST-com.visualworkbench.shared.WorkflowOwnershipTest.xml",
+      "bytes": 1280,
+      "sha256": "c2f8273c14437ddbceeeafd1788e0eca3ceb7cb0e5394818c9cb4b557033584c"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.AiEditorOwnershipTest.xml",
+      "bytes": 3427,
+      "sha256": "0afd2f28c793013d9156fe1072b881373d8b82bd7d82e689e47d94c7ae1f1389"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.AiResultPainterTest.xml",
+      "bytes": 485,
+      "sha256": "519c3ce9dcf8634dfc45451fe2eb659acff9576390a8ea72a10b02a417443272"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.AiServiceControllerTest.xml",
+      "bytes": 2351,
+      "sha256": "62bc3ebba430440ad436a957eb8d270d2485cfdb5447547d961588e9b7dba066"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.AiViewGeometryTest.xml",
+      "bytes": 2015,
+      "sha256": "bd891feb2840d17ba1234592e0ac091f2890285060c2e7c5b17311f400028bc2"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.capture.CaptureAdmissionTest.xml",
+      "bytes": 832,
+      "sha256": "5f1a8f620f9b3d506e06a81fa4392675b2b60ae88d1e87c8bd7a96339d1b99b6"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.ConnectionAssistanceTest.xml",
+      "bytes": 2790,
+      "sha256": "e8d957d26ae8c8bf9fed494e421dd09f77e28a83ccc38d6a7a0996031a5f898e"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.DesktopCoherenceTest.xml",
+      "bytes": 2657,
+      "sha256": "337b266ade00659d7f85ff88114462314cdeae75f201db3b49671db76a8691c7"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.DesktopInkTest.xml",
+      "bytes": 1681,
+      "sha256": "6cae77b79865d89deeafa41847ad141e9c22bf31c49ff6e39fb26a591b0a3474"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.DesktopInstructionFocusAdmissionTest.xml",
+      "bytes": 724,
+      "sha256": "df6f0daa007e13fd9b6733517b990f50dc65f70e587a7b473598f90b49e4a033"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.DesktopInstructionFocusTest.xml",
+      "bytes": 685,
+      "sha256": "7ddb0bdd75dbe33511b9d914e7e8670e0a7a93a99169b0f4000f3508098ac208"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.DesktopNativeRuntimeTest.xml",
+      "bytes": 1775,
+      "sha256": "5454614bf30773cd443aa6bc45ae480a9e51337cc70028a3bea26ad2d3ca4e2c"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.DesktopRenderTest.xml",
+      "bytes": 936,
+      "sha256": "b176e2086209172e6ae94505e94d09dc7d8417a6b9ff0896bca9f8700515fc4e"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.DesktopSessionsTest.xml",
+      "bytes": 1780,
+      "sha256": "43a6a739ef4890c04f91fdf001e108b7f798222e4d591bfcd5daf9e031484dfc"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.DesktopStateTest.xml",
+      "bytes": 889,
+      "sha256": "0c71f3e40d30f7628aac871bd6bf1e94a2dae3cc9f09756c718b8c4a7d810f72"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.DesktopTransferTest.xml",
+      "bytes": 3748,
+      "sha256": "3d34e2b445544593368945bfa9a31a20fc97a2b791c58172262c354e177f93f1"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.EraserGeometryTest.xml",
+      "bytes": 944,
+      "sha256": "e4f04999660f729962040b3df2aa7b7f3a249ccdad20d6f355f07e608b04b704"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.instructions.WindowsInstructionFieldTest.xml",
+      "bytes": 1033,
+      "sha256": "d27f51a2b2e48fe09f8ad2f50230d5293e8f82049458a9b75a12f73a3d189a3e"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.mcp.CodexHandoffTest.xml",
+      "bytes": 1750,
+      "sha256": "ea6c27ebb34b72b01345527b5eb3d65009f15f779c9a5e556f80f11752efedee"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.mcp.McpCoordinatorTest.xml",
+      "bytes": 1885,
+      "sha256": "b61542150b7611c4befdea6b77f6e2ca89faf840cf4ef4171e96b47c0ab39993"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.mcp.McpGrantTelemetryTest.xml",
+      "bytes": 1008,
+      "sha256": "e31ae8fb3ef1da6ff65c7623e0e8e94a16527a16c227e60ce35bfa1a582921a5"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.mcp.McpJsonTest.xml",
+      "bytes": 756,
+      "sha256": "f2436195d8208e78bd1d1f463cd297ec47629a71b6c0926b978876b513826d58"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.mcp.McpOwnerWorkTest.xml",
+      "bytes": 825,
+      "sha256": "cde3414b4f34b6ed1ff9bcead2c97317ded47e87a6b7af216e0ce52cb1f62601"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.mcp.McpProcessTest.xml",
+      "bytes": 495,
+      "sha256": "c82b2b8ece985242f4f8773ede0db51c8fa87a8b7232bfe80995b4b3b0f6baa9"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.mcp.McpStartupTest.xml",
+      "bytes": 2286,
+      "sha256": "7ffb25e81de19809700e1c0d3f3035d67e8d3f4399623a5c75bc8750769adf8d"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.NativeRuntimeAnchorTest.xml",
+      "bytes": 2406,
+      "sha256": "47bdd3661397c2ebb4c945e9a08988745692aa143006c9516b6fe0a7950feb3a"
+    },
+    {
+      "private_name": "desktop/TEST-com.visualworkbench.desktop.SelectionControllerTest.xml",
+      "bytes": 949,
+      "sha256": "ba148b60e1f96a6e2c9a20211425d89fec1c3e4806bf3fe60ec062d3aae54b21"
+    },
+    {
+      "private_name": "android/TEST-com.visualworkbench.android.capture.CaptureAdmissionTest.xml",
+      "bytes": 950,
+      "sha256": "55af6250c8082a6d776018fd290ffebc864b485fac45b94f71898fa23826c7eb"
+    },
+    {
+      "private_name": "android/TEST-com.visualworkbench.android.capture.CaptureOwnerTest.xml",
+      "bytes": 644,
+      "sha256": "8e5d235934687b266cbeed4082aba0b88262c9483ef569024580c5484a190a08"
+    },
+    {
+      "private_name": "android/TEST-com.visualworkbench.android.remote.DecoderRenderIdentityTest.xml",
+      "bytes": 1752,
+      "sha256": "52dc1cb52736205ce134f80b09b9a3496d869d29977e9d0b0c8323eac9d9113d"
+    },
+    {
+      "private_name": "android/TEST-com.visualworkbench.android.remote.RemoteDecoderStartupTest.xml",
+      "bytes": 1590,
+      "sha256": "0fe41ca168216a5de1025970bafd634f661a2b4bbfb9c8e8b71e49ff1589b76c"
+    }
+  ],
+  "decoder_startup_cases": [
+    "alreadyInvalidSurfaceRefusesEvenWithReadyCodec",
+    "cancellationDuringStartupRunsTicketCleanupWithoutQueueing",
+    "existingReadyOwnerAdmitsCurrentFrameImmediately",
+    "expiredAbsoluteStartupDeadlineRefusesWithoutWaiting",
+    "firstStaticIdrWaitsForReadyWithoutASecondFrame",
+    "invalidatedScopeDuringStartupNeverQueuesRetainedFrame",
+    "recoveryIsNotReadinessAndCannotAdmitFrame",
+    "retiredOwnerCannotQueueAFrame"
+  ],
+  "render_identity_cases": [
+    "callback_before_enqueue_is_distinct",
+    "callback_before_render_is_distinct",
+    "changed_pts_is_distinct_and_keeps_ledger",
+    "current_exact_callback_diagnostic_zero_then_consumes_only_that_ticket",
+    "missing_output_release_never_consumes_ticket",
+    "missing_ticket_and_release_facts_remain_explicit",
+    "original_500ms_age_is_distinct_and_not_extended",
+    "relative_deltas_are_bounded_without_absolute_clock_or_ids",
+    "render_before_actual_release_request_is_distinct"
+  ],
+  "live_hardware_delivery_proved": false,
+  "build_tasks_remaining": 6,
+  "milestone_passed": false,
+  "verification_images_created": 0
+}

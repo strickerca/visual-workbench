@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "kind": "M4-KP-balanced-input-retained-cancellation-failure",
+  "status": "failed",
+  "failure_phase": "validate-actual-controller-input",
+  "failure_reason": "cancelled_pointer",
+  "private_receipt_sha256": "452af9ff7c70fd45857bacf45b87876def4e565fd6b4a2eefdda50c5f2d052d2",
+  "source_map_sha256": "78ee6aa26c187f96de6b27f20537b4530045ceb05ad40b5d404f67f0588be7d5",
+  "component_reuse_proof_sha256": "55edb75c964bf7677033f94df5bc3a07c353baec40d05a0de71349854f59fb9d",
+  "validated_render_count": 3,
+  "render_records_validated": true,
+  "receiver_evidence": {
+    "schema": 1,
+    "snapshot_complete": true,
+    "counts": [
+      1,
+      2,
+      1,
+      0,
+      0,
+      0
+    ],
+    "event_count": 4,
+    "retained_event_count": 4,
+    "omitted_event_count": 0,
+    "events": [
+      {
+        "ordinal": 0,
+        "malformed": false,
+        "withheld_fields": [],
+        "message": 582,
+        "index": 0,
+        "count": 1,
+        "pressure": 512,
+        "pen_flags": 0,
+        "performance_count": 3568342089273,
+        "pointer_flags": 90135,
+        "pointer_id": 1007,
+        "pointer_available": true,
+        "received_qpc": {
+          "schema": 1,
+          "counter": 3568342232568,
+          "frequency": 10000000
+        },
+        "input_provenance": {
+          "schema": 1,
+          "source_available": true,
+          "device_type": 8,
+          "origin_id": 2,
+          "message_extra_info": "0000000000000000"
+        },
+        "unknown_field_count": 0
+      },
+      {
+        "ordinal": 1,
+        "malformed": false,
+        "withheld_fields": [],
+        "message": 581,
+        "index": 1,
+        "count": 1,
+        "pressure": 512,
+        "pen_flags": 0,
+        "performance_count": 3568342309273,
+        "pointer_flags": 155670,
+        "pointer_id": 1007,
+        "pointer_available": true,
+        "received_qpc": {
+          "schema": 1,
+          "counter": 3568342310083,
+          "frequency": 10000000
+        },
+        "input_provenance": {
+          "schema": 1,
+          "source_available": true,
+          "device_type": 8,
+          "origin_id": 2,
+          "message_extra_info": "0000000000000000"
+        },
+        "unknown_field_count": 0
+      },
+      {
+        "ordinal": 2,
+        "malformed": false,
+        "withheld_fields": [],
+        "message": 583,
+        "index": 2,
+        "count": 1,
+        "pressure": 0,
+        "pen_flags": 0,
+        "performance_count": 3568342509273,
+        "pointer_flags": 286722,
+        "pointer_id": 1007,
+        "pointer_available": true,
+        "received_qpc": {
+          "schema": 1,
+          "counter": 3568342519779,
+          "frequency": 10000000
+        },
+        "input_provenance": {
+          "schema": 1,
+          "source_available": true,
+          "device_type": 8,
+          "origin_id": 2,
+          "message_extra_info": "0000000000000000"
+        },
+        "unknown_field_count": 0
+      },
+      {
+        "ordinal": 3,
+        "malformed": false,
+        "withheld_fields": [],
+        "message": 581,
+        "index": 1,
+        "count": 2,
+        "pressure": 0,
+        "pen_flags": 0,
+        "performance_count": 3568342509274,
+        "pointer_flags": 188416,
+        "pointer_id": 1007,
+        "pointer_available": true,
+        "received_qpc": {
+          "schema": 1,
+          "counter": 3568345557749,
+          "frequency": 10000000
+        },
+        "input_provenance": {
+          "schema": 1,
+          "source_available": true,
+          "device_type": 8,
+          "origin_id": 2,
+          "message_extra_info": "0000000000000000"
+        },
+        "unknown_field_count": 0
+      }
+    ],
+    "journal_bytes": 1451,
+    "journal_sha256": "d0766a8ac804472435ff5dc42f03cb27651950b8a5d85ded52a9fce250b1bae8",
+    "journal_ends_with_newline": true,
+    "records_validated": false,
+    "acceptance": false
+  },
+  "host_actual_retirement": true,
+  "phone_actual_retirement": true,
+  "input_retirement_confirmed": true,
+  "process_cleanup": true,
+  "owned_packages_cleanup": true,
+  "private_work_disposed": true,
+  "input_acceptance": false,
+  "physical_acceptance": false,
+  "editor_acceptance": false,
+  "verification_images_created": 0
+}

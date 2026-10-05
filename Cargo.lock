@@ -3050,6 +3050,8 @@ dependencies = [
  "vw-package",
  "vw-proto",
  "vw-raster",
+ "vw-remote",
+ "vw-remote-host",
  "vw-semantics",
  "vw-store",
  "zeroize",
@@ -3089,6 +3091,7 @@ dependencies = [
  "vw-capture",
  "vw-model",
  "vw-raster",
+ "windows",
  "windows-sys 0.61.2",
 ]
 
@@ -3301,6 +3304,32 @@ dependencies = [
  "vw-ink",
  "vw-model",
  "vw-proto",
+]
+
+[[package]]
+name = "vw-remote"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+ "vw-model",
+]
+
+[[package]]
+name = "vw-remote-host"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "png",
+ "ring",
+ "serde",
+ "serde_json",
+ "vw-capture",
+ "vw-host-ffi",
+ "vw-remote",
+ "windows",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

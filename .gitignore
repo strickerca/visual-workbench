@@ -1,6 +1,7 @@
 target/
 **/build/
 **/build-hil/
+**/build-remote-integration/
 .gradle/
 **/.gradle/
 .kotlin/

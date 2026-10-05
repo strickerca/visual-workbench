@@ -21,8 +21,30 @@ pub use session::{
 };
 pub use sync::{HostSync, SyncReceiver, SyncResponse};
 
+/// Closed remote status codes. Free text is never carried as capture/control data.
+pub fn remote_reason_allowed(reason: &str) -> bool {
+    matches!(
+        reason,
+        "" | "owner_pause"
+            | "background"
+            | "surface_lost"
+            | "decoder_failure"
+            | "input_expired"
+            | "video_owner_retired"
+            | "input_owner_retired"
+            | "command_timeout"
+            | "input_busy"
+            | "partial_input"
+            | "native_refused"
+            | "target_changed"
+            | "current_state_unknown"
+            | "peer_background"
+            | "host_revoked"
+            | "connection_retired"
+    )
+}
 pub const PROTOCOL_MAJOR: u32 = 1;
-pub const PROTOCOL_MINOR: u32 = 4;
+pub const PROTOCOL_MINOR: u32 = 6;
 pub const CARRIER_ORDER: [vw_proto::v1::Carrier; 3] = [
     vw_proto::v1::Carrier::QuicTether,
     vw_proto::v1::Carrier::QuicWifi,
@@ -62,3 +84,6 @@ pub type Result<T> = std::result::Result<T, NetError>;
 mod focus_protocol_tests;
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod remote_protocol_tests;

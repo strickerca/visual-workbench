@@ -1,0 +1,257 @@
+{
+  "schema": 1,
+  "milestone": "M4-KP",
+  "checkpoint": "app-foundation",
+  "status": "software_checks_passed",
+  "acceptance_passed": false,
+  "gates_passed": [],
+  "source_sha256": {
+    "apps/android/src/androidTest/kotlin/com/visualworkbench/android/remote/RemoteDecoderInstrumentedTest.kt": "348bbf9de08d7f38193e5d0181b8e4f87b9691e9c77d99559a5d6489ac6afc05",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditorPalettePanel.kt": "14f601751cd2abc4c2c178a39609896229d55a3c81ee92a49a25a33f24637749",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteGhostOverlay.kt": "b26c4a5546bfc84cc189b59a58c23946fedea70c946eea32527be9b27c5d55d1",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteHardwareDecoder.kt": "57b45aab56fd348526c56b33218663bb5cc40bb79ae8b6e9ece9a957cf7f69c9",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/remote/RemoteEditorPalettePanel.kt": "d56d63b73d090d8df951c39906661568ce414de9a165c6ec43ee4c7a683602c2",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditApi.kt": "a029a98131df0a2042d7496c41da56fb181fa0e0be7ab7d29da8846f97f24aa0",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditorCompatibility.kt": "c1bc54078194638303090583db2928597785e4c4f84ea830d8ad104945cafdb1",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditorPalette.kt": "86563f2a8ee04701e7eba0c9f3bc19272242c394e55cee01122c39aa52c02afe",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditorProfileEvidence.kt": "7820d9b57dc6095ac4c8ce19dd900dedf35d8d9cadd2843b79813f4676c1b98d",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteGhostInk.kt": "d4768fd221d8ad2d2e44cb7cd0c41eb733bfd2902d8696fa138c6006bc54f10b",
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemoteEditorCompatibilityTest.kt": "9e96cc7f5bc8f65bc04ff2ced60f8f43fb141db011ba542e128929c3134ff2dd",
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemoteEditorPaletteTest.kt": "9c00665991a91e1623c217cd468e407c4b17bee7d6c134b29061932615bc30bd",
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemoteGhostInkTest.kt": "a5037a9a2a85446fc080b0b970230096f00323ad36c5f8f96b28e064f541cda3",
+    "tools/app-test/inventory.json": "1775402e912a7e48e1ded629ece12cbb32ff0538d8624277609606a37085122e",
+    "tools/app-test/reports.py": "20f2f515d569eab2d96080d01dbaebe19abc052427ef98ca547ffcb5877a5434",
+    "tools/app-test/test_reports.py": "649806e028d13572e91437329f8c95938a422edaf9ad346c4f473626cb833eab"
+  },
+  "jvm": {
+    "passed": 365,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "modules": [
+      {
+        "module": "shared",
+        "suites": 22,
+        "tests": 152,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "desktop",
+        "suites": 26,
+        "tests": 207,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "android",
+        "suites": 2,
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "new_shared_cases_passed": [
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorCompatibilityTest",
+        "name": "unknown_image_or_bad_digest_never_has_known_commands[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorCompatibilityTest",
+        "name": "profile_digest_is_added_after_receipt_validation_without_a_self_hash_cycle[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorCompatibilityTest",
+        "name": "profile_evidence_requires_effect_and_guard_receipts[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorCompatibilityTest",
+        "name": "sensor_success_requires_physical_device_observation[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorCompatibilityTest",
+        "name": "package_and_file_versions_are_separate_facts[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorCompatibilityTest",
+        "name": "compatibility_is_scoped_to_exact_image_tool_and_settings[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorCompatibilityTest",
+        "name": "labels_do_not_claim_eraser_state_setter_or_local_undo[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorPaletteTest",
+        "name": "mismatched_receipt_and_zero_success_sequence_are_refused[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorPaletteTest",
+        "name": "no_queue_or_retry_while_a_remote_operation_is_pending[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorPaletteTest",
+        "name": "compatibility_observations_never_enable_unverified_commands[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorPaletteTest",
+        "name": "old_epoch_receipt_cannot_reappear_in_reconnected_palette[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorPaletteTest",
+        "name": "stale_grant_geometry_and_missing_focus_refuse_before_dispatch[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorPaletteTest",
+        "name": "revoked_grant_does_not_adopt_delayed_success_receipt[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorPaletteTest",
+        "name": "close_waits_for_cancelled_dispatcher_retirement[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteEditorPaletteTest",
+        "name": "partial_batch_is_reported_without_a_success_claim_or_retry[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteGhostInkTest",
+        "name": "predictions_do_not_advance_sequence_or_creation_expiry[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteGhostInkTest",
+        "name": "ack_fades_at_150_ms_and_duplicate_never_restarts_fade[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteGhostInkTest",
+        "name": "long_stroke_new_segment_anchor_never_invents_sequence_or_extends_old_entry[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteGhostInkTest",
+        "name": "delayed_callback_can_arrive_after_overlay_tick_without_clock_reversal[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteGhostInkTest",
+        "name": "limits_nan_and_mutable_caller_lists_are_bounded[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteGhostInkTest",
+        "name": "no_predicted_only_segment_or_expiry_reset_on_update[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteGhostInkTest",
+        "name": "appended_actual_sample_needs_new_ack_and_never_extends_expiry[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteGhostInkTest",
+        "name": "late_ack_is_clamped_by_independent_creation_expiry[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteGhostInkTest",
+        "name": "missing_callback_still_expires_at_500_ms[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteGhostInkTest",
+        "name": "stale_frame_sequence_and_other_geometry_cannot_ack[desktop]",
+        "status": "passed"
+      },
+      {
+        "class": "com.visualworkbench.shared.RemoteGhostInkTest",
+        "name": "full_scope_and_grant_retirement_clear_immediately[desktop]",
+        "status": "passed"
+      }
+    ],
+    "log": "m4-phone-api-palette-test-apps-r3-r5-3a8c361ba5c44303992d1d51bd587425.log",
+    "inner_log": "test-apps-kotlin-d6f62b96ddc44589ab41a53068d184c8.log",
+    "actual_process_cleanup_confirmed": true
+  },
+  "report_parser": {
+    "passed": 27,
+    "log": "m4-remote-app-parser-r4-a9a3b20c7ceb4899805adb64dff3f009.log",
+    "checks_all_166_actual_source_methods": true
+  },
+  "isolated_android": {
+    "actual_passed_tests": 166,
+    "skipped": 0,
+    "new_decoder_fixture_cases": [
+      "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#actual_callback_thread_is_retained_until_it_joins_and_old_callback_cannot_ack",
+      "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#blocked_configuration_retains_permit_and_surface_until_actual_join",
+      "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#blocked_surface_release_retains_its_io_worker_and_permit_until_join",
+      "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#borrowed_surface_survives_actual_owned_wrapper_retirement",
+      "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#failed_release_stays_owned_and_explicit_close_retries_same_engine",
+      "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#first_frame_requires_idr_and_scope_generation_must_match",
+      "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#input_bytes_are_copied_and_au_size_is_bounded",
+      "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#policy_rejects_oversize_config_odd_coded_geometry_and_unbounded_padding",
+      "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#pts_release_render_callback_and_enqueue_times_remain_distinct",
+      "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#same_config_recovery_has_fresh_owner_and_rejects_delta_start",
+      "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#stale_pts_frame_ticket_and_expired_input_refuse",
+      "com.visualworkbench.android.remote.RemoteDecoderInstrumentedTest#successful_surface_callback_returns_exact_ticket_without_editor_effect_claim"
+    ],
+    "source_bindings_verified": 622,
+    "process_phases_cleanup_confirmed": 45,
+    "device_scope": {
+      "owner_user": 0,
+      "profile_count": 2,
+      "global_package_absence_verified": true,
+      "other_profiles_modified": false,
+      "cleanup_owner_user_only": true
+    },
+    "cleanup": {
+      "process_trees": true,
+      "owned_packages": true,
+      "private_work_disposed": true
+    },
+    "instrumentation_sha256": "9b0eed969731378f01ee03b9c7d7be52517ab6bdc839d679a536cb0be5b7bf24",
+    "artifact_sha256": {
+      "main": "163f54bc419cd0010844e18a0bcfa93ef4e47c02489229fa6a0785bdd959e9c2",
+      "test": "355bde061ffd2c70bd5a5f58c291ab28c1bde28130d9a48d02966586bd57f4a5"
+    },
+    "normal_app_tested": false
+  },
+  "isolated_android_log": "m4-s23-remote-app-hil-r4-0c57f2303a104c3f808c05a1b3e59da5.log",
+  "retained_failed_app_run": {
+    "receipt": "m4-phone-api-palette-test-apps-r1.json",
+    "status": "failed",
+    "log": "m4-phone-api-palette-test-apps-r1-0a5da8d8748d4484afc8655b92e19c10.log",
+    "causes": [
+      "Android coroutine receiver type mismatch",
+      "Ghost test attempted to clear an immutable copied list"
+    ]
+  },
+  "limits": [
+    "Android remote tests use fake decoder engines and real Surface/thread lifecycle fixtures.",
+    "No integrated hardware decode, paired stream, native rendered-frame acknowledgment or physical pen result.",
+    "No live editor action, frame rate, latency or practical owner drawing acceptance.",
+    "Native guard/protocol checks and final app composition have separate source and execution receipts."
+  ],
+  "verification_images": {
+    "created": 0,
+    "retained": 0,
+    "disposal_required": false
+  }
+}

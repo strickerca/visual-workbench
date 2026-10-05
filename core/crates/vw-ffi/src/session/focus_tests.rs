@@ -20,8 +20,8 @@ fn queue(hub: &FocusHub, epoch: u64, value: Pending) -> WorkflowResult<()> {
     hub.queue(epoch, hub.issue(epoch)?, value)
 }
 #[test]
-fn minor_three_control_roundtrip_has_a_bounded_exact_wire_binding() {
-    assert_eq!(vw_net::PROTOCOL_MINOR, 4);
+fn legacy_focus_payload_has_a_bounded_exact_wire_binding_at_current_minor() {
+    assert_eq!(vw_net::PROTOCOL_MINOR, 6);
     let value = wire(&pending(Some(4)), 1).unwrap();
     assert!(value.encoded_len() <= MAX_BYTES);
     assert_eq!(

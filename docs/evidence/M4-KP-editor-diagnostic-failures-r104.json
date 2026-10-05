@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "status": "failure-retained",
+  "source_map_sha256": "aeb4104d61a887827334674ffce810bd761dc36cb86d1f36a2faf9395992d132",
+  "cases": [
+    {
+      "name": "m4-krita-owned-r102-causal-native.json",
+      "sha256": "43e59fd167f73f5aff7473416537ff455150db60c3473fc957c8927972f8a939",
+      "status": "failed",
+      "phase": "baseline-frame",
+      "reason": "input-free-native-baseline-frame",
+      "input_attempt_count": 1,
+      "normalization_completed": 1,
+      "actual_effect_owners_retired": true,
+      "actual_editor_job_io_retired": true,
+      "source_preserved": true,
+      "image_count": 0
+    },
+    {
+      "name": "m4-paint-owned-r102-causal-native.json",
+      "sha256": "4fc0c42b2d990eea71691a62d0d28f2be65191fe20b08008d0926adb0d832b64",
+      "status": "failed",
+      "phase": "baseline-brush-normalize",
+      "reason": "native-effect-success",
+      "input_attempt_count": 1,
+      "normalization_completed": 0,
+      "actual_effect_owners_retired": true,
+      "actual_editor_job_io_retired": true,
+      "source_preserved": true,
+      "image_count": 1
+    },
+    {
+      "name": "m4-krita-owned-r104-causal-native.json",
+      "sha256": "46342d37c74b96d72be9eae7861571bd26ab7a11b78b0cca182c52f9c5c86e71",
+      "status": "failed",
+      "phase": "bind",
+      "reason": "exact-owned-foreground",
+      "input_attempt_count": 0,
+      "normalization_completed": 0,
+      "actual_effect_owners_retired": true,
+      "actual_editor_job_io_retired": true,
+      "source_preserved": true,
+      "image_count": 0
+    }
+  ],
+  "findings": [
+    "R102 Krita accepted the initial selected Brush normalization, then its input-free frame helper failed; old wrapper omitted exit/stderr so the cause remains unproven.",
+    "R102 Paint refused the first Brush click with Ungranted and zero accepted events; exact hit or neutral-key check remains under diagnosis.",
+    "R104 bounded helper diagnostics are present. Krita stopped earlier because foreground activation was denied; exact identity was retained, zero input was attempted."
+  ],
+  "image_disposal": {
+    "sha256": "642f8a0a9296bc68e751837810b080dce12cfcb0402e0652d4c807a24b03d2c5",
+    "count": 1,
+    "disposed": true,
+    "receipt": "m4-r102-image-disposal.json"
+  },
+  "milestone_passed": false,
+  "physical_acceptance": false
+}

@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "kind": "M4-KP-balanced-input-failed-run-and-actual-recovery",
+  "status": "failed",
+  "milestone_acceptance": false,
+  "source_count": 215,
+  "source_map_sha256": "b0f8dcdd9dfc5c245a804864fa380cf65c4016d9ccf5a44b1619cf236c4bac9d",
+  "artifact_snapshot_sha256": "48725ef154af7168864521c1759d8dc52cacfafcb523b3ac310c721a77de4cdf",
+  "source_preserved_after": true,
+  "native_receipt_sha256": "912eae4d7b7c838b4b7b4d6dc1be6929d79e9da3dcc7c861489004a84c1c4c4f",
+  "wrapper_receipt_sha256": "65bb6951f10fc509ec9f6ccc7c664beb80cfb9623ca9d78821ad2dac30e60ab9",
+  "render_records_observed": 2,
+  "rendered_phases": [
+    "initial",
+    "background_return"
+  ],
+  "failure_boundary": "reconnect_fresh_native_carrier_deadline",
+  "native_phone_reconnect_state": "Disconnected",
+  "reconnect_media_received": 0,
+  "reconnect_config_received": 0,
+  "phone_input_dispatch_completed": true,
+  "full_controller_input_receipt_validated": false,
+  "receiver_pen_down_move_up_observed": true,
+  "receiver_post_up_update_observed": true,
+  "later_receiver_mouse_events_observed": true,
+  "earlier_zero_directory_length_inference_corrected": true,
+  "cleanup_defect": "closed_carrier_notification_prevented_reaching_actual_session_close",
+  "recovery": {
+    "method": "reviewed_exact_live_JVM_single_cleanup_call_replacement",
+    "manifest_sha256": "e04a26b46e629f36c680540e1c19e85fbb3d1ad8ae78317f4584818f6d8e6868",
+    "real_session_close_awaited": true,
+    "original_retirement_checks_preserved": true,
+    "owners_killed": false,
+    "receipt_or_owner_flags_forged": false
+  },
+  "actual_cleanup": {
+    "host": true,
+    "phone": true,
+    "input": true,
+    "processes_and_readers": true,
+    "owned_packages": true,
+    "private_run_directory": true
+  },
+  "profile_inventory_after_failure": "not_measured",
+  "physical_pen_fidelity": false,
+  "editor_effect": false,
+  "latency_acceptance": false,
+  "screenshots_created": 0
+}

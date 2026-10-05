@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "kind": "actual-linker-output-and-primary-documentation-correction",
+  "status": "diagnostic",
+  "bound_build_rs_sha256": "277bd8cb72feedb02b951c481e593c7a1eef203778d4d80aebd839e5993faf9a",
+  "historical_integration_receipt_sha256": "bf40dcdc77dce9593e1620c55b774f8a15fcc14f3f7afd40f7f6cafe0366c24c",
+  "historical_integration_exit_zero_and_owner_retirement_preserved": true,
+  "prior_omitted_pdb_claim_confirmed": false,
+  "observed_pdb_output": {
+    "relative_path": "NONE",
+    "bytes": 128929792,
+    "sha256": "c67c518060061c7361dd91f9c5bfef1c4b9e99d67a90021ea550c6cadaa8f864",
+    "msf7_header_observed": true
+  },
+  "finding": "/PDB:NONE names a PDB output NONE; it does not omit external PDB generation.",
+  "documented_omission_option": "/DEBUG:NONE",
+  "ordered_source_repair_and_fresh_build_pending": true,
+  "primary_sources": [
+    "https://learn.microsoft.com/en-us/cpp/build/reference/pdb-use-program-database?view=msvc-170",
+    "https://learn.microsoft.com/en-us/cpp/build/reference/debug-generate-debug-info?view=msvc-170"
+  ],
+  "pdb_is_build_cache_not_delivery_asset": true,
+  "private_or_binary_artifacts_published": false,
+  "build_tasks_remaining": 6,
+  "milestone_passed": false
+}
