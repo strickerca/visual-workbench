@@ -14,7 +14,8 @@ import kotlinx.coroutines.*
     val scope=rememberCoroutineScope();val palette=remember(remote){RemoteEditorPalette(remote,scope)}
     val state by remote.state.collectAsState()
     var windows by remember{mutableStateOf<List<RemoteWindowCandidate>>(emptyList())}
-    var selected by remember{mutableStateOf<RemoteWindowCandidate?>(null)}
+    val selection=remember(remote){RemoteWindowSelection(remote)}
+    val selected by selection.selected.collectAsState()
     var message by remember{mutableStateOf<String?>(null)}
     var busy by remember{mutableStateOf(false)}
     val consumer=remember(remote){object:RemoteConsumerOwner{override fun invalidate(){};override suspend fun retire():Boolean{palette.close();return true}}.also{remote.registerConsumer(it)}}
@@ -26,8 +27,8 @@ import kotlinx.coroutines.*
         (state.destinationLabel?:selected?.let{"${it.label} · ${it.executableName}"})?.let{Text("Selected window: $it")}
         Text("Choose an exact window, then grant on this computer. Windows may require you to focus the editor and press Grant again.")
         TextButton(onClick={run{windows=remote.windows()}},enabled=!busy){Text("Refresh windows")}
-        for(candidate in windows){TextButton(onClick={selected=candidate;run{remote.select(candidate)}},enabled=!busy){Text("${candidate.label} · ${candidate.executableName}")}}
-        Button(onClick={run{remote.select(checkNotNull(selected));remote.grant()}},enabled=!busy&&selected!=null){Text("Grant selected window")}
+        for(candidate in windows){TextButton(onClick={run{selection.select(candidate)}},enabled=!busy){Text("${candidate.label} · ${candidate.executableName}")}}
+        Button(onClick={run{selection.grant()}},enabled=!busy&&selected!=null){Text("Grant selected window")}
         TextButton(onClick={run{remote.pause("owner_pause")}},enabled=!busy){Text("Pause control")}
         state.encoderDescription?.let{Text(it)}
         (message?:state.reason)?.let{Text(it)}

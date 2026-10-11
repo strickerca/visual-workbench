@@ -13,17 +13,17 @@ import com.visualworkbench.shared.*
 
 @Composable
 internal fun SelectionControls(controller: SelectionController, selectedObject: String?,
-    onSave: (SelectionSaveTicket) -> Unit, modifier: Modifier = Modifier) {
+    onSave: (SelectionSaveTicket) -> Unit, modifier: Modifier = Modifier, onOpen: (() -> Unit)? = null) {
     val state by controller.state.collectAsState()
     var open by remember { mutableStateOf(false) }
     Surface(modifier, elevation = 4.dp) {
         Row(Modifier.horizontalScroll(rememberScrollState())) {
-            TextButton({ open = true }, Modifier.heightIn(min = 48.dp)) { Text(if (state.active) "Selection · ${state.tool.name}" else "Select pixels") }
+            TextButton({ if (onOpen == null) open = true else onOpen() }, Modifier.heightIn(min = 48.dp)) { Text(if (state.active) "Selection · ${state.tool.name}" else "Select pixels") }
             if (state.active) TextButton({ controller.interaction.active(false) }, Modifier.heightIn(min = 48.dp)) { Text("Return to drawing") }
             if (state.busy) TextButton(controller::cancel, Modifier.heightIn(min = 48.dp)) { Text("Cancel selection") }
         }
     }
-    if (open) SelectionPanel(controller, selectedObject, { ticket -> open = false; onSave(ticket) }, { open = false })
+    if (onOpen == null && open) SelectionPanel(controller, selectedObject, { ticket -> open = false; onSave(ticket) }, { open = false })
 }
 
 @Composable

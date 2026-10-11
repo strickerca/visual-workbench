@@ -99,7 +99,10 @@ internal class SelectionController(
             if (!destination.discard(uri)) mutableSave.value = SelectionSaveState(message = "The unused destination could not be removed. An empty file may remain there.")
         } }
     }
-    fun cancel() { validPublication?.set(false); saveJob?.cancel(); interaction.cancelOperation() }
+    fun cancel() {
+        validPublication?.set(false); saveJob?.cancel()
+        if (state.value.busy) interaction.cancelOperation() else interaction.cancelGesture()
+    }
     fun background() { interaction.cancelGesture(); cancel() }
     suspend fun detach(): Unit = withContext(NonCancellable) {
         validPublication?.set(false); saveJob?.cancelAndJoin(); saveJob = null

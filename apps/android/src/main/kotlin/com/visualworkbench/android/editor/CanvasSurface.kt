@@ -10,6 +10,7 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.View
 import android.view.ViewConfiguration
 import androidx.graphics.lowlatency.CanvasFrontBufferedRenderer
 import androidx.graphics.surface.SurfaceControlCompat
@@ -46,6 +47,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
 
     init {
         contentDescription = "Document canvas. Pen draws; one finger pans; two fingers zoom and rotate."
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         isFocusable = true
         holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(holder: SurfaceHolder) { ensureRenderer() }

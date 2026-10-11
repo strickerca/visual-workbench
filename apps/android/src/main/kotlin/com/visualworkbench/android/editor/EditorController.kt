@@ -30,6 +30,23 @@ internal data class TextDraft(val objectId: String?, val anchor: Point, val text
 internal enum class ImportOutcome { Imported, Cancelled, Retained }
 internal data class CameraCapture(val token: String, val bytes: Long)
 
+/** A successful open belongs to one native handle and editor generation. */
+internal class ProjectOpenCompletion<P : Any>(private val opened: P, private val epoch: Long) {
+    fun deliverIfCurrent(current: P?, currentEpoch: Long, onOpened: (P, Long) -> Unit) {
+        if (current === opened && currentEpoch == epoch) onOpened(opened, epoch)
+    }
+}
+
+internal fun projectReceiveFailureMessage(kind: SessionFailureKind): String = when (kind) {
+    SessionFailureKind.Authentication -> "The project could not be verified as belonging to the selected computer. Check its pairing and project ownership on the PC."
+    SessionFailureKind.Timeout, SessionFailureKind.Transport -> "The computer's project could not be reached. On the PC, open the project and start its connection in Pair devices. For USB, select the connection and this phone, choose Use selected connection for USB project, then Connect phone to this project."
+    SessionFailureKind.Storage -> "The received project could not be saved or verified on this phone. Check available storage. Existing saved projects are unchanged."
+    SessionFailureKind.Backpressure -> "The project transfer exceeded a current resource or transfer limit. Existing saved projects are unchanged."
+    SessionFailureKind.Cancelled -> "Project receive canceled. Existing saved projects are unchanged."
+    SessionFailureKind.Closed -> "The project connection closed before receive finished. Reconnect to the selected computer and try again. Existing saved projects are unchanged."
+    else -> "The computer project could not be received safely (${kind.name}). Existing saved projects are unchanged."
+}
+
 /** UI state lives on Main; native/storage work is suspendable and input queues are bounded. */
 internal class EditorController @JvmOverloads constructor(application: Application, val core: WorkbenchCore = workbenchCore(),
     captureStatusFactory: (ProjectLink) -> WorkbenchAgentCaptureStatus = ::agentCaptureStatus,
@@ -357,7 +374,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (transferJob != null) { message = "Finish or cancel the image transfer before leaving this screen."; return }
         cancelTool(); diagnostics.background(); showContext = false
         if (screen == WorkbenchScreen.Pairing && next != WorkbenchScreen.Pairing) pairing.leave()
-        if (next == WorkbenchScreen.Pairing) { pairing.scanner = true; pairing.enter() }
+        if (next == WorkbenchScreen.Pairing) pairing.enter()
         if (next == WorkbenchScreen.Projects && project != null) {
             if (pending != 0) { message = "Finishing the current edit. Try returning to projects in a moment."; return }
             busy = true
@@ -390,7 +407,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         captureNavigationGeneration++
         ai.background();instructionInteractionChanged()
         instructionFocus.sharing(false); instructionFocus.following(false)
-        selections.background(); erasers.interaction.cancelOperation()
+        selections.background()
+        if (erasers.state.value.busy) erasers.interaction.cancelOperation()
         cancelTool(); finishRemotePreview(sliderLink, sliderGesture, true)
         sliderGesture = null; sliderLink = null; sliderRevision = null; selectedStyleDraft = null; showBrush = false
         pairing.leave(); diagnostics.background(); hoverPoint = null; publish()
@@ -440,7 +458,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
     fun open(id: String) = openRequest { repository.open(id) }
-    private fun openRequest(knownSrgb: Boolean = false, transfer: Boolean = false, load: suspend () -> WorkbenchProject): Job? {
+    private fun openRequest(knownSrgb: Boolean = false, transfer: Boolean = false, receivingProject: Boolean = false,
+        onOpened: ((WorkbenchProject, Long) -> Unit)? = null, load: suspend () -> WorkbenchProject): Job? {
         if(!mayCloseAi())return null
         if (instructionEditor.hasUnsaved()) {
             message = "Save or discard the instruction draft before opening another project."; screen = WorkbenchScreen.Instructions; return null
@@ -449,6 +468,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         busy = true; cancelTool()
         val job = scope.launch {
             var instructionSeal = false
+            var completion: ProjectOpenCompletion<WorkbenchProject>? = null
             try {
                 val opened=mutations.withLock {
                     if(disposing)return@withLock false
@@ -474,9 +494,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 observeProject(current, token)
                 colorAssumed = knownSrgb; screen = WorkbenchScreen.Canvas; cameraFitted = false
                 fit(); loadBackground()
+                if (onOpened != null) completion = ProjectOpenCompletion(current, token)
             } catch (cancel: CancellationException) { throw cancel }
+            catch (error: SessionFailure) {
+                if (receivingProject) message = projectReceiveFailureMessage(error.kind) else report(error)
+            }
             catch (error: CoreFailure) {
-                if (transfer) message = rasterFailure(error, importing = true) else report(error)
+                if (transfer && !receivingProject) message = rasterFailure(error, importing = true) else report(error)
             }
             catch (error: Exception) { report(error) }
             finally {
@@ -484,6 +508,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     instructionEditor.detach(); instructionEditor.resume(); semanticEditor.resumeAfterReplacement(); instructionEditor.refresh(); instructionFocus.revisionChanged()
                 }
                 busy = false; if (transfer) { transferLabel = null; transferJob = null }; publish()
+            }
+            currentCoroutineContext().ensureActive()
+            if (!disposing && document != null && screen == WorkbenchScreen.Canvas && onOpened != null) {
+                completion?.deliverIfCurrent(project, epoch, onOpened)
             }
         }
         if (transfer) transferJob = job.takeIf { it.isActive }
@@ -639,11 +667,16 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val current = project ?: run { message = "Open a project or receive the computer's project first."; return }
         val peer = pairing.selectedPeer ?: run { message = "Choose a paired computer first."; return }
         val endpoints = try { pairing.endpoint() } catch (error: Exception) { report(error); return }
+        connectProject(current, epoch, peer, endpoints)
+    }
+
+    private fun connectProject(current: WorkbenchProject, token: Long, peer: String, endpoints: List<SessionEndpoint>) {
+        if (busy || disposing || pending != 0 || current !== project || token != epoch) return
         busy = true
         connectionJob = scope.launch {
             try {
                 mutations.withLock {
-                    if (disposing || project !== current) return@withLock
+                    if (disposing || project !== current || token != epoch) return@withLock
                     detachLink()
                     val sessions = pairing.service()
                     val role = sessions.projectRole(current)
@@ -651,8 +684,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         message = "This project belongs to a different host. Choose its paired computer."; return@withLock
                     }
                     val created = if (role.isHost) sessions.host(current, peer, endpoints) else sessions.connect(current, peer, endpoints)
-                    if (disposing || project !== current) { withContext(NonCancellable) { created.close() }; return@withLock }
-                    link = created; observeLink(created, current, epoch, ++linkEpoch)
+                    if (disposing || project !== current || token != epoch) { withContext(NonCancellable) { created.close() }; return@withLock }
+                    link = created; observeLink(created, current, token, ++linkEpoch)
                     instructionFocus.attach(created)
                     message = if (role.isHost) "Listening for the paired computer on the selected phone address." else "Connecting to the paired computer."
                 }
@@ -666,13 +699,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     fun receiveProject() {
         val peer = pairing.selectedPeer ?: run { message = "Choose a paired computer first."; return }
         val endpoints = try { pairing.endpoint() } catch (error: Exception) { report(error); return }
-        val job = openRequest(transfer = true) {
+        openRequest(transfer = true, receivingProject = true,
+            onOpened = { current, token -> connectProject(current, token, peer, endpoints) }) {
             transferLabel = "Receiving and verifying the computer's project…"
             pairing.service().receiveProject(repository.receivePath(), peer, endpoints)
-        } ?: return
-        scope.launch {
-            job.join()
-            if (!disposing && project != null && document != null && screen == WorkbenchScreen.Canvas) connectCurrent()
         }
     }
 

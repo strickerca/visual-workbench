@@ -66,7 +66,12 @@ public class RemoteEditorPalette(
                 }
             } catch(cancelled:CancellationException) { throw cancelled }
             catch(_:Exception) {
-                mutable.update{current->if(current.target?.binding==target.binding&&!current.closed)current.copy(message="Remote command failed; no retry was sent.") else current}
+                mutable.update { current ->
+                    val currentTarget=current.target
+                    if(!current.closed&&currentTarget?.binding==target.binding&&
+                        currentTarget.identity==target.identity&&remoteEditorActionEnabled(currentTarget,action))
+                        current.copy(message="Remote command failed; no retry was sent.") else current
+                }
             } finally {
                 // Dispatcher cancellation must join its native operation before
                 // returning. This palette retains its admission until then.
@@ -92,7 +97,11 @@ public class RemoteEditorPalette(
 
 public fun remoteEditorActionEnabled(target:RemoteTargetState,action:RemoteEditorAction):Boolean {
     if(!target.identity.valid()||!target.grantActive||target.commandBusy||target.pauseReason!=null||action !in remoteEditorActions(target.identity.editor)||action !in target.verifiedActions)return false
-    val proof=target.focusProof ?: return false
+    // Exactly one variant. Selection-only proof supports the closed essential
+    // action set; legacy keyboard actions retain actual canvas focus.
+    if((target.focusProof==null)==(target.selectedCanvasProof==null))return false
+    if(target.selectedCanvasProof!=null&&action.ordinal>=10)return false
+    val proof:RemoteCanvasIdentityProof=target.focusProof?:target.selectedCanvasProof?:return false
     // This is an additional UI fence. Only native current proof can authorize
     // dispatch; an arbitrary caller-created descriptor has no authority.
     return target.identity.shortcutProfileDigest!=null&&proof.shortcutProfileDigest==target.identity.shortcutProfileDigest&&
@@ -106,7 +115,7 @@ public fun remoteEditorPaletteReason(target:RemoteTargetState?):String? = when {
     !target.grantActive->"The PC must grant control before remote commands."
     target.commandBusy->"Finishing the editor command; drawing resumes when the canvas is checked."
     target.pauseReason!=null->"Remote control is paused. Revalidate the selected editor on the PC."
-    target.focusProof==null->"Focus the verified editor canvas on the PC."
+    target.focusProof==null&&target.selectedCanvasProof==null->"Focus the verified editor canvas on the PC."
     target.identity.shortcutProfileDigest==null||target.verifiedActions.isEmpty()->"Shortcuts for this exact editor version have not been verified."
     else->null
 }

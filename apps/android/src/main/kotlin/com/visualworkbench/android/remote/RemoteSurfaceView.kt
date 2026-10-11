@@ -6,6 +6,8 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.FrameLayout
 import com.visualworkbench.shared.RemoteVideoConfig
 import com.visualworkbench.shared.RemoteViewport
@@ -26,6 +28,27 @@ internal class RemoteSurfaceView(context:Context,private val controller:RemoteEd
             override fun surfaceDestroyed(holder:SurfaceHolder){controller.surface(null,this@RemoteSurfaceView)}
         })
         isFocusable=true
+        importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        contentDescription="Remote computer canvas. A pen draws when computer control is active."
+    }
+    override fun getAccessibilityClassName():CharSequence = RemoteSurfaceView::class.java.name
+    override fun onInitializeAccessibilityNodeInfo(info:AccessibilityNodeInfo){
+        super.onInitializeAccessibilityNodeInfo(info)
+        val observed=controller.accessibilityInputSnapshot()
+        info.extras.putBoolean("com.visualworkbench.remote.ready",observed.ready)
+        info.extras.putBoolean("com.visualworkbench.remote.nativeGrant",observed.nativeGrant)
+        info.extras.putBoolean("com.visualworkbench.remote.paint",observed.paintTarget)
+        info.extras.putString("com.visualworkbench.remote.bindingDigest",observed.bindingDigest)
+        info.extras.putLong("com.visualworkbench.remote.renderAgeMillis",observed.renderAgeMillis)
+        info.extras.remove("com.visualworkbench.remote.viewport")
+        info.extras.remove("com.visualworkbench.remote.hostClientRect")
+        observed.hostClientRect?.let{info.extras.putIntArray("com.visualworkbench.remote.hostClientRect",it)}
+        observed.localViewport?.let{local->
+            if(local[0]>=0&&local[1]>=0&&local[2]<=width&&local[3]<=height&&local[2]>local[0]&&local[3]>local[1]){
+                val position=IntArray(2);getLocationOnScreen(position)
+                info.extras.putIntArray("com.visualworkbench.remote.viewport",intArrayOf(local[0]+position[0],local[1]+position[1],local[2]+position[0],local[3]+position[1]))
+            }
+        }
     }
     fun configure(value:RemoteVideoConfig?){if(value==configuration)return;configuration=value;layoutVideo()}
     private fun layoutVideo(){

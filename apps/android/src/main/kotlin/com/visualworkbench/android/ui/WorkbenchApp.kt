@@ -173,6 +173,10 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
     val eraserState by editor.erasers.state.collectAsState()
     val selectionState by editor.selections.state.collectAsState()
     val eraserSelected = eraserState.active || (selectionState.active && selectionState.tool == com.visualworkbench.shared.SelectionTool.MaskEraser)
+    var projectActionsOpen by remember(editor.document?.documentId) { mutableStateOf(false) }
+    var pixelSelectionOpen by remember(editor.document?.documentId) { mutableStateOf(false) }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    val contextHeight = (maxHeight * .24f).coerceIn(48.dp, 144.dp)
     Column(Modifier.fillMaxSize()) {
         Surface(elevation = 4.dp) {
             Column {
@@ -180,10 +184,24 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                     TextButton(onClick = { editor.navigate(WorkbenchScreen.Projects) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("← Projects") }
                     Text(editor.document?.title ?: "Opening…", modifier = Modifier.weight(1f).padding(horizontal = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.subtitle1)
-                    TextButton(onClick = editor::openAi,enabled=!editor.busy&&editor.pending==0,modifier=Modifier.heightIn(min=48.dp)){Text("AI edit")}
-                    TextButton(onClick = { editor.navigate(WorkbenchScreen.Settings) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Settings") }
-                    TextButton(onClick = { editor.navigate(WorkbenchScreen.Pairing) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Connect") }
-                    TextButton(onClick = editor::editInstruction, modifier = Modifier.heightIn(min = 48.dp)) { Text("Instructions") }
+                    Box {
+                        TextButton(onClick = { projectActionsOpen = true }, modifier = Modifier.heightIn(min = 48.dp)
+                            .semantics { contentDescription = "More project actions" }) { Text("More") }
+                        DropdownMenu(projectActionsOpen, { projectActionsOpen = false }) {
+                            DropdownMenuItem(onClick = { projectActionsOpen = false; editor.openAi() }, enabled = !editor.busy && editor.pending == 0) { Text("AI edit") }
+                            DropdownMenuItem(onClick = { projectActionsOpen = false; editor.navigate(WorkbenchScreen.Settings) }) { Text("Settings") }
+                            DropdownMenuItem(onClick = { projectActionsOpen = false; editor.navigate(WorkbenchScreen.Pairing) }) { Text("Connect") }
+                            if (editor.connection?.peerViewport?.documentId == editor.document?.documentId && editor.connection?.peerViewport != null) {
+                                DropdownMenuItem(onClick = { projectActionsOpen = false; editor.matchPeer() }) { Text("Match computer view") }
+                                DropdownMenuItem(onClick = { projectActionsOpen = false; editor.followPeer(!editor.followPeer) }) {
+                                    Text(if (editor.followPeer) "Stop following" else "Follow computer view")
+                                }
+                            }
+                            DropdownMenuItem(onClick = { projectActionsOpen = false; editor.editInstruction() }) { Text("Instructions") }
+                            DropdownMenuItem(onClick = { projectActionsOpen = false; pixelSelectionOpen = true }, enabled = !editor.busy && editor.document != null) { Text("Pixel selection") }
+                            DropdownMenuItem(onClick = { projectActionsOpen = false; onExport() }, enabled = !editor.busy && editor.pending == 0 && editor.document != null) { Text("Export") }
+                        }
+                    }
                 }
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -191,16 +209,6 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                             ?.let { "EXPORT READY · revision ${it.hostSeq} · ${it.width} × ${it.height} px" } ?: editor.connectionLabel(),
                             style = MaterialTheme.typography.caption, color = MaterialTheme.colors.secondary)
                         editor.document?.let { Text("${it.width} × ${it.height} px · ${it.bitDepth}-bit original", style = MaterialTheme.typography.caption) }
-                    }
-                    OutlinedButton(onClick = onExport, enabled = !editor.busy && editor.pending == 0 && editor.document != null,
-                        modifier = Modifier.heightIn(min = 48.dp)) { Text("Export") }
-                }
-                if (editor.connection?.peerViewport?.documentId == editor.document?.documentId && editor.connection?.peerViewport != null) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                        TextButton(onClick = editor::matchPeer, modifier = Modifier.heightIn(min = 48.dp)) { Text("Match computer view") }
-                        TextButton(onClick = { editor.followPeer(!editor.followPeer) }, modifier = Modifier.heightIn(min = 48.dp)) {
-                            Text(if (editor.followPeer) "Stop following" else "Follow computer view")
-                        }
                     }
                 }
             }
@@ -241,24 +249,46 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                     }
                 }
             }
-            editor.blockingMessage?.let { reason ->
-                Surface(Modifier.align(Alignment.Center).padding(24.dp).widthIn(max = 440.dp), shape = RoundedCornerShape(16.dp), elevation = 12.dp) {
-                    Column(Modifier.padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Original preserved", style = MaterialTheme.typography.h6)
-                        Text(reason)
-                        if (editor.needsColorConsent) Button(onClick = editor::assumeSrgb, enabled = !editor.busy,
-                            modifier = Modifier.heightIn(min = 48.dp)) { Text("Use sRGB for untagged colors") }
-                        OutlinedButton(onClick = { editor.navigate(WorkbenchScreen.Projects) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Back to projects") }
-                    }
-                }
-            }
             if (editor.tool == EditorTool.Select && editor.selected != null) Text("Drag to move · corner handles resize", style = MaterialTheme.typography.caption,
                 color = MaterialTheme.colors.onSurface, modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp).background(MaterialTheme.colors.surface, RoundedCornerShape(8.dp)).padding(8.dp))
         }
-        EraserControls(editor.erasers, editor::chooseEraser, editor::stopErasing, Modifier.fillMaxWidth())
-        SelectionControls(editor.selections, editor.selected, onSelectionSave, Modifier.fillMaxWidth())
+        val eraserControlsVisible = eraserState.busy || (eraserState.active && !selectionState.active)
+        val selectionControlsVisible = selectionState.active || selectionState.busy
+        val inactiveEraseMessage = eraserState.message?.takeIf { !eraserControlsVisible }
+        if (eraserControlsVisible || selectionControlsVisible || inactiveEraseMessage != null) {
+            Column(Modifier.fillMaxWidth().heightIn(max = contextHeight).verticalScroll(rememberScrollState())) {
+                if (eraserControlsVisible) EraserControls(editor.erasers, editor::chooseEraser, editor::stopErasing, Modifier.fillMaxWidth())
+                if (selectionControlsVisible) SelectionControls(editor.selections, editor.selected, onSelectionSave, Modifier.fillMaxWidth(),
+                    onOpen = { pixelSelectionOpen = true })
+                inactiveEraseMessage?.let { status ->
+                    Row(Modifier.fillMaxWidth().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(status, Modifier.weight(1f), style = MaterialTheme.typography.caption)
+                        TextButton(onClick = editor.erasers.interaction::dismissMessage, modifier = Modifier.heightIn(min = 48.dp)
+                            .semantics { contentDescription = "Dismiss erase status" }) { Text("Dismiss") }
+                    }
+                }
+            }
+        }
         QuickControls(editor.displayedBrush(), editor::brush, { editor.brushDialog(true) },
             editor.info?.canUndo == true && editor.pending == 0, editor.info?.canRedo == true && editor.pending == 0, editor::undo, editor::redo)
+    }
+    if (pixelSelectionOpen && editor.blockingMessage == null) SelectionPanel(editor.selections, editor.selected,
+        { ticket -> pixelSelectionOpen = false; onSelectionSave(ticket) }, { pixelSelectionOpen = false })
+    editor.blockingMessage?.let { reason ->
+        AlertDialog(onDismissRequest = { editor.navigate(WorkbenchScreen.Projects) }, title = { Text("Original preserved") },
+            text = {
+                Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
+                    editor.document?.title?.let { Text(it, style = MaterialTheme.typography.subtitle1) }
+                    Text(reason)
+                }
+            },
+            confirmButton = {
+                if (editor.needsColorConsent) Button(onClick = editor::assumeSrgb, enabled = !editor.busy,
+                    modifier = Modifier.heightIn(min = 48.dp)) { Text("Use sRGB for untagged colors") }
+            }, dismissButton = {
+                TextButton(onClick = { editor.navigate(WorkbenchScreen.Projects) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Back to projects") }
+            })
+    }
     }
 }
 

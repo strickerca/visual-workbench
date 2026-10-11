@@ -7,6 +7,25 @@ import kotlin.test.*
 
 class RemoteEditorPaletteTest {
     private fun fixture():PaletteFixture=PaletteFixture()
+    @Test fun selected_canvas_after_toolbar_keeps_sequential_essential_commands_without_focus_claim(){
+        val f=fixture();f.dispatcher.target.value=f.dispatcher.target.value!!.selectedObservation()
+        assertNull(f.dispatcher.target.value!!.focusProof)
+        assertTrue(f.palette.command(RemoteEditorAction.Undo));assertTrue(f.palette.command(RemoteEditorAction.Redo))
+        assertEquals(2,f.dispatcher.calls.size);assertNull(f.dispatcher.target.value!!.focusProof)
+        assertTrue(f.dispatcher.target.value!!.grantActive);f.close()
+    }
+    @Test fun selected_canvas_never_enables_extended_keyboard_routes(){
+        val f=fixture();val selected=f.dispatcher.target.value!!.selectedObservation()
+        f.dispatcher.target.value=selected.copy(verifiedActions=selected.verifiedActions+RemoteEditorAction.ActualPixels)
+        assertFalse(f.palette.command(RemoteEditorAction.ActualPixels));assertTrue(f.dispatcher.calls.isEmpty());f.close()
+    }
+    @Test fun selected_canvas_mismatch_and_dual_proof_refuse_before_dispatch(){
+        val f=fixture();val initial=f.dispatcher.target.value!!;val selected=initial.selectedObservation();val proof=selected.selectedCanvasProof!!
+        for(next in listOf(selected.copy(focusProof=initial.focusProof),selected.copy(binding=selected.binding.copy(geometryRevision=2u)),selected.copy(selectedCanvasProof=proof.copy(shortcutProfileDigest="f".repeat(64))),selected.copy(verifiedActions=emptySet()))){
+            f.dispatcher.target.value=next;assertFalse(f.palette.command(RemoteEditorAction.Undo))
+        }
+        assertTrue(f.dispatcher.calls.isEmpty());f.close()
+    }
     @Test fun native_command_barrier_disables_palette_without_revoking_pen_grant(){
         val f=fixture();val current=f.dispatcher.target.value!!
         f.dispatcher.target.value=current.copy(commandBusy=true)
@@ -39,6 +58,22 @@ class RemoteEditorPaletteTest {
         f.dispatcher.target.value=f.dispatcher.target.value!!.copy(grantActive=false);f.dispatcher.gate!!.complete(Unit)
         assertNull(f.palette.state.value.message);assertFalse(f.palette.state.value.busy);f.close()
     }
+    @Test fun revoked_grant_does_not_adopt_delayed_dispatch_failure(){
+        val f=fixture();f.dispatcher.gate=CompletableDeferred();f.dispatcher.failure=IllegalStateException("private old command detail")
+        assertTrue(f.palette.command(RemoteEditorAction.Undo))
+        f.dispatcher.target.value=f.dispatcher.target.value!!.copy(grantActive=false);f.dispatcher.gate!!.complete(Unit)
+        assertNull(f.palette.state.value.message);assertFalse(f.palette.state.value.busy)
+        assertFalse(f.palette.command(RemoteEditorAction.Redo));assertEquals(1,f.dispatcher.calls.size);f.close()
+    }
+    @Test fun replacement_editor_does_not_adopt_same_binding_delayed_dispatch_failure(){
+        val f=fixture();f.dispatcher.gate=CompletableDeferred();f.dispatcher.failure=IllegalStateException("private old editor detail")
+        assertTrue(f.palette.command(RemoteEditorAction.Undo));val old=f.dispatcher.target.value!!
+        val replacement=old.copy(identity=old.identity.copy(fileVersion="5.3.5.0"))
+        assertEquals(old.binding,replacement.binding);assertTrue(replacement.identity.valid())
+        f.dispatcher.target.value=replacement;f.dispatcher.gate!!.complete(Unit)
+        assertNull(f.palette.state.value.message);assertFalse(f.palette.state.value.busy)
+        assertEquals(replacement.identity,f.palette.state.value.target!!.identity);assertEquals(1,f.dispatcher.calls.size);f.close()
+    }
     @Test fun mismatched_receipt_and_zero_success_sequence_are_refused(){
         val f=fixture();f.dispatcher.receiptTransform={it.copy(inputSequence=0uL)};f.palette.command(RemoteEditorAction.Undo);assertEquals("Remote command receipt was refused.",f.palette.state.value.message)
         f.dispatcher.receiptTransform={it.copy(action=RemoteEditorAction.Redo)};f.palette.command(RemoteEditorAction.Undo);assertEquals("Remote command receipt was refused.",f.palette.state.value.message);f.close()
@@ -58,6 +93,10 @@ class RemoteEditorPaletteTest {
         assertTrue(f.palette.compatibility("brush","c".repeat(64),listOf(record)));assertFalse(f.palette.command(RemoteEditorAction.Undo));assertTrue(f.dispatcher.calls.isEmpty());f.close()
     }
 }
+private fun RemoteTargetState.selectedObservation():RemoteTargetState {
+    val focus=checkNotNull(focusProof)
+    return copy(focusProof=null,selectedCanvasProof=RemoteSelectedCanvasProof(focus.provider,focus.runtimeIdHash,focus.processId,focus.targetToken,focus.geometryRevision,focus.sampledQpc100ns,focus.focusedClassName,focus.focusedControlType,focus.canvasRectHost,focus.shortcutProfileDigest))
+}
 private fun paletteImmediate(block:suspend()->Unit){var completed:Result<Unit>?=null;block.startCoroutine(object:Continuation<Unit>{override val context:CoroutineContext=EmptyCoroutineContext;override fun resumeWith(result:Result<Unit>){completed=result}});checkNotNull(completed).getOrThrow()}
 private class PaletteFixture {
     val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
@@ -74,10 +113,12 @@ private class PaletteDispatcher:RemoteCommandDispatcher {
     var gate:CompletableDeferred<Unit>?=null
     var retirement:CompletableDeferred<Unit>?=null
     var cancelled=false
+    var failure:Exception?=null
     var receiptTransform:(RemoteCommandReceipt)->RemoteCommandReceipt={it}
     override suspend fun dispatch(binding:RemoteTargetBinding,action:RemoteEditorAction):RemoteCommandReceipt {
         calls+=binding to action
         try{gate?.await()}catch(error:CancellationException){cancelled=true;withContext(NonCancellable){retirement?.await()};throw error}
+        failure?.let{throw it}
         return receiptTransform(RemoteCommandReceipt(binding,action,1uL,200uL,RemoteCommandStatus.Injected,null))
     }
 }

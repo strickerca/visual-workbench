@@ -7,6 +7,7 @@ import android.view.MotionEvent
 import android.view.Surface
 import com.visualworkbench.shared.*
 import java.util.concurrent.atomic.AtomicReference
+import java.security.MessageDigest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -28,6 +29,9 @@ internal data class RemoteControllerInputEvidence(val input:RemoteControllerInpu
 internal data class RemoteControllerInputObservation(val admission:RemoteInputAdmission,
     val phase:RemotePenPhase,val ghostAccepted:Boolean,val ghostSegment:GhostSegment?)
 internal data class TouchAdmission(val binding:RemoteTargetBinding,val sample:RemotePenSample,val point:GhostPoint,val contact:Boolean,val fence:Long)
+/** Read-only accessibility observation. No setter, grant or input reservation. */
+internal data class RemoteAccessibilityInputSnapshot(val ready:Boolean,val nativeGrant:Boolean,
+    val paintTarget:Boolean,val bindingDigest:String,val localViewport:IntArray?,val hostClientRect:IntArray?,val renderAgeMillis:Long)
 /** Owns every native ticket, duplicated Surface/codec worker, palette and input
  * queue until actual retirement. No callback or predicted sample invents ACK. */
 internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:CoroutineScope):RemoteConsumerOwner {
@@ -44,6 +48,27 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
     val ghost=RemoteGhostInk()
     fun inputEvidence():RemoteControllerInputEvidence = synchronized(inputFence){
         RemoteControllerInputEvidence(inputObservationMutable.value,renderedMutable.value,echoMutable.value,ghost.snapshot(System.nanoTime()))
+    }
+    fun accessibilityInputSnapshot():RemoteAccessibilityInputSnapshot = synchronized(inputFence){
+        val target=remote.target.value;val state=remote.state.value;val map=mapping.get();val rendered=renderedMutable.value
+        val paint=target?.identity?.let{it.editor==RemoteEditorKind.Paint&&it.valid()}==true
+        val grant=target?.grantActive==true
+        val current=map!=null&&rendered!=null&&map.ownerId==rendered.ownerId&&map.frame.ticket==rendered.ticket&&
+            map.frame.frameId==rendered.frameId&&map.frame.config.scope==rendered.scope&&target?.binding?.scope()==rendered.scope
+        val ready=target!=null&&map!=null&&!retired&&foregroundActive&&enabled&&paint&&grant&&!target.commandBusy&&
+            state.status==RemoteEditStatus.Controlling&&state.target?.binding==target.binding&&
+            state.scope==map?.frame?.config?.scope&&inputGrantFence.permits(target.binding)&&current
+        val age=rendered?.let{((System.nanoTime()-it.callbackNanos).coerceAtLeast(0L)/1_000_000L).coerceAtMost(Int.MAX_VALUE.toLong())}?:Int.MAX_VALUE.toLong()
+        if(!ready||map==null||target==null)return@synchronized RemoteAccessibilityInputSnapshot(false,grant,paint,"",null,null,age)
+        val binding=target.binding
+        val fields=listOf(binding.connectionEpoch.toString(),binding.captureSessionId,binding.sourceGeneration.toString(),
+            binding.targetToken,binding.geometryRevision.toString(),binding.inputSessionId,map.ownerId,surfaceEpoch.toString(),admissionFence.toString())
+        val encoded=("remote-accessibility-v1|"+fields.joinToString("|"){"${it.length}:$it"}).toByteArray(Charsets.UTF_8)
+        val digest=MessageDigest.getInstance("SHA-256").digest(encoded).joinToString(""){"%02x".format(it.toInt() and 255)}
+        val viewport=map.viewport
+        val rect=intArrayOf(kotlin.math.ceil(viewport.left).toInt(),kotlin.math.ceil(viewport.top).toInt(),
+            kotlin.math.floor(viewport.left+viewport.width).toInt(),kotlin.math.floor(viewport.top+viewport.height).toInt())
+        RemoteAccessibilityInputSnapshot(true,grant,paint,digest,rect,intArrayOf(map.rect.x,map.rect.y,map.rect.width.toInt(),map.rect.height.toInt()),age)
     }
     val inputClockDescription:String=if(Build.VERSION.SDK_INT>=34)"Nanosecond event fields; uptime alignment bounded to 1 ms" else "Millisecond event precision"
     val palette=RemoteEditorPalette(remote,scope)

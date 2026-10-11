@@ -20,6 +20,28 @@ remote-edit milestone M4-KP described below and in D20. Expanded Phase 4 feature
 are deferred until the owner resumes them. This supersedes blanket continuation
 for those deferred features; retain original requirements and pending full gates.
 
+**Owner Paint focus and budget update, 2026-10-07:** continue M4-KP with Paint
+as the current editor target; defer Krita acceptance and preserve its work.
+Repeated Paint toolbar validation exhausted 180 ms before input: Undo succeeded
+at 176,914 us, while Redo and Size timed out at 180,409 and 180,517 us. The owner
+authorized a Paint-specific 500 ms provider budget and 1,000 ms parent exchange
+budget. Paint uses the established current-property UI Automation reads: the
+new cache prototype rejected valid empty identifiers and was removed after an
+input-free comparison against the installed editor. Preparation,
+final proof and both Size stages share one original-start provider deadline;
+the full eight-action authority query also shares one 500 ms deadline.
+
+The larger parent envelope applies only to shortcut/authority-refresh requests
+whose digest matches exact Paint authority returned by the pinned native helper
+for the opened target and catalog. Krita and legacy routes, unknown/mismatched
+authority, Pen, Check, finite Click and finite Wheel keep 250 ms; Krita provider
+work remains 180 ms. Source/target/focus, input release and stale-tail refusal
+guards remain required. These finite toolbar limits do not relax S23 pen
+latency, frame rate, ghost-ink or physical acceptance targets. Historical
+180 ms failures remain evidence of the earlier implementation. New budgets
+need matching builds, causal/restoration measurements and normal catalog-path
+validation before delivery acceptance; they are not a pass by themselves.
+
 ## Owner actions (things only Christian can do)
 
 **Owner continuation update, 2026-10-02:** continue implementation through the
@@ -960,3 +982,86 @@ Unbuilt R106/R107/R119 editor candidates and the narrowed validation/build draft
 remain preserved locally, not admitted as completed work. Use the owner's chosen
 model/effort without overrides; do not commandeer the OnePlus. No deferred
 editor, driver or Phase 5 work is authorized by this checkpoint.
+
+Paint continuation, 2026-10-08: R160's combined source batch is admitted after
+review of the actual Eraser/Size hit diagnostics, managed receipt timing,
+nonblocking post-stroke authority and durable installer-session ownership.
+The installer has 32 passing pure fixtures; changed native/managed checks and
+the coherent integration build are next. Prior R154 checks remain historical
+evidence for their exact bytes. Actual normal paired Paint controls and sustained
+viewing are not yet accepted. Five tasks remain (T4.03, T4.04, active T4.07,
+essential T4.08, personal packaging); Krita is deferred, S23 only, physical
+acceptance separate. Keep the owner's selected model and effort without overrides.
+
+R160a's affected checks now pass: 106 native and 15 managed cases, strict Clippy
+and formatting, nine retired phases with unchanged source. One full ordinary
+host/Android integration build is next; five scoped tasks remain open.
+
+Safe pause, R161 (2026-10-08): the R160a ordinary13 build passed. Actual
+history/Eraser and normalized Zoom cases passed with exact restoration; Size
+failed during its second pre-send validation (3/5 events, keys not sent).
+S23 viewing stopped before app launch on full installer-status output; its exact
+empty session was abandoned with historical terminal proof, normal app untouched.
+Four reviewed R161 source changes are now admitted: Paint provider750ms (parent1000,
+managed2500 unchanged), related existing regression expectations, and the targeted
+installer session query. R161 is UNBUILT/UNTESTED; compiled artifacts remain R160a.
+The owner requested no check reruns and then a safe pause. No build/device/input
+session is active. Existing121/32 checks and passing runtime cases remain scoped
+to their original bytes. All task verification images were inspected/disposed.
+Resume from ../M4-KP-PAINT-SAFE-PAUSE-2026-10-08-R161.md and stopped-agent checkpoints;
+retain all drafts/failures/archives. Five tasks remain open, Paint only, S23 only,
+Krita deferred and physical acceptance separate.
+
+Owner-authorized local Paint resume, 2026-10-08: continue the saved R161 work
+with the selected executor settings. The integrated source delta will include
+bounded calibration timing using the original command clock, alongside the
+750 ms Paint provider allowance and targeted installer-status query. Timing
+does not renew the deadline or authorize input. Bind a fresh current build to
+the exact consolidated source review; the original 121/32 checks remain
+historical and will not be rerun. Preserve scoped history, Eraser and normalized
+Zoom passes; run the missing Size pair, then S23 viewing, balanced input and
+phone/editor causality in sequence. Bind the measured Paint catalog before
+normal personal packaging and paired-app acceptance. First-use Zoom coverage,
+automatic post-stroke authority and sustained viewing remain actual runtime
+acceptance work. Five scoped tasks remain open; physical acceptance stays separate.
+
+R161b/c local delivery results, 2026-10-08: the single current integration
+build passed all 13 phases. The missing Size pair passed exact whole-pixel,
+settings and geometry restoration. Actual S23 initial/background/reconnect
+viewing, balanced input and automated phone-to-Paint Undo/Redo/final Undo
+causality passed with complete actual retirement. A script-only installer
+raw-progress correction was reviewed, admitted and checked once with 13 new
+saved-record cases; it reused the compiled artifacts. Historical 121/32 and
+scoped history/Eraser/normalized-Zoom passes were not repeated or promoted.
+
+The exact eight-action Paint catalog is packaged. Ordinary Android (10 phases)
+and complete Windows (17 phases) builds passed serially, then resource
+verification and an exact output archive passed. The normal S23 app was updated
+with its existing signer, installed bytes read back, and launched normally;
+the complete Windows app opened without test flags. No app-data clear occurred.
+Normal paired palette behavior, first-use Zoom, automatic post-pen-lift Undo
+eligibility, sustained normal viewing and normal shutdown still need actual
+normal-session evidence. Five scoped tasks remain open; physical S Pen,
+performance, A27 and owner acceptance are separate. Krita remains deferred.
+
+R164/R165 continuation checkpoint, 2026-10-11: the owner authorized separately
+selected OnePlus/IN2019 tests while taking the S23 away. The original-image
+repair passed its actual native/main build, and two compiled normal-device tests
+passed with synthetic stylus input. Those results retain their original source,
+artifact and device bindings. The normal tagged generated image was visibly
+rendered; the untagged draft awaits explicit sRGB consent. Image screenshots
+were inspected/disposed and temporary rotation was restored with exact readback.
+Windows protected-body observability still limits unattended GUI coordination.
+
+The owner has now put builds and memory-intensive work on hold. Five Android
+layout/lifecycle paths are independently reviewed and frozen as source only:
+compact project actions, conditional bounded tool controls, a separate color
+recovery dialog, native canvas accessibility and idle cancellation correction.
+They are unbuilt, uninstalled and runtime-unverified. Android-only packaging
+and the native touch helper are being prepared without executing producers.
+Do not repeat unchanged passing builds/tests or use an old source snapshot as
+new admission. Resume from
+../M4-KP-resume-coordinator-20261008/M4-KP-R165-BUILD-HOLD-CHECKPOINT-20261011.md
+and its referenced source reviews/receipts. Five scoped tasks remain open;
+OnePlus software proof does not pass physical S23/S Pen, performance or owner
+acceptance. Krita remains deferred and all milestone gates remain pending.
