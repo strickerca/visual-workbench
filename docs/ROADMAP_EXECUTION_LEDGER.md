@@ -573,3 +573,20 @@ tool, owner verdict, durable review, failure-package or image-alignment pass is
 claimed. Whole Android/desktop caller and diagnostics privacy grants are in
 `CALLER_PARALLEL_GRANTS_20261018.md`; root retains only shared contracts and
 coordinator/integration. Held picked-input d9fd8a5 remains uncomposed.
+
+## Reviewed private checkpoints published; next lineage contract
+
+Astra accepted G1 receipt02f5766 and private recapture7537afc/candidate30b77615.
+Main was advanced normally a1ad07f ->02f5766 ->30b77615 and each remote SHA
+verified. Accepted scope remains private producer/recapture software; PI1, full
+verification activation, the four caller/privacy lanes and device gates stay open.
+
+Root source candidate `88946bae68a265bf98a4e30f2f75b6066a1afc88` admits the optional six-field public failure lineage
+and bounded importer/schema checks from the existing interface contract. Ordinary
+compiler output still omits it. Seven native contract tests are written/unrun;
+formatting, whitespace, secret scans and15 lightweight schema fixtures pass. No
+compiler was started while image holds the slot. This is not accepted failure-
+package functionality; source review/package tests and native leaf/privacy
+composition remain next. Details: VERIFICATION_LINEAGE_ROOT_CONTRACT_20261018.md
+and evidence/VERIFICATION_LINEAGE_CONTRACT_20261018.json. Granted worker files
+are untouched; old worktrees remain with parent disposition.

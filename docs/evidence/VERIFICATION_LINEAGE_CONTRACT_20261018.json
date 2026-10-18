@@ -1,0 +1,78 @@
+{
+  "date_utc": "2026-10-18",
+  "scope": "Source-only root optional verification lineage manifest/schema/admission contract; no failure package or public verification activation",
+  "source_commit": "88946bae68a265bf98a4e30f2f75b6066a1afc88",
+  "branch": "cloud/verification-lineage-contract-20261018",
+  "accepted_base_and_remote_main": "30b77615fe0ce79b2b1a044a0704ae2c7d186c14",
+  "contract": "T5_01_INTERFACE_ADMISSION_20261018.md optional six-field lineage, unchanged vip-1 schema version",
+  "implementation": [
+    "Extensions.verification_origin: Option<VerificationOrigin>, default absent and skip None serialization; ordinary compiler explicitly None, legacy package bytes preserved in intended path",
+    "Public typed six-field VerificationOrigin exports automatically through existing manifest re-export; no worker-owned files or root module exports changed",
+    "Preflight caps original_marker_numbers by configured marker limit before typed serde allocation; fixed 512-entry stack census rejects duplicate/out-of-range numbers without a second allocated inventory",
+    "Native verification rejects package self-reference, different/unknown target, noncanonical hashes, empty or count-mismatched mapping; ordinary payload/path/inventory/PNG/semantic/proof checks remain mandatory",
+    "JSON schema adds the known optional object/null property and strict six-field definition with canonical hashes/UUIDs and bounded unique integer mapping; schema version and dependency pins unchanged",
+    "Descriptive imported lineage is not authentication, a verdict, alignment, proof of original marker existence or a capture/grant authority; leaf compiler must derive actual identities/current review from verified owners"
+  ],
+  "checks_executed": {
+    "rustfmt_affected": "PASS",
+    "git_diff_check": "PASS",
+    "source_secret_scans": "PASS",
+    "Draft2020_12_schema_structure": "PASS",
+    "optional_schema_fixtures": "3 valid plus12 invalid PASS using installed jsonschema; cross-field constraints remain native responsibilities",
+    "compiler_and_native_tests": "NOT RUN; image owner holds heavy build slot",
+    "bindings": "No generation; no UniFFI DTO or registration changes"
+  },
+  "rust_tests_written_not_run": {
+    "file": "core/crates/vw-package/tests/verification_origin_contract.rs",
+    "count": 7,
+    "cases": [
+      "ordinary absent/null lineage and retained ordinary hash",
+      "nonmonotonic boundary mapping [512,7] preserves current ordinals and all existing payload bytes",
+      "self-reference, target/hash/UUID refusal",
+      "empty/duplicate/range/type/count refusal including zero-marker package",
+      "unknown private field, missing field and duplicate member refusal",
+      "allocation preflight on incomplete array and escaped-key refusal",
+      "valid lineage cannot bypass existing payload integrity"
+    ]
+  },
+  "worker_ownership": "No changes to the four verification leaves, Android Air Actions roots, Desktop capture roots, shared diagnostics files, or image picked-input three-file lane. Review/CAS schema and archive-prefix contract await exact worker handoff; no private data persistence is activated.",
+  "next": [
+    "Astra review of six root source/schema files and seven written tests",
+    "After parent build-slot handoff: focused vw-package tests and strict package Clippy; do not regenerate bindings for this internal manifest change",
+    "Merge reviewed native verification leaves and exact archive privacy-prefix exclusion before any review persistence/FFI/UI activation",
+    "Continue shared APIs/module/export composition outside all granted caller files"
+  ],
+  "source_sha256": [
+    {
+      "path": "contracts/package.schema.json",
+      "bytes": 12518,
+      "sha256": "71e2ed966f050569f5a48c1e48510391ca1f4f2b70b2396ff5e035e555ab4c7b"
+    },
+    {
+      "path": "core/crates/vw-package/src/admission.rs",
+      "bytes": 6782,
+      "sha256": "70c2d1f8b5c65d73b825ba06155f637d97b8c1f309f3e5797eaebd013984773a"
+    },
+    {
+      "path": "core/crates/vw-package/src/compiler.rs",
+      "bytes": 19466,
+      "sha256": "ffb6aa5283f03b8132dcf6a5c63160012fbe5e0e8f4145c2149ed3dd840a9851"
+    },
+    {
+      "path": "core/crates/vw-package/src/manifest.rs",
+      "bytes": 5374,
+      "sha256": "f23aba1b9273b02b44288808495a9cd55618458b8180bf2d8a123bea0697a087"
+    },
+    {
+      "path": "core/crates/vw-package/src/verify.rs",
+      "bytes": 17627,
+      "sha256": "963106340852d0308c1bb78c01ed15e7dd289e2e158b8e37271e6b2b3caf69db"
+    },
+    {
+      "path": "core/crates/vw-package/tests/verification_origin_contract.rs",
+      "bytes": 9564,
+      "sha256": "6163bbe2368347a7815433bd65b28451dfbf9110aa0006faac1e31c8336b2e20"
+    }
+  ],
+  "operations": "No native/app compiler launched, no live providers/credentials/signing/deployment/device operations, no captures or worktree deletion."
+}
