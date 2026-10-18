@@ -101,6 +101,7 @@ impl From<TransferError> for CoreError {
             | TransferError::EncodedLimit
             | TransferError::ScratchLimit
             | TransferError::Backpressure => Self::Backpressure,
+            TransferError::ImageCodecUnavailable => Self::ImageCodecUnavailable,
             TransferError::Unsupported => Self::Unsupported,
             TransferError::Invalid => Self::Invalid,
             _ => Self::Raster,
