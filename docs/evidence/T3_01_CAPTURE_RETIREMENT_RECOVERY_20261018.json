@@ -1,0 +1,237 @@
+{
+  "schema": 1,
+  "status": "PASS focused normal-policy retirement/admission checks; full composition/runtime acceptance remains separate",
+  "created_utc": "2026-10-18T22:39:01.493071+00:00",
+  "combined_base": "70475b818b2ca5bf02b4a3539fb038c864410d83",
+  "source_commit": "350f492b62627fac36b36e83715b15441918d435",
+  "branch": "task/t3.01-retirement-recovery-test-20261018",
+  "changed_source_paths": [
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirementTest.kt"
+  ],
+  "repair": "Check reported error type/message and its exact original/cause across coroutine recovery; query retained synchronous action directly for original identity. Preserve two retry attempts, one destructor attempt, no parent closure, no foreground close after picker refusal.",
+  "policy": {
+    "assertions_enabled": true,
+    "coroutine_debug_enabled": true,
+    "stacktrace_recovery_enabled": true,
+    "coroutine_properties_overridden": false,
+    "proof": "FocusedJUnit runner reflects actual DebugKt flags in the same JVM as JUnit and requires both coroutine system properties to be absent. Java -ea enables normal assertion-driven recovery.",
+    "repository_test_or_recovery_configuration_changed": false
+  },
+  "execution_scope": "Bounded direct Kotlin/JUnit compilation of six exact repository source files plus an external runner. No API/source projections. Cached Kotlin 2.4.0 compiler, JDK21, repository-pinned coroutines1.9.0, JUnit4.13.2. This is not a fresh Gradle/application or native build.",
+  "baseline": {
+    "stage": "baseline",
+    "created_utc": "2026-10-18T22:36:59.067800+00:00",
+    "scope": "Direct Kotlin/JUnit compilation of exact repository sources; no projection or production edits; not the Gradle/full application batch",
+    "compiler": "cached Kotlin 2.4.0; JDK 21",
+    "runtime_coroutines": "repository-pinned 1.9.0",
+    "junit": "4.13.2",
+    "jvm_arguments": [
+      "-ea",
+      "-Xmx256m"
+    ],
+    "coroutine_properties_overridden": false,
+    "actual_recovery_enabled": true,
+    "source_sha256": {
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopDiagnosticsLifecycle.kt": "50c6906e678fa13745c6424f5f9e1dc4548a6b141558b0282c4a81b16cbeea9c",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirement.kt": "0a38cd414a3dfd15d1165b9e41fa5b8260f5a6b55038c627c927d5933414a20e",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/PickerOwnership.kt": "73536e02591520e9f7d425b549b9fbfa108a8af0874b4f33d4b491c252f983f8",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureAdmission.kt": "8938d51888c82b74629cd2c0b85241335fa53e4047c4fd87a6669a8f3f1f5f79",
+      "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirementTest.kt": "49fe0e5321da0a1adf56c379b62bd6c4d10826254bf7acdf3fa260a33375b9ad",
+      "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureAdmissionTest.kt": "96488b08a59dd30ea9ff57531161c9abd16422d29d3323e1a61eae3dbd059e1d"
+    },
+    "tool_sha256": {
+      "kotlin-compiler-embeddable-2.4.0.jar": "c2b25e8c1c93ec416ba4327f5e31eaec0f0c8847241b9353e294b8db9dce564f",
+      "kotlin-stdlib-2.4.0.jar": "ccb14ff83fabcb11458b798dbc9824748ccdffeec79c9aba789e6ed1cda86b1c",
+      "kotlin-script-runtime-2.4.0.jar": "196e8ecbf63daf477e34e67c2f871ee232ae7bf8b377432d876d1bbf9d273de3",
+      "kotlin-reflect-2.4.0.jar": "f0d8e8908624eb4478bb131e9f887366680d2e239741195e548fa5c906963b90",
+      "kotlinx-coroutines-core-jvm-1.10.2.jar": "5ca175b38df331fd64155b35cd8cae1251fa9ee369709b36d42e0a288ccce3fd",
+      "annotations-13.0.jar": "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478",
+      "kotlinx-coroutines-core-jvm-1.9.0.jar": "ad89c2892235e670f222d819cb3d81188143cb19a05b59df9889ae4269f5c70a",
+      "junit-4.13.2.jar": "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
+      "hamcrest-core-1.3.jar": "66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9"
+    },
+    "compile_args": [
+      "java",
+      "-Xmx512m",
+      "-cp",
+      "/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlin-compiler-embeddable-2.4.0.jar:/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlin-stdlib-2.4.0.jar:/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlin-script-runtime-2.4.0.jar:/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlin-reflect-2.4.0.jar:/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlinx-coroutines-core-jvm-1.10.2.jar:/workspace/.vw-tools/gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar",
+      "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
+      "-no-stdlib",
+      "-no-reflect",
+      "-jvm-target",
+      "21",
+      "-Xbackend-threads=1",
+      "-classpath",
+      "/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlin-stdlib-2.4.0.jar:/workspace/.vw-tools/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.9.0/9beade4c1c1569e4f36cbd2c37e02e3e41502601/kotlinx-coroutines-core-jvm-1.9.0.jar:/workspace/.vw-tools/gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar:/tmp/vw-t301-desktop/junit-4.13.2.jar:/tmp/vw-t301-desktop/hamcrest-core-1.3.jar",
+      "-d",
+      "/tmp/vw-t301-retirement-recovery-20261018/baseline.jar",
+      "/workspace/visual-workbench/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopDiagnosticsLifecycle.kt",
+      "/workspace/visual-workbench/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirement.kt",
+      "/workspace/visual-workbench/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/PickerOwnership.kt",
+      "/workspace/visual-workbench/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureAdmission.kt",
+      "/workspace/visual-workbench/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirementTest.kt",
+      "/workspace/visual-workbench/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureAdmissionTest.kt",
+      "/tmp/vw-t301-retirement-recovery-20261018/FocusedJUnit.kt"
+    ],
+    "run_args": [
+      "java",
+      "-ea",
+      "-Xmx256m",
+      "-cp",
+      "/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlin-stdlib-2.4.0.jar:/workspace/.vw-tools/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.9.0/9beade4c1c1569e4f36cbd2c37e02e3e41502601/kotlinx-coroutines-core-jvm-1.9.0.jar:/workspace/.vw-tools/gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar:/tmp/vw-t301-desktop/junit-4.13.2.jar:/tmp/vw-t301-desktop/hamcrest-core-1.3.jar:/tmp/vw-t301-retirement-recovery-20261018/baseline.jar",
+      "FocusedJUnitKt",
+      "com.visualworkbench.desktop.capture.CaptureCallerRetirementTest",
+      "com.visualworkbench.desktop.capture.CaptureAdmissionTest"
+    ],
+    "compile_exit": 0,
+    "test_exit": 1,
+    "result": "VW_POLICY assertions=true debug=true recovery=true; no coroutine property overrides\njava.lang.AssertionError: expected same:<java.lang.IllegalStateException: unknown source retirement> was not:<java.lang.IllegalStateException: unknown source retirement>\n\tat org.junit.Assert.fail(Assert.java:89)\n\tat org.junit.Assert.failNotSame(Assert.java:829)\n\tat org.junit.Assert.assertSame(Assert.java:772)\n\tat org.junit.Assert.assertSame(Assert.java:783)\n\tat com.visualworkbench.desktop.capture.CaptureCallerRetirementTest$eitherCaptureRefusalKeepsParentsAliveAndRetainsTheOriginalFailure$1.invokeSuspend(CaptureCallerRetirementTest.kt:33)\n\tat kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)\n\tat kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:101)\n\tat kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)\n\tat kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:95)\n\tat kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:69)\n\tat kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)\n\tat kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:47)\n\tat kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)\n\tat com.visualworkbench.desktop.capture.CaptureCallerRetirementTest.eitherCaptureRefusalKeepsParentsAliveAndRetainsTheOriginalFailure(CaptureCallerRetirementTest.kt:21)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\n\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)\n\tat org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)\n\tat org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)\n\tat org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)\n\tat org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:63)\n\tat org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)\n\tat org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)\n\tat org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)\n\tat org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)\n\tat org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)\n\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)\n\tat org.junit.runners.ParentRunner.run(ParentRunner.java:413)\n\tat org.junit.runners.Suite.runChild(Suite.java:128)\n\tat org.junit.runners.Suite.runChild(Suite.java:27)\n\tat org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)\n\tat org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)\n\tat org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)\n\tat org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)\n\tat org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)\n\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)\n\tat org.junit.runners.ParentRunner.run(ParentRunner.java:413)\n\tat org.junit.runner.JUnitCore.run(JUnitCore.java:137)\n\tat org.junit.runner.JUnitCore.run(JUnitCore.java:115)\n\tat org.junit.runner.JUnitCore.run(JUnitCore.java:105)\n\tat org.junit.runner.JUnitCore.runClasses(JUnitCore.java:62)\n\tat org.junit.runner.JUnitCore.runClasses(JUnitCore.java:49)\n\tat FocusedJUnitKt.main(FocusedJUnit.kt:14)\n\nVW_RESULT tests=7 failures=1 ignored=0\n",
+    "jar_sha256": "e29634543e30d16bfb44daa9bb2debd95063d51d29c38333fe81085ea3d79923"
+  },
+  "repaired": {
+    "stage": "repaired",
+    "created_utc": "2026-10-18T22:37:21.268205+00:00",
+    "scope": "Direct Kotlin/JUnit compilation of exact repository sources; no projection or production edits; not the Gradle/full application batch",
+    "compiler": "cached Kotlin 2.4.0; JDK 21",
+    "runtime_coroutines": "repository-pinned 1.9.0",
+    "junit": "4.13.2",
+    "jvm_arguments": [
+      "-ea",
+      "-Xmx256m"
+    ],
+    "coroutine_properties_overridden": false,
+    "actual_recovery_enabled": true,
+    "source_sha256": {
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopDiagnosticsLifecycle.kt": "50c6906e678fa13745c6424f5f9e1dc4548a6b141558b0282c4a81b16cbeea9c",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirement.kt": "0a38cd414a3dfd15d1165b9e41fa5b8260f5a6b55038c627c927d5933414a20e",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/PickerOwnership.kt": "73536e02591520e9f7d425b549b9fbfa108a8af0874b4f33d4b491c252f983f8",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureAdmission.kt": "8938d51888c82b74629cd2c0b85241335fa53e4047c4fd87a6669a8f3f1f5f79",
+      "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirementTest.kt": "900730e540b7969778a97966de4c5b5da892ee50c89a44f7bfdcc45d3a59d6d1",
+      "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureAdmissionTest.kt": "96488b08a59dd30ea9ff57531161c9abd16422d29d3323e1a61eae3dbd059e1d"
+    },
+    "tool_sha256": {
+      "kotlin-compiler-embeddable-2.4.0.jar": "c2b25e8c1c93ec416ba4327f5e31eaec0f0c8847241b9353e294b8db9dce564f",
+      "kotlin-stdlib-2.4.0.jar": "ccb14ff83fabcb11458b798dbc9824748ccdffeec79c9aba789e6ed1cda86b1c",
+      "kotlin-script-runtime-2.4.0.jar": "196e8ecbf63daf477e34e67c2f871ee232ae7bf8b377432d876d1bbf9d273de3",
+      "kotlin-reflect-2.4.0.jar": "f0d8e8908624eb4478bb131e9f887366680d2e239741195e548fa5c906963b90",
+      "kotlinx-coroutines-core-jvm-1.10.2.jar": "5ca175b38df331fd64155b35cd8cae1251fa9ee369709b36d42e0a288ccce3fd",
+      "annotations-13.0.jar": "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478",
+      "kotlinx-coroutines-core-jvm-1.9.0.jar": "ad89c2892235e670f222d819cb3d81188143cb19a05b59df9889ae4269f5c70a",
+      "junit-4.13.2.jar": "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
+      "hamcrest-core-1.3.jar": "66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9"
+    },
+    "compile_args": [
+      "java",
+      "-Xmx512m",
+      "-cp",
+      "/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlin-compiler-embeddable-2.4.0.jar:/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlin-stdlib-2.4.0.jar:/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlin-script-runtime-2.4.0.jar:/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlin-reflect-2.4.0.jar:/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlinx-coroutines-core-jvm-1.10.2.jar:/workspace/.vw-tools/gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar",
+      "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
+      "-no-stdlib",
+      "-no-reflect",
+      "-jvm-target",
+      "21",
+      "-Xbackend-threads=1",
+      "-classpath",
+      "/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlin-stdlib-2.4.0.jar:/workspace/.vw-tools/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.9.0/9beade4c1c1569e4f36cbd2c37e02e3e41502601/kotlinx-coroutines-core-jvm-1.9.0.jar:/workspace/.vw-tools/gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar:/tmp/vw-t301-desktop/junit-4.13.2.jar:/tmp/vw-t301-desktop/hamcrest-core-1.3.jar",
+      "-d",
+      "/tmp/vw-t301-retirement-recovery-20261018/repaired.jar",
+      "/workspace/visual-workbench/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopDiagnosticsLifecycle.kt",
+      "/workspace/visual-workbench/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirement.kt",
+      "/workspace/visual-workbench/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/PickerOwnership.kt",
+      "/workspace/visual-workbench/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureAdmission.kt",
+      "/workspace/visual-workbench/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirementTest.kt",
+      "/workspace/visual-workbench/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureAdmissionTest.kt",
+      "/tmp/vw-t301-retirement-recovery-20261018/FocusedJUnit.kt"
+    ],
+    "run_args": [
+      "java",
+      "-ea",
+      "-Xmx256m",
+      "-cp",
+      "/workspace/.vw-tools/gradle/wrapper/dists/gradle-9.7.0-bin/d4tj7w02tcgubx9zk9hbippn6/gradle-9.7.0/lib/kotlin-stdlib-2.4.0.jar:/workspace/.vw-tools/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.9.0/9beade4c1c1569e4f36cbd2c37e02e3e41502601/kotlinx-coroutines-core-jvm-1.9.0.jar:/workspace/.vw-tools/gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar:/tmp/vw-t301-desktop/junit-4.13.2.jar:/tmp/vw-t301-desktop/hamcrest-core-1.3.jar:/tmp/vw-t301-retirement-recovery-20261018/repaired.jar",
+      "FocusedJUnitKt",
+      "com.visualworkbench.desktop.capture.CaptureCallerRetirementTest",
+      "com.visualworkbench.desktop.capture.CaptureAdmissionTest"
+    ],
+    "compile_exit": 0,
+    "test_exit": 0,
+    "result": "VW_POLICY assertions=true debug=true recovery=true; no coroutine property overrides\nVW_RESULT tests=7 failures=0 ignored=0\n",
+    "jar_sha256": "fdbbc2452aaf83259bf0ae82801c27444cd88c173b6b7eec295754b8d6b8b900"
+  },
+  "test_names": {
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirementTest.kt": [
+      "abortedDepartureDoesNotPermanentlyRetireCapture",
+      "eitherCaptureRefusalKeepsParentsAliveAndRetainsTheOriginalFailure",
+      "cancelledQuitStillJoinsBothSourcesBeforeClosingAnyParent"
+    ],
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureAdmissionTest.kt": [
+      "cancelBeforeBodyReleasesAdmissionAndNextCaptureRuns",
+      "cancelledProducerRetainsSlotAndEveryShutdownJoinsItsCleanup",
+      "bodyCleanupFailureCannotPermanentlyHoldCaptureAdmission",
+      "busyRemainsPublishedUntilCancelledCleanupActuallyFinishes"
+    ]
+  },
+  "adjacent_failure_expectations_review": [
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureDeliveryTest.kt",
+      "sha256": "43c3e1a7199bb3af36b42fc5c4163811ab8538d3975c764428015b1db9f5327a",
+      "review": "Exact project/failure identity assertions remain at the actual retained owner or synchronous destructor boundary. No unconditional identity check is added across retirement withContext.",
+      "prior_composed_normal_policy": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "rerun_here": false
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "sha256": "d1896ad1b70b3c9d1c97544a29c62fbcbfa622c28129c785e3c0fc24007ea3e3",
+      "review": "Exact project/failure identity assertions remain at the actual retained owner or synchronous destructor boundary. No unconditional identity check is added across retirement withContext.",
+      "prior_composed_normal_policy": {
+        "tests": 31,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "rerun_here": false
+    }
+  ],
+  "normal_policy_prior_composition_receipt": {
+    "path": "docs/evidence/CAPTURE_AIR_CALLERS_COMPOSED_20261018.json",
+    "sha256": "019ee8ac62078034450f8f1fa2e732aa614866750bd211cf21faa06db33e1637"
+  },
+  "external_runner_source": "import org.junit.runner.JUnitCore\nimport kotlin.system.exitProcess\n\nfun main(args: Array<String>) {\n    val policy = Class.forName(\"kotlinx.coroutines.DebugKt\")\n    fun flag(name: String) = policy.getMethod(name).invoke(null) as Boolean\n    val assertions = flag(\"getASSERTIONS_ENABLED\")\n    val debug = flag(\"getDEBUG\")\n    val recovery = flag(\"getRECOVER_STACK_TRACES\")\n    check(assertions && debug && recovery)\n    check(System.getProperty(\"kotlinx.coroutines.stacktrace.recovery\") == null)\n    check(System.getProperty(\"kotlinx.coroutines.debug\") == null)\n    println(\"VW_POLICY assertions=$assertions debug=$debug recovery=$recovery; no coroutine property overrides\")\n    val result = JUnitCore.runClasses(*args.map { Class.forName(it) }.toTypedArray())\n    result.failures.forEach { println(it.trace) }\n    println(\"VW_RESULT tests=${result.runCount} failures=${result.failureCount} ignored=${result.ignoreCount}\")\n    exitProcess(if (result.wasSuccessful()) 0 else 1)\n}\n",
+  "external_bounded_command_driver": "from pathlib import Path\nimport subprocess,sys,fcntl,os,hashlib,json,datetime\nroot=Path('/workspace/visual-workbench'); out=Path(__file__).resolve().parent\nstage=sys.argv[1]; assert stage in ('baseline','repaired')\ntools=Path('/workspace/.vw-tools')\ngradle=next((tools/'gradle/wrapper/dists/gradle-9.7.0-bin').glob('*/gradle-9.7.0/lib'))\nannotations=next((tools/'gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0').rglob('*.jar'))\ncoroutines=next((tools/'gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.9.0').rglob('*.jar'))\ncompiler_jars=[gradle/name for name in ('kotlin-compiler-embeddable-2.4.0.jar','kotlin-stdlib-2.4.0.jar','kotlin-script-runtime-2.4.0.jar','kotlin-reflect-2.4.0.jar','kotlinx-coroutines-core-jvm-1.10.2.jar')]+[annotations]\nruntime_jars=[gradle/'kotlin-stdlib-2.4.0.jar',coroutines,annotations,Path('/tmp/vw-t301-desktop/junit-4.13.2.jar'),Path('/tmp/vw-t301-desktop/hamcrest-core-1.3.jar')]\nfor p in compiler_jars+runtime_jars: assert p.is_file(),p\nsources=[\n'apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopDiagnosticsLifecycle.kt',\n'apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirement.kt',\n'apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/PickerOwnership.kt',\n'apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureAdmission.kt',\n'apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirementTest.kt',\n'apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureAdmissionTest.kt']\ncompiler=':'.join(map(str,compiler_jars));runtime=':'.join(map(str,runtime_jars))\njar=out/f'{stage}.jar'\ncompile_args=['java','-Xmx512m','-cp',compiler,'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler','-no-stdlib','-no-reflect','-jvm-target','21','-Xbackend-threads=1','-classpath',runtime,'-d',str(jar),*[str(root/p) for p in sources],str(out/'FocusedJUnit.kt')]\nrun_args=['java','-ea','-Xmx256m','-cp',f'{runtime}:{jar}','FocusedJUnitKt','com.visualworkbench.desktop.capture.CaptureCallerRetirementTest','com.visualworkbench.desktop.capture.CaptureAdmissionTest']\nlock=open(tools/'heavy-build.lock','a')\nfcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)\nfor key in ('JAVA_TOOL_OPTIONS','_JAVA_OPTIONS','JDK_JAVA_OPTIONS'):\n assert 'kotlinx.coroutines.' not in os.environ.get(key,''),'Unexpected inherited coroutine policy override'\nresult=subprocess.run(compile_args,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=60,cwd=root)\n(out/f'{stage}-compile.txt').write_text(result.stdout)\nprint('Compile exit:',result.returncode,result.stdout)\nassert result.returncode==0\nresult=subprocess.run(run_args,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=25,cwd=root)\n(out/f'{stage}-junit.txt').write_text(result.stdout)\nprint(result.stdout)\nreceipt={'stage':stage,'created_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'scope':'Direct Kotlin/JUnit compilation of exact repository sources; no projection or production edits; not the Gradle/full application batch','compiler':'cached Kotlin 2.4.0; JDK 21','runtime_coroutines':'repository-pinned 1.9.0','junit':'4.13.2','jvm_arguments':['-ea','-Xmx256m'],'coroutine_properties_overridden':False,'actual_recovery_enabled':'VW_POLICY assertions=true debug=true recovery=true' in result.stdout,'source_sha256':{p:hashlib.sha256((root/p).read_bytes()).hexdigest() for p in sources},'tool_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in compiler_jars+runtime_jars},'compile_args':compile_args,'run_args':run_args,'compile_exit':0,'test_exit':result.returncode,'result':result.stdout,'jar_sha256':hashlib.sha256(jar.read_bytes()).hexdigest()}\n(out/f'{stage}-receipt.json').write_text(json.dumps(receipt,indent=2)+'\\n')\nfcntl.flock(lock,fcntl.LOCK_UN)\nassert receipt['actual_recovery_enabled']\nif stage=='baseline':\n assert result.returncode==1 and 'VW_RESULT tests=7 failures=1 ignored=0' in result.stdout\nelse:\n assert result.returncode==0 and 'VW_RESULT tests=7 failures=0 ignored=0' in result.stdout\n",
+  "external_evidence_sha256": {
+    "repaired-junit.txt": "590b007c1c5300dc224f57a9f829646a7dea400597c87f663674ff25fe424a40",
+    "repaired-compile.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-junit.txt": "b47d9e36f15b3d286fa9d10f199346fa45862a7656546507f0ef895bd1f81ee8",
+    "runner-first-compile-failure.txt": "ae15ce8198c3cadda418da8b2dbfb899967de051dea30ea00d284deb6494866e",
+    "baseline-compile.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "run_focused.py": "f2995f1b5895cff8d479edd2344a99294d5542caea5c087eab3aaf84e33f8dd7",
+    "FocusedJUnit.kt": "7e18f5f0fc5b2f6002568e7b5b7f2db199e8b86a975d13446b43d75dc451bcac"
+  },
+  "failure_preservation": [
+    "Original assertion failure reproduced with recovery enabled; baseline log retained in excerpt and /tmp.",
+    "First external runner compilation rejected Class::forName generic method reference; changed only runner to lambda; failure retained in /tmp/vw-t301-retirement-recovery-20261018/runner-first-compile-failure.txt."
+  ],
+  "checks": {
+    "only_owned_fixture_changes": true,
+    "production_sources_unchanged": true,
+    "git_diff_check": true,
+    "identical_baseline_repair_tool_hashes": true,
+    "identical_actual_coroutine_policy": true,
+    "native_or_binding_generation_repeated": false
+  },
+  "not_run": [
+    "Full combined Gradle/app/build batch",
+    "Native tests/builds/binding generation",
+    "Android lint/device checks",
+    "Windows WGC/UIA/exclusion/hotkey/picker/DPI runtime",
+    "Physical input/GPU/performance/owner acceptance"
+  ],
+  "new_download_install_paid_credential_security_device_actions": false,
+  "screenshots_created": false,
+  "next": "Astra fixture review; coordinator composes the one-file repair and runs its affected caller/test/lint batch under normal recovery; no main promotion by this lane."
+}
