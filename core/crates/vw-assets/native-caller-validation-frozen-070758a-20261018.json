@@ -1,0 +1,322 @@
+{
+  "schema": 1,
+  "status": "IMAGE PUBLIC RUNTIME REPAIRS PASSED; combined strict FFI lint remains blocked by one coordinator-owned document import diagnostic; no app/platform acceptance",
+  "candidate": "070758ac3b0537b4ea9efc0f6d21b23792d47762",
+  "branch": "cloud/roadmap-integration-20261018 frozen real-app candidate",
+  "image_owner_reserved_edits": false,
+  "platform": "Linux x86_64; Rust 1.99.0; CARGO_BUILD_JOBS=2; --test-threads=2; commands serialized under heavy-build lock",
+  "source_bindings": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "e2ca65676513708479154748472017592f1dfd0f203f6908ec1932947b6d7d46"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "197d599cd6afaeb065c6fd73a277bd9b963ea321ae80dd34c2ce716f897e29bd"
+    },
+    {
+      "path": "core/crates/vw-ffi/Cargo.toml",
+      "sha256": "32545151049eacce482a7f950934b09d9576a0f8e5898c261b0cae89d849d2db"
+    },
+    {
+      "path": "core/crates/vw-model/src/validate.rs",
+      "sha256": "fd352a49c260786584fb6f8a15788a110297237c4da3794ae48be7c6c97f9278"
+    },
+    {
+      "path": "core/crates/vw-model/tests/model_contract.rs",
+      "sha256": "0e24039d253fe75d01ba0f04996cd187ac1b32a7c3c4c61c5b3f855db966ee5c"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/lib.rs",
+      "sha256": "90865ea348eb7c494420eb4e2e34dc287d330bc0b6fbbe0059f5c080f2719540"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/queries.rs",
+      "sha256": "3f9bf1ef93db5ad26ba9e2ed0916e04d804f5789d6821eda40e38354df96e4e8"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/streaming_ffi.rs",
+      "sha256": "14b444cb84aea87a5a5895d4602ade4c4369e34027ea227fecad541bde7bee3c"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/documents/jobs.rs",
+      "sha256": "1c0619d9716024c4f184798059f77f43700424b96bd4f6157e1a770db09e7484"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/ai_edit/owner.rs",
+      "sha256": "b7f3e6e5bd2c72e5614d5b7077b6cc111884b69b283071857e55aea3b6099cb8"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session/discovery.rs",
+      "sha256": "79b8830ef12fce0e82420cdd356c3e5235cf397a58ab4c3a8c7928884a6ab3df"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/format_images.rs",
+      "sha256": "efc15e102c31b3fd3e4a94e014567bd2d7dee2ea7dbddaa5c717100ea9338bf9"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/avif_images.rs",
+      "sha256": "4ca03f6cdeeca4fff25a684f7410a22d9e3fae7dd960834face19b0a2ebefe49"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/format_seek_tests.rs",
+      "sha256": "a795d4daadb889c44008332ac3c0131d7f6feee749de813755c6ee1f86cfb9e8"
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/ordinary_formats.rs",
+      "sha256": "698e274ed358afe63f681f2b7bc09138f19611f4bf288075fb63b7249b4152d3"
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "sha256": "4e686d6c983f00453240db453239749224f66b582ff2752044d6e9c40c076a89"
+    },
+    {
+      "path": "core/crates/vw-formats/src/lib.rs",
+      "sha256": "0e4f217ff5109f64fdbefe14a9985d1363889e4705905c02e143598d09a24541"
+    },
+    {
+      "path": "core/crates/vw-formats/src/tiff.rs",
+      "sha256": "972e2083a00b886ad4e0a90f02aabde492472e187ca16f3a13cd30e661232339"
+    },
+    {
+      "path": "core/crates/vw-formats/tests/provenance.rs",
+      "sha256": "3953a689063f07a0e35a9f0faf552de481b6cba1376bd2826b058af1905c7d8e"
+    },
+    {
+      "path": "core/crates/vw-raster/src/display.rs",
+      "sha256": "64bf78579c6ecfc0831bd46168cca75d94aa2702aa6925fdcafa8d7b3395d507"
+    }
+  ],
+  "gate": {
+    "licenses_sources_bans": "passed on changed frozen dependency graph",
+    "license_log_sha256": "ca3a1be080ee4b9aef56cd1276e3a22c0a6793b527e5148cf91fef6ef1489ca6",
+    "cargo_lock_sha256": "197d599cd6afaeb065c6fd73a277bd9b963ea321ae80dd34c2ce716f897e29bd"
+  },
+  "new_execution": {
+    "total": {
+      "passed": 26,
+      "failed": 0,
+      "ignored": 0
+    },
+    "runs": [
+      {
+        "log": "public-tests.log",
+        "sha256": "65a68e401fdf5c16b69fd26661e891d2fa3ba50a18ce6951a88c145360a394ef",
+        "command": "cargo +1.99.0 test --locked -p vw-ffi --test ordinary_formats --test streaming_ffi -- --test-threads=2",
+        "exit_code": 0,
+        "passed": 17,
+        "failed": 0,
+        "ignored": 0,
+        "passing_cases": [
+          "avif_missing_codec::admitted_avif_file_import_keeps_the_typed_missing_codec_failure",
+          "avif_missing_codec::admitted_avif_reports_missing_codec_before_any_project_is_published",
+          "bmp_export_is_refused_instead_of_publishing_a_file_without_required_provenance",
+          "file_overwrite_and_cancellation_keep_existing_bytes_and_remove_owned_temporaries",
+          "file_tiff_intake_persists_first_page_notice_and_original_orientation",
+          "finalized_tiff_bytes_contain_source_revision_and_exact_clean_pixels_at_both_depths",
+          "multipage_tiff_memory_notice_precedes_display_consent_and_keeps_original_pages",
+          "ordinary_memory_bmp_intake_preserves_immutable_encoded_original_and_profile",
+          "ordinary_memory_tiff16_export_keeps_samples_profile_and_revision",
+          "ordinary_attachment_intake_retains_tiff_notice_depth_and_hash",
+          "original_format_query_refuses_stale_revision_cancellation_and_closed_project",
+          "buffered_jpeg_and_webp_keep_revision_metadata_and_no_clobber_publication",
+          "file_attachments_are_exact_retryable_immutable_assets_without_documents",
+          "depth_and_alpha_reductions_require_explicit_export_choices",
+          "malformed_video_and_cancelled_attachment_leave_history_unchanged",
+          "typed_memory_encoded_and_cancel_failures_publish_nothing",
+          "typed_format_and_source_binding_failures_precede_publication"
+        ]
+      },
+      {
+        "log": "model-notice.log",
+        "sha256": "3186c079fbbbefa125551abb747f3e3725ebab5320eee634fec80327ede552dc",
+        "command": "cargo +1.99.0 test --locked -p vw-model --test model_contract tiff_first_page_notice_admits_only_a_boolean_without_widening_descriptive_metadata -- --exact --test-threads=2",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "passing_cases": [
+          "tiff_first_page_notice_admits_only_a_boolean_without_widening_descriptive_metadata"
+        ]
+      },
+      {
+        "log": "unit-run.log",
+        "sha256": "a53392774069642c3ffe22e06645bb0ed130bc08037d0b09fd5c88e0c32e5a95",
+        "command": "exact current compiler-artifact executable, 4 selected image/hash/BMP-gate filters; --test-threads=2",
+        "exit_code": 0,
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0,
+        "passing_cases": [
+          "format_images::tests::a_tiny_crop_still_charges_the_entire_retained_source_allocation",
+          "format_images::tests::buffered_bytes_keep_requested_policy_original_identity_and_capture_provenance",
+          "format_images::tests::cancellation_after_the_generic_decoder_returns_discards_its_pixels",
+          "avif_images::tests::missing_codec_is_typed_separately_from_corrupt_or_unsupported_data",
+          "avif_images::tests::inspection_and_cancel_refusal_do_not_need_an_os_decoder",
+          "streaming_ffi::format_seek_tests::final_hash_refuses_cancelled_and_wrong_length_receipts",
+          "streaming_ffi::format_seek_tests::final_hash_includes_header_rewrites_and_ignores_the_write_order",
+          "streaming_ffi::tests::bmp_preflight_is_refused_before_staging_a_provenance_free_export"
+        ]
+      }
+    ],
+    "case_allocation": {
+      "public_ordinary_formats": 11,
+      "public_streaming_regressions": 6,
+      "model_boolean_notice_allowlist": 1,
+      "ffi_format_adapter_units": 3,
+      "ffi_avif_units": 2,
+      "ffi_final_file_hash_units": 2,
+      "ffi_bmp_preflight_gate_unit": 1
+    },
+    "previous_nine_blocked_public_cases": "all nine passed; initial failure receipts retained in native-caller-validation-20261018.json"
+  },
+  "unit_artifact": {
+    "executable": "target/debug/deps/vw_core-35b74b574706c4ab",
+    "executable_sha256": "87b693ec3d3db2f1e47cfbe7a3008edb42d7a85ec21e115b6d6c66783a176f88",
+    "compiler_json_sha256": "fdcc650276de4dd40b0870c654e41b42e339c644cdc5e62990928689be069126",
+    "results": [
+      {
+        "filter": "format_images::tests::",
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 196,
+        "names": [
+          "format_images::tests::a_tiny_crop_still_charges_the_entire_retained_source_allocation",
+          "format_images::tests::buffered_bytes_keep_requested_policy_original_identity_and_capture_provenance",
+          "format_images::tests::cancellation_after_the_generic_decoder_returns_discards_its_pixels"
+        ],
+        "log_sha256": "125e8d136b38416ba48fff1d32aa3d1284273395ae0eacc212e238dd03173132"
+      },
+      {
+        "filter": "avif_images::tests::",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 197,
+        "names": [
+          "avif_images::tests::missing_codec_is_typed_separately_from_corrupt_or_unsupported_data",
+          "avif_images::tests::inspection_and_cancel_refusal_do_not_need_an_os_decoder"
+        ],
+        "log_sha256": "11d453a139ca771fbc8360825ea0b21175e5d41f7aa8287a666f96477cc9422d"
+      },
+      {
+        "filter": "streaming_ffi::format_seek_tests::",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 197,
+        "names": [
+          "streaming_ffi::format_seek_tests::final_hash_refuses_cancelled_and_wrong_length_receipts",
+          "streaming_ffi::format_seek_tests::final_hash_includes_header_rewrites_and_ignores_the_write_order"
+        ],
+        "log_sha256": "f206e3cee6757df20090180d44db9273d285f6e66248b47b90a63cedd130e3ac"
+      },
+      {
+        "filter": "streaming_ffi::tests::bmp_preflight_is_refused_before_staging_a_provenance_free_export",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 198,
+        "names": [
+          "streaming_ffi::tests::bmp_preflight_is_refused_before_staging_a_provenance_free_export"
+        ],
+        "log_sha256": "de42d0dbce0e0b9603411e61db79e843e5fa654b6f0bfe97930035042fc60295"
+      }
+    ]
+  },
+  "unit_scope": {
+    "available": 199,
+    "selected": 8,
+    "unselected": 191,
+    "note": "Unselected counts are not ignored/skipped tests; overlapping per-filter counts must not be summed."
+  },
+  "resolved_prior_blockers": [
+    "Model asset metadata admits only the exact first_tiff_page_only boolean and rejects string/object/null/unknown-key/wrong-description-type cases in the new model regression.",
+    "All nine public BMP/TIFF import/query/export cases now pass against the actual production crate.",
+    "Final published TIFF bytes at 8/16-bit depth carry exact source and revision, agree with finalized-file hash/length, preserve ICC/pixels, and leave no owned scratch.",
+    "Buffered adapter output includes original/revision/capture-session/max-u64 frame in actual file bytes; selected final-file hash unit cases pass.",
+    "BMP memory/file exports and file preflight refuse publication; image root/UI gate is source-visible but no actual app UI was run.",
+    "Previous five strict FFI lint diagnostics no longer appear."
+  ],
+  "lint": {
+    "command": "cargo +1.99.0 clippy --locked -p vw-ffi --lib --test ordinary_formats --test streaming_ffi --no-deps -- -D warnings",
+    "exit_code": 101,
+    "log_sha256": "fa8f619fcc1f788318404720840b099bc7dbf852c7f412749910ea186b4cda47",
+    "reserved_errors": [
+      {
+        "path": "core/crates/vw-ffi/src/documents/jobs.rs",
+        "line": 5,
+        "diagnostic": "unused import: crate::*",
+        "ownership": "coordinator/document lane",
+        "proposal": "Platform-gate this wildcard import to the platform(s) that use its names; CoreError uses appear in the Windows runtime path. Preserve platform compilation; image owner made no reserved edit."
+      }
+    ],
+    "public_test_lint": "not reached after library diagnostic; cannot claim a clean package gate",
+    "dependency_warnings": "vw-ai-platform has two Linux dead-code warnings; dependency lint was outside --no-deps target scope"
+  },
+  "reused_evidence": {
+    "source": "core/crates/vw-assets/native-caller-validation-20261018.json",
+    "source_commit": "b0fee0aead798fe43fbb680125e082ccbf02afc8",
+    "module_tests": 87,
+    "components": {
+      "vw_assets": 20,
+      "vw_formats_including_provenance": 27,
+      "vw_avif_os": 12,
+      "vw_raster_display_R164": 5,
+      "vw_raster_formats": 15,
+      "vw_raster_ordinary_preparation": 8
+    },
+    "lint": "Prior portable all-target and selected raster -D warnings results retained for identical source and same platform/toolchain; these commands were not rerun on the frozen graph.",
+    "bindings": [
+      {
+        "path": "core/crates/vw-assets/src",
+        "old_git_object": "fecd0a67b60905fa52aaeb894b1dd7724a2af5a4",
+        "frozen_git_object": "fecd0a67b60905fa52aaeb894b1dd7724a2af5a4",
+        "identical": true
+      },
+      {
+        "path": "core/crates/vw-assets/tests",
+        "old_git_object": "45313a8945ce512486d120f5e9f52abc28810f72",
+        "frozen_git_object": "45313a8945ce512486d120f5e9f52abc28810f72",
+        "identical": true
+      },
+      {
+        "path": "core/crates/vw-assets/Cargo.toml",
+        "old_git_object": "ffab8597f7bb62b768fdfe5af780cdf1cf114dda",
+        "frozen_git_object": "ffab8597f7bb62b768fdfe5af780cdf1cf114dda",
+        "identical": true
+      },
+      {
+        "path": "core/crates/vw-formats",
+        "old_git_object": "92ac08603a579209328d812a494fdf8f57b9c330",
+        "frozen_git_object": "92ac08603a579209328d812a494fdf8f57b9c330",
+        "identical": true
+      },
+      {
+        "path": "core/crates/vw-avif-os",
+        "old_git_object": "b69b2a1686cfa3da94ab7e09195e9552bd76781b",
+        "frozen_git_object": "b69b2a1686cfa3da94ab7e09195e9552bd76781b",
+        "identical": true
+      },
+      {
+        "path": "core/crates/vw-raster",
+        "old_git_object": "805b680cfcea26dad3ac5a87f8986b8fdb1bef2c",
+        "frozen_git_object": "805b680cfcea26dad3ac5a87f8986b8fdb1bef2c",
+        "identical": true
+      }
+    ],
+    "limits": "Reused evidence establishes unchanged module behavior at its recorded source; it is not a new exact-candidate execution. The old 18 background/lifecycle cases remain historical FFI evidence and are not counted in new or reused module totals."
+  },
+  "not_executed": [
+    "Android SDK/app/JNI/generated Kotlin binding build or runtime, emulator/instrumentation/physical device validation.",
+    "Windows WIC or Windows native callers.",
+    "Real installed-OS AVIF entropy decode/fidelity; still-image restricted admission only, no HDR/multiframe/encoder/alpha/grid claims.",
+    "Giant JPEG/HEIC routing, original blob transfer, libvips/worker/GPU/performance or product acceptance.",
+    "App document/precision flows introduced by the frozen candidate; this is focused image runtime validation."
+  ],
+  "metadata_policy_limit": "The shared streaming seam may replace returned memory-budget settings after encoding. Exact embedded source/revision/capture is validated; complete settings equality is not claimed.",
+  "slot": "released after scheduled commands finished; no additional heavy build started after release",
+  "publication": "evidence-only followup on the authorized image integration branch; production source remains exactly the frozen candidate",
+  "next": "Coordinator fixes the document wildcard import; rerun strict FFI library/public-image-test lint, which has not yet reached the owned test targets."
+}
