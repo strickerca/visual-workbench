@@ -1,5 +1,5 @@
 {
-  "status": "admitted platform source implementation checkpoint; compilation/native/caller acceptance not yet established",
+  "status": "admitted source checkpoint with partial module validation; final publication/handoff regressions and actual caller/native verification pending",
   "base_engine_commit": "3d2839de8cfdecf1e0afeab5e93b67a268004c2b",
   "recovery_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
   "scope": [
@@ -213,7 +213,7 @@
     "Rendering tests: reject zero/overflow/invalid byte count/scale; known straight-RGBA-to-ARGB pixels, no authority/generation revival, bounded32 tiles, no bitmap recycling during live frames.",
     "IO tests: source cap4MiB SVG/64MiB PDF, cancellation/stale checks, source/output hash mismatch and partial owned destination cleanup failure. Hardware/native tests stay separately pending."
   ],
-  "build_status": "Focused pure leaf harness being prepared. No full app compile, native execution or UI/provider/device acceptance yet.",
+  "build_status": "Source/native ABI composition pending;47 earlier in-progress pure module tests passed. Three later regressions/changes await final focused compile/run. Never treat this checkpoint as full platform caller or runtime acceptance.",
   "admission_needed": "Parent/coordinator must admit candidate shared/native names and the frame binding (or supply exact alternative), choose coordinator-owned worker/native packaging recovery, and publish those contracts before dependent platform implementation/compilation. No root/shared/FFI/schema/manifest/Gradle edit requested from this lane.",
   "admission_commit": "6dcdcdfde4acdba76c710c16187e19d3f4489d4a",
   "root_seams_remaining": [
@@ -223,6 +223,204 @@
     "documentSourceHash must support hashing output bytes up to128MiB, or provide an output verifier. Source parser limits stay4MiB SVG/64MiB PDF.",
     "Root must close PreparedDocumentTile leases only after the last draw reader retires, then close cache; source reserves foreign copies independently. UI state replacement alone is not a retirement fence.",
     "Root shutdown must drain DesktopDocumentRuntimeCache.closePending and AndroidDocumentIO.close, retaining same owner on failure.",
-    "Android UID/artifact/hard-memory/deadline checks and unique per-job binding nonce remain native/root responsibilities; no real native artifact or sandbox acceptance claimed."
+    "Android UID/artifact/hard-memory/deadline checks and unique per-job binding nonce remain native/root responsibilities; no real native artifact or sandbox acceptance claimed.",
+    "Native byte-result validation round-trips large payloads; root must admit parent/JNI/source/copy memory reservations (or an owned validated-result handle). The128MiB transport cap alone is not proof of the app memory target.",
+    "Use DocumentTileCache.prepareOwned for dispatcher conversion, or preserve an equivalent acquired-frame handoff across prompt cancellation; close every returned PreparedDocumentTile after last draw retirement.",
+    "Existing NativeCacheAnchor.close suppresses individual release errors; strict document acquisition cleanup needs root retirement evidence/error propagation before actual pin-release acceptance."
+  ],
+  "source_checkpoint": "15e9425c3f356b421d04f25a27d7f175fac5176b",
+  "completed_checks": {
+    "compiler": "Kotlin2.4.20 JVM compiler, real admitted CoreApi/DocumentsApi/DocumentFrames, strict explicit API and warnings denied for pure production leaf modules",
+    "last_complete_run": {
+      "passed": 47,
+      "failed": 0,
+      "ignored": 0,
+      "classes": 8,
+      "scope": "both platform job gates and tile ownership, Android wire/publication/service signals, Desktop manifest/lease cleanup"
+    },
+    "pending_regressions": {
+      "count": 3,
+      "planned_total": 50,
+      "reason": "publication fixed-code privacy regression and two owned bitmap dispatcher-handoff cancellation regressions added after last completed47-test run; their production changes are NOT yet compiler/test validated"
+    },
+    "excluded_from_compile": "Android framework service/jobs/IO/Bitmap adapters and Desktop Compose/native-runtime adapters await root ABI/generated bindings/shared interaction and platform classpaths. No actual app caller or framework/native runtime was executed.",
+    "test_factory_actuals": "Two harness-only actuals for existing expect factories; workbenchCore throws if invoked, prepareCoreLibrary inert. No production native substitution was installed.",
+    "test_definitions_present": 50,
+    "scans": "Gitleaks8.30.1 zero findings in both platform source and dedicated test directories; JSON parse and git diff whitespace checks passed."
+  },
+  "retained_harness_artifacts": {
+    "tool-artifacts.json": {
+      "sha256": "1accd93a370bfce88c3612469de435a81077e981c7c03642991d182bf0710a58",
+      "bytes": 2967
+    },
+    "production-first.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "tests-first-compile.log": {
+      "sha256": "3a0786d059745eceffc14de925d579c230add912c1e03798b82ba43bf81f486c",
+      "bytes": 1972
+    },
+    "tests-first-run.log": {
+      "sha256": "48a1a76ce5917248a4fad752fedda27177d3bf117f5df484eb5ea20cf02e66a3",
+      "bytes": 90
+    },
+    "production-final-compile.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "tests-final-compile.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "tests-final-run.log": {
+      "sha256": "8c70321a8afe767435f07ada939ba24444cc88b6f2e9bc2df8b1186dfe45d775",
+      "bytes": 95
+    },
+    "production-closure-compile.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "tests-closure-compile.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "tests-closure-run.log": {
+      "sha256": "dca8cb29cb3202c33eec0d54c531fe5f63c4416fe1174dba11bc7661d55c410f",
+      "bytes": 97
+    },
+    "production.jar": {
+      "sha256": "c19e6f434df6436a9e720f9a702683a8d6ff4e9f34569d9e1f8bdc852f37bed0",
+      "bytes": 249871
+    },
+    "tests.jar": {
+      "sha256": "c97880e7987825a168676c348c7a19cd0a1c1dec19d4d52eae3cd0a1762114de",
+      "bytes": 189511
+    }
+  },
+  "execution_status": "Healthy shell; no test/build process running. Focused heavy slot released to image lane on parent status request. No further heavy command until another grant.",
+  "implementation_notes": [
+    "Normal post-result service disconnection no longer poisons success; only death or proof no job/FD was ever dispatched allows retirement. Five dedicated pure signal tests pass.",
+    "Joined job gates preserve caller cancellation when child termination produces a worker/pipe error, while uncertain retirement retains the same actual owner.",
+    "Provider publication has fixed-code privacy and explicit partial-file failure; the latest privacy regression is pending, not counted as passed.",
+    "Prepared tiles use independent refcounted image leases and a conservative foreign-copy reservation; UI disposal alone cannot close a live draw image. Latest dispatcher handoff changes await final tests.",
+    "Panels/controls remain deferred; no root/controller/Main/WorkbenchApp/shared API/FFI/schema/manifest/Gradle/lock edits were made in lane commits."
+  ],
+  "current_source_files": [
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/documents/AndroidDocumentIO.kt",
+      "bytes": 6545,
+      "sha256": "9c56655789d098a17bf5f20187a15d892e8197927415bd8d76dc836ae5607e71"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/documents/AndroidDocumentJobs.kt",
+      "bytes": 10773,
+      "sha256": "c7dae2cc0c03b10c2c53cf900bc02195fc504686066a05f769c78728444833a6"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentJobLifetime.kt",
+      "bytes": 3606,
+      "sha256": "a6a9c86b0e52fc18b1622097636cba61d3f2b4d644af8aafc1143056b23d4fd0"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentPublication.kt",
+      "bytes": 4515,
+      "sha256": "830f72428a7b611196f49d7050752ab8c0b9c357b62fed2628bfe02583d21e57"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentServiceSignals.kt",
+      "bytes": 1058,
+      "sha256": "a7babef2eefef974a08b95506d6349490434529c78d5f3736446f415ef688b10"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentTileOwnership.kt",
+      "bytes": 6895,
+      "sha256": "a9d9807537ff44e15ac6e87b83d6edea1fbfcf7da2564be032db4c19d6abbbe6"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentTiles.kt",
+      "bytes": 1979,
+      "sha256": "0dcbceef7625513542b3e2788309177bffb237dc16670b9e309ea45d630f73bd"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentWire.kt",
+      "bytes": 5136,
+      "sha256": "af1047e8e26da5f1cf22d213f9f2639f42f6d70f4324700795ba9caa0529b2be"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentWorkerService.kt",
+      "bytes": 5521,
+      "sha256": "0a5d88ecb592f3653820875e72f49f8651e270953d1a6f707abb33f61774c59d"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/documents/DocumentJobLifetimeTest.kt",
+      "bytes": 5685,
+      "sha256": "b3d16af280f2a61cf92b1381ea41d8ee3c73e2de8407b710a99bf14b3a8d34b6"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/documents/DocumentPublicationTest.kt",
+      "bytes": 5126,
+      "sha256": "f5d8852d8b642bcdd70f5881a757911d1e7adfa07ee684f6e33dd2d0613b5645"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/documents/DocumentServiceSignalsTest.kt",
+      "bytes": 1717,
+      "sha256": "9ef2d3080785536dee212c046c9c7541ca681d168909c8833767d7f37ebf0962"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/documents/DocumentTileOwnershipTest.kt",
+      "bytes": 5067,
+      "sha256": "35201483efe554e56ec3a5d6e9f17ec8b03553f9a33b1162dcb39d625141e942"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/documents/DocumentWireTest.kt",
+      "bytes": 4071,
+      "sha256": "7359990347cf0a7b6c087d324f6f74833ce33256daee70dad7e657425c1ad54d"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/documents/DesktopDocumentJobs.kt",
+      "bytes": 4854,
+      "sha256": "592dc79ad998f4868f05d3b660e03d19c5de8cfcfbbb2ae23ffd86d6931dceda"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/documents/DesktopDocumentRuntime.kt",
+      "bytes": 6993,
+      "sha256": "a18b6c31c678e8d83617424fa00f808dbfe3dd46e5bbbb5e9b6b96e1be234e4c"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/documents/DocumentJobLifetime.kt",
+      "bytes": 3606,
+      "sha256": "87c4e41e1a9a1507ca37f0bf9a34ffb0622262d2507b38c35389d2ab724b1bf4"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/documents/DocumentRuntimeManifest.kt",
+      "bytes": 2546,
+      "sha256": "b25acdf02a6639d1368000f222eb0255b0693a4203092463ca5cb3d1746eb3af"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/documents/DocumentTileOwnership.kt",
+      "bytes": 6895,
+      "sha256": "ce9fddc44195409024c992bc76e8c637efa14dc787c7413787f0a3ef5ff865e1"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/documents/DocumentTiles.kt",
+      "bytes": 1939,
+      "sha256": "c06303d3a502add3cc2b24f3b2e04be2ed19f6fbaf0fc974c5dd09a62b736d2a"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/documents/DocumentJobLifetimeTest.kt",
+      "bytes": 5685,
+      "sha256": "5ee257d9db6dff1ec9a533219e6cce2fac7acf671c2717f21c7549813bd4bbc3"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/documents/DocumentRuntimeManifestTest.kt",
+      "bytes": 2627,
+      "sha256": "6b9f10790b1ca99b5142c2a2cb2abc28cfaf388fd3d4328aa73cd7230101018b"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/documents/DocumentTileOwnershipTest.kt",
+      "bytes": 5067,
+      "sha256": "62caf7f1bb3195379b4028319b5a683a26c900d13844ea5cf52dd8d45da6feaa"
+    }
   ]
 }

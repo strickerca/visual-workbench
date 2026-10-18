@@ -52,6 +52,7 @@ public class DocumentWorkerService : Service() {
                     result = DocumentWireResult(native.sourceBlake3, native.metadataJson, native.bytes, native.outputBlake3)
                 } catch (error: DocumentJobException) { failure = nativeDocumentFailure(error).kind }
                 catch (error: DocumentFailure) { failure = error.kind }
+                catch (_: LinkageError) { failure = DocumentFailureKind.Unavailable }
                 catch (_: Exception) { failure = DocumentFailureKind.Worker }
                 finally {
                     runCatching { input.close() }
@@ -65,7 +66,8 @@ public class DocumentWorkerService : Service() {
     })
 
     private fun pdfium(): Pair<String, ByteArray> {
-        val bytes = assets.open("vw-document-android.sha256").use { it.readNBytes(1025) }
+        val bytes = try { assets.open("vw-document-android.sha256").use { it.readNBytes(1025) } }
+            catch (_: java.io.IOException) { throw DocumentFailure(DocumentFailureKind.Unavailable) }
         if (bytes.size !in 1..1024 || bytes.any { it.toInt() !in 32..126 && it.toInt() != 10 })
             throw DocumentFailure(DocumentFailureKind.Verification)
         val pin = bytes.toString(Charsets.US_ASCII).trim()

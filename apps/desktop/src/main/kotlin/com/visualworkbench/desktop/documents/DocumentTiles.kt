@@ -21,6 +21,7 @@ internal class DocumentTileCache(budgetBytes: Long = 192L * 1024 * 1024) : AutoC
         image to { image.asSkiaBitmap().close() }
     }
     fun prepare(frame: DocumentDisplayFrame, stillCurrent: () -> Boolean): List<PreparedDocumentTile> = images.prepare(frame, stillCurrent)
+    suspend fun prepareOwned(frame: DocumentDisplayFrame, stillCurrent: () -> Boolean): List<PreparedDocumentTile> = images.prepareOwned(frame, stillCurrent)
     override fun close() = images.close()
 }
 

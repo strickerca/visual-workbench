@@ -18,16 +18,23 @@ private class NativeDocumentBackend(
         private val cancellation = DocumentJobCancellation()
         private val state = Any()
         private var uncertain = false
+        private var cancelled = false
         private var retired = false
         private var heldSource: ByteArray? = null
         override fun cancel() = synchronized(state) {
+            cancelled = true
             try { if (!retired) cancellation.cancel() }
             catch (_: Exception) { uncertain = true }
         }
         override suspend fun execute(request: DocumentRequest, source: ByteArray): DocumentReply {
             heldSource = source
+            if (source.isEmpty()) throw DocumentFailure(DocumentFailureKind.Invalid)
+            if (source.size > if (documentSvgOperation(request.operation)) 4 * 1024 * 1024 else 64 * 1024 * 1024)
+                throw DocumentFailure(DocumentFailureKind.Limit)
+            synchronized(state) { if (cancelled) throw DocumentFailure(DocumentFailureKind.Cancelled) }
             if (!documentSvgOperation(request.operation) && !pdfium) throw DocumentFailure(DocumentFailureKind.Unavailable)
-            if (request.operation is DocumentOperation.Copy && request.operation.kind == DocumentCopy.PcRedaction && !pcRedaction)
+            val operation = request.operation
+            if (operation is DocumentOperation.Copy && operation.kind == DocumentCopy.PcRedaction && !pcRedaction)
                 throw DocumentFailure(DocumentFailureKind.Unsupported)
             try {
                 val text = documentRequestJson(request)
@@ -46,7 +53,11 @@ private class NativeDocumentBackend(
             // destroy is never used as a substitute for retirement evidence.
             synchronized(state) {
                 if (uncertain) throw DocumentFailure(DocumentFailureKind.Isolation)
-                if (!retired) { cancellation.destroy(); retired = true; heldSource = null }
+                if (!retired) {
+                    try { cancellation.destroy() }
+                    catch (_: Exception) { uncertain = true; throw DocumentFailure(DocumentFailureKind.Isolation) }
+                    retired = true; heldSource = null
+                }
             }
         }
     }
@@ -55,7 +66,7 @@ private class NativeDocumentBackend(
             try { runtime.destroy(); destroyed = true }
             catch (_: Exception) { throw DocumentFailure(DocumentFailureKind.Isolation) }
         }
-        retained.close()
+        try { retained.close() } catch (_: Exception) { throw DocumentFailure(DocumentFailureKind.Isolation) }
     }
 }
 

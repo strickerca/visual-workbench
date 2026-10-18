@@ -50,7 +50,11 @@ internal class DocumentPublisher(private val hash: suspend (ByteArray) -> String
             }
             current(stillCurrent); destination.finish(); destination.close(); current(stillCurrent)
             complete = true
-        } finally {
+        } catch (error: DocumentFailure) { throw error }
+        catch (error: DocumentPublicationFailure) { throw error }
+        catch (error: CancellationException) { throw error }
+        catch (_: Exception) { throw DocumentFailure(DocumentFailureKind.Worker) }
+        finally {
             withContext(NonCancellable) {
                 try { destination.close() }
                 catch (_: Exception) {
@@ -62,12 +66,15 @@ internal class DocumentPublisher(private val hash: suspend (ByteArray) -> String
         }
     }
 
+    fun closeAdmission() { closing.set(true) }
+
     suspend fun close() {
         closing.set(true) // Stops active writes at the next bounded IO boundary.
         withContext(NonCancellable) {
             gate.withLock {
                 val retained = pending ?: return@withLock
-                retained.destination.close() // Failure retains the exact owner.
+                try { retained.destination.close() } // Failure retains the exact owner.
+                catch (_: Exception) { throw DocumentFailure(DocumentFailureKind.Isolation) }
                 pending = null
                 if (!removed(retained.destination)) throw DocumentPublicationFailure()
             }
