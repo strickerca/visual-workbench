@@ -137,20 +137,50 @@ pub(super) fn bytes(
     if len == 0 || len > max {
         return Err(Error::Limit);
     }
+    read_fixed(file, len, budget, cancel)
+}
+
+/// Fixed payload storage, including when a file grows after metadata. No Vec
+/// append/read_to_end can expand the admitted allocation at an EOF boundary.
+fn read_fixed(
+    mut reader: impl Read,
+    len: u64,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<EncodedFile> {
+    cancel.check().map_err(Error::from)?;
     let allowance = len.checked_add(1).ok_or(Error::Limit)?;
     let charge = source::reserve(budget, MemoryKind::EncodedTiles, allowance)?;
+    let length = usize::try_from(len).map_err(|_| Error::Limit)?;
     let capacity = usize::try_from(allowance).map_err(|_| Error::Limit)?;
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(capacity)
         .map_err(|_| Error::Limit)?;
-    file.take(allowance)
-        .read_to_end(&mut bytes)
-        .map_err(io_error)?;
-    if bytes.len() as u64 != len || bytes.capacity() as u64 > allowance {
-        return Err(Error::Invalid);
+    if bytes.capacity() > capacity {
+        return Err(Error::Limit);
     }
-    cancel.check().map_err(Error::from)?;
+    bytes.resize(length, 0);
+    for chunk in bytes.chunks_mut(64 * 1024) {
+        cancel.check().map_err(Error::from)?;
+        reader.read_exact(chunk).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                Error::Invalid
+            } else {
+                io_error(e)
+            }
+        })?;
+    }
+    let mut sentinel = [0];
+    loop {
+        cancel.check().map_err(Error::from)?;
+        match reader.read(&mut sentinel) {
+            Ok(0) => break,
+            Ok(_) => return Err(Error::Invalid),
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(io_error(e)),
+        }
+    }
     Ok(EncodedFile {
         bytes,
         _charge: charge,
@@ -350,3 +380,7 @@ pub(super) fn release(build: Arc<ApprovedBuild>) -> Result<()> {
     let source_result = super::input::release(source);
     output_result.and(source_result)
 }
+
+#[cfg(test)]
+#[path = "cache_read_tests.rs"]
+mod read_tests;

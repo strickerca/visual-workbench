@@ -192,6 +192,40 @@ fn copy_output(output: CompletedOutput, context: &Context) -> Result<cache::Appr
     // AndroidTileBuild.close. Thus no publication can overlap its 80 MiB owner.
     Ok(build)
 }
+/// The native copy is not usable until the actual Java runner returns after
+/// successful joined close. Error status drops an independently owned build,
+/// never the still-held/quarantined Android owner or its foreign reservation.
+fn after_android_retirement(
+    context: &Context,
+    consumed: bool,
+    status: i32,
+    result: Option<Result<cache::ApprovedBuild>>,
+) -> Result<cache::ApprovedBuild> {
+    context.check()?;
+    if status != 0 {
+        return match result {
+            Some(Err(error)) => Err(error),
+            _ => Err(match status {
+                2 => Error::Cancelled,
+                3 => Error::Backpressure,
+                4 => Error::Unsupported,
+                5 => Error::Invalid,
+                6 => Error::Memory {
+                    estimated: context.budget.used_bytes().saturating_add(80 * 1024 * 1024),
+                    budget: context.budget.limit_bytes(),
+                },
+                7 => Error::Limit,
+                8 => Error::Closed,
+                _ => Error::Storage,
+            }),
+        };
+    }
+    if !consumed {
+        return Err(Error::Unsupported);
+    }
+    result.ok_or(Error::Unsupported)?
+}
+
 fn checked_output_root(
     output: &CompletedOutput,
     prepared: &input::PreparedSource,
@@ -283,3 +317,6 @@ fn check_inventory(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

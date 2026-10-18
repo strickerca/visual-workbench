@@ -140,6 +140,11 @@ pub(in crate::giant_images::producer) fn build(
     budget: SessionBudget,
 ) -> Result<cache::ApprovedBuild> {
     let runtime = RUNTIME.get().ok_or(Error::Unsupported)?;
+    // Kotlin reserves its 80 MiB owner through sharedSessionResources(). Native
+    // preparation/copy must be the exact same process pool, never a local cap.
+    if !budget.same_pool(&crate::session_resources::shared_budget()?) {
+        return Err(Error::Invalid);
+    }
     let context = Context {
         source,
         closed,
@@ -160,7 +165,7 @@ pub(in crate::giant_images::producer) fn build(
     let work = context.source.staging.path().join("android-work");
     std::fs::create_dir(&work).map_err(io_error)?;
     let id = NEXT_ID
-        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |id| {
+        .try_update(Ordering::AcqRel, Ordering::Acquire, |id| {
             (id < i64::MAX as u64).then_some(id + 1)
         })
         .map_err(|_| Error::Limit)?;
@@ -201,17 +206,12 @@ pub(in crate::giant_images::producer) fn build(
     let mut pending = ACTIVE
         .with(|cell| cell.borrow_mut().take())
         .ok_or(Error::Storage)?;
-    pending.context.check()?;
-    if status != 0 {
-        return match pending.result.take() {
-            Some(Err(error)) => Err(error),
-            _ => Err(Error::Storage),
-        };
-    }
-    if !pending.consumed {
-        return Err(Error::Unsupported);
-    }
-    pending.result.take().ok_or(Error::Unsupported)?
+    after_android_retirement(
+        &pending.context,
+        pending.consumed,
+        status,
+        pending.result.take(),
+    )
 }
 fn invoke(env: &mut Env<'_>, runtime: &Runtime, id: u64, work: &std::path::Path) -> Result<jint> {
     let info = ACTIVE
@@ -279,14 +279,14 @@ pub extern "system" fn Java_com_visualworkbench_shared_giant_AndroidGiantRuntime
                     })
                     .unwrap_or(true);
             env.exception_clear();
-            Ok::<jboolean, ::jni::errors::Error>(u8::from(cancelled))
+            Ok::<jboolean, ::jni::errors::Error>(cancelled)
         })
         .into_outcome();
     match outcome {
         Outcome::Ok(v) => v,
         Outcome::Err(_) | Outcome::Panic(_) => {
             clear_exception(&mut owner);
-            1
+            true
         }
     }
 }
@@ -362,14 +362,12 @@ fn describe(env: &mut Env<'_>, runtime: &Runtime, output: &JObject<'_>) -> Resul
     let array = env
         .cast_local::<JObjectArray>(value)
         .map_err(|_| Error::Invalid)?;
-    if env.get_array_length(&array).map_err(|_| Error::Invalid)? != 10 {
+    if array.len(env).map_err(|_| Error::Invalid)? != 10 {
         return Err(Error::Invalid);
     }
     let mut fields = Vec::with_capacity(10);
     for index in 0..10 {
-        let field = env
-            .get_object_array_element(&array, index)
-            .map_err(|_| Error::Invalid)?;
+        let field = array.get_element(env, index).map_err(|_| Error::Invalid)?;
         let field = env
             .cast_local::<JString>(field)
             .map_err(|_| Error::Invalid)?;

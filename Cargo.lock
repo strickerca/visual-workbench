@@ -3313,6 +3313,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "vw-assets-win"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "png",
+ "ring",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "vw-assets",
+ "vw-raster",
+ "vw-stream",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "vw-avif-os"
 version = "0.1.0"
 dependencies = [
@@ -3414,6 +3431,7 @@ dependencies = [
  "vw-ai-platform",
  "vw-ai-provider",
  "vw-assets",
+ "vw-assets-win",
  "vw-avif-os",
  "vw-codec-os",
  "vw-document-protocol",

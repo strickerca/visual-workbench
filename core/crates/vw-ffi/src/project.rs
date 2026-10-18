@@ -104,7 +104,7 @@ pub(crate) struct ProjectState {
     pub replica: Option<vw_ops::Replica>,
     pub remote: Option<vw_net::SyncReceiver>,
     pub changed: Arc<tokio::sync::Notify>,
-    permit: Option<SessionPermit>,
+    _permit: Option<SessionPermit>,
     // Last: store/model/history/replica/remote allocations must actually retire
     // before the giant publication's admission is returned to the shared pool.
     _memory_charge: Option<vw_stream::MemoryCharge>,
@@ -240,7 +240,7 @@ impl ProjectSession {
                 replica,
                 remote,
                 changed: changed.clone(),
-                permit: Some(input.permit),
+                _permit: Some(input.permit),
                 _memory_charge: input.charge,
             },
             16,
@@ -280,7 +280,8 @@ impl ProjectSession {
                     .map(|store| project_info(store, &state.history))
                     .transpose();
                 state.store.take();
-                state.permit.take();
+                // The permit and retained publication charge retire with the
+                // actual state after its model/history/replica, not this callback.
                 if let Ok(Some(info)) = &info {
                     state.events.publish(ChangeKind::Closed, info.clone());
                 }

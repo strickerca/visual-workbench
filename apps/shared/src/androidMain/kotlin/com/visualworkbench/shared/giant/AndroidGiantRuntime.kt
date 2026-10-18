@@ -1,6 +1,8 @@
 package com.visualworkbench.shared.giant
 
-import com.visualworkbench.shared.sharedSessionResources
+import com.visualworkbench.shared.GiantImageFailure
+import com.visualworkbench.shared.GiantImageFailureKind
+import com.visualworkbench.shared.sessionResources
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -25,7 +27,7 @@ internal object AndroidGiantRuntime {
             val input = JpegTileInput.fromRootPrepared(File(source), File(work), sha256,
                 rawWidth, rawHeight, orientation, encodedBytes, maxDiskBytes,
                 assumeUntaggedSrgb = true) // Native preparation already requires explicit consent.
-            val build = AndroidJpegPyramid.build(input, sharedSessionResources()) {
+            val build = AndroidJpegPyramid.build(input, sessionResources()) {
                 if (cancelledNative(operation)) throw CancellationException("giant build cancelled")
             }
             try {
@@ -41,7 +43,20 @@ internal object AndroidGiantRuntime {
             }
         }
         0
-    } catch (_: Throwable) { 1 }
+    } catch (_: CancellationException) { 2 }
+    catch (error: GiantImageFailure) { when(error.kind) {
+        GiantImageFailureKind.Cancelled -> 2
+        GiantImageFailureKind.Backpressure -> 3
+        GiantImageFailureKind.Unsupported -> 4
+        GiantImageFailureKind.Invalid, GiantImageFailureKind.Stale -> 5
+        GiantImageFailureKind.Memory -> 6
+        GiantImageFailureKind.Limit -> 7
+        GiantImageFailureKind.Closed -> 8
+        else -> 1
+    } }
+    catch (error: TileBuildFailure) { if(error.reason == "busy") 3 else 5 }
+    catch (_: OutOfMemoryError) { 7 }
+    catch (_: Throwable) { 1 }
 
     /** Called only within build.withRootOutput by the nested native callback.
      * This describes its private typed owner; it never accepts external paths. */

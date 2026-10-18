@@ -188,15 +188,14 @@ impl SecretProvider for AndroidCredentials {
         let runtime = RUNTIME.get().ok_or(CredentialFailure::Unavailable)?;
         // Exactly the provider's bounded worker owns this blocking OS/JNI call.
         // Detaching the caller does not release that worker's capacity early.
-        let result = runtime
+        runtime
             .vm
             .attach_current_thread_for_scope(|env| {
                 let result = read(env, runtime, stop, deadline);
                 env.exception_clear();
                 Ok::<Result<Secret>, jni::errors::Error>(result)
             })
-            .map_err(unavailable)?;
-        result
+            .map_err(unavailable)?
     }
 }
 fn read(

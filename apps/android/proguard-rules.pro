@@ -8,3 +8,7 @@
 -keep class org.rustls.platformverifier.CertificateVerifier { *; }
 -keep class org.rustls.platformverifier.VerificationResult { *; }
 -keep class org.rustls.platformverifier.StatusCode { *; }
+
+# Fixed private runner and typed output reached through the native JNI bridge.
+-keep class com.visualworkbench.shared.giant.AndroidGiantRuntime { *; }
+-keep class com.visualworkbench.shared.giant.AndroidTileBuild { *; }
