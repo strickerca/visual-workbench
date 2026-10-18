@@ -210,3 +210,44 @@ the final xref leaf repair passes 248 cases; portable document leaves pass 131 w
 2 required-runtime contracts ignored. The final source is now entering serialized
 native lint/rebuild, one phase binding-generation pass and actual app validation;
 no final combined acceptance is claimed yet.
+
+### Completed cloud composition checks — 2026-10-18
+
+Code candidate `b0ace63b075fee190515f8e0c45fb6062f3809d0` is published on
+`cloud/document-copy-identity-20261018`. Frozen `070758a` and main `7be9da7`
+remain unchanged. The combined software check phase is complete:
+
+- 443 native cases passed; two required PDFium runtime contracts were ignored.
+- Actual shared, desktop and Android app compilation passed. The full host/unit
+  suites passed 718 cases: shared 287, desktop 312 and Android 119. Seven desktop
+  Windows-only cases were skipped, with their exact names in the receipt.
+- Android instrumentation sources compile, including the actual controller's
+  delayed-page-refresh regression; none were device-run. Android lint reports
+  zero errors, 58 warnings and 12 hints. All four arm64 LOAD segments pass16KiB
+  alignment. The real desktop controller page-race/eraser-target regression passes.
+- Native integration strict Clippy passed on Linux. Windows-target document
+  runtime/worker/probe Clippy passed with warnings denied after correcting pinned
+  Win32 Boolean fields. This is a type check, not Windows runtime evidence.
+- Fresh Linux core/host/generator and Android arm64 libraries built. Core/host
+  bindings were generated once for this phase; retries reused unchanged output.
+  Cargo policy and the264-module Gradle license census passed.
+
+SVG publication alone is enabled, with verified final-file identity and bounded
+output. PDF exact-original is explicitly unsupported; other PDF publication stays
+unavailable until actual PDFium/qpdf compatibility and final redaction verification
+are performed. OS worker isolation/retirement, Windows packaging/launch and actual
+Android provider/service delivery are still unverified. Krita and physical product
+and performance gates remain deferred. The source does not claim a gate pass.
+
+Resolved build failures and artifact/generated-binding hashes are recorded in
+`docs/evidence/CLOUD_COMPOSED_APP_VALIDATION_20261018.json`. The test-only Skiko
+cache now uses the owned build tree; three real Windows file/owner tests have
+explicit platform assumptions. The bounded API29 pin reader and unsigned maximum
+identity wire tests pass. No home/security/credential/signing/device change occurred.
+
+Next integration work remains: independent combined-source review/main promotion,
+then deliberate giant-image root viewport and stream-finish consumer integration,
+remaining controls/selection/tilt promotions and Phase5 software verification gaps.
+Current ordinary-format callers, image foundations and their source-bound tests do
+not establish complete giant-image UI or stream acceptance. Parent-owned old
+worktrees and dirty picker remain untouched pending their separate disposition.
