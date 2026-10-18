@@ -5,8 +5,8 @@
 mod job;
 mod reply;
 pub use job::{
-    CopyKind, Job, JobBinding, JobLimits, Operation, Overlay, PageRegion, Request, Tile, read_job,
-    write_job,
+    CopyIdentity, CopyKind, Job, JobBinding, JobLimits, Operation, Overlay, PageRegion, Request,
+    Tile, read_job, write_job,
 };
 pub use reply::{
     Completion, FaultCode, Frame, FrameKind, Progress, ReplyReader, ReplyTracker, ReplyWriter,

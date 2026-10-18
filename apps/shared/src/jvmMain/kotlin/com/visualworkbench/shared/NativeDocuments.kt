@@ -32,6 +32,12 @@ internal fun documentJobFailure(error: DocumentJobException): DocumentFailure = 
 private fun Rect.jsonRegion(): JsonArray = JsonArray(listOf(x,y,x+width,y+height).map(::JsonPrimitive))
 private fun Transform.jsonTransform(): JsonArray = JsonArray(listOf(a,b,c,d,e,f).map(::JsonPrimitive))
 public fun documentRequestJson(request: DocumentRequest): String {
+    request.exportIdentity?.let { identity ->
+        identity.validate()
+        if (request.operation !is DocumentOperation.Copy) throw DocumentFailure(DocumentFailureKind.Invalid)
+    }
+    if (request.operation is DocumentOperation.Copy && request.exportIdentity == null)
+        throw DocumentFailure(DocumentFailureKind.Invalid)
     if (request.password?.let { it.toByteArray(Charsets.UTF_8).size > 1024 || '\u0000' in it } == true)
         throw DocumentFailure(DocumentFailureKind.Invalid)
     (request.operation as? DocumentOperation.Copy)?.let { copy ->
@@ -49,6 +55,12 @@ public fun documentRequestJson(request: DocumentRequest): String {
     return buildJsonObject {
     put("limits",buildJsonObject { put("input_bytes",64 * 1024 * 1024);put("output_bytes",128 * 1024 * 1024);put("memory_bytes",512 * 1024 * 1024) })
     put("password",request.password?.let(::JsonPrimitive) ?: JsonNull)
+    request.exportIdentity?.let { identity -> put("export_identity",buildJsonObject {
+        put("schema_version",identity.schemaVersion.toLong());put("host_seq",JsonPrimitive(identity.hostSeq))
+        put("state_hash",identity.stateHash);put("source_asset",identity.sourceAsset)
+        identity.captureSession?.let { put("capture_session",it) }
+        identity.frameId?.let { put("frame_id",JsonPrimitive(it)) }
+    }) }
     put("operation",buildJsonObject {
         when(val op = request.operation) {
             DocumentOperation.PdfInfo -> put("kind","pdf_info")
@@ -91,6 +103,14 @@ public fun documentReply(result: DocumentJobResult): DocumentReply = try {
         val glyph = value.jsonObject; val bounds = glyph["bounds"]?.takeUnless{it is JsonNull}?.jsonArray?.map{it.jsonPrimitive.double}
         DocumentGlyph(glyph.getValue("index").jsonPrimitive.long.toUInt(),glyph["unicode"]?.jsonPrimitive?.contentOrNull,bounds?.let{Rect(it[0],it[1],it[2]-it[0],it[3]-it[1])},glyph.getValue("generated").jsonPrimitive.boolean)
     }
+    fun exportIdentity(): DocumentExportIdentity? = data["export_identity"]?.takeUnless { it is JsonNull }?.jsonObject?.let { value ->
+        if (value.keys.any { it !in setOf("schema_version","host_seq","state_hash","source_asset","capture_session","frame_id") })
+            throw DocumentFailure(DocumentFailureKind.Verification)
+        DocumentExportIdentity(value.getValue("schema_version").jsonPrimitive.content.toUInt(),
+            value.getValue("host_seq").jsonPrimitive.content.toULong(),value.getValue("state_hash").jsonPrimitive.content,
+            value.getValue("source_asset").jsonPrimitive.content,value["capture_session"]?.jsonPrimitive?.contentOrNull,
+            value["frame_id"]?.jsonPrimitive?.contentOrNull?.toULong()).also { it.validate() }
+    }
     val kind = data.getValue("kind").jsonPrimitive.content
     val meta: DocumentMetadata = when(kind) {
         "pdf_info" -> DocumentMetadata.Info(EditableKind.Pdf,u("pages"),null,null,data.getValue("encrypted").jsonPrimitive.boolean,strings())
@@ -98,7 +118,7 @@ public fun documentReply(result: DocumentJobResult): DocumentReply = try {
         "pdf_page" -> DocumentMetadata.Page(u("page"),n("width"),n("height"),data.getValue("crop").jsonArray.map{it.jsonPrimitive.double},u("quarter_turns"))
         "rgba_tile" -> { val origin=data.getValue("origin").jsonArray; DocumentMetadata.Tile(data["page"]?.jsonPrimitive?.longOrNull?.toUInt(),Point(origin[0].jsonPrimitive.double,origin[1].jsonPrimitive.double),n("native_scale"),u("width"),u("height")) }
         "pdf_text","pdf_selection" -> DocumentMetadata.Text(u("page"),glyphs(),data["next"]?.jsonPrimitive?.longOrNull?.toUInt())
-        "pdf_copy","svg_copy","raster_redaction","pc_redaction" -> DocumentMetadata.Copy(when(kind){"svg_copy"->DocumentCopy.SvgAnnotations;"raster_redaction"->DocumentCopy.EveryPageRasterRedaction;"pc_redaction"->DocumentCopy.PcRedaction;else->when(data.getValue("copy").jsonPrimitive.content){"original"->DocumentCopy.Original;"annotated"->DocumentCopy.Annotated;"flattened"->DocumentCopy.Flattened;else->throw DocumentFailure(DocumentFailureKind.Verification)}},data.getValue("bytes").jsonPrimitive.long.toULong(),kind in setOf("raster_redaction","pc_redaction"),strings(),data["plan_blake3"]?.jsonPrimitive?.contentOrNull)
+        "pdf_copy","svg_copy","raster_redaction","pc_redaction" -> DocumentMetadata.Copy(when(kind){"svg_copy"->DocumentCopy.SvgAnnotations;"raster_redaction"->DocumentCopy.EveryPageRasterRedaction;"pc_redaction"->DocumentCopy.PcRedaction;else->when(data.getValue("copy").jsonPrimitive.content){"original"->DocumentCopy.Original;"annotated"->DocumentCopy.Annotated;"flattened"->DocumentCopy.Flattened;else->throw DocumentFailure(DocumentFailureKind.Verification)}},data.getValue("bytes").jsonPrimitive.long.toULong(),kind in setOf("raster_redaction","pc_redaction"),strings(),data["plan_blake3"]?.jsonPrimitive?.contentOrNull,exportIdentity())
         else -> throw DocumentFailure(DocumentFailureKind.Verification)
     }
     DocumentReply(result.sourceBlake3,result.outputBlake3,meta,result.bytes)

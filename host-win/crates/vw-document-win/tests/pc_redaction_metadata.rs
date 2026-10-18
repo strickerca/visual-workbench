@@ -16,6 +16,7 @@ fn request() -> Request {
             }],
         },
         password: None,
+        export_identity: None,
     }
 }
 fn metadata() -> ResultMetadata {

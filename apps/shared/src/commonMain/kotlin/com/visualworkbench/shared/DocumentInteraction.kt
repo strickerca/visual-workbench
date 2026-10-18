@@ -94,14 +94,16 @@ public class DocumentInteraction(private val jobs: DocumentJobs, private val cor
             result
         } else emptyList()
         coroutineContext.ensureActive()
-        val reply = jobs.run(DocumentRequest(DocumentOperation.Copy(mode,overlays,regions,explicitlyRemoveEncryption=explicitlyRemoveEncryption),password),source.bytes)
+        val exportIdentity = DocumentExportIdentity(1u,descriptor.revision.hostSeq,descriptor.revision.stateHash,descriptor.sourceAssetId)
+        exportIdentity.validate()
+        val reply = jobs.run(DocumentRequest(DocumentOperation.Copy(mode,overlays,regions,explicitlyRemoveEncryption=explicitlyRemoveEncryption),password,exportIdentity),source.bytes)
         val copy = reply.metadata as? DocumentMetadata.Copy ?: throw DocumentFailure(DocumentFailureKind.Verification)
         if(reply.sourceBlake3 != descriptor.sourceAssetId || copy.mode != mode || !project.info().sameDocumentRevision(descriptor.revision)) throw DocumentFailure(DocumentFailureKind.Stale)
         val expectedRedaction = mode in setOf(DocumentCopy.PcRedaction,DocumentCopy.EveryPageRasterRedaction)
-        if (copy.bytes != reply.bytes.size.toULong() || copy.redacted != expectedRedaction || !identity(reply.outputBlake3))
+        if (copy.exportIdentity != exportIdentity || copy.bytes != reply.bytes.size.toULong() || copy.redacted != expectedRedaction || !identity(reply.outputBlake3))
             throw DocumentFailure(DocumentFailureKind.Verification)
         coroutineContext.ensureActive()
-        return DocumentExport(reply.bytes,reply.outputBlake3,mode,copy.redacted,descriptor.sourceAssetId,descriptor.revision,copy.notices)
+        return DocumentExport(reply.bytes,reply.outputBlake3,mode,copy.redacted,descriptor.sourceAssetId,descriptor.revision,copy.notices,exportIdentity)
     }
 }
 internal expect object SystemTime { public fun nowMs(): Long }

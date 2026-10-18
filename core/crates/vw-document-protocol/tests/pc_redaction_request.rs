@@ -18,6 +18,7 @@ fn request() -> Request {
             }],
         },
         password: None,
+        export_identity: None,
     }
 }
 #[test]

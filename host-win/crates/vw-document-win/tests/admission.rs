@@ -9,6 +9,7 @@ fn request(operation: Operation) -> Request {
     Request {
         operation,
         password: None,
+        export_identity: None,
         limits: JobLimits {
             input_bytes: 64 * 1024 * 1024,
             output_bytes: 64 * 1024 * 1024,

@@ -45,8 +45,23 @@ public sealed interface DocumentOperation {
         public val regions: List<DocumentRegion> = emptyList(), public val scale: Double = 2.0,
         public val explicitlyRemoveEncryption: Boolean = false) : DocumentOperation
 }
+/** Exact immutable identity embedded in final PDF/SVG bytes by the isolated exporter.
+ * Capture fields are paired; ordinary PDF/SVG descriptors leave both absent. */
+public data class DocumentExportIdentity(public val schemaVersion: UInt, public val hostSeq: ULong,
+    public val stateHash: String, public val sourceAsset: String,
+    public val captureSession: String? = null, public val frameId: ULong? = null) {
+    public val revision: String get() = "r$hostSeq-${stateHash.take(8)}"
+    public fun validate(): Unit {
+        fun hash(value: String): Boolean = value.length == 64 && value.all { it in "0123456789abcdef" }
+        if (schemaVersion != 1u || !hash(stateHash) || !hash(sourceAsset) ||
+            (captureSession == null) != (frameId == null) ||
+            captureSession?.matches(Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) == false)
+            throw DocumentFailure(DocumentFailureKind.Invalid)
+    }
+}
 /** Passwords are private pipe payloads; never log, persist or echo a request. */
-public class DocumentRequest(public val operation: DocumentOperation, public val password: String? = null) {
+public class DocumentRequest(public val operation: DocumentOperation, public val password: String? = null,
+    public val exportIdentity: DocumentExportIdentity? = null) {
     public override fun toString(): String = "DocumentRequest(passwordSupplied=${password != null})"
 }
 public data class DocumentGlyph(public val index: UInt, public val text: String?, public val bounds: Rect?, public val generated: Boolean)
@@ -55,7 +70,7 @@ public sealed interface DocumentMetadata {
     public data class Page(public val index: UInt, public val width: Double, public val height: Double, public val crop: List<Double>, public val quarterTurns: UInt) : DocumentMetadata
     public data class Tile(public val page: UInt?, public val origin: Point, public val scale: Double, public val width: UInt, public val height: UInt) : DocumentMetadata
     public data class Text(public val page: UInt, public val glyphs: List<DocumentGlyph>, public val next: UInt?) : DocumentMetadata
-    public data class Copy(public val mode: DocumentCopy, public val bytes: ULong, public val redacted: Boolean, public val notices: List<String>, public val planBlake3: String?) : DocumentMetadata
+    public data class Copy(public val mode: DocumentCopy, public val bytes: ULong, public val redacted: Boolean, public val notices: List<String>, public val planBlake3: String?, public val exportIdentity: DocumentExportIdentity? = null) : DocumentMetadata
 }
 /** Native transport validates framing, nonce, both hashes and operation-specific
  * metadata before constructing this reply. Bytes belong to its admitted caller. */
@@ -77,7 +92,7 @@ public interface DocumentJobs {
     public suspend fun close()
 }
 public class DocumentExport(public val bytes: ByteArray, public val blake3: String, public val mode: DocumentCopy,
-    public val redacted: Boolean, public val sourceAssetId: String, public val revision: ProjectInfo, public val notices: List<String>) {
+    public val redacted: Boolean, public val sourceAssetId: String, public val revision: ProjectInfo, public val notices: List<String>, public val exportIdentity: DocumentExportIdentity? = null) {
     public override fun toString(): String = "DocumentExport(mode=$mode, bytes=${bytes.size}, redacted=$redacted)"
 }
 public fun ProjectInfo.sameDocumentRevision(other: ProjectInfo): Boolean = projectId == other.projectId && hostSeq == other.hostSeq && stateHash == other.stateHash && deviceId == other.deviceId && nextLamport == other.nextLamport

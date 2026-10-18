@@ -154,6 +154,7 @@ fn request() -> Request {
             memory_bytes: 128 * 1024 * 1024,
         },
         password: None,
+        export_identity: None,
         operation: Operation::SvgTile {
             tile: Tile {
                 x: 0.,

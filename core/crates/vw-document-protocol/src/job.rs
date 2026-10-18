@@ -131,6 +131,54 @@ pub enum Operation {
     },
 }
 
+/// Immutable CORE-006 identity. Exporters embed this exact value in final bytes
+/// and echo it only after reopening/verifying that carrier inside isolation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CopyIdentity {
+    pub schema_version: u32,
+    pub host_seq: u64,
+    pub state_hash: String,
+    pub source_asset: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capture_session: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame_id: Option<u64>,
+}
+impl CopyIdentity {
+    pub fn validate(&self) -> ProtocolResult<()> {
+        fn hash(value: &str) -> bool {
+            value.len() == 64
+                && value
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        }
+        let capture_valid = self.capture_session.as_ref().is_none_or(|value| {
+            value.len() == 36
+                && value.bytes().enumerate().all(|(index, byte)| {
+                    if [8, 13, 18, 23].contains(&index) {
+                        byte == b'-'
+                    } else {
+                        byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+                    }
+                })
+        });
+        if self.schema_version != 1
+            || !hash(&self.state_hash)
+            || !hash(&self.source_asset)
+            || self.capture_session.is_some() != self.frame_id.is_some()
+            || !capture_valid
+        {
+            return Err(ProtocolError::Invalid);
+        }
+        Ok(())
+    }
+    pub fn revision(&self) -> ProtocolResult<String> {
+        self.validate()?;
+        Ok(format!("r{}-{}", self.host_seq, &self.state_hash[..8]))
+    }
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
@@ -139,6 +187,8 @@ pub struct Request {
     /// A PDF password exists only in this private bounded pipe message. It is
     /// never placed on a command line, serialized into replies, or logged.
     pub password: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub export_identity: Option<CopyIdentity>,
 }
 impl std::fmt::Debug for Request {
     fn fmt(&self, output: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -151,6 +201,37 @@ impl std::fmt::Debug for Request {
 }
 
 impl Request {
+    pub fn is_copy(&self) -> bool {
+        matches!(
+            self.operation,
+            Operation::PdfCopy { .. }
+                | Operation::SvgCopy { .. }
+                | Operation::PdfRasterRedaction { .. }
+                | Operation::PdfPcRedaction { .. }
+        )
+    }
+    /// Application/worker copy admission requires identity. Legacy low-level
+    /// protocol fixtures may omit it; they are never publication authority.
+    pub fn require_copy_identity(&self) -> ProtocolResult<&CopyIdentity> {
+        if !self.is_copy() {
+            return Err(ProtocolError::Invalid);
+        }
+        let identity = self
+            .export_identity
+            .as_ref()
+            .ok_or(ProtocolError::Invalid)?;
+        identity.validate()?;
+        Ok(identity)
+    }
+    pub fn validate_source_identity(&self, source_blake3: &[u8; 32]) -> ProtocolResult<()> {
+        if let Some(identity) = &self.export_identity {
+            identity.validate()?;
+            if identity.source_asset != blake3::Hash::from(*source_blake3).to_hex().as_str() {
+                return Err(ProtocolError::Integrity);
+            }
+        }
+        Ok(())
+    }
     fn source_limit(&self) -> u64 {
         if matches!(
             self.operation,
@@ -163,6 +244,12 @@ impl Request {
     }
     pub fn validate(&self) -> ProtocolResult<()> {
         self.limits.validate()?;
+        if let Some(identity) = &self.export_identity {
+            identity.validate()?;
+            if !self.is_copy() {
+                return Err(ProtocolError::Invalid);
+            }
+        }
         if self
             .password
             .as_ref()
@@ -323,6 +410,7 @@ pub fn read_job(reader: &mut dyn Read) -> ProtocolResult<Job> {
     read_exact(reader, &mut metadata)?;
     let request: Request = serde_json::from_slice(&metadata).map_err(|_| ProtocolError::Invalid)?;
     request.validate()?;
+    request.validate_source_identity(&binding.source_blake3)?;
     if source_length > request.source_limit() {
         return Err(ProtocolError::Limit);
     }
@@ -364,6 +452,7 @@ pub fn write_job(
     source: &[u8],
 ) -> ProtocolResult<()> {
     request.validate()?;
+    request.validate_source_identity(&binding.source_blake3)?;
     if binding.nonce == [0; 16] || source.is_empty() || source.len() as u64 > request.source_limit()
     {
         return Err(ProtocolError::Limit);

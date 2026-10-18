@@ -11,6 +11,7 @@ fn request() -> Request {
         },
         operation: Operation::PdfInfo,
         password: None,
+        export_identity: None,
     }
 }
 fn binding(source: &[u8]) -> JobBinding {

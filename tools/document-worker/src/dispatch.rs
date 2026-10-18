@@ -584,6 +584,7 @@ mod tests {
         Request {
             operation,
             password: None,
+            export_identity: None,
             limits: JobLimits {
                 input_bytes: 64 * 1024 * 1024,
                 memory_bytes,

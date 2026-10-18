@@ -4,6 +4,7 @@ fn svg_request() -> String {
     serde_json::to_string(&Request {
         operation: Operation::SvgInfo,
         password: None,
+        export_identity: None,
         limits: vw_document_protocol::JobLimits {
             input_bytes: 64 * 1024 * 1024,
             output_bytes: 128 * 1024 * 1024,

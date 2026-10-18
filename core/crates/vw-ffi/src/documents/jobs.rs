@@ -1,8 +1,9 @@
 //! Fixed one-job transport adapters. The Windows entry never loads PDFium into
 //! the app. Android native parsing requires the OS-assigned isolated UID.
 #[cfg(windows)]
+use crate::CoreError;
+#[cfg(windows)]
 use crate::worker::startup;
-use crate::*;
 #[cfg(windows)]
 use std::io::{Seek, SeekFrom};
 use std::sync::Arc;
@@ -81,6 +82,18 @@ pub fn validate_document_job_result(
     let request: Request =
         serde_json::from_str(&request_json).map_err(|_| DocumentJobError::Invalid)?;
     request.validate().map_err(|_| DocumentJobError::Invalid)?;
+    if request.is_copy() {
+        request
+            .require_copy_identity()
+            .map_err(|_| DocumentJobError::Invalid)?;
+    }
+    if request
+        .export_identity
+        .as_ref()
+        .is_some_and(|identity| identity.source_asset != expected_source_blake3)
+    {
+        return Err(DocumentJobError::Verification);
+    }
     let metadata: vw_document_win::ResultMetadata =
         serde_json::from_str(&result.metadata_json).map_err(|_| DocumentJobError::Verification)?;
     metadata
@@ -100,6 +113,14 @@ fn request(text: &str, source: &[u8]) -> JobResult<Request> {
     }
     let request: Request = serde_json::from_str(text).map_err(|_| DocumentJobError::Invalid)?;
     request.validate().map_err(|_| DocumentJobError::Invalid)?;
+    if request.is_copy() {
+        request
+            .require_copy_identity()
+            .map_err(|_| DocumentJobError::Invalid)?;
+    }
+    request
+        .validate_source_identity(blake3::hash(source).as_bytes())
+        .map_err(|_| DocumentJobError::Verification)?;
     if request.limits.input_bytes > super::DOCUMENT_SOURCE_LIMIT
         || request.limits.output_bytes > 128 * 1024 * 1024
         || request.limits.memory_bytes > 512 * 1024 * 1024
