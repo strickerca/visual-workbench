@@ -1,0 +1,138 @@
+--- a/core/crates/vw-capture/Cargo.toml
++++ b/core/crates/vw-capture/Cargo.toml
+@@ -14,6 +14,7 @@
+ blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+ ring = "=0.17.14"
+ vw-model = { path = "../vw-model", version = "=0.1.0" }
++vw-geom = { path = "../vw-geom", version = "=0.1.0" }
+ 
+ [target.'cfg(windows)'.dependencies]
+ windows = { version = "=0.62.2", features = [
+--- a/core/crates/vw-capture/src/lib.rs
++++ b/core/crates/vw-capture/src/lib.rs
+@@ -8,6 +8,7 @@
+ pub use fixed_target::refreshed_target;
+ mod image;
+ pub mod process;
++pub mod picker;
+ #[cfg(windows)]
+ pub mod windows;
+ pub use admission::*;
+@@ -168,6 +169,8 @@
+     Capture(CaptureRequest),
+     CanvasFixture(CanvasCaptureRequest),
+     Tree(TreeRequest),
++    PickerCatalog { owner_process_id: u32 },
++    PickerCapture(picker::PickerCaptureRequest),
+ }
+ #[derive(Serialize, Deserialize)]
+ #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
+@@ -175,6 +178,8 @@
+     Frame(FrameReceipt),
+     CanvasFixture(CanvasFrameReceipt),
+     Tree(TreeReceipt),
++    PickerCatalog(picker::PickerCatalog),
++    PickerFrame(picker::PickerFrameReceipt),
+     Refused {
+         error: Error,
+         #[serde(default, skip_serializing_if = "Option::is_none")]
+--- a/core/crates/vw-capture/src/admission.rs
++++ b/core/crates/vw-capture/src/admission.rs
+@@ -141,7 +141,7 @@
+             || self.dpi_scale <= 0.0
+             || self.dpi_scale > 10.0
+             || !matches!(self.platform.as_str(), "windows" | "android")
+-            || !matches!(self.source_kind.as_str(), "window" | "monitor")
++            || !matches!(self.source_kind.as_str(), "window" | "monitor" | "region")
+             || self.monitor_id.len() > 256
+         {
+             return Err(Error::Invalid);
+--- a/core/crates/vw-capture/src/windows/mod.rs
++++ b/core/crates/vw-capture/src/windows/mod.rs
+@@ -1,6 +1,10 @@
+ //! All foreign handles are queried, never dereferenced. Provider calls run only
+ //! in the owned helper; the editor uses process::run to enforce cancellation.
+ pub mod hotkey;
++pub mod picker;
++mod picker_capture;
++pub mod region_hotkey;
++pub use picker_capture::capture as capture_picker;
+ mod uia;
+ mod wgc;
+ use crate::*;
+--- a/core/crates/vw-capture/src/process.rs
++++ b/core/crates/vw-capture/src/process.rs
+@@ -100,6 +100,14 @@
+             value.limits.validate()?;
+             value.limits.capture_ms + 2000
+         }
++        Request::PickerCatalog { owner_process_id } => {
++            if *owner_process_id == 0 { return Err(Error::Invalid); }
++            5000
++        }
++        Request::PickerCapture(value) => {
++            value.validate(&cancel)?;
++            value.limits.capture_ms + 2000
++        }
+         // Only the retained suspended harness parent owns canvas fixtures.
+         Request::CanvasFixture(_) => return Err(Error::Invalid),
+         Request::Tree(value) => {
+--- a/core/crates/vw-capture/src/bin/helper.rs
++++ b/core/crates/vw-capture/src/bin/helper.rs
+@@ -35,6 +35,14 @@
+     let request: Request = serde_json::from_slice(&request).map_err(|_| Error::Invalid)?;
+     let remaining = match &request {
+         Request::Capture(value) => value.limits.validate()?.capture_ms + 1000,
++        Request::PickerCatalog { owner_process_id } => {
++            if *owner_process_id == 0 { return Err(Error::Invalid); }
++            4000
++        }
++        Request::PickerCapture(value) => {
++            value.validate(&Cancellation::default())?;
++            value.limits.capture_ms + 1000
++        }
+         Request::CanvasFixture(value) => {
+             value.validate()?;
+             value.capture.limits.capture_ms + 1000
+@@ -72,6 +80,8 @@
+                     .map(Response::CanvasFixture)
+             }
+             Request::Tree(value) => windows::collect(value, &cancel).map(Response::Tree),
++            Request::PickerCatalog { owner_process_id } => windows::picker::enumerate(owner_process_id, &cancel).map(Response::PickerCatalog),
++            Request::PickerCapture(value) => windows::capture_picker(value, &cancel).map(Response::PickerFrame),
+         };
+         // SAFETY: paired successful RoInitialize on this thread.
+         unsafe {
+--- a/host-win/crates/vw-host-ffi/src/capture.rs
++++ b/host-win/crates/vw-host-ffi/src/capture.rs
+@@ -10,6 +10,9 @@
+ #[path = "capture_fixed.rs"]
+ mod fixed_target;
+ pub use editor_identity::*;
++#[path = "capture_picker.rs"]
++mod picker;
++pub use picker::*;
+ 
+ #[derive(Debug, thiserror::Error, uniffi::Error)]
+ pub enum CaptureError {
+--- a/core/crates/vw-ffi/src/capture_import.rs
++++ b/core/crates/vw-ffi/src/capture_import.rs
+@@ -36,7 +36,7 @@
+     pub(crate) fn new(value: CaptureImportDescriptor) -> Result<Self> {
+         if !value.explicit_owner_action
+             || !matches!(value.platform.as_str(), "windows" | "android")
+-            || !matches!(value.source_kind.as_str(), "window" | "monitor")
++            || !matches!(value.source_kind.as_str(), "window" | "monitor" | "region")
+             || value.width == 0
+             || value.height == 0
+             || value.width > 32768
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -3333,6 +3333,7 @@
+  "serde_json",
+  "tempfile",
+  "thiserror",
++ "vw-geom",
+  "vw-model",
+  "windows",
+ ]
