@@ -26,6 +26,7 @@ import com.visualworkbench.shared.*
                 }
             }
             remoteEditorLimits(identity.editor).forEach{Text(remoteEditorLimitText(it),style=MaterialTheme.typography.caption)}
+            RemoteCompatibilityImportButton(controller)
             remoteEditorCompatibilitySummary(state).forEach{Text(it,style=MaterialTheme.typography.caption)}
         }
         unavailable?.let{Text(it,style=MaterialTheme.typography.caption)}
