@@ -6,6 +6,7 @@ mod error;
 mod ffi;
 mod geometry;
 mod limits;
+mod metadata;
 mod overlay;
 #[cfg(any(windows, test))]
 mod pc_content;
@@ -20,6 +21,7 @@ pub use error::{PdfError, PdfResult};
 pub use ffi::{PdfDocument, PdfRuntime};
 pub use geometry::{PageGeometry, PdfPoint, PdfRect, PdfTileRequest};
 pub use limits::{PdfCancellation, PdfLimits};
+pub use metadata::{MAX_EXPORT_METADATA_BYTES, embed_pdf_copy_metadata, verify_pdf_copy_metadata};
 pub use overlay::{PdfOverlay, validate_overlays};
 pub use types::{
     PdfCopyKind, PdfDocumentInfo, PdfExportReceipt, PdfGlyph, PdfNotice, PdfPageInfo, PdfTextChunk,

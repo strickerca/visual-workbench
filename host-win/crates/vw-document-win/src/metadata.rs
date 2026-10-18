@@ -1,6 +1,8 @@
 //! Typed result validation happens before the host writes any DATA payload.
 use serde::{Deserialize, Serialize};
-use vw_document_protocol::{CopyKind, Operation, ProtocolError, ProtocolResult, Request};
+use vw_document_protocol::{
+    CopyIdentity, CopyKind, Operation, ProtocolError, ProtocolResult, Request,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -73,6 +75,7 @@ pub enum ResultMetadata {
         glyphs: Vec<Glyph>,
     },
     PdfCopy {
+        export_identity: CopyIdentity,
         copy: CopyKind,
         pages: u32,
         bytes: u64,
@@ -84,10 +87,12 @@ pub enum ResultMetadata {
         notices: Vec<Notice>,
     },
     SvgCopy {
+        export_identity: CopyIdentity,
         bytes: u64,
         notices: Vec<Notice>,
     },
     RasterRedaction {
+        export_identity: CopyIdentity,
         pages: u32,
         regions: u32,
         bytes: u64,
@@ -96,6 +101,7 @@ pub enum ResultMetadata {
         plan_blake3: String,
     },
     PcRedaction {
+        export_identity: CopyIdentity,
         pages: u32,
         regions: u32,
         bytes: u64,
@@ -116,6 +122,34 @@ impl std::fmt::Debug for ResultMetadata {
     }
 }
 impl ResultMetadata {
+    /// Existing image-export JSON vocabulary plus the full admitted identity.
+    /// One serializer is used by both isolated exporters and final-byte checks.
+    pub fn identity_metadata(identity: &CopyIdentity) -> ProtocolResult<String> {
+        identity.validate()?;
+        let mut value = serde_json::to_value(identity).map_err(|_| ProtocolError::Invalid)?;
+        value.as_object_mut().ok_or(ProtocolError::Invalid)?.insert(
+            "revision".into(),
+            serde_json::Value::String(identity.revision()?),
+        );
+        serde_json::to_string(&value).map_err(|_| ProtocolError::Invalid)
+    }
+    pub fn export_identity(&self) -> Option<&CopyIdentity> {
+        match self {
+            Self::PdfCopy {
+                export_identity, ..
+            }
+            | Self::SvgCopy {
+                export_identity, ..
+            }
+            | Self::RasterRedaction {
+                export_identity, ..
+            }
+            | Self::PcRedaction {
+                export_identity, ..
+            } => Some(export_identity),
+            _ => None,
+        }
+    }
     pub fn parse_for(bytes: &[u8], request: &Request) -> ProtocolResult<Self> {
         if bytes.len() > vw_document_protocol::MAX_REPLY_METADATA {
             return Err(ProtocolError::Limit);
@@ -138,6 +172,13 @@ impl ResultMetadata {
     }
     pub fn validate_for(&self, request: &Request) -> ProtocolResult<()> {
         request.validate()?;
+        if request.is_copy() {
+            if self.export_identity() != Some(request.require_copy_identity()?) {
+                return Err(ProtocolError::Integrity);
+            }
+        } else if self.export_identity().is_some() {
+            return Err(ProtocolError::Invalid);
+        }
         let valid = match (&request.operation, self) {
             (Operation::PdfInfo, Self::PdfInfo { pages, notices, .. }) => {
                 pages_valid(*pages) && notices_valid(notices, DocumentFormat::Pdf)
@@ -259,6 +300,7 @@ impl ResultMetadata {
                     pages,
                     redacted,
                     bytes,
+                    ..
                 },
             ) => copy == wanted && pages_valid(*pages) && !*redacted && *bytes >= 8,
             (
@@ -269,7 +311,7 @@ impl ResultMetadata {
                     notices,
                 },
             ) => dimensions(*width, *height) && notices_valid(notices, DocumentFormat::Svg),
-            (Operation::SvgCopy { .. }, Self::SvgCopy { bytes, notices }) => {
+            (Operation::SvgCopy { .. }, Self::SvgCopy { bytes, notices, .. }) => {
                 *bytes > 0
                     && *bytes <= 4 * 1024 * 1024
                     && notices_valid(notices, DocumentFormat::Svg)
@@ -287,6 +329,7 @@ impl ResultMetadata {
                     requested_scale,
                     effective_scale,
                     plan_blake3,
+                    ..
                 },
             ) => {
                 pages_valid(*pages)
@@ -316,6 +359,7 @@ impl ResultMetadata {
                     removed_objects,
                     preserved_paths,
                     raster_tiles,
+                    ..
                 },
             ) => {
                 pages_valid(*pages)

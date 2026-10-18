@@ -120,10 +120,22 @@ fn verified_pdfium_worker_contract() -> Result<(), Box<dyn std::error::Error>> {
             let receipt = doc.export(kind, &[rectangle(1)], &mut copy, &cancel)?;
             assert_eq!(receipt.bytes, copy.len() as u64);
             assert!(!receipt.redacted);
+            let metadata = format!(
+                r#"{{"schema_version":1,"revision":"r17-aabbccdd","source_asset":"{}"}}"#,
+                doc.info().source_blake3
+            );
+            vw_pdf::embed_pdf_copy_metadata(&mut copy, &metadata, PdfLimits::default(), &cancel)?;
+            vw_pdf::verify_pdf_copy_metadata(
+                &copy,
+                &metadata,
+                PdfLimits::default().output_bytes,
+                &cancel,
+            )?;
             // Release the immutable original before opening the private copy;
             // runtime lifetime statically disallows two public document owners.
             drop(doc);
             let mut reopened = runtime.open(copy, None, &cancel)?;
+            reopened.verify_export_metadata(&metadata, &cancel)?;
             assert_eq!(
                 reopened.page_info(1, &cancel)?.annotations,
                 if kind == PdfCopyKind::Annotated { 1 } else { 0 }
