@@ -1,0 +1,203 @@
+{
+  "schema": 1,
+  "status": "Source candidate for Astra; focused checks pass, broad ABI/app/platform checks deferred",
+  "base": "6d505416963fb42009921bd3fb8639994e73752a",
+  "code_commit": "cc80e07c470077e41f9095886a13b284c9f265c9",
+  "initial_code": "dbbf67f51b1b6aefe7d7f3e78a737015517ace36",
+  "scope": "Local-path picked/prepared/built/publication/rebuild native facade plus optional shared capability and exact foreign owner retirement; no URI/controller activation",
+  "native": {
+    "passed": 85,
+    "failed": 0,
+    "ignored_private_child_entrypoint": 1,
+    "new_public_facade_cases": 8,
+    "lib_clippy": "PASS Linux warnings denied",
+    "rustfmt": "PASS"
+  },
+  "shared": {
+    "strict_common_api": "PASS Kotlin2.4.20",
+    "ownership_junit_passed": 10,
+    "native_facade_callers_compile_only": 3,
+    "project_lifetime_caller_written_uncompiled": 1,
+    "whole_NativeCore_NativeGiantImports": "DEFERRED until final new ABI build",
+    "probe": {
+      "status": "focused ownership/API probe passed",
+      "compiler": "Kotlin2.4.20",
+      "heap_mib": 512,
+      "junit_cases": 10,
+      "commands": [
+        {
+          "name": "common-explicit-api",
+          "exit_code": 0
+        },
+        {
+          "name": "ownership-and-callers-compile",
+          "exit_code": 0
+        },
+        {
+          "name": "ownership-junit",
+          "exit_code": 0
+        }
+      ],
+      "source_sha256": {
+        "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImportsApi.kt": "fe265244e751a5d80b20470ab194ac130e8ccc530661e5cac05f9785f0d1d230",
+        "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/GiantImportOwnership.kt": "68f3cb53e3a987ea830c6e8830516680eff04e0c8a74f5be8b48c4c8381981dd",
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantImportOwnershipTest.kt": "0b7e6923a3b30963c0df1b40d738865a4a67c0d702c3a168568023488954213c",
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantImportNativeCallerTest.kt": "0cd67d7d4c23f036375bccafbba3893f1cdb5e71d1f364e771b6ebc0befda5d4"
+      },
+      "limits": [
+        "Actual shared ownership algorithm and existing joined native Cancellation bridge exercised",
+        "Three native facade callers compile only; execution deferred until final new ABI generation",
+        "Thin NativeGiantImports adapter and modified NativeCore not whole-module compiled here",
+        "Cached predecessor shared/bindings/native library used only for unchanged core types and cancellation symbols",
+        "No app, packaging, device or platform producer approval"
+      ],
+      "temporary_compiler_outputs_disposed": true,
+      "predecessor_compile_inputs": {
+        "apps/shared/build/libs/shared-desktop.jar": "05586d5634b4cbe15b97849b03e0f9bfbf528a400b7351f88a9e15a75d5c6ced",
+        "apps/bindings-core/build/libs/bindings-core.jar": "9a6908d6cfc85324e88420b5f7bae227f8d8b3c0b478e964867d059e5e651ea3"
+      }
+    }
+  },
+  "retained_leaf_identity": {
+    "unchanged_from_base": [
+      "core/crates/vw-ffi/src/giant_images/producer/input.rs",
+      "core/crates/vw-ffi/src/giant_images/producer/picked.rs",
+      "core/crates/vw-ffi/src/giant_images/producer/picked_tests.rs",
+      "core/crates/vw-ffi/src/giant_images/producer/android_bridge.rs"
+    ]
+  },
+  "deferred": [
+    "Final single native/arm64/core+host bindings build and complete app/shared compilation/tests/lint",
+    "Actual four new native-facade/project lifetime caller executions",
+    "All-target/Windows/Android Clippy and final license/policy/package runs",
+    "Android pre-admitted bounded URI staging and actual import UI implementation",
+    "Packaged pinned Windows decoder admission and Android JPEG/JNI runtime execution",
+    "GPU/renderer/giant memory/frame-rate/physical gates"
+  ],
+  "prior_failures": [
+    "SHA LowerHex test fixture compile error corrected before execution",
+    "Two unused Kotlin test expressions corrected after strict compile refused; zero cases executed in that first attempt"
+  ],
+  "source": [
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImportsApi.kt",
+      "bytes": 2333,
+      "sha256": "fe265244e751a5d80b20470ab194ac130e8ccc530661e5cac05f9785f0d1d230"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/GiantImportOwnership.kt",
+      "bytes": 2962,
+      "sha256": "68f3cb53e3a987ea830c6e8830516680eff04e0c8a74f5be8b48c4c8381981dd"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt",
+      "bytes": 21023,
+      "sha256": "7b796886e35d77b38d4a3794b7afdada36c29acdd37592d43176e62de4e014e3"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeGiantImages.kt",
+      "bytes": 6873,
+      "sha256": "df46cedd73302cd851ae8fe46444151db43832da878a982fb776e2c808fcc1bc"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeGiantImports.kt",
+      "bytes": 4297,
+      "sha256": "72832336f62d52bc84f6133fda3d55eb1535a4d7fd7ef065a111d9c2853a4cad"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantImportNativeCallerTest.kt",
+      "bytes": 4595,
+      "sha256": "0cd67d7d4c23f036375bccafbba3893f1cdb5e71d1f364e771b6ebc0befda5d4"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantImportOwnershipTest.kt",
+      "bytes": 8817,
+      "sha256": "0b7e6923a3b30963c0df1b40d738865a4a67c0d702c3a168568023488954213c"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantImportProjectLifetimeTest.kt",
+      "bytes": 2182,
+      "sha256": "fd8b2348fb55e13fb84eaccc6233dd678e284654c79beb8e6936beab356eeff6"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images.rs",
+      "bytes": 5892,
+      "sha256": "3ecdf5c2f69ac6c0c2414688246f1a03fc7980cddfe2d1a053453e6c4edb6ccd"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/intake.rs",
+      "bytes": 15920,
+      "sha256": "eaed4db63124783639c9cf619b59581a4be2cb13974c0093660dbd92da6c4cfc"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer.rs",
+      "bytes": 16897,
+      "sha256": "7820b2d3c3a926dd28a603b09c63f2574f3f2090330de8c42278a1d76d599754"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/producer_tests.rs",
+      "bytes": 40721,
+      "sha256": "87afdbd0c29aa74fbdbd46aa0cb8043f087ba9667ad8db5b3cda49ef9e273800"
+    },
+    {
+      "path": "core/crates/vw-ffi/uniffi.toml",
+      "bytes": 824,
+      "sha256": "aad30b6a7aad121f25648532a0d77e3f35948b9419bf7632299fc72b97347e4f"
+    }
+  ],
+  "logs": [
+    {
+      "path": "/tmp/vw-giant-public-native-check-attempt1.log",
+      "bytes": 983,
+      "sha256": "0357fbb09290e7b5bc71a2be5912ad94803c1f90d5b108a3983a240eb4b4a95b"
+    },
+    {
+      "path": "/tmp/vw-giant-public-focused-native-attempt1.log",
+      "bytes": 1593,
+      "sha256": "425fcf4b8ab0b1a8a6a1718fc3a86af41871f9f1acc3423389756e5b12f5cbf2"
+    },
+    {
+      "path": "/tmp/vw-giant-public-focused-native-attempt2.log",
+      "bytes": 10103,
+      "sha256": "8b49eac7a64fae9b3b050fdfa438f4705244788c0190c7fb5e5d8f7f7190c3f3"
+    },
+    {
+      "path": "/tmp/vw-giant-public-focused-native-final.log",
+      "bytes": 11006,
+      "sha256": "e1c7e6f2a2ea7705064e819ac4129e8dcac89cd695ffa8d44cb37731a209d2a0"
+    },
+    {
+      "path": "/tmp/vw-giant-public-ownership-probe-attempt1.log",
+      "bytes": 925,
+      "sha256": "ca13608f40608f0db99fa8df54867f6841e64d2f55b10c59c2d21ebdd652a44b"
+    },
+    {
+      "path": "/tmp/vw-giant-public-ownership-probe-attempt2.log",
+      "bytes": 132,
+      "sha256": "4da78cc58820fb5ebe8f0851b87da6605c711277fc9cead8d1aa8386c7f4dfd4"
+    },
+    {
+      "path": "/tmp/vw-giant-public-ownership-probe-final.log",
+      "bytes": 135,
+      "sha256": "852b472ced248051ecb1e5405e7b656cd09342a769d7aeeea27a799a40cbab8c"
+    },
+    {
+      "path": "/tmp/vw-giant-public-repro-run-20261018.log",
+      "bytes": 135,
+      "sha256": "8601c198b03b9b759e00d0a7efbc3180f1b6501ee3f974b1b0b25d3edd15dd1e"
+    }
+  ],
+  "repro_runner": {
+    "path": "tools/tests/check_giant_import_ownership.py",
+    "bytes": 4739,
+    "sha256": "a064885357ad64c7e0712c5a13b90c015ebc08ed9ebd7dc3d452712211b81a73"
+  },
+  "caller_repairs": {
+    "desktop": "7f180b48 accepted; next composition pending",
+    "android": "cf952b05 accepted; owner25case/isolated lint reported, reviewer lacked raw receipts; full lint deferred"
+  },
+  "offline": "c2f8f13 accepted; root restoration and module-registration hooks not yet composed",
+  "formats": "02e32f1 held for five P2 repairs; no gated BMP export activation",
+  "safety_scope": "No providers/keys/signing/deployment/device/driver action; no old worktree/archive cleanup; no new dependency or budget pool",
+  "limits_native_storage_retirement": "Existing process-lifetime storage quarantine remains held; retrying the foreign close does not authorize path cleanup or guarantee recovery/quota return; sticky failure can block subsequent giant admission."
+}

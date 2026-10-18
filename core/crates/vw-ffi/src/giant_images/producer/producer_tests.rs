@@ -642,6 +642,165 @@ fn publication_options(path: &Path, disk_cache_bytes: u64) -> GiantPublishOption
         disk_cache_bytes,
     }
 }
+
+/// Test-only approved producer. No public foreign factory can mint this witness.
+fn public_fixture() -> (Fixture, Arc<GiantBuiltCache>) {
+    let budget = crate::session_resources::shared_budget().unwrap();
+    let (owned, limits) = request(&png());
+    let source = input::prepare(
+        owned,
+        limits,
+        &AtomicBool::new(false),
+        &Cancellation::new(),
+        &budget,
+        &plentiful(),
+    )
+    .unwrap();
+    let fixture = Fixture { source, budget };
+    let build = synthetic(&fixture);
+    let cap = Arc::new(GiantBuiltCache {
+        worker: Worker::new(
+            "test-public-approved",
+            Some(BuiltState {
+                build: Arc::new(build),
+                publication_started: false,
+            }),
+            2,
+        )
+        .unwrap(),
+        closed: Arc::new(AtomicBool::new(false)),
+        budget: fixture.budget.clone(),
+    });
+    (fixture, cap)
+}
+fn public_options(path: &Path) -> crate::GiantProjectOptions {
+    let options = publication_options(path, 32 * 1024 * 1024);
+    crate::GiantProjectOptions {
+        path: options.path,
+        project_id: options.project_id,
+        document_id: options.document_id,
+        layer_id: options.layer_id,
+        device_id: options.device_id,
+        title: options.title,
+        now_ms: options.now_ms,
+        disk_cache_bytes: options.disk_cache_bytes,
+    }
+}
+#[test]
+fn public_publication_adopts_full_budgeted_session_and_reopens_accepted_destination() {
+    let _guard = serial();
+    let (fixture, cap) = public_fixture();
+    let root = tempfile::tempdir().unwrap();
+    let destination = root.path().join("project");
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let project = cap
+            .publish_project(public_options(&destination), Arc::new(Cancellation::new()))
+            .await
+            .unwrap();
+        assert!(matches!(
+            cap.publish_project(
+                public_options(&root.path().join("second")),
+                Arc::new(Cancellation::new())
+            )
+            .await,
+            Err(Error::Backpressure)
+        ));
+        let info = project.info().await.unwrap();
+        let image = project
+            .open_giant_image(
+                super::super::GiantOpenOptions {
+                    binding: WorkflowBinding {
+                        project_id: info.project_id.clone(),
+                        document_id: info.document_ids[0].clone(),
+                        host_seq: info.host_seq,
+                        state_hash: info.state_hash.clone(),
+                    },
+                    disk_cache_bytes: 32 * 1024 * 1024,
+                    ram_cache_bytes: 1024 * 1024,
+                },
+                Arc::new(Cancellation::new()),
+            )
+            .await
+            .unwrap();
+        let delivery = image
+            .tile(
+                super::super::GiantTileAddress {
+                    level: 0,
+                    x: 0,
+                    y: 0,
+                },
+                Arc::new(Cancellation::new()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(delivery.pixels.rgba, [21, 42, 84, 255]);
+        let lease = delivery.native_lease;
+        drop(delivery.pixels);
+        lease.close().unwrap();
+        image.close().await.unwrap();
+        cap.close().await.unwrap();
+        let charged = fixture.budget.used_bytes();
+        assert!(charged >= 32 * 1024 * 1024);
+        project.close().await.unwrap();
+        assert_eq!(fixture.budget.used_bytes(), charged - 32 * 1024 * 1024);
+        let reopened = crate::open_project(
+            destination.to_string_lossy().into_owned(),
+            Arc::new(Cancellation::new()),
+        )
+        .await
+        .unwrap();
+        assert_eq!(reopened.info().await.unwrap().state_hash, info.state_hash);
+        reopened.close().await.unwrap();
+    });
+}
+#[test]
+fn public_rebuild_uses_actual_project_binding_and_closed_owner() {
+    let _guard = serial();
+    let (_fixture, cap) = public_fixture();
+    let root = tempfile::tempdir().unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let project = cap
+            .publish_project(
+                public_options(&root.path().join("project")),
+                Arc::new(Cancellation::new()),
+            )
+            .await
+            .unwrap();
+        let info = project.info().await.unwrap();
+        let binding = WorkflowBinding {
+            project_id: info.project_id,
+            document_id: info.document_ids[0].clone(),
+            host_seq: info.host_seq,
+            state_hash: info.state_hash,
+        };
+        let mut stale = binding.clone();
+        stale.state_hash = "f".repeat(64);
+        assert!(matches!(
+            project
+                .rebuild_giant_image(cap.clone(), stale, Arc::new(Cancellation::new()))
+                .await,
+            Err(Error::Stale)
+        ));
+        project
+            .rebuild_giant_image(cap.clone(), binding.clone(), Arc::new(Cancellation::new()))
+            .await
+            .unwrap();
+        project.close().await.unwrap();
+        assert!(matches!(
+            project
+                .rebuild_giant_image(cap.clone(), binding, Arc::new(Cancellation::new()))
+                .await,
+            Err(Error::Closed)
+        ));
+        cap.close().await.unwrap();
+    });
+}
 #[test]
 fn private_publication_streams_exact_original_and_retains_project_resources() {
     let _guard = serial();

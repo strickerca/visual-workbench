@@ -22,11 +22,7 @@ use std::sync::{
 use vw_stream::SessionBudget;
 
 pub(crate) use input::{GiantInputLimits, GiantSourceInfo, RootOwnedPickedOriginal};
-#[allow(
-    unused_imports,
-    reason = "Private pre-open admission awaits the root public owned-input callers"
-)]
-pub(crate) use picked::{PendingInputAdmission, PickedOriginal, reserve_picked_input};
+pub(crate) use picked::{PickedOriginal, reserve_picked_input};
 pub(crate) use publish::{GiantPublishOptions, PublishedProject};
 #[cfg(windows)]
 #[allow(
@@ -44,6 +40,30 @@ use vw_assets::{MAX_ENCODED_TILE_BYTES, MAX_MANIFEST_BYTES, Manifest, TILE_SIZE}
 
 pub(super) const MAX_DISK_BYTES: u64 = 16 * 1024 * 1024 * 1024;
 const BAND_WORKSPACE_BYTES: u64 = 32 * 1024 * 1024;
+
+/// Root local-file adapter. Admission precedes all filesystem operations. No
+/// suspension or worker is introduced by opening the picked input; foreign
+/// callers run this synchronous boundary off their UI thread.
+pub(super) fn pick_path(
+    path: &Path,
+    work_parent: &Path,
+    limits: GiantInputLimits,
+    budget: SessionBudget,
+    cancel: &Cancellation,
+) -> Result<Arc<PickedOriginal>> {
+    input::validate_limits(&limits)?;
+    cancel.check().map_err(Error::from)?;
+    let admission = reserve_picked_input(budget)?;
+    let parent = input::checked_directory(work_parent)?;
+    cancel.check().map_err(Error::from)?;
+    let file = source::regular(path).map_err(Error::from)?;
+    let work = tempfile::Builder::new()
+        .prefix("vw-giant-input-")
+        .tempdir_in(parent)
+        .map_err(io_error)?;
+    // No fallible operation separates the actual resources and their admission.
+    admission.attach(RootOwnedPickedOriginal { file, work }, limits)
+}
 
 /// Internal planning data, not an approval token or a claim of runtime support.
 /// Root may lower this through its own explicit producer/import API later.

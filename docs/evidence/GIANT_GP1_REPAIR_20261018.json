@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "finding": "GP1 P2 pathname regular\u2192FIFO blocking-open replacement race",
+  "base_reviewed_candidate": "79d7d7fc20b8bc99c4b5990507a7cf65570f12f7",
+  "backend_grant": "03ad446caf648d56df1fea0cc6a62a21b2c641c9",
+  "production_change": "Linux/Android NONBLOCK added; NOFOLLOW/CLOEXEC and descriptor regular-file check retained; Windows unchanged",
+  "test_seam": "cfg(test) exact-path thread-local one-shot; actual public opener and real FIFO; bounded isolated child, both admissions reusable, no quota reset",
+  "focused_result": {
+    "parent_passed": 1,
+    "failed": 0,
+    "ignored_private_entrypoint_in_parent": 1,
+    "child_explicitly_executed_and_passed": true,
+    "watchdog_seconds": 5
+  },
+  "source": [
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/source.rs",
+      "bytes": 20868,
+      "sha256": "806871c8c13f06314ff60efd700b3266bedcd7a8b976b12340b391a3872558f6"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/intake.rs",
+      "bytes": 19505,
+      "sha256": "d6c900c7ad3269be42fb60b560cbc3ec7c18cdda0d23bc4676f7980fb31c5f58"
+    }
+  ],
+  "logs": [
+    {
+      "path": "/tmp/vw-giant-gp1-fixed-attempt1.log",
+      "bytes": 1085,
+      "sha256": "64eb86ac5014c9b46501afb244be5ad9fe1b213efae5a2d1aefbfbf26931beca"
+    },
+    {
+      "path": "/tmp/vw-giant-gp1-fixed-final.log",
+      "bytes": 587,
+      "sha256": "26c48dafb39fb7baff27cad4d815dd4169e90f9d78031e348bdeefedfed4ec61"
+    }
+  ],
+  "limits": [
+    "Narrow re-review pending",
+    "No independent baseline rerun; reviewer supplied bounded blocking reproduction",
+    "No broad native/ABI/app/platform/hardware test repetition",
+    "Prior85native/10ownership evidence source bindings preserved"
+  ]
+}

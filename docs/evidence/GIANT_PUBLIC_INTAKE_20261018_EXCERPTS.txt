@@ -1,0 +1,56 @@
+vw-giant-public-native-check-attempt1.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.75s
+
+vw-giant-public-focused-native-attempt1.log
+error[E0277]: the trait bound `Array<u8, UInt<UInt<UInt<UInt<_, B0>, B0>, B0>, B0>>: LowerHex` is not satisfied
+
+vw-giant-public-focused-native-attempt2.log
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.55s
+test giant_images::intake::tests::cancelled_or_malformed_input_retires_actual_work_without_removing_original ... ok
+test giant_images::intake::tests::invalid_uri_consent_and_limits_do_not_create_work ... ok
+test giant_images::intake::tests::public_input_saturation_refuses_before_missing_source_or_work_access ... ok
+test giant_images::intake::tests::public_input_uses_the_existing_global_foreign_memory_pool_before_io ... ok
+test giant_images::intake::tests::public_prepare_transfers_one_owner_and_hides_paths_from_metadata ... ok
+test giant_images::intake::tests::symlink_original_and_work_parent_refuse_without_following ... ok
+test giant_images::producer::producer_tests::public_publication_adopts_full_budgeted_session_and_reopens_accepted_destination ... ok
+test giant_images::producer::producer_tests::public_rebuild_uses_actual_project_binding_and_closed_owner ... ok
+test result: ok. 85 passed; 0 failed; 1 ignored; 0 measured; 213 filtered out; finished in 1.24s
+
+vw-giant-public-focused-native-final.log
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.86s
+test giant_images::intake::tests::cancelled_or_malformed_input_retires_actual_work_without_removing_original ... ok
+test giant_images::intake::tests::invalid_uri_consent_and_limits_do_not_create_work ... ok
+test giant_images::intake::tests::public_input_saturation_refuses_before_missing_source_or_work_access ... ok
+test giant_images::intake::tests::public_input_uses_the_existing_global_foreign_memory_pool_before_io ... ok
+test giant_images::intake::tests::public_prepare_transfers_one_owner_and_hides_paths_from_metadata ... ok
+test giant_images::intake::tests::symlink_original_and_work_parent_refuse_without_following ... ok
+test giant_images::producer::producer_tests::public_publication_adopts_full_budgeted_session_and_reopens_accepted_destination ... ok
+test giant_images::producer::producer_tests::public_rebuild_uses_actual_project_binding_and_closed_owner ... ok
+test result: ok. 85 passed; 0 failed; 1 ignored; 0 measured; 213 filtered out; finished in 1.26s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.79s
+
+vw-giant-public-ownership-probe-attempt1.log
+common-explicit-api 0
+ownership-and-callers-compile 1 error: warnings found and -Werror specified
+apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantImportOwnershipTest.kt:95:44: warning: expression is unused.
+apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantImportOwnershipTest.kt:115:44: warning: expression is unused.
+    run('ownership-and-callers-compile',compiler_base+['-classpath',os.pathsep.join(map(str,[api,*base])),
+AssertionError: ownership-and-callers-compile
+
+vw-giant-public-ownership-probe-attempt2.log
+common-explicit-api 0
+ownership-and-callers-compile 0
+ownership-junit 0 JUnit version 4.13.2
+OK (8 tests)
+
+vw-giant-public-ownership-probe-final.log
+common-explicit-api 0
+ownership-and-callers-compile 0
+ownership-junit 0 JUnit version 4.13.2
+OK (10 tests)
+
+vw-giant-public-repro-run-20261018.log
+common-explicit-api 0
+ownership-and-callers-compile 0
+ownership-junit 0 JUnit version 4.13.2
+OK (10 tests)

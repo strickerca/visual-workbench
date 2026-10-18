@@ -1,11 +1,10 @@
 # Real assisted-selection backend lane
 
-Reserved for a parent-assigned existing worker; not activated by this document.
-Base: accepted main6d505416 plus the EXACT API files at editing candidate
-707a92c641d05a22351eca01e481237b7a5430eb. The handoff reports Astra acceptance
-after its ownership repair, but root has no independently bound review receipt;
-do not describe that source or its pending root hooks as already integrated.
-Research/implementation may proceed against these frozen additive interfaces.
+Grant to the SAME editing owner **01a15009-f394-70eb-9e10-e873087f1003** on parent
+delivery. Base: accepted main6d505416 plus exact editing source707a92c6 and portable
+admission/review record9e41ed1d779b0c91a7c60d55a829c1f3e1defb28. Its Astra review
+binds base6e7c017b and the two repaired frame blobs, verified identical in707a92c6.
+Source-only acceptance does not implement the pending root hooks or real inference.
 
 Exclusive NEW paths once activated:
 
@@ -13,14 +12,31 @@ Exclusive NEW paths once activated:
 - apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/assistedselection/backend/**
 - Dedicated platform-neutral backend admission/tensor-layout tests under
   apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/assistedselection/backend/**
-- tools/assisted-selection/{README.md,model-runtime-candidate.json,verify_artifacts.py}
+- NEW core/crates/vw-ffi/src/assisted_source.rs and assisted_source/**,
+  tests/assisted_source.rs; NEW shared commonMain/AssistedSourcePixelsApi.kt,
+  jvmMain/NativeAssistedSource.kt and dedicated assisted-source tests.
+- tools/assisted-selection/{README.md,model-runtime-candidate.json,verify_artifacts.py,convert_mobile_sam.py}
   and synthetic test fixtures under tools/assisted-selection/tests/**.
 
 Do not modify existing AssistedSelectionApi/Interaction, MaskApi, NativeMasks,
 selection/import/frame leaves, platform panels, controllers, manifests, Gradle/
 Cargo roots, dependency locks, protocol/schema, licensing inventories or any
 giant/provider/Paint file. Root keeps final factory/caller/dependency/license
-registration. Return exact minimal pins/notices/Gradle and caller hunks promptly.
+registration. The new assisted_source/source-pixel leaves above are an explicit
+grant for the real native reader: use current project workers/bindings/cancellation,
+verify actual source hashes and full oriented dimensions, bound every decode/ABI/
+foreign copy against the existing256MiB pool, and preserve delivered-byte ownership
+through actual retirement. Prefer existing trusted readers when sufficient; no
+second decoder, memory pool or unchecked caller pixels. Return root lib/module,
+dependency/license and factory/controller registration hunks promptly.
+  For JVM native acquisition, reuse root's existing internal
+  `withNativeGiantProject(project, suspend (ProjectSession) -> T): T` project
+  lifetime borrow from giant candidate79d7d7fc: it holds the actual project's
+  close mutex through joined work, including ordinary projects. Map its typed
+  Closed/Invalid failure into the selection domain. Do not copy an unpinned
+  nativeProjectHandle across suspension or create another close/lifetime gate.
+  The helper composes with the root giant candidate; its final-ABI caller test
+  remains deferred, so report that source dependency explicitly.
 Do not duplicate the mask importer, correction workflow, memory pool or encoded
 image/session owner. Parent may reuse the completed offline owner for this lane;
 do not create another worker without assignment.
@@ -65,9 +81,20 @@ Use the current bounded prompt/proposal/import/correction workflow unchanged.
 
 ## Model/runtime admission and results
 
-No real model/runtime is currently selected or admitted. Use primary official
-model/runtime/license sources to choose a compatible candidate and implement a
-real loader/encoder/prompt decoder, not fake coverage. Inspect existing policies
+The portable research record proposes MobileSAM vit_t at source commit
+f706ad9c4eb7f219c00d9050e46328518ffb65d2; source checkpoint40,728,226bytes,
+SHA2566dbb90523a35330fedd7f1d3dfc66f995213d81b29a5ca8108dbcdd4e37d6c2f,
+and LiteRT2.3.0 CPU/GPU artifacts. Licenses/POM/artifact hashes are recorded in
+docs/evidence/SEL001_BACKEND_ADMISSION_RESEARCH_20261018.json at9e41ed1d.
+These are research candidates, not closed production admissions. Deployable
+encoder.tflite/prompt_decoder.tflite conversion, their exact hashes/tensor
+contracts and transitive/native notices remain OPEN. Implement the real converter,
+loader/encoder/prompt decoder, not fake coverage. Never use the .pt source hash as
+a converted model hash. Use a deterministic closed manifest identity for both
+converted artifacts and another for actual runtime children, verifying every
+child's bytes/hash; record this lowering without changing the shared five fields.
+Do not enable unsafe pickle or Flex/custom/vendor dependencies as a shortcut.
+Inspect primary official sources and existing policies
 before proposing a dependency. Public free artifacts may be downloaded into an
 owned temporary directory for inspection/hash/license evidence; no user images,
 paid service, key, device/driver install or live provider call. Do not commit a

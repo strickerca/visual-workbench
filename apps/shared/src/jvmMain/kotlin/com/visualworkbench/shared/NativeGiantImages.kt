@@ -45,7 +45,7 @@ private class NativeResourceCharge(private val native: NCharge,private val bytes
     }
 }
 private inline fun <T> giantNative(block:()->T):T = try{block()}catch(error:GiantImageException){throw mapGiantFailure(error)}
-private fun mapGiantFailure(error:GiantImageException):GiantImageFailure {
+internal fun mapGiantFailure(error:GiantImageException):GiantImageFailure {
     val kind=when(error){
         is GiantImageException.Invalid->GiantImageFailureKind.Invalid
         is GiantImageException.Limit->GiantImageFailureKind.Limit
