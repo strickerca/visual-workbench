@@ -4,6 +4,8 @@ package com.visualworkbench.shared
  * implementation must wrap that supplied pool, never construct a per-call pool.
  * Reserve before allocating/copying foreign pixels or creating a drawing resource.
  * Platform stride/surface limits still apply in addition to this byte admission. */
+public expect fun sessionResources(): SessionResources
+
 public interface SessionResources {
     public suspend fun reserveForeign(bytes: ULong): SessionResourceCharge
 }

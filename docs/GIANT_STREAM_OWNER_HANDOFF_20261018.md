@@ -24,7 +24,7 @@ renderer wiring. The common capability is `WorkbenchGiantImagesProject`:
     openGiantImage(binding: WorkflowBinding, diskCacheBytes: ULong,
         ramCacheBytes: ULong): GiantImage
 
-GiantImage has suspend viewport(view), tile(address), close. The separate
+GiantImage has suspend viewport(view), tile(address, foreignCharge), close. The separate
 SessionResources.reserveForeign(bytes) -> SessionResourceCharge contract wraps
 the SAME native SessionBudget and keeps each idempotent close token beside its
 actual foreign resource. Root must compose that required pool into the viewport
@@ -52,6 +52,14 @@ cancellation) and close(). Its private factory contract is:
         options: GiantOpenOptions, budget: vw_stream::SessionBudget,
         cancellation: Arc<Cancellation>
     ) -> GiantImageResult<Arc<GiantImage>>
+
+The follow-up foreign-ownership checkpoint adds a byte-only pixel record plus
+GiantTileDelivery with an opaque native lease. Root consumes the worker's exact
+private outgoing delivery hook with marshal_delivery(pixels, outgoingCharge),
+reserving an ABI copy before serialization. The common caller pre-reserves its
+foreign copies and keeps that charge until real renderer retirement; native
+outgoing/ABI charges stay live through complete reply decoding. See
+GIANT_RENDERER_PARALLEL_HANDOFF_20261018.md for the exact handoff and renderer lanes.
 
 Root supplies one shared budget for the active endpoint session; the provider
 MUST NOT create a fresh budget for each handle/read/codec. Workers can clone the

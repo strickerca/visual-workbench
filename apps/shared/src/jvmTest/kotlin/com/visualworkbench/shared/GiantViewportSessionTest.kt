@@ -18,7 +18,7 @@ class GiantViewportSessionTest {
             val keys = if(many)(0u..2u).map{GiantTileAddress(0u,it,0u)} else listOf(GiantTileAddress(0u,view.left.toUInt(),0u))
             return GiantViewportPlan(identity,"b".repeat(64),0u,keys,emptyList())
         }
-        override suspend fun tile(address: GiantTileAddress): GiantTilePixels {
+        override suspend fun tile(address: GiantTileAddress, foreign: SessionResourceCharge): GiantTilePixels {
             reads += address; onRead()
             return GiantTilePixels(identity,"b".repeat(64),address,address.x*256u+documentOffset,0u,256u,256u,256u,256u,ByteArray(256*256*4){if(it%4==3)255.toByte() else 0})
         }
@@ -33,9 +33,28 @@ class GiantViewportSessionTest {
         override suspend fun retire(){events+="retire:start";onRetire();events+="retire:end"}
         override fun release(image:Int){events+="release:$image"}
     }
+    private class Resources(private val limit: ULong = 512uL * 1024uL * 1024uL) : SessionResources {
+        var used = 0uL; var closes = 0; var failClose = false
+        override suspend fun reserveForeign(bytes: ULong): SessionResourceCharge {
+            if (bytes > limit - used) throw GiantImageFailure(GiantImageFailureKind.Memory)
+            used += bytes
+            return object : SessionResourceCharge {
+                private var closed = false
+                override fun close() {
+                    if (closed) return
+                    if (failClose) throw IllegalStateException("reservation is retained")
+                    closed = true; used -= bytes; closes++
+                }
+            }
+        }
+    }
+    private fun session(parent: CoroutineScope, image: GiantImage, backend: GiantRenderBackend<Int>,
+        bound: WorkflowBinding, epoch: Long, current: (WorkflowBinding, Long) -> Boolean,
+        max: Long = 192L * 1024L * 1024L, resources: Resources = Resources()): GiantViewportSession<Int> =
+        GiantViewportSession(parent, image, backend, bound, epoch, current, resources, max)
     private suspend fun until(test:()->Boolean){withTimeout(3000){while(!test())yield()}}
     @Test fun evictionCreditsOnlyAfterActualRendererRetirement()=runBlocking {
-        val source=Source();val backend=Renderer();val session=GiantViewportSession(this,source,backend,binding,1L,{_,_->true},GiantViewportSession.TILE_CHARGE)
+        val source=Source();val backend=Renderer();val session=session(this,source,backend,binding,1L,{_,_->true},GiantViewportSession.TILE_CHARGE)
         val entered=CompletableDeferred<Unit>();val leave=CompletableDeferred<Unit>()
         try{
             session.request(view(0.0));until{session.state.value.ready}
@@ -52,7 +71,7 @@ class GiantViewportSessionTest {
     @Test fun staleNativeCompletionNeverBecomesAVisibleFrame()=runBlocking {
         val source=Source();val backend=Renderer();val entered=CompletableDeferred<Unit>();val leave=CompletableDeferred<Unit>()
         source.onRead={if(source.reads.size==1){entered.complete(Unit);withContext(NonCancellable){leave.await()}}}
-        val session=GiantViewportSession(this,source,backend,binding,1L,{_,_->true})
+        val session=session(this,source,backend,binding,1L,{_,_->true})
         try{
             session.request(view(0.0));withTimeout(3000){entered.await()};session.request(view(1.0));session.request(view(2.0))
             leave.complete(Unit);until{session.state.value.ready}
@@ -63,7 +82,7 @@ class GiantViewportSessionTest {
     @Test fun concurrentCancelledCloseJoinsInFlightReadAndAllImages()=runBlocking {
         val source=Source();val backend=Renderer();val entered=CompletableDeferred<Unit>();val leave=CompletableDeferred<Unit>()
         source.onRead={entered.complete(Unit);withContext(NonCancellable){leave.await()}}
-        val session=GiantViewportSession(this,source,backend,binding,1L,{_,_->true})
+        val session=session(this,source,backend,binding,1L,{_,_->true})
         session.request(view(0.0));withTimeout(3000){entered.await()}
         val first=launch(start=CoroutineStart.UNDISPATCHED){session.close()}
         val second=launch(start=CoroutineStart.UNDISPATCHED){session.close()}
@@ -72,18 +91,18 @@ class GiantViewportSessionTest {
         assertTrue(source.closed);assertEquals(0,backend.next)
     }
     @Test fun visibleSetOverBudgetFailsBeforeAnyPixelRead()=runBlocking {
-        val source=Source().apply{many=true};val backend=Renderer();val session=GiantViewportSession(this,source,backend,binding,1L,{_,_->true},GiantViewportSession.TILE_CHARGE)
+        val source=Source().apply{many=true};val backend=Renderer();val session=session(this,source,backend,binding,1L,{_,_->true},GiantViewportSession.TILE_CHARGE)
         try{session.request(view(0.0));until{session.state.value.message!=null};assertTrue(source.reads.isEmpty());assertNull(backend.frame)}finally{session.close()}
     }
     @Test fun changedSourceIdentityCannotReuseOldFrame()=runBlocking {
-        val source=Source();val backend=Renderer();val session=GiantViewportSession(this,source,backend,binding,1L,{_,_->true})
+        val source=Source();val backend=Renderer();val session=session(this,source,backend,binding,1L,{_,_->true})
         try{
             session.request(view(0.0));until{session.state.value.ready};source.identity="c".repeat(64);session.request(view(1.0))
             until{session.state.value.message!=null};assertNull(backend.frame);assertEquals(1,source.reads.size);assertEquals(0L,session.state.value.retainedBytes)
         }finally{session.close()}
     }
     @Test fun imageCloseWaitsForCrossActorExportOwner()=runBlocking {
-        val source=Source();val session=GiantViewportSession(this,source,Renderer(),binding,1L,{_,_->true});val entered=CompletableDeferred<Unit>();val leave=CompletableDeferred<Unit>()
+        val source=Source();val session=session(this,source,Renderer(),binding,1L,{_,_->true});val entered=CompletableDeferred<Unit>();val leave=CompletableDeferred<Unit>()
         val export=launch(start=CoroutineStart.UNDISPATCHED){session.withExclusiveImage{entered.complete(Unit);withContext(NonCancellable){leave.await()}}}
         withTimeout(3000){entered.await()};val closing=launch(start=CoroutineStart.UNDISPATCHED){session.close()}
         try{export.cancel();assertFalse(source.closed);assertFalse(closing.isCompleted)}finally{leave.complete(Unit);withContext(NonCancellable){export.join();closing.join()}}
@@ -91,7 +110,7 @@ class GiantViewportSessionTest {
     }
     @Test fun cancelledParentStillRetiresOwnedNativeHandle()=runBlocking {
         val parent=Job().apply{cancel()};val source=Source();val backend=Renderer()
-        val session=GiantViewportSession(CoroutineScope(coroutineContext+parent),source,backend,binding,1L,{_,_->true})
+        val session=session(CoroutineScope(coroutineContext+parent),source,backend,binding,1L,{_,_->true})
         session.close();assertTrue(source.closed);assertTrue(backend.events.contains("retire:end"))
     }
     @Test fun revisionOrAttachmentChangeDuringReadPreventsUploadAndPublication()=runBlocking {
@@ -99,7 +118,7 @@ class GiantViewportSessionTest {
             val source=Source();val backend=Renderer();val entered=CompletableDeferred<Unit>();val leave=CompletableDeferred<Unit>()
             var liveBinding=binding;var liveEpoch=1L
             source.onRead={entered.complete(Unit);withContext(NonCancellable){leave.await()}}
-            val session=GiantViewportSession(this,source,backend,binding,1L,{expected,epoch->expected==liveBinding&&epoch==liveEpoch})
+            val session=session(this,source,backend,binding,1L,{expected,epoch->expected==liveBinding&&epoch==liveEpoch})
             try {
                 session.request(view(0.0));withTimeout(3000){entered.await()}
                 when(changed) {
@@ -114,7 +133,7 @@ class GiantViewportSessionTest {
     }
     @Test fun newViewportHidesPreviousFrameWhileKeepingItsResourcesCharged()=runBlocking {
         val source=Source();val backend=Renderer();val entered=CompletableDeferred<Unit>();val leave=CompletableDeferred<Unit>()
-        val session=GiantViewportSession(this,source,backend,binding,4L,{_,epoch->epoch==4L})
+        val session=session(this,source,backend,binding,4L,{_,epoch->epoch==4L})
         try {
             session.request(view(0.0));until{session.state.value.ready}
             assertEquals(binding,backend.frame?.binding);assertEquals(4L,backend.frame?.attachmentEpoch)
@@ -127,7 +146,7 @@ class GiantViewportSessionTest {
         } finally {leave.complete(Unit);session.close()}
     }
     @Test fun singularPhysicalTransformRefusesBeforeAnyTileRead()=runBlocking {
-        val source=Source();val session=GiantViewportSession(this,source,Renderer(),binding,1L,{_,_->true})
+        val source=Source();val session=session(this,source,Renderer(),binding,1L,{_,_->true})
         try {
             assertTrue(runCatching{session.request(view(0.0).copy(a=1.0,b=2.0,c=2.0,d=4.0))}.exceptionOrNull() is IllegalArgumentException)
             assertTrue(source.reads.isEmpty());assertEquals(0uL,session.state.value.generation)
@@ -135,7 +154,7 @@ class GiantViewportSessionTest {
     }
     @Test fun mismatchedTileDocumentGeometryRefusesBeforeForeignUpload()=runBlocking {
         val source=Source().apply{documentOffset=1u};val backend=Renderer()
-        val session=GiantViewportSession(this,source,backend,binding,1L,{_,_->true})
+        val session=session(this,source,backend,binding,1L,{_,_->true})
         try {
             session.request(view(0.0));until{session.state.value.message!=null}
             assertEquals(0,backend.next);assertNull(backend.frame);assertEquals(0L,session.state.value.retainedBytes)
@@ -143,7 +162,7 @@ class GiantViewportSessionTest {
     }
     @Test fun failedRendererRetirementRetainsEveryImageAndItsCharge()=runBlocking {
         val source=Source();val backend=Renderer()
-        val session=GiantViewportSession(this,source,backend,binding,1L,{_,_->true},GiantViewportSession.TILE_CHARGE)
+        val session=session(this,source,backend,binding,1L,{_,_->true},GiantViewportSession.TILE_CHARGE)
         session.request(view(0.0));until{session.state.value.ready}
         backend.onRetire={throw IllegalStateException("renderer still owns its recorded image")}
         session.request(view(1.0));until{source.closed}
@@ -153,7 +172,7 @@ class GiantViewportSessionTest {
     }
     @Test fun closeStillJoinsNativeReadWhenHidingTheBackendFails()=runBlocking {
         val source=Source();val backend=Renderer();val entered=CompletableDeferred<Unit>();val leave=CompletableDeferred<Unit>()
-        val session=GiantViewportSession(this,source,backend,binding,1L,{_,_->true})
+        val session=session(this,source,backend,binding,1L,{_,_->true})
         session.request(view(0.0));until{session.state.value.ready}
         source.onRead={entered.complete(Unit);withContext(NonCancellable){leave.await()}}
         session.request(view(1.0));withTimeout(3000){entered.await()}
@@ -164,6 +183,36 @@ class GiantViewportSessionTest {
         assertTrue(closing.await().isFailure);assertTrue(source.closed)
         assertTrue(session.state.value.retainedBytes>=GiantViewportSession.TILE_CHARGE)
         assertFalse(backend.events.any{it.startsWith("release:")})
+    }
+
+    @Test fun sharedPoolExhaustionRefusesBeforeNativeReadEvenWithLocalCapacity()=runBlocking {
+        val source=Source();val backend=Renderer();val resources=Resources(1u)
+        val session=session(this,source,backend,binding,1L,{_,_->true},resources=resources)
+        try { session.request(view(0.0));until{session.state.value.message!=null}
+            assertTrue(source.reads.isEmpty());assertEquals(0,backend.next)
+            assertEquals(0uL,resources.used);assertEquals(0L,session.state.value.retainedBytes)
+        } finally {session.close()}
+    }
+    @Test fun failedReservationReleaseCannotDoubleReleasePlatformImageOrCreditItsBytes()=runBlocking {
+        val source=Source();val backend=Renderer();val resources=Resources()
+        val session=session(this,source,backend,binding,1L,{_,_->true},resources=resources)
+        session.request(view(0.0));until{session.state.value.ready};resources.failClose=true
+        assertTrue(runCatching{session.close()}.isFailure)
+        assertEquals(GiantViewportSession.TILE_CHARGE.toULong(),resources.used)
+        assertEquals(GiantViewportSession.TILE_CHARGE,session.state.value.retainedBytes)
+        assertEquals(1,backend.events.count{it=="release:1"})
+        // The failed owner remains retained. No second close claims recovery.
+        assertTrue(runCatching{session.close()}.isFailure)
+        assertEquals(1,backend.events.count{it=="release:1"})
+    }
+    @Test fun globalChargeOutlivesFailedRendererRetirementAndNativeClose()=runBlocking {
+        val source=Source();val backend=Renderer();val resources=Resources()
+        val session=session(this,source,backend,binding,1L,{_,_->true},resources=resources)
+        session.request(view(0.0));until{session.state.value.ready}
+        backend.onRetire={throw IllegalStateException("pipeline retained")}
+        assertTrue(runCatching{session.close()}.isFailure)
+        assertTrue(source.closed);assertEquals(0,resources.closes)
+        assertEquals(GiantViewportSession.TILE_CHARGE.toULong(),resources.used)
     }
 
 }

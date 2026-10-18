@@ -1,6 +1,8 @@
 //! Shared UniFFI boundary. Storage and input run on distinct bounded core-owned workers.
 mod os_images;
 pub use os_images::*;
+mod session_resources;
+pub use session_resources::*;
 mod giant_images;
 pub use giant_images::*;
 mod avif_images;

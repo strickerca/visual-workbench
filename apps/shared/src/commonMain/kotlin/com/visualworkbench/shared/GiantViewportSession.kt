@@ -41,6 +41,7 @@ public class GiantViewportSession<T : Any>(
     parent: CoroutineScope, private val image: GiantImage, private val backend: GiantRenderBackend<T>,
     private val binding: WorkflowBinding, private val attachmentEpoch: Long,
     private val isCurrent: (WorkflowBinding, Long) -> Boolean,
+    private val resources: SessionResources,
     private val maxRetainedBytes: Long = 192L * 1024L * 1024L,
 ) {
     private data class Request(val generation: ULong, val view: GiantViewport)
@@ -50,7 +51,9 @@ public class GiantViewportSession<T : Any>(
     private val requests: Channel<Request> = Channel(Channel.CONFLATED)
     private val mutable: MutableStateFlow<GiantViewStatus> = MutableStateFlow(GiantViewStatus())
     public val state: StateFlow<GiantViewStatus> = mutable
-    private val retained: MutableMap<GiantTileAddress, GiantRenderedTile<T>> = linkedMapOf()
+    private class Owned<T : Any>(val charge: SessionResourceCharge,
+        var tile: GiantRenderedTile<T>? = null, var imageReleased: Boolean = false)
+    private val retained: MutableMap<GiantTileAddress, Owned<T>> = linkedMapOf()
     private var bytes: Long = 0L
     private var generation: ULong = 0uL
     private var lastView: GiantViewport? = null
@@ -124,10 +127,19 @@ public class GiantViewportSession<T : Any>(
         try {
             while (iterator.hasNext()) {
                 val entry = iterator.next()
-                backend.release(entry.value.image); iterator.remove(); bytes -= TILE_CHARGE
+                val owner = entry.value
+                if (!owner.imageReleased) {
+                    owner.tile?.let { backend.release(it.image) }
+                    owner.imageReleased = true
+                }
+                // Keep the owner/counter if native reservation release fails.
+                // A retry never destroys an already-released platform image twice.
+                owner.charge.close()
+                iterator.remove(); bytes -= TILE_CHARGE
             }
         } finally { mutable.value = mutable.value.copy(retainedBytes = bytes, ready = false) }
     }
+    private fun mutableStateForBytes(): GiantViewStatus = mutable.value.copy(retainedBytes = bytes)
     private suspend fun load(request: Request): Unit {
         val plan = image.viewport(request.view)
         if (!current(request)) return
@@ -140,17 +152,24 @@ public class GiantViewportSession<T : Any>(
         require(visible.size == plan.visible.size && prefetch.size == plan.prefetch.size && visible.intersect(prefetch).isEmpty())
         require(visible.size + prefetch.size <= 4096 && (visible + prefetch).all { it.level == plan.level })
         require(visible.size.toLong() * TILE_CHARGE <= maxRetainedBytes)
-        val missing = visible.count { it !in retained }
+        val missing = visible.count { retained[it]?.tile == null || retained[it]?.imageReleased == true }
         if (bytes + missing.toLong() * TILE_CHARGE > maxRetainedBytes) retire()
         if (!current(request)) return
         suspend fun read(key: GiantTileAddress): Boolean {
-            if (key in retained) return true
+            if (retained[key]?.let { it.tile != null && !it.imageReleased } == true) return true
             if (bytes + TILE_CHARGE > maxRetainedBytes) return false
-            // Reserve BEFORE either the foreign byte array or bitmap exists.
-            bytes += TILE_CHARGE; mutable.value = mutable.value.copy(retainedBytes = bytes)
-            var created: T? = null; var transferred = false
+            // Reserve from the SAME native session pool before the foreign byte
+            // array, CPU bitmap or GPU texture can exist. Local counters alone
+            // cannot admit work alongside ring/codec/transfer owners.
+            val charge = resources.reserveForeign(TILE_CHARGE.toULong())
+            val owner = Owned<T>(charge)
+            retained[key] = owner
+            bytes += TILE_CHARGE; mutable.value = mutableStateForBytes()
+            var transferred = false; var createStarted = false
             try {
-                val pixels = image.tile(key)
+                currentCoroutineContext().ensureActive()
+                if (!current(request)) return false
+                val pixels = image.tile(key, charge)
                 require(pixels.assetId == pair.first && pixels.manifestHash == pair.second && pixels.address == key)
                 require(pixels.width in 1u..256u && pixels.height in 1u..256u)
                 require(pixels.rgba.size.toLong() == pixels.width.toLong() * pixels.height.toLong() * 4L)
@@ -161,19 +180,31 @@ public class GiantViewportSession<T : Any>(
                 require(pixels.documentX.toULong() + pixels.documentWidth.toULong() <= 1_048_576uL && pixels.documentY.toULong() + pixels.documentHeight.toULong() <= 1_048_576uL)
                 require((3 until pixels.rgba.size step 4).all { pixels.rgba[it] == (-1).toByte() })
                 if (!current(request)) return false
-                val value = backend.create(pixels); created = value
-                if (!current(request)) return false
-                retained[key] = GiantRenderedTile(GiantTileDescriptor(key, pixels.documentX, pixels.documentY,
+                createStarted = true
+                val value = backend.create(pixels)
+                owner.tile = GiantRenderedTile(GiantTileDescriptor(key, pixels.documentX, pixels.documentY,
                     pixels.documentWidth, pixels.documentHeight, pixels.width, pixels.height), value)
+                if (!current(request)) return false
                 transferred = true; return true
             } finally {
-                if (!transferred) { created?.let(backend::release); bytes -= TILE_CHARGE; mutable.value = mutable.value.copy(retainedBytes = bytes) }
+                if (!transferred) {
+                    withContext(NonCancellable) {
+                        if (owner.tile != null || createStarted) retire()
+                        else {
+                            // No image reached a renderer, so this reservation
+                            // alone can retire. Keep it if close fails.
+                            owner.charge.close()
+                            retained.remove(key); bytes -= TILE_CHARGE
+                            mutable.value = mutableStateForBytes()
+                        }
+                    }
+                }
             }
         }
         for (key in plan.visible) { currentCoroutineContext().ensureActive(); if (!current(request) || !read(key)) return }
         if (!current(request)) return
         backend.present(GiantVisibleFrame(binding, attachmentEpoch, request.generation, request.view, pair.first, pair.second,
-            plan.visible.map { checkNotNull(retained[it]) }))
+            plan.visible.map { checkNotNull(retained[it]?.tile) }))
         mutable.value = mutable.value.copy(ready = true, busy = false, message = null)
         for (key in plan.prefetch) { currentCoroutineContext().ensureActive(); if (!current(request) || !read(key)) break }
     }

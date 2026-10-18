@@ -66,7 +66,19 @@ private class NativeCore : WorkbenchCore, WorkbenchStreamingCore, WorkbenchDocum
         TextLayout(value.algorithmVersion,value.glyphs.map { GlyphOutline(it.glyphId,it.cluster,it.font,it.x,it.y,it.advance,it.outline.map { p -> p.common() }) },value.width,value.height,value.lineHeight)
     }
 }
-private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject {
+private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject {
+    override suspend fun openGiantImage(binding:WorkflowBinding,diskCacheBytes:ULong,ramCacheBytes:ULong):GiantImage {
+        if(closed.get())throw GiantImageFailure(GiantImageFailureKind.Closed)
+        val image=openGiantImageNative(handle,binding,diskCacheBytes,ramCacheBytes)
+        try {
+            currentCoroutineContext().ensureActive()
+            if(closed.get())throw GiantImageFailure(GiantImageFailureKind.Closed)
+            return image
+        } catch(error:Throwable) {
+            try{disposeUnadoptedGiantImage(image)}catch(cleanup:Throwable){error.addSuppressed(cleanup)}
+            throw error
+        }
+    }
     private val documentPasswords = mutableMapOf<String,String>()
     private val documentPages = mutableMapOf<String,UInt>()
     private fun checkDocumentOpen() { if(closed.get()) throw CoreFailure(CoreFailureKind.Closed) }

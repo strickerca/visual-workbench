@@ -351,3 +351,32 @@ Kotlin/renderer source without a concurrent heavy build. Root retains all public
 FFI/shared contracts, registration, store APIs and app composition. Recovered
 local view counters alone do not satisfy session-wide resource accounting.
 Source-bound contract checks are in `evidence/GIANT_STREAM_CONTRACTS_20261018.json`.
+
+## Foreign-resource ownership source checkpoint
+
+Root's shared viewport owner now takes a required SessionResources pool and a
+live foreign reservation on every tile call. Charges survive actual renderer
+retirement failures, partial release and failed create cleanup; image release
+and reservation release have separate recorded phases. The planned native
+process-wide pool cannot be reset by replacing a project/session. Native delivery
+and a separately admitted ABI copy survive through full foreign reply decoding,
+while the foreign ByteArray/bitmap/texture charge was already admitted and remains
+with the renderer. Root's native adapter uses joined cancellation and retains
+unadopted native images if close cannot settle. Image owner's exact private
+provider hook still needs composition before that ABI is registered/generated.
+
+Common request/draw geometry includes precision pane footprints at their highest
+physical scale and repeats full revision/attachment/view matching. Six additional
+shared ownership/geometry regressions and one native foreign-object regression
+are written; total viewport/geometry tests written are19. None were run in this
+checkpoint: image owner holds the heavy slot. Format/import/whitespace/secret
+checks alone do not compile or validate the new adapter, generated methods,
+native budget/provider or platform renderer paths. Native/shared binding and
+caller compilation remain pending the coherent next phase.
+
+Exact Android/Desktop renderer-only ownership is proposed in
+`GIANT_RENDERER_PARALLEL_HANDOFF_20261018.md`. Those helpers can proceed in parallel
+under separate owners while root retains controllers, actual framework draw
+callbacks, Main/WorkbenchApp, public/native contracts and registration. Both
+renderer lanes must keep builds serialized behind image. Current main stays
+reviewed `83663107`; no giant/stream feature or hardware gate is passed.

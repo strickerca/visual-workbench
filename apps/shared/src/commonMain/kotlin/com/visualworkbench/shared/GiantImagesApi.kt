@@ -26,7 +26,9 @@ public class GiantTilePixels(public val assetId: String, public val manifestHash
  * caller obligation and a failed owner must stay retained and charged. */
 public interface GiantImage {
     public suspend fun viewport(view: GiantViewport): GiantViewportPlan
-    public suspend fun tile(address: GiantTileAddress): GiantTilePixels
+    /** The live reservation covers foreign bytes/bitmap/texture copies before
+     * native admission. Keep it through actual renderer retirement. */
+    public suspend fun tile(address: GiantTileAddress, foreign: SessionResourceCharge): GiantTilePixels
     public suspend fun close(): Unit
 }
 public enum class GiantImageFailureKind { Invalid, Limit, Memory, Stale, Missing, Unsupported, Closed, Cancelled, Backpressure, Storage }

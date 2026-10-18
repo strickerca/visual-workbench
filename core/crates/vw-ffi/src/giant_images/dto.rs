@@ -45,6 +45,15 @@ pub struct GiantTilePixels {
     pub height: u32,
     pub rgba: Vec<u8>,
 }
+/// The private provider's outgoing charge and an additional bounded ABI copy
+/// remain owned until the generated foreign reply has completely decoded.
+/// Foreign pixels are independently pre-reserved in the same endpoint pool.
+#[derive(uniffi::Record)]
+pub struct GiantTileDelivery {
+    pub pixels: GiantTilePixels,
+    pub native_lease: std::sync::Arc<crate::session_resources::SessionResourceCharge>,
+}
+
 #[derive(Clone, Debug, thiserror::Error, uniffi::Error)]
 pub enum GiantImageError {
     #[error("invalid giant-image request")]
