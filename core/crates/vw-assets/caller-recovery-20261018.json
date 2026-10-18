@@ -1,0 +1,201 @@
+{
+  "schema": 1,
+  "status": "leaf source recovered/adapted; helper harness passed; real native ABI and caller validation await coordinator seams",
+  "contract_commit": "6dcdcdfde4acdba76c710c16187e19d3f4489d4a",
+  "contract": "docs/RECOVERY_CALLER_ASSIGNMENTS_20261018.md",
+  "preservation_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "preserved_files": [
+    {
+      "path": "core/crates/vw-ffi/src/format_images.rs",
+      "candidate": "desktop/t3-formats/new/core/crates/vw-ffi/src/format_images.rs",
+      "preserved_sha256": "7460171b3171966c24839bd0f5ceb20d78b286ccd646cbcd9fd1094d2b3fb577",
+      "current_sha256": "cc7ceddad6b58676630147b4c935354b12f98f5e1b273dad415703192c740825"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/avif_images.rs",
+      "candidate": "desktop/core/crates/vw-ffi/src/avif_images.rs",
+      "preserved_sha256": "b75c1bb63651eb1bd47a63be4ffb3a13e92cbac7730749f30546092d5fd1f963",
+      "current_sha256": "4ca03f6cdeeca4fff25a684f7410a22d9e3fae7dd960834face19b0a2ebefe49"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/format_seek_tests.rs",
+      "candidate": "desktop/t3-formats/new/core/crates/vw-ffi/src/format_seek_tests.rs",
+      "preserved_sha256": "6bb2d69b872259dc697aaf6610c83e2fdface07554105d1786a3036b3e402010",
+      "current_sha256": "a795d4daadb889c44008332ac3c0131d7f6feee749de813755c6ee1f86cfb9e8"
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/ordinary_formats.rs",
+      "candidate": "desktop/t3-formats/new/core/crates/vw-ffi/tests/ordinary_formats.rs",
+      "preserved_sha256": "08f35495bd4bb8baa6da0f077fb9d480980917ee76a71f5379368fc57049b3ec",
+      "current_sha256": "b1572cac49eec85108a2ed8914f45bd36215d670ed1e492d5ba56cc0daa72826"
+    },
+    {
+      "path": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "candidate": "desktop/t3-formats/new/core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "preserved_sha256": "f11821ada0e62ceaec84ba975ae14cddbaec18980415fa40babe3d568209f88e",
+      "current_sha256": "52c87368533e9b0d1612e8b84ac61d7e3d2d7e656c2b46e99c1cad8597064982"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeOriginalFormats.kt",
+      "candidate": "desktop/t3-formats/new/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeOriginalFormats.kt",
+      "preserved_sha256": "60ac67353b4b7c4cc3ac78c9416a433694348875c316a168e5cd41522240a7c4",
+      "current_sha256": "60ac67353b4b7c4cc3ac78c9416a433694348875c316a168e5cd41522240a7c4"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeAvifImages.kt",
+      "candidate": "desktop/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeAvifImages.kt",
+      "preserved_sha256": "4ddde158f463ff75a867c2c825139f422410b9b93d98259593e736e5a3b859ba",
+      "current_sha256": "ba7121a51a461a08d54f77d768e00cb1fc8be9b095226cc008c6b081f01278be"
+    },
+    {
+      "path": "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/AndroidAvifImages.kt",
+      "candidate": "desktop/apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/AndroidAvifImages.kt",
+      "preserved_sha256": "830aa4d71be7efc03fd4d3c58c099051b31ccac043b8b364e2082c8169aeab25",
+      "current_sha256": "31242440c3c60f9ffe257d46dcae04e43893c4ec2771c00d235039bbfd4c6a92"
+    },
+    {
+      "path": "apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/AvifAdmissionInstrumentedTest.kt",
+      "candidate": "desktop/apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/AvifAdmissionInstrumentedTest.kt",
+      "preserved_sha256": "b495517ec64b957035229a22336f6d37b250a205615a1effb1aeb5eb15833892",
+      "current_sha256": "d846c950e905419b7f1cd4ad0916a940d5ec3aabeb2a9bb2ad015e3029f7e07a"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/editor/OrdinaryFormatSelectionTest.kt",
+      "candidate": "desktop/t3-formats/new/apps/android/src/test/kotlin/com/visualworkbench/android/editor/OrdinaryFormatSelectionTest.kt",
+      "preserved_sha256": "2313ab0d4b12c1ad697b64dbc1a11c677aa8f515dc0f18490b9442b4ef829616",
+      "current_sha256": "2e4299592b68183ea2e215093a71a15091993a96a741caabb4a43a572b9e87bf"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/OrdinaryFormatSelectionTest.kt",
+      "candidate": "desktop/t3-formats/new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/OrdinaryFormatSelectionTest.kt",
+      "preserved_sha256": "55dc26f0026d83a32e4d3b3c8012afca04c459757b81f6f2e0e43c5439457c55",
+      "current_sha256": "2601051fa24712723d5b03f819140476e7a2acabeae1ad8b5e687dd309a5e4fe"
+    }
+  ],
+  "new_helpers": [
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/OrdinaryFormatFiles.kt",
+      "sha256": "cbf71d0028b64e061af37f982b6263f65c55fe0b5087ade89f5ec74192f5794b"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/OrdinaryFormatFiles.kt",
+      "sha256": "b8d5e7a441ade568a6b6bd5ee76ff92610b28140ca61935fd55234bd1988be10"
+    }
+  ],
+  "changes": [
+    "Recovered only assigned absent files after preservation hash checks; no controller/root postimages overlaid.",
+    "Unified BMP/TIFF to AVIF to existing HEIC/raster dispatch with before/after cancellation checks.",
+    "Typed absent AVIF OS callback/codec as the admitted RasterError::CodecUnavailable; no generic decoder retry.",
+    "Charged the full retained source allocation and buffered reply copies during external encoding; internal caps do not replace requested policy in metadata.",
+    "Canonical original format query validates full binding, cancellation/close, allowed raster formats, bounded metadata and conservative legacy TIFF notice.",
+    "Added actual bitmap allocation admission and source-ID shape checks in restricted Android AVIF path; no OS fidelity is claimed.",
+    "Removed raw ICC Debug derivation from native AVIF header; prechecked native inspector inputs before UniFFI copies.",
+    "Added pure platform MIME/preferred-suffix/alias helpers without granting conversion consent."
+  ],
+  "helper_functions": [
+    "ExportEncoding.exportMimeType(): String",
+    "ExportEncoding.exportFileSuffix(): String",
+    "ExportEncoding.acceptsFileSuffix(String): Boolean"
+  ],
+  "source_checks": {
+    "rustfmt": "passed for new Rust source/tests",
+    "git_diff_check": "passed",
+    "preservation_hashes": "11 assigned preserved files verified before recovery"
+  },
+  "focused_harness": {
+    "compiler": "Kotlin 2.4.20, strict explicit API, JVM17, one backend worker; JVM capped at 512 MiB/2 processors",
+    "passed": 16,
+    "failed": 0,
+    "cases": "3 Android suffix/MIME cases + 3 desktop suffix/MIME cases + 10 pre-OS AVIF admission cases; Turkish process locale checks normalization",
+    "production_sources": [
+      "apps/android/src/main/kotlin/com/visualworkbench/android/editor/OrdinaryFormatFiles.kt",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/OrdinaryFormatFiles.kt",
+      "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/AndroidAvifImages.kt::admitAndroidAvif"
+    ],
+    "shims": "Test-only enum/DTO shapes stand in for not-yet-admitted platform enums/generated bindings. Only the exact production admission helper body is extracted; Android decoder code is not compiled by this harness.",
+    "compile_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "run_log_sha256": "d29474dff619c219a0bec80ae162ec9b4129c1efb8eb37dbe692180898f3023a",
+    "compiler_artifact_manifest_sha256": "6b4615034766b36a3ae32bb2f39228dff2c0e7067012f934fe70d41caa54bc16",
+    "actual_app_or_generated_abi_coverage": false
+  },
+  "written_rust_cases": [
+    {
+      "path": "core/crates/vw-ffi/src/format_images.rs",
+      "cases": 3
+    },
+    {
+      "path": "core/crates/vw-ffi/src/avif_images.rs",
+      "cases": 2
+    },
+    {
+      "path": "core/crates/vw-ffi/src/format_seek_tests.rs",
+      "cases": 2
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/ordinary_formats.rs",
+      "cases": 9
+    },
+    {
+      "path": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "cases": 8
+    }
+  ],
+  "written_kotlin_cases": [
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/editor/OrdinaryFormatSelectionTest.kt",
+      "cases": 3
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/OrdinaryFormatSelectionTest.kt",
+      "cases": 3
+    },
+    {
+      "path": "apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/AvifAdmissionInstrumentedTest.kt",
+      "cases": 6
+    }
+  ],
+  "root_seams_required": [
+    "vw-ffi Cargo dependencies on vw-formats and vw-avif-os; coordinator updates lockfile.",
+    "vw-raster ExportFormat::{Bmp8,Tiff8,Tiff16}, PreparedRaster and prepare_export_pixels; keep R164 display_rgba8 unchanged.",
+    "RasterError::CodecUnavailable -> CoreError::ImageCodecUnavailable -> CoreFailureKind.ImageCodecUnavailable, including background/import/transfer mappings.",
+    "Register format_images (re-export OriginalFormatInfo), avif_images (re-export public AVIF records/callback/inspector), common AvifImagesApi and Android callback installation in NativeLibrary.",
+    "Coherent memory/file/attachment/resolver/background import hooks must call format_images::decode, use format_images::label, and persist import_metadata before decode; do not retain webp fallback labels for BMP/TIFF/AVIF.",
+    "Coherent memory/file export hooks must choose encode_buffered/encode_private for external formats, retain private staging/fsync/atomic publication and hash finalized seekable bytes.",
+    "streaming_ffi hash_final_file(&mut File,u64,&mut blake3::Hasher,&Cancellation)->TransferResult<()> and #[cfg(test)] #[path=\"format_seek_tests.rs\"] mod format_seek_tests inside streaming_ffi.",
+    "Shared/native ImageFormat enums and mappings; Android ExportEncoding and desktop ExportEncoding/ExportSettings mappings; WorkbenchOriginalFormats facade delegates originalFormatInfoNative.",
+    "Controller notice adoption checks full revision plus current attachment epoch/refresh ticket and presents first-page warning before independent display/color consent.",
+    "File chooser hooks use exportMimeType/exportFileSuffix/acceptsFileSuffix, preserving PNG-only clipboard/drag policy."
+  ],
+  "integration_observations": [
+    "External adapter deducts actual full source Vec/ICC capacity, including when exporting a small crop. Coordinator preflight estimates should also include retained allocations.",
+    "Common AVIF DTO debug rendering should redact ICC/source byte arrays just as document source-bearing records do.",
+    "The new Linux public-import regression uses an admitted structural AVIF fixture without tile entropy to verify typed missing codec before project publication; it is not a decoder fidelity test."
+  ],
+  "remaining_limits": [
+    "New Rust adapters are not registered or typechecked in the active crate yet; root preparation/enums/error/registration seams are absent at this source checkpoint.",
+    "24 written Rust caller/preparation/adapter cases and 12 Kotlin platform/instrumented cases await actual root wiring; 16 standalone helper harness cases are a separate count.",
+    "No Android SDK build, instrumentation, emulator, Windows WIC execution, real AVIF entropy fixture, app caller, picker/provider or generated-binding ABI validation occurred in this phase.",
+    "Restricted Android AVIF remains opaque 8-bit identity orientation, no ICC and declared sRGB only; unsupported HDR/multiframe/alpha/transforms never fall back to generic decoding.",
+    "No giant image routing, blob transfer, GPU/performance or product acceptance is claimed; preceding 55 module + 5 R164 tests are historical evidence, not new adapter coverage."
+  ],
+  "heavy_slot": "Not acquired for this leaf phase; coordinator/document lane can use it until native root seams are composed.",
+  "verification_images_created": 0,
+  "publication": {
+    "kind": "reviewed source checkpoint; not acceptance or promotion",
+    "branch": "integration/image-caller-source-checkpoint-20261018",
+    "authorization": "Parent explicitly authorized recoverable branch publication of these 14 reviewed leaf files before root composition; final test gate stays before promotion.",
+    "native_adapters_compiled": false,
+    "real_native_caller_tests_executed": false,
+    "platform_generated_bindings_validated": false
+  },
+  "required_signatures": [
+    "vw_raster::PreparedRaster { pub image: DecodedImage, pub metadata: ExportMetadata }",
+    "vw_raster::prepare_export_pixels(&DecodedImage, &ExportRequest, &dyn Fn() -> bool) -> Result<PreparedRaster, RasterError>",
+    "vw_raster::ExportFormat::{Bmp8,Tiff8,Tiff16}; RasterError::CodecUnavailable (unit variant)",
+    "ProjectSession::original_format_info(&self, WorkflowBinding, Arc<Cancellation>) -> Result<OriginalFormatInfo, WorkflowError> is supplied by the leaf",
+    "streaming_ffi::hash_final_file(&mut File, u64, &mut blake3::Hasher, &Cancellation) -> TransferResult<()>",
+    "CoreError::ImageCodecUnavailable and shared CoreFailureKind.ImageCodecUnavailable retain the missing-codec distinction",
+    "Native project facade: originalFormatInfo(binding: WorkflowBinding): OriginalFormatInfo delegates originalFormatInfoNative(handle, binding)",
+    "Platform helper calls: encoding.exportMimeType(), encoding.exportFileSuffix(), encoding.acceptsFileSuffix(suffix: String)"
+  ]
+}
