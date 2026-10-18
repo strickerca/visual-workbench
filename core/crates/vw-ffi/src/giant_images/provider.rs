@@ -59,14 +59,18 @@ impl ImageState {
             let _index = reserve(budget, MemoryKind::CodecWorkspace, tiles::STORE_WORKSPACE)?;
             DiskCache::new(&source.root, options.disk_cache_bytes).map_err(store_error)?
         };
-        let (manifest, manifest_charge) =
-            tiles::manifest(&mut disk, &source.source, cancel, budget)?;
-        if manifest.encoded_bytes() > options.disk_cache_bytes {
+        let admitted =
+            tiles::manifest_scoped(&mut disk, &source.root, &source.source, cancel, budget)?;
+        if admitted.manifest.encoded_bytes() > options.disk_cache_bytes {
             return Err(Error::Limit);
         }
-        let identity = tiles::hex(&manifest.identity());
+        let identity = tiles::hex(&admitted.manifest.identity());
         let memory = BudgetCache::new(options.ram_cache_bytes).map_err(asset_error)?;
         live(closed, cancel)?;
+        let tiles::AdmittedManifest {
+            manifest,
+            charge: manifest_charge,
+        } = admitted;
         Ok(Self {
             disk,
             manifest,

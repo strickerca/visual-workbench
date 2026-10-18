@@ -79,7 +79,7 @@ pub(super) fn hash_copy(
 ) -> Result<([u8; 32], String, u64)> {
     hash_copy_checked(input, output, limit, || cancel.check())
 }
-fn hash_copy_checked(
+pub(super) fn hash_copy_checked(
     input: &mut File,
     mut output: Option<&mut File>,
     limit: u64,
