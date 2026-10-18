@@ -30,6 +30,9 @@ pub enum ExportFormat {
     Jpeg { quality: u8 },
     WebpLossless,
     WebpLossy { quality: u8 },
+    Bmp8,
+    Tiff8,
+    Tiff16,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AlphaPolicy {
@@ -134,6 +137,8 @@ pub fn preflight(
     let (name, limit) = match r.format {
         ExportFormat::WebpLossless | ExportFormat::WebpLossy { .. } => ("WebP", 16383),
         ExportFormat::Jpeg { .. } => ("JPEG", 65535),
+        ExportFormat::Bmp8 => ("BMP", 65535),
+        ExportFormat::Tiff8 | ExportFormat::Tiff16 => ("TIFF", 65535),
         _ => ("PNG", 0x7fffffff),
     };
     if w > limit || h > limit {
@@ -147,7 +152,10 @@ pub fn preflight(
     {
         return Err(RasterError::Invalid("quality must be 1..100"));
     }
-    if depth == 16 && !matches!(r.format, ExportFormat::Png16) && !r.allow_depth_reduction {
+    if depth == 16
+        && !matches!(r.format, ExportFormat::Png16 | ExportFormat::Tiff16)
+        && !r.allow_depth_reduction
+    {
         return Err(RasterError::Depth);
     }
     if matches!(r.format, ExportFormat::Jpeg { .. })
@@ -158,13 +166,26 @@ pub fn preflight(
     }
     let per_pixel = if matches!(r.format, ExportFormat::WebpLossy { .. }) {
         160
+    } else if matches!(
+        r.format,
+        ExportFormat::Bmp8 | ExportFormat::Tiff8 | ExportFormat::Tiff16
+    ) {
+        96
     } else {
         64
+    };
+    let fixed = if matches!(
+        r.format,
+        ExportFormat::Bmp8 | ExportFormat::Tiff8 | ExportFormat::Tiff16
+    ) {
+        64
+    } else {
+        32
     };
     let estimated = u64::from(w)
         .checked_mul(u64::from(h))
         .and_then(|v| v.checked_mul(per_pixel))
-        .and_then(|v| v.checked_add(32 * 1024 * 1024))
+        .and_then(|v| v.checked_add(fixed * 1024 * 1024))
         .ok_or(RasterError::Allocation)?;
     if estimated > r.memory_budget_bytes {
         return Err(RasterError::Memory {
@@ -175,9 +196,20 @@ pub fn preflight(
     Ok(estimated)
 }
 
-/// Export a full-resolution buffer. Call `render_document` first for marked output.
-/// Caller bytes are never changed. Lossy/depth/matte conversions are explicit settings.
-pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage, RasterError> {
+/// Prepared full-resolution pixels for caller-owned seekable encoders.
+/// Source bytes/depth/profile remain unchanged. The receipt records conversions.
+pub struct PreparedRaster {
+    pub image: DecodedImage,
+    pub metadata: ExportMetadata,
+}
+pub fn prepare_export_pixels(
+    source: &DecodedImage,
+    r: &ExportRequest,
+    cancel: &dyn Fn() -> bool,
+) -> Result<PreparedRaster, RasterError> {
+    if cancel() {
+        return Err(RasterError::Cancelled);
+    }
     image_shape(source)?;
     if !source.original_available {
         return Err(RasterError::OriginalRequired);
@@ -227,11 +259,11 @@ pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage,
     if gray
         && matches!(
             r.format,
-            ExportFormat::WebpLossless | ExportFormat::WebpLossy { .. }
+            ExportFormat::WebpLossless | ExportFormat::WebpLossy { .. } | ExportFormat::Bmp8
         )
     {
         return Err(RasterError::Unsupported(
-            "grayscale ICC cannot label WebP RGB pixels; convert to sRGB or use PNG/JPEG",
+            "grayscale ICC cannot label BMP/WebP RGB pixels; convert to sRGB or use PNG/JPEG/TIFF",
         ));
     }
     if let AlphaPolicy::Matte(matte) = r.alpha {
@@ -241,6 +273,9 @@ pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage,
             ));
         }
         for i in (0..image.pixels.len()).step_by(4) {
+            if i.is_multiple_of(16384) && cancel() {
+                return Err(RasterError::Cancelled);
+            }
             let a = u64::from(image.pixels.sample(i + 3));
             for (c, m) in matte.iter().enumerate() {
                 let v = (u64::from(image.pixels.sample(i + c)) * a
@@ -280,6 +315,71 @@ pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage,
         color_conversion: conversion.into(),
         settings: r.clone(),
     };
+    if matches!(
+        r.format,
+        ExportFormat::Bmp8 | ExportFormat::Tiff8 | ExportFormat::Tiff16
+    ) {
+        let depth = if r.format == ExportFormat::Tiff16 {
+            16
+        } else {
+            8
+        };
+        if image.pixels.bit_depth() != depth {
+            let samples = image.pixels.len();
+            if depth == 8 {
+                if !r.allow_depth_reduction {
+                    return Err(RasterError::Depth);
+                }
+                let mut pixels = Vec::new();
+                pixels
+                    .try_reserve_exact(samples)
+                    .map_err(|_| RasterError::Allocation)?;
+                for i in 0..samples {
+                    if i.is_multiple_of(16384) && cancel() {
+                        return Err(RasterError::Cancelled);
+                    }
+                    pixels.push(((u32::from(image.pixels.sample(i)) + 128) / 257) as u8);
+                }
+                image.pixels = Pixels::Rgba8(pixels);
+            } else {
+                let mut pixels = Vec::new();
+                pixels
+                    .try_reserve_exact(samples)
+                    .map_err(|_| RasterError::Allocation)?;
+                for i in 0..samples {
+                    if i.is_multiple_of(16384) && cancel() {
+                        return Err(RasterError::Cancelled);
+                    }
+                    pixels.push(image.pixels.sample(i));
+                }
+                image.pixels = Pixels::Rgba16(pixels);
+            }
+        }
+    }
+    if cancel() {
+        return Err(RasterError::Cancelled);
+    }
+    Ok(PreparedRaster {
+        image,
+        metadata: meta,
+    })
+}
+
+/// Export a full-resolution buffer. Call `render_document` first for marked output.
+pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage, RasterError> {
+    if matches!(
+        r.format,
+        ExportFormat::Bmp8 | ExportFormat::Tiff8 | ExportFormat::Tiff16
+    ) {
+        return Err(RasterError::Unsupported(
+            "BMP/TIFF require the owned seekable format adapter",
+        ));
+    }
+    let PreparedRaster {
+        image,
+        metadata: meta,
+    } = prepare_export_pixels(source, r, &|| false)?;
+    let gray = crate::pixels::gray_profile(&image)?;
     let json = serde_json::to_string(&meta).map_err(|_| RasterError::Metadata)?;
     let bytes = match r.format {
         ExportFormat::Png8 | ExportFormat::Png16 => encode_png(&image, r.format, &json)?,
@@ -335,6 +435,9 @@ pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage,
                 image.icc.as_deref(),
                 &json,
             )?
+        }
+        ExportFormat::Bmp8 | ExportFormat::Tiff8 | ExportFormat::Tiff16 => {
+            return Err(RasterError::Unsupported("seekable format adapter required"));
         }
         ExportFormat::WebpLossy { quality } => {
             let rgba = image.pixels.rgba8();

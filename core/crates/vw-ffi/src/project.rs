@@ -387,7 +387,9 @@ pub async fn create_image_project(
         let doc_id = Id::try_from(options.document_id)?;
         let layer_id = Id::try_from(options.layer_id)?;
         let device = DeviceId::try_from(options.device_id)?;
-        let image = crate::os_images::decode(&options.source, decode_limits(), &|| {
+        let import_metadata =
+            crate::format_images::import_metadata(&options.source, decode_limits(), &cancellation)?;
+        let image = crate::format_images::decode(&options.source, decode_limits(), &|| {
             cancellation.is_cancelled()
         })?;
         let mut project = Project::new(project_id, options.title.clone(), device.clone());
@@ -396,15 +398,7 @@ pub async fn create_image_project(
         } else {
             (image.width, image.height)
         };
-        let format = if vw_codec_os::is_heic(&options.source) {
-            "heic"
-        } else if options.source.starts_with(b"\x89PNG\r\n\x1a\n") {
-            "png"
-        } else if options.source.starts_with(&[0xff, 0xd8]) {
-            "jpeg"
-        } else {
-            "webp"
-        };
+        let format = crate::original_image_label(&options.source);
         project.assets.insert(
             image.source_asset.clone(),
             pb::AddAsset {
@@ -424,7 +418,7 @@ pub async fn create_image_project(
                 icc_profile: image.icc.clone().unwrap_or_default(),
                 byte_size: options.source.len() as u64,
                 source: "import".into(),
-                metadata_json: "{}".into(),
+                metadata_json: import_metadata,
                 ..Default::default()
             },
         );

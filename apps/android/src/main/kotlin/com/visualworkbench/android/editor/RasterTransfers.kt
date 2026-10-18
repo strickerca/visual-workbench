@@ -37,7 +37,7 @@ internal class RasterTransfers(context: Context, private val handoffFactory: (Co
         }
 
         fun file(name: String): File {
-            require(name in setOf("original.bin", "output.png", "output.jpg", "output.webp"))
+            require(name in setOf("original.bin", "output.png", "output.jpg", "output.webp", "output.bmp", "output.tiff"))
             val target = File(root, name)
             require(target.canonicalFile.parentFile == root)
             return target
@@ -148,6 +148,8 @@ internal class RasterTransfers(context: Context, private val handoffFactory: (Co
 
     private fun outputName(format: ImageFormat): String = when (format) {
         ImageFormat.Png8, ImageFormat.Png16 -> "output.png"
+        ImageFormat.Bmp8 -> "output.bmp"
+        ImageFormat.Tiff8, ImageFormat.Tiff16 -> "output.tiff"
         is ImageFormat.Jpeg -> "output.jpg"
         ImageFormat.WebpLossless, is ImageFormat.WebpLossy -> "output.webp"
     }

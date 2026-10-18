@@ -37,7 +37,7 @@ public interface WorkbenchStroke {
     /** Await native resource release; an already-started durable commit may finish. */
     public suspend fun dispose()
 }
-public enum class CoreFailureKind { Invalid, Backpressure, Closed, Cancelled, Storage, Unsupported, Worker, Stroke, Raster }
+public enum class CoreFailureKind { Invalid, Backpressure, Closed, Cancelled, Storage, Unsupported, Worker, Stroke, Raster, ImageCodecUnavailable }
 public class CoreFailure(public val kind: CoreFailureKind, cause: Throwable? = null) : Exception(kind.name, cause)
 public data class CreateProject(public val path: String, public val projectId: String, public val documentId: String, public val layerId: String, public val deviceId: String, public val title: String, public val source: ByteArray, public val nowMs: Long)
 public data class ProjectInfo(public val projectId: String, public val title: String, public val deviceId: String, public val nextLamport: ULong, public val canUndo: Boolean, public val canRedo: Boolean, public val hostSeq: ULong, public val stateHash: String, public val documentIds: List<String>)
@@ -88,6 +88,9 @@ public sealed interface EditCommand {
 }
 public sealed interface ImageFormat {
     public data object Png8 : ImageFormat
+    public data object Bmp8 : ImageFormat
+    public data object Tiff8 : ImageFormat
+    public data object Tiff16 : ImageFormat
     public data object Png16 : ImageFormat
     public data class Jpeg(public val quality: UByte) : ImageFormat
     public data object WebpLossless : ImageFormat

@@ -89,6 +89,24 @@ Every new worker shell must source
 `/workspace/.vw-tools/cloud-setup/start.sh`; the tested setup is `a79728a`, and
 the inherited tools/caches do not require another installation.
 
+## Next ordinary-format caller source checkpoint
+
+Main is published at `7be9da7372f686d3d864ed0817fdcdb0833be138` with the
+preceding combined validation scope. Image caller leaves `dafb622` are now
+composed with root native registration, preparation, bounded format dispatch,
+shared enum/error/facade mappings and both app import/export/notice seams on the
+integration branch. The missing-codec distinction survives to user messages;
+TIFF page notices check the current full revision and attachment/refresh owner.
+File export hashes completed seekable bytes before the existing atomic publish.
+
+This is an uncompiled source checkpoint, pending the image owner's focused
+native tests and review, then one combined binding/app build. Only Rustfmt,
+locked offline metadata, diff whitespace and Kotlin syntax checks ran in this
+seam phase; the documents lane owns the heavy build slot. Exact source checks
+and remaining gates are in `evidence/CLOUD_IMAGE_CALLER_SEAMS_20261018.json`.
+Precision adapters `260b4f5` are recorded for the following reserved-hook batch;
+their earlier module tests do not cover those new leaves.
+
 ## Verification recorded by this ledger
 
 The initial ledger recorded only exact baseline/ref checks, clean branch creation,

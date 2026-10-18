@@ -107,6 +107,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     var message by mutableStateOf<String?>(null); private set
     var blockingMessage by mutableStateOf<String?>(null); private set
     var needsColorConsent by mutableStateOf(false); private set
+    var originalFormatNotice by mutableStateOf<String?>(null); private set
     var info by mutableStateOf<ProjectInfo?>(null); private set
     var document by mutableStateOf<DocumentSnapshot?>(null); private set
     var selected by mutableStateOf<String?>(null); private set
@@ -493,7 +494,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
                 observeProject(current, token)
                 colorAssumed = knownSrgb; screen = WorkbenchScreen.Canvas; cameraFitted = false
-                fit(); loadBackground()
+                fit(); refreshOriginalFormatNotice(); loadBackground()
                 if (onOpened != null) completion = ProjectOpenCompletion(current, token)
             } catch (cancel: CancellationException) { throw cancel }
             catch (error: SessionFailure) {
@@ -626,7 +627,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             finally {
                 document = null; info = null
                 background = null; objects = emptyList(); selected = null; transientShape = null
-                transformed = emptyMap(); erased = emptySet(); scene = null; blockingMessage = null; needsColorConsent = false
+                transformed = emptyMap(); erased = emptySet(); scene = null; blockingMessage = null; needsColorConsent = false; originalFormatNotice = null
             }
         }
         // Published render snapshots may still reference the old bitmap. Allow
@@ -814,6 +815,29 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         scope.launch { try { target.finishPreview(id, cancel) } catch (_: SessionFailure) { /* A disconnected epoch retires all previews. */ } }
     }
 
+    private suspend fun refreshOriginalFormatNotice() {
+        val owner = project ?: return
+        val formats = owner as? WorkbenchOriginalFormats ?: return
+        val snapshot = document ?: return
+        val revision = snapshot.render.revision
+        val binding = WorkflowBinding(revision.projectId, snapshot.documentId, revision.hostSeq, revision.stateHash)
+        val token = epoch
+        val ticket = refreshAdmission.capture()
+        fun current(): Boolean = !disposing && project === owner && epoch == token && refreshAdmission.accepts(ticket) &&
+            document?.let { it.documentId == binding.documentId && originalFormatRevisionMatches(it.render.revision, binding) } == true
+        if (!current()) return
+        originalFormatNotice = null
+        try {
+            val receipt = formats.originalFormatInfo(binding)
+            currentCoroutineContext().ensureActive()
+            validateOriginalFormatInfo(receipt, binding)
+            if (current()) originalFormatNotice = originalFormatNotice(receipt)
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) {
+            currentCoroutineContext().ensureActive()
+            if (current()) originalFormatNotice = "Original-image page information could not be checked. Reopen the project to retry."
+        }
+    }
     private suspend fun loadBackground() {
         val current = project ?: return
         val doc = document ?: return
@@ -847,6 +871,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             needsColorConsent = error.kind == CoreFailureKind.Raster && !colorAssumed
             blockingMessage = if (error.kind == CoreFailureKind.Backpressure)
                 "This image exceeds the current full-resolution display memory budget. Its original is saved unchanged. Bounded tiled display is still required before all images up to 50 megapixels can be edited."
+            else if (error.kind == CoreFailureKind.ImageCodecUnavailable)
+                "A compatible image decoder is unavailable on this device. The original is preserved."
             else if (needsColorConsent)
                 "The image could not be converted for display. If it has no embedded color profile, you can explicitly treat its colors as sRGB. The original will remain unchanged."
             else "The image could not be displayed safely. Its original remains saved; no smaller replacement was created."
@@ -1251,6 +1277,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (document?.render?.revision != next.render.revision) clearPeerObjects()
         info = next.render.revision
         document = next; objects = drawing
+        refreshOriginalFormatNotice()
         instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
         if (exportReady?.matches(info, document) != true) exportReady = null
         if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq) { exportPreflight = null; checkedExport = null }
@@ -1468,6 +1495,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         transferLabel = "Canceling and removing temporary files…"; transferJob?.cancel()
     }
     private fun rasterFailure(error: CoreFailure, importing: Boolean): String = when (error.kind) {
+        CoreFailureKind.ImageCodecUnavailable -> "A compatible image decoder is unavailable on this device. The original is preserved."
         CoreFailureKind.Backpressure -> if (importing)
             "This image exceeds the current decoder, memory or scratch-storage limit. PNG and baseline JPEG have bounded import paths; some progressive JPEG and WebP images still need a larger decoder budget. The original was not resized or changed."
         else "This export exceeds the current memory, scratch-storage or output-size limit. Large result images and unusually complex marks can still exceed the bounded PNG path. The original and edits are intact."
@@ -1492,6 +1520,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 TransferFailureKind.EncodedLimit -> "The encoded image exceeds the current output limit. Choose a smaller region or another format."
                 TransferFailureKind.ScratchLimit -> "This transfer exceeds its temporary-storage limit. The original and edits are intact."
                 TransferFailureKind.Cancelled -> "The image transfer was canceled."
+                TransferFailureKind.ImageCodecUnavailable -> "An installed AVIF decoder is unavailable. The original is unchanged."
                 TransferFailureKind.Unsupported -> "This image or export feature is not supported by the current decoder. The original is unchanged."
                 else -> "The image transfer could not finish safely. The original and edits are intact."
             }
@@ -1499,6 +1528,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             is CoreFailure -> when (error.kind) {
                 CoreFailureKind.Backpressure -> "The core is at its resource limit. The unfinished action was canceled; saved work is intact."
                 CoreFailureKind.Storage -> "The edit could not be saved. Check available storage and try again."
+                CoreFailureKind.ImageCodecUnavailable -> "An installed AVIF decoder is unavailable. The original is unchanged."
                 CoreFailureKind.Cancelled -> "The unfinished action was canceled."
                 else -> "The core could not complete this action (${error.kind}). Saved work is intact."
             }

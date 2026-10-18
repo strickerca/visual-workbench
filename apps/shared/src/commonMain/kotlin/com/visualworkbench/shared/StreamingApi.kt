@@ -17,7 +17,7 @@ public interface WorkbenchFileTransfers {
 }
 public enum class TransferFailureKind {
     Dimensions, PixelLimit, Memory, Metadata, Alpha, Depth, EncodedLimit, ScratchLimit,
-    Unsupported, Invalid, Storage, Cancelled, Closed, Backpressure,
+    Unsupported, ImageCodecUnavailable, Invalid, Storage, Cancelled, Closed, Backpressure,
 }
 public class TransferFailure(
     public val kind: TransferFailureKind,

@@ -41,6 +41,7 @@ internal fun mapFailure(error: CoreException): CoreFailure = CoreFailure(when(er
     is CoreException.Worker -> CoreFailureKind.Worker
     is CoreException.Stroke -> CoreFailureKind.Stroke
     is CoreException.Raster -> CoreFailureKind.Raster
+    is CoreException.ImageCodecUnavailable -> CoreFailureKind.ImageCodecUnavailable
 },error)
 private suspend fun <T> native(block: suspend (Cancellation) -> T): T = withContext(Dispatchers.Default) {
     val cancellation = Cancellation()
@@ -60,7 +61,11 @@ private class NativeCore : WorkbenchCore, WorkbenchStreamingCore {
         TextLayout(value.algorithmVersion,value.glyphs.map { GlyphOutline(it.glyphId,it.cluster,it.font,it.x,it.y,it.advance,it.outline.map { p -> p.common() }) },value.width,value.height,value.lineHeight)
     }
 }
-private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers {
+private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats {
+    override suspend fun originalFormatInfo(binding: WorkflowBinding): OriginalFormatInfo {
+        if (closed.get()) throw WorkflowFailure(WorkflowFailureKind.Closed)
+        return originalFormatInfoNative(handle, binding)
+    }
     override suspend fun preflightFile(options: FileExportOptions): FilePreflight {
         if (closed.get()) throw TransferFailure(TransferFailureKind.Closed)
         return preflightFileNative(handle, options)
@@ -167,7 +172,7 @@ private fun EditCommand.native(): NEdit = when(this) {
     is EditCommand.SetText -> NEdit.SetText(objectId,text,font,size)
     is EditCommand.SetStyle -> NEdit.SetStyle(objectId,style.native())
 }
-private fun ImageFormat.native(): NFormat = when(this) { ImageFormat.Png8 -> NFormat.Png8; ImageFormat.Png16 -> NFormat.Png16; is ImageFormat.Jpeg -> NFormat.Jpeg(quality); ImageFormat.WebpLossless -> NFormat.WebpLossless; is ImageFormat.WebpLossy -> NFormat.WebpLossy(quality) }
+private fun ImageFormat.native(): NFormat = when(this) { ImageFormat.Png8 -> NFormat.Png8; ImageFormat.Png16 -> NFormat.Png16; ImageFormat.Bmp8 -> NFormat.Bmp8; ImageFormat.Tiff8 -> NFormat.Tiff8; ImageFormat.Tiff16 -> NFormat.Tiff16; is ImageFormat.Jpeg -> NFormat.Jpeg(quality); ImageFormat.WebpLossless -> NFormat.WebpLossless; is ImageFormat.WebpLossy -> NFormat.WebpLossy(quality) }
 
 internal fun nativeStrokeHandle(stroke: WorkbenchStroke): StrokeGesture = (stroke as? NativeStroke)?.handle ?: throw SessionFailure(SessionFailureKind.Invalid)
 

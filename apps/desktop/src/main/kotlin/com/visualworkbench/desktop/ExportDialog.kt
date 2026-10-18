@@ -24,6 +24,7 @@ internal fun ExportDialog(controller: EditorController, state: EditorState, save
                 request?.let {
                     Text("${it.revision} · ${it.width} × ${it.height} px", style = MaterialTheme.typography.subtitle1)
                 } ?: Text("Select a region that intersects the image, or choose Full image.")
+                state.originalFormatNotice?.let { Text(it, style = MaterialTheme.typography.caption) }
                 Text("Exports use the original image at document resolution. Region exports use rectangular pixel bounds.", style = MaterialTheme.typography.caption)
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     Choice("Content", if (settings.marked) "Marked" else "Clean", listOf("Marked", "Clean"), !state.busy) {

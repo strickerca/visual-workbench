@@ -628,6 +628,7 @@ fn background_raster_error(error: vw_raster::RasterError) -> CoreError {
             CoreError::Backpressure
         }
         vw_raster::RasterError::Cancelled => CoreError::Cancelled,
+        vw_raster::RasterError::CodecUnavailable => CoreError::ImageCodecUnavailable,
         _ => CoreError::Raster,
     }
 }
@@ -680,7 +681,7 @@ impl AssetResolver for Assets<'_> {
             .budget
             .checked_sub(bytes.len() as u64)
             .ok_or(vw_raster::RasterError::Allocation)?;
-        crate::os_images::decode(
+        crate::format_images::decode(
             &bytes,
             vw_raster::DecodeLimits {
                 max_encoded_bytes: limit,
@@ -777,6 +778,9 @@ pub(crate) fn export(
         format: match options.format {
             ImageFormat::Png8 => vw_raster::ExportFormat::Png8,
             ImageFormat::Png16 => vw_raster::ExportFormat::Png16,
+            ImageFormat::Bmp8 => vw_raster::ExportFormat::Bmp8,
+            ImageFormat::Tiff8 => vw_raster::ExportFormat::Tiff8,
+            ImageFormat::Tiff16 => vw_raster::ExportFormat::Tiff16,
             ImageFormat::Jpeg { quality } => vw_raster::ExportFormat::Jpeg { quality },
             ImageFormat::WebpLossless => vw_raster::ExportFormat::WebpLossless,
             ImageFormat::WebpLossy { quality } => vw_raster::ExportFormat::WebpLossy { quality },
@@ -804,7 +808,14 @@ pub(crate) fn export(
             .transpose()?,
         frame_id: definition.capture.as_ref().map(|c| c.frame_id),
     };
-    let result = vw_raster::export(&pixels, &request)?;
+    let result = if crate::format_images::external(request.format) {
+        // The external adapter reserves retained input itself.
+        let mut request = request;
+        request.memory_budget_bytes = options.memory_budget_bytes;
+        crate::format_images::encode_buffered(&pixels, &request, cancellation)?
+    } else {
+        vw_raster::export(&pixels, &request)?
+    };
     cancellation.check()?;
     if result.bytes.len() > 64 * 1024 * 1024 {
         return Err(CoreError::Backpressure);

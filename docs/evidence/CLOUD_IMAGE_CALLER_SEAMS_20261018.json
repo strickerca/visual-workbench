@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-18",
+  "publication": "integration source checkpoint; not main promotion",
+  "main_checkpoint": "7be9da7372f686d3d864ed0817fdcdb0833be138",
+  "image_leaves": "dafb6220b8958fc7009093e0e11b60e7bdb905ad",
+  "integration_parent": "accdd14e4577dab2c53eff972b7324d1624e6390",
+  "changes": [
+    "Registered image adapters and local format/AVIF dependencies; extended typed errors and enums through native/shared callers.",
+    "Extracted shared crop/profile/matte/depth preparation once, preserving existing raster display behavior.",
+    "Wired bounded memory/file/attachment/background format admission, canonical source metadata and original format labels.",
+    "Wired BMP/TIFF buffered/private seekable export and hash finalized file bytes before existing no-clobber publication.",
+    "Installed restricted Android AVIF callback and exposed header inspection; absent codec remains typed.",
+    "Added BMP/TIFF export selections, TIFF suffix aliases, AVIF/BMP/TIFF import choices and retained PNG-only clipboard/drag policy.",
+    "Both editor attachments and refresh paths validate original-format receipts against full current revision and attachment/refresh ownership before showing first-TIFF-page notices; notices also appear in export dialogs."
+  ],
+  "source_checks": {
+    "rustfmt_all_check": "passed",
+    "cargo_metadata_offline_locked": "passed; only two local vw-ffi dependency edges changed in lock",
+    "git_diff_check": "passed",
+    "kotlin_psi_syntax": {
+      "files": 15,
+      "passed": true,
+      "compiler": "Gradle cached Kotlin PSI; syntax only, not type checking",
+      "log_sha256": "a8379654fac45002f5df8b9f756eb147d1d6f82d82bf559843617860d8bf105f"
+    }
+  },
+  "tests_executed_in_this_seam_phase": 0,
+  "pending": [
+    "24 native caller/preparation/adapter cases at the image leaf checkpoint have not run on these seams.",
+    "Real native build and UniFFI regeneration, shared/desktop/Android type checking and 12 written platform/device cases remain pending.",
+    "Image owner should validate focused native cases on this exact source, then report review fixes before a combined app build.",
+    "Documents owns the serialized heavy build slot; this phase performed only metadata/format/syntax checks.",
+    "No Windows WIC, Android AVIF entropy decoding, picker/provider/app launch, device, giant-image routing or physical acceptance is claimed."
+  ],
+  "precision_next": "260b4f5e3fc47772cfa28f012c94ed1f29d48cf4 recorded separately; uncompiled adapter checkpoint not yet integrated",
+  "verification_images_created": 0
+}

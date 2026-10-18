@@ -1,6 +1,10 @@
 //! Shared UniFFI boundary. Storage and input run on distinct bounded core-owned workers.
 mod os_images;
 pub use os_images::*;
+mod avif_images;
+pub use avif_images::*;
+mod format_images;
+pub use format_images::OriginalFormatInfo;
 mod ai_edit;
 mod camera;
 pub use ai_edit::*;
@@ -61,6 +65,8 @@ pub enum CoreError {
     Stroke,
     #[error("raster operation rejected")]
     Raster,
+    #[error("an installed decoder for this admitted image is unavailable")]
+    ImageCodecUnavailable,
 }
 pub type Result<T> = std::result::Result<T, CoreError>;
 impl From<vw_model::ModelError> for CoreError {
@@ -94,8 +100,12 @@ impl From<vw_ink::InkError> for CoreError {
     }
 }
 impl From<vw_raster::RasterError> for CoreError {
-    fn from(_: vw_raster::RasterError) -> Self {
-        Self::Raster
+    fn from(error: vw_raster::RasterError) -> Self {
+        match error {
+            vw_raster::RasterError::Cancelled => Self::Cancelled,
+            vw_raster::RasterError::CodecUnavailable => Self::ImageCodecUnavailable,
+            _ => Self::Raster,
+        }
     }
 }
 
@@ -120,3 +130,20 @@ pub extern "C" fn vw_toolchain_smoke_version() -> u32 {
 
 mod masks;
 pub use masks::*;
+
+/// Called only after bounded decoding admitted the original container.
+pub(crate) fn original_image_label(bytes: &[u8]) -> &'static str {
+    if let Some(label) = format_images::label(bytes) {
+        label
+    } else if vw_avif_os::is_avif(bytes) {
+        "avif"
+    } else if vw_codec_os::is_heic(bytes) {
+        "heic"
+    } else if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        "png"
+    } else if bytes.starts_with(&[0xff, 0xd8]) {
+        "jpeg"
+    } else {
+        "webp"
+    }
+}

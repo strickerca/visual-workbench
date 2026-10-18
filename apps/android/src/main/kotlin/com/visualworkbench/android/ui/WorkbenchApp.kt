@@ -109,7 +109,7 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
                     { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     { editor.newCanvas() }, { editor.open(it) },
                     { editor.navigate(WorkbenchScreen.Settings) }, { editor.navigate(WorkbenchScreen.Diagnostics) }, { editor.navigate(WorkbenchScreen.Pairing) },
-                    { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/heic", "image/heif")) }, onCamera,
+                    { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/heic", "image/heif", "image/avif", "image/bmp", "image/tiff")) }, onCamera,
                     editor.cameraCaptures, editor::retryCamera, { cameraDiscardToken = it }, { token ->
                         if (cameraSaveToken != null) editor.transferMessage("Finish or cancel the pending original-file destination first.")
                         else {
@@ -158,7 +158,7 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
             editor.instructionModal(InstructionFocusModal.ExportPicker, true)
             pickerTicketId = ticket.id
             exporter.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
-                .setType(ticket.encoding.mime).putExtra(Intent.EXTRA_TITLE, "$title-$suffix.${ticket.encoding.extension}"))
+                .setType(ticket.encoding.exportMimeType()).putExtra(Intent.EXTRA_TITLE, "$title-$suffix.${ticket.encoding.exportFileSuffix()}"))
             exportDialog(false)
         } catch (_: Exception) { editor.cancelExportTicket(ticket.id); pickerTicketId = null; editor.instructionModal(InstructionFocusModal.ExportPicker, false); editor.transferMessage("A file destination is unavailable on this device.") }
         }
@@ -270,6 +270,7 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                 }
             }
         }
+        editor.originalFormatNotice?.let { Text(it, Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.caption) }
         QuickControls(editor.displayedBrush(), editor::brush, { editor.brushDialog(true) },
             editor.info?.canUndo == true && editor.pending == 0, editor.info?.canRedo == true && editor.pending == 0, editor::undo, editor::redo)
     }

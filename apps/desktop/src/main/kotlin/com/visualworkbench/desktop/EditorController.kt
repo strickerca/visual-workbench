@@ -22,7 +22,7 @@ data class EditorState(val document:DocumentSnapshot?=null,val background:ImageB
     val sync:SessionStatus?=null,val peerFrame:PeerFrame?=null,val peerViewport:PeerViewport?=null,
     val routeWarnings:List<TetherRouteWarning> = emptyList(),val previewStyles:Map<String,ObjectStyle> = emptyMap(),
     val wetStroke:RenderItem?=null,val shareViewport:Boolean=false,val sessionRole:ProjectSessionRole?=null,
-    val backgroundIssue:String?=null,val backgroundFailureKind:CoreFailureKind?=null) {
+    val backgroundIssue:String?=null,val backgroundFailureKind:CoreFailureKind?=null,val originalFormatNotice:String?=null) {
     val exportReady:Boolean get()=exportReceipt?.request?.matches(this)==true
 }
 private data class Drag(val start:Point,val initial:ViewState,val selected:List<RenderItem>,val bounds:Rect?,val resize:Boolean,val pan:Boolean,val binding:RenderBinding,val live:ObjectPreviewLease?=null,val newObject:NewObjectPreviewLease?=null,val tool:Tool=Tool.Select)
@@ -222,7 +222,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
                     } catch (error: Exception) {
                         report(when (error) {
                             is HandoffFailure, is TransferFailure, is java.nio.file.FileAlreadyExistsException -> transferMessage(error)
-                            is CoreFailure -> "Core ${error.kind.name.lowercase()}. The last accepted revision is preserved."
+                            is CoreFailure -> if(error.kind==CoreFailureKind.ImageCodecUnavailable) "A compatible image decoder is unavailable on this system. The original is preserved." else "Core ${error.kind.name.lowercase()}. The last accepted revision is preserved."
                             is SessionFailure -> sessionMessage(error)
                             is UnsupportedOperationException -> error.message ?: "This document feature is unavailable."
                             else -> "The operation could not finish. Check diagnostics and retry."
@@ -234,12 +234,34 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     }
     private fun transfer(epoch:Long,block:suspend()->Unit):Job?{if(transferJob?.isActive==true){report("A transfer is already running. Finish or cancel it first.");return null};val job=task(epoch,block);transferJob=job;return job}
     private suspend fun discardExport(){preparedDrag?.second?.close();preparedDrag=null;val prior=cachedExport;cachedExport=null;update{it.copy(exportReceipt=null,exportCheck=null,dragPrepared=false)};prior?.workspace?.close()}
-    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();loadBackground();refreshRole(value,generation)
+    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();refreshOriginalFormatNotice();loadBackground();refreshRole(value,generation)
         changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
         }finally{withContext(NonCancellable){
             try { if(!adopted)value.close() }
             finally { if(instructionSeal&&!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
         }}
+    }
+    private suspend fun refreshOriginalFormatNotice(){
+        val owner=project?:return
+        val formats=owner as? WorkbenchOriginalFormats?:return
+        val snapshot=mutable.value.document?:return
+        val revision=snapshot.render.revision
+        val binding=WorkflowBinding(revision.projectId,snapshot.documentId,revision.hostSeq,revision.stateHash)
+        val epoch=generation;val ticket=refreshTicket
+        fun current():Boolean = !closing&&project===owner&&generation==epoch&&refreshTicket==ticket&&
+            mutable.value.document?.let{it.documentId==binding.documentId&&originalFormatRevisionMatches(it.render.revision,binding)}==true
+        if(!current())return
+        update{it.copy(originalFormatNotice=null)}
+        try{
+            val receipt=formats.originalFormatInfo(binding)
+            currentCoroutineContext().ensureActive()
+            validateOriginalFormatInfo(receipt,binding)
+            if(current())update{it.copy(originalFormatNotice=originalFormatNotice(receipt))}
+        }catch(cancel:CancellationException){throw cancel}
+        catch(_:Exception){
+            currentCoroutineContext().ensureActive()
+            if(current())update{it.copy(originalFormatNotice="Original-image page information could not be checked. Reopen the project to retry.")}
+        }
     }
     private suspend fun loadBackground(){
         val p=project?:return;val doc=mutable.value.document?:return;val epoch=generation;val assumed=colorAssumed
@@ -301,7 +323,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     fun showPaste(){if(!mutable.value.busy)update{it.copy(pasteOpen=true)}}
     fun dismissPaste(){update{it.copy(pasteOpen=false)}}
     fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
-    fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one PNG, JPEG, WebP, HEIC or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension !in setOf("png","jpg","jpeg","webp","heic","heif","mp4")){report("This drop supports PNG, JPEG, WebP, admitted HEIC originals and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
+    fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one image or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension !in setOf("png","jpg","jpeg","webp","heic","heif","avif","bmp","tif","tiff","mp4")){report("This drop supports PNG, JPEG, WebP, BMP, TIFF, admitted HEIC/AVIF originals and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
     fun open(path:Path,epoch:Long=generation){task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
     suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
     fun closeProject(){if(!mayCloseAi())return;if(!mayCloseInstructions())return;cancelInput();sessionWork?.cancel();task(generation){
@@ -333,6 +355,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
         }
         selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)
         instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh()
+        refreshOriginalFormatNotice()
         refreshRole(p,epoch)
     }
     private suspend fun refreshRole(p:WorkbenchProject,epoch:Long){val provider=sessionProvider?:return;if(!provider.state.value.ready)return;try{val role=provider.requireService().projectRole(p);if(project===p&&generation==epoch)update{it.copy(sessionRole=role)}}catch(cancel:CancellationException){throw cancel}catch(_:SessionFailure){report("The local pending-edit count could not be refreshed.")}}
@@ -541,6 +564,7 @@ private fun backgroundFailureMessage(kind:CoreFailureKind):String=when(kind){
     CoreFailureKind.Unsupported->"This original uses an image feature that cannot be displayed here."
     CoreFailureKind.Worker->"Image display could not finish in its worker. Retry the image display."
     CoreFailureKind.Stroke->"Image display could not finish because of a drawing failure. Retry the image display."
+    CoreFailureKind.ImageCodecUnavailable->"An installed AVIF decoder is unavailable. Color conversion cannot enable a missing decoder."
     CoreFailureKind.Raster->"The original could not be displayed because of a source, color, decoding or image-processing failure. If the image is untagged, choose sRGB explicitly."
 }
 private fun bitmap(value:BackgroundImage):ImageBitmap {

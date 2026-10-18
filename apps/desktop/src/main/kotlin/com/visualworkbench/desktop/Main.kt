@@ -220,9 +220,9 @@ fun main(args: Array<String>) {
                 if (!commandsAllowed()) return
                 nativePickerCount++
                 try { controller.instructionPicker().use { val chooser=FileDialog(window,"Save ${request.settings.encoding.label} · ${request.revision}",FileDialog.SAVE)
-                try{chooser.directory=documents.toString();chooser.file="export-${request.revision}.${request.settings.encoding.extension}";chooser.isVisible=true;val filename=chooser.file?:return
-                    val extension=filename.substringAfterLast('.',"").lowercase();val allowed=if(request.settings.encoding==ExportEncoding.Jpeg)setOf("jpg","jpeg")else setOf(request.settings.encoding.extension)
-                    if(extension !in allowed){controller.report("Use a .${request.settings.encoding.extension} filename for the selected format.");return}
+                try{chooser.directory=documents.toString();chooser.file="export-${request.revision}.${request.settings.encoding.exportFileSuffix()}";chooser.isVisible=true;val filename=chooser.file?:return
+                    val extension=filename.substringAfterLast('.',"").lowercase();val allowed=request.settings.encoding.acceptsFileSuffix(extension)
+                    if(!allowed){controller.report("Use a .${request.settings.encoding.exportFileSuffix()} filename for the selected format.");return}
                     controller.saveExport(request,Path.of(chooser.directory,filename))
                 }finally{chooser.dispose()}} } finally { nativePickerCount-- }
             }
@@ -371,6 +371,7 @@ fun main(args: Array<String>) {
             TextButton(onClick=controller::openAi,enabled=editor.document!=null&&!editor.busy){Text("AI edit")}
             commandButton(Command.Import,action);commandButton(Command.Undo,action,enabled=editor.document?.render?.revision?.canUndo==true);commandButton(Command.Redo,action,enabled=editor.document?.render?.revision?.canRedo==true);commandButton(Command.Export,action,enabled=editor.document!=null)
         }
+        editor.originalFormatNotice?.let{Text(it,Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=8.dp),style=MaterialTheme.typography.caption)}
         AiResultStatus(controller)
         Row(Modifier.weight(1f)){
             Column(Modifier.width(178.dp).fillMaxHeight().background(Color(0xff141e29)).padding(12.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){

@@ -15,7 +15,8 @@ import kotlin.math.floor
 enum class ExportArea(val label: String) { Full("Full image"), Selection("Selection bounds"), View("Visible view bounds") }
 enum class ExportEncoding(val label: String, val extension: String) {
     Png8("PNG · 8 bit", "png"), Png16("PNG · 16 bit", "png"),
-    Jpeg("JPEG", "jpg"), WebpLossless("WebP · lossless", "webp"), WebpLossy("WebP · lossy", "webp");
+    Jpeg("JPEG", "jpg"), WebpLossless("WebP · lossless", "webp"), WebpLossy("WebP · lossy", "webp"),
+    Bmp8("BMP · 8 bit", "bmp"), Tiff8("TIFF · 8 bit", "tiff"), Tiff16("TIFF · 16 bit", "tiff");
     val png: Boolean get() = this == Png8 || this == Png16
 }
 enum class ExportMatte(val label: String, val rgb: UInt?) { Preserve("Preserve alpha", null), White("White matte", 0xffffffu), Black("Black matte", 0u) }
@@ -29,6 +30,9 @@ data class ExportSettings(
     fun format(): ImageFormat = when (encoding) {
         ExportEncoding.Png8 -> ImageFormat.Png8
         ExportEncoding.Png16 -> ImageFormat.Png16
+        ExportEncoding.Bmp8 -> ImageFormat.Bmp8
+        ExportEncoding.Tiff8 -> ImageFormat.Tiff8
+        ExportEncoding.Tiff16 -> ImageFormat.Tiff16
         ExportEncoding.Jpeg -> ImageFormat.Jpeg(quality.coerceIn(1, 100).toUByte())
         ExportEncoding.WebpLossless -> ImageFormat.WebpLossless
         ExportEncoding.WebpLossy -> ImageFormat.WebpLossy(quality.coerceIn(1, 100).toUByte())
@@ -110,6 +114,7 @@ internal fun transferMessage(error: Exception): String = when (error) {
         TransferFailureKind.EncodedLimit -> "The encoded file exceeds the transfer byte limit. Choose a different format or region."
         TransferFailureKind.ScratchLimit -> "The export exceeds its 400 MB scratch budget. Choose a smaller region."
         TransferFailureKind.Backpressure -> "The native transfer queue is busy. Retry after current work finishes."
+        TransferFailureKind.ImageCodecUnavailable -> "An installed AVIF decoder is unavailable. The original is unchanged."
         TransferFailureKind.Unsupported -> "This source or format is not supported by the current transfer pipeline."
         TransferFailureKind.Invalid -> "The transfer request is invalid or its source changed. Prepare it again."
         TransferFailureKind.Storage -> "The transfer could not safely read or publish its file. The existing destination was preserved."

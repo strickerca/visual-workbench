@@ -22,6 +22,7 @@ internal fun ExportDialog(editor: EditorController, onDismiss: () -> Unit, onSav
             Toggle("Crop to current view bounds", choice.viewOnly, enabled) { editor.configureExport(choice.copy(viewOnly = it)) }
             if (choice.viewOnly) Text("Exports the image-aligned rectangle enclosing the current view, clipped to the original. A rotated view is not a rotated crop.", style = MaterialTheme.typography.caption)
             Text("Format", style = MaterialTheme.typography.subtitle2)
+            editor.originalFormatNotice?.let { Text(it, style = MaterialTheme.typography.caption) }
             ExportEncoding.entries.forEach { encoding ->
                 TextButton(onClick = { editor.configureExport(choice.copy(encoding = encoding)) }, enabled = enabled,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(if (choice.encoding == encoding) "✓ ${encoding.label}" else encoding.label) }
@@ -32,7 +33,7 @@ internal fun ExportDialog(editor: EditorController, onDismiss: () -> Unit, onSav
                     valueRange = 1f..100f, steps = 98, modifier = Modifier.heightIn(min = 48.dp))
             }
             if (choice.encoding == ExportEncoding.Jpeg) Toggle("Flatten transparency onto white", choice.whiteMatte, enabled) { editor.configureExport(choice.copy(whiteMatte = it)) }
-            if ((editor.document?.bitDepth ?: 8u) > 8u && choice.encoding != ExportEncoding.Png16)
+            if ((editor.document?.bitDepth ?: 8u) > 8u && choice.encoding !in listOf(ExportEncoding.Png16, ExportEncoding.Tiff16))
                 Toggle("Allow reduction to 8-bit output", choice.allowDepthReduction, enabled) { editor.configureExport(choice.copy(allowDepthReduction = it)) }
             Toggle("Convert exported colors to sRGB", choice.convertToSrgb, enabled) { editor.configureExport(choice.copy(convertToSrgb = it)) }
             Text("The original stays unchanged. JPEG/WebP may require more memory than PNG. Color conversion and depth reduction apply only to this export.", style = MaterialTheme.typography.caption)

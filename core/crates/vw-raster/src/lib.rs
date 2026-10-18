@@ -12,8 +12,8 @@ mod stream;
 mod text;
 pub use display::{DisplayImage, display_rgba8};
 pub use export::{
-    AlphaPolicy, ColorPolicy, ExportFormat, ExportMetadata, ExportRequest, ExportedImage, Region,
-    export, preflight,
+    AlphaPolicy, ColorPolicy, ExportFormat, ExportMetadata, ExportRequest, ExportedImage,
+    PreparedRaster, Region, export, preflight, prepare_export_pixels,
 };
 pub use ffi::webp_encoder_version;
 pub use pixels::{DecodeLimits, DecodedImage, Pixels, decode, standard_srgb_profile};
@@ -45,6 +45,8 @@ pub enum RasterError {
     Alpha,
     #[error("raster codec rejected the image")]
     Codec,
+    #[error("an installed decoder for this admitted image is unavailable")]
+    CodecUnavailable,
     #[error("ICC color conversion failed or profile is unsupported")]
     Color,
     #[error("text requires an unsupported glyph U+{0:04X}")]

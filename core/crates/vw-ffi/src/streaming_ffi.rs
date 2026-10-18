@@ -38,6 +38,8 @@ pub enum TransferError {
     Memory { estimated: u64, budget: u64 },
     #[error("image metadata or color profile is invalid or unsupported")]
     Metadata,
+    #[error("an installed decoder for this admitted image is unavailable")]
+    ImageCodecUnavailable,
     #[error("JPEG needs an explicit matte for alpha")]
     Alpha,
     #[error("depth reduction needs explicit permission")]
@@ -69,6 +71,7 @@ impl From<CoreError> for TransferError {
             CoreError::Backpressure | CoreError::Worker => Self::Backpressure,
             CoreError::Unsupported => Self::Unsupported,
             CoreError::Raster => Self::Metadata,
+            CoreError::ImageCodecUnavailable => Self::ImageCodecUnavailable,
             _ => Self::Invalid,
         }
     }
@@ -212,6 +215,14 @@ pub(crate) async fn create_file_project_inner(
             options.max_encoded_bytes.min(options.memory_budget_bytes),
             &cancellation,
         )?;
+        let import_metadata = crate::format_images::import_metadata(
+            &bytes,
+            vw_raster::DecodeLimits {
+                max_memory_bytes: options.memory_budget_bytes,
+                ..Default::default()
+            },
+            &cancellation,
+        )?;
         let mut scratch = tempfile::Builder::new()
             .prefix("vw-raster-source-")
             .tempfile_in(&work)?;
@@ -258,15 +269,7 @@ pub(crate) async fn create_file_project_inner(
         } else {
             (info.width, info.height)
         };
-        let format = if vw_codec_os::is_heic(&bytes) {
-            "heic"
-        } else if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
-            "png"
-        } else if bytes.starts_with(&[0xff, 0xd8]) {
-            "jpeg"
-        } else {
-            "webp"
-        };
+        let format = crate::original_image_label(&bytes);
         project.assets.insert(
             info.source_asset.clone(),
             pb::AddAsset {
@@ -294,7 +297,7 @@ pub(crate) async fn create_file_project_inner(
                 captured_at_ms: capture
                     .as_ref()
                     .map_or(0, |value| value.info().captured_at_ms),
-                metadata_json: "{}".into(),
+                metadata_json: import_metadata,
             },
         );
         project.documents.insert(
@@ -636,7 +639,10 @@ fn preflight_file(
         width: region.width,
         height: region.height,
         source_bit_depth: asset.bit_depth as u8,
-        output_bit_depth: if matches!(request.format, vw_raster::ExportFormat::Png16) {
+        output_bit_depth: if matches!(
+            request.format,
+            vw_raster::ExportFormat::Png16 | vw_raster::ExportFormat::Tiff16
+        ) {
             16
         } else {
             8
@@ -703,7 +709,7 @@ fn export_buffered(
     options: &FileExportOptions,
     request: &vw_raster::ExportRequest,
     cancel: &Cancellation,
-    sink: &mut impl Write,
+    sink: &mut File,
 ) -> TransferResult<vw_raster::StreamReport> {
     let info = source.info();
     let region = vw_raster::Region {
@@ -739,6 +745,32 @@ fn export_buffered(
         .map_err(transfer_raster_error)?;
     }
     cancel.check()?;
+    if crate::format_images::external(request.format) {
+        let mut external = request.clone();
+        // available excludes encoded input and source workspace; the adapter
+        // reserves the complete retained decoded image before preparing pixels.
+        external.memory_budget_bytes = available;
+        let (bytes, mut metadata) = crate::format_images::encode_private(
+            &image,
+            &external,
+            options.max_encoded_bytes,
+            sink,
+            cancel,
+        )
+        .map_err(transfer_raster_error)?;
+        metadata.settings = request.clone();
+        let output_region = request.region.unwrap_or(region);
+        return Ok(vw_raster::StreamReport {
+            metadata,
+            plan: vw_raster::StreamPlan {
+                region: output_region,
+                strip_rows: output_region.height,
+                estimated_peak_bytes: request.memory_budget_bytes,
+            },
+            encoded_bytes: bytes,
+            strips: 1,
+        });
+    }
     let encoded = vw_raster::export(&image, &admit).map_err(transfer_raster_error)?;
     if encoded.bytes.len() as u64 > options.max_encoded_bytes {
         return Err(TransferError::EncodedLimit);
@@ -774,6 +806,7 @@ fn transfer_raster_error(error: vw_raster::RasterError) -> TransferError {
         vw_raster::RasterError::EncodedLimit { .. } => TransferError::EncodedLimit,
         vw_raster::RasterError::ScratchLimit { .. } => TransferError::ScratchLimit,
         vw_raster::RasterError::Cancelled => TransferError::Cancelled,
+        vw_raster::RasterError::CodecUnavailable => TransferError::ImageCodecUnavailable,
         vw_raster::RasterError::Io => TransferError::Storage,
         vw_raster::RasterError::Allocation => TransferError::Backpressure,
         vw_raster::RasterError::Unsupported(_) => TransferError::Unsupported,
@@ -858,6 +891,15 @@ fn attach_file(
                 options.max_encoded_bytes.min(options.memory_budget_bytes),
                 cancel,
             )?;
+            definition.metadata_json = crate::format_images::import_metadata(
+                &bytes,
+                vw_raster::DecodeLimits {
+                    max_memory_bytes: options.memory_budget_bytes,
+                    ..Default::default()
+                },
+                cancel,
+            )
+            .map_err(transfer_raster_error)?;
             let mut scratch = tempfile::Builder::new()
                 .prefix("vw-raster-source-")
                 .tempfile_in(&work)?;
@@ -906,16 +948,7 @@ fn attach_file(
             } else {
                 (info.width, info.height)
             };
-            definition.format = if vw_codec_os::is_heic(&bytes) {
-                "heic"
-            } else if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
-                "png"
-            } else if bytes.starts_with(&[0xff, 0xd8]) {
-                "jpeg"
-            } else {
-                "webp"
-            }
-            .into();
+            definition.format = crate::original_image_label(&bytes).into();
             definition.width = width;
             definition.height = height;
             definition.orientation = u32::from(info.orientation_applied);
@@ -1116,10 +1149,7 @@ fn export_file(
         .tempfile_in(&work)?;
     let mut hash = blake3::Hasher::new();
     let report = {
-        let mut sink = HashWriter {
-            file: output.as_file_mut(),
-            hash: &mut hash,
-        };
+        let mut sink = output.as_file_mut();
         with_source(
             &bytes,
             scratch.as_file_mut(),
@@ -1185,9 +1215,12 @@ fn export_file(
             .checked_mul(4)
             .ok_or(CoreError::Backpressure)?,
     )?;
-    if output.as_file().metadata()?.len() != report.encoded_bytes {
-        return Err(TransferError::Storage);
-    }
+    hash_final_file(
+        output.as_file_mut(),
+        report.encoded_bytes,
+        &mut hash,
+        cancel,
+    )?;
     output.as_file().sync_all()?;
     cancel.check()?;
     // Only the owned temporary is cleaned on an error. persist_noclobber cannot
@@ -1212,6 +1245,9 @@ fn request(
     let format = match options.format {
         ImageFormat::Png8 => vw_raster::ExportFormat::Png8,
         ImageFormat::Png16 => vw_raster::ExportFormat::Png16,
+        ImageFormat::Bmp8 => vw_raster::ExportFormat::Bmp8,
+        ImageFormat::Tiff8 => vw_raster::ExportFormat::Tiff8,
+        ImageFormat::Tiff16 => vw_raster::ExportFormat::Tiff16,
         ImageFormat::Jpeg { quality } => vw_raster::ExportFormat::Jpeg { quality },
         ImageFormat::WebpLossless => vw_raster::ExportFormat::WebpLossless,
         ImageFormat::WebpLossy { quality } => vw_raster::ExportFormat::WebpLossy { quality },
@@ -1292,7 +1328,7 @@ fn with_source<R>(
     let remaining = budget
         .checked_sub(bytes.len() as u64)
         .ok_or(CoreError::Backpressure)?;
-    let image = crate::os_images::decode(
+    let image = crate::format_images::decode(
         bytes,
         vw_raster::DecodeLimits {
             max_memory_bytes: remaining,
@@ -1397,7 +1433,7 @@ impl AssetResolver for ResultAssets<'_> {
             .budget
             .checked_sub(bytes.len() as u64)
             .ok_or(vw_raster::RasterError::Allocation)?;
-        crate::os_images::decode(
+        crate::format_images::decode(
             &bytes,
             vw_raster::DecodeLimits {
                 max_encoded_bytes: INPUT_LIMIT as usize,
@@ -1408,20 +1444,44 @@ impl AssetResolver for ResultAssets<'_> {
         )
     }
 }
-struct HashWriter<'a> {
-    file: &'a mut File,
-    hash: &'a mut blake3::Hasher,
-}
-impl Write for HashWriter<'_> {
-    fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
-        let n = self.file.write(b)?;
-        self.hash.update(&b[..n]);
-        Ok(n)
+/// Hash completed file bytes, including seekable encoder header rewrites.
+fn hash_final_file(
+    file: &mut File,
+    expected: u64,
+    hash: &mut blake3::Hasher,
+    cancel: &Cancellation,
+) -> TransferResult<()> {
+    cancel.check()?;
+    if expected > OUTPUT_LIMIT || file.metadata()?.len() != expected {
+        return Err(TransferError::Storage);
     }
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.file.flush()
+    file.seek(SeekFrom::Start(0))?;
+    *hash = blake3::Hasher::new();
+    let mut read = 0u64;
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        cancel.check()?;
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        read = read
+            .checked_add(count as u64)
+            .ok_or(TransferError::Storage)?;
+        if read > expected {
+            return Err(TransferError::Storage);
+        }
+        hash.update(&buffer[..count]);
     }
+    if read != expected || file.metadata()?.len() != expected {
+        return Err(TransferError::Storage);
+    }
+    cancel.check()?;
+    Ok(())
 }
+#[cfg(test)]
+#[path = "format_seek_tests.rs"]
+mod format_seek_tests;
 fn limits(memory: u64, encoded: u64, max_encoded: u64, scratch: u64) -> Result<()> {
     if memory == 0
         || memory > MEMORY_LIMIT
@@ -1442,6 +1502,7 @@ fn raster_error(error: vw_raster::RasterError) -> CoreError {
         | vw_raster::RasterError::ScratchLimit { .. }
         | vw_raster::RasterError::Allocation => CoreError::Backpressure,
         vw_raster::RasterError::Cancelled => CoreError::Cancelled,
+        vw_raster::RasterError::CodecUnavailable => CoreError::ImageCodecUnavailable,
         vw_raster::RasterError::Unsupported(_) => CoreError::Unsupported,
         vw_raster::RasterError::Io => CoreError::Storage,
         _ => CoreError::Raster,

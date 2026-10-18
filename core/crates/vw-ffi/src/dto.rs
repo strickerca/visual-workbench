@@ -99,6 +99,9 @@ pub enum ImageFormat {
     Jpeg { quality: u8 },
     WebpLossless,
     WebpLossy { quality: u8 },
+    Bmp8,
+    Tiff8,
+    Tiff16,
 }
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct ExportOptions {

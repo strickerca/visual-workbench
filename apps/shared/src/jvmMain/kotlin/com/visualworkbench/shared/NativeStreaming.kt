@@ -72,6 +72,9 @@ private fun transferOptions(options: FileExportOptions): NFileExportOptions {
     val format = when (export.format) {
         ImageFormat.Png8 -> NFormat.Png8
         ImageFormat.Png16 -> NFormat.Png16
+        ImageFormat.Bmp8 -> NFormat.Bmp8
+        ImageFormat.Tiff8 -> NFormat.Tiff8
+        ImageFormat.Tiff16 -> NFormat.Tiff16
         is ImageFormat.Jpeg -> NFormat.Jpeg(export.format.quality)
         ImageFormat.WebpLossless -> NFormat.WebpLossless
         is ImageFormat.WebpLossy -> NFormat.WebpLossy(export.format.quality)
@@ -115,6 +118,7 @@ internal fun mapTransferFailure(error: TransferException): TransferFailure = whe
     is TransferException.Depth -> TransferFailure(TransferFailureKind.Depth,cause=error)
     is TransferException.EncodedLimit -> TransferFailure(TransferFailureKind.EncodedLimit,cause=error)
     is TransferException.ScratchLimit -> TransferFailure(TransferFailureKind.ScratchLimit,cause=error)
+    is TransferException.ImageCodecUnavailable -> TransferFailure(TransferFailureKind.ImageCodecUnavailable,cause=error)
     is TransferException.Unsupported -> TransferFailure(TransferFailureKind.Unsupported,cause=error)
     is TransferException.Invalid -> TransferFailure(TransferFailureKind.Invalid,cause=error)
     is TransferException.Storage -> TransferFailure(TransferFailureKind.Storage,cause=error)
