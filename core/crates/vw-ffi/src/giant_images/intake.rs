@@ -210,7 +210,9 @@ mod tests {
     }
     impl Fixture {
         fn new() -> Self {
-            let root = tempfile::tempdir().unwrap();
+            Self::at(tempfile::tempdir().unwrap())
+        }
+        fn at(root: tempfile::TempDir) -> Self {
             let source = root.path().join("selected.png");
             let work = root.path().join("work");
             std::fs::create_dir(&work).unwrap();
@@ -245,6 +247,94 @@ mod tests {
         fn children(&self) -> usize {
             std::fs::read_dir(&self.work).unwrap().count()
         }
+    }
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn fifo_replacement_refuses_and_releases_admission_with_bounded_child() {
+        use std::{
+            process::{Command, Stdio},
+            time::{Duration, Instant},
+        };
+        let parent = tempfile::tempdir().unwrap();
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--ignored",
+                "--exact",
+                "giant_images::intake::tests::fifo_replacement_child",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env("VW_GIANT_FIFO_TEST_PARENT", parent.path())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let timed_out = loop {
+            if child.try_wait().unwrap().is_some() {
+                break false;
+            }
+            if Instant::now() >= deadline {
+                child.kill().unwrap();
+                child.wait().unwrap();
+                break true;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        let output = child.wait_with_output().unwrap();
+        // The parent removes only its synthetic tree after actual child exit,
+        // including the negative-control case killed while blocked in open.
+        parent.close().unwrap();
+        assert!(
+            !timed_out,
+            "FIFO replacement blocked the actual public opener"
+        );
+        assert!(
+            output.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("1 passed; 0 failed"),
+            "the exact child regression must execute"
+        );
+    }
+    #[cfg(target_os = "linux")]
+    #[test]
+    #[ignore = "bounded parent runs this deterministic syscall race in isolation"]
+    fn fifo_replacement_child() {
+        let parent = std::env::var_os("VW_GIANT_FIFO_TEST_PARENT").expect("owned parent fixture");
+        let fixture = Fixture::at(tempfile::tempdir_in(parent).unwrap());
+        let pool = crate::shared_session_resources().unwrap();
+        let before = pool.used_bytes();
+        let selected = fixture.source.clone();
+        let _hook = super::super::source::open_race::install(selected.clone(), move || {
+            std::fs::remove_file(&selected).unwrap();
+            rustix::fs::mkfifoat(
+                rustix::fs::CWD,
+                &selected,
+                rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+            )
+            .unwrap();
+        });
+        assert!(matches!(
+            open_giant_original(fixture.options(), token()),
+            Err(Error::Invalid)
+        ));
+        assert_eq!(pool.used_bytes(), before);
+        assert_eq!(fixture.children(), 0);
+        std::fs::remove_file(&fixture.source).unwrap();
+        std::fs::write(&fixture.source, &fixture.bytes).unwrap();
+        let first = open_giant_original(fixture.options(), token()).unwrap();
+        let second = open_giant_original(fixture.options(), token()).unwrap();
+        assert_eq!(pool.used_bytes(), before + 2 * OWNER);
+        runtime().block_on(async {
+            first.close().await.unwrap();
+            second.close().await.unwrap();
+        });
+        assert_eq!(pool.used_bytes(), before);
+        assert_eq!(fixture.children(), 0);
     }
     #[test]
     fn public_input_saturation_refuses_before_missing_source_or_work_access() {

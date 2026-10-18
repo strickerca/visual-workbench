@@ -35,6 +35,8 @@ pub(super) fn regular(path: &Path) -> Result<File> {
     if !before.is_file() || before.file_type().is_symlink() {
         return Err(CoreError::Invalid);
     }
+    #[cfg(all(test, any(target_os = "linux", target_os = "android")))]
+    open_race::run(path);
     #[cfg(windows)]
     {
         use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
@@ -55,7 +57,12 @@ pub(super) fn regular(path: &Path) -> Result<File> {
     {
         let fd = rustix::fs::open(
             path,
-            rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::CLOEXEC,
+            // Metadata is only a pathname observation. A replacement FIFO must
+            // not block before the descriptor's own regular-file check below.
+            rustix::fs::OFlags::RDONLY
+                | rustix::fs::OFlags::NOFOLLOW
+                | rustix::fs::OFlags::CLOEXEC
+                | rustix::fs::OFlags::NONBLOCK,
             rustix::fs::Mode::empty(),
         )
         .map_err(std::io::Error::from)?;
@@ -68,6 +75,46 @@ pub(super) fn regular(path: &Path) -> Result<File> {
     #[cfg(not(any(windows, target_os = "linux", target_os = "android")))]
     {
         Err(CoreError::Unsupported)
+    }
+}
+
+/// Deterministic test-only interleaving at the real pathname/descriptor seam.
+/// A thread-local, exact-path, one-shot hook cannot affect another test/worker.
+#[cfg(all(test, any(target_os = "linux", target_os = "android")))]
+pub(crate) mod open_race {
+    use std::{
+        cell::RefCell,
+        path::{Path, PathBuf},
+    };
+    type Hook = Option<(PathBuf, Box<dyn FnOnce()>)>;
+    thread_local! { static HOOK: RefCell<Hook> = const { RefCell::new(None) }; }
+    pub(crate) struct Guard;
+    pub(crate) fn install(path: PathBuf, callback: impl FnOnce() + 'static) -> Guard {
+        HOOK.with(|slot| {
+            assert!(slot.borrow().is_none(), "one scoped opener hook");
+            *slot.borrow_mut() = Some((path, Box::new(callback)));
+        });
+        Guard
+    }
+    pub(super) fn run(path: &Path) {
+        let hook = HOOK.with(|slot| {
+            let mut value = slot.borrow_mut();
+            if value.as_ref().is_some_and(|(expected, _)| expected == path) {
+                value.take().map(|(_, callback)| callback)
+            } else {
+                None
+            }
+        });
+        if let Some(callback) = hook {
+            callback();
+        }
+    }
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            HOOK.with(|slot| {
+                slot.borrow_mut().take();
+            });
+        }
     }
 }
 #[cfg(test)]
