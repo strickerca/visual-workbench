@@ -10,6 +10,12 @@ public class GiantOriginalOptions(public val sourcePath: String, public val work
     public val assumeUntaggedSrgb: Boolean) {
     public override fun toString(): String = "GiantOriginalOptions"
 }
+/** Android content URI; values are request-only and never diagnostic text. */
+public class GiantUriOptions(public val uri: String, public val workDirectory: String,
+    public val maxOriginalBytes: ULong, public val maxWorkDiskBytes: ULong,
+    public val assumeUntaggedSrgb: Boolean, public val timeoutMs: ULong = 120_000uL) {
+    public override fun toString(): String = "GiantUriOptions"
+}
 public class GiantOriginalInfo(public val assetId: String, public val sha256: String,
     public val encodedBytes: ULong, public val rawWidth: UInt, public val rawHeight: UInt,
     public val width: UInt, public val height: UInt, public val orientation: UByte,

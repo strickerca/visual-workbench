@@ -14,6 +14,16 @@ pub struct GiantOriginalOptions {
     pub max_work_disk_bytes: u64,
     pub assume_untagged_srgb: bool,
 }
+/// Content URI is request-only. Only the fixed Android resolver is used.
+#[derive(uniffi::Record)]
+pub struct GiantUriOptions {
+    pub uri: String,
+    pub work_directory: String,
+    pub max_original_bytes: u64,
+    pub max_work_disk_bytes: u64,
+    pub assume_untagged_srgb: bool,
+    pub timeout_ms: u64,
+}
 #[derive(Clone, uniffi::Record)]
 pub struct GiantOriginalInfo {
     pub asset_id: String,
@@ -77,6 +87,59 @@ pub fn open_giant_original(
         &cancellation,
     )?;
     Ok(Arc::new(GiantPickedOriginal { inner }))
+}
+
+/// Reserve native input capacity before any external resolver open or spool.
+#[uniffi::export]
+pub fn open_giant_content_uri(
+    options: GiantUriOptions,
+    cancellation: Arc<Cancellation>,
+) -> Result<Arc<GiantPickedOriginal>> {
+    if options.uri.len() > 8192
+        || !options.uri.starts_with("content://")
+        || options.uri.contains('\0')
+        || options.work_directory.is_empty()
+        || options.work_directory.len() > 8192
+        || options.work_directory.contains('\0')
+        || !Path::new(&options.work_directory).is_absolute()
+        || !(1..=120_000).contains(&options.timeout_ms)
+    {
+        return Err(Error::Invalid);
+    }
+    cancellation.check().map_err(Error::from)?;
+    #[cfg(target_os = "android")]
+    {
+        let inner = producer::uri_android::pick(
+            &options.uri,
+            Path::new(&options.work_directory),
+            producer::GiantInputLimits {
+                max_original_bytes: options.max_original_bytes,
+                max_work_disk_bytes: options.max_work_disk_bytes,
+                assume_untagged_srgb: options.assume_untagged_srgb,
+            },
+            options.timeout_ms,
+            crate::session_resources::shared_budget()?,
+            &cancellation,
+        )?;
+        Ok(Arc::new(GiantPickedOriginal { inner }))
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        Err(Error::Unsupported)
+    }
+}
+
+#[uniffi::export]
+pub fn retry_giant_uri_retirement(cancellation: Arc<Cancellation>) -> Result<()> {
+    cancellation.check().map_err(Error::from)?;
+    #[cfg(target_os = "android")]
+    {
+        producer::uri_android::retry_readers(&cancellation)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        Err(Error::Unsupported)
+    }
 }
 
 #[uniffi::export]

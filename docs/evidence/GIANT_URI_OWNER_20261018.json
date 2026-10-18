@@ -1,0 +1,48 @@
+{
+  "status": "focused source holder/JNI-name probe passed",
+  "junit_cases": 7,
+  "compiler": "Kotlin2.4.20",
+  "android_compile_api": 37,
+  "commands": [
+    {
+      "name": "production-explicit-api",
+      "exit_code": 0
+    },
+    {
+      "name": "test-compile",
+      "exit_code": 0
+    },
+    {
+      "name": "holder-junit",
+      "exit_code": 0
+    },
+    {
+      "name": "actual-jni-methods",
+      "exit_code": 0
+    }
+  ],
+  "source_sha256": {
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImportsApi.kt": "60c36508339c733ae044588050ccae35bb397a0502b9c1149ae5787c299f6d7f",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/GiantUriReaderOwner.kt": "4b6ca53047f29495e4ae34bae584e9ba991bed00ef37c2dbf043551c0681a4d6",
+    "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/giant/AndroidGiantUriRuntime.kt": "5ee75287f864534abf9b5d7bfc946d59fa04e1daea4afb429e15d0ac0aa0f0c4",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantUriReaderOwnerTest.kt": "5987fb22fd7e8cc328211677e7b42bc59e0e3e8c0b7fc42053f0eba1424a6add"
+  },
+  "temporary_compiler_outputs_disposed": true,
+  "limits": [
+    "Actual InputStream holder behavior exercised on JVM, no Android replacement classes",
+    "Actual Android fixed bridge compiled against SDK37, JNI names inspected",
+    "Cached predecessor shared/bindings used only for unchanged project/error types",
+    "New Rust URI ownership regressions and Android JNI target not compiled/executed",
+    "Thin native URI facade requires final ABI; app picker and device journey remain open"
+  ],
+  "native_source_sha256": {
+    "core/crates/vw-ffi/src/giant_images/producer/uri_android.rs": "754dc38d4921375189fa71a7f23df4ce6da08d59085af4ca99f398099d689fe7",
+    "core/crates/vw-ffi/src/giant_images/producer/uri_staging.rs": "5437e7d9ed61672702a88a61ce2f5074170abdead3aa12e972a6e40cac755806",
+    "core/crates/vw-ffi/src/giant_images/producer/uri_staging/tests.rs": "4f8101b6985b164cd3e1da156f962d646edbc80e37578ab209198f270d5871a9",
+    "core/crates/vw-ffi/src/giant_images/intake.rs": "193b124f7069310037fef6c1a96d027f183db9be2ac1686e513f3f76e630600a"
+  },
+  "retained_prior_failure": {
+    "status": "initial probe refused a nonexistent android-37 path before compiling; corrected to installed android-37.0; zero tests ran on failure",
+    "location": "/tmp/vw-giant-uri-owner-20261018/failure.json"
+  }
+}

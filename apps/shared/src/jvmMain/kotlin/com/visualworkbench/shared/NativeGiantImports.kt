@@ -32,6 +32,16 @@ internal suspend fun openGiantOriginalNative(options: GiantOriginalOptions): Gia
         options.maxWorkDiskBytes, options.assumeUntaggedSrgb)
     return importErrors { acquireGiantImport({ openNativeOriginal(native, it) }, ::ownPicked, ::NativePicked) }
 }
+internal suspend fun openGiantContentUriNative(options: GiantUriOptions): GiantPickedOriginal {
+    importRetirements.drain()
+    val native = com.visualworkbench.bindings.core.GiantUriOptions(options.uri, options.workDirectory,
+        options.maxOriginalBytes, options.maxWorkDiskBytes, options.assumeUntaggedSrgb, options.timeoutMs)
+    return importErrors { acquireGiantImport(
+        { com.visualworkbench.bindings.core.openGiantContentUri(native, it) }, ::ownPicked, ::NativePicked) }
+}
+internal suspend fun retryGiantUriRetirementNative(): Unit = importErrors {
+    settledStream { com.visualworkbench.bindings.core.retryGiantUriRetirement(it) }
+}
 private class NativePicked(private val owner: GiantImportOwner<NPicked>) : GiantPickedOriginal {
     override suspend fun prepare(): GiantPreparedOriginal = owner.call { handle ->
         importErrors { acquireGiantImport({ handle.prepare(it) }, ::ownPrepared, ::NativePrepared) }

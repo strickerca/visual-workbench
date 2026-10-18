@@ -12,3 +12,7 @@
 # Fixed private runner and typed output reached through the native JNI bridge.
 -keep class com.visualworkbench.shared.giant.AndroidGiantRuntime { *; }
 -keep class com.visualworkbench.shared.giant.AndroidTileBuild { *; }
+
+# Fixed URI holder is pinned before native opens the resolver; methods are JNI-only.
+-keep class com.visualworkbench.shared.giant.AndroidGiantUriRuntime { *; }
+-keep class com.visualworkbench.shared.giant.AndroidGiantUriReader { *; }

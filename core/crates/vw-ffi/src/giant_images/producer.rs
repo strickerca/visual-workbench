@@ -10,6 +10,10 @@ mod cleanup;
 mod input;
 mod picked;
 mod publish;
+#[cfg(target_os = "android")]
+pub(super) mod uri_android;
+#[cfg(any(target_os = "android", test))]
+mod uri_staging;
 #[cfg(windows)]
 mod windows;
 
