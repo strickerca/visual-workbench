@@ -1,4 +1,5 @@
 mod fixtures;
+mod provider_protocols;
 use super::*;
 use fixtures::*;
 use reqwest::header::{self, HeaderMap, HeaderValue};

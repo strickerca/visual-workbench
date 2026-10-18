@@ -165,7 +165,7 @@ pub(crate) fn admit_usage(bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn check(stop: &AtomicBool, deadline: Instant) -> Result<()> {
+pub(crate) fn check(stop: &AtomicBool, deadline: Instant) -> Result<()> {
     if stop.load(Ordering::Acquire) {
         Err(Error::Cancelled)
     } else if Instant::now() >= deadline {
@@ -174,7 +174,7 @@ fn check(stop: &AtomicBool, deadline: Instant) -> Result<()> {
         Ok(())
     }
 }
-fn network_error(error: reqwest::Error) -> Error {
+pub(crate) fn network_error(error: reqwest::Error) -> Error {
     if error.is_timeout() {
         Error::Deadline
     } else if error.is_connect() {
@@ -198,6 +198,14 @@ pub(crate) fn admit_headers(
     status: u16,
     headers: &HeaderMap,
     maximum: usize,
+) -> Result<Option<usize>> {
+    admit_headers_for(status, headers, maximum, "application/json")
+}
+fn admit_headers_for(
+    status: u16,
+    headers: &HeaderMap,
+    maximum: usize,
+    content_type: &str,
 ) -> Result<Option<usize>> {
     if headers.len() > MAX_HEADERS
         || headers
@@ -227,7 +235,7 @@ pub(crate) fn admit_headers(
     let mut parts = kind.split(';');
     if !parts
         .next()
-        .is_some_and(|value| value.trim().eq_ignore_ascii_case("application/json"))
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case(content_type))
         || parts.any(|value| !value.trim().eq_ignore_ascii_case("charset=utf-8"))
     {
         return Err(Error::Representation);
@@ -258,6 +266,142 @@ pub(crate) fn admit_headers(
 pub(crate) struct BoundedBytes {
     bytes: Vec<u8>,
     maximum: usize,
+}
+
+pub(crate) fn load_api_key(
+    secrets: &Arc<dyn SecretProvider>,
+    capability: crate::ApiKeyHeader,
+    stop: &AtomicBool,
+    deadline: Instant,
+) -> Result<header::HeaderValue> {
+    check(stop, deadline)?;
+    let secret = secrets.load(stop, deadline).map_err(Error::Credential)?;
+    check(stop, deadline)?;
+    let value = capability(&secret)?;
+    drop(secret);
+    if !value.is_sensitive() {
+        return Err(Error::Credential(crate::CredentialFailure::Invalid));
+    }
+    Ok(value)
+}
+
+/// Shared bounded IO only. Provider modules choose fixed origins and protocol;
+/// this helper cannot create another paid attempt or perform an HTTP retry.
+pub(crate) async fn post_json(
+    client: &reqwest::Client,
+    request: Arc<AuthorizedRequest>,
+    credential: (&'static str, header::HeaderValue),
+    stop: &Arc<AtomicBool>,
+    deadline: Instant,
+    target: &str,
+    maximum: usize,
+) -> Result<BoundedBytes> {
+    if maximum == 0 {
+        return Err(Error::ResponseLimit);
+    }
+    let body_request = Arc::clone(&request);
+    let body_stop = Arc::clone(stop);
+    let body = stream::unfold(
+        (body_request, body_stop, 0usize),
+        move |(request, stop, offset)| async move {
+            if offset >= request.body().len() {
+                return None;
+            }
+            if check(&stop, deadline).is_err() {
+                return Some((
+                    Err(std::io::Error::from(std::io::ErrorKind::Interrupted)),
+                    (request, stop, usize::MAX),
+                ));
+            }
+            let end = (offset + UPLOAD_CHUNK_BYTES).min(request.body().len());
+            let bytes = Bytes::copy_from_slice(&request.body()[offset..end]);
+            Some((Ok(bytes), (request, stop, end)))
+        },
+    );
+    checked(stop, deadline, async {
+        check(stop, deadline)?;
+        let response = client
+            .post(target)
+            .header(credential.0, credential.1)
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::CONTENT_LENGTH, request.body().len())
+            .header(header::ACCEPT, "application/json")
+            .header(header::ACCEPT_ENCODING, "identity")
+            .header(header::CONNECTION, "close")
+            .body(reqwest::Body::wrap_stream(body))
+            .timeout(deadline.saturating_duration_since(Instant::now()))
+            .send()
+            .await
+            .map_err(network_error)?;
+        read_response(response, maximum, "application/json", stop, deadline).await
+    })
+    .await
+}
+pub(crate) async fn get_bytes(
+    client: &reqwest::Client,
+    target: reqwest::Url,
+    credential: Option<header::HeaderValue>,
+    stop: &Arc<AtomicBool>,
+    deadline: Instant,
+    maximum: usize,
+    content_type: &str,
+) -> Result<BoundedBytes> {
+    if maximum == 0 {
+        return Err(Error::ResponseLimit);
+    }
+    checked(stop, deadline, async {
+        check(stop, deadline)?;
+        let mut builder = client
+            .get(target)
+            .header(header::ACCEPT, content_type)
+            .header(header::ACCEPT_ENCODING, "identity")
+            .header(header::CONNECTION, "close")
+            .timeout(deadline.saturating_duration_since(Instant::now()));
+        if let Some(key) = credential {
+            builder = builder.header("x-key", key);
+        }
+        let response = builder.send().await.map_err(network_error)?;
+        read_response(response, maximum, content_type, stop, deadline).await
+    })
+    .await
+}
+async fn read_response(
+    mut response: reqwest::Response,
+    maximum: usize,
+    content_type: &str,
+    stop: &AtomicBool,
+    deadline: Instant,
+) -> Result<BoundedBytes> {
+    let declared = admit_headers_for(
+        response.status().as_u16(),
+        response.headers(),
+        maximum,
+        content_type,
+    )?;
+    let mut bytes = BoundedBytes::new(maximum)?;
+    while let Some(chunk) = response.chunk().await.map_err(network_error)? {
+        check(stop, deadline)?;
+        bytes.append(&chunk)?;
+    }
+    if declared.is_some_and(|size| size != bytes.len()) {
+        return Err(Error::Representation);
+    }
+    check(stop, deadline)?;
+    Ok(bytes)
+}
+pub(crate) async fn checked<T>(
+    stop: &AtomicBool,
+    deadline: Instant,
+    future: impl std::future::Future<Output = Result<T>>,
+) -> Result<T> {
+    tokio::pin!(future);
+    loop {
+        tokio::select! {
+            biased;
+            _ = tokio::time::sleep(crate::worker::POLL) => check(stop, deadline)?,
+            result = &mut future => { check(stop, deadline)?; return result; },
+        }
+    }
 }
 impl BoundedBytes {
     pub(crate) fn new(maximum: usize) -> Result<Self> {

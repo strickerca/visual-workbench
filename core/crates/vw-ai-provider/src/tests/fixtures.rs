@@ -87,7 +87,10 @@ pub(super) fn prepared(
         &NeverCancel,
     )?)
 }
-fn png(width: u32, height: u32) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub(super) fn png(
+    width: u32,
+    height: u32,
+) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut bytes = Vec::new();
     {
         let mut encoder = png::Encoder::new(&mut bytes, width, height);
@@ -179,6 +182,9 @@ pub(super) struct Server {
     release: std::sync::mpsc::SyncSender<()>,
 }
 impl Server {
+    pub(super) fn target(&self) -> &str {
+        &self.target
+    }
     pub(super) fn start(reply: Vec<u8>, mode: ReplyMode) -> std::io::Result<Self> {
         let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))?;
         listener.set_nonblocking(true)?;
@@ -293,7 +299,7 @@ impl Drop for Server {
         }
     }
 }
-fn read_request(stream: &mut TcpStream) -> std::io::Result<(String, Vec<u8>)> {
+pub(super) fn read_request(stream: &mut TcpStream) -> std::io::Result<(String, Vec<u8>)> {
     let mut bytes = Vec::new();
     let mut one = [0; 1];
     while !bytes.ends_with(b"\r\n\r\n") {
@@ -311,6 +317,7 @@ fn read_request(stream: &mut TcpStream) -> std::io::Result<(String, Vec<u8>)> {
                 .filter(|(name, _)| name.eq_ignore_ascii_case("content-length"))
                 .and_then(|(_, size)| size.trim().parse::<usize>().ok())
         })
+        .or_else(|| head.starts_with("GET ").then_some(0))
         .ok_or(std::io::ErrorKind::InvalidData)?;
     if length > 1024 * 1024 {
         return Err(std::io::ErrorKind::InvalidData.into());

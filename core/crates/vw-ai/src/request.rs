@@ -2,7 +2,7 @@ use crate::{
     Cancellation, Error, Limits, MAX_ENCODED, MAX_FEATHER, MAX_PIXELS, Result,
     budget::AttemptPermit,
     check_cancel,
-    config::{ProviderConfig, Tokens},
+    config::{ProviderConfig, ProviderKind, Tokens},
     geometry::{self, CropPlan},
     pixel_count,
     pixels::{self, EditImage},
@@ -158,7 +158,13 @@ impl Prepared {
         {
             return Err(Error::Invalid("preparation binding or masks"));
         }
-        let prompt = instruction_prompt(&options.instructions)?;
+        let mut prompt = instruction_prompt(&options.instructions)?;
+        if !matches!(options.provider.kind, ProviderKind::OpenAiImageEdits) {
+            prompt = prompt.replace(
+                "The attached transparent-alpha mask guides the change region.",
+                "The second image is a black/white change-region mask: edit white areas and preserve black areas. Return exactly one PNG of the first image with the same dimensions. The mask is guidance; the application will enforce the original change region locally.",
+            );
+        }
         let retained_inputs = crate::memory::retained_inputs(
             source_encoded.len() as u64,
             change_masks.len() as u64,
@@ -246,7 +252,7 @@ impl Prepared {
         let image_png = pixels::encode_png(&srgb, None)?;
         drop(srgb);
         check_cancel(cancel)?;
-        let provider_mask = pixels::area_mask(
+        let mut provider_mask = pixels::area_mask(
             &dense,
             source.width,
             source.height,
@@ -254,6 +260,14 @@ impl Prepared {
             crop.model_width,
             crop.model_height,
         )?;
+        if !matches!(options.provider.kind, ProviderKind::OpenAiImageEdits) {
+            // Reuse the exact area coverage used by the alpha mask. FLUX uses
+            // opaque white for change, and Gemini receives it as visual guidance.
+            for pixel in provider_mask.pixels_mut() {
+                let coverage = 255 - pixel[3];
+                *pixel = Rgba([coverage, coverage, coverage, 255]);
+            }
+        }
         let mask_png = pixels::encode_png(&provider_mask, None)?;
         drop(provider_mask);
         if image_png.len() >= options.provider.capabilities.max_image_bytes_exclusive
@@ -281,10 +295,7 @@ impl Prepared {
             &source.icc,
             false,
         )?);
-        let estimated_microusd = options
-            .estimated_tokens
-            .map(|tokens| options.provider.prices.cost(tokens))
-            .transpose()?;
+        let estimated_microusd = options.provider.estimated_cost(options.estimated_tokens)?;
         let provider_fingerprint = options.provider.fingerprint()?;
         let source_hash = sha256(source_encoded);
         let mask_hash = sha256(&dense);
@@ -392,6 +403,9 @@ impl Prepared {
         {
             return Err(Error::Confirmation);
         }
+        if !matches!(self.provider.kind, ProviderKind::OpenAiImageEdits) {
+            return self.authorize_json(cancel);
+        }
         let boundary = format!("vw-ai-{}", self.summary.request_id);
         let collision = |bytes: &[u8]| {
             bytes
@@ -438,6 +452,54 @@ impl Prepared {
             request_id: self.summary.request_id.clone(),
             provider: self.provider.clone(),
             content_type: format!("multipart/form-data; boundary={boundary}"),
+            body,
+            limits: self.limits,
+            retained_bytes: self.retained_bytes(),
+        })
+    }
+
+    fn authorize_json(&self, cancel: &dyn Cancellation) -> Result<AuthorizedRequest> {
+        // Includes temporary base64 strings, JSON string escaping and the final
+        // serialized body, before any allocation proportional to image content.
+        self.limits.check(
+            self.retained_bytes()
+                + (self.image_png.len() as u64 + self.mask_png.len() as u64) * 5
+                + self.prompt.len() as u64 * 6
+                + 16 * 1024 * 1024,
+        )?;
+        let image = STANDARD.encode(&self.image_png);
+        let mask = STANDARD.encode(&self.mask_png);
+        let value = match self.provider.kind {
+            ProviderKind::GeminiImageGeneration => serde_json::json!({
+                "contents": [{"role":"user", "parts": [
+                    {"text": self.prompt},
+                    {"inlineData": {"mimeType":"image/png", "data": image}},
+                    {"inlineData": {"mimeType":"image/png", "data": mask}}
+                ]}],
+                "generationConfig": {
+                    "candidateCount": 1,
+                    "responseModalities": ["IMAGE"],
+                    "imageConfig": {"aspectRatio":"1:1"}
+                }
+            }),
+            ProviderKind::Flux1Fill { .. } => serde_json::json!({
+                "prompt": self.prompt, "image": image, "mask": mask,
+                "steps": 50, "guidance": 60, "prompt_upsampling": false,
+                "output_format": "png", "safety_tolerance": 2
+            }),
+            ProviderKind::OpenAiImageEdits => return Err(Error::Unsupported),
+        };
+        let body = serde_json::to_vec(&value)?;
+        if matches!(self.provider.kind, ProviderKind::GeminiImageGeneration)
+            && body.len() >= 20_000_000
+        {
+            return Err(Error::Limit("Gemini inline request bytes"));
+        }
+        check_cancel(cancel)?;
+        Ok(AuthorizedRequest {
+            request_id: self.summary.request_id.clone(),
+            provider: self.provider.clone(),
+            content_type: "application/json".into(),
             body,
             limits: self.limits,
             retained_bytes: self.retained_bytes(),
@@ -526,10 +588,7 @@ impl Prepared {
             None,
             cancel,
         )?;
-        let actual_microusd = response
-            .tokens
-            .map(|tokens| self.provider.prices.cost(tokens))
-            .transpose()?;
+        let actual_microusd = response.actual_microusd(&self.provider)?;
         Ok(Completed {
             source: self.source.clone(),
             result: composite,
@@ -636,6 +695,9 @@ pub struct AuthorizedRequest {
     retained_bytes: u64,
 }
 impl AuthorizedRequest {
+    pub fn provider_kind(&self) -> ProviderKind {
+        self.provider.kind
+    }
     pub fn request_id(&self) -> &str {
         &self.request_id
     }
@@ -671,6 +733,29 @@ impl AuthorizedRequest {
                 / 4) as usize,
         )
     }
+    /// FLUX returns a bounded PNG through a signed download URL rather than an
+    /// inline JSON image. Only the authorized FLUX request admits that payload.
+    pub fn parse_image_response(&self, bytes: &[u8]) -> Result<ProviderResponse> {
+        if !matches!(self.provider.kind, ProviderKind::Flux1Fill { .. }) {
+            return Err(Error::Unsupported);
+        }
+        if bytes.len() > self.max_response_bytes() {
+            return Err(Error::Limit("provider response bytes"));
+        }
+        self.limits.check(
+            self.retained_bytes
+                + self.body.len() as u64
+                + bytes.len() as u64 * 4
+                + 16 * 1024 * 1024,
+        )?;
+        admit_png(bytes)?;
+        Ok(ProviderResponse {
+            request_id: self.request_id.clone(),
+            image: bytes.to_vec(),
+            tokens: None,
+            origin: ResponseOrigin::ProviderPayload,
+        })
+    }
 }
 
 /// Platform implementations supply credentials from OS stores and enforce TLS,
@@ -695,6 +780,22 @@ pub struct ProviderResponse {
     origin: ResponseOrigin,
 }
 impl ProviderResponse {
+    fn actual_microusd(&self, provider: &ProviderConfig) -> Result<Option<u64>> {
+        provider.validate()?;
+        if self.origin == ResponseOrigin::OfflineMock {
+            return Ok(None);
+        }
+        match provider.kind {
+            // A configured quote is not a billing receipt. Preserve the useful
+            // image, but retain the attempted ledger entry until actual pricing
+            // is admitted through the single ledger's future fixed-charge hook.
+            ProviderKind::Flux1Fill { .. } => Ok(None),
+            _ => self
+                .tokens
+                .map(|tokens| provider.prices.cost(tokens))
+                .transpose(),
+        }
+    }
     /// Immutable exact provider PNG, retained as the Result original.
     pub fn image_png(&self) -> &[u8] {
         &self.image
@@ -740,6 +841,11 @@ fn parse_response(
     if bytes.len() > provider.max_response_bytes {
         return Err(Error::Limit("provider response bytes"));
     }
+    match provider.kind {
+        ProviderKind::GeminiImageGeneration => return parse_gemini(bytes, request_id),
+        ProviderKind::Flux1Fill { .. } => return Err(Error::Unsupported),
+        ProviderKind::OpenAiImageEdits => {}
+    }
     let response: ResponseBody = serde_json::from_slice(bytes)?;
     let encoded = &response.data[0].b64_json;
     if encoded.len() > MAX_ENCODED.div_ceil(3) * 4 {
@@ -748,9 +854,7 @@ fn parse_response(
     let image = STANDARD
         .decode(encoded)
         .map_err(|_| Error::Invalid("provider base64 image"))?;
-    if image.len() > MAX_ENCODED || image::guess_format(&image)? != image::ImageFormat::Png {
-        return Err(Error::Invalid("bounded PNG response required"));
-    }
+    admit_png(&image)?;
     let tokens = response
         .usage
         .map(|usage| {
@@ -771,6 +875,141 @@ fn parse_response(
             })
         })
         .transpose()?;
+    Ok(ProviderResponse {
+        request_id,
+        image,
+        tokens,
+        origin: ResponseOrigin::ProviderPayload,
+    })
+}
+
+fn admit_png(image: &[u8]) -> Result<()> {
+    if image.is_empty()
+        || image.len() > MAX_ENCODED
+        || image::guess_format(image)? != image::ImageFormat::Png
+    {
+        return Err(Error::Invalid("bounded PNG response required"));
+    }
+    Ok(())
+}
+
+// Gemini's image-only response has exactly one candidate and one image part.
+// Fixed cardinalities prevent unknown surplus output from being allocated or
+// silently discarded. Text, thoughts and cached/tool usage cannot be priced as
+// image tokens by the current cost model.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GeminiResponse {
+    candidates: [GeminiCandidate; 1],
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GeminiUsageEnvelope {
+    usage_metadata: Option<GeminiUsage>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GeminiCandidate {
+    content: GeminiContent,
+    finish_reason: String,
+    #[serde(default)]
+    index: u32,
+}
+#[derive(Deserialize)]
+struct GeminiContent {
+    parts: [GeminiPart; 1],
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GeminiPart {
+    inline_data: GeminiInlineData,
+    #[serde(default)]
+    thought: bool,
+    text: Option<String>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GeminiInlineData {
+    mime_type: String,
+    data: String,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GeminiUsage {
+    prompt_token_count: u64,
+    candidates_token_count: u64,
+    total_token_count: u64,
+    prompt_tokens_details: [GeminiModalityTokens; 2],
+    candidates_tokens_details: [GeminiModalityTokens; 1],
+    #[serde(default)]
+    cached_content_token_count: u64,
+    #[serde(default)]
+    tool_use_prompt_token_count: u64,
+    #[serde(default)]
+    thoughts_token_count: u64,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GeminiModalityTokens {
+    modality: String,
+    token_count: u64,
+}
+fn parse_gemini(bytes: &[u8], request_id: String) -> Result<ProviderResponse> {
+    let response: GeminiResponse = serde_json::from_slice(bytes)?;
+    let [candidate] = response.candidates;
+    let [part] = candidate.content.parts;
+    if candidate.finish_reason != "STOP"
+        || candidate.index != 0
+        || part.thought
+        || part.text.is_some()
+        || part.inline_data.mime_type != "image/png"
+        || part.inline_data.data.len() > MAX_ENCODED.div_ceil(3) * 4
+    {
+        return Err(Error::Invalid("Gemini image response"));
+    }
+    let image = STANDARD
+        .decode(&part.inline_data.data)
+        .map_err(|_| Error::Invalid("provider base64 image"))?;
+    admit_png(&image)?;
+    // Parse usage separately so an absent/new/unsupported accounting category
+    // cannot discard an otherwise valid paid image. This second pass skips the
+    // image strings without allocating copies and only admits fixed detail
+    // cardinalities. Unpriceable usage leaves the durable attempt unresolved.
+    let tokens = serde_json::from_slice::<GeminiUsageEnvelope>(bytes)
+        .ok()
+        .and_then(|envelope| envelope.usage_metadata)
+        .map(|usage| {
+            let mut text_input = None;
+            let mut image_input = None;
+            for detail in usage.prompt_tokens_details {
+                match detail.modality.as_str() {
+                    "TEXT" if text_input.is_none() => text_input = Some(detail.token_count),
+                    "IMAGE" if image_input.is_none() => image_input = Some(detail.token_count),
+                    _ => return Err(Error::Invalid("Gemini input token modalities")),
+                }
+            }
+            let text_input = text_input.ok_or(Error::Invalid("Gemini text usage"))?;
+            let image_input = image_input.ok_or(Error::Invalid("Gemini image usage"))?;
+            let [output] = usage.candidates_tokens_details;
+            if output.modality != "IMAGE"
+                || output.token_count == 0
+                || output.token_count != usage.candidates_token_count
+                || text_input.checked_add(image_input) != Some(usage.prompt_token_count)
+                || usage.prompt_token_count.checked_add(output.token_count)
+                    != Some(usage.total_token_count)
+                || usage.cached_content_token_count != 0
+                || usage.tool_use_prompt_token_count != 0
+                || usage.thoughts_token_count != 0
+            {
+                return Err(Error::Invalid("Gemini token usage"));
+            }
+            Ok(Tokens {
+                text_input,
+                image_input,
+                image_output: output.token_count,
+            })
+        })
+        .and_then(std::result::Result::ok);
     Ok(ProviderResponse {
         request_id,
         image,

@@ -7,6 +7,8 @@ pub enum MaskSupport {
     None,
     AlphaPngGuidance,
     AlphaPngExact,
+    /// A separate opaque black/white PNG; white requests an edit.
+    BlackWhitePngGuidance,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -14,9 +16,14 @@ pub enum Format {
     Png,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ProviderKind {
     OpenAiImageEdits,
+    GeminiImageGeneration,
+    /// Explicit per-image quote, never encoded as fabricated token usage.
+    Flux1Fill {
+        image_price_microusd: u64,
+    },
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -92,6 +99,11 @@ pub struct Prices {
     pub image_output_microusd_per_million: u64,
 }
 impl Prices {
+    pub const ZERO: Self = Self {
+        text_input_microusd_per_million: 0,
+        image_input_microusd_per_million: 0,
+        image_output_microusd_per_million: 0,
+    };
     pub fn cost(self, tokens: Tokens) -> Result<u64> {
         let total = [
             (tokens.text_input, self.text_input_microusd_per_million),
@@ -153,9 +165,6 @@ impl ProviderConfig {
             || !(1..=300).contains(&self.timeout_seconds)
             || self.max_response_bytes == 0
             || self.max_response_bytes > 100_000_000
-            || self.prices.text_input_microusd_per_million == 0
-            || self.prices.image_input_microusd_per_million == 0
-            || self.prices.image_output_microusd_per_million == 0
         {
             return Err(Error::Invalid("provider configuration"));
         }
@@ -167,11 +176,68 @@ impl ProviderConfig {
                     return Err(Error::Unsupported);
                 }
             }
+            ProviderKind::GeminiImageGeneration => {
+                // This first adapter supports one documented discrete output
+                // size. Do not turn the generic size grid into unsupported
+                // arbitrary Gemini dimensions or silently choose another model.
+                let caps = &self.capabilities;
+                if self.endpoint
+                    != "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent"
+                    || self.model != "gemini-2.5-flash-image"
+                    || self.quality != "standard"
+                    || caps.mask_support != MaskSupport::BlackWhitePngGuidance
+                    || caps.max_long_edge != 1024
+                    || caps.min_pixels != 1024 * 1024
+                    || caps.max_pixels != 1024 * 1024
+                    || caps.size_multiple != 1024
+                    || caps.max_aspect_ratio != 1
+                    || caps.max_image_bytes_exclusive > 7_000_000
+                    || caps.max_mask_bytes_exclusive > 7_000_000
+                {
+                    return Err(Error::Unsupported);
+                }
+            }
+            ProviderKind::Flux1Fill {
+                image_price_microusd,
+            } => {
+                if self.endpoint != "https://api.bfl.ai/v1/flux-pro-1.0-fill"
+                    || self.model != "flux-pro-1.0-fill"
+                    || self.quality != "standard"
+                    || self.capabilities.mask_support != MaskSupport::BlackWhitePngGuidance
+                    || image_price_microusd == 0
+                    || image_price_microusd > 1_000_000_000
+                    || self.prices != Prices::ZERO
+                {
+                    return Err(Error::Unsupported);
+                }
+            }
+        }
+        if !matches!(self.kind, ProviderKind::Flux1Fill { .. })
+            && (self.prices.text_input_microusd_per_million == 0
+                || self.prices.image_input_microusd_per_million == 0
+                || self.prices.image_output_microusd_per_million == 0)
+        {
+            return Err(Error::Invalid("provider token prices"));
         }
         Ok(())
     }
     pub fn fingerprint(&self) -> Result<String> {
         self.validate()?;
         Ok(crate::sha256(&crate::canonical(self)?))
+    }
+    /// Quotes bind into the existing review and durable ledger fingerprint.
+    pub fn estimated_cost(&self, tokens: Option<Tokens>) -> Result<Option<u64>> {
+        self.validate()?;
+        match self.kind {
+            ProviderKind::Flux1Fill {
+                image_price_microusd,
+            } => {
+                if tokens.is_some() {
+                    return Err(Error::Invalid("flat-price provider token estimate"));
+                }
+                Ok(Some(image_price_microusd))
+            }
+            _ => tokens.map(|value| self.prices.cost(value)).transpose(),
+        }
     }
 }
