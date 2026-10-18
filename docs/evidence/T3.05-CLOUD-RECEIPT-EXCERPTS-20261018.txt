@@ -1,0 +1,199 @@
+T3.05 cloud integration: sanitized execution excerpts.
+Validated source: dc6d4698e9890ab66b6789820c7f6e2f95de0482
+Native/ABI source: c6ea01433e302a51d49c7fa8d51b44e921f0c42c
+Source-bound commands, limitations and artifact hashes: T3.05-CLOUD-INTEGRATION-20261018.json.
+
+vw-t305-native-attempt3.log
+SHA256 2f8ab1aebed83cdd7d9e438a303ade6d3426d7a52ed21c683f9c1cc5f25eee76
+test result: ok. 204 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.14s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.44s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.48s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.66s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.24s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 64 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+vw-t305-clippy-attempt1.log
+SHA256 801da45d95830b9bcd4576493a6556f0f84b6400237388e9cc7b9625e3f8e244
+    Checking regex v1.13.1
+    Checking clap v4.6.7
+    Checking ciborium v0.2.2
+    Checking tinytemplate v1.2.1
+    Checking page_size v0.6.0
+    Checking anes v0.1.6
+    Checking oorandom v11.1.5
+    Checking criterion v0.8.2
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 24.15s
+
+vw-t305-linux-build.log
+SHA256 e81cd065e10d10a42473394f021e81b8ebbe1f74c5b156eb9f598bb1fb98fb88
+   Compiling vw-package v0.1.0 (/workspace/visual-workbench/core/crates/vw-package)
+   Compiling vw-net v0.1.0 (/workspace/visual-workbench/core/crates/vw-net)
+   Compiling vw-ai-platform v0.1.0 (/workspace/visual-workbench/core/crates/vw-ai-platform)
+   Compiling vw-formats v0.1.0 (/workspace/visual-workbench/core/crates/vw-formats)
+   Compiling vw-codec-os v0.1.0 (/workspace/visual-workbench/core/crates/vw-codec-os)
+   Compiling vw-avif-os v0.1.0 (/workspace/visual-workbench/core/crates/vw-avif-os)
+   Compiling vw-remote v0.1.0 (/workspace/visual-workbench/core/crates/vw-remote)
+   Compiling vw-ffi v0.1.0 (/workspace/visual-workbench/core/crates/vw-ffi)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 35.55s
+
+vw-t305-android-build.log
+SHA256 ae7cbdfc19aa51f3dce2fec69edf7a2f79ca4a1517296df1933a0a7ce2ac169b
+   Compiling vw-net v0.1.0 (/workspace/visual-workbench/core/crates/vw-net)
+   Compiling vw-ai-platform v0.1.0 (/workspace/visual-workbench/core/crates/vw-ai-platform)
+   Compiling vw-codec-os v0.1.0 (/workspace/visual-workbench/core/crates/vw-codec-os)
+   Compiling vw-avif-os v0.1.0 (/workspace/visual-workbench/core/crates/vw-avif-os)
+   Compiling vw-formats v0.1.0 (/workspace/visual-workbench/core/crates/vw-formats)
+   Compiling vw-remote v0.1.0 (/workspace/visual-workbench/core/crates/vw-remote)
+   Compiling vw-ffi v0.1.0 (/workspace/visual-workbench/core/crates/vw-ffi)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 36.30s
+     Copying libraries to /workspace/visual-workbench/target/android-jni
+
+vw-t305-apps-attempt1.log
+SHA256 b369b313ab49bcbe0c3fb9934a30c6d37cb4a0b7e505836ff921ac0ec31351af
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.7.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 3m 18s
+71 actionable tasks: 36 executed, 35 up-to-date
+
+vw-t305-apps-attempt3.log
+SHA256 e7c03c689e107ead48daa297cc4fa89ba53e2fcdd0e314cc6547bf9420fac1ef
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.7.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 1m 33s
+64 actionable tasks: 15 executed, 49 up-to-date
+
+vw-t305-apps-attempt4.log
+SHA256 b18c61f443f6b7dee3277a9c34d98d76d24dde9943e56108281c9eb6946a7b82
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.7.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 25s
+58 actionable tasks: 17 executed, 41 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.0/userguide/configuration_cache_enabling.html
+
+vw-t305-windows-clippy-attempt1.log
+SHA256 fe178cff9bfb598b9f46d38a31c1a2c5a637247241055f585a0a8f935702f2bb
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+warning: ring@0.17.14: GNU compiler is not supported for this target
+error: failed to run custom build command for `ring v0.17.14`
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  cargo:warning=GNU compiler is not supported for this target
+  error occurred in cc-rs: failed to find tool "lib.exe": No such file or directory (os error 2)
+
+Final JUnit counts (no hostname/device identifiers):
+{
+  "shared": {
+    "tests": 308,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 308,
+    "xml_files": 43,
+    "case_status_sha256": "480c489c14721f77d61afc7367f7c2b3b950408dbfd4b650d1f7a10144117852",
+    "skipped_cases": []
+  },
+  "desktop": {
+    "tests": 321,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 7,
+    "passed": 314,
+    "xml_files": 46,
+    "case_status_sha256": "4df3608d7a0fe94ab2dfa87db888cc11ac7782ab21e570e491e5fe645fe86208",
+    "skipped_cases": [
+      "com.visualworkbench.desktop.NativeRuntimeAnchorTest.boundedDosParserRefusesOtherNamespacesAndNoncanonicalForms",
+      "com.visualworkbench.desktop.NativeRuntimeAnchorTest.longNativeGuardPathsAreExplicitWithoutChangingTheShortAnchorNamespace",
+      "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realLongWindowsPinsStillRefuseWritesAndReplacement",
+      "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realWindowsAnchorHandleIsCanonicalAndOrdinaryPinsRemainExactAndExclusive",
+      "com.visualworkbench.desktop.mcp.McpStartupTest.expiredAndFutureOwnerMarkersRetireWithoutStartingService",
+      "com.visualworkbench.desktop.mcp.McpStartupTest.markerDeletionBindsValidatedHandleAndMalformedDataSurvives",
+      "com.visualworkbench.desktop.mcp.McpStartupTest.realWindowsOwnerLockPreventsDuplicateAndReleasesExactly"
+    ]
+  },
+  "android_unit": {
+    "tests": 122,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 122,
+    "xml_files": 23,
+    "case_status_sha256": "a9168887a7e067d7d9cb7daa9748f651a3090988ceee81a78f46529fe0a25d56",
+    "skipped_cases": []
+  }
+}

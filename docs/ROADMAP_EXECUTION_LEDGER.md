@@ -277,3 +277,52 @@ This diagnostic does not close either ignored PDFium case, native isolation,
 Windows/Android execution or any product gate. PDF publication stays refused.
 Exact artifact identities, reproducible diagnostic sources, bounds and results
 are in `evidence/CLOUD_PDF_RUNTIME_FEASIBILITY_20261018.json`.
+
+## T3.05 composed candidate and next independent batch
+
+Leaf source `2df316f` is deliberately composed on
+`cloud/t3-05-integration-20261018`, with validated code `dc6d469`.
+Ellipse and tapped-polygon pixel selections now use the existing native mask
+transaction, source binding, version and undo paths. Both app callers preserve
+only an admitted idle polygon between real contacts; Finish publishes one step,
+and cancellation, camera/page/revision/project/tool/refinement changes retire the
+draft. Actual desktop controller/native-journal tests exercise that lifecycle.
+The corresponding Android instrumentation is compiled, not device-run.
+
+Reported raw stroke axes remain unchanged. The calibrated native tilt conversion
+and exact scoped remote axis mask are composed through Android, protobuf, private
+wire and Windows injector source. Absent/unmeasured axes retain ordinary pressure
+with no tilt/twist claim; normal app construction still supplies no measured
+calibration. Physical calibration, Windows injection and pen feel remain open.
+
+Phase checks passed 566 native cases across this batch's six-package scope and
+744 executable JVM/unit cases (308 shared, 314 Desktop, 122 Android), with seven
+Windows-only skips. Fresh Linux and arm64 libraries, one binding-generation pass,
+actual app/instrumentation source compilation, zero-error Android lint, four
+16-KiB LOAD segments and dependency policy checks passed. The recovered opaque
+Mask equality assertions, synthetic fixture color-consent setup and one existing
+fast-IO diagnostics test assumption were corrected; failed receipts remain.
+The Windows cross-check stopped in ring's C build before project source checking:
+host GNU compilation was selected and lib.exe was unavailable. No alternate
+compiler, SDK or binary was installed/substituted. Windows target validation and
+independent review remain required considerations before main promotion; this
+candidate leaves main at `bca245e`. Exact source/artifact bindings and sanitized
+execution excerpts are in `evidence/T3.05-CLOUD-INTEGRATION-20261018.json` and
+`evidence/T3.05-CLOUD-RECEIPT-EXCERPTS-20261018.txt`.
+
+Exact runtime research `2400eac` is retained without changing pins or PDF gating.
+Publisher downloads returned403. Separate Android packaging trace `a3875e2`
+confirms that unextracted APK JNI bytes cannot satisfy the current physical-file
+PDFium hash/load contract; neither a Java-only hash nor an APK-relative string is
+a verified native-loader repair. That source repair belongs to a separate batch
+and still needs actual admitted artifacts and isolated-device validation.
+
+Giant viewport/JPEG stream leaves `ca773ed` and their51 written/unrun tests are
+queued for a separate coherent integration slice. Root first admits the minimal
+viewport API, source/manifest/full-revision/attachment fences, native provider
+contracts and session-wide memory/retirement accounting. Bounded producer leaves
+can then return to the image owner under exact new-file ownership while root
+keeps registration, store APIs, shared contracts and actual controller/draw wiring.
+No recovered controller postimage or unfinished stream workflow is promoted by
+this T3.05 candidate. Five scoped M4 build tasks and all physical/product gates
+retain their existing pending status; Krita remains deferred.

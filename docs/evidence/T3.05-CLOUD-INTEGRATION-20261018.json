@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-18",
+  "status": "Integrated T3.05 candidate with Linux/native and host app tests; independent review and Windows target check pending. No physical/product gate passed.",
+  "validated_code_source": "dc6d4698e9890ab66b6789820c7f6e2f95de0482",
+  "native_and_binding_source": "c6ea01433e302a51d49c7fa8d51b44e921f0c42c",
+  "native_inputs_identical_to_validated_source": true,
+  "branch": "cloud/t3-05-integration-20261018",
+  "main_unchanged": "bca245eda44a470906c23c464f60fdd2af618016",
+  "frozen_ref_unchanged": "070758ac3b0537b4ea9efc0f6d21b23792d47762",
+  "admitted_leaves": {
+    "source": "2df316fea1f2573cda70cc38f56f87d60dd21b7c",
+    "integrated_as": "4d22b58f999f99522c3d20c6da3039ebf2d74056",
+    "leaf_written_tests": 35,
+    "leaf_native_executed": 21,
+    "leaf_jvm_executed": 9,
+    "leaf_android_instrumentation_compiled_not_run": 5,
+    "rebase_repairs": "Recovered Mask tests compared opaque handles without PartialEq; assertions now use exact canonical serialization/pixels and explicit error matching."
+  },
+  "behavior": [
+    "Ellipse and tapped-polygon mask operations use existing bounded native mask transaction/history/version/undo paths; polygon lists are copied before asynchronous admission and charged to existing memory budget.",
+    "An ellipse is one DOWN-camera bounding box. Polygon contacts adjust/freeze one vertex per UP and preserve the captured target/combine/document/full revision/camera; explicit Finish makes one transaction. Idle-only Finish/Undo controls and closed/vertex previews are composed on both apps.",
+    "Normal pointer cleanup retains only an admitted idle polygon. Explicit cancellation, view/page/revision/project/tool/refinement changes, navigation and disposal invalidate its draft. Actual desktop controller/native-journal tests cover one commit/undo and cancellation/camera retirement; Android counterpart compiles but is not device-run.",
+    "Calibrated libm tilt projection uses atan(tan(theta)*sin/cos(phi+rotation)) and measured per-device signs. Raw stored stroke axes are unchanged; Android orientation never becomes twist.",
+    "Remote pressure continues with absent or uncalibrated axes. Android accepts an injected per-device measured-calibration provider, defaulting to none; its existing translation/uniform-scale viewport has actual directional rotation zero.",
+    "Optional scoped PenEvent.native_pen_mask carries exact axis presence through protobuf/private wire to Windows penMask. Absent mask defaults to pressure only; allowed masks are 1/3/13/15 and the tilt pair cannot be split. Calibrated reported tilt uses13, never twist. Legacy unscoped axis claims are refused. Both peers must be updated for these semantics; no old-host runtime claim.",
+    "Existing diagnostics race test now blocks IO until launch suspends, then captures the actual queued owner continuation. Production diagnostics writer is unchanged."
+  ],
+  "checks": {
+    "native": {
+      "passed": 566,
+      "failed": 0,
+      "ignored": 0,
+      "test_binaries": 39,
+      "command": "cargo test --locked --offline -p vw-geom -p vw-mask -p vw-ffi -p vw-remote -p vw-net -p vw-remote-host --all-targets -j 2",
+      "scope_note": "Different package scope from the prior443-case receipt. The two ignored PDFium cases live outside these invoked packages and remain unrun."
+    },
+    "jvm": {
+      "shared": {
+        "tests": 308,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 308,
+        "xml_files": 43,
+        "case_status_sha256": "480c489c14721f77d61afc7367f7c2b3b950408dbfd4b650d1f7a10144117852",
+        "skipped_cases": []
+      },
+      "desktop": {
+        "tests": 321,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 7,
+        "passed": 314,
+        "xml_files": 46,
+        "case_status_sha256": "4df3608d7a0fe94ab2dfa87db888cc11ac7782ab21e570e491e5fe645fe86208",
+        "skipped_cases": [
+          "com.visualworkbench.desktop.NativeRuntimeAnchorTest.boundedDosParserRefusesOtherNamespacesAndNoncanonicalForms",
+          "com.visualworkbench.desktop.NativeRuntimeAnchorTest.longNativeGuardPathsAreExplicitWithoutChangingTheShortAnchorNamespace",
+          "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realLongWindowsPinsStillRefuseWritesAndReplacement",
+          "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realWindowsAnchorHandleIsCanonicalAndOrdinaryPinsRemainExactAndExclusive",
+          "com.visualworkbench.desktop.mcp.McpStartupTest.expiredAndFutureOwnerMarkersRetireWithoutStartingService",
+          "com.visualworkbench.desktop.mcp.McpStartupTest.markerDeletionBindsValidatedHandleAndMalformedDataSurvives",
+          "com.visualworkbench.desktop.mcp.McpStartupTest.realWindowsOwnerLockPreventsDuplicateAndReleasesExactly"
+        ]
+      },
+      "android_unit": {
+        "tests": 122,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 122,
+        "xml_files": 23,
+        "case_status_sha256": "a9168887a7e067d7d9cb7daa9748f651a3090988ceee81a78f46529fe0a25d56",
+        "skipped_cases": []
+      }
+    },
+    "jvm_passed": 744,
+    "jvm_skipped": 7,
+    "app_source": "Actual shared Android/Desktop, both app sources, desktop tests and Android instrumentation compile. No app launch, APK signing, install or instrumentation execution.",
+    "source_binding": "Shared/Desktop green on c27b39c; dc6d469 changes only one Android diagnostics test. Final Android unit/instrumentation/lint green on dc6d469. Rust/ABI inputs unchanged since c6ea014; no per-small-commit binding regeneration.",
+    "android_lint": {
+      "errors": 0,
+      "warnings": 58,
+      "hints": 12
+    },
+    "android_alignment": {
+      "status": "passed",
+      "load_segments": 4,
+      "alignment_bytes": 16384
+    },
+    "strict_linux_clippy": "Passed vw-geom/vw-mask/vw-ffi/vw-remote/vw-net all targets, warnings denied. Linux vw-remote-host cfg tests ran but its pre-existing Linux dead-code warnings are not a strict-lint pass for that Windows package.",
+    "windows_clippy": {
+      "status": "blocked before project source check",
+      "command": "cargo clippy --locked --offline --target x86_64-pc-windows-msvc -p vw-ffi -p vw-remote-host --all-targets -j 2 -- -D warnings",
+      "exit_code": 101,
+      "cause": "ring0.17.14 selected host GNU C compilation and could not find lib.exe; no configured approved MSVC C/SDK toolchain in this environment. NDK LLVM tools alone were not substituted. No Windows compilation or injection execution claimed."
+    },
+    "dependency_policy": {
+      "cargo_licenses_bans_sources": "passed; no new dependencies or manifest/lock edits",
+      "gradle_exact_modules": 264,
+      "runtime_configurations": 12,
+      "bound_parent_poms": 5
+    },
+    "bindings": "Fresh Linux core/host plus generator built; core/host bindings generated once in app attempt1. Later Kotlin-only retries show up-to-date generation."
+  },
+  "resolved_validation_failures": [
+    {
+      "log": "vw-t305-native-attempt1.log",
+      "cause": "Wrong package name vw-core; command stopped before compilation. Corrected to vw-ffi."
+    },
+    {
+      "log": "vw-t305-native-attempt2.log",
+      "cause": "Recovered Mask assertions required nonexistent PartialEq. Repaired assertions without changing production mask equality API; native attempt3 passed."
+    },
+    {
+      "log": "vw-t305-apps-attempt1.log",
+      "cause": "Both new desktop native fixtures waited for an untagged PNG without explicit sRGB consent. Fixture now exercises ordinary assumeSrgb action; full desktop/shared attempt3 passed."
+    },
+    {
+      "log": "vw-t305-apps-attempt2.log",
+      "exit_code": 143,
+      "cause": "Owned retry stopped before APK packaging/signing. Unnecessary assembleDebug task removed. Neither attempt1 nor2 reached a signing task; no debug keystore was created."
+    },
+    {
+      "log": "vw-t305-apps-attempt3.log",
+      "cause": "Existing diagnostics fast-IO test could finish undispatched before launch returned, so no continuation was queued. Added deterministic IO barrier; final Android unit/lint attempt4 passed."
+    }
+  ],
+  "compiled_artifacts": [
+    {
+      "path": "target/debug/libvw_core.so",
+      "bytes": 202708376,
+      "sha256": "5e8e458c5ee749cec6dcb81eb1b550f9a97cd13d58da89d2461b9f3764818842"
+    },
+    {
+      "path": "target/debug/libvw_host.so",
+      "bytes": 50762312,
+      "sha256": "5bb636fed1a9bcfaa904d3030ecca3ab9369bdb4fb4f4c53aed0e3d5644d6b3c"
+    },
+    {
+      "path": "target/debug/vw-bindgen",
+      "bytes": 65751848,
+      "sha256": "86525fcddefa7bb713d9135dfc36310dae97aca3f1ad105ee39f2059113fe856"
+    },
+    {
+      "path": "target/android-jni/arm64-v8a/libvw_core.so",
+      "bytes": 223465600,
+      "sha256": "e5680d04fb563f95f68bb153eb33fc50774c7f27edc800f3e68d6b8f03501218"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/core/com/visualworkbench/bindings/core/vw_core.kt",
+      "bytes": 1009637,
+      "sha256": "c2d4684f0c7a0c958f52fb128553ae8ef71a72a3e20662d657b854252bbbb2aa"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/host/com/visualworkbench/bindings/host/vw_host.kt",
+      "bytes": 274624,
+      "sha256": "a26d23de6b9219bd449e0274890469a3199c1406f637fffbf25751f637cc5e5f"
+    }
+  ],
+  "logs": [
+    {
+      "name": "vw-t305-policy.log",
+      "sha256": "18c4026bed3bf2247256f85d778c99452bc8af1f1bc79f2d7a9cd358b58a2ae1",
+      "bytes": 89417
+    },
+    {
+      "name": "vw-t305-native-attempt1.log",
+      "sha256": "180d070239e577c40bef962a786896e37a188c6b8cfa972f4099b41ee65fae67",
+      "bytes": 125
+    },
+    {
+      "name": "vw-t305-native-attempt2.log",
+      "sha256": "96754f97bb28331f5e7f1a5bf77ecc12c732c14eef1a281bf0524c9fbaddd726",
+      "bytes": 8849
+    },
+    {
+      "name": "vw-t305-native-attempt3.log",
+      "sha256": "2f8ab1aebed83cdd7d9e438a303ade6d3426d7a52ed21c683f9c1cc5f25eee76",
+      "bytes": 63082
+    },
+    {
+      "name": "vw-t305-clippy-attempt1.log",
+      "sha256": "801da45d95830b9bcd4576493a6556f0f84b6400237388e9cc7b9625e3f8e244",
+      "bytes": 2917
+    },
+    {
+      "name": "vw-t305-linux-build.log",
+      "sha256": "e81cd065e10d10a42473394f021e81b8ebbe1f74c5b156eb9f598bb1fb98fb88",
+      "bytes": 2273
+    },
+    {
+      "name": "vw-t305-android-build.log",
+      "sha256": "ae7cbdfc19aa51f3dce2fec69edf7a2f79ca4a1517296df1933a0a7ce2ac169b",
+      "bytes": 1835
+    },
+    {
+      "name": "vw-t305-apps-attempt1.log",
+      "sha256": "b369b313ab49bcbe0c3fb9934a30c6d37cb4a0b7e505836ff921ac0ec31351af",
+      "bytes": 15433
+    },
+    {
+      "name": "vw-t305-apps-attempt2.log",
+      "sha256": "8a96cd77f9562521cf00b494c0ac1a63882aed746f116e214e24eef84dc72b21",
+      "bytes": 3654
+    },
+    {
+      "name": "vw-t305-apps-attempt3.log",
+      "sha256": "e7c03c689e107ead48daa297cc4fa89ba53e2fcdd0e314cc6547bf9420fac1ef",
+      "bytes": 9303
+    },
+    {
+      "name": "vw-t305-apps-attempt4.log",
+      "sha256": "b18c61f443f6b7dee3277a9c34d98d76d24dde9943e56108281c9eb6946a7b82",
+      "bytes": 5664
+    },
+    {
+      "name": "vw-t305-windows-clippy-attempt1.log",
+      "sha256": "fe178cff9bfb598b9f46d38a31c1a2c5a637247241055f585a0a8f935702f2bb",
+      "bytes": 5522
+    }
+  ],
+  "limits": [
+    "Independent review pending; main not advanced by this candidate. Required Windows target/source and runtime checks remain a publication consideration; no protection or required check bypass.",
+    "No actual Windows pen injection, Android isolated service/device run, measured per-device calibration, physical S Pen feel/signs/pressure/latency, device identity/security or provider actions. Calibration provider remains unset in normal app construction.",
+    "PDF publication remains gated. Exact151.0.7881.0/PDFium and qpdf12.4.2 research is preserved at core/crates/vw-pdf/RUNTIME_ARTIFACT_RESEARCH_20261018.json; downloads403 and runtime trust/target sandbox checks remain blocked. No replacement binaries installed or loaded.",
+    "Android document packaging incompatibility is separately traced on task/t3.09-android-runtime-packaging at a3875e2b4fd4ca4f0ef4b6c7006786dacb81c6cc. Unextracted JNI bytes do not satisfy the physical-file verifier/loader; this candidate does not repair or weaken it.",
+    "Giant viewport/JPEG stream leaves at ca773eda954cb4fdadd1f48091b90bed56d31c06 are preserved for a separate coherent integration batch. Their51 written tests are not this candidate evidence; root provider/renderer/accounting/caller work remains.",
+    "No screenshots created. Owned synthetic desktop projects were deleted after native/controller retirement; no vw-polygon-host-* temporary directories remained. Existing recovery/worktrees/backups preserved.",
+    "Assisted selection/model approval, Krita deferred scope, five remaining scoped M4 build tasks, all physical/product gates remain pending."
+  ]
+}

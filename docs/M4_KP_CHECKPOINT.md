@@ -160,3 +160,12 @@ acceptance remain open. These results neither advance a product gate nor complet
 Krita, giant-image root viewport/stream work or the remaining milestone tasks.
 Parent-owned worktree/picker disposition and local Windows/device execution remain
 separately coordinated; this cloud phase did not access them.
+
+T3.05 recovery continuation is composed as a separately reviewed software
+candidate (`dc6d469`, branch `cloud/t3-05-integration-20261018`): ellipse/tapped
+polygon masks, conditional calibrated tilt and exact remote axis presence.
+Its566 native and744 executable JVM/unit passes do not close an M4 task or a
+physical gate. Windows target checking is blocked by the unconfigured MSVC C/
+archive toolchain, and independent review is pending. Main remains `bca245e`.
+See `evidence/T3.05-CLOUD-INTEGRATION-20261018.json`; PDF runtime/publication and
+Android physical-file versus unextracted-JNI packaging gates remain unresolved.
