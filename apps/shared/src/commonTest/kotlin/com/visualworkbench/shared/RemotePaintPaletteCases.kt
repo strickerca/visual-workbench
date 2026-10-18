@@ -24,6 +24,8 @@ internal object RemotePaintPaletteCases {
             ::invalidCompatibilityCannotBecomeSupport,
             ::queuedObservationCannotAdmitOldTarget,
             ::queuedObservationCannotAdoptOldReceipt,
+            ::queuedCommandRechecksGrantBeforeDispatch,
+            ::queuedObservationCannotImportOldCompatibility,
         )
         cases.forEach{it()}
         return cases.size
@@ -59,6 +61,38 @@ internal object RemotePaintPaletteCases {
             queue.drain()
             check(f.palette.state.value.target?.binding!=original.binding)
             check(f.dispatcher.calls.size==1)
+        } finally { f.scope.cancel();queue.drain() }
+    }
+    private fun queuedCommandRechecksGrantBeforeDispatch() {
+        val queue=PaintPaletteQueue()
+        val f=PaintPaletteFixture(queue)
+        try {
+            queue.drain()
+            check(f.palette.command(RemoteEditorAction.Undo))
+            check(f.dispatcher.calls.isEmpty())
+            f.dispatcher.target.value=f.dispatcher.target.value!!.copy(grantActive=false)
+            // The command coroutine was queued first; the target collector is
+            // still delayed. No old native dispatch may start in that window.
+            queue.runFirst()
+            check(f.dispatcher.calls.isEmpty())
+            check(!f.palette.state.value.busy)
+            queue.drain()
+            check(!f.palette.command(RemoteEditorAction.Redo))
+        } finally { f.scope.cancel();queue.drain() }
+    }
+    private fun queuedObservationCannotImportOldCompatibility() {
+        val queue=PaintPaletteQueue()
+        val f=PaintPaletteFixture(queue)
+        try {
+            queue.drain()
+            val original=f.dispatcher.target.value!!
+            val observed=RemoteToolCompatibility(original.identity,"brush","c".repeat(64),RemoteEditorInputApi.Mouse,
+                RemoteCompatibilityAspect.Drawing,RemoteCompatibilityResult.Supported,
+                RemoteCompatibilityMethod.EditorObserved,"d".repeat(64),null)
+            f.dispatcher.target.value=original.copy(binding=original.binding.copy(connectionEpoch=2uL))
+            check(!f.palette.compatibility(observed.toolId,observed.settingsDigest,listOf(observed)))
+            check(f.palette.state.value.compatibility.isEmpty())
+            queue.drain()
         } finally { f.scope.cancel();queue.drain() }
     }
     private fun malformedProofIsVisible() = fixture { f ->
@@ -245,6 +279,7 @@ public fun main():Unit { println("Paint palette synthetic cases passed: ${Remote
 private class PaintPaletteQueue:CoroutineDispatcher() {
     private val queued=ArrayDeque<Runnable>()
     override fun dispatch(context:CoroutineContext,block:Runnable) { queued.addLast(block) }
+    fun runFirst() { queued.removeFirst().run() }
     fun runLast() { queued.removeLast().run() }
     fun drain() { while(queued.isNotEmpty())queued.removeFirst().run() }
 }
