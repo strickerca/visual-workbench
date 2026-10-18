@@ -585,3 +585,71 @@ fn quarantine_probe() {
     // No counter reset or fake credit. The exact quarantine owns permit+charge
     // until this isolated process exits; no recovery/approval claim is made.
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn completed_unpolled_replies_do_not_retain_actual_startup_workers() {
+    fn startup_workers() -> usize {
+        std::fs::read_dir("/proc/self/task")
+            .unwrap()
+            .filter_map(|entry| {
+                let path = entry.unwrap().path().join("comm");
+                match std::fs::read_to_string(path) {
+                    Ok(name) => Some(usize::from(name.trim() == "vw-core-open")),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+                    Err(error) => panic!("cannot inspect actual worker thread: {error}"),
+                }
+            })
+            .sum()
+    }
+    fn retired_workers() {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let live = startup_workers();
+            if live == 0 {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "{live} actual startup workers stayed alive"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+    let budget = budget();
+    runtime().block_on(async {
+        retired_workers();
+        let mut replies = Vec::new();
+        for _ in 0..8 {
+            let (picked, path, selected) = picked(&budget);
+            let (query, ready, release, retired) = blocked();
+            let owner = picked.clone();
+            let mut preparing = Box::pin(async move {
+                owner
+                    .prepare_with(Arc::new(Cancellation::new()), query, 2)
+                    .await
+            });
+            pending(preparing.as_mut()).await;
+            bounded(ready).await.unwrap();
+            release.send(()).unwrap();
+            retired.recv_timeout(Duration::from_secs(8)).unwrap();
+            assert!(path.join("original.input").exists());
+            bounded(picked.close_worker()).await.unwrap();
+            assert!(!path.exists());
+            assert_eq!(budget.used_bytes(), 0);
+            assert_eq!(std::fs::read(selected.path()).unwrap(), png());
+            replies.push(preparing);
+            // All prior futures remain alive and unpolled. Observe actual Linux
+            // threads, not permits, sender counters, or a job-body drop marker.
+            retired_workers();
+            assert_eq!(startup_workers(), 0);
+        }
+        assert_eq!(replies.len(), 8);
+        println!("eight completed futures retained: zero actual vw-core-open threads and zero input charges");
+        for preparing in replies {
+            assert!(matches!(bounded(preparing).await, Err(Error::Closed)));
+        }
+        retired_workers();
+        assert_eq!(budget.used_bytes(), 0);
+    });
+}
