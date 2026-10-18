@@ -51,7 +51,7 @@ class McpCoordinatorTest {
         override suspend fun unpublish(packageId:String,target:String,manifestSha256:String){unpublishEntered?.complete(Unit);unpublishFinish?.await()}
         override suspend fun previewClaude(packageId:String,manifestSha256:String)=McpClaudePreview(packageId,manifestSha256,"private folder","literal summary",mapOf("package_id" to packageId))
         override suspend fun pushClaude(connection:String,displayed:McpClaudePreview){sends++}
-        override suspend fun grant(connection:String,selectors:List<String>,lifetimeMs:Int){grantEntered?.complete(Unit);grantFinish?.await()}
+        override suspend fun grant(connection:String,selectors:List<String>,lifetimeMs:Int){grantEntered?.complete(Unit);grantFinish?.let{finish->withContext(NonCancellable){finish.await()}}}
         override suspend fun revoke(connection:String){revokes++;revokedSessions+=connection;revokeHook(connection)}
         override suspend fun close(){closed++}
     }

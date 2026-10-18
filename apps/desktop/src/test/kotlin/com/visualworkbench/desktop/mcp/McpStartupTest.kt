@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.*
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Assume.assumeTrue
 
 class McpStartupTest {
     @Test fun modalCommandFencesPendingPeerFocusBeforeCompositionAndSharesChooserLease(){
@@ -65,12 +66,14 @@ class McpStartupTest {
         for(value in listOf(bytes+byteArrayOf(10),"VWAPP1\nSend\n$nonce\n1000\n".toByteArray(),ByteArray(161){65},"VWAPP1\nMcp\n$nonce\n01000\n".toByteArray()))fails{DesktopAppOwner.decode(value)}
     }
     @Test fun realWindowsOwnerLockPreventsDuplicateAndReleasesExactly(){
+        assumeTrue("Requires Windows owner handles and file-sharing semantics",System.getProperty("os.name").startsWith("Windows",ignoreCase=true))
         val dir=Files.createTempDirectory("vw-mcp-owner-").toRealPath();var first:DesktopAppOwner?=null;var next:DesktopAppOwner?=null
         try{first=DesktopAppOwner.claim(dir,guard,WindowsAppMarkerIo());assertNotNull(first);assertNull(DesktopAppOwner.claim(dir,guard,WindowsAppMarkerIo()));first!!.close();first=null
             next=DesktopAppOwner.claim(dir,guard,WindowsAppMarkerIo());assertNotNull(next)
         }finally{next?.close();first?.close();deleteFixture(dir)}
     }
     @Test fun markerDeletionBindsValidatedHandleAndMalformedDataSurvives(){
+        assumeTrue("Requires Windows owner handles and file-sharing semantics",System.getProperty("os.name").startsWith("Windows",ignoreCase=true))
         val dir=Files.createTempDirectory("vw-mcp-marker-").toRealPath();val io=WindowsAppMarkerIo();val path=dir.resolve("request")
         try{
             Files.write(path,"foreign".toByteArray());fails{io.consume(path){DesktopAppOwner.decode(it)}};assertEquals("foreign",Files.readString(path));Files.delete(path)
@@ -112,6 +115,7 @@ class McpStartupTest {
         }finally{release.complete(Unit);start.cancelAndJoin();try{lifetime.close()}catch(_:McpRefused){}}
     }
     @Test fun expiredAndFutureOwnerMarkersRetireWithoutStartingService(){
+        assumeTrue("Requires Windows owner handles and file-sharing semantics",System.getProperty("os.name").startsWith("Windows",ignoreCase=true))
         val directory=Files.createTempDirectory("vw-mcp-marker-age-").toRealPath()
         var bytes:ByteArray?=null
         val marker=object:AppMarkerIo{

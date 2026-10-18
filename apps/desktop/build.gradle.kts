@@ -185,3 +185,9 @@ tasks.register("remoteIntegrationClasspath") {
         destination.get().asFile.writeText(entries.joinToString(File.pathSeparator) { it.path },Charsets.UTF_8)
     }
 }
+
+// Skiko extracts the pinned native runtime for drawing tests. Keep that cache in
+// this build tree so restricted CI does not require writable user-home state.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    systemProperty("skiko.data.path",layout.buildDirectory.dir("skikoTestCache").get().asFile.absolutePath)
+}

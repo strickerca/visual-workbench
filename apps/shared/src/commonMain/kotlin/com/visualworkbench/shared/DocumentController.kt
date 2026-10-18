@@ -41,7 +41,7 @@ public class DocumentController(private val scope: CoroutineScope, private val c
     public val exportPublicationAvailable:Boolean get() = canExport(DocumentCopy.SvgAnnotations)
     public fun copyUnavailableText(mode:DocumentCopy):String = if(mode==DocumentCopy.Original)
         "Exact original PDF copies cannot add the required revision and source metadata."
-        else "PDF copy export awaits final-file verification with the packaged PDF runtime."
+        else "PDF copies are unavailable in this build. Your original is preserved."
     public fun bind(descriptor: EditableDescriptor?, page: UInt): Unit {
         val currentEpoch = attachment()?.epoch
         val old = state.value

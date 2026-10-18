@@ -31,6 +31,7 @@ internal fun documentJobFailure(error: DocumentJobException): DocumentFailure = 
 
 private fun Rect.jsonRegion(): JsonArray = JsonArray(listOf(x,y,x+width,y+height).map(::JsonPrimitive))
 private fun Transform.jsonTransform(): JsonArray = JsonArray(listOf(a,b,c,d,e,f).map(::JsonPrimitive))
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 public fun documentRequestJson(request: DocumentRequest): String {
     request.exportIdentity?.let { identity ->
         identity.validate()

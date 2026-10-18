@@ -28,7 +28,7 @@ import com.visualworkbench.shared.*
                 Text(state.glyphs.joinToString(""){it.text.orEmpty()},style=MaterialTheme.typography.body2)
                 TextButton(controller::redactSelection,enabled=!state.busy){Text("Mark selected text for redaction")}
             }
-            listOf(DocumentCopy.Original to "Original PDF",DocumentCopy.Annotated to "PDF with annotations",DocumentCopy.Flattened to "Flattened annotations",DocumentCopy.PcRedaction to "PC object removal",DocumentCopy.EveryPageRasterRedaction to "Rasterize every page").forEach{(choice,label)->
+            listOf(DocumentCopy.Original to "Exact original PDF (unavailable)",DocumentCopy.Annotated to "PDF with annotations",DocumentCopy.Flattened to "Flattened annotations",DocumentCopy.PcRedaction to "PC object removal",DocumentCopy.EveryPageRasterRedaction to "Rasterize every page").forEach{(choice,label)->
                 Row{RadioButton(mode==choice,{mode=choice},enabled=!state.busy&&controller.canExport(choice)&&(choice!=DocumentCopy.PcRedaction||controller.pcRedaction));Text(label,Modifier.padding(top=12.dp))}
             }
             if(mode==DocumentCopy.PcRedaction||mode==DocumentCopy.EveryPageRasterRedaction){

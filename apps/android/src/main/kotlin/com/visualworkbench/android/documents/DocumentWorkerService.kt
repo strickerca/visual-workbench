@@ -66,7 +66,7 @@ public class DocumentWorkerService : Service() {
     })
 
     private fun pdfium(): Pair<String, ByteArray> {
-        val bytes = try { assets.open("vw-document-android.sha256").use { it.readNBytes(1025) } }
+        val bytes = try { assets.open("vw-document-android.sha256").use(::readDocumentRuntimePin) }
             catch (_: java.io.IOException) { throw DocumentFailure(DocumentFailureKind.Unavailable) }
         if (bytes.size !in 1..1024 || bytes.any { it.toInt() !in 32..126 && it.toInt() != 10 })
             throw DocumentFailure(DocumentFailureKind.Verification)
