@@ -164,6 +164,15 @@ pub fn export_document_png_to<A: AssetResolver>(
 ) -> Result<StreamReport, RasterError> {
     check_cancel(cancelled)?;
     validate_document(source.info(), &document)?;
+    if document
+        .project
+        .active_image_output(document.document)?
+        .is_some()
+    {
+        return Err(RasterError::Unsupported(
+            "image output requires the bounded output compositor",
+        ));
+    }
     let mut request = request.clone();
     request.memory_budget_bytes = request
         .memory_budget_bytes
@@ -555,6 +564,7 @@ fn export_metadata(
         }
         .into(),
         settings: r.clone(),
+        image_output: None,
     }
 }
 struct LimitedWriter<'a, W: Write> {

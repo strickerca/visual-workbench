@@ -59,7 +59,13 @@ impl Project {
             let doc = self.document(layer.definition.document_id.as_ref())?;
             one_of(
                 &layer.definition.kind,
-                &["annotation", "mask", "result", "adjustment"],
+                &[
+                    "annotation",
+                    "mask",
+                    "result",
+                    "adjustment",
+                    crate::IMAGE_OUTPUT_LAYER_KIND,
+                ],
             )?;
             OrderKey::try_from(layer.definition.order_key.clone())?;
             text(&layer.definition.name, 4096)?;
@@ -236,6 +242,7 @@ impl Project {
                 }
             }
         }
+        self.validate_image_outputs()?;
         Ok(())
     }
 

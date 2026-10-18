@@ -72,6 +72,9 @@ pub struct ExportMetadata {
     pub output_icc_hash: Option<String>,
     pub color_conversion: String,
     pub settings: ExportRequest,
+    /// Full immutable D extent and D-to-O mapping, before any O-region export.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_output: Option<crate::ImageOutputMetadata>,
 }
 #[derive(Debug)]
 pub struct ExportedImage {
@@ -314,6 +317,7 @@ pub fn prepare_export_pixels(
             .map(|v| vw_model::AssetId::hash(v).to_string()),
         color_conversion: conversion.into(),
         settings: r.clone(),
+        image_output: None,
     };
     if matches!(
         r.format,
@@ -365,8 +369,39 @@ pub fn prepare_export_pixels(
     })
 }
 
+/// Prepare O pixels for an existing encoder, binding their dimensions to the
+/// admitted frame and retaining the original D extent in embedded provenance.
+pub fn prepare_export_pixels_with_output(
+    source: &DecodedImage,
+    r: &ExportRequest,
+    output: Option<crate::ImageOutputMetadata>,
+    cancel: &dyn Fn() -> bool,
+) -> Result<PreparedRaster, RasterError> {
+    crate::source::check_cancel(cancel)?;
+    if let Some(metadata) = output
+        && metadata.frame()?.output_size() != [source.width, source.height]
+    {
+        return Err(RasterError::Invalid("image output metadata binding"));
+    }
+    let mut prepared = prepare_export_pixels(source, r, cancel)?;
+    if let Some(metadata) = output {
+        prepared.metadata.source_width = metadata.source_width;
+        prepared.metadata.source_height = metadata.source_height;
+    }
+    prepared.metadata.image_output = output;
+    Ok(prepared)
+}
+
 /// Export a full-resolution buffer. Call `render_document` first for marked output.
 pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage, RasterError> {
+    export_with_output(source, r, None)
+}
+
+pub(crate) fn export_with_output(
+    source: &DecodedImage,
+    r: &ExportRequest,
+    output: Option<crate::ImageOutputMetadata>,
+) -> Result<ExportedImage, RasterError> {
     if matches!(
         r.format,
         ExportFormat::Bmp8 | ExportFormat::Tiff8 | ExportFormat::Tiff16
@@ -378,7 +413,7 @@ pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage,
     let PreparedRaster {
         image,
         metadata: meta,
-    } = prepare_export_pixels(source, r, &|| false)?;
+    } = prepare_export_pixels_with_output(source, r, output, &|| false)?;
     let gray = crate::pixels::gray_profile(&image)?;
     let json = serde_json::to_string(&meta).map_err(|_| RasterError::Metadata)?;
     let bytes = match r.format {

@@ -3,6 +3,7 @@
 mod display;
 mod export;
 mod ffi;
+mod image_output;
 mod materialized_result;
 mod metadata;
 mod pixels;
@@ -14,8 +15,16 @@ pub use display::{DisplayImage, display_rgba8};
 pub use export::{
     AlphaPolicy, ColorPolicy, ExportFormat, ExportMetadata, ExportRequest, ExportedImage,
     PreparedRaster, Region, export, preflight, prepare_export_pixels,
+    prepare_export_pixels_with_output,
 };
 pub use ffi::webp_encoder_version;
+pub use image_output::{
+    DocumentOutput, ImageOutputMetadata, ImageOutputResampling,
+    document_editing_region_reservation, document_output_estimate, document_output_reservation,
+    export_document_output, image_output_estimate, image_resident_bytes, prepare_document_output,
+    render_document_editing_region, render_image_output, render_image_output_region,
+    requires_document_output,
+};
 pub use pixels::{DecodeLimits, DecodedImage, Pixels, decode, standard_srgb_profile};
 pub use render::{AssetResolver, RenderOptions, render_document};
 pub use source::{BorrowedSource, JpegSpool, PngSpool, RasterSource, SourceInfo, SpoolLimits};
