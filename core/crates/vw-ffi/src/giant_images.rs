@@ -9,6 +9,20 @@ use crate::ProjectSession;
 pub use provider::GiantImage;
 use std::sync::Arc;
 
+/// Consume the complete private publication owner without uncharged intermediate
+/// sessions. An undelivered Arc closes only after its worker state is destroyed;
+/// the accepted destination is never removed by facade construction failure.
+#[allow(
+    dead_code,
+    reason = "Private budgeted root facade awaits the reviewed producer import API"
+)]
+pub(crate) fn adopt_published_project(
+    published: producer::PublishedProject,
+) -> crate::Result<Arc<ProjectSession>> {
+    let (store, blobs, permit, charge) = published.into_parts();
+    ProjectSession::from_store_budgeted(store, blobs, permit, charge)
+}
+
 #[uniffi::export]
 impl ProjectSession {
     pub async fn open_giant_image(

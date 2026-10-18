@@ -4,6 +4,7 @@
     dead_code,
     reason = "Private producer interfaces are admitted; root foreign registration and packaged platform evidence remain pending"
 )]
+mod android_bridge;
 mod cache;
 mod cleanup;
 mod input;
@@ -224,7 +225,17 @@ impl PreparedOriginal {
             return Err(Error::Limit);
         }
         match options.platform {
-            GiantProducerPlatform::AndroidRegionJpeg => Err(Error::Unsupported),
+            GiantProducerPlatform::AndroidRegionJpeg => {
+                #[cfg(target_os = "android")]
+                {
+                    self.build_android(options.timeout_ms, options.disk_cache_bytes, cancel)
+                        .await
+                }
+                #[cfg(not(target_os = "android"))]
+                {
+                    Err(Error::Unsupported)
+                }
+            }
             GiantProducerPlatform::WindowsPinnedVips => {
                 #[cfg(windows)]
                 {
@@ -242,6 +253,51 @@ impl PreparedOriginal {
                 }
             }
         }
+    }
+    #[cfg(target_os = "android")]
+    async fn build_android(
+        &self,
+        timeout_ms: u64,
+        disk_cache_bytes: u64,
+        cancel: Arc<Cancellation>,
+    ) -> Result<Arc<GiantBuiltCache>> {
+        let closed = self.closed.clone();
+        let budget = self.budget.clone();
+        self.worker
+            .call(move |state| {
+                Ok((|| {
+                    source::live(&closed, &cancel)?;
+                    let state = state.as_mut().ok_or(Error::Closed)?;
+                    if state.build_started {
+                        return Err(Error::Backpressure);
+                    }
+                    state.build_started = true;
+                    let build = android_bridge::build(
+                        state.source.clone(),
+                        disk_cache_bytes,
+                        timeout_ms,
+                        closed,
+                        cancel,
+                        budget.clone(),
+                    )?;
+                    let worker = Worker::new(
+                        "vw-giant-built",
+                        Some(BuiltState {
+                            build: Arc::new(build),
+                            publication_started: false,
+                        }),
+                        2,
+                    )
+                    .map_err(Error::from)?;
+                    Ok(Arc::new(GiantBuiltCache {
+                        worker,
+                        closed: Arc::new(AtomicBool::new(false)),
+                        budget,
+                    }))
+                })())
+            })
+            .await
+            .map_err(Error::from)?
     }
     #[cfg(windows)]
     async fn build_windows(

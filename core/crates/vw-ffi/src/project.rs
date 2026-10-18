@@ -105,6 +105,9 @@ pub(crate) struct ProjectState {
     pub remote: Option<vw_net::SyncReceiver>,
     pub changed: Arc<tokio::sync::Notify>,
     permit: Option<SessionPermit>,
+    // Last: store/model/history/replica/remote allocations must actually retire
+    // before the giant publication's admission is returned to the shared pool.
+    _memory_charge: Option<vw_stream::MemoryCharge>,
 }
 impl ProjectState {
     pub fn store(&self) -> Result<&ProjectStore> {
@@ -164,13 +167,51 @@ impl Drop for ProjectSession {
         self.events.stop();
     }
 }
+/// One constructor payload before history restore, checkpoint parsing or worker
+/// startup can fail. Field order also protects failed-constructor destruction.
+struct StoreInput {
+    store: ProjectStore,
+    blobs: BlobStore,
+    permit: SessionPermit,
+    charge: Option<vw_stream::MemoryCharge>,
+}
 impl ProjectSession {
     pub(crate) fn from_store(
         store: ProjectStore,
         blobs: BlobStore,
         permit: SessionPermit,
     ) -> Result<Arc<Self>> {
-        let history = crate::editor::History::restore(&store)?;
+        Self::from_store_owned(StoreInput {
+            store,
+            blobs,
+            permit,
+            charge: None,
+        })
+    }
+    pub(crate) fn from_store_budgeted(
+        store: ProjectStore,
+        blobs: BlobStore,
+        permit: SessionPermit,
+        charge: vw_stream::MemoryCharge,
+    ) -> Result<Arc<Self>> {
+        // No fallible work precedes aggregation of all four publication parts.
+        let input = StoreInput {
+            store,
+            blobs,
+            permit,
+            charge: Some(charge),
+        };
+        if input.charge.as_ref().is_none_or(|charge| {
+            charge.bytes() != 32 * 1024 * 1024
+                || charge.kind() != vw_stream::MemoryKind::CodecWorkspace
+        }) {
+            return Err(CoreError::Invalid);
+        }
+        Self::from_store_owned(input)
+    }
+    fn from_store_owned(input: StoreInput) -> Result<Arc<Self>> {
+        let store = &input.store;
+        let history = crate::editor::History::restore(store)?;
         let mut remote = None;
         let replica = if store.local_device()? != *store.host_device() {
             let host = vw_ops::HostSequencer::from_checkpoint_bytes(&store.checkpoint_bytes()?)?;
@@ -183,7 +224,7 @@ impl ProjectSession {
         } else {
             None
         };
-        let mut initial = project_info(&store, &history)?;
+        let mut initial = project_info(store, &history)?;
         if let Some(replica) = &replica {
             initial.state_hash = replica.project().state_hash()?.to_string();
         }
@@ -192,14 +233,15 @@ impl ProjectSession {
         let worker = Worker::new(
             "vw-core-store",
             ProjectState {
-                store: Some(store),
-                blobs,
+                store: Some(input.store),
+                blobs: input.blobs,
                 events: events.clone(),
                 history,
                 replica,
                 remote,
                 changed: changed.clone(),
-                permit: Some(permit),
+                permit: Some(input.permit),
+                _memory_charge: input.charge,
             },
             16,
         )?;
@@ -560,3 +602,7 @@ mod tests {
         reopened.integrity_check().unwrap();
     }
 }
+
+#[cfg(test)]
+#[path = "project_budget_tests.rs"]
+mod budget_tests;

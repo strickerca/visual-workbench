@@ -60,6 +60,7 @@ png = "=0.18.1"
 rustix = { version = "=1.1.5", features = ["fs", "process"] }
 
 [target.'cfg(windows)'.dependencies]
+vw-assets-win = { version = "=0.1.0", path = "../../../host-win/crates/vw-assets-win" }
 vw-remote-host = { version = "=0.1.0", path = "../../../host-win/crates/vw-remote-host" }
 vw-host-win = { version = "=0.1.0", path = "../../../host-win/crates/vw-host-win" }
 vw-net = { version = "=0.1.0", path = "../vw-net", features = ["mdns"] }
