@@ -48,15 +48,16 @@ pub(crate) fn verify(
                 .mapping
         }
     };
-    let expected = bounded::json(
-        &serde_json::json!({
-            "schema": 1, "project_id": manifest.source.project_id,
-            "document_id": manifest.source.document_id, "host_seq": manifest.extensions.host_seq,
-            "state_hash": manifest.extensions.state_hash, "source_asset": manifest.source.asset_hash,
-            "mapping": mapping,
-        }),
-        8192,
-    )?;
+    let mut receipt = serde_json::json!({
+        "schema": 1, "project_id": manifest.source.project_id,
+        "document_id": manifest.source.document_id, "host_seq": manifest.extensions.host_seq,
+        "state_hash": manifest.extensions.state_hash, "source_asset": manifest.source.asset_hash,
+        "mapping": mapping,
+    });
+    if let Some(output) = manifest.extensions.image_output {
+        receipt["image_output"] = serde_json::to_value(output).map_err(|_| Error::Integrity)?;
+    }
+    let expected = bounded::json(&receipt, 8192)?;
     let mut at = 8_usize;
     let mut receipt = false;
     let mut profile = false;

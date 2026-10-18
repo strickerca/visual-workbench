@@ -425,8 +425,44 @@
             }
           ],
           "description": "Optional descriptive failure-package lineage; no capture permission, review verdict or alignment proof. Native admission additionally checks target, self-reference and marker count."
+        },
+        "image_output": {
+          "$ref": "#/$defs/imageOutput",
+          "description": "Optional canonical D-to-O crop, clockwise quarter-turn and resize. Source and document marker coordinates remain in immutable oriented D pixels; overview/context mappings are in O before target scaling. This is descriptive geometry, not alignment or authority."
+        },
+        "compiler": {
+          "enum": [
+            "vw-package-1-area-integer",
+            "vw-package-1-image-output-v1"
+          ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "image_output"
+            ]
+          },
+          "then": {
+            "required": [
+              "compiler"
+            ],
+            "properties": {
+              "compiler": {
+                "const": "vw-package-1-image-output-v1"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "compiler": {
+                "const": "vw-package-1-area-integer"
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "$defs": {
@@ -489,6 +525,89 @@
           "description": "Entry n maps current contiguous marker n+1 to this original marker number."
         }
       }
+    },
+    "imageOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "source_width",
+        "source_height",
+        "crop",
+        "clockwise_degrees",
+        "output_width",
+        "output_height",
+        "resampling"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "source_width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32768
+        },
+        "source_height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32768
+        },
+        "crop": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "properties": {
+            "x": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32767
+            },
+            "y": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 32767
+            },
+            "width": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32768
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32768
+            }
+          }
+        },
+        "clockwise_degrees": {
+          "enum": [
+            0,
+            90,
+            180,
+            270
+          ]
+        },
+        "output_width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32768
+        },
+        "output_height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32768
+        },
+        "resampling": {
+          "const": "PremultipliedBilinearSourceSamplesV1"
+        }
+      },
+      "description": "Native admission additionally checks crop containment, exact source binding, output extent and every derived mapping/PNG receipt."
     }
   }
 }

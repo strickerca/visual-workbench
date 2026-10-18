@@ -165,6 +165,7 @@ struct SemanticData {
 fn semantic(
     files: &BTreeMap<String, Vec<u8>>,
     m: &Manifest,
+    mapping: &geometry::DocumentMapping,
     cancel: &dyn Cancellation,
 ) -> Result<()> {
     let bytes = files.get("semantic.json").ok_or(Error::Integrity)?;
@@ -231,6 +232,9 @@ fn semantic(
             return Err(Error::Limit("references"));
         }
         for reference in &marker.element_refs {
+            mapping
+                .admit_marker(marker.point_document, reference.bounds_document)
+                .map_err(|_| Error::Integrity)?;
             let e = elements
                 .get(reference.eid.as_str())
                 .ok_or(Error::Integrity)?;
@@ -301,14 +305,26 @@ pub(crate) fn from_compiler(
         || m.prompt_file != "prompt.md"
         || m.semantic_file != "semantic.json"
         || m.untrusted_text_notice != UNTRUSTED_TEXT_NOTICE
-        || m.extensions.compiler != "vw-package-1-area-integer"
         || !matches!(m.extensions.source_bit_depth, 8 | 16)
         || m.extensions.derivative_bit_depth != 8
     {
         return Err(Error::Integrity);
     }
+    match (m.extensions.compiler.as_str(), m.extensions.image_output) {
+        (geometry::ORDINARY_COMPILER, None) | (geometry::OUTPUT_COMPILER, Some(_)) => {}
+        _ => return Err(Error::Integrity),
+    }
+    let document_mapping = geometry::DocumentMapping::new(
+        [m.source.width, m.source.height],
+        m.extensions.image_output,
+    )
+    .map_err(|_| Error::Integrity)?;
+    let [output_width, output_height] = document_mapping.extent;
+    if u64::from(output_width) * u64::from(output_height) > limits.source_pixels {
+        return Err(Error::Limit("output pixels"));
+    }
     let overview = ImageMapping::new(
-        [0, 0, i64::from(m.source.width), i64::from(m.source.height)],
+        [0, 0, i64::from(output_width), i64::from(output_height)],
         target.max_long_edge(),
         64,
     )?;
@@ -433,15 +449,24 @@ pub(crate) fn from_compiler(
             m.source.width,
             m.source.height,
         )?;
-        if marker.bbox_compiled != overview.bounds(marker.bbox_document, target)
-            || marker.point_compiled != overview.point(marker.point_document, target)
+        document_mapping
+            .admit_marker(marker.point_document, marker.bbox_document)
+            .map_err(|_| Error::Integrity)?;
+        let output_bounds = document_mapping
+            .bounds(marker.bbox_document)
+            .map_err(|_| Error::Integrity)?;
+        let output_point = document_mapping
+            .point(marker.point_document)
+            .map_err(|_| Error::Integrity)?;
+        if marker.bbox_compiled != overview.bounds(output_bounds, target)
+            || marker.point_compiled != overview.point(output_point, target)
         {
             return Err(Error::Integrity);
         }
         let mapping = geometry::crop(
-            marker.bbox_document,
-            m.source.width,
-            m.source.height,
+            output_bounds,
+            output_width,
+            output_height,
             target.max_long_edge(),
         )?;
         if crop.mapping != mapping
@@ -449,7 +474,7 @@ pub(crate) fn from_compiler(
             || marker.crop_image != crop.image
             || crop.bbox_crop_pixels
                 != mapping.bounds(
-                    marker.bbox_document,
+                    output_bounds,
                     &Target::Generic {
                         max_long_edge: 8192,
                     },
@@ -467,7 +492,7 @@ pub(crate) fn from_compiler(
         }
         text(&marker.instruction, 32 * 1024)?;
     }
-    semantic(&files, &m, cancel)?;
+    semantic(&files, &m, &document_mapping, cancel)?;
     let prompt = files.get("prompt.md").ok_or(Error::Integrity)?;
     if prompt.len() > bounded::MAX_TEXT
         || !std::str::from_utf8(prompt)

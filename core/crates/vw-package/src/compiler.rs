@@ -107,6 +107,7 @@ struct ImageContext<'a> {
     binding: &'a vw_instructions::SourceBinding,
     asset: &'a str,
     limits: Limits,
+    output: Option<vw_raster::ImageOutputMetadata>,
 }
 fn image_file(
     files: &mut BTreeMap<String, Vec<u8>>,
@@ -121,11 +122,13 @@ fn image_file(
         binding,
         asset,
         limits,
+        output,
     } = context;
-    let metadata = bounded::json(
-        &serde_json::json!({"schema":1,"project_id":binding.project_id,"document_id":binding.document_id,"host_seq":binding.host_seq,"state_hash":binding.state_hash,"source_asset":asset,"mapping":map}),
-        8192,
-    )?;
+    let mut receipt = serde_json::json!({"schema":1,"project_id":binding.project_id,"document_id":binding.document_id,"host_seq":binding.host_seq,"state_hash":binding.state_hash,"source_asset":asset,"mapping":map});
+    if let Some(output) = output {
+        receipt["image_output"] = serde_json::to_value(output).map_err(|_| Error::Encoding)?;
+    }
+    let metadata = bounded::json(&receipt, 8192)?;
     let bytes = pixels::encode(
         frame,
         profile,
@@ -202,14 +205,37 @@ pub fn compile(
         }
     };
     let asset = AssetId::try_from(definition.primary_asset_id.clone())?;
-    // D remains the immutable source authority. The current portable mapping
-    // has only a rectangle and uniform scale; it cannot truthfully express a
-    // crop/quarter-turn/independent-axis resize. Refuse before decoding until
-    // the coordinator admits the explicit output-provenance contract and the
-    // canonical output compositor is connected to this compiler.
-    if let Some(output) = input.project.active_image_output(input.document)? {
-        geometry::admit_output_instructions(output.crop(), &instructions)?;
-        return Err(Error::Unsupported("package image output provenance"));
+    let image_output = input
+        .project
+        .active_image_output(input.document)?
+        .map(vw_raster::ImageOutputMetadata::new);
+    if let Some(output) = image_output {
+        let frame = output.frame()?;
+        geometry::admit_output_instructions(frame.crop(), &instructions)?;
+        // An unmarked region may carry owner meaning too. Until its exact
+        // shape envelope is admitted, a cropped frame must refuse that target
+        // rather than infer that a nearby marker covers it.
+        if frame.crop() != [0, 0, output.source_width, output.source_height]
+            && instructions.instructions().iter().any(|instruction| {
+                instruction.target_ids.iter().any(|id| {
+                    !instructions
+                        .markers()
+                        .iter()
+                        .any(|marker| &marker.object_id == id)
+                })
+            })
+        {
+            return Err(Error::Unsupported("cropped unmarked instruction geometry"));
+        }
+        vw_raster::document_output_reservation(
+            input.project,
+            input.document,
+            RenderOptions {
+                memory_budget_bytes: options.limits.working(encoded_bytes)?,
+                include_guides: true,
+                assume_untagged_srgb: options.assume_untagged_srgb,
+            },
+        )?;
     }
     let original = input.originals.get(&asset).ok_or(Error::Original)?;
     let source = vw_raster::decode(
@@ -236,6 +262,11 @@ pub fn compile(
     }
     if depth == 16 && !options.allow_depth_reduction {
         return Err(Error::Raster(vw_raster::RasterError::Depth));
+    }
+    let document_mapping = geometry::DocumentMapping::new([width, height], image_output)?;
+    let [output_width, output_height] = document_mapping.extent;
+    if u64::from(output_width) * u64::from(output_height) > options.limits.source_pixels {
+        return Err(Error::Limit("output pixels"));
     }
     let capture = definition
         .capture
@@ -290,7 +321,7 @@ pub fn compile(
         )?
     };
     let overview = ImageMapping::new(
-        [0, 0, i64::from(width), i64::from(height)],
+        [0, 0, i64::from(output_width), i64::from(output_height)],
         options.target.max_long_edge(),
         64,
     )?;
@@ -301,8 +332,15 @@ pub fn compile(
         check(cancel)?;
         let bounds =
             geometry::marker_bounds(marker.point_document, marker.bounds_document, width, height)?;
-        let map = geometry::crop(bounds, width, height, options.target.max_long_edge())?;
-        let refs = if marker.element_eids.is_empty() {
+        document_mapping.admit_marker(marker.point_document, bounds)?;
+        let output_bounds = document_mapping.bounds(bounds)?;
+        let map = geometry::crop(
+            output_bounds,
+            output_width,
+            output_height,
+            options.target.max_long_edge(),
+        )?;
+        let refs: Vec<ElementReference> = if marker.element_eids.is_empty() {
             Vec::new()
         } else {
             let snapshot = semantics
@@ -321,6 +359,9 @@ pub fn compile(
                 .map(ElementReference::from)
                 .collect()
         };
+        for reference in &refs {
+            document_mapping.admit_marker(marker.point_document, reference.bounds_document)?;
+        }
         let instruction = instructions
             .instructions()
             .iter()
@@ -332,7 +373,7 @@ pub fn compile(
             image: image.clone(),
             mapping: map,
             bbox_crop_pixels: map.bounds(
-                bounds,
+                output_bounds,
                 &Target::Generic {
                     max_long_edge: 8192,
                 },
@@ -348,9 +389,12 @@ pub fn compile(
             .into(),
             role: marker.role.as_str().into(),
             instruction: instruction.text.clone(),
-            bbox_compiled: overview.bounds(bounds, &options.target),
+            bbox_compiled: overview.bounds(output_bounds, &options.target),
             bbox_document: bounds,
-            point_compiled: overview.point(marker.point_document, &options.target),
+            point_compiled: overview.point(
+                document_mapping.point(marker.point_document)?,
+                &options.target,
+            ),
             point_document: marker.point_document,
             element_refs: refs,
             crop_image: image,
@@ -362,14 +406,52 @@ pub fn compile(
         binding: instructions.source(),
         asset: asset.as_str(),
         limits: options.limits,
+        output: image_output,
     };
     {
+        let clean_output = if image_output.is_some() {
+            let output = vw_raster::prepare_document_output(
+                &source,
+                input.project,
+                input.document,
+                &Resolver {
+                    originals: input.originals,
+                    limits: DecodeLimits {
+                        max_encoded_bytes: options.limits.source_bytes,
+                        max_pixels: options.limits.source_pixels,
+                        max_memory_bytes: options
+                            .limits
+                            .working(encoded_bytes + resident(&source))?,
+                    },
+                    cancel,
+                },
+                RenderOptions {
+                    memory_budget_bytes: options.limits.working(encoded_bytes)?,
+                    include_guides: true,
+                    assume_untagged_srgb: options.assume_untagged_srgb,
+                },
+                false,
+                &|| cancel.is_cancelled(),
+            )?;
+            if output.frame != image_output {
+                return Err(Error::Stale);
+            }
+            Some(output)
+        } else {
+            None
+        };
+        let retained_output = clean_output
+            .as_ref()
+            .map_or(0, |output| resident(&output.image));
         let clean = srgb(
-            &source,
+            clean_output
+                .as_ref()
+                .map_or(&source, |output| &output.image),
             input.revision,
             &options,
-            encoded_bytes + resident(&source),
+            encoded_bytes + resident(&source) + retained_output,
         )?;
+        drop(clean_output);
         check(cancel)?;
         let frame = pixels::resample(
             &clean,
@@ -399,17 +481,37 @@ pub fn compile(
         },
         cancel,
     };
-    let marked = vw_raster::render_document(
-        &source,
-        input.project,
-        input.document,
-        &resolver,
-        RenderOptions {
-            memory_budget_bytes: render_budget,
-            include_guides: true,
-            assume_untagged_srgb: options.assume_untagged_srgb,
-        },
-    )?;
+    let marked = if image_output.is_some() {
+        let output = vw_raster::prepare_document_output(
+            &source,
+            input.project,
+            input.document,
+            &resolver,
+            RenderOptions {
+                memory_budget_bytes: render_budget,
+                include_guides: true,
+                assume_untagged_srgb: options.assume_untagged_srgb,
+            },
+            true,
+            &|| cancel.is_cancelled(),
+        )?;
+        if output.frame != image_output {
+            return Err(Error::Stale);
+        }
+        output.image
+    } else {
+        vw_raster::render_document(
+            &source,
+            input.project,
+            input.document,
+            &resolver,
+            RenderOptions {
+                memory_budget_bytes: render_budget,
+                include_guides: true,
+                assume_untagged_srgb: options.assume_untagged_srgb,
+            },
+        )?
+    };
     check(cancel)?;
     let raster = srgb(
         &marked,
@@ -427,7 +529,7 @@ pub fn compile(
             frame.marker(
                 marker.number,
                 original.role,
-                marker.bbox_document,
+                document_mapping.bounds(marker.bbox_document)?,
                 &overview,
             );
         }
@@ -446,7 +548,7 @@ pub fn compile(
         frame.marker(
             marker.number,
             original.role,
-            marker.bbox_document,
+            document_mapping.bounds(marker.bbox_document)?,
             &crop.mapping,
         );
         images.push(image_file(
@@ -503,8 +605,14 @@ pub fn compile(
             Vec::new()
         },
         extensions: Extensions {
+            image_output,
             verification_origin: None,
-            compiler: "vw-package-1-area-integer".into(),
+            compiler: if image_output.is_some() {
+                geometry::OUTPUT_COMPILER
+            } else {
+                geometry::ORDINARY_COMPILER
+            }
+            .into(),
             state_hash: instructions.source().state_hash.to_string(),
             host_seq: input.revision.host_seq,
             target_profile: options.target,

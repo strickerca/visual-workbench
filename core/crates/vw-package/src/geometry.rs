@@ -142,3 +142,84 @@ pub(crate) fn admit_output_instructions(
     }
     Ok(())
 }
+
+pub(crate) const ORDINARY_COMPILER: &str = "vw-package-1-area-integer";
+pub(crate) const OUTPUT_COMPILER: &str = "vw-package-1-image-output-v1";
+
+/// One checked canonical D-to-O matrix followed by the existing target/crop
+/// mapping. The portable ImageMapping stays unchanged and addresses O when an
+/// explicit frame is present; original document coordinates never get rewritten.
+pub(crate) struct DocumentMapping {
+    output: Option<vw_raster::ImageOutputMetadata>,
+    matrix: Option<[f64; 6]>,
+    pub extent: [u32; 2],
+}
+impl DocumentMapping {
+    pub fn new(source: [u32; 2], output: Option<vw_raster::ImageOutputMetadata>) -> Result<Self> {
+        let (matrix, extent) = if let Some(metadata) = output {
+            let frame = metadata.frame()?;
+            if frame.source_size() != source {
+                return Err(Error::Invalid("image output source binding"));
+            }
+            let matrix = frame
+                .matrix()
+                .map_err(|_| Error::Invalid("image output matrix"))?;
+            (Some(matrix.coefficients()), frame.output_size())
+        } else {
+            (None, source)
+        };
+        Ok(Self {
+            output,
+            matrix,
+            extent,
+        })
+    }
+    pub fn point(&self, point: [f64; 2]) -> Result<[f64; 2]> {
+        let [x, y] = point;
+        let mapped = if let Some([a, b, c, d, e, f]) = self.matrix {
+            [a * x + c * y + e, b * x + d * y + f]
+        } else {
+            point
+        };
+        if !mapped.iter().all(|value| value.is_finite()) {
+            return Err(Error::Invalid("image output point"));
+        }
+        Ok(mapped.map(|value| if value == 0.0 { 0.0 } else { value }))
+    }
+    pub fn bounds(&self, bounds: [f64; 4]) -> Result<[f64; 4]> {
+        if self.matrix.is_none() {
+            return Ok(bounds);
+        }
+        let [x, y, w, h] = bounds;
+        let mut low = [f64::INFINITY; 2];
+        let mut high = [f64::NEG_INFINITY; 2];
+        for corner in [[x, y], [x + w, y], [x, y + h], [x + w, y + h]] {
+            let mapped = self.point(corner)?;
+            for axis in 0..2 {
+                low[axis] = low[axis].min(mapped[axis]);
+                high[axis] = high[axis].max(mapped[axis]);
+            }
+        }
+        Ok([low[0], low[1], high[0] - low[0], high[1] - low[1]])
+    }
+    pub fn admit_marker(&self, point: [f64; 2], bounds: [f64; 4]) -> Result<()> {
+        if let Some(metadata) = self.output {
+            let crop = metadata.crop;
+            let [left, top, width, height] =
+                [crop.x, crop.y, crop.width, crop.height].map(f64::from);
+            let [x, y, w, h] = bounds;
+            if point[0] < left
+                || point[1] < top
+                || point[0] >= left + width
+                || point[1] >= top + height
+                || x < left
+                || y < top
+                || x + w > left + width
+                || y + h > top + height
+            {
+                return Err(Error::Invalid("image output omits instruction"));
+            }
+        }
+        Ok(())
+    }
+}
