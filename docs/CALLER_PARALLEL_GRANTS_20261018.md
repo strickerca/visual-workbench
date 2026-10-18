@@ -54,6 +54,7 @@ Reuse the Air Actions owner. Exclusive existing paths:
 - apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt
 - apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorPreferences.kt
 - apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
+- apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditPanel.kt (additional exclusive grant to the SAME Android owner, 2026-10-18)
 - apps/android/src/main/AndroidManifest.xml
 - apps/android/src/main/kotlin/com/visualworkbench/android/airactions/ (all existing/new lane files)
 - apps/android/src/test/kotlin/com/visualworkbench/android/airactions/ (lane tests)
@@ -197,3 +198,19 @@ Main, controllers, preferences or other shared files without a new scoped grant.
 5. Physical capture/DPI, BLE/S Pen, cross-JNI codec/GPU and performance gates stay
    open; no compilation or synthetic fixture changes them. Existing provider and
    Krita/device deferrals remain in force.
+
+## Additional Android remote-panel ownership
+
+Grant apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditPanel.kt
+exclusively to the existing Air Actions owner01a1507a-7956-7594-8687-9e7a9a18900b.
+Verified against the current grants: Desktop capture owns only Desktop Main/
+capture and its region helper; native verification owns four core leaves; shared
+diagnostics owns four shared report files; root has no Android remote edits.
+No current lane owns this path. Existing Android controller/Activity/canvas/UI/
+preferences/manifest files remain with that same owner. Root will not duplicate
+its prepared patch. Finish the separate Dialog Window and exact existing remote
+palette wiring in this path, preserving native grant/target/focus/lifecycle and
+queued-command retirement. No native input authority, generic key injection,
+local undo fallback, vendor SDK, protocol or unrelated remote module changes.
+Return one coherent complete Android caller candidate/source receipt; source
+review and whole Android compilation/tests precede main promotion.
