@@ -187,10 +187,27 @@ pub async fn create_file_image_project(
 ) -> Result<Arc<ProjectSession>> {
     create_file_project_inner(options, cancellation, None).await
 }
+/// Explicit rendered RAW preview intake. This preserves the immutable source and
+/// never grants sensor/full-resolution pixels or ordinary original export.
+#[uniffi::export]
+pub async fn create_file_raw_preview_project(
+    options: CreateFileImageProject,
+    cancellation: Arc<Cancellation>,
+) -> Result<Arc<ProjectSession>> {
+    create_file_project_mode(options, cancellation, None, true).await
+}
 pub(crate) async fn create_file_project_inner(
     options: CreateFileImageProject,
     cancellation: Arc<Cancellation>,
     capture: Option<crate::capture_import::ValidatedCapture>,
+) -> Result<Arc<ProjectSession>> {
+    create_file_project_mode(options, cancellation, capture, false).await
+}
+async fn create_file_project_mode(
+    options: CreateFileImageProject,
+    cancellation: Arc<Cancellation>,
+    capture: Option<crate::capture_import::ValidatedCapture>,
+    raw_preview: bool,
 ) -> Result<Arc<ProjectSession>> {
     validate_path(&options.path)?;
     validate_path(&options.source_path)?;
@@ -216,51 +233,82 @@ pub(crate) async fn create_file_project_inner(
             options.max_encoded_bytes.min(options.memory_budget_bytes),
             &cancellation,
         )?;
-        let import_metadata = crate::format_images::import_metadata(
-            &bytes,
-            vw_raster::DecodeLimits {
-                max_memory_bytes: options.memory_budget_bytes,
-                ..Default::default()
-            },
-            &cancellation,
-        )?;
-        let mut scratch = tempfile::Builder::new()
-            .prefix("vw-raster-source-")
-            .tempfile_in(&work)?;
-        let (info, alpha) = with_source(
-            &bytes,
-            scratch.as_file_mut(),
-            options.memory_budget_bytes,
-            options.max_scratch_bytes,
-            &cancellation,
-            |source| {
-                admit_scan(source, options.memory_budget_bytes)?;
-                let info = source.info().clone();
-                let mut alpha = false;
-                for y in (0..info.height).step_by(32) {
-                    cancellation.check()?;
-                    let region = vw_raster::Region {
-                        x: 0,
-                        y,
-                        width: info.width,
-                        height: 32.min(info.height - y),
-                    };
-                    if source
-                        .read_region(region, options.memory_budget_bytes, &|| {
-                            cancellation.is_cancelled()
-                        })
-                        .map_err(raster_error)?
-                        .pixels
-                        .has_alpha()
-                    {
-                        alpha = true;
-                        break;
+        let (info, alpha, format, import_metadata) = if raw_preview {
+            let (image, format, metadata) = crate::format_images::raw_preview_import(
+                &bytes,
+                vw_raster::DecodeLimits {
+                    max_encoded_bytes: options.max_encoded_bytes as usize,
+                    max_memory_bytes: options.memory_budget_bytes,
+                    ..Default::default()
+                },
+                &|| cancellation.is_cancelled(),
+            )?;
+            cancellation.check()?;
+            // SourceInfo describes the displayed preview grid, with immutable
+            // container identity and the explicit unavailable-original flag.
+            let info = SourceInfo {
+                width: image.width,
+                height: image.height,
+                bit_depth: image.pixels.bit_depth(),
+                icc: image.icc,
+                source_asset: image.source_asset,
+                original_available: false,
+                orientation_applied: image.orientation_applied,
+            };
+            (info, image.pixels.has_alpha(), format, metadata)
+        } else {
+            let import_metadata = crate::format_images::import_metadata(
+                &bytes,
+                vw_raster::DecodeLimits {
+                    max_memory_bytes: options.memory_budget_bytes,
+                    ..Default::default()
+                },
+                &cancellation,
+            )?;
+            let mut scratch = tempfile::Builder::new()
+                .prefix("vw-raster-source-")
+                .tempfile_in(&work)?;
+            let (info, alpha) = with_source(
+                &bytes,
+                scratch.as_file_mut(),
+                options.memory_budget_bytes,
+                options.max_scratch_bytes,
+                &cancellation,
+                |source| {
+                    admit_scan(source, options.memory_budget_bytes)?;
+                    let info = source.info().clone();
+                    let mut alpha = false;
+                    for y in (0..info.height).step_by(32) {
+                        cancellation.check()?;
+                        let region = vw_raster::Region {
+                            x: 0,
+                            y,
+                            width: info.width,
+                            height: 32.min(info.height - y),
+                        };
+                        if source
+                            .read_region(region, options.memory_budget_bytes, &|| {
+                                cancellation.is_cancelled()
+                            })
+                            .map_err(raster_error)?
+                            .pixels
+                            .has_alpha()
+                        {
+                            alpha = true;
+                            break;
+                        }
                     }
-                }
-                Ok((info, alpha))
-            },
-        )?;
-        scratch.close()?;
+                    Ok((info, alpha))
+                },
+            )?;
+            scratch.close()?;
+            (
+                info,
+                alpha,
+                crate::original_image_label(&bytes),
+                import_metadata,
+            )
+        };
         if let Some(capture) = &capture {
             capture.verify_source(&info, &bytes)?;
         }
@@ -270,7 +318,6 @@ pub(crate) async fn create_file_project_inner(
         } else {
             (info.width, info.height)
         };
-        let format = crate::original_image_label(&bytes);
         project.assets.insert(
             info.source_asset.clone(),
             pb::AddAsset {
@@ -401,12 +448,17 @@ impl ProjectSession {
                 if closed.load(std::sync::atomic::Ordering::Acquire) {
                     return Err(CoreError::Closed);
                 }
-                let revision = state.info()?;
+                // Admit canonical validation/hash work before producing an
+                // event revision or reading any immutable source bytes.
+                let preflight = match preflight_file(state, &options) {
+                    Ok(value) => value,
+                    Err(error) => return Ok(Err(error)),
+                };
+                let revision = preflight.revision;
                 state
                     .events
                     .publish(ChangeKind::ExportStarted, revision.clone());
-                let result = preflight_file(state, &options)
-                    .and_then(|_| export_file(state, options, &cancellation));
+                let result = export_file(state, options, &cancellation);
                 state.events.publish(
                     if result.is_ok() {
                         ChangeKind::ExportReady
@@ -456,6 +508,8 @@ fn preflight_verified(
     cancel: &Cancellation,
 ) -> TransferResult<FilePreflight> {
     let mut result = preflight_file(state, options)?;
+    let work = work_directory(&options.work_directory)?;
+    destination(&options.output_path, &work)?;
     let project = state.project()?;
     let document = Id::try_from(options.export.document_id.clone())?;
     let definition = &project
@@ -463,10 +517,29 @@ fn preflight_verified(
         .get(&document)
         .ok_or(TransferError::Invalid)?
         .definition;
+    if vw_raster::requires_document_output(project, &document, options.export.marked)
+        .map_err(transfer_raster_error)?
+    {
+        let prepared = prepare_file_output(state, &document, options, cancel)?;
+        let request = request(&options.export, definition, state.view_revision()?)?;
+        let admitted = output_codec_request(&prepared, &request)?;
+        // Validate actual composed alpha, color, depth and O-region before a
+        // destination/staging file exists. The codec receives the same pixels.
+        vw_raster::prepare_export_pixels_with_output(
+            &prepared.output.image,
+            &admitted,
+            prepared.output.frame,
+            &|| cancel.is_cancelled(),
+        )
+        .map_err(transfer_raster_error)?;
+        result.estimated_peak_bytes = result
+            .estimated_peak_bytes
+            .max(options.export.memory_budget_bytes);
+        cancel.check()?;
+        return Ok(result);
+    }
     let asset = AssetId::try_from(definition.primary_asset_id.clone())?;
     let request = request(&options.export, definition, state.view_revision()?)?;
-    let work = work_directory(&options.work_directory)?;
-    destination(&options.output_path, &work)?;
     let bytes = read_bounded(
         &state.blobs.path(&asset)?,
         INPUT_LIMIT.min(request.memory_budget_bytes),
@@ -557,16 +630,14 @@ fn preflight_file(
     state: &ProjectState,
     options: &FileExportOptions,
 ) -> TransferResult<FilePreflight> {
-    // CORE-006 requires provenance in the delivered bytes; BMP has no admitted carrier.
-    if matches!(options.export.format, ImageFormat::Bmp8) {
-        return Err(TransferError::Unsupported);
-    }
     limits(
         options.export.memory_budget_bytes,
         options.max_encoded_bytes,
         OUTPUT_LIMIT,
         options.max_scratch_bytes,
     )?;
+    crate::workflow::canonical_workspace(state, options.export.memory_budget_bytes, false)
+        .map_err(output_error)?;
     let project = state.project()?;
     let document = Id::try_from(options.export.document_id.clone())?;
     let definition = &project
@@ -578,18 +649,27 @@ fn preflight_file(
         .assets
         .get(&AssetId::try_from(definition.primary_asset_id.clone())?)
         .ok_or(TransferError::Metadata)?;
-    let (width, height) = if asset.orientation >= 5 {
+    if crate::format_images::asset_is_raw_preview(asset).map_err(transfer_raster_error)? {
+        return Err(TransferError::Unsupported);
+    }
+    let (source_width, source_height) = if asset.orientation >= 5 {
         (asset.height, asset.width)
     } else {
         (asset.width, asset.height)
     };
-    if u64::from(width) * u64::from(height) > 50_000_000 {
+    if u64::from(source_width) * u64::from(source_height) > 50_000_000 {
         return Err(TransferError::PixelLimit {
-            width,
-            height,
+            width: source_width,
+            height: source_height,
             max_pixels: 50_000_000,
         });
     }
+    let needs_output =
+        vw_raster::requires_document_output(project, &document, options.export.marked)
+            .map_err(transfer_raster_error)?;
+    let [width, height] = project
+        .active_image_output(&document)?
+        .map_or([source_width, source_height], |frame| frame.output_size());
     if asset.byte_size > INPUT_LIMIT {
         return Err(TransferError::EncodedLimit);
     }
@@ -600,10 +680,11 @@ fn preflight_file(
         width,
         height,
     });
-    let buffered = !matches!(
-        request.format,
-        vw_raster::ExportFormat::Png8 | vw_raster::ExportFormat::Png16
-    );
+    let buffered = needs_output
+        || !matches!(
+            request.format,
+            vw_raster::ExportFormat::Png8 | vw_raster::ExportFormat::Png16
+        );
     let budget = request.memory_budget_bytes;
     request.memory_budget_bytes = u64::MAX;
     let codec = vw_raster::preflight(
@@ -621,7 +702,7 @@ fn preflight_file(
         },
         other => transfer_raster_error(other),
     })?;
-    let full = u64::from(width) * u64::from(height) * 8;
+    let full = u64::from(source_width) * u64::from(source_height) * 8;
     let profile = profile_reserve(!asset.icc_profile.is_empty());
     let estimate = if buffered {
         asset.byte_size + full + profile + codec
@@ -638,7 +719,21 @@ fn preflight_file(
     } else {
         0
     };
-    let estimate = estimate.max(source_decode);
+    let estimate = if needs_output {
+        let render = vw_raster::document_output_reservation(
+            project,
+            &document,
+            vw_raster::RenderOptions {
+                memory_budget_bytes: budget,
+                include_guides: false,
+                assume_untagged_srgb: options.export.assume_untagged_srgb,
+            },
+        )
+        .map_err(transfer_raster_error)?;
+        estimate.max(source_decode).max(render)
+    } else {
+        estimate.max(source_decode)
+    };
     memory(estimate, budget)?;
     Ok(FilePreflight {
         width: region.width,
@@ -654,8 +749,140 @@ fn preflight_file(
         },
         estimated_peak_bytes: estimate,
         buffered,
-        requires_render_validation: options.export.marked,
+        requires_render_validation: options.export.marked || needs_output,
         revision: state.info()?,
+    })
+}
+fn output_error(error: WorkflowError) -> TransferError {
+    match error {
+        WorkflowError::Cancelled => TransferError::Cancelled,
+        WorkflowError::Closed => TransferError::Closed,
+        WorkflowError::Storage => TransferError::Storage,
+        WorkflowError::Memory { estimated, budget } => TransferError::Memory { estimated, budget },
+        WorkflowError::Limit | WorkflowError::Backpressure => TransferError::Backpressure,
+        _ => TransferError::Metadata,
+    }
+}
+fn prepare_file_output(
+    state: &ProjectState,
+    document: &Id,
+    options: &FileExportOptions,
+    cancel: &Cancellation,
+) -> TransferResult<crate::image_frames::PreparedOutput> {
+    let prepared = crate::image_frames::prepare_output(
+        state,
+        document,
+        options.export.marked,
+        options.export.assume_untagged_srgb,
+        options.export.memory_budget_bytes,
+        cancel,
+    )
+    .map_err(output_error)?;
+    crate::workflow::check_binding(state, &prepared.binding).map_err(output_error)?;
+    let project = state.project()?;
+    let definition = &project
+        .documents
+        .get(document)
+        .ok_or(TransferError::Metadata)?
+        .definition;
+    let asset = project
+        .assets
+        .get(&AssetId::try_from(definition.primary_asset_id.clone())?)
+        .ok_or(TransferError::Metadata)?;
+    let source_size = if asset.orientation >= 5 {
+        [asset.height, asset.width]
+    } else {
+        [asset.width, asset.height]
+    };
+    let expected = project
+        .active_image_output(document)?
+        .map_or(source_size, |frame| frame.output_size());
+    if prepared.binding.document_id != document.as_str()
+        || prepared.source_asset_id != asset.asset_id
+        || prepared.output.image.source_asset.as_str() != asset.asset_id
+        || !prepared.output.image.original_available
+        || [prepared.source_width, prepared.source_height] != source_size
+        || [prepared.output.image.width, prepared.output.image.height] != expected
+    {
+        return Err(TransferError::Metadata);
+    }
+    cancel.check()?;
+    Ok(prepared)
+}
+fn output_codec_request(
+    prepared: &crate::image_frames::PreparedOutput,
+    request: &vw_raster::ExportRequest,
+) -> TransferResult<vw_raster::ExportRequest> {
+    let image = &prepared.output.image;
+    let retained = vw_raster::image_resident_bytes(image).map_err(transfer_raster_error)?;
+    let budget = prepared
+        .memory_budget_bytes
+        .checked_sub(retained)
+        .ok_or(TransferError::Backpressure)?;
+    let mut admitted = request.clone();
+    admitted.memory_budget_bytes = budget;
+    vw_raster::preflight(
+        image.width,
+        image.height,
+        image.pixels.bit_depth(),
+        image.pixels.has_alpha() && admitted.region.is_none(),
+        &admitted,
+    )
+    .map_err(transfer_raster_error)?;
+    Ok(admitted)
+}
+fn encode_file_output(
+    prepared: &crate::image_frames::PreparedOutput,
+    request: &vw_raster::ExportRequest,
+    options: &FileExportOptions,
+    cancel: &Cancellation,
+    sink: &mut File,
+) -> TransferResult<vw_raster::StreamReport> {
+    let image = &prepared.output.image;
+    let admitted = output_codec_request(prepared, request)?;
+    let output_region = request.region.unwrap_or(vw_raster::Region {
+        x: 0,
+        y: 0,
+        width: image.width,
+        height: image.height,
+    });
+    let (metadata, bytes) = if crate::format_images::external(request.format) {
+        let (bytes, metadata) = crate::format_images::encode_private_in_budget(
+            image,
+            request,
+            prepared.output.frame,
+            options.max_encoded_bytes,
+            sink,
+            cancel,
+            prepared.memory_budget_bytes,
+        )
+        .map_err(transfer_raster_error)?;
+        (metadata, bytes)
+    } else {
+        // Only composed output uses this bounded materialized codec route.
+        // Ordinary PNG retains its existing row/scratch streaming owner.
+        let encoded = vw_raster::export_with_output(image, &admitted, prepared.output.frame)
+            .map_err(transfer_raster_error)?;
+        cancel.check()?;
+        if encoded.bytes.len() as u64 > options.max_encoded_bytes {
+            return Err(TransferError::EncodedLimit);
+        }
+        for chunk in encoded.bytes.chunks(65536) {
+            cancel.check()?;
+            sink.write_all(chunk)?;
+        }
+        (encoded.metadata, encoded.bytes.len() as u64)
+    };
+    cancel.check()?;
+    Ok(vw_raster::StreamReport {
+        metadata,
+        encoded_bytes: bytes,
+        strips: 1,
+        plan: vw_raster::StreamPlan {
+            region: output_region,
+            strip_rows: output_region.height,
+            estimated_peak_bytes: request.memory_budget_bytes,
+        },
     })
 }
 fn validate_source_binding(
@@ -751,19 +978,18 @@ fn export_buffered(
     }
     cancel.check()?;
     if crate::format_images::external(request.format) {
-        let mut external = request.clone();
-        // available excludes encoded input and source workspace; the adapter
-        // reserves the complete retained decoded image before preparing pixels.
-        external.memory_budget_bytes = available;
-        let (bytes, mut metadata) = crate::format_images::encode_private(
+        // available excludes encoded input and source workspace; policy and
+        // embedded provenance retain the original request throughout encoding.
+        let (bytes, metadata) = crate::format_images::encode_private_in_budget(
             &image,
-            &external,
+            request,
+            None,
             options.max_encoded_bytes,
             sink,
             cancel,
+            available,
         )
         .map_err(transfer_raster_error)?;
-        metadata.settings = request.clone();
         let output_region = request.region.unwrap_or(region);
         return Ok(vw_raster::StreamReport {
             metadata,
@@ -1095,7 +1321,9 @@ pub(crate) fn open_input(path: &Path, limit: u64) -> TransferResult<(File, u64)>
     #[cfg(any(target_os = "linux", target_os = "android"))]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
+        options.custom_flags(
+            (rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK).bits() as i32,
+        );
     }
     #[cfg(windows)]
     {
@@ -1136,81 +1364,89 @@ fn export_file(
         .ok_or(CoreError::Invalid)?
         .definition;
     let asset = AssetId::try_from(definition.primary_asset_id.clone())?;
-    let source_path = state.blobs.path(&asset)?;
-    let bytes = read_bounded(
-        &source_path,
-        INPUT_LIMIT.min(options.export.memory_budget_bytes),
-        cancel,
-    )?;
-    if AssetId::hash(&bytes) != asset {
-        return Err(TransferError::Storage);
-    }
     let request = request(&options.export, definition, state.view_revision()?)?;
-    let mut scratch = tempfile::Builder::new()
-        .prefix("vw-raster-source-")
-        .tempfile_in(&work)?;
     let mut output = tempfile::Builder::new()
         .prefix("vw-raster-output-")
         .tempfile_in(&work)?;
     let mut hash = blake3::Hasher::new();
-    let report = {
-        let mut sink = output.as_file_mut();
-        with_source(
-            &bytes,
-            scratch.as_file_mut(),
-            request.memory_budget_bytes,
-            options.max_scratch_bytes,
+    let report = if vw_raster::requires_document_output(project, &document, options.export.marked)
+        .map_err(transfer_raster_error)?
+    {
+        let prepared = prepare_file_output(state, &document, &options, cancel)?;
+        encode_file_output(&prepared, &request, &options, cancel, output.as_file_mut())?
+    } else {
+        let source_path = state.blobs.path(&asset)?;
+        let bytes = read_bounded(
+            &source_path,
+            INPUT_LIMIT.min(options.export.memory_budget_bytes),
             cancel,
-            |source| {
-                validate_source_binding(source.info(), project, &asset)?;
-                if !matches!(
-                    request.format,
-                    vw_raster::ExportFormat::Png8 | vw_raster::ExportFormat::Png16
-                ) {
-                    return export_buffered(
-                        source, state, &document, &options, &request, cancel, sink,
-                    );
-                }
-                let mut adapter = SourceView(source);
-                let limit = vw_raster::StreamLimits {
-                    max_encoded_bytes: options.max_encoded_bytes,
-                    max_strip_rows: 128,
-                    max_pixels: 50_000_000,
-                };
-                if options.export.marked {
-                    let assets = ResultAssets {
-                        blobs: &state.blobs,
-                        budget: request.memory_budget_bytes,
-                        cancel,
+        )?;
+        if AssetId::hash(&bytes) != asset {
+            return Err(TransferError::Storage);
+        }
+        let mut scratch = tempfile::Builder::new()
+            .prefix("vw-raster-source-")
+            .tempfile_in(&work)?;
+        let report = {
+            let mut sink = output.as_file_mut();
+            with_source(
+                &bytes,
+                scratch.as_file_mut(),
+                request.memory_budget_bytes,
+                options.max_scratch_bytes,
+                cancel,
+                |source| {
+                    validate_source_binding(source.info(), project, &asset)?;
+                    if !matches!(
+                        request.format,
+                        vw_raster::ExportFormat::Png8 | vw_raster::ExportFormat::Png16
+                    ) {
+                        return export_buffered(
+                            source, state, &document, &options, &request, cancel, sink,
+                        );
+                    }
+                    let mut adapter = SourceView(source);
+                    let limit = vw_raster::StreamLimits {
+                        max_encoded_bytes: options.max_encoded_bytes,
+                        max_strip_rows: 128,
+                        max_pixels: 50_000_000,
                     };
-                    vw_raster::export_document_png_to(
-                        &mut adapter,
-                        vw_raster::MarkedDocument {
-                            project,
-                            document: &document,
-                            assets: &assets,
-                            options: vw_raster::RenderOptions {
-                                memory_budget_bytes: request.memory_budget_bytes,
-                                include_guides: false,
-                                assume_untagged_srgb: options.export.assume_untagged_srgb,
+                    if options.export.marked {
+                        let assets = ResultAssets {
+                            blobs: &state.blobs,
+                            budget: request.memory_budget_bytes,
+                            cancel,
+                        };
+                        vw_raster::export_document_png_to(
+                            &mut adapter,
+                            vw_raster::MarkedDocument {
+                                project,
+                                document: &document,
+                                assets: &assets,
+                                options: vw_raster::RenderOptions {
+                                    memory_budget_bytes: request.memory_budget_bytes,
+                                    include_guides: false,
+                                    assume_untagged_srgb: options.export.assume_untagged_srgb,
+                                },
                             },
-                        },
-                        &request,
-                        limit,
-                        &mut sink,
-                        &|| cancel.is_cancelled(),
-                    )
-                    .map_err(transfer_raster_error)
-                } else {
-                    vw_raster::export_png_to(&mut adapter, &request, limit, &mut sink, &|| {
-                        cancel.is_cancelled()
-                    })
-                    .map_err(transfer_raster_error)
-                }
-            },
-        )?
+                            &request,
+                            limit,
+                            &mut sink,
+                            &|| cancel.is_cancelled(),
+                        )
+                        .map_err(transfer_raster_error)
+                    } else {
+                        vw_raster::export_png_to(&mut adapter, &request, limit, &mut sink, &|| {
+                            cancel.is_cancelled()
+                        })
+                        .map_err(transfer_raster_error)
+                    }
+                },
+            )?
+        };
+        scratch.close()?;
+        report
     };
-    scratch.close()?;
     let metadata_json = serde_json::to_string(&report.metadata).map_err(|_| CoreError::Invalid)?;
     let mut response_bytes = crate::payload::info_bytes(&revision)?;
     crate::payload::accumulate(
@@ -1570,13 +1806,16 @@ fn destination(path: &str, work: &Path) -> Result<PathBuf> {
     }
 }
 pub(crate) fn read_bounded(path: &Path, limit: u64, cancel: &Cancellation) -> Result<Vec<u8>> {
+    cancel.check()?;
     check_components(path)?;
     let mut options = OpenOptions::new();
     options.read(true);
     #[cfg(any(target_os = "linux", target_os = "android"))]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
+        options.custom_flags(
+            (rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK).bits() as i32,
+        );
     }
     #[cfg(windows)]
     {
@@ -1714,7 +1953,7 @@ mod tests {
         }));
     }
     #[tokio::test]
-    async fn bmp_preflight_is_refused_before_staging_a_provenance_free_export() {
+    async fn bmp_file_export_embeds_revision_and_source_before_publication() {
         let root = temp();
         let (bytes, _) = image();
         let source = root.path().join("source.png");
@@ -1726,14 +1965,35 @@ mod tests {
             .unwrap();
         let mut output = exporting(root.path(), document);
         output.export.format = ImageFormat::Bmp8;
+        output.export.allow_depth_reduction = true;
         output.output_path = root.path().join("gated.bmp").to_string_lossy().into_owned();
-        assert!(matches!(
-            project
-                .preflight_image_file(output, Arc::new(Cancellation::new()))
-                .await,
-            Err(TransferError::Unsupported)
-        ));
+        let preflight = project
+            .preflight_image_file(output.clone(), Arc::new(Cancellation::new()))
+            .await
+            .unwrap();
+        assert_eq!(
+            (
+                preflight.width,
+                preflight.height,
+                preflight.output_bit_depth
+            ),
+            (6, 4, 8)
+        );
         assert!(!root.path().join("gated.bmp").exists());
+        let result = project
+            .export_image_file(output, Arc::new(Cancellation::new()))
+            .await
+            .unwrap();
+        let delivered = std::fs::read(root.path().join("gated.bmp")).unwrap();
+        let provenance = vw_formats::bmp_provenance(&delivered, vw_formats::Limits::default())
+            .unwrap()
+            .unwrap();
+        let metadata: vw_raster::ExportMetadata = serde_json::from_str(provenance).unwrap();
+        assert_eq!(metadata.source_asset, AssetId::hash(&bytes).to_string());
+        assert_eq!(
+            serde_json::to_value(&metadata).unwrap(),
+            serde_json::from_str::<serde_json::Value>(&result.metadata_json).unwrap()
+        );
         assert_eq!(std::fs::read(source).unwrap(), bytes);
         no_scratch(root.path());
         project.close().await.unwrap();
@@ -1862,4 +2122,5 @@ mod tests {
             assert!(work_directory(&path.to_string_lossy()).is_err());
         }
     }
+    include!("format_stream_tests.rs");
 }

@@ -1,4 +1,4 @@
-//! Additive BMP/TIFF admission and private-file encoding. Encoded originals
+//! Bounded ordinary/composite admission, explicit RAW previews and private-file encoding. Encoded originals
 //! remain authoritative; this adapter never replaces them with a derivative.
 use crate::{Cancellation, ProjectSession, WorkflowBinding, WorkflowError};
 use std::{
@@ -15,10 +15,19 @@ const MIB: u64 = 1024 * 1024;
 const BUFFERED_LIMIT: u64 = 64 * MIB;
 
 pub(crate) fn is_format(bytes: &[u8]) -> bool {
-    bytes.starts_with(b"BM") || bytes.starts_with(b"II") || bytes.starts_with(b"MM")
+    bytes.starts_with(b"BM")
+        || bytes.starts_with(b"II")
+        || bytes.starts_with(b"MM")
+        || bytes.starts_with(b"8BPS")
 }
 pub(crate) fn label(bytes: &[u8]) -> Option<&'static str> {
-    if bytes.starts_with(b"BM") {
+    if bytes.starts_with(b"8BPS") {
+        match bytes.get(4..6) {
+            Some([0, 1]) => Some("psd"),
+            Some([0, 2]) => Some("psb"),
+            _ => None,
+        }
+    } else if bytes.starts_with(b"BM") {
         Some("bmp")
     } else if bytes.starts_with(b"II") || bytes.starts_with(b"MM") {
         Some("tiff")
@@ -36,8 +45,10 @@ fn limits(l: DecodeLimits) -> vw_formats::Limits {
 }
 fn error(e: vw_formats::Error) -> RasterError {
     match e {
-        vw_formats::Error::Invalid => RasterError::Invalid("BMP/TIFF container"),
-        vw_formats::Error::Unsupported => RasterError::Unsupported("BMP/TIFF representation"),
+        vw_formats::Error::Invalid => RasterError::Invalid("bounded image container"),
+        vw_formats::Error::Unsupported => RasterError::Unsupported(
+            "bounded image representation; RAW requires explicit preview import",
+        ),
         vw_formats::Error::Depth => RasterError::Depth,
         vw_formats::Error::Color => RasterError::Color,
         vw_formats::Error::Limit => RasterError::Allocation,
@@ -66,9 +77,15 @@ pub(crate) fn decode(
                 budget: l.max_memory_bytes,
             });
         }
-        vw_formats::decode(bytes, limits(l), cancel)
-            .map(|result| result.image)
-            .map_err(error)
+        if bytes.starts_with(b"8BPS") {
+            vw_formats::psd::decode(bytes, limits(l), cancel)
+                .map(|result| result.image)
+                .map_err(error)
+        } else {
+            vw_formats::decode(bytes, limits(l), cancel)
+                .map(|result| result.image)
+                .map_err(error)
+        }
     };
     // Generic PNG/JPEG/WebP and installed OS decoders may be non-interruptible.
     // Their result cannot escape after the caller cancelled while they ran.
@@ -79,8 +96,95 @@ pub(crate) fn decode(
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Default)]
+#[serde(default)]
 struct ImportNotices {
     first_tiff_page_only: bool,
+    #[serde(skip_serializing_if = "false_notice")]
+    flattened_composite: bool,
+    #[serde(skip_serializing_if = "false_notice")]
+    raw_preview: bool,
+}
+fn false_notice(value: &bool) -> bool {
+    !*value
+}
+
+pub(crate) fn asset_is_raw_preview(asset: &vw_proto::v1::AddAsset) -> Result<bool, RasterError> {
+    if !matches!(asset.format.as_str(), "dng" | "cr2" | "raw-preview") {
+        return Ok(false);
+    }
+    if asset.metadata_json.len() > 4096 {
+        return Err(RasterError::Metadata);
+    }
+    let notices: ImportNotices =
+        serde_json::from_str(&asset.metadata_json).map_err(|_| RasterError::Metadata)?;
+    if !notices.raw_preview
+        || notices.flattened_composite
+        || notices.first_tiff_page_only
+        || asset.bit_depth != 8
+    {
+        return Err(RasterError::Metadata);
+    }
+    Ok(true)
+}
+
+/// Explicit preview intake only. The unchanged container is stored by the
+/// existing project creation owner. Neither suffix nor TIFF sniffing grants it.
+pub(crate) fn raw_preview_import(
+    bytes: &[u8],
+    l: DecodeLimits,
+    cancel: &dyn Fn() -> bool,
+) -> Result<(DecodedImage, &'static str, String), RasterError> {
+    let preview = vw_formats::raw_preview::embedded(bytes, limits(l), cancel).map_err(error)?;
+    let format = match preview.kind() {
+        vw_formats::raw_preview::Kind::Dng => "dng",
+        vw_formats::raw_preview::Kind::Cr2 => "cr2",
+        vw_formats::raw_preview::Kind::TiffCfa => "raw-preview",
+    };
+    let image = preview.decode(limits(l), cancel).map_err(error)?;
+    if image.original_available {
+        return Err(RasterError::Metadata);
+    }
+    let metadata = serde_json::to_string(&ImportNotices {
+        raw_preview: true,
+        ..Default::default()
+    })
+    .map_err(|_| RasterError::Metadata)?;
+    Ok((image, format, metadata))
+}
+
+/// Reopen/render uses the exact canonical intake declaration; ordinary decoders
+/// never auto-adopt a RAW preview. This does not grant full-resolution export.
+pub(crate) fn decode_asset(
+    bytes: &[u8],
+    l: DecodeLimits,
+    cancel: &dyn Fn() -> bool,
+    asset: &vw_proto::v1::AddAsset,
+) -> Result<DecodedImage, RasterError> {
+    let image = if asset_is_raw_preview(asset)? {
+        let (image, format, _) = raw_preview_import(bytes, l, cancel)?;
+        if format != asset.format {
+            return Err(RasterError::Metadata);
+        }
+        image
+    } else {
+        decode(bytes, l, cancel)?
+    };
+    if image.source_asset.as_str() != asset.asset_id {
+        return Err(RasterError::Metadata);
+    }
+    let extent = if asset.orientation >= 5 {
+        [asset.height, asset.width]
+    } else {
+        [asset.width, asset.height]
+    };
+    if [image.width, image.height] != extent
+        || u32::from(image.pixels.bit_depth()) != asset.bit_depth
+        || u32::from(image.orientation_applied) != asset.orientation
+        || image.icc.as_deref().unwrap_or_default() != asset.icc_profile
+    {
+        return Err(RasterError::Metadata);
+    }
+    Ok(image)
 }
 
 /// Called before decoding, while no decoded pixels/profile clones are held.
@@ -94,12 +198,22 @@ pub(crate) fn import_metadata(
     if !is_format(bytes) {
         return Ok("{}".into());
     }
+    if bytes.starts_with(b"8BPS") {
+        vw_formats::psd::inspect(bytes, limits(l), &|| cancel.is_cancelled()).map_err(error)?;
+        cancel.check().map_err(|_| RasterError::Cancelled)?;
+        return serde_json::to_string(&ImportNotices {
+            flattened_composite: true,
+            ..Default::default()
+        })
+        .map_err(|_| RasterError::Metadata);
+    }
     let header = vw_formats::inspect(bytes, limits(l)).map_err(error)?;
     cancel.check().map_err(|_| RasterError::Cancelled)?;
     serde_json::to_string(&ImportNotices {
         first_tiff_page_only: header
             .notices
             .contains(&vw_formats::Notice::FirstTiffPageOnly),
+        ..Default::default()
     })
     .map_err(|_| RasterError::Metadata)
 }
@@ -161,10 +275,65 @@ pub(crate) fn encode_private(
     file: &mut File,
     cancel: &Cancellation,
 ) -> Result<(u64, vw_raster::ExportMetadata), RasterError> {
-    if request.format == ExportFormat::Bmp8 {
-        return Err(RasterError::Unsupported(
-            "BMP standalone provenance is not supported; use TIFF or PNG",
-        ));
+    encode_private_inner(
+        source,
+        request,
+        None,
+        cap,
+        file,
+        cancel,
+        request.memory_budget_bytes,
+    )
+}
+pub(crate) fn encode_private_with_output(
+    source: &DecodedImage,
+    request: &ExportRequest,
+    output: Option<vw_raster::ImageOutputMetadata>,
+    cap: u64,
+    file: &mut File,
+    cancel: &Cancellation,
+) -> Result<(u64, vw_raster::ExportMetadata), RasterError> {
+    if output.is_none() {
+        return encode_private(source, request, cap, file, cancel);
+    }
+    encode_private_inner(
+        source,
+        request,
+        output,
+        cap,
+        file,
+        cancel,
+        request.memory_budget_bytes,
+    )
+}
+pub(crate) fn encode_private_in_budget(
+    source: &DecodedImage,
+    request: &ExportRequest,
+    output: Option<vw_raster::ImageOutputMetadata>,
+    cap: u64,
+    file: &mut File,
+    cancel: &Cancellation,
+    working_budget: u64,
+) -> Result<(u64, vw_raster::ExportMetadata), RasterError> {
+    if working_budget > request.memory_budget_bytes {
+        return Err(RasterError::Invalid("working budget exceeds request"));
+    }
+    if working_budget == request.memory_budget_bytes {
+        return encode_private_with_output(source, request, output, cap, file, cancel);
+    }
+    encode_private_inner(source, request, output, cap, file, cancel, working_budget)
+}
+fn encode_private_inner(
+    source: &DecodedImage,
+    request: &ExportRequest,
+    output: Option<vw_raster::ImageOutputMetadata>,
+    cap: u64,
+    file: &mut File,
+    cancel: &Cancellation,
+    working_budget: u64,
+) -> Result<(u64, vw_raster::ExportMetadata), RasterError> {
+    if !source.original_available {
+        return Err(RasterError::OriginalRequired);
     }
     if output_bound(source, request)? > cap {
         return Err(RasterError::EncodedLimit { limit: cap });
@@ -175,9 +344,11 @@ pub(crate) fn encode_private(
     // the user's original settings in the final receipt, not this internal cap.
     let mut admitted = request.clone();
     admitted.memory_budget_bytes =
-        subtract_retained(request.memory_budget_bytes, retained_source_bytes(source)?)?;
+        subtract_retained(working_budget, retained_source_bytes(source)?)?;
     let mut prepared =
-        vw_raster::prepare_export_pixels(source, &admitted, &|| cancel.is_cancelled())?;
+        vw_raster::prepare_export_pixels_with_output(source, &admitted, output, &|| {
+            cancel.is_cancelled()
+        })?;
     prepared.metadata.settings = request.clone();
     let limits = vw_formats::Limits {
         output_bytes: cap,
@@ -186,14 +357,20 @@ pub(crate) fn encode_private(
     };
     let provenance =
         serde_json::to_string(&prepared.metadata).map_err(|_| RasterError::Metadata)?;
-    let result = vw_formats::encode_to_with_metadata(
-        &prepared.image,
-        external_format(request.format)?,
-        limits,
-        &provenance,
-        file,
-        &|| cancel.is_cancelled(),
-    )
+    let result = if request.format == ExportFormat::Bmp8 {
+        vw_formats::encode_bmp_with_provenance(&prepared.image, limits, &provenance, file, &|| {
+            cancel.is_cancelled()
+        })
+    } else {
+        vw_formats::encode_to_with_metadata(
+            &prepared.image,
+            external_format(request.format)?,
+            limits,
+            &provenance,
+            file,
+            &|| cancel.is_cancelled(),
+        )
+    }
     .map_err(error)?;
     if file.metadata().map_err(|_| RasterError::Io)?.len() != result.bytes {
         return Err(RasterError::Io);
@@ -204,6 +381,14 @@ pub(crate) fn encode_private(
 pub(crate) fn encode_buffered(
     source: &DecodedImage,
     request: &ExportRequest,
+    cancel: &Cancellation,
+) -> Result<ExportedImage, RasterError> {
+    encode_buffered_with_output(source, request, None, cancel)
+}
+pub(crate) fn encode_buffered_with_output(
+    source: &DecodedImage,
+    request: &ExportRequest,
+    output: Option<vw_raster::ImageOutputMetadata>,
     cancel: &Cancellation,
 ) -> Result<ExportedImage, RasterError> {
     let bound = output_bound(source, request)?;
@@ -233,10 +418,9 @@ pub(crate) fn encode_buffered(
         });
     }
     let mut file = tempfile::tempfile().map_err(|_| RasterError::Io)?;
-    let mut admitted = request.clone();
-    admitted.memory_budget_bytes = subtract_retained(request.memory_budget_bytes, copies)?;
-    let (length, mut metadata) = encode_private(source, &admitted, bound, &mut file, cancel)?;
-    metadata.settings = request.clone();
+    let available = subtract_retained(request.memory_budget_bytes, copies)?;
+    let (length, metadata) =
+        encode_private_in_budget(source, request, output, bound, &mut file, cancel, available)?;
     file.seek(SeekFrom::Start(0)).map_err(|_| RasterError::Io)?;
     let mut bytes = Vec::new();
     bytes
@@ -262,6 +446,8 @@ pub struct OriginalFormatInfo {
     pub source_bit_depth: u8,
     pub untagged: bool,
     pub first_tiff_page_only: bool,
+    pub flattened_composite: bool,
+    pub raw_preview: bool,
 }
 
 #[uniffi::export]
@@ -300,7 +486,19 @@ impl ProjectSession {
                     if !matches!(asset.bit_depth, 8 | 16)
                         || !matches!(
                             asset.format.as_str(),
-                            "png" | "jpeg" | "webp" | "heic" | "heif" | "avif" | "bmp" | "tiff"
+                            "png"
+                                | "jpeg"
+                                | "webp"
+                                | "heic"
+                                | "heif"
+                                | "avif"
+                                | "bmp"
+                                | "tiff"
+                                | "psd"
+                                | "psb"
+                                | "dng"
+                                | "cr2"
+                                | "raw-preview"
                         )
                     {
                         return Err(WorkflowError::Invalid);
@@ -312,11 +510,26 @@ impl ProjectSession {
                         // Old projects may lack the additive field. Report conservative
                         // visibility rather than silently promising a complete TIFF.
                         serde_json::from_str(&asset.metadata_json).unwrap_or(ImportNotices {
-                            first_tiff_page_only: true,
+                            first_tiff_page_only: asset.format == "tiff",
+                            ..Default::default()
                         })
+                    } else if matches!(
+                        asset.format.as_str(),
+                        "psd" | "psb" | "dng" | "cr2" | "raw-preview"
+                    ) {
+                        serde_json::from_str(&asset.metadata_json)
+                            .map_err(|_| WorkflowError::Invalid)?
                     } else {
                         ImportNotices::default()
                     };
+                    if notices.flattened_composite != matches!(asset.format.as_str(), "psd" | "psb")
+                        || notices.raw_preview
+                            != matches!(asset.format.as_str(), "dng" | "cr2" | "raw-preview")
+                        || (notices.first_tiff_page_only && asset.format != "tiff")
+                        || (notices.raw_preview && asset.bit_depth != 8)
+                    {
+                        return Err(WorkflowError::Invalid);
+                    }
                     cancellation.check()?;
                     if closed.load(std::sync::atomic::Ordering::Acquire) {
                         return Err(WorkflowError::Closed);
@@ -328,6 +541,8 @@ impl ProjectSession {
                         source_bit_depth: asset.bit_depth as u8,
                         untagged: asset.icc_profile.is_empty(),
                         first_tiff_page_only: notices.first_tiff_page_only,
+                        flattened_composite: notices.flattened_composite,
+                        raw_preview: notices.raw_preview,
                     })
                 })())
             })
@@ -442,4 +657,5 @@ mod tests {
         assert_eq!(embedded.settings.capture_session, r.capture_session);
         assert_eq!(embedded.settings.frame_id, Some(u64::MAX));
     }
+    include!("format_adapter_tests.rs");
 }
