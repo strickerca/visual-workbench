@@ -147,6 +147,7 @@ kotlin {
     android {
         namespace = "com.visualworkbench.shared"
         compileSdk = 37
+        buildToolsVersion = "36.1.0"
         minSdk = 29
         packaging {
             jniLibs {
