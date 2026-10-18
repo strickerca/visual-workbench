@@ -196,6 +196,20 @@ async fn durable_manual_cas_checks_real_pair_and_compiles_only_failed_markers_ag
                 .all(|m| m.verdict == VerificationVerdict::Pending)
     );
     let note = "private manual note, never portable";
+    assert!(
+        original
+            .verification_review_history(None, 8, cancel())
+            .await
+            .unwrap()
+            .snapshots
+            .is_empty()
+    );
+    assert!(matches!(
+        original
+            .check_verification_history(pending.clone(), cancel())
+            .await,
+        Err(PackageError::Stale)
+    ));
     let one = original
         .change_verification_review(
             after.clone(),
@@ -280,6 +294,33 @@ async fn durable_manual_cas_checks_real_pair_and_compiles_only_failed_markers_ag
     original = open_project(path.to_string_lossy().into(), cancel())
         .await
         .unwrap();
+    let history = original
+        .verification_review_history(None, 8, cancel())
+        .await
+        .unwrap();
+    assert!(history.next_cursor.is_none() && history.snapshots == vec![reviewed.clone()]);
+    original
+        .check_verification_history(reviewed.clone(), cancel())
+        .await
+        .unwrap();
+    assert!(matches!(
+        original
+            .check_verification_history(one.clone(), cancel())
+            .await,
+        Err(PackageError::Stale)
+    ));
+    assert!(matches!(
+        original
+            .verification_review_history(Some("foreign".into()), 8, cancel())
+            .await,
+        Err(PackageError::Invalid)
+    ));
+    assert!(matches!(
+        original
+            .verification_review_history(None, 9, cancel())
+            .await,
+        Err(PackageError::Invalid)
+    ));
     assert!(
         original
             .verification_review(

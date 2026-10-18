@@ -46,3 +46,25 @@ public interface WorkbenchVerification {
 
 public expect fun verificationWorkflows(original: WorkbenchProject, after: WorkbenchProject,
     catalog: WorkbenchPackageCatalog, inbox: WorkbenchMcpInbox): WorkbenchVerification
+
+/** Saved installation-local notes only. Reading history does not recover a
+ * capture selector, grant, current source binding or authority to change it. */
+public data class VerificationReviewHistoryPage(public val snapshots: List<VerificationReviewSnapshot>,
+    public val nextCursor: String?) {
+    override fun toString(): String = "VerificationReviewHistoryPage([PRIVATE])"
+}
+
+/** Optional read-only capability borrowing the original project's existing
+ * owner. Native storage admits at most eight records and 2 MiB encoded bytes;
+ * public DTOs cannot establish their original encoded size. Decoded notes remain
+ * bounded to 1 MiB per page. All returned snapshots have a saved version > 0. */
+public interface WorkbenchVerificationHistory {
+    /** The opaque cursor is the last returned canonical store key, exclusive
+     * on the next page. No cursor is returned when there are no further rows. */
+    public suspend fun page(after: String? = null, limit: UInt = 8u): VerificationReviewHistoryPage
+    /** Checks the exact saved snapshot and original store project identity.
+     * Historical notes do not assert current document/source revision. */
+    public suspend fun check(expected: VerificationReviewSnapshot): Unit
+}
+
+public expect fun verificationHistory(original: WorkbenchProject): WorkbenchVerificationHistory

@@ -409,11 +409,12 @@ fn archive_export_requires_private_prefix_removal_without_mutating_source() {
     .unwrap();
     let destination = temp.path().join("copy.vwbz");
     export_vwbz(&mut store, &destination).unwrap();
-    let mut zip = zip::ZipArchive::new(std::fs::File::open(destination).unwrap()).unwrap();
+    let mut zip = zip::ZipArchive::new(std::fs::File::open(&destination).unwrap()).unwrap();
     let extracted = temp.path().join("export.sqlite");
     let mut file = std::fs::File::create(&extracted).unwrap();
     std::io::copy(&mut zip.by_name("project.sqlite").unwrap(), &mut file).unwrap();
     drop(file);
+    drop(zip);
     let copy = rusqlite::Connection::open(&extracted).unwrap();
     let rows: i64 = copy
         .query_row(
@@ -439,4 +440,350 @@ fn archive_export_requires_private_prefix_removal_without_mutating_source() {
             .any(|w| w == note.as_bytes())
     );
     assert!(store.verification_review(&p).unwrap() == snapshot);
+    assert!(
+        store
+            .verification_review_history(None, 8)
+            .unwrap()
+            .snapshots
+            == vec![snapshot]
+    );
+    let mut restored = import_vwbz(
+        &destination,
+        &temp.path().join("restored"),
+        ImportLimits::default(),
+    )
+    .unwrap();
+    let history = restored.verification_review_history(None, 8).unwrap();
+    assert!(history.snapshots.is_empty() && history.next_cursor.is_none());
+}
+
+fn review_key(pair: &VerificationReviewPair) -> String {
+    format!(
+        "{VERIFICATION_REVIEW_PREFIX}{}",
+        blake3::hash(&serde_json::to_vec(pair).unwrap()).to_hex()
+    )
+}
+fn seed_history(store: &mut ProjectStore, count: u64) -> Vec<VerificationReviewSnapshot> {
+    let mut expected = Vec::new();
+    for n in 0..count {
+        let mut pair = pair();
+        pair.comparison_receipt_id = id(2000 + n);
+        expected.push(
+            store
+                .change_verification_review(
+                    &pair,
+                    0,
+                    &id(3000 + n),
+                    change(1, VerificationVerdict::Fail, "private history note"),
+                    || false,
+                )
+                .unwrap(),
+        );
+    }
+    expected.sort_unstable_by_key(|snapshot| review_key(&snapshot.pair));
+    expected
+}
+
+#[test]
+fn history_reopens_and_pages_all_64_exact_pairs_at_every_supported_page_size() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("p");
+    let mut store = fixture(&path);
+    // Reads of an unedited v0 review remain absent from durable history.
+    store.verification_review(&pair()).unwrap();
+    let empty = store.verification_review_history(None, 8).unwrap();
+    assert!(empty.snapshots.is_empty() && empty.next_cursor.is_none());
+    let expected = seed_history(&mut store, 64);
+    let before = store.checkpoint_bytes().unwrap();
+    drop(store);
+    let mut store = ProjectStore::open(&path).unwrap();
+    for limit in 1..=VERIFICATION_REVIEW_HISTORY_MAX_ROWS {
+        let mut cursor = None;
+        let mut actual = Vec::new();
+        for _ in 0..=VERIFICATION_REVIEW_MAX_ROWS {
+            let page = store
+                .verification_review_history(cursor.clone(), limit)
+                .unwrap();
+            assert!(!page.snapshots.is_empty());
+            assert!(page.snapshots.len() <= limit as usize);
+            assert!(page.snapshots.iter().all(|snapshot| snapshot.version > 0));
+            let last_key = review_key(&page.snapshots.last().unwrap().pair);
+            actual.extend(page.snapshots);
+            match page.next_cursor {
+                None => break,
+                Some(next) => {
+                    assert_eq!(next, last_key);
+                    assert!(cursor.as_ref().is_none_or(|previous| &next > previous));
+                    cursor = Some(next);
+                }
+            }
+        }
+        assert!(actual == expected);
+    }
+    let end = store
+        .verification_review_history(Some(review_key(&expected.last().unwrap().pair)), 8)
+        .unwrap();
+    assert!(end.snapshots.is_empty() && end.next_cursor.is_none());
+    assert!(store.checkpoint_bytes().unwrap() == before);
+}
+
+#[test]
+fn history_refuses_noncanonical_cursors_and_unsupported_limits_without_writes() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("p");
+    let mut store = fixture(&path);
+    let snapshot = seed_history(&mut store, 1).remove(0);
+    let key = review_key(&snapshot.pair);
+    let saved = raw(&path);
+    for cursor in [
+        String::new(),
+        VERIFICATION_REVIEW_PREFIX.to_owned(),
+        "a".repeat(64),
+        key[..key.len() - 1].to_owned(),
+        format!("{key}0"),
+        key.to_uppercase(),
+        format!("{VERIFICATION_REVIEW_PREFIX}{}", "A".repeat(64)),
+        format!("{VERIFICATION_REVIEW_PREFIX}{}", "g".repeat(64)),
+        format!("{key}\0"),
+    ] {
+        assert!(matches!(
+            store.verification_review_history(Some(cursor), 8),
+            Err(VerificationReviewError::Invalid)
+        ));
+    }
+    for limit in [0, 9, u32::MAX] {
+        assert!(matches!(
+            store.verification_review_history(None, limit),
+            Err(VerificationReviewError::Invalid)
+        ));
+    }
+    // A canonical exclusive boundary does not have to identify an extant row.
+    let end = store
+        .verification_review_history(
+            Some(format!("{VERIFICATION_REVIEW_PREFIX}{}", "f".repeat(64))),
+            8,
+        )
+        .unwrap();
+    assert!(end.snapshots.is_empty() && end.next_cursor.is_none());
+    assert_eq!(raw(&path), saved);
+}
+
+#[test]
+fn history_aggregate_admission_returns_partial_pages_and_makes_progress_at_two_mib() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("p");
+    let mut store = fixture(&path);
+    let expected = seed_history(&mut store, 5);
+    let sql = rusqlite::Connection::open(path.join("project.sqlite")).unwrap();
+    for snapshot in &expected {
+        let key = review_key(&snapshot.pair);
+        let raw: String = sql
+            .query_row("SELECT value FROM settings WHERE key=?1", [&key], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        // Valid JSON whitespace makes the encoded admission exactly 1 MiB
+        // without creating oversized manual notes or decoded snapshots.
+        let padded = format!(
+            "{raw}{}",
+            " ".repeat(VERIFICATION_REVIEW_MAX_BYTES - raw.len())
+        );
+        sql.execute(
+            "UPDATE settings SET value=?1 WHERE key=?2",
+            rusqlite::params![padded, key],
+        )
+        .unwrap();
+    }
+    let first = store.verification_review_history(None, 8).unwrap();
+    assert!(first.snapshots == expected[..2]);
+    assert!(first.next_cursor == Some(review_key(&expected[1].pair)));
+    let second = store
+        .verification_review_history(first.next_cursor, 8)
+        .unwrap();
+    assert!(second.snapshots == expected[2..4]);
+    assert!(second.next_cursor == Some(review_key(&expected[3].pair)));
+    let third = store
+        .verification_review_history(second.next_cursor, 8)
+        .unwrap();
+    assert!(third.snapshots == expected[4..]);
+    assert!(third.next_cursor.is_none());
+    let one = store.verification_review_history(None, 1).unwrap();
+    assert!(one.snapshots == expected[..1]);
+    assert!(one.next_cursor == Some(review_key(&expected[0].pair)));
+}
+
+#[test]
+fn history_rejects_malformed_namespace_keys_even_before_the_cursor_without_allocating_them() {
+    for malformed in [
+        format!("{VERIFICATION_REVIEW_PREFIX}a"),
+        format!("{VERIFICATION_REVIEW_PREFIX}{}", "A".repeat(64)),
+        format!(
+            "{VERIFICATION_REVIEW_PREFIX}{}",
+            "a".repeat(2 * 1024 * 1024)
+        ),
+        format!("{VERIFICATION_REVIEW_PREFIX}{}\0", "a".repeat(63)),
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("p");
+        let mut store = fixture(&path);
+        let snapshot = seed_history(&mut store, 1).remove(0);
+        let sql = rusqlite::Connection::open(path.join("project.sqlite")).unwrap();
+        sql.execute(
+            "UPDATE settings SET key=?1 WHERE key=?2",
+            rusqlite::params![malformed, review_key(&snapshot.pair)],
+        )
+        .unwrap();
+        assert!(matches!(
+            store.verification_review_history(
+                Some(format!("{VERIFICATION_REVIEW_PREFIX}{}", "f".repeat(64))),
+                8
+            ),
+            Err(VerificationReviewError::Corrupt)
+        ));
+    }
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("blob");
+    let mut store = fixture(&path);
+    let snapshot = seed_history(&mut store, 1).remove(0);
+    let sql = rusqlite::Connection::open(path.join("project.sqlite")).unwrap();
+    sql.execute(
+        "UPDATE settings SET key=CAST(?1 AS BLOB)",
+        [review_key(&snapshot.pair)],
+    )
+    .unwrap();
+    assert!(matches!(
+        store.verification_review_history(None, 8),
+        Err(VerificationReviewError::Corrupt)
+    ));
+}
+
+#[test]
+fn history_checks_schema_row_types_encoded_bounds_and_namespace_capacity_before_raw_reads() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("p");
+    let mut store = fixture(&path);
+    seed_history(&mut store, 1);
+    let sql = rusqlite::Connection::open(path.join("project.sqlite")).unwrap();
+    let saved = raw(&path);
+    sql.execute_batch(
+        "CREATE TRIGGER injected_history AFTER INSERT ON settings BEGIN SELECT 1; END;",
+    )
+    .unwrap();
+    assert!(store.verification_review_history(None, 8).is_err());
+    sql.execute_batch("DROP TRIGGER injected_history;").unwrap();
+    for payload in [
+        Vec::new(),
+        vec![b'x'; 4],
+        vec![b'x'; VERIFICATION_REVIEW_MAX_BYTES + 1],
+    ] {
+        sql.execute(
+            "UPDATE settings SET value=?1 WHERE key GLOB 'vw.verification-review.v1.*'",
+            [payload],
+        )
+        .unwrap();
+        assert!(matches!(
+            store.verification_review_history(None, 8),
+            Err(VerificationReviewError::Corrupt)
+        ));
+    }
+    sql.execute(
+        "UPDATE settings SET value=?1",
+        ["x".repeat(VERIFICATION_REVIEW_MAX_BYTES + 1)],
+    )
+    .unwrap();
+    assert!(matches!(
+        store.verification_review_history(None, 8),
+        Err(VerificationReviewError::Corrupt)
+    ));
+    sql.execute_batch("UPDATE settings SET value=CAST(X'80' AS TEXT);")
+        .unwrap();
+    assert!(matches!(
+        store.verification_review_history(None, 8),
+        Err(VerificationReviewError::Corrupt)
+    ));
+    sql.execute("UPDATE settings SET value=?1", [&saved])
+        .unwrap();
+    assert!(store.verification_review_history(None, 8).is_ok());
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("capacity");
+    let mut store = fixture(&path);
+    seed_history(&mut store, 64);
+    let sql = rusqlite::Connection::open(path.join("project.sqlite")).unwrap();
+    sql.execute(
+        "INSERT INTO settings(key,value) VALUES (?1,'{}')",
+        [format!("{VERIFICATION_REVIEW_PREFIX}{}", "0".repeat(64))],
+    )
+    .unwrap();
+    assert!(matches!(
+        store.verification_review_history(None, 8),
+        Err(VerificationReviewError::Limit)
+    ));
+}
+
+#[test]
+fn history_reuses_current_record_validation_and_binds_keys_pairs_and_owning_project() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("p");
+    let mut store = fixture(&path);
+    let snapshot = seed_history(&mut store, 1).remove(0);
+    let sql = rusqlite::Connection::open(path.join("project.sqlite")).unwrap();
+    let saved = raw(&path);
+    let key = review_key(&snapshot.pair);
+    for invalid in [
+        saved.replace("\"schema\":1", "\"schema\":2"),
+        saved.replace("\"version\":1", "\"version\":0"),
+        saved.replace("\"version\":1", "\"version\":1,\"version\":1"),
+        saved.replace("\"original_number\":1", "\"original_number\":0"),
+        saved.replace(
+            &snapshot.pair.comparison_receipt_id.to_string(),
+            &id(8000).to_string(),
+        ),
+        saved.replace("\"digest\":\"", "\"digest\":\"g"),
+        "{}".into(),
+    ] {
+        sql.execute(
+            "UPDATE settings SET value=?1 WHERE key=?2",
+            rusqlite::params![invalid, key],
+        )
+        .unwrap();
+        assert!(matches!(
+            store.verification_review_history(None, 8),
+            Err(VerificationReviewError::Corrupt)
+        ));
+        assert!(matches!(
+            store.verification_review(&snapshot.pair),
+            Err(VerificationReviewError::Corrupt)
+        ));
+    }
+    sql.execute(
+        "UPDATE settings SET value=?1 WHERE key=?2",
+        rusqlite::params![saved, key],
+    )
+    .unwrap();
+    let wrong_key = format!("{VERIFICATION_REVIEW_PREFIX}{}", "0".repeat(64));
+    sql.execute(
+        "UPDATE settings SET key=?1 WHERE key=?2",
+        rusqlite::params![wrong_key, key],
+    )
+    .unwrap();
+    assert!(matches!(
+        store.verification_review_history(None, 8),
+        Err(VerificationReviewError::Corrupt)
+    ));
+    let mut foreign = snapshot.pair.clone();
+    foreign.project_id = id(9000);
+    let mut raw_foreign: serde_json::Value = serde_json::from_str(&raw(&path)).unwrap();
+    raw_foreign["snapshot"]["pair"] = serde_json::to_value(&foreign).unwrap();
+    sql.execute(
+        "UPDATE settings SET key=?1,value=?2",
+        rusqlite::params![
+            review_key(&foreign),
+            serde_json::to_string(&raw_foreign).unwrap()
+        ],
+    )
+    .unwrap();
+    assert!(matches!(
+        store.verification_review_history(None, 8),
+        Err(VerificationReviewError::Corrupt)
+    ));
 }

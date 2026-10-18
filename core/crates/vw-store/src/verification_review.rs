@@ -1,22 +1,11 @@
 //! Private manual reviews over the existing settings/transaction owner.
 //!
-//! Root activation (not performed by this leaf): `mod verification_review;`
-//! and `pub use verification_review::*;` in lib.rs. BEFORE activation, archive.rs
-//! must run this exact removal on its private copy before the final VACUUM:
-//! ```ignore
-//! copy_connection.execute("DELETE FROM settings WHERE key GLOB ?1",
-//!     [format!("{}*", crate::VERIFICATION_REVIEW_PREFIX)])?;
-//! ```
 //! No notes, settings keys or selectors enter package lineage. Callers derive
 //! the pair from checked catalog/receipt owners and recheck their retirement
 //! under the existing caller mutex; this store is not a capture authority.
-//!
-//! Frozen source: 02f5766d236b9cfbef2c88257fc38785a4e21d07. Source receipt:
-//! rustfmt syntax/format checks and eight source-bound SQLite contract probes
-//! passed (CAS, rollback/fault, bounds and private-copy DELETE + VACUUM).
-//! Eight integration regressions are written, not run: the image lane holds the
-//! compiler slot. After root privacy/export activation, run
-//! `cargo test -p vw-store --test verification_review`. No device/gate evidence.
+//! Portable archive scrubbing/refusal must cover this raw-byte namespace,
+//! including malformed BLOB keys; see the archive portability finding in
+//! vw-ffi/src/verification/INTEGRATION.md. GLOB's BLOB matching is build-dependent.
 use crate::{ProjectStore, StoreError, migrations};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use serde::{
@@ -29,8 +18,13 @@ pub const VERIFICATION_REVIEW_PREFIX: &str = "vw.verification-review.v1.";
 pub const VERIFICATION_REVIEW_MAX_MARKERS: usize = 512;
 pub const VERIFICATION_REVIEW_MAX_ROWS: usize = 64;
 pub const VERIFICATION_REVIEW_MAX_BYTES: usize = 1024 * 1024;
+pub const VERIFICATION_REVIEW_HISTORY_MAX_ROWS: u32 = 8;
+pub const VERIFICATION_REVIEW_HISTORY_MAX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_NOTE: usize = 32 * 1024;
 const MAX_NOTES: usize = 128 * 1024;
+// Read only bounded key previews and scalar admission metadata. Byte-prefix
+// matching also catches malformed BLOB keys regardless of GLOB compile options.
+const HISTORY_ADMISSION_SQL: &str = "SELECT typeof(key),length(CAST(key AS BLOB)),typeof(value),length(CAST(value AS BLOB)),substr(CAST(key AS BLOB),1,?3) FROM settings WHERE substr(CAST(key AS BLOB),1,?1)=CAST(?2 AS BLOB) LIMIT ?4";
 
 #[derive(Debug, thiserror::Error)]
 pub enum VerificationReviewError {
@@ -128,6 +122,13 @@ pub struct VerificationReviewSnapshot {
     #[serde(deserialize_with = "bounded_markers")]
     pub markers: Vec<VerificationMarkerReview>,
 }
+/// Private installation-local history only. The cursor is exactly the settings
+/// key: VERIFICATION_REVIEW_PREFIX followed by 64 lowercase ASCII hex digits.
+/// It is an exclusive binary lexicographic boundary, never a capture selector.
+pub struct VerificationReviewHistoryPage {
+    pub snapshots: Vec<VerificationReviewSnapshot>,
+    pub next_cursor: Option<String>,
+}
 fn bounded_markers<'de, D: serde::Deserializer<'de>>(
     decoder: D,
 ) -> Result<Vec<VerificationMarkerReview>, D::Error> {
@@ -223,6 +224,25 @@ struct StoredReview {
     operation: Id,
     digest: String,
 }
+// Inspect the identity envelope before deserializing any marker/note vector.
+// IgnoredAny traverses bounded encoded markers without retaining their strings.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoredReviewAdmission {
+    schema: u32,
+    snapshot: SnapshotAdmission,
+    #[serde(rename = "operation")]
+    _operation: Id,
+    digest: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SnapshotAdmission {
+    pair: VerificationReviewPair,
+    version: u64,
+    #[serde(rename = "markers")]
+    _markers: serde::de::IgnoredAny,
+}
 
 fn admit_schema(connection: &Connection) -> VerificationReviewResult<()> {
     let (count, bytes): (i64, i64) = connection.query_row(
@@ -236,9 +256,13 @@ fn admit_schema(connection: &Connection) -> VerificationReviewResult<()> {
 }
 fn load(
     connection: &Connection,
-    pair: &VerificationReviewPair,
+    pair: Option<&VerificationReviewPair>,
+    project: &Id,
     key: &str,
 ) -> VerificationReviewResult<Option<(StoredReview, String)>> {
+    if !history_key(key) {
+        return Err(VerificationReviewError::Corrupt);
+    }
     let admission: Option<(String, i64)> = connection
         .query_row(
             "SELECT typeof(value),length(CAST(value AS BLOB)) FROM settings WHERE key=?1",
@@ -252,13 +276,32 @@ fn load(
     if kind != "text" || !(1..=VERIFICATION_REVIEW_MAX_BYTES as i64).contains(&size) {
         return Err(VerificationReviewError::Corrupt);
     }
-    let raw: String =
-        connection.query_row("SELECT value FROM settings WHERE key=?1", [key], |r| {
-            r.get(0)
-        })?;
-    if raw.len() > VERIFICATION_REVIEW_MAX_BYTES {
+    let bytes: Vec<u8> = connection.query_row(
+        "SELECT CAST(value AS BLOB) FROM settings WHERE key=?1",
+        [key],
+        |r| r.get(0),
+    )?;
+    if bytes.len() != size as usize || bytes.len() > VERIFICATION_REVIEW_MAX_BYTES {
         return Err(VerificationReviewError::Corrupt);
     }
+    let raw = String::from_utf8(bytes).map_err(|_| VerificationReviewError::Corrupt)?;
+    let admission: StoredReviewAdmission =
+        serde_json::from_str(&raw).map_err(|_| VerificationReviewError::Corrupt)?;
+    if admission.schema != 1
+        || !(1..=i64::MAX as u64).contains(&admission.snapshot.version)
+        || pair.is_some_and(|expected| admission.snapshot.pair != *expected)
+        || &admission.snapshot.pair.project_id != project
+        || admission
+            .snapshot
+            .pair
+            .key()
+            .map_err(|_| VerificationReviewError::Corrupt)?
+            != key
+        || !hash(&admission.digest)
+    {
+        return Err(VerificationReviewError::Corrupt);
+    }
+    drop(admission);
     let value: StoredReview =
         serde_json::from_str(&raw).map_err(|_| VerificationReviewError::Corrupt)?;
     value
@@ -267,14 +310,129 @@ fn load(
         .map_err(|_| VerificationReviewError::Corrupt)?;
     if value.schema != 1
         || value.snapshot.version == 0
-        || value.snapshot.pair != *pair
+        || pair.is_some_and(|expected| value.snapshot.pair != *expected)
+        || &value.snapshot.pair.project_id != project
+        || value
+            .snapshot
+            .pair
+            .key()
+            .map_err(|_| VerificationReviewError::Corrupt)?
+            != key
         || !hash(&value.digest)
     {
         return Err(VerificationReviewError::Corrupt);
     }
     Ok(Some((value, raw)))
 }
+fn history_key(key: &str) -> bool {
+    key.strip_prefix(VERIFICATION_REVIEW_PREFIX)
+        .is_some_and(hash)
+}
+struct HistoryRow {
+    key: String,
+    bytes: usize,
+}
+fn history_rows(connection: &Connection) -> VerificationReviewResult<Vec<HistoryRow>> {
+    let mut statement = connection.prepare(HISTORY_ADMISSION_SQL)?;
+    let mut query = statement.query(params![
+        VERIFICATION_REVIEW_PREFIX.len() as i64,
+        VERIFICATION_REVIEW_PREFIX,
+        (VERIFICATION_REVIEW_PREFIX.len() + 64) as i64,
+        (VERIFICATION_REVIEW_MAX_ROWS + 1) as i64,
+    ])?;
+    let mut rows = Vec::new();
+    while let Some(row) = query.next()? {
+        if rows.len() == VERIFICATION_REVIEW_MAX_ROWS {
+            return Err(VerificationReviewError::Limit);
+        }
+        let key_type: String = row.get(0)?;
+        let key_bytes: i64 = row.get(1)?;
+        let value_type: String = row.get(2)?;
+        let value_bytes: i64 = row.get(3)?;
+        if key_type != "text"
+            || key_bytes != (VERIFICATION_REVIEW_PREFIX.len() + 64) as i64
+            || value_type != "text"
+            || !(1..=VERIFICATION_REVIEW_MAX_BYTES as i64).contains(&value_bytes)
+        {
+            return Err(VerificationReviewError::Corrupt);
+        }
+        let preview: Vec<u8> = row.get(4)?;
+        let key = String::from_utf8(preview).map_err(|_| VerificationReviewError::Corrupt)?;
+        if !history_key(&key) {
+            return Err(VerificationReviewError::Corrupt);
+        }
+        rows.push(HistoryRow {
+            key,
+            bytes: value_bytes as usize,
+        });
+    }
+    rows.sort_unstable_by(|a, b| a.key.cmp(&b.key));
+    Ok(rows)
+}
 impl ProjectStore {
+    /// Enumerate existing durable reviews without creating version-zero rows.
+    /// Persisted exact pairs are history authority, never restored OS capture
+    /// authority. The caller revalidates selected packages/source/grants before
+    /// any later mutation or compilation, through the existing joined owners.
+    pub fn verification_review_history(
+        &mut self,
+        after: Option<String>,
+        limit: u32,
+    ) -> VerificationReviewResult<VerificationReviewHistoryPage> {
+        if !(1..=VERIFICATION_REVIEW_HISTORY_MAX_ROWS).contains(&limit)
+            || after.as_deref().is_some_and(|cursor| !history_key(cursor))
+        {
+            return Err(VerificationReviewError::Invalid);
+        }
+        let project = self.project().id.clone();
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)?;
+        admit_schema(&tx)?;
+        // Validate the complete bounded namespace metadata before any raw JSON
+        // read, including malformed rows before/at the supplied cursor.
+        let rows = history_rows(&tx)?;
+        let mut candidates = rows
+            .into_iter()
+            .filter(|row| after.as_ref().is_none_or(|cursor| row.key > *cursor))
+            .peekable();
+        let mut snapshots = Vec::new();
+        let mut admitted = 0_usize;
+        let mut last_returned = None;
+        while snapshots.len() < limit as usize {
+            let Some(row) = candidates.peek() else {
+                break;
+            };
+            let next_bytes = admitted
+                .checked_add(row.bytes)
+                .ok_or(VerificationReviewError::Limit)?;
+            if next_bytes > VERIFICATION_REVIEW_HISTORY_MAX_BYTES {
+                // Each individual row fits <=1 MiB, so at least one row always
+                // fits an empty page. Defer this row without reading its JSON;
+                // returning the last included key makes the next page advance.
+                break;
+            }
+            let row = candidates.next().ok_or(VerificationReviewError::Corrupt)?;
+            let (record, raw) =
+                load(&tx, None, &project, &row.key)?.ok_or(VerificationReviewError::Corrupt)?;
+            if raw.len() != row.bytes {
+                return Err(VerificationReviewError::Corrupt);
+            }
+            admitted = next_bytes;
+            snapshots.push(record.snapshot);
+            last_returned = Some(row.key);
+        }
+        let next_cursor = if candidates.peek().is_some() {
+            last_returned
+        } else {
+            None
+        };
+        tx.commit()?;
+        Ok(VerificationReviewHistoryPage {
+            snapshots,
+            next_cursor,
+        })
+    }
     pub fn verification_review(
         &mut self,
         pair: &VerificationReviewPair,
@@ -288,7 +446,7 @@ impl ProjectStore {
             .connection
             .transaction_with_behavior(TransactionBehavior::Deferred)?;
         admit_schema(&tx)?;
-        let snapshot = load(&tx, pair, &key)?.map_or_else(
+        let snapshot = load(&tx, Some(pair), &pair.project_id, &key)?.map_or_else(
             || VerificationReviewSnapshot::empty(pair),
             |(value, _)| value.snapshot,
         );
@@ -333,7 +491,7 @@ impl ProjectStore {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         admit_schema(&tx)?;
-        let loaded = load(&tx, pair, &key)?;
+        let loaded = load(&tx, Some(pair), &pair.project_id, &key)?;
         if let Some((value, _)) = &loaded
             && value.operation == *operation
         {
@@ -397,7 +555,8 @@ impl ProjectStore {
         if changed != 1 {
             return Err(VerificationReviewError::Conflict);
         }
-        let (persisted, raw) = load(&tx, pair, &key)?.ok_or(VerificationReviewError::Corrupt)?;
+        let (persisted, raw) = load(&tx, Some(pair), &pair.project_id, &key)?
+            .ok_or(VerificationReviewError::Corrupt)?;
         if raw != encoded {
             return Err(VerificationReviewError::Corrupt);
         }
