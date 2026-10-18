@@ -1,0 +1,92 @@
+{
+  "date_utc": "2026-10-18",
+  "scope": "T5.01 private coordinator recapture ownership composition; partial verification foundation, no public tool or failure-package activation",
+  "source_commit": "7537afc968115ef0cf38b7699bb34fa9e7212b74",
+  "branch": "cloud/verification-owner-integration-20261018",
+  "base": "02f5766d236b9cfbef2c88257fc38785a4e21d07",
+  "accepted_leaves": [
+    "6591961d582a012b23b3b0cec58c1c7f711f1b93",
+    "44363826256b6aee0baddff95bb0f8b42f64dc35"
+  ],
+  "review": "Accepted leaf source unchanged; new root coordinator/test code requires Astra review before main promotion. G1 parent receipt reconciliation is separate.",
+  "changes": [
+    "Resolve original through current native checked catalog and retiring guard before ticket admission and again at completion, under catalogGate. Immutable caller metadata/ticket is insufficient.",
+    "Reuse exact selector grant, drawn indicator, existing captureGate, beforePublish check inside catalogGate, actual joined cancellation/compiled close and session-only routing.",
+    "Optional registry saturation/malformed/unavailable routing never turns a durable ordinary publication into a failed result; explicit state message reports verification unavailable.",
+    "A conflicting/unregistered capture cannot inherit a prior window route from equal canonical source bytes; no target overwrite/eviction.",
+    "Retire route before existing unpublish/drain; join actual active jobs before registry close."
+  ],
+  "tests": {
+    "actual_coordinator_class": 16,
+    "passed": 16,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "new_cases": 6,
+    "cases": [
+      "successful exact original/after checked pair",
+      "missing current original refuses before new capture",
+      "original removed during capture refuses completion while durable after package survives",
+      "64-package registry saturation preserves 65th publication and refuses unbound recapture",
+      "same bytes from another selected window cannot inherit original route",
+      "retirement during joined capture prevents publication and closes actual compiled owner"
+    ],
+    "mock_boundary": "Real Kotlin coordinator/coroutines/grant/catalog gates; catalog/inbox/wire/capture are deterministic mocks, no OS/provider/MCP network calls.",
+    "prior_and_final_runs": "First15 cases pass; sixth new retirement case added and final16 pass. No failed attempt."
+  },
+  "checks": {
+    "desktop_actual_main_and_test_compilation": "PASS",
+    "common_import_guard": "PASS",
+    "whitespace": "PASS",
+    "source_secret_scan": "PASS",
+    "native_bindings": "Unchanged from G1; no rebuild/generation needed for Kotlin-only coordinator source"
+  },
+  "command": "bash apps/gradlew -p apps :desktop:test --tests com.visualworkbench.desktop.mcp.McpCoordinatorTest -x :shared:generateCoreBindings -x :shared:generateHostBindings -x :desktop:packageConnectionRuntime --console=plain --no-daemon --no-parallel --max-workers=2",
+  "source_sha256": [
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/DesktopMcpCoordinator.kt",
+      "bytes": 21399,
+      "sha256": "ed21f598e1a9ab45c9c0b9401bfac2015a2df04278db8cdb3d53c9f989bf92e5"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpCoordinatorTest.kt",
+      "bytes": 23508,
+      "sha256": "45c01c567fb7b4c5ef3e59bcd31721fde42ccb42529940393b9683fe81a92261"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpVerificationTargets.kt",
+      "bytes": 6311,
+      "sha256": "269a03dccc06b98c17674e8bdb6d342f430866d0c56cd8708b6faa714f12c03d"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpMarkerAssessments.kt",
+      "bytes": 5526,
+      "sha256": "d52c2354286dce0a0c7219ffc332e82a15bc19f18e41535924b3964209368670"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpSemanticMarkerAlignment.kt",
+      "bytes": 12845,
+      "sha256": "8f68cb3995e806faa857c48c3b94242c5f1ff798b27a41ee577ee4e51a592522"
+    }
+  ],
+  "logs": [
+    {
+      "path": "vw-verification-owner-tests-attempt1.log",
+      "bytes": 4083,
+      "sha256": "646cf9ed70931f67b6229fadd709255f349b1658e55c265f755964e29b57196c"
+    },
+    {
+      "path": "vw-verification-owner-tests-final.log",
+      "bytes": 4105,
+      "sha256": "f7e080f1a3cecc9cbf6e3f0674f028ea0c7bb40d710470145da573cf9c94430c"
+    }
+  ],
+  "remaining": [
+    "Astra review of new root source",
+    "Public MCP tool and owner review UI registration",
+    "Durable bounded review/CAS, failure-package leaf and root lineage/privacy exports",
+    "Original overview mapping/pixel-bound composition; image alignment unresolved",
+    "Actual capture/OS/provider/device/hardware gates"
+  ],
+  "operations": "No live provider/send/credential/signing/deployment/device action, private captures, archive overlay or worktree deletion. Picked-input d9fd8a5 held and not integrated."
+}

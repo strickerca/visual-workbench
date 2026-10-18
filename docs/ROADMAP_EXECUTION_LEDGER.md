@@ -556,3 +556,20 @@ giant picked-input grant preserve root DTO/FFI/schema/controller ownership.
 Krita and live provider work remain deferred; no signing, installation, external
 authority, physical/product gate or old-worktree disposition changed.
 
+
+## Private verification owner composition
+
+Candidate `7537afc968115ef0cf38b7699bb34fa9e7212b74` on cloud/verification-owner-integration-20261018 composes the
+unchanged accepted 6591961d/4436382 leaves with new coordinator ownership wiring.
+Exact original catalog/retiring checks run before ticket admission and again at
+completion. Existing selector grants, drawn indicator, joined capture/close and
+publication gate remain authoritative. Optional route saturation preserves durable
+ordinary publication with an explicit unavailability message; equal captured
+bytes from another selected window cannot inherit an older route. All 16 actual
+coordinator cases pass, including six new current-catalog/saturation/collision/
+retirement regressions. New root code awaits independent review; see
+`evidence/VERIFICATION_OWNER_INTEGRATION_20261018.json`. No public verification
+tool, owner verdict, durable review, failure-package or image-alignment pass is
+claimed. Whole Android/desktop caller and diagnostics privacy grants are in
+`CALLER_PARALLEL_GRANTS_20261018.md`; root retains only shared contracts and
+coordinator/integration. Held picked-input d9fd8a5 remains uncomposed.
