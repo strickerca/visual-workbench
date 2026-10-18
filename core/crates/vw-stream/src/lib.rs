@@ -1,9 +1,12 @@
 //! Bounded capture-stream primitives. Authentication, OS capture, transport and
 //! actual display presentation remain explicit adapter responsibilities.
-//! Per-ring/per-call caps do not replace a session ledger: adapters reserve all
-//! queued, drawing, displayed, frozen, verified-original and transfer copies,
-//! including retained Arc owners, before admitting additional codec work.
+//! Production entrypoints named `*_budgeted` use the endpoint's supplied shared
+//! SessionBudget for capture, codecs, retained pixels and transfers. Their owners
+//! retain admission through the final Arc. Legacy unbudgeted codec/state helpers
+//! are isolated utilities; adapters must use the budgeted entrypoints and reserve
+//! foreign/serialized copies from that same pool before platform allocation.
 #![forbid(unsafe_code)]
+mod budget;
 mod consent;
 mod frame;
 mod freeze;
@@ -12,6 +15,7 @@ mod pacer;
 mod ring;
 mod tiles;
 
+pub use budget::*;
 pub use consent::*;
 pub use frame::*;
 pub use freeze::*;

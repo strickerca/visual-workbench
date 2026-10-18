@@ -1,14 +1,118 @@
 use crate::{
-    Cancellation, FrameIdentity, MAX_TILE_BYTES, MAX_TILES, OriginalFrame, Result, StreamError,
-    StreamGeometry, rgba_bytes,
+    BudgetedBytes, Cancellation, FrameIdentity, MAX_TILE_BYTES, MAX_TILES, MemoryCharge,
+    MemoryKind, OriginalFrame, Result, SessionBudget, StreamError, StreamGeometry, rgba_bytes,
 };
 use image::{ExtendedColorType, ImageDecoder};
 use std::io::{Cursor, Write};
 use vw_model::Id;
-use vw_proto::v1;
+use vw_proto::{Message, v1};
 
 pub const TILE_SIDE: u32 = 512;
 const CODEC_FIXED: u64 = 8 * 1024 * 1024;
+// Bounded tile Vec, rectangles, labels, geometry and ownership metadata.
+const PACKET_OVERHEAD: u64 = 64 * 1024;
+const DISPLAY_OVERHEAD: u64 = 4096;
+
+/// Immutable MEDIA payload with its admission held through queueing/transport.
+/// The transport DTO is available by reference; it cannot discard the charge by
+/// extracting an owned packet. A separately serialized wire copy is charged too.
+pub struct EncodedTiles {
+    packet: v1::FrameTiles,
+    charge: MemoryCharge,
+}
+impl EncodedTiles {
+    pub fn packet(&self) -> &v1::FrameTiles {
+        &self.packet
+    }
+    pub fn charge(&self) -> &MemoryCharge {
+        &self.charge
+    }
+    pub fn into_transfer(self) -> Self {
+        Self {
+            packet: self.packet,
+            charge: self.charge.reclassify(MemoryKind::Transfer),
+        }
+    }
+    /// Serialize a distinct wire allocation only after a second reservation.
+    /// The DTO's charge remains held while this physical copy exists.
+    pub fn to_transfer_bytes(
+        &self,
+        budget: &SessionBudget,
+        cancel: &Cancellation,
+    ) -> Result<BudgetedBytes> {
+        if !self.charge.belongs_to(budget) {
+            return Err(StreamError::Invalid);
+        }
+        let len = self.packet.encoded_len();
+        if len as u64 > MAX_TILE_BYTES as u64 + PACKET_OVERHEAD {
+            return Err(StreamError::Limit);
+        }
+        let mut wire = BudgetedBytes::allocate(budget, MemoryKind::Transfer, len, cancel)?;
+        self.packet
+            .encode(&mut wire.bytes_mut())
+            .map_err(|_| StreamError::Invalid)?;
+        cancel.check()?;
+        Ok(wire)
+    }
+    /// Reserve before the transport parser allocates an inbound DTO. Keep the
+    /// reservation alive through parsing and adopt its resulting bounded packet.
+    pub fn reserve(budget: &SessionBudget, cancel: &Cancellation) -> Result<TilePacketReservation> {
+        cancel.check()?;
+        Ok(TilePacketReservation {
+            charge: budget.reserve(
+                MemoryKind::EncodedTiles,
+                MAX_TILE_BYTES as u64 + PACKET_OVERHEAD,
+            )?,
+        })
+    }
+}
+pub struct TilePacketReservation {
+    charge: MemoryCharge,
+}
+impl TilePacketReservation {
+    pub fn adopt(self, packet: v1::FrameTiles, cancel: &Cancellation) -> Result<EncodedTiles> {
+        cancel.check()?;
+        if packet.tiles.len() > MAX_TILES || packet.tiles.capacity() > MAX_TILES {
+            return Err(StreamError::Limit);
+        }
+        let mut retained =
+            packet.tiles.capacity() as u64 * std::mem::size_of::<v1::TileImage>() as u64;
+        retained = retained
+            .checked_add(
+                packet
+                    .capture_session_id
+                    .as_ref()
+                    .map_or(0, |id| id.value.capacity()) as u64,
+            )
+            .ok_or(StreamError::Limit)?;
+        if let Some(g) = &packet.geometry {
+            retained = retained
+                .checked_add(g.source_kind.capacity() as u64)
+                .and_then(|n| n.checked_add(g.monitor_id.capacity() as u64))
+                .ok_or(StreamError::Limit)?;
+        }
+        let mut encoded = 0u64;
+        for tile in &packet.tiles {
+            encoded = encoded
+                .checked_add(tile.data.capacity() as u64)
+                .ok_or(StreamError::Limit)?;
+            retained = retained
+                .checked_add(tile.format.capacity() as u64)
+                .ok_or(StreamError::Limit)?;
+        }
+        if encoded > MAX_TILE_BYTES as u64
+            || retained
+                .checked_add(encoded)
+                .is_none_or(|n| n > self.charge.bytes())
+        {
+            return Err(StreamError::Limit);
+        }
+        Ok(EncodedTiles {
+            packet,
+            charge: self.charge,
+        })
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TileRect {
@@ -40,12 +144,16 @@ impl TileRect {
     }
 }
 
-fn grid(width: u32, height: u32) -> Result<Vec<TileRect>> {
+fn grid_count(width: u32, height: u32) -> Result<usize> {
     rgba_bytes(width, height)?;
     let count = width.div_ceil(TILE_SIDE) as usize * height.div_ceil(TILE_SIDE) as usize;
     if count > MAX_TILES {
         return Err(StreamError::Limit);
     }
+    Ok(count)
+}
+fn grid(width: u32, height: u32) -> Result<Vec<TileRect>> {
+    let count = grid_count(width, height)?;
     let mut tiles = Vec::with_capacity(count);
     for y in (0..height).step_by(TILE_SIDE as usize) {
         for x in (0..width).step_by(TILE_SIDE as usize) {
@@ -64,7 +172,7 @@ fn grid(width: u32, height: u32) -> Result<Vec<TileRect>> {
 /// includes worst-case fixed tile decode/encode scratch, RGB copy, full MEDIA
 /// output capacity and library temporaries. No CPU/GPU driver peak is implied.
 pub fn encode_workspace(width: u32, height: u32) -> Result<u64> {
-    grid(width, height)?;
+    grid_count(width, height)?;
     Ok(CODEC_FIXED
         + u64::from(TILE_SIDE.min(width)) * u64::from(TILE_SIDE.min(height)) * 64
         + 2 * MAX_TILE_BYTES as u64)
@@ -101,7 +209,42 @@ impl Write for Capped<'_> {
 /// backpressure discards it, the adapter must request keyframe=true next time.
 /// Unchanged capture frames still produce an empty numbered delta, preserving
 /// exact ID continuity; capture IDs are never renumbered after a network drop.
+/// This unbudgeted codec utility is for isolated use; production callers use
+/// encode_tiles_budgeted to retain the output's shared session admission.
 pub fn encode_tiles(
+    current: &OriginalFrame,
+    previous: Option<&OriginalFrame>,
+    keyframe: bool,
+    quality: u8,
+    workspace: u64,
+    cancel: &Cancellation,
+) -> Result<v1::FrameTiles> {
+    encode_tiles_inner(current, previous, keyframe, quality, workspace, cancel)
+}
+
+/// Production encoder: all input originals must belong to this same endpoint
+/// pool, and retained output plus transient codec allocations are admitted first.
+pub fn encode_tiles_budgeted(
+    current: &OriginalFrame,
+    previous: Option<&OriginalFrame>,
+    keyframe: bool,
+    quality: u8,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<EncodedTiles> {
+    cancel.check()?;
+    if !current.belongs_to(budget) || previous.is_some_and(|old| !old.belongs_to(budget)) {
+        return Err(StreamError::Invalid);
+    }
+    let g = &current.identity().geometry;
+    let workspace = encode_workspace(g.width(), g.height())?;
+    let _codec = budget.reserve(MemoryKind::CodecWorkspace, workspace)?;
+    let reservation = EncodedTiles::reserve(budget, cancel)?;
+    let packet = encode_tiles_inner(current, previous, keyframe, quality, workspace, cancel)?;
+    reservation.adopt(packet, cancel)
+}
+
+fn encode_tiles_inner(
     current: &OriginalFrame,
     previous: Option<&OriginalFrame>,
     keyframe: bool,
@@ -150,7 +293,10 @@ pub fn encode_tiles(
         for y in rect.y..rect.y + rect.height {
             cancel.check()?;
             let start = y as usize * stride + rect.x as usize * 4;
-            for p in current.rgba()[start..start + rect.width as usize * 4].chunks_exact(4) {
+            for p in current.rgba()[start..start + rect.width as usize * 4]
+                .as_chunks::<4>()
+                .0
+            {
                 rgb.extend_from_slice(&p[..3]);
             }
         }
@@ -195,16 +341,23 @@ pub fn encode_tiles(
         tiles,
         timestamp_ns: id.timestamp_ns,
         last_input_seq_applied: 0,
-        ..Default::default()
     })
 }
 
 /// Immutable reconstructable frame. A UI must explicitly report actual
 /// presentation before FreezeMachine will pin it; decode is not presentation.
-#[derive(Debug)]
 pub struct DisplayFrame {
     identity: FrameIdentity,
     rgba: Vec<u8>,
+    charge: Option<MemoryCharge>,
+}
+impl std::fmt::Debug for DisplayFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DisplayFrame")
+            .field("identity", &self.identity)
+            .field("charged_bytes", &self.charged_bytes())
+            .finish_non_exhaustive()
+    }
 }
 impl DisplayFrame {
     pub fn identity(&self) -> &FrameIdentity {
@@ -213,14 +366,65 @@ impl DisplayFrame {
     pub fn rgba(&self) -> &[u8] {
         &self.rgba
     }
+    pub fn belongs_to(&self, budget: &SessionBudget) -> bool {
+        self.charge
+            .as_ref()
+            .is_some_and(|charge| charge.belongs_to(budget))
+    }
+    pub fn charged_bytes(&self) -> u64 {
+        self.charge.as_ref().map_or(0, MemoryCharge::bytes)
+    }
+    pub fn copy_into_transfer(
+        &self,
+        budget: &SessionBudget,
+        cancel: &Cancellation,
+    ) -> Result<BudgetedBytes> {
+        if !self.belongs_to(budget) {
+            return Err(StreamError::Invalid);
+        }
+        BudgetedBytes::copy_from(budget, MemoryKind::Transfer, &self.rgba, cancel)
+    }
 }
 
 /// Strong failure atomicity: malformed last tiles never partially update the
 /// existing frame. At most old+new RGBA plus one bounded JPEG decoder coexist.
+/// Isolated utility; production callers use decode_tiles_budgeted.
 pub fn decode_tiles(
     packet: &v1::FrameTiles,
     previous: Option<&DisplayFrame>,
     budget: u64,
+    cancel: &Cancellation,
+) -> Result<DisplayFrame> {
+    decode_tiles_inner(packet, previous, budget, None, cancel)
+}
+
+pub fn decode_tiles_budgeted(
+    packet: &EncodedTiles,
+    previous: Option<&DisplayFrame>,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<DisplayFrame> {
+    cancel.check()?;
+    if !packet.charge.belongs_to(budget) || previous.is_some_and(|old| !old.belongs_to(budget)) {
+        return Err(StreamError::Invalid);
+    }
+    // Covers bounded geometry/header/rectangle admission before any parser-side
+    // allocation. The inner admission adds only the remaining codec workspace.
+    let _admission = budget.reserve(MemoryKind::CodecWorkspace, CODEC_FIXED)?;
+    decode_tiles_inner(
+        packet.packet(),
+        previous,
+        budget.limit_bytes(),
+        Some(budget),
+        cancel,
+    )
+}
+
+fn decode_tiles_inner(
+    packet: &v1::FrameTiles,
+    previous: Option<&DisplayFrame>,
+    budget: u64,
+    session: Option<&SessionBudget>,
     cancel: &Cancellation,
 ) -> Result<DisplayFrame> {
     cancel.check()?;
@@ -307,6 +511,17 @@ pub fn decode_tiles(
     if peak > budget {
         return Err(StreamError::Limit);
     }
+    let _codec = session
+        .map(|pool| {
+            pool.reserve(
+                MemoryKind::CodecWorkspace,
+                peak - retained - bytes as u64 - CODEC_FIXED,
+            )
+        })
+        .transpose()?;
+    let charge = session
+        .map(|pool| pool.reserve(MemoryKind::DisplayFrame, bytes as u64 + DISPLAY_OVERHEAD))
+        .transpose()?;
     let mut rgba = Vec::new();
     rgba.try_reserve_exact(bytes)
         .map_err(|_| StreamError::Limit)?;
@@ -339,22 +554,34 @@ pub fn decode_tiles(
             .zip(rect.y..rect.y + rect.height)
         {
             let start = (y as usize * packet.width as usize + rect.x as usize) * 4;
-            for (p, out) in row
-                .chunks_exact(3)
-                .zip(rgba[start..start + rect.width as usize * 4].chunks_exact_mut(4))
-            {
+            for (p, out) in row.as_chunks::<3>().0.iter().zip(
+                rgba[start..start + rect.width as usize * 4]
+                    .as_chunks_mut::<4>()
+                    .0,
+            ) {
                 out[..3].copy_from_slice(p);
                 out[3] = 255;
             }
         }
     }
     cancel.check()?;
-    Ok(DisplayFrame { identity, rgba })
+    Ok(DisplayFrame {
+        identity,
+        rgba,
+        charge,
+    })
 }
 
 /// Nonallocating subset admission before image's JPEG header parser. Our wire
 /// encoder emits baseline three-component 8-bit JFIF; progressive/ICC/Exif,
 /// extra scans, giant tables, arbitrary metadata and trailing files are refused.
+pub fn validate_jpeg_tile_header(bytes: &[u8], width: u32, height: u32) -> Result<()> {
+    if width == 0 || height == 0 || width > TILE_SIDE || height > TILE_SIDE {
+        return Err(StreamError::Limit);
+    }
+    jpeg_header(bytes, width, height)
+}
+
 fn jpeg_header(bytes: &[u8], width: u32, height: u32) -> Result<()> {
     if bytes.len() < 4 || bytes.len() > MAX_TILE_BYTES || bytes[..2] != [0xff, 0xd8] {
         return Err(StreamError::Codec);
@@ -412,7 +639,7 @@ fn jpeg_header(bytes: &[u8], width: u32, height: u32) -> Result<()> {
                 {
                     return Err(StreamError::Codec);
                 }
-                for (i, component) in payload[6..].chunks_exact(3).enumerate() {
+                for (i, component) in payload[6..].as_chunks::<3>().0.iter().enumerate() {
                     if component[0] != i as u8 + 1
                         || !(1..=2).contains(&(component[1] >> 4))
                         || !(1..=2).contains(&(component[1] & 15))

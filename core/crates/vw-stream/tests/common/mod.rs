@@ -41,7 +41,7 @@ pub fn frame(ring: &mut FrameRing, n: u64, w: u32, h: u32, color: [u8; 4]) -> Or
     let mut writer = ring
         .begin_frame(identity(n, w, h), &Cancellation::default())
         .unwrap();
-    for p in writer.rgba_mut().chunks_exact_mut(4) {
+    for p in writer.rgba_mut().as_chunks_mut::<4>().0 {
         p.copy_from_slice(&color)
     }
     let frame = writer.finish(&Cancellation::default()).unwrap();

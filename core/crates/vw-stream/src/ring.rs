@@ -1,6 +1,6 @@
 use crate::{
-    Cancellation, DEFAULT_RING_FRAMES, FrameIdentity, MAX_RING_BYTES, Result, StreamError,
-    StreamGeometry, rgba_bytes,
+    BudgetedBytes, Cancellation, DEFAULT_RING_FRAMES, FrameIdentity, MAX_RING_BYTES, MemoryCharge,
+    MemoryKind, Result, SessionBudget, StreamError, StreamGeometry, rgba_bytes,
 };
 use std::{
     collections::VecDeque,
@@ -30,7 +30,7 @@ impl Drop for Reservation {
 impl Pool {
     fn reserve(self: &Arc<Self>, bytes: u64) -> Result<Reservation> {
         self.used
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |used| {
                 used.checked_add(bytes).filter(|next| *next <= self.limit)
             })
             .map_err(|_| StreamError::Limit)?;
@@ -41,22 +41,43 @@ impl Pool {
     }
 }
 
-#[derive(Debug)]
 struct Pixels {
     identity: FrameIdentity,
     rgba: Vec<u8>,
     _reservation: Reservation,
+    charge: MemoryCharge,
 }
 /// Cheap immutable pin. A pin continues charging the original ring pool after
 /// eviction, so abandoned freeze/export readers cannot bypass the hard cap.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct OriginalFrame(Arc<Pixels>);
+impl std::fmt::Debug for OriginalFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OriginalFrame")
+            .field("identity", self.identity())
+            .field("charged_bytes", &self.0.charge.bytes())
+            .finish_non_exhaustive()
+    }
+}
 impl OriginalFrame {
     pub fn identity(&self) -> &FrameIdentity {
         &self.0.identity
     }
     pub fn rgba(&self) -> &[u8] {
         &self.0.rgba
+    }
+    pub fn belongs_to(&self, budget: &SessionBudget) -> bool {
+        self.0.charge.belongs_to(budget)
+    }
+    pub fn copy_into_transfer(
+        &self,
+        budget: &SessionBudget,
+        cancel: &Cancellation,
+    ) -> Result<BudgetedBytes> {
+        if !self.belongs_to(budget) {
+            return Err(StreamError::Invalid);
+        }
+        BudgetedBytes::copy_from(budget, MemoryKind::Transfer, self.rgba(), cancel)
     }
 }
 
@@ -66,6 +87,7 @@ pub struct FrameWriter {
     identity: FrameIdentity,
     rgba: Vec<u8>,
     reservation: Reservation,
+    charge: MemoryCharge,
 }
 impl FrameWriter {
     pub fn rgba_mut(&mut self) -> &mut [u8] {
@@ -82,6 +104,7 @@ impl FrameWriter {
             identity: self.identity,
             rgba: self.rgba,
             _reservation: self.reservation,
+            charge: self.charge,
         })))
     }
 }
@@ -92,6 +115,7 @@ pub struct FrameReservation {
     identity: FrameIdentity,
     bytes: usize,
     reservation: Reservation,
+    charge: MemoryCharge,
 }
 impl FrameReservation {
     pub fn allocate(self) -> Result<FrameWriter> {
@@ -103,6 +127,7 @@ impl FrameReservation {
             identity: self.identity,
             rgba,
             reservation: self.reservation,
+            charge: self.charge,
         })
     }
     pub fn adopt(self, rgba: Vec<u8>, cancel: &Cancellation) -> Result<OriginalFrame> {
@@ -113,6 +138,7 @@ impl FrameReservation {
             identity: self.identity,
             rgba,
             reservation: self.reservation,
+            charge: self.charge,
         }
         .finish(cancel)
     }
@@ -123,6 +149,7 @@ impl FrameReservation {
 /// separate explicit workspace, not hidden in this retained-original budget.
 pub struct FrameRing {
     pool: Arc<Pool>,
+    budget: SessionBudget,
     source: StreamGeometry,
     session: vw_model::Id,
     capacity: usize,
@@ -131,11 +158,24 @@ pub struct FrameRing {
     last_timestamp: i64,
 }
 impl FrameRing {
+    /// Isolated compatibility ring with a private pool. Production capture uses
+    /// new_budgeted and the existing endpoint pool.
     pub fn new(
         session: vw_model::Id,
         source: StreamGeometry,
         capacity: usize,
         limit: u64,
+    ) -> Result<Self> {
+        // Isolated compatibility utility. Production callers must supply the
+        // endpoint's shared pool with new_budgeted/default_budgeted_for.
+        Self::new_budgeted(session, source, capacity, limit, SessionBudget::new(limit)?)
+    }
+    pub fn new_budgeted(
+        session: vw_model::Id,
+        source: StreamGeometry,
+        capacity: usize,
+        limit: u64,
+        budget: SessionBudget,
     ) -> Result<Self> {
         let charge = rgba_bytes(source.width(), source.height())? as u64 + FRAME_OVERHEAD;
         if !(DEFAULT_RING_FRAMES..=32).contains(&capacity)
@@ -151,6 +191,7 @@ impl FrameRing {
                 used: AtomicU64::new(0),
                 limit,
             }),
+            budget,
             source,
             session,
             capacity,
@@ -161,6 +202,13 @@ impl FrameRing {
     }
     pub fn default_for(session: vw_model::Id, source: StreamGeometry) -> Result<Self> {
         Self::new(session, source, DEFAULT_RING_FRAMES, MAX_RING_BYTES)
+    }
+    pub fn default_budgeted_for(
+        session: vw_model::Id,
+        source: StreamGeometry,
+        budget: SessionBudget,
+    ) -> Result<Self> {
+        Self::new_budgeted(session, source, DEFAULT_RING_FRAMES, MAX_RING_BYTES, budget)
     }
     pub fn used_bytes(&self) -> u64 {
         self.pool.used.load(Ordering::Acquire)
@@ -193,11 +241,16 @@ impl FrameRing {
         let charge = bytes as u64 + FRAME_OVERHEAD;
         // Eviction is explicit and occurs before allocation; pinned frames stay
         // charged. Never purge every live ring entry in an attempt to beat pins.
-        let reservation = match self.pool.reserve(charge) {
+        let reserve = || -> Result<(Reservation, MemoryCharge)> {
+            let local = self.pool.reserve(charge)?;
+            let shared = self.budget.reserve(MemoryKind::RingOriginal, charge)?;
+            Ok((local, shared))
+        };
+        let (reservation, charge) = match reserve() {
             Ok(value) => value,
             Err(StreamError::Limit) if self.frames.len() == self.capacity => {
                 self.frames.pop_front();
-                self.pool.reserve(charge)?
+                reserve()?
             }
             Err(error) => return Err(error),
         };
@@ -205,6 +258,7 @@ impl FrameRing {
             identity,
             bytes,
             reservation,
+            charge,
         })
     }
     pub fn publish(&mut self, frame: OriginalFrame) -> Result<()> {

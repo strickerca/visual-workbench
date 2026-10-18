@@ -120,7 +120,7 @@ pub(crate) fn opaque(rgba: &[u8], width: u32, height: u32, cancel: &Cancellation
     }
     for row in rgba.chunks_exact(width as usize * 4) {
         cancel.check()?;
-        if row.chunks_exact(4).any(|p| p[3] != 255) {
+        if row.as_chunks::<4>().0.iter().any(|p| p[3] != 255) {
             return Err(StreamError::Invalid);
         }
     }
