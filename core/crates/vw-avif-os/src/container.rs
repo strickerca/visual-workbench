@@ -85,11 +85,17 @@ pub fn is_avif(bytes: &[u8]) -> bool {
         return false;
     };
     let size = u32::from_be_bytes(raw) as usize;
-    if !(16..=4096).contains(&size) || size > bytes.len() || size % 4 != 0 {
+    if !(16..=4096).contains(&size) || size > bytes.len() || !size.is_multiple_of(4) {
         return false;
     }
     std::iter::once(&bytes[8..12])
-        .chain(bytes[16..size].chunks_exact(4))
+        .chain(
+            bytes[16..size]
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|v| v.as_slice()),
+        )
         .any(|v| matches!(v, b"avif" | b"avis"))
 }
 
@@ -118,7 +124,13 @@ pub fn inspect(bytes: &[u8], budget: u64) -> Result<Header> {
         return Err(Error::Invalid);
     }
     let mut av1 = false;
-    for brand in std::iter::once(&ftyp.payload[..4]).chain(ftyp.payload[8..].chunks_exact(4)) {
+    for brand in std::iter::once(&ftyp.payload[..4]).chain(
+        ftyp.payload[8..]
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|v| v.as_slice()),
+    ) {
         if matches!(brand, b"avif") {
             av1 = true;
         }

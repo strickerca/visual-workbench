@@ -42,7 +42,7 @@ pub(crate) fn inspect(bytes: &[u8], limits: Limits) -> Result<Header> {
             le32(bytes, 46)?,
         )
     };
-    if !matches!(bpp, 1 | 4 | 8 | 16 | 24 | 32) || !matches!(compression, 0 | 1 | 2 | 3) {
+    if !matches!(bpp, 1 | 4 | 8 | 16 | 24 | 32) || !matches!(compression, 0..=3) {
         return Err(Error::Unsupported);
     }
     if (compression == 1 && bpp != 8)
@@ -219,7 +219,12 @@ pub(crate) fn decode(
         if y % 16 == 0 {
             check(cancel)?;
         }
-        for (a, b) in src.chunks_exact(3).zip(dst.chunks_exact_mut(4)) {
+        for (a, b) in src
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .zip(dst.as_chunks_mut::<4>().0.iter_mut())
+        {
             b[..3].copy_from_slice(a);
             b[3] = 255;
         }
@@ -282,7 +287,12 @@ pub(crate) fn encode(image: &DecodedImage, out: &mut crate::io::Output<'_>) -> R
     out.bytes(&h)?;
     let mut row = alloc(image.width as usize * 4)?;
     for src in pixels.chunks_exact(image.width as usize * 4) {
-        for (a, b) in src.chunks_exact(4).zip(row.chunks_exact_mut(4)) {
+        for (a, b) in src
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(row.as_chunks_mut::<4>().0.iter_mut())
+        {
             b.copy_from_slice(&[a[2], a[1], a[0], a[3]]);
         }
         out.bytes(&row)?;

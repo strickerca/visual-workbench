@@ -133,7 +133,9 @@ fn independently_compressed_tiff_strips_keep_exact_samples_and_source_hash() {
         10, 20, 30, 11, 21, 31, 12, 22, 32, 40, 50, 60, 41, 51, 61, 42, 52, 62,
     ];
     let rgba: Vec<_> = rgb
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .flat_map(|p| [p[0], p[1], p[2], 255])
         .collect();
     for compression in [1, 5, 8, 32946, 32773] {

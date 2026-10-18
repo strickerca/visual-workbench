@@ -261,7 +261,9 @@ pub(crate) fn encode(image: &DecodedImage, out: &mut crate::io::Output<'_>) -> R
         Pixels::Rgba8(p) => {
             for src in p.chunks_exact(image.width as usize * 4) {
                 for (a, b) in src
-                    .chunks_exact(4)
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
                     .zip(row_bytes.chunks_exact_mut(samples as usize))
                 {
                     if gray {
@@ -276,14 +278,16 @@ pub(crate) fn encode(image: &DecodedImage, out: &mut crate::io::Output<'_>) -> R
         Pixels::Rgba16(p) => {
             for src in p.chunks_exact(image.width as usize * 4) {
                 for (a, b) in src
-                    .chunks_exact(4)
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
                     .zip(row_bytes.chunks_exact_mut(samples as usize * 2))
                 {
                     if gray {
                         b[..2].copy_from_slice(&a[0].to_le_bytes());
                         b[2..4].copy_from_slice(&a[3].to_le_bytes());
                     } else {
-                        for (v, pair) in a.iter().zip(b.chunks_exact_mut(2)) {
+                        for (v, pair) in a.iter().zip(b.as_chunks_mut::<2>().0.iter_mut()) {
                             pair.copy_from_slice(&v.to_le_bytes());
                         }
                     }
