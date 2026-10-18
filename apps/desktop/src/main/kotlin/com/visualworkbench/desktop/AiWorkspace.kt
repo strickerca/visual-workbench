@@ -239,9 +239,12 @@ private fun AiCandidateGrid(controller: AiEditorController<AiBitmap>, state: AiE
         TextButton({ amount?.let { service.configureDailyBudget(configuration.fingerprint, it) } }, enabled = enabled && amount != null) { Text("Save daily budget") }
         OutlinedTextField(json, { json = it.take(65_536) }, Modifier.fillMaxWidth(), label = { Text("Versioned provider configuration JSON") }, enabled = enabled)
         TextButton({ service.configure(json, configuration.fingerprint) }, enabled = enabled) { Text("Validate & save configuration") }
-        TextButton(onKeys, enabled = enabled) { Text("Protected API key settings") }
+        if (configuration.providerKind == AiProviderKind.OpenAiImageEdits)
+            TextButton(onKeys, enabled = enabled) { Text("Protected API key settings") }
+        else Text("Provider-specific protected key settings are unavailable for this configuration.",
+            style = MaterialTheme.typography.caption)
     }
-    state.readiness?.let { Text("Recorded today ${aiMoney(it.spentTodayMicrousd)} of ${aiMoney(it.dailySoftBudgetMicrousd)} soft budget.\nCredentials ${if (it.trustReady) "ready" else "unavailable"}; configuration ${if (it.configurationCurrent) "current" else "expired"}.", style = MaterialTheme.typography.caption) }
+    state.readiness?.let { Text("Recorded today ${aiMoney(it.spentTodayMicrousd)} of ${aiMoney(it.dailySoftBudgetMicrousd)} soft budget.\nProvider ${if (it.providerReady && it.configured) "ready" else "unavailable"}; TLS trust ${if (it.trustReady) "ready" else "unavailable"}; configuration ${if (it.configurationCurrent) "current" else "expired"}.", style = MaterialTheme.typography.caption) }
     state.failure?.let { Text(aiFailureText(it), color = MaterialTheme.colors.error) }
     if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
 }
