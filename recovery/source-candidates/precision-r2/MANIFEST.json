@@ -1,0 +1,124 @@
+{
+  "candidate": "T3.03/T3.04 precision R2",
+  "source_manifest_name": "t3-precision-candidate-20261003-r2.sha256",
+  "source_manifest_sha256": "73a149bf5a0c99444375c5a363bf8a32c3aa8e8aa4eca38cffcd78dc18a94568",
+  "status": "source-only; unbuilt;34 written tests unrun; A03/A04/A05 and physical acceptance pending",
+  "base_of_literal_prerequisites": "0930c7b; rebase deliberately onto current canonical source, never wholesale-apply stale postimages",
+  "prerequisites": [
+    "instructions-ui R2",
+    "focus R2",
+    "focus-app R2",
+    "semantic-ui R2"
+  ],
+  "integration_targets": [
+    "core/crates/vw-ffi/src/lib.rs",
+    "Android EditorController",
+    "Android EditorDrawing",
+    "Android CanvasSurface",
+    "Android WorkbenchApp",
+    "Desktop EditorController",
+    "Desktop EditorCanvas",
+    "Desktop Main"
+  ],
+  "files": [
+    {
+      "source_relative_path": "apps/android/src/androidTest/kotlin/com/visualworkbench/android/PrecisionInstrumentedTest.kt",
+      "sha256": "a0da95dd94c8f5ee78190334615c77f2e0221c4fc549dd22287dfea2a1de2cec",
+      "bytes": 8339
+    },
+    {
+      "source_relative_path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionControls.kt",
+      "sha256": "75c482191038390f3f8021b0c2dd88ddb55d3ac2cf4b92edf6adf79ae95df1e0",
+      "bytes": 3369
+    },
+    {
+      "source_relative_path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionDrawing.kt",
+      "sha256": "35e2c42ece81a96f05b8848ae1384fcda7670452b9d151295eff071e4b3fb65d",
+      "bytes": 3343
+    },
+    {
+      "source_relative_path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionHit.kt",
+      "sha256": "07bceb6d3a53f5d42fc39b5edc8caab7295c3ebb6ccd2b584bda9225bf6cd681",
+      "bytes": 1811
+    },
+    {
+      "source_relative_path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionInput.kt",
+      "sha256": "dcb606a83f696d15155485405b26a06a210671799f03432dceba12ec81184489",
+      "bytes": 2095
+    },
+    {
+      "source_relative_path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/precision/PrecisionControls.kt",
+      "sha256": "a009b8975b25b9c44902240f8b3d3a9a34244d42ed2d576cb6232fee5fa74ccb",
+      "bytes": 3202
+    },
+    {
+      "source_relative_path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/precision/PrecisionDrawing.kt",
+      "sha256": "88023fa0c76fa6328e7f3761f8ef729800136482c4e5f330a94347b4cdb7fe84",
+      "bytes": 2120
+    },
+    {
+      "source_relative_path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/precision/PrecisionHit.kt",
+      "sha256": "816846eeca776c4863b56fb79de47dd7f03d958b7116c3892a8c5e39cba27d35",
+      "bytes": 1023
+    },
+    {
+      "source_relative_path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopPrecisionTest.kt",
+      "sha256": "bcf9cbcf9bbcfba9ff3f40e691fdbfd84ab394e43ae4f6fc2fc9999b3fd7766c",
+      "bytes": 4369
+    },
+    {
+      "source_relative_path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PrecisionApi.kt",
+      "sha256": "0cff9dbede35d6a1cedcd2452cfe6c2fb7c37496fb554234367b7d11a5f5e2ff",
+      "bytes": 862
+    },
+    {
+      "source_relative_path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PrecisionController.kt",
+      "sha256": "5a2bc36bca047b0aff3af874f33bd4269e9b5718ab4762ed12b3025141a67141",
+      "bytes": 10904
+    },
+    {
+      "source_relative_path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PrecisionGrid.kt",
+      "sha256": "f4c0cda0624e5e8dea505d70879979c48f55fb8c21fa58b8b260c0efd15fc6cf",
+      "bytes": 1429
+    },
+    {
+      "source_relative_path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativePrecision.kt",
+      "sha256": "2082be9bf46e965f235a0cf8f7ef6848324e89aa12dd761635c2b2568e19ed0e",
+      "bytes": 2542
+    },
+    {
+      "source_relative_path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PrecisionTest.kt",
+      "sha256": "b1bd148562c175a3fbe7ecf6e97507fab9de4f691ac5f2a0f48a0b89905564bb",
+      "bytes": 6245
+    },
+    {
+      "source_relative_path": "core/crates/vw-ffi/src/precision.rs",
+      "sha256": "2ffade145e6551c25657ac7c76b0841f627392dc007cf2d8b743b743d44540f9",
+      "bytes": 4554
+    },
+    {
+      "source_relative_path": "core/crates/vw-ffi/tests/precision.rs",
+      "sha256": "5172b41e69b50152f00bdc3b9ec478f1385b3767c6fd14f8df5be4d55b404bc5",
+      "bytes": 5128
+    },
+    {
+      "source_relative_path": "precision/BASES.json",
+      "sha256": "41f7af735b19a1bd001eba4f7fed238450eb9a10bb8ba561427c47e7479e1b3d",
+      "bytes": 5765
+    },
+    {
+      "source_relative_path": "precision/README.md",
+      "sha256": "cc3a0173c07f33b999910f8147560522132511232a1ebb633879518946ce6e91",
+      "bytes": 7254
+    },
+    {
+      "source_relative_path": "precision/integration.patch",
+      "sha256": "7e22ab6fcf7ff558dd6c6518be384eeea482655574b6e6c0c1372652f83a9b3d",
+      "bytes": 44155
+    }
+  ],
+  "generator_retained_only_in_verified_private_archive": [
+    "precision/make_patch.py"
+  ],
+  "ownership": "Cloud coordinator assigns a distinct precision owner; current image/document lanes remain unchanged. No main publication by local owner."
+}

@@ -1,0 +1,109 @@
+{
+  "canonical_revision": "0930c7b",
+  "prerequisites": [
+    "instructions-ui R2",
+    "focus R2",
+    "focus-app R2",
+    "semantics-ui R2"
+  ],
+  "sources": {
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt": {
+      "origin": "ROOT",
+      "sha256": "9e19d1fe9c1f0fdcedd53204094857ae379f49c8ed7d6c11b1512081a8272350"
+    },
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/ProjectRepository.kt": {
+      "origin": "ROOT",
+      "sha256": "3071989a5d6ef722993b6caabc967686794a34d0d8b883a167630f6ce9a541a0"
+    },
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorPreferences.kt": {
+      "origin": "ROOT",
+      "sha256": "e0dab0c6b973df8333a4f798ef1bb11e310df763a53fe5825117ab8ffb561095"
+    },
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt": {
+      "origin": "ROOT",
+      "sha256": "d5f56089ee0ca7483aa0a7d1c25218ec02a01ece602b5eb6e71a2cf1df74c7ec"
+    },
+    "apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt": {
+      "origin": "ROOT",
+      "sha256": "7409d305f6d1d7e4f2608ce693330cbf98549baca3e51ea4e478d4aa807dfdad"
+    },
+    "apps/android/src/main/AndroidManifest.xml": {
+      "origin": "ROOT",
+      "sha256": "ec0c7d6f7975f956186f150148d217842c45ff7d94340579ea9c99839425d17e"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt": {
+      "origin": "ROOT",
+      "sha256": "93c1945afe9cba0eda2851a541ac08d102ebd1d41e05fb609f218dcbaedee528"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopState.kt": {
+      "origin": "ROOT",
+      "sha256": "4a5d8b81e54da538b0ea7cabd737c394f3036087e36fb9015f1c868180cdb1be"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": {
+      "origin": "ROOT",
+      "sha256": "faeb7e6d390c8e4f7c1ea18bea5c3338b25848b4ff234145e89b62261a3b5f83"
+    },
+    "contracts/vw_protocol.proto": {
+      "origin": "ROOT",
+      "sha256": "957638aca770b8ee6639c403d587baf5e5fc96f2a16d1ab58ee4a681565bf15d"
+    },
+    "core/crates/vw-net/src/lib.rs": {
+      "origin": "ROOT",
+      "sha256": "eec64168c8a3f61c6f80b96451054323fc0df3d5638cee02884aaba07dc1c8bd"
+    },
+    "core/crates/vw-ffi/src/session/link.rs": {
+      "origin": "ROOT",
+      "sha256": "d2ef189089d3530ffb89b30f54f34caa29bbe706475f018a4b78044e43779d25"
+    },
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeSessions.kt": {
+      "origin": "ROOT",
+      "sha256": "62803161d1a172c73019a88aa672e251e2aae9007a2fec5aa37e9abf46dee98f"
+    },
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/MarkerFocusFollower.kt": {
+      "origin": "frozen candidate",
+      "sha256": "4016475301c56ae92ce23d1bde4146bef9a91f66ce1813a0fa6bb4148fa9723f"
+    },
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/InstructionEditor.kt": {
+      "origin": "frozen candidate",
+      "sha256": "5c7c9c94da46c5bf3dce7c458b388a63084c7e0072366bb1306d869574133a54"
+    },
+    "apps/android/src/main/kotlin/com/visualworkbench/android/instructions/InstructionsScreen.kt": {
+      "origin": "frozen candidate",
+      "sha256": "33dcd266484621ae0a33fbaf54c3af6aa3cc75e4c81e87a2f1b3e5bd95832b80"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopLiveLink.kt": {
+      "origin": "ROOT",
+      "sha256": "2b5606640d26923e65194829f90fc06a6827c104f9fec7de098c6026770b1374"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/instructions/InstructionsPanel.kt": {
+      "origin": "frozen candidate",
+      "sha256": "e52eee44a4c46ea7db2b95b662eb29db8b6fba237d4ed73fc28eaaaac8c49396"
+    },
+    "core/crates/vw-ffi/src/lib.rs": {
+      "origin": "ROOT",
+      "sha256": "83d84995aa3db9c6b0df3ed404a13169168402476f32f975ba305a3c130bea81"
+    },
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeInstructions.kt": {
+      "origin": "frozen candidate",
+      "sha256": "63a57ac63b29ed1cb25c27646e9a5aa9089a0f7577036c433f25114908324bee"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt": {
+      "origin": "ROOT",
+      "sha256": "1e94d37248f4432bdeb569f914026e2b6d088c11484b0a2e6beff5433c4e70f6"
+    },
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt": {
+      "origin": "ROOT",
+      "sha256": "c8e9645668fa5027de1bc401cd5210db6335baba2bf5bd4290c5a10c02eead33"
+    }
+  },
+  "composed_bases": {
+    "core/crates/vw-ffi/src/lib.rs": "c09b07946db803e918b9789da6942ba1ab2573554a38d08fa3c501ffd6eb9e30",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt": "62b1aacad4db6a87f9c54c93a8e4599d16bf0873e09664d87209b8c68c921bc6",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt": "11d28aa6e901717750f80e3c40f6b159ae768d9c23c6043ae9e5358b25a65845",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt": "c8e9645668fa5027de1bc401cd5210db6335baba2bf5bd4290c5a10c02eead33",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt": "eb49e971bce427d15550936c6f9d3485053b0c72d516e4165a0e073e005563e7",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt": "a4e346b6884c14c9e45dc42d26e03c319bd412f8c6202394014b3df4078d5b63",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt": "b427452c5ad476f632429caa9d74282653d5522c3d476b33bf85ead73b928a2f",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": "d7bb8fa65495b46993f71d6833ba4ba965d97523a84fbb10c811970dea855e4d"
+  }
+}

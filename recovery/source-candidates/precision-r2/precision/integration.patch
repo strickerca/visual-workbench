@@ -1,0 +1,545 @@
+--- a/core/crates/vw-ffi/src/lib.rs
++++ b/core/crates/vw-ffi/src/lib.rs
+@@ -6,6 +6,8 @@
+ mod gesture;
+ mod payload;
+ mod project;
++mod precision;
++pub use precision::*;
+ mod semantic_ui;
+ pub use semantic_ui::*;
+ mod queries;
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -14,6 +14,9 @@
+ import com.visualworkbench.android.input.*
+ import com.visualworkbench.android.ui.ProjectCard
+ import com.visualworkbench.shared.*
++import com.visualworkbench.android.precision.routePen
++import com.visualworkbench.android.precision.precisionHitScene
++import com.visualworkbench.android.precision.precisionResizeHandle
+ import com.visualworkbench.android.session.PairingController
+ import com.visualworkbench.android.session.RefreshAdmission
+ import com.visualworkbench.android.session.sessionMessage
+@@ -107,6 +110,14 @@
+     private var sceneRevision = 0L
+     private var background: Bitmap? = null
+     private var objects = emptyList<DrawObject>()
++    private var precisionUpdating = false
++    val precision = PrecisionController(core, { if (!precisionUpdating && !disposing) publish() })
++    private fun synchronizePrecision() {
++        if (precision.baseCamera() == camera) return
++        precisionUpdating = true
++        try { cancelTool(); precision.synchronize(camera) }
++        finally { precisionUpdating = false }
++    }
+     private var camera = Camera(Point(800.0, 600.0), 1.0, 0.0, 1.0, 1.0)
+     private var cameraFitted = false
+     private var unsnappedRotation = 0.0
+@@ -399,6 +410,7 @@
+     }
+ 
+     private suspend fun closeCurrent() {
++        precision.reset()
+         withContext(NonCancellable) {
+         exportReady = null
+         exportPreflight = null; checkedExport = null
+@@ -659,8 +671,10 @@
+         publish()
+     }
+     private fun publish() {
++        if (precisionUpdating || disposing) return
+         val doc = document ?: return
+         if (camera.viewportWidth <= 1 || camera.viewportHeight <= 1) return
++        synchronizePrecision()
+         val savedIds = objects.mapTo(HashSet()) { it.item.objectId }
+         val peerById = peerObjects.associateBy { it.item.objectId }
+         // Existing objects keep their canonical stacking position. Local
+@@ -673,7 +687,7 @@
+         val allErased = pendingErases.values.fold(emptySet<String>()) { a, b -> a + b } + erased
+         val next = CanvasScene(++sceneRevision, doc, background, camera, core.cameraMatrix(camera), visibleObjects,
+             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
+-            connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty())
++            connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(), precision.frame())
+         scene = next; canvasSink?.invoke(next)
+         val viewport = PeerViewport(doc.documentId, core.mapPoints(camera, true, listOf(Point(0.0, 0.0),
+             Point(camera.viewportWidth, 0.0), Point(camera.viewportWidth, camera.viewportHeight), Point(0.0, camera.viewportHeight))))
+@@ -707,9 +721,9 @@
+                                    val item: RenderItem? = null, val resizeAnchor: Point? = null,
+                                    val previewId: String? = null, val link: ProjectLink? = null, var previewSequence: UInt = 0u,
+                                    val revision: ProjectInfo? = null, val newObjectId: String? = null,
+-                                   val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false)
+-
+-    override fun beginTool(sample: PenSample, capabilities: StylusCapabilities) {
++                                   val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false, val semanticMatrix: Transform = Transform())
++
++    override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
+         cancelTool(); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
+         if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || background == null || strokes.size >= 3) {
+             if (strokes.size >= 3) message = "The save queue is full. Wait for the current strokes to finish."
+@@ -717,8 +731,15 @@
+         }
+         val current = project ?: return
+         this.capabilities = capabilities; hoverPoint = null
+-        val activeTool = if (sample.tool == PointerTool.Eraser) EditorTool.Eraser else tool
++        val activeTool = if (rawSample.tool == PointerTool.Eraser) EditorTool.Eraser else tool
+         try {
++            synchronizePrecision()
++            precision.down(Point(rawSample.x, rawSample.y))
++            val sample = precision.routePen(listOf(rawSample)).single()
++            // Geometry edits keep the remapped D point. Physical hit admission
++            // instead uses the raw contact and exact latched lens matrix.
++            val hitPoint = Point(rawSample.x, rawSample.y)
++            val hitScene = scene?.let { precisionHitScene(it, precision.inputMatrix()) }
+             val layer = selectedLayer(); val brush = preferences.brush(activeTool); val first = toDocument(sample, camera)
+             var run: StrokeRun? = null
+             var item: RenderItem? = null
+@@ -735,40 +756,41 @@
+                     if (family == "highlighter") "multiply" else "normal", link)
+                 invalidateExport(); strokes += run; pending++; startStroke(current, run)
+             } else if (activeTool == EditorTool.Select) {
+-                val snapshot = scene
++                val snapshot = hitScene
+                 val previous = objects.firstOrNull { it.item.objectId == selected }
+                 if (snapshot != null && previous != null) {
+-                    val handles = EditorDrawing.screenBounds(snapshot, previous.item)
+-                    val near = handles.indices.minByOrNull { hypot(handles[it].x - sample.x, handles[it].y - sample.y) }
+-                    if (near != null && hypot(handles[near].x - sample.x, handles[near].y - sample.y) <= 24 * density) {
++                    val near = precisionResizeHandle(snapshot, previous.item, hitPoint, 24 * density)
++                    if (near != null) {
+                         item = previous.item
+                         val r = item.bounds
+                         val corners = listOf(Point(r.x, r.y), Point(r.x + r.width, r.y), Point(r.x + r.width, r.y + r.height), Point(r.x, r.y + r.height))
+                         anchor = corners[(near + 2) % 4]
+                     }
+                 }
+-                if (item == null) item = scene?.let { EditorDrawing.hit(it, Point(sample.x, sample.y), 8 * density)?.item }
++                if (item == null) item = hitScene?.let { EditorDrawing.hit(it, hitPoint, 8 * density)?.item }
+                 selected = item?.objectId
+                 instructionFocus.localSelection(selected)
+                 if (item?.shape is Shape.Marker) item?.objectId?.let(instructionEditor::focusObject)
+             }
+             val newShape = activeTool in listOf(EditorTool.Line, EditorTool.Arrow, EditorTool.Rectangle, EditorTool.Ellipse)
+             gesture = ToolGesture(activeTool, camera, first, Point(sample.x, sample.y), layer, brush, run, item, anchor,
+-                if (item != null || newShape) newId() else null, link, revision = info, newObjectId = if (newShape || activeTool == EditorTool.Callout) newId() else null, semanticModifier = sample.buttons and android.view.MotionEvent.BUTTON_STYLUS_PRIMARY != 0)
++                if (item != null || newShape) newId() else null, link, revision = info, newObjectId = if (newShape || activeTool == EditorTool.Callout) newId() else null, semanticModifier = sample.buttons and android.view.MotionEvent.BUTTON_STYLUS_SECONDARY != 0, semanticMatrix = precision.inputMatrix())
+             eraserLast = if (activeTool == EditorTool.Eraser) Point(sample.x, sample.y) else null
+             if (activeTool == EditorTool.Text) {
+-                val hit = scene?.let { EditorDrawing.hit(it, Point(sample.x, sample.y), 8 * density)?.item }
++                val hit = hitScene?.let { EditorDrawing.hit(it, hitPoint, 8 * density)?.item }
+                 val text = hit?.shape as? Shape.Text
+                 textDraft = if (text != null) TextDraft(hit.objectId, text.anchor, text.text, text.font, text.size) else TextDraft(null, first)
+             }
+-            extendTool(listOf(sample)); publish()
++            extendTool(listOf(rawSample)); publish()
+         } catch (error: Exception) { cancelTool(); report(error) }
+     }
+ 
+-    override fun extendTool(samples: List<PenSample>) {
++    override fun extendTool(rawSamples: List<PenSample>) {
+         val active = gesture ?: return
+-        if (samples.isEmpty()) return
++        if (rawSamples.isEmpty()) return
+         try {
++            val samples = precision.routePen(rawSamples)
++            precision.move(Point(rawSamples.last().x, rawSamples.last().y))
+             val run = active.stroke
+             if (run != null) {
+                 if (!run.queue.trySend(samples.toList()).isSuccess) { cancelTool(); message = "Ink input exceeded its bounded queue. The unfinished stroke was canceled; saved marks are unchanged." }
+@@ -778,7 +800,7 @@
+             when (active.tool) {
+                 EditorTool.Callout -> {
+                     active.semanticEnd = end
+-                    transientShape = semanticDropBox(active.first, end, core.cameraMatrix(active.camera))?.let { previewShape(Shape.Rectangle(it), active) }
++                    transientShape = semanticDropBox(active.first, end, active.semanticMatrix)?.let { previewShape(Shape.Rectangle(it), active) }
+                 }
+                 EditorTool.Line, EditorTool.Arrow, EditorTool.Rectangle, EditorTool.Ellipse -> {
+                     val shape = shape(active.tool, active.first, end)
+@@ -828,6 +850,7 @@
+         extendTool(samples)
+         if (gesture !== active) return
+         gesture = null
++        precision.end() // Final accepted batch was routed through the still-latched transform.
+         val run = active.stroke
+         if (run != null) { run.finished = true; run.prediction = null; run.queue.close(); return }
+         if (active.tool == EditorTool.Callout) {
+@@ -835,8 +858,8 @@
+                 screen = WorkbenchScreen.Instructions
+                 val end = active.semanticEnd
+                 transientShape = null
+-                val box = semanticDropBox(active.first, end, core.cameraMatrix(active.camera))
+-                semanticEditor.place(active.first, ObjectStyle(EditorDrawing.rgba(active.brush.colorArgb), active.brush.width), core.cameraMatrix(active.camera), box, active.semanticModifier)
++                val box = semanticDropBox(active.first, end, active.semanticMatrix)
++                semanticEditor.place(active.first, ObjectStyle(EditorDrawing.rgba(active.brush.colorArgb), active.brush.width), active.semanticMatrix, box, active.semanticModifier)
+             } else message = "The document changed. Place the marker again on the current revision."
+             publish(); return
+         }
+@@ -856,6 +879,7 @@
+     }
+ 
+     override fun cancelTool() {
++        precision.cancel()
+         gesture?.let { active -> finishRemotePreview(active.link, active.previewId, true) }
+         gesture?.stroke?.let { run -> run.canceled.set(true); cancelNative(run.native); run.queue.close(); run.drawing = null }
+         gesture = null; transientShape = null; erased = emptySet(); transformed = emptyMap(); eraserLast = null; publish()
+@@ -868,7 +892,10 @@
+             if(error.kind!=CoreFailureKind.Closed&&error.kind!=CoreFailureKind.Cancelled)report(error)
+         }
+     }
+-    fun predict(sample: PenSample?) { gesture?.stroke?.prediction = sample }
++    fun predict(sample: PenSample?) {
++        val run = gesture?.stroke ?: return
++        run.prediction = sample?.let { precision.routePen(listOf(it)).single() }
++    }
+ 
+     private fun batch(run: StrokeRun, samples: List<PenSample>, predicted: Boolean = false): SampleBatch {
+         require(samples.isNotEmpty() && samples.size <= if (predicted) 32 else 512)
+@@ -1094,6 +1121,10 @@
+     }
+     override fun hover(sample: PenSample?, capabilities: StylusCapabilities) {
+         this.capabilities = capabilities
++        if (camera.viewportWidth > 1 && camera.viewportHeight > 1 && document != null) {
++            synchronizePrecision()
++            precision.hover(sample?.takeIf { capabilities.hover }?.let { Point(it.x, it.y) })
++        }
+         hoverPoint = sample?.let { Point(it.x, it.y) }; publish()
+     }
+ 
+@@ -1288,7 +1319,10 @@
+                         }
+                     }
+                 } catch (error: Exception) { report(error) }
+-                finally { scope.cancel() }
++                finally {
++                    precisionUpdating = true
++                    try { precision.close() } finally { scope.cancel() }
++                }
+             }
+         }
+         super.onCleared()
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt
+@@ -34,6 +34,8 @@
+     val density: Float = 1f,
+     val dark: Boolean = true,
+     val peerViewport: List<Point> = emptyList(),
++    val precision: PrecisionFrame = PrecisionFrame(),
++    val smoothBackground: Boolean = true,
+ )
+ 
+ internal object EditorDrawing {
+@@ -173,7 +175,7 @@
+         canvas.concat(matrix(scene.matrix))
+         canvas.clipRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat())
+         canvas.drawColor(android.graphics.Color.WHITE)
+-        scene.background?.let { canvas.drawBitmap(it, 0f, 0f, Paint(Paint.FILTER_BITMAP_FLAG)) }
++        scene.background?.let { canvas.drawBitmap(it, 0f, 0f, Paint(if (scene.smoothBackground) Paint.FILTER_BITMAP_FLAG else 0)) }
+         canvas.restoreToCount(pageSave)
+         val clipSave = canvas.save()
+         val page = Path().apply { addRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat(), Path.Direction.CW) }
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt
+@@ -17,6 +17,8 @@
+ import com.visualworkbench.android.input.CanvasGestureRouter
+ import com.visualworkbench.android.input.PointerTool
+ import com.visualworkbench.android.input.StylusInput
++import com.visualworkbench.android.precision.PrecisionDrawing
++import com.visualworkbench.android.precision.PrecisionButtons
+ 
+ /** One immutable scene slot per surface generation bounds queued render memory. */
+ internal class CanvasSurface(context: Context, val controller: EditorController) : SurfaceView(context) {
+@@ -32,6 +34,7 @@
+     private val lock = Any()
+     private val main = Handler(Looper.getMainLooper())
+     private val stylus = StylusInput()
++    private val precisionButtons = PrecisionButtons(controller)
+     private val router = CanvasGestureRouter(controller, ViewConfiguration.get(context).scaledTouchSlop.toDouble())
+     private var predictor = MotionEventPredictor.newInstance(this)
+     private var renderer: CanvasFrontBufferedRenderer<Frame>? = null
+@@ -72,7 +75,7 @@
+     }
+ 
+     fun cancelInput() {
+-        main.removeCallbacks(longPress); router.cancel()
++        main.removeCallbacks(longPress); router.cancel(); precisionButtons.reset(); controller.precision.cancel()
+         predictor = MotionEventPredictor.newInstance(this)
+     }
+ 
+@@ -107,7 +110,7 @@
+                     currentSession.frontQueued = false
+                     if (currentSession.closed || param.session !== currentSession) null else currentSession.latest?.also { currentSession.frontDrawn = it.revision }
+                 } ?: return
+-                EditorDrawing.draw(canvas, snapshot)
++                PrecisionDrawing.draw(canvas, snapshot)
+                 if (param.inputMs > 0) main.post { if (!currentSession.closed) controller.drawCallback(param.inputMs) }
+             }
+             override fun onDrawMultiBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, params: Collection<Frame>) {
+@@ -116,7 +119,7 @@
+                     if (currentSession.closed) null else currentSession.latest?.also { currentSession.drawn = it.revision }
+                 }
+                 if (snapshot == null) canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+-                else EditorDrawing.draw(canvas, snapshot)
++                else PrecisionDrawing.draw(canvas, snapshot)
+             }
+             override fun onFrontBufferedLayerRenderComplete(frontBufferedLayerSurfaceControl: SurfaceControlCompat,
+                                                             transaction: SurfaceControlCompat.Transaction) {
+@@ -177,7 +180,9 @@
+             }
+             predictor.record(event)
+             val packet = stylus.snapshot(event)
++            if (packet.action != MotionEvent.ACTION_DOWN) precisionButtons.accept(packet)
+             router.accept(packet)
++            if (packet.action == MotionEvent.ACTION_DOWN) precisionButtons.accept(packet)
+             if (event.actionMasked in setOf(MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL)) {
+                 main.removeCallbacks(longPress); controller.predict(null)
+                 predictor = MotionEventPredictor.newInstance(this)
+@@ -196,7 +201,7 @@
+         return true
+     }
+     override fun onHoverEvent(event: MotionEvent): Boolean {
+-        try { router.accept(stylus.snapshot(event)) } catch (_: IllegalArgumentException) { controller.predict(null) }
++        try { val packet = stylus.snapshot(event); precisionButtons.accept(packet); router.accept(packet) } catch (_: IllegalArgumentException) { controller.predict(null) }
+         return true
+     }
+     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
+@@ -23,6 +23,8 @@
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.viewinterop.AndroidView
++import com.visualworkbench.android.precision.PrecisionControls
++import com.visualworkbench.android.precision.PrecisionHandles
+ import com.visualworkbench.android.editor.*
+ import com.visualworkbench.shared.Shape
+ import com.visualworkbench.android.instructions.InstructionsScreen
+@@ -181,6 +183,7 @@
+         }
+         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+             AndroidView(factory = { context -> CanvasSurface(context, editor) }, update = { it.updatePreferences() }, modifier = Modifier.fillMaxSize())
++            PrecisionHandles(editor.precision)
+             val availableHeight = maxHeight
+             val railHeight = minOf(availableHeight * .78f, 560.dp).coerceAtLeast(80.dp)
+             val travel = (availableHeight - railHeight - 16.dp).coerceAtLeast(0.dp)
+@@ -219,6 +222,7 @@
+             if (editor.tool == EditorTool.Select && editor.selected != null) Text("Drag to move · corner handles resize", style = MaterialTheme.typography.caption,
+                 color = MaterialTheme.colors.onSurface, modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp).background(MaterialTheme.colors.surface, RoundedCornerShape(8.dp)).padding(8.dp))
+         }
++        PrecisionControls(editor.precision)
+         QuickControls(editor.displayedBrush(), editor::brush, { editor.brushDialog(true) },
+             editor.info?.canUndo == true && editor.pending == 0, editor.info?.canRedo == true && editor.pending == 0, editor::undo, editor::redo)
+     }
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
+@@ -3,6 +3,7 @@
+ import androidx.compose.ui.graphics.ImageBitmap
+ import androidx.compose.ui.graphics.toComposeImageBitmap
+ import com.visualworkbench.shared.*
++import com.visualworkbench.desktop.precision.precisionResizeHit
+ import com.visualworkbench.bindings.host.HostService
+ import kotlinx.coroutines.*
+ import kotlinx.coroutines.flow.MutableStateFlow
+@@ -21,7 +22,7 @@
+     val exportCheck:ExportCheck?=null,val exportReceipt:CompletedExport?=null,val dragPrepared:Boolean=false,
+     val sync:SessionStatus?=null,val peerFrame:PeerFrame?=null,val peerViewport:PeerViewport?=null,
+     val routeWarnings:List<TetherRouteWarning> = emptyList(),val previewStyles:Map<String,ObjectStyle> = emptyMap(),
+-    val wetStroke:RenderItem?=null,val shareViewport:Boolean=false,val sessionRole:ProjectSessionRole?=null) {
++    val wetStroke:RenderItem?=null,val shareViewport:Boolean=false,val sessionRole:ProjectSessionRole?=null,val precision:PrecisionFrame=PrecisionFrame()) {
+     val exportReady:Boolean get()=exportReceipt?.request?.matches(this)==true
+ }
+ private data class Drag(val start:Point,val initial:ViewState,val selected:List<RenderItem>,val bounds:Rect?,val resize:Boolean,val pan:Boolean,val binding:RenderBinding,val live:ObjectPreviewLease?=null,val newObject:NewObjectPreviewLease?=null,val tool:Tool=Tool.Select)
+@@ -30,6 +31,10 @@
+ class EditorController internal constructor(private val scope:CoroutineScope,val core:WorkbenchCore,private val handoff:DesktopHandoff,val location:LocationPolicy,private val deviceId:String,workRoot:Path=location.path.resolve(".handoff")) {
+     constructor(scope:CoroutineScope,core:WorkbenchCore,host:HostService,location:LocationPolicy,deviceId:String,workRoot:Path):this(scope,core,NativeDesktopHandoff(host),location,deviceId,workRoot)
+     private val mutable=MutableStateFlow(EditorState());val state:StateFlow<EditorState> = mutable
++    private var precisionUpdating=false
++    val precision:PrecisionController=PrecisionController(core,{if(!precisionUpdating&&!closing)mutable.value=mutable.value.copy(precision=precision.frame())})
++    private var precisionDownMatrix:Transform?=null
++    private var precisionDownPoint:Point?=null
+     private var project:WorkbenchProject?=null;private var changes:Job?=null;private val edits=Mutex();private var drag:Drag?=null
+     private var closing=false;private var queued=0;private var colorAssumed=false;private var generation=0L
+     private val transferFiles=TransferFiles(workRoot);private var transferJob:Job?=null;private var cachedExport:CachedExport?=null
+@@ -42,7 +47,7 @@
+     private val live=DesktopLiveLink(scope,{mutable.value.document?.binding(generation)},::sessionStatus,
+         {frame->update{it.copy(peerFrame=frame)}},::report,::detachInstructionFocus)
+     private var viewportJob:Job?=null
+-    private data class MarkerPress(val binding: RenderBinding, val first: Point, val camera: Camera, val invertSnapping: Boolean, var end: Point = first)
++    private data class MarkerPress(val binding: RenderBinding, val first: Point, val camera: Camera, val invertSnapping: Boolean, var end: Point = first, val physical:Transform)
+     private var markerPress: MarkerPress? = null
+     val instructionEditor = InstructionEditor(scope, edits,
+         { val p = project; val d = mutable.value.document; if (p != null && d != null && !closing) InstructionAttachment(p, d) else null },
+@@ -78,7 +83,18 @@
+         if (instructionEditor.sealIfClean()) return true
+         report("Save or discard the instruction draft before closing or replacing this project."); return false
+     }
+-    private fun update(f:(EditorState)->EditorState){val before=mutable.value;var next=f(before);if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.close();preparedDrag=null;next=next.copy(dragPrepared=false)};if(next.exportCheck?.request?.matches(next)==false)next=next.copy(exportCheck=null);mutable.value=next;if(next.shareViewport&&(next.view.camera!=before.view.camera||!before.shareViewport))scheduleViewport()}
++    private fun update(f:(EditorState)->EditorState){val before=mutable.value;var next=f(before);
++        if(!precisionUpdating && (precision.baseCamera()!=next.view.camera || before.projectEpoch!=next.projectEpoch)) {
++            val active=precision.state.value.latched
++            precisionUpdating=true
++            try {
++                if(active)cancelInput()
++                if(before.projectEpoch!=next.projectEpoch)precision.reset()
++                precision.synchronize(next.view.camera)
++            } finally {precisionUpdating=false}
++            if(active)next=next.copy(preview=emptyMap(),previewStyles=emptyMap(),draft=null,wetStroke=null)
++        }
++        next=next.copy(precision=precision.frame());if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.close();preparedDrag=null;next=next.copy(dragPrepared=false)};if(next.exportCheck?.request?.matches(next)==false)next=next.copy(exportCheck=null);mutable.value=next;if(next.shareViewport&&(next.view.camera!=before.view.camera||!before.shareViewport))scheduleViewport()}
+     fun clearMessage(){update{it.copy(message=null)}}
+     internal fun useSessionService(value:DesktopSessionController){sessionProvider=value}
+     fun report(message:String){update{it.copy(message=message)}}
+@@ -163,7 +179,7 @@
+     fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
+     fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one PNG, JPEG, WebP or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension !in setOf("png","jpg","jpeg","webp","mp4")){report("This drop supports PNG, JPEG, WebP and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
+     fun open(path:Path,epoch:Long=generation){task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
+-    suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
++    suspend fun close(){try{closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}finally{precision.close()}}
+     fun closeProject(){if(!mayCloseInstructions())return;cancelInput();sessionWork?.cancel();task(generation){
+         if(!sealInstructionsForClose())return@task
+         try { live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
+@@ -222,13 +238,35 @@
+     fun select(id:String,extend:Boolean=false){val item=mutable.value.document?.render?.items?.firstOrNull{it.objectId==id}?:return;if(item.locked)return;cancelWidth();update{it.copy(selected=if(extend)it.selected.toggle(id)else setOf(id),color=item.style.rgba,width=item.style.width.coerceIn(.25,256.0))};instructionFocus.localSelection(mutable.value.selected.singleOrNull());if(item.shape is Shape.Marker)instructionEditor.focusObject(id)}
+     fun selectAll(){instructionFocus.localSelection(null);update{it.copy(selected=it.document?.render?.items?.filterNot{item->item.locked}?.map{item->item.objectId}?.toSet()?:emptySet())}}
+     fun clearSelection(){instructionFocus.localSelection(null);cancelInput();update{it.copy(selected=emptySet(),preview=emptyMap(),draft=null,textAnchor=null)}}
++    fun precisionDown(raw:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long,pressure:Float=1f,semanticModifier:Boolean=false){
++        val s=mutable.value
++        if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||s.background==null||!s.canvasReady||s.renderIssue!=null)return
++        precision.synchronize(s.view.camera)
++        val pan=panButton||s.tool==Tool.Pan
++        val point=if(pan)raw else precision.route(listOf(raw)).single()
++        precisionDownMatrix=precision.inputMatrix(if(pan)null else raw)
++        precisionDownPoint=raw
++        try{pointerDown(point,extend,panButton,uptimeMs,pressure,semanticModifier)}finally{precisionDownMatrix=null;precisionDownPoint=null}
++        // pointerDown can clear selection through cancelInput. Latch after that
++        // synchronous admission; the first point already used this exact map.
++        if(!pan)precision.down(raw)
++    }
++    fun precisionMove(raw:Point,uptimeMs:Long,pressure:Float=1f){
++        val point=if(precision.state.value.latched)precision.route(listOf(raw)).single()else raw
++        precision.move(raw);pointerMove(point,uptimeMs,pressure)
++    }
++    fun precisionUp(raw:Point,uptimeMs:Long,pressure:Float=1f){
++        val point=if(precision.state.value.latched)precision.route(listOf(raw)).single()else raw
++        try{pointerUp(point,uptimeMs,pressure)}finally{precision.end()}
++    }
++    fun precisionHover(raw:Point?){if(mutable.value.document!=null)precision.hover(raw)}
+     fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false){val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||s.background==null||!s.canvasReady||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||s.tool==Tool.Pan
+-        if(s.tool==Tool.Callout&&!pan){markerPress=MarkerPress(binding,point,s.view.camera,semanticModifier);update{it.copy(draft=point to point)};return}
++        if(s.tool==Tool.Callout&&!pan){markerPress=MarkerPress(binding,point,s.view.camera,semanticModifier,physical=precisionDownMatrix?:core.cameraMatrix(s.view.camera));update{it.copy(draft=point to point)};return}
+         if(s.tool==Tool.Pen&&!pan){beginInk(DesktopSample(point,uptimeMs,pressure),binding);return}
+         if(s.tool==Tool.Text&&!pan){update{it.copy(textAnchor=point)};return}
+         if(s.tool !in listOf(Tool.Select,Tool.Pan)&&!pan){update{it.copy(draft=point to point)};drag=Drag(point,s.view,emptyList(),null,false,false,binding,newObject=newObjectPreview(s,binding),tool=s.tool);return}
+-        var selected=s.document?.render?.items?.filter{it.objectId in s.selected}?:emptyList();val bounds=union(selected.map{it.bounds});val tolerance=10.0/s.view.camera.scale
+-        val resize=!pan&&bounds!=null&&kotlin.math.abs(point.x-bounds.x-bounds.width)<=tolerance&&kotlin.math.abs(point.y-bounds.y-bounds.height)<=tolerance
++        var selected=s.document?.render?.items?.filter{it.objectId in s.selected}?:emptyList();val bounds=union(selected.map{it.bounds})
++        val resize=!pan&&bounds!=null&&precisionResizeHit(bounds,precisionDownMatrix?:core.cameraMatrix(s.view.camera),precisionDownPoint?:viewPoint,10.0)
+         if(!pan&&!resize){val item=s.document?.render?.items?.asReversed()?.firstOrNull{!it.locked&&point.x>=it.bounds.x&&point.x<=it.bounds.x+it.bounds.width&&point.y>=it.bounds.y&&point.y<=it.bounds.y+it.bounds.height};if(item!=null){if(item.objectId !in s.selected||extend)select(item.objectId,extend)}else if(!extend)clearSelection();selected=mutable.value.document?.render?.items?.filter{it.objectId in mutable.value.selected}?:emptyList()}
+         drag=Drag(point,s.view,selected,union(selected.map{it.bounds}),resize,pan,binding,if(!pan)previewFor(selected,binding,PreviewKind.HandleDrag)else null)
+     }
+@@ -252,7 +290,7 @@
+             val current = mutable.value
+             if (geometryMatches(binding, current)) {
+                 val end = viewPoint?.let { core.mapPoints(press.camera, true, listOf(it)).single() } ?: press.end
+-                val matrix = core.cameraMatrix(press.camera)
++                val matrix = press.physical
+                 semanticEditor.place(point, ObjectStyle(current.color, current.width), matrix, semanticDropBox(point, end, matrix), press.invertSnapping)
+             }
+             else report("The document changed. Place the marker again on the current revision.")
+@@ -273,7 +311,7 @@
+         return ObjectPreviewLease(core.newId(System.currentTimeMillis().toULong()),attached,binding.documentId,item.objectId,kind)
+     }
+     private fun cancelWidth(){val old=widthGesture;widthGesture=null;live.cancelLater(old?.live?.attachment,old?.live?.id);update{it.copy(previewStyles=emptyMap())}}
+-    fun cancelInput(){cancelDrag();cancelWidth();cancelInk()}
++    fun cancelInput(){precision.cancel();cancelDrag();cancelWidth();cancelInk()}
+     private fun beginInk(first:DesktopSample,binding:RenderBinding){
+         val s=mutable.value;val p=project?:return;val doc=s.document?:return;val layer=doc.layers.firstOrNull{it.visible&&!it.locked&&it.blend=="normal"}?:return
+         val now=System.currentTimeMillis();val info=doc.render.revision
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt
+@@ -21,6 +21,7 @@
+ import androidx.compose.ui.layout.onSizeChanged
+ import com.visualworkbench.shared.*
+ import com.visualworkbench.shared.Outline
++import com.visualworkbench.desktop.precision.drawPrecision
+ import com.visualworkbench.shared.Shape
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.currentCoroutineContext
+@@ -159,13 +160,15 @@
+         catch(_:Exception){prepared=null;controller.canvasFailed(requested,"Canvas geometry could not be prepared. Reopen the project before editing; saved data is intact.")}
+     }
+     Canvas(modifier.fillMaxSize().clipToBounds().focusRequester(focus).onFocusChanged{controller.canvasFocus(it.isFocused)}.focusable()
++        .onPointerEvent(PointerEventType.Move){event->if(event.changes.none{it.pressed})event.changes.firstOrNull()?.let{controller.precisionHover(Point(it.position.x.toDouble(),it.position.y.toDouble()))}}
++        .onPointerEvent(PointerEventType.Exit){controller.precisionHover(null)}
+         .onSizeChanged{controller.viewport(it.width.toDouble(),it.height.toDouble())}
+         .onPointerEvent(PointerEventType.Scroll){event->val change=event.changes.firstOrNull()?:return@onPointerEvent;val delta=change.scrollDelta;if(event.keyboardModifiers.isCtrlPressed){controller.zoom(kotlin.math.exp(-delta.y.toDouble()*0.12),Point(change.position.x.toDouble(),change.position.y.toDouble()))}else{controller.pan(-delta.x*28.0,-delta.y*28.0)};change.consume()}
+         .pointerInput(controller){awaitEachGesture{
+             val down=awaitFirstDown(requireUnconsumed=false);focus.requestFocus()
+-            controller.pointerDown(Point(down.position.x.toDouble(),down.position.y.toDouble()),currentEvent.keyboardModifiers.isShiftPressed,down.type==PointerType.Touch||currentEvent.buttons.isTertiaryPressed||currentEvent.buttons.isSecondaryPressed,down.uptimeMillis,semanticModifier=currentEvent.keyboardModifiers.isAltPressed);down.consume()
++            controller.precisionDown(Point(down.position.x.toDouble(),down.position.y.toDouble()),currentEvent.keyboardModifiers.isShiftPressed,down.type==PointerType.Touch||currentEvent.buttons.isTertiaryPressed||currentEvent.buttons.isSecondaryPressed,down.uptimeMillis,semanticModifier=currentEvent.keyboardModifiers.isAltPressed);down.consume()
+             var completed=false
+-            try{while(true){val event=awaitPointerEvent();val change=event.changes.firstOrNull{it.id==down.id}?:break;if(!change.pressed){controller.pointerUp(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);completed=true;change.consume();break};controller.pointerMove(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);change.consume()}}
++            try{while(true){val event=awaitPointerEvent();val change=event.changes.firstOrNull{it.id==down.id}?:break;if(!change.pressed){controller.precisionUp(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);completed=true;change.consume();break};controller.precisionMove(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);change.consume()}}
+             finally{if(completed)controller.cancelDrag()else controller.cancelInput()}
+         }}
+     ){
+@@ -178,21 +181,23 @@
+         val replacements=currentOverlay?.source?.associateBy{it.objectId}.orEmpty()
+         val originalIds=doc.render.items.mapTo(hashSetOf()){it.objectId}
+         val displayed=doc.render.items.map{replacements[it.objectId]?:it}+replacements.values.filter{it.objectId !in originalIds}
+-        val camera=controller.core.cameraMatrix(current.view.camera)
+-        withTransform({transform(camera.matrix())}){
++        fun DrawScope.document(matrix:Transform,scale:Double,smooth:Boolean){ withTransform({transform(matrix.matrix())}){
+             drawRect(Color.White,size=Size(doc.width.toFloat(),doc.height.toFloat()))
+-            drawImage(background,filterQuality=FilterQuality.None)
++            drawImage(background,filterQuality=if(smooth)FilterQuality.Medium else FilterQuality.None)
+             clipRect(0f,0f,doc.width.toFloat(),doc.height.toFloat()){
+                 for((_,items)in displayed.groupBy{it.layerId}){
+                     val first=items.first();val paint=Paint().apply{alpha=first.layerOpacity.toFloat();blendMode=if(first.layerBlend=="multiply")BlendMode.Multiply else BlendMode.SrcOver}
+                     drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f,0f,doc.width.toFloat(),doc.height.toFloat()),paint)
+-                    try{for(item in items)drawGeometry(item,checkNotNull(currentOverlay?.entries?.get(item.objectId)?:frame.entries[item.objectId]),current.preview[item.objectId],current.view.camera.scale)}finally{drawContext.canvas.restore()}
++                    try{for(item in items)drawGeometry(item,checkNotNull(currentOverlay?.entries?.get(item.objectId)?:frame.entries[item.objectId]),current.preview[item.objectId],scale)}finally{drawContext.canvas.restore()}
+                 }
+             }
+             val selected=doc.render.items.filter{it.objectId in current.selected}
+-            union(selected.map{previewBounds(it,current.preview[it.objectId])})?.let{bounds->val width=(1.0/current.view.camera.scale).toFloat();drawRect(Color(0xff81e0c8),Offset(bounds.x.toFloat(),bounds.y.toFloat()),Size(bounds.width.toFloat(),bounds.height.toFloat()),style=Stroke(width));val side=(8.0/current.view.camera.scale).toFloat();drawRect(Color(0xff81e0c8),Offset((bounds.x+bounds.width).toFloat()-side/2,(bounds.y+bounds.height).toFloat()-side/2),Size(side,side))}
+-            current.draft?.let{(a,b)->drawRect(color(current.color),Offset(minOf(a.x,b.x).toFloat(),minOf(a.y,b.y).toFloat()),Size(kotlin.math.abs(a.x-b.x).toFloat(),kotlin.math.abs(a.y-b.y).toFloat()),style=Stroke((1.0/current.view.camera.scale).toFloat()))}
+-            if(current.view.showPeerOutline){current.peerViewport?.takeIf{it.documentId==doc.documentId}?.let{peer->drawPath(polyline(peer.corners,true),Color(0xffecbb72),style=Stroke((1.0/current.view.camera.scale).toFloat(),pathEffect=PathEffect.dashPathEffect(floatArrayOf((6/current.view.camera.scale).toFloat(),(4/current.view.camera.scale).toFloat()))))}}
+-        }
+-    }
+-}
++            union(selected.map{previewBounds(it,current.preview[it.objectId])})?.let{bounds->val width=(1.0/scale).toFloat();drawRect(Color(0xff81e0c8),Offset(bounds.x.toFloat(),bounds.y.toFloat()),Size(bounds.width.toFloat(),bounds.height.toFloat()),style=Stroke(width));val side=(8.0/scale).toFloat();drawRect(Color(0xff81e0c8),Offset((bounds.x+bounds.width).toFloat()-side/2,(bounds.y+bounds.height).toFloat()-side/2),Size(side,side))}
++            current.draft?.let{(a,b)->drawRect(color(current.color),Offset(minOf(a.x,b.x).toFloat(),minOf(a.y,b.y).toFloat()),Size(kotlin.math.abs(a.x-b.x).toFloat(),kotlin.math.abs(a.y-b.y).toFloat()),style=Stroke((1.0/scale).toFloat()))}
++            if(current.view.showPeerOutline){current.peerViewport?.takeIf{it.documentId==doc.documentId}?.let{peer->drawPath(polyline(peer.corners,true),Color(0xffecbb72),style=Stroke((1.0/scale).toFloat(),pathEffect=PathEffect.dashPathEffect(floatArrayOf((6/scale).toFloat(),(4/scale).toFloat()))))}}
++        }
++        }
++        document(controller.core.cameraMatrix(current.view.camera),current.view.camera.scale,false)
++        drawPrecision(current.precision,current.view.camera){matrix,scale,smooth->document(matrix,scale,smooth)}
++    }
++}
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
+@@ -19,6 +19,8 @@
+ import androidx.compose.ui.window.*
+ import com.visualworkbench.bindings.host.*
+ import com.visualworkbench.shared.*
++import com.visualworkbench.desktop.precision.PrecisionControls
++import com.visualworkbench.desktop.precision.PrecisionHandles
+ import kotlinx.coroutines.*
+ import kotlinx.coroutines.flow.debounce
+ import java.awt.FileDialog
+@@ -149,6 +151,7 @@
+             Column(Modifier.weight(1f)){Text(editor.document?.title?:"Visual Workbench",fontWeight=FontWeight.SemiBold);Text(editor.document?.let{"${it.width} × ${it.height} px · revision ${it.render.revision.hostSeq}"}?:"A precise workspace for shared visual work",style=MaterialTheme.typography.caption,color=Color(0xff9cabbc))}
+             commandButton(Command.Import,action);commandButton(Command.Undo,action,enabled=editor.document?.render?.revision?.canUndo==true);commandButton(Command.Redo,action,enabled=editor.document?.render?.revision?.canRedo==true);commandButton(Command.Export,action,enabled=editor.document!=null)
+         }
++        if(editor.document!=null)PrecisionControls(controller.precision)
+         Row(Modifier.weight(1f)){
+             Column(Modifier.width(178.dp).fillMaxHeight().background(Color(0xff141e29)).padding(12.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                 Text("TOOLS",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc));for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout))commandButton(c,action,Modifier.fillMaxWidth(),selected=c.name==editor.tool.name)
+@@ -157,6 +160,7 @@
+             }
+             Box(Modifier.weight(1f).fillMaxHeight()){
+                 EditorCanvas(controller,editor)
++                PrecisionHandles(controller.precision)
+                 if(editor.document!=null&&(editor.renderIssue!=null||!editor.canvasReady||editor.background==null)){
+                     val status=editor.renderIssue?:if(!editor.canvasReady)"Preparing this revision…"else if(editor.busy)"Loading the original image…"else"The source image is unavailable. Review its color and memory settings."
+                     Text(status,Modifier.align(Alignment.Center).widthIn(max=440.dp).padding(24.dp),color=Color(0xffaebccb))
