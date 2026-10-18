@@ -1,0 +1,78 @@
+{
+  "rust": "1.99.0",
+  "node": "24.21.0",
+  "jdk": "21.0.12.1",
+  "android_license": {
+    "id": "android-sdk-license",
+    "terms_url": "https://developer.android.com/studio/terms",
+    "repository_url": "https://dl.google.com/android/repository/repository2-3.xml",
+    "package_text_sha256": "de5fa465e908e7f098e718082f013135b9a36ee706d032cf510f4f1153424b2a",
+    "sdkmanager_sha1": "9002c006f4b8d9a16e715a9fa4df30ddb8abf9d9",
+    "package_text_date": "January 16, 2019"
+  },
+  "archives": [
+    {
+      "name": "node",
+      "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-x64.tar.xz",
+      "sha256": "fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6",
+      "directory": "node-v24.21.0-linux-x64"
+    },
+    {
+      "name": "jdk",
+      "url": "https://deb.debian.org/debian/pool/main/o/openjdk-21/openjdk-21-jdk-headless_21.0.12.1+1-1~deb13u1_amd64.deb",
+      "sha256": "f3abafb6c644b03df042824e707cd211ea33254761d7f7b75be3f8dc0df97c7a"
+    },
+    {
+      "name": "cargo-deny",
+      "version": "0.20.2",
+      "url": "https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz",
+      "sha256": "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f",
+      "binaries": ["cargo-deny"]
+    },
+    {
+      "name": "cargo-ndk",
+      "version": "4.1.2",
+      "url": "https://github.com/bbqsrc/cargo-ndk/releases/download/v4.1.2/cargo-ndk-x86_64-unknown-linux-gnu-v4.1.2.tgz",
+      "sha256": "9451622c4567e8abb2c8005001855e32901c0b716ccdd3a173a4375fd03426e1",
+      "binaries": ["cargo-ndk", "cargo-ndk-env", "cargo-ndk-runner", "cargo-ndk-test"]
+    },
+    {
+      "name": "gitleaks",
+      "version": "8.30.1",
+      "url": "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz",
+      "sha256": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb",
+      "binaries": ["gitleaks"]
+    }
+  ],
+  "android": [
+    {
+      "package": "cmdline-tools;22.0",
+      "revision": "22.0",
+      "url": "https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip",
+      "sha1": "040d3996a65543d22ec4bf73e4c37aa37a8d4af4",
+      "directory": "cmdline-tools/22.0",
+      "archive_root": "cmdline-tools"
+    },
+    {
+      "package": "platforms;android-37.0",
+      "revision": "2",
+      "url": "https://dl.google.com/android/repository/platform-37.0_r02.zip",
+      "sha1": "ed8ebf7f8822a4de5686d427f237d2fa30ff7410",
+      "directory": "platforms/android-37.0"
+    },
+    {
+      "package": "build-tools;36.1.0",
+      "revision": "36.1.0",
+      "url": "https://dl.google.com/android/repository/build-tools_r36.1_linux.zip",
+      "sha1": "936a0d6bd5ae3e2118a7567dddbc95ff67ed46e9",
+      "directory": "build-tools/36.1.0"
+    },
+    {
+      "package": "ndk;30.0.16248370",
+      "revision": "30.0.16248370",
+      "url": "https://dl.google.com/android/repository/android-ndk-r30-linux.zip",
+      "sha1": "5107f898313790e449e87eee2183d9a20602dee9",
+      "directory": "ndk/30.0.16248370"
+    }
+  ]
+}
