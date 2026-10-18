@@ -1,0 +1,20 @@
+[package]
+name = "vw-formats"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+vw-model = { path = "../vw-model", version = "=0.1.0" }
+vw-raster = { path = "../vw-raster", version = "=0.1.0" }
+image = { version = "=0.25.10", default-features = false, features = ["bmp"] }
+tiff = { version = "=0.11.3", default-features = false, features = ["deflate", "jpeg", "lzw"] }
+thiserror = "=2.0.21"
+
+[dev-dependencies]
+weezl = "=0.1.10"
+
+[lints]
+workspace = true

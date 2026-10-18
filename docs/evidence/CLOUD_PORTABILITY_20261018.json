@@ -1,0 +1,24 @@
+{
+  "status": "source/configuration and focused guards validated; product compilation pending",
+  "baseline": "b49c4f53ff1f8dd0534e7902a377fdbb17441c46",
+  "changes": [
+    "Shared Gradle selects Windows or Linux x86-64 library/generator filenames and native resource paths.",
+    "Windows Android alignment path is retained. Linux invokes the pinned NDK objdump through a bounded Python checker with the same minimum 16 KiB LOAD contract.",
+    "Desktop shared core loading admits the packaged Linux core for host validation; this does not enable Windows capture/input providers."
+  ],
+  "checks": {
+    "cloud_setup": "18/18 prerequisite and small compilation checks passed using setup a79728a254b6afffd1d34cc7078b28a2777ee30a; no product build",
+    "gradle_configuration": "passed during bootstrap with the changed shared script",
+    "python_ffi_guards": "44 passed",
+    "gradle_common_imports_import_fixtures_alignment_fixtures": "all three tasks passed; fixture counts 4 and 2",
+    "ndk_alignment_probe": "passed, three ELF LOAD segments on the setup-owned JNI smoke library; product core was not built",
+    "gradle_application_license_gate": "failed offline: uncached application dependency metadata/artifacts and unresolved lock state; no dependency pins or license allowances changed",
+    "product_native_shared_android_compilation": "not run; next heavy slot belongs to document lane",
+    "windows_regression": "not run; Windows paths retained and source reviewed"
+  },
+  "limits": [
+    "Product Kotlin compilation, binding generation and full packaging require a subsequent serialized build after application dependency/license resolution.",
+    "Desktop connection runtime packaging remains Windows-specific; this patch does not claim a Linux desktop product.",
+    "No provider calls, emulator, device tests, verification images, signing, identity changes or main merge occurred."
+  ]
+}

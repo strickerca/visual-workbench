@@ -9,6 +9,21 @@ plugins {
 val repository = rootProject.projectDir.parentFile
 val nativeDirectory = providers.gradleProperty("vwNativeDir").map { file(it) }.orElse(repository.resolve("target/debug"))
 val androidNativeDirectory = providers.gradleProperty("vwAndroidNativeDir").map { file(it) }.orElse(repository.resolve("target/android-jni"))
+val windowsBuildHost = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+val linuxBuildHost = System.getProperty("os.name").startsWith("Linux", ignoreCase = true)
+val nativeResourcePlatform = when {
+    windowsBuildHost -> "win32-x86-64"
+    linuxBuildHost -> "linux-x86-64"
+    else -> "unsupported"
+}
+val coreLibraryName = if (windowsBuildHost) "vw_core.dll" else "libvw_core.so"
+val hostLibraryName = if (windowsBuildHost) "vw_host.dll" else "libvw_host.so"
+val bindingGeneratorName = if (windowsBuildHost) "vw-bindgen.exe" else "vw-bindgen"
+fun checkNativeBuildHost() {
+    check((windowsBuildHost || linuxBuildHost) && System.getProperty("os.arch").lowercase() in setOf("amd64", "x86_64")) {
+        "Native binding generation currently supports Windows/Linux x86-64 build hosts"
+    }
+}
 fun generatedBindingsDirectory(component: String): java.io.File {
     check(component in setOf("core", "host"))
     val output = layout.buildDirectory.dir("generated/uniffi/$component").get().asFile
@@ -69,32 +84,37 @@ fun assertGeneratedBindings(component: String) {
     // separate JVM module; every handwritten shared source retains explicitApi.
 }
 val generateCoreBindings = tasks.register<Exec>("generateCoreBindings") {
-    val library = nativeDirectory.map { it.resolve("vw_core.dll") }
-    val generator = nativeDirectory.map { it.resolve("vw-bindgen.exe") }
+    val library = nativeDirectory.map { it.resolve(coreLibraryName) }
+    val generator = nativeDirectory.map { it.resolve(bindingGeneratorName) }
     inputs.file(library); inputs.file(generator); inputs.file(repository.resolve("core/crates/vw-ffi/uniffi.toml"))
     inputs.property("generatedJvmBoundary", 2)
     outputs.dir(layout.buildDirectory.dir("generated/uniffi/core"))
     doFirst {
+        checkNativeBuildHost()
         cleanGeneratedBindings("core")
         commandLine(generator.get().absolutePath,"generate","--library",library.get().absolutePath,"--crate","vw_core","--language","kotlin","--config",repository.resolve("core/crates/vw-ffi/uniffi.toml").absolutePath,"--out-dir",layout.buildDirectory.dir("generated/uniffi/core").get().asFile.absolutePath,"--no-format")
     }
     doLast { assertGeneratedBindings("core") }
 }
 val generateHostBindings = tasks.register<Exec>("generateHostBindings") {
-    val library = nativeDirectory.map { it.resolve("vw_host.dll") }
-    inputs.file(library); inputs.file(nativeDirectory.map { it.resolve("vw-bindgen.exe") }); inputs.file(repository.resolve("host-win/crates/vw-host-ffi/uniffi.toml"))
+    val library = nativeDirectory.map { it.resolve(hostLibraryName) }
+    inputs.file(library); inputs.file(nativeDirectory.map { it.resolve(bindingGeneratorName) }); inputs.file(repository.resolve("host-win/crates/vw-host-ffi/uniffi.toml"))
     inputs.property("generatedJvmBoundary", 2)
     outputs.dir(layout.buildDirectory.dir("generated/uniffi/host"))
     doFirst {
+        checkNativeBuildHost()
         cleanGeneratedBindings("host")
-        commandLine(nativeDirectory.get().resolve("vw-bindgen.exe").absolutePath,"generate","--library",library.get().absolutePath,"--crate","vw_host","--language","kotlin","--config",repository.resolve("host-win/crates/vw-host-ffi/uniffi.toml").absolutePath,"--out-dir",layout.buildDirectory.dir("generated/uniffi/host").get().asFile.absolutePath,"--no-format")
+        commandLine(nativeDirectory.get().resolve(bindingGeneratorName).absolutePath,"generate","--library",library.get().absolutePath,"--crate","vw_host","--language","kotlin","--config",repository.resolve("host-win/crates/vw-host-ffi/uniffi.toml").absolutePath,"--out-dir",layout.buildDirectory.dir("generated/uniffi/host").get().asFile.absolutePath,"--no-format")
     }
     doLast { assertGeneratedBindings("host") }
 }
 val packageDesktopNative = tasks.register<Sync>("packageDesktopNative") {
-    from(nativeDirectory) { include("vw_core.dll","vw_host.dll"); into("win32-x86-64") }
+    from(nativeDirectory) { include(coreLibraryName,hostLibraryName); into(nativeResourcePlatform) }
     into(layout.buildDirectory.dir("generated/nativeResources"))
-    doFirst { for (name in listOf("vw_core.dll","vw_host.dll")) check(nativeDirectory.get().resolve(name).isFile) { "Missing prebuilt $name; use build.ps1" } }
+    doFirst {
+        checkNativeBuildHost()
+        for (name in listOf(coreLibraryName,hostLibraryName)) check(nativeDirectory.get().resolve(name).isFile) { "Missing prebuilt $name; use the serialized native build lane" }
+    }
 }
 val checkCommonMainImports = tasks.register<Exec>("checkCommonMainImports") {
     commandLine("python",repository.resolve("tools/ffi-test/check_imports.py").absolutePath,file("src/commonMain").absolutePath)
@@ -104,11 +124,21 @@ val checkImportGuardFixtures = tasks.register<Exec>("checkImportGuardFixtures") 
     workingDir(repository.resolve("tools/ffi-test"))
     commandLine("python","-m","unittest","test_imports")
 }
+val checkAlignmentGuardFixtures = tasks.register<Exec>("checkAlignmentGuardFixtures") {
+    workingDir(repository.resolve("tools/ffi-test"))
+    commandLine("python","-m","unittest","test_alignment")
+}
 val checkAndroidNativeAlignment = tasks.register<Exec>("checkAndroidNativeAlignment") {
     val sdk = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
     doFirst {
         check(sdk != null) { "ANDROID_HOME required for the pinned NDK alignment check" }
-        commandLine("powershell","-NoProfile","-ExecutionPolicy","Bypass","-File",repository.resolve("tools/ffi-test/check-alignment.ps1").absolutePath,"-Library",androidNativeDirectory.get().resolve("arm64-v8a/libvw_core.so").absolutePath,"-Objdump",file("$sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-objdump.exe").absolutePath)
+        checkNativeBuildHost()
+        val library = androidNativeDirectory.get().resolve("arm64-v8a/libvw_core.so").absolutePath
+        if (windowsBuildHost) {
+            commandLine("powershell","-NoProfile","-ExecutionPolicy","Bypass","-File",repository.resolve("tools/ffi-test/check-alignment.ps1").absolutePath,"-Library",library,"-Objdump",file("$sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-objdump.exe").absolutePath)
+        } else {
+            commandLine("python",repository.resolve("tools/ffi-test/check_alignment.py").absolutePath,"--library",library,"--objdump",file("$sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objdump").absolutePath)
+        }
     }
 }
 kotlin {
@@ -175,4 +205,4 @@ kotlin {
 androidComponents { onVariants { variant -> variant.sources.jniLibs?.addStaticSourceDirectory(androidNativeDirectory.get().absolutePath) } }
 tasks.matching { it.name.startsWith("compile") && it.name.contains("Kotlin") }.configureEach { dependsOn(checkCommonMainImports) }
 tasks.matching { it.name.contains("Android") && it.name.startsWith("compile") }.configureEach { dependsOn(checkAndroidNativeAlignment) }
-tasks.named("check") { dependsOn(checkCommonMainImports,checkImportGuardFixtures) }
+tasks.named("check") { dependsOn(checkCommonMainImports,checkImportGuardFixtures,checkAlignmentGuardFixtures) }
