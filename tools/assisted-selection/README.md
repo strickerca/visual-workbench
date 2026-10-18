@@ -201,11 +201,20 @@ standard builtin allowlist in `verify_artifacts.py` is allowed. Custom, Flex,
 DELEGATE, vendor/unknown operators, dynamic tensors, external buffers and mutable
 resource/variant tensors refuse. Metadata inspection is not proof of CPU/GPU
 operator support or successful execution.
+Graph IO index vectors and signature binding indices must each be unique.
+In particular, `point_labels` and `point_valid` cannot alias one tensor even
+though their int32 shapes match. Matching sets alone are insufficient.
 
 The three converter provenance children are
 `convert_mobile_sam.py`, `verify_artifacts.py`, `model-runtime-candidate.json`,
 each `{path,bytes,sha256}`. Verification checks these against the actual local
-tool files as well. Keep the exact tool revision with a conversion receipt.
+tool files as well. The converter captures immutable bytes of all three files at
+module startup, before any ML import or conversion, derives provenance from that
+snapshot, and reads the candidate configuration from the same retained bytes.
+It refuses changes before conversion starts and revalidates all three files
+immediately before atomic publication. A file edited during conversion cannot
+be recorded as though the changed tool produced the artifacts. Keep the exact
+tool revision with a conversion receipt.
 
 Runtime manifest fields are exactly
 `{schema,status,runtime,version,artifacts}`, with schema
@@ -251,7 +260,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
   -s tools/assisted-selection/tests -v
 ```
 
-Current tool-only result: **25 synthetic tests passing**. Official source pins
+Current tool-only result: **30 synthetic tests passing**. Official source pins
 matched all ten model/build/license files, 88,068 bytes total. No torch,
 LiteRT, model constructor, conversion or learned-model inference was imported/run
 by these checks. Python syntax and owned-file whitespace checks also passed.
@@ -305,8 +314,10 @@ by the delegated leaf lanes. Root retains integration and final admission.
 
 The source/native checkpoint is
 `4f26dfff9b6def0ca0bdaf7d19de8738c7bdcb68`, pushed by root on that branch. It
-contains the six common/JVM/native source leaves; the tools are a subsequent
-uncommitted handoff and are not evidence that generated bindings were integrated.
+contains the six common/JVM/native source leaves. The initial tools checkpoint
+is `f9ff4a329c9df7c230725999c62b6efe0af4e7d8`; subsequent review repairs reject
+aliased IO indices and bind provenance before conversion. These source records
+are not evidence that generated bindings were integrated.
 
 The native source lane reports three new Rust files plus 14 unrun Rust tests
 (10 integration, four unit). Root registration is:
@@ -341,6 +352,55 @@ providers. The Python tool tests are synthetic only; native integration, actual
 conversion/reference inference, device CPU/GPU/cancellation/retirement and
 correction/undo journeys remain separate unrun gates. Parent Astra review follows
 the coherent source candidate; no product gate or production admission is closed.
+
+The Android source checkpoint is
+`3d1d6328a3710a13fb889126b813c7513c32df8a`. Its public composition hook is:
+
+```kotlin
+val backend = liteRtAssistedSelectionBackend(
+    context, catalog, actualProject, currentSource, assumeUntaggedSrgb = false,
+)
+// Supply backend and the matching reviewed pins to the EXISTING
+// AssistedSelectionInteraction constructor; keep pins null while unadmitted.
+```
+
+`currentSource` must be a thread-safe read-only callback returning null when the
+actual project reference changes, during disposal/reopen, or when the full source
+binding/page/attachment epoch changes. Reuse the existing interaction's ordered
+invalidate/close, shared resource reservation, proposal acceptance, mask importer
+and ordinary correction/undo paths. No second document/session manager is added.
+`LiteRtReviewedCatalog.empty(appPrivateRoot)` is the supplied safe configuration;
+only trusted root composition may inject detached `LiteRtReviewedAdmission`
+records with exact manifest/APK/license/runtime/memory evidence.
+
+Actual LiteRT 2.3.0 AAR/Android 37 API jars passed focused Kotlin compilation with
+`-Werror` and explicit API checks. The native source factory was linked through a
+temporary signature-only fixture: regenerated ABI and actual caller builds remain
+unrun. No `Environment`, `CompiledModel`, learned-model inference, Android service
+or device execution occurred. Sampled resize goldens came from installed Pillow
+12.3.0, independently of any ML package. Unknown LiteRT initialization failures
+propagate because the public 2.3.0 exception API exposes no typed status getter;
+only observed provider absence can permit the existing single CPU fallback.
+Prompt execution never retries. Encoder-only handles retire before decoder load.
+Each model loads from an exclusive private unlinked snapshot, with all writable
+descriptors closed before compilation and read-only descriptors retained to close.
+
+Inspected upstream AAR arm64 children (not packaged APK admissions):
+
+| Child | Bytes | SHA-256 |
+| --- | --- | --- |
+| `liblitert_jni.so` | 529296 | `b4bc082f740076f09d566b2deaa8a1af6b1ec1252d20c3688acb8405d69871dc` |
+| `libLiteRt.so` | 5629696 | `e5b7e3413a8b428b1a1b669f368cf613058868bc7b63e10d0b9c2e6ba55c97d8` |
+| `libLiteRtClGlAccelerator.so` | 3253032 | `c200369269a3994b646a8d0ac56ff29127c6ce742abcfd345a7d478eab3b6c6d` |
+
+The adapter's conservative arithmetic bound is 84,672,512 fixed bytes plus
+`5 * maximumSourcePixels`, reviewed model residency, reviewed activation bytes
+and reviewed runtime bytes; the sum must fit 256 MiB. This is not a native peak
+measurement. Original decode/publication and later mask-import reservations also
+retain their existing shared pool charges. Closed memory evidence must include
+snapshots, mappings, compiled weights, native/delegate allocations and intermediates
+for the exact admitted model/runtime/APK identities. An artifact-size check alone
+cannot close that review.
 
 ## Retained upstream license text
 
