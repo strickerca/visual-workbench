@@ -6,8 +6,8 @@ import android.content.Intent
 import android.Manifest
 import android.content.pm.PackageManager
 import android.view.WindowManager
-import android.view.KeyEvent
 import com.visualworkbench.android.airactions.AirActionKeys
+import com.visualworkbench.android.airactions.AirActionWindowKeyHook
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
     private var cameraStarting = false
     private val airActivityOwner = Any()
     private var airKeys: AirActionKeys? = null
+    private var airWindowKeys: AirActionWindowKeyHook? = null
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) takePhoto()
         else editor.transferMessage("Camera permission was not granted. Choose an image from Photos or Files, or try the camera again.")
@@ -64,6 +65,7 @@ class MainActivity : ComponentActivity() {
         editor = ViewModelProvider(this)[EditorController::class.java]
         airKeys = AirActionKeys(editor.airActionRouter)
         editor.attachAirActivity(airActivityOwner, { event -> airKeys?.accept(event) == true }, { airKeys?.schedule() })
+        airWindowKeys = AirActionWindowKeyHook(window) { event -> editor.airActivityKey(airActivityOwner, event) }
         cameraToken = savedInstanceState?.getString("camera-token")
         val activeCamera = cameraToken
         editor.scope.launch { editor.cleanupTransfer { handoff.prune(System.currentTimeMillis(), activeCamera) } }
@@ -108,10 +110,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (::editor.isInitialized && editor.airActivityKey(airActivityOwner, event)) return true
-        return super.dispatchKeyEvent(event)
-    }
     override fun onResume() {
         super.onResume()
         if (::editor.isInitialized) {
@@ -128,6 +126,7 @@ class MainActivity : ComponentActivity() {
         editor.onBackground(); super.onPause()
     }
     override fun onDestroy() {
+        airWindowKeys?.close(); airWindowKeys = null
         airKeys?.detach(interruptRouter = !::editor.isInitialized || editor.airActivityCurrent(airActivityOwner)); airKeys = null
         if (::editor.isInitialized) editor.detachAirActivity(airActivityOwner)
         super.onDestroy()
