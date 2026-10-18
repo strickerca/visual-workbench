@@ -34,10 +34,14 @@ public interface WorkbenchVerification {
         originalNumber: UInt, verdict: VerificationVerdict, note: String): VerificationReviewSnapshot
     /** Pending or stale reviews refuse. All-pass returns null after checking
      * current owners. Failed markers require exact measured translations and
-     * are compiled normally over the after source, without private notes. */
+     * are compiled normally over the after source, without private notes.
+     * The default uses the existing native 256 MiB ceiling: normal package
+     * compilation reserves over 160 MiB before source/codec work, in addition
+     * to the verification caller's retained packages and canonical workspace.
+     * Smaller explicit budgets remain bounded and may refuse compilation. */
     public suspend fun compileFailures(expected: VerificationReviewSnapshot,
         translations: List<VerificationMarkerTranslation>, packageId: String, createdAtMs: Long,
-        memoryBudgetBytes: ULong = 128uL * 1024uL * 1024uL): WorkbenchCompiledPackage?
+        memoryBudgetBytes: ULong = 256uL * 1024uL * 1024uL): WorkbenchCompiledPackage?
 }
 
 public expect fun verificationWorkflows(original: WorkbenchProject, after: WorkbenchProject,

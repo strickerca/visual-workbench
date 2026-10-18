@@ -8,6 +8,7 @@ JUnit/common test bodies run with tiny ordinary assertion facades in temp files.
 This does not validate Compose, bindings, native catalog bytes or real captures.
 """
 from pathlib import Path
+import argparse
 import os
 import re
 import subprocess
@@ -30,6 +31,10 @@ shared = ROOT / 'apps/shared/src/commonMain/kotlin/com/visualworkbench/shared'
 jvm = ROOT / 'apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared'
 production = ROOT / 'apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp'
 tests = Path(__file__).parent
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--legacy-failure-budget-negative-control', action='store_true',
+                    help='Restore only the temporary shared128MiB default; failure caller regression must fail')
+args = parser.parse_args()
 
 helpers = '''
 private fun assertTrue(value:Boolean){check(value)}
@@ -55,6 +60,12 @@ with tempfile.TemporaryDirectory(prefix='vw-verification-workflow-') as scratch:
     sources['WorkflowBinding.kt'] = 'package com.visualworkbench.shared\n' + binding[0]
     for name in ('PackagesApi.kt', 'McpInboxApi.kt', 'VerificationApi.kt'):
         sources[name] = (shared / name).read_text().split('public expect')[0]
+    if args.legacy_failure_budget_negative_control:
+        current = 'memoryBudgetBytes: ULong = 256uL * 1024uL * 1024uL'
+        assert sources['VerificationApi.kt'].count(current) == 1
+        sources['VerificationApi.kt'] = sources['VerificationApi.kt'].replace(current,
+            'memoryBudgetBytes: ULong = 128uL * 1024uL * 1024uL')
+        print('NEGATIVE CONTROL: only temporary shared default restored to128MiB; default caller must fail', flush=True)
     sources['SemanticsApi.kt'] = (shared / 'SemanticsApi.kt').read_text().split('public interface WorkbenchSemanticCollection')[0]
     sources['UnavailableNative.kt'] = '''package com.visualworkbench.shared
 @Suppress("UNUSED_PARAMETER")
@@ -105,4 +116,4 @@ public fun verificationWorkflows(original:WorkbenchProject,after:WorkbenchProjec
     subprocess.run(command, check=True, timeout=55)
     for main in ('com.visualworkbench.shared.SharedProbeKt', 'com.visualworkbench.desktop.mcp.McpVerificationWorkflowProbe', 'com.visualworkbench.desktop.mcp.CoordinatorProbeKt'):
         subprocess.run([str(java), '-Xmx128m', '-cp', os.pathsep.join((str(output), classpath)), main], check=True, timeout=30)
-print('43 focused Kotlin cases passed; temporary classes/declarations disposed. No Gradle/native/Compose/ABI validation claimed.')
+print('44 focused Kotlin cases passed; temporary classes/declarations disposed. No Gradle/native/Compose/ABI validation claimed.')

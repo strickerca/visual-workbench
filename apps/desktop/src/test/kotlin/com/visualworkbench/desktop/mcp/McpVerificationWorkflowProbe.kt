@@ -64,9 +64,25 @@ internal object McpVerificationWorkflowProbe {
     }
     private class Backend:WorkbenchVerification {
         var compileCalls=0;var translations:List<VerificationMarkerTranslation>?=null;var pair:VerificationPair?=null
+        var budget:ULong?=null
         override suspend fun review(pair:VerificationPair)=VerificationReviewSnapshot(pair,original.binding.projectId,1u,1uL,listOf(VerificationMarkerReview(1u,VerificationVerdict.Pending,"private")))
         override suspend fun change(pair:VerificationPair,expectedVersion:ULong,operationId:String,originalNumber:UInt,verdict:VerificationVerdict,note:String):VerificationReviewSnapshot=error("unused")
-        override suspend fun compileFailures(expected:VerificationReviewSnapshot,translations:List<VerificationMarkerTranslation>,packageId:String,createdAtMs:Long,memoryBudgetBytes:ULong):WorkbenchCompiledPackage?{compileCalls++;this.translations=translations;pair=expected.pair;return null}
+        override suspend fun compileFailures(expected:VerificationReviewSnapshot,translations:List<VerificationMarkerTranslation>,packageId:String,createdAtMs:Long,memoryBudgetBytes:ULong):WorkbenchCompiledPackage? {
+            compileCalls++;this.translations=translations;pair=expected.pair;budget=memoryBudgetBytes
+            val failed=expected.markers.count{it.verdict==VerificationVerdict.Fail}.toUInt()
+            if(failed==0u)return null
+            // This records the real Desktop -> shared default argument, not
+            // native compile evidence. The normal native compiler alone
+            // reserves 2 * 32 MiB package bytes + 96 MiB before codec work.
+            // Even before canonical/source costs, the old128MiB cannot fit.
+            if(memoryBudgetBytes<=2uL*32uL*1024uL*1024uL+96uL*1024uL*1024uL)
+                throw PackageFailure(PackageFailureKind.Limit)
+            check(memoryBudgetBytes<=256uL*1024uL*1024uL)
+            return object:WorkbenchCompiledPackage {
+                override val info=after.copy(packageId=packageId,markerCount=failed)
+                override suspend fun close(){}
+            }
+        }
     }
     private suspend fun refused(body:suspend()->Unit){var rejected=false;try{body()}catch(_:IllegalArgumentException){rejected=true}catch(_:IllegalStateException){rejected=true}catch(_:McpRefused){rejected=true}catch(_:PackageFailure){rejected=true};check(rejected)}
     @JvmStatic fun main(args:Array<String>)=runBlocking {
@@ -102,12 +118,20 @@ internal object McpVerificationWorkflowProbe {
         refused{workflow.compile(review,id(200),0,false,false)};check(backend.compileCalls==0);println("PASS pending review never reaches failure compiler")
         val passed=review.copy(markers=listOf(VerificationMarkerReview(1u,VerificationVerdict.Pass,"private")))
         check(workflow.compile(passed,id(200),0,false,false)==null&&backend.compileCalls==1&&backend.translations==emptyList<VerificationMarkerTranslation>());println("PASS all-pass still reaches authoritative native currentness check")
+        val failed=review.copy(markers=listOf(VerificationMarkerReview(1u,VerificationVerdict.Fail,"private")))
+        val followUp=requireNotNull(workflow.compile(failed,id(201),0,false,false))
+        try {
+            check(followUp.info.packageId==id(201)&&followUp.info.markerCount==1u&&followUp.info.binding==after.binding)
+            check(backend.compileCalls==2&&backend.pair==review.pair&&backend.budget==256uL*1024uL*1024uL)
+            check(backend.translations==listOf(VerificationMarkerTranslation(1u,7.0,3.0)))
+        }finally{followUp.close()}
+        println("PASS nonempty failure follows the actual Desktop/shared default budget within the native ceiling")
         catalog.semantics=false
         val unresolved=workflow.comparison(original.verificationKey(),receipt.receiptId,receipt.receiptBlake3,1u)
         check(unresolved.method==null&&unresolved.before==null&&unresolved.after==null)
         refused{workflow.compile(review.copy(markers=listOf(VerificationMarkerReview(1u,VerificationVerdict.Fail,""))),id(200),0,false,false)}
-        check(backend.compileCalls==1);println("PASS uniform equal-size images do not invent alignment or compile failures")
+        check(backend.compileCalls==2);println("PASS uniform equal-size images do not invent alignment or compile failures")
         workflow.retire(after);refused{workflow.review(receipt)};println("PASS after retirement invalidates pair")
-        println("13 synthetic workflow-routing cases passed; native, app, OS and device gates remain unrun.")
+        println("14 synthetic workflow-routing cases passed; native, app, OS and device gates remain unrun.")
     }
 }
