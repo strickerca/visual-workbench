@@ -171,7 +171,9 @@ fn render_list_for_page(
             a.state.order_key.cmp(&b.state.order_key).then(aid.cmp(bid))
         });
         for (id, object) in objects {
-            if crate::tone_controls::is_editing_metadata(project, &document, id) {
+            if crate::tone_controls::is_editing_metadata(project, &document, id)
+                || crate::image_frames::is_editing_metadata(project, &document, id)
+            {
                 continue;
             }
             let shape = draw_shape(&object.state, project)?;
@@ -574,9 +576,9 @@ impl ProjectSession {
             })
             .await
     }
-    /// Full-resolution oriented display pixels, requested independently of edit
-    /// snapshots. Original assets and bit depth are retained on disk. This display
-    /// derivative is explicitly converted to sRGB/8-bit; no silent downsampling.
+    /// Oriented display pixels, requested independently of edit snapshots.
+    /// Explicit RAW imports use only their admitted embedded preview. Source
+    /// bytes and depth remain on disk; display conversion is explicitly sRGB/8-bit.
     pub async fn background_image(
         &self,
         document_id: String,
@@ -602,6 +604,8 @@ impl ProjectSession {
                     .assets
                     .get(&AssetId::try_from(doc.primary_asset_id.clone())?)
                     .ok_or(CoreError::Invalid)?;
+                let raw_preview = crate::format_images::asset_is_raw_preview(asset)
+                    .map_err(background_raster_error)?;
                 let estimate = u64::from(asset.width)
                     .checked_mul(u64::from(asset.height))
                     .and_then(|n| n.checked_mul(40))
@@ -621,13 +625,15 @@ impl ProjectSession {
                 };
                 let assets = Assets {
                     blobs: &state.blobs,
+                    project: state.project()?,
                     budget: memory_budget_bytes,
                     cancel: &cancellation,
                 };
-                // This verifies the immutable original's complete BLAKE3 hash.
+                // This verifies the immutable source's complete BLAKE3 hash.
                 // Its encoded Vec and decoder temporaries are dropped before
                 // the consuming display conversion begins; there is no PNG
-                // export, crop, re-decode or source-resolution substitution.
+                // export, crop or re-decode. RAW preview availability remains
+                // false throughout its explicitly admitted display route.
                 let source = assets
                     .image(&source_asset_id)
                     .map_err(background_raster_error)?;
@@ -639,12 +645,14 @@ impl ProjectSession {
                 {
                     return Err(CoreError::Raster);
                 }
-                let image = vw_raster::display_rgba8(
-                    source,
-                    memory_budget_bytes,
-                    assume_untagged_srgb,
-                    &|| cancellation.is_cancelled(),
-                )
+                let display = if raw_preview {
+                    vw_raster::display_preview_rgba8
+                } else {
+                    vw_raster::display_rgba8
+                };
+                let image = display(source, memory_budget_bytes, assume_untagged_srgb, &|| {
+                    cancellation.is_cancelled()
+                })
                 .map_err(background_raster_error)?;
                 cancellation.check()?;
                 Ok(BackgroundImage {
@@ -676,6 +684,7 @@ fn background_raster_error(error: vw_raster::RasterError) -> CoreError {
 
 struct Assets<'a> {
     blobs: &'a vw_store::BlobStore,
+    project: &'a Project,
     budget: u64,
     cancel: &'a Cancellation,
 }
@@ -683,6 +692,11 @@ impl AssetResolver for Assets<'_> {
     fn image(&self, asset: &str) -> std::result::Result<DecodedImage, vw_raster::RasterError> {
         let id = AssetId::try_from(asset.to_owned())
             .map_err(|_| vw_raster::RasterError::MissingAsset)?;
+        let asset = self
+            .project
+            .assets
+            .get(&id)
+            .ok_or(vw_raster::RasterError::MissingAsset)?;
         let path = self
             .blobs
             .path(&id)
@@ -722,7 +736,7 @@ impl AssetResolver for Assets<'_> {
             .budget
             .checked_sub(bytes.len() as u64)
             .ok_or(vw_raster::RasterError::Allocation)?;
-        crate::format_images::decode(
+        crate::format_images::decode_asset(
             &bytes,
             vw_raster::DecodeLimits {
                 max_encoded_bytes: limit,
@@ -730,6 +744,7 @@ impl AssetResolver for Assets<'_> {
                 max_memory_bytes: budget,
             },
             &|| self.cancel.is_cancelled(),
+            asset,
         )
     }
 }
@@ -738,7 +753,7 @@ pub(crate) fn export(
     options: ExportOptions,
     cancellation: &Cancellation,
 ) -> Result<ExportResult> {
-    let document = Id::try_from(options.document_id)?;
+    let document = Id::try_from(options.document_id.clone())?;
     let definition = &state
         .project()?
         .documents
@@ -748,8 +763,16 @@ pub(crate) fn export(
     if options.memory_budget_bytes > 512 * 1024 * 1024 || options.memory_budget_bytes == 0 {
         return Err(CoreError::Invalid);
     }
+    // The admission helper meters canonical validation/hash workspace before
+    // requires_document_output validates the current model or reads originals.
+    crate::image_frames::admit_legacy_export(state, &options)?;
+    if vw_raster::requires_document_output(state.project()?, &document, options.marked)? {
+        cancellation.check()?;
+        return crate::image_frames::legacy_export(state, &options, cancellation);
+    }
     let assets = Assets {
         blobs: &state.blobs,
+        project: state.project()?,
         budget: options.memory_budget_bytes,
         cancel: cancellation,
     };
@@ -767,6 +790,7 @@ pub(crate) fn export(
             .ok_or(CoreError::Backpressure)?;
         let result_assets = Assets {
             blobs: &state.blobs,
+            project: state.project()?,
             budget: remaining,
             cancel: cancellation,
         };
@@ -930,3 +954,7 @@ pub async fn layout_text(
     })
     .await
 }
+
+#[cfg(test)]
+#[path = "queries_output_tests.rs"]
+pub(crate) mod output_tests;
