@@ -251,3 +251,29 @@ remaining controls/selection/tilt promotions and Phase5 software verification ga
 Current ordinary-format callers, image foundations and their source-bound tests do
 not establish complete giant-image UI or stream acceptance. Parent-owned old
 worktrees and dirty picker remain untouched pending their separate disposition.
+
+## Reviewed publication and PDF runtime feasibility
+
+Independent source review accepted restricted candidate `5f4f581` with no remaining
+source blocker. A normal, non-forced fast-forward push advanced remote main from
+`7be9da7` to exact `5f4f581c84d9215c06c0029f8dd042fc8453f26d`. The remote SHA
+was verified. GitHub returned no commit statuses or PR workflow runs for this
+commit; protection/check-run REST reads returned Forbidden. No protection,
+required check, security or workflow configuration was changed or overridden.
+This records server acceptance of the normal push, not Windows runtime evidence.
+The frozen roadmap validation ref remains `070758ac3b0537b4ea9efc0f6d21b23792d47762`.
+Durable sanitized execution excerpts supplement the full source-bound receipt in
+`evidence/CLOUD_COMPOSED_APP_RECEIPT_EXCERPTS_20261018.txt`; original logs and failed
+attempts remain in the cloud execution environment.
+
+The two ignored PDFium engine cases cannot safely run with the available approved
+inputs: the project requires verified build 7881 while the preinstalled Linux
+library is build 7999, and no reviewed artifact/trust pin or actual target worker
+boundary is available. System qpdf is 12.2.0 rather than required 12.4.2; its
+Windows LPAC path is unavailable on Linux. No substitute native binary was loaded
+or installed. Six strict pypdf cross-parser checks on actual Rust-stamped
+synthetic copies passed for LF, CRLF and CR xref rows and repeated stamping.
+This diagnostic does not close either ignored PDFium case, native isolation,
+Windows/Android execution or any product gate. PDF publication stays refused.
+Exact artifact identities, reproducible diagnostic sources, bounds and results
+are in `evidence/CLOUD_PDF_RUNTIME_FEASIBILITY_20261018.json`.
