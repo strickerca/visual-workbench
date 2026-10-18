@@ -1,0 +1,185 @@
+{
+  "date_utc": "2026-10-18",
+  "base_candidate": "707e940841373b076ebbe750c01319df2d992eed",
+  "code_commit": "35ad8b46493f5240119b2927e1e90d7a7e68379d",
+  "branch": "cloud/editing-lifecycle-fixes-20261018",
+  "independent_review": "Astra rejected the base on two confirmed P2 lifecycle findings; this exact correction requires Astra recheck before any main promotion.",
+  "fixes": [
+    {
+      "finding": "Observer restoration guard began after cancellable retirement joins.",
+      "change": "Both roots use withDocumentObserversRetired before the first join. Its NonCancellable final retirement joins the same actual old owners before one guarded restore. Failed retirement creates no replacement observer.",
+      "regressions": "Four shared cases include cancellation inside the first blocked join, cleanup completion and exactly one actual flow subscription restored; cancellation during adoption, closed-project refusal and unknown retirement also covered."
+    },
+    {
+      "finding": "Rotation collectors unconditionally reconciled even if refresh rejected its snapshot.",
+      "change": "Remove both unconditional reconciled calls. Only existing successfully admitted snapshot bindings reconcile.",
+      "regressions": "Actual Desktop controller accepts one mocked-native edit with lost receipt, rejects an old snapshot against newer info, remains Unconfirmed and blocks another gesture, then admits a current snapshot without replaying the edit."
+    }
+  ],
+  "jvm": {
+    "shared": {
+      "tests": 464,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 464,
+      "skipped_cases": []
+    },
+    "desktop": {
+      "tests": 356,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 7,
+      "passed": 349,
+      "skipped_cases": [
+        "com.visualworkbench.desktop.mcp.McpStartupTest.expiredAndFutureOwnerMarkersRetireWithoutStartingService",
+        "com.visualworkbench.desktop.mcp.McpStartupTest.markerDeletionBindsValidatedHandleAndMalformedDataSurvives",
+        "com.visualworkbench.desktop.mcp.McpStartupTest.realWindowsOwnerLockPreventsDuplicateAndReleasesExactly",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realLongWindowsPinsStillRefuseWritesAndReplacement",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.boundedDosParserRefusesOtherNamespacesAndNoncanonicalForms",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.longNativeGuardPathsAreExplicitWithoutChangingTheShortAnchorNamespace",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realWindowsAnchorHandleIsCanonicalAndOrdinaryPinsRemainExactAndExclusive"
+      ]
+    },
+    "android": {
+      "tests": 136,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 136,
+      "skipped_cases": []
+    }
+  },
+  "jvm_total_passed": 949,
+  "jvm_total_skipped": 7,
+  "focused_suites": [
+    {
+      "scope": "shared",
+      "suite": "DocumentObserverRetirementTest[desktop]",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "scope": "desktop",
+      "suite": "com.visualworkbench.desktop.RotationEditorTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "scope": "desktop",
+      "suite": "com.visualworkbench.desktop.DocumentWorkflowEditorTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "scope": "desktop",
+      "suite": "com.visualworkbench.desktop.DesktopCoherenceTest",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "checks": {
+    "android_instrumentation": "Current source compilation passed; NOT DEVICE-RUN",
+    "android_lint": {
+      "errors": 0,
+      "warnings": 60,
+      "hints": 12
+    },
+    "android_alignment": "Four LOAD segments pass16KiB; reused unchanged arm64 library",
+    "common_imports": "HOOK-002 PASS",
+    "whitespace": "PASS",
+    "secrets": "Staged source/evidence and candidate history scanned before publication",
+    "native": "No native/dependency/DTO/binding change in this correction. Prior 504-pass native/strict-Clippy receipts apply to identical native source/artifacts; not rerun.",
+    "bindings": "No regeneration; prior generated files byte-identical",
+    "ownership": "Single heavy batch, at most two workers; no device/Windows/provider calls"
+  },
+  "command": "bash apps/gradlew -p apps :shared:desktopTest :desktop:test :android:testDebugUnitTest :android:compileDebugAndroidTestKotlin :android:lintDebug -x :desktop:packageConnectionRuntime --console=plain --no-daemon --no-parallel --max-workers=2",
+  "retained_failure": "First regression attempt asserted gesture reentry before the admitted snapshot metadata owners had settled. The rejection and Unconfirmed assertions already passed; fixture now waits for actual ordinary input readiness before asserting a fresh gesture. No production admission was relaxed.",
+  "source_sha256": [
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt",
+      "bytes": 127847,
+      "sha256": "62c0d0872ef403f3b7b61e908777ad2f9b873df4815e84c88f30fc4003e7cce8"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt",
+      "bytes": 90461,
+      "sha256": "b7b528f6931b43728ce0355c1f1eb4dd47f957eadbd773fa7e6a99ab595390c8"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopCoherenceTest.kt",
+      "bytes": 28828,
+      "sha256": "87f327c0d5bdc2e568bf7de72c599e6d2ec9a4da858282236accc9039252aa62"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentObserverRetirement.kt",
+      "bytes": 756,
+      "sha256": "e5f896317629363057c935f1e712c42c76b40417387050f8b1fd03cb3fe58542"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/DocumentObserverRetirementTest.kt",
+      "bytes": 3369,
+      "sha256": "dd808eebc3aa1d502023e3f73263703e99d17d3383f44e17c2e5f26e3cb4d4cf"
+    }
+  ],
+  "unchanged_native_artifacts": [
+    {
+      "path": "target/debug/libvw_core.so",
+      "bytes": 246912848,
+      "sha256": "6e2a1da6a65593a6700bb9e9ffb28c03d25272e490708136d551d9c5983712ed"
+    },
+    {
+      "path": "target/debug/libvw_host.so",
+      "bytes": 86144024,
+      "sha256": "ea933ac88b21e64f99a761802104fb23284b01c5c7778b615bfc8ea8d9cc2d7d"
+    },
+    {
+      "path": "target/debug/vw-bindgen",
+      "bytes": 65737848,
+      "sha256": "61a2a9b8ee85685408ca8ce5428c98fe12bb6371de96da18d4179ea2433204d6"
+    },
+    {
+      "path": "target/android-jni/arm64-v8a/libvw_core.so",
+      "bytes": 233108416,
+      "sha256": "e4ec27a9832b0e07474b792abbfa5d6102e070e1740a9322e0a23e85762bdbd8"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/core/com/visualworkbench/bindings/core/vw_core.kt",
+      "bytes": 1162737,
+      "sha256": "60c9e722ea679b35c260e57edb2e9042b9faf6659ab0d8dfeab2c9108fe785de"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/host/com/visualworkbench/bindings/host/vw_host.kt",
+      "bytes": 274624,
+      "sha256": "a26d23de6b9219bd449e0274890469a3199c1406f637fffbf25751f637cc5e5f"
+    }
+  ],
+  "logs": [
+    {
+      "path": "vw-editing-lifecycle-attempt1.log",
+      "bytes": 9150,
+      "sha256": "f00cb2e0ce9dc0373ef225c3e305cbb53a9596777ce6b684f9e6f855ba801bf5"
+    },
+    {
+      "path": "vw-editing-lifecycle-final.log",
+      "bytes": 8192,
+      "sha256": "6ff5b85665dcba402279f1086a8fe11170b9284c1612c5dd1abd57183182825b"
+    }
+  ],
+  "gates_unpassed": [
+    "Windows actual runtime/Window/GPU",
+    "Android instrumentation/device/physical pen",
+    "Timing/RSS/carrier/provider quality",
+    "Full T3.07/T3.11 and product acceptance"
+  ],
+  "separate_drafts": "Producer af934061 composition and uncompiled root ownership/JNI work are preserved on cloud/giant-producer-draft-20261018 atd8f0193; none are in this correction. Image repair9b05bea and T5.01/AirActions leaves await their separate review dispositions.",
+  "main": "Unchanged reviewed6f3e2f3b9ed7a760d4dd7f4c6f26fa44dc5ad88d; no rejected candidate promoted."
+}

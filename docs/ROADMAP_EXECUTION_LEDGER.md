@@ -479,3 +479,30 @@ Air Actions and capture-picker leaves keep exclusive ownership and send minimal
 interfaces to root. Krita, PDF runtime activation, external authority and all
 physical/product gates remain deferred/open. Preserved worktrees and archives
 are untouched.
+
+## Editing lifecycle review correction
+
+Astra rejected 707e940 on two P2 lifecycle findings: observer retirement preceded
+its restoration guard, and rotation recovery cleared Unconfirmed after a refresh
+that could return without admitting a snapshot. Correction `35ad8b46493f5240119b2927e1e90d7a7e68379d` moves both
+roots through a common guard before the first join, joins the same old owners in
+NonCancellable cleanup before one guarded restoration, and removes unconditional
+rotation reconciliation. The actual Desktop controller regression holds an old
+snapshot after one accepted/lost edit receipt, proves gestures stay blocked, then
+admits a current snapshot without another mutation. Four cancellation/retirement
+regressions also pass, including exactly one actual flow subscription restored.
+
+Final correction checks pass 949 JVM/unit cases (464 shared, 349 Desktop, 136 Android)
+with seven Windows-only skips. Android instrumentation source compiles and lint
+has zero errors; no device run is claimed. Native source/libraries and generated
+bindings match the prior receipt, so no native rerun or binding regeneration was
+performed. The new exact candidate still needs Astra recheck. Main stays reviewed
+6f3e2f3; no rejected editing candidate is promoted. Evidence and failed-attempt
+excerpts are in `evidence/EDITING_LIFECYCLE_CORRECTION_20261018.json`.
+
+Producer work is separately preserved as uncompiled draft d8f0193 on
+`cloud/giant-producer-draft-20261018`, with actual limitations in its handoff.
+The reviewed unchanged af934061 leaf delta is retained there; image repair 9b05bea
+and the new root budget/JNI bridge require their separate review/validation.
+The T5.01 minimal interface decision grants four dedicated continuation files
+without applying root patches or admitting an unreviewed implementation.
