@@ -573,3 +573,16 @@ tool, owner verdict, durable review, failure-package or image-alignment pass is
 claimed. Whole Android/desktop caller and diagnostics privacy grants are in
 `CALLER_PARALLEL_GRANTS_20261018.md`; root retains only shared contracts and
 coordinator/integration. Held picked-input d9fd8a5 remains uncomposed.
+
+## Private picked-input admission composed after PI1 review
+
+Astra narrowly accepts ba338ad and closes PI1. Root code `04a913e3e36d4b6e18bf4b8b3d5a286e3ecf8b7a` composes the
+three unchanged leaves over main30b77615 and adds only the exact private module/
+export hunk. The combined serial producer batch passes54 parent tests (17 picked,
+four G1 bridge,33 other producer/cache/publication), plus the bounded invoked
+quarantine child; one child entrypoint is ignored in the parent. Strict Linux
+all-target and arm64 library Clippy pass. No binding/dependency/app changes.
+See GIANT_PICKED_INPUT_COMPOSED_20261018.md and its exact receipt/excerpts.
+Close is not an OS-thread join; the actual Linux probe proves eventual exit under
+bounded waits, not an instantaneous thread/RSS bound. Public intake remains
+next; all four parallel grants and device/runtime gates stay separate/open.
