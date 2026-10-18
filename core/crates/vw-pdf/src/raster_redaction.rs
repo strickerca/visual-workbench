@@ -105,6 +105,26 @@ pub struct UnverifiedRasterCopy {
     bytes: u64,
 }
 impl UnverifiedRasterCopy {
+    /// Embed generated export identity BEFORE independent PDFium verification.
+    /// Changed staged bytes cannot obtain a rebound intermediate receipt.
+    pub fn embed_metadata(
+        mut self,
+        bytes: &mut Vec<u8>,
+        metadata: &str,
+        limits: PdfLimits,
+        cancel: &PdfCancellation,
+    ) -> RasterRedactionResult<Self> {
+        cancel.check()?;
+        if self.bytes != bytes.len() as u64
+            || self.output_blake3 != blake3::hash(bytes).to_hex().as_str()
+        {
+            return Err(RasterRedactionError::Verification);
+        }
+        crate::embed_pdf_copy_metadata(bytes, metadata, limits, cancel)?;
+        self.bytes = bytes.len() as u64;
+        self.output_blake3 = blake3::hash(bytes).to_hex().to_string();
+        Ok(self)
+    }
     pub fn output_blake3(&self) -> &str {
         &self.output_blake3
     }
@@ -551,6 +571,7 @@ impl RasterRedactionPlan {
         cancel.check()?;
         if intermediate.source_blake3 != self.source_blake3
             || intermediate.plan_blake3 != self.plan_blake3
+            || intermediate.bytes > self.work.maximum_encoded_bytes
             || document.info().source_blake3 != intermediate.output_blake3
             || document.info().pages != self.work.pages
             || document.info().encrypted
@@ -1132,5 +1153,54 @@ mod tests {
         ] {
             assert!(!text.contains(forbidden));
         }
+    }
+}
+
+#[cfg(test)]
+mod metadata_receipt_tests {
+    use super::*;
+    fn receipt(bytes: &[u8]) -> UnverifiedRasterCopy {
+        UnverifiedRasterCopy {
+            source_blake3: "a".repeat(64),
+            plan_blake3: "b".repeat(64),
+            output_blake3: blake3::hash(bytes).to_hex().to_string(),
+            bytes: bytes.len() as u64,
+        }
+    }
+    #[test]
+    fn generated_metadata_rebinds_only_unverified_exact_staging() -> RasterRedactionResult<()> {
+        let mut bytes = crate::metadata::tests::fixture();
+        let original_hash = blake3::hash(&bytes).to_hex().to_string();
+        let metadata = crate::metadata::tests::identity();
+        let stamped = receipt(&bytes).embed_metadata(
+            &mut bytes,
+            &metadata,
+            PdfLimits::default(),
+            &PdfCancellation::default(),
+        )?;
+        assert_ne!(stamped.output_blake3, original_hash);
+        assert_eq!(
+            stamped.output_blake3,
+            blake3::hash(&bytes).to_hex().as_str()
+        );
+        assert_eq!(stamped.source_blake3, "a".repeat(64));
+        assert_eq!(stamped.plan_blake3, "b".repeat(64));
+        assert_eq!(stamped.bytes, bytes.len() as u64);
+        Ok(())
+    }
+    #[test]
+    fn changed_staging_cannot_receive_a_rebound_redaction_receipt() {
+        let mut bytes = crate::metadata::tests::fixture();
+        let owner = receipt(&bytes);
+        bytes[0] = b'!';
+        assert!(matches!(
+            owner.embed_metadata(
+                &mut bytes,
+                &crate::metadata::tests::identity(),
+                PdfLimits::default(),
+                &PdfCancellation::default()
+            ),
+            Err(RasterRedactionError::Verification)
+        ));
     }
 }

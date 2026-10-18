@@ -39,6 +39,12 @@ pub struct SvgTile {
 }
 
 impl SvgDocument {
+    pub(crate) fn admit_metadata_readback(&self, bytes: usize) -> SvgResult<()> {
+        let parser = self.limits.parse_memory(bytes, bytes as u64)?;
+        self.limits
+            .admit(self.workspace.checked_add(parser).ok_or(SvgError::Limit)?)
+    }
+
     pub fn parse(bytes: &[u8], limits: Limits, cancelled: &dyn Fn() -> bool) -> SvgResult<Self> {
         limits.validate()?;
         if bytes.len() > limits.input_bytes {

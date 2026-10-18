@@ -1,5 +1,15 @@
 use vw_document_protocol::{JobLimits, Operation, PageRegion, Request};
 use vw_document_win::ResultMetadata;
+fn identity() -> vw_document_protocol::CopyIdentity {
+    vw_document_protocol::CopyIdentity {
+        schema_version: 1,
+        host_seq: 42,
+        state_hash: "a".repeat(64),
+        source_asset: "b".repeat(64),
+        capture_session: None,
+        frame_id: None,
+    }
+}
 fn request() -> Request {
     Request {
         limits: JobLimits {
@@ -16,11 +26,12 @@ fn request() -> Request {
             }],
         },
         password: None,
-        export_identity: None,
+        export_identity: Some(identity()),
     }
 }
 fn metadata() -> ResultMetadata {
     ResultMetadata::PcRedaction {
+        export_identity: identity(),
         pages: 3,
         regions: 1,
         bytes: 4096,
@@ -47,6 +58,7 @@ fn pc_reply_requires_matching_operation_and_effective_native_scale() {
 #[test]
 fn ordinary_or_raster_copy_metadata_cannot_claim_pc_redaction() {
     let raster = ResultMetadata::RasterRedaction {
+        export_identity: identity(),
         pages: 3,
         regions: 1,
         bytes: 4096,

@@ -38,6 +38,25 @@ fn engine_memory(request: &Request) -> Result<u64, FaultCode> {
 }
 
 pub(crate) fn execute(job: Job, library: &Path) -> Result<Output, FaultCode> {
+    job.request.validate().map_err(|_| FaultCode::Invalid)?;
+    job.request
+        .validate_source_identity(&job.binding.source_blake3)
+        .map_err(|_| FaultCode::Verification)?;
+    if job.request.is_copy() {
+        job.request
+            .require_copy_identity()
+            .map_err(|_| FaultCode::Invalid)?;
+    }
+    if matches!(
+        job.request.operation,
+        Operation::PdfCopy {
+            copy: CopyKind::Original,
+            ..
+        }
+    ) {
+        // Exact-original passthrough cannot also add CORE-006 file metadata.
+        return Err(FaultCode::Unsupported);
+    }
     let memory = engine_memory(&job.request)?;
     let output = if matches!(
         &job.request.operation,
@@ -105,6 +124,12 @@ fn svg(job: &Job, memory: u64) -> Result<Output, FaultCode> {
             })
         }
         Operation::SvgCopy { overlays } => {
+            let identity = job
+                .request
+                .require_copy_identity()
+                .map_err(|_| FaultCode::Invalid)?;
+            let metadata =
+                ResultMetadata::identity_metadata(identity).map_err(|_| FaultCode::Invalid)?;
             let outlines = overlays
                 .iter()
                 .map(|overlay| vw_svg::Outline {
@@ -126,10 +151,11 @@ fn svg(job: &Job, memory: u64) -> Result<Output, FaultCode> {
                 })
                 .collect::<Vec<_>>();
             let bytes = document
-                .export_svg(&outlines, &|| false)
+                .export_svg_with_metadata(&outlines, &metadata, &|| false)
                 .map_err(svg_error)?;
             Ok(Output {
                 metadata: ResultMetadata::SvgCopy {
+                    export_identity: identity.clone(),
                     bytes: bytes.len() as u64,
                     notices,
                 },
@@ -253,6 +279,11 @@ fn pdf(
             })
         }
         Operation::PdfCopy { copy, overlays } => {
+            let identity = request
+                .require_copy_identity()
+                .map_err(|_| FaultCode::Invalid)?;
+            let metadata =
+                ResultMetadata::identity_metadata(identity).map_err(|_| FaultCode::Invalid)?;
             let kind = match copy {
                 CopyKind::Original => PdfCopyKind::Original,
                 CopyKind::Annotated => PdfCopyKind::Annotated,
@@ -266,14 +297,37 @@ fn pdf(
             if result.redacted || result.bytes != stage.bytes.len() as u64 {
                 return Err(FaultCode::Verification);
             }
+            drop(document);
+            vw_pdf::embed_pdf_copy_metadata(&mut stage.bytes, &metadata, limits, &cancel)
+                .map_err(pdf_error)?;
+            let generated = runtime
+                .open(stage.bytes, None, &cancel)
+                .map_err(pdf_error)?;
+            generated
+                .verify_export_metadata(&metadata, &cancel)
+                .map_err(|_| FaultCode::Verification)?;
+            let mut published = BoundedBytes::new(request.limits.output_bytes)?;
+            // Exact passthrough of this freshly verified generated document.
+            let mut generated = generated;
+            generated
+                .export(PdfCopyKind::Original, &[], &mut published, &cancel)
+                .map_err(pdf_error)?;
+            vw_pdf::verify_pdf_copy_metadata(
+                &published.bytes,
+                &metadata,
+                request.limits.output_bytes,
+                &cancel,
+            )
+            .map_err(|_| FaultCode::Verification)?;
             Ok(Output {
                 metadata: ResultMetadata::PdfCopy {
+                    export_identity: identity.clone(),
                     copy: *copy,
                     pages: result.pages,
-                    bytes: result.bytes,
+                    bytes: published.bytes.len() as u64,
                     redacted: false,
                 },
-                bytes: stage.bytes,
+                bytes: published.bytes,
             })
         }
         Operation::PdfRasterRedaction {
@@ -281,6 +335,15 @@ fn pdf(
             explicitly_remove_encryption,
             regions,
         } => {
+            let identity = request
+                .require_copy_identity()
+                .map_err(|_| FaultCode::Invalid)?;
+            let metadata =
+                ResultMetadata::identity_metadata(identity).map_err(|_| FaultCode::Invalid)?;
+            let copy_limits = PdfLimits {
+                output_bytes: limits.output_bytes.min(limits.input_bytes),
+                ..limits
+            };
             let plan = RasterRedactionPlan::prepare(
                 &mut document,
                 regions
@@ -301,16 +364,28 @@ fn pdf(
                 &cancel,
             )
             .map_err(redaction_error)?;
+            let copy_limits = PdfLimits {
+                output_bytes: copy_limits
+                    .output_bytes
+                    .min(plan.work().maximum_encoded_bytes),
+                ..copy_limits
+            };
             let mut stage =
                 BoundedBytes::new(request.limits.output_bytes.min(request.limits.input_bytes))?;
             let intermediate = plan
                 .write_unverified(&mut document, &mut stage, &cancel, &mut |_| {})
+                .map_err(redaction_error)?;
+            let intermediate = intermediate
+                .embed_metadata(&mut stage.bytes, &metadata, copy_limits, &cancel)
                 .map_err(redaction_error)?;
             drop(document);
             // Reopen the exact completed bytes, without copying a second Vec.
             let mut generated = runtime
                 .open(stage.bytes, None, &cancel)
                 .map_err(pdf_error)?;
+            generated
+                .verify_export_metadata(&metadata, &cancel)
+                .map_err(|_| FaultCode::Verification)?;
             let verified = plan
                 .verify(&mut generated, intermediate, &cancel)
                 .map_err(redaction_error)?;
@@ -324,8 +399,16 @@ fn pdf(
             if published.bytes.len() as u64 != verified.bytes() {
                 return Err(FaultCode::Verification);
             }
+            vw_pdf::verify_pdf_copy_metadata(
+                &published.bytes,
+                &metadata,
+                copy_limits.output_bytes,
+                &cancel,
+            )
+            .map_err(|_| FaultCode::Verification)?;
             Ok(Output {
                 metadata: ResultMetadata::RasterRedaction {
+                    export_identity: identity.clone(),
                     pages: verified.pages(),
                     regions: verified.regions(),
                     bytes: verified.bytes(),

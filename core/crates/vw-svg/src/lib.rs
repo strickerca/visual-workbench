@@ -4,11 +4,13 @@
 mod engine;
 mod export;
 mod limits;
+mod metadata;
 mod preflight;
 
 pub use engine::{SvgDocument, SvgInfo, SvgTile};
 pub use export::{Outline, Point};
 pub use limits::{Limits, TileRequest};
+pub use metadata::{MAX_EXPORT_METADATA_BYTES, verify_svg_copy_metadata};
 pub use preflight::FidelityNotice;
 
 pub type SvgResult<T> = Result<T, SvgError>;

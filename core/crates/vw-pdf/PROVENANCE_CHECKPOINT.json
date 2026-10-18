@@ -1,0 +1,144 @@
+{
+  "status": "unbuilt source checkpoint for coordinator composition; no publication capability enabled",
+  "base_caller_commit": "070758ac3b0537b4ea9efc0f6d21b23792d47762",
+  "admitted_identity_contract": "5d0e39a7ed11a293c6b905392683020ec9d515ff",
+  "contract_document": "docs/DOCUMENT_COPY_IDENTITY_HANDOFF_20261018.md",
+  "environment": "Successful shell/git/source checks after reported disconnect; no remaining environment disconnect blocker.",
+  "copy_identity": "Use admitted CopyIdentity exactly: schema_version=1, host_seq u64, full64-lowercase-hex state_hash/source_asset, paired canonical lowercase UUID capture_session/frame_id u64. Root request/source admission is unchanged. Derive revision via CopyIdentity::revision().",
+  "serialization": "ResultMetadata::identity_metadata(&CopyIdentity) reuses existing image JSON names and adds derived revision. Leaves receive that serialized validated JSON; generic leaf metadata strings alone are never publication authority.",
+  "carriers": {
+    "pdf": "Active final trailer /Info reference points to generated /Subject UTF-16BE hex JSON. Replace complete classic xref/trailer, preserving body offsets/Root/ID; no incremental /Prev append. Independent PDFium Subject readback after reopening final bytes, then portable active-xref/info verification on exact returned bytes.",
+    "svg": "SVG metadata contains the existing image XMP rdf:Description/vwb:Metadata vocabulary at https://visualworkbench.app/ns/export/1.0/. XML text escaped, no external resolver, DTD denied. Final XML tree namespace/ancestry/uniqueness/text inspected; matching comment, orphan or wrong namespace is not proof."
+  },
+  "copy_modes": {
+    "annotated_and_flattened_pdf": "Write private ordinary copy; stamp generated identity; drop original and reopen final generated PDF; PDFium Subject readback; exact passthrough into returned private stage; portable active-carrier verification; echo entire CopyIdentity with final byte count.",
+    "svg": "export_svg_with_metadata emits static tree and overlays plus fresh metadata; retained tree and readback DOM have separate conservative admission; verify final XML before exact identity echo.",
+    "every_page_raster_redaction": "UnverifiedRasterCopy::embed_metadata checks exact staged bytes/hash and updates only intermediate hash/length; then reopen, read Subject and perform existing independent plan.verify. Echo only after verified exact final output.",
+    "pc_redaction": "qpdf cleanup removes source metadata first. CleanedPcCopy::embed_metadata verifies exact cleaned staging, inserts only generated identity, rebinds output hash/length; then independent PDFium Subject plus plan.verify. Does not re-admit source /Info or incremental history.",
+    "original_pdf": "Isolated request returns FaultCode::Unsupported before native parsing. Low-level exact Original passthrough remains unchanged for internal copying of freshly verified generated documents; app cannot claim metadata-bearing exact-original export."
+  },
+  "bounds_and_limitations": [
+    "Metadata16KiB ASCII nonempty/noNUL matches existing formats metadata limit; serialized JSON generation and identity validation stay in admitted protocol/typed adapter.",
+    "PDF metadata path supports complete classic xref only, at most4MiB xref/200000 entries/4KiB trailer; rejects unknown keys, /Prev, /Encrypt, hybrid/xref streams and noncanonical unsupported dictionaries. No fallback omits metadata.",
+    "Redaction stamping and final verification remain capped by the prepared plan maximum_encoded_bytes as well as transport/output limits; no estimate or memory/output target was relaxed.",
+    "PDFium/qpdf emitted bytes have not been observed against this new metadata path. Native integration tests remain ignored/unrun; no sandbox/native/fidelity acceptance claimed.",
+    "Existing modified-encrypted-copy refusal, PC opaque filled-polygon subset/refusal and full-page raster search/vector loss remain unchanged.",
+    "Partial nonzero layer opacity remains Unsupported; no group-opacity support added.",
+    "No app publication gate, protocol schema, root native source admission, shared/controller/Main/WorkbenchApp, manifest, dependency or lock edits in this leaf batch."
+  ],
+  "checks": {
+    "rustfmt": "passed, syntax/format only",
+    "diff_whitespace": "passed",
+    "gitleaks": "Zero findings in PDF/SVG/host document runtime/worker trees and targeted FFI document engine tree.",
+    "compilation": "NOT RUN: parent assigned heavy slot to another lane",
+    "new_regression_definitions": 18,
+    "new_tests_executed": 0,
+    "existing_native_contracts_extended": 3,
+    "native_contracts_executed": 0
+  },
+  "regression_scope": [
+    "PDF active Subject byte readback and independent hex decode, unchanged page/object prefix, wrong identity/orphans/mutated bytes, hostile/duplicate/encrypted/incremental trailers, EOF/xref bounds, cancellation, metadata/output caps",
+    "Raster and PC exact receipt rebinding refuses changed staging; immutable source and plan identity preserved",
+    "SVG XML roundtrip, known rendered pixels unchanged, no source metadata, correct namespace and exact text, wrong revision/duplicate/comment/DTD/controls/cancel/caps, unsigned maxima in serialized identity",
+    "Host result exact identity echo for Annotated/Flattened/SVG/raster/PC, full-state change with same hash8, missing/changed echo and exact u64 maxima"
+  ],
+  "focused_commands_after_slot_grant": [
+    "cargo test --locked -p vw-pdf --lib metadata",
+    "cargo test --locked -p vw-svg --test provenance",
+    "cargo test --locked -p vw-document-win --test copy_identity_metadata --test pc_redaction_metadata --test admission",
+    "cargo clippy --locked -p vw-pdf -p vw-svg -p vw-document-win --all-targets -- -D warnings",
+    "Windows-target document worker and Android vw-ffi engine type checks remain separate coordinator checks"
+  ],
+  "source_files": [
+    {
+      "path": "core/crates/vw-ffi/src/documents/engine.rs",
+      "bytes": 23895,
+      "sha256": "3e700b2d7237f95fd272babd0fc7f176463acd7be3c0e7f0265e218f4e4ae782"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/ffi.rs",
+      "bytes": 30816,
+      "sha256": "532f040ccffa44cbef6ea321b63db91061c77fd6cafc11fabe5cb90a6ed51720"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/lib.rs",
+      "bytes": 1453,
+      "sha256": "bfe632d03f298b9aec5457e00afd1723d8f7b2866412aa1b478f7b05a163cf4c"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/metadata.rs",
+      "bytes": 20388,
+      "sha256": "10cd8f1a19d82018768f9259d7e78de07d30ba97b5184deba6f71afdc88cdd89"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/pc_redaction.rs",
+      "bytes": 44785,
+      "sha256": "3001e8a4eb12e43215fb391f8034ed5ecd76f5489aca67b1df628e6071ed2232"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/raster_redaction.rs",
+      "bytes": 42465,
+      "sha256": "c0dac8992b7ccfaae3e89cf982cfb896d59ba1d4e88481a1704649f830b5fb9c"
+    },
+    {
+      "path": "core/crates/vw-pdf/tests/pc_redaction_worker.rs",
+      "bytes": 7395,
+      "sha256": "b322af1a5f4219266d767cb17a3b9304b08d9e7adffbd0b47ae6b97d7d8562f0"
+    },
+    {
+      "path": "core/crates/vw-pdf/tests/pdfium_worker.rs",
+      "bytes": 7603,
+      "sha256": "bec534feb4729088d1657f1dec2c825d50b6d881b41cb5d345249cdc0c30ed9c"
+    },
+    {
+      "path": "core/crates/vw-pdf/tests/raster_redaction_worker.rs",
+      "bytes": 6444,
+      "sha256": "5059afc1d75b63984012508ddba679307c73747dde83f1ae8480d4d5ad1840d2"
+    },
+    {
+      "path": "core/crates/vw-svg/src/engine.rs",
+      "bytes": 8033,
+      "sha256": "9590efc85efeb569a5059840d315a463ec4b532079538cad19c0f0f1da8b314e"
+    },
+    {
+      "path": "core/crates/vw-svg/src/lib.rs",
+      "bytes": 1755,
+      "sha256": "6e3d6b39603eb8796576d5a449ea1915ab8310dc901e04a28595bf26fcbb7196"
+    },
+    {
+      "path": "core/crates/vw-svg/src/metadata.rs",
+      "bytes": 5475,
+      "sha256": "52466f0b7730c7e030bcd16eb2c923207e0c1392267bcfa9fdb855eedf6c9296"
+    },
+    {
+      "path": "core/crates/vw-svg/tests/provenance.rs",
+      "bytes": 4832,
+      "sha256": "87534634fcba4fbc7538b3ef3b8fbfec631e9f5a99302a25fb64842310f9b39f"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/src/metadata.rs",
+      "bytes": 14230,
+      "sha256": "95687ef49a29fa34fb547e5106c786973f87b094548277ebf74e389382d6401d"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/tests/admission.rs",
+      "bytes": 8858,
+      "sha256": "dfb09f575ce0ac9c01fb49049df1fb5cdd85fc1d76356bc9f5b2be68f5a59643"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/tests/copy_identity_metadata.rs",
+      "bytes": 5186,
+      "sha256": "887084e2061f538a839541d7ba0f271a6a5eda15cab27dd94aee00cb1b00fc28"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/tests/pc_redaction_metadata.rs",
+      "bytes": 2731,
+      "sha256": "af2dd180f8f18e6135fa64d7941969b412e6fbec85f73c878402e219931730f6"
+    },
+    {
+      "path": "tools/document-worker/src/dispatch.rs",
+      "bytes": 29463,
+      "sha256": "7284b604c8385b14e0090ce8bff6f5311fc3534e734c39931c32fcc04ff42809"
+    }
+  ]
+}

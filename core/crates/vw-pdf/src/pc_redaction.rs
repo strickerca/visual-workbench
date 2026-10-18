@@ -1,8 +1,8 @@
 //! Fresh PC reconstruction. Unaffected admitted polygons remain vector; source
 //! objects/dictionaries/resources are never copied to the generated document.
 use crate::{
-    PageGeometry, PageRedaction, PdfCancellation, PdfDocument, PdfError, PdfNotice, PdfPoint,
-    PdfRect, PdfTileRequest, RasterSecurityPolicy,
+    PageGeometry, PageRedaction, PdfCancellation, PdfDocument, PdfError, PdfLimits, PdfNotice,
+    PdfPoint, PdfRect, PdfTileRequest, RasterSecurityPolicy,
 };
 use std::io::Write;
 
@@ -130,6 +130,30 @@ pub struct CleanedPcCopy {
     pub(crate) output_blake3: String,
     pub(crate) bytes: u64,
 }
+impl CleanedPcCopy {
+    /// qpdf deliberately removes source /Info. Add only generated export JSON
+    /// AFTER cleanup and BEFORE independent PDFium/content verification. This
+    /// does not admit any original metadata or incremental history.
+    pub fn embed_metadata(
+        mut self,
+        bytes: &mut Vec<u8>,
+        metadata: &str,
+        limits: PdfLimits,
+        cancel: &PdfCancellation,
+    ) -> PcRedactionResult<Self> {
+        cancel.check()?;
+        if self.bytes != bytes.len() as u64
+            || self.output_blake3 != blake3::hash(bytes).to_hex().as_str()
+        {
+            return Err(PcRedactionError::Verification);
+        }
+        crate::embed_pdf_copy_metadata(bytes, metadata, limits, cancel)?;
+        self.bytes = bytes.len() as u64;
+        self.output_blake3 = blake3::hash(bytes).to_hex().to_string();
+        Ok(self)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct VerifiedPcRedaction {
     source_blake3: String,
@@ -556,6 +580,7 @@ impl PcRedactionPlan {
     ) -> PcRedactionResult<VerifiedPcRedaction> {
         if cleaned.source_blake3 != self.source_blake3
             || cleaned.plan_blake3 != self.plan_blake3
+            || cleaned.bytes > self.work.maximum_encoded_bytes
             || cleaned.output_blake3 != document.info().source_blake3
             || document.info().pages != self.work.pages
             || document.info().encrypted
@@ -1221,5 +1246,54 @@ mod tests {
             .is_err()
         );
         assert_eq!(pixels, vec![123; 4]);
+    }
+}
+
+#[cfg(test)]
+mod metadata_receipt_tests {
+    use super::*;
+    fn receipt(bytes: &[u8]) -> CleanedPcCopy {
+        CleanedPcCopy {
+            source_blake3: "a".repeat(64),
+            plan_blake3: "b".repeat(64),
+            output_blake3: blake3::hash(bytes).to_hex().to_string(),
+            bytes: bytes.len() as u64,
+        }
+    }
+    #[test]
+    fn generated_metadata_rebinds_exact_cleaned_staging_before_verification()
+    -> PcRedactionResult<()> {
+        let mut bytes = crate::metadata::tests::fixture();
+        let old_hash = blake3::hash(&bytes).to_hex().to_string();
+        let stamped = receipt(&bytes).embed_metadata(
+            &mut bytes,
+            &crate::metadata::tests::identity(),
+            PdfLimits::default(),
+            &PdfCancellation::default(),
+        )?;
+        assert_ne!(stamped.output_blake3, old_hash);
+        assert_eq!(
+            stamped.output_blake3,
+            blake3::hash(&bytes).to_hex().as_str()
+        );
+        assert_eq!(stamped.source_blake3, "a".repeat(64));
+        assert_eq!(stamped.plan_blake3, "b".repeat(64));
+        assert_eq!(stamped.bytes, bytes.len() as u64);
+        Ok(())
+    }
+    #[test]
+    fn changed_cleanup_output_cannot_receive_a_rebound_receipt() {
+        let mut bytes = crate::metadata::tests::fixture();
+        let owner = receipt(&bytes);
+        bytes[0] = b'!';
+        assert!(matches!(
+            owner.embed_metadata(
+                &mut bytes,
+                &crate::metadata::tests::identity(),
+                PdfLimits::default(),
+                &PdfCancellation::default()
+            ),
+            Err(PcRedactionError::Verification)
+        ));
     }
 }

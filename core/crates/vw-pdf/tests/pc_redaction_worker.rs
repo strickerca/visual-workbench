@@ -108,7 +108,7 @@ fn pc_copy_removes_covered_text_preserves_unaffected_polygons_and_qpdf_verifies_
         original_hash.to_hex().to_string()
     );
     drop(source);
-    let (output, cleaned) = cleanup.rewrite_and_audit(&plan, intermediate, &fresh, &cancel)?;
+    let (mut output, cleaned) = cleanup.rewrite_and_audit(&plan, intermediate, &fresh, &cancel)?;
     for forbidden in [
         b"SECRET ORIGINAL".as_slice(),
         b"SECRET METADATA",
@@ -124,7 +124,15 @@ fn pc_copy_removes_covered_text_preserves_unaffected_polygons_and_qpdf_verifies_
                 .any(|part| part == forbidden)
         );
     }
+    let metadata = format!(
+        r#"{{"schema_version":1,"host_seq":42,"state_hash":"{}","revision":"r42-aaaaaaaa","source_asset":"{}"}}"#,
+        "a".repeat(64),
+        original_hash.to_hex()
+    );
+    let cleaned = cleaned.embed_metadata(&mut output, &metadata, limits, &cancel)?;
+    vw_pdf::verify_pdf_copy_metadata(&output, &metadata, limits.output_bytes, &cancel)?;
     let mut generated = runtime.open(output, None, &cancel)?;
+    generated.verify_export_metadata(&metadata, &cancel)?;
     let verified = plan.verify(&mut generated, cleaned, &cancel)?;
     assert_eq!(verified.work().preserved_paths, 2);
     assert_eq!(

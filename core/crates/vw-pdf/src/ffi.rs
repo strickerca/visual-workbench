@@ -153,6 +153,53 @@ pub struct PdfDocument<'a> {
 }
 
 impl PdfDocument<'_> {
+    /// Independent PDFium readback of the final copy's active Subject value.
+    /// Call after reopening the exact stamped bytes, before copy adoption.
+    pub fn verify_export_metadata(
+        &self,
+        expected: &str,
+        cancel: &PdfCancellation,
+    ) -> PdfResult<()> {
+        crate::metadata::metadata_valid(expected)?;
+        cancel.check()?;
+        let bytes = (expected.len() + 1) * 2;
+        // SAFETY: live exclusively owned document, fixed known metadata tag;
+        // null/zero query returns required UTF-16LE byte count without writing.
+        let count = unsafe {
+            self.raw
+                .bindings
+                .FPDF_GetMetaText(self.raw.handle, "Subject", std::ptr::null_mut(), 0)
+        };
+        if count as usize != bytes {
+            return Err(PdfError::Malformed);
+        }
+        let mut units = Vec::<u16>::new();
+        units
+            .try_reserve_exact(expected.len() + 1)
+            .map_err(|_| PdfError::Allocation)?;
+        units.resize(expected.len() + 1, 0);
+        // SAFETY: initialized aligned storage owns exactly `bytes` writable
+        // bytes; native synchronous call cannot retain the pointer.
+        let written = unsafe {
+            self.raw.bindings.FPDF_GetMetaText(
+                self.raw.handle,
+                "Subject",
+                units.as_mut_ptr().cast(),
+                bytes as _,
+            )
+        };
+        if written as usize != bytes
+            || units.last() != Some(&0)
+            || units[..expected.len()]
+                .iter()
+                .zip(expected.bytes())
+                .any(|(unit, byte)| u16::from_le(*unit) != u16::from(byte))
+        {
+            return Err(PdfError::Malformed);
+        }
+        cancel.check()
+    }
+
     pub fn info(&self) -> &PdfDocumentInfo {
         &self.info
     }

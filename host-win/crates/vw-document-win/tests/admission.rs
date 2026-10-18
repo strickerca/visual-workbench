@@ -143,6 +143,14 @@ fn successful_normal_copy_can_never_claim_redaction() {
         overlays: vec![],
     });
     let value = ResultMetadata::PdfCopy {
+        export_identity: vw_document_protocol::CopyIdentity {
+            schema_version: 1,
+            host_seq: 42,
+            state_hash: "a".repeat(64),
+            source_asset: "b".repeat(64),
+            capture_session: None,
+            frame_id: None,
+        },
         copy: CopyKind::Flattened,
         pages: 1,
         bytes: 100,

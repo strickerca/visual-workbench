@@ -64,6 +64,11 @@ fn phone_copy_reconstructs_every_page_and_verifies_no_text_or_original_resources
         unsafe { PdfRuntime::from_verified_bindings(bindings, PdfLimits::default()) }?;
     let cancel = PdfCancellation::default();
     let mut source = runtime.open(synthetic_sensitive_pdf(), None, &cancel)?;
+    let metadata = format!(
+        r#"{{"schema_version":1,"host_seq":42,"state_hash":"{}","revision":"r42-aaaaaaaa","source_asset":"{}"}}"#,
+        "a".repeat(64),
+        source.info().source_blake3
+    );
     assert!(source.text_chunk(0, 0, 4096, &cancel)?.total_characters > 0);
     assert!(source.text_chunk(1, 0, 4096, &cancel)?.total_characters > 0);
     let plan = RasterRedactionPlan::prepare(
@@ -107,11 +112,19 @@ fn phone_copy_reconstructs_every_page_and_verifies_no_text_or_original_resources
                 .any(|window| window == forbidden)
         );
     }
+    let pending = pending.embed_metadata(&mut output, &metadata, PdfLimits::default(), &cancel)?;
+    vw_pdf::verify_pdf_copy_metadata(
+        &output,
+        &metadata,
+        PdfLimits::default().output_bytes,
+        &cancel,
+    )?;
     drop(source);
     let mut changed = runtime.open(tampered, None, &cancel)?;
     assert!(plan.verify(&mut changed, wrong_receipt, &cancel).is_err());
     drop(changed);
     let mut reconstructed = runtime.open(output, None, &cancel)?;
+    reconstructed.verify_export_metadata(&metadata, &cancel)?;
     let receipt = plan.verify(&mut reconstructed, pending, &cancel)?;
     assert_eq!(receipt.pages(), 2);
     assert_eq!(
