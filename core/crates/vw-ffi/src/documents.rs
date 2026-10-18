@@ -470,6 +470,31 @@ impl ProjectSession {
     }
 }
 
+/// Shared atomic page admission for ordinary edits and vector erasure. The
+/// current view stays local; caller-supplied page must own every target layer.
+pub(crate) fn admit_page_layer(
+    project: &vw_model::Project,
+    document: &Id,
+    page: u32,
+    layer: &Id,
+) -> Result<()> {
+    let doc = project.documents.get(document).ok_or(CoreError::Invalid)?;
+    let expected_layer_page = match pb::DocumentKind::try_from(doc.definition.kind) {
+        Ok(pb::DocumentKind::Pdf) if doc.pages.iter().any(|value| value.page_index == page) => {
+            i32::try_from(page).map_err(|_| CoreError::Invalid)?
+        }
+        Ok(pb::DocumentKind::Svg) if page == 0 => -1,
+        _ => return Err(CoreError::Invalid),
+    };
+    let layer = project.layers.get(layer).ok_or(CoreError::Invalid)?;
+    if layer.definition.document_id.as_ref() != Some(&document.to_proto())
+        || expected_layer_page != layer.definition.page_index
+    {
+        return Err(CoreError::Invalid);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod source_contract_tests {
     use super::*;
@@ -529,29 +554,4 @@ mod source_contract_tests {
             assert!(dimensions(&page).is_err());
         }
     }
-}
-
-/// Shared atomic page admission for ordinary edits and vector erasure. The
-/// current view stays local; caller-supplied page must own every target layer.
-pub(crate) fn admit_page_layer(
-    project: &vw_model::Project,
-    document: &Id,
-    page: u32,
-    layer: &Id,
-) -> Result<()> {
-    let doc = project.documents.get(document).ok_or(CoreError::Invalid)?;
-    let expected_layer_page = match pb::DocumentKind::try_from(doc.definition.kind) {
-        Ok(pb::DocumentKind::Pdf) if doc.pages.iter().any(|value| value.page_index == page) => {
-            i32::try_from(page).map_err(|_| CoreError::Invalid)?
-        }
-        Ok(pb::DocumentKind::Svg) if page == 0 => -1,
-        _ => return Err(CoreError::Invalid),
-    };
-    let layer = project.layers.get(layer).ok_or(CoreError::Invalid)?;
-    if layer.definition.document_id.as_ref() != Some(&document.to_proto())
-        || expected_layer_page != layer.definition.page_index
-    {
-        return Err(CoreError::Invalid);
-    }
-    Ok(())
 }

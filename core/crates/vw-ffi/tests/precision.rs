@@ -37,7 +37,7 @@ fn closing_restores_the_exact_saved_matrix_at_every_scale_and_rotation() -> Test
     for scale in [1.0 / 64.0, 0.75, 1.0, 13.0, 64.0] {
         for rotation in [-3.1, -0.5, 0.0, 1.7, 3.1] {
             let c = camera(scale, rotation);
-            let lens = create_precision_lens(c.clone())?;
+            let lens = create_precision_lens(c)?;
             let before = camera_matrix(c, false)?;
             for mag in [2, 4, 8] {
                 lens.configure(
@@ -56,15 +56,15 @@ fn closing_restores_the_exact_saved_matrix_at_every_scale_and_rotation() -> Test
 #[test]
 fn the_focus_maps_to_inset_center_and_native_samples_return_to_document() -> TestResult {
     let c = camera(1.3, 0.74);
-    let lens = create_precision_lens(c.clone())?;
+    let lens = create_precision_lens(c)?;
     let focus = Point { x: 100.5, y: 20.25 };
     for mag in [2, 4, 8] {
         let center = Point { x: 450.0, y: 340.0 };
-        lens.configure(focus.clone(), center.clone(), mag)?;
+        lens.configure(focus, center, mag)?;
         point_close(&apply(&lens.mapping()?.lens, &focus), &center);
         lens.down(true)?;
         let mapped = lens.map_to_base(vec![center], false)?;
-        let doc = camera_map_points(c.clone(), true, mapped)?;
+        let doc = camera_map_points(c, true, mapped)?;
         point_close(&doc[0], &focus);
         lens.up()?;
     }
@@ -78,7 +78,7 @@ fn two_hundred_midstroke_toggle_traces_have_one_unbroken_mapping() -> TestResult
             0.25 + f64::from(trace % 40) / 7.0,
             -3.0 + f64::from(trace) / 37.0,
         );
-        let lens = create_precision_lens(c.clone())?;
+        let lens = create_precision_lens(c)?;
         lens.configure(Point { x: 13.0, y: 40.0 }, Point { x: 330.0, y: 440.0 }, 4)?;
         lens.down(true)?;
         let points: Vec<_> = (0..60)
@@ -163,7 +163,7 @@ fn render_footprint_ignores_outside_contact_latch_without_changing_input() -> Te
     lens.configure(Point { x: 0.0, y: 0.0 }, Point { x: 500.0, y: 400.0 }, 4)?;
     lens.down(false)?;
     let input = Point { x: 500.0, y: 400.0 };
-    let raw = lens.map_to_base(vec![input.clone()], true)?;
+    let raw = lens.map_to_base(vec![input], true)?;
     assert_eq!(raw[0].x, input.x);
     let view = lens.view_to_base(vec![input])?;
     assert_ne!(view[0].x, raw[0].x);
@@ -202,12 +202,12 @@ fn disposal_and_batch_bounds_refuse_without_changing_geometry() -> TestResult {
 #[test]
 fn inspection_matrix_never_changes_the_editable_handle() -> TestResult {
     let c = camera(0.875, 0.42);
-    let lens = create_precision_lens(c.clone())?;
+    let lens = create_precision_lens(c)?;
     lens.down(false)?;
     let before = bits(&lens.mapping()?.lens);
     for i in 0..100 {
         precision_view_transform(
-            c.clone(),
+            c,
             Point {
                 x: f64::from(i),
                 y: 7.0,
