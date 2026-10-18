@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-18",
+  "reviewed_main": "bca245eda44a470906c23c464f60fdd2af618016",
+  "status": "Read-only source/artifact research. Exact releases located; artifact acquisition, signature and extracted-file verification NOT performed. Runtime/product gates remain closed.",
+  "no_execution_or_license_change": {
+    "native_binaries_loaded": false,
+    "archives_downloaded": false,
+    "software_installed": false,
+    "pins_changed": false,
+    "licenses_accepted": false,
+    "builds_run": false
+  },
+  "existing_evidence": {
+    "feasibility": "docs/evidence/CLOUD_PDF_RUNTIME_FEASIBILITY_20261018.json",
+    "finding": "No admitted project PDFium/qpdf artifacts or source-bound document runtime pin manifests found in tracked main or searched worker caches. Recovery preserves candidate source/receipts, not accepted runtime binaries. Installed7999/12.2.0 remain unsuitable and were not loaded.",
+    "recovery_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+    "verified_against_public_recovery_manifest": [
+      {
+        "path": "ink-core/t3-document-pc-redaction/LICENSES-ADDITIONS.json",
+        "bytes": 2079,
+        "sha256": "4c7430cc1ed522644bddf620d9fe1636e9e98e2328d0257288912b86e961a1e0"
+      },
+      {
+        "path": "ink-core/t3-document-pc-redaction/QPDF-ARTIFACT-CANDIDATE.json",
+        "bytes": 5436,
+        "sha256": "dcb88243e2ce2dc88d8d89eb0197bc9bc871039089f1562668c8a60373d51742"
+      },
+      {
+        "path": "ink-core/t3-document-pc-redaction/QPDF-EXTRA-DATA-RECEIPT.json",
+        "bytes": 5002,
+        "sha256": "c7e6c11e9ace1202c8be4f97be7cd1841f5c4f0c1a33ff438b2a693b4cd25845"
+      },
+      {
+        "path": "ink-core/t3-document-pc-redaction/QPDF-PUBLISHER-DATA-RECEIPT.json",
+        "bytes": 3604,
+        "sha256": "a18d72461b0de5cd5a21d05f7f6a372d41178d23cd1642931df8c722fb023fd2"
+      }
+    ]
+  },
+  "pin_resolution": {
+    "active_pdfium": "pdfium-render0.9.4 with pdfium_7881 in vw-pdf/vw-ffi/document-worker; required prebuilt release is PDFium151.0.7881.0, chromium/7881, released2026-06-08.",
+    "active_qpdf": "qpdf12.4.2 exact string checked by qpdf_cleanup/windows.rs; required Windows x64 qpdf30.dll.",
+    "stale_catalog": "docs/SOURCES.json S47 and TOOLCHAIN.md mention156.x/8076; those broad older catalog entries do not override active ABI7881. No source pin was changed."
+  },
+  "artifacts": [
+    {
+      "name": "pdfium-linux-x64.tgz",
+      "platform": "Linux x86_64 glibc; fixture engine checks only",
+      "release": "151.0.7881.0 / chromium/7881",
+      "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7881/pdfium-linux-x64.tgz",
+      "publisher_reported_archive_sha256": "1470e21b8b4a3b4ad7f85684e2da11d94f3b69a86d81dee11b9b6709d927ac1d",
+      "archive_entry": "lib/libpdfium.so",
+      "extracted_file_sha256": "not yet acquired/reviewed",
+      "variant": "non-V8, non-debug, shared"
+    },
+    {
+      "name": "pdfium-win-x64.tgz",
+      "platform": "Windows x64 LPAC worker",
+      "release": "151.0.7881.0 / chromium/7881",
+      "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7881/pdfium-win-x64.tgz",
+      "publisher_reported_archive_sha256": "73cc0de638ac2095e7445bf56a38200a5b7c7ca0e9f4ba144598f2457377ac08",
+      "archive_entry": "bin/pdfium.dll",
+      "extracted_file_sha256": "not yet acquired/reviewed",
+      "variant": "non-V8, non-debug, shared"
+    },
+    {
+      "name": "pdfium-android-arm64.tgz",
+      "platform": "Android arm64-v8a actual isolated service",
+      "release": "151.0.7881.0 / chromium/7881",
+      "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7881/pdfium-android-arm64.tgz",
+      "publisher_reported_archive_sha256": "16d23bb86c4188d59326dc509938f59df3c417ecfdd3d2ca2f160dc5bd49a839",
+      "archive_entry": "lib/libpdfium.so",
+      "extracted_file_sha256": "not yet acquired/reviewed",
+      "variant": "non-V8, non-debug, shared"
+    },
+    {
+      "name": "qpdf-12.4.2-msvc64.zip",
+      "platform": "Windows x64 PC cleanup C ABI; existing recovered candidate",
+      "release": "v12.4.2",
+      "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-msvc64.zip",
+      "publisher_reported_archive_sha256": "db87077e683630c1217e0e8f9a20a9749d952ab676e881c3689187763a5de25d",
+      "recovery_candidate_dll": "qpdf30.dll",
+      "recovery_candidate_dll_bytes": 7448064,
+      "recovery_candidate_dll_sha256": "8812952678de93e0750308a113aa650e9161af466f9770679ea9673adeb61041",
+      "dll_status": "Recovered data receipt only, not freshly reacquired or admitted for runtime; exact archive entry/import table still to inspect."
+    },
+    {
+      "name": "qpdf-12.4.2-bin-linux-x86_64.zip",
+      "platform": "Optional independent Linux qpdf CLI diagnostics; cannot run the Windows-only qpdf C-ABI/LPAC path",
+      "release": "v12.4.2",
+      "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-bin-linux-x86_64.zip",
+      "publisher_reported_archive_sha256": "db367d897829f22c4198ce1094143c9d467bd6ee7dfabc44ba6f02056b24f8b1",
+      "admission": "not installed or accepted; not needed to replace required Windows DLL"
+    },
+    {
+      "name": "qpdf-12.4.2.tar.gz",
+      "platform": "Official source archive if separate source reproduction is approved; no source build needed to locate released target artifacts",
+      "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2.tar.gz",
+      "publisher_reported_archive_sha256": "8a58af5b6141319287c1883bec8bd1bd545b7567b7fc5e6ce5d25a1c85f36397"
+    }
+  ],
+  "verification_metadata": {
+    "pdfium_release": "https://github.com/bblanchon/pdfium-binaries/releases/tag/chromium%2F7881",
+    "pdfium_publisher_asset_manifest": "https://github.com/bblanchon/pdfium-binaries/releases/expanded_assets/chromium%2F7881",
+    "pdfium_attestation": {
+      "url": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7881/pdfium-attestation.json",
+      "publisher_reported_sha256": "24dec7cd76acb81106a0c29b908cceceef8215b050f6ff6ffbf875465811ef60",
+      "verified": false
+    },
+    "qpdf_release": "https://github.com/qpdf/qpdf/releases/tag/v12.4.2",
+    "qpdf_publisher_asset_manifest": "https://github.com/qpdf/qpdf/releases/expanded_assets/v12.4.2",
+    "qpdf_checksum_file": {
+      "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2.sha256",
+      "publisher_reported_sha256": "bb4472ec2efb3fe4c4a49f030906c734506ffd99cb27abab0eb2f15ab1820d69"
+    },
+    "qpdf_sigstore_bundle": {
+      "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2.sha256.sigstore",
+      "publisher_reported_sha256": "a2b57ecf7d15b34dc81a178683e57acc0a3b0c0cc3bb6cd7cb590ff1b9c7bfd5",
+      "release_signer": "ejb@ql.org",
+      "oidc_issuer": "https://github.com/login/oauth",
+      "verified": false
+    },
+    "qpdf_source_asc": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2.tar.gz.asc",
+    "qpdf_gpg_fingerprint": "C2C9 6B10 011F E009 E6D1 DF82 8A75 D109 9801 2C7E",
+    "qpdf_verification_instructions": "https://raw.githubusercontent.com/qpdf/qpdf/v12.4.2/README.md",
+    "cosign_command_if_already_approved_and_available": "cosign verify-blob qpdf-12.4.2.sha256 --bundle qpdf-12.4.2.sha256.sigstore --certificate-identity=ejb@ql.org --certificate-oidc-issuer=https://github.com/login/oauth",
+    "command_executed": false
+  },
+  "license_prerequisites": {
+    "pdfium": "bblanchon is the already-cataloged community binary publisher, not Google/Foxit. Package wrapper LICENSE is MIT; PDFium/upstream composite and all compiled third-party notices are collected under licenses/. Do not treat wrapper MIT as the whole binary license. Retain exact archive LICENSE, licenses/*, VERSION and args.gn, hash the notice inventory and submit additive central third_party/LICENSES records before distribution. Exact archive notice closure remains pending.",
+    "pdfium_license_sources": [
+      "https://raw.githubusercontent.com/bblanchon/pdfium-binaries/chromium/7881/LICENSE",
+      "https://raw.githubusercontent.com/bblanchon/pdfium-binaries/chromium/7881/steps/07-stage.sh",
+      "https://raw.githubusercontent.com/bblanchon/pdfium-binaries/chromium/7881/steps/08-licenses.sh"
+    ],
+    "qpdf": "qpdf12.4.2 is Apache-2.0; retain exact LICENSE.txt and NOTICE.md. Recovery MSVC64 data review additionally records statically linked zlib1.3.2 (Zlib), libjpeg-turbo3.2.0 (IJG AND BSD-3-Clause), OpenSSL3.6.4 (Apache-2.0), libspng0.7.4 (BSD-2-Clause AND libpng-2.0). Original review did not reproduce linker-member census. Data review is not license acceptance/runtime admission.",
+    "qpdf_sources": [
+      "https://raw.githubusercontent.com/qpdf/qpdf/v12.4.2/LICENSE.txt",
+      "https://raw.githubusercontent.com/qpdf/qpdf/v12.4.2/NOTICE.md"
+    ],
+    "recovered_qpdf_notice_archive": {
+      "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/vcpkg.zip",
+      "bytes": 195951195,
+      "publisher_and_recovery_sha256": "82005252fee032135d07c85ad7626a38f26fb253c1e098d1d185f315bea15ebb",
+      "reviewed_metadata_paths": [
+        "vcpkg/installed/x64-windows-static/share/zlib/copyright",
+        "vcpkg/installed/x64-windows-static/share/libjpeg-turbo/copyright",
+        "vcpkg/installed/x64-windows-static/share/openssl/copyright",
+        "vcpkg/installed/x64-windows-static/share/libspng/copyright"
+      ],
+      "exact_notice_hashes": "Recovery LICENSES-ADDITIONS and publisher/extra-data receipts verified above. No notice texts were promoted in this pass."
+    },
+    "central_status": "No PDFium/qpdf entries found in current third_party/LICENSES. No license text/acceptance or central manifest edit performed."
+  },
+  "actionable_sequence": [
+    "Obtain only the exact release archives above through the authorized artifact acquisition path; no latest URLs, package-manager upgrades, substitute7999/12.2.0 libraries or installers.",
+    "Check archive SHA256 against publisher release manifest; verify available release attestation/signatures using existing approved tooling. Preserve verification receipts; no new tooling or trust-key acceptance in this pass.",
+    "Inspect archive entries as data with bounded extraction/no traversal or symlink adoption. Preserve VERSION/args.gn/licenses, inspect PE/ELF architecture/imports without loading, hash each actual library and record exact byte lengths. PDFium per-file SHA/size are missing until this step; qpdf candidate DLL hash is an expectation to reproduce, not new trust authority.",
+    "Coordinator admits exact file hashes, complete license/dependency closure and an appropriate capped isolated runner. Keep application PDF capability false until actual platform checks pass.",
+    "For Linux fixtures, use lib/libpdfium.so from pdfium-linux-x64.tgz, never Windows/Android archives; only then supply VW_PDFIUM_TEST_LIBRARY to each ignored PDFium contract separately in the approved isolated/capped runner. This establishes Linux engine-fixture evidence only.",
+    "For Windows, stage exact x64 vw-document-worker.exe/pdfium.dll/qpdf30.dll plus source-bound manifest and trusted System32 dependencies. Run Windows LPAC/token/Job/private-output/retirement checks and all ignored native contracts; Linux qpdf binaries cannot substitute.",
+    "For Android, admit exact arm64 native/APK bytes and pin asset, reconcile physical-file loading with modern unextracted JNI packaging, then execute real isolated Binder UID/native deadline/AS tests. No Android PC qpdf redaction capability is added."
+  ],
+  "platform_prerequisites": {
+    "windows": "Desktop expects resource vw-document-runtime.sha256: lowercase SHA256 decimal_bytes filename lines for exactly worker and optional pdfium.dll/qpdf30.dll (qpdf requires PDFium), with artifacts under document-win32-x86-64/. Native source pins every physical ancestor and exact file, permits at most32 files but Kotlin currently at most3 closed names. Recovered MSVC policy permits trusted installed System32 runtime only, no copying/installing publisher VC redist. Inspect PE imports; unresolved non-system dependencies require coordinator admission, not PATH fallback.",
+    "linux": "The two ignored PDFium contracts need exact7881 ELF and explicit approved isolated/capped runner. PC qpdf adapter is cfg(windows); a matching Linux qpdf archive can support independent diagnostics only. Existing pypdf strict synthetic diagnostics are not native runtime acceptance.",
+    "android": "Current app is arm64-v8a, minSdk29/target36 and uses uncompressed JNI ZIP packaging. Archive lib/libpdfium.so must pass ELF/AArch64 and16KiB segment/ZIP alignment checks. Asset vw-document-android.sha256 uses SHA256 decimal_bytes libpdfium.so; native C ABI independently checks actual UID, library hash/path and resource limits.",
+    "android_packaging_gap": {
+      "status": "Source-level prerequisite/inference, not device-observed failure",
+      "evidence": [
+        "apps/android/build.gradle.kts: jniLibs.useLegacyPackaging=false",
+        "tools/check_android_artifacts.py: every APK .so must be ZIP_STORED arm64 and16KiB aligned",
+        "DocumentWorkerService.pdfium(): requires File(applicationInfo.nativeLibraryDir,libpdfium.so).isFile",
+        "native job: requires absolute regular file path, hashes it before load"
+      ],
+      "implication": "Simply placing the archive .so in jniLibs does not establish the required physical library file. Android documentation says non-extracted libraries load from the APK. Coordinator must admit and verify a loading/extraction contract consistent with isolated UID and current packaging; changing compression alone conflicts with existing artifact checks.",
+      "source": "https://developer.android.com/guide/topics/manifest/application-element#extractNativeLibs"
+    }
+  },
+  "network_limits": "Public publisher release pages, asset digests and source scripts were readable through web. Direct cloud GitHub/API HTTPS requests returned proxy403; release download/attestation links were restricted through browsing. No binary archive or signature bundle was downloaded, so no archive/dll/signature verification is claimed.",
+  "remaining_blockers": [
+    "Acquire/review exact artifact bytes and PDFium inner library hashes/sizes/notices",
+    "Authenticate publisher verification metadata using an approved existing verification route",
+    "Admit runner/platform dependency and packaging prerequisites, including Windows System32 VC runtime policy and Android physical-file versus APK loading",
+    "Execute target native/OS isolation and exported-output contracts before changing publication gates"
+  ]
+}
