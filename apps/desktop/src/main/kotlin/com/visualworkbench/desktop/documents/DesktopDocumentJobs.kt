@@ -2,6 +2,7 @@ package com.visualworkbench.desktop.documents
 
 import com.visualworkbench.bindings.core.*
 import com.visualworkbench.shared.*
+import kotlinx.coroutines.CancellationException
 
 internal class DesktopDocumentJobs(
     runtime: DesktopDocumentRuntime, pcRedaction: Boolean, retained: AutoCloseable, pdfium: Boolean = true,
@@ -13,25 +14,21 @@ private class NativeDocumentBackend(
     private val pdfium: Boolean,
     private val retained: AutoCloseable,
 ) : DocumentBackend {
-    private var destroyed = false
+    private val runtimeRetirement = DocumentNativeRetirement(
+        prove = { runtime.retryRetirement() }, destroy = { runtime.destroy() }, initiallyRequired = true,
+    )
     override fun call(): DocumentCall = object : DocumentCall {
         private val cancellation = DocumentJobCancellation()
-        private val state = Any()
-        private var uncertain = false
-        private var cancelled = false
-        private var retired = false
+        private val retirement = DocumentNativeRetirement(
+            prove = { runtime.retryRetirement() }, destroy = { cancellation.destroy() },
+        )
         private var heldSource: ByteArray? = null
-        override fun cancel() = synchronized(state) {
-            cancelled = true
-            try { if (!retired) cancellation.cancel() }
-            catch (_: Exception) { uncertain = true }
-        }
+        override fun cancel(): Unit = retirement.cancel { cancellation.cancel() }
         override suspend fun execute(request: DocumentRequest, source: ByteArray): DocumentReply {
             heldSource = source
             if (source.isEmpty()) throw DocumentFailure(DocumentFailureKind.Invalid)
             if (source.size > if (documentSvgOperation(request.operation)) 4 * 1024 * 1024 else 64 * 1024 * 1024)
                 throw DocumentFailure(DocumentFailureKind.Limit)
-            synchronized(state) { if (cancelled) throw DocumentFailure(DocumentFailureKind.Cancelled) }
             if (!documentSvgOperation(request.operation) && !pdfium) throw DocumentFailure(DocumentFailureKind.Unavailable)
             val operation = request.operation
             if (operation is DocumentOperation.Copy && operation.kind == DocumentCopy.PcRedaction && !pcRedaction)
@@ -39,33 +36,26 @@ private class NativeDocumentBackend(
             try {
                 val text = documentRequestJson(request)
                 val expected = documentSourceHash(source)
+                retirement.beforeRun()
                 val result = runtime.run(text, source, cancellation)
                 return documentReply(validateDocumentJobResult(text, expected, result))
             } catch (error: DocumentJobException) {
-                val failure = nativeDocumentFailure(error)
-                if (failure.kind == DocumentFailureKind.Isolation) synchronized(state) { uncertain = true }
-                throw failure
+                throw nativeDocumentFailure(error)
+            } catch (error: DocumentFailure) {
+                throw error
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                throw DocumentFailure(DocumentFailureKind.Worker)
             }
         }
         override suspend fun retire() {
-            // The root ABI must add a joined-retirement retry to recover from
-            // Isolation. Until then preserve this exact runtime/token/pin owner;
-            // destroy is never used as a substitute for retirement evidence.
-            synchronized(state) {
-                if (uncertain) throw DocumentFailure(DocumentFailureKind.Isolation)
-                if (!retired) {
-                    try { cancellation.destroy() }
-                    catch (_: Exception) { uncertain = true; throw DocumentFailure(DocumentFailureKind.Isolation) }
-                    retired = true; heldSource = null
-                }
-            }
+            retirement.retire()
+            heldSource = null
         }
     }
     override suspend fun close() {
-        if (!destroyed) {
-            try { runtime.destroy(); destroyed = true }
-            catch (_: Exception) { throw DocumentFailure(DocumentFailureKind.Isolation) }
-        }
+        runtimeRetirement.retire()
         try { retained.close() } catch (_: Exception) { throw DocumentFailure(DocumentFailureKind.Isolation) }
     }
 }

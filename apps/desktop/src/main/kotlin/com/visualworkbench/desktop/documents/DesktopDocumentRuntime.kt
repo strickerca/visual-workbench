@@ -102,11 +102,15 @@ internal object DesktopDocumentRuntimeCache {
             opened = null
             return result
         } catch (error: Throwable) {
+            val retirement = opened?.let { runtime ->
+                DocumentNativeRetirement(
+                    prove = { runtime.retryRetirement() }, destroy = { runtime.destroy() }, initiallyRequired = true,
+                )
+            }
             val cleanup = object : DocumentJobs {
-                private var runtime = opened
                 override val pcRedaction = false
                 override suspend fun run(request: DocumentRequest, source: ByteArray): DocumentReply = throw DocumentFailure(DocumentFailureKind.Isolation)
-                override suspend fun close() { runtime?.destroy(); runtime = null; retained.close() }
+                override suspend fun close() { retirement?.retire(); retained.close() }
             }
             withContext(NonCancellable) { closeRetained(cleanup) }
             when (error) {
