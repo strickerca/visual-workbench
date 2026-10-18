@@ -1,0 +1,743 @@
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -152,7 +152,7 @@
+         InstructionEntryMethod.PhoneKeyboard, localFocused = ::localInstructionFocused)
+     val semanticEditor = SemanticEditor(scope, mutations,
+         { val p = project; val d = document; if (p != null && d != null && !disposing) InstructionAttachment(p, d) else null },
+-        { !disposing && !busy && !ai.state.value.open && !documentControls.state.value.active && !localViews.state.value.active && !localViewTransition && pending == 0 && gesture == null && strokes.isEmpty() &&
++        { !disposing && !busy && !ai.state.value.open && !documentControls.state.value.active && !localViews.state.value.active && !localViewTransition && !imageOutputs.state.value.blocksInput && pending == 0 && gesture == null && strokes.isEmpty() &&
+             !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy &&
+             instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) },
+         { current -> val next = current.info(); WorkflowMetadata(newId(), repository.deviceId,
+@@ -164,7 +164,7 @@
+     val instructionFocus = InstructionFocusController(scope, instructionEditor,
+         { val p = project; val d = document; if (p != null && d != null && !disposing) InstructionAttachment(p, d) else null },
+         { !disposing && !busy && !semanticEditor.state.value.busy && pending == 0 && gesture == null && strokes.isEmpty() &&
+-            !ai.state.value.open && !documentControls.state.value.active && !localViews.state.value.active && !localViewTransition && instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) &&
++            !ai.state.value.open && !documentControls.state.value.active && !localViews.state.value.active && !localViewTransition && !imageOutputs.state.value.blocksInput && instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) &&
+             screen in setOf(WorkbenchScreen.Canvas, WorkbenchScreen.Instructions) },
+         { id, peer -> selected = id; if (peer) screen = WorkbenchScreen.Instructions; publish() }, selectedObject = { selected })
+     private fun localInstructionFocused(field: InstructionField) { instructionFocus.localField(field) }
+@@ -193,7 +193,7 @@
+     private fun aiFrame()=aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),camera,aiPoses())}
+     private fun aiResultReady()=document?.render?.items?.none{it.shape is Shape.Result}!=false||aiFrame()!=null
+     fun openAi(){
+-        if(localViewTransition||localViews.state.value.active||documentControls.state.value.active||documentControls.state.value.busy||documentControls.state.value.retry!=null)return
++        if(imageOutputs.state.value.blocksInput||localViewTransition||localViews.state.value.active||documentControls.state.value.active||documentControls.state.value.busy||documentControls.state.value.retry!=null)return
+         if(disposing||busy||pending!=0||document==null||textDraft!=null||showBrush||showContext||blockingMessage!=null)return
+         if(instructionEditor.hasUnsaved()){message="Save or discard the instruction draft before opening AI review.";return}
+         cancelTool();ai.open();instructionInteractionChanged()
+@@ -216,7 +216,7 @@
+     private var localViewTransition = false
+     fun localViews(value: Boolean) {
+         if (value) {
+-            if (disposing || busy || pending != 0 || document == null || localViewTransition || ai.state.value.open ||
++            if (disposing || busy || pending != 0 || document == null || imageOutputs.state.value.blocksInput || localViewTransition || ai.state.value.open ||
+                 documentControls.state.value.active || semanticEditor.state.value.busy || instructionEditor.state.value.busy ||
+                 textDraft != null || showBrush || showContext || blockingMessage != null) return
+             if (instructionEditor.hasUnsaved()) { message = "Save or discard the instruction draft before opening saved views."; return }
+@@ -226,12 +226,12 @@
+     }
+     fun saveLocalView(binding: LocalViewsBinding, name: String) {
+         val doc = document ?: return
+-        if (disposing || busy || localViewTransition || localViews.state.value.binding != binding || doc.documentId != binding.documentId || doc.render.revision.projectId != binding.projectId) return
++        if (disposing || busy || imageOutputs.state.value.blocksInput || localViewTransition || localViews.state.value.binding != binding || doc.documentId != binding.documentId || doc.render.revision.projectId != binding.projectId) return
+         localViews.addBookmark(binding, name, camera)
+     }
+     fun restoreLocalView(binding: LocalViewsBinding, id: String) {
+         val doc = document ?: return
+-        if (disposing || busy || pending != 0 || localViewTransition || doc.documentId != binding.documentId || doc.render.revision.projectId != binding.projectId) return
++        if (disposing || busy || pending != 0 || imageOutputs.state.value.blocksInput || localViewTransition || doc.documentId != binding.documentId || doc.render.revision.projectId != binding.projectId) return
+         val value = localViews.restoreBookmark(binding, id, camera, epoch) ?: return
+         cancelTool(); followPeer = false; invalidateViewCheck()
+         camera = value; cameraFitted = true; unsnappedRotation = value.rotation
+@@ -257,17 +257,41 @@
+             return true
+         } finally { localViewTransition = false }
+     }
++    val imageOutputs = ImageOutputInteraction(scope, mutations, ::newId,
++        { current -> val next=current.info(); WorkflowMetadata(newId(), repository.deviceId,
++            repository.instructionLamport(next.nextLamport), System.currentTimeMillis()) },
++        { !disposing && !busy && pending==0 && gesture==null && strokes.isEmpty() && !ai.state.value.open &&
++            !documentControls.state.value.active && !localViews.state.value.active && !localViewTransition &&
++            !semanticEditor.state.value.busy && !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy &&
++            instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null) },
++        { receipt -> val current=project; if(current!=null && !disposing)refresh(current,receipt.revision,epoch) })
++    fun imageOutput(value:Boolean) {
++        if(value) {
++            if(disposing || busy || pending!=0 || document==null || localViewTransition || localViews.state.value.active ||
++                documentControls.state.value.active || ai.state.value.open || semanticEditor.state.value.busy ||
++                textDraft!=null || showBrush || showContext || blockingMessage!=null)return
++            if(instructionEditor.hasUnsaved()){message="Save or discard the instruction draft before opening image output.";return}
++            cancelTool()
++        }
++        if(!imageOutputs.active(value))message="Apply or discard private output values, and resolve the retained edit before closing."
++        instructionInteractionChanged()
++    }
++    fun mayLeaveImageOutput():Boolean {
++        if(imageOutputs.state.value.mayLeave)return true
++        message="Apply or discard private output values, and retry or discard the retained edit before leaving."
++        imageOutputs.active(true);instructionInteractionChanged();return false
++    }
+     private val documentCameras = LinkedHashMap<String, Camera>()
+     val documentControls = DocumentControlsInteraction(scope, mutations,
+         { current -> val next = current.info(); WorkflowMetadata(newId(), repository.deviceId,
+             repository.instructionLamport(next.nextLamport), System.currentTimeMillis()) },
+         { !disposing && !busy && pending == 0 && gesture == null && strokes.isEmpty() &&
+-            !ai.state.value.open && !localViews.state.value.active && !localViewTransition && !semanticEditor.state.value.busy && !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy &&
++            !ai.state.value.open && !localViews.state.value.active && !localViewTransition && !imageOutputs.state.value.blocksInput && !semanticEditor.state.value.busy && !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy &&
+             instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) },
+         { receipt -> val current = project; if (current != null && !disposing) refresh(current, receipt.revision, epoch) })
+     fun documentControls(value: Boolean) {
+         if (value) {
+-            if (localViewTransition || localViews.state.value.active || ai.state.value.open || semanticEditor.state.value.busy) return
++            if (imageOutputs.state.value.blocksInput || localViewTransition || localViews.state.value.active || ai.state.value.open || semanticEditor.state.value.busy) return
+             if (disposing || busy || pending != 0 || document == null || textDraft != null || showBrush || showContext || blockingMessage != null) return
+             if (instructionEditor.hasUnsaved()) { message = "Save or discard the instruction draft before opening document controls."; return }
+             cancelTool()
+@@ -276,6 +300,7 @@
+         instructionInteractionChanged()
+     }
+     private fun mayLeaveDocumentControls(): Boolean {
++        if(!mayLeaveImageOutput())return false
+         if (!mayCloseAi()) { documentControls.active(false); instructionInteractionChanged(); return false }
+         if (documentControls.state.value.mayLeave) return true
+         message = "Finish or cancel the document edit, then retry or discard its retained handle before switching documents or projects."
+@@ -307,6 +332,7 @@
+                 // Document views are local; canonical history and the project
+                 // link stay open. Join borrowed capability work before rebinding.
+                 retireAi()
++                imageOutputs.active(false); imageOutputs.detach()
+                 documentControls.active(false); documentControls.detach()
+                 erasers.detach(); selections.detach(); semanticEditor.detach(); instructionEditor.detach()
+                 documentCameras[old.documentId] = camera
+@@ -483,6 +509,7 @@
+     }
+     fun returnFromSettings() { screen = if (project == null) WorkbenchScreen.Projects else WorkbenchScreen.Canvas }
+     fun onBackground() {
++        imageOutputs.cancel(); imageOutputs.active(false)
+         documentControls.active(false); documentControls.cancel()
+         ai.background();instructionInteractionChanged()
+         instructionFocus.sharing(false); instructionFocus.following(false)
+@@ -592,6 +619,7 @@
+         withContext(NonCancellable) {
+         exportReady = null
+         exportPreflight = null; checkedExport = null
++        if(disposing)imageOutputs.close()else imageOutputs.detach()
+         documentControls.detach(); stopLocalViews(); documentCameras.clear()
+         erasers.detach(); selections.detach()
+         instructionFocus.detach()
+@@ -634,7 +662,7 @@
+                 current.changes.collect { change ->
+                     if (change.kind in setOf(ChangeKind.Committed, ChangeKind.Opened) && token == epoch && current === project && change.project.projectId == info?.projectId &&
+                         refreshAdmission.observe(change.sequence)) {
+-                        documentControls.observe(change.sequence); erasers.observe(change); selections.observe(change)
++                        imageOutputs.observe(change.sequence); documentControls.observe(change.sequence); erasers.observe(change); selections.observe(change)
+                         clearPeerObjects(); publish()
+                         invalidateExport(); queue.trySend(Unit)
+                     }
+@@ -764,7 +792,7 @@
+     fun matchPeer() { followPeer = false; matchPeerCamera(); publish() }
+     fun followPeer(enabled: Boolean) { followPeer = enabled; if (enabled) matchPeerCamera(); publish() }
+     private fun matchPeerCamera() {
+-        if (localViewTransition || localViews.state.value.active) return
++        if (imageOutputs.state.value.blocksInput || localViewTransition || localViews.state.value.active) return
+         val view = connection?.peerViewport?.takeIf { it.documentId == document?.documentId && it.corners.size == 4 } ?: return
+         val first = view.corners[0]; val next = view.corners[1]
+         val width = hypot(next.x - first.x, next.y - first.y)
+@@ -843,7 +871,7 @@
+         if (!cameraFitted) fit() else publish()
+     }
+     fun fit() {
+-        if (localViewTransition) return
++        if (imageOutputs.state.value.blocksInput || localViewTransition) return
+         val doc = document ?: return
+         invalidateViewCheck(); followPeer = false
+         cancelTool()
+@@ -857,7 +885,7 @@
+     private fun publish() {
+         ai.changed()
+         val doc = document ?: return
+-        project?.let { documentControls.bind(it, doc, epoch, refreshAdmission.capture().sequence); selections.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera); erasers.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera) }
++        project?.let { imageOutputs.bind(it, doc, epoch, refreshAdmission.capture().sequence); documentControls.bind(it, doc, epoch, refreshAdmission.capture().sequence); selections.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera); erasers.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera) }
+         if (camera.viewportWidth <= 1 || camera.viewportHeight <= 1) return
+         localViews.remember(camera, epoch, doc.documentId)
+         aiResults.request()
+@@ -915,7 +943,7 @@
+                                    val rotation: ObjectRotationContact? = null)
+ 
+     override fun beginTool(sample: PenSample, capabilities: StylusCapabilities) {
+-        if (localViewTransition || localViews.state.value.active || documentControls.state.value.active || documentControls.state.value.busy || documentControls.state.value.retry != null) return
++        if (imageOutputs.state.value.blocksInput || localViewTransition || localViews.state.value.active || documentControls.state.value.active || documentControls.state.value.busy || documentControls.state.value.retry != null) return
+         if(ai.state.value.open||!aiResultReady())return
+         cancelTool(); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
+         if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || background == null || strokes.size >= 3) {
+@@ -1301,7 +1329,7 @@
+     override fun undo() = undoRedo(false)
+     override fun redo() = undoRedo(true)
+     private fun undoRedo(redo: Boolean) {
+-        if (busy) return
++        if (busy || imageOutputs.state.value.blocksInput) return
+         cancelTool()
+         if (pending != 0) { message = "Wait for the current edit to finish before undo or redo."; return }
+         val current = project ?: return
+@@ -1315,7 +1343,7 @@
+     }
+ 
+     override fun pan(dx: Double, dy: Double) {
+-        if (localViewTransition || localViews.state.value.active || gesture != null) return
++        if (imageOutputs.state.value.blocksInput || localViewTransition || localViews.state.value.active || gesture != null) return
+         followPeer = false
+         invalidateViewCheck()
+         val middle = Point(camera.viewportWidth / 2, camera.viewportHeight / 2)
+@@ -1323,7 +1351,7 @@
+         camera = camera.copy(center = next); publish()
+     }
+     override fun pinch(previousX: Double, previousY: Double, nextX: Double, nextY: Double, scale: Double, radians: Double) {
+-        if (localViewTransition || localViews.state.value.active || gesture != null || !scale.isFinite() || scale <= 0 || !radians.isFinite()) return
++        if (imageOutputs.state.value.blocksInput || localViewTransition || localViews.state.value.active || gesture != null || !scale.isFinite() || scale <= 0 || !radians.isFinite()) return
+         followPeer = false
+         invalidateViewCheck()
+         val anchored = core.mapPoints(camera, true, listOf(Point(previousX, previousY))).single()
+@@ -1336,6 +1364,7 @@
+         camera = next.copy(center = Point(next.center.x + anchored.x - under.x, next.center.y + anchored.y - under.y)); publish()
+     }
+     override fun contextMenu(x: Double, y: Double) {
++        if(imageOutputs.state.value.blocksInput)return
+         selected = scene?.let { EditorDrawing.hit(it, Point(x, y), 8 * density)?.item?.objectId }
+         showContext = true; publish()
+     }
+@@ -1379,8 +1408,9 @@
+     }
+ 
+     private fun exportOptions(doc: DocumentSnapshot, selection: ExportSelection): ExportOptions {
+-        val region = if (selection.viewOnly) viewExportRegion(core.mapPoints(camera, true, listOf(
+-            Point(0.0, 0.0), Point(camera.viewportWidth, 0.0), Point(camera.viewportWidth, camera.viewportHeight), Point(0.0, camera.viewportHeight))), doc.width, doc.height) else null
++        val output=imageOutputs.exportSnapshot(doc) ?: throw IllegalStateException("Wait for committed output settings to load, or reopen Export to retry.")
++        val region = if (selection.viewOnly) imageOutputRegion(output, core.mapPoints(camera, true, listOf(
++            Point(0.0, 0.0), Point(camera.viewportWidth, 0.0), Point(camera.viewportWidth, camera.viewportHeight), Point(0.0, camera.viewportHeight)))) else null
+         require(selection.quality in 1..100)
+         return ExportOptions(doc.documentId, format = selection.encoding.format(selection.quality),
+             marked = selection.marked, region = region, convertToSrgb = selection.convertToSrgb,
+@@ -1438,6 +1468,9 @@
+         if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq || options.documentId != doc.documentId) {
+             exportPreflight = null; checkedExport = null; message = "The project changed. Check the export again."; return
+         }
++        val receiptCheck=exportPreflight ?: return
++        val publicationBinding=WorkflowBinding(receiptCheck.revision.projectId,options.documentId,
++            receiptCheck.revision.hostSeq,receiptCheck.revision.stateHash)
+         if (doc.bitDepth > 8u && options.format == ImageFormat.Png8 && !options.allowDepthReduction) {
+             message = "Choose PNG 16-bit or explicitly allow reduction to 8-bit."; return
+         }
+@@ -1447,14 +1480,15 @@
+             try {
+                 val result = mutations.withLock {
+                     if (sharing) {
+-                        val shared = repository.sharePng(current, options) { transferLabel = it }
++                        val shared = repository.sharePng(current, options, publicationBinding) { transferLabel = it }
+                         shareLease = shared.first; shareUri = shared.first.uri
+                         shared.second
+-                    } else repository.exportImage(checkNotNull(uri), current, options) { transferLabel = it }
+-                }
++                    } else repository.exportImage(checkNotNull(uri), current, options, publicationBinding) { transferLabel = it }
++                }
++                if(result.revision.projectId!=receiptCheck.revision.projectId || result.revision.hostSeq!=receiptCheck.revision.hostSeq ||
++                    result.revision.stateHash!=receiptCheck.revision.stateHash)throw IllegalStateException("The completed export has a different revision. Check it again.")
+                 exportReady = ExportReady(result.revision.projectId, doc.documentId, result.revision.stateHash,
+-                    result.revision.hostSeq, options.region?.width?.toUInt() ?: doc.width,
+-                    options.region?.height?.toUInt() ?: doc.height, result.blake3)
++                    result.revision.hostSeq, receiptCheck.width, receiptCheck.height, result.blake3)
+                 message = "${exportSelection.encoding.label} exported at revision ${result.revision.hostSeq}. The original image is unchanged."
+             } catch (cancel: CancellationException) {
+                 message = "Export canceled. The original and saved edits are unchanged."
+@@ -1512,6 +1546,7 @@
+     override fun onCleared() {
+         disposing = true
+         importReadiness.close()
++        imageOutputs.cancel()
+         incomingJob?.cancel()
+         transferJob?.cancel()
+         cancelTool(); diagnostics.background(); previewJob?.cancel(); cancelNative(previewHandle)
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/ProjectRepository.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/ProjectRepository.kt
+@@ -116,11 +116,11 @@
+         return core.create(CreateProject(checkedPath(project), project, core.newId(now.toULong()), core.newId(now.toULong()), deviceId, title, bytes, now))
+     }
+ 
+-    suspend fun exportImage(uri: Uri, project: WorkbenchProject, options: ExportOptions, stage: (String) -> Unit): FileExportResult =
+-        rasterTransfers.export(uri, project as? WorkbenchStreamingProject ?: throw CoreFailure(CoreFailureKind.Unsupported), options, stage)
++    suspend fun exportImage(uri: Uri, project: WorkbenchProject, options: ExportOptions, expected: WorkflowBinding, stage: (String) -> Unit): FileExportResult =
++        rasterTransfers.exportBound(uri, project as? WorkbenchStreamingProject ?: throw CoreFailure(CoreFailureKind.Unsupported), options, expected, stage)
+ 
+-    suspend fun sharePng(project: WorkbenchProject, options: ExportOptions, stage: (String) -> Unit): Pair<MediaHandoff.Lease, FileExportResult> =
+-        rasterTransfers.sharePng(project as? WorkbenchStreamingProject ?: throw CoreFailure(CoreFailureKind.Unsupported), options, stage)
++    suspend fun sharePng(project: WorkbenchProject, options: ExportOptions, expected: WorkflowBinding, stage: (String) -> Unit): Pair<MediaHandoff.Lease, FileExportResult> =
++        rasterTransfers.sharePngBound(project as? WorkbenchStreamingProject ?: throw CoreFailure(CoreFailureKind.Unsupported), options, expected, stage)
+ 
+     suspend fun preflight(project: WorkbenchProject, options: ExportOptions): FilePreflight =
+         rasterTransfers.preflight(project as? WorkbenchFileTransfers ?: throw CoreFailure(CoreFailureKind.Unsupported), options)
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/RasterTransfers.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/RasterTransfers.kt
+@@ -90,7 +90,13 @@
+         }
+     }
+ 
+-    suspend fun export(uri: Uri, project: WorkbenchStreamingProject, options: ExportOptions, stage: (String) -> Unit): FileExportResult {
++    suspend fun export(uri: Uri, project: WorkbenchStreamingProject, options: ExportOptions, stage: (String) -> Unit): FileExportResult =
++        exportOwned(uri, project, options, null, stage)
++
++    suspend fun exportBound(uri: Uri, project: WorkbenchStreamingProject, options: ExportOptions, expected: WorkflowBinding, stage: (String) -> Unit): FileExportResult =
++        exportOwned(uri, project, options, expected, stage)
++
++    private suspend fun exportOwned(uri: Uri, project: WorkbenchStreamingProject, options: ExportOptions, expected: WorkflowBinding?, stage: (String) -> Unit): FileExportResult {
+         require(uri.scheme == "content") { "The export destination must be a document provider." }
+         val work = Workspace(context.cacheDir)
+         var published = false
+@@ -100,6 +106,10 @@
+             val output = work.file(outputName(options.format))
+             val request = FileExportOptions(options, output.absolutePath, work.root.absolutePath)
+             val result = if (project is WorkbenchFileTransfers) project.exportTransfer(request) else project.exportFile(request)
++            // Receipt validation happens while bytes are still app-private,
++            // before opening/truncating the owner-selected provider destination.
++            expected?.let { verifyImageOutputPublication(it, options, result) }
++            coroutineContext.ensureActive()
+             stage("Saving the exported image…")
+             withContext(Dispatchers.IO) {
+                 require(output.isFile && output.length().toULong() == result.encodedBytes) { "The completed export did not match its native receipt" }
+@@ -191,7 +201,13 @@
+         } finally { if (!complete) discardDestination(uri) }
+     }
+ 
+-    suspend fun sharePng(project: WorkbenchStreamingProject, options: ExportOptions, stage: (String) -> Unit): Pair<MediaHandoff.Lease, FileExportResult> {
++    suspend fun sharePng(project: WorkbenchStreamingProject, options: ExportOptions, stage: (String) -> Unit): Pair<MediaHandoff.Lease, FileExportResult> =
++        shareOwned(project, options, null, stage)
++
++    suspend fun sharePngBound(project: WorkbenchStreamingProject, options: ExportOptions, expected: WorkflowBinding, stage: (String) -> Unit): Pair<MediaHandoff.Lease, FileExportResult> =
++        shareOwned(project, options, expected, stage)
++
++    private suspend fun shareOwned(project: WorkbenchStreamingProject, options: ExportOptions, expected: WorkflowBinding?, stage: (String) -> Unit): Pair<MediaHandoff.Lease, FileExportResult> {
+         require(options.format == ImageFormat.Png8 || options.format == ImageFormat.Png16)
+         val work = Workspace(context.cacheDir)
+         val handoff = handoffFactory(context)
+@@ -203,6 +219,9 @@
+             val output = work.file("output.png")
+             val request = FileExportOptions(options, output.absolutePath, work.root.absolutePath)
+             val result = if (project is WorkbenchFileTransfers) project.exportTransfer(request) else project.exportFile(request)
++            // Do not create a grantable URI or a share lease for stale pixels.
++            expected?.let { verifyImageOutputPublication(it, options, result) }
++            coroutineContext.ensureActive()
+             withContext(Dispatchers.IO) {
+                 require(output.isFile && output.length().toULong() == result.encodedBytes)
+                 lease = handoff.create(camera = false)
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/ExportDialog.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/ExportDialog.kt
+@@ -4,7 +4,9 @@
+ import androidx.compose.foundation.rememberScrollState
+ import androidx.compose.foundation.verticalScroll
+ import androidx.compose.material.*
+-import androidx.compose.runtime.Composable
++import androidx.compose.runtime.*
++import com.visualworkbench.shared.outputWidth
++import com.visualworkbench.shared.outputHeight
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.unit.dp
+@@ -14,13 +16,19 @@
+ @Composable
+ internal fun ExportDialog(editor: EditorController, onDismiss: () -> Unit, onSave: () -> Unit, onShare: () -> Unit) {
+     val choice = editor.exportSelection
+-    val enabled = !editor.busy && editor.pending == 0
++    val output by editor.imageOutputs.state.collectAsState()
++    val idle = !editor.busy && editor.pending == 0
++    val committed = editor.document?.let(editor.imageOutputs::exportSnapshot)
++    LaunchedEffect(editor.document?.render?.revision?.stateHash) { editor.imageOutputs.requestExportContext() }
++    val enabled = idle && committed != null && !output.loading
+     val checked = editor.exportPreflight
+-    AlertDialog(onDismissRequest = { if (enabled) onDismiss() }, title = { Text("Export image") }, text = {
++    AlertDialog(onDismissRequest = { if (idle) onDismiss() }, title = { Text("Export image") }, text = {
+         Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
++            committed?.let { Text("Committed output: ${it.outputWidth} × ${it.outputHeight} px · original ${it.sourceWidth} × ${it.sourceHeight} px") }
++                ?: Text(if(output.loading)"Loading committed output settings…" else output.issue ?: "Output settings are unavailable. Close and reopen Export to retry.")
+             Toggle("Include annotations (marked)", choice.marked, enabled) { editor.configureExport(choice.copy(marked = it)) }
+             Toggle("Crop to current view bounds", choice.viewOnly, enabled) { editor.configureExport(choice.copy(viewOnly = it)) }
+-            if (choice.viewOnly) Text("Exports the image-aligned rectangle enclosing the current view, clipped to the original. A rotated view is not a rotated crop.", style = MaterialTheme.typography.caption)
++            if (choice.viewOnly) Text("Maps the current view bounds through the committed crop, quarter-turn and size, then clips to output pixels. Camera rotation encloses a rectangle; it does not change the saved output frame.", style = MaterialTheme.typography.caption)
+             Text("Format", style = MaterialTheme.typography.subtitle2)
+             ExportEncoding.entries.forEach { encoding ->
+                 TextButton(onClick = { editor.configureExport(choice.copy(encoding = encoding)) }, enabled = enabled,
+@@ -51,7 +59,7 @@
+             TextButton(onClick = onShare, enabled = enabled && checked != null && choice.encoding in listOf(ExportEncoding.Png8, ExportEncoding.Png16), modifier = Modifier.heightIn(min = 48.dp)) { Text("Share PNG") }
+             TextButton(onClick = onSave, enabled = enabled && checked != null, modifier = Modifier.heightIn(min = 48.dp)) { Text("Save file") }
+         }
+-    }, dismissButton = { TextButton(onClick = onDismiss, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp)) { Text("Close") } })
++    }, dismissButton = { TextButton(onClick = onDismiss, enabled = idle, modifier = Modifier.heightIn(min = 48.dp)) { Text("Close") } })
+ }
+ 
+ @Composable
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
+@@ -33,7 +33,11 @@
+ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
+     val context = LocalContext.current
+     var showExport by remember { mutableStateOf(false) }
+-    fun exportDialog(value: Boolean) { editor.instructionModal(InstructionFocusModal.ExportDialog, value); showExport = value }
++    fun exportDialog(value: Boolean) {
++        if(value){if(!editor.mayLeaveImageOutput())return;editor.imageOutputs.active(false);editor.imageOutputs.requestExportContext()}
++        else editor.imageOutputs.endExportContext()
++        editor.instructionModal(InstructionFocusModal.ExportDialog, value); showExport = value
++    }
+     // Deliberately not saveable across process death: without its live project
+     // attachment, a returned destination is discarded rather than rebound.
+     var selectionPicker by remember { mutableStateOf<SelectionSaveTicket?>(null) }
+@@ -193,6 +197,8 @@
+             }
+         }
+         AiResultStatus(editor)
++        if(editor.document!=null)Text("Document editing view. Committed crop, resize and tone appear in Image output preview and exports.",
++            Modifier.padding(horizontal=12.dp,vertical=4.dp),style=MaterialTheme.typography.caption)
+         if (editor.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+         editor.transferLabel?.let { label ->
+             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+@@ -247,6 +253,7 @@
+         SelectionControls(editor.selections, editor.selected, onSelectionSave, Modifier.fillMaxWidth())
+         DocumentControlsPanel(editor.documentControls, editor::documentControlId, { editor.selectDocument(it) }, setOfNotNull(editor.selected), editor::documentControls, Modifier.fillMaxWidth())
+         LocalViewsPanel(editor.localViews, editor::localViews, editor::saveLocalView, editor::restoreLocalView, Modifier.fillMaxWidth())
++        ImageOutputPanel(editor.imageOutputs, editor::imageOutput, Modifier.fillMaxWidth())
+         QuickControls(editor.displayedBrush(), editor::brush, { editor.brushDialog(true) },
+             editor.info?.canUndo == true && editor.pending == 0, editor.info?.canRedo == true && editor.pending == 0, editor::undo, editor::redo)
+     }
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopTransfers.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopTransfers.kt
+@@ -61,8 +61,9 @@
+ data class ExportCheck(val request: ExportRequest, val result: FilePreflight)
+ data class ImportRequest(val epoch: Long, val path: Path)
+ 
+-internal fun captureExport(state: EditorState, core: WorkbenchCore): ExportRequest {
++internal fun captureExport(state: EditorState, core: WorkbenchCore, output: ImageOutputSnapshot? = null): ExportRequest {
+     val document = state.document ?: throw HandoffFailure("Open a document before exporting.")
++    if(output!=null && !output.matches(document))throw HandoffFailure("The committed output settings changed. Reload them before exporting.")
+     val settings = state.exportSettings
+     val candidate = when (settings.area) {
+         ExportArea.Full -> null
+@@ -77,10 +78,15 @@
+             Rect(x, y, points.maxOf { it.x } - x, points.maxOf { it.y } - y)
+         }
+     }
+-    val region = candidate?.let { clippedExportRect(it, document.width, document.height) }
++    val region = candidate?.let { rect ->
++        if(output==null)clippedExportRect(rect,document.width,document.height)
++        else try { imageOutputRegion(output,listOf(Point(rect.x,rect.y),Point(rect.x+rect.width,rect.y),
++            Point(rect.x+rect.width,rect.y+rect.height),Point(rect.x,rect.y+rect.height))) }
++        catch(_:WorkflowFailure){throw HandoffFailure("The selected region does not intersect the committed output.")}
++    }
+     val info = document.render.revision
+     return ExportRequest(state.projectEpoch, info.projectId, document.documentId, info.hostSeq, info.stateHash,
+-        settings, region, region?.width?.toUInt() ?: document.width, region?.height?.toUInt() ?: document.height,
++        settings, region, region?.width?.toUInt() ?: output?.outputWidth ?: document.width, region?.height?.toUInt() ?: output?.outputHeight ?: document.height,
+         if (settings.area == ExportArea.Selection) state.selected.toSet() else emptySet(),
+         state.view.camera.takeIf { settings.area == ExportArea.View })
+ }
+@@ -126,12 +132,9 @@
+     if (!request.matches(result.revision) || result.metadataJson.length > 65536 ||
+         !Regex("[0-9a-f]{64}").matches(result.blake3) || result.encodedBytes == 0uL)
+         throw HandoffFailure("The export receipt does not match the captured revision.")
+-    fun string(key: String): String = Regex("\"$key\"\\s*:\\s*\"([^\"]*)\"").findAll(result.metadataJson)
+-        .toList().singleOrNull()?.groupValues?.get(1) ?: throw HandoffFailure("The export receipt is incomplete.")
+-    fun number(key: String): UInt = Regex("\"$key\"\\s*:\\s*([0-9]+)(?=\\s*[,}])").findAll(result.metadataJson)
+-        .toList().singleOrNull()?.groupValues?.get(1)?.toUIntOrNull() ?: throw HandoffFailure("The export dimensions are missing.")
+-    val revision = string("revision"); val source = string("source_asset")
+-    val width = number("output_width"); val height = number("output_height")
++    val fields=imageOutputReceiptFields(result.metadataJson)
++    val revision=fields.revision;val source=fields.source
++    val width=fields.width;val height=fields.height
+     if (revision != request.revision || !Regex("[0-9a-f]{64}").matches(source) || width != request.width || height != request.height)
+         throw HandoffFailure("The completed export has different source/revision or dimensions. Prepare it again.")
+     return CompletedExport(request, result.encodedBytes, result.blake3, source, revision, width, height)
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
+@@ -63,7 +63,7 @@
+     internal fun aiResultFrame(): AiResultFrame<AiBitmap>? = aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),mutable.value.view.camera,aiPoses())}
+     internal fun aiResultReady(): Boolean = mutable.value.document?.render?.items?.none{it.shape is Shape.Result} != false || aiResultFrame()!=null
+     fun openAi() {
+-        if(localViewTransition||localViews.state.value.active||documentControls.state.value.active||documentControls.state.value.busy||documentControls.state.value.retry!=null)return
++        if(imageOutputs.state.value.blocksInput||localViewTransition||localViews.state.value.active||documentControls.state.value.active||documentControls.state.value.busy||documentControls.state.value.retry!=null)return
+         val current=mutable.value
+         if(closing||current.busy||current.document==null||current.textAnchor!=null||current.exportOpen||current.pasteOpen)return
+         if(instructionEditor.hasUnsaved()){report("Save or discard the instruction draft before opening AI review.");return}
+@@ -90,7 +90,7 @@
+         { refresh() }, InstructionEntryMethod.PcKeyboard, localFocused = ::localInstructionFocused)
+     val semanticEditor = SemanticEditor(scope, edits,
+         { val p = project; val d = mutable.value.document; if (p != null && d != null && !closing) InstructionAttachment(p, d) else null },
+-        { val s = mutable.value; !closing && !s.busy && !ai.state.value.open && !documentControls.state.value.active && !localViews.state.value.active && !localViewTransition && queued == 0 && drag == null && ink == null &&
++        { val s = mutable.value; !closing && !s.busy && !ai.state.value.open && !documentControls.state.value.active && !localViews.state.value.active && !localViewTransition && !imageOutputs.state.value.blocksInput && queued == 0 && drag == null && ink == null &&
+             !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy && instructionAdmission.allows(s.textAnchor != null, s.exportOpen, s.pasteOpen) },
+         { p -> val info = p.info(); val now = System.currentTimeMillis(); WorkflowMetadata(core.newId(now.toULong()), deviceId, info.nextLamport, now) },
+         { refresh() },
+@@ -100,7 +100,7 @@
+     val instructionFocus = InstructionFocusController(scope, instructionEditor,
+         { val p = project; val d = mutable.value.document; if (p != null && d != null && !closing) InstructionAttachment(p, d) else null },
+         { !closing && !mutable.value.busy && !semanticEditor.state.value.busy && drag == null && ink == null && widthGesture == null &&
+-            !ai.state.value.open && !documentControls.state.value.active && !localViews.state.value.active && !localViewTransition && instructionAdmission.allows(mutable.value.textAnchor != null, mutable.value.exportOpen, mutable.value.pasteOpen) },
++            !ai.state.value.open && !documentControls.state.value.active && !localViews.state.value.active && !localViewTransition && !imageOutputs.state.value.blocksInput && instructionAdmission.allows(mutable.value.textAnchor != null, mutable.value.exportOpen, mutable.value.pasteOpen) },
+         { id, peer -> update { it.copy(selected = setOf(id), canvasFocused = if (peer) false else it.canvasFocused) } },
+         selectedObject = { mutable.value.selected.singleOrNull() })
+     private fun localInstructionFocused(field: InstructionField) { instructionFocus.localField(field) }
+@@ -122,7 +122,7 @@
+     fun localViews(value: Boolean) {
+         if (value) {
+             val s = mutable.value
+-            if (closing || s.busy || s.document == null || localViewTransition || ai.state.value.open || documentControls.state.value.active ||
++            if (closing || s.busy || s.document == null || imageOutputs.state.value.blocksInput || localViewTransition || ai.state.value.open || documentControls.state.value.active ||
+                 semanticEditor.state.value.busy || instructionEditor.state.value.busy || s.textAnchor != null || s.exportOpen || s.pasteOpen) return
+             if (!mayCloseInstructions()) return
+             cancelInput(); update { it.copy(view = it.view.copy(followPeer = false)) }
+@@ -131,12 +131,12 @@
+     }
+     fun saveLocalView(binding: LocalViewsBinding, name: String) {
+         val s = mutable.value; val doc = s.document ?: return
+-        if (closing || s.busy || localViewTransition || localViews.state.value.binding != binding || doc.documentId != binding.documentId || doc.render.revision.projectId != binding.projectId) return
++        if (closing || s.busy || imageOutputs.state.value.blocksInput || localViewTransition || localViews.state.value.binding != binding || doc.documentId != binding.documentId || doc.render.revision.projectId != binding.projectId) return
+         localViews.addBookmark(binding, name, s.view.camera)
+     }
+     fun restoreLocalView(binding: LocalViewsBinding, id: String) {
+         val s = mutable.value; val doc = s.document ?: return
+-        if (closing || s.busy || localViewTransition || doc.documentId != binding.documentId || doc.render.revision.projectId != binding.projectId) return
++        if (closing || s.busy || imageOutputs.state.value.blocksInput || localViewTransition || doc.documentId != binding.documentId || doc.render.revision.projectId != binding.projectId) return
+         val value = localViews.restoreBookmark(binding, id, s.view.camera, generation) ?: return
+         cancelInput(); localViews.active(false); instructionInteractionChanged()
+         update { it.copy(view = it.view.copy(camera = value, followPeer = false)) }
+@@ -160,15 +160,39 @@
+             return true
+         } finally { localViewTransition = false }
+     }
++    val imageOutputs=ImageOutputInteraction(scope,edits,{core.newId(System.currentTimeMillis().toULong())},
++        { current -> val next=current.info();val now=System.currentTimeMillis();WorkflowMetadata(core.newId(now.toULong()),deviceId,next.nextLamport,now) },
++        { !closing && !mutable.value.busy && queued==0 && ink==null && drag==null && !ai.state.value.open &&
++            !documentControls.state.value.active && !localViews.state.value.active && !localViewTransition &&
++            !semanticEditor.state.value.busy && !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy &&
++            instructionAdmission.allows(mutable.value.textAnchor!=null,mutable.value.exportOpen,mutable.value.pasteOpen) },
++        { if(!closing && project!=null)refresh() })
++    fun imageOutput(value:Boolean) {
++        if(value) {
++            val s=mutable.value
++            if(closing || s.busy || s.document==null || localViewTransition || localViews.state.value.active ||
++                documentControls.state.value.active || ai.state.value.open || semanticEditor.state.value.busy ||
++                s.textAnchor!=null || s.exportOpen || s.pasteOpen)return
++            if(!mayCloseInstructions())return
++            cancelInput()
++        }
++        if(!imageOutputs.active(value))report("Apply or discard private output values, and resolve the retained edit before closing.")
++        instructionInteractionChanged()
++    }
++    fun mayLeaveImageOutput():Boolean {
++        if(imageOutputs.state.value.mayLeave)return true
++        report("Apply or discard private output values, and retry or discard the retained edit before leaving.")
++        imageOutputs.active(true);instructionInteractionChanged();return false
++    }
+     private val documentCameras = LinkedHashMap<String, Camera>()
+     val documentControls = DocumentControlsInteraction(scope, edits,
+         { current -> val next=current.info(); val now=System.currentTimeMillis(); WorkflowMetadata(core.newId(now.toULong()),deviceId,next.nextLamport,now) },
+-        { !closing && !mutable.value.busy && ink==null && drag==null && !ai.state.value.open && !localViews.state.value.active && !localViewTransition && !semanticEditor.state.value.busy &&
++        { !closing && !mutable.value.busy && ink==null && drag==null && !ai.state.value.open && !localViews.state.value.active && !localViewTransition && !imageOutputs.state.value.blocksInput && !semanticEditor.state.value.busy &&
+             !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy && instructionAdmission.allows(mutable.value.textAnchor!=null,mutable.value.exportOpen,mutable.value.pasteOpen) },
+         { if(!closing && project!=null) refresh() })
+     fun documentControls(value: Boolean) {
+         if(value) {
+-            if(localViewTransition||localViews.state.value.active||ai.state.value.open||semanticEditor.state.value.busy)return
++            if(imageOutputs.state.value.blocksInput||localViewTransition||localViews.state.value.active||ai.state.value.open||semanticEditor.state.value.busy)return
+             val state=mutable.value
+             if(closing || state.busy || state.document==null || state.textAnchor!=null || state.exportOpen || state.pasteOpen)return
+             if(!mayCloseInstructions())return
+@@ -178,6 +202,7 @@
+         instructionInteractionChanged()
+     }
+     fun mayLeaveDocumentControls(): Boolean {
++        if(!mayLeaveImageOutput())return false
+         if(!mayCloseAi()){documentControls.active(false);instructionInteractionChanged();return false}
+         if(documentControls.state.value.mayLeave)return true
+         report("Finish or cancel the document edit, then retry or discard its retained handle before switching documents or projects.")
+@@ -197,7 +222,7 @@
+                 if(old.documentId !in documentCameras && documentCameras.size>=128){report("This open project already retains 128 document views. No view was discarded.");return@task}
+                 // Keep the project/link; retire every document-borrowed owner.
+                 retireAi()
+-                documentControls.active(false);documentControls.detach()
++                imageOutputs.active(false);imageOutputs.detach();documentControls.active(false);documentControls.detach()
+                 erasers.detach();selections.detach();semanticEditor.detach();instructionEditor.detach();discardExport()
+                 documentCameras[old.documentId]=mutable.value.view.camera
+                 stopLocalViews()
+@@ -208,7 +233,7 @@
+                     exportOpen=false,exportCheck=null,exportReceipt=null,
+                     view=value.view.copy(peer=null,camera=saved?.copy(viewportWidth=value.view.camera.viewportWidth,viewportHeight=value.view.camera.viewportHeight)?:value.view.camera)) }
+                 if(!enterLocalViews(current,next)&&saved==null)fit()
+-                documentControls.bind(current,next,generation,changeSequence)
++                imageOutputs.bind(current,next,generation,changeSequence);documentControls.bind(current,next,generation,changeSequence)
+                 selections.bind(current,next,generation,changeSequence,mutable.value.view.camera);erasers.bind(current,next,generation,changeSequence,mutable.value.view.camera)
+                 aiRetiring=false;ai.changed();aiResults.request();instructionFocus.localSelection(null);instructionFocus.revisionChanged()
+                 refresh()
+@@ -268,8 +293,8 @@
+     }
+     private fun transfer(epoch:Long,block:suspend()->Unit):Job?{if(transferJob?.isActive==true){report("A transfer is already running. Finish or cancel it first.");return null};val job=task(epoch,block);transferJob=job;return job}
+     private suspend fun discardExport(){preparedDrag?.second?.close();preparedDrag=null;val prior=cachedExport;cachedExport=null;update{it.copy(exportReceipt=null,exportCheck=null,dragPrepared=false)};prior?.workspace?.close()}
+-    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!mayLeaveDocumentControls()||!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();documentControls.detach();stopLocalViews();documentCameras.clear();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};documentControls.bind(value,snapshot,generation,changeSequence);selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();if(!enterLocalViews(value,snapshot))fit();loadBackground();refreshRole(value,generation)
+-        changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){documentControls.observe(event.sequence);erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()else mutable.value.document?.let{documentControls.bind(value,it,generation,changeSequence)}}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
++    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!mayLeaveDocumentControls()||!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();imageOutputs.detach();documentControls.detach();stopLocalViews();documentCameras.clear();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};imageOutputs.bind(value,snapshot,generation,changeSequence);documentControls.bind(value,snapshot,generation,changeSequence);selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();if(!enterLocalViews(value,snapshot))fit();loadBackground();refreshRole(value,generation)
++        changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){imageOutputs.observe(event.sequence);documentControls.observe(event.sequence);erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()else mutable.value.document?.let{imageOutputs.bind(value,it,generation,changeSequence);documentControls.bind(value,it,generation,changeSequence)}}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
+         }finally{withContext(NonCancellable){
+             try { if(!adopted)value.close() }
+             finally { if(instructionSeal&&!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
+@@ -316,10 +341,10 @@
+     fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
+     fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one PNG, JPEG, WebP or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension !in setOf("png","jpg","jpeg","webp","mp4")){report("This drop supports PNG, JPEG, WebP and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
+     fun open(path:Path,epoch:Long=generation){task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
+-    suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();documentControls.detach();stopLocalViews();documentCameras.clear();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
++    suspend fun close(){closing=true;imageOutputs.cancel();transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();imageOutputs.close();documentControls.detach();stopLocalViews();documentCameras.clear();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
+     fun closeProject(){if(!mayLeaveDocumentControls()||!mayCloseAi())return;if(!mayCloseInstructions())return;cancelInput();sessionWork?.cancel();task(generation){
+         if(!mayLeaveDocumentControls()||!sealInstructionsForClose())return@task
+-        try { live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();documentControls.detach();stopLocalViews();documentCameras.clear();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
++        try { live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();imageOutputs.detach();documentControls.detach();stopLocalViews();documentCameras.clear();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
+         finally { if(!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
+     }}
+     private suspend fun refresh(){
+@@ -334,14 +359,14 @@
+         if(currentInfo.hostSeq!=snapshot.render.revision.hostSeq||currentInfo.stateHash!=snapshot.render.revision.stateHash)return
+         when(snapshotDecision(mutable.value.document,snapshot,allowVisibleChange=true)){
+             SnapshotDecision.Stale->return
+-            SnapshotDecision.Duplicate->{documentControls.bind(p,snapshot,generation,changeSequence);selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);return}
++            SnapshotDecision.Duplicate->{imageOutputs.bind(p,snapshot,generation,changeSequence);documentControls.bind(p,snapshot,generation,changeSequence);selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);return}
+             SnapshotDecision.Conflict->{cancelDrag();update{it.copy(canvasReady=false,renderIssue="The same revision returned different content. Reopen the project before editing.")};return}
+             SnapshotDecision.Newer->{
+                 val issue=try{validateDrawing(snapshot);null}catch(error:UnsupportedOperationException){error.message}
+                 cancelDrag();cancelWidth();update{it.copy(document=snapshot,selected=it.selected.intersect(snapshot.render.items.filterNot{item->item.locked}.map{item->item.objectId}.toSet()),preview=emptyMap(),previewStyles=emptyMap(),draft=null,peerFrame=null,exportReceipt=null,exportCheck=null,canvasReady=false,renderIssue=issue)}
+             }
+         }
+-        documentControls.bind(p,snapshot,generation,changeSequence);selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)
++        imageOutputs.bind(p,snapshot,generation,changeSequence);documentControls.bind(p,snapshot,generation,changeSequence);selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)
+         instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh()
+         refreshRole(p,epoch)
+     }
+@@ -358,7 +383,7 @@
+         try{project?.edit(options(binding,gestureId,createdAt),commands)?:error("No project");onCommitted()}catch(error:CoreFailure){if(error.kind==CoreFailureKind.Invalid){refresh();if(mutable.value.document?.binding(generation)!=binding){report("The document changed before this edit could commit. Review it and repeat the gesture.");return false}};throw error}
+         refresh();return true
+     }
+-    private fun edit(commands:List<EditCommand>,binding:RenderBinding?=mutable.value.document?.binding(generation),afterSuccess:()->Unit={}){if(commands.isEmpty()||binding==null)return;task(binding.epoch){if(performEdit(commands,binding))afterSuccess()}}
++    private fun edit(commands:List<EditCommand>,binding:RenderBinding?=mutable.value.document?.binding(generation),afterSuccess:()->Unit={}){if(imageOutputs.state.value.blocksInput||commands.isEmpty()||binding==null)return;task(binding.epoch){if(performEdit(commands,binding))afterSuccess()}}
+     private fun gestureEdit(commands:List<EditCommand>,binding:RenderBinding,preview:GesturePreview?){
+         if(commands.isEmpty()){live.cancelLater(preview?.attachment,preview?.id);return}
+         var settled=false
+@@ -366,20 +391,20 @@
+         if(job==null)live.cancelLater(preview?.attachment,preview?.id)
+         else job.invokeOnCompletion{if(!settled)live.cancelLater(preview?.attachment,preview?.id)}
+     }
+-    private fun editCurrent(build:(DocumentSnapshot,Set<String>)->List<EditCommand>){val selected=mutable.value.selected;val epoch=generation;task(epoch){refresh();val document=mutable.value.document?:return@task;if(mutable.value.renderIssue!=null)return@task;performEdit(build(document,selected),document.binding(epoch))}}
++    private fun editCurrent(build:(DocumentSnapshot,Set<String>)->List<EditCommand>){if(imageOutputs.state.value.blocksInput)return;val selected=mutable.value.selected;val epoch=generation;task(epoch){refresh();val document=mutable.value.document?:return@task;if(mutable.value.renderIssue!=null)return@task;performEdit(build(document,selected),document.binding(epoch))}}
+     internal fun canvasPrepared(binding:RenderBinding){if(geometryMatches(binding,mutable.value))update{val swap=wetCommitted?.let{id->it.document?.render?.items?.any{item->item.objectId==id}}==true;if(swap)wetCommitted=null;it.copy(canvasReady=true,wetStroke=if(swap)null else it.wetStroke)}}
+     internal fun canvasFailed(binding:RenderBinding,message:String){if(mutable.value.document?.binding(generation)==binding){cancelDrag();update{it.copy(canvasReady=false,renderIssue=message)}}}
+     fun canvasFocus(focused:Boolean){update{it.copy(canvasFocused=focused)}}
+     fun tool(value:Tool){cancelInput();erasers.tools.drawing();update{it.copy(tool=value,preview=emptyMap(),draft=null)}}
+     fun viewport(width:Double,height:Double){if(width<=0||height<=0)return;update{it.copy(view=it.view.copy(camera=it.view.camera.copy(viewportWidth=width,viewportHeight=height)))}}
+-    fun fit(){if(localViewTransition||localViews.state.value.active)return;val d=mutable.value.document?:return;update{val c=it.view.camera;it.copy(view=it.view.copy(camera=c.copy(center=Point(d.width.toDouble()/2,d.height.toDouble()/2),scale=minOf(c.viewportWidth/d.width.toDouble(),c.viewportHeight/d.height.toDouble()).coerceAtLeast(0.0001)*0.9,rotation=0.0)))}}
+-    fun actualPixels(){if(localViewTransition||localViews.state.value.active)return;update{it.copy(view=it.view.copy(camera=it.view.camera.copy(scale=1.0)))}}
+-    fun zoom(factor:Double,at:Point?=null){if(localViewTransition||localViews.state.value.active)return;val s=mutable.value;val c=s.view.camera;val anchor=at?:Point(c.viewportWidth/2,c.viewportHeight/2);val before=core.mapPoints(c,true,listOf(anchor)).single();val next=c.copy(scale=(c.scale*factor).coerceIn(0.001,256.0));val after=core.mapPoints(next,true,listOf(anchor)).single();update{it.copy(view=it.view.copy(camera=next.copy(center=Point(next.center.x+before.x-after.x,next.center.y+before.y-after.y))))}}
+-    fun pan(dx:Double,dy:Double){if(localViewTransition||localViews.state.value.active)return;val c=mutable.value.view.camera;val points=core.mapPoints(c,true,listOf(Point(0.0,0.0),Point(dx,dy)));update{it.copy(view=it.view.copy(camera=c.copy(center=Point(c.center.x-points[1].x+points[0].x,c.center.y-points[1].y+points[0].y))))}}
++    fun fit(){if(imageOutputs.state.value.blocksInput||localViewTransition||localViews.state.value.active)return;val d=mutable.value.document?:return;update{val c=it.view.camera;it.copy(view=it.view.copy(camera=c.copy(center=Point(d.width.toDouble()/2,d.height.toDouble()/2),scale=minOf(c.viewportWidth/d.width.toDouble(),c.viewportHeight/d.height.toDouble()).coerceAtLeast(0.0001)*0.9,rotation=0.0)))}}
++    fun actualPixels(){if(imageOutputs.state.value.blocksInput||localViewTransition||localViews.state.value.active)return;update{it.copy(view=it.view.copy(camera=it.view.camera.copy(scale=1.0)))}}
++    fun zoom(factor:Double,at:Point?=null){if(imageOutputs.state.value.blocksInput||localViewTransition||localViews.state.value.active)return;val s=mutable.value;val c=s.view.camera;val anchor=at?:Point(c.viewportWidth/2,c.viewportHeight/2);val before=core.mapPoints(c,true,listOf(anchor)).single();val next=c.copy(scale=(c.scale*factor).coerceIn(0.001,256.0));val after=core.mapPoints(next,true,listOf(anchor)).single();update{it.copy(view=it.view.copy(camera=next.copy(center=Point(next.center.x+before.x-after.x,next.center.y+before.y-after.y))))}}
++    fun pan(dx:Double,dy:Double){if(imageOutputs.state.value.blocksInput||localViewTransition||localViews.state.value.active)return;val c=mutable.value.view.camera;val points=core.mapPoints(c,true,listOf(Point(0.0,0.0),Point(dx,dy)));update{it.copy(view=it.view.copy(camera=c.copy(center=Point(c.center.x-points[1].x+points[0].x,c.center.y-points[1].y+points[0].y))))}}
+     fun select(id:String,extend:Boolean=false){val item=mutable.value.document?.render?.items?.firstOrNull{it.objectId==id}?:return;if(item.locked)return;cancelWidth();update{it.copy(selected=if(extend)it.selected.toggle(id)else setOf(id),color=item.style.rgba,width=item.style.width.coerceIn(.25,256.0))};instructionFocus.localSelection(mutable.value.selected.singleOrNull());if(item.shape is Shape.Marker)instructionEditor.focusObject(id)}
+     fun selectAll(){instructionFocus.localSelection(null);update{it.copy(selected=it.document?.render?.items?.filterNot{item->item.locked}?.map{item->item.objectId}?.toSet()?:emptySet())}}
+     fun clearSelection(){instructionFocus.localSelection(null);cancelInput();update{it.copy(selected=emptySet(),preview=emptyMap(),draft=null,textAnchor=null)}}
+-    fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false){if(localViewTransition||localViews.state.value.active||documentControls.state.value.active||documentControls.state.value.busy||documentControls.state.value.retry!=null)return;if(ai.state.value.open||(!panButton&&mutable.value.tool!=Tool.Pan&&!aiResultReady()))return;val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||s.background==null||(!s.canvasReady&&!panButton&&s.tool!=Tool.Pan)||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||(s.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
++    fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false){if(imageOutputs.state.value.blocksInput||localViewTransition||localViews.state.value.active||documentControls.state.value.active||documentControls.state.value.busy||documentControls.state.value.retry!=null)return;if(ai.state.value.open||(!panButton&&mutable.value.tool!=Tool.Pan&&!aiResultReady()))return;val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||s.background==null||(!s.canvasReady&&!panButton&&s.tool!=Tool.Pan)||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||(s.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
+         if(!pan)when(erasers.tools.route()){
+             EraserInputRoute.Selection->{selectionPointer=selections.interaction.begin(viewPoint,s.view.camera);return}
+             EraserInputRoute.Eraser->{eraserPointer=erasers.interaction.begin(viewPoint,s.view.camera);return}
+@@ -473,10 +498,11 @@
+             else report("Delete numbered markers individually in Instructions so their linked instruction and numbering remain atomic.")
+         } else edit(state.selected.map{EditCommand.Delete(it)})
+     }
+-    fun undo(redo:Boolean){task(generation){cancelDrag();project?.undoRedo(options(),redo)?:error("No project");refresh()}}
++    fun undo(redo:Boolean){if(imageOutputs.state.value.blocksInput)return;task(generation){cancelDrag();project?.undoRedo(options(),redo)?:error("No project");refresh()}}
+     fun nudge(dx:Double,dy:Double){editCurrent{document,selected->document.render.items.filter{it.objectId in selected&&!it.locked}.map{EditCommand.SetTransform(it.objectId,translated(it.transform,dx,dy))}}}
+     fun color(value:UInt){update{it.copy(color=value)};editCurrent{document,selected->document.render.items.filter{it.objectId in selected&&!it.locked}.map{EditCommand.SetStyle(it.objectId,it.style.copy(rgba=value))}}}
+     fun width(value:Double,commit:Boolean){
++        if(imageOutputs.state.value.blocksInput)return
+         val width=value.coerceIn(0.25,256.0);update{it.copy(width=width)}
+         val s=mutable.value;val doc=s.document?:return
+         if(!commit){
+@@ -495,7 +521,7 @@
+     fun commitWidth(){width(mutable.value.width,true)}
+     fun cycleMarker(){val ids=mutable.value.document?.render?.items?.filter{it.shape is Shape.Marker}?.sortedBy{(it.shape as Shape.Marker).number}?.map{it.objectId}.orEmpty();if(ids.isEmpty()){report("No markers in this document.");return};val current=ids.indexOf(mutable.value.selected.firstOrNull());select(ids[(current+1)%ids.size])}
+     fun follow(){if(mutable.value.view.peer==null){report("Peer view is unavailable until an authenticated session is connected.");return};update{it.copy(view=it.view.copy(followPeer=!it.view.followPeer))}}
+-    fun matchPeer(){if(localViewTransition||localViews.state.value.active)return;if(mutable.value.view.peer==null)report("No authenticated peer viewport is available.")else update{it.copy(view=it.view.matchPeer())}}
++    fun matchPeer(){if(imageOutputs.state.value.blocksInput||localViewTransition||localViews.state.value.active)return;if(mutable.value.view.peer==null)report("No authenticated peer viewport is available.")else update{it.copy(view=it.view.matchPeer())}}
+     fun outline(){update{it.copy(view=it.view.copy(showPeerOutline=!it.view.showPeerOutline))}}
+     private fun sessionStatus(value:SessionStatus?){update{s->
+         val peer=value?.peerViewport?.takeIf{it.documentId==s.document?.documentId}
+@@ -529,10 +555,10 @@
+     fun disconnectSession(){cancelInput();task(generation){live.close();update{it.copy(routeWarnings=emptyList())}}}
+     fun cancelSessionWork(){sessionWork?.cancel()}
+     suspend fun disconnectPeer(peer:String){if(mutable.value.sync?.peerDeviceId!=peer)return;cancelInput();edits.withLock{if(mutable.value.sync?.peerDeviceId==peer)live.close()}}
+-    fun showExport(){if(mutable.value.document==null){report("Open a document before exporting.");return};update{it.copy(exportOpen=true)}}
+-    fun dismissExport(){update{it.copy(exportOpen=false)}}
++    fun showExport(){if(!mayLeaveImageOutput())return;if(mutable.value.document==null){report("Open a document before exporting.");return};imageOutputs.active(false);imageOutputs.requestExportContext();update{it.copy(exportOpen=true)}}
++    fun dismissExport(){imageOutputs.endExportContext();update{it.copy(exportOpen=false)}}
+     fun exportSettings(settings:ExportSettings){update{it.copy(exportSettings=settings.copy(quality=settings.quality.coerceIn(1,100)),message=null)}}
+-    fun exportRequest():ExportRequest?=try{captureExport(mutable.value,core)}catch(error:HandoffFailure){report(error.message?:"Export region unavailable.");null}
++    fun exportRequest():ExportRequest?=try{captureImageOutputExport(mutable.value,core,mutable.value.document?.let(imageOutputs::exportSnapshot))}catch(error:HandoffFailure){report(error.message?:"Export region unavailable.");null}
+     private fun requireCurrent(request:ExportRequest){if(!request.matches(mutable.value))throw HandoffFailure("The project, revision, region or export settings changed. Review them and prepare the export again.")}
+     private fun transferApi():WorkbenchFileTransfers=project as? WorkbenchFileTransfers?:throw HandoffFailure("File export is unavailable in this core binding.")
+     private fun fileOptions(request:ExportRequest,workspace:TransferWorkspace)=FileExportOptions(request.options(),workspace.output.toString(),workspace.directory.toString())
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/ExportDialog.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/ExportDialog.kt
+@@ -12,8 +12,10 @@
+ @Composable
+ internal fun ExportDialog(controller: EditorController, state: EditorState, save: (ExportRequest) -> Unit) {
+     val settings = state.exportSettings
+-    val request = remember(state.document, state.projectEpoch, settings, state.selected, state.view.camera) {
+-        runCatching { captureExport(state, controller.core) }.getOrNull()
++    val output by controller.imageOutputs.state.collectAsState()
++    LaunchedEffect(state.document?.render?.revision?.stateHash){controller.imageOutputs.requestExportContext()}
++    val request = remember(state.document, state.projectEpoch, settings, state.selected, state.view.camera, output.snapshot, output.loading) {
++        runCatching { captureImageOutputExport(state, controller.core, state.document?.let(controller.imageOutputs::exportSnapshot)) }.getOrNull()
+     }
+     val enabled = !state.busy && request != null
+     AlertDialog(
+@@ -23,8 +25,8 @@
+             Column(Modifier.width(650.dp).heightIn(max = 620.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                 request?.let {
+                     Text("${it.revision} · ${it.width} × ${it.height} px", style = MaterialTheme.typography.subtitle1)
+-                } ?: Text("Select a region that intersects the image, or choose Full image.")
+-                Text("Exports use the original image at document resolution. Region exports use rectangular pixel bounds.", style = MaterialTheme.typography.caption)
++                } ?: Text(if(output.loading)"Loading committed output settings…" else output.issue ?: "Choose a region intersecting the committed output, or reopen Export to reload settings.")
++                Text("Exports use the committed output crop, quarter-turn, size and tone settings. Originals stay in document coordinates; regions are mapped to output pixel bounds.", style = MaterialTheme.typography.caption)
+                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                     Choice("Content", if (settings.marked) "Marked" else "Clean", listOf("Marked", "Clean"), !state.busy) {
+                         controller.exportSettings(settings.copy(marked = it == "Marked"))
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
+@@ -79,7 +79,7 @@
+         }
+         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
+         Window(onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
+-            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,dialog!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.documentControls.state.value.active||controller.localViews.state.value.active||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
++            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,dialog!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.imageOutputs.state.value.blocksInput||controller.documentControls.state.value.active||controller.localViews.state.value.active||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
+             fun file(command:Command){controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,command.label,FileDialog.LOAD)
+                 try{chooser.directory=(if(command==Command.Import)documents else location.path).toString();if(command==Command.Open)chooser.file="project.sqlite";chooser.isVisible=true
+                     val filename=chooser.file?:return;val chosen=Path.of(chooser.directory,filename)
+@@ -162,6 +162,8 @@
+             commandButton(Command.Import,action);commandButton(Command.Undo,action,enabled=editor.document?.render?.revision?.canUndo==true);commandButton(Command.Redo,action,enabled=editor.document?.render?.revision?.canRedo==true);commandButton(Command.Export,action,enabled=editor.document!=null)
+         }
+         AiResultStatus(controller)
++        if(editor.document!=null)Text("Document editing view. Committed crop, resize and tone appear in Image output preview and exports.",
++            Modifier.padding(horizontal=12.dp,vertical=4.dp),style=MaterialTheme.typography.caption)
+         Row(Modifier.weight(1f)){
+             Column(Modifier.width(178.dp).fillMaxHeight().background(Color(0xff141e29)).padding(12.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                 Text("TOOLS",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc));for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout))commandButton(c,action,Modifier.fillMaxWidth(),selected=c.name==editor.tool.name&&!eraserState.active&&!selectionState.active)
+@@ -169,6 +171,7 @@
+                 SelectionPanel(controller.selections,editor.selected.singleOrNull(),saveSelection,Modifier.fillMaxWidth())
+                 DocumentControlsPanel(controller.documentControls,controller::documentControlId,{controller.selectDocument(it)},editor.selected,controller::documentControls,Modifier.fillMaxWidth())
+                 LocalViewsPanel(controller.localViews,controller::localViews,controller::saveLocalView,controller::restoreLocalView,Modifier.fillMaxWidth())
++                ImageOutputPanel(controller.imageOutputs,controller::imageOutput,Modifier.fillMaxWidth())
+                 Spacer(Modifier.height(18.dp));Text("LAYERS & OBJECTS",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc))
+                 editor.document?.layers?.forEach{layer->Text(layer.name,Modifier.padding(top=8.dp),fontWeight=FontWeight.Medium);editor.document?.render?.items?.filter{it.layerId==layer.id}?.forEach{item->Text(item.shape.javaClass.simpleName,Modifier.fillMaxWidth().clickable(enabled=!item.locked){controller.select(item.objectId)}.background(if(item.objectId in editor.selected)Color(0xff294a49)else Color.Transparent).padding(8.dp),style=MaterialTheme.typography.body2)}}
+             }

@@ -1,0 +1,125 @@
+package com.visualworkbench.android
+
+import android.app.Application
+import android.graphics.Bitmap
+import android.view.MotionEvent
+import androidx.lifecycle.ViewModelStore
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.visualworkbench.android.editor.EditorController
+import com.visualworkbench.android.input.CanvasGestureRouter
+import com.visualworkbench.android.input.PenSample
+import com.visualworkbench.android.input.PointerFrame
+import com.visualworkbench.android.input.PointerPacket
+import com.visualworkbench.android.input.PointerTool
+import com.visualworkbench.android.input.StylusCapabilities
+import com.visualworkbench.shared.*
+import kotlinx.coroutines.*
+import org.junit.Assert.*
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.io.ByteArrayOutputStream
+import java.io.File
+
+/** Real router -> EditorController -> shared interaction -> native project.
+ * Synthetic contacts only; this does not establish physical pen behavior. */
+@RunWith(AndroidJUnit4::class)
+class PolygonEditorInstrumentedTest {
+    @Test fun separateDownUpContactsKeepVerticesAndFinishPublishesOneUndoableTransaction() = runBlocking {
+        fixture { editor, router ->
+            val before = withContext(Dispatchers.Main) { checkNotNull(editor.info).stateHash }
+            withContext(Dispatchers.Main) {
+                tap(router, 30.0, 30.0, 100)
+                tap(router, 90.0, 30.0, 200)
+                tap(router, 60.0, 90.0, 300)
+                assertEquals(3, editor.selections.state.value.draft?.points?.size)
+                assertEquals(before, editor.info?.stateHash)
+                assertTrue(editor.selections.interaction.finishPolygon())
+                assertFalse(editor.selections.interaction.finishPolygon())
+            }
+            waitUntil { !editor.selections.state.value.busy && editor.selections.state.value.selection != null && editor.info?.stateHash != before }
+            withContext(Dispatchers.Main) {
+                assertEquals(1uL, editor.info?.hostSeq)
+                assertNull(editor.selections.state.value.draft)
+                editor.undo()
+            }
+            waitUntil { editor.pending == 0 && editor.info?.stateHash == before }
+        }
+    }
+
+    @Test fun canceledContactAndChangedViewportCannotReuseEarlierPolygonVertices() = runBlocking {
+        fixture { editor, router ->
+            withContext(Dispatchers.Main) {
+                val before = editor.info?.stateHash
+                tap(router, 30.0, 30.0, 100)
+                tap(router, 90.0, 30.0, 200)
+                router.accept(packet(MotionEvent.ACTION_DOWN, 60.0, 90.0, 300))
+                router.accept(packet(MotionEvent.ACTION_CANCEL, 60.0, 90.0, 301, canceled = true))
+                assertNull(editor.selections.state.value.draft)
+                assertFalse(editor.selections.interaction.finishPolygon())
+                tap(router, 30.0, 30.0, 400)
+                tap(router, 90.0, 30.0, 500)
+                editor.pan(8.0, 0.0)
+                assertNull(editor.selections.state.value.draft)
+                assertFalse(editor.selections.interaction.finishPolygon())
+                tap(router, 60.0, 90.0, 600)
+                assertEquals(1, editor.selections.state.value.draft?.points?.size)
+                assertFalse(editor.selections.interaction.finishPolygon())
+                editor.cancelTool()
+                assertNull(editor.selections.state.value.draft)
+                assertEquals(before, editor.info?.stateHash)
+            }
+        }
+    }
+
+    private suspend fun fixture(block: suspend (EditorController, CanvasGestureRouter) -> Unit) {
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as Application
+        val actual = workbenchCore()
+        val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
+        val source = try {
+            bitmap.eraseColor(android.graphics.Color.WHITE)
+            ByteArrayOutputStream().also { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }.toByteArray()
+        } finally { bitmap.recycle() }
+        var ownedPath: File? = null
+        val core = object : WorkbenchCore by actual {
+            override suspend fun create(options: CreateProject): WorkbenchProject {
+                ownedPath = File(options.path).canonicalFile
+                return actual.create(options.copy(source = source))
+            }
+        }
+        val store = ViewModelStore()
+        val editor = withContext(Dispatchers.Main) { EditorController(app, core).also { store.put("polygon-contact", it) } }
+        try {
+            waitUntil { !editor.busy }
+            withContext(Dispatchers.Main) { editor.viewport(128, 128, 1f); editor.newCanvas() }
+            waitUntil { !editor.busy && editor.scene?.background != null }
+            withContext(Dispatchers.Main) { editor.selections.interaction.tool(SelectionTool.Polygon) }
+            waitUntil { editor.selections.state.value.canDraw }
+            block(editor, CanvasGestureRouter(editor, 4.0))
+        } finally {
+            // Only the exact project created by this fixture is removed, and
+            // only after ViewModel/native ownership has completely settled.
+            withContext(NonCancellable) {
+                withContext(Dispatchers.Main) { store.clear() }
+                withTimeout(15_000) { checkNotNull(editor.scope.coroutineContext[Job]).join() }
+                ownedPath?.let { owned ->
+                    assertEquals(File(app.filesDir, "projects").canonicalFile, owned.parentFile)
+                    assertTrue(owned.name.matches(Regex("[0-9a-fA-F-]{36}")))
+                    assertTrue(!owned.exists() || owned.deleteRecursively())
+                }
+            }
+        }
+    }
+    private suspend fun waitUntil(condition: () -> Boolean) = withTimeout(10_000) {
+        while (!withContext(Dispatchers.Main) { condition() }) delay(10)
+    }
+    private fun tap(router: CanvasGestureRouter, x: Double, y: Double, time: Long) {
+        router.accept(packet(MotionEvent.ACTION_DOWN, x, y, time))
+        router.accept(packet(MotionEvent.ACTION_UP, x, y, time + 1))
+    }
+    private fun packet(action: Int, x: Double, y: Double, time: Long, canceled: Boolean = false): PointerPacket {
+        val sample = PenSample(1, PointerTool.Pen, x, y, time, .5f, .5f, null, null, 0)
+        return PointerPacket(action, 1, canceled, time, listOf(PointerFrame(time, listOf(sample))),
+            StylusCapabilities(true, false, false, false, false, false))
+    }
+}

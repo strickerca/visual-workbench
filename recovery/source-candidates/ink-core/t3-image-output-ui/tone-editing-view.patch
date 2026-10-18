@@ -1,0 +1,26 @@
+--- a/core/crates/vw-ffi/src/image_outputs.rs
++++ b/core/crates/vw-ffi/src/image_outputs.rs
+@@ -1,6 +1,8 @@
+ //! Typed nondestructive output and tonal settings over existing canonical ops.
+ mod plan;
+ mod pixels;
++mod editing_view;
++pub(crate) use editing_view::is_metadata as editing_view_metadata;
+ use crate::{Cancellation,ProjectSession,workflow::*};
+ use std::sync::Arc;
+ use vw_model::{AssetId,Id,Project};
+--- a/core/crates/vw-ffi/src/queries.rs
++++ b/core/crates/vw-ffi/src/queries.rs
+@@ -137,6 +137,12 @@
+             a.state.order_key.cmp(&b.state.order_key).then(aid.cmp(bid))
+         });
+         for (id, object) in objects {
++            // The editing canvas remains in source D space. Only the typed,
++            // strictly admitted global tone metadata belongs in output preview;
++            // unrelated/malformed adjustments retain their unsupported shape.
++            if crate::image_outputs::editing_view_metadata(project, &document, layer_id, id) {
++                continue;
++            }
+             let shape = draw_shape(&object.state, project)?;
+             let (local, contours) = local_bounds(&object.state, project, page, &shape)?;
+             let a = object.state.transform.as_ref().ok_or(CoreError::Invalid)?;

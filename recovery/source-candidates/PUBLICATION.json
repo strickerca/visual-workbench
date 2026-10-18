@@ -1,0 +1,19 @@
+{
+  "status": "source-preservation-only; unbuilt and unpromoted",
+  "base_commit": "67b0af376612f999a0ea2543ad99a98fddd69b22",
+  "source_files": 796,
+  "syntax_parse_checks": {
+    "rust": 405,
+    "toml": 34,
+    "json": 10,
+    "xml": 2
+  },
+  "secret_scan": "corrected source directory scan passed; original false-positive receipt retained privately",
+  "runtime_tests": "not run; prior passing runtime evidence applies to canonical base only",
+  "excluded_generator_scripts": 41,
+  "private_worktrees": "all five fully archived and verified locally, including ignored contents",
+  "main_merge": "not performed; promote coherent slices only after their focused validation",
+  "checkout_bytes": "nested .gitattributes disables text conversion so recorded source SHA-256 values remain reproducible",
+  "picker": "source-reviewed; apply-check passed; Desktop build and normal acceptance pending",
+  "private_paths_and_artifacts": "excluded from this candidate source branch"
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "path": "apps/android/src/test/kotlin/com/visualworkbench/android/editor/OrdinaryFormatSelectionTest.kt",
+    "source_sha256": "2313ab0d4b12c1ad697b64dbc1a11c677aa8f515dc0f18490b9442b4ef829616",
+    "cases": [
+      "bmpAndBothTiffDepthsUseActualFormatMimeAndSuffix",
+      "choosingTiff16DoesNotGrantDepthReductionOrColorConversion"
+    ],
+    "executed": false
+  },
+  {
+    "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/OrdinaryFormatSelectionTest.kt",
+    "source_sha256": "55dc26f0026d83a32e4d3b3c8012afca04c459757b81f6f2e0e43c5439457c55",
+    "cases": [
+      "formatsRetainTheirDepthAndCannotBecomePngClipboardExports",
+      "highDepthTiffDoesNotSilentlyChangeTheExportPolicies"
+    ],
+    "executed": false
+  },
+  {
+    "path": "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/OriginalFormatsTest.kt",
+    "source_sha256": "7920490fef8fb0cc7d2801b2259663252af31555363b1c014774bb070b9fc01f",
+    "cases": [
+      "multipageWarningRemainsVisibleForHighDepthAndUntaggedOriginals",
+      "singlePageAndBmpHaveNoMisleadingMultipageWarning",
+      "mismatchedFullRevisionCannotBeAccepted",
+      "replacementProjectOrMissingDocumentCannotAdoptAnOldNotice",
+      "malformedAssetHashOrUnknownDepthCannotEnterTheUi",
+      "tiffWarningCannotBeAttachedToBmpOrUnknownFormat",
+      "allOrdinaryFormatsAreDistinctAndPreserveTheirRequestedDepth",
+      "latestDisplayTicketInvalidationRejectsAStaleNoticeAdoption"
+    ],
+    "executed": false
+  },
+  {
+    "path": "core/crates/vw-ffi/src/format_seek_tests.rs",
+    "source_sha256": "6bb2d69b872259dc697aaf6610c83e2fdface07554105d1786a3036b3e402010",
+    "cases": [
+      "final_hash_includes_header_rewrites_and_ignores_the_write_order",
+      "final_hash_refuses_cancelled_and_wrong_length_receipts"
+    ],
+    "executed": false
+  },
+  {
+    "path": "core/crates/vw-ffi/tests/ordinary_formats.rs",
+    "source_sha256": "08f35495bd4bb8baa6da0f077fb9d480980917ee76a71f5379368fc57049b3ec",
+    "cases": [
+      "ordinary_memory_bmp_intake_preserves_immutable_encoded_original_and_profile",
+      "ordinary_memory_tiff16_export_keeps_samples_profile_and_revision",
+      "multipage_tiff_memory_notice_precedes_display_consent_and_keeps_original_pages",
+      "file_tiff_intake_persists_first_page_notice_and_original_orientation",
+      "ordinary_attachment_intake_retains_tiff_notice_depth_and_hash",
+      "finalized_file_hash_and_preflight_depth_match_exact_clean_pixels_for_all_formats",
+      "file_overwrite_and_cancellation_keep_existing_bytes_and_remove_owned_temporaries",
+      "original_format_query_refuses_stale_revision_cancellation_and_closed_project"
+    ],
+    "executed": false
+  },
+  {
+    "path": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+    "source_sha256": "f11821ada0e62ceaec84ba975ae14cddbaec18980415fa40babe3d568209f88e",
+    "cases": [
+      "tiff16_preserves_adjacent_samples_and_original_provenance_without_permission",
+      "eight_to_sixteen_promotion_is_exact_and_needs_no_depth_reduction_permission",
+      "bmp_and_tiff8_refuse_silent_depth_reduction_and_record_explicit_permission",
+      "gray_icc_can_label_tiff_but_bmp_requires_explicit_conversion",
+      "format_limits_refuse_oversized_sides_and_preserve_exact_crop_without_scaling",
+      "cancellation_during_depth_promotion_does_not_modify_source",
+      "missing_original_or_insufficient_workspace_refuses_before_preparation",
+      "raster_memory_encoder_refuses_external_formats_and_existing_png_still_roundtrips"
+    ],
+    "executed": false
+  }
+]

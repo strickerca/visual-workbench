@@ -1,0 +1,36 @@
+--- a/core/crates/vw-pdf/Cargo.toml
++++ b/core/crates/vw-pdf/Cargo.toml
+@@ -6,5 +6,10 @@
+ license.workspace = true
+ publish = false
+ 
++[dependencies]
++pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881"] }
++blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
++thiserror = "=2.0.21"
++
+ [lints]
+ workspace = true
+--- a/core/crates/vw-pdf/src/lib.rs
++++ b/core/crates/vw-pdf/src/lib.rs
+@@ -1,2 +1,18 @@
+-//! Future module stub for PDF rendering and redaction.
+-//! Product behavior is implemented and verified by the owning later task.
++//! Bounded PDFium engine for an exclusively owned isolated worker.
++//! Runtime isolation and verified native artifacts are required by the unsafe
++//! constructor; this crate does not claim that input bounds sandbox PDFium.
++
++mod error;
++mod ffi;
++mod geometry;
++mod limits;
++mod overlay;
++mod sink;
++mod types;
++
++pub use error::{PdfError, PdfResult};
++pub use ffi::{PdfDocument, PdfRuntime};
++pub use geometry::{PageGeometry, PdfPoint, PdfRect, PdfTileRequest};
++pub use limits::{PdfCancellation, PdfLimits};
++pub use overlay::{PdfOverlay, validate_overlays};
++pub use types::{PdfCopyKind, PdfDocumentInfo, PdfExportReceipt, PdfGlyph, PdfNotice, PdfPageInfo, PdfTextChunk, PdfTile};

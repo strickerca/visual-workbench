@@ -1,0 +1,79 @@
+[
+  {
+    "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt",
+    "base": "local-views-r2-composed",
+    "bytes": 100816,
+    "sha256": "36546d9f28df9b97c3cf32cbfe8dc28ba3cfb6dddb51b8a75e7a73e2fc81c59c",
+    "patch": "integration.patch"
+  },
+  {
+    "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/ProjectRepository.kt",
+    "base": "root-r2-snapshot",
+    "bytes": 7239,
+    "sha256": "53257889b732deed03f08b436aa047a068f29d805751851d9f74c2da93087999",
+    "patch": "integration.patch"
+  },
+  {
+    "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/RasterTransfers.kt",
+    "base": "root-r2-snapshot",
+    "bytes": 12865,
+    "sha256": "ddbf5996ff642f1a43dbeb3eef9c9a4d5a2558be44e3e1cfc5348e5a21114a76",
+    "patch": "integration.patch"
+  },
+  {
+    "path": "apps/android/src/main/kotlin/com/visualworkbench/android/ui/ExportDialog.kt",
+    "base": "root-snapshot",
+    "bytes": 4992,
+    "sha256": "303d77fef0db24861c95a168510e4e7702e06e7ecc5ed602d593b6a0a55df3a6",
+    "patch": "integration.patch"
+  },
+  {
+    "path": "apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt",
+    "base": "local-views-r2-composed",
+    "bytes": 21420,
+    "sha256": "9b1cfc123f4866637b5b9161b5dffda019cebe7f4f617164522d8548728fea95",
+    "patch": "integration.patch"
+  },
+  {
+    "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopTransfers.kt",
+    "base": "root-snapshot",
+    "bytes": 21446,
+    "sha256": "c1847306cc05de63e08c4703fa8ef313973a0bc27a28cdd574172a68925ec9e6",
+    "patch": "integration.patch"
+  },
+  {
+    "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt",
+    "base": "local-views-r2-composed",
+    "bytes": 66229,
+    "sha256": "8b940bf579ae702fd078187b96a2cf04ac9f427cf32f801f44eaad98ff051934",
+    "patch": "integration.patch"
+  },
+  {
+    "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/ExportDialog.kt",
+    "base": "root-snapshot",
+    "bytes": 8730,
+    "sha256": "f90e879a29df0c17e22b12ed397a9849edb12dfe84697653f1aa15848d68d487",
+    "patch": "integration.patch"
+  },
+  {
+    "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt",
+    "base": "local-views-r2-composed",
+    "bytes": 28618,
+    "sha256": "96b1c092035a4eff2d05e3600fbf5480285ca0cdd3b37f05eb67ab46ba4d5db8",
+    "patch": "integration.patch"
+  },
+  {
+    "path": "core/crates/vw-ffi/src/image_outputs.rs",
+    "base": "image-output-foundation-r2",
+    "bytes": 9735,
+    "sha256": "e2aafc13eccf82109b615278987fd3eb5bfc6a77f12fdab8b07b47701bea990c",
+    "patch": "tone-editing-view.patch"
+  },
+  {
+    "path": "core/crates/vw-ffi/src/queries.rs",
+    "base": "image-output-foundation-r2",
+    "bytes": 30709,
+    "sha256": "6aff967b47dc17e131f053c409dc013b3c749cf5db14c8425387daa3a8e8ca52",
+    "patch": "tone-editing-view.patch"
+  }
+]

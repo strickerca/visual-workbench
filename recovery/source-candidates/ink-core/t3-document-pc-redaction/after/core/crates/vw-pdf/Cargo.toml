@@ -1,0 +1,18 @@
+[package]
+name = "vw-pdf"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881"] }
+blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+thiserror = "=2.0.21"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_System_LibraryLoader"] }
+
+[lints]
+workspace = true

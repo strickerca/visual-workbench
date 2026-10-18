@@ -1,0 +1,25 @@
+--- a/core/crates/vw-pdf/src/lib.rs
++++ b/core/crates/vw-pdf/src/lib.rs
+@@ -7,6 +7,7 @@
+ mod geometry;
+ mod limits;
+ mod overlay;
++mod raster_redaction;
+ mod sink;
+ mod types;
+ 
+@@ -16,3 +17,5 @@
+ pub use limits::{PdfCancellation, PdfLimits};
+ pub use overlay::{PdfOverlay, validate_overlays};
+ pub use types::{PdfCopyKind, PdfDocumentInfo, PdfExportReceipt, PdfGlyph, PdfNotice, PdfPageInfo, PdfTextChunk, PdfTile};
++
++pub use raster_redaction::{PageRedaction, RasterProgress, RasterRedactionError, RasterRedactionOptions, RasterRedactionPlan, RasterRedactionResult, RasterSecurityPolicy, RasterWork, UnverifiedRasterCopy, VerifiedRasterRedaction, admit_raster_redaction};
+--- a/core/crates/vw-pdf/src/ffi.rs
++++ b/core/crates/vw-pdf/src/ffi.rs
+@@ -1,4 +1,6 @@
+ //! Exclusive PDFium FFI ownership for the isolated document worker.
++#[path = "redaction_ffi.rs"]
++mod redaction_ffi;
+ use crate::limits::MAX_TEXT_CHUNK;
+ use crate::sink::SaveSink;
+ use crate::{PageGeometry, PdfCancellation, PdfCopyKind, PdfDocumentInfo, PdfError, PdfExportReceipt, PdfGlyph, PdfLimits, PdfNotice, PdfOverlay, PdfPageInfo, PdfPoint, PdfRect, PdfResult, PdfTextChunk, PdfTile, PdfTileRequest, validate_overlays};

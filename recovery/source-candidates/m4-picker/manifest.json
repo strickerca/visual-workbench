@@ -1,0 +1,23 @@
+{
+  "repository": "https://github.com/strickerca/visual-workbench.git",
+  "base_commit": "67b0af376612f999a0ea2543ad99a98fddd69b22",
+  "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt",
+  "base_git_blob": "6f2bc956a3ab5891e963add2ff97f562eb06e7ef",
+  "base_git_bytes_sha256": "516da4ca61803ddb05df989cb9cd90b18e15ae8ad64ff6c88e8ea6b71aa3c500",
+  "working_original_bytes_sha256": "67267a39495af3b72d7f422cbe0d8466ddb6c677e6adcf9615997d71e8861ca2",
+  "patch_sha256": "117b7cb1bce0770b9d0ab1a9133c1946257778c3fda29a62bbbd7e4d07e5f345",
+  "apply_check_against_isolated_base_index": "passed",
+  "status": "source-reviewed; unbuilt; normal-app acceptance pending",
+  "transfer_allowlist": [
+    "unbuilt-picker.patch",
+    "unbuilt-picker-Main.kt",
+    "manifest.json"
+  ],
+  "instructions": [
+    "Verify base commit and both file hashes before transfer.",
+    "Apply patch only to a clean checkout of the exact base; git apply --check first.",
+    "Keep one Desktop Main owner. Do not apply the unrelated future diagnostics Main overlay.",
+    "Run affected Desktop compilation/tests in a correctly provisioned environment, then normal Windows acceptance locally.",
+    "Do not transfer .local, runtime receipts, identities, project databases, archives, credentials, device identifiers, keys or binary packages."
+  ]
+}

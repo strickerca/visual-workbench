@@ -1,0 +1,211 @@
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -109,6 +109,9 @@
+     private var giant: GiantAndroidCanvas? = null
+     private var giantSurfaceIssue: String? = null
+     private val giantGate = Mutex()
++    private val giantExports = GiantAndroidExports(application, render = { options ->
++        giantGate.withLock { checkNotNull(giant) { "Open the complete giant cache before exporting." }.exportPng(options) }
++    })
+     private var rendererAvailable: (() -> Unit)? = null
+     private val rendererLeases = GiantRenderLeases { rendererAvailable?.invoke() }
+     private fun isGiant() = document?.let { it.width.toULong() * it.height.toULong() > 50_000_000uL } == true
+@@ -121,8 +124,9 @@
+             giantSurfaceIssue = null; true
+         } catch (error: IllegalArgumentException) { giantSurfaceIssue = error.message; blockingMessage = error.message; false }
+     }
+-    private suspend fun retireGiant() = giantGate.withLock {
+-        giant?.close(); giant = null; giantSurfaceIssue = null
++    private suspend fun retireGiant() {
++        giantExports.clear()
++        giantGate.withLock { giant?.close(); giant = null; giantSurfaceIssue = null }
+     }
+     private var objects = emptyList<DrawObject>()
+     private var camera = Camera(Point(800.0, 600.0), 1.0, 0.0, 1.0, 1.0)
+@@ -1344,11 +1348,18 @@
+         val current = project ?: return
+         val doc = document ?: return
+         val options = try { exportOptions(doc, exportSelection) } catch (error: Exception) { report(error); return }
++        val expected = info ?: return
++        val token = epoch
++        val binding = WorkflowBinding(expected.projectId, doc.documentId, expected.hostSeq, expected.stateHash)
+         busy = true; cancelTool(); exportPreflight = null; checkedExport = null
+-        val job = scope.launch {
++        val job = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+             try {
+                 transferLabel = "Checking image dimensions, color and export limits…"
+-                val result = mutations.withLock { repository.preflight(current, options) }
++                val result = mutations.withLock {
++                    require(!disposing && project === current && epoch == token)
++                    if (isGiant()) giantExports.prepare(binding, doc.width, doc.height, options) { transferLabel = it }
++                    else repository.preflight(current, options)
++                }
+                 if (result.revision.stateHash == info?.stateHash && result.revision.hostSeq == info?.hostSeq) { exportPreflight = result; checkedExport = options }
+                 else message = "The project changed during the check. Check the export again."
+             } catch (cancel: CancellationException) { throw cancel }
+@@ -1393,12 +1404,31 @@
+         if (doc.bitDepth > 8u && options.format == ImageFormat.Png8 && !options.allowDepthReduction) {
+             message = "Choose PNG 16-bit or explicitly allow reduction to 8-bit."; return
+         }
++        val expected = info ?: return
++        val token = epoch
++        val binding = WorkflowBinding(expected.projectId, doc.documentId, expected.hostSeq, expected.stateHash)
++        val giantRequest = isGiant()
+         exportReady = null
+         busy = true; cancelTool()
+-        val job = scope.launch {
++        val job = scope.launch(start = CoroutineStart.UNDISPATCHED) {
++            var destinationTransferred = false
+             try {
+                 val result = mutations.withLock {
+-                    if (sharing) {
++                    require(!disposing && project === current && epoch == token)
++                    if (giantRequest) {
++                        val now = current.info()
++                        require(now.projectId == binding.projectId && now.hostSeq == binding.hostSeq &&
++                            now.stateHash == binding.stateHash && binding.documentId in now.documentIds) {
++                            "The project changed after checking the PNG. Check the export again."
++                        }
++                        if (sharing) {
++                            val shared = giantExports.share(binding, options) { transferLabel = it }
++                            shareLease = shared.first; shareUri = shared.first.uri; shared.second
++                        } else {
++                            destinationTransferred = true
++                            giantExports.save(checkNotNull(uri), binding, options) { transferLabel = it }
++                        }
++                    } else if (sharing) {
+                         val shared = repository.sharePng(current, options) { transferLabel = it }
+                         shareLease = shared.first; shareUri = shared.first.uri
+                         shared.second
+@@ -1414,7 +1444,13 @@
+             } catch (error: CoreFailure) {
+                 message = rasterFailure(error, importing = false)
+             } catch (error: Exception) { report(error) }
+-            finally { busy = false; transferLabel = null; transferJob = null }
++            finally {
++                if (giantRequest && uri != null && !destinationTransferred) withContext(NonCancellable) {
++                    try { repository.discardDestination(uri) }
++                    catch (_: Exception) { message = "An unused PNG destination could not be removed. The original and private checked PNG are intact." }
++                }
++                busy = false; transferLabel = null; transferJob = null
++            }
+         }
+         transferJob = job.takeIf { it.isActive }
+     }
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/GiantAndroidCanvas.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/GiantAndroidCanvas.kt
+@@ -91,6 +91,12 @@
+     }
+     internal fun request(view: GiantViewport) { if (!closed) viewport.request(view) }
+     fun retry() { if (!closed) viewport.retry() }
++    suspend fun exportPng(options: GiantPngOptions): GiantPngReceipt {
++        check(!closed)
++        val paused = leases.pauseAdmission()
++        try { return viewport.withRetiredImage { it.exportPng(options) } }
++        finally { paused.close() }
++    }
+     suspend fun close() {
+         closed = true
+         withContext(NonCancellable) {
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/GiantRenderLeases.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/GiantRenderLeases.kt
+@@ -10,6 +10,7 @@
+ internal class GiantRenderLeases(private val available: () -> Unit) {
+     private val entries = LinkedHashSet<Lease>()
+     private var retiring = false
++    private var pauses = 0
+ 
+     inner class Lease internal constructor(private val request: () -> Unit) {
+         private val completion = CompletableDeferred<Unit>()
+@@ -25,12 +26,12 @@
+             // registry ownership before signaling its observation boundary.
+             entries.remove(this)
+             completion.complete(Unit)
+-            if (!wasRetiring && announce) available()
++            if (!wasRetiring && pauses == 0 && announce) available()
+         }
+     }
+ 
+     fun acquire(retire: () -> Unit): Lease? {
+-        if (retiring || entries.size >= 2) return null
++        if (retiring || pauses != 0 || entries.size >= 2) return null
+         return Lease(retire).also(entries::add)
+     }
+ 
+@@ -44,8 +45,20 @@
+         for (entry in captured) entry.await()
+         check(entries.isEmpty())
+         retiring = false
+-        available()
++        if (pauses == 0) available()
+     }
+ 
++    /** Seal recreation before retiring the old renderer. Reopen only after
++     * native strip encoding settles, including cancellation. Main confined. */
++    fun pauseAdmission(): AutoCloseable {
++        check(pauses < 4); pauses++
++        var closed = false
++        return AutoCloseable {
++            if (!closed) {
++                closed = true; pauses--
++                if (pauses == 0 && !retiring) available()
++            }
++        }
++    }
+     internal fun retainedCount(): Int = entries.size
+ }
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/ExportDialog.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/ExportDialog.kt
+@@ -22,7 +22,7 @@
+             Toggle("Crop to current view bounds", choice.viewOnly, enabled) { editor.configureExport(choice.copy(viewOnly = it)) }
+             if (choice.viewOnly) Text("Exports the image-aligned rectangle enclosing the current view, clipped to the original. A rotated view is not a rotated crop.", style = MaterialTheme.typography.caption)
+             Text("Format", style = MaterialTheme.typography.subtitle2)
+-            ExportEncoding.entries.forEach { encoding ->
++            (if (editor.giantDocument()) listOf(ExportEncoding.Png8) else ExportEncoding.entries).forEach { encoding ->
+                 TextButton(onClick = { editor.configureExport(choice.copy(encoding = encoding)) }, enabled = enabled,
+                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(if (choice.encoding == encoding) "✓ ${encoding.label}" else encoding.label) }
+             }
+@@ -32,10 +32,11 @@
+                     valueRange = 1f..100f, steps = 98, modifier = Modifier.heightIn(min = 48.dp))
+             }
+             if (choice.encoding == ExportEncoding.Jpeg) Toggle("Flatten transparency onto white", choice.whiteMatte, enabled) { editor.configureExport(choice.copy(whiteMatte = it)) }
+-            if ((editor.document?.bitDepth ?: 8u) > 8u && choice.encoding != ExportEncoding.Png16)
++            if (((editor.document?.bitDepth ?: 8u) > 8u && choice.encoding != ExportEncoding.Png16) || (editor.giantDocument() && choice.allowDepthReduction))
+                 Toggle("Allow reduction to 8-bit output", choice.allowDepthReduction, enabled) { editor.configureExport(choice.copy(allowDepthReduction = it)) }
+             Toggle("Convert exported colors to sRGB", choice.convertToSrgb, enabled) { editor.configureExport(choice.copy(convertToSrgb = it)) }
+             Text("The original stays unchanged. JPEG/WebP may require more memory than PNG. Color conversion and depth reduction apply only to this export.", style = MaterialTheme.typography.caption)
++            if (editor.giantDocument()) Text("Giant export preserves PNG8 pixels from full-resolution lossless tiles. Check renders one exact private snapshot (up to 4 GiB), temporarily retiring the drawing surface. Save uses that same file; in-app sharing is limited to 128 MiB. Other formats and image-output tone/resize composition remain unavailable on this path.", style = MaterialTheme.typography.caption)
+             OutlinedButton(onClick = editor::prepareExport, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Check export") }
+             checked?.let {
+                 Text("${it.width} × ${it.height} px · ${it.outputBitDepth}-bit · revision ${it.revision.hostSeq}")
+--- a/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantViewportSession.kt
++++ b/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantViewportSession.kt
+@@ -102,6 +102,7 @@
+         } finally { mutable.value = mutable.value.copy(retainedBytes = bytes, ready = false) }
+     }
+     private suspend fun load(request: Request): Unit {
++        if (!current(request)) return
+         val plan = image.viewport(request.view)
+         if (!current(request)) return
+         val pair = plan.assetId to plan.manifestHash
+@@ -153,6 +154,20 @@
+         check(!sealed && runner.isActive)
+         block(image)
+     }
++    /** Retire the complete foreign rendering epoch before a bounded native
++     * export. While the guard is held, viewport requests only replace the latest
++     * request. The same actual close guard joins this operation. */
++    public suspend fun <R> withRetiredImage(block: suspend (GiantImage) -> R): R = operationGate.withLock {
++        currentCoroutineContext().ensureActive()
++        check(!sealed && runner.isActive)
++        try {
++            retire()
++            currentCoroutineContext().ensureActive()
++            block(image)
++        } finally {
++            if (!sealed && runner.isActive) retry()
++        }
++    }
+     /** Every closer joins the same worker and native/renderer teardown, including
+      * cancellation during a native read. Never call project.close before this. */
+     public suspend fun close(): Unit {

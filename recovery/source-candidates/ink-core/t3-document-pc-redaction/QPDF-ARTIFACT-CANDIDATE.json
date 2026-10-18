@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "version": "12.4.2",
+  "status": "publisher artifacts and notices reviewed as data; runtime admission pending",
+  "archive": {
+    "url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-msvc64.zip",
+    "sha256": "db87077e683630c1217e0e8f9a20a9749d952ab676e881c3689187763a5de25d"
+  },
+  "qpdf30_dll": {
+    "bytes": 7448064,
+    "sha256": "8812952678de93e0750308a113aa650e9161af466f9770679ea9673adeb61041"
+  },
+  "header": {
+    "sha256": "b6e4ffb5f81e471e4f494ea86935eb1a679c87da1dd0520e762abce34bdb142f",
+    "url": "https://raw.githubusercontent.com/qpdf/qpdf/v12.4.2/include/qpdf/qpdf-c.h",
+    "additional_prototypes": [
+      {
+        "line": 879,
+        "prototype": "int qpdf_oh_get_generation(qpdf_data qpdf, qpdf_oh oh);"
+      }
+    ]
+  },
+  "required_c_symbols": {
+    "qpdf_check_pdf": {
+      "forwarded": false
+    },
+    "qpdf_cleanup": {
+      "forwarded": false
+    },
+    "qpdf_get_buffer": {
+      "forwarded": false
+    },
+    "qpdf_get_buffer_length": {
+      "forwarded": false
+    },
+    "qpdf_get_num_pages": {
+      "forwarded": false
+    },
+    "qpdf_get_page_n": {
+      "forwarded": false
+    },
+    "qpdf_get_qpdf_version": {
+      "forwarded": false
+    },
+    "qpdf_get_root": {
+      "forwarded": false
+    },
+    "qpdf_get_trailer": {
+      "forwarded": false
+    },
+    "qpdf_has_error": {
+      "forwarded": false
+    },
+    "qpdf_init": {
+      "forwarded": false
+    },
+    "qpdf_init_write_memory": {
+      "forwarded": false
+    },
+    "qpdf_more_warnings": {
+      "forwarded": false
+    },
+    "qpdf_oh_begin_dict_key_iter": {
+      "forwarded": false
+    },
+    "qpdf_oh_dict_more_keys": {
+      "forwarded": false
+    },
+    "qpdf_oh_dict_next_key": {
+      "forwarded": false
+    },
+    "qpdf_oh_free_buffer": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_array_item": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_array_n_items": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_dict": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_generation": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_key": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_object_id": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_page_content_data": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_stream_data": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_value_as_number": {
+      "forwarded": false
+    },
+    "qpdf_oh_is_dictionary": {
+      "forwarded": false
+    },
+    "qpdf_oh_is_name_and_equals": {
+      "forwarded": false
+    },
+    "qpdf_oh_is_null": {
+      "forwarded": false
+    },
+    "qpdf_oh_is_stream": {
+      "forwarded": false
+    },
+    "qpdf_oh_release_all": {
+      "forwarded": false
+    },
+    "qpdf_oh_remove_key": {
+      "forwarded": false
+    },
+    "qpdf_read_memory": {
+      "forwarded": false
+    },
+    "qpdf_set_attempt_recovery": {
+      "forwarded": false
+    },
+    "qpdf_set_compress_streams": {
+      "forwarded": false
+    },
+    "qpdf_set_content_normalization": {
+      "forwarded": false
+    },
+    "qpdf_set_deterministic_ID": {
+      "forwarded": false
+    },
+    "qpdf_set_object_stream_mode": {
+      "forwarded": false
+    },
+    "qpdf_set_preserve_encryption": {
+      "forwarded": false
+    },
+    "qpdf_set_preserve_unreferenced_objects": {
+      "forwarded": false
+    },
+    "qpdf_set_stream_data_mode": {
+      "forwarded": false
+    },
+    "qpdf_set_suppress_warnings": {
+      "forwarded": false
+    },
+    "qpdf_silence_errors": {
+      "forwarded": false
+    },
+    "qpdf_write": {
+      "forwarded": false
+    }
+  },
+  "required_c_symbol_count": 44,
+  "package_named_export_count": 1281,
+  "static_dependencies": {
+    "zlib": {
+      "version": "1.3.2",
+      "license": "Zlib",
+      "port_revision": 2
+    },
+    "libjpeg-turbo": {
+      "version": "3.2.0",
+      "license": "IJG AND BSD-3-Clause",
+      "port_revision": 1
+    },
+    "openssl": {
+      "version": "3.6.4",
+      "license": "Apache-2.0",
+      "port_revision": 1
+    },
+    "libspng": {
+      "version": "0.7.4",
+      "license": "BSD-2-Clause AND libpng-2.0",
+      "port_revision": 1
+    }
+  },
+  "static_link_basis": "same exact release vcpkg metadata, CMake version/config text, and official libqpdf/CMakeLists x64-windows-static zs/turbojpeg/libssl/libcrypto route; not a reproduced linker-member census",
+  "supplemental_libspng_notice": "full exact publisher copyright file retained as nonexecuted notice text, including embedded source attribution and license blocks; static TurboJPEG target declares spng::spng_static",
+  "publisher_review_receipt_sha256": "a18d72461b0de5cd5a21d05f7f6a372d41178d23cd1642931df8c722fb023fd2",
+  "extra_review_receipt_sha256": "c7e6c11e9ace1202c8be4f97be7cd1841f5c4f0c1a33ff438b2a693b4cd25845",
+  "msvc_runtime_policy": "installed trusted System32 runtime only; no publisher redist DLL copying or redistribution proposed",
+  "root_data_acquisition": true,
+  "lane_native_or_product_execution": false,
+  "runtime_admission": false,
+  "turbojpeg_static_spng_route": {
+    "archive_entry": "vcpkg/installed/x64-windows-static/share/libjpeg-turbo/libjpeg-turboTargets.cmake",
+    "sha256": "d60457bba12a257c618044edc0bd2e3d46d556b3c6e60eb9934fb6dc7b01ffa9",
+    "target": "libjpeg-turbo::turbojpeg-static",
+    "interface_link_libraries": [
+      "spng::spng_static"
+    ],
+    "release_library": "lib/turbojpeg.lib",
+    "exact_linker_members_reproduced": false
+  }
+}

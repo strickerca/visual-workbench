@@ -1,0 +1,189 @@
+{
+  "schema": 1,
+  "data_review_only": true,
+  "native_or_product_execution": false,
+  "archive_sha256": "db87077e683630c1217e0e8f9a20a9749d952ab676e881c3689187763a5de25d",
+  "dependency_archive_sha256": "82005252fee032135d07c85ad7626a38f26fb253c1e098d1d185f315bea15ebb",
+  "dll_sha256": "8812952678de93e0750308a113aa650e9161af466f9770679ea9673adeb61041",
+  "header_sha256": "b6e4ffb5f81e471e4f494ea86935eb1a679c87da1dd0520e762abce34bdb142f",
+  "symbol_source_sha256": "1ca2eeaa242939279bfe244041b7371d2766551383d454fecb967a3ffecfbf7f",
+  "named_exports": 1281,
+  "required_symbols": {
+    "qpdf_check_pdf": {
+      "forwarded": false
+    },
+    "qpdf_cleanup": {
+      "forwarded": false
+    },
+    "qpdf_get_buffer": {
+      "forwarded": false
+    },
+    "qpdf_get_buffer_length": {
+      "forwarded": false
+    },
+    "qpdf_get_num_pages": {
+      "forwarded": false
+    },
+    "qpdf_get_page_n": {
+      "forwarded": false
+    },
+    "qpdf_get_qpdf_version": {
+      "forwarded": false
+    },
+    "qpdf_get_root": {
+      "forwarded": false
+    },
+    "qpdf_get_trailer": {
+      "forwarded": false
+    },
+    "qpdf_has_error": {
+      "forwarded": false
+    },
+    "qpdf_init": {
+      "forwarded": false
+    },
+    "qpdf_init_write_memory": {
+      "forwarded": false
+    },
+    "qpdf_more_warnings": {
+      "forwarded": false
+    },
+    "qpdf_oh_begin_dict_key_iter": {
+      "forwarded": false
+    },
+    "qpdf_oh_dict_more_keys": {
+      "forwarded": false
+    },
+    "qpdf_oh_dict_next_key": {
+      "forwarded": false
+    },
+    "qpdf_oh_free_buffer": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_array_item": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_array_n_items": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_dict": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_generation": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_key": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_object_id": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_page_content_data": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_stream_data": {
+      "forwarded": false
+    },
+    "qpdf_oh_get_value_as_number": {
+      "forwarded": false
+    },
+    "qpdf_oh_is_dictionary": {
+      "forwarded": false
+    },
+    "qpdf_oh_is_name_and_equals": {
+      "forwarded": false
+    },
+    "qpdf_oh_is_null": {
+      "forwarded": false
+    },
+    "qpdf_oh_is_stream": {
+      "forwarded": false
+    },
+    "qpdf_oh_release_all": {
+      "forwarded": false
+    },
+    "qpdf_oh_remove_key": {
+      "forwarded": false
+    },
+    "qpdf_read_memory": {
+      "forwarded": false
+    },
+    "qpdf_set_attempt_recovery": {
+      "forwarded": false
+    },
+    "qpdf_set_compress_streams": {
+      "forwarded": false
+    },
+    "qpdf_set_content_normalization": {
+      "forwarded": false
+    },
+    "qpdf_set_deterministic_ID": {
+      "forwarded": false
+    },
+    "qpdf_set_object_stream_mode": {
+      "forwarded": false
+    },
+    "qpdf_set_preserve_encryption": {
+      "forwarded": false
+    },
+    "qpdf_set_preserve_unreferenced_objects": {
+      "forwarded": false
+    },
+    "qpdf_set_stream_data_mode": {
+      "forwarded": false
+    },
+    "qpdf_set_suppress_warnings": {
+      "forwarded": false
+    },
+    "qpdf_silence_errors": {
+      "forwarded": false
+    },
+    "qpdf_write": {
+      "forwarded": false
+    }
+  },
+  "required_symbol_count": 44,
+  "header_prototypes": [
+    {
+      "line": 879,
+      "prototype": "int qpdf_oh_get_generation(qpdf_data qpdf, qpdf_oh oh);"
+    }
+  ],
+  "text_entries": [
+    {
+      "archive": "vcpkg.zip",
+      "entry": "vcpkg/installed/x64-windows-static/share/libspng/copyright",
+      "bytes": 208054,
+      "sha256": "c23ec2c56ebd6ff8af3ac70e72e85ac11e9183d602d461e1712ca46dd647868f",
+      "receipt": "extra-text/000-c23ec2c56ebd6ff8.txt"
+    },
+    {
+      "archive": "vcpkg.zip",
+      "entry": "vcpkg/installed/x64-windows-static/share/libjpeg-turbo/libjpeg-turboTargets.cmake",
+      "bytes": 4549,
+      "sha256": "d60457bba12a257c618044edc0bd2e3d46d556b3c6e60eb9934fb6dc7b01ffa9",
+      "receipt": "extra-text/001-d60457bba12a257c.txt"
+    },
+    {
+      "archive": "vcpkg.zip",
+      "entry": "vcpkg/installed/x64-windows-static/share/libjpeg-turbo/libjpeg-turboTargets-debug.cmake",
+      "bytes": 1500,
+      "sha256": "eadc5981f4769432d47937317aeea852b2722696cb080690b371368daa5ef2b9",
+      "receipt": "extra-text/002-eadc5981f4769432.txt"
+    },
+    {
+      "archive": "vcpkg.zip",
+      "entry": "vcpkg/installed/x64-windows-static/share/libjpeg-turbo/libjpeg-turboTargets-release.cmake",
+      "bytes": 1494,
+      "sha256": "c0a48cf24611fd0142645161814125dae10710e2cf4d326340dec46384fbbea6",
+      "receipt": "extra-text/003-c0a48cf24611fd01.txt"
+    },
+    {
+      "archive": "qpdf-msvc64.zip",
+      "entry": "qpdf-12.4.2-msvc64/include/qpdf/qpdf-c.h",
+      "bytes": 45350,
+      "sha256": "b6e4ffb5f81e471e4f494ea86935eb1a679c87da1dd0520e762abce34bdb142f",
+      "receipt": "extra-text/qpdf-c.h.txt"
+    }
+  ]
+}

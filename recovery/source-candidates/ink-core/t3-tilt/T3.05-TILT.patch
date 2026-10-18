@@ -1,0 +1,19 @@
+--- a/core/crates/vw-geom/src/lib.rs
++++ b/core/crates/vw-geom/src/lib.rs
+@@ -29,4 +29,6 @@
+ pub use display::{Insets, QuarterTurn, ScreenTransform};
+ pub use lens::LensTransform;
++mod stylus_tilt;
++pub use stylus_tilt::{TiltAxisSign, TiltCalibration, TiltError, WindowsTilt, windows_tilt};
+ 
+ /// Invalid or unrepresentable geometry is rejected before crossing an input API.
+--- a/core/crates/vw-ffi/src/lib.rs
++++ b/core/crates/vw-ffi/src/lib.rs
+@@ -27,4 +27,7 @@
+ mod eraser;
+ pub use eraser::*;
++
++mod stylus_tilt;
++pub use stylus_tilt::*;
+ 
+ uniffi::setup_scaffolding!();

@@ -1,0 +1,687 @@
+--- a/core/crates/vw-ffi/src/lib.rs
++++ b/core/crates/vw-ffi/src/lib.rs
+@@ -120,3 +120,6 @@
+ 
+ mod masks;
+ pub use masks::*;
++
++mod image_outputs;
++pub use image_outputs::*;
+--- a/core/crates/vw-ffi/src/project.rs
++++ b/core/crates/vw-ffi/src/project.rs
+@@ -328,6 +328,7 @@
+         self.worker
+             .call(move |state| {
+                 cancellation.check()?;
++                crate::image_outputs::admit_legacy_export(state, &options)?;
+                 let info = state.info()?;
+                 state
+                     .events
+--- a/core/crates/vw-ffi/src/queries.rs
++++ b/core/crates/vw-ffi/src/queries.rs
+@@ -110,6 +110,7 @@
+         .filter(|(_, layer)| {
+             layer.definition.document_id.as_ref() == Some(&document.to_proto())
+                 && layer.visible
++                && layer.definition.kind != vw_model::IMAGE_OUTPUT_LAYER_KIND
+                 && layer.opacity > 0.0
+         })
+         .collect::<Vec<_>>();
+@@ -680,7 +681,10 @@
+     options: ExportOptions,
+     cancellation: &Cancellation,
+ ) -> Result<ExportResult> {
+-    let document = Id::try_from(options.document_id)?;
++    let document = Id::try_from(options.document_id.clone())?;
++    if vw_raster::requires_document_output(state.project()?, &document, options.marked)? {
++        return crate::image_outputs::legacy_export(state, &options, cancellation);
++    }
+     let definition = &state
+         .project()?
+         .documents
+--- a/core/crates/vw-ffi/src/session/bootstrap.rs
++++ b/core/crates/vw-ffi/src/session/bootstrap.rs
+@@ -80,7 +80,8 @@
+                     &link::hello(local.clone()),
+                 )
+                 .await?;
+-                if !connection.session().capabilities().contains("app_sync_v1") {
++                if !connection.session().capabilities().contains("app_sync_v1")
++                    || !connection.session().capabilities().contains(vw_model::IMAGE_OUTPUT_CAPABILITY) {
+                     return Err(SessionError::Invalid);
+                 }
+                 let (sender, mut receiver) = connection.into_duplex()?;
+--- a/core/crates/vw-ffi/src/session/link.rs
++++ b/core/crates/vw-ffi/src/session/link.rs
+@@ -390,6 +390,7 @@
+         label: String::new(),
+         capabilities: BTreeSet::from([
+             "app_sync_v1".into(),
++            vw_model::IMAGE_OUTPUT_CAPABILITY.into(),
+             "preview_lifecycle_v2".into(),
+             "original_upload_v1".into(),
+             "new_shape_preview_v1".into(),
+@@ -710,6 +711,7 @@
+             Ok((carrier, connection)) => {
+                 if [
+                     "app_sync_v1",
++                    vw_model::IMAGE_OUTPUT_CAPABILITY,
+                     "preview_lifecycle_v2",
+                     "original_upload_v1",
+                     "new_shape_preview_v1",
+@@ -887,6 +889,7 @@
+         .session()
+         .capabilities()
+         .contains("preview_lifecycle_v2")
++        || !connection.session().capabilities().contains(vw_model::IMAGE_OUTPUT_CAPABILITY)
+     {
+         return Err(SessionError::Invalid);
+     }
+--- a/core/crates/vw-ffi/src/streaming_ffi.rs
++++ b/core/crates/vw-ffi/src/streaming_ffi.rs
+@@ -1,5 +1,6 @@
+ //! File-backed raster operations. The native worker owns every scratch handle;
+ //! only complete no-clobber outputs leave its private staging area.
++mod image_output;
+ use crate::{
+     project::{ProjectState, SessionPermit},
+     *,
+@@ -397,6 +398,7 @@
+                 if closed.load(std::sync::atomic::Ordering::Acquire) {
+                     return Err(CoreError::Closed);
+                 }
++                crate::image_outputs::admit_legacy_export(state, &options.export)?;
+                 let revision = state.info()?;
+                 state
+                     .events
+@@ -477,7 +479,7 @@
+     with_source(
+         &bytes,
+         scratch.as_file_mut(),
+-        request.memory_budget_bytes,
++        image_output::source_budget(state, &options.export)?,
+         options.max_scratch_bytes,
+         cancel,
+         |source| {
+@@ -488,6 +490,9 @@
+             {
+                 return Err(TransferError::Metadata);
+             }
++            // The output compositor must inspect final alpha/tone pixels. A metadata
++            // preflight never claims those render-dependent refusals are resolved.
++            if image_output::required(state, &options.export)? { return Ok(()); }
+             if result.buffered {
+                 let (estimate, _, _) = buffered_admission(source, &request)?;
+                 result.estimated_peak_bytes = result.estimated_peak_bytes.max(estimate);
+@@ -559,6 +564,7 @@
+         OUTPUT_LIMIT,
+         options.max_scratch_bytes,
+     )?;
++    if image_output::required(state, &options.export)? { return image_output::preflight(state, options); }
+     let project = state.project()?;
+     let document = Id::try_from(options.export.document_id.clone())?;
+     let definition = &project
+@@ -1123,11 +1129,14 @@
+         with_source(
+             &bytes,
+             scratch.as_file_mut(),
+-            request.memory_budget_bytes,
++            image_output::source_budget(state, &options.export)?,
+             options.max_scratch_bytes,
+             cancel,
+             |source| {
+                 validate_source_binding(source.info(), project, &asset)?;
++                if image_output::required(state, &options.export)? {
++                    return image_output::export(source, state, &document, &options, &request, cancel, &mut sink);
++                }
+                 if !matches!(
+                     request.format,
+                     vw_raster::ExportFormat::Png8 | vw_raster::ExportFormat::Png16
+--- a/core/crates/vw-geom/src/lib.rs
++++ b/core/crates/vw-geom/src/lib.rs
+@@ -90,3 +90,6 @@
+         Err(GeometryError::NonFinite)
+     }
+ }
++
++mod image_output;
++pub use image_output::{IMAGE_OUTPUT_MAX_SIDE, ImageOutputFrame};
+--- a/core/crates/vw-model/src/lib.rs
++++ b/core/crates/vw-model/src/lib.rs
+@@ -2,6 +2,8 @@
+ //! No original asset bytes or device-local camera state are mutated here.
+ 
+ mod ids;
++mod image_output;
++pub use image_output::{DocumentImageOutput, IMAGE_OUTPUT_CAPABILITY, IMAGE_OUTPUT_LAYER_KIND};
+ mod order;
+ mod state;
+ mod validate;
+--- a/core/crates/vw-model/src/validate.rs
++++ b/core/crates/vw-model/src/validate.rs
+@@ -59,7 +59,7 @@
+             let doc = self.document(layer.definition.document_id.as_ref())?;
+             one_of(
+                 &layer.definition.kind,
+-                &["annotation", "mask", "result", "adjustment"],
++                &["annotation", "mask", "result", "adjustment", "output"],
+             )?;
+             OrderKey::try_from(layer.definition.order_key.clone())?;
+             text(&layer.definition.name, 4096)?;
+@@ -236,6 +236,7 @@
+                 }
+             }
+         }
++        self.validate_image_outputs()?;
+         Ok(())
+     }
+ 
+--- a/core/crates/vw-package/Cargo.toml
++++ b/core/crates/vw-package/Cargo.toml
+@@ -10,6 +10,7 @@
+ workspace = true
+ 
+ [dependencies]
++vw-geom = { path = "../vw-geom", version = "=0.1.0" }
+ vw-model = { path = "../vw-model", version = "=0.1.0" }
+ vw-proto = { path = "../vw-proto", version = "=0.1.0" }
+ vw-instructions = { path = "../vw-instructions", version = "=0.1.0" }
+--- a/core/crates/vw-package/src/compiler.rs
++++ b/core/crates/vw-package/src/compiler.rs
+@@ -21,25 +21,48 @@
+     pub originals: &'a BTreeMap<AssetId, Vec<u8>>,
+ }
+ struct Resolver<'a> {
++    project: &'a Project,
+     originals: &'a BTreeMap<AssetId, Vec<u8>>,
+     limits: DecodeLimits,
+     cancel: &'a dyn Cancellation,
+ }
+ impl vw_raster::AssetResolver for Resolver<'_> {
+     fn image(&self, id: &str) -> std::result::Result<DecodedImage, vw_raster::RasterError> {
+-        if self.cancel.is_cancelled() {
+-            return Err(vw_raster::RasterError::Cancelled);
+-        }
+-        let key =
+-            AssetId::try_from(id.to_owned()).map_err(|_| vw_raster::RasterError::MissingAsset)?;
+-        vw_raster::decode(
+-            self.originals
+-                .get(&key)
+-                .ok_or(vw_raster::RasterError::MissingAsset)?,
+-            self.limits,
+-        )
+-    }
+-}
++        use vw_raster::RasterError;
++        if self.cancel.is_cancelled() { return Err(RasterError::Cancelled); }
++        let key = AssetId::try_from(id.to_owned()).map_err(|_| RasterError::MissingAsset)?;
++        let binding = self.project.assets.get(&key).ok_or(RasterError::MissingAsset)?;
++        let bytes = self.originals.get(&key).ok_or(RasterError::MissingAsset)?;
++        if binding.byte_size != bytes.len() as u64 || AssetId::hash(bytes) != key {
++            return Err(RasterError::MissingAsset);
++        }
++        let count = u64::from(binding.width).checked_mul(u64::from(binding.height)).ok_or(RasterError::Allocation)?;
++        if count == 0 || count > self.limits.max_pixels { return Err(RasterError::Unsupported("referenced image pixel limit")); }
++        // render_buffer has already retained its D composition. This decode may
++        // consume only this asset's own 32*N + 32MiB reservation, never the whole
++        // render budget. The encoded originals were admitted before composition.
++        // Large ICC metadata can conservatively refuse rather than borrow from
++        // other live buffers or the canonical profile reservation.
++        let decode_budget = count.checked_mul(32).and_then(|n| n.checked_add(32*1024*1024)).ok_or(RasterError::Allocation)?;
++        let total = decode_budget.checked_add(binding.byte_size).ok_or(RasterError::Allocation)?;
++        if total > self.limits.max_memory_bytes { return Err(RasterError::Memory { estimated: total, budget: self.limits.max_memory_bytes }); }
++        let image = vw_raster::decode(bytes, DecodeLimits {
++            max_encoded_bytes: self.limits.max_encoded_bytes.min(bytes.len()),
++            max_pixels: count,
++            max_memory_bytes: decode_budget,
++        })?;
++        let expected = if binding.orientation >= 5 { (binding.height,binding.width) } else { (binding.width,binding.height) };
++        if (image.width,image.height) != expected || u32::from(image.orientation_applied) != binding.orientation ||
++            u32::from(image.pixels.bit_depth()) != binding.bit_depth.max(8) ||
++            image.icc.as_deref().unwrap_or_default() != binding.icc_profile.as_slice() {
++            return Err(RasterError::MissingAsset);
++        }
++        Ok(image)
++    }
++}
++#[cfg(test)]
++#[path = "resolver_admission_tests.rs"]
++mod resolver_admission_tests;
+ fn resident(image: &DecodedImage) -> u64 {
+     let pixels = match &image.pixels {
+         Pixels::Rgba8(p) => p.capacity() as u64,
+@@ -280,11 +303,22 @@
+             8192,
+         )?
+     };
++    let output = input.project.active_image_output(input.document)?.map(vw_raster::ImageOutputMetadata::new);
++    let [output_width, output_height] = output.map_or([width, height], |v| [v.output_width, v.output_height]);
++    if u64::from(output_width)*u64::from(output_height)>options.limits.source_pixels { return Err(Error::Limit("output pixels")); }
++    if output.is_some_and(|v| v.crop != (vw_raster::Region{x:0,y:0,width,height})) {
++        // Markers have explicit, independently checked D bounds below. Region
++        // targets without such a box must not be silently clipped by a crop.
++        if instructions.instructions().iter().any(|instruction| instruction.target_ids.iter().any(|target|
++            !instructions.markers().iter().any(|marker| &marker.object_id == target))) {
++            return Err(Error::Unsupported("cropped package requires bounded marker targets for every linked instruction"));
++        }
++    }
+     let overview = ImageMapping::new(
+-        [0, 0, i64::from(width), i64::from(height)],
++        [0, 0, i64::from(output_width), i64::from(output_height)],
+         options.target.max_long_edge(),
+         64,
+-    )?;
++    )?.with_output(output)?;
+     let mut markers = Vec::new();
+     let mut crops = Vec::new();
+     let mut reference_bytes = 0usize;
+@@ -292,7 +326,8 @@
+         check(cancel)?;
+         let bounds =
+             geometry::marker_bounds(marker.point_document, marker.bounds_document, width, height)?;
+-        let map = geometry::crop(bounds, width, height, options.target.max_long_edge())?;
++        let projected = geometry::output_bounds(bounds, marker.point_document, output)?;
++        let map = geometry::crop(projected, output_width, output_height, options.target.max_long_edge())?.with_output(output)?;
+         let refs = if marker.element_eids.is_empty() {
+             Vec::new()
+         } else {
+@@ -354,13 +389,28 @@
+         asset: asset.as_str(),
+         limits: options.limits,
+     };
++    let render_budget = options.limits.working(encoded_bytes + resident(&source))?;
++    let resolver = Resolver {
++        project: input.project,
++        originals: input.originals,
++        limits: DecodeLimits {
++            max_encoded_bytes: options.limits.source_bytes,
++            max_pixels: options.limits.source_pixels,
++            max_memory_bytes: render_budget,
++        },
++        cancel,
++    };
+     {
++        let clean_output = vw_raster::prepare_document_output(&source, input.project, input.document, &resolver,
++            RenderOptions { memory_budget_bytes: render_budget, include_guides: false, assume_untagged_srgb: options.assume_untagged_srgb },
++            false, &|| cancel.is_cancelled())?.image;
+         let clean = srgb(
+-            &source,
++            &clean_output,
+             input.revision,
+             &options,
+-            encoded_bytes + resident(&source),
++            encoded_bytes + resident(&source) + resident(&clean_output),
+         )?;
++        drop(clean_output);
+         check(cancel)?;
+         let frame = pixels::resample(
+             &clean,
+@@ -380,17 +430,7 @@
+         )?);
+     }
+     check(cancel)?;
+-    let render_budget = options.limits.working(encoded_bytes + resident(&source))?;
+-    let resolver = Resolver {
+-        originals: input.originals,
+-        limits: DecodeLimits {
+-            max_encoded_bytes: options.limits.source_bytes,
+-            max_pixels: options.limits.source_pixels,
+-            max_memory_bytes: render_budget,
+-        },
+-        cancel,
+-    };
+-    let marked = vw_raster::render_document(
++    let marked = vw_raster::prepare_document_output(
+         &source,
+         input.project,
+         input.document,
+@@ -400,7 +440,8 @@
+             include_guides: true,
+             assume_untagged_srgb: options.assume_untagged_srgb,
+         },
+-    )?;
++        true, &|| cancel.is_cancelled(),
++    )?.image;
+     check(cancel)?;
+     let raster = srgb(
+         &marked,
+@@ -494,7 +535,7 @@
+             Vec::new()
+         },
+         extensions: Extensions {
+-            compiler: "vw-package-1-area-integer".into(),
++            compiler: if output.is_some() { "vw-package-1-output-bilinear-v1" } else { "vw-package-1-area-integer" }.into(),
+             state_hash: instructions.source().state_hash.to_string(),
+             host_seq: input.revision.host_seq,
+             target_profile: options.target,
+--- a/core/crates/vw-package/src/geometry.rs
++++ b/core/crates/vw-package/src/geometry.rs
+@@ -4,7 +4,10 @@
+ #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+ #[serde(deny_unknown_fields)]
+ pub struct ImageMapping {
++    /// O-space rectangle when output_frame is present; otherwise the original D grid.
+     pub source_rectangle: [i64; 4],
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub output_frame: Option<vw_raster::ImageOutputMetadata>,
+     pub scale_numerator: u32,
+     pub scale_denominator: u32,
+     pub content_width: u32,
+@@ -23,6 +26,7 @@
+         let height = (rect[3] as u64 * u64::from(n)).div_ceil(u64::from(d)) as u32;
+         Ok(Self {
+             source_rectangle: rect,
++            output_frame: None,
+             scale_numerator: n,
+             scale_denominator: d,
+             content_width: width,
+@@ -31,10 +35,19 @@
+             height: height.max(minimum),
+         })
+     }
++    pub(crate) fn with_output(mut self, output: Option<vw_raster::ImageOutputMetadata>) -> Result<Self> {
++        if let Some(value) = output { value.frame()?; }
++        self.output_frame = output;
++        Ok(self)
++    }
+     pub fn scale(&self) -> f64 {
+         f64::from(self.scale_numerator) / f64::from(self.scale_denominator)
+     }
+     pub fn point(&self, point: [f64; 2], target: &Target) -> [f64; 2] {
++        let point = if let Some(output) = self.output_frame {
++            output.frame().ok().and_then(|frame| vw_geom::Point::new(point[0], point[1]).ok().and_then(|point| frame.point(point).ok()))
++                .map_or([f64::NAN; 2], |point| [point.x(), point.y()])
++        } else { point };
+         let x = (point[0] - self.source_rectangle[0] as f64) * self.scale();
+         let y = (point[1] - self.source_rectangle[1] as f64) * self.scale();
+         if target.convention() == "normalized_1000_yxyx" {
+@@ -47,12 +60,18 @@
+         }
+     }
+     pub fn bounds(&self, b: [f64; 4], target: &Target) -> [f64; 4] {
+-        let a = self.point([b[0], b[1]], target);
+-        let z = self.point([b[0] + b[2], b[1] + b[3]], target);
++        let corners = [[b[0], b[1]], [b[0]+b[2], b[1]], [b[0], b[1]+b[3]], [b[0]+b[2], b[1]+b[3]]];
++        let mut lo = [f64::INFINITY; 2];
++        let mut hi = [f64::NEG_INFINITY; 2];
++        for point in corners {
++            let p = self.point(point, target);
++            if p.iter().any(|v| !v.is_finite()) { return [f64::NAN; 4]; }
++            for axis in 0..2 { lo[axis] = lo[axis].min(p[axis]); hi[axis] = hi[axis].max(p[axis]); }
++        }
+         if target.convention() == "normalized_1000_yxyx" {
+-            [a[0], a[1], z[0], z[1]]
++            [lo[0], lo[1], hi[0], hi[1]]
+         } else {
+-            [a[0], a[1], b[2] * self.scale(), b[3] * self.scale()]
++            [lo[0], lo[1], hi[0]-lo[0], hi[1]-lo[1]]
+         }
+     }
+ }
+@@ -108,3 +127,18 @@
+     let (y, height) = axis(bounds[1], bounds[3], h);
+     ImageMapping::new([x, y, width, height], edge, 256)
+ }
++
++/// All retained instructions must remain wholly inside the selected output crop.
++/// Explicit refusal is preferable to silently omitting or clipping their target.
++pub(crate) fn output_bounds(bounds: [f64;4], point: [f64;2], output: Option<vw_raster::ImageOutputMetadata>) -> Result<[f64;4]> {
++    let Some(output) = output else { return Ok(bounds); };
++    let frame = output.frame()?;
++    let rect = vw_geom::Rect::new(bounds[0], bounds[1], bounds[2], bounds[3]).map_err(|_| Error::Integrity)?;
++    let [x,y,w,h] = frame.crop();
++    if !frame.contains(rect) || point[0] < f64::from(x) || point[1] < f64::from(y)
++        || point[0] >= f64::from(x+w) || point[1] >= f64::from(y+h) {
++        return Err(Error::Unsupported("instruction target lies outside the output crop"));
++    }
++    let rect = frame.bounds(rect).map_err(|_| Error::Integrity)?;
++    Ok([rect.left(), rect.top(), rect.width(), rect.height()])
++}
+--- a/core/crates/vw-package/src/prompt.rs
++++ b/core/crates/vw-package/src/prompt.rs
+@@ -14,11 +14,13 @@
+     cancel: &dyn Cancellation,
+ ) -> Result<Vec<u8>> {
+     let mut out = String::new();
++    let output = manifest.extensions.overview_mapping.output_frame;
++    let grid = if output.is_some() { "O (output-grid)" } else { "D" };
+     push(&mut out, "# Visual instruction package\n\n")?;
+     push(
+         &mut out,
+         &format!(
+-            "Source revision {} (full hash {}). Compiled image {} × {} pixels; source document {} × {} px.\nCoordinate convention: {}. Uniform scale: {} compiled pixels per D pixel. Padding is only on the bottom/right and never shifts coordinates.\n",
++            "Source revision {} (full hash {}). Compiled image {} × {} pixels; source document {} × {} px.\nCoordinate convention: {}. Uniform scale: {} compiled pixels per {grid} pixel. Padding is only on the bottom/right and never shifts coordinates.\n",
+             manifest.source.revision,
+             manifest.extensions.state_hash,
+             manifest.extensions.overview_mapping.width,
+@@ -37,6 +39,12 @@
+             quote(manifest.compiled_for.model.as_deref().unwrap_or("generic"))?
+         ),
+     )?;
++    if let Some(output) = output {
++        push(&mut out, &format!(
++            "Explicit image output: original D crop [x,y,w,h]=[{},{},{},{}], clockwise rotation {} degrees, output grid O={} × {}. Resampling: premultiplied bilinear in original source sample space. Document boxes/points remain D coordinates; compiled coordinates include this crop/rotation/resize before the package scale. Originals are unchanged.\n",
++            output.crop.x, output.crop.y, output.crop.width, output.crop.height,
++            output.clockwise_degrees, output.output_width, output.output_height))?;
++    }
+     match &manifest.extensions.target_profile {
+         Target::OpenAiResponses { .. } => push(
+             &mut out,
+@@ -115,7 +123,7 @@
+             push(
+                 &mut out,
+                 &format!(
+-                    "Crop D rectangle: {:?}; content {} × {}, image {} × {} pixels; box in crop pixels [x,y,w,h]: {:?}.\n",
++                    "Crop {grid} rectangle: {:?}; content {} × {}, image {} × {} pixels; box in crop pixels [x,y,w,h]: {:?}.\n",
+                     crop.mapping.source_rectangle,
+                     crop.mapping.content_width,
+                     crop.mapping.content_height,
+--- a/core/crates/vw-package/src/verify.rs
++++ b/core/crates/vw-package/src/verify.rs
+@@ -289,17 +289,24 @@
+         || m.prompt_file != "prompt.md"
+         || m.semantic_file != "semantic.json"
+         || m.untrusted_text_notice != UNTRUSTED_TEXT_NOTICE
+-        || m.extensions.compiler != "vw-package-1-area-integer"
++        || m.extensions.compiler != if m.extensions.overview_mapping.output_frame.is_some() { "vw-package-1-output-bilinear-v1" } else { "vw-package-1-area-integer" }
+         || !matches!(m.extensions.source_bit_depth, 8 | 16)
+         || m.extensions.derivative_bit_depth != 8
+     {
+         return Err(Error::Integrity);
+     }
++    let output = m.extensions.overview_mapping.output_frame;
++    let [width, height] = if let Some(value) = output {
++        let frame = value.frame()?;
++        if frame.source_size() != [m.source.width,m.source.height] { return Err(Error::Integrity); }
++        frame.output_size()
++    } else { [m.source.width,m.source.height] };
++    if u64::from(width)*u64::from(height)>limits.source_pixels { return Err(Error::Integrity); }
+     let overview = ImageMapping::new(
+-        [0, 0, i64::from(m.source.width), i64::from(m.source.height)],
++        [0, 0, i64::from(width), i64::from(height)],
+         target.max_long_edge(),
+         64,
+-    )?;
++    )?.with_output(output)?;
+     if m.extensions.overview_mapping != overview
+         || m.compiled_for.target != target.name()
+         || m.compiled_for.model.as_deref() != target.model()
+@@ -425,12 +432,10 @@
+         {
+             return Err(Error::Integrity);
+         }
++        let projected = geometry::output_bounds(marker.bbox_document, marker.point_document, output)?;
+         let mapping = geometry::crop(
+-            marker.bbox_document,
+-            m.source.width,
+-            m.source.height,
+-            target.max_long_edge(),
+-        )?;
++            projected, width, height, target.max_long_edge(),
++        )?.with_output(output)?;
+         if crop.mapping != mapping
+             || crop.image != format!("marker_{number}")
+             || marker.crop_image != crop.image
+--- a/core/crates/vw-raster/Cargo.toml
++++ b/core/crates/vw-raster/Cargo.toml
+@@ -10,6 +10,7 @@
+ test = false
+ 
+ [dependencies]
++vw-geom = { path = "../vw-geom", version = "=0.1.0" }
+ vw-model = { path = "../vw-model", version = "=0.1.0" }
+ vw-proto = { path = "../vw-proto", version = "=0.1.0" }
+ vw-ink = { path = "../vw-ink", version = "=0.1.0" }
+--- a/core/crates/vw-raster/src/export.rs
++++ b/core/crates/vw-raster/src/export.rs
+@@ -69,6 +69,9 @@
+     pub output_icc_hash: Option<String>,
+     pub color_conversion: String,
+     pub settings: ExportRequest,
++    /// Explicit D-to-output grid. Absent in legacy exports; region coordinates are in this output grid when present.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub image_output: Option<crate::ImageOutputMetadata>,
+ }
+ #[derive(Debug)]
+ pub struct ExportedImage {
+@@ -178,6 +181,14 @@
+ /// Export a full-resolution buffer. Call `render_document` first for marked output.
+ /// Caller bytes are never changed. Lossy/depth/matte conversions are explicit settings.
+ pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage, RasterError> {
++    export_with_output(source, r, None)
++}
++
++pub(crate) fn export_with_output(source: &DecodedImage, r: &ExportRequest, output: Option<crate::ImageOutputMetadata>) -> Result<ExportedImage, RasterError> {
++    if let Some(output) = output {
++        let frame = output.frame()?;
++        if frame.output_size() != [source.width, source.height] { return Err(RasterError::Invalid("image output metadata binding")); }
++    }
+     image_shape(source)?;
+     if !source.original_available {
+         return Err(RasterError::OriginalRequired);
+@@ -263,8 +274,8 @@
+         schema_version: 1,
+         revision: format!("r{}-{hash8}", r.revision.host_seq),
+         source_asset: source.source_asset.to_string(),
+-        source_width: source.width,
+-        source_height: source.height,
++        source_width: output.map_or(source.width, |v| v.source_width),
++        source_height: output.map_or(source.height, |v| v.source_height),
+         output_width: image.width,
+         output_height: image.height,
+         source_bit_depth: source.pixels.bit_depth(),
+@@ -279,6 +290,7 @@
+             .map(|v| vw_model::AssetId::hash(v).to_string()),
+         color_conversion: conversion.into(),
+         settings: r.clone(),
++        image_output: output,
+     };
+     let json = serde_json::to_string(&meta).map_err(|_| RasterError::Metadata)?;
+     let bytes = match r.format {
+--- a/core/crates/vw-raster/src/lib.rs
++++ b/core/crates/vw-raster/src/lib.rs
+@@ -1,6 +1,10 @@
+ //! Source-resolution CPU raster exports. No network, UI or preview fallback.
+ //! Streaming PNG can use a caller-owned private scratch file.
+ mod export;
++mod image_output;
++mod document_output;
++pub use image_output::{ImageOutputMetadata, ImageOutputResampling, image_resident_bytes, image_output_estimate, render_image_output, render_image_output_region};
++pub use document_output::{prepare_document_output, export_document_output, document_output_estimate, document_output_reservation, requires_document_output, DocumentOutput};
+ mod ffi;
+ mod materialized_result;
+ mod metadata;
+--- a/core/crates/vw-raster/src/render.rs
++++ b/core/crates/vw-raster/src/render.rs
+@@ -37,6 +37,15 @@
+     assets: &impl AssetResolver,
+     options: RenderOptions,
+ ) -> Result<DecodedImage, RasterError> {
++    render_document_mode(source, project, document, assets, options, true, &|| false)
++}
++
++/// Shared D-grid composition; clean output applies tonal layers but no annotations/results.
++pub(crate) fn render_document_mode(
++    source: &DecodedImage, project: &Project, document: &Id, assets: &impl AssetResolver,
++    options: RenderOptions, annotations: bool, cancelled: &dyn Fn() -> bool,
++) -> Result<DecodedImage, RasterError> {
++    crate::source::check_cancel(cancelled)?;
+     crate::export::image_shape(source)?;
+     project.validate()?;
+     if !source.original_available {
+@@ -79,7 +88,7 @@
+         });
+     }
+     source.validate()?;
+-    render_buffer(
++    render_buffer_mode(
+         source,
+         project,
+         document,
+@@ -88,8 +97,9 @@
+         RegionRender {
+             origin: (0, 0),
+             estimated,
+-            cancelled: &|| false,
++            cancelled,
+         },
++        annotations,
+     )
+ }
+ 
+@@ -108,6 +118,13 @@
+     assets: &impl AssetResolver,
+     options: RenderOptions,
+     region: RegionRender<'_>,
++) -> Result<DecodedImage, RasterError> {
++    render_buffer_mode(source, project, document, assets, options, region, true)
++}
++
++fn render_buffer_mode(
++    source: &DecodedImage, project: &Project, document: &Id, assets: &impl AssetResolver,
++    options: RenderOptions, region: RegionRender<'_>, annotations: bool,
+ ) -> Result<DecodedImage, RasterError> {
+     let RegionRender {
+         origin,
+@@ -134,6 +151,7 @@
+     let mut scratch = Pixmap::new(source.width, source.height).ok_or(RasterError::Allocation)?;
+     for (layer_id, layer) in layers {
+         crate::source::check_cancel(cancelled)?;
++        if layer.definition.kind == vw_model::IMAGE_OUTPUT_LAYER_KIND { continue; }
+         let mut objects = project
+             .objects
+             .iter()
+@@ -161,6 +179,7 @@
+             }
+             continue;
+         }
++        if !annotations { continue; }
+         let replacement = objects.iter().try_fold(false, |found, (_, object)| {
+             if let Some(Shape::ResultId(id)) = &object.state.shape {
+                 let candidate = project
+--- a/core/crates/vw-raster/src/stream.rs
++++ b/core/crates/vw-raster/src/stream.rs
+@@ -164,6 +164,7 @@
+ ) -> Result<StreamReport, RasterError> {
+     check_cancel(cancelled)?;
+     validate_document(source.info(), &document)?;
++    if document.project.active_image_output(document.document)?.is_some() { return Err(RasterError::Unsupported("image output requires the bounded output compositor")); }
+     let mut request = request.clone();
+     request.memory_budget_bytes = request
+         .memory_budget_bytes
+@@ -280,6 +281,7 @@
+             .is_some_and(|layer| {
+                 layer.definition.document_id.as_ref() == Some(&document.to_proto())
+                     && layer.visible
++                    && layer.definition.kind != vw_model::IMAGE_OUTPUT_LAYER_KIND
+                     && layer.opacity > 0.0
+             })
+     })
+@@ -555,6 +557,7 @@
+         }
+         .into(),
+         settings: r.clone(),
++        image_output: None,
+     }
+ }
+ struct LimitedWriter<'a, W: Write> {

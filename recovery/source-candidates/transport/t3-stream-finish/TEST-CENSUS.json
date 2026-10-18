@@ -1,0 +1,2896 @@
+{
+  "executed": false,
+  "count": 289,
+  "cases": [
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "artifact": "after/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "name": "exactRuntimeIsPreparedBeforeAnyLoadAndClosePreservesLoadedFilePaths",
+      "line": 17,
+      "source_sha256": "50ec4a8d735065d109c7741691c35514d02cc3544401a03199010211ffc5a98a",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "artifact": "after/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "name": "anIdenticalBuildReusesOnlyTheCompleteHashBoundOwnedDirectory",
+      "line": 27,
+      "source_sha256": "50ec4a8d735065d109c7741691c35514d02cc3544401a03199010211ffc5a98a",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "artifact": "after/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "name": "changedExistingBytesAreRefusedWithoutOverwriteOrDeletion",
+      "line": 34,
+      "source_sha256": "50ec4a8d735065d109c7741691c35514d02cc3544401a03199010211ffc5a98a",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "artifact": "after/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "name": "unknownEntriesInAnExistingCacheSurviveRefusal",
+      "line": 40,
+      "source_sha256": "50ec4a8d735065d109c7741691c35514d02cc3544401a03199010211ffc5a98a",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "artifact": "after/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "name": "malformedDuplicateMissingAndOversizedInventoriesFailBeforeExtraction",
+      "line": 46,
+      "source_sha256": "50ec4a8d735065d109c7741691c35514d02cc3544401a03199010211ffc5a98a",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "artifact": "after/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "name": "hashOrLengthMismatchNeverPublishesAReadyRuntime",
+      "line": 55,
+      "source_sha256": "50ec4a8d735065d109c7741691c35514d02cc3544401a03199010211ffc5a98a",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "artifact": "after/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "name": "injectedReparseRefusalReleasesEveryAcquiredLeaseAndPreservesPriorCache",
+      "line": 63,
+      "source_sha256": "50ec4a8d735065d109c7741691c35514d02cc3544401a03199010211ffc5a98a",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "artifact": "after/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "name": "parentReparseIsRefusedBeforeCreatingAnyChild",
+      "line": 69,
+      "source_sha256": "50ec4a8d735065d109c7741691c35514d02cc3544401a03199010211ffc5a98a",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "refusedCaptureExclusionShowsEditorAndDisablesCapture",
+      "line": 13,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "exclusionSuccessAloneEnablesPicker",
+      "line": 18,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "cancelledStartupCannotPublishAnExclusionOutcome",
+      "line": 22,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "fractionalLetterboxUsesTheSameOriginalPixelTransformAsRegionMapping",
+      "line": 28,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "cancellationJoinsNativeProducerAndReleasesLateOwnerExactlyOnce",
+      "line": 44,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "throwingCancellationSignalStillJoinsAndReleasesProducer",
+      "line": 54,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "alreadyCancelledCallerCannotCreateAWorkspaceOrNativeOwner",
+      "line": 60,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "deliveredOwnerBelongsToCallerAndIsNotDisposedByHandoff",
+      "line": 65,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "pickerModalOwnsOneLeaseAndNeverReleasesAnotherDialog",
+      "line": 70,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "rgbaDisplayConversionPreservesChannelOrderAndAlpha",
+      "line": 76,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "emptyPrivateWorkspaceIsRemovedButCompletedOriginalIsRetained",
+      "line": 82,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "foreignMarkerAndUnexpectedChildRefuseCleanupWithoutDeletingOriginal",
+      "line": 90,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "name": "retainedCaptureCountCannotGrowWithoutBoundOrAdoptOldOwners",
+      "line": 99,
+      "source_sha256": "01580538fc3c46bdd622ff31e2365fc8d88297a80939c665cab068169fde3aaa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPumpTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPumpTest.kt",
+      "name": "cancelledPublicationRetainsPacketAndProducerUntilNativeSettlement",
+      "line": 11,
+      "source_sha256": "06a6f86d1ebec91a1ce9b78c84f797fb7dea8b179832a2e19455ea7176e874a6",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPumpTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPumpTest.kt",
+      "name": "rejectedMediaFeedbackIsConsumedExactlyOnceAndRequestsRepair",
+      "line": 33,
+      "source_sha256": "06a6f86d1ebec91a1ce9b78c84f797fb7dea8b179832a2e19455ea7176e874a6",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPumpTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPumpTest.kt",
+      "name": "exactOriginalRequestIsAnsweredOnceWhilePaused",
+      "line": 49,
+      "source_sha256": "06a6f86d1ebec91a1ce9b78c84f797fb7dea8b179832a2e19455ea7176e874a6",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPumpTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPumpTest.kt",
+      "name": "lateOpenedProducerClosesWithoutPublishingAfterCancellation",
+      "line": 67,
+      "source_sha256": "06a6f86d1ebec91a1ce9b78c84f797fb7dea8b179832a2e19455ea7176e874a6",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPumpTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPumpTest.kt",
+      "name": "failedCleanupCannotReadmitAnotherProducer",
+      "line": 79,
+      "source_sha256": "06a6f86d1ebec91a1ce9b78c84f797fb7dea8b179832a2e19455ea7176e874a6",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPumpTest.kt",
+      "artifact": "new/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPumpTest.kt",
+      "name": "stopBeforeDispatchDoesNotOpenCapture",
+      "line": 89,
+      "source_sha256": "06a6f86d1ebec91a1ce9b78c84f797fb7dea8b179832a2e19455ea7176e874a6",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "name": "freezeCreatesOnlyPrivateDraftAndOriginalUpgradeKeepsThatIdentity",
+      "line": 9,
+      "source_sha256": "77dfed840ac54bee2ed6a3dcfa6293d9fecad383dadee88a74c2bec2322eb4c9",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "name": "degradedChoiceIsRequiredAndBorrowedPixelsCloseAfterNativePreparation",
+      "line": 14,
+      "source_sha256": "77dfed840ac54bee2ed6a3dcfa6293d9fecad383dadee88a74c2bec2322eb4c9",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "name": "mismatchedDegradedBackgroundRefusesAndClosesExceptionalHandle",
+      "line": 21,
+      "source_sha256": "77dfed840ac54bee2ed6a3dcfa6293d9fecad383dadee88a74c2bec2322eb4c9",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "name": "unknownCommitRetainsSamePlanForDurableRetryAfterDisconnection",
+      "line": 26,
+      "source_sha256": "77dfed840ac54bee2ed6a3dcfa6293d9fecad383dadee88a74c2bec2322eb4c9",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "name": "failedDraftCloseRetainsSealedOwnerAndRetryJoinsBeforeResume",
+      "line": 32,
+      "source_sha256": "77dfed840ac54bee2ed6a3dcfa6293d9fecad383dadee88a74c2bec2322eb4c9",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "name": "resumeCannotPassActualDraftRetirementFence",
+      "line": 37,
+      "source_sha256": "77dfed840ac54bee2ed6a3dcfa6293d9fecad383dadee88a74c2bec2322eb4c9",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "name": "childEditorFailureSealsFreezeAndSaveUntilExplicitDiscard",
+      "line": 45,
+      "source_sha256": "77dfed840ac54bee2ed6a3dcfa6293d9fecad383dadee88a74c2bec2322eb4c9",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "name": "wrongOriginalNeverUpgradesReadyStateAndItsOwnerRetires",
+      "line": 49,
+      "source_sha256": "77dfed840ac54bee2ed6a3dcfa6293d9fecad383dadee88a74c2bec2322eb4c9",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+      "name": "frameAgeUsesPeerMinusLocalClockOffsetAndNeverClaimsUnsynchronizedAge",
+      "line": 53,
+      "source_sha256": "77dfed840ac54bee2ed6a3dcfa6293d9fecad383dadee88a74c2bec2322eb4c9",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "name": "displayLetterboxingAndDpiNeverDoubleScaleFrameCoordinates",
+      "line": 13,
+      "source_sha256": "44e8f9c1442d30e559b2ba5f087ac861ddf4a5d3b4219b84ad752534e8313085",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "name": "reversedDragRemainsExplicitForNativePixelEdgeAdmission",
+      "line": 18,
+      "source_sha256": "44e8f9c1442d30e559b2ba5f087ac861ddf4a5d3b4219b84ad752534e8313085",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "name": "outsideImageOrEmptyContactsDoNotBecomeRegionRequests",
+      "line": 22,
+      "source_sha256": "44e8f9c1442d30e559b2ba5f087ac861ddf4a5d3b4219b84ad752534e8313085",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "name": "sourceViewportAndSizeChangesInvalidateBothDownAndCompletedDrafts",
+      "line": 28,
+      "source_sha256": "44e8f9c1442d30e559b2ba5f087ac861ddf4a5d3b4219b84ad752534e8313085",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "name": "cancelAndDetachCannotReuseACompletedRectangle",
+      "line": 38,
+      "source_sha256": "44e8f9c1442d30e559b2ba5f087ac861ddf4a5d3b4219b84ad752534e8313085",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "name": "nonfiniteInputAndMappingFailureDoNotEscapeTheDisplayBoundary",
+      "line": 42,
+      "source_sha256": "44e8f9c1442d30e559b2ba5f087ac861ddf4a5d3b4219b84ad752534e8313085",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt",
+      "name": "cancelledLateResourceIsReleasedBeforeCallerSettles",
+      "line": 9,
+      "source_sha256": "b185e247c545b6dad2329f6f46b1d73d329f4b396f1945d848badc0f0bfca834",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt",
+      "name": "failedCancellationSignalStillJoinsAndReleasesLateHandle",
+      "line": 21,
+      "source_sha256": "b185e247c545b6dad2329f6f46b1d73d329f4b396f1945d848badc0f0bfca834",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt",
+      "name": "alreadyCancelledCallerCannotStartNativeProducer",
+      "line": 32,
+      "source_sha256": "b185e247c545b6dad2329f6f46b1d73d329f4b396f1945d848badc0f0bfca834",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt",
+      "name": "closeSealsBeforeWakingAndRetainsHandleThroughEnteredCalls",
+      "line": 39,
+      "source_sha256": "b185e247c545b6dad2329f6f46b1d73d329f4b396f1945d848badc0f0bfca834",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt",
+      "artifact": "new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt",
+      "name": "nativeCloseFailureJoinsButRetainsHandleForSealedRetry",
+      "line": 51,
+      "source_sha256": "b185e247c545b6dad2329f6f46b1d73d329f4b396f1945d848badc0f0bfca834",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-capture/tests/picker.rs",
+      "artifact": "new/core/crates/vw-capture/tests/picker.rs",
+      "name": "physical_mapping_is_exact_and_dpi_is_only_metadata",
+      "line": 9,
+      "source_sha256": "c36098851f2ee3ccf36f7378bbc55639a28be1b26ae9a7f77c09c1645e73e974",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-capture/tests/picker.rs",
+      "artifact": "new/core/crates/vw-capture/tests/picker.rs",
+      "name": "region_uses_pixel_edges_and_refuses_cross_monitor_silent_clipping",
+      "line": 22,
+      "source_sha256": "c36098851f2ee3ccf36f7378bbc55639a28be1b26ae9a7f77c09c1645e73e974",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-capture/tests/picker.rs",
+      "artifact": "new/core/crates/vw-capture/tests/picker.rs",
+      "name": "source_identity_and_geometry_changes_never_retarget_an_old_selection",
+      "line": 32,
+      "source_sha256": "c36098851f2ee3ccf36f7378bbc55639a28be1b26ae9a7f77c09c1645e73e974",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-capture/tests/picker.rs",
+      "artifact": "new/core/crates/vw-capture/tests/picker.rs",
+      "name": "region_capture_charges_full_monitor_readback_before_crop",
+      "line": 42,
+      "source_sha256": "c36098851f2ee3ccf36f7378bbc55639a28be1b26ae9a7f77c09c1645e73e974",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-capture/tests/picker.rs",
+      "artifact": "new/core/crates/vw-capture/tests/picker.rs",
+      "name": "distinct_window_monitor_and_region_types_cannot_silently_broaden",
+      "line": 47,
+      "source_sha256": "c36098851f2ee3ccf36f7378bbc55639a28be1b26ae9a7f77c09c1645e73e974",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-capture/tests/picker.rs",
+      "artifact": "new/core/crates/vw-capture/tests/picker.rs",
+      "name": "consent_zero_identity_and_cancel_are_rejected_before_platform_work",
+      "line": 55,
+      "source_sha256": "c36098851f2ee3ccf36f7378bbc55639a28be1b26ae9a7f77c09c1645e73e974",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/capture_import.rs",
+      "artifact": "after/core/crates/vw-ffi/src/capture_import.rs",
+      "name": "no_capture_without_action_or_exact_geometry",
+      "line": 158,
+      "source_sha256": "c8d2e0808533a5a50f12579bf8af6b02b8e43bcaa9513ac0a960881eac158d35",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/capture_import.rs",
+      "artifact": "after/core/crates/vw-ffi/src/capture_import.rs",
+      "name": "bound_provenance_is_not_synthesized_from_import_time",
+      "line": 170,
+      "source_sha256": "c8d2e0808533a5a50f12579bf8af6b02b8e43bcaa9513ac0a960881eac158d35",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "artifact": "after/core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "name": "exactly_one_body_and_authenticated_connection_shape_are_admitted_before_storage",
+      "line": 109,
+      "source_sha256": "6628a087b8735ad9be0be0db845f9378b4d23ebf659671a3767729bf59920dfc",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "artifact": "after/core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "name": "hostile_dimensions_and_truncated_png_fail_before_publication",
+      "line": 123,
+      "source_sha256": "6628a087b8735ad9be0be0db845f9378b4d23ebf659671a3767729bf59920dfc",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "artifact": "after/core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "name": "exact_retry_and_reopen_preserve_literal_text_note_and_package_revision",
+      "line": 144,
+      "source_sha256": "6628a087b8735ad9be0be0db845f9378b4d23ebf659671a3767729bf59920dfc",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "artifact": "after/core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "name": "before_after_regions_come_from_exact_stored_package_and_result_bytes",
+      "line": 174,
+      "source_sha256": "6628a087b8735ad9be0be0db845f9378b4d23ebf659671a3767729bf59920dfc",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "artifact": "after/core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "name": "display_requires_explicit_untagged_and_depth_choices_and_bounds_regions",
+      "line": 210,
+      "source_sha256": "6628a087b8735ad9be0be0db845f9378b4d23ebf659671a3767729bf59920dfc",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "artifact": "after/core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "name": "cancellation_before_storage_does_not_publish_and_lost_postpublish_receipt_recovers",
+      "line": 275,
+      "source_sha256": "6628a087b8735ad9be0be0db845f9378b4d23ebf659671a3767729bf59920dfc",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "artifact": "after/core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "name": "changed_published_bytes_are_preserved_and_never_served_or_deleted",
+      "line": 303,
+      "source_sha256": "6628a087b8735ad9be0be0db845f9378b4d23ebf659671a3767729bf59920dfc",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "artifact": "after/core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "name": "retirement_has_explicit_platform_cleanup_outcome_and_blocks_further_reads",
+      "line": 338,
+      "source_sha256": "6628a087b8735ad9be0be0db845f9378b4d23ebf659671a3767729bf59920dfc",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "artifact": "after/core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "name": "retained_orphan_bytes_count_against_quota_without_allocating_them",
+      "line": 368,
+      "source_sha256": "6628a087b8735ad9be0be0db845f9378b4d23ebf659671a3767729bf59920dfc",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "artifact": "after/core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "name": "marker_only_retirement_keeps_its_logical_slot_and_reopens_at_capacity",
+      "line": 387,
+      "source_sha256": "6628a087b8735ad9be0be0db845f9378b4d23ebf659671a3767729bf59920dfc",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "artifact": "after/core/crates/vw-ffi/src/packages/inbox/tests.rs",
+      "name": "both_retirement_and_incoming_scratch_consume_publication_slots",
+      "line": 441,
+      "source_sha256": "6628a087b8735ad9be0be0db845f9378b4d23ebf659671a3767729bf59920dfc",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/project.rs",
+      "artifact": "after/core/crates/vw-ffi/src/project.rs",
+      "name": "saturated_project_close_releases_the_database_even_after_waiter_cancellation",
+      "line": 555,
+      "source_sha256": "53c87cbd15055c0c90d2973a9e926dea2e80ee018dd69ac3cb65e579e3f9e597",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/link.rs",
+      "artifact": "after/core/crates/vw-ffi/src/session/link.rs",
+      "name": "blocked_queue_sender_and_cross_thread_capture_cannot_cross_carrier_epoch",
+      "line": 1492,
+      "source_sha256": "fe177e2b30af901e3b608f7f5a59eba6377388cd16293e41fb534f1bfe335593",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/link.rs",
+      "artifact": "after/core/crates/vw-ffi/src/session/link.rs",
+      "name": "active_or_exhausted_epoch_cannot_be_reentered_or_wrap",
+      "line": 1519,
+      "source_sha256": "fe177e2b30af901e3b608f7f5a59eba6377388cd16293e41fb534f1bfe335593",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/decoder_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/decoder_tests.rs",
+      "name": "cancelled_consumer_retains_actual_worker_and_all_bytes_until_decoder_returns",
+      "line": 6,
+      "source_sha256": "61314a1ef6e3de8b43c9357ffc37d0f60996d7318dded2a66c1e39277afac6fa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/decoder_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/decoder_tests.rs",
+      "name": "interrupted_wait_keeps_exact_result_and_frame_credit_after_worker_shutdown",
+      "line": 19,
+      "source_sha256": "61314a1ef6e3de8b43c9357ffc37d0f60996d7318dded2a66c1e39277afac6fa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/decoder_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/decoder_tests.rs",
+      "name": "foreign_budget_base_and_small_budget_refuse_without_consuming_codec_lifetime",
+      "line": 33,
+      "source_sha256": "61314a1ef6e3de8b43c9357ffc37d0f60996d7318dded2a66c1e39277afac6fa",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "late_lossless_original_is_required_and_exact_save_is_durable_retryable",
+      "line": 62,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "failed_preparation_and_plan_drop_restore_draft_edit_admission",
+      "line": 84,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "retired_link_refuses_new_save_without_redirecting_or_mutating_target",
+      "line": 93,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "cancellation_of_queued_save_keeps_snapshot_sealed_until_actual_settlement",
+      "line": 102,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "central_commit_refuses_a_queued_edit_after_save_preparation_seals",
+      "line": 113,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "joined_disposal_waits_for_real_worker_and_removes_only_owned_draft",
+      "line": 132,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "annotation_geometry_survives_atomic_save_undo_redo_and_reopen",
+      "line": 149,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "cancelled_prepare_future_keeps_edit_seal_until_the_queued_worker_drops_its_capture",
+      "line": 175,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "draft_disposal_joins_a_dropped_save_waiter_on_the_other_project_actor",
+      "line": 187,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "actual_saved_frame_can_resume_after_disposal_without_reviving_a_closed_source",
+      "line": 203,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "absent_stream_proof_retains_legacy_capture_canonical_json_and_hash",
+      "line": 222,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "explicit_degraded_save_requires_exact_native_timeout_and_keeps_no_original_claim",
+      "line": 233,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "native_timeout_cannot_downgrade_a_verified_original_or_other_generation",
+      "line": 253,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "saved_capture_output_receipt_binds_native_frame_asset_and_final_full_revision",
+      "line": 262,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+      "name": "degraded_capture_quality_and_saved_hash_survive_atomic_undo_redo_and_reopen",
+      "line": 280,
+      "source_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "name": "old_entry_epoch_cannot_enable_a_receiver_after_reconnect",
+      "line": 36,
+      "source_sha256": "28332f4ef04813ac30d2a76142fe474200d1a57128ade0401dd761733b705d3a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "name": "cancelled_enable_before_dispatch_does_not_create_a_worker_or_seal_the_link",
+      "line": 44,
+      "source_sha256": "28332f4ef04813ac30d2a76142fe474200d1a57128ade0401dd761733b705d3a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "name": "cancelled_enable_after_creation_keeps_receiver_until_actual_retirement",
+      "line": 52,
+      "source_sha256": "28332f4ef04813ac30d2a76142fe474200d1a57128ade0401dd761733b705d3a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "name": "undelivered_draw_seals_its_view_without_claiming_it_was_not_presented",
+      "line": 61,
+      "source_sha256": "28332f4ef04813ac30d2a76142fe474200d1a57128ade0401dd761733b705d3a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "name": "cancelled_receipt_waiter_rejoins_exact_choice_and_contact_freezes_actual_frame",
+      "line": 71,
+      "source_sha256": "28332f4ef04813ac30d2a76142fe474200d1a57128ade0401dd761733b705d3a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "name": "equal_size_new_frames_publish_readiness_and_close_wakes_a_cancelled_ui_wait",
+      "line": 84,
+      "source_sha256": "28332f4ef04813ac30d2a76142fe474200d1a57128ade0401dd761733b705d3a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "name": "link_close_seals_immediately_and_waits_for_driver_join",
+      "line": 94,
+      "source_sha256": "28332f4ef04813ac30d2a76142fe474200d1a57128ade0401dd761733b705d3a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "name": "forced_driver_drop_reports_failure_to_waiters_instead_of_false_join_success",
+      "line": 101,
+      "source_sha256": "28332f4ef04813ac30d2a76142fe474200d1a57128ade0401dd761733b705d3a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+      "name": "actual_scoped_transfer_upgrades_only_the_exact_frozen_background_and_old_reads_remain_honest",
+      "line": 110,
+      "source_sha256": "28332f4ef04813ac30d2a76142fe474200d1a57128ade0401dd761733b705d3a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/incoming_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/incoming_tests.rs",
+      "name": "actual_hash_verified_file_survives_io_shutdown_only_while_result_owner_retains_it",
+      "line": 13,
+      "source_sha256": "433982ae811be719f4d693bb21754ab726643317658143019eb96b3966b140cd",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/incoming_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/incoming_tests.rs",
+      "name": "cancelled_consumer_keeps_actual_writer_and_scratch_until_join",
+      "line": 22,
+      "source_sha256": "433982ae811be719f4d693bb21754ab726643317658143019eb96b3966b140cd",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/incoming_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/incoming_tests.rs",
+      "name": "interrupted_select_wait_retains_the_single_complete_file_result",
+      "line": 32,
+      "source_sha256": "433982ae811be719f4d693bb21754ab726643317658143019eb96b3966b140cd",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/incoming_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/incoming_tests.rs",
+      "name": "wrong_scope_and_hidden_chunk_capacity_refuse_before_worker_admission",
+      "line": 40,
+      "source_sha256": "433982ae811be719f4d693bb21754ab726643317658143019eb96b3966b140cd",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/lossless_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/lossless_tests.rs",
+      "name": "blob_hash_is_not_lossless_proof_and_late_exact_png_can_upgrade_degraded_frame",
+      "line": 28,
+      "source_sha256": "a827fdea63fed6bcbe9cee9fb9b86a283bb891b3a7961b29ba7c146d6ed18b92",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/lossless_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/lossless_tests.rs",
+      "name": "same_frame_provenance_hash_or_scope_cannot_change_after_first_offer",
+      "line": 44,
+      "source_sha256": "a827fdea63fed6bcbe9cee9fb9b86a283bb891b3a7961b29ba7c146d6ed18b92",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/lossless_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/lossless_tests.rs",
+      "name": "correctly_hashed_non_png_never_becomes_a_lossless_original",
+      "line": 55,
+      "source_sha256": "a827fdea63fed6bcbe9cee9fb9b86a283bb891b3a7961b29ba7c146d6ed18b92",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/lossless_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/lossless_tests.rs",
+      "name": "exact_cancel_destroys_queued_file_and_cannot_publish_a_late_codec_result",
+      "line": 64,
+      "source_sha256": "a827fdea63fed6bcbe9cee9fb9b86a283bb891b3a7961b29ba7c146d6ed18b92",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "start_and_epoch_are_admission_authority_not_media",
+      "line": 23,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "duplicate_open_does_not_clear_the_decoded_base",
+      "line": 29,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "late_repaired_original_cannot_regress_pixels_or_change_its_timestamp",
+      "line": 34,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "pending_delta_replacement_refuses_broken_chain_without_lifetime_failure",
+      "line": 39,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "older_repair_during_newer_decode_cannot_queue_a_pixel_regression",
+      "line": 46,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "one_pending_suffix_may_wait_behind_its_owned_decoder",
+      "line": 52,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "close_and_new_source_retain_old_worker_until_actual_settlement",
+      "line": 62,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "malformed_future_and_foreign_generation_never_create_source",
+      "line": 70,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "stamp_preserves_real_identity_across_keyframe_replay",
+      "line": 76,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "source_metadata_is_exact_and_does_not_imply_an_input_grant",
+      "line": 82,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "scoped_blob_exact_window_roundtrip_and_final_then_old_ack",
+      "line": 91,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "scoped_request_and_chunk_cannot_acquire_another_original_or_generation",
+      "line": 99,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "corrupt_completion_consumes_receiver_and_held_chunk_does_not_advance",
+      "line": 106,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "captured_time_and_platform_cannot_change_under_one_source_or_frame",
+      "line": 113,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+      "name": "late_lossless_offer_must_match_frozen_wall_time_and_generation",
+      "line": 121,
+      "source_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/outgoing_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/outgoing_tests.rs",
+      "name": "original_announcement_precedes_scoped_request_and_backpressure_retains_exact_chunk",
+      "line": 10,
+      "source_sha256": "4994d399ec5f2c7e8ba2c1a206f6f2da46eb5946a8f7060391d9d06075840003",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/outgoing_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/outgoing_tests.rs",
+      "name": "arbitrary_asset_or_foreign_scope_cannot_start_or_cancel_the_approved_original",
+      "line": 25,
+      "source_sha256": "4994d399ec5f2c7e8ba2c1a206f6f2da46eb5946a8f7060391d9d06075840003",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/outgoing_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/outgoing_tests.rs",
+      "name": "malformed_or_cancelled_local_original_never_reaches_an_offer_and_releases_budget",
+      "line": 34,
+      "source_sha256": "4994d399ec5f2c7e8ba2c1a206f6f2da46eb5946a8f7060391d9d06075840003",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+      "name": "remote_source_or_freeze_never_creates_a_local_publisher_without_explicit_admission",
+      "line": 42,
+      "source_sha256": "06b8f0a60f750af9379f7aa6dea5fd10bab191e9eb5782ab3eb21b5db46496a2",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+      "name": "cancelled_publisher_acquisition_before_or_after_dispatch_is_joined_and_old_epoch_refused",
+      "line": 51,
+      "source_sha256": "06b8f0a60f750af9379f7aa6dea5fd10bab191e9eb5782ab3eb21b5db46496a2",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+      "name": "cancelled_frame_waiter_cannot_release_actual_input_admission_or_publish_late_pixels",
+      "line": 62,
+      "source_sha256": "06b8f0a60f750af9379f7aa6dea5fd10bab191e9eb5782ab3eb21b5db46496a2",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+      "name": "public_frame_feedback_binds_generation_and_exact_original_descriptor_before_any_offer",
+      "line": 74,
+      "source_sha256": "06b8f0a60f750af9379f7aa6dea5fd10bab191e9eb5782ab3eb21b5db46496a2",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+      "name": "original_completion_after_resume_cannot_offer_a_retired_ticket",
+      "line": 94,
+      "source_sha256": "06b8f0a60f750af9379f7aa6dea5fd10bab191e9eb5782ab3eb21b5db46496a2",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+      "name": "publication_close_does_not_close_receiver_and_link_close_joins_both_owners",
+      "line": 107,
+      "source_sha256": "06b8f0a60f750af9379f7aa6dea5fd10bab191e9eb5782ab3eb21b5db46496a2",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publish_order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publish_order_tests.rs",
+      "name": "local_packet_admission_refuses_network_authority_spare_capacity_and_malformed_repeated_fields",
+      "line": 8,
+      "source_sha256": "018e32dd4e301d4b9dc310e3db2692262f58756ae520010e29a0c1cee4716f46",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publish_order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publish_order_tests.rs",
+      "name": "source_open_precedes_media_and_declined_admission_preserves_captured_identity",
+      "line": 17,
+      "source_sha256": "018e32dd4e301d4b9dc310e3db2692262f58756ae520010e29a0c1cee4716f46",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publish_order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publish_order_tests.rs",
+      "name": "same_frame_repair_cannot_change_provenance_geometry_or_capture_pixels_mode",
+      "line": 29,
+      "source_sha256": "018e32dd4e301d4b9dc310e3db2692262f58756ae520010e29a0c1cee4716f46",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publish_order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publish_order_tests.rs",
+      "name": "only_admitted_recent_frames_and_exact_source_can_create_one_immutable_freeze_ticket",
+      "line": 40,
+      "source_sha256": "018e32dd4e301d4b9dc310e3db2692262f58756ae520010e29a0c1cee4716f46",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publish_order_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publish_order_tests.rs",
+      "name": "bounded_sent_history_never_authorizes_an_arbitrary_project_asset_or_future_frame",
+      "line": 54,
+      "source_sha256": "018e32dd4e301d4b9dc310e3db2692262f58756ae520010e29a0c1cee4716f46",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publish_worker_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publish_worker_tests.rs",
+      "name": "dropped_waiter_retains_actual_input_and_worker_until_held_preparation_returns",
+      "line": 8,
+      "source_sha256": "f5e94756fceedb55aff4a4866a8d7566444d324c38d439cda96345d371764198",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/publish_worker_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/publish_worker_tests.rs",
+      "name": "interrupted_select_can_rejoin_exact_preparation_and_escaped_result_keeps_its_charge",
+      "line": 21,
+      "source_sha256": "f5e94756fceedb55aff4a4866a8d7566444d324c38d439cda96345d371764198",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "name": "decode_is_not_presentation_and_first_contact_waits_for_exact_draw_receipt",
+      "line": 34,
+      "source_sha256": "e2e57af878846fc03bff4ed43d339fbbd41bd434a1a07304da47a6bf48f2dc5b",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "name": "source_loss_allows_late_actual_receipt_preserves_pixels_and_never_substitutes_a_draft",
+      "line": 46,
+      "source_sha256": "e2e57af878846fc03bff4ed43d339fbbd41bd434a1a07304da47a6bf48f2dc5b",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "name": "new_source_and_cancelled_old_decode_do_not_publish_old_pixels",
+      "line": 55,
+      "source_sha256": "e2e57af878846fc03bff4ed43d339fbbd41bd434a1a07304da47a6bf48f2dc5b",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "name": "frozen_draft_refuses_remote_source_replacement_and_explicit_dispose_resumes_with_repair",
+      "line": 64,
+      "source_sha256": "e2e57af878846fc03bff4ed43d339fbbd41bd434a1a07304da47a6bf48f2dc5b",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "name": "remote_edit_never_requests_a_freeze",
+      "line": 72,
+      "source_sha256": "e2e57af878846fc03bff4ed43d339fbbd41bd434a1a07304da47a6bf48f2dc5b",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "name": "coalesced_and_escaped_frames_keep_actual_byte_credit_through_freeze_and_disposal",
+      "line": 78,
+      "source_sha256": "e2e57af878846fc03bff4ed43d339fbbd41bd434a1a07304da47a6bf48f2dc5b",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "name": "packet_spare_capacity_cannot_bypass_the_queued_reservation",
+      "line": 89,
+      "source_sha256": "e2e57af878846fc03bff4ed43d339fbbd41bd434a1a07304da47a6bf48f2dc5b",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+      "name": "byte_reservation_overflow_and_failed_admission_do_not_change_used_bytes",
+      "line": 94,
+      "source_sha256": "e2e57af878846fc03bff4ed43d339fbbd41bd434a1a07304da47a6bf48f2dc5b",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/region.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/region.rs",
+      "name": "phone_request_is_only_a_prompt_and_requires_exact_local_resolution",
+      "line": 91,
+      "source_sha256": "d3442a09965620bade8f92f5a25f0c190afc3610fcce638756af5fa8a1c7414a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/region.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/region.rs",
+      "name": "pending_prompt_cannot_be_replaced_by_replay_or_rate_limited_request",
+      "line": 98,
+      "source_sha256": "d3442a09965620bade8f92f5a25f0c190afc3610fcce638756af5fa8a1c7414a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/region.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/region.rs",
+      "name": "consent_expires_at_fixed_thirty_seconds_and_never_opens_a_source",
+      "line": 104,
+      "source_sha256": "d3442a09965620bade8f92f5a25f0c190afc3610fcce638756af5fa8a1c7414a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/region.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/region.rs",
+      "name": "stop_releases_only_prompt_and_pending_wire_and_new_epoch_starts_empty",
+      "line": 109,
+      "source_sha256": "d3442a09965620bade8f92f5a25f0c190afc3610fcce638756af5fa8a1c7414a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/region.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/region.rs",
+      "name": "remote_rectangle_choice_has_no_source_authority",
+      "line": 115,
+      "source_sha256": "d3442a09965620bade8f92f5a25f0c190afc3610fcce638756af5fa8a1c7414a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/verified_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/verified_tests.rs",
+      "name": "verified_original_retains_real_provenance_exact_source_and_charge_until_disposal",
+      "line": 22,
+      "source_sha256": "2cc8c9ab15b5287c36eb44323693103b289f7267747b9d17dd2ec0270a87c67a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/verified_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/verified_tests.rs",
+      "name": "corrupt_hash_and_size_refuse_without_retained_bytes_or_scratch",
+      "line": 29,
+      "source_sha256": "2cc8c9ab15b5287c36eb44323693103b289f7267747b9d17dd2ec0270a87c67a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/session/stream/verified_tests.rs",
+      "artifact": "new/core/crates/vw-ffi/src/session/stream/verified_tests.rs",
+      "name": "cancelled_and_insufficient_budget_verification_never_exposes_lossless_success",
+      "line": 37,
+      "source_sha256": "2cc8c9ab15b5287c36eb44323693103b289f7267747b9d17dd2ec0270a87c67a",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-ffi/src/streaming_ffi.rs",
+      "artifact": "after/core/crates/vw-ffi/src/streaming_ffi.rs",
+      "name": "file_import_export_preserves_original_16bit_alpha_and_bound_revision",
+      "line": 1740,
+      "source_sha256": "b1a142fe9139294adfef05d9f3f5469175a24e0a0b533338e01ad6783fec8a0a",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/streaming_ffi.rs",
+      "artifact": "after/core/crates/vw-ffi/src/streaming_ffi.rs",
+      "name": "export_limits_cancel_and_collision_preserve_targets_and_remove_owned_scratch",
+      "line": 1778,
+      "source_sha256": "b1a142fe9139294adfef05d9f3f5469175a24e0a0b533338e01ad6783fec8a0a",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/streaming_ffi.rs",
+      "artifact": "after/core/crates/vw-ffi/src/streaming_ffi.rs",
+      "name": "rejected_import_never_publishes_project_or_removes_original",
+      "line": 1821,
+      "source_sha256": "b1a142fe9139294adfef05d9f3f5469175a24e0a0b533338e01ad6783fec8a0a",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/src/streaming_ffi.rs",
+      "artifact": "after/core/crates/vw-ffi/src/streaming_ffi.rs",
+      "name": "output_is_restricted_to_owned_work_directory",
+      "line": 1845,
+      "source_sha256": "b1a142fe9139294adfef05d9f3f5469175a24e0a0b533338e01ad6783fec8a0a",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/capture_delivery.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/capture_delivery.rs",
+      "name": "exact_capture_append_retry_and_reopen_preserve_original_and_identity",
+      "line": 98,
+      "source_sha256": "f309662de49206fb9cb36dc4521e3fbf0de5bd8673b72f18f86dbdf62c5429af",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/capture_delivery.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/capture_delivery.rs",
+      "name": "stale_target_and_cancelled_or_disposed_plan_never_publish_a_document",
+      "line": 142,
+      "source_sha256": "f309662de49206fb9cb36dc4521e3fbf0de5bd8673b72f18f86dbdf62c5429af",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/capture_delivery.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/capture_delivery.rs",
+      "name": "repeated_identical_screen_reuses_original_without_rewriting_capture_time",
+      "line": 179,
+      "source_sha256": "f309662de49206fb9cb36dc4521e3fbf0de5bd8673b72f18f86dbdf62c5429af",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/capture_delivery.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/capture_delivery.rs",
+      "name": "missing_or_corrupt_replica_original_is_not_a_ready_capture",
+      "line": 206,
+      "source_sha256": "f309662de49206fb9cb36dc4521e3fbf0de5bd8673b72f18f86dbdf62c5429af",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/capture_delivery.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/capture_delivery.rs",
+      "name": "prepared_copy_survives_source_close_and_retains_literal_semantics",
+      "line": 256,
+      "source_sha256": "f309662de49206fb9cb36dc4521e3fbf0de5bd8673b72f18f86dbdf62c5429af",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/capture_delivery.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/capture_delivery.rs",
+      "name": "small_budget_refuses_without_publication",
+      "line": 337,
+      "source_sha256": "f309662de49206fb9cb36dc4521e3fbf0de5bd8673b72f18f86dbdf62c5429af",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/capture_delivery.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/capture_delivery.rs",
+      "name": "actual_existing_authenticated_link_delivers_a_new_original_without_project_replacement",
+      "line": 465,
+      "source_sha256": "f309662de49206fb9cb36dc4521e3fbf0de5bd8673b72f18f86dbdf62c5429af",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/capture_delivery.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/capture_delivery.rs",
+      "name": "undo_redo_retains_original_and_capture_frame_without_false_ready_for_deleted_document",
+      "line": 584,
+      "source_sha256": "f309662de49206fb9cb36dc4521e3fbf0de5bd8673b72f18f86dbdf62c5429af",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/capture_delivery.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/capture_delivery.rs",
+      "name": "annotated_source_is_refused_instead_of_silently_dropping_saved_marks",
+      "line": 630,
+      "source_sha256": "f309662de49206fb9cb36dc4521e3fbf0de5bd8673b72f18f86dbdf62c5429af",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "rectangle_is_exact_document_coverage_and_one_durable_transaction",
+      "line": 135,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "lasso_matches_independent_axis_aligned_rectangle_answers",
+      "line": 185,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "subtractive_paint_erases_mask_only_and_undo_restores_its_exact_asset",
+      "line": 225,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "feather_and_morphology_have_independent_disk_kernel_answers",
+      "line": 271,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "boolean_operations_and_invert_keep_exact_coverage",
+      "line": 319,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "stale_revision_source_and_selection_version_never_publish_an_edit",
+      "line": 361,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "cancel_budget_and_bad_geometry_are_atomic_refusals",
+      "line": 411,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "transaction_ids_cannot_be_reused_even_with_a_fresh_binding",
+      "line": 445,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "mask_export_is_exact_gray_png_and_never_overwrites_a_destination",
+      "line": 467,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "export_refusals_leave_staging_and_source_unchanged",
+      "line": 496,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "cutout_preserves_sixteen_bit_hidden_rgb_and_multiplies_alpha_once",
+      "line": 531,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "corrupt_mask_blob_is_refused_and_never_replaced",
+      "line": 620,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "deleting_a_selection_is_whole_object_erase_and_undo_restores_it",
+      "line": 644,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/masks.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/masks.rs",
+      "name": "content_identical_imported_gray_original_reuses_its_existing_metadata",
+      "line": 697,
+      "source_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/semantic_ui.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/semantic_ui.rs",
+      "name": "catalog_pages_stored_identity_without_selecting_latest_and_survives_reopen",
+      "line": 246,
+      "source_sha256": "8c6f50d1e6eec35f4f69d84765f8e4ac68b466fa29d56756595df893f54e8b75",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/semantic_ui.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/semantic_ui.rs",
+      "name": "cursor_is_bound_to_complete_visible_revision_and_existing_capture_row",
+      "line": 289,
+      "source_sha256": "8c6f50d1e6eec35f4f69d84765f8e4ac68b466fa29d56756595df893f54e8b75",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/semantic_ui.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/semantic_ui.rs",
+      "name": "ordinary_image_and_missing_provider_are_explicit_empty_inventory",
+      "line": 327,
+      "source_sha256": "8c6f50d1e6eec35f4f69d84765f8e4ac68b466fa29d56756595df893f54e8b75",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/semantic_ui.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/semantic_ui.rs",
+      "name": "referenced_marker_reopens_exactly_and_reference_replacement_retries_and_undoes",
+      "line": 348,
+      "source_sha256": "8c6f50d1e6eec35f4f69d84765f8e4ac68b466fa29d56756595df893f54e8b75",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/semantic_ui.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/semantic_ui.rs",
+      "name": "unknown_duplicate_cancelled_and_stale_reference_requests_preserve_canonical_state",
+      "line": 419,
+      "source_sha256": "8c6f50d1e6eec35f4f69d84765f8e4ac68b466fa29d56756595df893f54e8b75",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/semantic_ui.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/semantic_ui.rs",
+      "name": "catalog_resource_and_cancellation_admission_precedes_decode",
+      "line": 489,
+      "source_sha256": "8c6f50d1e6eec35f4f69d84765f8e4ac68b466fa29d56756595df893f54e8b75",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/semantic_ui.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/semantic_ui.rs",
+      "name": "locked_marker_or_layer_cannot_replace_references",
+      "line": 514,
+      "source_sha256": "8c6f50d1e6eec35f4f69d84765f8e4ac68b466fa29d56756595df893f54e8b75",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/semantic_ui.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/semantic_ui.rs",
+      "name": "native_snap_uses_physical_affine_threshold_and_box_corners",
+      "line": 572,
+      "source_sha256": "8c6f50d1e6eec35f4f69d84765f8e4ac68b466fa29d56756595df893f54e8b75",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "name": "buffered_jpeg_and_webp_keep_revision_metadata_and_no_clobber_publication",
+      "line": 114,
+      "source_sha256": "218b9590f796da58bead4e6a6c3c7e6f122946a1f597b85a1f0d10c4f3b93d91",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "name": "typed_memory_encoded_and_cancel_failures_publish_nothing",
+      "line": 172,
+      "source_sha256": "218b9590f796da58bead4e6a6c3c7e6f122946a1f597b85a1f0d10c4f3b93d91",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "name": "file_attachments_are_exact_retryable_immutable_assets_without_documents",
+      "line": 208,
+      "source_sha256": "218b9590f796da58bead4e6a6c3c7e6f122946a1f597b85a1f0d10c4f3b93d91",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "name": "malformed_video_and_cancelled_attachment_leave_history_unchanged",
+      "line": 279,
+      "source_sha256": "218b9590f796da58bead4e6a6c3c7e6f122946a1f597b85a1f0d10c4f3b93d91",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "name": "typed_format_and_source_binding_failures_precede_publication",
+      "line": 330,
+      "source_sha256": "218b9590f796da58bead4e6a6c3c7e6f122946a1f597b85a1f0d10c4f3b93d91",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/streaming_ffi.rs",
+      "name": "depth_and_alpha_reductions_require_explicit_export_choices",
+      "line": 382,
+      "source_sha256": "218b9590f796da58bead4e6a6c3c7e6f122946a1f597b85a1f0d10c4f3b93d91",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/workflows.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/workflows.rs",
+      "name": "immutable_marker_plan_retries_exactly_and_reopens_full_literal_instruction",
+      "line": 79,
+      "source_sha256": "bca064cb60195cfb926d141ad50ae138db03ca9bd0ee08484992543336e5814b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/workflows.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/workflows.rs",
+      "name": "stale_simultaneous_marker_plan_fails_without_renumbering_accepted_content",
+      "line": 128,
+      "source_sha256": "bca064cb60195cfb926d141ad50ae138db03ca9bd0ee08484992543336e5814b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/workflows.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/workflows.rs",
+      "name": "marker_delete_renumbers_atomically_and_existing_undo_restores_identity",
+      "line": 152,
+      "source_sha256": "bca064cb60195cfb926d141ad50ae138db03ca9bd0ee08484992543336e5814b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/workflows.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/workflows.rs",
+      "name": "offline_successive_plans_use_accepted_wire_base_with_visible_compare_and_swap",
+      "line": 191,
+      "source_sha256": "bca064cb60195cfb926d141ad50ae138db03ca9bd0ee08484992543336e5814b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/workflows.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/workflows.rs",
+      "name": "draft_partial_sequence_focus_and_stale_revision_never_auto_commit",
+      "line": 251,
+      "source_sha256": "bca064cb60195cfb926d141ad50ae138db03ca9bd0ee08484992543336e5814b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/workflows.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/workflows.rs",
+      "name": "final_handwriting_draft_requires_explicit_plan_and_durable_commit",
+      "line": 318,
+      "source_sha256": "bca064cb60195cfb926d141ad50ae138db03ca9bd0ee08484992543336e5814b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/workflows.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/workflows.rs",
+      "name": "cancellation_disposal_budget_and_used_transaction_refusals_are_atomic",
+      "line": 380,
+      "source_sha256": "bca064cb60195cfb926d141ad50ae138db03ca9bd0ee08484992543336e5814b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/workflows.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/workflows.rs",
+      "name": "semantic_ticket_persists_exact_frame_exports_private_data_safely_and_snaps_in_screen_pixels",
+      "line": 559,
+      "source_sha256": "bca064cb60195cfb926d141ad50ae138db03ca9bd0ee08484992543336e5814b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/workflows.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/workflows.rs",
+      "name": "semantic_late_collection_and_invalid_tree_cannot_attach_to_a_changed_capture",
+      "line": 660,
+      "source_sha256": "bca064cb60195cfb926d141ad50ae138db03ca9bd0ee08484992543336e5814b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-ffi/tests/workflows.rs",
+      "artifact": "after/core/crates/vw-ffi/tests/workflows.rs",
+      "name": "transaction_workspace_refusal_keeps_draft_editable_before_sealing",
+      "line": 709,
+      "source_sha256": "bca064cb60195cfb926d141ad50ae138db03ca9bd0ee08484992543336e5814b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "uuid_v7_vectors_validate_version_variant_and_canonical_encoding",
+      "line": 224,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "device_and_asset_ids_reject_aliases_overflow_and_noncanonical_text",
+      "line": 248,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "fractional_keys_cover_prefixes_boundaries_exhaustion_and_stable_ties",
+      "line": 286,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "fractional_order_survives_51200_seeded_insertions_without_reordering",
+      "line": 324,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "every_object_variant_round_trips_through_proto_and_canonical_project",
+      "line": 346,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "canonical_hash_ignores_map_insertion_order_and_signed_zero",
+      "line": 378,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "canonical_roundtrip_preserves_full_f64_geometry_precision",
+      "line": 411,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "malformed_json_unknown_fields_and_nonfinite_numbers_never_hash",
+      "line": 457,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "reserved_timeline_unknown_kind_and_schema_return_typed_errors",
+      "line": 480,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "capture_info_round_trips_all_fields_without_integer_precision_loss",
+      "line": 513,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "semantic_capture_binding_is_exact_and_text_is_untrusted",
+      "line": 565,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "invalid_shapes_and_common_fields_are_rejected_before_serialization",
+      "line": 609,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "groups_reject_cycles_missing_parents_and_cross_document_membership",
+      "line": 685,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "pdf_pages_and_entity_references_are_checked",
+      "line": 738,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-model/tests/model_contract.rs",
+      "artifact": "after/core/crates/vw-model/tests/model_contract.rs",
+      "name": "asset_metadata_is_whitelisted_and_result_candidates_require_outside_proof",
+      "line": 788,
+      "source_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "artifact": "after/core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "name": "tiff16_preserves_adjacent_samples_and_original_provenance_without_permission",
+      "line": 21,
+      "source_sha256": "cfb5f1b98858735df65f7fc6b2d25f074a3df4c9e14b13d184df661f3052ff5e",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "artifact": "after/core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "name": "eight_to_sixteen_promotion_is_exact_and_needs_no_depth_reduction_permission",
+      "line": 33,
+      "source_sha256": "cfb5f1b98858735df65f7fc6b2d25f074a3df4c9e14b13d184df661f3052ff5e",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "artifact": "after/core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "name": "bmp_and_tiff8_refuse_silent_depth_reduction_and_record_explicit_permission",
+      "line": 43,
+      "source_sha256": "cfb5f1b98858735df65f7fc6b2d25f074a3df4c9e14b13d184df661f3052ff5e",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "artifact": "after/core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "name": "gray_icc_can_label_tiff_but_bmp_requires_explicit_conversion",
+      "line": 57,
+      "source_sha256": "cfb5f1b98858735df65f7fc6b2d25f074a3df4c9e14b13d184df661f3052ff5e",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "artifact": "after/core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "name": "format_limits_refuse_oversized_sides_and_preserve_exact_crop_without_scaling",
+      "line": 72,
+      "source_sha256": "cfb5f1b98858735df65f7fc6b2d25f074a3df4c9e14b13d184df661f3052ff5e",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "artifact": "after/core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "name": "cancellation_during_depth_promotion_does_not_modify_source",
+      "line": 83,
+      "source_sha256": "cfb5f1b98858735df65f7fc6b2d25f074a3df4c9e14b13d184df661f3052ff5e",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "artifact": "after/core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "name": "missing_original_or_insufficient_workspace_refuses_before_preparation",
+      "line": 95,
+      "source_sha256": "cfb5f1b98858735df65f7fc6b2d25f074a3df4c9e14b13d184df661f3052ff5e",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "artifact": "after/core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "name": "raster_memory_encoder_refuses_external_formats_and_existing_png_still_roundtrips",
+      "line": 104,
+      "source_sha256": "cfb5f1b98858735df65f7fc6b2d25f074a3df4c9e14b13d184df661f3052ff5e",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "reopen_retains_exact_retry_ack_undo_and_conflict_records",
+      "line": 151,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "pending_queue_survives_restart_in_order_and_deletes_only_exact_acked_bytes",
+      "line": 201,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "failed_sqlite_writer_lock_preserves_log_and_in_memory_host",
+      "line": 236,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "integer_overflow_rejections_leave_storage_and_retry_identity_unchanged",
+      "line": 293,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "writer_lock_is_exclusive_and_released_after_drop",
+      "line": 340,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "transaction_count_checkpoint_replays_only_the_three_transaction_tail",
+      "line": 364,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "elapsed_time_and_explicit_idle_checkpoints_limit_replay",
+      "line": 410,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "cancellation_survives_a_checkpoint_without_mutating_visible_state",
+      "line": 440,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "rich_document_projections_preserve_full_capture_identity_and_model_types",
+      "line": 457,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "corrupted_log_checkpoint_and_snapshot_bindings_are_rejected",
+      "line": 636,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "oversized_and_malformed_pending_payloads_fail_without_decoding_unbounded_bytes",
+      "line": 658,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "pending_column_mismatches_and_deleted_or_modified_projections_fail_open",
+      "line": 684,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "source_selected_path_and_device_metadata_are_persisted_without_pairing_fields",
+      "line": 709,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "asset_metadata_columns_must_match_the_immutable_protobuf_definition",
+      "line": 774,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-store/tests/database.rs",
+      "artifact": "after/core/crates/vw-store/tests/database.rs",
+      "name": "oversized_asset_definition_and_object_state_are_rejected_before_decoding",
+      "line": 795,
+      "source_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+      "executed": false,
+      "source_case_in_literal_base": true,
+      "source_case_in_preserved_checkpoint": false
+    },
+    {
+      "target": "core/crates/vw-stream/tests/consent.rs",
+      "artifact": "new/core/crates/vw-stream/tests/consent.rs",
+      "name": "incoming_request_never_grants_source_access_without_explicit_local_approval",
+      "line": 9,
+      "source_sha256": "6f5b47f28b6836e3283a23617010ea51cacc81fad9eeabd2fb71f91a4b48c5c3",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/consent.rs",
+      "artifact": "new/core/crates/vw-stream/tests/consent.rs",
+      "name": "foreign_peer_and_reconnected_epoch_cannot_use_an_old_offer",
+      "line": 16,
+      "source_sha256": "6f5b47f28b6836e3283a23617010ea51cacc81fad9eeabd2fb71f91a4b48c5c3",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/consent.rs",
+      "artifact": "new/core/crates/vw-stream/tests/consent.rs",
+      "name": "exact_frame_rectangle_and_offer_binding_prevent_scope_expansion",
+      "line": 23,
+      "source_sha256": "6f5b47f28b6836e3283a23617010ea51cacc81fad9eeabd2fb71f91a4b48c5c3",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/consent.rs",
+      "artifact": "new/core/crates/vw-stream/tests/consent.rs",
+      "name": "expiry_deny_and_revoke_release_authority_without_displacing_pending_request",
+      "line": 31,
+      "source_sha256": "6f5b47f28b6836e3283a23617010ea51cacc81fad9eeabd2fb71f91a4b48c5c3",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/consent.rs",
+      "artifact": "new/core/crates/vw-stream/tests/consent.rs",
+      "name": "stale_control_sequences_cannot_reopen_a_denied_prompt",
+      "line": 40,
+      "source_sha256": "6f5b47f28b6836e3283a23617010ea51cacc81fad9eeabd2fb71f91a4b48c5c3",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/consent.rs",
+      "artifact": "new/core/crates/vw-stream/tests/consent.rs",
+      "name": "approved_region_pins_original_after_ring_eviction",
+      "line": 45,
+      "source_sha256": "6f5b47f28b6836e3283a23617010ea51cacc81fad9eeabd2fb71f91a4b48c5c3",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/freeze.rs",
+      "artifact": "new/core/crates/vw-stream/tests/freeze.rs",
+      "name": "first_pen_freezes_displayed_frame_not_newer_decode_or_capture",
+      "line": 8,
+      "source_sha256": "d18ecc9da101791ea66baf61ac233046542ef281061abf42a6d8b673cc8d4664",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/freeze.rs",
+      "artifact": "new/core/crates/vw-stream/tests/freeze.rs",
+      "name": "queued_frames_cannot_be_acknowledged_before_their_owned_draw_and_old_epoch_refuses",
+      "line": 15,
+      "source_sha256": "d18ecc9da101791ea66baf61ac233046542ef281061abf42a6d8b673cc8d4664",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/freeze.rs",
+      "artifact": "new/core/crates/vw-stream/tests/freeze.rs",
+      "name": "late_actual_b_presentation_survives_c_and_d_offers_and_freezes_b",
+      "line": 24,
+      "source_sha256": "d18ecc9da101791ea66baf61ac233046542ef281061abf42a6d8b673cc8d4664",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/freeze.rs",
+      "artifact": "new/core/crates/vw-stream/tests/freeze.rs",
+      "name": "explicitly_never_drawn_frame_releases_only_its_inflight_slot",
+      "line": 37,
+      "source_sha256": "d18ecc9da101791ea66baf61ac233046542ef281061abf42a6d8b673cc8d4664",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/freeze.rs",
+      "artifact": "new/core/crates/vw-stream/tests/freeze.rs",
+      "name": "remote_edit_and_invalid_hover_contact_never_freeze",
+      "line": 44,
+      "source_sha256": "d18ecc9da101791ea66baf61ac233046542ef281061abf42a6d8b673cc8d4664",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/freeze.rs",
+      "artifact": "new/core/crates/vw-stream/tests/freeze.rs",
+      "name": "timeout_flags_degraded_without_discarding_draft_then_exact_lossless_can_swap",
+      "line": 50,
+      "source_sha256": "d18ecc9da101791ea66baf61ac233046542ef281061abf42a6d8b673cc8d4664",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/freeze.rs",
+      "artifact": "new/core/crates/vw-stream/tests/freeze.rs",
+      "name": "cancel_then_new_contact_refuses_old_lossless_reply_and_saved_document_is_not_discarded",
+      "line": 58,
+      "source_sha256": "d18ecc9da101791ea66baf61ac233046542ef281061abf42a6d8b673cc8d4664",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/freeze.rs",
+      "artifact": "new/core/crates/vw-stream/tests/freeze.rs",
+      "name": "source_close_retains_current_frozen_draft_and_blocks_silent_substitution",
+      "line": 64,
+      "source_sha256": "d18ecc9da101791ea66baf61ac233046542ef281061abf42a6d8b673cc8d4664",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/lossless.rs",
+      "artifact": "new/core/crates/vw-stream/tests/lossless.rs",
+      "name": "lossless_frame_roundtrip_binds_hash_extent_geometry_and_every_rgba_sample",
+      "line": 7,
+      "source_sha256": "bad7e3a8dcec3fe1117fad3d219febdbf780e9a27622542a7d752b73cb62c2ab",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/lossless.rs",
+      "artifact": "new/core/crates/vw-stream/tests/lossless.rs",
+      "name": "approved_region_crops_same_original_with_negative_physical_origin_and_unchanged_time",
+      "line": 15,
+      "source_sha256": "bad7e3a8dcec3fe1117fad3d219febdbf780e9a27622542a7d752b73cb62c2ab",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/lossless.rs",
+      "artifact": "new/core/crates/vw-stream/tests/lossless.rs",
+      "name": "corrupt_crc_hash_dimension_metadata_and_trailing_bytes_cannot_be_verified",
+      "line": 24,
+      "source_sha256": "bad7e3a8dcec3fe1117fad3d219febdbf780e9a27622542a7d752b73cb62c2ab",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/lossless.rs",
+      "artifact": "new/core/crates/vw-stream/tests/lossless.rs",
+      "name": "complete_output_and_decode_budgets_are_admitted_before_codec",
+      "line": 32,
+      "source_sha256": "bad7e3a8dcec3fe1117fad3d219febdbf780e9a27622542a7d752b73cb62c2ab",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/ring.rs",
+      "artifact": "new/core/crates/vw-stream/tests/ring.rs",
+      "name": "default_ring_retains_exact_last_eight_and_never_substitutes",
+      "line": 6,
+      "source_sha256": "4d49ac781ef1a511575032512635e101d9ee56996471e1c25e6161ffb08aa804",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/ring.rs",
+      "artifact": "new/core/crates/vw-stream/tests/ring.rs",
+      "name": "pinned_evicted_original_stays_charged_and_pressure_refuses_before_allocating",
+      "line": 12,
+      "source_sha256": "4d49ac781ef1a511575032512635e101d9ee56996471e1c25e6161ffb08aa804",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/ring.rs",
+      "artifact": "new/core/crates/vw-stream/tests/ring.rs",
+      "name": "dropped_writer_and_failed_opaque_validation_release_their_reservation",
+      "line": 20,
+      "source_sha256": "4d49ac781ef1a511575032512635e101d9ee56996471e1c25e6161ffb08aa804",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/ring.rs",
+      "artifact": "new/core/crates/vw-stream/tests/ring.rs",
+      "name": "geometry_epoch_and_duplicate_frames_cannot_replace_history",
+      "line": 26,
+      "source_sha256": "4d49ac781ef1a511575032512635e101d9ee56996471e1c25e6161ffb08aa804",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/ring.rs",
+      "artifact": "new/core/crates/vw-stream/tests/ring.rs",
+      "name": "eight_4k_frames_fit_hard_300mb_but_large_sources_cannot_relax_capacity",
+      "line": 35,
+      "source_sha256": "4d49ac781ef1a511575032512635e101d9ee56996471e1c25e6161ffb08aa804",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/ring.rs",
+      "artifact": "new/core/crates/vw-stream/tests/ring.rs",
+      "name": "cancellation_precedes_eviction_and_allocation",
+      "line": 42,
+      "source_sha256": "4d49ac781ef1a511575032512635e101d9ee56996471e1c25e6161ffb08aa804",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/ring.rs",
+      "artifact": "new/core/crates/vw-stream/tests/ring.rs",
+      "name": "platform_readback_can_adopt_one_pre_admitted_vec_without_a_second_frame_copy",
+      "line": 48,
+      "source_sha256": "4d49ac781ef1a511575032512635e101d9ee56996471e1c25e6161ffb08aa804",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/ring.rs",
+      "artifact": "new/core/crates/vw-stream/tests/ring.rs",
+      "name": "excess_readback_capacity_cannot_hide_unaccounted_retained_bytes",
+      "line": 53,
+      "source_sha256": "4d49ac781ef1a511575032512635e101d9ee56996471e1c25e6161ffb08aa804",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/tiles.rs",
+      "artifact": "new/core/crates/vw-stream/tests/tiles.rs",
+      "name": "tiled_keyframe_and_dirty_delta_preserve_every_unchanged_pixel",
+      "line": 7,
+      "source_sha256": "cc8e370f8d88a6d676b395c87f98846f865fb4e19ecfedfb8e29719ec04ed203",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/tiles.rs",
+      "artifact": "new/core/crates/vw-stream/tests/tiles.rs",
+      "name": "unchanged_numbered_delta_keeps_id_continuity_without_reencoding",
+      "line": 19,
+      "source_sha256": "cc8e370f8d88a6d676b395c87f98846f865fb4e19ecfedfb8e29719ec04ed203",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/tiles.rs",
+      "artifact": "new/core/crates/vw-stream/tests/tiles.rs",
+      "name": "dropped_delta_requires_keyframe_and_keyframe_can_jump",
+      "line": 24,
+      "source_sha256": "cc8e370f8d88a6d676b395c87f98846f865fb4e19ecfedfb8e29719ec04ed203",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/tiles.rs",
+      "artifact": "new/core/crates/vw-stream/tests/tiles.rs",
+      "name": "missing_overlapping_outside_or_excess_keyframe_tiles_refuse_atomically",
+      "line": 31,
+      "source_sha256": "cc8e370f8d88a6d676b395c87f98846f865fb4e19ecfedfb8e29719ec04ed203",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/tiles.rs",
+      "artifact": "new/core/crates/vw-stream/tests/tiles.rs",
+      "name": "hostile_jpeg_header_metadata_dimensions_and_trailing_files_refuse",
+      "line": 38,
+      "source_sha256": "cc8e370f8d88a6d676b395c87f98846f865fb4e19ecfedfb8e29719ec04ed203",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/tiles.rs",
+      "artifact": "new/core/crates/vw-stream/tests/tiles.rs",
+      "name": "memory_and_cancellation_refuse_before_decoder_staging",
+      "line": 46,
+      "source_sha256": "cc8e370f8d88a6d676b395c87f98846f865fb4e19ecfedfb8e29719ec04ed203",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/tiles.rs",
+      "artifact": "new/core/crates/vw-stream/tests/tiles.rs",
+      "name": "negative_host_origin_and_dpi_never_scale_frame_pixels",
+      "line": 52,
+      "source_sha256": "cc8e370f8d88a6d676b395c87f98846f865fb4e19ecfedfb8e29719ec04ed203",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/tiles.rs",
+      "artifact": "new/core/crates/vw-stream/tests/tiles.rs",
+      "name": "adaptive_backpressure_demands_a_keyframe_without_unbounded_in_flight_work",
+      "line": 56,
+      "source_sha256": "cc8e370f8d88a6d676b395c87f98846f865fb4e19ecfedfb8e29719ec04ed203",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "core/crates/vw-stream/tests/tiles.rs",
+      "artifact": "new/core/crates/vw-stream/tests/tiles.rs",
+      "name": "repair_request_during_an_in_flight_encode_is_not_lost_on_completion",
+      "line": 62,
+      "source_sha256": "cc8e370f8d88a6d676b395c87f98846f865fb4e19ecfedfb8e29719ec04ed203",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_picker_preview.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_picker_preview.rs",
+      "name": "display_derivative_retains_source_binding_and_never_rewrites_original",
+      "line": 97,
+      "source_sha256": "180f3ae6dacd1a3a13741a737dd2b5a6adb3a94c265f41abdd61d9bb6a806177",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_picker_preview.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_picker_preview.rs",
+      "name": "exact_physical_crop_preserves_pixels_and_refuses_overwrite",
+      "line": 108,
+      "source_sha256": "180f3ae6dacd1a3a13741a737dd2b5a6adb3a94c265f41abdd61d9bb6a806177",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_picker_preview.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_picker_preview.rs",
+      "name": "changed_source_or_header_receipt_is_rejected_before_pixel_publication",
+      "line": 120,
+      "source_sha256": "180f3ae6dacd1a3a13741a737dd2b5a6adb3a94c265f41abdd61d9bb6a806177",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_picker_preview.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_picker_preview.rs",
+      "name": "cancellation_and_outside_region_create_no_output_file",
+      "line": 128,
+      "source_sha256": "180f3ae6dacd1a3a13741a737dd2b5a6adb3a94c265f41abdd61d9bb6a806177",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_picker_preview.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_picker_preview.rs",
+      "name": "hostile_preview_bound_and_unexpected_color_format_refuse",
+      "line": 139,
+      "source_sha256": "180f3ae6dacd1a3a13741a737dd2b5a6adb3a94c265f41abdd61d9bb6a806177",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "name": "normal_close_sends_stop_and_publishes_only_after_producer_destruction",
+      "line": 41,
+      "source_sha256": "ff8d17b85267a587531de7586dbcee70d68b3a3dd5a94269299b388f74fa0cee",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "name": "packet_owns_global_output_and_input_until_actual_handle_destruction",
+      "line": 51,
+      "source_sha256": "ff8d17b85267a587531de7586dbcee70d68b3a3dd5a94269299b388f74fa0cee",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "name": "canceled_request_keeps_slots_until_actual_blocked_exchange_settles",
+      "line": 63,
+      "source_sha256": "ff8d17b85267a587531de7586dbcee70d68b3a3dd5a94269299b388f74fa0cee",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "name": "normal_close_during_exchange_refuses_late_frame_then_stops_normally",
+      "line": 79,
+      "source_sha256": "ff8d17b85267a587531de7586dbcee70d68b3a3dd5a94269299b388f74fa0cee",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "name": "canceled_start_retains_owner_until_late_producer_is_destroyed",
+      "line": 93,
+      "source_sha256": "ff8d17b85267a587531de7586dbcee70d68b3a3dd5a94269299b388f74fa0cee",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "name": "feedback_retains_exact_helper_offer_and_monotonic_command_sequence",
+      "line": 106,
+      "source_sha256": "ff8d17b85267a587531de7586dbcee70d68b3a3dd5a94269299b388f74fa0cee",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "name": "canceled_close_waiter_does_not_cancel_or_abandon_normal_stop",
+      "line": 117,
+      "source_sha256": "ff8d17b85267a587531de7586dbcee70d68b3a3dd5a94269299b388f74fa0cee",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "name": "explicit_source_and_both_process_budgets_are_admitted_before_start",
+      "line": 145,
+      "source_sha256": "ff8d17b85267a587531de7586dbcee70d68b3a3dd5a94269299b388f74fa0cee",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    },
+    {
+      "target": "host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "artifact": "new/host-win/crates/vw-host-ffi/src/capture_stream/tests.rs",
+      "name": "original_mapping_preserves_physical_and_wall_clock_provenance",
+      "line": 156,
+      "source_sha256": "ff8d17b85267a587531de7586dbcee70d68b3a3dd5a94269299b388f74fa0cee",
+      "executed": false,
+      "source_case_in_literal_base": false,
+      "source_case_in_preserved_checkpoint": true
+    }
+  ]
+}

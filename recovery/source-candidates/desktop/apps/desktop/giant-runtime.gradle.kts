@@ -1,0 +1,78 @@
+import java.security.MessageDigest
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import org.gradle.api.tasks.SourceSetContainer
+
+// Existing approved T0.09 artifact only; no downloads or native compilation.
+val vipsDirectory=providers.gradleProperty("vwVipsDir").map{file(it)}
+val expectedVips=mapOf(
+    "libaom.dll" to "aaca18312104606e0e162b346636651cc2f2853fe6ae075d457198c14fa5047e",
+    "libarchive-13.dll" to "c5b15ad0b74f39e79f583dfb0b58a1a99a71d1e7639fc5a648f3974743c4b6f9",
+    "libc++.dll" to "1994597b48abb9ea494f43d4e5b7ae53267a7858e25d068260864667771683dc",
+    "libcairo-2.dll" to "3f07c11fe7cd180a3650d2aec5d533ced04e6e27ccdbe30bbdbbcb6be06857bb",
+    "libcgif-0.dll" to "f6ffa745c3ff1e5e0b3bd7a0df8976dc532a39f385c605e5c5b37eaaab5b7763",
+    "libexif-12.dll" to "a3ec1040052bf6189a0c5ae7979db80ed7a263c4129a0a5129972265a0deb952",
+    "libexpat-1.dll" to "b960c03868d8f3d21c0e40a0c2d8b3704d4833bdee216fb617db720d06b315a3",
+    "libffi-8.dll" to "203b0b53062221bdbcefe3d82720db52b99a38c0f87b742de46d7accebce207d",
+    "libfontconfig-1.dll" to "59cd7552c3a130e872e58fcc4c762180703857b92098dfc8b760cace6d081d87",
+    "libfreetype-6.dll" to "b1bc712a8099dfbf60c31b2c87ce1b83632d7bf5ba455fd490348c60625f50ec",
+    "libfribidi-0.dll" to "21be07e6dbfcbaa8c6d308d554ef7536b01e3d21f0d72ba03f4de28f1df3e908",
+    "libgio-2.0-0.dll" to "b9cb469131059b7bc84fadebeb43c49464dbf5e73d46c0c96ffbaa8e7d823f59",
+    "libglib-2.0-0.dll" to "fa5a7a698bf7ecd6767b373467346bb574a794eb8647383df6149f9c5f39417e",
+    "libgmodule-2.0-0.dll" to "066d04d888c2e453a64568ea867b20c6e1fc34b8d37282b14c909aa35941f25e",
+    "libgobject-2.0-0.dll" to "d2a6a5b3fe463ecabb9ca5b62ea86d55ace0d316e334663e3ccdebbdd4c72234",
+    "libharfbuzz-0.dll" to "3b57e52b04349356e6e495c4cbfd9e2a4510cc955b912d8c92a7c953e480d275",
+    "libheif.dll" to "b80079ed81adc7dda7a0ef9971e2b2546b718b912f5c0410c4ca6538a2f9ffa5",
+    "libhwy.dll" to "a0fb9ad8520f407f98dbdcd179265afe8509e30a7b727a79b1ac1ab9e0937b24",
+    "libimagequant.dll" to "991175c70c0ce41293bb83656abf2f51db9aaf7bcb16349e1ace12b8a779ca18",
+    "libjpeg-62.dll" to "e797f624df8d058b98d621750a2b8a0f78464d23c1416ece8959515ea926dae3",
+    "liblcms2-2.dll" to "04a46c6cc52cab5a5ddb4d985e4cbd31283a690f6843fe1e810f77e2a2df3e7b",
+    "libpango-1.0-0.dll" to "5d91c9b18832eb6669ff4384fae3aaceeee0698cbde1847f94146f3f3ab47689",
+    "libpangocairo-1.0-0.dll" to "24ca2b7106abb8a8171aa1e9c73a8066d7f12368d9bf696339cd6b87bf5b412f",
+    "libpangoft2-1.0-0.dll" to "000d8d57bc3513d6c241c59997f96c44f0cb4d977fd87e31a53607ded8dc3d29",
+    "libpixman-1-0.dll" to "ed893588fee47353fec5cf4a1775236e1a3e2272a24a3c4e89a5c96e230f5064",
+    "libpng16-16.dll" to "461610d0b8d4afe82b2372786e0a9b66bce6376e16e33b79855a7f5dab4e7477",
+    "librsvg-2-2.dll" to "97e5acf33963ed2848a6ba3e7d851caee9d3c94e0abdae60d757ac23e3069f75",
+    "libsharpyuv-0.dll" to "429a6c855be9004a3f9cfe3745c1a4ded9a618ffd8969eca6a44d522852c236c",
+    "libtiff-6.dll" to "029256630dfa91c70459e2d6ce00f8241307f221a751a6c91420e620a50ac660",
+    "libuhdr.dll" to "243e7febade1e700353854fc407020ac65008752b9bb8fcbb574ee8970a69b8c",
+    "libunwind.dll" to "cada28244c3d5dc816f7c3d10667c38941d741452a8657b0f4948efee4ac345d",
+    "libvips-42.dll" to "4d3a83e136eb6f63fa8f4062e8343f87bfdc65afaab2eb30175d9ac844b88555",
+    "libvips-cpp-42.dll" to "85651dbfbd2b489d2a87da9778855ac7a2c7cd998be0d9e1ed6777c092e70aeb",
+    "libwebp-7.dll" to "27d8dc57e63fa2ac5798628d7fa3e044cc06d7dd2c005fd8a8b719c09f1a432e",
+    "libwebpdemux-2.dll" to "d16119ec43a1b428f5cd85f37fd180e1bc05069d3e42235f74a50608b35c12de",
+    "libwebpmux-3.dll" to "dc4ab500a11c6f8cf9689a22f1bcfda3f5db456306e25460872ba61c2cbca6b1",
+    "libxml2-16.dll" to "75bf149ed95fee1b9d8672e83bc7e515c451b65648c7d62dbdb3743e2f6cc02f",
+    "libz1.dll" to "40484b21bcce8db31d247974777bdc423e445baaa63fcfa091bab07e3245b959"
+)
+val packageGiantRuntime=tasks.register("packageGiantRuntime") {
+    inputs.property("directoryConfigured",vipsDirectory.isPresent)
+    if(vipsDirectory.isPresent)inputs.files(expectedVips.keys.map{name->vipsDirectory.map{it.resolve(name)}})
+    val output=layout.buildDirectory.dir("generated/giantRuntimeResources")
+    outputs.dir(output)
+    doLast {
+        check(vipsDirectory.isPresent){"Giant runtime packaging requires explicit -PvwVipsDir pointing to the approved libvips8.18.7 artifact; no download or system codec install is performed"}
+        val input=vipsDirectory.get()
+        check(input.isDirectory&&input.canonicalFile==input.absoluteFile.normalize()){"Giant runtime input must be a plain canonical directory"}
+        val destination=output.get().asFile.resolve("win32-x86-64/vips")
+        destination.mkdirs()
+        check(destination.canonicalFile==destination.absoluteFile.normalize()){"Giant runtime output was redirected"}
+        check(destination.listFiles().orEmpty().all{it.name in expectedVips&&it.isFile}){"Unexpected prior generated giant runtime resources"}
+        var total=0L
+        for((name,expected)in expectedVips){
+            val source=input.resolve(name)
+            check(source.isFile&&source.canonicalFile==source.absoluteFile.normalize()&&source.length() in 1..128L*1024*1024){"Missing or invalid approved giant DLL: $name"}
+            total=Math.addExact(total,source.length());check(total<=512L*1024*1024){"Giant runtime exceeds total packaging bound"}
+            val temporary=Files.createTempFile(destination.toPath(),".vips-", ".tmp")
+            try {
+                val digest=MessageDigest.getInstance("SHA-256");var size=0L
+                source.inputStream().use{stream->Files.newOutputStream(temporary).use{out->val buffer=ByteArray(65536);while(true){val n=stream.read(buffer);if(n<0)break;check(n>0){"Giant resource read stalled"};size+=n;check(size<=128L*1024*1024){"Giant DLL grew during packaging"};digest.update(buffer,0,n);out.write(buffer,0,n)}}}
+                check(digest.digest().joinToString(""){"%02x".format(it.toInt() and 255)}==expected){"Giant DLL differs from exact approved artifact: $name"}
+                // Only this task's known generated pathname is replaced; the
+                // source artifact is untouched and runtime rechecks every hash.
+                Files.move(temporary,destination.resolve(name).toPath(),StandardCopyOption.REPLACE_EXISTING)
+            }finally{Files.deleteIfExists(temporary)}
+        }
+    }
+}
+extensions.getByType<SourceSetContainer>().named("main"){resources.srcDir(packageGiantRuntime)}

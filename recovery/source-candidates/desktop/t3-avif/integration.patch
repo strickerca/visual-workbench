@@ -1,0 +1,101 @@
+--- a/core/crates/vw-ffi/Cargo.toml
++++ b/core/crates/vw-ffi/Cargo.toml
+@@ -40,6 +40,7 @@
+ vw-raster = { version = "=0.1.0", path = "../vw-raster" }
+ vw-package = { version = "=0.1.0", path = "../vw-package" }
+ vw-codec-os = { version = "=0.1.0", path = "../vw-codec-os" }
++vw-avif-os = { version = "=0.1.0", path = "../vw-avif-os" }
+ vw-instructions = { version = "=0.1.0", path = "../vw-instructions" }
+ vw-semantics = { version = "=0.1.0", path = "../vw-semantics" }
+ vw-mask = { version = "=0.1.0", path = "../vw-mask" }
+--- a/core/crates/vw-ffi/src/lib.rs
++++ b/core/crates/vw-ffi/src/lib.rs
+@@ -1,4 +1,6 @@
+ //! Shared UniFFI boundary. Storage and input run on distinct bounded core-owned workers.
++mod avif_images;
++pub use avif_images::*;
+ mod os_images;
+ pub use os_images::*;
+ mod ai_edit;
+--- a/core/crates/vw-ffi/src/project.rs
++++ b/core/crates/vw-ffi/src/project.rs
+@@ -387,7 +387,7 @@
+         let doc_id = Id::try_from(options.document_id)?;
+         let layer_id = Id::try_from(options.layer_id)?;
+         let device = DeviceId::try_from(options.device_id)?;
+-        let image = crate::os_images::decode(&options.source, decode_limits(), &|| {
++        let image = crate::avif_images::decode(&options.source, decode_limits(), &|| {
+             cancellation.is_cancelled()
+         })?;
+         let mut project = Project::new(project_id, options.title.clone(), device.clone());
+@@ -396,7 +396,9 @@
+         } else {
+             (image.width, image.height)
+         };
+-        let format = if vw_codec_os::is_heic(&options.source) {
++        let format = if vw_avif_os::is_avif(&options.source) {
++            "avif"
++        } else if vw_codec_os::is_heic(&options.source) {
+             "heic"
+         } else if options.source.starts_with(b"\x89PNG\r\n\x1a\n") {
+             "png"
+--- a/core/crates/vw-ffi/src/queries.rs
++++ b/core/crates/vw-ffi/src/queries.rs
+@@ -664,7 +664,7 @@
+             .budget
+             .checked_sub(bytes.len() as u64)
+             .ok_or(vw_raster::RasterError::Allocation)?;
+-        crate::os_images::decode(
++        crate::avif_images::decode(
+             &bytes,
+             vw_raster::DecodeLimits {
+                 max_encoded_bytes: limit,
+--- a/core/crates/vw-ffi/src/streaming_ffi.rs
++++ b/core/crates/vw-ffi/src/streaming_ffi.rs
+@@ -258,7 +258,9 @@
+         } else {
+             (info.width, info.height)
+         };
+-        let format = if vw_codec_os::is_heic(&bytes) {
++        let format = if vw_avif_os::is_avif(&bytes) {
++            "avif"
++        } else if vw_codec_os::is_heic(&bytes) {
+             "heic"
+         } else if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+             "png"
+@@ -906,7 +908,9 @@
+             } else {
+                 (info.width, info.height)
+             };
+-            definition.format = if vw_codec_os::is_heic(&bytes) {
++            definition.format = if vw_avif_os::is_avif(&bytes) {
++                "avif"
++            } else if vw_codec_os::is_heic(&bytes) {
+                 "heic"
+             } else if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+                 "png"
+@@ -1292,7 +1296,7 @@
+     let remaining = budget
+         .checked_sub(bytes.len() as u64)
+         .ok_or(CoreError::Backpressure)?;
+-    let image = crate::os_images::decode(
++    let image = crate::avif_images::decode(
+         bytes,
+         vw_raster::DecodeLimits {
+             max_memory_bytes: remaining,
+@@ -1397,7 +1401,7 @@
+             .budget
+             .checked_sub(bytes.len() as u64)
+             .ok_or(vw_raster::RasterError::Allocation)?;
+-        crate::os_images::decode(
++        crate::avif_images::decode(
+             &bytes,
+             vw_raster::DecodeLimits {
+                 max_encoded_bytes: INPUT_LIMIT as usize,
+--- a/apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/NativeLibrary.kt
++++ b/apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/NativeLibrary.kt
+@@ -1,3 +1,3 @@
+ package com.visualworkbench.shared
+ 
+-internal actual fun prepareCoreLibrary() { System.loadLibrary("vw_core"); AndroidOsImages.install() }
++internal actual fun prepareCoreLibrary() { System.loadLibrary("vw_core"); AndroidOsImages.install(); AndroidAvifImages.install() }

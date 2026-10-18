@@ -1,0 +1,77 @@
+--- a/core/crates/vw-ffi/src/giant_import.rs
++++ b/core/crates/vw-ffi/src/giant_import.rs
+@@ -2,6 +2,8 @@
+ //! may supply the derived pyramid; arbitrary external pyramids are not an import format.
+ mod source;
+ mod tiles;
++mod export;
++pub use export::*;
+ #[cfg(test)] mod tests;
+ use crate::{project::SessionPermit,worker::Worker,*};
+ use std::{fs::{File,OpenOptions},io::{Seek,SeekFrom,Write},path::{Path},sync::{Arc,atomic::{AtomicUsize,Ordering}}};
+@@ -117,7 +119,7 @@
+ 
+ struct ImageState{cache:DiskCache,manifest:Manifest,identity:String,memory:vw_assets::BudgetCache<TileKey,Vec<u8>>}
+ #[derive(uniffi::Object)]
+-pub struct GiantImage{worker:Worker<ImageState>,project:Arc<ProjectSession>,document:String,source:Source}
++pub struct GiantImage{worker:Worker<ImageState>,project:Arc<ProjectSession>,document:String,source:Source,export_gate:Arc<tokio::sync::Mutex<()>>,closing:std::sync::atomic::AtomicBool}
+ #[uniffi::export]
+ impl ProjectSession{
+     /// Reconstruct disposable tiles from the immutable original after eviction.
+@@ -137,7 +139,7 @@
+             let manifest=Manifest::decode(&raw,&source_for_worker).map_err(|_|CoreError::Invalid)?;let identity=hex(&manifest.identity());
+             cancellation.check()?;let memory=vw_assets::BudgetCache::new(ram_cache_bytes).map_err(|_|CoreError::Invalid)?;
+             Ok((Worker::new("vw-giant-image",ImageState{cache,manifest,identity,memory},8)?,source_for_worker))}).await?;
+-        Ok(Arc::new(GiantImage{worker,project:self,document:document_id,source}))
++        Ok(Arc::new(GiantImage{worker,project:self,document:document_id,source,export_gate:Arc::new(tokio::sync::Mutex::new(())),closing:std::sync::atomic::AtomicBool::new(false)}))
+     }
+ }
+ fn project_source(state:&project::ProjectState,document:&str)->Result<Source>{
+@@ -147,15 +149,16 @@
+     let(width,height)=if asset.orientation>=5{(asset.height,asset.width)}else{(asset.width,asset.height)};
+     let source=Source{original:hash,original_bytes:asset.byte_size,width,height,orientation:asset.orientation.try_into().map_err(|_|CoreError::Invalid)?,bit_depth:8,icc:None,display_conversion:false};source.validate().map_err(|_|CoreError::Invalid)?;Ok(source)
+ }
+-impl GiantImage{async fn check_binding(&self)->Result<()>{self.project.check_open()?;let source=self.source.clone();let document=self.document.clone();self.project.worker.call(move|state|{if project_source(state,&document)?!=source{return Err(CoreError::Invalid)}Ok(())}).await}}
++impl GiantImage{fn admit_operation(&self)->Result<tokio::sync::OwnedMutexGuard<()>>{if self.closing.load(Ordering::Acquire){return Err(CoreError::Closed)}let guard=self.export_gate.clone().try_lock_owned().map_err(|_|CoreError::Backpressure)?;if self.closing.load(Ordering::Acquire){return Err(CoreError::Closed)}Ok(guard)}async fn check_binding_owned(&self,guard:tokio::sync::OwnedMutexGuard<()>)->Result<tokio::sync::OwnedMutexGuard<()>>{self.project.check_open()?;let source=self.source.clone();let document=self.document.clone();self.project.worker.call(move|state|{if project_source(state,&document)?!=source{return Err(CoreError::Invalid)}Ok(guard)}).await}}
+ #[uniffi::export]
+ impl GiantImage{
+-    pub async fn viewport(&self,view:GiantViewport)->Result<GiantViewportPlan>{self.check_binding().await?;self.worker.call(move|state|{
++    pub async fn viewport(&self,view:GiantViewport)->Result<GiantViewportPlan>{let guard=self.admit_operation()?;let guard=self.check_binding_owned(guard).await?;self.worker.call(move|state|{let _guard=guard;
+         let physical_scale=vw_assets::maximum_physical_scale(view.a,view.b,view.c,view.d).map_err(|_|CoreError::Invalid)?;
+         let selected=state.manifest.pyramid().viewport(vw_assets::Viewport{left:view.left,top:view.top,right:view.right,bottom:view.bottom,physical_scale}).map_err(|_|CoreError::Invalid)?;
+         Ok(GiantViewportPlan{asset_id:hex(&state.manifest.source().original),manifest_hash:state.identity.clone(),level:selected.level,visible:selected.visible.into_iter().map(address).collect(),prefetch:selected.prefetch.into_iter().map(address).collect()})
+     }).await}
+-    pub async fn tile(&self,requested:GiantTileAddress,cancellation:Arc<Cancellation>)->Result<GiantTilePixels>{self.check_binding().await?;self.worker.call(move|state|{
++    pub async fn tile(&self,requested:GiantTileAddress,cancellation:Arc<Cancellation>)->Result<GiantTilePixels>{let guard=self.admit_operation()?;let guard=self.check_binding_owned(guard).await?;self.worker.call(move|state|{
++        let _guard=guard;
+         cancellation.check()?;let key=TileKey{level:requested.level,x:requested.x,y:requested.y};let record=state.manifest.tile(key).map_err(|_|CoreError::Invalid)?;let region=state.manifest.pyramid().region(key).map_err(|_|CoreError::Invalid)?;
+         let lease=if let Some(lease)=state.memory.get(&key).map_err(|_|CoreError::Worker)?{lease}else{
+             let reservation=state.memory.reserve(key,32*1024*1024).map_err(|_|CoreError::Backpressure)?;
+@@ -165,5 +168,5 @@
+         cancellation.check()?;let factor=1u32.checked_shl(u32::from(key.level)).ok_or(CoreError::Invalid)?;let x=region.x.checked_mul(factor).ok_or(CoreError::Invalid)?;let y=region.y.checked_mul(factor).ok_or(CoreError::Invalid)?;
+         Ok(GiantTilePixels{asset_id:hex(&state.manifest.source().original),manifest_hash:state.identity.clone(),address:requested,document_x:x,document_y:y,document_width:region.width.saturating_mul(factor).min(state.manifest.source().width-x),document_height:region.height.saturating_mul(factor).min(state.manifest.source().height-y),width:region.width,height:region.height,rgba:lease.payload().map_err(|_|CoreError::Worker)?.clone()})
+     }).await}
+-    pub async fn shutdown(&self)->Result<()>{self.worker.shutdown(|_|Ok(())).await}
++    pub async fn shutdown(&self)->Result<()>{self.closing.store(true,Ordering::Release);let _guard=self.export_gate.clone().lock_owned().await;self.worker.shutdown(|_|Ok(())).await}
+ }
+--- a/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImagesApi.kt
++++ b/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImagesApi.kt
+@@ -24,6 +24,8 @@
+ public interface GiantImage {
+     public suspend fun viewport(view:GiantViewport):GiantViewportPlan
+     public suspend fun tile(address:GiantTileAddress):GiantTilePixels
++    /** Base lossless tiles only; concurrent tile/export work returns Backpressure. */
++    public suspend fun exportPng(options:GiantPngOptions):GiantPngReceipt
+     /** Joins all admitted native reads before the project can close. */
+     public suspend fun close()
+ }
+--- a/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeGiantImages.kt
++++ b/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeGiantImages.kt
+@@ -49,6 +49,7 @@
+ }
+ private class NativeGiantImage(private val handle:NImage):GiantImage {
+     private val owner=GiantHandleOwner()
++    override suspend fun exportPng(options:GiantPngOptions):GiantPngReceipt {owner.checkOpen();return nativeGiantPng(handle,options)}
+     override suspend fun viewport(view:GiantViewport):GiantViewportPlan {owner.checkOpen();return settledStream{handle.viewport(NViewport(view.left,view.top,view.right,view.bottom,view.a,view.b,view.c,view.d)).let{GiantViewportPlan(it.assetId,it.manifestHash,it.level,it.visible.map{key->GiantTileAddress(key.level,key.x,key.y)},it.prefetch.map{key->GiantTileAddress(key.level,key.x,key.y)})}}}
+     override suspend fun tile(address:GiantTileAddress):GiantTilePixels {owner.checkOpen();return settledStream{cancel->handle.tile(NAddress(address.level,address.x,address.y),cancel).let{GiantTilePixels(it.assetId,it.manifestHash,GiantTileAddress(it.address.level,it.address.x,it.address.y),it.documentX,it.documentY,it.documentWidth,it.documentHeight,it.width,it.height,it.rgba)}}}
+     override suspend fun close(){owner.close{try{handle.shutdown()}finally{handle.destroy()}}}

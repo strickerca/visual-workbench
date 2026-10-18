@@ -1,0 +1,10 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -15,6 +15,7 @@
+     "tools/stroke-spike/native",
+     "tools/ai-spike",
+     "tools/pair-cli",
++    "tools/document-worker",
+     "mcp/native",
+ ]
+ 

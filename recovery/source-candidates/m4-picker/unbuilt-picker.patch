@@ -1,0 +1,171 @@
+diff --git a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
+index 6f2bc95..94e377a 100644
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
+@@ -22,6 +22,7 @@ import com.visualworkbench.shared.*
+ import com.visualworkbench.desktop.mcp.*
+ import kotlinx.coroutines.*
+ import kotlinx.coroutines.flow.debounce
++import java.awt.EventQueue
+ import java.awt.FileDialog
+ import java.awt.GraphicsEnvironment
+ import java.nio.file.Path
+@@ -29,6 +30,27 @@ import javax.swing.filechooser.FileSystemView
+ 
+ private val accent=Color(0xff81e0c8)
+ private val palette=listOf(0x78dcc8ffu,0xffd580ffu,0xf68282ffu,0x91b7ffffu,0xffffffffu,0x182535ffu)
++
++/** One queued native chooser; its focus lease also covers the AWT handoff. */
++private class ProjectFilePickerRequest(val owner: java.awt.Frame, private val focusLease: AutoCloseable) : AutoCloseable {
++    private var chooser: FileDialog? = null
++    var retired: Boolean = false
++        private set
++
++    fun create(title: String): FileDialog {
++        check(!retired && chooser == null)
++        return FileDialog(owner, title, FileDialog.LOAD).also { chooser = it }
++    }
++
++    override fun close() {
++        if (retired) return
++        // A failed native disposal keeps the chooser and lease held for retry.
++        chooser?.dispose()
++        chooser = null
++        try { focusLease.close() } finally { retired = true }
++    }
++}
++
+ fun main(args: Array<String>) {
+     // Refuse unknown/duplicate arguments before native, preference or UI work.
+     require(args.isEmpty() || args.contentEquals(arrayOf("--startup-smoke")) || args.contentEquals(arrayOf("--mcp-runtime-smoke")) || args.contentEquals(arrayOf("--mcp-minimized"))) { "Unsupported desktop argument" }
+@@ -106,8 +128,10 @@ fun main(args: Array<String>) {
+         var floating by remember{mutableStateOf(saved.copy(mode=WindowMode.Windowed))};var dialog by remember{mutableStateOf<Command?>(null)}
+         var connectionDraft by remember { mutableStateOf(ConnectionDraft()) }
+         var pickerReturnsToConnection by remember { mutableStateOf(false) }
++        var projectPicker by remember { mutableStateOf<ProjectFilePickerRequest?>(null) }
++        var dialogRoute by remember { mutableStateOf(Any()) }
+         var quitting by remember{mutableStateOf(false)};var dpiText by remember{mutableStateOf("Checking display scale…")};var startupMs by remember{mutableStateOf<Long?>(null)}
+-        fun instructionDialog(value: Command?) { controller.instructionModal(value != null); dialog = value }
++        fun instructionDialog(value: Command?) { dialogRoute = Any(); controller.instructionModal(value != null); dialog = value }
+         fun quit() {
+             if(!controller.mayCloseAi())return
+             if (quitting || !controller.sealInstructionsForClose()) return
+@@ -116,6 +140,7 @@ fun main(args: Array<String>) {
+                 scope.launch { withContext(NonCancellable) {
+                     var clean = false
+                     try {
++                        projectPicker?.let { request -> request.close(); if (projectPicker === request) projectPicker = null }
+                         remoteView?.let{it.seal("owner_pause");it.close()}
+                         // Retire link-owned helpers before foreign parent teardown.
+                         controller.close();assertRemoteEditRetired()
+@@ -158,12 +183,82 @@ fun main(args: Array<String>) {
+         mcpState.owner?.let{McpCaptureIndicator(it)}
+         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
+         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
+-            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
+-            fun file(command:Command){controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,command.label,FileDialog.LOAD)
+-                try{chooser.directory=(if(command==Command.Import)documents else location.path).toString();if(command==Command.Open)chooser.file="project.sqlite";chooser.isVisible=true
+-                    val filename=chooser.file?:return;val chosen=Path.of(chooser.directory,filename)
+-                    when(command){Command.Import->controller.importFile(ImportRequest(epoch,chosen.toAbsolutePath().normalize()));Command.Open->{val projectDirectory=projectDirectoryFromPicker(chosen);if(projectDirectory==null)controller.report("Choose project.sqlite inside the saved project folder. The current project is unchanged.")else controller.open(projectDirectory,epoch)};else->Unit}
+-                }finally{chooser.dispose()}}}
++            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
++            DisposableEffect(window, controller) {
++                onDispose {
++                    projectPicker?.takeIf { it.owner === window }?.let { request ->
++                        request.close()
++                        if (projectPicker === request) projectPicker = null
++                    }
++                }
++            }
++            fun competingModal(): Boolean = codexModal.state.value.settings || mcpModal.state.value.settings ||
++                mcpModal.state.value.compare != null || captureSettings || remoteView != null ||
++                controller.state.value.textAnchor != null || controller.state.value.exportOpen ||
++                controller.state.value.pasteOpen || controller.ai.state.value.open
++            fun file(command: Command, returnToConnection: Boolean) {
++                if (projectPicker != null || quitting) {
++                    if (dialog == command) instructionDialog(null)
++                    return
++                }
++                val epoch = controller.state.value.projectEpoch
++                val request = try { ProjectFilePickerRequest(window, controller.instructionPicker()) }
++                catch (_: Exception) {
++                    instructionDialog(null)
++                    if (returnToConnection && !quitting) instructionDialog(Command.Pairing)
++                    controller.report("The file picker could not open. Review the current project before retrying.")
++                    return
++                }
++                projectPicker = request
++                instructionDialog(null)
++                val route = dialogRoute
++                fun complete(admitted: Boolean) {
++                    try { request.close() }
++                    catch (_: Exception) { controller.report("File picker cleanup is pending. Close it before retrying.") }
++                    if (request.retired && projectPicker === request) {
++                        projectPicker = null
++                        if (admitted && dialogRoute === route && window.isDisplayable && !competingModal()) {
++                            val next = dialogAfterProjectPicker(returnToConnection, dialog, quitting)
++                            if (next != dialog) instructionDialog(next)
++                        }
++                    }
++                }
++                try {
++                    // A modal show must run on a fresh AWT tick, outside the
++                    // ComposeScene dispatcher used by LaunchedEffect.
++                    EventQueue.invokeLater {
++                        var admitted = false
++                        try {
++                            if (projectPicker !== request || request.retired || quitting || !window.isDisplayable ||
++                                dialogRoute !== route || dialog != null || competingModal() ||
++                                controller.state.value.projectEpoch != epoch) return@invokeLater
++                            admitted = true
++                            val chooser = request.create(command.label)
++                            chooser.directory = (if (command == Command.Import) documents else location.path).toString()
++                            if (command == Command.Open) chooser.file = "project.sqlite"
++                            chooser.isVisible = true
++                            if (request.retired || quitting || !window.isDisplayable || dialogRoute !== route ||
++                                dialog != null || competingModal()) return@invokeLater
++                            val filename = chooser.file ?: return@invokeLater
++                            val chosen = Path.of(chooser.directory, filename)
++                            when (command) {
++                                Command.Import -> controller.importFile(ImportRequest(epoch, chosen.toAbsolutePath().normalize()))
++                                Command.Open -> {
++                                    val projectDirectory = projectDirectoryFromPicker(chosen)
++                                    if (projectDirectory == null) controller.report("Choose project.sqlite inside the saved project folder. The current project is unchanged.")
++                                    else controller.open(projectDirectory, epoch)
++                                }
++                                else -> Unit
++                            }
++                        } catch (_: Exception) {
++                            controller.report("The file picker could not complete. Review the current project before retrying.")
++                        } finally { complete(admitted) }
++                    }
++                } catch (_: Exception) {
++                    controller.report("The file picker could not open. Review the current project before retrying.")
++                    complete(true)
++                }
++            }
+             fun save(request:ExportRequest){controller.instructionPicker().use { val chooser=FileDialog(window,"Save ${request.settings.encoding.label} · ${request.revision}",FileDialog.SAVE)
+                 try{chooser.directory=documents.toString();chooser.file="export-${request.revision}.${request.settings.encoding.extension}";chooser.isVisible=true;val filename=chooser.file?:return
+                     val extension=filename.substringAfterLast('.',"").lowercase();val allowed=if(request.settings.encoding==ExportEncoding.Jpeg)setOf("jpg","jpeg")else setOf(request.settings.encoding.extension)
+@@ -194,19 +289,14 @@ fun main(args: Array<String>) {
+                         catch(error:CancellationException){throw error}catch(_:Exception){controller.report("The exact PNG export was refused or cleanup is uncertain. Existing destination files were preserved.")}}
+                 }finally{try{chooser.dispose()}finally{chooserLease.close()}}
+             }
+-            fun action(command:Command){if(command in listOf(Command.Import,Command.Open))file(command)else dispatch(command,false,controller,{mode(it)},{instructionDialog(it)},{quit()})}
++            fun action(command:Command){if(projectPicker==null&&!quitting)dispatch(command,false,controller,{mode(it)},{instructionDialog(it)},{quit()})}
+             LaunchedEffect(editor.textAnchor != null, editor.exportOpen, editor.pasteOpen) { controller.instructionFocus.interactionChanged() }
+             LaunchedEffect(dialog) {
+                 val pending = dialog
+                 if (pending in listOf(Command.Import, Command.Open)) {
+                     val returnToConnection = pickerReturnsToConnection
+                     pickerReturnsToConnection = false
+-                    instructionDialog(null)
+-                    try { file(checkNotNull(pending)) }
+-                    finally {
+-                        val next = dialogAfterProjectPicker(returnToConnection, dialog, quitting)
+-                        if (next != dialog) instructionDialog(next)
+-                    }
++                    file(checkNotNull(pending), returnToConnection)
+                 }
+             }
+             DisposableEffect(window,controller){val drop=DesktopDropTarget(window.contentPane,controller);val focus=object:java.awt.event.WindowAdapter(){override fun windowDeactivated(event:java.awt.event.WindowEvent){controller.cancelInput()}};window.addWindowListener(focus);onDispose{window.removeWindowListener(focus);controller.cancelInput();drop.close()}}

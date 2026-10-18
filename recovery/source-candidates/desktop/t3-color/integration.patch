@@ -1,0 +1,383 @@
+--- a/core/crates/vw-raster/src/lib.rs
++++ b/core/crates/vw-raster/src/lib.rs
+@@ -1,5 +1,7 @@
+ //! Source-resolution CPU raster exports. No network, UI or preview fallback.
+ //! Streaming PNG can use a caller-owned private scratch file.
++mod display;
++pub use display::{DisplayFrame, DisplayOptions, DisplaySpace, DISPLAY_COLOR_WORK, MAX_DISPLAY_PIXELS, display_peak, display_profile, display_region};
+ mod export;
+ mod ffi;
+ mod materialized_result;
+--- a/core/crates/vw-ffi/src/lib.rs
++++ b/core/crates/vw-ffi/src/lib.rs
+@@ -1,4 +1,6 @@
+ //! Shared UniFFI boundary. Storage and input run on distinct bounded core-owned workers.
++mod display_colors;
++pub use display_colors::*;
+ mod avif_images;
+ pub use avif_images::*;
+ mod os_images;
+--- a/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt
++++ b/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt
+@@ -60,7 +60,11 @@
+         TextLayout(value.algorithmVersion,value.glyphs.map { GlyphOutline(it.glyphId,it.cluster,it.font,it.x,it.y,it.advance,it.outline.map { p -> p.common() }) },value.width,value.height,value.lineHeight)
+     }
+ }
+-private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers {
++private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchColorDisplay {
++    override suspend fun originalColors(request: DisplayColorRequest): DisplayColorPixels {
++        if (closed.get()) throw DisplayColorFailure(DisplayColorFailureKind.Closed)
++        return originalColorsNative(handle, request)
++    }
+     override suspend fun preflightFile(options: FileExportOptions): FilePreflight {
+         if (closed.get()) throw TransferFailure(TransferFailureKind.Closed)
+         return preflightFileNative(handle, options)
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -82,6 +82,13 @@
+     var message by mutableStateOf<String?>(null); private set
+     var blockingMessage by mutableStateOf<String?>(null); private set
+     var needsColorConsent by mutableStateOf(false); private set
++    var needsDisplayDepthConsent by mutableStateOf(false); private set
++    var needsSrgbDisplay by mutableStateOf(false); private set
++    var colorDisplayStatus by mutableStateOf<String?>(null); private set
++    private val displayAdoption = DisplayAdoption()
++    private var displaySpace = DisplayColorSpace.Srgb
++    private var displayDepthAllowed = false
++    private var forceSrgbDisplay = false
+     var info by mutableStateOf<ProjectInfo?>(null); private set
+     var document by mutableStateOf<DocumentSnapshot?>(null); private set
+     var selected by mutableStateOf<String?>(null); private set
+@@ -463,7 +470,7 @@
+                 document = snapshot; info = snapshot.render.revision; objects = drawing
+                 instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
+                 observeProject(current, token)
+-                colorAssumed = knownSrgb; screen = WorkbenchScreen.Canvas; cameraFitted = false
++                colorAssumed = knownSrgb; displayDepthAllowed = false; forceSrgbDisplay = false; colorDisplayStatus = null; needsDisplayDepthConsent = false; needsSrgbDisplay = false; screen = WorkbenchScreen.Canvas; cameraFitted = false
+                 fit(); loadBackground()
+             } catch (cancel: CancellationException) { throw cancel }
+             catch (error: CoreFailure) {
+@@ -577,7 +584,7 @@
+         instructionEditor.detach()
+         retireAi()
+         captureArrivals.detach(); failedCaptureOpen = null
+-        epoch++; refreshAdmission.reset()
++        epoch++; refreshAdmission.reset(); displayAdoption.invalidate(); displayDepthAllowed = false; forceSrgbDisplay = false; colorDisplayStatus = null; needsDisplayDepthConsent = false; needsSrgbDisplay = false
+         changesJob?.cancelAndJoin(); changesJob = null
+         refreshQueue?.close(); refreshQueue = null
+         refreshJob?.cancelAndJoin(); refreshJob = null
+@@ -773,50 +780,94 @@
+         scope.launch { try { target.finishPreview(id, cancel) } catch (_: SessionFailure) { /* A disconnected epoch retires all previews. */ } }
+     }
+ 
++    private fun displayBinding(): WorkflowBinding? = document?.let { d ->
++        d.render.revision.let { WorkflowBinding(it.projectId, d.documentId, it.hostSeq, it.stateHash) }
++    }
++    internal fun configureDisplay(space: DisplayColorSpace) {
++        if (displaySpace == space) return
++        displaySpace = space; displayAdoption.invalidate()
++        if (!disposing && project != null && document != null) scope.launch { try { loadBackground() } catch (error: Exception) { report(error) } }
++    }
+     private suspend fun loadBackground() {
+         val current = project ?: return
+         val doc = document ?: return
+         val token = epoch
++        val wide = !forceSrgbDisplay && current is WorkbenchColorDisplay && doc.width.toULong() * doc.height.toULong() <= MAX_COLOR_DISPLAY_PIXELS
++        val space = if (wide) displaySpace else DisplayColorSpace.Srgb
++        val request = originalDisplayRequest(doc, space, colorAssumed, displayDepthAllowed)
++        val ticket = displayAdoption.issue(token, request)
++        fun admitted(): Boolean = !disposing && current === project && displayAdoption.accepts(ticket, epoch, displayBinding(), if (wide) displaySpace else DisplayColorSpace.Srgb)
++        var staged: Bitmap? = null
+         try {
+-            val image = current.background(doc.documentId, assumeUntaggedSrgb = colorAssumed)
+-            val bitmap = withContext(Dispatchers.Default) {
+-                require(image.width in 1u..50_000u && image.height in 1u..50_000u)
+-                val width = image.width.toInt(); val height = image.height.toInt()
+-                require(width.toLong() * height * 4 == image.rgba.size.toLong())
+-                val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+-                try {
+-                    val row = IntArray(width)
+-                    for (y in 0 until height) {
+-                        ensureActive()
+-                        for (x in row.indices) {
+-                            val i = (y * width + x) * 4
+-                            row[x] = ((image.rgba[i + 3].toInt() and 255) shl 24) or ((image.rgba[i].toInt() and 255) shl 16) or
+-                                ((image.rgba[i + 1].toInt() and 255) shl 8) or (image.rgba[i + 2].toInt() and 255)
+-                        }
+-                        out.setPixels(row, 0, width, 0, y, width, 1)
+-                    }
+-                    out
+-                } catch (error: Exception) { out.recycle(); throw error }
+-            }
+-            if (token != epoch) return
+-            background = bitmap; blockingMessage = null; needsColorConsent = false
++            if (doc.bitDepth > 8u && !displayDepthAllowed) throw DisplayColorFailure(DisplayColorFailureKind.Depth)
++            var assumed = colorAssumed
++            if (wide) {
++                val pixels = (current as WorkbenchColorDisplay).originalColors(request)
++                validateDisplayPixels(pixels, request)
++                assumed = pixels.assumedSrgb
++                staged = ColorDisplay.bitmap(pixels, request)
++            } else {
++                val pixels = current.background(doc.documentId, assumeUntaggedSrgb = colorAssumed)
++                require(pixels.width == doc.width && pixels.height == doc.height)
++                staged = ColorDisplay.legacy(pixels)
++            }
++            if (!admitted()) return
++            val actual = current.info()
++            if (!admitted() || actual.projectId != request.binding.projectId || actual.hostSeq != request.binding.hostSeq || actual.stateHash != request.binding.stateHash) return
++            background = checkNotNull(staged); staged = null
++            blockingMessage = null; needsColorConsent = false; needsDisplayDepthConsent = false; needsSrgbDisplay = false
++            colorDisplayStatus = (if (wide && space == DisplayColorSpace.DisplayP3) "Display P3 display" else "Display converted to sRGB") +
++                (if (doc.bitDepth > 8u) " in 8 bit" else "") + (if (assumed) "; untagged colors treated as sRGB" else "") + ". Original profile and depth retained."
+         } catch (cancel: CancellationException) { throw cancel }
+-        catch (error: CoreFailure) {
+-            if (token != epoch) return
++        catch (error: DisplayColorFailure) {
++            if (!admitted()) return
++            needsColorConsent = error.kind == DisplayColorFailureKind.Untagged
++            needsDisplayDepthConsent = error.kind == DisplayColorFailureKind.Depth
++            needsSrgbDisplay = error.kind == DisplayColorFailureKind.Unsupported && wide
++            blockingMessage = when (error.kind) {
++                DisplayColorFailureKind.Untagged -> "This original has no embedded color profile. Choose the sRGB assumption for display; its original bytes stay unchanged."
++                DisplayColorFailureKind.Depth -> "This original has more than 8 bits per channel. Choose an 8-bit display derivative; exports and the original retain their depth."
++                DisplayColorFailureKind.Unsupported -> "This profile cannot use the bounded wide-color display path. You can try a converted sRGB display; unsupported conversions are refused."
++                DisplayColorFailureKind.Memory, DisplayColorFailureKind.Backpressure -> "The display exceeds the available memory budget. The unchanged original is retained; use a smaller region or tiled display."
++                DisplayColorFailureKind.Stale -> "The project changed while preparing its display. Retry after current work finishes."
++                else -> "The original could not be displayed safely. Its unchanged bytes remain saved."
++            }
++        } catch (error: CoreFailure) {
++            if (!admitted()) return
+             needsColorConsent = error.kind == CoreFailureKind.Raster && !colorAssumed
++            needsDisplayDepthConsent = false; needsSrgbDisplay = false
+             blockingMessage = if (error.kind == CoreFailureKind.Backpressure)
+-                "This image exceeds the current full-resolution display memory budget. Its original is saved unchanged. Bounded tiled display is still required before all images up to 50 megapixels can be edited."
++                "The full-resolution sRGB display exceeds its memory budget. The original is retained; use tiled display or a smaller region."
+             else if (needsColorConsent)
+-                "The image could not be converted for display. If it has no embedded color profile, you can explicitly treat its colors as sRGB. The original will remain unchanged."
+-            else "The image could not be displayed safely. Its original remains saved; no smaller replacement was created."
+-        }
+-        publish()
+-    }
+-    fun assumeSrgb() {
+-        if (busy || !needsColorConsent) return
+-        colorAssumed = true; busy = true; exportPreflight = null; checkedExport = null
+-        scope.launch { try { loadBackground() } catch (error: Exception) { report(error) } finally { busy = false } }
+-    }
++                "Display conversion failed. If the original is untagged, explicitly choose the sRGB assumption. Unsupported embedded profiles are still refused."
++            else "The original could not be displayed safely. Its unchanged bytes remain saved."
++        } finally { staged?.recycle() }
++        if (admitted()) publish()
++    }
++    private fun displayChoice(action: () -> Unit) {
++        if (busy || pending != 0 || disposing) return
++        val current = project ?: return
++        val expected = displayBinding() ?: return
++        val token = epoch
++        busy = true
++        scope.launch {
++            try {
++                val actual = current.info()
++                if (current !== project || token != epoch || disposing) return@launch
++                if (displayBinding() != expected || actual.projectId != expected.projectId || actual.hostSeq != expected.hostSeq || actual.stateHash != expected.stateHash) {
++                    message = "The document changed. Review its display choice again."; return@launch
++                }
++                action(); exportPreflight = null; checkedExport = null
++                loadBackground()
++            } catch (cancel: CancellationException) { throw cancel }
++            catch (error: Exception) { if (current === project && token == epoch && !disposing) report(error) }
++            finally { if (current === project && token == epoch && !disposing) busy = false }
++        }
++    }
++    fun assumeSrgb() { if (needsColorConsent) displayChoice { colorAssumed = true } }
++    fun allowDisplayDepth() { if (needsDisplayDepthConsent) displayChoice { displayDepthAllowed = true } }
++    fun useSrgbDisplay() { if (needsSrgbDisplay) displayChoice { forceSrgbDisplay = true } }
++    fun retryDisplay() { displayChoice {} }
+ 
+     fun viewport(width: Int, height: Int, displayDensity: Float) {
+         if (width <= 0 || height <= 0) return
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/MainActivity.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/MainActivity.kt
+@@ -12,6 +12,7 @@
+ import androidx.lifecycle.ViewModelProvider
+ import androidx.lifecycle.Lifecycle
+ import com.visualworkbench.android.editor.EditorController
++import com.visualworkbench.android.editor.ColorDisplay
+ import com.visualworkbench.android.editor.MediaHandoff
+ import com.visualworkbench.android.editor.MediaIntents
+ import kotlinx.coroutines.Dispatchers
+@@ -57,7 +58,9 @@
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
++        ColorDisplay.enable(this)
+         editor = ViewModelProvider(this)[EditorController::class.java]
++        editor.configureDisplay(ColorDisplay.space(this))
+         cameraToken = savedInstanceState?.getString("camera-token")
+         val activeCamera = cameraToken
+         editor.scope.launch { editor.cleanupTransfer { handoff.prune(System.currentTimeMillis(), activeCamera) } }
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
+@@ -173,6 +173,7 @@
+     val selectionState by editor.selections.state.collectAsState()
+     val eraserSelected = eraserState.active || (selectionState.active && selectionState.tool == com.visualworkbench.shared.SelectionTool.MaskEraser)
+     Column(Modifier.fillMaxSize()) {
++        editor.colorDisplayStatus?.let { Text(it, style = MaterialTheme.typography.caption, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) }
+         Surface(elevation = 4.dp) {
+             Column {
+                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+@@ -245,6 +246,9 @@
+                     Column(Modifier.padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                         Text("Original preserved", style = MaterialTheme.typography.h6)
+                         Text(reason)
++                        if (editor.needsDisplayDepthConsent) Button(onClick = editor::allowDisplayDepth, enabled = !editor.busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Display in 8 bit; keep original depth") }
++                        if (editor.needsSrgbDisplay) Button(onClick = editor::useSrgbDisplay, enabled = !editor.busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Use converted sRGB display") }
++                        Button(onClick = editor::retryDisplay, enabled = !editor.busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Retry display") }
+                         if (editor.needsColorConsent) Button(onClick = editor::assumeSrgb, enabled = !editor.busy,
+                             modifier = Modifier.heightIn(min = 48.dp)) { Text("Use sRGB for untagged colors") }
+                         OutlinedButton(onClick = { editor.navigate(WorkbenchScreen.Projects) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Back to projects") }
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
+@@ -9,14 +9,10 @@
+ import kotlinx.coroutines.flow.StateFlow
+ import kotlinx.coroutines.sync.Mutex
+ import kotlinx.coroutines.sync.withLock
+-import java.awt.image.BufferedImage
+-import java.io.ByteArrayOutputStream
+ import java.nio.file.Files
+ import java.nio.file.Path
+-import javax.imageio.ImageIO
+-import org.jetbrains.skia.Image
+ 
+-data class EditorState(val document:DocumentSnapshot?=null,val background:ImageBitmap?=null,val view:ViewState=ViewState(),val selected:Set<String> = emptySet(),val tool:Tool=Tool.Select,val preview:Map<String,Transform> = emptyMap(),val draft:Pair<Point,Point>?=null,val busy:Boolean=false,val message:String?=null,val textAnchor:Point?=null,val color:UInt=0x78dcc8ffu,val width:Double=3.0,val path:Path?=null,val needsColorConsent:Boolean=false,val projectEpoch:Long=0,val canvasReady:Boolean=false,val canvasFocused:Boolean=false,val renderIssue:String?=null,
++data class EditorState(val document:DocumentSnapshot?=null,val background:ImageBitmap?=null,val view:ViewState=ViewState(),val selected:Set<String> = emptySet(),val tool:Tool=Tool.Select,val preview:Map<String,Transform> = emptyMap(),val draft:Pair<Point,Point>?=null,val busy:Boolean=false,val message:String?=null,val textAnchor:Point?=null,val color:UInt=0x78dcc8ffu,val width:Double=3.0,val path:Path?=null,val needsColorConsent:Boolean=false,val needsDisplayDepthConsent:Boolean=false,val needsSrgbDisplay:Boolean=false,val colorDisplayStatus:String?=null,val projectEpoch:Long=0,val canvasReady:Boolean=false,val canvasFocused:Boolean=false,val renderIssue:String?=null,
+     val exportSettings:ExportSettings=ExportSettings(),val exportOpen:Boolean=false,val pasteOpen:Boolean=false,
+     val exportCheck:ExportCheck?=null,val exportReceipt:CompletedExport?=null,val dragPrepared:Boolean=false,
+     val sync:SessionStatus?=null,val peerFrame:PeerFrame?=null,val peerViewport:PeerViewport?=null,
+@@ -32,6 +28,9 @@
+     private val mutable=MutableStateFlow(EditorState());val state:StateFlow<EditorState> = mutable
+     private var project:WorkbenchProject?=null;private var changes:Job?=null;private val edits=Mutex();private var drag:Drag?=null
+     private var closing=false;private var queued=0;private var colorAssumed=false;private var generation=0L
++    private val displayAdoption = DisplayAdoption()
++    private var displayDepthAllowed = false
++    private var forceSrgbDisplay = false
+     private val transferFiles=TransferFiles(workRoot);private var transferJob:Job?=null;private var cachedExport:CachedExport?=null
+     private var preparedDrag:Pair<CompletedExport,DesktopDragFile>?=null
+     private var widthGesture:WidthGesture?=null
+@@ -229,15 +228,82 @@
+     }
+     private fun transfer(epoch:Long,block:suspend()->Unit):Job?{if(transferJob?.isActive==true){report("A transfer is already running. Finish or cancel it first.");return null};val job=task(epoch,block);transferJob=job;return job}
+     private suspend fun discardExport(){preparedDrag?.second?.close();preparedDrag=null;val prior=cachedExport;cachedExport=null;update{it.copy(exportReceipt=null,exportCheck=null,dragPrepared=false)};prior?.workspace?.close()}
+-    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();loadBackground();refreshRole(value,generation)
++    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;displayDepthAllowed=false;forceSrgbDisplay=false;displayAdoption.invalidate();update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();loadBackground();refreshRole(value,generation)
+         changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
+         }finally{withContext(NonCancellable){
+             try { if(!adopted)value.close() }
+             finally { if(instructionSeal&&!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
+         }}
+     }
+-    private suspend fun loadBackground(){val p=project?:return;val doc=mutable.value.document?:return;try{val pixels=p.background(doc.documentId,256uL*1024uL*1024uL,assumeUntaggedSrgb=colorAssumed);val image=withContext(Dispatchers.Default){bitmap(pixels)};if(project===p)update{it.copy(background=image,needsColorConsent=false)}}catch(error:CoreFailure){update{it.copy(needsColorConsent=error.kind==CoreFailureKind.Raster&&!colorAssumed)};report("The original is saved unchanged. Full-resolution display needs a supported color profile and enough memory within 256 MiB. For untagged images, explicitly choose the sRGB assumption.")}}
+-    fun assumeSrgb(){task(generation){colorAssumed=true;loadBackground()}}
++    private fun displayBinding(): WorkflowBinding? = mutable.value.document?.let { d ->
++        d.render.revision.let { WorkflowBinding(it.projectId, d.documentId, it.hostSeq, it.stateHash) }
++    }
++    private suspend fun loadBackground() {
++        val p = project ?: return
++        val doc = mutable.value.document ?: return
++        val epoch = generation
++        val wide = !forceSrgbDisplay && p is WorkbenchColorDisplay && doc.width.toULong() * doc.height.toULong() <= MAX_COLOR_DISPLAY_PIXELS
++        val space = if (wide) DisplayColorSpace.DisplayP3 else DisplayColorSpace.Srgb
++        val request = originalDisplayRequest(doc, space, colorAssumed, displayDepthAllowed)
++        val ticket = displayAdoption.issue(epoch, request)
++        fun admitted(): Boolean = !closing && project === p && displayAdoption.accepts(ticket, generation, displayBinding(), space)
++        var staged: OwnedColorImage? = null
++        try {
++            if (doc.bitDepth > 8u && !displayDepthAllowed) throw DisplayColorFailure(DisplayColorFailureKind.Depth)
++            var assumed = colorAssumed
++            if (wide) {
++                val pixels = (p as WorkbenchColorDisplay).originalColors(request)
++                validateDisplayPixels(pixels, request); assumed = pixels.assumedSrgb
++                staged = ColorDisplay.bitmap(pixels, request)
++            } else {
++                val pixels = p.background(doc.documentId, 256uL * 1024uL * 1024uL, assumeUntaggedSrgb = colorAssumed)
++                require(pixels.width == doc.width && pixels.height == doc.height)
++                staged = ColorDisplay.legacy(pixels)
++            }
++            if (!admitted()) return
++            val actual = p.info()
++            if (!admitted() || actual.projectId != request.binding.projectId || actual.hostSeq != request.binding.hostSeq || actual.stateHash != request.binding.stateHash) return
++            val image = checkNotNull(staged).take(); staged = null
++            val status = (if (wide) "Display P3 display" else "Display converted to sRGB") +
++                (if (doc.bitDepth > 8u) " in 8 bit" else "") + (if (assumed) "; untagged colors treated as sRGB" else "") + ". Original profile and depth retained."
++            update { it.copy(background = image, needsColorConsent = false, needsDisplayDepthConsent = false, needsSrgbDisplay = false, colorDisplayStatus = status) }
++        } catch (cancel: CancellationException) { throw cancel }
++        catch (error: DisplayColorFailure) {
++            if (!admitted()) return
++            update { it.copy(needsColorConsent = error.kind == DisplayColorFailureKind.Untagged,
++                needsDisplayDepthConsent = error.kind == DisplayColorFailureKind.Depth,
++                needsSrgbDisplay = error.kind == DisplayColorFailureKind.Unsupported && wide) }
++            report(when (error.kind) {
++                DisplayColorFailureKind.Untagged -> "This original has no embedded color profile. Choose the sRGB assumption for display; its original bytes stay unchanged."
++                DisplayColorFailureKind.Depth -> "Choose an 8-bit display derivative for this high-depth original. Exports and the original retain their depth."
++                DisplayColorFailureKind.Unsupported -> "This profile cannot use the bounded wide-color path. Try a converted sRGB display; unsupported conversions are refused."
++                DisplayColorFailureKind.Memory, DisplayColorFailureKind.Backpressure -> "Display exceeds the available memory budget. The unchanged original is retained; use tiles or a smaller region."
++                DisplayColorFailureKind.Stale -> "The project changed while preparing its display. Retry after current work finishes."
++                else -> "The original could not be displayed safely. Its unchanged bytes remain saved."
++            })
++        } catch (error: CoreFailure) {
++            if (!admitted()) return
++            update { it.copy(needsColorConsent = error.kind == CoreFailureKind.Raster && !colorAssumed,
++                needsDisplayDepthConsent = false, needsSrgbDisplay = false) }
++            report("The original is retained. Full-resolution sRGB display needs a supported profile and enough memory within 256 MiB. Untagged colors require the explicit sRGB assumption.")
++        } finally { staged?.abandon() }
++    }
++    private fun displayChoice(action: () -> Unit) {
++        val expected = displayBinding() ?: return
++        val p = project ?: return
++        task(generation) {
++            val actual = p.info()
++            if (project !== p || displayBinding() != expected || actual.projectId != expected.projectId || actual.hostSeq != expected.hostSeq || actual.stateHash != expected.stateHash) {
++                report("The document changed. Review its display choice again."); return@task
++            }
++            action(); loadBackground()
++        }
++    }
++    fun assumeSrgb() { if (mutable.value.needsColorConsent) displayChoice { colorAssumed = true } }
++    fun allowDisplayDepth() { if (mutable.value.needsDisplayDepthConsent) displayChoice { displayDepthAllowed = true } }
++    fun useSrgbDisplay() { if (mutable.value.needsSrgbDisplay) displayChoice { forceSrgbDisplay = true } }
++    fun retryDisplay() { displayChoice {} }
++
+     private fun validateDrawing(snapshot:DocumentSnapshot){if(snapshot.render.items.any{it.shape is Shape.Adjustment})throw UnsupportedOperationException("This document contains adjustment objects that the desktop canvas cannot display yet. Its original and saved edits are preserved.")}
+     fun importImage(path:Path)=importFile(ImportRequest(generation,path.toAbsolutePath().normalize()))
+     fun importFile(request: ImportRequest, onStaged: (Boolean) -> Unit = {}, retainAcceptedDrop: Boolean = false): Job? {
+@@ -277,7 +343,7 @@
+     fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
+     fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one PNG, JPEG, WebP, HEIC or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension !in setOf("png","jpg","jpeg","webp","heic","heif","mp4")){report("This drop supports PNG, JPEG, WebP, admitted HEIC originals and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
+     fun open(path:Path,epoch:Long=generation){task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
+-    suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
++    suspend fun close(){closing=true;displayAdoption.invalidate();transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
+     fun closeProject(){if(!mayCloseAi())return;if(!mayCloseInstructions())return;cancelInput();sessionWork?.cancel();task(generation){
+         // The pre-enqueue check can become stale while another owner holds
+         // edits. task has now set busy under that same mutex, fencing Send.
+@@ -506,8 +572,3 @@
+     fun cancelTransfer(){transferJob?.cancel();report("Cancelling transfer; waiting for native work to release its files.")}
+ }
+ private fun <T> Set<T>.toggle(value:T):Set<T> = if(value in this)this-value else this+value
+-private fun bitmap(value:BackgroundImage):ImageBitmap {
+-    val width=value.width.toInt();val height=value.height.toInt();val image=BufferedImage(width,height,BufferedImage.TYPE_INT_ARGB);val row=IntArray(width)
+-    for(y in 0 until height){for(x in 0 until width){val i=(y*width+x)*4;row[x]=((value.rgba[i+3].toInt() and 255) shl 24) or ((value.rgba[i].toInt() and 255) shl 16) or ((value.rgba[i+1].toInt() and 255) shl 8) or (value.rgba[i+2].toInt() and 255)};image.setRGB(0,y,width,1,row,0,width)}
+-    val bytes=ByteArrayOutputStream().use{check(ImageIO.write(image,"png",it));it.toByteArray()};return Image.makeFromEncoded(bytes).toComposeImageBitmap()
+-}
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
+@@ -293,6 +293,10 @@
+                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){palette.forEach{rgba->Box(Modifier.size(24.dp).background(Color(((rgba and 255u)shl 24 or(rgba shr 8)).toInt()),RoundedCornerShape(5.dp)).border(if(editor.color==rgba)2.dp else 0.dp,Color.White,RoundedCornerShape(5.dp)).clickable{controller.color(rgba)})}}
+                 Text("Width  ${"%.1f".format(editor.width)} px",style=MaterialTheme.typography.body2);Slider(value=editor.width.toFloat(),onValueChange={controller.width(it.toDouble(),false)},onValueChangeFinished={controller.commitWidth()},valueRange=.25f..256f,enabled=!editor.busy)
+                 Text("Drag selected objects to move. Drag the lower-right handle to resize. Each gesture saves one undo step.",style=MaterialTheme.typography.caption,color=Color(0xff9cabbc));Divider();Text("LOCAL VIEW",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc));commandButton(Command.Fit,action);commandButton(Command.ActualPixels,action);commandButton(Command.MatchPeer,action)
++                editor.colorDisplayStatus?.let { Text(it, style=MaterialTheme.typography.caption) }
++                if(editor.needsDisplayDepthConsent)Button(onClick={controller.allowDisplayDepth()}){Text("Display in 8 bit; keep original depth")}
++                if(editor.needsSrgbDisplay)Button(onClick={controller.useSrgbDisplay()}){Text("Use converted sRGB display")}
++                if(editor.document!=null&&editor.background==null&&!editor.busy)Button(onClick={controller.retryDisplay()}){Text("Retry display")}
+                 if(editor.needsColorConsent)Button(onClick={controller.assumeSrgb()}){Text("Treat untagged colors as sRGB")}
+                 commandButton(Command.Pairing,action);if(editor.sync?.blocked?.let{it>0u}==true)Text("${editor.sync?.blocked} pending edits need conflict review.",color=MaterialTheme.colors.secondary,style=MaterialTheme.typography.caption)
+                 if(editor.routeWarnings.isNotEmpty())Text("Tether default-route warning. Open Devices for the metric fix and revert.",color=MaterialTheme.colors.secondary,style=MaterialTheme.typography.caption)

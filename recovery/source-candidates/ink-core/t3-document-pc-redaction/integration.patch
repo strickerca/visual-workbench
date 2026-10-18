@@ -1,0 +1,215 @@
+--- a/core/crates/vw-pdf/Cargo.toml
++++ b/core/crates/vw-pdf/Cargo.toml
+@@ -11,5 +11,8 @@
+ blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+ thiserror = "=2.0.21"
+ 
++[target.'cfg(windows)'.dependencies]
++windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_System_LibraryLoader"] }
++
+ [lints]
+ workspace = true
+--- a/core/crates/vw-pdf/src/lib.rs
++++ b/core/crates/vw-pdf/src/lib.rs
+@@ -8,6 +8,12 @@
+ mod limits;
+ mod overlay;
+ mod raster_redaction;
++#[cfg(windows)]
++mod pc_content;
++#[cfg(windows)]
++mod pc_redaction;
++#[cfg(windows)]
++mod qpdf_cleanup;
+ mod sink;
+ mod types;
+ 
+@@ -19,3 +25,8 @@
+ pub use types::{PdfCopyKind, PdfDocumentInfo, PdfExportReceipt, PdfGlyph, PdfNotice, PdfPageInfo, PdfTextChunk, PdfTile};
+ 
+ pub use raster_redaction::{PageRedaction, RasterProgress, RasterRedactionError, RasterRedactionOptions, RasterRedactionPlan, RasterRedactionResult, RasterSecurityPolicy, RasterWork, UnverifiedRasterCopy, VerifiedRasterRedaction, admit_raster_redaction};
++
++#[cfg(windows)]
++pub use pc_redaction::{CleanedPcCopy, PcRedactionError, PcRedactionOptions, PcRedactionPlan, PcRedactionProgress, PcRedactionResult, PcRedactionWork, PcSourceAdmission, UnverifiedPcCopy, VerifiedPcRedaction};
++#[cfg(windows)]
++pub use qpdf_cleanup::QpdfRuntime;
+--- a/core/crates/vw-pdf/src/ffi.rs
++++ b/core/crates/vw-pdf/src/ffi.rs
+@@ -1,6 +1,9 @@
+ //! Exclusive PDFium FFI ownership for the isolated document worker.
+ #[path = "redaction_ffi.rs"]
+ mod redaction_ffi;
++#[cfg(windows)]
++#[path = "pc_redaction_ffi.rs"]
++mod pc_redaction_ffi;
+ use crate::limits::MAX_TEXT_CHUNK;
+ use crate::sink::SaveSink;
+ use crate::{PageGeometry, PdfCancellation, PdfCopyKind, PdfDocumentInfo, PdfError, PdfExportReceipt, PdfGlyph, PdfLimits, PdfNotice, PdfOverlay, PdfPageInfo, PdfPoint, PdfRect, PdfResult, PdfTextChunk, PdfTile, PdfTileRequest, validate_overlays};
+--- a/core/crates/vw-document-protocol/src/job.rs
++++ b/core/crates/vw-document-protocol/src/job.rs
+@@ -51,6 +51,8 @@
+     PdfSelection { page: u32, rectangle: [f64; 4] },
+     PdfCopy { copy: CopyKind, overlays: Vec<Overlay> },
+     PdfRasterRedaction { scale: f64, explicitly_remove_encryption: bool, regions: Vec<PageRegion> },
++    /// Explicit PC path; never silently changes to full-page raster export.
++    PdfPcRedaction { scale: f64, explicitly_remove_encryption: bool, regions: Vec<PageRegion> },
+     SvgInfo,
+     SvgTile { tile: Tile },
+     SvgCopy { overlays: Vec<Overlay> },
+@@ -92,7 +94,7 @@
+                 overlays_valid(overlays)?;
+                 if overlays.iter().any(|item| item.page != 0) { return Err(ProtocolError::Invalid); }
+             }
+-            Operation::PdfRasterRedaction { scale, regions, .. } => {
++            Operation::PdfRasterRedaction { scale, regions, .. } | Operation::PdfPcRedaction { scale, regions, .. } => {
+                 if !scale.is_finite() || !(0.25..=8.0).contains(scale) || regions.is_empty() || regions.len() > 4096 { return Err(ProtocolError::Invalid); }
+                 for region in regions { rectangle_valid(region.rectangle)?; }
+             }
+--- a/host-win/crates/vw-document-win/src/metadata.rs
++++ b/host-win/crates/vw-document-win/src/metadata.rs
+@@ -29,6 +29,7 @@
+     SvgInfo { width: f64, height: f64, notices: Vec<Notice> },
+     SvgCopy { bytes: u64, notices: Vec<Notice> },
+     RasterRedaction { pages: u32, regions: u32, bytes: u64, requested_scale: f64, effective_scale: f64, plan_blake3: String },
++    PcRedaction { pages: u32, regions: u32, bytes: u64, requested_scale: f64, effective_scale: f64, plan_blake3: String, removed_objects: u32, preserved_paths: u32, raster_tiles: u32 },
+ }
+ impl std::fmt::Debug for ResultMetadata {
+     fn fmt(&self, output: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+@@ -44,7 +45,7 @@
+     pub fn data_bytes(&self) -> u64 {
+         match self {
+             Self::RgbaTile { width, height, .. } => u64::from(*width).saturating_mul(u64::from(*height)).saturating_mul(4),
+-            Self::PdfCopy { bytes, .. } | Self::SvgCopy { bytes, .. } | Self::RasterRedaction { bytes, .. } => *bytes,
++            Self::PdfCopy { bytes, .. } | Self::SvgCopy { bytes, .. } | Self::RasterRedaction { bytes, .. } | Self::PcRedaction { bytes, .. } => *bytes,
+             _ => 0,
+         }
+     }
+@@ -78,6 +79,11 @@
+                 pages_valid(*pages) && *regions as usize == wanted.len() && *requested_scale == *scale && *effective_scale == f64::from(*scale as f32)
+                     && *bytes >= 8 && *bytes <= request.limits.input_bytes && plan_blake3.len() == 64
+                     && plan_blake3.bytes().all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c)),
++            (Operation::PdfPcRedaction { scale, regions: wanted, .. }, Self::PcRedaction { pages, regions, bytes, requested_scale, effective_scale, plan_blake3, removed_objects, preserved_paths, raster_tiles }) =>
++                pages_valid(*pages) && *regions as usize == wanted.len() && *requested_scale == *scale && *effective_scale == f64::from(*scale as f32)
++                    && *bytes >= 8 && *bytes <= request.limits.input_bytes && plan_blake3.len() == 64
++                    && plan_blake3.bytes().all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
++                    && *removed_objects <= 100_000_000 && *preserved_paths <= 100_000 && *raster_tiles <= 100_000,
+             _ => false,
+         };
+         if !valid { return Err(ProtocolError::Invalid); }
+--- a/host-win/crates/vw-document-win/src/windows.rs
++++ b/host-win/crates/vw-document-win/src/windows.rs
+@@ -150,6 +150,7 @@
+     let _admission = Admission::acquire()?;
+     if cleanup_pending() { return Err(Error::CleanupPending); }
+     limits.validate(request)?; cancel.check()?;
++    if matches!(request.operation, vw_document_protocol::Operation::PdfPcRedaction { .. }) && !runtime.pc_redaction_available() { return Err(Error::Integrity); }
+     let scratch_root = pin::absolute(scratch_root)?;
+     if !scratch_root.to_str().ok_or(Error::Invalid)?.eq_ignore_ascii_case(runtime.private_workspace_path()?.to_str().ok_or(Error::Invalid)?) {
+         return Err(Error::Invalid);
+--- a/host-win/crates/vw-document-win/src/windows/pin.rs
++++ b/host-win/crates/vw-document-win/src/windows/pin.rs
+@@ -48,6 +48,7 @@
+     chain: DirectoryChain,
+     pub(super) files: Vec<PinnedFile>,
+     pub(super) executable: PathBuf,
++    pc_redaction_available: bool,
+ }
+ impl PinnedRuntime {
+     /// The root must be a dedicated already-extracted runtime with exactly the
+@@ -70,10 +71,13 @@
+             files.push(PinnedFile { handle });
+         }
+         let executable = chain.path.join("vw-document-worker.exe");
+-        Ok(Self { chain, files, executable })
++        let pc_redaction_available = expected.contains("qpdf30.dll");
++        Ok(Self { chain, files, executable, pc_redaction_available })
+     }
+     pub(super) fn root_handle(&self) -> Result<&Handle> { self.chain.handles.last().ok_or(Error::Integrity) }
+     pub(super) fn root(&self) -> &Path { &self.chain.path }
++    /// True only when qpdf30.dll is among the source-bound retained file pins.
++    pub fn pc_redaction_available(&self) -> bool { self.pc_redaction_available }
+     /// Stable private sibling shared by all versions/instances of this runtime
+     /// cache. The application creates it explicitly before invoking run.
+     pub fn private_workspace_path(&self) -> Result<PathBuf> {
+--- a/tools/document-worker/src/dispatch.rs
++++ b/tools/document-worker/src/dispatch.rs
+@@ -4,7 +4,7 @@
+ use vw_document_protocol::{CopyKind, FaultCode, Job, Operation, Overlay, Request};
+ use vw_document_win::{DocumentFormat, Glyph, Notice, ResultMetadata};
+ use vw_pdf::{PdfCancellation, PdfCopyKind, PdfError, PdfLimits, PdfNotice, PdfOverlay, PdfPoint, PdfRect,
+-    PdfRuntime, PdfTileRequest, PageRedaction, RasterRedactionError, RasterRedactionOptions, RasterRedactionPlan, RasterSecurityPolicy};
++    PcRedactionError, PcRedactionOptions, PcRedactionPlan, QpdfRuntime, PdfRuntime, PdfTileRequest, PageRedaction, RasterRedactionError, RasterRedactionOptions, RasterRedactionPlan, RasterSecurityPolicy};
+ use vw_svg::{FidelityNotice, SvgDocument, SvgError};
+ 
+ pub(super) struct Output { pub metadata: ResultMetadata, pub bytes: Vec<u8> }
+@@ -17,6 +17,7 @@
+     let staging = match &request.operation {
+         Operation::PdfCopy { .. } => request.limits.output_bytes,
+         Operation::PdfRasterRedaction { .. } => request.limits.output_bytes.min(request.limits.input_bytes),
++        Operation::PdfPcRedaction { .. } => request.limits.output_bytes.min(request.limits.input_bytes).checked_mul(2).ok_or(FaultCode::Memory)?,
+         Operation::SvgCopy { .. } => request.limits.output_bytes.min(4 * 1024 * 1024),
+         _ => 0,
+     };
+@@ -62,13 +63,20 @@
+ fn pdf(source: Vec<u8>, request: &Request, memory: u64, library: &Path) -> Result<Output, FaultCode> {
+     let limits = PdfLimits { input_bytes: request.limits.input_bytes, output_bytes: request.limits.output_bytes,
+         memory_bytes: memory, ..PdfLimits::default() };
++    let cancel = PdfCancellation::default();
++    let pc_runtime = if matches!(request.operation, Operation::PdfPcRedaction { .. }) {
++        // SAFETY: parent run refuses this operation unless qpdf30.dll is among
++        // its exact retained pins. Worker token/Job/DLL policy has been verified.
++        let cleanup = unsafe { QpdfRuntime::from_verified_library(&library.with_file_name("qpdf30.dll"), limits) }.map_err(pc_error)?;
++        let admission = cleanup.admit_source(&source, request.password.as_deref(), &cancel).map_err(pc_error)?;
++        Some((cleanup, admission))
++    } else { None };
+     let bindings = Pdfium::bind_to_library(library).map_err(|_| FaultCode::Native)?;
+     // SAFETY: only the Windows entrypoint calls execute in production, after
+     // checking LPAC/no capabilities, bounded Job and constrained DLL search.
+     // The parent holds exact ABI7881 source-bound binary/ancestor pins until
+     // this child has exited. No other Pdfium instance exists in this process.
+     let mut runtime = unsafe { PdfRuntime::from_verified_bindings(bindings, limits) }.map_err(pdf_error)?;
+-    let cancel = PdfCancellation::default();
+     let mut document = runtime.open(source, request.password.as_deref(), &cancel).map_err(pdf_error)?;
+     match &request.operation {
+         Operation::PdfInfo => Ok(Output { metadata: ResultMetadata::PdfInfo { pages: document.info().pages, encrypted: document.info().encrypted,
+@@ -118,6 +126,26 @@
+             Ok(Output { metadata: ResultMetadata::RasterRedaction { pages: verified.pages(), regions: verified.regions(), bytes: verified.bytes(),
+                 requested_scale: verified.requested_pixels_per_point(), effective_scale: verified.pixels_per_point(), plan_blake3: verified.plan_blake3().to_owned() }, bytes: published.bytes })
+         }
++        Operation::PdfPcRedaction { scale, explicitly_remove_encryption, regions } => {
++            let (cleanup, admission) = pc_runtime.ok_or(FaultCode::Unsupported)?;
++            let plan = PcRedactionPlan::prepare(&mut document, admission,
++                regions.iter().map(|region| PageRedaction { page: region.page, region: rect(region.rectangle) }).collect(),
++                PcRedactionOptions { pixels_per_point: *scale, security: if *explicitly_remove_encryption { RasterSecurityPolicy::ExplicitlyRemoveEncryption } else { RasterSecurityPolicy::RefuseEncrypted } }, &cancel).map_err(pc_error)?;
++            let mut fresh = BoundedBytes::new(request.limits.output_bytes.min(request.limits.input_bytes))?;
++            let intermediate = plan.write_unverified(&mut document, &mut fresh, &cancel, &mut |_| {}).map_err(pc_error)?;
++            drop(document);
++            let (bytes, cleaned) = cleanup.rewrite_and_audit(&plan, intermediate, &fresh.bytes, &cancel).map_err(pc_error)?;
++            drop(fresh);
++            let mut generated = runtime.open(bytes, None, &cancel).map_err(pdf_error)?;
++            let verified = plan.verify(&mut generated, cleaned, &cancel).map_err(pc_error)?;
++            let mut published = BoundedBytes::new(request.limits.output_bytes.min(request.limits.input_bytes))?;
++            generated.export(PdfCopyKind::Original, &[], &mut published, &cancel).map_err(pdf_error)?;
++            if published.bytes.len() as u64 != verified.bytes() { return Err(FaultCode::Verification); }
++            let work = verified.work();
++            Ok(Output { metadata: ResultMetadata::PcRedaction { pages: work.pages, regions: verified.regions(), bytes: verified.bytes(),
++                requested_scale: verified.requested_pixels_per_point(), effective_scale: verified.pixels_per_point(), plan_blake3: verified.plan_blake3().to_owned(),
++                removed_objects: work.removed_objects, preserved_paths: work.preserved_paths, raster_tiles: work.tiles }, bytes: published.bytes })
++        }
+         _ => Err(FaultCode::Invalid),
+     }
+ }
+@@ -154,6 +182,13 @@
+ fn redaction_error(value: RasterRedactionError) -> FaultCode { match value {
+     RasterRedactionError::Pdf(error) => pdf_error(error), RasterRedactionError::Invalid => FaultCode::Invalid,
+     RasterRedactionError::Limit => FaultCode::Limit, RasterRedactionError::SourceMismatch | RasterRedactionError::Verification => FaultCode::Verification,
++} }
++
++fn pc_error(value: PcRedactionError) -> FaultCode { match value {
++    PcRedactionError::Pdf(error) => pdf_error(error), PcRedactionError::Invalid => FaultCode::Invalid,
++    PcRedactionError::Limit => FaultCode::Limit, PcRedactionError::UnsupportedContent | PcRedactionError::UnsupportedObject { .. } => FaultCode::Unsupported,
++    PcRedactionError::SourceMismatch | PcRedactionError::Verification => FaultCode::Verification,
++    PcRedactionError::CleanupUnavailable | PcRedactionError::Cleanup => FaultCode::Native,
+ } }
+ 
+ struct BoundedBytes { bytes: Vec<u8>, limit: usize }

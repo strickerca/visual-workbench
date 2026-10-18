@@ -1,0 +1,8 @@
+{
+  "schema": "source-data-failures.v1",
+  "product_execution": false,
+  "failures": [
+    {"phase": "source-write", "result": "disk-full", "affected": "t3-document-app/freeze.py", "bytes_after_failure": 0, "action": "paused; root restored capacity; audited earlier product source tails; reconstructed source-data generator"},
+    {"phase": "source-freeze-diff", "result": "UnicodeDecodeError", "exit": 1, "encoding": "Windows cp1252 default", "action": "explicit UTF-8 snapshot reads; no product execution"}
+  ]
+}

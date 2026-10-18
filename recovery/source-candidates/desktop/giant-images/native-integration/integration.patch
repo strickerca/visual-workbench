@@ -1,0 +1,52 @@
+--- a/core/crates/vw-ffi/src/lib.rs
++++ b/core/crates/vw-ffi/src/lib.rs
+@@ -5,6 +5,8 @@
+ mod camera;
+ pub use ai_edit::*;
+ mod creation;
++mod giant_import;
++pub use giant_import::*;
+ mod dto;
+ mod editor;
+ mod gesture;
+--- a/core/crates/vw-ffi/Cargo.toml
++++ b/core/crates/vw-ffi/Cargo.toml
+@@ -18,6 +18,8 @@
+ fixtures = ["tokio/rt", "tokio/macros"]
+ 
+ [dependencies]
++vw-assets = { version = "=0.1.0", path = "../vw-assets" }
++ring = "=0.17.14"
+ uniffi = { version = "=0.32.2", default-features = false }
+ tokio = { version = "=1.53.1", features = ["sync", "rt", "net", "time", "macros"] }
+ thiserror = "=2.0.21"
+--- a/core/crates/vw-store/src/blobs.rs
++++ b/core/crates/vw-store/src/blobs.rs
+@@ -11,6 +11,9 @@
+ }
+ 
+ impl BlobStore {
++    /// Canonical project root for a serialized derived-cache owner.
++    pub fn project_root(&self) -> &Path { &self.root }
++
+     /// Create the blob hierarchy beneath a caller-selected project directory.
+     pub fn new(project_root: &Path) -> Result<Self, StoreError> {
+         let root = project_root.canonicalize()?;
+--- a/core/crates/vw-store/src/cache.rs
++++ b/core/crates/vw-store/src/cache.rs
+@@ -361,6 +361,15 @@
+         self.manifest.entries.contains_key(key)
+     }
+ 
++    /// Admit the retained payload before allocating its file buffer. The ordinary
++    /// hash/length checks and durable LRU update remain in `get`.
++    pub fn get_bounded(&mut self, key: &str, max_bytes: u64) -> Result<Option<Vec<u8>>, StoreError> {
++        if self.manifest.entries.get(key).is_some_and(|entry| entry.bytes > max_bytes) {
++            return Err(StoreError::Invalid("cache payload exceeds caller bound"));
++        }
++        self.get(key)
++    }
++
+     /// Return verified derived bytes and update durable LRU order.
+     pub fn get(&mut self, key: &str) -> Result<Option<Vec<u8>>, StoreError> {
+         self.check_paths()?;

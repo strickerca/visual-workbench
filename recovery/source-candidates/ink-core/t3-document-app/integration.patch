@@ -1,0 +1,621 @@
+--- a/core/crates/vw-ffi/src/lib.rs
++++ b/core/crates/vw-ffi/src/lib.rs
+@@ -5,6 +5,8 @@
+ mod camera;
+ pub use ai_edit::*;
+ mod creation;
++mod documents;
++pub use documents::*;
+ mod dto;
+ mod editor;
+ mod gesture;
+--- a/core/crates/vw-ffi/Cargo.toml
++++ b/core/crates/vw-ffi/Cargo.toml
+@@ -44,6 +44,19 @@
+ vw-semantics = { version = "=0.1.0", path = "../vw-semantics" }
+ vw-mask = { version = "=0.1.0", path = "../vw-mask" }
+ png = "=0.18.1"
++vw-pdf = { version = "=0.1.0", path = "../vw-pdf" }
++vw-svg = { version = "=0.1.0", path = "../vw-svg" }
++vw-document-protocol = { version = "=0.1.0", path = "../vw-document-protocol" }
++vw-document-win = { version = "=0.1.0", path = "../../../host-win/crates/vw-document-win" }
++tiny-skia = { version = "=0.12.0", default-features = false, features = ["std"] }
++
++[target.'cfg(target_os = "android")'.dependencies.pdfium-render]
++version = "=0.9.4"
++default-features = false
++features = ["pdfium_7881"]
++
++[target.'cfg(target_os = "android")'.dependencies.sha2]
++version = "=0.11.0"
+ 
+ [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+ rustix = { version = "=1.1.5", features = ["fs"] }
+--- a/core/crates/vw-ffi/src/queries.rs
++++ b/core/crates/vw-ffi/src/queries.rs
+@@ -81,6 +81,16 @@
+     document: &str,
+     query: Option<QueryRect>,
+ ) -> Result<RenderList> {
++    render_list_for_page(state, document, None, query)
++}
++pub(crate) fn render_list_page(state: &ProjectState, document: &str, page: u32, query: Option<QueryRect>) -> Result<RenderList> {
++    render_list_for_page(state, document, Some(page), query)
++}
++fn render_list_for_page(state: &ProjectState, document: &str, selected: Option<u32>, query: Option<QueryRect>) -> Result<RenderList> {
++    let editable = crate::documents::descriptor(state,document)?;
++    let selected = if editable.is_some() { Some(selected.unwrap_or(0)) } else { selected };
++    if selected.is_some() && editable.is_none() { return Err(CoreError::Unsupported); }
++    let geometry = selected.map(|page| editable.as_ref().and_then(|d| d.pages.get(page as usize)).filter(|p| p.page == page).ok_or(CoreError::Invalid)).transpose()?;
+     let query = query.map(rect).transpose()?;
+     let project = state.project()?;
+     let document = Id::try_from(document.to_owned())?;
+@@ -101,14 +111,15 @@
+     let page = QueryRect {
+         x: 0.0,
+         y: 0.0,
+-        width: f64::from(w),
+-        height: f64::from(h),
++        width: geometry.map_or(f64::from(w), |p| p.width),
++        height: geometry.map_or(f64::from(h), |p| p.height),
+     };
+     let mut layers = project
+         .layers
+         .iter()
+         .filter(|(_, layer)| {
+             layer.definition.document_id.as_ref() == Some(&document.to_proto())
++                && selected.is_none_or(|p| layer.definition.page_index == if editable.as_ref().is_some_and(|d| d.kind == crate::EditableDocumentKind::Pdf) { p as i32 } else { -1 })
+                 && layer.visible
+                 && layer.opacity > 0.0
+         })
+--- a/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt
++++ b/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt
+@@ -47,7 +47,8 @@
+     try { block(cancellation) } catch (error: CancellationException) { cancellation.cancel(); throw error }
+     catch (error: CoreException) { throw mapFailure(error) } finally { cancellation.destroy() }
+ }
+-private class NativeCore : WorkbenchCore, WorkbenchStreamingCore {
++private class NativeCore : WorkbenchCore, WorkbenchStreamingCore, WorkbenchDocumentsCore {
++    override suspend fun createDocument(options: CreateDocument): WorkbenchProject = acquireNative({createEditableDocument(options.documentNative(),it)},{NativeProject(it).also{p->p.documentPassword(options.documentId,options.password)}},{try{it.closeSession()}finally{it.destroy()}})
+     override suspend fun createFile(options: CreateFileProject): WorkbenchProject = createFileNative(options) { NativeProject(it) }
+     override fun newId(unixMs: ULong): String = generateId(unixMs)
+     override fun newDeviceId(): String = generateDeviceId()
+@@ -60,7 +61,19 @@
+         TextLayout(value.algorithmVersion,value.glyphs.map { GlyphOutline(it.glyphId,it.cluster,it.font,it.x,it.y,it.advance,it.outline.map { p -> p.common() }) },value.width,value.height,value.lineHeight)
+     }
+ }
+-private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers {
++private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchDocumentsProject {
++    private val documentPages=java.util.concurrent.ConcurrentHashMap<String,UInt>()
++    private val documentPasswords=java.util.concurrent.ConcurrentHashMap<String,String>()
++    override fun documentPassword(documentId:String):String? = documentPasswords[documentId]
++    override fun documentPassword(documentId:String,password:String?) {if(password==null)documentPasswords.remove(documentId)else{require(password.length<=1024 && '\u0000' !in password);documentPasswords[documentId]=password}}
++    override fun selectedDocumentPage(documentId:String):UInt = documentPages[documentId] ?: 0u
++    override suspend fun documentDescriptor(documentId:String):EditableDescriptor? = call{handle.editableDocumentDescriptor(documentId,it)?.documentCommon()}
++    override suspend fun documentSource(documentId:String,expected:ProjectInfo):EditableSource = call{val value=handle.editableDocumentSource(documentId,expected.documentNative(),it);EditableSource(value.descriptor.documentCommon(),value.bytes)}
++    override suspend fun documentPage(documentId:String,page:UInt):DocumentSnapshot = call{handle.editableDocumentPage(documentId,page,it).documentCommon()}
++    override suspend fun selectDocumentPage(documentId:String,page:UInt):DocumentSnapshot {val snapshot=documentPage(documentId,page);documentPages[documentId]=page;return snapshot}
++    override suspend fun documentOverlays(documentId:String,page:UInt,expected:ProjectInfo):List<DocumentOverlay> = call{handle.editableDocumentOverlays(documentId,page,expected.documentNative(),it).map{value->DocumentOverlay(value.page,value.contours.map{line->line.map{p->Point(p.x,p.y)}},Transform(value.transform.a,value.transform.b,value.transform.c,value.transform.d,value.transform.e,value.transform.f),value.rgba)}}
++    override suspend fun publishDocumentCopy(documentId:String,destination:String,copy:DocumentExport):String = call{handle.publishEditableCopy(PublishEditableCopy(documentId,copy.sourceAssetId,copy.revision.documentNative(),destination,copy.bytes,copy.blake3),it)}
++
+     override suspend fun preflightFile(options: FileExportOptions): FilePreflight {
+         if (closed.get()) throw TransferFailure(TransferFailureKind.Closed)
+         return preflightFileNative(handle, options)
+@@ -86,13 +99,14 @@
+         awaitClose { subscription.unsubscribe(); subscription.destroy() }
+     }.buffer(Channel.CONFLATED)
+     override suspend fun info(): ProjectInfo = call { handle.info().common() }
+-    override suspend fun document(documentId: String): DocumentSnapshot = call { cancel ->
+-        val d=handle.documentSnapshot(documentId,cancel)
+-        DocumentSnapshot(d.documentId,d.title,d.width,d.height,d.bitDepth,d.layers.map { LayerInfo(it.id,it.name,it.visible,it.locked,it.opacity,it.blend) },d.render.common())
++    override suspend fun document(documentId: String): DocumentSnapshot {
++        if(documentDescriptor(documentId)!=null)return documentPage(documentId,selectedDocumentPage(documentId))
++        return call{cancel->handle.documentSnapshot(documentId,cancel).documentCommon()}
+     }
+-    override suspend fun background(documentId: String,memoryBudgetBytes: ULong,assumeUntaggedSrgb: Boolean): BackgroundImage = call { cancel ->
+-        val b=handle.backgroundImage(documentId,memoryBudgetBytes,assumeUntaggedSrgb,cancel)
+-        BackgroundImage(b.width,b.height,b.rgba,b.sourceAssetId,b.sourceBitDepth,b.iccProfile)
++    override suspend fun background(documentId: String,memoryBudgetBytes: ULong,assumeUntaggedSrgb: Boolean): BackgroundImage {
++        val descriptor=documentDescriptor(documentId)
++        if(descriptor!=null){val source=documentSource(documentId,descriptor.revision);val image=DocumentInteraction(installedDocumentJobs(),workbenchCore()).background(source,selectedDocumentPage(documentId),documentPassword(documentId));if(!info().sameDocumentRevision(descriptor.revision))throw DocumentFailure(DocumentFailureKind.Stale);return image}
++        return call { cancel -> val b=handle.backgroundImage(documentId,memoryBudgetBytes,assumeUntaggedSrgb,cancel);BackgroundImage(b.width,b.height,b.rgba,b.sourceAssetId,b.sourceBitDepth,b.iccProfile) }
+     }
+     override suspend fun beginStroke(options: StrokeOptions): WorkbenchStroke {
+         if(closed.get())throw CoreFailure(CoreFailureKind.Closed)
+@@ -104,7 +118,10 @@
+         handle.applyEditAt(options.native(),commands.map { it.native() },expected,options.gestureId,it).common()
+     }
+     override suspend fun undoRedo(options: EditOptions,redo: Boolean): ProjectInfo = call { handle.undoRedo(options.native(),redo,it).common() }
+-    override suspend fun render(documentId: String,rectangle: Rect?): RenderList = call { handle.renderList(documentId,rectangle?.native(),it).common() }
++    override suspend fun render(documentId: String,rectangle: Rect?): RenderList {
++        return if(documentDescriptor(documentId)!=null)call{handle.editableDocumentRender(documentId,selectedDocumentPage(documentId),rectangle?.native(),it).common()}
++        else call{handle.renderList(documentId,rectangle?.native(),it).common()}
++    }
+     override suspend fun export(options: ExportOptions): ExportResult = call { cancel ->
+         val e=handle.exportImage(NExportOptions(options.documentId,options.format.native(),options.marked,options.region?.native(),options.matteRgb,options.convertToSrgb,options.assumeUntaggedSrgb,options.allowDepthReduction,options.memoryBudgetBytes),cancel)
+         ExportResult(e.bytes,e.blake3,e.metadataJson,e.revision.common())
+@@ -112,7 +129,7 @@
+     override suspend fun close(): Unit = releaseNative {
+         closeMutex.withLock { if(!closed.get()) {
+             try { handle.closeSession() } catch(error:CoreException) { throw mapFailure(error) }
+-            finally { closed.set(true);handle.destroy() }
++            finally { documentPasswords.clear();documentPages.clear();closed.set(true);handle.destroy() }
+         } }
+     }
+ }
+@@ -154,7 +171,8 @@
+     is DrawShape.Stroke -> Shape.Stroke(family); is DrawShape.Line -> Shape.Line(points.map { it.common() }); is DrawShape.Arrow -> Shape.Arrow(points.map { it.common() }); is DrawShape.Rectangle -> Shape.Rectangle(rectangle.common()); is DrawShape.Ellipse -> Shape.Ellipse(rectangle.common()); is DrawShape.Polygon -> Shape.Polygon(points.map { it.common() },closed)
+     is DrawShape.Text -> Shape.Text(anchor.common(),text,font,size,outline.map { it.common() }); is DrawShape.Marker -> Shape.Marker(number,point.common(),rectangle?.common()); is DrawShape.Guide -> Shape.Guide(rectangle.common()); is DrawShape.Result -> Shape.Result(assetId,resultId); is DrawShape.Adjustment -> Shape.Adjustment
+ }
+-private fun NRender.common(): RenderList = RenderList(revision.common(),items.map { RenderItem(it.objectId,it.layerId,it.layerOpacity,it.layerBlend,it.bounds.common(),it.strokeContours.common(),it.transform.common(),it.style.common(),it.shape.common(),it.locked) })
++internal fun nativeRenderItem(it:com.visualworkbench.bindings.core.RenderItem):RenderItem = RenderItem(it.objectId,it.layerId,it.layerOpacity,it.layerBlend,it.bounds.common(),it.strokeContours.common(),it.transform.common(),it.style.common(),it.shape.common(),it.locked)
++private fun NRender.common(): RenderList = RenderList(revision.common(),items.map(::nativeRenderItem))
+ internal fun nativeRenderItem(item: com.visualworkbench.bindings.core.RenderItem): RenderItem = RenderItem(item.objectId,item.layerId,item.layerOpacity,item.layerBlend,item.bounds.common(),item.strokeContours.common(),item.transform.common(),item.style.common(),item.shape.common(),item.locked)
+ internal fun nativeProjectHandle(project: WorkbenchProject): ProjectSession = (project as? NativeProject)?.handle ?: throw SessionFailure(SessionFailureKind.Invalid)
+ private fun EditOptions.native(): NEditOptions = NEditOptions(transactionId,documentId,deviceId,lamport,createdAtMs)
+--- a/apps/shared/build.gradle.kts
++++ b/apps/shared/build.gradle.kts
+@@ -133,7 +133,7 @@
+     }
+     jvm("desktop")
+     sourceSets {
+-        commonMain.dependencies { implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0") }
++        commonMain.dependencies { implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0"); implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3") }
+         commonTest.dependencies { implementation(kotlin("test")) }
+         androidMain {
+             kotlin.srcDir("src/jvmMain/kotlin")
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
+@@ -229,18 +229,18 @@
+     }
+     private fun transfer(epoch:Long,block:suspend()->Unit):Job?{if(transferJob?.isActive==true){report("A transfer is already running. Finish or cancel it first.");return null};val job=task(epoch,block);transferJob=job;return job}
+     private suspend fun discardExport(){preparedDrag?.second?.close();preparedDrag=null;val prior=cachedExport;cachedExport=null;update{it.copy(exportReceipt=null,exportCheck=null,dragPrepared=false)};prior?.workspace?.close()}
+-    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();loadBackground();refreshRole(value,generation)
++    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();documents.close();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};bindDocument(snapshot);selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();loadBackground();refreshRole(value,generation)
+         changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
+         }finally{withContext(NonCancellable){
+             try { if(!adopted)value.close() }
+             finally { if(instructionSeal&&!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
+         }}
+     }
+-    private suspend fun loadBackground(){val p=project?:return;val doc=mutable.value.document?:return;try{val pixels=p.background(doc.documentId,256uL*1024uL*1024uL,assumeUntaggedSrgb=colorAssumed);val image=withContext(Dispatchers.Default){bitmap(pixels)};if(project===p)update{it.copy(background=image,needsColorConsent=false)}}catch(error:CoreFailure){update{it.copy(needsColorConsent=error.kind==CoreFailureKind.Raster&&!colorAssumed)};report("The original is saved unchanged. Full-resolution display needs a supported color profile and enough memory within 256 MiB. For untagged images, explicitly choose the sRGB assumption.")}}
++    private suspend fun loadBackground(){val p=project?:return;val doc=mutable.value.document?:return;try{val pixels=p.background(doc.documentId,256uL*1024uL*1024uL,assumeUntaggedSrgb=colorAssumed);val image=withContext(Dispatchers.Default){bitmap(pixels)};if(project===p)update{it.copy(background=image,needsColorConsent=false)}}catch(error:DocumentFailure){report(documentFailureText(error))}catch(error:CoreFailure){update{it.copy(needsColorConsent=error.kind==CoreFailureKind.Raster&&!colorAssumed)};report("The original is saved unchanged. Full-resolution display needs a supported color profile and enough memory within 256 MiB. For untagged images, explicitly choose the sRGB assumption.")}}
+     fun assumeSrgb(){task(generation){colorAssumed=true;loadBackground()}}
+     private fun validateDrawing(snapshot:DocumentSnapshot){if(snapshot.render.items.any{it.shape is Shape.Adjustment})throw UnsupportedOperationException("This document contains adjustment objects that the desktop canvas cannot display yet. Its original and saved edits are preserved.")}
+     fun importImage(path:Path)=importFile(ImportRequest(generation,path.toAbsolutePath().normalize()))
+-    fun importFile(request: ImportRequest, onStaged: (Boolean) -> Unit = {}, retainAcceptedDrop: Boolean = false): Job? {
++    fun importFile(request: ImportRequest, onStaged: (Boolean) -> Unit = {}, retainAcceptedDrop: Boolean = false, documentPassword:String?=null): Job? {
+         val completed = java.util.concurrent.atomic.AtomicBoolean(false)
+         fun finish(value: Boolean) { if (completed.compareAndSet(false, true)) onStaged(value) }
+         val job = transfer(request.epoch) {
+@@ -258,7 +258,7 @@
+                     files.attachFile(AttachFileOptions(core.newId(now.toULong()), info.deviceId, info.nextLamport, now,
+                         input.toString(), workspace.directory.toString(), FileAssetKind.Mp4))
+                     refresh(); report("MP4 stored as an ordinary project asset. No timeline was created.")
+-                } else createImported(input, workspace.directory, request.path.fileName.toString())
++                } else createImported(input, workspace.directory, request.path.fileName.toString(),documentPassword)
+                 imported = true
+             } catch (cancel: CancellationException) {
+                 if (retained) throw RetainedDropCancellation(workspace.input).also { it.initCause(cancel) }
+@@ -271,19 +271,30 @@
+         if (job == null) finish(false) else job.invokeOnCompletion { finish(false) }
+         return job
+     }
+-    private suspend fun createImported(input:Path,work:Path,title:String){val streaming=core as? WorkbenchStreamingCore?:throw HandoffFailure("Streaming import is unavailable in this core binding.");val time=System.currentTimeMillis();val id=core.newId(time.toULong());val destination=location.path.toAbsolutePath().resolve("$id.vwb");withContext(Dispatchers.IO){Files.createDirectories(location.path)};val value=try{streaming.createFile(CreateFileProject(destination.toString(),id,core.newId(time.toULong()),core.newId(time.toULong()),deviceId,title.take(256),input.toString(),work.toString(),time))}catch(error:CoreFailure){if(error.kind==CoreFailureKind.Raster)throw HandoffFailure("Image import refused. Images over 50 MP, unsupported profiles and sources exceeding the 256 MiB memory budget are not accepted; the original was not resized.");throw error};attach(value,destination)}
++    private suspend fun createImported(input:Path,work:Path,title:String,password:String?=null){
++        val extension=title.substringAfterLast('.',"").lowercase()
++        if(extension in setOf("pdf","svg")){
++            val kind=if(extension=="pdf")EditableKind.Pdf else EditableKind.Svg
++            val source=withContext(Dispatchers.IO){val cap=if(kind==EditableKind.Svg)4*1024*1024 else 64*1024*1024;Files.newInputStream(input).use{it.readNBytes(cap+1)}.also{if(it.isEmpty()||it.size>cap)throw DocumentFailure(DocumentFailureKind.Limit)}}
++            val time=System.currentTimeMillis();val id=core.newId(time.toULong());val destination=location.path.toAbsolutePath().resolve("$id.vwb")
++            val inspected=DocumentInteraction(installedDocumentJobs(),core).inspect(source,kind,password)
++            withContext(Dispatchers.IO){Files.createDirectories(location.path)}
++            val value=(core as WorkbenchDocumentsCore).createDocument(CreateDocument(destination.toString(),id,core.newId(time.toULong()),deviceId,title.take(256),source,inspected.first.sourceBlake3,kind,inspected.second,time,password))
++            attach(value,destination);return
++        }
++val streaming=core as? WorkbenchStreamingCore?:throw HandoffFailure("Streaming import is unavailable in this core binding.");val time=System.currentTimeMillis();val id=core.newId(time.toULong());val destination=location.path.toAbsolutePath().resolve("$id.vwb");withContext(Dispatchers.IO){Files.createDirectories(location.path)};val value=try{streaming.createFile(CreateFileProject(destination.toString(),id,core.newId(time.toULong()),core.newId(time.toULong()),deviceId,title.take(256),input.toString(),work.toString(),time))}catch(error:CoreFailure){if(error.kind==CoreFailureKind.Raster)throw HandoffFailure("Image import refused. Images over 50 MP, unsupported profiles and sources exceeding the 256 MiB memory budget are not accepted; the original was not resized.");throw error};attach(value,destination)}
+     fun showPaste(){if(!mutable.value.busy)update{it.copy(pasteOpen=true)}}
+     fun dismissPaste(){update{it.copy(pasteOpen=false)}}
+     fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
+-    fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one PNG, JPEG, WebP, HEIC or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension !in setOf("png","jpg","jpeg","webp","heic","heif","mp4")){report("This drop supports PNG, JPEG, WebP, admitted HEIC originals and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
++    fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one image, MP4, PDF or SVG file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension !in setOf("png","jpg","jpeg","webp","heic","heif","mp4","pdf","svg")){report("This drop supports PNG, JPEG, WebP, admitted HEIC originals and ordinary MP4 assets, PDF and SVG.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
+     fun open(path:Path,epoch:Long=generation){task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
+-    suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
++    suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();documents.close();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
+     fun closeProject(){if(!mayCloseAi())return;if(!mayCloseInstructions())return;cancelInput();sessionWork?.cancel();task(generation){
+         // The pre-enqueue check can become stale while another owner holds
+         // edits. task has now set busy under that same mutex, fencing Send.
+         if(!mayCloseAi())return@task
+         if(!sealInstructionsForClose())return@task
+-        try { live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
++        try { live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();documents.close();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
+         finally { if(!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
+     }}
+     private suspend fun refresh(){
+@@ -305,7 +316,7 @@
+                 cancelDrag();cancelWidth();update{it.copy(document=snapshot,selected=it.selected.intersect(snapshot.render.items.filterNot{item->item.locked}.map{item->item.objectId}.toSet()),preview=emptyMap(),previewStyles=emptyMap(),draft=null,peerFrame=null,exportReceipt=null,exportCheck=null,canvasReady=false,renderIssue=issue)}
+             }
+         }
+-        selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)
++        bindDocument(snapshot);selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)
+         instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh()
+         refreshRole(p,epoch)
+     }
+@@ -334,7 +345,7 @@
+     internal fun canvasPrepared(binding:RenderBinding){if(geometryMatches(binding,mutable.value))update{val swap=wetCommitted?.let{id->it.document?.render?.items?.any{item->item.objectId==id}}==true;if(swap)wetCommitted=null;it.copy(canvasReady=true,wetStroke=if(swap)null else it.wetStroke)}}
+     internal fun canvasFailed(binding:RenderBinding,message:String){if(mutable.value.document?.binding(generation)==binding){cancelDrag();update{it.copy(canvasReady=false,renderIssue=message)}}}
+     fun canvasFocus(focused:Boolean){update{it.copy(canvasFocused=focused)}}
+-    fun tool(value:Tool){cancelInput();erasers.tools.drawing();update{it.copy(tool=value,preview=emptyMap(),draft=null)}}
++    fun tool(value:Tool){documents.inputStarted();cancelInput();erasers.tools.drawing();update{it.copy(tool=value,preview=emptyMap(),draft=null)}}
+     fun viewport(width:Double,height:Double){if(width<=0||height<=0)return;update{it.copy(view=it.view.copy(camera=it.view.camera.copy(viewportWidth=width,viewportHeight=height)))}}
+     fun fit(){val d=mutable.value.document?:return;update{val c=it.view.camera;it.copy(view=it.view.copy(camera=c.copy(center=Point(d.width.toDouble()/2,d.height.toDouble()/2),scale=minOf(c.viewportWidth/d.width.toDouble(),c.viewportHeight/d.height.toDouble()).coerceAtLeast(0.0001)*0.9,rotation=0.0)))}}
+     fun actualPixels(){update{it.copy(view=it.view.copy(camera=it.view.camera.copy(scale=1.0)))}}
+@@ -504,6 +515,20 @@
+     fun prepareDragExport(request:ExportRequest){transfer(request.epoch){if(!request.settings.encoding.png)throw HandoffFailure("File drag requires PNG. Choose PNG 8 or 16 bit.");val cached=prepareExport(request);requireCurrent(request);val lease=handoff.stage(cached.workspace.output,cached.receipt);var adopted=false;try{requireCurrent(request);preparedDrag?.second?.close();preparedDrag=cached.receipt to lease;adopted=true;update{it.copy(dragPrepared=true,exportOpen=false,message="PNG drag prepared. Drag the button to the destination; nothing is sent automatically.")}}finally{if(!adopted)lease.close()}}}
+     internal fun takePreparedDrag():DesktopDragFile?{val offer=preparedDrag?:return null;if(!offer.first.request.matches(mutable.value)){offer.second.close();preparedDrag=null;update{it.copy(dragPrepared=false)};return null};preparedDrag=null;update{it.copy(dragPrepared=false)};return offer.second}
+     fun cancelTransfer(){transferJob?.cancel();report("Cancelling transfer; waiting for native work to release its files.")}
++    val documents=DocumentController(scope,core,::documentAttachment,::documentsAdmitted,::changeDocumentPage)
++    private fun documentAttachment():DocumentAttachment? {val p=project?:return null;val d=mutable.value.document?:return null;return if(closing)null else DocumentAttachment(p,d,generation)}
++    private fun documentsAdmitted():Boolean = !closing&&!mutable.value.busy&&!ai.state.value.open&&!semanticEditor.state.value.busy&&!instructionEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&drag==null&&ink==null&&inkWork==null&&widthGesture==null
++    private suspend fun bindDocument(snapshot:DocumentSnapshot){val p=project as? WorkbenchDocumentsProject;documents.bind(p?.documentDescriptor(snapshot.documentId),p?.selectedDocumentPage(snapshot.documentId)?:0u)}
++    private suspend fun changeDocumentPage(attached:DocumentAttachment,page:UInt)=edits.withLock {
++        val p=project?:throw DocumentFailure(DocumentFailureKind.Stale)
++        if(closing||p!==attached.project||generation!=attached.epoch||!mutable.value.document!!.render.revision.sameDocumentRevision(attached.snapshot.render.revision)||ai.state.value.open||instructionEditor.hasUnsaved())throw DocumentFailure(DocumentFailureKind.Stale)
++        cancelInput();val snapshot=(p as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
++        if(project!==p||generation!=attached.epoch||!p.info().sameDocumentRevision(snapshot.render.revision))throw DocumentFailure(DocumentFailureKind.Stale)
++        update{it.copy(document=snapshot,background=null,selected=emptySet(),preview=emptyMap(),draft=null,textAnchor=null,canvasReady=false,busy=true,exportReceipt=null,exportCheck=null)}
++        try{bindDocument(snapshot);selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();loadBackground()}
++        finally{update{it.copy(busy=false)}}
++    }
++    fun saveDocumentCopy(destination:Path,copy:DocumentExport){val epoch=generation;transfer(epoch){val p=project?:throw DocumentFailure(DocumentFailureKind.Stale);val doc=mutable.value.document?:throw DocumentFailure(DocumentFailureKind.Stale);if(documents.checkedExport()!==copy||!p.info().sameDocumentRevision(copy.revision))throw DocumentFailure(DocumentFailureKind.Stale);(p as WorkbenchDocumentsProject).publishDocumentCopy(doc.documentId,destination.toAbsolutePath().normalize().toString(),copy);report("Document copy for revision ${copy.revision.hostSeq} saved at $destination.")}}
+ }
+ private fun <T> Set<T>.toggle(value:T):Set<T> = if(value in this)this-value else this+value
+ private fun bitmap(value:BackgroundImage):ImageBitmap {
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
+@@ -54,6 +54,8 @@
+     }
+     Runtime.getRuntime().addShutdownHook(Thread({appOwner.close();appAnchor.close()},"vw-app-owner-release"))
+     val core=workbenchCore()
++    val documentJobs=runBlocking{runCatching{com.visualworkbench.desktop.documents.DesktopDocumentRuntimeCache.prepare(local)}.getOrNull()}
++    documentJobs?.let(::installDocumentJobs)
+     val preferences=DesktopPreferences(local.resolve("Visual Workbench/settings.properties"));val saved=preferences.window();val device=preferences.device(core)
+     val documents=FileSystemView.getFileSystemView().defaultDirectory.toPath()
+     val clouds=listOf("OneDrive","OneDriveConsumer","OneDriveCommercial","DROPBOX").mapNotNull{System.getenv(it)?.takeIf(String::isNotBlank)?.let{v->Path.of(v)}}
+@@ -107,6 +109,7 @@
+                         mcpModal.close()
+                         try { try { capture.shutdown() } finally { assistance.close() } } finally {
+                             try { controller.close() } finally {
++                                documentJobs?.close()
+                                 try { sessions.close() } finally {
+                                     try { host.shutdown() } finally { host.destroy() }
+                                 }
+@@ -144,8 +147,9 @@
+             fun file(command:Command){controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,command.label,FileDialog.LOAD)
+                 try{chooser.directory=(if(command==Command.Import)documents else location.path).toString();if(command==Command.Open)chooser.file="project.sqlite";chooser.isVisible=true
+                     val filename=chooser.file?:return;val chosen=Path.of(chooser.directory,filename)
+-                    when(command){Command.Import->controller.importFile(ImportRequest(epoch,chosen.toAbsolutePath().normalize()));Command.Open->controller.open(chosen.parent,epoch);else->Unit}
++                    when(command){Command.Import->{val password=if(filename.substringAfterLast('.',"").equals("pdf",true)){val field=javax.swing.JPasswordField(24);if(javax.swing.JOptionPane.showConfirmDialog(window,field,"PDF password, if needed",javax.swing.JOptionPane.OK_CANCEL_OPTION)!=javax.swing.JOptionPane.OK_OPTION)return;String(field.password).takeIf(String::isNotEmpty)}else null;controller.importFile(ImportRequest(epoch,chosen.toAbsolutePath().normalize()),documentPassword=password)};Command.Open->controller.open(chosen.parent,epoch);else->Unit}
+                 }finally{chooser.dispose()}}}
++            fun saveDocument(copy:DocumentExport){controller.instructionPicker().use{val chooser=FileDialog(window,"Save document copy · revision ${copy.revision.hostSeq}",FileDialog.SAVE);try{val extension=if(copy.mode==DocumentCopy.SvgAnnotations)"svg" else "pdf";chooser.directory=documents.toString();chooser.file="document-${copy.revision.hostSeq}.$extension";chooser.isVisible=true;val name=chooser.file?:return;if(name.substringAfterLast('.',"").lowercase()!=extension){controller.report("Choose a .$extension destination.");return};controller.saveDocumentCopy(Path.of(chooser.directory,name),copy)}finally{chooser.dispose()}}}
+             fun save(request:ExportRequest){controller.instructionPicker().use { val chooser=FileDialog(window,"Save ${request.settings.encoding.label} · ${request.revision}",FileDialog.SAVE)
+                 try{chooser.directory=documents.toString();chooser.file="export-${request.revision}.${request.settings.encoding.extension}";chooser.isVisible=true;val filename=chooser.file?:return
+                     val extension=filename.substringAfterLast('.',"").lowercase();val allowed=if(request.settings.encoding==ExportEncoding.Jpeg)setOf("jpg","jpeg")else setOf(request.settings.encoding.extension)
+@@ -224,7 +228,7 @@
+                 Box(Modifier.fillMaxSize().drawWithContent {
+                     drawContent()
+                     if (startupSmoke) firstDraw.complete(Unit)
+-                }) { EditorShell(controller,editor,dpiText,quitting,::action,::saveSelection) }
++                }) { EditorShell(controller,editor,dpiText,quitting,::action,::saveSelection,::saveDocument) }
+                 if(codexPanels.settings){
+                     val catalogOwner=mcpState.owner
+                     val published=if(catalogOwner!=null){val catalog by catalogOwner.state.collectAsState();catalog.packages}else emptyList()
+@@ -257,7 +261,7 @@
+         }
+     }
+ }
+-@Composable private fun EditorShell(controller:EditorController,editor:EditorState,dpiText:String,quitting:Boolean,action:(Command)->Unit,saveSelection:(SelectionSaveTicket)->Unit){
++@Composable private fun EditorShell(controller:EditorController,editor:EditorState,dpiText:String,quitting:Boolean,action:(Command)->Unit,saveSelection:(SelectionSaveTicket)->Unit,saveDocument:(DocumentExport)->Unit){
+     val eraserState by controller.erasers.state.collectAsState()
+     val selectionState by controller.selections.state.collectAsState()
+     Surface(Modifier.fillMaxSize()){Column{
+@@ -280,6 +284,7 @@
+                 EditorCanvas(controller,editor)
+                 if(editor.canvasReady&&editor.background!=null)EraserOverlay(controller.erasers,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
+                 if(editor.canvasReady&&editor.background!=null)SelectionOverlay(controller.selections,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
++                if(editor.document!=null)com.visualworkbench.desktop.documents.DocumentTextOverlay(controller.documents,controller.core,editor.view.camera)
+                 if(editor.document!=null&&(editor.renderIssue!=null||!editor.canvasReady||editor.background==null)){
+                     val status=editor.renderIssue?:if(!editor.canvasReady)"Preparing this revision…"else if(editor.busy)"Loading the original image…"else"The source image is unavailable. Review its color and memory settings."
+                     Text(status,Modifier.align(Alignment.Center).widthIn(max=440.dp).padding(24.dp),color=Color(0xffaebccb))
+@@ -296,6 +301,7 @@
+                 if(editor.needsColorConsent)Button(onClick={controller.assumeSrgb()}){Text("Treat untagged colors as sRGB")}
+                 commandButton(Command.Pairing,action);if(editor.sync?.blocked?.let{it>0u}==true)Text("${editor.sync?.blocked} pending edits need conflict review.",color=MaterialTheme.colors.secondary,style=MaterialTheme.typography.caption)
+                 if(editor.routeWarnings.isNotEmpty())Text("Tether default-route warning. Open Devices for the metric fix and revert.",color=MaterialTheme.colors.secondary,style=MaterialTheme.typography.caption)
++                com.visualworkbench.desktop.documents.DocumentPanel(controller.documents,saveDocument)
+                 InstructionsPanel(controller.instructionEditor,controller.instructionFocus,controller.semanticEditor,editor.selected.firstOrNull(),Modifier.weight(1f),onTextFocus={controller.canvasFocus(false)})
+             }
+         }
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt
+@@ -20,6 +20,7 @@
+ import androidx.compose.ui.input.pointer.*
+ import androidx.compose.ui.layout.onSizeChanged
+ import com.visualworkbench.shared.*
++import com.visualworkbench.desktop.documents.drawDocumentTiles
+ import com.visualworkbench.shared.Outline
+ import com.visualworkbench.shared.Shape
+ import kotlinx.coroutines.Dispatchers
+@@ -120,6 +121,12 @@
+ @Composable
+ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier=Modifier){
+     val latest by rememberUpdatedState(state)
++    val documentState by controller.documents.state.collectAsState()
++    val documentTileCache=remember{com.visualworkbench.desktop.documents.DocumentTileCache()}
++    var documentTiles by remember{mutableStateOf(emptyList<com.visualworkbench.desktop.documents.PreparedDocumentTile>())}
++    LaunchedEffect(state.view.camera,documentState.page,state.document?.render?.revision){controller.documents.viewport(state.view.camera)}
++    LaunchedEffect(documentState.tiles){val prepared=withContext(Dispatchers.Default){documentTileCache.prepare(documentState.tiles)};if(controller.documents.state.value.tiles===documentState.tiles)documentTiles=prepared}
++
+     val aiResultState by controller.aiResults.state.collectAsState()
+     val focus=remember{FocusRequester()}
+     var prepared by remember{mutableStateOf<GeometryFrame<CanvasGeometry>?>(null)}
+@@ -193,6 +200,7 @@
+             drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f,0f,doc.width.toFloat(),doc.height.toFloat()),Paint())
+             try {
+             drawImage(background,filterQuality=FilterQuality.None)
++            clipRect(0f,0f,doc.width.toFloat(),doc.height.toFloat()){drawDocumentTiles(documentTiles)}
+             clipRect(0f,0f,doc.width.toFloat(),doc.height.toFloat()){
+                 for((_,items)in displayed.groupBy{it.layerId}){
+                     val first=items.first()
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -460,7 +460,7 @@
+                 val snapshot = current.document(doc)
+                 val drawing = prepareEditorObjects(core, snapshot.render.items)
+                 if (disposing || token != epoch || current !== project) return@launch
+-                document = snapshot; info = snapshot.render.revision; objects = drawing
++                document = snapshot; info = snapshot.render.revision; objects = drawing;bindDocument(snapshot)
+                 instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
+                 observeProject(current, token)
+                 colorAssumed = knownSrgb; screen = WorkbenchScreen.Canvas; cameraFitted = false
+@@ -536,7 +536,7 @@
+                             // Modal entry may run while the owners above settle.
+                             if (!stillOwned() || !receivedCaptureIdle(ownInstructions = true, ownSemantics = true)) return@capture
+                             cancelTool(); invalidateExport(); clearPeerObjects(); aiRetiring = false
+-                            document = next; info = next.render.revision; objects = drawing; selected = null
++                            document = next; info = next.render.revision; objects = drawing;bindDocument(next); selected = null
+                             background = staged; staged = null; blockingMessage = null; needsColorConsent = false; colorAssumed = false
+                             screen = WorkbenchScreen.Canvas; cameraFitted = false; fit()
+                             captureArrivals.acknowledge(value); failedCaptureOpen = null
+@@ -576,6 +576,7 @@
+         semanticEditor.detach()
+         instructionEditor.detach()
+         retireAi()
++        documents.close()
+         captureArrivals.detach(); failedCaptureOpen = null
+         epoch++; refreshAdmission.reset()
+         changesJob?.cancelAndJoin(); changesJob = null
+@@ -801,6 +802,7 @@
+             if (token != epoch) return
+             background = bitmap; blockingMessage = null; needsColorConsent = false
+         } catch (cancel: CancellationException) { throw cancel }
++        catch (error: DocumentFailure) {if(token==epoch){blockingMessage=documentFailureText(error);needsColorConsent=false}}
+         catch (error: CoreFailure) {
+             if (token != epoch) return
+             needsColorConsent = error.kind == CoreFailureKind.Raster && !colorAssumed
+@@ -857,8 +859,8 @@
+         val next = CanvasScene(++sceneRevision, doc, background, camera, core.cameraMatrix(camera), visibleObjects,
+             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
+             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
+-            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady())
+-        scene = next; canvasSink?.invoke(next)
++            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentTiles=documentTiles)
++        scene = next; canvasSink?.invoke(next);documents.viewport(camera)
+         val viewport = PeerViewport(doc.documentId, core.mapPoints(camera, true, listOf(Point(0.0, 0.0),
+             Point(camera.viewportWidth, 0.0), Point(camera.viewportWidth, camera.viewportHeight), Point(0.0, camera.viewportHeight))))
+         if (viewport != lastViewport) {
+@@ -1057,6 +1059,7 @@
+     }
+ 
+     override fun cancelTool() {
++        documents.inputStarted()
+         eraserPointer = false; erasers.interaction.cancelGesture()
+         selectionPointer = false; selections.interaction.cancelGesture()
+         gesture?.let { active -> finishRemotePreview(active.link, active.previewId, true) }
+@@ -1209,7 +1212,7 @@
+         // alone cannot order optimistic edits sharing the same accepted base.
+         if (document?.render?.revision != next.render.revision) clearPeerObjects()
+         info = next.render.revision
+-        document = next; objects = drawing
++        document = next; objects = drawing;bindDocument(next)
+         instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
+         if (exportReady?.matches(info, document) != true) exportReady = null
+         if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq) { exportPreflight = null; checkedExport = null }
+@@ -1497,6 +1500,25 @@
+         }
+         super.onCleared()
+     }
++    val documents=DocumentController(scope,core,::documentAttachment,::documentsAdmitted,::changeDocumentPage)
++    fun documentEpoch():Long = epoch
++    private val documentTileCache=com.visualworkbench.android.documents.DocumentTileCache()
++    private var documentTiles=emptyList<com.visualworkbench.android.documents.PreparedDocumentTile>()
++    init {com.visualworkbench.android.documents.prepareAndroidDocumentJobs(application);scope.launch{documents.state.collect{value->val prepared=withContext(Dispatchers.Default){documentTileCache.prepare(value.tiles)};if(documents.state.value===value){documentTiles=prepared;publish()}}}}
++    private fun documentAttachment():DocumentAttachment? {val p=project?:return null;val d=document?:return null;return if(disposing)null else DocumentAttachment(p,d,epoch)}
++    private fun documentsAdmitted():Boolean = !disposing&&!busy&&pending==0&&!ai.state.value.open&&!semanticEditor.state.value.busy&&!instructionEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&gesture==null&&strokes.isEmpty()
++    private suspend fun bindDocument(snapshot:DocumentSnapshot){val p=project as? WorkbenchDocumentsProject;documents.bind(p?.documentDescriptor(snapshot.documentId),p?.selectedDocumentPage(snapshot.documentId)?:0u)}
++    private suspend fun changeDocumentPage(attached:DocumentAttachment,page:UInt)=mutations.withLock {
++        val p=project?:throw DocumentFailure(DocumentFailureKind.Stale)
++        if(disposing||p!==attached.project||epoch!=attached.epoch||document?.render?.revision?.sameDocumentRevision(attached.snapshot.render.revision)!=true||ai.state.value.open||instructionEditor.hasUnsaved()||pending!=0)throw DocumentFailure(DocumentFailureKind.Stale)
++        cancelTool();val snapshot=(p as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
++        if(p!==project||epoch!=attached.epoch||!p.info().sameDocumentRevision(snapshot.render.revision))throw DocumentFailure(DocumentFailureKind.Stale)
++        val drawing=prepareEditorObjects(core,snapshot.render.items);busy=true
++        try{document=snapshot;info=snapshot.render.revision;objects=drawing;selected=null;textDraft=null;clearPeerObjects();background=null;exportReady=null;exportPreflight=null;checkedExport=null;cameraFitted=false;bindDocument(snapshot);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();loadBackground()}
++        finally{busy=false;publish()}
++    }
++    fun importDocument(uri:Uri,kind:EditableKind,password:String?=null)=openRequest(transfer=true){val now=System.currentTimeMillis();val id=core.newId(now.toULong());com.visualworkbench.android.documents.AndroidDocumentIO(getApplication(),core).import(uri,kind,repository.checkedPath(id),repository.deviceId,if(kind==EditableKind.Pdf)"PDF document" else "SVG document",password){transferLabel=it}}
++    fun saveDocumentCopy(uri:Uri,copy:DocumentExport){if(busy||pending!=0)return;val captured=documentAttachment()?:return;busy=true;scope.launch{try{mutations.withLock{val p=project?:throw DocumentFailure(DocumentFailureKind.Stale);if(p!==captured.project||epoch!=captured.epoch||documents.checkedExport()!==copy||!p.info().sameDocumentRevision(copy.revision))throw DocumentFailure(DocumentFailureKind.Stale);com.visualworkbench.android.documents.AndroidDocumentIO(getApplication(),core).publish(uri,copy);message="Prepared document revision ${copy.revision.hostSeq} saved."}}catch(error:CancellationException){message="Document publication cancelled. The destination provider may contain a partial copy; the verified private result is retained.";throw error}catch(error:Exception){message=if(error is DocumentFailure)documentFailureText(error) else "The destination provider could not finish the copy. It may contain partial bytes; the verified private result is retained."}finally{busy=false;publish()}}}
+ }
+ 
+ private fun PressureCurve.values() = listOf(0.0, 0.0, x1.toDouble(), y1.toDouble(), x2.toDouble(), y2.toDouble(), 1.0, 1.0)
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt
+@@ -2,6 +2,7 @@
+ 
+ package com.visualworkbench.android.editor
+ 
++import com.visualworkbench.android.documents.drawDocumentTiles
+ import android.graphics.Bitmap
+ import android.graphics.BlendMode
+ import android.graphics.Canvas
+@@ -36,6 +37,7 @@
+     val peerViewport: List<Point> = emptyList(),
+     val aiResults: Map<String,AiResultImage<AiBitmap>> = emptyMap(),
+     val resultDisplayReady: Boolean = true,
++    val documentTiles:List<com.visualworkbench.android.documents.PreparedDocumentTile> = emptyList(),
+ )
+ 
+ internal object EditorDrawing {
+@@ -207,6 +209,7 @@
+         val sourceSave=canvas.save()
+         canvas.concat(matrix(scene.matrix))
+         scene.background?.let{canvas.drawBitmap(it,0f,0f,Paint(Paint.FILTER_BITMAP_FLAG))}
++        drawDocumentTiles(canvas,scene.documentTiles)
+         canvas.restoreToCount(sourceSave)
+         val combined = (scene.objects + scene.provisional).filter { it.item.objectId !in scene.hidden }
+         val orderedLayers = (scene.document.layers.map { it.id } + combined.map { it.item.layerId }).distinct()
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
+@@ -102,6 +102,7 @@
+             val captureStatus by editor.agentCapture.state.collectAsState()
+             AgentCaptureIndicator(captureStatus)
+             ReceivedCaptureBanner(editor)
++            if(editor.screen==WorkbenchScreen.Projects)com.visualworkbench.android.documents.DocumentOpenButton(editor)
+             Box(Modifier.weight(1f)) {
+             when (editor.screen) {
+                 WorkbenchScreen.Projects -> ProjectsScreen(editor.projects, editor.busy,
+@@ -205,6 +206,7 @@
+             }
+         }
+         AiResultStatus(editor)
++        com.visualworkbench.android.documents.DocumentControls(editor)
+         if (editor.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+         editor.transferLabel?.let { label ->
+             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+@@ -216,6 +218,7 @@
+             AndroidView(factory = { context -> CanvasSurface(context, editor) }, update = { it.updatePreferences() }, modifier = Modifier.fillMaxSize())
+             editor.scene?.takeIf { it.background != null && editor.blockingMessage == null }?.let { scene -> EraserOverlay(editor.erasers, scene.camera, scene.document.render.revision, scene.document.documentId) }
+             editor.scene?.takeIf { it.background != null && editor.blockingMessage == null }?.let { scene -> SelectionOverlay(editor.selections, scene.camera, scene.document.render.revision, scene.document.documentId) }
++            editor.scene?.let{scene->com.visualworkbench.android.documents.DocumentTextOverlay(editor.documents,editor.core,scene.camera)}
+             val availableHeight = maxHeight
+             val railHeight = minOf(availableHeight * .78f, 560.dp).coerceAtLeast(80.dp)
+             val travel = (availableHeight - railHeight - 16.dp).coerceAtLeast(0.dp)
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/instructions/InstructionFocusAdmission.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/instructions/InstructionFocusAdmission.kt
+@@ -1,6 +1,6 @@
+ package com.visualworkbench.android.instructions
+ 
+-internal enum class InstructionFocusModal { ExportDialog, ExportPicker }
++internal enum class InstructionFocusModal { ExportDialog, ExportPicker, DocumentPicker }
+ 
+ /** Owner UI dispatcher only. The two external modal lifetimes overlap while an
+  * export dialog hands off to a document picker; dismissing one cannot unseal the other. */
+--- a/apps/android/src/main/AndroidManifest.xml
++++ b/apps/android/src/main/AndroidManifest.xml
+@@ -8,7 +8,8 @@
+     <queries><intent><action android:name="android.speech.RecognitionService" /></intent></queries>
+     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+     <application android:label="${vwApplicationLabel}" android:allowBackup="false" android:supportsRtl="true"
+-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
++        android:extractNativeLibs="${vwDocumentExtractNative}" android:theme="@android:style/Theme.Material.Light.NoActionBar">
++        <service android:name=".documents.DocumentWorkerService" android:exported="false" android:isolatedProcess="true" android:process=":document_worker" />
+         <provider android:name=".editor.ImageFileProvider"
+             android:authorities="${applicationId}.images" android:exported="false"
+             android:grantUriPermissions="true">
+--- a/apps/desktop/build.gradle.kts
++++ b/apps/desktop/build.gradle.kts
+@@ -9,6 +9,7 @@
+ sourceSets.main { resources.srcDir(rootProject.file("../third_party/notices")) }
+ dependencies {
+     implementation(project(":shared"))
++    implementation(project(":bindings-core"))
+     implementation(project(":bindings-host"))
+     implementation(compose.desktop.currentOs)
+     implementation(compose.material)
+@@ -104,3 +105,25 @@
+ }
+ if (mcpServerResources.isPresent) sourceSets.named("main") { resources.srcDir(mcpServerResources) }
+ tasks.named("processResources") { dependsOn(admitMcpServerResources) }
++
++// Explicit build-owner admission only. Never discovers/downloads a runtime.
++val documentRuntimeResources = providers.gradleProperty("vwDocumentRuntimeResources").map { file(it) }
++val admitDocumentRuntimeResources = tasks.register("admitDocumentRuntimeResources") {
++    inputs.property("enabled",documentRuntimeResources.isPresent)
++    if(documentRuntimeResources.isPresent) inputs.dir(documentRuntimeResources)
++    doLast { if(documentRuntimeResources.isPresent) {
++        val folder=documentRuntimeResources.get();check(folder.isDirectory&&folder.canonicalFile==folder.absoluteFile.normalize())
++        val inventory=folder.resolve("vw-document-runtime.sha256");check(inventory.isFile&&inventory.length() in 1..8192)
++        val lines=inventory.readLines(Charsets.US_ASCII);val pattern=Regex("([0-9a-f]{64}) ([1-9][0-9]{0,8}) (pdfium\\.dll|qpdf30\\.dll|vw-document-worker\\.exe)")
++        val entries=lines.map{pattern.matchEntire(it)?:error("Invalid document runtime inventory")}
++        val names=entries.map{it.groupValues[3]}.toSet();check(entries.size in 2..3&&names.size==entries.size&&names.containsAll(setOf("pdfium.dll","vw-document-worker.exe")))
++        check(folder.listFiles()!!.map{it.name}.toSet()==setOf("vw-document-runtime.sha256","document-win32-x86-64","vw-document-admission.properties"))
++        val admission=java.util.Properties().apply{folder.resolve("vw-document-admission.properties").inputStream().use{load(it)}}
++        check(admission.getProperty("admitted-by-build-owner")=="true"&&admission.getProperty("pdfium-api")=="7881"&&admission.getProperty("licenses-reviewed")=="true"&&admission.getProperty("lgpl-artifacts")=="false")
++        if("qpdf30.dll" in names)check(admission.getProperty("qpdf-version")=="12.4.2"&&admission.getProperty("qpdf-static-notices-reviewed")=="true")
++        check(folder.resolve("document-win32-x86-64").listFiles()!!.map{it.name}.toSet()==names)
++        for(entry in entries){val source=folder.resolve("document-win32-x86-64/${entry.groupValues[3]}");check(source.isFile&&source.canonicalFile==source.absoluteFile.normalize()&&source.length()==entry.groupValues[2].toLong()&&source.length()<=256L*1024*1024);val digest=MessageDigest.getInstance("SHA-256");source.inputStream().use{input->val buffer=ByteArray(65536);while(true){val count=input.read(buffer);if(count<0)break;digest.update(buffer,0,count)}};check(digest.digest().joinToString(""){"%02x".format(it.toInt() and 255)}==entry.groupValues[1])}
++    } }
++}
++if(documentRuntimeResources.isPresent)sourceSets.named("main"){resources.srcDir(documentRuntimeResources)}
++tasks.named("processResources"){dependsOn(admitDocumentRuntimeResources)}
+--- a/apps/android/build.gradle.kts
++++ b/apps/android/build.gradle.kts
+@@ -17,6 +17,7 @@
+         applicationId = "com.visualworkbench.android"
+         if (vwAndroidHil) applicationIdSuffix = ".hil"
+         manifestPlaceholders["vwApplicationLabel"] = if (vwAndroidHil) "Visual Workbench Test" else "Visual Workbench"
++        manifestPlaceholders["vwDocumentExtractNative"] = providers.gradleProperty("vwDocumentAndroidResources").isPresent.toString()
+         minSdk = 29
+         targetSdk = 36
+         versionCode = 1
+@@ -31,7 +32,7 @@
+         }
+     }
+     packaging {
+-        jniLibs.useLegacyPackaging = false
++        jniLibs.useLegacyPackaging = providers.gradleProperty("vwDocumentAndroidResources").isPresent
+         // Preserve the independently built core bytes for the APK binding check.
+         jniLibs.keepDebugSymbols += "**/libvw_core.so"
+     }
+@@ -39,6 +40,7 @@
+ }
+ dependencies {
+     implementation(project(":shared"))
++    implementation(project(":bindings-core"))
+     implementation(platform(libs.compose.bom))
+     implementation(libs.activity.compose)
+     implementation("androidx.compose.ui:ui")
+@@ -59,3 +61,25 @@
+ }
+ // The shared module packages the prebuilt core and checks ELF alignment.
+ // build.ps1 owns the serialized Rust build; do not compile/package it twice.
++
++// Root alone supplies an independently admitted arm64 PDFium build. Its source,
++// binary hash, notices and 16 KiB PT_LOAD acceptance are mandatory. No download.
++val documentAndroidResources=providers.gradleProperty("vwDocumentAndroidResources").map{file(it)}
++val admitAndroidDocumentRuntime=tasks.register("admitAndroidDocumentRuntime") {
++    inputs.property("enabled",documentAndroidResources.isPresent)
++    if(documentAndroidResources.isPresent)inputs.dir(documentAndroidResources)
++    doLast{if(documentAndroidResources.isPresent){
++        val folder=documentAndroidResources.get();check(folder.isDirectory&&folder.canonicalFile==folder.absoluteFile.normalize())
++        check(folder.listFiles()!!.map{it.name}.toSet()==setOf("assets","jni","vw-document-admission.properties"))
++        val admission=java.util.Properties().apply{folder.resolve("vw-document-admission.properties").inputStream().use{load(it)}}
++        check(admission.getProperty("admitted-by-build-owner")=="true"&&admission.getProperty("pdfium-api")=="7881"&&admission.getProperty("licenses-reviewed")=="true"&&admission.getProperty("lgpl-artifacts")=="false"&&admission.getProperty("elf-16k-reviewed")=="true"&&admission.getProperty("extracted-apk-checker-reviewed")=="true")
++        check(admission.getProperty("pdfium-source-sha256")?.matches(Regex("[0-9a-f]{64}"))==true)
++        val inventory=folder.resolve("assets/vw-document-android.sha256");check(inventory.isFile&&inventory.length() in 1..1024)
++        val match=Regex("([0-9a-f]{64}) ([1-9][0-9]{0,8}) libpdfium\\.so\\n?").matchEntire(inventory.readText(Charsets.US_ASCII))?:error("Invalid admitted PDFium inventory")
++        check(folder.resolve("jni").listFiles()!!.map{it.name}.toSet()==setOf("arm64-v8a"));check(folder.resolve("jni/arm64-v8a").listFiles()!!.map{it.name}.toSet()==setOf("libpdfium.so"))
++        val source=folder.resolve("jni/arm64-v8a/libpdfium.so");check(source.isFile&&source.canonicalFile==source.absoluteFile.normalize()&&source.length()==match.groupValues[2].toLong()&&source.length()<=128L*1024*1024)
++        val digest=java.security.MessageDigest.getInstance("SHA-256");source.inputStream().use{input->val buffer=ByteArray(65536);while(true){val count=input.read(buffer);if(count<0)break;digest.update(buffer,0,count)}};check(digest.digest().joinToString(""){"%02x".format(it.toInt() and 255)}==match.groupValues[1])
++    }}
++}
++if(documentAndroidResources.isPresent){android.sourceSets.getByName("main").apply{jniLibs.srcDir(documentAndroidResources.map{it.resolve("jni")});assets.srcDir(documentAndroidResources.map{it.resolve("assets")})}}
++tasks.matching{it.name.startsWith("merge")&&(it.name.endsWith("NativeLibs")||it.name.endsWith("Assets"))}.configureEach{dependsOn(admitAndroidDocumentRuntime)}

@@ -1,0 +1,705 @@
+--- a/core/crates/vw-raster/src/export.rs
++++ b/core/crates/vw-raster/src/export.rs
+@@ -30,6 +30,9 @@
+     Jpeg { quality: u8 },
+     WebpLossless,
+     WebpLossy { quality: u8 },
++    Bmp8,
++    Tiff8,
++    Tiff16,
+ }
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+ pub enum AlphaPolicy {
+@@ -134,6 +137,8 @@
+     let (name, limit) = match r.format {
+         ExportFormat::WebpLossless | ExportFormat::WebpLossy { .. } => ("WebP", 16383),
+         ExportFormat::Jpeg { .. } => ("JPEG", 65535),
++        ExportFormat::Bmp8 => ("BMP", 65535),
++        ExportFormat::Tiff8 | ExportFormat::Tiff16 => ("TIFF", 65535),
+         _ => ("PNG", 0x7fffffff),
+     };
+     if w > limit || h > limit {
+@@ -147,7 +152,7 @@
+     {
+         return Err(RasterError::Invalid("quality must be 1..100"));
+     }
+-    if depth == 16 && !matches!(r.format, ExportFormat::Png16) && !r.allow_depth_reduction {
++    if depth == 16 && !matches!(r.format, ExportFormat::Png16 | ExportFormat::Tiff16) && !r.allow_depth_reduction {
+         return Err(RasterError::Depth);
+     }
+     if matches!(r.format, ExportFormat::Jpeg { .. })
+@@ -158,13 +163,16 @@
+     }
+     let per_pixel = if matches!(r.format, ExportFormat::WebpLossy { .. }) {
+         160
++    } else if matches!(r.format, ExportFormat::Bmp8 | ExportFormat::Tiff8 | ExportFormat::Tiff16) {
++        96
+     } else {
+         64
+     };
++    let fixed = if matches!(r.format, ExportFormat::Bmp8 | ExportFormat::Tiff8 | ExportFormat::Tiff16) { 64 } else { 32 };
+     let estimated = u64::from(w)
+         .checked_mul(u64::from(h))
+         .and_then(|v| v.checked_mul(per_pixel))
+-        .and_then(|v| v.checked_add(32 * 1024 * 1024))
++        .and_then(|v| v.checked_add(fixed * 1024 * 1024))
+         .ok_or(RasterError::Allocation)?;
+     if estimated > r.memory_budget_bytes {
+         return Err(RasterError::Memory {
+@@ -175,9 +183,12 @@
+     Ok(estimated)
+ }
+ 
+-/// Export a full-resolution buffer. Call `render_document` first for marked output.
+-/// Caller bytes are never changed. Lossy/depth/matte conversions are explicit settings.
+-pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage, RasterError> {
++/// Prepared full-resolution pixels for caller-owned seekable encoders.
++/// Source bytes/depth/profile remain unchanged. The receipt records conversions.
++pub struct PreparedRaster { pub image: DecodedImage, pub metadata: ExportMetadata }
++pub fn prepare_export_pixels(source: &DecodedImage, r: &ExportRequest,
++    cancel: &dyn Fn() -> bool) -> Result<PreparedRaster, RasterError> {
++    if cancel() { return Err(RasterError::Cancelled); }
+     image_shape(source)?;
+     if !source.original_available {
+         return Err(RasterError::OriginalRequired);
+@@ -227,11 +238,11 @@
+     if gray
+         && matches!(
+             r.format,
+-            ExportFormat::WebpLossless | ExportFormat::WebpLossy { .. }
++            ExportFormat::WebpLossless | ExportFormat::WebpLossy { .. } | ExportFormat::Bmp8
+         )
+     {
+         return Err(RasterError::Unsupported(
+-            "grayscale ICC cannot label WebP RGB pixels; convert to sRGB or use PNG/JPEG",
++            "grayscale ICC cannot label BMP/WebP RGB pixels; convert to sRGB or use PNG/JPEG/TIFF",
+         ));
+     }
+     if let AlphaPolicy::Matte(matte) = r.alpha {
+@@ -241,6 +252,7 @@
+             ));
+         }
+         for i in (0..image.pixels.len()).step_by(4) {
++            if i % 16384 == 0 && cancel() { return Err(RasterError::Cancelled); }
+             let a = u64::from(image.pixels.sample(i + 3));
+             for (c, m) in matte.iter().enumerate() {
+                 let v = (u64::from(image.pixels.sample(i + c)) * a
+@@ -280,6 +292,41 @@
+         color_conversion: conversion.into(),
+         settings: r.clone(),
+     };
++    if matches!(r.format, ExportFormat::Bmp8 | ExportFormat::Tiff8 | ExportFormat::Tiff16) {
++        let depth = if r.format == ExportFormat::Tiff16 { 16 } else { 8 };
++        if image.pixels.bit_depth() != depth {
++            let samples = image.pixels.len();
++            if depth == 8 {
++                if !r.allow_depth_reduction { return Err(RasterError::Depth); }
++                let mut pixels = Vec::new();
++                pixels.try_reserve_exact(samples).map_err(|_| RasterError::Allocation)?;
++                for i in 0..samples {
++                    if i % 16384 == 0 && cancel() { return Err(RasterError::Cancelled); }
++                    pixels.push(((u32::from(image.pixels.sample(i)) + 128) / 257) as u8);
++                }
++                image.pixels = Pixels::Rgba8(pixels);
++            } else {
++                let mut pixels = Vec::new();
++                pixels.try_reserve_exact(samples).map_err(|_| RasterError::Allocation)?;
++                for i in 0..samples {
++                    if i % 16384 == 0 && cancel() { return Err(RasterError::Cancelled); }
++                    pixels.push(image.pixels.sample(i));
++                }
++                image.pixels = Pixels::Rgba16(pixels);
++            }
++        }
++    }
++    if cancel() { return Err(RasterError::Cancelled); }
++    Ok(PreparedRaster { image, metadata: meta })
++}
++
++/// Export a full-resolution buffer. Call `render_document` first for marked output.
++pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage, RasterError> {
++    if matches!(r.format, ExportFormat::Bmp8 | ExportFormat::Tiff8 | ExportFormat::Tiff16) {
++        return Err(RasterError::Unsupported("BMP/TIFF require the owned seekable format adapter"));
++    }
++    let PreparedRaster { image, metadata: meta } = prepare_export_pixels(source, r, &|| false)?;
++    let gray = crate::pixels::gray_profile(&image)?;
+     let json = serde_json::to_string(&meta).map_err(|_| RasterError::Metadata)?;
+     let bytes = match r.format {
+         ExportFormat::Png8 | ExportFormat::Png16 => encode_png(&image, r.format, &json)?,
+@@ -336,6 +383,7 @@
+                 &json,
+             )?
+         }
++        ExportFormat::Bmp8 | ExportFormat::Tiff8 | ExportFormat::Tiff16 => return Err(RasterError::Unsupported("seekable format adapter required")),
+         ExportFormat::WebpLossy { quality } => {
+             let rgba = image.pixels.rgba8();
+             let encoded = crate::ffi::encode_lossy_webp(
+--- a/core/crates/vw-raster/src/lib.rs
++++ b/core/crates/vw-raster/src/lib.rs
+@@ -13,7 +13,7 @@
+ mod text;
+ pub use export::{
+     AlphaPolicy, ColorPolicy, ExportFormat, ExportMetadata, ExportRequest, ExportedImage, Region,
+-    export, preflight,
++    export, preflight, PreparedRaster, prepare_export_pixels,
+ };
+ pub use ffi::webp_encoder_version;
+ pub use pixels::{DecodeLimits, DecodedImage, Pixels, decode, standard_srgb_profile};
+@@ -39,7 +39,7 @@
+         "raster memory estimate {estimated} bytes exceeds budget {budget}; use a smaller region, split, or tiles"
+     )]
+     Memory { estimated: u64, budget: u64 },
+-    #[error("depth conversion requires explicit permission; use 16-bit PNG")]
++    #[error("depth conversion requires explicit permission; use 16-bit PNG/TIFF")]
+     Depth,
+     #[error("JPEG cannot preserve alpha; choose PNG/WebP or an explicit matte")]
+     Alpha,
+--- a/core/crates/vw-ffi/Cargo.toml
++++ b/core/crates/vw-ffi/Cargo.toml
+@@ -41,6 +41,7 @@
+ vw-package = { version = "=0.1.0", path = "../vw-package" }
+ vw-codec-os = { version = "=0.1.0", path = "../vw-codec-os" }
+ vw-avif-os = { version = "=0.1.0", path = "../vw-avif-os" }
++vw-formats = { version = "=0.1.0", path = "../vw-formats" }
+ vw-instructions = { version = "=0.1.0", path = "../vw-instructions" }
+ vw-semantics = { version = "=0.1.0", path = "../vw-semantics" }
+ vw-mask = { version = "=0.1.0", path = "../vw-mask" }
+--- a/core/crates/vw-ffi/src/lib.rs
++++ b/core/crates/vw-ffi/src/lib.rs
+@@ -124,3 +124,6 @@
+ 
+ mod masks;
+ pub use masks::*;
++
++mod format_images;
++pub use format_images::OriginalFormatInfo;
+--- a/core/crates/vw-ffi/src/dto.rs
++++ b/core/crates/vw-ffi/src/dto.rs
+@@ -99,6 +99,9 @@
+     Jpeg { quality: u8 },
+     WebpLossless,
+     WebpLossy { quality: u8 },
++    Bmp8,
++    Tiff8,
++    Tiff16,
+ }
+ #[derive(Clone, Debug, uniffi::Record)]
+ pub struct ExportOptions {
+--- a/core/crates/vw-ffi/src/display_colors.rs
++++ b/core/crates/vw-ffi/src/display_colors.rs
+@@ -74,7 +74,13 @@
+             // capacities and profiles before its first semantic parse/copy.
+             let retained=checked_add(canonical,asset.byte_size)?;
+             let display=checked_add(checked_add(pixels*8,count*48)?,vw_raster::DISPLAY_COLOR_WORK+20*MIB)?;
+-            memory(checked_add(retained,display.max(pixels*32+32*MIB))?,budget)?;
++            let decode = match asset.format.as_str() {
++                "bmp" | "tiff" => checked_add(checked_add(pixels*32,asset.byte_size*2)?,checked_add(asset.icc_profile.len() as u64*4,64*MIB)?)?,
++                "avif" => checked_add(checked_add(u64::from(width.div_ceil(128)*128)*u64::from(height.div_ceil(128)*128)*64,asset.byte_size*4)?,32*MIB)?,
++                "heic" | "heif" => checked_add(checked_add(u64::from(width.div_ceil(64)*64)*u64::from(height.div_ceil(64)*64)*64,asset.byte_size*4)?,32*MIB)?,
++                _ => checked_add(pixels*32,32*MIB)?,
++            };
++            memory(checked_add(retained,display.max(decode))?,budget)?;
+             let path=state.blobs.path(&asset_id).map_err(|_|DisplayColorError::Storage)?;
+             let mut file=std::fs::File::open(path).map_err(|_|DisplayColorError::Storage)?;
+             if file.metadata().map_err(|_|DisplayColorError::Storage)?.len()!=asset.byte_size {return Err(DisplayColorError::Storage);}
+@@ -82,7 +88,7 @@
+             let mut encoded=Vec::new();encoded.try_reserve_exact(len).map_err(|_|DisplayColorError::Memory{estimated:asset.byte_size,budget})?;encoded.resize(len,0);
+             for chunk in encoded.chunks_mut(65536) {cancellation.check()?;file.read_exact(chunk).map_err(|_|DisplayColorError::Storage)?;}
+             if file.read(&mut[0u8;1]).map_err(|_|DisplayColorError::Storage)?!=0||AssetId::hash(&encoded)!=asset_id {return Err(DisplayColorError::Storage);}
+-            let decoded=crate::avif_images::decode(&encoded,vw_raster::DecodeLimits{max_encoded_bytes:len,max_pixels:pixels,max_memory_bytes:budget-retained},&||cancellation.is_cancelled())?;
++            let decoded=crate::format_images::decode(&encoded,vw_raster::DecodeLimits{max_encoded_bytes:len,max_pixels:pixels,max_memory_bytes:budget-retained},&||cancellation.is_cancelled())?;
+             if decoded.width!=width||decoded.height!=height||u32::from(decoded.pixels.bit_depth())!=asset.bit_depth||u32::from(decoded.orientation_applied)!=asset.orientation||decoded.pixels.has_alpha()!=asset.has_alpha||decoded.icc.as_deref().unwrap_or(&[])!=asset.icc_profile||decoded.source_asset!=asset_id {return Err(DisplayColorError::Storage);}
+             let space=match request.space {DisplayColorSpace::Srgb=>DisplaySpace::Srgb,DisplayColorSpace::DisplayP3=>DisplaySpace::DisplayP3};
+             let frame=vw_raster::display_region(&decoded,area,DisplayOptions{space,assume_untagged_srgb:request.assume_untagged_srgb,allow_depth_reduction:request.allow_display_depth_reduction,memory_budget_bytes:budget,retained_bytes:checked_add(canonical,encoded.capacity() as u64)?},&||cancellation.is_cancelled())?;
+--- a/core/crates/vw-ffi/src/project.rs
++++ b/core/crates/vw-ffi/src/project.rs
+@@ -387,7 +387,8 @@
+         let doc_id = Id::try_from(options.document_id)?;
+         let layer_id = Id::try_from(options.layer_id)?;
+         let device = DeviceId::try_from(options.device_id)?;
+-        let image = crate::avif_images::decode(&options.source, decode_limits(), &|| {
++        let import_metadata = crate::format_images::import_metadata(&options.source, decode_limits(), &cancellation)?;
++        let image = crate::format_images::decode(&options.source, decode_limits(), &|| {
+             cancellation.is_cancelled()
+         })?;
+         let mut project = Project::new(project_id, options.title.clone(), device.clone());
+@@ -396,7 +397,9 @@
+         } else {
+             (image.width, image.height)
+         };
+-        let format = if vw_avif_os::is_avif(&options.source) {
++        let format = if let Some(format) = crate::format_images::label(&options.source) {
++            format
++        } else if vw_avif_os::is_avif(&options.source) {
+             "avif"
+         } else if vw_codec_os::is_heic(&options.source) {
+             "heic"
+@@ -426,7 +429,7 @@
+                 icc_profile: image.icc.clone().unwrap_or_default(),
+                 byte_size: options.source.len() as u64,
+                 source: "import".into(),
+-                metadata_json: "{}".into(),
++                metadata_json: import_metadata,
+                 ..Default::default()
+             },
+         );
+--- a/core/crates/vw-ffi/src/queries.rs
++++ b/core/crates/vw-ffi/src/queries.rs
+@@ -664,7 +664,7 @@
+             .budget
+             .checked_sub(bytes.len() as u64)
+             .ok_or(vw_raster::RasterError::Allocation)?;
+-        crate::avif_images::decode(
++        crate::format_images::decode(
+             &bytes,
+             vw_raster::DecodeLimits {
+                 max_encoded_bytes: limit,
+@@ -764,6 +764,9 @@
+             ImageFormat::Jpeg { quality } => vw_raster::ExportFormat::Jpeg { quality },
+             ImageFormat::WebpLossless => vw_raster::ExportFormat::WebpLossless,
+             ImageFormat::WebpLossy { quality } => vw_raster::ExportFormat::WebpLossy { quality },
++            ImageFormat::Bmp8 => vw_raster::ExportFormat::Bmp8,
++            ImageFormat::Tiff8 => vw_raster::ExportFormat::Tiff8,
++            ImageFormat::Tiff16 => vw_raster::ExportFormat::Tiff16,
+         },
+         region,
+         revision: state.view_revision()?,
+@@ -788,7 +791,9 @@
+             .transpose()?,
+         frame_id: definition.capture.as_ref().map(|c| c.frame_id),
+     };
+-    let result = vw_raster::export(&pixels, &request)?;
++    let result = if crate::format_images::external(request.format) {
++        crate::format_images::encode_buffered(&pixels, &request, cancellation)?
++    } else { vw_raster::export(&pixels, &request)? };
+     cancellation.check()?;
+     if result.bytes.len() > 64 * 1024 * 1024 {
+         return Err(CoreError::Backpressure);
+--- a/core/crates/vw-ffi/src/streaming_ffi.rs
++++ b/core/crates/vw-ffi/src/streaming_ffi.rs
+@@ -212,6 +212,8 @@
+             options.max_encoded_bytes.min(options.memory_budget_bytes),
+             &cancellation,
+         )?;
++        let import_metadata = crate::format_images::import_metadata(&bytes,
++            vw_raster::DecodeLimits { max_encoded_bytes: INPUT_LIMIT as usize, max_pixels: 50_000_000, max_memory_bytes: options.memory_budget_bytes }, &cancellation)?;
+         let mut scratch = tempfile::Builder::new()
+             .prefix("vw-raster-source-")
+             .tempfile_in(&work)?;
+@@ -258,7 +260,9 @@
+         } else {
+             (info.width, info.height)
+         };
+-        let format = if vw_avif_os::is_avif(&bytes) {
++        let format = if let Some(format) = crate::format_images::label(&bytes) {
++            format
++        } else if vw_avif_os::is_avif(&bytes) {
+             "avif"
+         } else if vw_codec_os::is_heic(&bytes) {
+             "heic"
+@@ -296,7 +300,7 @@
+                 captured_at_ms: capture
+                     .as_ref()
+                     .map_or(0, |value| value.info().captured_at_ms),
+-                metadata_json: "{}".into(),
++                metadata_json: import_metadata,
+             },
+         );
+         project.documents.insert(
+@@ -629,16 +633,23 @@
+             .and_then(|n| n.checked_add(asset.byte_size.checked_mul(5)?))
+             .and_then(|n| n.checked_add(32 * 1024 * 1024))
+             .ok_or(TransferError::Backpressure)?
+-    } else {
+-        0
+-    };
++    } else if matches!(asset.format.as_str(), "bmp" | "tiff") {
++        u64::from(width).checked_mul(u64::from(height)).and_then(|n| n.checked_mul(32))
++            .and_then(|n| n.checked_add(asset.byte_size.checked_mul(3)?))
++            .and_then(|n| n.checked_add((asset.icc_profile.len() as u64).checked_mul(4)?))
++            .and_then(|n| n.checked_add(64 * 1024 * 1024)).ok_or(TransferError::Backpressure)?
++    } else if asset.format == "avif" {
++        u64::from(width.div_ceil(128) * 128).checked_mul(u64::from(height.div_ceil(128) * 128))
++            .and_then(|n| n.checked_mul(64)).and_then(|n| n.checked_add(asset.byte_size.checked_mul(5)?))
++            .and_then(|n| n.checked_add(32 * 1024 * 1024)).ok_or(TransferError::Backpressure)?
++    } else { 0 };
+     let estimate = estimate.max(source_decode);
+     memory(estimate, budget)?;
+     Ok(FilePreflight {
+         width: region.width,
+         height: region.height,
+         source_bit_depth: asset.bit_depth as u8,
+-        output_bit_depth: if matches!(request.format, vw_raster::ExportFormat::Png16) {
++        output_bit_depth: if matches!(request.format, vw_raster::ExportFormat::Png16 | vw_raster::ExportFormat::Tiff16) {
+             16
+         } else {
+             8
+@@ -761,6 +772,61 @@
+         strips: 1,
+     })
+ }
++// Seekable codecs may overwrite earlier headers. Hash only finalized bytes.
++fn hash_final_file(file: &mut File, length: u64, hash: &mut blake3::Hasher,
++    cancel: &Cancellation) -> TransferResult<()> {
++    if file.metadata()?.len() != length || length == 0 || length > OUTPUT_LIMIT {
++        return Err(TransferError::Storage);
++    }
++    file.seek(SeekFrom::Start(0))?;
++    let mut remaining = length;
++    let mut buffer = [0u8; 65536];
++    while remaining != 0 {
++        cancel.check()?;
++        let count = remaining.min(buffer.len() as u64) as usize;
++        file.read_exact(&mut buffer[..count])?;
++        hash.update(&buffer[..count]);
++        remaining -= count as u64;
++    }
++    if file.read(&mut [0u8; 1])? != 0 { return Err(TransferError::Storage); }
++    cancel.check()?;
++    Ok(())
++}
++
++fn export_external(source: &mut dyn RasterSource, state: &ProjectState,
++    document: &Id, options: &FileExportOptions, request: &vw_raster::ExportRequest,
++    cancel: &Cancellation, output: &mut File) -> TransferResult<vw_raster::StreamReport> {
++    let info = source.info();
++    let full = vw_raster::Region { x: 0, y: 0, width: info.width, height: info.height };
++    let (estimate, available, admit) = buffered_admission(source, request)?;
++    let output_region = request.region.unwrap_or(full);
++    // Output and retained source scratch coexist in the same owned workspace.
++    let output_bound = u64::from(output_region.width).checked_mul(u64::from(output_region.height))
++        .and_then(|n| n.checked_mul(8)).and_then(|n| n.checked_add(5 * 1024 * 1024))
++        .ok_or(TransferError::Backpressure)?;
++    if output_bound > options.max_encoded_bytes { return Err(TransferError::EncodedLimit); }
++    let source_scratch = u64::from(info.width).checked_mul(u64::from(info.height))
++        .and_then(|n| n.checked_mul(u64::from(info.bit_depth) / 2)).ok_or(TransferError::Backpressure)?;
++    if source_scratch.checked_add(output_bound).is_none_or(|n| n > options.max_scratch_bytes) {
++        return Err(TransferError::ScratchLimit);
++    }
++    cancel.check()?;
++    let mut image = source.read_region(full, request.memory_budget_bytes, &|| cancel.is_cancelled())
++        .map_err(transfer_raster_error)?;
++    if options.export.marked {
++        let assets = ResultAssets { blobs: &state.blobs, budget: available, cancel };
++        image = vw_raster::render_document(&image, state.project()?, document, &assets,
++            vw_raster::RenderOptions { memory_budget_bytes: available, include_guides: false,
++                assume_untagged_srgb: options.export.assume_untagged_srgb }).map_err(transfer_raster_error)?;
++    }
++    let (length, metadata) = crate::format_images::encode_private(&image, &admit,
++        options.max_encoded_bytes, output, cancel).map_err(transfer_raster_error)?;
++    cancel.check()?;
++    Ok(vw_raster::StreamReport { metadata, plan: vw_raster::StreamPlan {
++        region: output_region, strip_rows: 16.min(output_region.height), estimated_peak_bytes: estimate },
++        encoded_bytes: length, strips: output_region.height.div_ceil(16) })
++}
++
+ fn transfer_raster_error(error: vw_raster::RasterError) -> TransferError {
+     match error {
+         vw_raster::RasterError::Memory { estimated, budget } => {
+@@ -860,6 +926,8 @@
+                 options.max_encoded_bytes.min(options.memory_budget_bytes),
+                 cancel,
+             )?;
++            definition.metadata_json = crate::format_images::import_metadata(&bytes,
++                vw_raster::DecodeLimits { max_encoded_bytes: INPUT_LIMIT as usize, max_pixels: 50_000_000, max_memory_bytes: options.memory_budget_bytes }, cancel).map_err(transfer_raster_error)?;
+             let mut scratch = tempfile::Builder::new()
+                 .prefix("vw-raster-source-")
+                 .tempfile_in(&work)?;
+@@ -908,7 +976,9 @@
+             } else {
+                 (info.width, info.height)
+             };
+-            definition.format = if vw_avif_os::is_avif(&bytes) {
++            definition.format = if let Some(format) = crate::format_images::label(&bytes) {
++                format
++            } else if vw_avif_os::is_avif(&bytes) {
+                 "avif"
+             } else if vw_codec_os::is_heic(&bytes) {
+                 "heic"
+@@ -1119,7 +1189,14 @@
+         .prefix("vw-raster-output-")
+         .tempfile_in(&work)?;
+     let mut hash = blake3::Hasher::new();
+-    let report = {
++    let report = if crate::format_images::external(request.format) {
++        let report = with_source(&bytes, scratch.as_file_mut(), request.memory_budget_bytes, options.max_scratch_bytes, cancel, |source| {
++            validate_source_binding(source.info(), project, &asset)?;
++            export_external(source, state, &document, &options, &request, cancel, output.as_file_mut())
++        })?;
++        hash_final_file(output.as_file_mut(), report.encoded_bytes, &mut hash, cancel)?;
++        report
++    } else {
+         let mut sink = HashWriter {
+             file: output.as_file_mut(),
+             hash: &mut hash,
+@@ -1219,6 +1296,9 @@
+         ImageFormat::Jpeg { quality } => vw_raster::ExportFormat::Jpeg { quality },
+         ImageFormat::WebpLossless => vw_raster::ExportFormat::WebpLossless,
+         ImageFormat::WebpLossy { quality } => vw_raster::ExportFormat::WebpLossy { quality },
++            ImageFormat::Bmp8 => vw_raster::ExportFormat::Bmp8,
++            ImageFormat::Tiff8 => vw_raster::ExportFormat::Tiff8,
++            ImageFormat::Tiff16 => vw_raster::ExportFormat::Tiff16,
+     };
+     let region = options
+         .region
+@@ -1296,7 +1376,7 @@
+     let remaining = budget
+         .checked_sub(bytes.len() as u64)
+         .ok_or(CoreError::Backpressure)?;
+-    let image = crate::avif_images::decode(
++    let image = crate::format_images::decode(
+         bytes,
+         vw_raster::DecodeLimits {
+             max_memory_bytes: remaining,
+@@ -1401,7 +1481,7 @@
+             .budget
+             .checked_sub(bytes.len() as u64)
+             .ok_or(vw_raster::RasterError::Allocation)?;
+-        crate::avif_images::decode(
++        crate::format_images::decode(
+             &bytes,
+             vw_raster::DecodeLimits {
+                 max_encoded_bytes: INPUT_LIMIT as usize,
+@@ -1776,3 +1856,7 @@
+         }
+     }
+ }
++
++#[cfg(test)]
++#[path = "format_seek_tests.rs"]
++mod format_seek_tests;
+--- a/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CoreApi.kt
++++ b/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CoreApi.kt
+@@ -92,6 +92,9 @@
+     public data class Jpeg(public val quality: UByte) : ImageFormat
+     public data object WebpLossless : ImageFormat
+     public data class WebpLossy(public val quality: UByte) : ImageFormat
++    public data object Bmp8 : ImageFormat
++    public data object Tiff8 : ImageFormat
++    public data object Tiff16 : ImageFormat
+ }
+ public data class ExportOptions(public val documentId: String, public val format: ImageFormat = ImageFormat.Png8, public val marked: Boolean = true, public val region: Rect? = null, public val matteRgb: UInt? = null, public val convertToSrgb: Boolean = false, public val assumeUntaggedSrgb: Boolean = false, public val allowDepthReduction: Boolean = false, public val memoryBudgetBytes: ULong = 256uL * 1024uL * 1024uL)
+ public data class ExportResult(public val bytes: ByteArray, public val blake3: String, public val metadataJson: String, public val revision: ProjectInfo)
+--- a/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt
++++ b/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt
+@@ -60,7 +60,11 @@
+         TextLayout(value.algorithmVersion,value.glyphs.map { GlyphOutline(it.glyphId,it.cluster,it.font,it.x,it.y,it.advance,it.outline.map { p -> p.common() }) },value.width,value.height,value.lineHeight)
+     }
+ }
+-private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchColorDisplay {
++private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchColorDisplay, WorkbenchOriginalFormats {
++    override suspend fun originalFormatInfo(binding: WorkflowBinding): OriginalFormatInfo {
++        if (closed.get()) throw WorkflowFailure(WorkflowFailureKind.Closed)
++        return originalFormatInfoNative(handle, binding)
++    }
+     override suspend fun originalColors(request: DisplayColorRequest): DisplayColorPixels {
+         if (closed.get()) throw DisplayColorFailure(DisplayColorFailureKind.Closed)
+         return originalColorsNative(handle, request)
+@@ -171,7 +175,7 @@
+     is EditCommand.SetText -> NEdit.SetText(objectId,text,font,size)
+     is EditCommand.SetStyle -> NEdit.SetStyle(objectId,style.native())
+ }
+-private fun ImageFormat.native(): NFormat = when(this) { ImageFormat.Png8 -> NFormat.Png8; ImageFormat.Png16 -> NFormat.Png16; is ImageFormat.Jpeg -> NFormat.Jpeg(quality); ImageFormat.WebpLossless -> NFormat.WebpLossless; is ImageFormat.WebpLossy -> NFormat.WebpLossy(quality) }
++private fun ImageFormat.native(): NFormat = when(this) { ImageFormat.Png8 -> NFormat.Png8; ImageFormat.Png16 -> NFormat.Png16; is ImageFormat.Jpeg -> NFormat.Jpeg(quality); ImageFormat.WebpLossless -> NFormat.WebpLossless; is ImageFormat.WebpLossy -> NFormat.WebpLossy(quality); ImageFormat.Bmp8 -> NFormat.Bmp8; ImageFormat.Tiff8 -> NFormat.Tiff8; ImageFormat.Tiff16 -> NFormat.Tiff16 }
+ 
+ internal fun nativeStrokeHandle(stroke: WorkbenchStroke): StrokeGesture = (stroke as? NativeStroke)?.handle ?: throw SessionFailure(SessionFailureKind.Invalid)
+ 
+--- a/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeStreaming.kt
++++ b/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeStreaming.kt
+@@ -72,6 +72,9 @@
+     val format = when (export.format) {
+         ImageFormat.Png8 -> NFormat.Png8
+         ImageFormat.Png16 -> NFormat.Png16
++        ImageFormat.Bmp8 -> NFormat.Bmp8
++        ImageFormat.Tiff8 -> NFormat.Tiff8
++        ImageFormat.Tiff16 -> NFormat.Tiff16
+         is ImageFormat.Jpeg -> NFormat.Jpeg(export.format.quality)
+         ImageFormat.WebpLossless -> NFormat.WebpLossless
+         is ImageFormat.WebpLossy -> NFormat.WebpLossy(export.format.quality)
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/RasterTransfers.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/RasterTransfers.kt
+@@ -150,6 +150,8 @@
+         ImageFormat.Png8, ImageFormat.Png16 -> "output.png"
+         is ImageFormat.Jpeg -> "output.jpg"
+         ImageFormat.WebpLossless, is ImageFormat.WebpLossy -> "output.webp"
++    ImageFormat.Bmp8 -> "output.bmp"
++    ImageFormat.Tiff8, ImageFormat.Tiff16 -> "output.tiff"
+     }
+ 
+     suspend fun discardDestination(uri: Uri) = withContext(NonCancellable + Dispatchers.IO) {
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/ExportSelection.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/ExportSelection.kt
+@@ -6,10 +6,12 @@
+ 
+ internal enum class ExportEncoding(val label: String, val mime: String, val extension: String) {
+     Png8("PNG 8-bit", "image/png", "png"), Png16("PNG 16-bit", "image/png", "png"),
+-    Jpeg("JPEG", "image/jpeg", "jpg"), WebpLossless("WebP lossless", "image/webp", "webp"), WebpLossy("WebP lossy", "image/webp", "webp");
++    Jpeg("JPEG", "image/jpeg", "jpg"), WebpLossless("WebP lossless", "image/webp", "webp"), WebpLossy("WebP lossy", "image/webp", "webp"),
++    Bmp8("BMP 8-bit", "image/bmp", "bmp"), Tiff8("TIFF 8-bit", "image/tiff", "tiff"), Tiff16("TIFF 16-bit", "image/tiff", "tiff");
+     fun format(quality: Int): ImageFormat = when (this) {
+         Png8 -> ImageFormat.Png8; Png16 -> ImageFormat.Png16; Jpeg -> ImageFormat.Jpeg(quality.toUByte())
+         WebpLossless -> ImageFormat.WebpLossless; WebpLossy -> ImageFormat.WebpLossy(quality.toUByte())
++        Bmp8 -> ImageFormat.Bmp8; Tiff8 -> ImageFormat.Tiff8; Tiff16 -> ImageFormat.Tiff16
+     }
+ }
+ internal data class ExportSelection(val marked: Boolean = true, val viewOnly: Boolean = false,
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopTransfers.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopTransfers.kt
+@@ -15,7 +15,8 @@
+ enum class ExportArea(val label: String) { Full("Full image"), Selection("Selection bounds"), View("Visible view bounds") }
+ enum class ExportEncoding(val label: String, val extension: String) {
+     Png8("PNG · 8 bit", "png"), Png16("PNG · 16 bit", "png"),
+-    Jpeg("JPEG", "jpg"), WebpLossless("WebP · lossless", "webp"), WebpLossy("WebP · lossy", "webp");
++    Jpeg("JPEG", "jpg"), WebpLossless("WebP · lossless", "webp"), WebpLossy("WebP · lossy", "webp"),
++    Bmp8("BMP · 8 bit", "bmp"), Tiff8("TIFF · 8 bit", "tiff"), Tiff16("TIFF · 16 bit", "tiff");
+     val png: Boolean get() = this == Png8 || this == Png16
+ }
+ enum class ExportMatte(val label: String, val rgb: UInt?) { Preserve("Preserve alpha", null), White("White matte", 0xffffffu), Black("Black matte", 0u) }
+@@ -29,6 +30,9 @@
+     fun format(): ImageFormat = when (encoding) {
+         ExportEncoding.Png8 -> ImageFormat.Png8
+         ExportEncoding.Png16 -> ImageFormat.Png16
++        ExportEncoding.Bmp8 -> ImageFormat.Bmp8
++        ExportEncoding.Tiff8 -> ImageFormat.Tiff8
++        ExportEncoding.Tiff16 -> ImageFormat.Tiff16
+         ExportEncoding.Jpeg -> ImageFormat.Jpeg(quality.coerceIn(1, 100).toUByte())
+         ExportEncoding.WebpLossless -> ImageFormat.WebpLossless
+         ExportEncoding.WebpLossy -> ImageFormat.WebpLossy(quality.coerceIn(1, 100).toUByte())
+@@ -105,8 +109,8 @@
+         TransferFailureKind.PixelLimit -> "Images over 50 MP are not supported yet. The original was preserved and was not downsampled."
+         TransferFailureKind.Memory -> "This export needs ${error.estimatedBytes?.div(1024uL * 1024uL)} MiB; its budget is ${error.budgetBytes?.div(1024uL * 1024uL)} MiB. Choose PNG or a smaller region."
+         TransferFailureKind.Metadata -> "The color profile cannot be preserved in this export. Choose explicit sRGB conversion; untagged input also needs the sRGB assumption."
+-        TransferFailureKind.Alpha -> "This format cannot retain transparency. Choose a white or black matte, or PNG/WebP."
+-        TransferFailureKind.Depth -> "This format would reduce sample depth. Choose PNG 16 bit or explicitly allow depth reduction."
++        TransferFailureKind.Alpha -> "This format cannot retain transparency. Choose a white or black matte, or PNG/WebP/BMP/TIFF."
++        TransferFailureKind.Depth -> "This format would reduce sample depth. Choose PNG/TIFF 16 bit or explicitly allow depth reduction."
+         TransferFailureKind.EncodedLimit -> "The encoded file exceeds the transfer byte limit. Choose a different format or region."
+         TransferFailureKind.ScratchLimit -> "The export exceeds its 400 MB scratch budget. Choose a smaller region."
+         TransferFailureKind.Backpressure -> "The native transfer queue is busy. Retry after current work finishes."
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -85,6 +85,7 @@
+     var needsDisplayDepthConsent by mutableStateOf(false); private set
+     var needsSrgbDisplay by mutableStateOf(false); private set
+     var colorDisplayStatus by mutableStateOf<String?>(null); private set
++    var formatNotice by mutableStateOf<String?>(null); private set
+     private val displayAdoption = DisplayAdoption()
+     private var displaySpace = DisplayColorSpace.Srgb
+     private var displayDepthAllowed = false
+@@ -470,7 +471,7 @@
+                 document = snapshot; info = snapshot.render.revision; objects = drawing
+                 instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
+                 observeProject(current, token)
+-                colorAssumed = knownSrgb; displayDepthAllowed = false; forceSrgbDisplay = false; colorDisplayStatus = null; needsDisplayDepthConsent = false; needsSrgbDisplay = false; screen = WorkbenchScreen.Canvas; cameraFitted = false
++                colorAssumed = knownSrgb; displayDepthAllowed = false; forceSrgbDisplay = false; colorDisplayStatus = null; formatNotice = null; needsDisplayDepthConsent = false; needsSrgbDisplay = false; screen = WorkbenchScreen.Canvas; cameraFitted = false
+                 fit(); loadBackground()
+             } catch (cancel: CancellationException) { throw cancel }
+             catch (error: CoreFailure) {
+@@ -584,7 +585,7 @@
+         instructionEditor.detach()
+         retireAi()
+         captureArrivals.detach(); failedCaptureOpen = null
+-        epoch++; refreshAdmission.reset(); displayAdoption.invalidate(); displayDepthAllowed = false; forceSrgbDisplay = false; colorDisplayStatus = null; needsDisplayDepthConsent = false; needsSrgbDisplay = false
++        epoch++; refreshAdmission.reset(); displayAdoption.invalidate(); displayDepthAllowed = false; forceSrgbDisplay = false; colorDisplayStatus = null; formatNotice = null; needsDisplayDepthConsent = false; needsSrgbDisplay = false
+         changesJob?.cancelAndJoin(); changesJob = null
+         refreshQueue?.close(); refreshQueue = null
+         refreshJob?.cancelAndJoin(); refreshJob = null
+@@ -799,6 +800,14 @@
+         fun admitted(): Boolean = !disposing && current === project && displayAdoption.accepts(ticket, epoch, displayBinding(), if (wide) displaySpace else DisplayColorSpace.Srgb)
+         var staged: Bitmap? = null
+         try {
++            if (admitted()) formatNotice = null
++            if (current is WorkbenchOriginalFormats) {
++                val format = current.originalFormatInfo(request.binding)
++                validateOriginalFormatInfo(format, request.binding)
++                val fresh = current.info()
++                if (!admitted() || !originalFormatRevisionMatches(fresh, request.binding)) return
++                formatNotice = originalFormatNotice(format)
++            }
+             if (doc.bitDepth > 8u && !displayDepthAllowed) throw DisplayColorFailure(DisplayColorFailureKind.Depth)
+             var assumed = colorAssumed
+             if (wide) {
+@@ -1446,7 +1455,7 @@
+             exportPreflight = null; checkedExport = null; message = "The project changed. Check the export again."; return
+         }
+         if (doc.bitDepth > 8u && options.format == ImageFormat.Png8 && !options.allowDepthReduction) {
+-            message = "Choose PNG 16-bit or explicitly allow reduction to 8-bit."; return
++            message = "Choose PNG/TIFF 16-bit or explicitly allow reduction to 8-bit."; return
+         }
+         exportReady = null
+         busy = true; cancelTool()
+@@ -1496,8 +1505,8 @@
+                 TransferFailureKind.PixelLimit -> "Images over 50 megapixels aren't supported yet. The original was not resized or changed."
+                 TransferFailureKind.Dimensions -> "This format cannot represent the requested dimensions. Choose PNG or a smaller region; the original is unchanged."
+                 TransferFailureKind.Memory, TransferFailureKind.Backpressure -> "This export exceeds the current memory budget. Try PNG or a smaller region; no resizing was applied."
+-                TransferFailureKind.Alpha -> "JPEG cannot preserve transparency. Explicitly choose a white background or use PNG/WebP."
+-                TransferFailureKind.Depth -> "This format reduces the original bit depth. Choose PNG 16-bit or explicitly allow 8-bit output."
++                TransferFailureKind.Alpha -> "JPEG cannot preserve transparency. Explicitly choose a white background or use PNG/WebP/BMP/TIFF."
++                TransferFailureKind.Depth -> "This format reduces the original bit depth. Choose PNG/TIFF 16-bit or explicitly allow 8-bit output."
+                 TransferFailureKind.Metadata -> "The color profile could not be preserved or converted safely. The original is unchanged."
+                 TransferFailureKind.EncodedLimit -> "The encoded image exceeds the current output limit. Choose a smaller region or another format."
+                 TransferFailureKind.ScratchLimit -> "This transfer exceeds its temporary-storage limit. The original and edits are intact."
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
+@@ -12,7 +12,7 @@
+ import java.nio.file.Files
+ import java.nio.file.Path
+ 
+-data class EditorState(val document:DocumentSnapshot?=null,val background:ImageBitmap?=null,val view:ViewState=ViewState(),val selected:Set<String> = emptySet(),val tool:Tool=Tool.Select,val preview:Map<String,Transform> = emptyMap(),val draft:Pair<Point,Point>?=null,val busy:Boolean=false,val message:String?=null,val textAnchor:Point?=null,val color:UInt=0x78dcc8ffu,val width:Double=3.0,val path:Path?=null,val needsColorConsent:Boolean=false,val needsDisplayDepthConsent:Boolean=false,val needsSrgbDisplay:Boolean=false,val colorDisplayStatus:String?=null,val projectEpoch:Long=0,val canvasReady:Boolean=false,val canvasFocused:Boolean=false,val renderIssue:String?=null,
++data class EditorState(val document:DocumentSnapshot?=null,val background:ImageBitmap?=null,val view:ViewState=ViewState(),val selected:Set<String> = emptySet(),val tool:Tool=Tool.Select,val preview:Map<String,Transform> = emptyMap(),val draft:Pair<Point,Point>?=null,val busy:Boolean=false,val message:String?=null,val textAnchor:Point?=null,val color:UInt=0x78dcc8ffu,val width:Double=3.0,val path:Path?=null,val needsColorConsent:Boolean=false,val needsDisplayDepthConsent:Boolean=false,val needsSrgbDisplay:Boolean=false,val colorDisplayStatus:String?=null,val formatNotice:String?=null,val projectEpoch:Long=0,val canvasReady:Boolean=false,val canvasFocused:Boolean=false,val renderIssue:String?=null,
+     val exportSettings:ExportSettings=ExportSettings(),val exportOpen:Boolean=false,val pasteOpen:Boolean=false,
+     val exportCheck:ExportCheck?=null,val exportReceipt:CompletedExport?=null,val dragPrepared:Boolean=false,
+     val sync:SessionStatus?=null,val peerFrame:PeerFrame?=null,val peerViewport:PeerViewport?=null,
+@@ -249,6 +249,14 @@
+         fun admitted(): Boolean = !closing && project === p && displayAdoption.accepts(ticket, generation, displayBinding(), space)
+         var staged: OwnedColorImage? = null
+         try {
++            if (admitted()) update { it.copy(formatNotice = null) }
++            if (p is WorkbenchOriginalFormats) {
++                val format = p.originalFormatInfo(request.binding)
++                validateOriginalFormatInfo(format, request.binding)
++                val fresh = p.info()
++                if (!admitted() || !originalFormatRevisionMatches(fresh, request.binding)) return
++                update { it.copy(formatNotice = originalFormatNotice(format)) }
++            }
+             if (doc.bitDepth > 8u && !displayDepthAllowed) throw DisplayColorFailure(DisplayColorFailureKind.Depth)
+             var assumed = colorAssumed
+             if (wide) {
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
+@@ -108,7 +108,7 @@
+                     { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                     { editor.newCanvas() }, { editor.open(it) },
+                     { editor.navigate(WorkbenchScreen.Settings) }, { editor.navigate(WorkbenchScreen.Diagnostics) }, { editor.navigate(WorkbenchScreen.Pairing) },
+-                    { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/heic", "image/heif")) }, onCamera,
++                    { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/heic", "image/heif", "image/avif", "image/bmp", "image/tiff")) }, onCamera,
+                     editor.cameraCaptures, editor::retryCamera, { cameraDiscardToken = it }, { token ->
+                         if (cameraSaveToken != null) editor.transferMessage("Finish or cancel the pending original-file destination first.")
+                         else {
+@@ -173,6 +173,7 @@
+     val selectionState by editor.selections.state.collectAsState()
+     val eraserSelected = eraserState.active || (selectionState.active && selectionState.tool == com.visualworkbench.shared.SelectionTool.MaskEraser)
+     Column(Modifier.fillMaxSize()) {
++        editor.formatNotice?.let { Text(it, style = MaterialTheme.typography.caption, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) }
+         editor.colorDisplayStatus?.let { Text(it, style = MaterialTheme.typography.caption, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) }
+         Surface(elevation = 4.dp) {
+             Column {
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
+@@ -148,7 +148,7 @@
+                 }finally{chooser.dispose()}}}
+             fun save(request:ExportRequest){controller.instructionPicker().use { val chooser=FileDialog(window,"Save ${request.settings.encoding.label} · ${request.revision}",FileDialog.SAVE)
+                 try{chooser.directory=documents.toString();chooser.file="export-${request.revision}.${request.settings.encoding.extension}";chooser.isVisible=true;val filename=chooser.file?:return
+-                    val extension=filename.substringAfterLast('.',"").lowercase();val allowed=if(request.settings.encoding==ExportEncoding.Jpeg)setOf("jpg","jpeg")else setOf(request.settings.encoding.extension)
++                    val extension=filename.substringAfterLast('.',"").lowercase();val allowed=when(request.settings.encoding){ExportEncoding.Jpeg->setOf("jpg","jpeg");ExportEncoding.Tiff8,ExportEncoding.Tiff16->setOf("tif","tiff");else->setOf(request.settings.encoding.extension)}
+                     if(extension !in allowed){controller.report("Use a .${request.settings.encoding.extension} filename for the selected format.");return}
+                     controller.saveExport(request,Path.of(chooser.directory,filename))
+                 }finally{chooser.dispose()}}}
+@@ -293,6 +293,7 @@
+                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){palette.forEach{rgba->Box(Modifier.size(24.dp).background(Color(((rgba and 255u)shl 24 or(rgba shr 8)).toInt()),RoundedCornerShape(5.dp)).border(if(editor.color==rgba)2.dp else 0.dp,Color.White,RoundedCornerShape(5.dp)).clickable{controller.color(rgba)})}}
+                 Text("Width  ${"%.1f".format(editor.width)} px",style=MaterialTheme.typography.body2);Slider(value=editor.width.toFloat(),onValueChange={controller.width(it.toDouble(),false)},onValueChangeFinished={controller.commitWidth()},valueRange=.25f..256f,enabled=!editor.busy)
+                 Text("Drag selected objects to move. Drag the lower-right handle to resize. Each gesture saves one undo step.",style=MaterialTheme.typography.caption,color=Color(0xff9cabbc));Divider();Text("LOCAL VIEW",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc));commandButton(Command.Fit,action);commandButton(Command.ActualPixels,action);commandButton(Command.MatchPeer,action)
++                editor.formatNotice?.let { Text(it, style=MaterialTheme.typography.caption) }
+                 editor.colorDisplayStatus?.let { Text(it, style=MaterialTheme.typography.caption) }
+                 if(editor.needsDisplayDepthConsent)Button(onClick={controller.allowDisplayDepth()}){Text("Display in 8 bit; keep original depth")}
+                 if(editor.needsSrgbDisplay)Button(onClick={controller.useSrgbDisplay()}){Text("Use converted sRGB display")}

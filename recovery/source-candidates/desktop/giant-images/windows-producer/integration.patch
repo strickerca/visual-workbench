@@ -1,0 +1,217 @@
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
+@@ -33,6 +33,9 @@
+     internal var giantView:GiantDesktopView?=null;private set
+     internal fun giantReady(value:Boolean){if(mutable.value.giantReady!=value)update{it.copy(giantReady=value,canvasReady=if(value)it.canvasReady else false)}}
+     private suspend fun retireGiant(){val value=giantView?:return;value.close();giantView=null}
++    private var giantRuntime:DesktopNativeRuntime?=null
++    private var giantImportRecovery:GiantImportResources?=null
++    internal fun useGiantRuntime(value:DesktopNativeRuntime){check(giantRuntime==null);giantRuntime=value}
+     private var project:WorkbenchProject?=null;private var changes:Job?=null;private val edits=Mutex();private var drag:Drag?=null
+     private var closing=false;private var queued=0;private var colorAssumed=false;private var generation=0L
+     private val transferFiles=TransferFiles(workRoot);private var transferJob:Job?=null;private var cachedExport:CachedExport?=null
+@@ -163,7 +166,7 @@
+                     update { it.copy(busy = true, message = null) }
+                     try { block() }
+                     catch (cancel: CancellationException) {
+-                        if (!closing) report(if (cancel is RetainedDropCancellation)
++                        if (!closing) report(if(cancel is GiantImportCancelled) "Giant import cancellation settled. The selected original is unchanged; any completed project remains at ${cancel.destination}." else if (cancel is RetainedDropCancellation)
+                             "Import cancelled. The accepted drop's original bytes remain at ${cancel.input}. See drop-recovery.txt beside it for the original name and retry steps."
+                             else "Cancellation settled. Any file or clipboard copy already published remains in its destination.")
+                         throw cancel
+@@ -205,6 +208,66 @@
+     }
+     fun assumeSrgb(){task(generation){colorAssumed=true;loadBackground()}}
+     private fun validateDrawing(snapshot:DocumentSnapshot){if(snapshot.render.items.any{it.shape is Shape.Adjustment})throw UnsupportedOperationException("This document contains adjustment objects that the desktop canvas cannot display yet. Its original and saved edits are preserved.")}
++    internal fun importGiant(request:ImportRequest):Job? {
++        if(!mayCloseAi()||!mayCloseInstructions())return null
++        return transfer(request.epoch){
++            // The mutable review may have changed while waiting for edits.
++            if(!mayCloseAi()||!mayCloseInstructions())return@transfer
++            checkGiantRecovery()
++            val runtime=giantRuntime?:throw HandoffFailure("The packaged giant producer is unavailable.")
++            val now=System.currentTimeMillis();val id=core.newId(now.toULong())
++            val destination=location.path.toAbsolutePath().normalize().resolve("$id.vwb")
++            val owner=GiantImportResources(transferFiles.create())
++            try{
++                report("Copying and checking the immutable giant original. The selected file will remain unchanged.")
++                val source=prepareGiantImage(GiantInputOptions(request.path.toString(),owner.workspace.directory.toString()));owner.source=source
++                val info=source.describe();admitGiantWorkingDisk(info)
++                report("Building the lossless base tiles and display pyramid in the owned Windows worker. This can be cancelled.")
++                val producer=GiantWindowsProducer.create(runtime);owner.producer=producer
++                val pyramid=owner.workspace.directory.resolve("pyramid");producer.build(info,pyramid)
++                // The worker has returned; core independently verifies every
++                // original/tile hash before publishing the canonical project.
++                withContext(Dispatchers.IO){Files.createDirectories(location.path);requirePlainDirectory(location.path)}
++                report("Verifying and publishing the complete original, project and tile cache.")
++                val value=source.publish(GiantProjectOptions(destination.toString(),id,core.newId(now.toULong()),core.newId(now.toULong()),
++                    deviceId,request.path.fileName.toString().take(256),now,16uL*1024uL*1024uL*1024uL),pyramid.toString())
++                attach(value,destination)
++                report(if(project===value)"Giant original and complete tile cache saved. Choose the sRGB assumption explicitly before viewing."
++                    else "The complete giant project is saved at $destination. The current project was preserved.")
++            }catch(cancel:CancellationException){throw GiantImportCancelled(destination).also{it.initCause(cancel)}}
++            catch(error:Exception){throw HandoffFailure("Giant import did not finish. The selected original is unchanged. Any completed project is at $destination; partial projects are not published.")}
++            finally{retireGiantImport(owner)}
++        }
++    }
++    internal fun rebuildGiant():Job? = transfer(generation){
++        checkGiantRecovery()
++        val current=project?:throw HandoffFailure("Open a giant-image project before rebuilding its cache.")
++        val doc=mutable.value.document?:throw HandoffFailure("The giant document is unavailable.")
++        if(doc.width.toULong()*doc.height.toULong()<=50_000_000uL)throw HandoffFailure("This source uses the ordinary image path.")
++        val runtime=giantRuntime?:throw HandoffFailure("The packaged giant producer is unavailable.")
++        cancelInput();retireGiant();discardExport()
++        update{it.copy(giant=false,giantReady=false,background=null,canvasReady=false)}
++        val owner=GiantImportResources(transferFiles.create())
++        try{
++            report("Rebuilding disposable tiles from the preserved original. Saved edits are unchanged.")
++            val source=current.prepareGiantRebuild(doc.documentId,owner.workspace.directory.toString());owner.source=source
++            val info=source.describe();admitGiantWorkingDisk(info)
++            val producer=GiantWindowsProducer.create(runtime);owner.producer=producer
++            val pyramid=owner.workspace.directory.resolve("pyramid");producer.build(info,pyramid)
++            source.rebuild(current,doc.documentId,pyramid.toString(),16uL*1024uL*1024uL*1024uL)
++            report("The complete derived cache was rebuilt from the original.")
++        }finally{
++            retireGiantImport(owner)
++            // Cancellation still joins the worker/source first. Preserve a
++            // readable old cache where available, without claiming repair.
++            withContext(NonCancellable){if(!closing&&project===current)loadBackground()}
++        }
++    }
++    private fun checkGiantRecovery(){if(giantImportRecovery!=null)throw HandoffFailure("A prior giant worker could not be confirmed closed. Its private files and runtime are retained; restart only after checking diagnostics.")}
++    private suspend fun retireGiantImport(owner:GiantImportResources)=withContext(NonCancellable){
++        try{owner.close()}catch(error:Throwable){giantImportRecovery=owner;throw HandoffFailure("Giant cleanup could not confirm every owner closed. Private files remain at ${owner.workspace.directory}; no further giant producer is admitted.")}
++    }
++    private suspend fun settleGiantRecovery(){val owner=giantImportRecovery?:return;owner.close();giantImportRecovery=null}
+     fun importImage(path:Path)=importFile(ImportRequest(generation,path.toAbsolutePath().normalize()))
+     fun importFile(request: ImportRequest, onStaged: (Boolean) -> Unit = {}, retainAcceptedDrop: Boolean = false): Job? {
+         val completed = java.util.concurrent.atomic.AtomicBoolean(false)
+@@ -243,7 +306,7 @@
+     fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
+     fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one PNG, JPEG, WebP, HEIC or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension !in setOf("png","jpg","jpeg","webp","heic","heif","mp4")){report("This drop supports PNG, JPEG, WebP, admitted HEIC originals and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
+     fun open(path:Path,epoch:Long=generation){task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
+-    suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();retireGiant();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
++    suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{settleGiantRecovery();live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();retireGiant();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
+     fun closeProject(){if(!mayCloseAi())return;if(!mayCloseInstructions())return;cancelInput();sessionWork?.cancel();task(generation){
+         // The pre-enqueue check can become stale while another owner holds
+         // edits. task has now set busy under that same mutex, fencing Send.
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
+@@ -62,7 +62,7 @@
+     val captureService=runBlocking(Dispatchers.Default){com.visualworkbench.desktop.capture.openDesktopCaptureService(
+         nativeRuntime.directory.resolve("vw-capture-helper.exe"),nativeRuntime.packagedHash("vw-capture-helper.exe"))}
+     application {
+-        val scope=rememberCoroutineScope();val sessions=remember{DesktopSessionController(scope,device)};val assistance=remember{ConnectionAssistanceController(scope,NativeConnectionAssistance())};val controller=remember{EditorController(scope,core,host,location,device,local.resolve("VisualWorkbench/transfer-work")).also{it.useSessionService(sessions);it.useAiDirectory(local.resolve("Visual Workbench"))}};val editor by controller.state.collectAsState()
++        val scope=rememberCoroutineScope();val sessions=remember{DesktopSessionController(scope,device)};val assistance=remember{ConnectionAssistanceController(scope,NativeConnectionAssistance())};val controller=remember{EditorController(scope,core,host,location,device,local.resolve("VisualWorkbench/transfer-work")).also{it.useSessionService(sessions);it.useAiDirectory(local.resolve("Visual Workbench"));it.useGiantRuntime(nativeRuntime)}};val editor by controller.state.collectAsState()
+         val capture=remember{com.visualworkbench.desktop.capture.DesktopCaptureController(scope,core,captureService,location.path,device,
+             {captured,path,warning->withContext(NonCancellable){captured.close()};controller.open(path);warning?.let(controller::report)},controller::report)}
+         var captureSettings by remember{mutableStateOf(false)}
+@@ -137,10 +137,10 @@
+         val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||dialog!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
+         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
+             onPreviewKeyEvent=canvasShortcut) {
+-            fun file(command:Command){controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,command.label,FileDialog.LOAD)
++            fun file(command:Command,giant:Boolean=false){controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,if(giant)"Import giant opaque PNG/JPEG"else command.label,FileDialog.LOAD)
+                 try{chooser.directory=(if(command==Command.Import)documents else location.path).toString();if(command==Command.Open)chooser.file="project.sqlite";chooser.isVisible=true
+                     val filename=chooser.file?:return;val chosen=Path.of(chooser.directory,filename)
+-                    when(command){Command.Import->controller.importFile(ImportRequest(epoch,chosen.toAbsolutePath().normalize()));Command.Open->controller.open(chosen.parent,epoch);else->Unit}
++                    when(command){Command.Import->if(giant)controller.importGiant(ImportRequest(epoch,chosen.toAbsolutePath().normalize()))else controller.importFile(ImportRequest(epoch,chosen.toAbsolutePath().normalize()));Command.Open->controller.open(chosen.parent,epoch);else->Unit}
+                 }finally{chooser.dispose()}}}
+             fun save(request:ExportRequest){controller.instructionPicker().use { val chooser=FileDialog(window,"Save ${request.settings.encoding.label} · ${request.revision}",FileDialog.SAVE)
+                 try{chooser.directory=documents.toString();chooser.file="export-${request.revision}.${request.settings.encoding.extension}";chooser.isVisible=true;val filename=chooser.file?:return
+@@ -210,7 +210,7 @@
+                 val snapshot=floating.copy(mode=placement.mode());withContext(Dispatchers.IO){preferences.saveWindow(snapshot)}
+             }}
+             MenuBar {
+-                Menu("File"){for(c in listOf(Command.Import,Command.Paste,Command.Open,Command.Export,Command.Copy,Command.Close,Command.Quit))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
++                Menu("File"){Item("Import giant PNG/JPEG…",onClick={file(Command.Import,true)},enabled=!editor.busy);Item("Rebuild giant tile cache",onClick={controller.rebuildGiant()},enabled=!editor.busy&&editor.document?.let{it.width.toULong()*it.height.toULong()>50_000_000uL}==true);Separator();for(c in listOf(Command.Import,Command.Paste,Command.Open,Command.Export,Command.Copy,Command.Close,Command.Quit))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
+                 Menu("Edit"){for(c in listOf(Command.Undo,Command.Redo,Command.Delete,Command.SelectAll,Command.ClearSelection,Command.Color,Command.WidthUp,Command.WidthDown,Command.NudgeLeft,Command.NudgeRight,Command.NudgeUp,Command.NudgeDown))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
+                 Menu("Tools"){for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout,Command.CycleMarker,Command.Instructions))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
+                 Menu("View"){for(c in listOf(Command.Fit,Command.ActualPixels,Command.ZoomIn,Command.ZoomOut,Command.Windowed,Command.Maximized,Command.Fullscreen,Command.FollowPeer,Command.MatchPeer,Command.PeerOutline))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopNativeRuntime.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopNativeRuntime.kt
+@@ -46,7 +46,7 @@
+         if (closed.compareAndSet(false, true)) leases.asReversed().forEach { runCatching { it.close() } }
+     }
+     companion object {
+-        private val names = setOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
++        private val names = setOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-pyramid-helper.exe")
+         private const val MAX_FILE = 256L * 1024 * 1024
+         private const val MAX_TOTAL = 512L * 1024 * 1024
+         private const val MANIFEST = "vw-native-runtime.sha256"
+@@ -171,7 +171,7 @@
+         private data class CreatedFile(val path: Path, val key: Any?)
+         private fun parseManifest(bytes: ByteArray): List<Entry> {
+             if (bytes.size !in 1..4096 || bytes.any { it.toInt() !in 10..126 || it.toInt() in 11..31 }) throw NativeRuntimeFailure("The native runtime manifest is invalid.")
+-            val pattern = Regex("([0-9a-f]{64}) ([1-9][0-9]{0,8}) (vw_core\\.dll|vw_host\\.dll|vw-connection-helper\\.exe|vw-capture-helper\\.exe)")
++            val pattern = Regex("([0-9a-f]{64}) ([1-9][0-9]{0,8}) (vw_core\\.dll|vw_host\\.dll|vw-connection-helper\\.exe|vw-capture-helper\\.exe|vw-pyramid-helper\\.exe)")
+             val entries = bytes.toString(Charsets.US_ASCII).lineSequence().filter(String::isNotEmpty).map { line ->
+                 val match = pattern.matchEntire(line) ?: throw NativeRuntimeFailure("The native runtime manifest is invalid.")
+                 val size = match.groupValues[2].toLong()
+--- a/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt
++++ b/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt
+@@ -17,7 +17,7 @@
+     @Test fun exactRuntimeIsPreparedBeforeAnyLoadAndClosePreservesLoadedFilePaths() {
+         val files = runtimeResources(); val guard = MemoryFileGuard()
+         val runtime = DesktopNativeRuntime.prepareAt(root(), files, guard)
+-        assertEquals(root().nameCount + 8, guard.live) // ancestors including volume root, cache, and six exact files
++        assertEquals(root().nameCount + 9, guard.live) // ancestors including volume root, cache, and seven exact files
+         for (name in runtimeNames) assertArrayEquals(files.bytes.getValue("win32-x86-64/$name"), Files.readAllBytes(runtime.directory.resolve(name)))
+         assertTrue(Files.isRegularFile(runtime.directory.resolve("owner")))
+         assertTrue(Files.isRegularFile(runtime.directory.resolve("ready")))
+@@ -76,7 +76,7 @@
+     private fun root(): Path = temporary.root.toPath().toAbsolutePath().normalize().resolve("runtime")
+     private fun assertFailure(block: () -> Unit) { try { block(); fail("unverified runtime accepted") } catch (_: NativeRuntimeFailure) { } }
+ }
+-private val runtimeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
++private val runtimeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-pyramid-helper.exe")
+ private class MapNativeResources(val bytes: MutableMap<String, ByteArray>) : NativeResources {
+     override fun open(name: String) = bytes[name]?.let(::ByteArrayInputStream)
+ }
+--- a/apps/desktop/build.gradle.kts
++++ b/apps/desktop/build.gradle.kts
+@@ -39,7 +39,7 @@
+ val runtimeRepository = rootProject.projectDir.parentFile
+ val runtimeNativeDirectory = providers.gradleProperty("vwNativeDir").map { file(it) }.orElse(runtimeRepository.resolve("target/debug"))
+ val packageConnectionRuntime = tasks.register("packageConnectionRuntime") {
+-    val nativeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
++    val nativeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-pyramid-helper.exe")
+     inputs.files(nativeNames.map { name -> runtimeNativeDirectory.map { it.resolve(name) } })
+     val output = layout.buildDirectory.dir("generated/connectionRuntimeResources")
+     outputs.dir(output)
+@@ -57,6 +57,7 @@
+         directory.resolve("win32-x86-64").mkdirs()
+         runtimeNativeDirectory.get().resolve("vw-connection-helper.exe").copyTo(directory.resolve("win32-x86-64/vw-connection-helper.exe"), overwrite = true)
+         runtimeNativeDirectory.get().resolve("vw-capture-helper.exe").copyTo(directory.resolve("win32-x86-64/vw-capture-helper.exe"), overwrite = true)
++        runtimeNativeDirectory.get().resolve("vw-pyramid-helper.exe").copyTo(directory.resolve("win32-x86-64/vw-pyramid-helper.exe"), overwrite = true)
+         directory.resolve("vw-native-runtime.sha256").writeText(records.joinToString("\n", postfix = "\n"), Charsets.US_ASCII)
+     }
+ }
+@@ -104,3 +105,6 @@
+ }
+ if (mcpServerResources.isPresent) sourceSets.named("main") { resources.srcDir(mcpServerResources) }
+ tasks.named("processResources") { dependsOn(admitMcpServerResources) }
++
++// Exact approved optional-decoder bytes; no global codec installation.
++apply(from = "giant-runtime.gradle.kts")
+--- a/host-win/crates/vw-host-ffi/Cargo.toml
++++ b/host-win/crates/vw-host-ffi/Cargo.toml
+@@ -14,6 +14,7 @@
+ crate-type = ["cdylib", "rlib"]
+ 
+ [dependencies]
++vw-assets-win = { version = "=0.1.0", path = "../vw-assets-win" }
+ vw-capture = { version = "=0.1.0", path = "../../../core/crates/vw-capture" }
+ uniffi = { version = "=0.32.2", default-features = false }
+ thiserror = "=2.0.21"
+--- a/host-win/crates/vw-host-ffi/src/lib.rs
++++ b/host-win/crates/vw-host-ffi/src/lib.rs
+@@ -1,6 +1,8 @@
+ //! Windows-only host services. UniFFI futures enqueue bounded work; PNG parsing,
+ //! Win32 calls and clipboard waits run on a dedicated native worker.
+ mod binding;
++mod pyramid;
++pub use pyramid::*;
+ mod capture;
+ pub use capture::*;
+ mod connection_assist;

@@ -1,0 +1,1833 @@
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -34,7 +34,8 @@
+ internal class EditorController @JvmOverloads constructor(application: Application, val core: WorkbenchCore = workbenchCore(),
+     captureStatusFactory: (ProjectLink) -> WorkbenchAgentCaptureStatus = ::agentCaptureStatus,
+     private val captureArrivalQuery: suspend (WorkbenchProject, ULong) -> ReceivedCapture? = { p, after -> p.receivedCapture(after) },
+-    sessionFactory: suspend (android.content.Context, String) -> WorkbenchSessions = ::createAndroidSessions) : AndroidViewModel(application), CanvasGestureSink {
++    sessionFactory: suspend (android.content.Context, String) -> WorkbenchSessions = ::createAndroidSessions,
++    private val streamDraftOnly: Boolean = false) : AndroidViewModel(application), CanvasGestureSink {
+     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+     private val repository = ProjectRepository(application, core)
+     private val preferencesStore = EditorPreferencesStore(application)
+@@ -165,7 +166,7 @@
+         InstructionEntryMethod.PhoneKeyboard, localFocused = ::localInstructionFocused)
+     val semanticEditor = SemanticEditor(scope, mutations,
+         { val p = project; val d = document; if (p != null && d != null && !disposing) InstructionAttachment(p, d) else null },
+-        { !disposing && !busy && !ai.state.value.open && pending == 0 && gesture == null && strokes.isEmpty() &&
++        { !streamActive && !disposing && !busy && !ai.state.value.open && pending == 0 && gesture == null && strokes.isEmpty() &&
+             !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy &&
+             instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) },
+         { current -> val next = current.info(); WorkflowMetadata(newId(), repository.deviceId,
+@@ -176,7 +177,7 @@
+     private val instructionAdmission = com.visualworkbench.android.instructions.InstructionFocusAdmission { instructionInteractionChanged() }
+     val instructionFocus = InstructionFocusController(scope, instructionEditor,
+         { val p = project; val d = document; if (p != null && d != null && !disposing) InstructionAttachment(p, d) else null },
+-        { !disposing && !busy && !semanticEditor.state.value.busy && pending == 0 && gesture == null && strokes.isEmpty() &&
++        { !streamActive && !disposing && !busy && !semanticEditor.state.value.busy && pending == 0 && gesture == null && strokes.isEmpty() &&
+             !ai.state.value.open && instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) &&
+             screen in setOf(WorkbenchScreen.Canvas, WorkbenchScreen.Instructions) },
+         { id, peer -> selected = id; if (peer) screen = WorkbenchScreen.Instructions; publish() }, selectedObject = { selected })
+@@ -223,6 +224,91 @@
+         try{if(disposing)ai.close()else ai.detach()}
+         finally{try{if(disposing)aiResults.close()else aiResults.detach()}finally{if(disposing)aiService.close()}}
+     }
++    internal var liveStream by mutableStateOf<com.visualworkbench.android.stream.AndroidStreamController?>(null); private set
++    private var streamOpening: Job? = null
++    private val streamInitialization = CompletableDeferred<Unit>()
++    private val streamDisposalGate = Mutex()
++    private var streamDisposalComplete = false
++    private var streamBorrow: WorkbenchProject? = null
++    private val streamActive: Boolean get() = liveStream != null || streamOpening != null
++    internal fun openLiveStream() {
++        if (streamDraftOnly || disposing || streamActive || busy || !receivedCaptureIdle()) return
++        val current = project ?: return
++        val peer = link ?: run { message = "Connect to the computer before receiving a live capture."; return }
++        val doc = document?.documentId ?: return
++        if (connection?.status !in setOf(SyncStatus.Syncing, SyncStatus.Synced)) {
++            message = "The paired connection is not ready. Reconnect before receiving capture."; return
++        }
++        val projectEpoch = epoch; val peerEpoch = linkEpoch
++        val job = scope.launch(start = CoroutineStart.LAZY) {
++            var receiver: WorkbenchCaptureStream? = null
++            var acquired: com.visualworkbench.android.stream.AndroidStreamController? = null
++            var retained = false
++            try {
++                val opened = peer.openCaptureStream(); receiver = opened
++                ensureActive()
++                check(!disposing && project === current && link === peer && epoch == projectEpoch && linkEpoch == peerEpoch)
++                val annotation = CaptureAnnotationSession(current, doc, peer, opened, ::newId,
++                    { next -> WorkflowMetadata(newId(), repository.deviceId, repository.streamLamport(next.nextLamport), System.currentTimeMillis()) },
++                    { !disposing && project === current && link === peer && epoch == projectEpoch && linkEpoch == peerEpoch })
++                val controller = com.visualworkbench.android.stream.AndroidStreamController(getApplication(), scope, core, annotation)
++                acquired = controller; liveStream = controller; retained = true
++            } catch (cancel: CancellationException) { throw cancel }
++            catch (_: Exception) { message = "Live capture is unavailable for this peer or memory budget. The paired project remains open." }
++            finally { if (!retained) withContext(NonCancellable) { if (acquired != null) acquired.close() else receiver?.close() } }
++        }
++        streamOpening = job; instructionInteractionChanged()
++        job.invokeOnCompletion { scope.launch(NonCancellable + Dispatchers.Main.immediate) { if (streamOpening === job) { streamOpening = null; instructionInteractionChanged() } } }
++        job.start()
++    }
++    internal fun closeLiveStream() { scope.launch { try { closeLiveStreamJoined() } catch (_: Exception) { message = "Live capture cleanup did not finish; its ownership remains sealed. Retry closing before replacing the project." } } }
++    private suspend fun closeLiveStreamJoined(): Unit = withContext(NonCancellable) {
++        streamOpening?.cancelAndJoin()
++        val current = liveStream
++        if (current != null) { current.close(); if (liveStream === current) liveStream = null }
++        instructionInteractionChanged()
++    }
++    internal suspend fun installStreamDraft(value: WorkbenchProject) {
++        check(streamDraftOnly && streamBorrow == null)
++        streamBorrow = value // Retain through refused initialization and joined retry.
++        streamInitialization.await()
++        val work = openRequest(knownSrgb = true) { value } ?: error("Stream editor is not ready")
++        work.join(); currentCoroutineContext().ensureActive()
++        check(project === value && document != null && background != null && !disposing) { "Stream draft could not display" }
++    }
++    internal fun streamEditsIdle(): Boolean = streamDraftOnly && !disposing && !busy && pending == 0 && gesture == null && strokes.isEmpty()
++    internal suspend fun settleStreamEdits() { check(streamDraftOnly); mutations.withLock { check(streamEditsIdle()) } }
++    internal fun installStreamOriginal(bitmap: Bitmap, documentId: String) {
++        try {
++            check(streamDraftOnly && !disposing && document?.documentId == documentId)
++            require(bitmap.width.toUInt() == document?.width && bitmap.height.toUInt() == document?.height)
++        } catch (error: Throwable) { bitmap.recycle(); throw error }
++        val previous = background
++        background = bitmap; publish()
++        // Main has atomically published the new scene and callback. Child
++        // editors have no peer/export readers; the old software bitmap retires.
++        if (previous !== bitmap) previous?.recycle()
++    }
++    internal suspend fun disposeStreamEditor(): Unit = withContext(NonCancellable) { streamDisposalGate.withLock {
++        check(streamDraftOnly)
++        if (streamDisposalComplete) return@withLock
++        disposing = true
++        captureOwner.close(); importReadiness.close()
++        incomingJob?.cancel(); transferJob?.cancel()
++        cancelTool(); diagnostics.background(); previewJob?.cancel(); cancelNative(previewHandle)
++        preferencesQueue.close()
++        preferencesWriter.join(); diagnostics.awaitSave()
++        incomingJob?.join(); transferJob?.join()
++        connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin()
++        mutations.withLock { closeCurrent() }
++        pairing.close()
++        // closeCurrent may have dropped its display reference after a native
++        // refusal. This retained borrow keeps a real joined retry available.
++        streamBorrow?.close(); streamBorrow = null
++        scope.cancel(); scope.coroutineContext[Job]?.join()
++        streamDisposalComplete = true
++    } }
++
+     private val preferencesWriter: Job
+ 
+     init {
+@@ -234,7 +320,7 @@
+         scope.launch {
+             try {
+                 repository.initialize(); preferences = preferencesStore.read(); refreshProjects(); refreshCaptures()
+-                if (disposing || !kotlinx.coroutines.currentCoroutineContext().isActive) return@launch
++                if (streamDraftOnly || disposing || !kotlinx.coroutines.currentCoroutineContext().isActive) return@launch
+                 val owner = com.visualworkbench.android.capture.CaptureRuntime(core, repository.deviceId,
+                     repository::checkedPath, { repository.lamport() }) { captured, warning ->
+                     // This callback consumes the delivered handle. The saved
+@@ -247,8 +333,8 @@
+                     com.visualworkbench.android.capture.CaptureRuntime.installed.compareAndSet(null, candidate)
+                 }
+             }
+-            catch (error: Exception) { report(error) }
+-            finally { busy = false }
++            catch (error: Exception) { streamInitialization.completeExceptionally(error); report(error) }
++            finally { busy = false; streamInitialization.complete(Unit) }
+         }
+     }
+ 
+@@ -440,6 +526,7 @@
+     }
+     fun open(id: String) = openRequest { repository.open(id) }
+     private fun openRequest(knownSrgb: Boolean = false, transfer: Boolean = false, load: suspend () -> WorkbenchProject): Job? {
++        if (streamActive) { message = "Close the live capture draft before replacing its paired project."; return null }
+         if(!mayCloseAi())return null
+         if (instructionEditor.hasUnsaved()) {
+             message = "Save or discard the instruction draft before opening another project."; screen = WorkbenchScreen.Instructions; return null
+@@ -499,7 +586,7 @@
+         captureNavigationGeneration++
+         instructionInteractionChanged()
+     }
+-    private fun receivedCaptureIdle(ownInstructions: Boolean = false, ownSemantics: Boolean = false): Boolean = !disposing && !navigationContactActive && pending == 0 && gesture == null && strokes.isEmpty() &&
++    private fun receivedCaptureIdle(ownInstructions: Boolean = false, ownSemantics: Boolean = false): Boolean = !streamActive && !disposing && !navigationContactActive && pending == 0 && gesture == null && strokes.isEmpty() &&
+         !ai.state.value.open && !instructionEditor.hasUnsaved() && (ownInstructions || !instructionEditor.state.value.busy) && (ownSemantics || !semanticEditor.state.value.busy) &&
+         !selections.state.value.active && !erasers.state.value.active &&
+         instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null)
+@@ -577,6 +664,9 @@
+     }
+     private suspend fun closeCurrent() {
+         withContext(NonCancellable) {
++        // Refuse project retirement before any finally block can drop it while
++        // the real stream child/native cleanup still requires a joined retry.
++        closeLiveStreamJoined()
+         exportReady = null
+         exportPreflight = null; checkedExport = null
+         erasers.detach(); selections.detach()
+@@ -738,6 +828,7 @@
+ 
+     private suspend fun detachLink() {
+         withContext(NonCancellable) {
++        closeLiveStreamJoined()
+         agentCapture.detach()
+         instructionFocus.detach()
+         linkEpoch++; followPeer = false
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/ProjectRepository.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/ProjectRepository.kt
+@@ -57,6 +57,17 @@
+             val first = maxOf(observed, minimum.toLong())
+             check(first > 0 && first <= reservedUntil - count) { "Reopen the app to reserve another operation counter range" }
+             if (next.compareAndSet(observed, first + count)) return first.toULong()
++        }
++    }
++
++    // Bound native capture append admits at most 4,096 operations. Reserve the
++    // full disjoint range before plan construction, including remote advances.
++    fun streamLamport(minimum: ULong): ULong {
++        require(minimum <= Long.MAX_VALUE.toULong())
++        while (true) {
++            val observed = next.get(); val first = maxOf(observed, minimum.toLong())
++            check(first > 0 && first <= reservedUntil - 4096) { "Reopen to reserve operation counters" }
++            if (next.compareAndSet(observed, first + 4096)) return first.toULong()
+         }
+     }
+ 
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
+@@ -143,6 +143,7 @@
+         }
+         }
+     }
++    editor.liveStream?.let { com.visualworkbench.android.stream.StreamPanel(it, editor::closeLiveStream) }
+     AiEditorOverlay(editor)
+     if (editor.showBrush) BrushDialog(editor.tool, editor.displayedBrush(), editor.brushPreview, editor::brush) { editor.brushDialog(false) }
+     editor.textDraft?.let { draft -> TextEditor(draft, editor.busy || editor.pending != 0, editor::saveText, editor::dismissText) }
+@@ -184,6 +185,7 @@
+                     TextButton(onClick = editor::openAi,enabled=!editor.busy&&editor.pending==0,modifier=Modifier.heightIn(min=48.dp)){Text("AI edit")}
+                     TextButton(onClick = { editor.navigate(WorkbenchScreen.Settings) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Settings") }
+                     TextButton(onClick = { editor.navigate(WorkbenchScreen.Pairing) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Connect") }
++                    TextButton(onClick = editor::openLiveStream, enabled = !editor.busy && editor.pending == 0, modifier = Modifier.heightIn(min = 48.dp)) { Text("Live capture") }
+                     TextButton(onClick = editor::editInstruction, modifier = Modifier.heightIn(min = 48.dp)) { Text("Instructions") }
+                 }
+                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+--- a/apps/desktop/build.gradle.kts
++++ b/apps/desktop/build.gradle.kts
+@@ -39,7 +39,7 @@
+ val runtimeRepository = rootProject.projectDir.parentFile
+ val runtimeNativeDirectory = providers.gradleProperty("vwNativeDir").map { file(it) }.orElse(runtimeRepository.resolve("target/debug"))
+ val packageConnectionRuntime = tasks.register("packageConnectionRuntime") {
+-    val nativeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
++    val nativeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-stream-helper.exe")
+     inputs.files(nativeNames.map { name -> runtimeNativeDirectory.map { it.resolve(name) } })
+     val output = layout.buildDirectory.dir("generated/connectionRuntimeResources")
+     outputs.dir(output)
+@@ -57,6 +57,7 @@
+         directory.resolve("win32-x86-64").mkdirs()
+         runtimeNativeDirectory.get().resolve("vw-connection-helper.exe").copyTo(directory.resolve("win32-x86-64/vw-connection-helper.exe"), overwrite = true)
+         runtimeNativeDirectory.get().resolve("vw-capture-helper.exe").copyTo(directory.resolve("win32-x86-64/vw-capture-helper.exe"), overwrite = true)
++        runtimeNativeDirectory.get().resolve("vw-stream-helper.exe").copyTo(directory.resolve("win32-x86-64/vw-stream-helper.exe"), overwrite = true)
+         directory.resolve("vw-native-runtime.sha256").writeText(records.joinToString("\n", postfix = "\n"), Charsets.US_ASCII)
+     }
+ }
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopNativeRuntime.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopNativeRuntime.kt
+@@ -46,7 +46,7 @@
+         if (closed.compareAndSet(false, true)) leases.asReversed().forEach { runCatching { it.close() } }
+     }
+     companion object {
+-        private val names = setOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
++        private val names = setOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-stream-helper.exe")
+         private const val MAX_FILE = 256L * 1024 * 1024
+         private const val MAX_TOTAL = 512L * 1024 * 1024
+         private const val MANIFEST = "vw-native-runtime.sha256"
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
+@@ -147,6 +147,43 @@
+         current.compilePackage(PackageCompileOptions(WorkflowBinding(actual.projectId,document.documentId,actual.hostSeq,actual.stateHash),
+             core.newId(System.currentTimeMillis().toULong()),System.currentTimeMillis(),choice.target,choice.semanticSnapshotId,choice.includeWindowTitle,choice.assumeSrgb,choice.allowDepth))
+     }
++    private val liveCapture = com.visualworkbench.desktop.stream.DesktopStreamPump(scope)
++    internal val liveCaptureState get() = liveCapture.state
++    private var pendingRegionOwner: Pair<LiveAttachment, CaptureRegionSignal>? = null
++    internal suspend fun captureRegionPrompt(): CaptureRegionSignal? {
++        val attached=live.attachment()
++        if (closing || attached == null || !attached.acceptsPreviews) { pendingRegionOwner=null;return null }
++        val signal=attached.link.captureRegionSignal()
++        if (live.attachment() !== attached || signal.requestId == null) { pendingRegionOwner=null;return null }
++        pendingRegionOwner=attached to signal;return signal
++    }
++    internal suspend fun resolveCaptureRegion(prompt: CaptureRegionSignal, approve:Boolean, opened:()->Unit) {
++        val retained=checkNotNull(pendingRegionOwner)
++        check(!closing && retained.second.requestId == prompt.requestId && retained.second.connectionEpoch == prompt.connectionEpoch
++            && live.attachment() === retained.first && retained.first.acceptsPreviews)
++        retained.first.link.resolveCaptureRegion(checkNotNull(prompt.requestId), prompt.connectionEpoch, approve)
++        if (approve) { check(!closing && live.attachment() === retained.first && retained.first.acceptsPreviews);opened() }
++        pendingRegionOwner=null
++    }
++    internal fun startLiveCapture(selection: com.visualworkbench.bindings.host.CaptureSelection,
++        openService: suspend () -> com.visualworkbench.bindings.host.CaptureService) {
++        val target = project; val attached = live.attachment(); val epoch = generation
++        if (closing || target == null || attached == null || mutable.value.sessionRole?.isHost != true || !attached.acceptsPreviews) {
++            report("Open and pair the host project before approving a live capture source."); return
++        }
++        val source = com.visualworkbench.desktop.stream.streamPublicationSource(selection, core.newId(System.currentTimeMillis().toULong()), 1u, 30u, true)
++        val started = liveCapture.start(
++            { com.visualworkbench.desktop.stream.openOwnedHostStream(selection, source, openService) },
++            {
++                check(!closing && project === target && generation == epoch && live.attachment() === attached && attached.acceptsPreviews)
++                attached.link.openCapturePublisher(source)
++            })
++        if (!started) report("The prior live source is still owned. Stop it and await cleanup before choosing another.")
++    }
++    internal fun stopLiveCapture() { scope.launch {
++        try { liveCapture.stop() } catch (_: Exception) { report("Live capture cleanup is incomplete. Retry Stop before replacing the project or connection.") }
++    } }
++    private suspend fun retireLiveCapture() { liveCapture.stop() }
+     fun clearMessage(){update{it.copy(message=null)}}
+     internal fun useSessionService(value:DesktopSessionController){sessionProvider=value}
+     /** Capture the destination BEFORE the hotkey worker begins. A later project,
+@@ -228,7 +265,7 @@
+     }
+     private fun transfer(epoch:Long,block:suspend()->Unit):Job?{if(transferJob?.isActive==true){report("A transfer is already running. Finish or cancel it first.");return null};val job=task(epoch,block);transferJob=job;return job}
+     private suspend fun discardExport(){preparedDrag?.second?.close();preparedDrag=null;val prior=cachedExport;cachedExport=null;update{it.copy(exportReceipt=null,exportCheck=null,dragPrepared=false)};prior?.workspace?.close()}
+-    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;displayDepthAllowed=false;forceSrgbDisplay=false;displayAdoption.invalidate();update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();loadBackground();refreshRole(value,generation)
++    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();retireLiveCapture();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;displayDepthAllowed=false;forceSrgbDisplay=false;displayAdoption.invalidate();update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();loadBackground();refreshRole(value,generation)
+         changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
+         }finally{withContext(NonCancellable){
+             try { if(!adopted)value.close() }
+@@ -351,13 +388,13 @@
+     fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
+     fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one PNG, JPEG, WebP, HEIC or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension !in setOf("png","jpg","jpeg","webp","heic","heif","mp4")){report("This drop supports PNG, JPEG, WebP, admitted HEIC originals and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
+     fun open(path:Path,epoch:Long=generation){task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
+-    suspend fun close(){closing=true;displayAdoption.invalidate();transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
++    suspend fun close(){closing=true;displayAdoption.invalidate();transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{retireLiveCapture();live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
+     fun closeProject(){if(!mayCloseAi())return;if(!mayCloseInstructions())return;cancelInput();sessionWork?.cancel();task(generation){
+         // The pre-enqueue check can become stale while another owner holds
+         // edits. task has now set busy under that same mutex, fencing Send.
+         if(!mayCloseAi())return@task
+         if(!sealInstructionsForClose())return@task
+-        try { live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
++        try { retireLiveCapture();live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
+         finally { if(!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
+     }}
+     private suspend fun refresh(){
+@@ -542,7 +579,7 @@
+             if(!hosting&&peer!=role.hostDeviceId)throw HandoffFailure("Select the original host paired with this replica.")
+             require(chosen.isNotEmpty()&&chosen.size<=8);chosen.forEach{checkedEndpoint(it.address)}
+             if(chosen.any{it.carrier==SessionCarrier.QuicTether}&&tetherInterface==null)throw HandoffFailure("Choose the tether interface before connecting so its default-route safety can be checked.")
+-            live.close();update{it.copy(sessionRole=role,routeWarnings=emptyList())}
++            retireLiveCapture();live.close();update{it.copy(sessionRole=role,routeWarnings=emptyList())}
+             val link=if(hosting)service.host(p,peer,chosen)else service.connect(p,peer,chosen)
+             var adopted=false
+             try{if(project!==p||generation!=epoch)throw CancellationException("Project changed");live.install(link){if(tetherInterface!=null){val findings=service.tetherRouteWarnings(tetherInterface);if(project===p&&generation==epoch)update{it.copy(routeWarnings=findings)}}};adopted=true;instructionFocus.attach(link);scheduleViewport()}
+@@ -554,9 +591,9 @@
+         val chosen=endpoints.map{SessionEndpoint(it.carrier,it.address)}.distinct().sortedBy{it.carrier.ordinal};val epoch=generation
+         sessionWork=task(epoch){require(chosen.isNotEmpty()&&chosen.size<=8);chosen.forEach{checkedEndpoint(it.address)};val service=sessions.requireService();if(chosen.any{it.carrier==SessionCarrier.QuicTether}){if(tetherInterface==null)throw HandoffFailure("Choose the tether interface before receiving a project.");val findings=service.tetherRouteWarnings(tetherInterface);update{it.copy(routeWarnings=findings)}};val destination=location.path.toAbsolutePath().resolve("${core.newId(System.currentTimeMillis().toULong())}.vwb");withContext(Dispatchers.IO){Files.createDirectories(location.path)};val received=service.receiveProject(destination.toString(),peer,chosen,expectedProject?.trim()?.takeIf{it.isNotEmpty()});attach(received,destination);val role=service.projectRole(received);update{it.copy(sessionRole=role,message="Project received and saved locally. Connect the replica to continue live editing.")}}
+     }
+-    fun disconnectSession(){cancelInput();task(generation){live.close();update{it.copy(routeWarnings=emptyList())}}}
++    fun disconnectSession(){cancelInput();task(generation){retireLiveCapture();live.close();update{it.copy(routeWarnings=emptyList())}}}
+     fun cancelSessionWork(){sessionWork?.cancel()}
+-    suspend fun disconnectPeer(peer:String){if(mutable.value.sync?.peerDeviceId!=peer)return;cancelInput();edits.withLock{if(mutable.value.sync?.peerDeviceId==peer)live.close()}}
++    suspend fun disconnectPeer(peer:String){if(mutable.value.sync?.peerDeviceId!=peer)return;cancelInput();edits.withLock{if(mutable.value.sync?.peerDeviceId==peer){retireLiveCapture();live.close()}}}
+     fun showExport(){if(mutable.value.document==null){report("Open a document before exporting.");return};update{it.copy(exportOpen=true)}}
+     fun dismissExport(){update{it.copy(exportOpen=false)}}
+     fun exportSettings(settings:ExportSettings){update{it.copy(exportSettings=settings.copy(quality=settings.quality.coerceIn(1,100)),message=null)}}
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
+@@ -20,6 +20,7 @@
+ import com.visualworkbench.bindings.host.*
+ import com.visualworkbench.shared.*
+ import com.visualworkbench.desktop.mcp.*
++import com.visualworkbench.desktop.capture.*
+ import kotlinx.coroutines.*
+ import kotlinx.coroutines.flow.debounce
+ import java.awt.FileDialog
+@@ -65,6 +66,15 @@
+         val scope=rememberCoroutineScope();val sessions=remember{DesktopSessionController(scope,device)};val assistance=remember{ConnectionAssistanceController(scope,NativeConnectionAssistance())};val controller=remember{EditorController(scope,core,host,location,device,local.resolve("VisualWorkbench/transfer-work")).also{it.useSessionService(sessions);it.useAiDirectory(local.resolve("Visual Workbench"))}};val editor by controller.state.collectAsState()
+         val capture=remember{com.visualworkbench.desktop.capture.DesktopCaptureController(scope,core,captureService,location.path,device,
+             controller::captureDestination,controller::report)}
++        val pickerModal=remember{PickerModal{controller.instructionPicker()}}
++        val capturePicker=remember{CapturePickerController(scope,core,location.path,device,
++            {openDesktopCaptureService(nativeRuntime.directory.resolve("vw-capture-helper.exe"),nativeRuntime.packagedHash("vw-capture-helper.exe"))},
++            controller::captureDestination,pickerModal::set,
++            {selection->controller.startLiveCapture(selection) {
++                openDesktopCaptureService(nativeRuntime.directory.resolve("vw-stream-helper.exe"),nativeRuntime.packagedHash("vw-stream-helper.exe"))
++            }})}
++        val pickerState by capturePicker.state.collectAsState()
++        val liveCaptureState by controller.liveCaptureState.collectAsState()
+         var captureSettings by remember{mutableStateOf(false)}
+         var captureFocusLease by remember { mutableStateOf<AutoCloseable?>(null) }
+         fun captureDialog(value: Boolean) {
+@@ -75,6 +85,13 @@
+         DisposableEffect(controller) { onDispose { val prior = captureFocusLease; captureFocusLease = null; prior?.close() } }
+         var captureProtected by remember{mutableStateOf(false)}
+         var captureChecked by remember{mutableStateOf(false)}
++        var phoneRegionPrompt by remember { mutableStateOf<CaptureRegionSignal?>(null) }
++        LaunchedEffect(controller,captureProtected) {
++            while (isActive) {
++                phoneRegionPrompt=if(captureProtected) try { controller.captureRegionPrompt() } catch(_:Exception) { null } else null
++                delay(250)
++            }
++        }
+         val mcp=remember{DesktopMcpLifetime(appAnchor.directory,nativeRuntime.directory.resolve("vw-capture-helper.exe"),nativeRuntime.packagedHash("vw-capture-helper.exe"),core,device)}
+         val codex=remember{DesktopCodexHandoff(appAnchor.directory)}
+         val codexModal=remember{McpModalOwner<Unit>{controller.instructionPicker()}}
+@@ -105,7 +122,7 @@
+                         try { codex.close() } finally { codexModal.close()
+                         try { mcpTasks.close() } finally { try { mcp.close() } finally {
+                         mcpModal.close()
+-                        try { try { capture.shutdown() } finally { assistance.close() } } finally {
++                        try { try { capturePicker.shutdown() } finally { capture.shutdown() } } finally { assistance.close() } finally {
+                             try { controller.close() } finally {
+                                 try { sessions.close() } finally {
+                                     try { host.shutdown() } finally { host.destroy() }
+@@ -139,8 +156,9 @@
+         }
+         mcpState.owner?.let{McpCaptureIndicator(it)}
+         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
++        if(captureProtected)CapturePickerWindow(capturePicker,controller::report)
+         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
+-            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||dialog!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
++            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||pickerState.open||captureSettings||dialog!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
+             fun file(command:Command){controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,command.label,FileDialog.LOAD)
+                 try{chooser.directory=(if(command==Command.Import)documents else location.path).toString();if(command==Command.Open)chooser.file="project.sqlite";chooser.isVisible=true
+                     val filename=chooser.file?:return;val chosen=Path.of(chooser.directory,filename)
+@@ -218,7 +236,7 @@
+                 Menu("Edit"){for(c in listOf(Command.Undo,Command.Redo,Command.Delete,Command.SelectAll,Command.ClearSelection,Command.Color,Command.WidthUp,Command.WidthDown,Command.NudgeLeft,Command.NudgeRight,Command.NudgeUp,Command.NudgeDown))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
+                 Menu("Tools"){for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout,Command.CycleMarker,Command.Instructions))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
+                 Menu("View"){for(c in listOf(Command.Fit,Command.ActualPixels,Command.ZoomIn,Command.ZoomOut,Command.Windowed,Command.Maximized,Command.Fullscreen,Command.FollowPeer,Command.MatchPeer,Command.PeerOutline))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
+-                Menu("Workbench"){Item("Send package to Codex",onClick={controller.cancelInput();codexModal.settings();mcpModal.dismiss()});Item("Local agents and Compare",onClick={controller.cancelInput();mcpModal.settings();codexModal.dismiss()});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Foreground capture…",enabled=captureProtected,onClick={captureDialog(true)})}
++                Menu("Workbench"){Item("Send package to Codex",onClick={controller.cancelInput();codexModal.settings();mcpModal.dismiss()});Item("Local agents and Compare",onClick={controller.cancelInput();mcpModal.settings();codexModal.dismiss()});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Capture window, monitor or region…",enabled=captureProtected,onClick={controller.cancelInput();capturePicker.open()});Item("Stop live capture",enabled=liveCaptureState.running||liveCaptureState.failure!=null,onClick=controller::stopLiveCapture);Item("Foreground capture…",enabled=captureProtected,onClick={captureDialog(true)})}
+             }
+             MaterialTheme(colors=darkColors(primary=accent,secondary=Color(0xffe8bb75),background=Color(0xff101720),surface=Color(0xff18222e))){
+                 Box(Modifier.fillMaxSize().drawWithContent {
+@@ -243,6 +261,14 @@
+                 }
+                 mcpCompare?.let{receipt->mcpState.owner?.let{owner->McpComparePanel(owner,receipt,{mcpModal.dismiss()},::saveMcp)}}
+                 AiEditorOverlay(controller)
++                if(liveCaptureState.running || liveCaptureState.stopping || liveCaptureState.failure != null) {
++                    Text(if(liveCaptureState.stopping) "Stopping approved live capture…" else if(liveCaptureState.paused) "Live capture frozen on the phone" else liveCaptureState.failure ?: "Approved live capture active")
++                }
++                phoneRegionPrompt?.let { prompt -> AlertDialog(onDismissRequest={scope.launch { try { controller.resolveCaptureRegion(prompt,false) {} } catch(_:Exception){} }},
++                    title={Text("Phone requests a computer region")},
++                    text={Text("Open the protected capture picker, choose a monitor and draw a region. Review its exact snapshot, then explicitly Save or Start live. This request alone does not capture or share a source.")},
++                    confirmButton={TextButton(onClick={scope.launch { try { controller.resolveCaptureRegion(prompt,true) { controller.cancelInput();capturePicker.open(true) } } catch(_:Exception){controller.report("The region request expired or its connection changed. Ask the phone to request again.")} }}){Text("Open region picker")}},
++                    dismissButton={TextButton(onClick={scope.launch { try { controller.resolveCaptureRegion(prompt,false) {} } catch(_:Exception){} }}){Text("Decline")}}) }
+                 if(captureSettings)com.visualworkbench.desktop.capture.CaptureSettings(capture){captureDialog(false)}
+                 if(editor.exportOpen&&editor.document!=null)ExportDialog(controller,editor,::save)
+                 if(editor.pasteOpen)PasteDialog(controller,editor)
+--- a/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt
++++ b/apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt
+@@ -17,7 +17,7 @@
+     @Test fun exactRuntimeIsPreparedBeforeAnyLoadAndClosePreservesLoadedFilePaths() {
+         val files = runtimeResources(); val guard = MemoryFileGuard()
+         val runtime = DesktopNativeRuntime.prepareAt(root(), files, guard)
+-        assertEquals(root().nameCount + 8, guard.live) // ancestors including volume root, cache, and six exact files
++        assertEquals(root().nameCount + 9, guard.live) // ancestors including volume root, cache, and seven exact files
+         for (name in runtimeNames) assertArrayEquals(files.bytes.getValue("win32-x86-64/$name"), Files.readAllBytes(runtime.directory.resolve(name)))
+         assertTrue(Files.isRegularFile(runtime.directory.resolve("owner")))
+         assertTrue(Files.isRegularFile(runtime.directory.resolve("ready")))
+@@ -76,7 +76,7 @@
+     private fun root(): Path = temporary.root.toPath().toAbsolutePath().normalize().resolve("runtime")
+     private fun assertFailure(block: () -> Unit) { try { block(); fail("unverified runtime accepted") } catch (_: NativeRuntimeFailure) { } }
+ }
+-private val runtimeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe")
++private val runtimeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-stream-helper.exe")
+ private class MapNativeResources(val bytes: MutableMap<String, ByteArray>) : NativeResources {
+     override fun open(name: String) = bytes[name]?.let(::ByteArrayInputStream)
+ }
+--- a/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CoreApi.kt
++++ b/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CoreApi.kt
+@@ -97,7 +97,7 @@
+     public data object Tiff16 : ImageFormat
+ }
+ public data class ExportOptions(public val documentId: String, public val format: ImageFormat = ImageFormat.Png8, public val marked: Boolean = true, public val region: Rect? = null, public val matteRgb: UInt? = null, public val convertToSrgb: Boolean = false, public val assumeUntaggedSrgb: Boolean = false, public val allowDepthReduction: Boolean = false, public val memoryBudgetBytes: ULong = 256uL * 1024uL * 1024uL)
+-public data class ExportResult(public val bytes: ByteArray, public val blake3: String, public val metadataJson: String, public val revision: ProjectInfo)
++public data class ExportResult(public val bytes: ByteArray, public val blake3: String, public val metadataJson: String, public val revision: ProjectInfo, public val captureProvenanceJson: String? = null)
+ public data class GlyphOutline(public val glyphId: UInt, public val cluster: ULong, public val font: String, public val x: Float, public val y: Float, public val advance: Float, public val outline: List<Outline>)
+ public data class TextLayout(public val algorithmVersion: UInt, public val glyphs: List<GlyphOutline>, public val width: Float, public val height: Float, public val lineHeight: Float)
+ public enum class ChangeKind { Opened, Committed, ExportStarted, ExportReady, ExportFailed, Closed }
+--- a/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PackagesApi.kt
++++ b/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PackagesApi.kt
+@@ -20,7 +20,7 @@
+ public data class PackageInfo(public val packageId:String,public val target:String,public val model:String?,
+     public val binding:WorkflowBinding,public val sourceAssetId:String,public val manifestSha256:String,
+     public val createdAt:String,public val totalBytes:ULong,public val markerCount:UInt,
+-    public val images:List<PackageImageInfo>,public val inlineImagesAvailable:Boolean,public val includesWindowTitle:Boolean)
++    public val images:List<PackageImageInfo>,public val inlineImagesAvailable:Boolean,public val includesWindowTitle:Boolean,public val captureProvenanceJson:String?=null)
+ public data class PublishedPackage(public val info:PackageInfo,public val directory:String)
+ public data class PackageRetirement(public val packageId:String,public val target:String,
+     public val manifestSha256:String,public val filesRemoved:Boolean)
+--- a/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/StreamingApi.kt
++++ b/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/StreamingApi.kt
+@@ -66,4 +66,5 @@
+     /** Compositor/encoder reservation, not process RSS or the earlier source
+      * decode peak. Decode is checked separately against the same memory budget. */
+     public val estimatedPeakBytes: ULong,
++    public val captureProvenanceJson: String? = null,
+ )
+--- a/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt
++++ b/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt
+@@ -115,7 +115,7 @@
+     override suspend fun render(documentId: String,rectangle: Rect?): RenderList = call { handle.renderList(documentId,rectangle?.native(),it).common() }
+     override suspend fun export(options: ExportOptions): ExportResult = call { cancel ->
+         val e=handle.exportImage(NExportOptions(options.documentId,options.format.native(),options.marked,options.region?.native(),options.matteRgb,options.convertToSrgb,options.assumeUntaggedSrgb,options.allowDepthReduction,options.memoryBudgetBytes),cancel)
+-        ExportResult(e.bytes,e.blake3,e.metadataJson,e.revision.common())
++        ExportResult(e.bytes,e.blake3,e.metadataJson,e.revision.common(),e.captureProvenanceJson)
+     }
+     override suspend fun close(): Unit = releaseNative {
+         closeMutex.withLock { if(!closed.get()) {
+--- a/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativePackages.kt
++++ b/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativePackages.kt
+@@ -22,7 +22,7 @@
+ private suspend fun <T> settled(release:suspend(T)->Unit={},block:suspend(Cancellation)->T):T=
+     ownPackageResult(packageScope,packageSlots,::Cancellation,{it.cancel()},{it.destroy()},release){token->
+         try{block(token)}catch(error:PackageException){throw failure(error)}catch(error:IllegalStateException){throw PackageFailure(PackageFailureKind.Closed)}}
+-private fun NInfo.public()=PackageInfo(packageId,target,model,workflowBinding(binding),sourceAssetId,manifestSha256,createdAt,totalBytes,markerCount,images.map{PackageImageInfo(it.id,it.role,it.path,it.width,it.height,it.encodedBytes)},inlineImagesAvailable,includesWindowTitle)
++private fun NInfo.public()=PackageInfo(packageId,target,model,workflowBinding(binding),sourceAssetId,manifestSha256,createdAt,totalBytes,markerCount,images.map{PackageImageInfo(it.id,it.role,it.path,it.width,it.height,it.encodedBytes)},inlineImagesAvailable,includesWindowTitle,captureProvenanceJson)
+ private fun NPublished.public()=PublishedPackage(info.public(),directory)
+ private fun NRetirement.public()=PackageRetirement(packageId,target,manifestSha256,filesRemoved)
+ private fun PackageTarget.native():NTarget=when(this){
+--- a/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeStreaming.kt
++++ b/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeStreaming.kt
+@@ -93,7 +93,7 @@
+ private fun transferResult(result: com.visualworkbench.bindings.core.FileExportResult): FileExportResult {
+     val info = result.revision
+     return FileExportResult(result.encodedBytes,result.blake3,result.metadataJson,
+-        ProjectInfo(info.projectId,info.title,info.deviceId,info.nextLamport,info.canUndo,info.canRedo,info.hostSeq,info.stateHash,info.documentIds),result.estimatedPeakBytes)
++        ProjectInfo(info.projectId,info.title,info.deviceId,info.nextLamport,info.canUndo,info.canRedo,info.hostSeq,info.stateHash,info.documentIds),result.estimatedPeakBytes,result.captureProvenanceJson)
+ }
+ internal suspend fun preflightFileNative(handle: ProjectSession, options: FileExportOptions): FilePreflight = settledStream { cancel ->
+     val result = handle.preflightImageFile(transferOptions(options), cancel)
+--- a/contracts/vw_protocol.proto
++++ b/contracts/vw_protocol.proto
+@@ -77,6 +77,8 @@
+     VideoFrame video_frame = 52;
+     FreezeRequest freeze_request = 53;
+     LosslessFrame lossless_frame = 54;
++    RegionCaptureControl region_capture_control = 55; // CONTROL: capture_stream_v1
++    StreamBlob stream_blob = 56; // BLOB: transient capture-only transfer scope
+ 
+     InputEvent input_event = 60;
+     InputStatus input_status = 61;
+@@ -319,6 +321,22 @@
+   bool lossless = 7;
+   bool degraded = 8;        // freeze fell back to the compressed frame (BUILD_SPECIFICATION §4.18)
+   int64 captured_at_ms = 9;
++  StreamSaveProvenance stream_save = 10; // optional native stream Save receipt, minor5
++}
++
++// Persisted with the new capture document by the same annotation transaction.
++// The final output/package carries its own full current revision in addition
++// to this immutable before-Save target CAS and producer/frame provenance.
++message StreamSaveProvenance {
++  Uuid draft_id = 1;
++  Uuid transaction_id = 2;
++  Uuid target_project_id = 3;
++  uint64 target_host_seq = 4;
++  string target_state_hash = 5;
++  uint64 connection_epoch = 6;
++  uint64 source_generation = 7;
++  string saved_asset_id = 8;
++  string original_asset_id = 9; // empty for explicitly degraded decoded preview
+ }
+ 
+ message UpdateDocument {
+@@ -695,7 +713,7 @@
+ 
+ message StreamControl {
+   Uuid capture_session_id = 1;
+-  string action = 2;  // start | stop | pause
++  string action = 2;  // start | stop | pause | resume | keyframe | source_closed
+   string source_kind = 3;
+   uint64 window_handle = 4;
+   string monitor_id = 5;
+@@ -703,6 +721,10 @@
+   uint32 max_height = 7;
+   uint32 target_fps = 8;
+   string mode = 9;  // frame_tiles | video_hevc
++  CaptureGeometry source_geometry = 10; // owner-approved physical source
++  string interaction = 11; // live_annotate | remote_edit; no input grant implied
++  uint64 source_generation = 12; // producer-monotonic CONTROL openings within this connection
++  string platform = 13; // windows | android, immutable for this source generation
+ }
+ 
+ message TileImage {
+@@ -721,6 +743,9 @@
+   repeated TileImage tiles = 7;
+   int64 timestamp_ns = 8;
+   uint64 last_input_seq_applied = 9;  // drives ghost-ink fading (§4.11); 0 when no remote input
++  uint64 delivery_sequence = 10; // capture_stream_v1: transmission order, NOT captured frame identity
++  uint64 source_generation = 11; // exact currently approved CONTROL opening
++  int64 captured_at_ms = 12; // original capture UTC time; never receipt/import time
+ }
+ 
+ message VideoFrame {
+@@ -734,7 +759,11 @@
+   uint64 last_input_seq_applied = 8;  // drives ghost-ink fading (§4.11); 0 when no remote input
+ }
+ 
+-message FreezeRequest { Uuid capture_session_id = 1; uint64 frame_id = 2; }
++message FreezeRequest {
++  Uuid capture_session_id = 1; uint64 frame_id = 2;
++  Uuid request_id = 3; uint32 geometry_revision = 4; // exact connection-local draft
++  uint64 source_generation = 5; // cannot revive a prior owner-approved source
++}
+ 
+ message LosslessFrame {
+   Uuid capture_session_id = 1;
+@@ -744,6 +773,73 @@
+   string format = 5;   // png | qoi
+   bytes data = 6;      // or empty with asset_id set for blob transfer
+   string asset_id = 7;
++  CaptureTransferKey transfer = 8; // required by capture_stream_v1 when available
++  uint64 total_size = 9; // admitted before scoped BLOB receiver creation
++  Uuid request_id = 10; // binds unavailable replies too
++  int64 captured_at_ms = 11; // available response must exactly match the frozen frame
++}
++
++// capture_stream_v1 is an independently negotiated capability. Its connection
++// epoch is always the authenticated Envelope connection_id, never a supplied
++// integer. No message below grants remote input or authorizes an OS capture.
++// Only explicit local source approval can create a producer/region offer.
++message CaptureTransferKey {
++  Uuid capture_session_id = 1;
++  uint64 frame_id = 2;
++  uint32 geometry_revision = 3;
++  Uuid request_id = 4;
++  Uuid transfer_id = 5;
++  uint64 generation = 6; // producer-monotonic for this authenticated connection
++}
++
++// Separate from ordinary project Blob messages. Capture bytes remain transient
++// and cannot enter immutable project inventory until explicit durable Save.
++message StreamBlob {
++  CaptureTransferKey key = 1;
++  oneof body {
++    BlobRequest request = 2;
++    BlobChunk chunk = 3;
++    BlobAck ack = 4;
++    StreamTransferCancel cancel = 5;
++  }
++}
++message StreamTransferCancel {}
++
++// CONTROL metadata only; image bytes use FrameTiles MEDIA or scoped StreamBlob.
++message RegionCaptureControl {
++  Uuid request_id = 1;
++  uint64 sequence = 2;
++  oneof body {
++    RegionCaptureRequest request = 3;
++    RegionCaptureOffer offer = 4;
++    RegionCaptureChoice choose = 5;
++    RegionCaptureEnd end = 6;
++    RegionCaptureResult result = 7;
++  }
++}
++message RegionCaptureRequest {} // prompt only, never a source selector
++message RegionCaptureOffer {
++  Uuid offer_id = 1;
++  Uuid capture_session_id = 2;
++  uint64 frame_id = 3;
++  CaptureGeometry geometry = 4;
++  uint32 width = 5;
++  uint32 height = 6;
++  uint32 expires_after_ms = 7; // <=30s; receiver uses its own monotonic clock
++}
++message RegionCaptureChoice {
++  Uuid offer_id = 1;
++  Uuid capture_session_id = 2;
++  uint64 frame_id = 3;
++  CaptureGeometry geometry = 4;
++  RectI rectangle = 5; // integer F edges on that exact approved frame
++}
++message RegionCaptureEnd {
++  string reason = 1; // declined | cancelled | expired | unavailable | invalid | picker_opened
++}
++message RegionCaptureResult {
++  Uuid offer_id = 1;
++  LosslessFrame original = 2; // exact same approved frame, cropped geometry
+ }
+ 
+ // ---------------------------------------------------------------------------
+--- a/core/crates/vw-capture/Cargo.toml
++++ b/core/crates/vw-capture/Cargo.toml
+@@ -14,6 +14,9 @@
+ blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+ ring = "=0.17.14"
+ vw-model = { path = "../vw-model", version = "=0.1.0" }
++vw-geom = { path = "../vw-geom", version = "=0.1.0" }
++vw-stream = { path = "../vw-stream", version = "=0.1.0" }
++vw-proto = { path = "../vw-proto", version = "=0.1.0" }
+ 
+ [target.'cfg(windows)'.dependencies]
+ windows = { version = "=0.62.2", features = [
+@@ -33,3 +36,7 @@
+ [[bin]]
+ name = "vw-capture-helper"
+ path = "src/bin/helper.rs"
++
++[[bin]]
++name = "vw-stream-helper"
++path = "src/bin/stream_helper.rs"
+--- a/core/crates/vw-capture/src/admission.rs
++++ b/core/crates/vw-capture/src/admission.rs
+@@ -141,8 +141,7 @@
+             || self.dpi_scale <= 0.0
+             || self.dpi_scale > 10.0
+             || !matches!(self.platform.as_str(), "windows" | "android")
+-            || !matches!(self.source_kind.as_str(), "window" | "monitor")
+-            || self.monitor_id.len() > 256
++            || !matches!(self.source_kind.as_str(), "window" | "monitor"|"region")||self.monitor_id.len() > 256
+         {
+             return Err(Error::Invalid);
+         }
+--- a/core/crates/vw-capture/src/bin/helper.rs
++++ b/core/crates/vw-capture/src/bin/helper.rs
+@@ -35,8 +35,8 @@
+     let request: Request = serde_json::from_slice(&request).map_err(|_| Error::Invalid)?;
+     let remaining = match &request {
+         Request::Capture(value) => value.limits.validate()?.capture_ms + 1000,
+-        Request::Tree(value) => value.limits.validate()?.tree_ms + 50,
+-    };
++        Request::Tree(value) => value.limits.validate()?.tree_ms+50,Request::PickerCatalog{owner_process_id}=>{if *owner_process_id==0{return Err(Error::Invalid);}4000},Request::PickerCapture(value)=>value.limits.validate()?.capture_ms+1000};
++
+     deadline.store(
+         u64::try_from(start.elapsed().as_millis()).map_err(|_| Error::Limit)? + remaining,
+         std::sync::atomic::Ordering::Release,
+@@ -55,8 +55,8 @@
+         let cancel = Cancellation::default();
+         let result = match request {
+             Request::Capture(value) => windows::capture(value, &cancel).map(Response::Frame),
+-            Request::Tree(value) => windows::collect(value, &cancel).map(Response::Tree),
+-        };
++            Request::Tree(value) => windows::collect(value, &cancel).map(Response::Tree),Request::PickerCatalog{owner_process_id}=>windows::picker::enumerate(owner_process_id,&cancel).map(Response::PickerCatalog),Request::PickerCapture(value)=>windows::picker_capture::capture(value,&cancel).map(Response::PickerFrame)};
++
+         // SAFETY: paired successful RoInitialize on this thread.
+         unsafe {
+             ::windows::Win32::System::WinRT::RoUninitialize();
+--- a/core/crates/vw-capture/src/lib.rs
++++ b/core/crates/vw-capture/src/lib.rs
+@@ -4,6 +4,10 @@
+ pub use fixed_target::refreshed_target;
+ mod image;
+ pub mod process;
++pub mod picker;
++pub mod stream;
++pub mod stream_wire;
++pub mod stream_process;
+ #[cfg(windows)]
+ pub mod windows;
+ pub use admission::*;
+@@ -153,12 +157,11 @@
+ #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
+ pub enum Request {
+     Capture(CaptureRequest),
+-    Tree(TreeRequest),
+-}
++    Tree(TreeRequest),PickerCatalog{owner_process_id:u32},PickerCapture(picker::PickerCaptureRequest)}
++
+ #[derive(Serialize, Deserialize)]
+ #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
+ pub enum Response {
+     Frame(FrameReceipt),
+-    Tree(TreeReceipt),
+-    Refused { error: Error },
++    Tree(TreeReceipt),PickerCatalog(picker::PickerCatalog),PickerFrame(picker::PickerFrameReceipt),Refused{ error: Error },
+ }
+--- a/core/crates/vw-capture/src/process.rs
++++ b/core/crates/vw-capture/src/process.rs
+@@ -46,6 +46,7 @@
+     _file: File,
+ }
+ impl LockedHelper {
++    pub(crate) fn stream_path(&self)->&Path { &self.path }
+     /// `expected` must come from the app's trusted packaged runtime inventory,
+     /// never from the selected file or request. Keep this object alive through run.
+     pub fn open(path: &Path, expected: &str) -> Result<Self> {
+@@ -102,9 +103,8 @@
+         }
+         Request::Tree(value) => {
+             value.limits.validate()?;
+-            value.limits.tree_ms + 1000
+-        }
+-    };
++            value.limits.tree_ms+1000},Request::PickerCatalog{owner_process_id}=>{if *owner_process_id==0{return Err(Error::Invalid);}5000},Request::PickerCapture(value)=>{value.validate(&cancel)?;value.limits.capture_ms+2000}};
++
+     struct BoundedRequest(Vec<u8>);
+     impl Write for BoundedRequest {
+         fn write(&mut self, value: &[u8]) -> std::io::Result<usize> {
+--- a/core/crates/vw-capture/src/windows/mod.rs
++++ b/core/crates/vw-capture/src/windows/mod.rs
+@@ -1,6 +1,10 @@
+ //! All foreign handles are queried, never dereferenced. Provider calls run only
+ //! in the owned helper; the editor uses process::run to enforce cancellation.
+ pub mod hotkey;
++pub mod picker;
++pub mod picker_capture;
++pub mod stream_capture;
++pub mod region_hotkey;
+ mod uia;
+ mod wgc;
+ use crate::*;
+--- a/core/crates/vw-capture/src/windows/wgc.rs
++++ b/core/crates/vw-capture/src/windows/wgc.rs
+@@ -192,7 +192,7 @@
+         filename: "capture.png".into(),
+     })
+ }
+-fn admit_sdr(device: &IDXGIDevice, target: &WindowTarget) -> Result<()> {
++pub(super) fn admit_sdr(device: &IDXGIDevice, target: &WindowTarget) -> Result<()> {
+     // SDR8 is admitted only when the actual target monitor reports RGB/P709.
+     // HDR/wide-gamut captures need an explicit high-depth adapter, not clipping.
+     unsafe {
+@@ -223,25 +223,22 @@
+     }
+     Err(Error::ColorDepth)
+ }
+-fn readback(
+-    device: &ID3D11Device,
+-    context: &ID3D11DeviceContext,
+-    texture: &ID3D11Texture2D,
+-    request: &CaptureRequest,
+-    cancel: &Cancellation,
+-) -> Result<Vec<u8>> {
+-    let expected = &request.target;
+-    let (x, y) = expected.client.offset_inside(expected.frame)?;
+-    let count = request
+-        .limits
+-        .image(expected.client.width, expected.client.height)?;
++fn readback(device: &ID3D11Device, context: &ID3D11DeviceContext, texture: &ID3D11Texture2D,
++    request: &CaptureRequest, cancel: &Cancellation) -> Result<Vec<u8>> {
++    readback_rect(device, context, texture, request.target.frame, request.target.client, request.limits, cancel)
++}
++pub(super) fn readback_rect(device: &ID3D11Device, context: &ID3D11DeviceContext, texture: &ID3D11Texture2D,
++    frame: crate::Rect, client: crate::Rect, limits: crate::Limits, cancel: &Cancellation) -> Result<Vec<u8>> {
++    let (x, y) = client.offset_inside(frame)?;
++    let count = limits
++        .image(client.width, client.height)?;
+     // SAFETY: texture metadata, stride, offsets and total allocation are checked
+     // before mapped pointer reads. Unmap executes on every return from the closure.
+     unsafe {
+         let mut desc = D3D11_TEXTURE2D_DESC::default();
+         texture.GetDesc(&mut desc);
+-        if desc.Width != expected.frame.width
+-            || desc.Height != expected.frame.height
++        if desc.Width != frame.width
++            || desc.Height != frame.height
+             || desc.Format != DXGI_FORMAT_B8G8R8A8_UNORM
+             || desc.ArraySize != 1
+             || desc.MipLevels != 1
+@@ -249,7 +246,7 @@
+         {
+             return Err(Error::ColorDepth);
+         }
+-        request.limits.image(desc.Width, desc.Height)?;
++        limits.image(desc.Width, desc.Height)?;
+         desc.Usage = D3D11_USAGE_STAGING;
+         desc.BindFlags = 0;
+         desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ.0 as u32;
+@@ -263,12 +260,12 @@
+         let result = (|| {
+             if mapped.pData.is_null()
+                 || mapped.RowPitch < desc.Width.checked_mul(4).ok_or(Error::Limit)?
+-                || u64::from(mapped.RowPitch) * u64::from(desc.Height) > request.limits.memory_bytes
++                || u64::from(mapped.RowPitch) * u64::from(desc.Height) > limits.memory_bytes
+             {
+                 return Err(Error::Limit);
+             }
+             let mut rgba = Vec::with_capacity(count);
+-            for row in y..y + expected.client.height {
++            for row in y..y + client.height {
+                 cancel.check()?;
+                 let offset = (row as usize)
+                     .checked_mul(mapped.RowPitch as usize)
+@@ -276,7 +273,7 @@
+                     .ok_or(Error::Limit)?;
+                 let data = std::slice::from_raw_parts(
+                     (mapped.pData as *const u8).add(offset),
+-                    expected.client.width as usize * 4,
++                    client.width as usize * 4,
+                 );
+                 for pixel in data.as_chunks::<4>().0 {
+                     if pixel[3] != 255 {
+--- a/core/crates/vw-ffi/Cargo.toml
++++ b/core/crates/vw-ffi/Cargo.toml
+@@ -31,6 +31,7 @@
+ zeroize = "=1.9.0"
+ blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+ vw-net = { version = "=0.1.0", path = "../vw-net" }
++vw-stream = { version = "=0.1.0", path = "../vw-stream" }
+ vw-model = { version = "=0.1.0", path = "../vw-model" }
+ vw-geom = { version = "=0.1.0", path = "../vw-geom" }
+ vw-proto = { version = "=0.1.0", path = "../vw-proto" }
+--- a/core/crates/vw-ffi/src/ai_edit/pixels.rs
++++ b/core/crates/vw-ffi/src/ai_edit/pixels.rs
+@@ -154,7 +154,9 @@
+                             memory_budget_bytes: memory_budget_bytes - bytes.len() as u64,
+                             capture_session: None,
+                             frame_id: None,
+-                        },
++                        
++                            capture_provenance: None,
++},
+                     )?;
+                     drop(decoded);
+                     drop(bytes);
+--- a/core/crates/vw-ffi/src/capture_import.rs
++++ b/core/crates/vw-ffi/src/capture_import.rs
+@@ -36,7 +36,8 @@
+     pub(crate) fn new(value: CaptureImportDescriptor) -> Result<Self> {
+         if !value.explicit_owner_action
+             || !matches!(value.platform.as_str(), "windows" | "android")
+-            || !matches!(value.source_kind.as_str(), "window" | "monitor")
++            || !matches!(value.source_kind.as_str(), "window" | "monitor"|"region")
++
+             || value.width == 0
+             || value.height == 0
+             || value.width > 32768
+@@ -87,7 +88,9 @@
+             lossless: true,
+             degraded: false,
+             captured_at_ms: value.captured_at_ms,
+-        };
++        
++            stream_save: None,
++};
+         vw_model::validate_capture(&capture)?;
+         Ok(Self {
+             capture,
+--- a/core/crates/vw-ffi/src/dto.rs
++++ b/core/crates/vw-ffi/src/dto.rs
+@@ -117,6 +117,7 @@
+ }
+ #[derive(Clone, Debug, uniffi::Record)]
+ pub struct ExportResult {
++    pub capture_provenance_json: Option<String>,
+     pub bytes: Vec<u8>,
+     pub blake3: String,
+     pub metadata_json: String,
+--- a/core/crates/vw-ffi/src/editor.rs
++++ b/core/crates/vw-ffi/src/editor.rs
+@@ -117,6 +117,9 @@
+         device: &DeviceId,
+         time: i64,
+     ) -> Result<ProjectInfo> {
++        if self.draft_edit_sealed.as_ref().is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire)) {
++            return Err(CoreError::Backpressure);
++        }
+         if &self.store()?.local_device()? != device {
+             return Err(CoreError::Invalid);
+         }
+--- a/core/crates/vw-ffi/src/lib.rs
++++ b/core/crates/vw-ffi/src/lib.rs
+@@ -20,6 +20,7 @@
+ mod semantic_ui;
+ pub use semantic_ui::*;
+ mod capture_delivery;
++mod capture_provenance;
+ mod capture_import;
+ pub use capture_delivery::*;
+ mod queries;
+--- a/core/crates/vw-ffi/src/masks/export.rs
++++ b/core/crates/vw-ffi/src/masks/export.rs
+@@ -186,7 +186,9 @@
+                         .ok_or(SelectionError::Limit)?,
+                     capture_session,
+                     frame_id,
+-                },
++                
++                    capture_provenance: None,
++},
+             )?;
+             (result.bytes, depth)
+         }
+--- a/core/crates/vw-ffi/src/packages/dto.rs
++++ b/core/crates/vw-ffi/src/packages/dto.rs
+@@ -110,6 +110,7 @@
+ }
+ #[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+ pub struct PackageInfo {
++    pub capture_provenance_json: Option<String>,
+     pub package_id: String,
+     pub target: String,
+     pub model: Option<String>,
+@@ -148,6 +149,7 @@
+         })
+         .collect::<PackageResult<Vec<_>>>()?;
+     Ok(PackageInfo {
++        capture_provenance_json: m.source.capture.as_ref().map(serde_json::to_string).transpose().map_err(|_|PackageError::Integrity)?,
+         package_id: m.package_id.to_string(),
+         target: m.compiled_for.target.clone(),
+         model: m.compiled_for.model.clone(),
+--- a/core/crates/vw-ffi/src/packages/inbox/pixels.rs
++++ b/core/crates/vw-ffi/src/packages/inbox/pixels.rs
+@@ -147,7 +147,9 @@
+             memory_budget_bytes: MAX_MEMORY - 32 * 1024 * 1024,
+             capture_session: None,
+             frame_id: None,
+-        },
++        
++            capture_provenance: None,
++},
+     )
+     .map_err(raster)?;
+     drop(source);
+--- a/core/crates/vw-ffi/src/packages/inbox/tests.rs
++++ b/core/crates/vw-ffi/src/packages/inbox/tests.rs
+@@ -50,7 +50,9 @@
+             memory_budget_bytes: MAX_MEMORY,
+             capture_session: None,
+             frame_id: None,
+-        },
++        
++            capture_provenance: None,
++},
+     )
+     .unwrap()
+     .bytes
+--- a/core/crates/vw-ffi/src/project.rs
++++ b/core/crates/vw-ffi/src/project.rs
+@@ -96,6 +96,11 @@
+     }
+ }
+ 
++// Field order also protects initialization failures before the worker exists.
++struct OwnedProject {
++    store: ProjectStore, blobs: BlobStore, permit: SessionPermit,
++    sealed: Option<Arc<AtomicBool>>, temporary: Option<tempfile::TempDir>,
++}
+ pub(crate) struct ProjectState {
+     pub store: Option<ProjectStore>,
+     pub blobs: BlobStore,
+@@ -105,6 +110,11 @@
+     pub remote: Option<vw_net::SyncReceiver>,
+     pub changed: Arc<tokio::sync::Notify>,
+     permit: Option<SessionPermit>,
++    // Present only for a temporary stream draft. All mutations still enter the
++    // ordinary central commit path; the actual plan owns this admission flag.
++    pub(crate) draft_edit_sealed: Option<Arc<AtomicBool>>,
++    // Last: SQLite, blob access and canonical state retire before scratch.
++    _temporary_root: Option<tempfile::TempDir>,
+ }
+ impl ProjectState {
+     pub fn store(&self) -> Result<&ProjectStore> {
+@@ -170,7 +180,15 @@
+         blobs: BlobStore,
+         permit: SessionPermit,
+     ) -> Result<Arc<Self>> {
+-        let history = crate::editor::History::restore(&store)?;
++        Self::from_owned_store(OwnedProject { store, blobs, permit, sealed: None, temporary: None })
++    }
++    pub(crate) fn from_temporary_store(store: ProjectStore, blobs: BlobStore, permit: SessionPermit,
++        temporary: tempfile::TempDir, sealed: Arc<AtomicBool>) -> Result<Arc<Self>> {
++        Self::from_owned_store(OwnedProject { store, blobs, permit, sealed: Some(sealed), temporary: Some(temporary) })
++    }
++    fn from_owned_store(owned: OwnedProject) -> Result<Arc<Self>> {
++        let store = &owned.store;
++        let history = crate::editor::History::restore(store)?;
+         let mut remote = None;
+         let replica = if store.local_device()? != *store.host_device() {
+             let host = vw_ops::HostSequencer::from_checkpoint_bytes(&store.checkpoint_bytes()?)?;
+@@ -183,7 +201,7 @@
+         } else {
+             None
+         };
+-        let mut initial = project_info(&store, &history)?;
++        let mut initial = project_info(store, &history)?;
+         if let Some(replica) = &replica {
+             initial.state_hash = replica.project().state_hash()?.to_string();
+         }
+@@ -192,14 +210,16 @@
+         let worker = Worker::new(
+             "vw-core-store",
+             ProjectState {
+-                store: Some(store),
+-                blobs,
++                store: Some(owned.store),
++                blobs: owned.blobs,
+                 events: events.clone(),
+                 history,
+                 replica,
+                 remote,
+                 changed: changed.clone(),
+-                permit: Some(permit),
++                permit: Some(owned.permit),
++                draft_edit_sealed: owned.sealed,
++                _temporary_root: owned.temporary,
+             },
+             16,
+         )?;
+--- a/core/crates/vw-ffi/src/queries.rs
++++ b/core/crates/vw-ffi/src/queries.rs
+@@ -790,6 +790,7 @@
+             .map(|c| Id::from_proto(c.capture_session_id.as_ref()))
+             .transpose()?,
+         frame_id: definition.capture.as_ref().map(|c| c.frame_id),
++        capture_provenance: definition.capture.clone(),
+     };
+     let result = if crate::format_images::external(request.format) {
+         crate::format_images::encode_buffered(&pixels, &request, cancellation)?
+@@ -798,11 +799,14 @@
+     if result.bytes.len() > 64 * 1024 * 1024 {
+         return Err(CoreError::Backpressure);
+     }
++    let output_revision = state.info()?;
++    let capture_provenance_json = crate::capture_provenance::export_receipt(&result.metadata, &options.document_id, &output_revision)?;
+     Ok(ExportResult {
++        capture_provenance_json,
+         blake3: AssetId::hash(&result.bytes).to_string(),
+         bytes: result.bytes,
+         metadata_json: serde_json::to_string(&result.metadata).map_err(|_| CoreError::Invalid)?,
+-        revision: state.info()?,
++        revision: output_revision,
+     })
+ }
+ #[uniffi::export]
+--- a/core/crates/vw-ffi/src/session.rs
++++ b/core/crates/vw-ffi/src/session.rs
+@@ -8,6 +8,7 @@
+ mod preview;
+ mod replication;
+ mod runtime;
++mod stream;
+ mod trust;
+ pub use bootstrap::*;
+ pub use discovery::*;
+@@ -16,6 +17,7 @@
+ pub use pairing::*;
+ pub use preview::{NewObjectPreview, ObjectPreview, PeerPreviews, PreviewKind};
+ pub use trust::*;
++pub use stream::{CaptureBackground,CaptureDraw,CaptureStream,StreamFrameInfo,StreamFreezeReceipt,StreamSignal,StreamStage,CaptureOriginalRequest,CapturePublicationSignal,CapturePublisher,CapturePublishSource,CaptureDraft,CaptureDraftInfo,CaptureDraftOptions,CaptureDraftSave,CaptureDraftSaveInfo,CaptureRegionSignal};
+ 
+ #[derive(Clone, Debug, thiserror::Error, uniffi::Error)]
+ pub enum SessionError {
+--- a/core/crates/vw-ffi/src/session/link.rs
++++ b/core/crates/vw-ffi/src/session/link.rs
+@@ -145,11 +145,13 @@
+     local: DeviceId,
+     focus: Arc<focus::FocusHub>,
+     agent_capture: Arc<agent_capture::CaptureStatusHub>,
++    stream_hub: Arc<super::stream::Hub>,
+ }
+ impl Drop for LiveSession {
+     fn drop(&mut self) {
+         self.focus.stop();
+         self.agent_capture.stop();
++        self.stream_hub.stop();
+         self.runtime.stop();
+     }
+ }
+@@ -371,11 +373,62 @@
+                 mpsc::error::TrySendError::Closed(_) => SessionError::Closed,
+             })
+     }
++    /// Explicit local display admission. It grants no remote input or OS source
++    /// selection, and is available only on a negotiated capture_stream_v1 epoch.
++    pub async fn create_capture_draft(&self, stream: Arc<super::stream::CaptureStream>,
++        options: super::stream::CaptureDraftOptions, cancellation: Arc<crate::Cancellation>)
++        -> crate::workflow::WorkflowResult<Arc<super::stream::CaptureDraft>> {
++        let entered_epoch = self.epoch.load(Ordering::Acquire);
++        use crate::workflow::WorkflowError;
++        if self.closed.load(Ordering::Acquire) { return Err(WorkflowError::Closed); }
++        let endpoint = self.stream_hub.endpoint(entered_epoch).map_err(|_| WorkflowError::Closed)?;
++        if !Arc::ptr_eq(&endpoint, &stream.lease.endpoint) { return Err(WorkflowError::Stale); }
++        let project = self.project.upgrade().ok_or(WorkflowError::Closed)?;
++        super::stream::draft::create(project, stream, options, cancellation).await
++    }
++    pub fn capture_region_signal(&self)->SessionResult<super::stream::CaptureRegionSignal>{
++        let entered_epoch=self.epoch.load(Ordering::Acquire);
++        if self.closed.load(Ordering::Acquire){return Err(SessionError::Closed)}
++        let endpoint=self.stream_hub.endpoint(entered_epoch)?;
++        let value=endpoint.region.borrow().clone();Ok(value)
++    }
++    pub async fn request_capture_region(&self,request_id:String)->SessionResult<()>{
++        let entered_epoch=self.epoch.load(Ordering::Acquire);
++        if self.closed.load(Ordering::Acquire){return Err(SessionError::Closed)}
++        let endpoint=self.stream_hub.endpoint(entered_epoch)?;
++        let id=Id::try_from(request_id).map_err(|_|SessionError::Invalid)?;
++        let(reply,receive)=tokio::sync::oneshot::channel();
++        endpoint.send(super::stream::hub::Command::RegionRequest{id,reply})?;
++        receive.await.map_err(|_|SessionError::Closed)?
++    }
++    pub async fn resolve_capture_region(&self,request_id:String,connection_epoch:u64,approve:bool)->SessionResult<()>{
++        let entered_epoch=self.epoch.load(Ordering::Acquire);
++        if self.closed.load(Ordering::Acquire)||entered_epoch!=connection_epoch{return Err(SessionError::Closed)}
++        let endpoint=self.stream_hub.endpoint(entered_epoch)?;
++        let id=Id::try_from(request_id).map_err(|_|SessionError::Invalid)?;
++        let(reply,receive)=tokio::sync::oneshot::channel();
++        endpoint.send(super::stream::hub::Command::RegionResolve{id,approve,reply})?;
++        receive.await.map_err(|_|SessionError::Closed)?
++    }
++    pub async fn open_capture_stream(&self, memory_budget_bytes: u64) -> SessionResult<Arc<super::stream::CaptureStream>> {
++        let entered_epoch = self.epoch.load(Ordering::Acquire);
++        if self.closed.load(Ordering::Acquire) { return Err(SessionError::Closed); }
++        self.stream_hub.open(entered_epoch, memory_budget_bytes).await
++    }
++    /// Explicit local source approval; remote requests cannot invoke this.
++    /// The caller retains the actual platform producer until it has stopped.
++    pub async fn open_capture_publisher(&self, source: super::stream::CapturePublishSource, memory_budget_bytes: u64) -> SessionResult<Arc<super::stream::CapturePublisher>> {
++        let entered_epoch = self.epoch.load(Ordering::Acquire);
++        if self.closed.load(Ordering::Acquire) { return Err(SessionError::Closed); }
++        self.stream_hub.publish(entered_epoch, source, memory_budget_bytes).await
++    }
+     pub async fn close(&self) -> SessionResult<()> {
+         self.closed.store(true, Ordering::Release);
+         self.focus.stop();
+         self.agent_capture.stop();
+-        self.runtime.close().await
++        let stream = self.stream_hub.close().await;
++        let network = self.runtime.close().await;
++        stream.and(network)
+     }
+ }
+ fn command_error(error: mpsc::error::TrySendError<super::preview::Command>) -> SessionError {
+@@ -400,6 +453,7 @@
+             "original_upload_v1".into(),
+             "new_shape_preview_v1".into(),
+             "marker_focus_v1".into(),
++            "capture_stream_v1".into(),
+             agent_capture::CAPABILITY.into(),
+         ]),
+     }
+@@ -543,6 +597,8 @@
+                 let incoming_epoch = epoch.clone();
+                 let focus = focus::FocusHub::new(initial.project.clone());
+                 let incoming_focus = focus.clone();
++                let stream_hub = super::stream::Hub::new();
++                let incoming_stream_hub = stream_hub.clone();
+                 let agent_capture = agent_capture::CaptureStatusHub::new(host);
+                 let incoming_capture = agent_capture.clone();
+                 let previews = Arc::new(Mutex::new(super::preview::Previews::default()));
+@@ -562,6 +618,7 @@
+                         epoch: incoming_epoch,
+                         previews: incoming_previews,
+                         focus: incoming_focus,
++                        stream_hub: incoming_stream_hub,
+                         agent_capture: incoming_capture,
+                     })
+                     .await;
+@@ -578,6 +635,7 @@
+                     local: local_identity,
+                     focus,
+                     agent_capture,
++                    stream_hub,
+                 }))
+             })
+             .await
+@@ -696,6 +754,7 @@
+     previews: Arc<Mutex<super::preview::Previews>>,
+     focus: Arc<focus::FocusHub>,
+     agent_capture: Arc<agent_capture::CaptureStatusHub>,
++    stream_hub: Arc<super::stream::Hub>,
+ }
+ async fn drive(mut driver: Driver) {
+     let local = hello(driver.local.clone());
+@@ -717,6 +776,7 @@
+             previews,
+             focus,
+             agent_capture,
++            stream_hub,
+             ..
+         } = &mut driver;
+         match connection {
+@@ -757,6 +817,7 @@
+                         incoming: &mut incoming,
+                         previews,
+                         focus,
++                        stream_hub,
+                         agent_capture,
+                     },
+                 )
+@@ -895,6 +956,7 @@
+     incoming: &'a mut Option<Incoming>,
+     previews: &'a Arc<Mutex<super::preview::Previews>>,
+     focus: &'a Arc<focus::FocusHub>,
++    stream_hub: &'a Arc<super::stream::Hub>,
+     agent_capture: &'a Arc<agent_capture::CaptureStatusHub>,
+ }
+ async fn connected(connection: SecureConnection, context: Connected<'_>) -> SessionResult<()> {
+@@ -917,7 +979,9 @@
+         previews,
+         focus,
+         agent_capture,
++        stream_hub,
+     } = context;
++    let stream_supported = connection.session().capabilities().contains("capture_stream_v1");
+     let active_epoch = ConnectionEpoch::enter(epoch.clone())?;
+     let _focus_epoch = focus.activate(active_epoch.value)?;
+     let _capture_epoch = agent_capture.activate(
+@@ -929,6 +993,11 @@
+     )?;
+     let (sender, mut receive) = connection.into_duplex()?;
+     let _closing = Closing(sender.clone());
++    let mut stream = if stream_supported {
++        let (endpoint, commands) = stream_hub.activate(active_epoch.value)?;
++        Some(super::stream::Bridge::new(endpoint, commands))
++    } else { None };
++    let outcome = async {
+     let start = Instant::now();
+     let mut interval = tokio::time::interval(Duration::from_nanos(8_333_334));
+     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+@@ -956,7 +1025,7 @@
+         waiting = true;
+     }
+     loop {
+-        if project.check_open().is_err() {
++        if project.check_open().is_err() || stream.as_ref().is_some_and(super::stream::Bridge::is_stopped) {
+             return Ok(());
+         }
+         tokio::select! {
+@@ -1007,6 +1076,12 @@
+                     },
+                     Body::ViewportOutline(view)=>{if view.corners.len()!=4||view.corners.iter().any(|p|!p.x.is_finite()||!p.y.is_finite()){return Err(SessionError::Invalid);}let id=Id::from_proto(view.document_id.as_ref()).map_err(|_|SessionError::Invalid)?;publish(status,|s|s.peer_viewport=Some(PeerViewport{document_id:id.to_string(),corners:view.corners.into_iter().map(|p|crate::Point{x:p.x,y:p.y}).collect()}));},
+                     Body::MarkerFocus(value)=>focus.receive(value,active_epoch.value)?,
++                    Body::StreamControl(value)=>stream.as_mut().ok_or(SessionError::Invalid)?.control(value)?,
++                    Body::FrameTiles(value)=>stream.as_mut().ok_or(SessionError::Invalid)?.media(value)?,
++                    Body::LosslessFrame(value)=>stream.as_mut().ok_or(SessionError::Invalid)?.lossless_offer(value,project)?,
++                    Body::RegionCaptureControl(value)=>stream.as_mut().ok_or(SessionError::Invalid)?.region_control(value,start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64)?,
++                    Body::StreamBlob(value)=>stream.as_mut().ok_or(SessionError::Invalid)?.stream_blob(value)?,
++                    Body::FreezeRequest(value)=>stream.as_mut().ok_or(SessionError::Invalid)?.freeze_request(value,start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64)?,
+                     Body::AgentCaptureStatus(value)=>agent_capture.receive(value,active_epoch.value)?,
+                     Body::GestureUpdate(update)=>receive_preview(project,peer,&sender,previews,*update,false,false).await?,
+                     Body::GestureReplay(replay)=>receive_preview(project,peer,&sender,previews,replay.update.ok_or(SessionError::Invalid)?,true,replay.open).await?,
+@@ -1024,6 +1099,9 @@
+                 super::preview::CommandKind::NewObject(value)=>{let local=sync::state(project).await?.local;let gesture=Id::try_from(value.gesture_id.clone()).map_err(|_|SessionError::Invalid)?;if !sync::gesture_closed(project,local.clone(),gesture).await?{previews.lock().map_err(|_|SessionError::Worker)?.record_new_object(value,&local)?;}},
+                 super::preview::CommandKind::Finish{gesture,cancel}=>{let closes=previews.lock().map_err(|_|SessionError::Worker)?.finish(gesture.clone(),cancel)?;if host&&cancel{sync::cancel_gesture(project,sync::state(project).await?.local,gesture).await?;}for close in closes{sender.enqueue(close)?;}},
+             }},
++            event=async { match stream.as_mut() { Some(value)=>value.next().await, None=>std::future::pending().await } }=>{
++                if let Some(value)=stream.as_mut(){value.handle(event,start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64)?;}
++            },
+             _=project.network_changed.notified()=>{},
+             _=interval.tick()=>{},
+         }
+@@ -1032,6 +1110,7 @@
+         }
+         echo.tick(&sender)?;
+         focus.flush(&sender)?;
++        if let Some(value)=stream.as_mut(){value.tick(&sender,start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64)?;}
+         agent_capture.flush(&sender)?;
+         fill(&sender, &mut outbound)?;
+         let updates = {
+@@ -1158,6 +1237,9 @@
+             };
+         });
+     }
++    }.await;
++    let cleanup = match stream.as_mut(){Some(value)=>value.shutdown().await,None=>Ok(())};
++    outcome.and(cleanup)
+ }
+ async fn receive_preview(
+     project: &ProjectSession,
+--- a/core/crates/vw-ffi/src/streaming_ffi.rs
++++ b/core/crates/vw-ffi/src/streaming_ffi.rs
+@@ -166,6 +166,7 @@
+ }
+ #[derive(Clone, Debug, uniffi::Record)]
+ pub struct FileExportResult {
++    pub capture_provenance_json: Option<String>,
+     pub encoded_bytes: u64,
+     pub blake3: String,
+     pub metadata_json: String,
+@@ -1273,11 +1274,13 @@
+     cancel.check()?;
+     // Only the owned temporary is cleaned on an error. persist_noclobber cannot
+     // replace any existing file, and cancellation after publication keeps it.
++    let capture_provenance_json = crate::capture_provenance::export_receipt(&report.metadata, &options.export.document_id, &revision)?;
+     output
+         .persist_noclobber(&destination)
+         .map_err(|_| CoreError::Storage)?;
+     sync_directory(&work)?;
+     Ok(FileExportResult {
++        capture_provenance_json,
+         encoded_bytes: report.encoded_bytes,
+         blake3: hash.finalize().to_hex().to_string(),
+         metadata_json,
+@@ -1341,6 +1344,7 @@
+             .map(|c| Id::from_proto(c.capture_session_id.as_ref()))
+             .transpose()?,
+         frame_id: document.capture.as_ref().map(|c| c.frame_id),
++        capture_provenance: document.capture.clone(),
+     })
+ }
+ fn with_source<R>(
+@@ -1684,7 +1688,9 @@
+             memory_budget_bytes: MEMORY_LIMIT,
+             capture_session: None,
+             frame_id: None,
+-        };
++        
++            capture_provenance: None,
++};
+         (vw_raster::export(&source, &request).unwrap().bytes, pixels)
+     }
+     fn creation(root: &Path, source: &Path) -> CreateFileImageProject {
+--- a/core/crates/vw-ffi/tests/capture_delivery.rs
++++ b/core/crates/vw-ffi/tests/capture_delivery.rs
+@@ -526,7 +526,9 @@
+             memory_budget_bytes: BUDGET,
+             capture_session: None,
+             frame_id: None,
+-        },
++        
++            capture_provenance: None,
++},
+     )
+     .unwrap()
+     .bytes;
+--- a/core/crates/vw-ffi/tests/masks.rs
++++ b/core/crates/vw-ffi/tests/masks.rs
+@@ -558,7 +558,9 @@
+             memory_budget_bytes: MEMORY,
+             capture_session: None,
+             frame_id: None,
+-        },
++        
++            capture_provenance: None,
++},
+     )
+     .unwrap()
+     .bytes;
+--- a/core/crates/vw-ffi/tests/semantic_ui.rs
++++ b/core/crates/vw-ffi/tests/semantic_ui.rs
+@@ -131,7 +131,9 @@
+                     lossless: true,
+                     degraded: false,
+                     captured_at_ms: TIME,
+-                }),
++                
++                    stream_save: None,
++}),
+             },
+             pages: vec![],
+             created_at_ms: TIME,
+--- a/core/crates/vw-ffi/tests/streaming_ffi.rs
++++ b/core/crates/vw-ffi/tests/streaming_ffi.rs
+@@ -410,7 +410,9 @@
+             memory_budget_bytes: 256 * 1024 * 1024,
+             capture_session: None,
+             frame_id: None,
+-        },
++        
++            capture_provenance: None,
++},
+     )
+     .unwrap()
+     .bytes;
+--- a/core/crates/vw-ffi/tests/support/mod.rs
++++ b/core/crates/vw-ffi/tests/support/mod.rs
+@@ -39,7 +39,9 @@
+             memory_budget_bytes: 256 * 1024 * 1024,
+             capture_session: None,
+             frame_id: None,
+-        },
++        
++            capture_provenance: None,
++},
+     )
+     .unwrap()
+     .bytes
+--- a/core/crates/vw-ffi/tests/workflows.rs
++++ b/core/crates/vw-ffi/tests/workflows.rs
+@@ -479,7 +479,9 @@
+                     lossless: true,
+                     degraded: false,
+                     captured_at_ms: TIME,
+-                }),
++                
++                    stream_save: None,
++}),
+             },
+             pages: vec![],
+             created_at_ms: TIME,
+--- a/core/crates/vw-model/src/validate.rs
++++ b/core/crates/vw-model/src/validate.rs
+@@ -32,7 +32,12 @@
+             text(&definition.title, 4096)?;
+             self.asset_ref(&definition.primary_asset_id, true)?;
+             match (&definition.capture, kind) {
+-                (Some(capture), v1::DocumentKind::Capture) => validate_capture(capture)?,
++                (Some(capture), v1::DocumentKind::Capture) => {
++                    validate_capture(capture)?;
++                    if capture.stream_save.as_ref().is_some_and(|s|s.saved_asset_id != definition.primary_asset_id) {
++                        return Err(ModelError::Invalid("stream Save document asset"));
++                    }
++                },
+                 (None, v1::DocumentKind::Capture) => {
+                     return Err(ModelError::Missing("capture info"));
+                 }
+@@ -309,6 +314,19 @@
+     text(&value.window_title, 4096)?;
+     if value.lossless && value.degraded {
+         return Err(ModelError::Invalid("capture quality flags"));
++    }
++    if let Some(save) = &value.stream_save {
++        Id::from_proto(save.draft_id.as_ref())?;
++        Id::from_proto(save.transaction_id.as_ref())?;
++        Id::from_proto(save.target_project_id.as_ref())?;
++        AssetId::try_from(save.target_state_hash.clone())?;
++        AssetId::try_from(save.saved_asset_id.clone())?;
++        if save.connection_epoch & 1 == 0 || save.source_generation == 0 || value.lossless == value.degraded {
++            return Err(ModelError::Invalid("stream Save quality/epoch"));
++        }
++        if value.lossless {
++            if save.original_asset_id != save.saved_asset_id { return Err(ModelError::Invalid("stream original hash")); }
++        } else if !save.original_asset_id.is_empty() { return Err(ModelError::Invalid("degraded original claim")); }
+     }
+     let geometry = value
+         .geometry
+--- a/core/crates/vw-model/tests/model_contract.rs
++++ b/core/crates/vw-model/tests/model_contract.rs
+@@ -216,7 +216,9 @@
+         lossless: true,
+         degraded: false,
+         captured_at_ms: 1_700_000_000_001,
+-    }
++    
++        stream_save: None,
++}
+ }
+ 
+ #[test]
+--- a/core/crates/vw-net/src/frame.rs
++++ b/core/crates/vw-net/src/frame.rs
+@@ -42,7 +42,8 @@
+         | Body::BlobAck(_)
+         | Body::TileRequest(_)
+         | Body::Tile(_)
+-        | Body::LosslessFrame(_) => v1::Channel::Blob,
++        | Body::LosslessFrame(_)
++        | Body::StreamBlob(_) => v1::Channel::Blob,
+         Body::FrameTiles(_) | Body::VideoFrame(_) => v1::Channel::Media,
+         Body::InputEvent(_) | Body::InputStatus(_) => v1::Channel::Input,
+         _ => v1::Channel::Control,
+@@ -100,6 +101,10 @@
+     if bytes.len() != HEADER_BYTES + len {
+         return Err(NetError::Invalid("frame length"));
+     }
++    if channel == v1::Channel::Media {
++        vw_proto::capture_admission::media_envelope(&bytes[HEADER_BYTES..])
++            .map_err(NetError::Invalid)?;
++    }
+     let envelope = v1::Envelope::decode(&bytes[HEADER_BYTES..])
+         .map_err(|_| NetError::Invalid("protobuf decode"))?;
+     if envelope.channel != channel as i32
+--- a/core/crates/vw-net/src/lib.rs
++++ b/core/crates/vw-net/src/lib.rs
+@@ -22,7 +22,7 @@
+ pub use sync::{HostSync, SyncReceiver, SyncResponse};
+ 
+ pub const PROTOCOL_MAJOR: u32 = 1;
+-pub const PROTOCOL_MINOR: u32 = 4;
++pub const PROTOCOL_MINOR: u32 = 5;
+ pub const CARRIER_ORDER: [vw_proto::v1::Carrier; 3] = [
+     vw_proto::v1::Carrier::QuicTether,
+     vw_proto::v1::Carrier::QuicWifi,
+@@ -62,3 +62,6 @@
+ mod focus_protocol_tests;
+ #[cfg(test)]
+ mod tests;
++
++#[cfg(test)]
++mod capture_protocol_tests;
+--- a/core/crates/vw-net/src/session.rs
++++ b/core/crates/vw-net/src/session.rs
+@@ -315,6 +315,7 @@
+         if !self.active {
+             return Err(NetError::Invalid("disconnected session"));
+         }
++        validate_capture_delivery(&body, &self.capabilities)?;
+         let channel = channel_for(&body);
+         let index = channel as usize;
+         let seq = self.next[index]
+@@ -477,6 +478,7 @@
+             return Ok(Receive::Discard);
+         }
+         let body = frame.envelope.body.ok_or(NetError::Invalid("body"))?;
++        validate_capture_delivery(&body, &self.capabilities)?;
+         let index = frame.channel as usize;
+         if matches!(frame.channel, v1::Channel::Ephemeral | v1::Channel::Media) {
+             let key = (frame.channel as i32, latest_key(&body)?);
+@@ -542,9 +544,18 @@
+         _ => u32::MAX,
+     }
+ }
++fn validate_capture_delivery(body: &Body, capabilities: &BTreeSet<String>) -> Result<()> {
++    match body {
++        Body::FrameTiles(value) if (value.delivery_sequence != 0) != capabilities.contains("capture_stream_v1") =>
++            Err(NetError::Invalid("capture delivery capability")),
++        Body::RegionCaptureControl(_) | Body::StreamBlob(_) if !capabilities.contains("capture_stream_v1") =>
++            Err(NetError::Invalid("capture stream capability")),
++        _ => Ok(()),
++    }
++}
+ pub(crate) fn media_info(body: &Body) -> Result<(u64, bool)> {
+     let value = match body {
+-        Body::FrameTiles(v) => (v.frame_id, v.keyframe),
++        Body::FrameTiles(v) => (if v.delivery_sequence == 0 { v.frame_id } else { v.delivery_sequence }, v.keyframe),
+         Body::VideoFrame(v) => (v.frame_id, v.keyframe),
+         _ => return Err(NetError::Invalid("media body")),
+     };
+--- a/core/crates/vw-package/src/compiler.rs
++++ b/core/crates/vw-package/src/compiler.rs
+@@ -68,7 +68,9 @@
+             memory_budget_bytes: budget,
+             capture_session: None,
+             frame_id: None,
+-        },
++        
++            capture_provenance: None,
++},
+     )?;
+     let remaining = options.limits.working(
+         retained
+@@ -107,6 +109,7 @@
+     binding: &'a vw_instructions::SourceBinding,
+     asset: &'a str,
+     limits: Limits,
++    capture: Option<&'a Capture>,
+ }
+ fn image_file(
+     files: &mut BTreeMap<String, Vec<u8>>,
+@@ -121,11 +124,11 @@
+         binding,
+         asset,
+         limits,
++        capture,
+     } = context;
+-    let metadata = bounded::json(
+-        &serde_json::json!({"schema":1,"project_id":binding.project_id,"document_id":binding.document_id,"host_seq":binding.host_seq,"state_hash":binding.state_hash,"source_asset":asset,"mapping":map}),
+-        8192,
+-    )?;
++    let mut receipt = serde_json::json!({"schema":1,"project_id":binding.project_id,"document_id":binding.document_id,"host_seq":binding.host_seq,"state_hash":binding.state_hash,"source_asset":asset,"mapping":map});
++    if let Some(capture) = capture.filter(|c|c.stream_save.is_some()) { receipt["capture"] = serde_json::to_value(capture).map_err(|_|Error::Encoding)?; }
++    let metadata = bounded::json(&receipt, 8192)?;
+     let bytes = pixels::encode(
+         frame,
+         profile,
+@@ -241,6 +244,7 @@
+                 return Err(Error::Stale);
+             }
+             Ok(Capture {
++                stream_save: c.stream_save.clone(),
+                 platform: c.platform.clone(),
+                 session_id: Id::from_proto(c.capture_session_id.as_ref())?,
+                 frame_id: c.frame_id,
+@@ -353,6 +357,7 @@
+         binding: instructions.source(),
+         asset: asset.as_str(),
+         limits: options.limits,
++        capture: capture.as_ref(),
+     };
+     {
+         let clean = srgb(
+--- a/core/crates/vw-package/src/image_receipt.rs
++++ b/core/crates/vw-package/src/image_receipt.rs
+@@ -48,15 +48,14 @@
+                 .mapping
+         }
+     };
+-    let expected = bounded::json(
+-        &serde_json::json!({
++    let mut receipt_value = serde_json::json!({
+             "schema": 1, "project_id": manifest.source.project_id,
+             "document_id": manifest.source.document_id, "host_seq": manifest.extensions.host_seq,
+             "state_hash": manifest.extensions.state_hash, "source_asset": manifest.source.asset_hash,
+             "mapping": mapping,
+-        }),
+-        8192,
+-    )?;
++        });
++    if let Some(capture) = manifest.source.capture.as_ref().filter(|c|c.stream_save.is_some()) { receipt_value["capture"] = serde_json::to_value(capture).map_err(|_|Error::Integrity)?; }
++    let expected = bounded::json(&receipt_value, 8192)?;
+     let mut at = 8_usize;
+     let mut receipt = false;
+     let mut profile = false;
+--- a/core/crates/vw-package/src/manifest.rs
++++ b/core/crates/vw-package/src/manifest.rs
+@@ -41,6 +41,8 @@
+ #[derive(Debug, Serialize, Deserialize)]
+ #[serde(deny_unknown_fields)]
+ pub struct Capture {
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub stream_save: Option<vw_proto::v1::StreamSaveProvenance>,
+     pub platform: String,
+     pub session_id: Id,
+     pub frame_id: u64,
+--- a/core/crates/vw-package/src/verify.rs
++++ b/core/crates/vw-package/src/verify.rs
+@@ -318,6 +318,15 @@
+         {
+             return Err(Error::Integrity);
+         }
++        if let Some(save) = &c.stream_save {
++            Id::from_proto(save.draft_id.as_ref()).map_err(|_|Error::Integrity)?;
++            Id::from_proto(save.transaction_id.as_ref()).map_err(|_|Error::Integrity)?;
++            Id::from_proto(save.target_project_id.as_ref()).map_err(|_|Error::Integrity)?;
++            vw_model::AssetId::try_from(save.target_state_hash.clone()).map_err(|_|Error::Integrity)?;
++            if save.saved_asset_id != m.source.asset_hash || save.connection_epoch & 1 == 0 || save.source_generation == 0
++                || c.lossless == c.degraded || (c.lossless && save.original_asset_id != save.saved_asset_id)
++                || (c.degraded && !save.original_asset_id.is_empty()) { return Err(Error::Integrity); }
++        }
+         text(&c.app_name, 4096)?;
+         if let Some(title) = &c.window_title {
+             text(title, 4096)?;
+--- a/core/crates/vw-package/tests/common/mod.rs
++++ b/core/crates/vw-package/tests/common/mod.rs
+@@ -211,7 +211,9 @@
+         lossless: true,
+         degraded: false,
+         captured_at_ms: 100,
+-    });
++    
++        stream_save: None,
++});
+     f.host = HostSequencer::new(project, device())?;
+     Ok(())
+ }
+--- a/core/crates/vw-proto/build.rs
++++ b/core/crates/vw-proto/build.rs
+@@ -14,6 +14,7 @@
+     config.boxed(".vw.v1.Envelope.body.gesture_replay");
+     config.type_attribute(".", "#[derive(::serde::Serialize, ::serde::Deserialize)]");
+     config.message_attribute(".", "#[serde(deny_unknown_fields)]");
++    config.field_attribute(".vw.v1.CaptureInfo.stream_save", "#[serde(default, skip_serializing_if = \"Option::is_none\")]");
+     config.compile_protos(&[schema], &[contracts])?;
+     Ok(())
+ }
+--- a/core/crates/vw-proto/src/lib.rs
++++ b/core/crates/vw-proto/src/lib.rs
+@@ -9,3 +9,5 @@
+ }
+ 
+ pub use prost::Message;
++
++pub mod capture_admission;
+--- a/core/crates/vw-raster/src/export.rs
++++ b/core/crates/vw-raster/src/export.rs
+@@ -56,6 +56,8 @@
+     /// Optional capture identity accompanies the document revision.
+     pub capture_session: Option<vw_model::Id>,
+     pub frame_id: Option<u64>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub capture_provenance: Option<v1::CaptureInfo>,
+ }
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ pub struct ExportMetadata {
+@@ -79,6 +81,18 @@
+     pub metadata: ExportMetadata,
+ }
+ 
++pub(crate) fn validate_capture_export(r: &ExportRequest, asset: &str) -> Result<(), RasterError> {
++    if let Some(capture) = &r.capture_provenance {
++        vw_model::validate_capture(capture).map_err(|_|RasterError::Invalid("capture provenance"))?;
++        let session = vw_model::Id::from_proto(capture.capture_session_id.as_ref()).map_err(|_|RasterError::Invalid("capture session"))?;
++        if r.capture_session.as_ref() != Some(&session) || r.frame_id != Some(capture.frame_id)
++            || capture.stream_save.as_ref().is_some_and(|save|save.saved_asset_id != asset) {
++            return Err(RasterError::Invalid("capture export binding"));
++        }
++    }
++    Ok(())
++}
++
+ /// Nonallocating admission for retained ICC bytes, transient profile copies and
+ /// simultaneous source/destination parser objects during color conversion.
+ /// The codec/geometry reserves account their other fixed workspaces separately.
+@@ -123,6 +137,7 @@
+     if width == 0 || height == 0 || !matches!(depth, 8 | 16) {
+         return Err(RasterError::Invalid("dimensions/depth"));
+     }
++    validate_capture_export(r, source.source_asset.as_str())?;
+     if r.revision.state_hash.len() != 32 || r.capture_session.is_some() != r.frame_id.is_some() {
+         return Err(RasterError::Invalid("revision/capture identity"));
+     }
+--- a/core/crates/vw-raster/src/stream.rs
++++ b/core/crates/vw-raster/src/stream.rs
+@@ -64,6 +64,7 @@
+ ) -> Result<StreamPlan, RasterError> {
+     let info = source.info();
+     crate::checked_samples(info.width, info.height)?;
++    crate::export::validate_capture_export(r, info.source_asset.as_str())?;
+     if r.revision.state_hash.len() != 32 || r.capture_session.is_some() != r.frame_id.is_some() {
+         return Err(RasterError::Invalid("revision/capture identity"));
+     }
+--- a/core/crates/vw-raster/tests/ordinary_format_preparation.rs
++++ b/core/crates/vw-raster/tests/ordinary_format_preparation.rs
+@@ -13,7 +13,9 @@
+ fn request(format: ExportFormat) -> ExportRequest {
+     ExportRequest { format, region: None, revision: vw_proto::v1::Revision { host_seq: 17, state_hash: vec![9; 32] },
+         alpha: AlphaPolicy::Preserve, color: ColorPolicy::Preserve, allow_depth_reduction: false,
+-        memory_budget_bytes: 256 * 1024 * 1024, capture_session: None, frame_id: None }
++        memory_budget_bytes: 256 * 1024 * 1024, capture_session: None, frame_id: None ,
++        capture_provenance: None,
++}
+ }
+ 
+ #[test]
+--- a/core/crates/vw-raster/tests/support/mod.rs
++++ b/core/crates/vw-raster/tests/support/mod.rs
+@@ -70,7 +70,9 @@
+         memory_budget_bytes: 1024 * 1024 * 1024,
+         capture_session: None,
+         frame_id: None,
+-    }
++    
++        capture_provenance: None,
++}
+ }
+ pub fn asset(image: &DecodedImage) -> v1::AddAsset {
+     v1::AddAsset {
+--- a/core/crates/vw-semantics/tests/common/mod.rs
++++ b/core/crates/vw-semantics/tests/common/mod.rs
+@@ -43,7 +43,9 @@
+                     lossless: true,
+                     degraded: false,
+                     captured_at_ms: 1000,
+-                }),
++                
++                    stream_save: None,
++}),
+                 ..Default::default()
+             },
+             pages: vec![],
+--- a/core/crates/vw-store/tests/database.rs
++++ b/core/crates/vw-store/tests/database.rs
+@@ -482,7 +482,9 @@
+         lossless: true,
+         degraded: false,
+         captured_at_ms: 100,
+-    };
++    
++        stream_save: None,
++};
+     value.documents.insert(
+         id(3),
+         Document {
+--- a/host-win/crates/vw-host-ffi/src/capture.rs
++++ b/host-win/crates/vw-host-ffi/src/capture.rs
+@@ -5,6 +5,11 @@
+ use vw_capture as capture;
+ #[path = "capture_fixed.rs"]
+ mod fixed_target;
++#[path = "capture_picker.rs"] mod picker;
++pub use picker::*;
++#[path = "capture_stream.rs"]
++mod stream_api;
++pub use stream_api::*;
+ 
+ #[derive(Debug, thiserror::Error, uniffi::Error)]
+ pub enum CaptureError {
+--- a/tools/desktop-test/reports.py
++++ b/tools/desktop-test/reports.py
+@@ -22,7 +22,7 @@
+ MAX_TOTAL = 4 * 1024**3
+ MAX_FILE = 1024**3
+ MAX_JSON = 8 * 1024**2
+-NATIVES = ("vw-capture-helper.exe", "vw-connection-helper.exe", "vw_core.dll", "vw_host.dll")
++NATIVES = ("vw-capture-helper.exe", "vw-stream-helper.exe", "vw-connection-helper.exe", "vw_core.dll", "vw_host.dll")
+ INPUTS = (*NATIVES, "vw-bindgen.exe")
+ BEGIN = ".local/desktop-test-build-start.json"
+ BUILT = ".local/desktop-test-build.json"

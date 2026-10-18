@@ -1,0 +1,577 @@
+--- a/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SelectionInteraction.kt
++++ b/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SelectionInteraction.kt
+@@ -23,7 +23,7 @@
+ import kotlin.math.max
+ import kotlin.math.min
+ 
+-public enum class SelectionTool { Rectangle, Lasso, Paint, MaskEraser }
++public enum class SelectionTool { Rectangle, Ellipse, Polygon, Lasso, Paint, MaskEraser }
+ public enum class SelectionRefinement { Invert, Expand, Shrink, Feather }
+ public data class SelectionDraft(public val tool: SelectionTool, public val points: List<Point>, public val radius: Double)
+ public data class SelectionPreview(public val binding: SelectionBinding, public val selection: SelectionVersion,
+@@ -77,6 +77,7 @@
+     private var selectedId: String? = null
+     private var camera: Camera? = null
+     private var gesture: Gesture? = null
++    private var polygon: SelectionPolygon? = null
+     private var owner: Job? = null
+     private var reader: Job? = null
+     private var operation: Job? = null
+@@ -130,7 +131,7 @@
+     }
+ 
+     private fun invalidate() {
+-        admission++; previewAdmission++; gesture = null
++        admission++; previewAdmission++; gesture = null; polygon = null
+         mutableState.value = mutableState.value.copy(document = null, selection = null, preview = null, draft = null)
+     }
+ 
+@@ -189,6 +190,16 @@
+         val point = runCatching { core.mapPoints(capturedCamera, true, listOf(screenPoint)).singleOrNull() }.getOrNull() ?: return false
+         if (!finite(point)) return false
+         val current = state.value
++        val retained = gesture
++        if (current.tool == SelectionTool.Polygon && retained != null) {
++            if (retained.tool != SelectionTool.Polygon || retained.admission != admission ||
++                retained.camera != capturedCamera || retained.document != document || polygon?.begin(point) != true) {
++                cancelGesture()
++                mutableState.value = state.value.copy(message = "Polygon cancelled: its view changed or its vertex limit was reached.")
++                return false
++            }
++            showDraft(); return true
++        }
+         if (current.selection == null && current.combine != SelectionCombine.Add) {
+             mutableState.value = current.copy(message = "Create a selection with Add before subtracting or intersecting."); return false
+         }
+@@ -198,6 +209,8 @@
+         gesture = Gesture(admission, capturedCamera, document, target, current.tool,
+             if (current.tool == SelectionTool.MaskEraser) SelectionCombine.Subtract else current.combine,
+             current.radius, current.opacity, mutableListOf(point))
++        polygon = if (current.tool == SelectionTool.Polygon) SelectionPolygon() else null
++        if (polygon != null && polygon?.begin(point) != true) { cancelGesture(); return false }
+         showDraft(); return true
+     }
+     /** Each real event is mapped with the DOWN camera. No thinning or predicted
+@@ -207,7 +220,11 @@
+         if (value.admission != admission || !finite(screenPoint)) { cancelGesture(); return }
+         val point = runCatching { core.mapPoints(value.camera, true, listOf(screenPoint)).singleOrNull() }.getOrNull()
+         if (point == null || !finite(point)) { cancelGesture(); return }
+-        if (value.tool == SelectionTool.Rectangle) {
++        if (value.tool == SelectionTool.Polygon) {
++            if (polygon?.move(point) != true) { cancelGesture(); return }
++            showDraft(); return
++        }
++        if (value.tool == SelectionTool.Rectangle || value.tool == SelectionTool.Ellipse) {
+             if (value.points.size == 1) value.points += point else value.points[1] = point
+         } else if (value.points.last() != point) {
+             if (value.points.size == 16_384) {
+@@ -220,16 +237,22 @@
+     public fun finish(screenPoint: Point? = null): Boolean {
+         if (screenPoint != null) append(screenPoint)
+         val value = gesture ?: return false
++        if (value.tool == SelectionTool.Polygon) {
++            if (value.admission != admission || polygon?.end() != true) { cancelGesture(); return false }
++            showDraft(); return true // UP adds one vertex; only Finish polygon publishes.
++        }
+         gesture = null; mutableState.value = state.value.copy(draft = null)
+         if (value.admission != admission) return false
+         val points = value.points.toList()
+         val action = when (value.tool) {
+-            SelectionTool.Rectangle -> {
++            SelectionTool.Rectangle, SelectionTool.Ellipse -> {
+                 val first = points.first(); val last = points.last()
+                 val rectangle = Rect(min(first.x, last.x), min(first.y, last.y), kotlin.math.abs(last.x - first.x), kotlin.math.abs(last.y - first.y))
+                 if (rectangle.width == 0.0 || rectangle.height == 0.0) return false
+-                SelectionOperation.Rectangle(rectangle, value.combine)
+-            }
++                if (value.tool == SelectionTool.Ellipse) SelectionOperation.Ellipse(rectangle, value.combine)
++                else SelectionOperation.Rectangle(rectangle, value.combine)
++            }
++            SelectionTool.Polygon -> return false // Explicit finishPolygon handles persistent drafts.
+             SelectionTool.Lasso -> {
+                 if (points.size < 3) { mutableState.value = state.value.copy(message = "A lasso needs at least three points."); return false }
+                 SelectionOperation.Lasso(points, value.combine)
+@@ -238,14 +261,44 @@
+         }
+         return submit(value.document, value.target, action)
+     }
+-    public fun cancelGesture() { gesture = null; mutableState.value = state.value.copy(draft = null) }
++    public fun finishPolygon(): Boolean {
++        val value = gesture ?: return false
++        if (value.tool != SelectionTool.Polygon || value.admission != admission ||
++            value.document != state.value.document || !state.value.canDraw || selectedSnapshotPending()) {
++            cancelGesture(); return false
++        }
++        val vertices = polygon?.completed()
++        if (vertices == null) {
++            mutableState.value = state.value.copy(message = "Tap at least three vertices and lift the pen before finishing.")
++            return false
++        }
++        cancelGesture()
++        return submit(value.document, value.target, SelectionOperation.Polygon(vertices, value.combine))
++    }
++    public fun undoPolygonVertex(): Boolean {
++        if (gesture?.tool != SelectionTool.Polygon || polygon?.undo() != true) return false
++        if (polygon?.count == 0) cancelGesture() else showDraft()
++        return true
++    }
++    /** Normal Android DOWN may retire an old tool contact while preserving only
++     * this admitted idle polygon. All explicit cancellation stays unconditional. */
++    public fun canResumePolygonContact(capturedCamera: Camera): Boolean {
++        val retained = gesture ?: return false
++        return retained.tool == SelectionTool.Polygon && state.value.tool == SelectionTool.Polygon &&
++            polygon?.let { !it.contacting && it.count > 0 } == true &&
++            state.value.canDraw && !selectedSnapshotPending() && owner?.isActive == true &&
++            retained.admission == admission && retained.camera == capturedCamera &&
++            retained.document == state.value.document
++    }
++    public fun cancelGesture() { gesture = null; polygon = null; mutableState.value = state.value.copy(draft = null) }
+     private fun showDraft() {
+         val value = gesture ?: return
+-        mutableState.value = state.value.copy(draft = SelectionDraft(value.tool, value.points.toList(), value.radius))
++        mutableState.value = state.value.copy(draft = SelectionDraft(value.tool, polygon?.preview() ?: value.points.toList(), value.radius))
+     }
+     public fun refine(value: SelectionRefinement): Boolean {
+         if (!state.value.canRefine) return false
+         val doc = state.value.document ?: return false; val selection = state.value.selection ?: return false
++        cancelGesture()
+         val radius = state.value.refinementRadius
+         val action = when (value) {
+             SelectionRefinement.Invert -> SelectionOperation.Invert
+@@ -342,7 +395,7 @@
+     /** Await on the UI dispatcher before closing/replacing the project. */
+     public suspend fun detach(): Unit = withContext(NonCancellable) {
+         detaching = true
+-        admission++; previewAdmission++; gesture = null
++        admission++; previewAdmission++; gesture = null; polygon = null
+         val jobs = listOfNotNull(operation, reader).distinct()
+         owner?.cancel(); jobs.forEach { it.cancel() }
+         jobs.joinAll()
+--- a/apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/SelectionInteractionTest.kt
++++ b/apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/SelectionInteractionTest.kt
+@@ -8,6 +8,102 @@
+ import kotlin.test.*
+ 
+ class SelectionInteractionTest {
++    @Test fun ellipseUsesOneDownCameraRectangleAndOneCommit() {
++        val f = SelectionFixture()
++        try {
++            f.ui.tool(SelectionTool.Ellipse)
++            assertTrue(f.ui.begin(Point(20.0, 30.0), f.camera))
++            f.ui.append(Point(10.0, 12.0)); assertTrue(f.ui.finish())
++            assertFalse(f.ui.finish())
++            assertEquals(SelectionOperation.Ellipse(Rect(10.0, 12.0, 10.0, 18.0), SelectionCombine.Add), f.api.edits.single().operation)
++        } finally { f.close() }
++    }
++    @Test fun polygonRetainsTappedVerticesWithoutWritingUntilExplicitFinish() {
++        val f = SelectionFixture()
++        try {
++            f.ui.tool(SelectionTool.Polygon)
++            val vertices = listOf(Point(1.0, 2.0), Point(12.0, 3.0), Point(8.0, 20.0))
++            for (p in vertices) { assertTrue(f.ui.begin(p, f.camera)); assertTrue(f.ui.finish()) }
++            assertTrue(f.api.edits.isEmpty())
++            assertEquals(vertices, f.ui.state.value.draft?.points)
++            assertTrue(f.ui.finishPolygon()); assertFalse(f.ui.finishPolygon())
++            assertEquals(SelectionOperation.Polygon(vertices, SelectionCombine.Add), f.api.edits.single().operation)
++            assertNull(f.ui.state.value.draft)
++        } finally { f.close() }
++    }
++    @Test fun polygonDragAdjustsOneVertexAndUndoDoesNotCommit() {
++        val f = SelectionFixture()
++        try {
++            f.ui.tool(SelectionTool.Polygon)
++            assertTrue(f.ui.begin(Point(1.0, 1.0), f.camera))
++            repeat(50) { f.ui.append(Point(2.0 + it, 2.0)) }
++            assertTrue(f.ui.finish()); assertEquals(listOf(Point(51.0, 2.0)), f.ui.state.value.draft?.points)
++            assertFalse(f.ui.finishPolygon())
++            assertTrue(f.ui.begin(Point(10.0, 20.0), f.camera)); f.ui.finish()
++            assertTrue(f.ui.undoPolygonVertex()); assertEquals(1, f.ui.state.value.draft?.points?.size)
++            assertTrue(f.ui.undoPolygonVertex()); assertNull(f.ui.state.value.draft)
++            assertTrue(f.api.edits.isEmpty())
++        } finally { f.close() }
++    }
++    @Test fun polygonCannotFinishWhileContactIsDownAndCancelLosesAllVertices() {
++        val f = SelectionFixture()
++        try {
++            f.ui.tool(SelectionTool.Polygon)
++            for (p in listOf(Point(1.0, 1.0), Point(6.0, 1.0), Point(4.0, 5.0))) {
++                assertTrue(f.ui.begin(p, f.camera)); f.ui.finish()
++            }
++            assertTrue(f.ui.begin(Point(1.0, 5.0), f.camera))
++            assertFalse(f.ui.finishPolygon()); assertTrue(f.api.edits.isEmpty())
++            f.ui.cancelGesture(); assertFalse(f.ui.finish()); assertFalse(f.ui.finishPolygon())
++            assertNull(f.ui.state.value.draft)
++        } finally { f.close() }
++    }
++    @Test fun polygonRevisionViewportAttachmentAndToolChangesCannotPublishOldVertices() {
++        for (reason in 0..3) {
++            val f = SelectionFixture()
++            try {
++                f.ui.tool(SelectionTool.Polygon)
++                for (p in listOf(Point(1.0, 1.0), Point(6.0, 1.0), Point(4.0, 5.0))) { f.ui.begin(p, f.camera); f.ui.finish() }
++                when (reason) {
++                    0 -> f.ui.observe(f.info.copy(stateHash = "new-pending-visible-hash"), 2u)
++                    1 -> f.ui.viewport(f.camera.copy(rotation = .5))
++                    2 -> immediate { f.ui.detach() }
++                    else -> f.ui.tool(SelectionTool.Ellipse)
++                }
++                assertFalse(f.ui.finishPolygon()); assertTrue(f.api.edits.isEmpty()); assertNull(f.ui.state.value.draft)
++            } finally { f.close() }
++        }
++    }
++    @Test fun polygonExistingMaskUsesCapturedVersionAndSubtractMode() {
++        val f = SelectionFixture()
++        try {
++            f.select(); f.ui.tool(SelectionTool.Polygon); f.ui.combine(SelectionCombine.Subtract)
++            for (p in listOf(Point(1.0, 1.0), Point(6.0, 1.0), Point(4.0, 5.0))) { f.ui.begin(p, f.camera); f.ui.finish() }
++            assertTrue(f.ui.finishPolygon())
++            val edit = f.api.edits.single()
++            assertEquals(SelectionCombine.Subtract, (edit.operation as SelectionOperation.Polygon).combine)
++            assertEquals(SelectionVersion("selection", "mask", 1u), (edit.target as SelectionTarget.Existing).selection)
++        } finally { f.close() }
++    }
++    @Test fun polygonFailureRefreshesOnceAndDoesNotReuseItsPrivateDraft() {
++        val f = SelectionFixture()
++        try {
++            f.api.failure = SelectionFailure(SelectionFailureKind.Memory); f.ui.tool(SelectionTool.Polygon)
++            for (p in listOf(Point(1.0, 1.0), Point(6.0, 1.0), Point(4.0, 5.0))) { f.ui.begin(p, f.camera); f.ui.finish() }
++            assertTrue(f.ui.finishPolygon()); assertEquals(1, f.api.edits.size); assertEquals(1, f.refreshes)
++            assertFalse(f.ui.finishPolygon()); assertFalse(f.ui.state.value.busy); assertNull(f.ui.state.value.draft)
++        } finally { f.close() }
++    }
++    @Test fun polygonOwnedRequestCopiesVerticesBeforeCallerMutation() {
++        val vertices = mutableListOf(Point(1.0, 1.0), Point(8.0, 1.0), Point(4.0, 9.0))
++        val edit = SelectionEdit(SelectionBinding("p", "d", "a", 0u, "hash"), "txn", "device", 1u, 0,
++            SelectionTarget.New("o", "l"), SelectionOperation.Polygon(vertices, SelectionCombine.Add))
++        val owned = edit.ownedSelectionRequest()
++        vertices.clear()
++        assertEquals(3, (owned.operation as SelectionOperation.Polygon).vertices.size)
++        assertFailsWith<SelectionFailure> { edit.ownedSelectionRequest() }
++    }
++
+     @Test fun inactiveEditorDoesNotAcquireOrReadUnusedNativeSelectionCapability() {
+         val f = SelectionFixture()
+         f.capabilityFailure = SelectionFailure(SelectionFailureKind.Unsupported)
+--- a/core/crates/vw-ffi/src/masks/edit.rs
++++ b/core/crates/vw-ffi/src/masks/edit.rs
+@@ -15,7 +15,7 @@
+     }
+     if let SelectionOperation::Combine { other, .. } = &options.operation { admit_version(other)?; }
+     match &options.operation {
+-        SelectionOperation::Lasso { points, .. } if points.len() < 3 || points.len() > vw_mask::MAX_PATH_POINTS => Err(SelectionError::Limit),
++        SelectionOperation::Lasso { points, .. } | SelectionOperation::Polygon { vertices: points, .. } if points.len() < 3 || points.len() > vw_mask::MAX_PATH_POINTS => Err(SelectionError::Limit),
+         SelectionOperation::Paint { points, .. } if points.is_empty() || points.len() > vw_mask::MAX_PATH_POINTS => Err(SelectionError::Limit),
+         _ => Ok(()),
+     }
+@@ -30,7 +30,8 @@
+     let device = DeviceId::try_from(options.device_id.clone())?;
+     if device != state.store()?.local_device()? { return Err(SelectionError::Invalid); }
+     let input_bytes = match &options.operation {
+-        SelectionOperation::Lasso { points, .. } | SelectionOperation::Paint { points, .. } => points.len() as u64 * 256,
++        SelectionOperation::Lasso { points, .. } | SelectionOperation::Paint { points, .. }
++            | SelectionOperation::Polygon { vertices: points, .. } => points.len() as u64 * 256,
+         _ => 0,
+     };
+     memory(mask_estimate(size, input_bytes.checked_add(canonical).ok_or(SelectionError::Limit)?)?, options.memory_budget_bytes)?;
+@@ -39,6 +40,9 @@
+         admit_morphology_size(size, *radius)?;
+     }
+ 
++    if let SelectionOperation::Ellipse { rectangle: r, .. } = &options.operation {
++        Mask::admit_ellipse(size, vw_mask::Rect { x: r.x, y: r.y, width: r.width, height: r.height })?;
++    }
+     let project = state.project()?;
+     let document_id = Id::try_from(options.binding.document_id.clone())?;
+     let mut kinds = Vec::new();
+@@ -207,6 +211,9 @@
+         SelectionOperation::Rectangle { rectangle: r, combine: how } => combine(
+             Mask::rectangle(base.size(), vw_mask::Rect { x: r.x, y: r.y, width: r.width, height: r.height })?, *how),
+         SelectionOperation::Lasso { points: p, combine: how } => combine(Mask::lasso(base.size(), &points(p))?, *how),
++        SelectionOperation::Ellipse { rectangle: r, combine: how } => combine(
++            Mask::ellipse(base.size(), vw_mask::Rect { x: r.x, y: r.y, width: r.width, height: r.height })?, *how),
++        SelectionOperation::Polygon { vertices, combine: how } => combine(Mask::polygon(base.size(), &points(vertices))?, *how),
+         SelectionOperation::Paint { points: p, radius, opacity, combine: how } =>
+             combine(Mask::paint(base.size(), &points(p), *radius, *opacity)?, *how),
+         SelectionOperation::Combine { other, combine: how } => {
+--- a/core/crates/vw-mask/src/lib.rs
++++ b/core/crates/vw-mask/src/lib.rs
+@@ -5,6 +5,7 @@
+ mod coverage;
+ mod export;
+ mod morphology;
++mod shape_selection;
+ 
+ pub use export::{Cutout8, Cutout16};
+ use std::{collections::BTreeMap, sync::Arc};
+--- a/core/crates/vw-mask/src/coverage.rs
++++ b/core/crates/vw-mask/src/coverage.rs
+@@ -144,18 +144,22 @@
+ enum Primitive {
+     Edge { low: Q, high: Q, winding: i32 },
+     Circle { center: Q, radius: i64 },
++    // Twice the quantized center preserves odd (1/256 px) bounding widths.
++    Ellipse { center2: Q, width: i64, height: i64 },
+ }
+ impl Primitive {
+     fn low(self) -> i64 {
+         match self {
+             Self::Edge { low, .. } => low.y,
+             Self::Circle { center, radius } => center.y - radius,
++            Self::Ellipse { center2, height, .. } => (center2.y - height) / 2,
+         }
+     }
+     fn high(self) -> i64 {
+         match self {
+             Self::Edge { high, .. } => high.y,
+             Self::Circle { center, radius } => center.y + radius,
++            Self::Ellipse { center2, height, .. } => (center2.y + height) / 2,
+         }
+     }
+     fn events(self, y2: i64, out: &mut Vec<(i64, i32)>) {
+@@ -168,6 +172,15 @@
+                 let offset = (numerator + denominator / 2).div_euclid(denominator);
+                 out.push((low.x * 256 + offset as i64, winding));
+             }
++            Self::Ellipse { center2, width, height } => {
++                let dy = (y2 - center2.y) as f64 / height as f64;
++                let square = 1.0 - dy * dy;
++                if square > 0.0 {
++                    let offset = libm::round(libm::sqrt(square) * width as f64 * 128.0) as i64;
++                    out.push((center2.x * 128 - offset, -1));
++                    out.push((center2.x * 128 + offset, 1));
++                }
++            }
+             Self::Circle { center, radius } => {
+                 let dy = y2 - 2 * center.y;
+                 let square = 4 * radius * radius - dy * dy;
+@@ -180,6 +193,14 @@
+         }
+     }
+ }
++/// Called only after the nonallocating ellipse geometry/work admission.
++pub(crate) fn rasterize_ellipse(size: Size, [left, top, right, bottom]: [i64; 4]) -> Result<Mask> {
++    rasterize(size, vec![Primitive::Ellipse {
++        center2: Q { x: left + right, y: top + bottom },
++        width: right - left, height: bottom - top,
++    }], Fill::NonZero, 255)
++}
++
+ fn add_polygon(primitives: &mut Vec<Primitive>, points: &[Q]) {
+     for (&a, &b) in points
+         .iter()
+--- a/core/crates/vw-ffi/src/masks/dto.rs
++++ b/core/crates/vw-ffi/src/masks/dto.rs
+@@ -81,6 +81,8 @@
+ pub enum SelectionOperation {
+     Rectangle { rectangle: QueryRect, combine: SelectionCombine },
+     Lasso { points: Vec<Point>, combine: SelectionCombine },
++    Ellipse { rectangle: QueryRect, combine: SelectionCombine },
++    Polygon { vertices: Vec<Point>, combine: SelectionCombine },
+     /// Subtract + paint is the nondestructive mask eraser. Radius is in D pixels.
+     Paint { points: Vec<Point>, radius: f64, opacity: u8, combine: SelectionCombine },
+     Combine { other: SelectionVersion, combine: SelectionCombine },
+--- a/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/MaskApi.kt
++++ b/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/MaskApi.kt
+@@ -49,6 +49,8 @@
+ public sealed interface SelectionOperation {
+     public data class Rectangle(public val rectangle: Rect, public val combine: SelectionCombine) : SelectionOperation
+     public data class Lasso(public val points: List<Point>, public val combine: SelectionCombine) : SelectionOperation
++    public data class Ellipse(public val rectangle: Rect, public val combine: SelectionCombine) : SelectionOperation
++    public data class Polygon(public val vertices: List<Point>, public val combine: SelectionCombine) : SelectionOperation
+     /** Subtract is a mask eraser. Only real D-space samples; no motion prediction. */
+     public data class Paint(public val points: List<Point>, public val radius: Double,
+         public val opacity: UByte, public val combine: SelectionCombine) : SelectionOperation
+@@ -99,6 +101,10 @@
+             if (value.points.size !in 3..16_384) throw SelectionFailure(SelectionFailureKind.Limit)
+             value.copy(points = value.points.toList())
+         }
++        is SelectionOperation.Polygon -> {
++            if (value.vertices.size !in 3..16_384) throw SelectionFailure(SelectionFailureKind.Limit)
++            value.copy(vertices = value.vertices.toList())
++        }
+         is SelectionOperation.Paint -> {
+             if (value.points.size !in 1..16_384) throw SelectionFailure(SelectionFailureKind.Limit)
+             value.copy(points = value.points.toList())
+--- a/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeMasks.kt
++++ b/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeMasks.kt
+@@ -142,6 +142,9 @@
+         is SelectionOperation.Rectangle -> NOperation.Rectangle(QueryRect(value.rectangle.x, value.rectangle.y,
+             value.rectangle.width, value.rectangle.height), value.combine.native())
+         is SelectionOperation.Lasso -> NOperation.Lasso(value.points.map { NPoint(it.x, it.y) }, value.combine.native())
++        is SelectionOperation.Ellipse -> NOperation.Ellipse(QueryRect(value.rectangle.x, value.rectangle.y,
++            value.rectangle.width, value.rectangle.height), value.combine.native())
++        is SelectionOperation.Polygon -> NOperation.Polygon(value.vertices.map { NPoint(it.x, it.y) }, value.combine.native())
+         is SelectionOperation.Paint -> NOperation.Paint(value.points.map { NPoint(it.x, it.y) }, value.radius, value.opacity, value.combine.native())
+         is SelectionOperation.Combine -> NOperation.Combine(value.other.native(), value.combine.native())
+         SelectionOperation.Invert -> NOperation.Invert
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/SelectionPanel.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/SelectionPanel.kt
+@@ -21,7 +21,8 @@
+             SelectionTool.entries.forEach { tool ->
+                 OutlinedButton({ actions.tool(tool) }, Modifier.fillMaxWidth(), enabled = !state.busy) {
+                     Text((if (state.tool == tool) "• " else "") + when (tool) {
+-                        SelectionTool.Rectangle -> "Rectangle"; SelectionTool.Lasso -> "Lasso"
++                        SelectionTool.Rectangle -> "Rectangle"; SelectionTool.Ellipse -> "Ellipse"
++                        SelectionTool.Polygon -> "Polygon"; SelectionTool.Lasso -> "Lasso"
+                         SelectionTool.Paint -> "Paint selection"; SelectionTool.MaskEraser -> "Erase mask"
+                     })
+                 }
+@@ -30,6 +31,14 @@
+             SelectionCombine.entries.forEach { mode ->
+                 TextButton({ actions.combine(mode) }, enabled = !state.busy && state.tool != SelectionTool.MaskEraser) {
+                     Text((if (state.combine == mode) "• " else "") + mode.name)
++                }
++            }
++            if (state.tool == SelectionTool.Polygon) {
++                Text("Tap vertices. Drag adjusts the current vertex. Finish saves one selection.")
++                Row {
++                    TextButton({ actions.finishPolygon() }, enabled = !state.busy && !state.loading && (state.draft?.points?.size ?: 0) >= 3) { Text("Finish polygon") }
++                    TextButton({ actions.undoPolygonVertex() }, enabled = !state.busy && state.draft != null) { Text("Undo vertex") }
++                    TextButton(actions::cancelGesture, enabled = state.draft != null) { Text("Cancel") }
+                 }
+             }
+             if (state.tool == SelectionTool.Paint || state.tool == SelectionTool.MaskEraser) {
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/SelectionPanel.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/SelectionPanel.kt
+@@ -20,6 +20,12 @@
+         Row(Modifier.horizontalScroll(rememberScrollState())) {
+             TextButton({ open = true }, Modifier.heightIn(min = 48.dp)) { Text(if (state.active) "Selection · ${state.tool.name}" else "Select pixels") }
+             if (state.active) TextButton({ controller.interaction.active(false) }, Modifier.heightIn(min = 48.dp)) { Text("Return to drawing") }
++            if (state.active && state.tool == SelectionTool.Polygon && state.draft != null) {
++                TextButton({ controller.interaction.finishPolygon() }, Modifier.heightIn(min = 48.dp),
++                    enabled = !state.busy && !state.loading && (state.draft?.points?.size ?: 0) >= 3) { Text("Finish polygon") }
++                TextButton({ controller.interaction.undoPolygonVertex() }, Modifier.heightIn(min = 48.dp), enabled = !state.busy) { Text("Undo vertex") }
++                TextButton(controller.interaction::cancelGesture, Modifier.heightIn(min = 48.dp)) { Text("Cancel polygon") }
++            }
+             if (state.busy) TextButton(controller::cancel, Modifier.heightIn(min = 48.dp)) { Text("Cancel selection") }
+         }
+     }
+@@ -38,13 +44,22 @@
+             SelectionTool.entries.forEach { tool ->
+                 OutlinedButton({ actions.tool(tool) }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = !state.busy) {
+                     Text((if (state.active && state.tool == tool) "• " else "") + when (tool) {
+-                        SelectionTool.Rectangle -> "Rectangle"; SelectionTool.Lasso -> "Lasso"
++                        SelectionTool.Rectangle -> "Rectangle"; SelectionTool.Ellipse -> "Ellipse"
++                        SelectionTool.Polygon -> "Polygon"; SelectionTool.Lasso -> "Lasso"
+                         SelectionTool.Paint -> "Paint selection"; SelectionTool.MaskEraser -> "Erase mask"
+                     })
+                 }
+             }
+             Row(Modifier.horizontalScroll(rememberScrollState())) {
+                 SelectionCombine.entries.forEach { mode -> TextButton({ actions.combine(mode) }, Modifier.heightIn(min = 48.dp), enabled = !state.busy && state.tool != SelectionTool.MaskEraser) { Text((if (state.combine == mode) "• " else "") + mode.name) } }
++            }
++            if (state.tool == SelectionTool.Polygon) {
++                Text("Tap vertices. Drag adjusts the current vertex. Finish saves one selection.")
++                Row {
++                    TextButton({ actions.finishPolygon() }, enabled = !state.busy && !state.loading && (state.draft?.points?.size ?: 0) >= 3) { Text("Finish polygon") }
++                    TextButton({ actions.undoPolygonVertex() }, enabled = !state.busy && state.draft != null) { Text("Undo vertex") }
++                    TextButton(actions::cancelGesture, enabled = state.draft != null) { Text("Cancel") }
++                }
+             }
+             if (state.tool == SelectionTool.Paint || state.tool == SelectionTool.MaskEraser) {
+                 Text("Radius ${state.radius.toInt()} document pixels")
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/SelectionOverlay.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/SelectionOverlay.kt
+@@ -66,9 +66,15 @@
+                     if (draft.tool == SelectionTool.Rectangle) drawRect(color,
+                         Offset(minOf(first.x, last.x).toFloat(), minOf(first.y, last.y).toFloat()),
+                         Size(kotlin.math.abs(last.x - first.x).toFloat(), kotlin.math.abs(last.y - first.y).toFloat()), style = line)
++                    else if (draft.tool == SelectionTool.Ellipse) drawOval(color,
++                        Offset(minOf(first.x, last.x).toFloat(), minOf(first.y, last.y).toFloat()),
++                        Size(kotlin.math.abs(last.x - first.x).toFloat(), kotlin.math.abs(last.y - first.y).toFloat()), style = line)
+                     else {
+-                        val path = Path().apply { moveTo(first.x.toFloat(), first.y.toFloat()); draft.points.drop(1).forEach { lineTo(it.x.toFloat(), it.y.toFloat()) }; if (draft.tool == SelectionTool.Lasso) close() }
++                        val path = Path().apply { moveTo(first.x.toFloat(), first.y.toFloat()); draft.points.drop(1).forEach { lineTo(it.x.toFloat(), it.y.toFloat()) }; if (draft.tool == SelectionTool.Lasso || draft.tool == SelectionTool.Polygon) close() }
+                         drawPath(path, color, style = line)
++                        if (draft.tool == SelectionTool.Polygon) draft.points.forEach { point ->
++                            drawCircle(color, (2.5 / camera.scale).toFloat(), Offset(point.x.toFloat(), point.y.toFloat()))
++                        }
+                         if (draft.tool == SelectionTool.Paint || draft.tool == SelectionTool.MaskEraser)
+                             drawCircle(color, draft.radius.toFloat(), Offset(last.x.toFloat(), last.y.toFloat()), style = line)
+                     }
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/SelectionOverlay.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/SelectionOverlay.kt
+@@ -61,9 +61,15 @@
+                     if (draft.tool == SelectionTool.Rectangle) drawRect(color,
+                         Offset(minOf(first.x, last.x).toFloat(), minOf(first.y, last.y).toFloat()),
+                         Size(kotlin.math.abs(last.x - first.x).toFloat(), kotlin.math.abs(last.y - first.y).toFloat()), style = line)
++                    else if (draft.tool == SelectionTool.Ellipse) drawOval(color,
++                        Offset(minOf(first.x, last.x).toFloat(), minOf(first.y, last.y).toFloat()),
++                        Size(kotlin.math.abs(last.x - first.x).toFloat(), kotlin.math.abs(last.y - first.y).toFloat()), style = line)
+                     else {
+-                        val path = Path().apply { moveTo(first.x.toFloat(), first.y.toFloat()); draft.points.drop(1).forEach { lineTo(it.x.toFloat(), it.y.toFloat()) }; if (draft.tool == SelectionTool.Lasso) close() }
++                        val path = Path().apply { moveTo(first.x.toFloat(), first.y.toFloat()); draft.points.drop(1).forEach { lineTo(it.x.toFloat(), it.y.toFloat()) }; if (draft.tool == SelectionTool.Lasso || draft.tool == SelectionTool.Polygon) close() }
+                         drawPath(path, color, style = line)
++                        if (draft.tool == SelectionTool.Polygon) draft.points.forEach { point ->
++                            drawCircle(color, (2.5 / camera.scale).toFloat(), Offset(point.x.toFloat(), point.y.toFloat()))
++                        }
+                         if (draft.tool == SelectionTool.Paint || draft.tool == SelectionTool.MaskEraser)
+                             drawCircle(color, draft.radius.toFloat(), Offset(last.x.toFloat(), last.y.toFloat()), style = line)
+                     }
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt
+@@ -166,7 +166,7 @@
+             controller.pointerDown(Point(down.position.x.toDouble(),down.position.y.toDouble()),currentEvent.keyboardModifiers.isShiftPressed,down.type==PointerType.Touch||currentEvent.buttons.isTertiaryPressed||currentEvent.buttons.isSecondaryPressed,down.uptimeMillis);down.consume()
+             var completed=false
+             try{while(true){val event=awaitPointerEvent();val change=event.changes.firstOrNull{it.id==down.id}?:break;if(!change.pressed){controller.pointerUp(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);completed=true;change.consume();break};controller.pointerMove(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);change.consume()}}
+-            finally{if(completed)controller.cancelDrag()else controller.cancelInput()}
++            finally{if(completed){if(controller.selections.state.value.draft?.tool!=SelectionTool.Polygon)controller.cancelDrag()}else controller.cancelInput()}
+         }}
+     ){
+         drawRect(Color(0xff0c1118))
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -664,7 +664,11 @@
+                                    val createdAtMs: Long = System.currentTimeMillis())
+ 
+     override fun beginTool(sample: PenSample, capabilities: StylusCapabilities) {
+-        cancelTool(); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
++        val retainPolygon = !selectionPointer && !eraserPointer && gesture == null &&
++            !busy && blockingMessage == null && background != null && strokes.size < 3 &&
++            erasers.tools.route(sample.tool == PointerTool.Eraser) == EraserInputRoute.Selection &&
++            selections.interaction.canResumePolygonContact(camera)
++        clearToolContact(retainPolygon); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
+         if (busy || blockingMessage != null || background == null || strokes.size >= 3) {
+             if (strokes.size >= 3) message = "The save queue is full. Wait for the current strokes to finish."
+             return
+@@ -804,9 +808,10 @@
+         publish()
+     }
+ 
+-    override fun cancelTool() {
++    override fun cancelTool() { clearToolContact(false) }
++    private fun clearToolContact(retainPolygon: Boolean) {
+         eraserPointer = false; erasers.interaction.cancelGesture()
+-        selectionPointer = false; selections.interaction.cancelGesture()
++        selectionPointer = false; if (!retainPolygon) selections.interaction.cancelGesture()
+         gesture?.let { active -> finishRemotePreview(active.link, active.previewId, true) }
+         gesture?.stroke?.let { run -> run.canceled.set(true); cancelNative(run.native); run.queue.close(); run.drawing = null }
+         gesture = null; transientShape = null; erased = emptySet(); transformed = emptyMap(); eraserLast = null; publish()
+--- a/core/crates/vw-ffi/tests/mask_admission.rs
++++ b/core/crates/vw-ffi/tests/mask_admission.rs
+@@ -39,6 +39,25 @@
+ fn temporary() -> tempfile::TempDir {
+     if cfg!(target_os = "android") { tempfile::tempdir_in(std::env::current_dir().unwrap()).unwrap() }
+     else { tempfile::tempdir().unwrap() }
++}
++
++#[tokio::test]
++async fn ellipse_work_admission_precedes_missing_mask_blob_access() {
++    let dir = temporary(); let path = dir.path().join("project");
++    let device = DeviceId::try_from(device()).unwrap();
++    drop(vw_store::ProjectStore::create(&path, fixture(1, 1_000_000), device, TIME).unwrap());
++    let project = open_project(path.to_string_lossy().into(), cancel()).await.unwrap();
++    let doc = project.selection_document(id(2), cancel()).await.unwrap();
++    let request = SelectionEdit { binding: doc.binding, transaction_id: id(30), device_id: support::device(),
++        lamport: doc.revision.next_lamport, created_at_ms: TIME + 30,
++        target: SelectionTarget::Existing { selection: SelectionVersion { object_id: id(21),
++            asset_id: AssetId::hash(b"absent synthetic mask").to_string(), version: 0 } },
++        operation: SelectionOperation::Ellipse { rectangle: QueryRect { x: 0.0, y: 0.0, width: 1.0, height: 1_000_000.0 },
++            combine: SelectionCombine::Add }, memory_budget_bytes: 256 * 1024 * 1024 };
++    assert!(matches!(project.apply_selection(request, cancel()).await, Err(SelectionError::Limit)));
++    assert_eq!(project.info().await.unwrap(), doc.revision);
++    assert_eq!(std::fs::read_dir(path.join("blobs")).unwrap().count(), 0);
++    project.close().await.unwrap();
+ }
+ 
+ #[tokio::test]

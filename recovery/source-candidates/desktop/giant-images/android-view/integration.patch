@@ -1,0 +1,209 @@
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt
+@@ -36,6 +36,7 @@
+     private var predictor = MotionEventPredictor.newInstance(this)
+     private var renderer: CanvasFrontBufferedRenderer<Frame>? = null
+     private var session: RenderSession? = null
++    private var rendererLease: GiantRenderLeases.Lease? = null
+     private var retiring = false
+     private var surfaceWidth = 0
+     private var surfaceHeight = 0
+@@ -63,7 +64,7 @@
+ 
+     override fun onAttachedToWindow() {
+         super.onAttachedToWindow(); attached = true
+-        controller.attachCanvas(::publish)
++        controller.attachCanvas(::publish, ::ensureRenderer)
+         ensureRenderer()
+     }
+     override fun onDetachedFromWindow() {
+@@ -99,9 +100,12 @@
+ 
+     private fun ensureRenderer() {
+         if (!attached || !holder.surface.isValid || width <= 0 || height <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0 || renderer != null || retiring) return
++        if (!controller.admitGiantSurface(surfaceWidth, surfaceHeight)) return
++        val lease = controller.acquireRendererLease(::retireRenderer) ?: return
++        rendererLease = lease
+         val currentSession = RenderSession().also { it.latest = latest }
+         session = currentSession
+-        renderer = CanvasFrontBufferedRenderer(this, object : CanvasFrontBufferedRenderer.Callback<Frame> {
++        try { renderer = CanvasFrontBufferedRenderer(this, object : CanvasFrontBufferedRenderer.Callback<Frame> {
+             override fun onDrawFrontBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, param: Frame) {
+                 val snapshot = synchronized(lock) {
+                     currentSession.frontQueued = false
+@@ -143,6 +147,9 @@
+                 main.post { redrawNewer(currentSession) }
+             }
+         })
++        } catch (error: Throwable) {
++            session = null; rendererLease = null; lease.released(announce = false); throw error
++        }
+         enqueue(currentSession, true)
+     }
+ 
+@@ -162,10 +169,15 @@
+         synchronized(lock) { session?.closed = true }
+         session = null
+         val previous = renderer; renderer = null
++        val lease = rendererLease; rendererLease = null
+         if (previous != null) {
+             retiring = true
+-            previous.release(true) { main.post { retiring = false; ensureRenderer() } }
+-        }
++            previous.release(true) { main.post {
++                // Callback means both renderers and recorded display lists have
++                // released their tile references. Detach alone never credits them.
++                lease?.released(); retiring = false; ensureRenderer()
++            } }
++        } else lease?.released()
+     }
+ 
+     override fun onTouchEvent(event: MotionEvent): Boolean {
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt
+@@ -36,6 +36,9 @@
+     val peerViewport: List<Point> = emptyList(),
+     val aiResults: Map<String,AiResultImage<AiBitmap>> = emptyMap(),
+     val resultDisplayReady: Boolean = true,
++    val giant: Boolean = false,
++    val giantFrame: GiantVisibleFrame<Bitmap>? = null,
++    val giantDisplayReady: Boolean = false,
+ )
+ 
+ internal object EditorDrawing {
+@@ -202,11 +205,12 @@
+         val clipSave = canvas.save()
+         val page = Path().apply { addRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat(), Path.Direction.CW) }
+         page.transform(matrix(scene.matrix)); canvas.clipPath(page)
+-        if(!scene.resultDisplayReady){canvas.restoreToCount(clipSave);return}
++        if(!scene.resultDisplayReady || (scene.giant && (!scene.giantDisplayReady || scene.giantFrame == null))){canvas.restoreToCount(clipSave);return}
+         val documentLayer=canvas.saveLayer(null,null)
+         val sourceSave=canvas.save()
+         canvas.concat(matrix(scene.matrix))
+-        scene.background?.let{canvas.drawBitmap(it,0f,0f,Paint(Paint.FILTER_BITMAP_FLAG))}
++        if(scene.giant) drawGiantAndroidTiles(canvas,checkNotNull(scene.giantFrame))
++        else scene.background?.let{canvas.drawBitmap(it,0f,0f,Paint(Paint.FILTER_BITMAP_FLAG))}
+         canvas.restoreToCount(sourceSave)
+         val combined = (scene.objects + scene.provisional).filter { it.item.objectId !in scene.hidden }
+         val orderedLayers = (scene.document.layers.map { it.id } + combined.map { it.item.layerId }).distinct()
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -106,6 +106,24 @@
+     private var epoch = 0L
+     private var sceneRevision = 0L
+     private var background: Bitmap? = null
++    private var giant: GiantAndroidCanvas? = null
++    private var giantSurfaceIssue: String? = null
++    private val giantGate = Mutex()
++    private var rendererAvailable: (() -> Unit)? = null
++    private val rendererLeases = GiantRenderLeases { rendererAvailable?.invoke() }
++    private fun isGiant() = document?.let { it.width.toULong() * it.height.toULong() > 50_000_000uL } == true
++    internal fun acquireRendererLease(retire: () -> Unit): GiantRenderLeases.Lease? = if (disposing) null else rendererLeases.acquire(retire)
++    internal fun admitGiantSurface(width: Int, height: Int): Boolean {
++        if (!isGiant()) return true
++        return try {
++            admitGiantAndroidSurface(width, height)
++            if (blockingMessage == giantSurfaceIssue) blockingMessage = null
++            giantSurfaceIssue = null; true
++        } catch (error: IllegalArgumentException) { giantSurfaceIssue = error.message; blockingMessage = error.message; false }
++    }
++    private suspend fun retireGiant() = giantGate.withLock {
++        giant?.close(); giant = null; giantSurfaceIssue = null
++    }
+     private var objects = emptyList<DrawObject>()
+     private var camera = Camera(Point(800.0, 600.0), 1.0, 0.0, 1.0, 1.0)
+     private var cameraFitted = false
+@@ -239,8 +257,10 @@
+         }
+     }
+ 
+-    fun attachCanvas(sink: (CanvasScene) -> Unit) { canvasSink = sink; scene?.let(sink) }
+-    fun detachCanvas() { canvasSink = null; cancelTool(); hoverPoint = null }
++    fun attachCanvas(sink: (CanvasScene) -> Unit, available: () -> Unit = {}) {
++        canvasSink = sink; rendererAvailable = available; scene?.let(sink)
++    }
++    fun detachCanvas() { canvasSink = null; rendererAvailable = null; cancelTool(); hoverPoint = null }
+     fun dismissMessage() { message = null }
+     fun transferMessage(value: String) { message = value }
+     fun configureExport(value: ExportSelection) { if (exportSelection != value) { exportSelection = value; exportPreflight = null; checkedExport = null } }
+@@ -483,6 +503,7 @@
+         semanticEditor.detach()
+         instructionEditor.detach()
+         retireAi()
++        retireGiant()
+         epoch++; refreshAdmission.reset()
+         changesJob?.cancelAndJoin(); changesJob = null
+         refreshQueue?.close(); refreshQueue = null
+@@ -678,6 +699,7 @@
+         val current = project ?: return
+         val doc = document ?: return
+         val token = epoch
++        if (isGiant()) { loadGiantBackground(current, doc, token); return }
+         try {
+             val image = current.background(doc.documentId, assumeUntaggedSrgb = colorAssumed)
+             val bitmap = withContext(Dispatchers.Default) {
+@@ -713,6 +735,36 @@
+         }
+         publish()
+     }
++    private suspend fun loadGiantBackground(current: WorkbenchProject, doc: DocumentSnapshot, token: Long) {
++        if (!colorAssumed) {
++            needsColorConsent = true
++            blockingMessage = "The giant original is preserved. Explicitly choose the sRGB assumption before displaying its untagged derived cache."
++            publish(); return
++        }
++        giantGate.withLock {
++            if (disposing || token != epoch || current !== project) return@withLock
++            if (giant != null) { giant?.retry(); return@withLock }
++            var pendingImage: GiantImage? = null
++            try {
++                val image = current.openGiantImage(doc.documentId, 16uL * 1024uL * 1024uL * 1024uL, 32uL * 1024uL * 1024uL)
++                pendingImage = image
++                currentCoroutineContext().ensureActive()
++                if (disposing || token != epoch || current !== project) return@withLock
++                giant = GiantAndroidCanvas(scope, image, rendererLeases) {
++                    if (!disposing && token == epoch && current === project) {
++                        giant?.status?.message?.let { message = it }
++                        publish()
++                    }
++                }
++                pendingImage = null
++                background = null; needsColorConsent = false; blockingMessage = null
++            } catch (cancel: CancellationException) { throw cancel }
++            catch (_: Exception) {
++                blockingMessage = "The giant tile cache is absent, incomplete or unsupported. Rebuild it from the preserved original; no smaller image has replaced it."
++            } finally { withContext(NonCancellable) { pendingImage?.close() } }
++        }
++        publish()
++    }
+     fun assumeSrgb() {
+         if (busy || !needsColorConsent) return
+         colorAssumed = true; busy = true; exportPreflight = null; checkedExport = null
+@@ -742,6 +794,8 @@
+         val doc = document ?: return
+         project?.let { selections.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera); erasers.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera) }
+         if (camera.viewportWidth <= 1 || camera.viewportHeight <= 1) return
++        try { giant?.update(core, camera) }
++        catch (error: IllegalArgumentException) { giantSurfaceIssue = error.message; blockingMessage = error.message }
+         aiResults.request()
+         val resultFrame=aiFrame()
+         val savedIds = objects.mapTo(HashSet()) { it.item.objectId }
+@@ -758,7 +812,8 @@
+         val next = CanvasScene(++sceneRevision, doc, background, camera, core.cameraMatrix(camera), visibleObjects,
+             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
+             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
+-            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady())
++            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),
++            giant=isGiant(),giantFrame=giant?.frame,giantDisplayReady=giant?.status?.ready == true)
+         scene = next; canvasSink?.invoke(next)
+         val viewport = PeerViewport(doc.documentId, core.mapPoints(camera, true, listOf(Point(0.0, 0.0),
+             Point(camera.viewportWidth, 0.0), Point(camera.viewportWidth, camera.viewportHeight), Point(0.0, camera.viewportHeight))))
+@@ -797,7 +852,7 @@
+     override fun beginTool(sample: PenSample, capabilities: StylusCapabilities) {
+         if(ai.state.value.open||!aiResultReady())return
+         cancelTool(); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
+-        if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || background == null || strokes.size >= 3) {
++        if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || (background == null && !(giant?.status?.ready == true && giant?.frame != null)) || strokes.size >= 3) {
+             if (strokes.size >= 3) message = "The save queue is full. Wait for the current strokes to finish."
+             return
+         }

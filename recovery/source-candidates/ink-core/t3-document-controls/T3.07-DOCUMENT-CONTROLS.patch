@@ -1,0 +1,447 @@
+--- a/core/crates/vw-ffi/src/lib.rs
++++ b/core/crates/vw-ffi/src/lib.rs
+@@ -27,6 +27,8 @@
+ pub use semantics::*;
+ pub use session::*;
+ pub use worker::Cancellation;
++mod document_controls;
++pub use document_controls::*;
+ pub use workflow::*;
+ mod eraser;
+ pub use eraser::*;
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -152,7 +152,7 @@
+         InstructionEntryMethod.PhoneKeyboard, localFocused = ::localInstructionFocused)
+     val semanticEditor = SemanticEditor(scope, mutations,
+         { val p = project; val d = document; if (p != null && d != null && !disposing) InstructionAttachment(p, d) else null },
+-        { !disposing && !busy && !ai.state.value.open && pending == 0 && gesture == null && strokes.isEmpty() &&
++        { !disposing && !busy && !ai.state.value.open && !documentControls.state.value.active && pending == 0 && gesture == null && strokes.isEmpty() &&
+             !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy &&
+             instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) },
+         { current -> val next = current.info(); WorkflowMetadata(newId(), repository.deviceId,
+@@ -164,7 +164,7 @@
+     val instructionFocus = InstructionFocusController(scope, instructionEditor,
+         { val p = project; val d = document; if (p != null && d != null && !disposing) InstructionAttachment(p, d) else null },
+         { !disposing && !busy && !semanticEditor.state.value.busy && pending == 0 && gesture == null && strokes.isEmpty() &&
+-            !ai.state.value.open && instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) &&
++            !ai.state.value.open && !documentControls.state.value.active && instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) &&
+             screen in setOf(WorkbenchScreen.Canvas, WorkbenchScreen.Instructions) },
+         { id, peer -> selected = id; if (peer) screen = WorkbenchScreen.Instructions; publish() }, selectedObject = { selected })
+     private fun localInstructionFocused(field: InstructionField) { instructionFocus.localField(field) }
+@@ -193,6 +193,7 @@
+     private fun aiFrame()=aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),camera,aiPoses())}
+     private fun aiResultReady()=document?.render?.items?.none{it.shape is Shape.Result}!=false||aiFrame()!=null
+     fun openAi(){
++        if(documentControls.state.value.active||documentControls.state.value.busy||documentControls.state.value.retry!=null)return
+         if(disposing||busy||pending!=0||document==null||textDraft!=null||showBrush||showContext||blockingMessage!=null)return
+         if(instructionEditor.hasUnsaved()){message="Save or discard the instruction draft before opening AI review.";return}
+         cancelTool();ai.open();instructionInteractionChanged()
+@@ -208,6 +209,78 @@
+         aiRetiring=true
+         try{if(disposing)ai.close()else ai.detach()}
+         finally{try{if(disposing)aiResults.close()else aiResults.detach()}finally{if(disposing)aiService.close()}}
++    }
++    private val documentCameras = LinkedHashMap<String, Camera>()
++    val documentControls = DocumentControlsInteraction(scope, mutations,
++        { current -> val next = current.info(); WorkflowMetadata(newId(), repository.deviceId,
++            repository.instructionLamport(next.nextLamport), System.currentTimeMillis()) },
++        { !disposing && !busy && pending == 0 && gesture == null && strokes.isEmpty() &&
++            !ai.state.value.open && !semanticEditor.state.value.busy && !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy &&
++            instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) },
++        { receipt -> val current = project; if (current != null && !disposing) refresh(current, receipt.revision, epoch) })
++    fun documentControls(value: Boolean) {
++        if (value) {
++            if (ai.state.value.open || semanticEditor.state.value.busy) return
++            if (disposing || busy || pending != 0 || document == null || textDraft != null || showBrush || showContext || blockingMessage != null) return
++            if (instructionEditor.hasUnsaved()) { message = "Save or discard the instruction draft before opening document controls."; return }
++            cancelTool()
++        }
++        documentControls.active(value)
++        instructionInteractionChanged()
++    }
++    private fun mayLeaveDocumentControls(): Boolean {
++        if (!mayCloseAi()) { documentControls.active(false); instructionInteractionChanged(); return false }
++        if (documentControls.state.value.mayLeave) return true
++        message = "Finish or cancel the document edit, then retry or discard its retained handle before switching documents or projects."
++        documentControls.active(true); return false
++    }
++    fun documentControlId(): String = newId()
++    fun selectDocument(id: String): Job? {
++        val old = document ?: return null
++        val current = project ?: return null
++        if (id == old.documentId || disposing || busy || pending != 0 || strokes.isNotEmpty() || !mayLeaveDocumentControls()) return null
++        if (instructionEditor.hasUnsaved() || textDraft != null) { message = "Save or discard the open text draft before switching documents."; return null }
++        val token = epoch
++        busy = true; cancelTool()
++        return scope.launch {
++            var sealed = false
++            try { mutations.withLock {
++                if (disposing || project !== current || token != epoch || document?.documentId != old.documentId || !mayLeaveDocumentControls()) return@withLock
++                if (!instructionEditor.sealIfClean()) { message = "Save or discard the instruction draft first."; return@withLock }
++                sealed = true
++                val next = current.document(id)
++                val drawing = prepareEditorObjects(core, next.render.items)
++                val latest = current.info()
++                if (disposing || project !== current || token != epoch || latest.hostSeq != next.render.revision.hostSeq || latest.stateHash != next.render.revision.stateHash) {
++                    message = "The project changed while opening that document. Select it again."; return@withLock
++                }
++                if (old.documentId !in documentCameras && documentCameras.size >= 128) {
++                    message = "This open project already retains 128 document views. No view was discarded."; return@withLock
++                }
++                // Document views are local; canonical history and the project
++                // link stay open. Join borrowed capability work before rebinding.
++                retireAi()
++                documentControls.active(false); documentControls.detach()
++                erasers.detach(); selections.detach(); semanticEditor.detach(); instructionEditor.detach()
++                documentCameras[old.documentId] = camera
++                refreshAdmission.reset(); clearPeerObjects(); invalidateExport()
++                document = next; info = next.render.revision; objects = drawing; background = null
++                selected = null; transformed = emptyMap(); erased = emptySet(); transientShape = null
++                blockingMessage = null; needsColorConsent = false; colorAssumed = false; followPeer = false; lastViewport = null
++                cameraFitted = false; screen = WorkbenchScreen.Canvas
++                val saved = documentCameras[id]
++                if (saved != null) { camera = saved.copy(viewportWidth = camera.viewportWidth, viewportHeight = camera.viewportHeight); cameraFitted = true; unsnappedRotation = camera.rotation; publish() }
++                else fit()
++                aiRetiring = false; ai.changed(); aiResults.request(); instructionFocus.localSelection(null); instructionFocus.revisionChanged()
++                refresh(current, current.info(), token)
++                loadBackground()
++            } } catch (cancel: CancellationException) { throw cancel }
++            catch (error: Exception) { report(error) }
++            finally {
++                if (sealed && !disposing) { instructionEditor.resume(); semanticEditor.resumeAfterReplacement(); instructionEditor.refresh(); instructionInteractionChanged() }
++                busy = false; publish()
++            }
++        }
+     }
+     private val preferencesWriter: Job
+ 
+@@ -321,6 +394,7 @@
+         } else { previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null }
+     }
+     fun navigate(next: WorkbenchScreen) {
++        if (next == WorkbenchScreen.Projects && !mayLeaveDocumentControls()) return
+         if(next==WorkbenchScreen.Projects&&!mayCloseAi())return
+         if (next == WorkbenchScreen.Projects && instructionEditor.hasUnsaved()) {
+             message = "Save or discard the instruction draft before closing this project."; screen = WorkbenchScreen.Instructions; return
+@@ -336,6 +410,7 @@
+                 var instructionSeal = false
+                 try {
+                     val closed = mutations.withLock {
++                        if (!mayLeaveDocumentControls()) return@withLock false
+                         if (!instructionEditor.sealIfClean()) {
+                             message = "Save or discard the instruction draft before closing this project."
+                             screen = WorkbenchScreen.Instructions; false
+@@ -357,6 +432,7 @@
+     }
+     fun returnFromSettings() { screen = if (project == null) WorkbenchScreen.Projects else WorkbenchScreen.Canvas }
+     fun onBackground() {
++        documentControls.active(false); documentControls.cancel()
+         ai.background();instructionInteractionChanged()
+         instructionFocus.sharing(false); instructionFocus.following(false)
+         selections.background(); erasers.interaction.cancelOperation()
+@@ -410,6 +486,7 @@
+     }
+     fun open(id: String) = openRequest { repository.open(id) }
+     private fun openRequest(knownSrgb: Boolean = false, transfer: Boolean = false, load: suspend () -> WorkbenchProject): Job? {
++        if (!mayLeaveDocumentControls()) return null
+         if(!mayCloseAi())return null
+         if (instructionEditor.hasUnsaved()) {
+             message = "Save or discard the instruction draft before opening another project."; screen = WorkbenchScreen.Instructions; return null
+@@ -421,6 +498,7 @@
+             try {
+                 val opened=mutations.withLock {
+                     if(disposing)return@withLock false
++                    if (!mayLeaveDocumentControls()) return@withLock false
+                     if (!instructionEditor.sealIfClean()) {
+                         message = "Save or discard the instruction draft before opening another project."
+                         screen = WorkbenchScreen.Instructions; return@withLock false
+@@ -463,6 +541,7 @@
+         withContext(NonCancellable) {
+         exportReady = null
+         exportPreflight = null; checkedExport = null
++        documentControls.detach(); documentCameras.clear()
+         erasers.detach(); selections.detach()
+         instructionFocus.detach()
+         semanticEditor.detach()
+@@ -504,7 +583,7 @@
+                 current.changes.collect { change ->
+                     if (change.kind in setOf(ChangeKind.Committed, ChangeKind.Opened) && token == epoch && current === project && change.project.projectId == info?.projectId &&
+                         refreshAdmission.observe(change.sequence)) {
+-                        erasers.observe(change); selections.observe(change)
++                        documentControls.observe(change.sequence); erasers.observe(change); selections.observe(change)
+                         clearPeerObjects(); publish()
+                         invalidateExport(); queue.trySend(Unit)
+                     }
+@@ -684,11 +763,11 @@
+                     out
+                 } catch (error: Exception) { out.recycle(); throw error }
+             }
+-            if (token != epoch) return
++            if (token != epoch || project !== current || document?.documentId != doc.documentId) return
+             background = bitmap; blockingMessage = null; needsColorConsent = false
+         } catch (cancel: CancellationException) { throw cancel }
+         catch (error: CoreFailure) {
+-            if (token != epoch) return
++            if (token != epoch || project !== current || document?.documentId != doc.documentId) return
+             needsColorConsent = error.kind == CoreFailureKind.Raster && !colorAssumed
+             blockingMessage = if (error.kind == CoreFailureKind.Backpressure)
+                 "This image exceeds the current full-resolution display memory budget. Its original is saved unchanged. Bounded tiled display is still required before all images up to 50 megapixels can be edited."
+@@ -725,7 +804,7 @@
+     private fun publish() {
+         ai.changed()
+         val doc = document ?: return
+-        project?.let { selections.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera); erasers.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera) }
++        project?.let { documentControls.bind(it, doc, epoch, refreshAdmission.capture().sequence); selections.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera); erasers.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera) }
+         if (camera.viewportWidth <= 1 || camera.viewportHeight <= 1) return
+         aiResults.request()
+         val resultFrame=aiFrame()
+@@ -754,7 +833,7 @@
+     }
+ 
+     private fun toDocument(sample: PenSample, camera: Camera) = core.mapPoints(camera, true, listOf(Point(sample.x, sample.y))).single()
+-    private fun selectedLayer(): LayerInfo = document?.layers?.firstOrNull { it.visible && !it.locked && it.blend == "normal" }
++    private fun selectedLayer(): LayerInfo = document?.let { documentControlDrawingLayer(it, documentControls.state.value.drawingLayerId) }
+         ?: error("There is no unlocked normal annotation layer in this document")
+ 
+     private class StrokeRun(val epoch: Long, val camera: Camera, val start: PenSample, val origin: Point, val capabilities: StylusCapabilities,
+@@ -780,6 +859,7 @@
+                                    val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false)
+ 
+     override fun beginTool(sample: PenSample, capabilities: StylusCapabilities) {
++        if (documentControls.state.value.active || documentControls.state.value.busy || documentControls.state.value.retry != null) return
+         if(ai.state.value.open||!aiResultReady())return
+         cancelTool(); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
+         if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || background == null || strokes.size >= 3) {
+@@ -1090,7 +1170,7 @@
+         val doc = document ?: return
+         val next = current.document(doc.documentId)
+         val drawing = prepareEditorObjects(core, next.render.items)
+-        if (token != epoch || project !== current || disposing || !refreshAdmission.accepts(ticket)) return
++        if (token != epoch || project !== current || disposing || document?.documentId != doc.documentId || !refreshAdmission.accepts(ticket)) return
+         // The document and its own revision are one native snapshot. Host sequence
+         // alone cannot order optimistic edits sharing the same accepted base.
+         if (document?.render?.revision != next.render.revision) clearPeerObjects()
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
+@@ -63,6 +63,7 @@
+     internal fun aiResultFrame(): AiResultFrame<AiBitmap>? = aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),mutable.value.view.camera,aiPoses())}
+     internal fun aiResultReady(): Boolean = mutable.value.document?.render?.items?.none{it.shape is Shape.Result} != false || aiResultFrame()!=null
+     fun openAi() {
++        if(documentControls.state.value.active||documentControls.state.value.busy||documentControls.state.value.retry!=null)return
+         val current=mutable.value
+         if(closing||current.busy||current.document==null||current.textAnchor!=null||current.exportOpen||current.pasteOpen)return
+         if(instructionEditor.hasUnsaved()){report("Save or discard the instruction draft before opening AI review.");return}
+@@ -89,7 +90,7 @@
+         { refresh() }, InstructionEntryMethod.PcKeyboard, localFocused = ::localInstructionFocused)
+     val semanticEditor = SemanticEditor(scope, edits,
+         { val p = project; val d = mutable.value.document; if (p != null && d != null && !closing) InstructionAttachment(p, d) else null },
+-        { val s = mutable.value; !closing && !s.busy && !ai.state.value.open && queued == 0 && drag == null && ink == null &&
++        { val s = mutable.value; !closing && !s.busy && !ai.state.value.open && !documentControls.state.value.active && queued == 0 && drag == null && ink == null &&
+             !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy && instructionAdmission.allows(s.textAnchor != null, s.exportOpen, s.pasteOpen) },
+         { p -> val info = p.info(); val now = System.currentTimeMillis(); WorkflowMetadata(core.newId(now.toULong()), deviceId, info.nextLamport, now) },
+         { refresh() },
+@@ -99,7 +100,7 @@
+     val instructionFocus = InstructionFocusController(scope, instructionEditor,
+         { val p = project; val d = mutable.value.document; if (p != null && d != null && !closing) InstructionAttachment(p, d) else null },
+         { !closing && !mutable.value.busy && !semanticEditor.state.value.busy && drag == null && ink == null && widthGesture == null &&
+-            !ai.state.value.open && instructionAdmission.allows(mutable.value.textAnchor != null, mutable.value.exportOpen, mutable.value.pasteOpen) },
++            !ai.state.value.open && !documentControls.state.value.active && instructionAdmission.allows(mutable.value.textAnchor != null, mutable.value.exportOpen, mutable.value.pasteOpen) },
+         { id, peer -> update { it.copy(selected = setOf(id), canvasFocused = if (peer) false else it.canvasFocused) } },
+         selectedObject = { mutable.value.selected.singleOrNull() })
+     private fun localInstructionFocused(field: InstructionField) { instructionFocus.localField(field) }
+@@ -115,6 +116,61 @@
+     fun sealInstructionsForClose(): Boolean {
+         if (instructionEditor.sealIfClean()) return true
+         report("Save or discard the instruction draft before closing or replacing this project."); return false
++    }
++    private val documentCameras = LinkedHashMap<String, Camera>()
++    val documentControls = DocumentControlsInteraction(scope, edits,
++        { current -> val next=current.info(); val now=System.currentTimeMillis(); WorkflowMetadata(core.newId(now.toULong()),deviceId,next.nextLamport,now) },
++        { !closing && !mutable.value.busy && ink==null && drag==null && !ai.state.value.open && !semanticEditor.state.value.busy &&
++            !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy && instructionAdmission.allows(mutable.value.textAnchor!=null,mutable.value.exportOpen,mutable.value.pasteOpen) },
++        { if(!closing && project!=null) refresh() })
++    fun documentControls(value: Boolean) {
++        if(value) {
++            if(ai.state.value.open||semanticEditor.state.value.busy)return
++            val state=mutable.value
++            if(closing || state.busy || state.document==null || state.textAnchor!=null || state.exportOpen || state.pasteOpen)return
++            if(!mayCloseInstructions())return
++            cancelInput()
++        }
++        documentControls.active(value)
++        instructionInteractionChanged()
++    }
++    fun mayLeaveDocumentControls(): Boolean {
++        if(!mayCloseAi()){documentControls.active(false);instructionInteractionChanged();return false}
++        if(documentControls.state.value.mayLeave)return true
++        report("Finish or cancel the document edit, then retry or discard its retained handle before switching documents or projects.")
++        documentControls.active(true);return false
++    }
++    fun documentControlId(): String = core.newId(System.currentTimeMillis().toULong())
++    fun selectDocument(id: String): Job? {
++        val before=mutable.value;val old=before.document?:return null;val current=project?:return null
++        if(id==old.documentId || closing || before.busy || ink!=null || !mayLeaveDocumentControls() || !mayCloseInstructions())return null
++        if(before.textAnchor!=null){report("Save or discard the text draft before switching documents.");return null}
++        cancelInput()
++        return task(generation) {
++            if(project!==current || mutable.value.document?.documentId!=old.documentId || !mayLeaveDocumentControls() || !sealInstructionsForClose())return@task
++            try {
++                val next=current.document(id);validateDrawing(next);val latest=current.info()
++                if(closing || project!==current || latest.hostSeq!=next.render.revision.hostSeq || latest.stateHash!=next.render.revision.stateHash){report("The project changed while opening that document. Select it again.");return@task}
++                if(old.documentId !in documentCameras && documentCameras.size>=128){report("This open project already retains 128 document views. No view was discarded.");return@task}
++                // Keep the project/link; retire every document-borrowed owner.
++                retireAi()
++                documentControls.active(false);documentControls.detach()
++                erasers.detach();selections.detach();semanticEditor.detach();instructionEditor.detach();discardExport()
++                documentCameras[old.documentId]=mutable.value.view.camera
++                refreshTicket++;colorAssumed=false;wetCommitted=null
++                val saved=documentCameras[id]
++                update { value -> value.copy(document=next,background=null,selected=emptySet(),preview=emptyMap(),previewStyles=emptyMap(),draft=null,
++                    textAnchor=null,wetStroke=null,peerFrame=null,peerViewport=null,canvasReady=false,renderIssue=null,needsColorConsent=false,
++                    exportOpen=false,exportCheck=null,exportReceipt=null,
++                    view=value.view.copy(peer=null,camera=saved?.copy(viewportWidth=value.view.camera.viewportWidth,viewportHeight=value.view.camera.viewportHeight)?:value.view.camera)) }
++                if(saved==null)fit()
++                documentControls.bind(current,next,generation,changeSequence)
++                selections.bind(current,next,generation,changeSequence,mutable.value.view.camera);erasers.bind(current,next,generation,changeSequence,mutable.value.view.camera)
++                aiRetiring=false;ai.changed();aiResults.request();instructionFocus.localSelection(null);instructionFocus.revisionChanged()
++                refresh()
++                loadBackground()
++            } finally { if(!closing){instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionInteractionChanged()} }
++        }
+     }
+     private var selectionPointer=false
+     private var eraserPointer=false
+@@ -168,14 +224,14 @@
+     }
+     private fun transfer(epoch:Long,block:suspend()->Unit):Job?{if(transferJob?.isActive==true){report("A transfer is already running. Finish or cancel it first.");return null};val job=task(epoch,block);transferJob=job;return job}
+     private suspend fun discardExport(){preparedDrag?.second?.close();preparedDrag=null;val prior=cachedExport;cachedExport=null;update{it.copy(exportReceipt=null,exportCheck=null,dragPrepared=false)};prior?.workspace?.close()}
+-    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();loadBackground();refreshRole(value,generation)
+-        changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
++    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!mayLeaveDocumentControls()||!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();documentControls.detach();documentCameras.clear();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};documentControls.bind(value,snapshot,generation,changeSequence);selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();loadBackground();refreshRole(value,generation)
++        changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){documentControls.observe(event.sequence);erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()else mutable.value.document?.let{documentControls.bind(value,it,generation,changeSequence)}}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
+         }finally{withContext(NonCancellable){
+             try { if(!adopted)value.close() }
+             finally { if(instructionSeal&&!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
+         }}
+     }
+-    private suspend fun loadBackground(){val p=project?:return;val doc=mutable.value.document?:return;try{val pixels=p.background(doc.documentId,256uL*1024uL*1024uL,assumeUntaggedSrgb=colorAssumed);val image=withContext(Dispatchers.Default){bitmap(pixels)};if(project===p)update{it.copy(background=image,needsColorConsent=false)}}catch(error:CoreFailure){update{it.copy(needsColorConsent=error.kind==CoreFailureKind.Raster&&!colorAssumed)};report("The original is saved unchanged. Full-resolution display needs a supported color profile and enough memory within 256 MiB. For untagged images, explicitly choose the sRGB assumption.")}}
++    private suspend fun loadBackground(){val p=project?:return;val doc=mutable.value.document?:return;try{val pixels=p.background(doc.documentId,256uL*1024uL*1024uL,assumeUntaggedSrgb=colorAssumed);val image=withContext(Dispatchers.Default){bitmap(pixels)};if(project===p&&mutable.value.document?.documentId==doc.documentId)update{it.copy(background=image,needsColorConsent=false)}}catch(error:CoreFailure){if(project!==p||mutable.value.document?.documentId!=doc.documentId)return;update{it.copy(needsColorConsent=error.kind==CoreFailureKind.Raster&&!colorAssumed)};report("The original is saved unchanged. Full-resolution display needs a supported color profile and enough memory within 256 MiB. For untagged images, explicitly choose the sRGB assumption.")}}
+     fun assumeSrgb(){task(generation){colorAssumed=true;loadBackground()}}
+     private fun validateDrawing(snapshot:DocumentSnapshot){if(snapshot.render.items.any{it.shape is Shape.Adjustment})throw UnsupportedOperationException("This document contains adjustment objects that the desktop canvas cannot display yet. Its original and saved edits are preserved.")}
+     fun importImage(path:Path)=importFile(ImportRequest(generation,path.toAbsolutePath().normalize()))
+@@ -216,32 +272,32 @@
+     fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
+     fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one PNG, JPEG, WebP or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension !in setOf("png","jpg","jpeg","webp","mp4")){report("This drop supports PNG, JPEG, WebP and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
+     fun open(path:Path,epoch:Long=generation){task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
+-    suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
+-    fun closeProject(){if(!mayCloseAi())return;if(!mayCloseInstructions())return;cancelInput();sessionWork?.cancel();task(generation){
+-        if(!sealInstructionsForClose())return@task
+-        try { live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
++    suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();documentControls.detach();documentCameras.clear();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
++    fun closeProject(){if(!mayLeaveDocumentControls()||!mayCloseAi())return;if(!mayCloseInstructions())return;cancelInput();sessionWork?.cancel();task(generation){
++        if(!mayLeaveDocumentControls()||!sealInstructionsForClose())return@task
++        try { live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();documentControls.detach();documentCameras.clear();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
+         finally { if(!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
+     }}
+     private suspend fun refresh(){
+         val p=project?:return;val epoch=generation;val id=mutable.value.document?.documentId?:return
+         val ticket=++refreshTicket;val observed=changeSequence;val snapshot=p.document(id)
+-        if(project!==p||epoch!=generation||ticket!=refreshTicket||observed<changeSequence)return
++        if(project!==p||epoch!=generation||mutable.value.document?.documentId!=id||ticket!=refreshTicket||observed<changeSequence)return
+         // A host sequence is the accepted journal position, not the version of
+         // the client's optimistic view. Confirm that this fetch still matches
+         // the worker's current visible hash before admitting a same-seq change.
+         val currentInfo=p.info()
+-        if(project!==p||epoch!=generation||ticket!=refreshTicket||observed<changeSequence)return
++        if(project!==p||epoch!=generation||mutable.value.document?.documentId!=id||ticket!=refreshTicket||observed<changeSequence)return
+         if(currentInfo.hostSeq!=snapshot.render.revision.hostSeq||currentInfo.stateHash!=snapshot.render.revision.stateHash)return
+         when(snapshotDecision(mutable.value.document,snapshot,allowVisibleChange=true)){
+             SnapshotDecision.Stale->return
+-            SnapshotDecision.Duplicate->{selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);return}
++            SnapshotDecision.Duplicate->{documentControls.bind(p,snapshot,generation,changeSequence);selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);return}
+             SnapshotDecision.Conflict->{cancelDrag();update{it.copy(canvasReady=false,renderIssue="The same revision returned different content. Reopen the project before editing.")};return}
+             SnapshotDecision.Newer->{
+                 val issue=try{validateDrawing(snapshot);null}catch(error:UnsupportedOperationException){error.message}
+                 cancelDrag();cancelWidth();update{it.copy(document=snapshot,selected=it.selected.intersect(snapshot.render.items.filterNot{item->item.locked}.map{item->item.objectId}.toSet()),preview=emptyMap(),previewStyles=emptyMap(),draft=null,peerFrame=null,exportReceipt=null,exportCheck=null,canvasReady=false,renderIssue=issue)}
+             }
+         }
+-        selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)
++        documentControls.bind(p,snapshot,generation,changeSequence);selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)
+         instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh()
+         refreshRole(p,epoch)
+     }
+@@ -279,7 +335,7 @@
+     fun select(id:String,extend:Boolean=false){val item=mutable.value.document?.render?.items?.firstOrNull{it.objectId==id}?:return;if(item.locked)return;cancelWidth();update{it.copy(selected=if(extend)it.selected.toggle(id)else setOf(id),color=item.style.rgba,width=item.style.width.coerceIn(.25,256.0))};instructionFocus.localSelection(mutable.value.selected.singleOrNull());if(item.shape is Shape.Marker)instructionEditor.focusObject(id)}
+     fun selectAll(){instructionFocus.localSelection(null);update{it.copy(selected=it.document?.render?.items?.filterNot{item->item.locked}?.map{item->item.objectId}?.toSet()?:emptySet())}}
+     fun clearSelection(){instructionFocus.localSelection(null);cancelInput();update{it.copy(selected=emptySet(),preview=emptyMap(),draft=null,textAnchor=null)}}
+-    fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false){if(ai.state.value.open||(!panButton&&mutable.value.tool!=Tool.Pan&&!aiResultReady()))return;val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||s.background==null||(!s.canvasReady&&!panButton&&s.tool!=Tool.Pan)||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||(s.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
++    fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false){if(documentControls.state.value.active||documentControls.state.value.busy||documentControls.state.value.retry!=null)return;if(ai.state.value.open||(!panButton&&mutable.value.tool!=Tool.Pan&&!aiResultReady()))return;val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||s.background==null||(!s.canvasReady&&!panButton&&s.tool!=Tool.Pan)||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||(s.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
+         if(!pan)when(erasers.tools.route()){
+             EraserInputRoute.Selection->{selectionPointer=selections.interaction.begin(viewPoint,s.view.camera);return}
+             EraserInputRoute.Eraser->{eraserPointer=erasers.interaction.begin(viewPoint,s.view.camera);return}
+@@ -330,7 +386,7 @@
+     fun cancelDrag(){markerPress=null;eraserPointer=false;erasers.interaction.cancelGesture();selectionPointer=false;selections.interaction.cancelGesture();val old=drag?.let{it.live?:it.newObject};drag=null;live.cancelLater(old?.attachment,old?.id);update{it.copy(preview=emptyMap(),draft=null)}}
+     private fun newObjectPreview(state:EditorState,binding:RenderBinding):NewObjectPreviewLease?{
+         val attachment=live.attachment()?:return null;val shape=draftTemplate(state.tool)?:return null
+-        val layer=state.document?.layers?.firstOrNull{it.visible&&!it.locked&&it.blend=="normal"}?:return null;val now=System.currentTimeMillis()
++        val layer=state.document?.let{documentControlDrawingLayer(it,documentControls.state.value.drawingLayerId)}?:return null;val now=System.currentTimeMillis()
+         return NewObjectPreviewLease(core.newId(now.toULong()),attachment,core.newId(now.toULong()),binding.documentId,layer.id,now,shape,ObjectStyle(state.color,state.width))
+     }
+     private fun previewFor(items:List<RenderItem>,binding:RenderBinding,kind:PreviewKind):ObjectPreviewLease?{
+@@ -340,7 +396,7 @@
+     private fun cancelWidth(){val old=widthGesture;widthGesture=null;live.cancelLater(old?.live?.attachment,old?.live?.id);update{it.copy(previewStyles=emptyMap())}}
+     fun cancelInput(){cancelDrag();cancelWidth();cancelInk()}
+     private fun beginInk(first:DesktopSample,binding:RenderBinding){
+-        val s=mutable.value;val p=project?:return;val doc=s.document?:return;val layer=doc.layers.firstOrNull{it.visible&&!it.locked&&it.blend=="normal"}?:return
++        val s=mutable.value;val p=project?:return;val doc=s.document?:return;val layer=documentControlDrawingLayer(doc,documentControls.state.value.drawingLayerId)?:return
+         val now=System.currentTimeMillis();val info=doc.render.revision
+         val options=StrokeOptions(core.newId(now.toULong()),core.newId(now.toULong()),core.newId(now.toULong()),binding.documentId,layer.id,info.deviceId,info.nextLamport,now,"pen",s.width,s.color)
+         val run=DesktopInkRun(options,binding,s.view.camera,layer,live.attachment(),first);ink=run
+@@ -353,7 +409,7 @@
+     }
+     private fun finishInk(){val current=ink;ink=null;current?.finish()}
+     private fun cancelInk(){val current=inkWork?.first?:ink;ink=null;try{current?.cancel()}catch(error:CoreFailure){report("Core ${error.kind.name.lowercase()} while cancelling ink.")};if(current?.committed!=true){wetCommitted=null;update{it.copy(wetStroke=null)}}}
+-    internal fun create(shape:Shape,binding:RenderBinding?=mutable.value.document?.binding(generation),afterSuccess:()->Unit={}){val s=mutable.value;if(s.renderIssue!=null)return;val layer=s.document?.layers?.firstOrNull{it.visible&&!it.locked&&it.blend=="normal"}?:return;edit(listOf(EditCommand.Create(core.newId(System.currentTimeMillis().toULong()),layer.id,shape,ObjectStyle(s.color,s.width))),binding,afterSuccess)}
++    internal fun create(shape:Shape,binding:RenderBinding?=mutable.value.document?.binding(generation),afterSuccess:()->Unit={}){val s=mutable.value;if(s.renderIssue!=null)return;val layer=s.document?.let{documentControlDrawingLayer(it,documentControls.state.value.drawingLayerId)}?:return;edit(listOf(EditCommand.Create(core.newId(System.currentTimeMillis().toULong()),layer.id,shape,ObjectStyle(s.color,s.width))),binding,afterSuccess)}
+     fun acceptText(text:String){val anchor=mutable.value.textAnchor?:return;if(text.isNotBlank()&&!mutable.value.busy&&queued==0)create(Shape.Text(anchor,text,"Inter",18.0),afterSuccess={update{it.copy(textAnchor=null)}})}
+     fun delete(){
+         val state = mutable.value
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
+@@ -244,6 +244,7 @@
+         }
+         EraserControls(editor.erasers, editor::chooseEraser, editor::stopErasing, Modifier.fillMaxWidth())
+         SelectionControls(editor.selections, editor.selected, onSelectionSave, Modifier.fillMaxWidth())
++        DocumentControlsPanel(editor.documentControls, editor::documentControlId, { editor.selectDocument(it) }, setOfNotNull(editor.selected), editor::documentControls, Modifier.fillMaxWidth())
+         QuickControls(editor.displayedBrush(), editor::brush, { editor.brushDialog(true) },
+             editor.info?.canUndo == true && editor.pending == 0, editor.info?.canRedo == true && editor.pending == 0, editor::undo, editor::redo)
+     }
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt
+@@ -54,7 +54,7 @@
+         fun instructionDialog(value: Command?) { controller.instructionModal(value != null); dialog = value }
+         fun quit() {
+             if(!controller.mayCloseAi())return
+-            if (quitting || !controller.sealInstructionsForClose()) return
++            if (quitting || !controller.mayLeaveDocumentControls() || !controller.sealInstructionsForClose()) return
+             if (!quitting) {
+                 quitting = true
+                 scope.launch { withContext(NonCancellable) {
+@@ -79,7 +79,7 @@
+         }
+         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
+         Window(onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
+-            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,dialog!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
++            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,dialog!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.documentControls.state.value.active||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
+             fun file(command:Command){controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,command.label,FileDialog.LOAD)
+                 try{chooser.directory=(if(command==Command.Import)documents else location.path).toString();if(command==Command.Open)chooser.file="project.sqlite";chooser.isVisible=true
+                     val filename=chooser.file?:return;val chosen=Path.of(chooser.directory,filename)
+@@ -167,6 +167,7 @@
+                 Text("TOOLS",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc));for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout))commandButton(c,action,Modifier.fillMaxWidth(),selected=c.name==editor.tool.name&&!eraserState.active&&!selectionState.active)
+                 EraserPanel(controller.erasers,controller::chooseEraser,controller::stopErasing,Modifier.fillMaxWidth())
+                 SelectionPanel(controller.selections,editor.selected.singleOrNull(),saveSelection,Modifier.fillMaxWidth())
++                DocumentControlsPanel(controller.documentControls,controller::documentControlId,{controller.selectDocument(it)},editor.selected,controller::documentControls,Modifier.fillMaxWidth())
+                 Spacer(Modifier.height(18.dp));Text("LAYERS & OBJECTS",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc))
+                 editor.document?.layers?.forEach{layer->Text(layer.name,Modifier.padding(top=8.dp),fontWeight=FontWeight.Medium);editor.document?.render?.items?.filter{it.layerId==layer.id}?.forEach{item->Text(item.shape.javaClass.simpleName,Modifier.fillMaxWidth().clickable(enabled=!item.locked){controller.select(item.objectId)}.background(if(item.objectId in editor.selected)Color(0xff294a49)else Color.Transparent).padding(8.dp),style=MaterialTheme.typography.body2)}}
+             }

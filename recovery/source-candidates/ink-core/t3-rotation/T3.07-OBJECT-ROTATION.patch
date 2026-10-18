@@ -1,0 +1,286 @@
+--- a/core/crates/vw-geom/src/lib.rs
++++ b/core/crates/vw-geom/src/lib.rs
+@@ -22,6 +22,8 @@
+ mod capture;
+ mod display;
+ mod lens;
++mod object_rotation;
++pub use object_rotation::object_rotation;
+ 
+ pub use affine::{Affine, Camera, Point, Rect, Size, snap_edge, snap_pixel_center};
+ pub use asset::{ExifOrientation, PdfPage, SvgFit, SvgViewport};
+--- a/core/crates/vw-ffi/src/lib.rs
++++ b/core/crates/vw-ffi/src/lib.rs
+@@ -32,6 +32,9 @@
+ pub use workflow::*;
+ mod eraser;
+ pub use eraser::*;
++
++mod object_rotation;
++pub use object_rotation::rotate_object_transforms;
+ 
+ uniffi::setup_scaffolding!();
+ 
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -210,6 +210,8 @@
+         try{if(disposing)ai.close()else ai.detach()}
+         finally{try{if(disposing)aiResults.close()else aiResults.detach()}finally{if(disposing)aiService.close()}}
+     }
++    var rotationSnap by mutableStateOf(false); private set
++    fun rotationSnapping(enabled: Boolean) { rotationSnap = enabled }
+     private val documentCameras = LinkedHashMap<String, Camera>()
+     val documentControls = DocumentControlsInteraction(scope, mutations,
+         { current -> val next = current.info(); WorkflowMetadata(newId(), repository.deviceId,
+@@ -822,7 +824,8 @@
+         val next = CanvasScene(++sceneRevision, doc, background, camera, core.cameraMatrix(camera), visibleObjects,
+             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
+             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
+-            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady())
++            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),
++            rotationHandles=pending==0&&tool==EditorTool.Select&&!selections.state.value.active&&!erasers.state.value.active)
+         scene = next; canvasSink?.invoke(next)
+         val viewport = PeerViewport(doc.documentId, core.mapPoints(camera, true, listOf(Point(0.0, 0.0),
+             Point(camera.viewportWidth, 0.0), Point(camera.viewportWidth, camera.viewportHeight), Point(0.0, camera.viewportHeight))))
+@@ -856,7 +859,8 @@
+                                    val item: RenderItem? = null, val resizeAnchor: Point? = null,
+                                    val previewId: String? = null, val link: ProjectLink? = null, var previewSequence: UInt = 0u,
+                                    val revision: ProjectInfo? = null, val newObjectId: String? = null,
+-                                   val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false)
++                                   val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false,
++                                   val rotation: ObjectRotationContact? = null)
+ 
+     override fun beginTool(sample: PenSample, capabilities: StylusCapabilities) {
+         if (documentControls.state.value.active || documentControls.state.value.busy || documentControls.state.value.retry != null) return
+@@ -877,10 +881,12 @@
+         val activeTool = tool
+         if (activeTool == EditorTool.Eraser) return // all erasers use the guarded route above
+         try {
+-            val layer = selectedLayer(); val brush = preferences.brush(activeTool); val first = toDocument(sample, camera)
++            val layer = if (activeTool == EditorTool.Select) document?.layers?.firstOrNull { it.visible && !it.locked } ?: selectedLayer() else selectedLayer()
++            val brush = preferences.brush(activeTool); val first = toDocument(sample, camera)
+             var run: StrokeRun? = null
+             var item: RenderItem? = null
+             var anchor: Point? = null
++            var rotation: ObjectRotationContact? = null
+             if (activeTool in listOf(EditorTool.Pen, EditorTool.Highlighter, EditorTool.Marker)) {
+                 val now = System.currentTimeMillis(); val gestureId = core.newId(now.toULong())
+                 val family = when (activeTool) { EditorTool.Highlighter -> "highlighter"; EditorTool.Marker -> "marker"; else -> "pen" }
+@@ -895,14 +901,24 @@
+             } else if (activeTool == EditorTool.Select) {
+                 val snapshot = scene
+                 val previous = objects.firstOrNull { it.item.objectId == selected }
+-                if (snapshot != null && previous != null) {
+-                    val handles = EditorDrawing.screenBounds(snapshot, previous.item)
+-                    val near = handles.indices.minByOrNull { hypot(handles[it].x - sample.x, handles[it].y - sample.y) }
+-                    if (near != null && hypot(handles[near].x - sample.x, handles[near].y - sample.y) <= 24 * density) {
++                if (snapshot != null && previous != null && !previous.item.locked) {
++                    val knob = if(pending==0)androidRotationHandle(snapshot, previous.item)else null
++                    if (knob?.hit(Point(sample.x, sample.y), 24.0 * density) == true) {
++                        val r = previous.item.bounds
++                        rotation = ObjectRotationContact.begin(checkNotNull(document).objectRotationFrame(epoch,camera),
++                            listOf(previous.item), Point(r.x+r.width/2,r.y+r.height/2), first)
++                        if (rotation == null) { message = "This rotation cannot be represented. Saved objects are unchanged."; return }
+                         item = previous.item
+-                        val r = item.bounds
+-                        val corners = listOf(Point(r.x, r.y), Point(r.x + r.width, r.y), Point(r.x + r.width, r.y + r.height), Point(r.x, r.y + r.height))
+-                        anchor = corners[(near + 2) % 4]
++                    }
++                    if (rotation == null) {
++                        val handles = EditorDrawing.screenBounds(snapshot, previous.item)
++                        val near = handles.indices.minByOrNull { hypot(handles[it].x - sample.x, handles[it].y - sample.y) }
++                        if (near != null && hypot(handles[near].x - sample.x, handles[near].y - sample.y) <= 24 * density) {
++                            item = previous.item
++                            val r = item.bounds
++                            val corners = listOf(Point(r.x, r.y), Point(r.x + r.width, r.y), Point(r.x + r.width, r.y + r.height), Point(r.x, r.y + r.height))
++                            anchor = corners[(near + 2) % 4]
++                        }
+                     }
+                 }
+                 if (item == null) item = scene?.let { EditorDrawing.hit(it, Point(sample.x, sample.y), 8 * density)?.item }
+@@ -917,7 +933,7 @@
+             }
+             val newShape = activeTool in listOf(EditorTool.Line, EditorTool.Arrow, EditorTool.Rectangle, EditorTool.Ellipse)
+             gesture = ToolGesture(activeTool, camera, first, Point(sample.x, sample.y), layer, brush, run, item, anchor,
+-                if (item != null || newShape) newId() else null, link, revision = info, newObjectId = if (newShape || activeTool == EditorTool.Callout) newId() else null, semanticModifier = sample.buttons and android.view.MotionEvent.BUTTON_STYLUS_PRIMARY != 0)
++                if (item != null || newShape) newId() else null, link, revision = if (rotation != null) document?.render?.revision else info, newObjectId = if (newShape || activeTool == EditorTool.Callout) newId() else null, semanticModifier = sample.buttons and android.view.MotionEvent.BUTTON_STYLUS_PRIMARY != 0, rotation = rotation)
+             eraserLast = if (activeTool == EditorTool.Eraser) Point(sample.x, sample.y) else null
+             if (activeTool == EditorTool.Text) {
+                 val hit = scene?.let { EditorDrawing.hit(it, Point(sample.x, sample.y), 8 * density)?.item }
+@@ -971,14 +987,21 @@
+                     require(erased.size <= 512) { "Erase at most 512 objects in one gesture; this unfinished erase was canceled." }
+                 }
+                 EditorTool.Select -> active.item?.let { item ->
+-                    val outer = if (active.resizeAnchor == null) Transform(e = end.x - active.first.x, f = end.y - active.first.y) else {
+-                        val anchor = active.resizeAnchor
+-                        val dx = active.first.x - anchor.x; val dy = active.first.y - anchor.y
+-                        val sx = if (abs(dx) < .001) 1.0 else ((end.x - anchor.x) / dx).coerceIn(.05, 20.0)
+-                        val sy = if (abs(dy) < .001) 1.0 else ((end.y - anchor.y) / dy).coerceIn(.05, 20.0)
+-                        Transform(a = sx, d = sy, e = anchor.x * (1 - sx), f = anchor.y * (1 - sy))
+-                    }
+-                    transformed = mapOf(item.objectId to EditorDrawing.compose(outer, item.transform))
++                    if (active.rotation != null) {
++                        val doc = document ?: run { cancelTool(); return }
++                        val values = active.rotation.preview(end,doc.objectRotationFrame(epoch,camera),rotationSnap)
++                        if (values == null) { cancelTool(); message = "The view or document changed. Start rotation again."; return }
++                        transformed = values
++                    } else {
++                        val outer = if (active.resizeAnchor == null) Transform(e = end.x - active.first.x, f = end.y - active.first.y) else {
++                            val anchor = active.resizeAnchor
++                            val dx = active.first.x - anchor.x; val dy = active.first.y - anchor.y
++                            val sx = if (abs(dx) < .001) 1.0 else ((end.x - anchor.x) / dx).coerceIn(.05, 20.0)
++                            val sy = if (abs(dy) < .001) 1.0 else ((end.y - anchor.y) / dy).coerceIn(.05, 20.0)
++                            Transform(a = sx, d = sy, e = anchor.x * (1 - sx), f = anchor.y * (1 - sy))
++                        }
++                        transformed = mapOf(item.objectId to EditorDrawing.compose(outer, item.transform))
++                    }
+                     active.previewId?.let { id -> sendObject(active.link, ObjectPreview(id, checkNotNull(document).documentId,
+                         item.objectId, ++active.previewSequence, PreviewKind.HandleDrag, checkNotNull(transformed[item.objectId]), item.style)) }
+                 }
+@@ -1012,7 +1035,9 @@
+                 listOf(EditCommand.Create(it.item.objectId, active.layer.id, it.item.shape, it.item.style, it.item.transform))
+             } ?: emptyList()
+             EditorTool.Eraser -> erased.take(512).map { EditCommand.Delete(it) }
+-            EditorTool.Select -> active.item?.let { item -> transformed[item.objectId]?.takeIf { it != item.transform }
++            EditorTool.Select -> if (active.rotation != null) document?.let {
++                active.rotation.finish(null,it.objectRotationFrame(epoch,camera),rotationSnap)
++            }.orEmpty() else active.item?.let { item -> transformed[item.objectId]?.takeIf { it != item.transform }
+                 ?.let { listOf(EditCommand.SetTransform(item.objectId, it)) } } ?: emptyList()
+             else -> emptyList()
+         }
+@@ -1023,6 +1048,7 @@
+     }
+ 
+     override fun cancelTool() {
++        gesture?.rotation?.cancel()
+         eraserPointer = false; erasers.interaction.cancelGesture()
+         selectionPointer = false; selections.interaction.cancelGesture()
+         gesture?.let { active -> finishRemotePreview(active.link, active.previewId, true) }
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt
+@@ -36,6 +36,7 @@
+     val peerViewport: List<Point> = emptyList(),
+     val aiResults: Map<String,AiResultImage<AiBitmap>> = emptyMap(),
+     val resultDisplayReady: Boolean = true,
++    val rotationHandles: Boolean = false,
+ )
+ 
+ internal object EditorDrawing {
+@@ -247,6 +248,7 @@
+             canvas.drawPath(outline, paint)
+             paint.style = Paint.Style.FILL
+             points.forEach { canvas.drawCircle(it.x.toFloat(), it.y.toFloat(), 6 * scene.density, paint) }
++            if(scene.rotationHandles)drawAndroidRotationHandle(canvas,scene,selection.item)
+         }
+         scene.hover?.let { p ->
+             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xff0883b8.toInt(); style = Paint.Style.STROKE; strokeWidth = scene.density }
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
+@@ -219,6 +219,7 @@
+                         TextButton(onClick = { editor.fit(); editor.showContext = false }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Fit image") }
+                         TextButton(onClick = { editor.brushDialog(true); editor.showContext = false }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Brush settings") }
+                         if (editor.selected != null) {
++                            TextButton(onClick = { editor.rotationSnapping(!editor.rotationSnap) }, modifier = Modifier.heightIn(min = 48.dp)) { Text(if(editor.rotationSnap) "Rotation snap: 15°" else "Rotation snap: free") }
+                             TextButton(onClick = editor::deleteSelected, modifier = Modifier.heightIn(min = 48.dp)) { Text("Delete selected object") }
+                             if (editor.scene?.objects?.any { it.item.objectId == editor.selected && it.item.shape is Shape.Text } == true) {
+                                 TextButton(onClick = { editor.editSelectedText(); editor.showContext = false }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Edit text") }
+@@ -239,7 +240,7 @@
+                     }
+                 }
+             }
+-            if (editor.tool == EditorTool.Select && editor.selected != null) Text("Drag to move · corner handles resize", style = MaterialTheme.typography.caption,
++            if (editor.tool == EditorTool.Select && editor.selected != null) Text("Drag to move · corners resize · round handle rotates", style = MaterialTheme.typography.caption,
+                 color = MaterialTheme.colors.onSurface, modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp).background(MaterialTheme.colors.surface, RoundedCornerShape(8.dp)).padding(8.dp))
+         }
+         EraserControls(editor.erasers, editor::chooseEraser, editor::stopErasing, Modifier.fillMaxWidth())
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt
+@@ -24,7 +24,7 @@
+     val wetStroke:RenderItem?=null,val shareViewport:Boolean=false,val sessionRole:ProjectSessionRole?=null) {
+     val exportReady:Boolean get()=exportReceipt?.request?.matches(this)==true
+ }
+-private data class Drag(val start:Point,val initial:ViewState,val selected:List<RenderItem>,val bounds:Rect?,val resize:Boolean,val pan:Boolean,val binding:RenderBinding,val live:ObjectPreviewLease?=null,val newObject:NewObjectPreviewLease?=null,val tool:Tool=Tool.Select)
++private data class Drag(val start:Point,val initial:ViewState,val selected:List<RenderItem>,val bounds:Rect?,val resize:Boolean,val pan:Boolean,val binding:RenderBinding,val live:ObjectPreviewLease?=null,val newObject:NewObjectPreviewLease?=null,val tool:Tool=Tool.Select,val rotation:ObjectRotationContact?=null)
+ private data class WidthGesture(val binding:RenderBinding,val items:List<RenderItem>,val live:ObjectPreviewLease?)
+ private data class CachedExport(val workspace:TransferWorkspace,val receipt:CompletedExport)
+ class EditorController internal constructor(private val scope:CoroutineScope,val core:WorkbenchCore,private val handoff:DesktopHandoff,val location:LocationPolicy,private val deviceId:String,workRoot:Path=location.path.resolve(".handoff")) {
+@@ -348,25 +348,35 @@
+         if(s.tool==Tool.Text&&!pan){update{it.copy(textAnchor=point)};return}
+         if(s.tool !in listOf(Tool.Select,Tool.Pan)&&!pan){update{it.copy(draft=point to point)};drag=Drag(point,s.view,emptyList(),null,false,false,binding,newObject=newObjectPreview(s,binding),tool=s.tool);return}
+         var selected=s.document?.render?.items?.filter{it.objectId in s.selected}?:emptyList();val bounds=union(selected.map{it.bounds});val tolerance=10.0/s.view.camera.scale
+-        val resize=!pan&&bounds!=null&&kotlin.math.abs(point.x-bounds.x-bounds.width)<=tolerance&&kotlin.math.abs(point.y-bounds.y-bounds.height)<=tolerance
+-        if(!pan&&!resize){val item=s.document?.render?.items?.asReversed()?.firstOrNull{!it.locked&&point.x>=it.bounds.x&&point.x<=it.bounds.x+it.bounds.width&&point.y>=it.bounds.y&&point.y<=it.bounds.y+it.bounds.height};if(item!=null){if(item.objectId !in s.selected||extend)select(item.objectId,extend)}else if(!extend)clearSelection();selected=mutable.value.document?.render?.items?.filter{it.objectId in mutable.value.selected}?:emptyList()}
++        val rotating=!pan&&desktopRotationHandle(core,s.view.camera,selected)?.hit(viewPoint,12.0)==true
++        val resize=!pan&&!rotating&&bounds!=null&&kotlin.math.abs(point.x-bounds.x-bounds.width)<=tolerance&&kotlin.math.abs(point.y-bounds.y-bounds.height)<=tolerance
++        if(!pan&&!resize&&!rotating){val item=s.document?.render?.items?.asReversed()?.firstOrNull{!it.locked&&point.x>=it.bounds.x&&point.x<=it.bounds.x+it.bounds.width&&point.y>=it.bounds.y&&point.y<=it.bounds.y+it.bounds.height};if(item!=null){if(item.objectId !in s.selected||extend)select(item.objectId,extend)}else if(!extend)clearSelection();selected=mutable.value.document?.render?.items?.filter{it.objectId in mutable.value.selected}?:emptyList()}
+         if(!pan&&selected.any{it.shape is Shape.Guide}){report("Use selection tools to edit pixel coverage; guides keep their source coordinates.");return}
+-        drag=Drag(point,s.view,selected,union(selected.map{it.bounds}),resize,pan,binding,if(!pan)previewFor(selected,binding,PreviewKind.HandleDrag)else null)
+-    }
+-    fun pointerMove(viewPoint:Point,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f){
++        val rotation=if(rotating&&bounds!=null)try{ObjectRotationContact.begin(s.document.objectRotationFrame(generation,s.view.camera),selected,Point(bounds.x+bounds.width/2,bounds.y+bounds.height/2),point)}catch(_:CoreFailure){report("This rotation cannot be represented. Saved objects are unchanged.");return}else null
++        if(rotating&&rotation==null){report("This rotation cannot be represented. Saved objects are unchanged.");return}
++        drag=Drag(point,s.view,selected,union(selected.map{it.bounds}),resize,pan,binding,if(!pan)previewFor(selected,binding,PreviewKind.HandleDrag)else null,rotation=rotation)
++    }
++    fun pointerMove(viewPoint:Point,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,snapRotation:Boolean=false){
+         markerPress?.let { press ->
+             if (!geometryMatches(press.binding, mutable.value)) { cancelDrag(); return }
+             press.end = core.mapPoints(press.camera, true, listOf(viewPoint)).single()
+             update { it.copy(draft = press.first to press.end) }; return
+         }
+-        if(eraserPointer){erasers.interaction.append(viewPoint);return};if(selectionPointer){selections.interaction.append(viewPoint);return};ink?.let{run->val point=core.mapPoints(run.camera,true,listOf(viewPoint)).single();if(!run.offer(DesktopSample(point,uptimeMs,pressure))){cancelInk();report("The input queue or stroke limit was reached. The unfinished stroke was cancelled.")};return};val d=drag?:return;if(!geometryMatches(d.binding,mutable.value)){cancelDrag();return};val point=core.mapPoints(d.initial.camera,true,listOf(viewPoint)).single();val dx=point.x-d.start.x;val dy=point.y-d.start.y
++        if(eraserPointer){erasers.interaction.append(viewPoint);return};if(selectionPointer){selections.interaction.append(viewPoint);return};ink?.let{run->val point=core.mapPoints(run.camera,true,listOf(viewPoint)).single();if(!run.offer(DesktopSample(point,uptimeMs,pressure))){cancelInk();report("The input queue or stroke limit was reached. The unfinished stroke was cancelled.")};return};val d=drag?:return;if(!geometryMatches(d.binding,mutable.value)){cancelDrag();return};val point=core.mapPoints(d.initial.camera,true,listOf(viewPoint)).single()
++        d.rotation?.let{contact->
++            val now=mutable.value;val doc=now.document?:run{cancelDrag();return}
++            val values=try{contact.preview(point,doc.objectRotationFrame(generation,now.view.camera),snapRotation)}catch(_:CoreFailure){cancelDrag();report("This rotation cannot be represented. Saved objects are unchanged.");return}
++            if(values==null){cancelDrag();report("The view or document changed. Start rotation again.");return}
++            update{it.copy(preview=values)};d.selected.singleOrNull()?.let{item->d.live?.update(values[item.objectId]?:item.transform,item.style)};return
++        }
++        val dx=point.x-d.start.x;val dy=point.y-d.start.y
+         if(d.pan){update{it.copy(view=it.view.copy(camera=d.initial.camera.copy(center=Point(d.initial.camera.center.x-dx,d.initial.camera.center.y-dy))))};return}
+         if(mutable.value.draft!=null){update{it.copy(draft=d.start to point)};draftShape(d.tool,d.start,point)?.let{d.newObject?.update(it)};return}
+         val b=d.bounds;val preview=d.selected.associate{item->item.objectId to if(d.resize&&b!=null&&b.width>0&&b.height>0)scaledAbout(item.transform,Point(b.x,b.y),((b.width+dx)/b.width).coerceIn(0.01,100.0),((b.height+dy)/b.height).coerceIn(0.01,100.0))else translated(item.transform,dx,dy)}
+         update{it.copy(preview=preview)}
+         d.selected.singleOrNull()?.let{item->d.live?.update(preview[item.objectId]?:item.transform,item.style)}
+     }
+-    fun pointerUp(viewPoint:Point?=null,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f){
++    fun pointerUp(viewPoint:Point?=null,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,snapRotation:Boolean=false){
+         markerPress?.let { press ->
+             val binding = press.binding; val point = press.first
+             markerPress = null; update { it.copy(draft = null) }
+@@ -379,11 +389,11 @@
+             else report("The document changed. Place the marker again on the current revision.")
+             return
+         }
+-        if(eraserPointer){eraserPointer=false;erasers.interaction.finish(viewPoint);return};if(selectionPointer){selectionPointer=false;selections.interaction.finish(viewPoint);return};if(ink!=null){if(viewPoint!=null)pointerMove(viewPoint,uptimeMs,pressure);finishInk();return};val s=mutable.value;val d=drag;drag=null;if(d==null)return;if(!geometryMatches(d.binding,s)){val old=d.live?:d.newObject;live.cancelLater(old?.attachment,old?.id);cancelDrag();return}
++        if(eraserPointer){eraserPointer=false;erasers.interaction.finish(viewPoint);return};if(selectionPointer){selectionPointer=false;selections.interaction.finish(viewPoint);return};if(ink!=null){if(viewPoint!=null)pointerMove(viewPoint,uptimeMs,pressure);finishInk();return};if(drag?.rotation!=null&&viewPoint!=null)pointerMove(viewPoint,uptimeMs,pressure,snapRotation);val s=mutable.value;val d=drag;drag=null;if(d==null)return;if(!geometryMatches(d.binding,s)){val old=d.live?:d.newObject;live.cancelLater(old?.attachment,old?.id);cancelDrag();return}
+         if(s.draft!=null){val(a,b)=s.draft;val r=Rect(minOf(a.x,b.x),minOf(a.y,b.y),kotlin.math.abs(a.x-b.x),kotlin.math.abs(a.y-b.y));val shape=when(d.tool){Tool.Rectangle->Shape.Rectangle(r);Tool.Ellipse->Shape.Ellipse(r);Tool.Line->Shape.Line(listOf(a,b));Tool.Arrow->Shape.Arrow(listOf(a,b));else->null};update{it.copy(draft=null)};val provisional=d.newObject;val geometry=draftShape(d.tool,a,b);if(provisional!=null){if(geometry!=null)gestureEdit(listOf(EditCommand.Create(provisional.objectId,provisional.layer,geometry,provisional.style)),d.binding,provisional)else live.cancelLater(provisional.attachment,provisional.id)}else if(shape!=null&&r.width+r.height>0.01)create(shape,d.binding);return}
+-        val edits=s.preview.filter{(id,transform)->d.selected.any{it.objectId==id&&it.transform!=transform}}.map{EditCommand.SetTransform(it.key,it.value)};update{it.copy(preview=emptyMap())};gestureEdit(edits,d.binding,d.live)
+-    }
+-    fun cancelDrag(){markerPress=null;eraserPointer=false;erasers.interaction.cancelGesture();selectionPointer=false;selections.interaction.cancelGesture();val old=drag?.let{it.live?:it.newObject};drag=null;live.cancelLater(old?.attachment,old?.id);update{it.copy(preview=emptyMap(),draft=null)}}
++        val edits=if(d.rotation!=null)s.document?.let{d.rotation.finish(null,it.objectRotationFrame(generation,s.view.camera),snapRotation)}.orEmpty()else s.preview.filter{(id,transform)->d.selected.any{it.objectId==id&&it.transform!=transform}}.map{EditCommand.SetTransform(it.key,it.value)};update{it.copy(preview=emptyMap())};gestureEdit(edits,d.binding,d.live)
++    }
++    fun cancelDrag(){drag?.rotation?.cancel();markerPress=null;eraserPointer=false;erasers.interaction.cancelGesture();selectionPointer=false;selections.interaction.cancelGesture();val old=drag?.let{it.live?:it.newObject};drag=null;live.cancelLater(old?.attachment,old?.id);update{it.copy(preview=emptyMap(),draft=null)}}
+     private fun newObjectPreview(state:EditorState,binding:RenderBinding):NewObjectPreviewLease?{
+         val attachment=live.attachment()?:return null;val shape=draftTemplate(state.tool)?:return null
+         val layer=state.document?.let{documentControlDrawingLayer(it,documentControls.state.value.drawingLayerId)}?:return null;val now=System.currentTimeMillis()
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt
+@@ -170,7 +170,7 @@
+             val down=awaitFirstDown(requireUnconsumed=false);focus.requestFocus()
+             controller.pointerDown(Point(down.position.x.toDouble(),down.position.y.toDouble()),currentEvent.keyboardModifiers.isShiftPressed,down.type==PointerType.Touch||currentEvent.buttons.isTertiaryPressed||currentEvent.buttons.isSecondaryPressed,down.uptimeMillis,semanticModifier=currentEvent.keyboardModifiers.isAltPressed);down.consume()
+             var completed=false
+-            try{while(true){val event=awaitPointerEvent();val change=event.changes.firstOrNull{it.id==down.id}?:break;if(!change.pressed){controller.pointerUp(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);completed=true;change.consume();break};controller.pointerMove(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);change.consume()}}
++            try{while(true){val event=awaitPointerEvent();val change=event.changes.firstOrNull{it.id==down.id}?:break;if(!change.pressed){controller.pointerUp(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis,snapRotation=event.keyboardModifiers.isShiftPressed);completed=true;change.consume();break};controller.pointerMove(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis,snapRotation=event.keyboardModifiers.isShiftPressed);change.consume()}}
+             finally{if(completed)controller.cancelDrag()else controller.cancelInput()}
+         }}
+     ){
+@@ -211,5 +211,7 @@
+             current.draft?.let{(a,b)->drawRect(color(current.color),Offset(minOf(a.x,b.x).toFloat(),minOf(a.y,b.y).toFloat()),Size(kotlin.math.abs(a.x-b.x).toFloat(),kotlin.math.abs(a.y-b.y).toFloat()),style=Stroke((1.0/current.view.camera.scale).toFloat()))}
+             if(current.view.showPeerOutline){current.peerViewport?.takeIf{it.documentId==doc.documentId}?.let{peer->drawPath(polyline(peer.corners,true),Color(0xffecbb72),style=Stroke((1.0/current.view.camera.scale).toFloat(),pathEffect=PathEffect.dashPathEffect(floatArrayOf((6/current.view.camera.scale).toFloat(),(4/current.view.camera.scale).toFloat()))))}}
+         }
+-    }
+-}
++        if(current.tool==Tool.Select&&!controller.selections.state.value.active&&!controller.erasers.state.value.active)
++            desktopRotationHandle(controller.core,current.view.camera,doc.render.items.filter{it.objectId in current.selected},current.preview)?.let{drawDesktopRotationHandle(it)}
++    }
++}

@@ -1,0 +1,17 @@
+[package]
+name = "vw-assets"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+thiserror = "=2.0.21"
+
+[dev-dependencies]
+tempfile = "=3.27.0"
+
+[lints]
+workspace = true

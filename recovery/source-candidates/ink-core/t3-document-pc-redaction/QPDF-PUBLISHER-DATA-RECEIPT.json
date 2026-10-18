@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "source_url": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/vcpkg.zip",
+  "archive_sha256": "82005252fee032135d07c85ad7626a38f26fb253c1e098d1d185f315bea15ebb",
+  "archive_bytes": 195951195,
+  "zip_entries_checked": 1267,
+  "selected_text_bytes": 30524,
+  "required_metadata_found": {
+    "qpdf-dep-versions": true,
+    "vcpkg-list": true,
+    "zlib/copyright": true,
+    "libjpeg-turbo/copyright": true,
+    "openssl/copyright": true
+  },
+  "entries": [
+    {
+      "archive_entry": "vcpkg/qpdf-dep-versions",
+      "bytes": 59,
+      "sha256": "f1d5d577fd2dee31034a8083671f461034ab987454716e964a4e704cb6bcedb6",
+      "receipt": "publisher-text/000-f1d5d577fd2dee31.txt"
+    },
+    {
+      "archive_entry": "vcpkg/installed/x64-windows-static/vcpkg-list",
+      "bytes": 653,
+      "sha256": "dd2005979504a13f4f0cf6bc5db6dca1fb168843f038f9db31c734e8066f4d0d",
+      "receipt": "publisher-text/001-dd2005979504a13f.txt"
+    },
+    {
+      "archive_entry": "vcpkg/installed/x64-windows-static/share/libjpeg-turbo/libjpeg-turboConfig.cmake",
+      "bytes": 1354,
+      "sha256": "638e84f03d6e2df6c35c1654aef29871deafd98472e8c3f32ed36fc796031aaf",
+      "receipt": "publisher-text/002-638e84f03d6e2df6.txt"
+    },
+    {
+      "archive_entry": "vcpkg/installed/x64-windows-static/share/libjpeg-turbo/copyright",
+      "bytes": 6077,
+      "sha256": "ba6bceebcba0fdd35488477c2cca8c4632ce82c74dbfbc87d886ce6fc4433579",
+      "receipt": "publisher-text/003-ba6bceebcba0fdd3.txt"
+    },
+    {
+      "archive_entry": "vcpkg/installed/x64-windows-static/share/libjpeg-turbo/libjpeg-turboConfigVersion.cmake",
+      "bytes": 1904,
+      "sha256": "0842f57e9c6228260dfccac6a13bf0884edcd20195cef0db02cd71a5185ec388",
+      "receipt": "publisher-text/004-0842f57e9c622826.txt"
+    },
+    {
+      "archive_entry": "vcpkg/installed/x64-windows-static/share/zlib/ZLIBConfigVersion.cmake",
+      "bytes": 1904,
+      "sha256": "365cece0f1b99846ce43a5648520cc9acf296aaabe74e4bbaba9dc84de921c36",
+      "receipt": "publisher-text/005-365cece0f1b99846.txt"
+    },
+    {
+      "archive_entry": "vcpkg/installed/x64-windows-static/share/zlib/ZLIBConfig.cmake",
+      "bytes": 1633,
+      "sha256": "f27b30ddc7e89d8f8041192457820f06f86a2773198091a73154430d13c4bbc1",
+      "receipt": "publisher-text/006-f27b30ddc7e89d8f.txt"
+    },
+    {
+      "archive_entry": "vcpkg/installed/x64-windows-static/share/zlib/copyright",
+      "bytes": 1002,
+      "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+      "receipt": "publisher-text/007-e32ff4e00d9d9493.txt"
+    },
+    {
+      "archive_entry": "vcpkg/installed/x64-windows-static/share/openssl/OpenSSLConfigVersion.cmake",
+      "bytes": 541,
+      "sha256": "5374e6941568ccdf1bf2a858e4440dd8395c530a5928840764e259d1c1ba3643",
+      "receipt": "publisher-text/008-5374e6941568ccdf.txt"
+    },
+    {
+      "archive_entry": "vcpkg/installed/x64-windows-static/share/openssl/OpenSSLConfig.cmake",
+      "bytes": 5222,
+      "sha256": "f2235dff39bd042526b909beb4438452e09ff46759044ca7f0e88b76ffd35052",
+      "receipt": "publisher-text/009-f2235dff39bd0425.txt"
+    },
+    {
+      "archive_entry": "vcpkg/installed/x64-windows-static/share/openssl/copyright",
+      "bytes": 10175,
+      "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a",
+      "receipt": "publisher-text/010-7d5450cb2d142651.txt"
+    }
+  ],
+  "data_review_only": true,
+  "product_or_native_execution": false,
+  "static_dependency_attribution": "candidate until exact x64-windows-static metadata and package linkage are reviewed"
+}

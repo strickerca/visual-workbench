@@ -1,0 +1,69 @@
+[package]
+name = "vw-ffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+name = "vw_core"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+bindgen = ["uniffi/cli"]
+fixtures = ["tokio/rt", "tokio/macros"]
+
+[dependencies]
+uniffi = { version = "=0.32.2", default-features = false }
+tokio = { version = "=1.53.1", features = ["sync", "rt", "net", "time", "macros"] }
+thiserror = "=2.0.21"
+serde_json = "=1.0.151"
+serde = { version = "=1.0.229", features = ["derive"] }
+fs2 = "=0.4.3"
+vw-ai = { version = "=0.1.0", path = "../vw-ai" }
+vw-ai-provider = { version = "=0.1.0", path = "../vw-ai-provider" }
+vw-ai-platform = { version = "=0.1.0", path = "../vw-ai-platform" }
+tempfile = "=3.27.0"
+zeroize = "=1.9.0"
+blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+vw-net = { version = "=0.1.0", path = "../vw-net" }
+vw-model = { version = "=0.1.0", path = "../vw-model" }
+vw-geom = { version = "=0.1.0", path = "../vw-geom" }
+vw-proto = { version = "=0.1.0", path = "../vw-proto" }
+vw-ops = { version = "=0.1.0", path = "../vw-ops" }
+vw-store = { version = "=0.1.0", path = "../vw-store" }
+vw-ink = { version = "=0.1.0", path = "../vw-ink" }
+vw-raster = { version = "=0.1.0", path = "../vw-raster" }
+vw-package = { version = "=0.1.0", path = "../vw-package" }
+vw-codec-os = { version = "=0.1.0", path = "../vw-codec-os" }
+vw-instructions = { version = "=0.1.0", path = "../vw-instructions" }
+vw-semantics = { version = "=0.1.0", path = "../vw-semantics" }
+vw-mask = { version = "=0.1.0", path = "../vw-mask" }
+png = "=0.18.1"
+
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+rustix = { version = "=1.1.5", features = ["fs"] }
+
+[target.'cfg(windows)'.dependencies]
+vw-host-win = { version = "=0.1.0", path = "../../../host-win/crates/vw-host-win" }
+vw-net = { version = "=0.1.0", path = "../vw-net", features = ["mdns"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = { version = "=0.22.4", default-features = false }
+
+[dev-dependencies]
+tokio = { version = "=1.53.1", features = ["rt", "macros", "time"] }
+
+[[bin]]
+name = "vw-bindgen"
+path = "src/bin/bindgen.rs"
+required-features = ["bindgen"]
+
+[[bin]]
+name = "vw-ffi-golden"
+path = "src/bin/ffi-golden.rs"
+required-features = ["fixtures"]

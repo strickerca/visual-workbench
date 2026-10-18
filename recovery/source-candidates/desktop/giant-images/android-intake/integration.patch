@@ -1,0 +1,206 @@
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/ProjectRepository.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/ProjectRepository.kt
+@@ -23,6 +23,7 @@
+     private val context = context.applicationContext
+     private val root = File(this.context.filesDir, "projects")
+     private val rasterTransfers = RasterTransfers(this.context)
++    private val giantInputs = GiantAndroidInputs(this.context)
+     private val next = AtomicLong(0)
+     private var reservedUntil = 0L
+     lateinit var deviceId: String
+@@ -110,6 +111,15 @@
+         }, stage)
+     }
+ 
++    suspend fun importGiantJpeg(uri: Uri, stage: (String) -> Unit): WorkbenchProject = giantInputs.importJpeg(uri, { _, title ->
++        val now = System.currentTimeMillis(); val id = core.newId(now.toULong())
++        GiantProjectOptions(checkedPath(id), id, core.newId(now.toULong()), core.newId(now.toULong()), deviceId,
++            title, now, GIANT_PHONE_WORK_BYTES.toULong())
++    }, stage)
++    suspend fun rebuildGiant(project: WorkbenchProject, documentId: String, stage: (String) -> Unit) =
++        giantInputs.rebuild(project, documentId, stage)
++    suspend fun settleGiantInputs() = giantInputs.settle()
++
+     private suspend fun create(bytes: ByteArray, title: String): WorkbenchProject {
+         val now = System.currentTimeMillis()
+         val project = core.newId(now.toULong())
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -189,6 +189,7 @@
+     private fun localInstructionFocused(field: InstructionField) { instructionFocus.localField(field) }
+     fun instructionInteractionChanged() { instructionFocus.interactionChanged() }
+     internal fun instructionModal(owner: com.visualworkbench.android.instructions.InstructionFocusModal, active: Boolean) { instructionAdmission.modal(owner, active) }
++    internal fun giantPickerLease(): AutoCloseable = instructionAdmission.hold()
+     internal fun clearInstructionModals() { instructionAdmission.clear() }
+     fun editInstruction() {
+         if (document == null) { message = "Open a document first."; return }
+@@ -443,6 +444,40 @@
+             }
+         }
+     }
++    fun receiveGiantJpeg(uri: Uri): Job? {
++        if (uri.scheme != "content") { message = "Choose a JPEG from an Android document provider."; return null }
++        return openRequest(transfer = true) { repository.importGiantJpeg(uri) { transferLabel = it } }
++    }
++    fun giantDocument(): Boolean = isGiant()
++    fun rebuildGiantCache(): Job? {
++        val current = project ?: return null
++        val doc = document ?: return null
++        if (!isGiant() || disposing || busy || pending != 0 || !mayCloseAi() || instructionEditor.hasUnsaved() ||
++            instructionEditor.state.value.busy || semanticEditor.state.value.busy) return null
++        val token = epoch
++        busy = true; cancelTool(); exportPreflight = null; checkedExport = null; exportReady = null
++        val job = scope.launch {
++            try {
++                mutations.withLock {
++                    if (disposing || current !== project || token != epoch || !mayCloseAi() || instructionEditor.hasUnsaved()) return@withLock
++                    retireGiant()
++                    repository.rebuildGiant(current, doc.documentId) { transferLabel = it }
++                    message = "The full-resolution tile cache was rebuilt from the unchanged original."
++                }
++            } catch (cancel: CancellationException) { throw cancel }
++            catch (error: Exception) { report(error) }
++            finally {
++                withContext(NonCancellable) {
++                    if (!disposing && current === project && token == epoch) {
++                        try { loadBackground() } catch (error: Exception) { report(error) }
++                    }
++                }
++                busy = false; transferLabel = null; transferJob = null
++            }
++        }
++        transferJob = job.takeIf { it.isActive }
++        return job
++    }
+     fun open(id: String) = openRequest { repository.open(id) }
+     private fun openRequest(knownSrgb: Boolean = false, transfer: Boolean = false, load: suspend () -> WorkbenchProject): Job? {
+         if(!mayCloseAi())return null
+@@ -455,7 +490,7 @@
+             var instructionSeal = false
+             try {
+                 val opened=mutations.withLock {
+-                    if(disposing)return@withLock false
++                    if(disposing || !mayCloseAi())return@withLock false
+                     if (!instructionEditor.sealIfClean()) {
+                         message = "Save or discard the instruction draft before opening another project."
+                         screen = WorkbenchScreen.Instructions; return@withLock false
+@@ -478,7 +513,11 @@
+                 observeProject(current, token)
+                 colorAssumed = knownSrgb; screen = WorkbenchScreen.Canvas; cameraFitted = false
+                 fit(); loadBackground()
+-            } catch (cancel: CancellationException) { throw cancel }
++            } catch (cancel: CancellationException) {
++                if (cancel is GiantAndroidPublicationCancelled)
++                    message = "Import delivery was canceled. A complete project may already be saved at ${cancel.projectPath}. Reopen the projects list; the provider original is unchanged."
++                throw cancel
++            }
+             catch (error: CoreFailure) {
+                 if (transfer) message = rasterFailure(error, importing = true) else report(error)
+             }
+@@ -504,6 +543,7 @@
+         instructionEditor.detach()
+         retireAi()
+         retireGiant()
++        repository.settleGiantInputs()
+         epoch++; refreshAdmission.reset()
+         changesJob?.cancelAndJoin(); changesJob = null
+         refreshQueue?.close(); refreshQueue = null
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
+@@ -52,6 +52,20 @@
+     var pickerTicketId by rememberSaveable { mutableStateOf<String?>(null) }
+     var cameraSaveToken by rememberSaveable { mutableStateOf<String?>(null) }
+     var cameraDiscardToken by remember { mutableStateOf<String?>(null) }
++    var giantUri by remember(editor) { mutableStateOf<android.net.Uri?>(null) }
++    var giantAwaiting by rememberSaveable { mutableStateOf(false) }
++    val giantAdmission = remember(editor) { GiantPickerAdmission(giantAwaiting, editor::giantPickerLease) { pending, uri ->
++        giantAwaiting = pending; giantUri = uri
++    } }
++    DisposableEffect(giantAdmission) { onDispose { giantAdmission.close() } }
++    val giantPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
++        giantAdmission.result(uri)
++    }
++    if (giantUri != null) AlertDialog(onDismissRequest = giantAdmission::dismiss,
++        title = { Text("Import the giant original?") },
++        text = { Text("This explicit path supports opaque, untagged 8-bit JPEGs above 50 megapixels, up to 1 GiB encoded. The original stays unchanged. Full-resolution tiling can take time and several GiB of private storage; cancel waits for the current decoder call to finish.") },
++        confirmButton = { TextButton(onClick = { giantAdmission.accept { editor.receiveGiantJpeg(it) } }, enabled = !editor.busy) { Text("Build tiles and import") } },
++        dismissButton = { TextButton(onClick = giantAdmission::dismiss) { Text("Cancel") } })
+     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { editor.receiveImage(it) } }
+     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { editor.receiveImage(it) } }
+     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+@@ -112,6 +126,9 @@
+                             try { cameraSaver.launch("camera-original") }
+                             catch (_: Exception) { cameraSaveToken = null; editor.transferMessage("A file destination is unavailable on this device.") }
+                         }
++                    }, onGiantJpeg = {
++                        try { giantAdmission.launch { giantPicker.launch(arrayOf("image/jpeg")) } }
++                        catch (_: Exception) { editor.transferMessage("The JPEG picker is unavailable. The original and project are unchanged.") }
+                     })
+                 WorkbenchScreen.Canvas -> EditorScreen(editor, { exportDialog(true) }, ::saveSelection)
+                 WorkbenchScreen.Settings -> Column {
+@@ -200,6 +217,11 @@
+             }
+         }
+         AiResultStatus(editor)
++        if (editor.giantDocument()) Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
++            Text("Full-resolution original with derived view tiles", Modifier.weight(1f), style = MaterialTheme.typography.caption)
++            TextButton(onClick = { editor.rebuildGiantCache() }, enabled = !editor.busy && editor.pending == 0,
++                modifier = Modifier.heightIn(min = 48.dp)) { Text("Rebuild tiles") }
++        }
+         if (editor.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+         editor.transferLabel?.let { label ->
+             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+@@ -209,8 +231,8 @@
+         }
+         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+             AndroidView(factory = { context -> CanvasSurface(context, editor) }, update = { it.updatePreferences() }, modifier = Modifier.fillMaxSize())
+-            editor.scene?.takeIf { it.background != null && editor.blockingMessage == null }?.let { scene -> EraserOverlay(editor.erasers, scene.camera, scene.document.render.revision, scene.document.documentId) }
+-            editor.scene?.takeIf { it.background != null && editor.blockingMessage == null }?.let { scene -> SelectionOverlay(editor.selections, scene.camera, scene.document.render.revision, scene.document.documentId) }
++            editor.scene?.takeIf { (it.background != null || it.giantDisplayReady) && editor.blockingMessage == null }?.let { scene -> EraserOverlay(editor.erasers, scene.camera, scene.document.render.revision, scene.document.documentId) }
++            editor.scene?.takeIf { (it.background != null || it.giantDisplayReady) && editor.blockingMessage == null }?.let { scene -> SelectionOverlay(editor.selections, scene.camera, scene.document.render.revision, scene.document.documentId) }
+             val availableHeight = maxHeight
+             val railHeight = minOf(availableHeight * .78f, 560.dp).coerceAtLeast(80.dp)
+             val travel = (availableHeight - railHeight - 16.dp).coerceAtLeast(0.dp)
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/ProjectScreens.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/ProjectScreens.kt
+@@ -21,7 +21,7 @@
+ internal fun ProjectsScreen(projects: List<ProjectCard>, busy: Boolean, onOpenImage: () -> Unit, onNewCanvas: () -> Unit,
+                             onOpen: (String) -> Unit, onSettings: () -> Unit, onDiagnostics: () -> Unit, onPairing: () -> Unit,
+                             onFiles: () -> Unit, onCamera: () -> Unit, cameraCaptures: List<CameraCapture>,
+-                            onRetryCamera: (String) -> Unit, onDiscardCamera: (String) -> Unit, onSaveCamera: (String) -> Unit) {
++                            onRetryCamera: (String) -> Unit, onDiscardCamera: (String) -> Unit, onSaveCamera: (String) -> Unit, onGiantJpeg: () -> Unit = {}) {
+     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+         Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+             Column(Modifier.weight(1f)) {
+@@ -38,6 +38,9 @@
+         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+             OutlinedButton(onClick = onFiles, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Browse files") }
+             OutlinedButton(onClick = onCamera, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Take photo") }
++        }
++        OutlinedButton(onClick = onGiantJpeg, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
++            Text("Import giant JPEG original")
+         }
+         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+         if (cameraCaptures.isNotEmpty()) Column(Modifier.fillMaxWidth().heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/instructions/InstructionFocusAdmission.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/instructions/InstructionFocusAdmission.kt
+@@ -6,11 +6,18 @@
+  * export dialog hands off to a document picker; dismissing one cannot unseal the other. */
+ internal class InstructionFocusAdmission(private val changed: () -> Unit = {}) {
+     private val owners = mutableSetOf<InstructionFocusModal>()
++    private val leases = mutableSetOf<Any>()
++    /** Independent picker leases survive a previous composition clearing its
++     * Boolean modal flags. Only the exact owner token can release this fence. */
++    fun hold(): AutoCloseable {
++        val token = Any(); leases.add(token); changed()
++        return AutoCloseable { if (leases.remove(token)) changed() }
++    }
+     fun modal(owner: InstructionFocusModal, active: Boolean) {
+         val updated = if (active) owners.add(owner) else owners.remove(owner)
+         if (updated) changed()
+     }
+     fun clear() { if (owners.isNotEmpty()) { owners.clear(); changed() } }
+     fun allows(textDraft: Boolean, brush: Boolean, contextMenu: Boolean, blocked: Boolean): Boolean =
+-        owners.isEmpty() && !textDraft && !brush && !contextMenu && !blocked
++        owners.isEmpty() && leases.isEmpty() && !textDraft && !brush && !contextMenu && !blocked
+ }
