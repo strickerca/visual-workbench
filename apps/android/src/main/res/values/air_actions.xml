@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="air_action_lens">Toggle precision lens (default)</string>
+    <string name="air_action_fit">Fit / restore view (default)</string>
+    <string name="air_action_undo">Undo (default)</string>
+    <string name="air_action_redo">Redo (default)</string>
+    <string name="air_action_previous_tool">Previous tool (default)</string>
+    <string name="air_action_next_tool">Next tool (default)</string>
+    <string name="air_action_increase">Increase lens magnification (default)</string>
+    <string name="air_action_decrease">Decrease lens magnification (default)</string>
+</resources>
