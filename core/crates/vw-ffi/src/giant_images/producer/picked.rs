@@ -12,6 +12,7 @@
 //! Picked owners create no threads. Preparation uses existing bounded startup
 //! ownership. A completed source stays in shared control, never in an unpolled
 //! oneshot reply: close/drop can retire it without cooperation from that future.
+//! Shared control also retires the startup sender independently of reply polling.
 //! Actual cleanup precedes completion, or quarantines the same permit/4MiB.
 //! The independent prepared worker is constructed only in the receiving future's
 //! final synchronous poll; no await follows construction/delivery.
@@ -20,9 +21,14 @@ use super::{
     input, source,
 };
 use crate::{Cancellation, worker::Worker};
-use std::sync::{
-    Arc, Mutex, MutexGuard,
-    atomic::{AtomicBool, Ordering},
+use std::{
+    future::{Future, poll_fn},
+    pin::Pin,
+    sync::{
+        Arc, Mutex, MutexGuard,
+        atomic::{AtomicBool, Ordering},
+    },
+    task::Poll,
 };
 use tokio::sync::watch;
 use vw_store::FreeSpaceQuery;
@@ -54,8 +60,10 @@ impl PendingInputAdmission {
                 status: Mutex::new(Status {
                     state: State::Ready { input, limits },
                     retirement: Ok(()),
+                    operation: None,
                 }),
                 closed: Arc::new(AtomicBool::new(false)),
+                startup: Mutex::new(StartupSlot::default()),
                 done,
             }),
             budget: self.budget,
@@ -74,11 +82,19 @@ enum State {
 struct Status {
     state: State,
     retirement: Result<()>,
+    operation: Option<Result<()>>,
 }
 struct Control {
     status: Mutex<Status>,
     closed: Arc<AtomicBool>,
+    startup: Mutex<StartupSlot>,
     done: watch::Sender<bool>,
+}
+type StartupFuture = Pin<Box<dyn Future<Output = crate::Result<Result<()>>> + Send>>;
+#[derive(Default)]
+struct StartupSlot {
+    future: Option<StartupFuture>,
+    retired: bool,
 }
 enum Retiring {
     Input(input::AdmittedInput),
@@ -93,10 +109,54 @@ impl Control {
             Err(poisoned) => poisoned.into_inner(),
         }
     }
+    /// Poll startup once to enqueue its synchronous job, then give shared
+    /// control the sole future/sender owner. Actual job completion (or close)
+    /// drops that owner without waiting for the receiving future to poll again.
+    /// This preserves worker::startup's existing global admission and does not
+    /// require a Tokio executor, another thread, or another pool.
+    async fn start_once(&self, mut future: StartupFuture) -> Result<()> {
+        let first = poll_fn(|cx| Poll::Ready(future.as_mut().poll(cx))).await;
+        match first {
+            Poll::Ready(result) => result.map_err(Error::from)?,
+            Poll::Pending => {
+                let mut slot = match self.startup.lock() {
+                    Ok(slot) => slot,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                if slot.retired {
+                    // The worker may settle (or close may run) before parking.
+                    // Drop outside the mutex: skipped-job cleanup can reenter.
+                    drop(slot);
+                    drop(future);
+                } else {
+                    slot.future = Some(future);
+                }
+                Ok(())
+            }
+        }
+    }
+    fn retire_startup(&self) {
+        let future = {
+            let mut slot = match self.startup.lock() {
+                Ok(slot) => slot,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            slot.retired = true;
+            slot.future.take()
+        };
+        // The queued/running job owns admission independently. Dropping this
+        // sender lets the actual worker exit after its job, even if the public
+        // preparation future stays alive/unpolled. Never drop under the mutex.
+        drop(future);
+    }
     fn complete(&self, result: Result<()>) {
+        self.retire_startup();
         let mut status = self.status();
         if status.retirement.is_ok() {
             status.retirement = result;
+        }
+        if status.operation.is_none() {
+            status.operation = Some(Err(Error::Closed));
         }
         self.done.send_replace(true);
     }
@@ -116,6 +176,7 @@ impl Control {
             }
             retiring
         };
+        self.retire_startup();
         if let Some(retiring) = retiring {
             let result = match retiring {
                 Retiring::Input(input) => input.release(),
@@ -128,6 +189,10 @@ impl Control {
         let mut status = self.status();
         if !self.closed.load(Ordering::Acquire) && matches!(status.state, State::Working) {
             status.state = State::Available(source);
+            status.operation = Some(Ok(()));
+            // Retire before advertising completion. A completed, unpolled
+            // reply cannot keep an otherwise idle startup worker sender alive.
+            self.retire_startup();
             self.done.send_replace(true);
             return Ok(());
         }
@@ -178,14 +243,28 @@ impl PickedOriginal {
         // An already-cancelled attempt never invokes the actual worker body.
         source::live(&self.control.closed, &cancel)?;
         let work_cancel = cancel.clone();
-        crate::worker::startup(move || Ok(job.run(&work_cancel, &query)))
-            .await
-            .map_err(Error::from)??;
+        let mut done = self.control.done.subscribe();
+        self.control
+            .start_once(Box::pin(crate::worker::startup(move || {
+                Ok(job.run(&work_cancel, &query))
+            })))
+            .await?;
+        loop {
+            if *done.borrow() {
+                break;
+            }
+            done.changed().await.map_err(|_| Error::Storage)?;
+        }
 
         // Linearize consumption against close. No await/caller callback follows
         // this fence. A stalled receiving future cannot own the available source.
         let mut status = self.control.status();
         source::live(&self.control.closed, &cancel)?;
+        match status.operation.as_ref() {
+            Some(Ok(())) => {}
+            Some(Err(error)) => return Err(error.clone()),
+            None => return Err(Error::Storage),
+        }
         let source = match std::mem::replace(&mut status.state, State::Consumed) {
             State::Available(source) => source,
             previous => {
@@ -274,6 +353,7 @@ impl Preparation {
         ) {
             Ok(source) => self.control.publish_source(source),
             Err(failure) => {
+                self.control.status().operation = Some(Err(failure.error.clone()));
                 self.control.complete(failure.retirement);
                 Err(failure.error)
             }
