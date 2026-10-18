@@ -253,6 +253,7 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
             }
         }
         PrecisionControls(editor.precision)
+        EditorWorkflowControls(editor)
         if(documentState.descriptor!=null)Column(Modifier.fillMaxWidth().heightIn(max=220.dp).verticalScroll(rememberScrollState())){EditableDocumentControls(editor.documents,onDocumentSave)}
         AiResultStatus(editor)
         if (editor.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -318,6 +319,7 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
             }
         }
         editor.originalFormatNotice?.let { Text(it, Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.caption) }
+        if(editor.document?.hasToneAdjustments==true)Text("Tone adjustments appear in Tone preview and marked exports. This canvas shows the original image.",Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=8.dp),style=MaterialTheme.typography.caption)
         QuickControls(editor.displayedBrush(), editor::brush, { editor.brushDialog(true) },
             editor.info?.canUndo == true && editor.pending == 0, editor.info?.canRedo == true && editor.pending == 0, editor::undo, editor::redo)
     }

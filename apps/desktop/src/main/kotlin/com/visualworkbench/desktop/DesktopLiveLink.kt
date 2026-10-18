@@ -69,6 +69,11 @@ internal class DesktopLiveLink(
             } catch (cancel: CancellationException) { throw cancel }
             catch (error: Exception) { if (current === attached) warning(sessionMessage(error)) }
         }
+        startPreviews(attached)
+    }
+
+    private fun startPreviews(attached: LiveAttachment) {
+        val link=attached.link
         previewJob = scope.launch {
             try {
                 while (currentCoroutineContext().isActive && current === attached) {
@@ -95,6 +100,18 @@ internal class DesktopLiveLink(
             } catch (cancel: CancellationException) { throw cancel }
             catch (error: Exception) { if (current === attached) { previews(null); warning(sessionMessage(error)) } }
         }
+    }
+
+    /** A document switch keeps the authenticated project link. Retire only
+     * old-document preview reads and actual queued preview cancellations. */
+    suspend fun documentChanging() {
+        previewJob?.cancelAndJoin(); previewJob=null
+        while(finishes.isNotEmpty())finishes.toList().forEach{it.join();finishes.remove(it)}
+        current?.lastFrame=null;previews(null)
+    }
+    fun documentChanged() {
+        val attached=attachment()?:return
+        if(previewJob?.isActive!=true)startPreviews(attached)
     }
 
     fun sendViewport(document: String, corners: List<Point>) {

@@ -265,6 +265,10 @@ public class DocumentControlsInteraction(
         mutable.value = mutable.value.copy(retry = null)
     }
 
+    /** Parent shutdown signals accepted producers before waiting for its edit
+     * gate. Ownership stays here until detach joins and releases exact plans. */
+    public fun beginDeparture(): Unit { action?.cancel(); reader?.cancel() }
+
     public suspend fun detach(): Unit = withContext(NonCancellable) {
         attachment = null; binding = null; sequence = 0uL; ticket++; awaitingBinding = false
         val current = action; val reading = reader

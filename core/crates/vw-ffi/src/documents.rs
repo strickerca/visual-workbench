@@ -461,6 +461,7 @@ impl ProjectSession {
                     bit_depth: 8,
                     layers,
                     render,
+                    has_tone_adjustments: false,
                 };
                 crate::payload::document_bytes(&result)?;
                 cancellation.check()?;

@@ -147,7 +147,7 @@ private class NativeProject(val handle: ProjectSession) : WorkbenchProject, Work
     }
     private suspend fun imageDocument(documentId: String): DocumentSnapshot = call { cancel ->
         val d=handle.documentSnapshot(documentId,cancel)
-        DocumentSnapshot(d.documentId,d.title,d.width,d.height,d.bitDepth,d.layers.map { LayerInfo(it.id,it.name,it.visible,it.locked,it.opacity,it.blend) },d.render.common())
+        DocumentSnapshot(d.documentId,d.title,d.width,d.height,d.bitDepth,d.layers.map { LayerInfo(it.id,it.name,it.visible,it.locked,it.opacity,it.blend) },d.render.common(),hasToneAdjustments=d.hasToneAdjustments)
     }
     override suspend fun background(documentId: String,memoryBudgetBytes: ULong,assumeUntaggedSrgb: Boolean): BackgroundImage = call { cancel ->
         val b=handle.backgroundImage(documentId,memoryBudgetBytes,assumeUntaggedSrgb,cancel)

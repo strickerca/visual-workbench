@@ -299,8 +299,9 @@ async fn stale_visible_hash_is_refused_and_a_staged_review_is_recovered_without_
         SessionPermit::acquire().unwrap(),
     )
     .unwrap();
-    // The root History::restore floor hook is separately required before other
-    // ordinary edits. This read also repairs the same floor on its own worker.
+    // Startup must reserve the durable draft's counter before any review read
+    // can repair the worker. Ordinary metadata allocation calls info first.
+    assert_eq!(reopened.info().await.unwrap().next_lamport, 101);
     let draft = reopened
         .offline_review_details(conflict.to_string(), BUDGET, token())
         .await

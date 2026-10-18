@@ -36,7 +36,23 @@ mod queries;
 mod semantics;
 mod streaming_ffi;
 pub use capture_import::*;
+mod local_views;
 mod worker;
+pub use local_views::{LocalViewsBinding, LocalViewsMutation, LocalViewsSnapshot, RegionBookmark};
+mod document_controls;
+pub use document_controls::{
+    DocumentControlCommand, DocumentControlRow, DocumentControlSnapshot, DocumentControlTargets,
+    GroupControlRow, LayerControlRow, LayerControlUpdate, ObjectControlRow,
+};
+mod object_rotation;
+pub use object_rotation::rotate_object_transforms;
+mod tone_controls;
+pub use tone_controls::{
+    ImageToneSettings, ToneControlCommand, ToneControlEntry, ToneControlPreview,
+    ToneControlSnapshot,
+};
+mod offline_review;
+pub use offline_review::*;
 mod workflow;
 pub use streaming_ffi::*;
 pub mod session;

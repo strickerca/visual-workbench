@@ -116,18 +116,18 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     private val documentOwner:EditorDocuments=EditorDocuments(scope,core,
         { val p=project;val snapshot=document;if(p!=null&&snapshot!=null&&!disposing)DocumentAttachment(p,snapshot,epoch)else null },
-        { !disposing&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
+        { !disposing&&!workflows.blocksInput()&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
         { attached,page -> mutations.withLock {
             if(project!==attached.project||epoch!=attached.epoch||!documentRevisionMatches(attached))throw DocumentFailure(DocumentFailureKind.Stale)
             refreshAdmission.invalidate();documentRefresh.invalidate()
-            cancelTool();detachGiant();erasers.detach();selections.detach();documentOwnerDiscardDraw()
+            cancelTool();workflows.detach();rotation.detach();detachGiant();erasers.detach();selections.detach();documentOwnerDiscardDraw()
             val next=(attached.project as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
             val drawing=prepareEditorObjects(core,next.render.items)
             if(project!==attached.project||epoch!=attached.epoch||disposing)throw DocumentFailure(DocumentFailureKind.Stale)
             document=next;info=next.render.revision;objects=drawing;background=null;selected=null;cameraFitted=false
             selections.bind(attached.project,next,epoch,refreshAdmission.capture().sequence,camera)
             erasers.bind(attached.project,next,epoch,refreshAdmission.capture().sequence,camera)
-            instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit()
+            instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();bindWorkflows();enterWorkflows()
         } }, { publish() },application,{canvasRetirement()})
     val documents:DocumentController get()=documentOwner.controller
     private fun documentRevisionMatches(attached:DocumentAttachment):Boolean = document?.render?.revision?.sameDocumentRevision(attached.snapshot.render.revision)==true
@@ -305,6 +305,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private fun aiFrame()=aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),camera,aiPoses())}
     private fun aiResultReady()=document?.render?.items?.none{it.shape is Shape.Result}!=false||aiFrame()!=null
     fun openAi(){
+        if(workflows.blocksInput())return
         if(documents.state.value.descriptor!=null){message="AI image edits require a raster image document.";return}
         if(disposing||busy||pending!=0||document==null||textDraft!=null||showBrush||showContext||blockingMessage!=null)return
         if(instructionEditor.hasUnsaved()){message="Save or discard the instruction draft before opening AI review.";return}
@@ -312,6 +313,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     fun hideAi(){ai.hide();instructionInteractionChanged()}
     private fun mayCloseAi():Boolean{
+        if(!workflows.mayLeave())return false
         if(!ai.needsDecision())return true
         message="Save the paid Result or explicitly discard its review before replacing or closing this project."
         if(!instructionEditor.hasUnsaved()){ai.open();instructionInteractionChanged()}
@@ -322,9 +324,122 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         try{if(disposing)ai.close()else ai.detach()}
         finally{try{if(disposing)aiResults.close()else aiResults.detach()}finally{if(disposing)aiService.close()}}
     }
+    private fun workflowAttachment():EditorWorkflowAttachment? {
+        val current=project;val doc=document
+        return if(current!=null&&doc!=null&&!disposing)EditorWorkflowAttachment(current,doc,epoch,refreshAdmission.capture().sequence,repository.deviceId)else null
+    }
+    private fun workflowIdle():Boolean = !disposing&&!busy&&pending==0&&operationCount==0&&screen==WorkbenchScreen.Canvas&&
+        !navigationContactActive&&!rotation.state.value.active&&!rotationUnavailable()&&gesture==null&&strokes.isEmpty()&&documentPress==null&&!selectionPointer&&!eraserPointer&&
+        sliderGesture==null&&selectedStyleDraft==null&&!showBrush&&!showContext&&textDraft==null&&blockingMessage==null&&
+        !ai.state.value.open&&!ai.needsDecision()&&!instructionEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&
+        !semanticEditor.state.value.busy&&!selections.state.value.busy&&!erasers.state.value.busy&&!documents.state.value.busy&&
+        !remoteOpen&&transferJob==null&&incomingJob==null&&incomingProducer==null&&connectionJob?.isActive!=true&&
+        captureOpenWork==null&&previewJob?.isActive!=true&&previewHandle==null&&pickerTicket==null&&shareLease==null&&
+        instructionAdmission.allows(false,false,false,false)
+    internal fun workflowId():String=newId()
+    internal val workflows=EditorWorkflows(scope,mutations,::workflowAttachment,::workflowIdle,{cancelTool();followPeer=false},
+        metadata={current->val next=current.info();WorkflowMetadata(newId(),repository.deviceId,
+            repository.instructionLamport(next.nextLamport),System.currentTimeMillis())},
+        newId=::newId,camera={camera},applyCamera={value->invalidateViewCheck();followPeer=false;camera=value;cameraFitted=true;unsnappedRotation=value.rotation;publish()},
+        updated={a,revision->if(project===a.project&&epoch==a.epoch&&!disposing){repository.observeLamport(revision.nextLamport);refresh(a.project,revision,a.epoch)}},
+        committed={a,receipt->if(project===a.project&&epoch==a.epoch&&!disposing){repository.observeLamport(receipt.revision.nextLamport);refresh(a.project,receipt.revision,a.epoch)}},
+        adoptDocument=::adoptWorkflowDocument,report={message=it},
+        localViews=::localViewWorkflows,documentControls=::documentControlWorkflows,reviews=::offlineReviews,toneControls=::toneControlWorkflows)
+    private var rotationGesture:ObjectRotationGesture?=null
+    private var rotationDisplay:ObjectRotationHandle?=null
+    private var rotationPhysical:Transform?=null
+    internal var rotationSnap15 by mutableStateOf(false); private set
+    internal fun rotationSnap(value:Boolean){if(!disposing&&!workflows.blocksInput())rotationSnap15=value}
+    private fun rotationUnavailable():Boolean=rotation.state.value.busy||rotation.state.value.failure==ObjectRotationFailure.Unconfirmed
+    private fun rotationAdmission():Boolean = !disposing&&!busy&&pending==0&&operationCount==0&&!workflows.blocksInput()&&
+        !instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!ai.state.value.open&&
+        instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)
+    internal val rotation=ObjectRotationInteraction(scope,mutations,::newId,::objectRotationTransforms,
+        current={val current=project;val doc=document;if(current!=null&&doc!=null&&!disposing)ObjectRotationAttachment(current,doc,epoch,camera,setOfNotNull(selected))else null},
+        mayMutate=::rotationAdmission,
+        commit={request->
+            val doc=document
+            if(project!==request.project||doc==null||doc.objectRotationFrame(epoch,camera)!=request.frame)false
+            else{
+                repository.observeLamport(request.project.info().nextLamport)
+                val options=editOptions(request.commands.size).copy(gestureId=request.gestureId,
+                    expectedHostSeq=request.frame.binding.hostSeq,expectedStateHash=request.frame.binding.stateHash)
+                val revision=request.project.edit(options,request.commands)
+                repository.observeLamport(revision.nextLamport);refresh(request.project,revision,epoch);true
+            }
+        })
+    private fun rotationHandle():ObjectRotationHandle? {
+        val doc=document?:return null
+        if(tool!=EditorTool.Select||workflows.blocksInput()||blockingMessage!=null)return null
+        val base=objectRotationHandle(doc,setOfNotNull(selected),camera,28.0*density)?:return null
+        return rotationDisplay?:base
+    }
+    private fun beginRotation(point:Point,raw:Point,physical:Transform):Boolean {
+        val handle=rotationHandle()?:return false
+        if(!handle.hit(physical,raw,24.0*density))return false
+        val token=rotation.begin(handle.pivot,point)?:return false
+        rotationGesture=token;rotationDisplay=handle.copy(point=point);rotationPhysical=physical;publish();return true
+    }
+    private fun bindWorkflows(){rotation.reconciled();info?.let{repository.observeLamport(it.nextLamport)};workflowAttachment()?.let(workflows::bind)}
+    private suspend fun enterWorkflows(){workflowAttachment()?.let{workflows.enter(it)}}
+    private suspend fun adoptWorkflowDocument(a:EditorWorkflowAttachment,target:DocumentSnapshot){
+        if(project!==a.project||epoch!=a.epoch||document?.documentId!=a.document.documentId||document?.page!=a.document.page||document?.render?.revision?.sameDocumentRevision(a.document.render.revision)!=true||disposing)
+            throw WorkflowFailure(WorkflowFailureKind.Stale)
+        val drawing=prepareEditorObjects(core,target.render.items)
+        cancelTool();followPeer=false
+        // Keep the authenticated ProjectLink and native project/history. Only
+        // subscriptions carrying the old attachment token retire here.
+        changesJob?.cancelAndJoin();changesJob=null;refreshQueue?.close();refreshQueue=null
+        refreshJob?.cancelAndJoin();refreshJob=null
+        linkChanges?.cancelAndJoin();linkChanges=null;peerWorker?.cancelAndJoin();peerWorker=null
+        var metadataRetired=false
+        try {
+            refreshMutex.withLock {
+                rotation.detach();semanticEditor.detach();instructionEditor.detach();instructionFocus.detach()
+                metadataRetired=true
+                erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.detach()
+                if(disposing||project!==a.project||epoch!=a.epoch)throw WorkflowFailure(WorkflowFailureKind.Stale)
+                val actual=a.project.info();val expected=target.render.revision
+                if(actual.projectId!=expected.projectId||actual.hostSeq!=expected.hostSeq||actual.stateHash!=expected.stateHash||target.documentId !in actual.documentIds)
+                    throw WorkflowFailure(WorkflowFailureKind.Stale)
+                invalidateExport();clearPeerObjects();captureArrivals.detach();captureNavigationGeneration++
+                epoch++;refreshAdmission.reset();documentRefresh.invalidate();aiRetiring=false;colorAssumed=false
+                if(!precisionClosed)precision.reset()
+                document=target;info=target.render.revision;objects=drawing;background=null;scene=null;selected=null
+                transientShape=null;transformed=emptyMap();erased=emptySet();hoverPoint=null;selectedStyleDraft=null
+                pendingPreviews.clear();pendingTransforms.clear();pendingErases.clear()
+                blockingMessage=null;needsColorConsent=false;originalFormatNotice=null;cameraFitted=false;lastViewport=null
+                instructionEditor.resume();semanticEditor.resumeAfterReplacement();metadataRetired=false
+                selections.bind(a.project,target,epoch,refreshAdmission.capture().sequence,camera)
+                erasers.bind(a.project,target,epoch,refreshAdmission.capture().sequence,camera)
+                instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();documentOwner.bind(a.project,target)
+                fit();bindWorkflows();refreshOriginalFormatNotice();loadBackground()
+            }
+        } finally {withContext(NonCancellable){
+            if(!disposing&&project===a.project){
+                try {
+                    if(metadataRetired){instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()}
+                } finally {
+                    observeProject(a.project,epoch);refreshQueue?.trySend(Unit)
+                    link?.let{observeLink(it,a.project,epoch,linkEpoch,reattachAgent=false);instructionFocus.attach(it)}
+                }
+            }
+        }}
+    }
     private val preferencesWriter: Job
 
     init {
+        scope.launch { rotation.state.collect{value->
+            if(!value.active&&!value.busy){rotationDisplay=null;rotationPhysical=null}
+            publish()
+            if(value.failure==ObjectRotationFailure.Unconfirmed&&!disposing){
+                val current=project;val token=epoch
+                if(current!=null)scope.launch{mutations.withLock{
+                    if(current===project&&token==epoch&&!disposing)try{refresh(current,current.info(),token);rotation.reconciled()}
+                    catch(error:Exception){report(error)}
+                }}
+            }
+        }}
         scope.launch { aiResults.state.collect { publish() } }
         preferencesWriter = scope.launch {
             for (settings in preferencesQueue) try { preferencesStore.write(settings) }
@@ -455,6 +570,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         } else { previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null }
     }
     fun navigate(next: WorkbenchScreen) {
+        if(workflows.blocksInput()){message="Close the current controls or finish their operation first.";return}
         captureNavigationGeneration++ // Explicit navigation invalidates any staged arrival before suspension.
         if(next==WorkbenchScreen.Projects&&!mayCloseAi())return
         if (next == WorkbenchScreen.Projects && instructionEditor.hasUnsaved()) {
@@ -563,6 +679,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     fun open(id: String) = openRequest { repository.open(id) }
     private fun openRequest(knownSrgb: Boolean = false, transfer: Boolean = false, receivingProject: Boolean = false,
         onOpened: ((WorkbenchProject, Long) -> Unit)? = null, load: suspend () -> WorkbenchProject): Job? {
+        if(workflows.blocksInput()||!workflows.mayLeave())return null
         if(!mayCloseAi())return null
         if (instructionEditor.hasUnsaved()) {
             message = "Save or discard the instruction draft before opening another project."; screen = WorkbenchScreen.Instructions; return null
@@ -597,7 +714,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
                 observeProject(current, token)
                 colorAssumed = knownSrgb; screen = WorkbenchScreen.Canvas; cameraFitted = false
-                fit(); refreshOriginalFormatNotice(); loadBackground()
+                fit(); bindWorkflows();enterWorkflows();refreshOriginalFormatNotice(); loadBackground()
                 if (onOpened != null) completion = ProjectOpenCompletion(current, token)
             } catch (cancel: CancellationException) { throw cancel }
             catch (error: SessionFailure) {
@@ -637,7 +754,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         !ai.state.value.open && !instructionEditor.hasUnsaved() && (ownInstructions || !instructionEditor.state.value.busy) && (ownSemantics || !semanticEditor.state.value.busy) &&
         !selections.state.value.active && !erasers.state.value.active &&
         instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null)
-    internal fun canOpenReceivedCapture(): Boolean = !busy && captureOpenWork == null && receivedCaptureIdle()
+    internal fun canOpenReceivedCapture(): Boolean = !workflows.blocksInput()&&!busy && captureOpenWork == null && receivedCaptureIdle()
     internal fun autoOpenReceivedCapture(value: ReceivedCapture): Boolean =
         screen == WorkbenchScreen.Canvas && failedCaptureOpen != value.createdHostSeq && canOpenReceivedCapture()
 
@@ -674,14 +791,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                             val checked = current.info()
                             if (!stillOwned() || !receivedCaptureIdle(ownInstructions = true) || checked.hostSeq != next.render.revision.hostSeq ||
                                 checked.stateHash != next.render.revision.stateHash) return@capture
-                            semanticEditor.detach(); instructionEditor.detach(); detachGiant(); selections.detach(); erasers.detach(); retireAi()
+                            workflows.detach();rotation.detach();semanticEditor.detach(); instructionEditor.detach(); detachGiant(); selections.detach(); erasers.detach(); retireAi()
                             // Modal entry may run while the owners above settle.
                             if (!stillOwned() || !receivedCaptureIdle(ownInstructions = true, ownSemantics = true)) return@capture
                             cancelTool(); invalidateExport(); clearPeerObjects(); aiRetiring = false
                             refreshAdmission.invalidate();documentRefresh.invalidate()
                             document = next; info = next.render.revision; objects = drawing; selected = null
                             background = staged; staged = null; blockingMessage = null; needsColorConsent = false; colorAssumed = false
-                            screen = WorkbenchScreen.Canvas; cameraFitted = false; fit()
+                            screen = WorkbenchScreen.Canvas; cameraFitted = false; fit();bindWorkflows();enterWorkflows()
                             captureArrivals.acknowledge(value); failedCaptureOpen = null
                             message = "Received lossless capture. Its exact original is saved in this project."
                             publish()
@@ -712,6 +829,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     private suspend fun closeCurrent() {
         withContext(NonCancellable) {
+        workflows.detach();rotation.detach()
         documentOwner.detach()
         if(!precisionClosed)precision.reset()
         scene=null
@@ -763,6 +881,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         refreshAdmission.observe(change.sequence)) {
                         captureArrivals.changed(current, token)
                         giantOwner.observe(change.project)
+                        workflows.observe(change.project,change.sequence)
                         erasers.observe(change); selections.observe(change)
                         clearPeerObjects(); publish()
                         invalidateExport(); queue.trySend(Unit)
@@ -817,10 +936,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
 
-    private fun observeLink(created: ProjectLink, current: WorkbenchProject, token: Long, generation: Long) {
+    private fun observeLink(created: ProjectLink, current: WorkbenchProject, token: Long, generation: Long, reattachAgent:Boolean=true) {
         clearPeerObjects()
         connection = created.status(); lastViewport = null
-        agentCapture.attach(created)
+        if(reattachAgent)agentCapture.attach(created)
         linkChanges = scope.launch {
             try {
                 created.changes.collect { status ->
@@ -897,8 +1016,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         cancelTool(); scope.launch { try { detachLink(); publish() } catch (error: Exception) { report(error) } }
     }
     fun revoke(peer: String) { pairing.revoke(peer) { cancelTool(); detachLink(); publish() } }
-    fun matchPeer() { followPeer = false; matchPeerCamera(); publish() }
-    fun followPeer(enabled: Boolean) { followPeer = enabled; if (enabled) matchPeerCamera(); publish() }
+    fun matchPeer() { if(workflows.blocksInput())return;followPeer = false; matchPeerCamera(); publish() }
+    fun followPeer(enabled: Boolean) { if(workflows.blocksInput())return;followPeer = enabled; if (enabled) matchPeerCamera(); publish() }
     private fun matchPeerCamera() {
         val view = connection?.peerViewport?.takeIf { it.documentId == document?.documentId && it.corners.size == 4 } ?: return
         val first = view.corners[0]; val next = view.corners[1]
@@ -1039,7 +1158,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val localProvisional = (strokes.mapNotNull { it.drawing } + pendingPreviews.values).filter { it.item.objectId !in savedIds } + listOfNotNull(transientShape)
         val localIds = localProvisional.mapTo(HashSet()) { it.item.objectId }
         val provisional = localProvisional + admittedPeers.filter { it.item.objectId !in savedIds && it.item.objectId !in localIds }
-        val allTransforms = pendingTransforms.values.fold(emptyMap<String, Transform>()) { a, b -> a + b } + transformed
+        val allTransforms = pendingTransforms.values.fold(emptyMap<String, Transform>()) { a, b -> a + b } + transformed + rotation.state.value.preview
         val allErased = pendingErases.values.fold(emptySet<String>()) { a, b -> a + b } + erased
         var giantUpdateFailed=false
         giantOwner.current?.let{view->
@@ -1054,8 +1173,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val next = CanvasScene(++sceneRevision, doc, background, camera, core.cameraMatrix(camera), visibleObjects,
             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
-            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame)
+            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame,rotationHandle=rotationHandle())
         scene = next; canvasSink?.invoke(next)
+        workflows.remember(camera)
         documents.viewport(camera)
         val viewport = PeerViewport(doc.documentId, core.mapPoints(camera, true, listOf(Point(0.0, 0.0),
             Point(camera.viewportWidth, 0.0), Point(camera.viewportWidth, camera.viewportHeight), Point(0.0, camera.viewportHeight))))
@@ -1066,8 +1186,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
 
     private fun toDocument(sample: PenSample, camera: Camera) = core.mapPoints(camera, true, listOf(Point(sample.x, sample.y))).single()
-    private fun selectedLayer(): LayerInfo = document?.layers?.firstOrNull { it.visible && !it.locked && it.blend == "normal" }
-        ?: error("There is no unlocked normal annotation layer in this document")
+    private fun selectedLayer(): LayerInfo = document?.let{documentControlDrawingLayer(it,workflows.controls.state.value.drawingLayerId)}
+        ?: error("Choose a visible unlocked annotation layer before drawing")
 
     private class StrokeRun(val epoch: Long, val camera: Camera, val start: PenSample, val origin: Point, val capabilities: StylusCapabilities,
                             val options: StrokeOptions, val layerId: String, val opacity: Double, val blend: String, val link: ProjectLink?) {
@@ -1091,12 +1211,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                                    val revision: ProjectInfo? = null, val newObjectId: String? = null,
                                    val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false,val physical:Transform=Transform())
 
-    internal fun precisionInputAllowed():Boolean = !disposing&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
+    internal fun precisionInputAllowed():Boolean = !disposing&&!rotationUnavailable()&&!workflows.blocksInput()&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
         !instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&
         !ai.state.value.open&&aiResultReady()&&blockingMessage==null&&textDraft==null&&!showBrush&&!showContext&&instructionAdmission.allows(false,false,false,false)&&
         document?.let{background!=null||documentOwner.matchingFrame(it,epoch)!=null||giantInputReady(it)}==true
     override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
-        if(ai.state.value.open||!aiResultReady())return
+        if(rotationUnavailable()||workflows.blocksInput()||ai.state.value.open||!aiResultReady())return
         val retainPolygon = !selectionPointer && !eraserPointer && gesture == null && documentPress == null &&
             precisionInputAllowed() && erasers.tools.route(rawSample.tool == PointerTool.Eraser) == EraserInputRoute.Selection &&
             selections.interaction.canResumePolygonContact(camera)
@@ -1126,6 +1246,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             EraserInputRoute.Editor -> Unit
         }
         this.capabilities = capabilities; hoverPoint = null
+        if(tool==EditorTool.Select&&route==EraserInputRoute.Editor&&beginRotation(toDocument(sample,camera),raw,physical))return
         val activeTool = tool
         if (activeTool == EditorTool.Eraser) {precision.end();return} // all erasers use the guarded route above
         try {
@@ -1136,7 +1257,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             if (activeTool in listOf(EditorTool.Pen, EditorTool.Highlighter, EditorTool.Marker)) {
                 val now = System.currentTimeMillis(); val gestureId = core.newId(now.toULong())
                 val family = when (activeTool) { EditorTool.Highlighter -> "highlighter"; EditorTool.Marker -> "marker"; else -> "pen" }
-                val highlighter = if (family == "highlighter") document?.layers?.filter { it.visible && !it.locked && it.blend == "multiply" }?.minByOrNull { it.id } else null
+                val explicitLayer=workflows.controls.state.value.drawingLayerId
+                if(family=="highlighter"&&explicitLayer!=null&&layer.blend!="multiply"){
+                    message="Choose a multiply annotation layer for highlighter marks.";precision.cancel();return
+                }
+                val highlighter = if(family!="highlighter")null else if(explicitLayer!=null)layer
+                    else document?.layers?.filter { it.visible && !it.locked && it.blend == "multiply" }?.minByOrNull { it.id }
                 val target = if (family == "highlighter") highlighter?.id ?: gestureId else layer.id
                 val options = StrokeOptions(gestureId, core.newId(now.toULong()), core.newId(now.toULong()), checkNotNull(document).documentId,
                     layer.id, repository.deviceId, repository.lamport(3), now, family, brush.width, EditorDrawing.rgba(brush.colorArgb),
@@ -1182,6 +1308,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     override fun extendTool(samples: List<PenSample>) {
         samples.lastOrNull()?.let{precision.move(Point(it.x,it.y))}
         val mapped=precision.routePen(samples)
+        rotationGesture?.let{token->
+            if(precision.inputMatrix()!=rotationPhysical){rotationGesture=null;rotation.cancel();publish();return}
+            mapped.lastOrNull()?.let{sample->val point=toDocument(sample,token.frame.camera);rotationDisplay=rotationDisplay?.copy(point=point);rotation.move(token,point,rotationSnap15)}
+            publish();return
+        }
         if(documentPress!=null){val end=mapped.lastOrNull()?.let{toDocument(it,camera)};if(end!=null)documentPress=documentPress!!.first to end;publish();return}
         extendMappedTool(mapped)
     }
@@ -1248,6 +1379,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     override fun finishTool(samples: List<PenSample>) {
         try{
             val mapped=precision.routePen(samples)
+            rotationGesture?.let{token->
+                rotationGesture=null
+                if(precision.inputMatrix()!=rotationPhysical){rotation.cancel();publish();return}
+                val point=mapped.lastOrNull()?.let{toDocument(it,token.frame.camera)}
+                if(point==null)rotation.cancel()else{rotationDisplay=rotationDisplay?.copy(point=point);rotation.finish(token,point,rotationSnap15)}
+                publish();return
+            }
             val press=documentPress
             if(press!=null){
                 val end=mapped.lastOrNull()?.let{toDocument(it,camera)}?:press.second
@@ -1295,8 +1433,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         publish()
     }
 
-    override fun cancelTool() { clearToolContact(false) }
+    override fun cancelTool() { rotationGesture=null;rotation.cancel();clearToolContact(false) }
     private fun clearToolContact(retainPolygon: Boolean) {
+        if(rotationGesture!=null){rotationGesture=null;rotation.cancel()}
         documentPress=null
         cancelPrecision()
         eraserPointer = false; erasers.interaction.cancelGesture()
@@ -1414,6 +1553,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                      createdAtMs: Long = System.currentTimeMillis()) {
         val current = project ?: return
         if (commands.isEmpty()) return
+        if(rotationUnavailable()||workflows.blocksInput()){finishRemotePreview(previewLink,gestureId,true);message="Finish or close the current controls before editing.";return}
         if (operationCount >= 32) { finishRemotePreview(previewLink, gestureId, true); message = "The edit queue is full. Try the edit again after saving finishes."; return }
         val token = epoch
         val options = editOptions(commands.sumOf { when (it) { is EditCommand.SetText -> 3; is EditCommand.SetStyle -> 2; else -> 1 } })
@@ -1456,6 +1596,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if(giantMode||giantOwner.retaining)giantOwner.invalidate()
         document = next; objects = drawing
         documentOwner.bind(current,next)
+        bindWorkflows()
         if(giantMode||giantDisplayRequired(next))loadBackground()
         refreshOriginalFormatNotice()
         instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
@@ -1719,6 +1860,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
     override fun onCleared() {
+        workflows.beginDeparture();rotation.cancel()
         giantOwner.invalidate()
         disposing = true
         remoteCapability?.let{it.seal("background");retireRemoteEditLater(it)}
@@ -1738,7 +1880,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 // can miss a project returned while the ViewModel is clearing.
                 try {
                     incomingJob?.join()
-                    try { connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin(); mutations.withLock { closeCurrent();documentOwner.close();closePrecision() } }
+                    try { connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin(); mutations.withLock { closeCurrent();workflows.close();rotation.close();documentOwner.close();closePrecision() } }
                     finally {
                         try { pairing.close() }
                         finally {
@@ -1748,7 +1890,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     }
                 } catch (error: Exception) {
                     report(error)
-                    DocumentRetirementRegistry.retain(this@EditorController){mutations.withLock{closeCurrent();documentOwner.close();closePrecision()}}
+                    DocumentRetirementRegistry.retain(this@EditorController){mutations.withLock{closeCurrent();workflows.close();rotation.close();documentOwner.close();closePrecision()}}
                 } finally { scope.cancel() }
             }
         }

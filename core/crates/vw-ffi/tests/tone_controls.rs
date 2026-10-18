@@ -132,6 +132,13 @@ async fn draft_and_prepare_are_read_only_and_committed_preview_matches_undo_redo
     let initial = project.info().await.unwrap();
     let view = snapshot(&project).await;
     assert!(view.tones.is_empty());
+    assert!(
+        !project
+            .document_snapshot(id(2), cancel())
+            .await
+            .unwrap()
+            .has_tone_adjustments
+    );
     assert_eq!(
         (view.source_width, view.source_height, view.source_bit_depth),
         (64, 64, 8)
@@ -158,6 +165,15 @@ async fn draft_and_prepare_are_read_only_and_committed_preview_matches_undo_redo
     plan.dispose();
     let accepted = snapshot(&project).await;
     assert_eq!(accepted.tones.len(), 1);
+    let editing = project.document_snapshot(id(2), cancel()).await.unwrap();
+    assert!(editing.has_tone_adjustments);
+    assert!(
+        !editing
+            .render
+            .items
+            .iter()
+            .any(|item| matches!(&item.shape, DrawShape::Adjustment))
+    );
     assert_eq!(accepted.tones[0].settings, settings());
     assert_eq!(accepted.tones[0].opacity, 0.5);
     assert_eq!(
@@ -211,6 +227,13 @@ async fn draft_and_prepare_are_read_only_and_committed_preview_matches_undo_redo
         .await
         .unwrap();
     assert!(snapshot(&reopened).await.tones.is_empty());
+    assert!(
+        !reopened
+            .document_snapshot(id(2), cancel())
+            .await
+            .unwrap()
+            .has_tone_adjustments
+    );
     reopened.close().await.unwrap();
 }
 

@@ -207,6 +207,18 @@ class DocumentControlsInteractionTest {
         } finally {f.close()}
     }
 
+    @Test fun departureSignalCancelsAnAcceptedProducerAfterItsPanelTokenWasInvalidated()=runBlocking {
+        val f=Fixture();val entered=CompletableDeferred<Unit>();val canceled=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>()
+        try {
+            f.open();f.commitGate={entered.complete(Unit);try{awaitCancellation()}finally{canceled.complete(Unit);withContext(NonCancellable){release.await()}}}
+            assertTrue(f.controls.execute(DocumentControlCommand.RenameDocument("accepted")));entered.await()
+            f.controls.observe(1uL);assertNull(f.controls.capture());f.controls.beginDeparture();canceled.await()
+            assertTrue(f.controls.state.value.busy);assertEquals(0,f.closedPlans)
+            release.complete(Unit);withTimeout(3000){f.controls.detach()}
+            assertEquals(1,f.closedPlans);assertFalse(f.gate.isLocked)
+        }finally{release.complete(Unit);f.close()}
+    }
+
     // Test shorthand deliberately captures the CURRENT token. Dedicated stale
     // callback cases below call the production signatures with old tokens.
     private fun DocumentControlsInteraction.execute(command: DocumentControlCommand): Boolean = capture()?.let { execute(it,command) } ?: false

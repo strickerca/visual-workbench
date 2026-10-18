@@ -393,6 +393,10 @@ public class ToneControlsInteraction(
         value?.plan?.close()
     }
 
+    /** Retain exact plans/pixels while parent shutdown signals cancellation
+     * before waiting for the shared mutation gate. detach joins settlement. */
+    public fun beginDeparture(): Unit { action?.cancel(); reader?.cancel() }
+
     public suspend fun detach(): Unit = withContext(NonCancellable) {
         attachment = null; binding = null; sequence = 0uL; ticket++; previewSerial++; awaitingBinding = false
         val writing = action; val reading = reader

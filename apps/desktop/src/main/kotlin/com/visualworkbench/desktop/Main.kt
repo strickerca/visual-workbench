@@ -82,7 +82,7 @@ fun main(args: Array<String>) {
         val diagnosticsLifecycle = remember(diagnostics) {
             DesktopDiagnosticsLifecycle({ diagnostics.held }, diagnostics::requestClose, { diagnostics.closeWithin() })
         }
-        fun commandsAllowed(): Boolean = projectPicker == null && diagnosticsLifecycle.allowsCommand(quitting)
+        fun commandsAllowed(): Boolean = projectPicker == null && !controller.workflows.blocksInput() && diagnosticsLifecycle.allowsCommand(quitting)
         val capture=remember{com.visualworkbench.desktop.capture.DesktopCaptureController(scope,core,captureService,location.path,device,
             controller::captureDestination,controller::report)}
         var captureSettings by remember{mutableStateOf(false)}
@@ -134,7 +134,7 @@ fun main(args: Array<String>) {
         var dpiText by remember{mutableStateOf("Checking display scale…")}
         fun competingModal(ignorePicker: ProjectFilePickerRequest? = null): Boolean {
             val current = controller.state.value
-            return (projectPicker != null && projectPicker !== ignorePicker) ||
+            return controller.workflows.blocksInput() || (projectPicker != null && projectPicker !== ignorePicker) ||
                 documentImport!=null||nativePickerCount != 0 || codexModal.state.value.settings ||
                 mcpModal.state.value.let { it.settings || it.compare != null } || captureSettings || remoteView != null ||
                 current.textAnchor != null || current.exportOpen || current.pasteOpen || controller.ai.state.value.open
@@ -249,7 +249,7 @@ fun main(args: Array<String>) {
         }
         mcpState.owner?.let{McpCaptureIndicator(it)}
         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
-        val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
+        val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,controller.workflows.blocksInput()||codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
             onPreviewKeyEvent=canvasShortcut) {
             DisposableEffect(window, controller) {
@@ -496,6 +496,7 @@ fun main(args: Array<String>) {
             commandButton(Command.Import,action);commandButton(Command.Undo,action,enabled=editor.document?.render?.revision?.canUndo==true);commandButton(Command.Redo,action,enabled=editor.document?.render?.revision?.canRedo==true);commandButton(Command.Export,action,enabled=editor.document!=null)
         }
         editor.originalFormatNotice?.let{Text(it,Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=8.dp),style=MaterialTheme.typography.caption)}
+        if(editor.document?.hasToneAdjustments==true)Text("Tone adjustments appear in Tone preview and marked exports. This canvas shows the original image.",Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=8.dp),style=MaterialTheme.typography.caption)
         PrecisionControls(controller.precision)
         AiResultStatus(controller)
         Row(Modifier.weight(1f)){
@@ -503,6 +504,7 @@ fun main(args: Array<String>) {
                 Text("TOOLS",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc));for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout))commandButton(c,action,Modifier.fillMaxWidth(),selected=c.name==editor.tool.name&&!eraserState.active&&!selectionState.active)
                 EraserPanel(controller.erasers,controller::chooseEraser,controller::stopErasing,Modifier.fillMaxWidth())
                 SelectionPanel(controller.selections,editor.selected.singleOrNull(),saveSelection,Modifier.fillMaxWidth())
+                EditorWorkflowControls(controller,editor)
                 Spacer(Modifier.height(18.dp));Text("LAYERS & OBJECTS",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc))
                 editor.document?.layers?.forEach{layer->Text(layer.name,Modifier.padding(top=8.dp),fontWeight=FontWeight.Medium);editor.document?.render?.items?.filter{it.layerId==layer.id}?.forEach{item->Text(item.shape.javaClass.simpleName,Modifier.fillMaxWidth().clickable(enabled=!item.locked){controller.select(item.objectId)}.background(if(item.objectId in editor.selected)Color(0xff294a49)else Color.Transparent).padding(8.dp),style=MaterialTheme.typography.body2)}}
             }

@@ -9,7 +9,7 @@ import kotlinx.serialization.json.*
 
 internal actual object SystemTime { public actual fun nowMs(): Long = System.currentTimeMillis() }
 internal fun NativeInfo.documentCommon(): ProjectInfo = ProjectInfo(projectId,title,deviceId,nextLamport,canUndo,canRedo,hostSeq,stateHash,documentIds)
-internal fun NativeSnapshot.documentCommon(): DocumentSnapshot = DocumentSnapshot(documentId,title,width,height,bitDepth,layers.map{LayerInfo(it.id,it.name,it.visible,it.locked,it.opacity,it.blend)},RenderList(render.revision.documentCommon(),render.items.map(::nativeRenderItem)))
+internal fun NativeSnapshot.documentCommon(): DocumentSnapshot = DocumentSnapshot(documentId,title,width,height,bitDepth,layers.map{LayerInfo(it.id,it.name,it.visible,it.locked,it.opacity,it.blend)},RenderList(render.revision.documentCommon(),render.items.map(::nativeRenderItem)),hasToneAdjustments=hasToneAdjustments)
 internal fun EditableDocumentDescriptor.documentCommon(): EditableDescriptor = EditableDescriptor(documentId,sourceAssetId,if(kind == EditableDocumentKind.PDF) EditableKind.Pdf else EditableKind.Svg,pages.map{DocumentPage(it.page,it.width,it.height,it.crop,it.quarterTurns,it.layerId)},revision.documentCommon())
 internal fun CreateDocument.documentNative(): CreateEditableDocument = CreateEditableDocument(path,projectId,documentId,deviceId,title,source,sourceBlake3,if(kind == EditableKind.Pdf) EditableDocumentKind.PDF else EditableDocumentKind.SVG,pages.map{DocumentPageGeometry(it.index,it.width,it.height,it.crop,it.quarterTurns,it.layerId)},nowMs)
 internal fun ProjectInfo.documentNative(): NativeInfo = NativeInfo(projectId,title,deviceId,nextLamport,canUndo,canRedo,hostSeq,stateHash,documentIds)

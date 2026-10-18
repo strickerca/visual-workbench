@@ -410,6 +410,7 @@ fn object_conflict(temp: &TempDir, deleting: bool) -> (ProjectStore, Id) {
             stroke: Some(pb::Color { rgba: 0x112233ff }),
             ..Default::default()
         }),
+        role: pb::Role::None as i32,
         created_by: device(1).to_string(),
         created_at_ms: 210,
         shape: Some(pb::object_state::Shape::Rect(pb::RectD {

@@ -99,6 +99,10 @@ fn admission(
             .checked_mul(32)
             .ok_or(WorkflowError::Limit)?,
     )?;
+    // A private draft can add its own normal layer and adjustment object after
+    // this preallocation check. The canonical renderer charges32bytes per row;
+    // reserve both rows now rather than granting a larger budget after cloning.
+    geometry = add(geometry, 2 * 32)?;
     // An untagged source has no retained ICC or profile parser workspace.
     // Keep the conservative tagged-source allowance; the existing renderer
     // still validates its actual ICC workspace against its supplied budget.

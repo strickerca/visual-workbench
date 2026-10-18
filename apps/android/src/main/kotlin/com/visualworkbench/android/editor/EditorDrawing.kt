@@ -45,6 +45,7 @@ internal data class CanvasScene(
     val documentDraft:Pair<Point,Point>?=null,
     val giantMode:Boolean=false,
     val giantFrame:GiantVisibleFrame<Bitmap>?=null,
+    val rotationHandle:ObjectRotationHandle?=null,
 )
 
 internal object EditorDrawing {
@@ -253,6 +254,12 @@ internal object EditorDrawing {
                 color = 0xffc26b18.toInt(); style = Paint.Style.STROKE; strokeWidth = 2 * scene.density
                 pathEffect = android.graphics.DashPathEffect(floatArrayOf(8 * scene.density, 5 * scene.density), 0f)
             })
+        }
+        scene.rotationHandle?.let{handle->
+            val pivot=map(scene.matrix,handle.pivot);val point=map(scene.matrix,handle.point)
+            val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=0xff81e0c8.toInt();style=Paint.Style.STROKE;strokeWidth=1.5f*scene.density}
+            canvas.drawLine(pivot.x.toFloat(),pivot.y.toFloat(),point.x.toFloat(),point.y.toFloat(),paint)
+            canvas.drawCircle(point.x.toFloat(),point.y.toFloat(),6f*scene.density,paint)
         }
         val selection = scene.objects.firstOrNull { it.item.objectId == scene.selected }
         if (selection != null) {
