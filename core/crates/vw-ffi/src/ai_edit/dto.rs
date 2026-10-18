@@ -39,6 +39,24 @@ pub enum AiEditError {
 }
 pub type AiEditResult<T> = Result<T, AiEditError>;
 
+/// The transport family is explicit; a model string cannot change provider
+/// credentials, pricing or wire protocol.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum AiProviderKind {
+    OpenAiImageEdits,
+    GeminiImageGeneration,
+    Flux1Fill,
+}
+impl From<vw_ai::config::ProviderKind> for AiProviderKind {
+    fn from(value: vw_ai::config::ProviderKind) -> Self {
+        match value {
+            vw_ai::config::ProviderKind::OpenAiImageEdits => Self::OpenAiImageEdits,
+            vw_ai::config::ProviderKind::GeminiImageGeneration => Self::GeminiImageGeneration,
+            vw_ai::config::ProviderKind::Flux1Fill { .. } => Self::Flux1Fill,
+        }
+    }
+}
+
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct AiConfiguration {
     /// Versioned JSON configuration, including dated provenance. No credentials.
@@ -49,6 +67,7 @@ pub struct AiConfiguration {
     pub model: String,
     pub quality: String,
     pub daily_soft_budget_microusd: u64,
+    pub provider_kind: AiProviderKind,
 }
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct AiTokenEstimate {
@@ -99,6 +118,7 @@ pub struct AiReview {
     pub estimate_expires_on: Option<String>,
     pub configuration_expires_on: String,
     pub provider_copy_reduces_depth: bool,
+    pub provider_kind: AiProviderKind,
 }
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct AiReadiness {
@@ -107,6 +127,8 @@ pub struct AiReadiness {
     pub configuration_current: bool,
     pub spent_today_microusd: u64,
     pub daily_soft_budget_microusd: u64,
+    /// Provider-scoped protected credentials and wire accounting are installed.
+    pub provider_ready: bool,
 }
 #[derive(Clone, Copy, Debug, uniffi::Enum)]
 pub enum AiSettlement {

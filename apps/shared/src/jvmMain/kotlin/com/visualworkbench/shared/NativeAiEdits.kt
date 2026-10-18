@@ -13,11 +13,28 @@ import com.visualworkbench.bindings.core.AiCompareMode as NMode
 import com.visualworkbench.bindings.core.AiRegion as NRegion
 import com.visualworkbench.bindings.core.AiAcceptanceBrush as NBrush
 import com.visualworkbench.bindings.core.AiSaveOptions as NSave
+import com.visualworkbench.bindings.core.AiProviderKind as NProviderKind
 import com.visualworkbench.bindings.core.SelectionVersion as NSelection
 import com.visualworkbench.bindings.core.Point as NPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.Collections
+
+// A cancelled caller may never receive its native handle. Keep failed
+// retirements here until a later settings/request action can join them; losing
+// the Kotlin wrapper must not make an uncertain native request disappear.
+private val failedAiRequests = Collections.synchronizedSet(mutableSetOf<NativeAiRequest>())
+private val failedAiHandles = Collections.synchronizedSet(mutableSetOf<NRequest>())
+private suspend fun retryAiRetirements() {
+    for (request in synchronized(failedAiRequests) { failedAiRequests.toList() }) request.close()
+    for (handle in synchronized(failedAiHandles) { failedAiHandles.toList() }) {
+        releaseNative { handle.shutdown(); handle.destroy() }
+        failedAiHandles.remove(handle)
+    }
+}
 
 private val aiScope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
 private val aiSlots=Semaphore(4)
@@ -36,10 +53,15 @@ private inline fun <T> direct(block:()->T):T=try{block()}catch(e:AiEditException
  * handles. Cancellation never frees the token/slot before native settlement. */
 internal suspend fun <T> settledAi(release:suspend(T)->Unit={},block:suspend(Cancellation)->T):T =
     ownAiResult(aiScope,aiSlots,::Cancellation,{it.cancel()},{it.destroy()},release){token->try{block(token)}catch(e:AiEditException){throw failure(e)}catch(e:IllegalStateException){throw AiFailure(AiFailureKind.Closed)}}
-private fun NConfiguration.public()=AiConfiguration(json,fingerprint,verifiedOn,expiresOn,model,quality,dailySoftBudgetMicrousd)
+private fun NProviderKind.public()=when(this){
+    NProviderKind.OPEN_AI_IMAGE_EDITS->AiProviderKind.OpenAiImageEdits
+    NProviderKind.GEMINI_IMAGE_GENERATION->AiProviderKind.GeminiImageGeneration
+    NProviderKind.FLUX1_FILL->AiProviderKind.Flux1Fill
+}
+private fun NConfiguration.public()=AiConfiguration(json,fingerprint,verifiedOn,expiresOn,model,quality,dailySoftBudgetMicrousd,providerKind.public())
 private fun AiTokenEstimate.native()=NEstimate(schema,textInput,imageInput,imageOutput,provenance,verifiedOn,expiresOn)
 private fun AiPrepareOptions.native()=NPrepare(workflowBinding(binding),selections.map{NSelection(it.objectId,it.assetId,it.version)},intentId,instruction,configurationFingerprint,estimate?.native(),featherPx,allow16bitProviderCopy,assumeUntaggedSrgb,memoryBudgetBytes)
-private fun NReview.public()=AiReview(requestId,workflowBinding(binding),sourceAssetId,sourceFileSha256,maskSha256,configurationFingerprint,model,quality,sourceWidth,sourceHeight,sourceBitDepth,modelWidth,modelHeight,cropX,cropY,cropWidth,cropHeight,featherPx,estimatedMicrousd,estimateProvenance,estimateExpiresOn,configurationExpiresOn,providerCopyReducesDepth)
+private fun NReview.public()=AiReview(requestId,workflowBinding(binding),sourceAssetId,sourceFileSha256,maskSha256,configurationFingerprint,model,quality,sourceWidth,sourceHeight,sourceBitDepth,modelWidth,modelHeight,cropX,cropY,cropWidth,cropHeight,featherPx,estimatedMicrousd,estimateProvenance,estimateExpiresOn,configurationExpiresOn,providerCopyReducesDepth,providerKind.public())
 private fun NProof.public()=AiProofInfo(changedOutside,outsideSha256Before,outsideSha256After,changedUnaccepted,unacceptedSha256Before,unacceptedSha256After,deltaE2000Mean,deltaE2000Max,ssimInsideMask)
 private fun NCandidate.public()=AiCandidateInfo(requestId,candidateId,workflowBinding(binding),width,height,bitDepth,partial,when(settlement){com.visualworkbench.bindings.core.AiSettlement.USAGE_PRICED->AiSettlement.UsagePriced;com.visualworkbench.bindings.core.AiSettlement.USAGE_MISSING->AiSettlement.UsageMissing;com.visualworkbench.bindings.core.AiSettlement.LEDGER_UNAVAILABLE->AiSettlement.LedgerUnavailable},actualMicrousd,proof.public())
 private fun AiRegion.native()=NRegion(x,y,width,height)
@@ -53,14 +75,24 @@ public actual suspend fun createAiService(applicationPrivateDirectory:String,pro
 }
 private class NativeAiService(val handle:NService):WorkbenchAiService{
     private val closed=AtomicBoolean(false)
+    private val retired=AtomicBoolean(false)
+    private val retirement=Mutex()
     fun check(){if(closed.get())throw AiFailure(AiFailureKind.Closed)}
     override suspend fun configuration():AiConfiguration{check();return settledAi{handle.configuration(it).public()}}
     override suspend fun configure(json:String,expectedFingerprint:String):AiConfiguration{check();if(json.length>65_536||expectedFingerprint.length!=64)throw AiFailure(AiFailureKind.Invalid);return settledAi{handle.configure(json,expectedFingerprint,it).public()}}
     override suspend fun configureDailyBudget(expectedFingerprint:String,dailySoftBudgetMicrousd:ULong):AiConfiguration{check();return settledAi{handle.configureDailyBudget(expectedFingerprint,dailySoftBudgetMicrousd,it).public()}}
-    override suspend fun readiness():AiReadiness{check();return settledAi{handle.readiness(it).let{v->AiReadiness(v.configured,v.trustReady,v.configurationCurrent,v.spentTodayMicrousd,v.dailySoftBudgetMicrousd)}}}
+    override suspend fun readiness():AiReadiness{check();return settledAi{handle.readiness(it).let{v->AiReadiness(v.configured,v.trustReady,v.configurationCurrent,v.spentTodayMicrousd,v.dailySoftBudgetMicrousd,v.providerReady)}}}
     override suspend fun saveWindowsKey(bytes:ByteArray){try{check();if(bytes.isEmpty()||bytes.size>4096)throw AiFailure(AiFailureKind.Invalid);settledAi{handle.saveWindowsKey(bytes,it)}}finally{bytes.fill(0)}}
     override suspend fun removeWindowsKey(){check();settledAi{handle.removeWindowsKey(it)}}
-    override suspend fun close(){releaseNative{if(!closed.getAndSet(true))try{handle.shutdown()}finally{handle.destroy()}}}
+    override suspend fun close(){closed.set(true);retryAiRetirements();releaseNative{retirement.withLock{
+        if(!retired.get()){
+            // A failed shutdown retains the native handle for the owner's next
+            // explicit close. Worker completion includes state destruction.
+            handle.shutdown()
+            handle.destroy()
+            retired.set(true)
+        }
+    }}}
 }
 public actual fun WorkbenchProject.aiEdits(service:WorkbenchAiService):WorkbenchAiEdits{
     val owner=service as? NativeAiService?:throw AiFailure(AiFailureKind.Invalid);owner.check()
@@ -74,16 +106,23 @@ private open class NativeAiResults(protected val project:WorkbenchProject):Workb
 }
 private class NativeAiEdits(project:WorkbenchProject,val service:NativeAiService):NativeAiResults(project),WorkbenchAiEdits{
     override suspend fun prepare(options:AiPrepareOptions):WorkbenchAiRequest{
+        retryAiRetirements()
         service.check()
         if(options.selections.size !in 1..64 || options.instruction.length>16*1024 || options.estimate?.provenance?.length?.let{it>1024}==true)throw AiFailure(AiFailureKind.Invalid)
         return settledAi(release={it.close()}){cancel->
             val handle=nativeProjectHandle(project).prepareAiEdit(service.handle,options.native(),cancel)
-            try{NativeAiRequest(handle)}catch(e:Throwable){try{handle.shutdown()}finally{handle.destroy()};throw e}
+            try{NativeAiRequest(handle)}catch(e:Throwable){
+                try{handle.shutdown();handle.destroy()}
+                catch(retirement:Throwable){failedAiHandles.add(handle);e.addSuppressed(retirement)}
+                throw e
+            }
         }
     }
 }
 private class NativeAiRequest(val handle:NRequest):WorkbenchAiRequest{
     private val closed=AtomicBoolean(false)
+    private val retired=AtomicBoolean(false)
+    private val retirement=Mutex()
     override val review:AiReview=direct{handle.describe().public()}
     private fun check(){if(closed.get())throw AiFailure(AiFailureKind.Closed)}
     override suspend fun send(requestId:String,displayedEstimateMicrousd:ULong,acknowledgeSoftBudget:Boolean):AiCandidateInfo{check();return settledAi{handle.send(requestId,displayedEstimateMicrousd,acknowledgeSoftBudget,it).public()}}
@@ -91,5 +130,14 @@ private class NativeAiRequest(val handle:NRequest):WorkbenchAiRequest{
     override suspend fun compare(candidateId:String,mode:AiCompareMode,region:AiRegion):AiPixels{check();return settledAi{handle.compare(candidateId,mode.native(),region.native(),it).let{p->AiPixels(p.candidateId,p.region.public(),p.canvasWidth,p.canvasHeight,p.rgbaSrgb)}}}
     override suspend fun acceptBrush(brush:AiAcceptanceBrush):AiCandidateInfo{check();if(brush.points.size !in 1..16_384)throw AiFailure(AiFailureKind.Limit);return settledAi{handle.acceptBrush(NBrush(brush.expectedCandidateId,brush.nextCandidateId,brush.points.map{p->NPoint(p.x,p.y)},brush.radius,brush.opacity,brush.subtract,brush.clearFirst),it).public()}}
     override suspend fun save(candidateId:String,options:AiSaveOptions):AiResultReceipt{check();return settledAi{cancel->handle.save(candidateId,NSave(workflowBinding(options.expected),workflowMetadata(options.metadata),options.resultId,options.layerId,options.objectId,options.replaceObjectId),cancel).let{AiResultReceipt(it.transactionId,it.resultId,it.objectId,it.layerId,it.outputAssetId,it.compositeAssetId,it.acceptanceMaskAssetId,workflowInfo(it.revision),it.proof.public())}}}
-    override suspend fun close(){releaseNative{if(!closed.getAndSet(true))try{handle.shutdown()}finally{handle.destroy()}}}
+    override suspend fun close(){try{releaseNative{retirement.withLock{
+        closed.set(true)
+        if(!retired.get()){
+            handle.shutdown()
+            handle.destroy()
+            retired.set(true)
+        }
+    }}}catch(error:Throwable){failedAiRequests.add(this);throw error}
+        failedAiRequests.remove(this)
+    }
 }

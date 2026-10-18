@@ -1,25 +1,46 @@
 use super::*;
 use crate::{ProjectSession, worker::startup};
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
-};
+use std::sync::{Arc, Mutex};
 use vw_model::Id;
-static REQUESTS: AtomicUsize = AtomicUsize::new(0);
-pub(super) struct RequestPermit;
+/// All retained reviews share one finite memory envelope. Charge the complete
+/// advertised per-request budget before any source read, and release only when
+/// the owned request worker has actually been joined and dropped.
+const MAX_RETAINED_REQUESTS: usize = 4;
+const MAX_RETAINED_BUDGET: u64 = 1024 * 1024 * 1024;
+struct RequestAdmission {
+    count: usize,
+    budget: u64,
+}
+static REQUESTS: Mutex<RequestAdmission> = Mutex::new(RequestAdmission {
+    count: 0,
+    budget: 0,
+});
+pub(super) struct RequestPermit {
+    budget: u64,
+}
 impl RequestPermit {
-    pub(super) fn acquire() -> AiEditResult<Self> {
-        REQUESTS
-            .try_update(Ordering::AcqRel, Ordering::Acquire, |n| {
-                (n == 0).then_some(1)
-            })
-            .map_err(|_| AiEditError::Busy)?;
-        Ok(Self)
+    pub(super) fn acquire(budget: u64) -> AiEditResult<Self> {
+        if budget == 0 || budget > MAX_MEMORY {
+            return Err(AiEditError::Limit);
+        }
+        let mut state = REQUESTS.lock().map_err(|_| AiEditError::Busy)?;
+        let next = state.budget.checked_add(budget).ok_or(AiEditError::Limit)?;
+        if state.count >= MAX_RETAINED_REQUESTS || next > MAX_RETAINED_BUDGET {
+            return Err(AiEditError::Busy);
+        }
+        state.count += 1;
+        state.budget = next;
+        Ok(Self { budget })
     }
 }
 impl Drop for RequestPermit {
     fn drop(&mut self) {
-        REQUESTS.fetch_sub(1, Ordering::AcqRel);
+        // A poisoned admission lock retains the charge; it must never turn an
+        // uncertain live owner into apparent spare capacity.
+        if let Ok(mut state) = REQUESTS.lock() {
+            state.count = state.count.saturating_sub(1);
+            state.budget = state.budget.saturating_sub(self.budget);
+        }
     }
 }
 #[uniffi::export]
@@ -42,7 +63,7 @@ impl ProjectSession {
         }
         memory(RAW_RESERVE + 32 * 1024 * 1024, options.memory_budget_bytes)?;
         let intent = Id::try_from(options.intent_id.clone())?;
-        let permit = RequestPermit::acquire()?;
+        let permit = RequestPermit::acquire(options.memory_budget_bytes)?;
         let config = {
             let state = service.state.try_lock().map_err(|_| AiEditError::Busy)?;
             if state.configuration.fingerprint()? != options.configuration_fingerprint {

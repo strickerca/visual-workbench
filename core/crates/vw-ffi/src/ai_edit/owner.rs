@@ -159,13 +159,25 @@ impl AiService {
                     check(&stop, &cancellation)?;
                     let state = shared.try_lock().map_err(|_| AiEditError::Busy)?;
                     let today = configuration::today()?;
-                    let configured = credential_ready(&cancellation)?;
+                    // The present protected store contains only the OpenAI
+                    // credential. Never present it as readiness for another
+                    // provider or read it on that provider's behalf.
+                    let provider_ready = matches!(
+                        state.configuration.provider.kind,
+                        vw_ai::config::ProviderKind::OpenAiImageEdits
+                    );
+                    let configured = if provider_ready {
+                        credential_ready(&cancellation)?
+                    } else {
+                        false
+                    };
                     Ok(AiReadiness {
                         configured,
                         trust_ready: PlatformTrust::system().is_ok(),
                         configuration_current: state.configuration.current(today)?,
                         spent_today_microusd: state.ledger.spent_on(today)?,
                         daily_soft_budget_microusd: state.configuration.daily_soft_budget_microusd,
+                        provider_ready,
                     })
                 })())
             })

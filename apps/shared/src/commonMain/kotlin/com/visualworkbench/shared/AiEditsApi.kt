@@ -6,9 +6,11 @@ package com.visualworkbench.shared
 public enum class AiFailureKind { Invalid, Stale, Limit, Depth, Color, Estimate, SoftBudget, Unresolved,
     AttemptConsumed, Credentials, Provider, Proof, Storage, Unsupported, Cancelled, Closed, Busy }
 public class AiFailure(public val kind: AiFailureKind) : Exception("AI edit: ${kind.name}")
+public enum class AiProviderKind { OpenAiImageEdits, GeminiImageGeneration, Flux1Fill }
 public data class AiConfiguration(public val json: String, public val fingerprint: String,
     public val verifiedOn: String, public val expiresOn: String, public val model: String,
-    public val quality: String, public val dailySoftBudgetMicrousd: ULong)
+    public val quality: String, public val dailySoftBudgetMicrousd: ULong,
+    public val providerKind: AiProviderKind = AiProviderKind.OpenAiImageEdits)
 public data class AiTokenEstimate(public val schema: UInt = 1u, public val textInput: ULong,
     public val imageInput: ULong, public val imageOutput: ULong, public val provenance: String,
     public val verifiedOn: String, public val expiresOn: String)
@@ -26,10 +28,11 @@ public data class AiReview(public val requestId: String, public val binding: Wor
     public val cropWidth: UInt, public val cropHeight: UInt, public val featherPx: UInt,
     public val estimatedMicrousd: ULong?, public val estimateProvenance: String?,
     public val estimateExpiresOn: String?, public val configurationExpiresOn: String,
-    public val providerCopyReducesDepth: Boolean)
+    public val providerCopyReducesDepth: Boolean,
+    public val providerKind: AiProviderKind = AiProviderKind.OpenAiImageEdits)
 public data class AiReadiness(public val configured: Boolean, public val trustReady: Boolean,
     public val configurationCurrent: Boolean, public val spentTodayMicrousd: ULong,
-    public val dailySoftBudgetMicrousd: ULong)
+    public val dailySoftBudgetMicrousd: ULong, public val providerReady: Boolean = true)
 public enum class AiSettlement { UsagePriced, UsageMissing, LedgerUnavailable }
 public data class AiProofInfo(public val changedOutside: ULong, public val outsideSha256Before: String,
     public val outsideSha256After: String, public val changedUnaccepted: ULong?,

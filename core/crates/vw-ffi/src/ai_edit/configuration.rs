@@ -53,6 +53,7 @@ impl Configuration {
             model: self.provider.model.clone(),
             quality: self.provider.quality.clone(),
             daily_soft_budget_microusd: self.daily_soft_budget_microusd,
+            provider_kind: self.provider.kind.into(),
         })
     }
 }
