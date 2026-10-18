@@ -1,0 +1,86 @@
+{
+  "base": "6e8649aaeb4ce9b964c4f8636d7f100cb91f3165",
+  "status": "Desktop diagnostics caller implemented; independent review and full product validation pending",
+  "changes": [
+    "Current Main retains one closed-schema private log and one DiagnosticsExportOwner. Each session freezes the exact preview once; missing measurements remain null.",
+    "Chooser completion rechecks the route token, displayable window, Diagnostics command, quit state and current competing modals. Existing instructionPicker focus leases remain authoritative.",
+    "Ordinary commands, direct Workbench menus and app-handoff modal requests are blocked while diagnostics ownership is held. Current native file picker scopes are counted only for diagnostics admission; this does not replace or accept the separately owned picker repair.",
+    "Quit waits for successful diagnostics close on the UI dispatcher, then rechecks AI/instruction admission and seals/closes existing parents. A pending close preserves parent owners and permits retry.",
+    "Composition disposal only requests diagnostics close; it does not claim IO retirement."
+  ],
+  "source_files": {
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": {
+      "bytes": 45236,
+      "sha256": "250ea072ba3e66f09d6c5cf9dde21cfe10788ac3d2aa5fc6b4f0965b31de4cef"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopDiagnosticsLifecycle.kt": {
+      "bytes": 1539,
+      "sha256": "50c6906e678fa13745c6424f5f9e1dc4548a6b141558b0282c4a81b16cbeea9c"
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopDiagnosticsLifecycleTest.kt": {
+      "bytes": 5504,
+      "sha256": "95954e4b8d361a287c4f5f8c8406791d52d780fbb708115f944372d2859163ca"
+    }
+  },
+  "checks": {
+    "focused_lifecycle_tests": {
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "runner": "JUnit 4.13.2 with pinned coroutines 1.9.0 and setup JDK; raw Gradle-bundled Kotlin compiler 2.4.0; actual product compiler 2.4.20 remains pending",
+      "cases": [
+        "same frozen report on repeated open",
+        "pending-close route and command retention with retry",
+        "stale callback after leave/reenter",
+        "chooser rejects shutdown/window/route/modal changes",
+        "no parent seal or close on pending shutdown",
+        "admission rechecked after suspended settlement",
+        "no report/route/commands during quit"
+      ],
+      "jdk_version_components": [
+        21,
+        0,
+        12,
+        1
+      ]
+    },
+    "kotlin_syntax": "Main, caller policy and regression source parsed with Kotlin PSI 2.4.0, no errors; parsing is not full semantic compilation",
+    "application_license_gate": "Preserved prior 262-dependency/12-configuration pass; this slice adds no product dependency or allowance",
+    "full_app_build": "not run; image lane owns heavy slot",
+    "prior_diagnostics_module_harness": "27 passed at c219e33 per owning lane; not rerun in this caller-policy harness",
+    "privacy_scan": "Initial evidence scan matched the dotted JDK version as a network-address pattern. Version components are now numeric fields; scanner rules and allowlists remain unchanged."
+  },
+  "validation_commands": [
+    "source /workspace/.vw-tools/cloud-setup/start.sh",
+    "java -Xmx384m -cp <Gradle 9.7.0 lib/*> org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -no-reflect -jvm-target 21 -classpath <Kotlin 2.4.0 stdlib:coroutines 1.9.0:JUnit 4.13.2:Hamcrest 1.3> -d <owned temporary classes> apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopDiagnosticsLifecycle.kt apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopDiagnosticsLifecycleTest.kt",
+    "java -Xmx128m -Djava.awt.headless=true -cp <owned classes and same runtime dependencies> org.junit.runner.JUnitCore com.visualworkbench.desktop.DesktopDiagnosticsLifecycleTest"
+  ],
+  "external_logs": {
+    "compile.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "tests.log": {
+      "bytes": 56,
+      "sha256": "a6cfb22eee105c32f65efcfbb18e2522c4708057cb817bb3468bb74aba5e215c"
+    },
+    "syntax.log": {
+      "bytes": 305,
+      "sha256": "1f395e64c887cbc03691a00ae14d9dfcdd2267757e52d039bdb49fc51d8f861d"
+    }
+  },
+  "review_request": "Independent Astra review of this caller diff before combined candidate promotion. Inspect route/focus/quit interactions and composition with the separately owned picker repair.",
+  "next_validation": [
+    "Full pinned Kotlin/Compose compilation and desktop unit/lifecycle suite after central slot allocation",
+    "Windows native chooser focus/cancel/retry and slow filesystem shutdown scenarios",
+    "Android screen/controller compilation and provider export lifecycle",
+    "No hardware, provider quality or physical pen gate is passed"
+  ],
+  "planned_combined_validation": {
+    "status": "planned only; wait for parent slot handoff after precision",
+    "script_sha256": "de22e3568f6c98aa4d9d6c8b39f66054dcca4282afb610482eead8c5c43a4b68",
+    "script": "#!/usr/bin/env bash\nset -euo pipefail\ncd /workspace/visual-workbench\nsource /workspace/.vw-tools/cloud-setup/start.sh\ncargo deny --offline check licenses sources bans\nbash apps/gradlew -p apps checkDependencyLicenses --console=plain --no-daemon --no-parallel --max-workers=2\ncargo test --locked -p vw-document-protocol -- --test-threads=2\ncargo build --locked -p vw-ffi -p vw-host-ffi --features vw-ffi/bindgen --lib --bin vw-bindgen\ncargo ndk -t arm64-v8a --platform 29 -o target/android-jni build --locked -p vw-ffi\n# Focused Linux-host tests compile the actual apps. The Windows-only desktop\n# helper resource task is excluded only here; product packaging remains untested.\nbash apps/gradlew -p apps \\\n  :shared:desktopTest --tests com.visualworkbench.shared.DiagnosticsBundleTest \\\n  :desktop:test --tests com.visualworkbench.desktop.DesktopDiagnosticsLifecycleTest \\\n  --tests com.visualworkbench.desktop.diagnostics.DiagnosticsPublicationTest \\\n  :android:testDebugUnitTest --tests com.visualworkbench.android.diagnostics.DiagnosticReportWriterTest \\\n  :android:lintDebug -x :desktop:packageConnectionRuntime \\\n  --console=plain --no-daemon --no-parallel --max-workers=2\n",
+    "outer_command": "flock -n /workspace/.vw-tools/heavy-build.lock timeout --signal=TERM --kill-after=20s 40m bash /tmp/vw-combined-app-validation.sh > /tmp/vw-combined-app-validation.log 2>&1",
+    "windows_packaging_limit": "Excluding :desktop:packageConnectionRuntime is restricted to focused Linux-host unit tests. No distributable or Windows helper inventory is accepted by this run."
+  }
+}

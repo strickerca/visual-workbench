@@ -1,4 +1,29 @@
-## Source publication checkpoint, 2026-10-18
+## Cloud integration publication checkpoint, 2026-10-18
+
+The authorized independent source checkpoint now includes reviewed portable
+document/image foundations, integrated diagnostics and admitted caller contracts.
+Candidate `e33242a` retains the exact tested implementation at `6dcdcdf`; the
+later change records evidence only. Fresh main was `67b0af3`, an ancestor with
+no intervening changes. Publication assessment and review disposition are in
+`evidence/CLOUD_PHASE_PUBLICATION_20261018.json`.
+
+The combined Linux/Android run passed 20 protocol tests, 53 focused JVM tests,
+protocol Clippy, native builds/binding generation, product Android ELF alignment,
+application licenses and Android lint (zero errors; warnings/notes retained).
+See `evidence/CLOUD_COMBINED_VALIDATION_20261018.json` for the exact scope.
+All reported source-review findings were repaired and rechecked. No requirement
+or numbered phase is marked complete by this publication; full `test-all`,
+`lint-all`, Windows delivery, runtime, device and manual gates stay open.
+
+Windows-native outputs and affected Windows build/runtime checks remain required
+for the next Windows delivery. This checkpoint publishes source and text receipts
+without a Windows package, installer, native PDF/decoder acceptance, device
+installation or usable-milestone claim. The local unbuilt picker repair is still
+owned separately and must be composed with the current diagnostics Main; no
+local working file or worktree is replaced or removed. Precision `1d0f2fd` stays
+preserved on its independent branch for the next batch. Krita remains deferred.
+
+## Earlier source publication checkpoint, 2026-10-18
 
 The completed R164 native/tooling and R166/R167 normal-app source is being
 integrated with its original build and test bindings. The 1,447 R167 source

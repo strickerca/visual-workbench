@@ -1,0 +1,289 @@
+{
+  "schema": 1,
+  "status": "portable Linux module checks passed; app, Windows codec and product acceptance pending",
+  "base_commit": "67b0af376612f999a0ea2543ad99a98fddd69b22",
+  "preservation_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "preservation_manifest_sha256": "b70be4e1b62fc62817c61496012a44f7e5c91070d91dbcb8c1afbafa74198f28",
+  "source_selection": [
+    "T3.08-ASSETS-FOUNDATION-SOURCE-MANIFEST-R2.json",
+    "T3.10-BMP-TIFF-SOURCE-MANIFEST.json",
+    "T3.10-ORDINARY-FORMATS-SOURCE-MANIFEST.json",
+    "T3.10-AVIF-SOURCE-MANIFEST.json",
+    "T3.10-COLOR-DISPLAY-SOURCE-MANIFEST.json"
+  ],
+  "owned_paths": [
+    "core/crates/vw-assets",
+    "core/crates/vw-formats",
+    "core/crates/vw-avif-os"
+  ],
+  "recovery_changes": [
+    "Verified every recovered file against preservation hashes before copying absent modules and replacing the assets stub.",
+    "Applied Rust 2024 rustfmt and workspace package inheritance.",
+    "Removed unused assets tempfile dependency; kept weezl as a test-only TIFF fixture compressor.",
+    "Charged spare pixel/profile Vec capacity during format export and AVIF decode receipt validation.",
+    "Refused exports whose original_available flag is false without adding an error variant.",
+    "Enforced restricted AVIF depth/orientation/encoded size in public receipt admission.",
+    "Added portable compressed-TIFF, R164 provenance, allocation, cancellation and resource-retirement tests.",
+    "Confirmed coordinator source findings before fixing them: tiff 0.11.3 ignores FillOrder and legacy color declarations; TileScheduler completion ignored viewport generation.",
+    "Reject nondefault TIFF FillOrder and unsupported legacy color declarations before decoder entry; ICC does not silently override unsupported declarations.",
+    "Reject completion from an earlier viewport generation; requeue still-wanted retired tiles once, with visible tiles ahead of prefetch.",
+    "Applied and reviewed Rust 1.99 clippy slice/control-flow fixes within owned crates; preserved public signatures and error variants."
+  ],
+  "files": [
+    {
+      "path": "core/crates/vw-assets/Cargo.toml",
+      "preserved_sha256": "58dbd10c4b2c56d9a7da01e939cfa5c5f616da1bc5a22ec167ba9c6f8a956276",
+      "recovered_sha256": "9544ac22c88df99167eeca28fdf7faa565d391d3c1fcafcfad648ec398ca2bf7"
+    },
+    {
+      "path": "core/crates/vw-assets/src/cache.rs",
+      "preserved_sha256": "a48d17bdd578458596dc8761e1164da606ad1e8786730b8e3d48beb08f51cd5f",
+      "recovered_sha256": "6b8bec8c4535b2a1749f620c97cba2d7044baa5a1a24621f4d62f98b9613be44"
+    },
+    {
+      "path": "core/crates/vw-assets/src/lib.rs",
+      "preserved_sha256": "bc0b505a7b315be16f72597404a445b2e3819373071887e4bbfeb937ea57c846",
+      "recovered_sha256": "b99de77d05d1f90c076fa74ce6b65b0e64444195bfdef0070f58bfecf1da1191"
+    },
+    {
+      "path": "core/crates/vw-assets/src/manifest.rs",
+      "preserved_sha256": "abd5a36e7b07400698695880666acf5a9f24ceda48849413a28ed6fcfb12cec4",
+      "recovered_sha256": "40da8f7e8a255d82179b84f6633ffbf9fd0188ebe842a32efc79749407020889"
+    },
+    {
+      "path": "core/crates/vw-assets/src/plan.rs",
+      "preserved_sha256": "6ab2dd146c666f351935b7633a403b0923ad88ac0ee134f24020c5728705e328",
+      "recovered_sha256": "48fe5032a637179f6b8ccfea3fd26fb5afafcc6ccce6c1127d3a3873cad5864a"
+    },
+    {
+      "path": "core/crates/vw-assets/src/scheduler.rs",
+      "preserved_sha256": "f739b3b113861baeb10cf501196c4b45eb75a0a05d6d5bb726ad913b04955ad5",
+      "recovered_sha256": "46abf2b68e3b69e0899a2e5f1e3270cd5852ecbb782b29f3a0b5224b76d6e3cb"
+    },
+    {
+      "path": "core/crates/vw-assets/tests/tiles.rs",
+      "preserved_sha256": "097765173f77313230a7e2da2f337b9c4bd2951319a67257c3e80908ad6ff590",
+      "recovered_sha256": "0e4cc0b19f43bc6dcd5d4652a3e45a73fe8298b6ee29cce0b4a9f8d7fd5807fc"
+    },
+    {
+      "path": "core/crates/vw-avif-os/Cargo.toml",
+      "preserved_sha256": "55a9de7d378c56e29e40b7a51dbff9df34056720d0f2fc07a5f9494013818f16",
+      "recovered_sha256": "4d0301a30be1b433164a50757473240a2f193afc132645d97fa0590bc741228b"
+    },
+    {
+      "path": "core/crates/vw-avif-os/src/av1.rs",
+      "preserved_sha256": "c0ff8320ed5196a4784a45a63e3c5b5b284b5e908f89e87875534779573b2562",
+      "recovered_sha256": "d732190c99b199577383250231825cc9a8b314f12c6c09278e98cf596b4a2894"
+    },
+    {
+      "path": "core/crates/vw-avif-os/src/container.rs",
+      "preserved_sha256": "194fc6437a294ea81d32b0b8c2af0f28c8ca5aea2927a6c2bd1a10516d9e26b8",
+      "recovered_sha256": "8fcc4733e476d52b0eb04e8b3a73118eeb6e0231bc9e97c46d9876b13808cc20"
+    },
+    {
+      "path": "core/crates/vw-avif-os/src/lib.rs",
+      "preserved_sha256": "dde31fbc6e677d72d51f587bd45e8f1a5625965b58ce298e0bdc91813c12f3fa",
+      "recovered_sha256": "37dc70d4c7f1ca476cec56ab1afbbc2923827388269ea02b1ca463f6e494f356"
+    },
+    {
+      "path": "core/crates/vw-avif-os/src/windows.rs",
+      "preserved_sha256": "e604db6820bd749c2d60817f38362b554e4815fa3fdac147c9365ffd6d3dbdbc",
+      "recovered_sha256": "b5d6f34b9ae4496f42f9785eadfba3ef3b62f4ac5d01d1476d0d9467724907ee"
+    },
+    {
+      "path": "core/crates/vw-avif-os/tests/admission.rs",
+      "preserved_sha256": "6234b0489fed642b671161181478b3b2df3e03355f3392679b9c7562aa108c2f",
+      "recovered_sha256": "9b55f1a62d722493ddaf1b1f98abf9ab0cdecca2e30c2bc618d89369e9e8fdd4"
+    },
+    {
+      "path": "core/crates/vw-formats/Cargo.toml",
+      "preserved_sha256": "5026bf34c116c7f1062aaf6eec2ca1e7f6b66a0e28fd3195acec8bfef45e41cd",
+      "recovered_sha256": "02d6d8a14d4a35f4f37f8d01f507efcb2db36e4eb2d06694948490e58c100f52"
+    },
+    {
+      "path": "core/crates/vw-formats/src/admission.rs",
+      "preserved_sha256": "696cc26c090c786c850a0a1ae632274d73b74c6925dc69fb19dfe2b2efa5783f",
+      "recovered_sha256": "2eb87510fa7dbd05e2f9109957484e396d1724e7dac2c1ef44d7465623ba33a4"
+    },
+    {
+      "path": "core/crates/vw-formats/src/bmp.rs",
+      "preserved_sha256": "a4882dcd879d63315af9c32da1b7a18790b2d560d49f975d1d21ba61b5436155",
+      "recovered_sha256": "14caf4d1a05aac0027b1369968b5b7d1bfe6bcbe791b4aaca3af1c41af22e6a1"
+    },
+    {
+      "path": "core/crates/vw-formats/src/io.rs",
+      "preserved_sha256": "3286b0fcc7bfa56c59d813841f9bd20ca28ace7484ee259e082df1dc39fcffb4",
+      "recovered_sha256": "1fbfcc5e10cd4e46caffb5072888e9bb4713fa737aa99b80a314738b5cb294a1"
+    },
+    {
+      "path": "core/crates/vw-formats/src/jpeg.rs",
+      "preserved_sha256": "8b121db4cb1639d55c5dc3e4205bcc9bfa0286c7ee2a65795ba29a0f8da89c9b",
+      "recovered_sha256": "233f3c05ee407ec5c41b05cc89b24ee6dcb7cd1b115bae2bc899781f1ab11f19"
+    },
+    {
+      "path": "core/crates/vw-formats/src/lib.rs",
+      "preserved_sha256": "4b3bd2f08e8b737158cd3fd97cb4ba5035aacdfbb03b36e57bb31b8e14126b34",
+      "recovered_sha256": "c91d1f392448c443972afc90b296a1ad0c5b8ef391479517c75999179494e5ba"
+    },
+    {
+      "path": "core/crates/vw-formats/src/orientation.rs",
+      "preserved_sha256": "52972f321bbb87053a553831fa10d56a28fe4977f80f9f7dfceedf8397a66eb8",
+      "recovered_sha256": "1c6af476763ef740338ab5e3bdeaae428170a00c635c4b6914eb1a274293b717"
+    },
+    {
+      "path": "core/crates/vw-formats/src/tiff_header.rs",
+      "preserved_sha256": "78efd4792a04129edb8078940c67da71eb6115308d07903ffb3b4b5bed63f469",
+      "recovered_sha256": "23322065ca51eb99db84c0762094b6b014cbc057fbd4e202b6097dcc23a6206e"
+    },
+    {
+      "path": "core/crates/vw-formats/src/tiff.rs",
+      "preserved_sha256": "b663a4bbdf7e5dcb88b5bd64e9a78fda2f586ebd108d13cb6c19f8de3a949818",
+      "recovered_sha256": "27116ae140f5849b97bda7a23833fd20f0463c8751a57c9e723fa7fc54b9f2aa"
+    },
+    {
+      "path": "core/crates/vw-formats/tests/formats.rs",
+      "preserved_sha256": "d11844632a378d8e840bd057c290181ea8b465552a488c6644138efd254e7aea",
+      "recovered_sha256": "d40faca310c829c4799d0001aab5bf668f6441291f32bb92f56a17e3fc983eba"
+    }
+  ],
+  "new_test_files": [
+    {
+      "path": "core/crates/vw-formats/tests/invariants.rs",
+      "sha256": "a34bbae591cc0beddd4487fea00283ba11d6c02f215d44e22bf66248c5c9a19a"
+    },
+    {
+      "path": "core/crates/vw-formats/tests/legacy_admission.rs",
+      "sha256": "5e2253529843e02366bb94a34c8b597963559eaab0424364d46415a3855a782a"
+    }
+  ],
+  "source_checks": {
+    "rustfmt": "passed",
+    "git_diff_check": "passed",
+    "check_setup_all": "passed",
+    "check_plan_coverage": "passed: 189 requirements, 66 tasks, 26 prompts",
+    "gitleaks": "passed: gitleaks 8.30.1, one commit, 164623 staged source/text bytes, zero findings",
+    "clippy": "passed: all targets in vw-assets, vw-formats, vw-avif-os; --no-deps -- -D warnings",
+    "cargo_licenses_sources_bans": "passed with cargo-deny 0.20.2; existing duplicate-version/unmatched-allowance warnings retained"
+  },
+  "focused_tests": {
+    "vw-assets": 20,
+    "vw-formats": 23,
+    "vw-avif-os": 12,
+    "module_total": 55,
+    "r164_display": 5,
+    "total": 60,
+    "execution": "all passed on Linux; final module run after lint-driven source changes; unchanged R164 display tests passed once"
+  },
+  "integration_contract": {
+    "root_workspace": "Existing core/crates/* membership admits both new crates; coordinator owns lockfile update.",
+    "crate_dependencies": {
+      "vw-assets": [
+        "blake3 =1.8.7 (std,pure)",
+        "thiserror =2.0.21"
+      ],
+      "vw-formats": [
+        "vw-model =0.1.0",
+        "vw-raster =0.1.0",
+        "image =0.25.10 (bmp)",
+        "tiff =0.11.3 (deflate,jpeg,lzw)",
+        "thiserror =2.0.21",
+        "test-only weezl =0.1.10"
+      ],
+      "vw-avif-os": [
+        "vw-model =0.1.0",
+        "vw-raster =0.1.0",
+        "thiserror =2.0.21",
+        "cfg(windows): windows =0.62.2 (Foundation,Imaging,Com,StructuredStorage,Variant)"
+      ]
+    },
+    "ffi": "Adopt deliberate hunks from desktop/t3-formats/new and after, t3-avif, and t3-color; preserved portable public signatures and Error variants remain compatible. Missing original export returns existing Error::Unsupported.",
+    "display": "R164 display_rgba8 and current vw-raster files untouched. Later display_region APIs require coordinator/raster owner integration, not a full-file replacement.",
+    "giant_images": "Manifest/Source/TileRecord, BudgetCache, TileScheduler, Pyramid contracts are recovered. FFI, storage/blob transfer, Windows/Android producers and view/export integration remain with other owners."
+  },
+  "runtime_limits": [
+    "55 portable module tests and 5 existing R164 display tests pass on Linux, with owned-crate clippy and Cargo license/source/bans gates. This does not establish FFI/app integration or a product gate.",
+    "AVIF structural fixtures contain no real AV1 tile entropy; no installed OS decoder fidelity has been tested. Windows WIC remains uncompiled and unrun on this Linux host.",
+    "AVIF supports only opaque 8-bit reduced-still profile-0 AV1, a single item/frame, identity orientation and restricted SDR color declarations. No encoder, HDR, alpha, multiframe, grid, Exif-transform or giant AVIF support.",
+    "Ordinary BMP/TIFF admission is constrained by a conservative allocation estimate, encoded/source/depth limits, and explicit color/alpha support. Nominal pixel caps do not guarantee admission within a smaller memory budget. TIFF import warns when only the first page is decoded and retains original encoded identity.",
+    "Cache tests model owned allocation lifetimes; they do not prove actual GPU accounting, process RSS, performance, texture uploads, worker termination or libvips behavior.",
+    "Original blob transfer, giant JPEG/HEIC routing, tile/export app integration and device acceptance need separate source-bound runtime evidence.",
+    "TIFF FillOrder other than 1 is refused. Legacy GrayResponse/TransferFunction/WhitePoint/PrimaryChromaticities/ColorMap/TransferRange/YCbCrCoefficients/ReferenceBlackWhite declarations are explicitly refused, including alongside ICC, until their semantics are implemented."
+  ],
+  "next_validation": [
+    "Coordinator merges this validated portable lane delta and performs formats/color FFI and app adoption before overlapping stream-finish integration.",
+    "Validate Windows WIC and Android platform decoder fidelity with real admitted still-image fixtures; retain restricted feature refusals.",
+    "Verify original blob transfer, giant JPEG/HEIC routing, producer isolation, PNG/tile/export app integration and real GPU/working-set lifetimes in their owning stages.",
+    "Measure performance and run named-device/owner acceptance separately; no requirements or gates are passed by this portable module checkpoint."
+  ],
+  "shared_admission_commit": "fb824935a331d7d16a7e50620b5ed611dccceb4a",
+  "source_review_commit": "6e8649aaeb4ce9b964c4f8636d7f100cb91f3165",
+  "validation": {
+    "host": "x86_64-unknown-linux-gnu",
+    "rust": "1.99.0 (b940084d7 2026-09-28)",
+    "build_workers": 2,
+    "execution": "parent-assigned exclusive slot; flock and process-group timeout; logs observed for advancing compilation; no forced termination",
+    "cargo_lock_sha256": "f58b9377e6650bf5f84be59ca089f0a25d20407e0d9908a52c1b2f47ba6965bb",
+    "commands": [
+      {
+        "command": "cargo +1.99.0 test --locked -p vw-assets -p vw-formats -p vw-avif-os --all-targets",
+        "exit": 0,
+        "passed": 55,
+        "log_sha256": "49106f7f8d0daba067eb83faed4e1cfb3441073194c6a602f1cfbaac47071795"
+      },
+      {
+        "command": "cargo +1.99.0 test --locked -p vw-raster --test display",
+        "exit": 0,
+        "passed": 5,
+        "log_sha256": "c38f54820be5e1982638a50dc6500bc712f41aef8b15f58aa0f6c4d95a8cc7eb"
+      },
+      {
+        "command": "cargo +1.99.0 clippy --locked -p vw-assets -p vw-formats -p vw-avif-os --all-targets --no-deps -- -D warnings",
+        "exit": 0,
+        "log_sha256": "2e2e13244d483a1495c62ee87687915d3915cd0693c4b8869a2e5df2585fe242"
+      },
+      {
+        "command": "cargo +1.99.0 deny --offline check licenses sources bans",
+        "exit": 0,
+        "log_sha256": "c6b7ebd0c86b0ef5d2cecb5b723f7fa4d85bc6ed52d9f81bad35f9c2da17fe6b"
+      }
+    ],
+    "initial_failure": "The first clippy pass refused legacy slice/range/control-flow style. Failure log retained; fixes reviewed; final clippy pass has no warnings.",
+    "initial_clippy_failure_log_sha256": "5d4c48fa115ac20d270b6dfc3f785c84a93e282c157f501c17df2d4876a6755a",
+    "r164_display_source_unchanged": true,
+    "r164_display_source_sha256": "64bf78579c6ecfc0831bd46168cca75d94aa2702aa6925fdcafa8d7b3395d507",
+    "verification_images_created": 0,
+    "verification_image_disposal": "not applicable; no screenshots or verification images were created",
+    "heavy_slot": "released after meaningful checks; remaining evidence/publication checks are cheap"
+  },
+  "previous_bootstrap_blocker": {
+    "commit": "a79728a254b6afffd1d34cc7078b28a2777ee30a",
+    "method": "Extracted only seven tools/cloud-setup files outside product checkout; install without Android SDK/NDK options.",
+    "install": "stopped at cargo fetch --locked: new portable crates require coordinator-owned lockfile admission",
+    "bounded_verifier": "ran once: all six pinned tool versions pass; cargo-cache-offline exits 101 because Cargo.lock needs an update; later checks not run",
+    "tool_versions": {
+      "rust": "1.99.0",
+      "node": "24.21.0",
+      "jdk": "21.0.12.1",
+      "cargo-deny": "0.20.2",
+      "cargo-ndk": "4.1.2",
+      "gitleaks": "8.30.1"
+    },
+    "android_sdk_installed_for_this_lane": false,
+    "product_build_started": false,
+    "failure_receipts_retained_outside_repository": true,
+    "resolved_by": "shared admission fb824935a331d7d16a7e50620b5ed611dccceb4a"
+  },
+  "bootstrap": {
+    "commit": "a79728a254b6afffd1d34cc7078b28a2777ee30a",
+    "install": "passed after shared lock admission; initial stale-lock failure retained",
+    "bounded_verifier": "9/9 host checks passed; pinned tool versions, offline Cargo cache, installed npm license policy, offline Gradle configuration",
+    "android": "SDK/NDK installation not requested by this portable lane; no emulator, device or Android product build",
+    "log_sha256": "02f0dcb0080b4b7fdd33573f1a2c0db801a2d8f8bd07704781ce013d0b9e778b"
+  },
+  "coordinator_review_regressions": {
+    "tiff_fill_order": "Independent 1x1 bit-reversed FillOrder=2 source refuses; absent/default FillOrder retains byte-exact grayscale samples.",
+    "tiff_legacy_color": "Ten legacy color declaration tags refuse with Error::Color, with and without ICC. Ordinary untagged and ICC-only sources keep their exact declarations and source hash.",
+    "scheduler_generation": "Cancelled and superseded same-view requests refuse cache admission; skipped still-wanted visible tiles requeue before prefetch; retries queue once under current generation.",
+    "public_interface_changes": "none; no coordinator-owned files edited"
+  }
+}

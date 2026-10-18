@@ -1,0 +1,339 @@
+{
+  "status": "focused portable software checks passed; native/runtime/product acceptance pending",
+  "base_commit": "67b0af376612f999a0ea2543ad99a98fddd69b22",
+  "recovery_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "candidate_selection": [
+    "SVG engine R3",
+    "document protocol R2 compatibility reviewed only",
+    "PDF engine plus raster redaction R2 and PC redaction composition",
+    "Windows worker R2 compatibility reviewed only"
+  ],
+  "provenance": "All 104 extracted document candidate files matched public recovery MANIFEST.json bytes and SHA-256. Original private manifest documents are not published; their descriptor hashes are retained by recovery. Only the two owned crates were promoted.",
+  "changes_from_candidates": [
+    "rustfmt 1.99.0 formatting",
+    "explicit fidelity notices for denied external paint URLs",
+    "refuse split/commented stylesheet CSS and mixed-case URLs before reference graph resolution",
+    "compile portable PC planner/PDFium probes and pure content admission tests on Linux; qpdf loader remains Windows-only",
+    "scope synthetic test unwrap/panic allowances to test modules",
+    "use public usvg0.47 Font::families accessor",
+    "refuse all marker and pattern definitions before tree conversion: per-vertex marker expansion and transform-sized pattern surfaces are outside admitted budgets",
+    "shared strict URL-target grammar refuses quoted delimiters/whitespace that could hide different reference IDs",
+    "resolve pinned Rust1.99 Clippy findings without suppressing library warnings"
+  ],
+  "interfaces": {
+    "svg": "SvgDocument::parse/info/render_tile/export_svg; owned SVG DTOs and cancellation callback, no filesystem/network resolver",
+    "pdf": "PdfRuntime::from_verified_bindings (unsafe, exclusive verified ABI7881 + externally isolated process); open/info/page_info/render_tile/text_chunk/select_text/export",
+    "redaction": "RasterRedactionPlan::prepare/write_unverified/verify; PcRedactionPlan requires unforgeable PcSourceAdmission, qpdf rewrite_and_audit then independent PDFium reopen/verify before a verified receipt",
+    "protocol": "Compatible with preserved document worker dispatch. No protocol/shared/FFI app/controller edits requested in this lane.",
+    "dependencies": [
+      "resvg =0.47.0 default-features=false features=text",
+      "usvg =0.47.0 default-features=false features=text",
+      "pdfium-render =0.9.4 default-features=false features=pdfium_7881",
+      "thiserror =2.0.21",
+      "blake3 =1.8.7 default-features=false features=std,pure",
+      "windows-sys =0.61.2 target=windows features=Win32_Foundation,Win32_System_LibraryLoader"
+    ]
+  },
+  "checks": {
+    "candidate_hash_verification": "passed (104 files)",
+    "rustfmt_check": "passed (Rust1.99.0)",
+    "git_diff_check": "passed",
+    "svg_tests_present": 27,
+    "pdf_tests_present": 49,
+    "cargo_tests": {
+      "command": "cargo test --locked -p vw-svg -p vw-pdf",
+      "passed": 73,
+      "failed": 0,
+      "ignored": 2,
+      "windows_native_test_not_compiled_on_linux": 1,
+      "pdf_passed": 46,
+      "svg_passed": 27
+    },
+    "clippy": {
+      "linux": "cargo clippy --locked -p vw-svg -p vw-pdf --all-targets -- -D warnings: exit0",
+      "windows_source": "cargo clippy --locked -p vw-pdf --all-targets --target x86_64-pc-windows-msvc -- -D warnings: exit0; cross-target source checking only, no native DLL loaded"
+    },
+    "license_gate": "cargo deny check licenses sources bans: exit0; no dependency/lock edits after admission",
+    "gitleaks": "pinned8.30.1 zero findings in both owned crates before final staged scan",
+    "bootstrap_core_verifier": "9/9 commands exit0 on pristine67b0af3, Android omitted"
+  },
+  "limitations": [
+    "SVG parsing/rendering cancellation is cooperative between third-party calls; hard process memory/time sandbox is required on Windows. Data URLs, external images, paths, fonts and resource resolution are denied. Stylesheets outside the declared static subset refuse; fidelity notices are exposed. SVG text export becomes paths. Marker/pattern definitions and ambiguous quoted-URL/CSS forms explicitly refuse; their fidelity is not claimed.",
+    "PDF native ABI7881 and zero-capability worker/pinned artifacts are not provided by this lane. Unsafe runtime construction cannot be justified by input bounds alone. No native library was downloaded or executed.",
+    "PC redaction preserves only admitted opaque filled polygon paths outside replaced raster tiles, refuses unsupported unaffected text/curves/strokes/XObjects/clipping/blend/marked-content/color-space constructs, and requires separately verified qpdf12.4.2 Windows artifacts. It is not general PDF redaction.",
+    "Full-page raster redaction reconstructs EVERY page, including pages without selected rectangles. It discards searchable text, vectors, forms, metadata, attachments and actions; it does not promise searchable/vector preservation. Encrypted modifications need explicit removal policy and interactive forms refuse.",
+    "Normal original/annotated/flattened copies retain source features and always report redacted=false. They are not sanitization.",
+    "Native/exported-output/Windows/Android/app integration and A12/product gates remain unverified. Windows-target Clippy establishes source compatibility only. All3 native runtime contracts remain unrun. No screenshots were created."
+  ],
+  "files": [
+    {
+      "path": "core/crates/vw-svg/Cargo.toml",
+      "candidate": "ink-core/t3-document-formats-svg/after/core/crates/vw-svg/Cargo.toml",
+      "candidate_sha256": "294acd935e64c8208a5db9acacae6b4c63b6d1287fc3a8768d0cf7bc769f9359",
+      "sha256": "294acd935e64c8208a5db9acacae6b4c63b6d1287fc3a8768d0cf7bc769f9359"
+    },
+    {
+      "path": "core/crates/vw-svg/src/engine.rs",
+      "candidate": "ink-core/core/crates/vw-svg/src/engine.rs",
+      "candidate_sha256": "bd45242b3d1d1a207e26a12f794be7a7e7fef0662c725b7314a457d8f92ebc9a",
+      "sha256": "e5858f35a6e19db736675b5728f4970ba611fcd770fdfe531eaca28b140e8799"
+    },
+    {
+      "path": "core/crates/vw-svg/src/export.rs",
+      "candidate": "ink-core/core/crates/vw-svg/src/export.rs",
+      "candidate_sha256": "ce2a17f1b0a10120a8391f0f576933a17bacd85479a269645727d11c0f709fb2",
+      "sha256": "8ce504e12462a06bde6a31fc4a52d23067f4c45ec2a9487b423ec9254727cfe3"
+    },
+    {
+      "path": "core/crates/vw-svg/src/lib.rs",
+      "candidate": "ink-core/t3-document-formats-svg/after/core/crates/vw-svg/src/lib.rs",
+      "candidate_sha256": "6d42a3e43cb2b12e23a60ad6771cd31b5c147e0093eb874e49ce2b976368b809",
+      "sha256": "fa91af03074ec0d305544a77acfcf1dfc11988a4788d1b4a1d48e243c7dc5ec5"
+    },
+    {
+      "path": "core/crates/vw-svg/src/limits.rs",
+      "candidate": "ink-core/core/crates/vw-svg/src/limits.rs",
+      "candidate_sha256": "6a6346a6db2833c7ec52c9cada6fa1e46ca683c49a03c04fe4d3bf2ebad069cd",
+      "sha256": "0599f3e78eb63a54044b8354eb698f12212ac2b389eef97492650024d25d926c"
+    },
+    {
+      "path": "core/crates/vw-svg/src/preflight.rs",
+      "candidate": "ink-core/core/crates/vw-svg/src/preflight.rs",
+      "candidate_sha256": "498c5d6af21492e8e154c6f25bdf14cab4efb31c88857ed9ffc4261d06932751",
+      "sha256": "82d86f55d646f4a7d0c48278f5bc5fa1ccd8b98725fbd4abe5c91dd97f0e1bc8"
+    },
+    {
+      "path": "core/crates/vw-svg/tests/hostile.rs",
+      "candidate": "ink-core/core/crates/vw-svg/tests/hostile.rs",
+      "candidate_sha256": "877e936679a6ca16ae6b4eee5c71577e35f82dc6f5d4e7609f11fb8b69f99cee",
+      "sha256": "9e284bba9431fc21e280faf38dffce6c4c994c096f97b2311235538372ce1194"
+    },
+    {
+      "path": "core/crates/vw-svg/tests/static_svg.rs",
+      "candidate": "ink-core/core/crates/vw-svg/tests/static_svg.rs",
+      "candidate_sha256": "4f3e4fdd9b16c8f96d011bf38aef62f83e38712b08492cb37d5772ba94503410",
+      "sha256": "020b1ffb8024c98e805628f5424b75ea49d24923ae5b6219aed99666740f49a8"
+    },
+    {
+      "path": "core/crates/vw-pdf/Cargo.toml",
+      "candidate": "ink-core/t3-document-pc-redaction/after/core/crates/vw-pdf/Cargo.toml",
+      "candidate_sha256": "74a45bb94d41fa8278316d4da4f34e8b56ee7deadf86949e74c7677e588c4e0d",
+      "sha256": "74a45bb94d41fa8278316d4da4f34e8b56ee7deadf86949e74c7677e588c4e0d"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/error.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/error.rs",
+      "candidate_sha256": "1599e2cbbda3c576d360de1699d3fa97a7d81def5337d319aa686e1f0d7312ef",
+      "sha256": "1599e2cbbda3c576d360de1699d3fa97a7d81def5337d319aa686e1f0d7312ef"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/ffi.rs",
+      "candidate": "ink-core/t3-document-pc-redaction/after/core/crates/vw-pdf/src/ffi.rs",
+      "candidate_sha256": "6f9aea020b90188b13bb4860c2eda384a13fd6eed2519c79159d98b81bdc1ea5",
+      "sha256": "050fb42bbf8dd528695aa47daebe0e9b3e68d8b6cd0a73b99e4fa797db581338"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/geometry.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/geometry.rs",
+      "candidate_sha256": "601b5e9a8d3e8414ba1534eed93308e20aa924f74d497705792c82caa669b6f1",
+      "sha256": "447e0af3f8d2a46f2e0d69b0d7f4b30e10fb928fe1e8b148b6a02b3f78c3afd4"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/lib.rs",
+      "candidate": "ink-core/t3-document-pc-redaction/after/core/crates/vw-pdf/src/lib.rs",
+      "candidate_sha256": "a6a11c4fb58539b46fef018415241d751c8fc546d19c1d336c8b3fe1ec44fb8e",
+      "sha256": "fa69fb4b30f22371014fcce2552aa55e1bd05f44cb7208feacd5dda53e8a1559"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/limits.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/limits.rs",
+      "candidate_sha256": "ef15340eae6aa6335760a853d0509d5c375f8941e49577bd4e52d86461c032ad",
+      "sha256": "d4708a267254765fdeaeb7b8833fcc65a77c108ed92cc2ee9f5f6140115a99a7"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/overlay.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/overlay.rs",
+      "candidate_sha256": "f9aaba5d2c2937dcad1e91be20c8f812767017be1ff58523d24d242efcefec22",
+      "sha256": "3f37bcd69d18b78ce6e256e83b3dd00939c13432b13cd45abb3b50ce427b6d11"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/pc_content.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/pc_content.rs",
+      "candidate_sha256": "a96189aa4417e47a397629b6f4d654d60f2d5bded92d4038e81759399d6c43e1",
+      "sha256": "41a9f7174b89fff7ac7b04e2ea7817258ceb1359d979ea5923bbef8755f14fb1"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/pc_redaction.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/pc_redaction.rs",
+      "candidate_sha256": "9df78ad78bb4846f12438b2dc831325d8cda926d551e316742427969e3a06b0e",
+      "sha256": "cbab03e4e62c372da0a48980df0b27bd7da9bae1345d208ca7e1d15405b6934d"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/pc_redaction_ffi.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/pc_redaction_ffi.rs",
+      "candidate_sha256": "271c11c05213f0218ff694a4d534e282dc7ba6515519233611d444e34dc3a72b",
+      "sha256": "01987c2381d872a129e14994bb8e5c31ea79060e630d357869f5ce865d4e467e"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/qpdf_cleanup/windows.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/qpdf_cleanup/windows.rs",
+      "candidate_sha256": "1ca2eeaa242939279bfe244041b7371d2766551383d454fecb967a3ffecfbf7f",
+      "sha256": "d0d28f27fb2ff25a65de5ef4a1cc2b47f019252fab51449f342a2fd023a35c99"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/qpdf_cleanup.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/qpdf_cleanup.rs",
+      "candidate_sha256": "5d29812970a1847b7e32ce5515be213142bcd5309ebf5e82e703ae28051964dc",
+      "sha256": "5d29812970a1847b7e32ce5515be213142bcd5309ebf5e82e703ae28051964dc"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/raster_redaction.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/raster_redaction.rs",
+      "candidate_sha256": "830071ddfbee27443881bde7710535085bd944fd65813813a7fe8efd5ca0dcf8",
+      "sha256": "c45eeabd4cc03727581ff627dcb450479a131bfa81372384cf321d23e10a50fa"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/redaction_ffi.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/redaction_ffi.rs",
+      "candidate_sha256": "40a00627e798eb5aaa6a5487587f947f10f5f51574a7f8b6ea8888dd68722cca",
+      "sha256": "0a9547e583c90b7ee0a670fd791fc645460e5d27b955ad7ab33393baa9ee1ec4"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/sink.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/sink.rs",
+      "candidate_sha256": "3c48b09b83d506e54ee3fb880c216d25e9c1d539048aa1076705d1df51897a9a",
+      "sha256": "79d7b0073c89a2a57bea5d0ba77572b8d0ae31b4e4f14d9f2ba0ee6c06b61d7b"
+    },
+    {
+      "path": "core/crates/vw-pdf/src/types.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/src/types.rs",
+      "candidate_sha256": "fe3497dff5728dbdb770a73b3b42a79795c6c590e02a9ad1067659b12dbef825",
+      "sha256": "59ce7545da555883dac5293f3a7f74e876e749ca0d0d423b624f9c456c98b75f"
+    },
+    {
+      "path": "core/crates/vw-pdf/tests/geometry.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/tests/geometry.rs",
+      "candidate_sha256": "0f179e06615924c25822bad3adf9645b5e7dc278932f2b93b3d8ee271218bd92",
+      "sha256": "938525c19954283e54fdb60ffbb39c04cbe932c13f1818ab117386bf041b45d6"
+    },
+    {
+      "path": "core/crates/vw-pdf/tests/overlays.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/tests/overlays.rs",
+      "candidate_sha256": "0022fbb649cfa36f2456a919412efb519721343f3926d3b49baf5d598046f52c",
+      "sha256": "5cfcc65c9bd90a3614ac612dd7e57daa3cb1304d232cf7879dc482a66df3e05c"
+    },
+    {
+      "path": "core/crates/vw-pdf/tests/pc_redaction_worker.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/tests/pc_redaction_worker.rs",
+      "candidate_sha256": "e1f95ef2e08c01e236716fd11d198ac720f28cee4ac7c9653de5ad4778b8a5a7",
+      "sha256": "1152b0ee1d4104607a6c67c696c4d02a4b49a57aee3754ff31796b874b3865d8"
+    },
+    {
+      "path": "core/crates/vw-pdf/tests/pdfium_worker.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/tests/pdfium_worker.rs",
+      "candidate_sha256": "47691e64e9953f1e50a257f840aeb507ff9e408939a4613b169114993cf229ea",
+      "sha256": "1b51a3ef4b9749cd63a0c077d04cdb640b0b4bd3f412ea6f905f98e97a91b708"
+    },
+    {
+      "path": "core/crates/vw-pdf/tests/raster_redaction.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/tests/raster_redaction.rs",
+      "candidate_sha256": "326c5a7e3a192d948b55b704022bd71064eef71645a02ad1596d564e8cb5ff24",
+      "sha256": "6f1ae54fa11ff2f427be2fd01b9e88701ef0c8aa225265475c82268ca5f8ad56"
+    },
+    {
+      "path": "core/crates/vw-pdf/tests/raster_redaction_worker.rs",
+      "candidate": "ink-core/core/crates/vw-pdf/tests/raster_redaction_worker.rs",
+      "candidate_sha256": "e5dde938939766c708c5681eea79e48ad30b26d896b9ef2e0db48a51a6230987",
+      "sha256": "a45cce646386cacd21170185f89f637a71fa091229c960fb200d16822df596f5"
+    }
+  ],
+  "setup_branch": "task/cloud-setup-20261018",
+  "setup_commit": "a79728a254b6afffd1d34cc7078b28a2777ee30a",
+  "setup_status": "Core bootstrap installed in this VM; all9 core verifier checks passed against detached pristine67b0af3. Installer first refused product-branch locked dependency drift; retained failure preceded coordinator admission. No Android SDK installed.",
+  "next_checks": [
+    "Coordinator reviews/integrates this lane; no remaining crate-dependency or enum-variant change requested. Heavy product build slot released after focused checks.",
+    "Supply pinned approved PDFium7881/qpdf12.4.2 libraries inside verified isolated worker, run retained native/exported-output contracts, then verify app integration.",
+    "Keep T3.09/A12 partial until native runtime, sandbox, fidelity and integration clauses are verified. Marker/pattern support remains explicitly unsupported pending bounded implementation."
+  ],
+  "dependency_admission_commit": "fb824935a331d7d16a7e50620b5ed611dccceb4a",
+  "admitted_lock_sha256": "f58b9377e6650bf5f84be59ca089f0a25d20407e0d9908a52c1b2f47ba6965bb",
+  "expansion_review": {
+    "marker": "usvg0.47 parser/marker.rs::resolve converts marker children for every vertex. URL-occurrence accounting cannot bound this; marker definitions now return existing Malformed (malformed or unsupported) before Tree::from_xmltree, including nested, inherited/CSS-selected and unused definitions.",
+    "pattern": "resvg0.47 src/path.rs::render_pattern_pixmap allocates rect*transform-scale dimensions independently of the output-tile clamp. Pattern definitions now refuse before conversion, including small/unused definitions; this subset remains unsupported until a safe surface budget is implemented.",
+    "neighbors": "Internal href/use and paint/clip/mask reference graphs keep per-occurrence expanded-byte/depth/visit limits and cycle checks. External/data image resolvers remain deny-all. Stylesheet/escaped/mixed-case/quoted-target grammar refusals prevent hidden graph edges. Other native/parser/renderer internals still require external hard memory/deadline isolation."
+  },
+  "native_tests_not_run": [
+    "verified_pdfium_worker_contract (ignored on Linux)",
+    "phone_copy_reconstructs_every_page_and_verifies_no_text_or_original_resources (ignored on Linux)",
+    "pc_copy_removes_covered_text_preserves_unaffected_polygons_and_qpdf_verifies_every_resource (cfg(windows), not compiled as Linux test; Windows source checked only)"
+  ],
+  "retained_failure_receipts": [
+    {
+      "check": "product-branch setup",
+      "result": "locked dependency fetch exit101 before coordinator admission; tools installation succeeded"
+    },
+    {
+      "check": "first focused compile",
+      "result": "exit101: candidate accessed private usvg Font::families field; fixed public accessor"
+    },
+    {
+      "check": "first three Linux Clippy passes",
+      "result": "exit101: constant-size chunk API, is_multiple_of, cloned_ref_to_slice_refs, manual_checked_ops and collapsible_if findings fixed; fourth pass and final tests succeeded"
+    }
+  ],
+  "external_logs": {
+    "bootstrap-current-branch.json": {
+      "bytes": 468,
+      "sha256": "395f68432b65241f44574e52c34576d5514f755f54e70a0e402bfb26a3f7893e"
+    },
+    "bootstrap-base.log": {
+      "bytes": 5911,
+      "sha256": "52eee01fd89e4d112eb31f466a83a02dca11a89458f4fe2b73e41dfcb048c3a4"
+    },
+    "bootstrap-verification.log": {
+      "bytes": 1124,
+      "sha256": "98c335c8f4eb65631d5c735b47989421e26ff45b6c61a084d8fd88b9846bd6b9"
+    },
+    "fetch-admitted.log": {
+      "bytes": 1073,
+      "sha256": "246795159e0f4d6bed962c57a96cbecec95b3e3c05480438e1835c672a83d18d"
+    },
+    "license-admitted.log": {
+      "bytes": 84463,
+      "sha256": "28e6d99130f6740000d12f6fe55e96fa3a6151850294787c9e66739c10821f4e"
+    },
+    "test-first.log": {
+      "bytes": 3043,
+      "sha256": "d0b3b308ac219eed60eb3fdc8c95cefee3b8845f9617589d1a6f24c39ed86b32"
+    },
+    "test-second.log": {
+      "bytes": 8487,
+      "sha256": "a3a75a05c1c9086b0548254ceac590facb2a1bbf54ca44763dfd51675db16f8e"
+    },
+    "test-final.log": {
+      "bytes": 8487,
+      "sha256": "58798f5533dcdd5d7ab728e70641f6af7426a3874bc3182aec450c4d2bfff5a7"
+    },
+    "clippy-first.log": {
+      "bytes": 3783,
+      "sha256": "d0c372787587a5734d02f35a7238db40967293a066b31e03adeb9d39fdce8c7c"
+    },
+    "clippy-second.log": {
+      "bytes": 1273,
+      "sha256": "b9297f5feebc9125ed6a3df3af3b81cde712dbb2da4032f943093982613d63dd"
+    },
+    "clippy-third.log": {
+      "bytes": 2632,
+      "sha256": "7755ab23cdaca178ecdfe757ceb731847e5aac37946480757a6dbce11968e307"
+    },
+    "clippy-fourth.log": {
+      "bytes": 224,
+      "sha256": "3994a8565fd61ed321bf49d8a9dd45ac06aabeaeeb9778f0f538cc6233cba79b"
+    },
+    "windows-clippy-first.log": {
+      "bytes": 1149,
+      "sha256": "419c76a9c5b7fc9d45e4d88081abed2adf8e482bc96e09d3862789474724d509"
+    }
+  },
+  "build_slot": "released: focused tests, Linux/Windows-target Clippy and Cargo policy checks completed"
+}

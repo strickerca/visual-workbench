@@ -1,0 +1,31 @@
+{
+  "status": "source/configuration and focused guards validated; product compilation pending",
+  "baseline": "b49c4f53ff1f8dd0534e7902a377fdbb17441c46",
+  "changes": [
+    "Shared Gradle selects Windows or Linux x86-64 library/generator filenames and native resource paths.",
+    "Windows Android alignment path is retained. Linux invokes the pinned NDK objdump through a bounded Python checker with the same minimum 16 KiB LOAD contract.",
+    "Desktop shared core loading admits the packaged Linux core for host validation; this does not enable Windows capture/input providers.",
+    "Desktop Linux validation uses its own Gradle lock; the Windows lock is byte-identical. Only desktop-jvm and skiko native runtime module names differ, at the same exact versions."
+  ],
+  "checks": {
+    "cloud_setup": "18/18 prerequisite and small compilation checks passed using setup a79728a254b6afffd1d34cc7078b28a2777ee30a; no product build",
+    "gradle_configuration": "passed during bootstrap with the changed shared script",
+    "python_ffi_guards": "44 passed",
+    "gradle_common_imports_import_fixtures_alignment_fixtures": "all three tasks passed; fixture counts 4 and 2",
+    "ndk_alignment_probe": "passed, three ELF LOAD segments on the setup-owned JNI smoke library; product core was not built",
+    "gradle_application_license_gate": "passed online after platform lock separation: 262 exact dependency entries across 12 runtime configurations and 5 bound parent POMs; no dependency version or license allowance changed",
+    "product_native_shared_android_compilation": "not run; document and image owners retain the serialized heavy build slots",
+    "windows_regression": "not run; Windows paths retained and source reviewed",
+    "linux_lock_resolution": "passed :desktop:dependencies --configuration runtimeClasspath with selective --update-locks for desktop-jvm-* and skiko-awt-runtime-*; all shared coordinates/versions unchanged"
+  },
+  "limits": [
+    "Product Kotlin compilation, binding generation and full packaging require a subsequent serialized build after application dependency/license resolution.",
+    "Desktop connection runtime packaging remains Windows-specific; this patch does not claim a Linux desktop product.",
+    "No provider calls, emulator, device tests, verification images, signing, identity changes or main merge occurred."
+  ],
+  "commands": [
+    "source /workspace/.vw-tools/cloud-setup/start.sh",
+    "bash apps/gradlew -p apps :desktop:dependencies --configuration runtimeClasspath --update-locks org.jetbrains.compose.desktop:desktop-jvm-*,org.jetbrains.skiko:skiko-awt-runtime-* --console=plain --no-daemon --no-parallel --max-workers=2",
+    "bash apps/gradlew -p apps checkDependencyLicenses --console=plain --no-daemon --no-parallel --max-workers=2"
+  ]
+}

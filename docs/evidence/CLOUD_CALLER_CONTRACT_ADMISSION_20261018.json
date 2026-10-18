@@ -1,0 +1,72 @@
+{
+  "baseline": "091e668dd6b8d6802e15dd10ba335a8f9b5e0f05",
+  "build_prerequisite_fix": "6845fb2: shared Android Build Tools pinned to approved 36.1.0; full combined task graph dry run passed without temporary override",
+  "diagnostics_cancellation_fix": "b19a81fe5b49f45035d1a664a22be5234fae0e4c cherry-picks 74ed9e5; parent reports Astra recheck closed the finding; owner harness 31 passed",
+  "status": "Common caller contracts admitted; workers may implement the exact assigned slices. Native registration, platform actuals and usable workflow validation remain pending.",
+  "assignment_contract": "docs/RECOVERY_CALLER_ASSIGNMENTS_20261018.md",
+  "source_files": {
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentFrames.kt": {
+      "bytes": 2409,
+      "sha256": "e1c8fe130cdfc5e49a7f34900face40b4ee649e2d1879a054c8d20003582ca8a"
+    },
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentJobsOwner.kt": {
+      "bytes": 1594,
+      "sha256": "18d80f712e78ffc3dfcf449fba4bfbc6d76f745d09dba4aa369880e23b8a59a3"
+    },
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentsApi.kt": {
+      "bytes": 7301,
+      "sha256": "3c8c745ef2bf72a5caf1b4fd60feb89e78bf8f648e23b9b94fd47571c36d8f4c"
+    },
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/OriginalFormatsApi.kt": {
+      "bytes": 1532,
+      "sha256": "d06a16b40c72775a08c5a7f93d7175dca02585d9fd922d35ac19f0223e76504a"
+    },
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/DocumentFramesTest.kt": {
+      "bytes": 2498,
+      "sha256": "4063bbce9a7f3413369a930f6997e4d5dd16959c4b41c784b240b72a0804fbd0"
+    },
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/DocumentJobsOwnerTest.kt": {
+      "bytes": 5050,
+      "sha256": "e33ecc2e067e6cdf6318beab7de0d6e4480c76ba1134c4eb67c9021998a672c1"
+    },
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/OriginalFormatsTest.kt": {
+      "bytes": 3102,
+      "sha256": "17fe5527f2c90f2eed20995a1718908ade86c6eb91bad7dde0254787776a0c75"
+    }
+  },
+  "checks": {
+    "caller_contract_cases": {
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    "compiler": "Pinned Kotlin 2.4.20 JVM compiler; production sources compiled with strict explicit API, including existing CoreApi/WorkflowApi and small test-only actuals for the two native factory declarations",
+    "harness_limit": "The two factory actuals throw if called or return Unit for library preparation; no native core, app, device, PDFium, qpdf or OS decoder was exercised",
+    "cases": "Six ordinary-format receipt/revision/notice cases, five document ownership/privacy/revision cases, four frame authority/geometry/count cases",
+    "future_recovery_tests": "Two recovered ordinary-format cases depend on unadmitted export enums/display tickets and remain in the archive for their native caller batch, not silently counted as passing",
+    "diagnostics_evidence": "Desktop wiring source and its prior evidence are unchanged; no new product dependency or license allowance was added",
+    "combined_run": "Not started while contracts were prepared; coordinator now owns the slot and will run after this handoff"
+  },
+  "logs": {
+    "production-compile.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "test-compile.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "frames-production-compile.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "frames-test-compile.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "all-tests.log": {
+      "bytes": 65,
+      "sha256": "d12deedca96e9c2801200693684b06321a0e29927f8caf183e61ff2e2f2603c1"
+    }
+  }
+}

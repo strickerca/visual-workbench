@@ -1,0 +1,184 @@
+{
+  "source_candidate": "6dcdcdfde4acdba76c710c16187e19d3f4489d4a",
+  "status": "Combined compile/focused-test validation passed; no product or hardware gate passed",
+  "pipeline_exit_code": 0,
+  "protocol_clippy_exit_code": 0,
+  "pipeline_script": "#!/usr/bin/env bash\nset -euo pipefail\ncd /workspace/visual-workbench\nsource /workspace/.vw-tools/cloud-setup/start.sh\ncargo deny --offline check licenses sources bans\nbash apps/gradlew -p apps checkDependencyLicenses --console=plain --no-daemon --no-parallel --max-workers=2\ncargo test --locked -p vw-document-protocol -- --test-threads=2\ncargo build --locked -p vw-ffi -p vw-host-ffi --features vw-ffi/bindgen --lib --bin vw-bindgen\ncargo ndk -t arm64-v8a --platform 29 -o target/android-jni build --locked -p vw-ffi\n# Focused Linux-host tests compile the actual apps. The Windows-only desktop\n# helper resource task is excluded only here; product packaging remains untested.\nbash apps/gradlew -p apps \\\n  :shared:desktopTest --tests com.visualworkbench.shared.DiagnosticsBundleTest \\\n  --tests com.visualworkbench.shared.DocumentJobsOwnerTest \\\n  --tests com.visualworkbench.shared.DocumentFramesTest \\\n  --tests com.visualworkbench.shared.OriginalFormatsTest \\\n  :desktop:test --tests com.visualworkbench.desktop.DesktopDiagnosticsLifecycleTest \\\n  --tests com.visualworkbench.desktop.diagnostics.DiagnosticsPublicationTest \\\n  :android:testDebugUnitTest --tests com.visualworkbench.android.diagnostics.DiagnosticReportWriterTest \\\n  :android:lintDebug -x :desktop:packageConnectionRuntime \\\n  --console=plain --no-daemon --no-parallel --max-workers=2\n",
+  "pipeline_script_receipt": {
+    "bytes": 1355,
+    "sha256": "3bf9be8e562612d1c9fa4dda02404d4e491afc275b90ad1337dbd4e7b09a1446"
+  },
+  "checks": {
+    "cargo_policy": "cargo deny --offline check licenses sources bans passed; existing duplicate-version/unencountered-allowance warnings retained",
+    "application_licenses": {
+      "passed": true,
+      "dependencies": 262,
+      "runtime_configurations": 12,
+      "bound_parent_poms": 5
+    },
+    "document_protocol": {
+      "passed": 20,
+      "failed": 0,
+      "ignored": 0,
+      "command": "cargo test --locked -p vw-document-protocol -- --test-threads=2"
+    },
+    "document_protocol_clippy": "cargo clippy --locked -p vw-document-protocol --all-targets -- -D warnings passed",
+    "host_native": "Linux core/host libraries and vw-bindgen compiled successfully",
+    "android_native": "arm64-v8a core compiled with pinned NDK, platform 29; no device execution",
+    "android_alignment": {
+      "passed": true,
+      "minimum_load_alignment_bytes": 16384,
+      "segments": 4,
+      "artifact": "target/android-jni/arm64-v8a/libvw_core.so"
+    },
+    "generated_bindings": "Both real library-derived core/host Kotlin bindings generated once; task package/filename/tree checks passed",
+    "app_source_compilation": "Actual shared Android/Desktop sources, Desktop Main/controllers and Android application/test sources compiled with pinned Gradle/Kotlin graph",
+    "focused_jvm_tests": {
+      "passed": 53,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "shared": 22,
+      "desktop": 18,
+      "android_writer": 13
+    },
+    "android_lint": {
+      "completed": true,
+      "errors": 0,
+      "warnings": 53,
+      "notes": 12,
+      "sarif_receipt": {
+        "bytes": 295294,
+        "sha256": "627985d9f6ebb237a5d01fcdc39cf4813c1fdc34baee57466d2054dce6fb237e"
+      }
+    },
+    "gradle_terminal": "BUILD SUCCESSFUL; 74 actionable tasks executed; final Gradle phase reported 3m 33s"
+  },
+  "junit_reports": {
+    "apps/shared/build/test-results/desktopTest": [
+      {
+        "report": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DiagnosticsBundleTest.xml",
+        "suite": "DiagnosticsBundleTest[desktop]",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "bytes": 1387,
+        "sha256": "47984105c62e010ae0521693d4836982c501151cab966a1ebcaa3dcded408bbe"
+      },
+      {
+        "report": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DocumentFramesTest.xml",
+        "suite": "DocumentFramesTest[desktop]",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "bytes": 931,
+        "sha256": "9599661092367c096d7b164f9b519943c7f6108d15598d19bcf55feced6015e1"
+      },
+      {
+        "report": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DocumentJobsOwnerTest.xml",
+        "suite": "DocumentJobsOwnerTest[desktop]",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "bytes": 1110,
+        "sha256": "9ea9b7cc037c7ade49bca83f58422afda98416007218e07d8de32d6723c4dfda"
+      },
+      {
+        "report": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.OriginalFormatsTest.xml",
+        "suite": "OriginalFormatsTest[desktop]",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "bytes": 1230,
+        "sha256": "253c72e0b32b9a798d06819bb60bd23b0134b3be7be094a007da7e56347837c7"
+      }
+    ],
+    "apps/desktop/build/test-results/test": [
+      {
+        "report": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopDiagnosticsLifecycleTest.xml",
+        "suite": "com.visualworkbench.desktop.DesktopDiagnosticsLifecycleTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "bytes": 1478,
+        "sha256": "003af216ca3aef1f46bd9cbb0eaeb6914653736b309d5ba45e283816aaec7267"
+      },
+      {
+        "report": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.diagnostics.DiagnosticsPublicationTest.xml",
+        "suite": "com.visualworkbench.desktop.diagnostics.DiagnosticsPublicationTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "bytes": 2203,
+        "sha256": "ba89c721d16f16a3c716e82809415867ee48c41d86e541eeacd7d536c520eb43"
+      }
+    ],
+    "apps/android/build/test-results/testDebugUnitTest": [
+      {
+        "report": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.diagnostics.DiagnosticReportWriterTest.xml",
+        "suite": "com.visualworkbench.android.diagnostics.DiagnosticReportWriterTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "bytes": 2492,
+        "sha256": "9e682d6a3c180ac20571f7684fc30b2044e1461f35b6bc62f1235d04ae8d1a67"
+      }
+    ]
+  },
+  "artifact_receipts": {
+    "target/debug/libvw_core.so": {
+      "bytes": 217309016,
+      "sha256": "d08e9a3a972f071c29db00775f91c2ea30ec2c42be98acae3c48c0c6d2dec996"
+    },
+    "target/debug/libvw_host.so": {
+      "bytes": 85724016,
+      "sha256": "1fb57254a953f24c023a9f45f0307b1853be6cfefb2a13eb8a58a43f48133044"
+    },
+    "target/debug/vw-bindgen": {
+      "bytes": 65524520,
+      "sha256": "84a39227ddf10f05d07f399a224ccca072f5613961af2faeead240c7ae32c8a8"
+    },
+    "target/android-jni/arm64-v8a/libvw_core.so": {
+      "bytes": 182990720,
+      "sha256": "41f62c2ea4d7f967ac106be8ccb301cbbece603f9bc5085c278e6e680f6a4cf6"
+    },
+    "apps/shared/build/generated/uniffi/core/com/visualworkbench/bindings/core/vw_core.kt": {
+      "bytes": 887602,
+      "sha256": "885fd2645f1a34c110b645621984c0e1ac8e99668d0c67dc6d4e8b5e157e9860"
+    },
+    "apps/shared/build/generated/uniffi/host/com/visualworkbench/bindings/host/vw_host.kt": {
+      "bytes": 274624,
+      "sha256": "a26d23de6b9219bd449e0274890469a3199c1406f637fffbf25751f637cc5e5f"
+    }
+  },
+  "logs": {
+    "vw-combined-app-validation-attempt-1.log": {
+      "bytes": 122847,
+      "sha256": "4a20dbbec37545749c502dcb5344391797a7ee5f7526df20ad47991e1f49b2f5"
+    },
+    "vw-combined-protocol-clippy.log": {
+      "bytes": 532,
+      "sha256": "83d8bc95c7505af163c95ff21652a2507a34ed551989a7ee28297b1ba0a4c37e"
+    }
+  },
+  "retained_warnings": [
+    "Existing Linux-only unused imports/dead-code warnings in native platform code; the full FFI workspace did not receive a warnings-denied Clippy claim.",
+    "Existing Kotlin compiler warnings and Android lint warnings/notes remain.",
+    "Missing platform-tools and unwritable default Android analytics directory were nonfatal warnings; no platform-tools license, device identity or machine permission was changed."
+  ],
+  "limits": [
+    "Focused tests cover diagnostics/common contracts/publication and cancellation, not the entire historical app test census.",
+    "Desktop packageConnectionRuntime was excluded only for Linux unit tests. No Windows helper inventory, distributable, app launch or installer was validated.",
+    "Document/image engines remain module admissions until native registration, storage/facade and app callers are integrated under the admitted contracts.",
+    "Native PDFium/qpdf, isolated runtime artifacts/sandbox, real OS decoder fidelity, chooser/provider lifecycle, GPU/performance, physical S Pen and owner acceptance remain pending.",
+    "No live provider call, signing, deployment, device operation, main promotion or local worktree cleanup occurred."
+  ],
+  "heavy_build_slot": "All validation commands terminated; available for parent scheduling"
+}
