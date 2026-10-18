@@ -435,3 +435,47 @@ reviews do not establish user workflows, carrier switching, scale rebase or phon
 AI acceptance. Phase5 provider/verification/release gaps and all physical gates
 remain open. Main remains83663107 until the composed candidate is reviewed.
 No old worktree or preserved source archive is disposed by this integration lane.
+
+## Reviewed giant publication and editing/offline composition
+
+Independent review accepted the restricted giant candidate. A normal push
+advanced main from 83663107 to exact
+`6f3e2f3b9ed7a760d4dd7f4c6f26fa44dc5ad88d`; the remote SHA was verified.
+This supersedes the earlier pre-publication main boundary above and leaves all
+runtime, device and product gates open.
+
+Editing/offline code `454abe75a997f18c3792578cd408a52f4bfb862c` is published for composed-source review on
+`cloud/editing-offline-integration-20261018`. Real Desktop/Android roots now wire
+the accepted navigation, local camera/bookmark, layer/group, rotation, dedicated
+tonal and offline-review leaves through their existing mutation gate and borrowed
+project. Native startup restores durable conflict-draft counter floors; Android
+observes them without consuming a reservation per revision. Navigation preserves
+the authenticated link while joining old attachment subscriptions. Cancellation
+signals before parent gate waits and joined detach retains actual ownership.
+
+Phase checks pass 504 native executions in 37 result blocks (three-package scope,
+two private harness entrypoints ignored in the parent and exercised by owning
+subprocess tests), 460 shared/348 Desktop/136 Android unit cases, strict Linux
+Clippy, fresh Linux/arm64 libraries, one binding-generation pass, current Android
+instrumentation source compilation, four 16 KiB LOAD segments, dependency policy,
+and zero-error Android lint (60 warnings/12 hints). Seven Windows-only cases remain
+skipped. Actual Desktop controller/JNI regressions cover 24 documents and saved
+camera/bookmark reopen, plus one accepted rotation followed by ordinary Undo.
+No actual Window, device, physical input, Windows runtime, GPU, RSS or performance
+acceptance is inferred. Failure corrections and exact source/artifact bindings
+are in `evidence/EDITING_OFFLINE_INTEGRATION_20261018.json`.
+
+T3.07 remains partial: full-canvas tonal editing and document crop/rotate/resize
+are open; the canvas explicitly labels its original while dedicated tone preview
+and marked exports evaluate adjustments. T3.11 scale rebase, <=2s carrier changes,
+phone-only AI and A14/A25 remain open. No gate or requirement is marked passed by
+this batch. Main stays at reviewed 6f3e2f3 pending independent composed-source review.
+
+Image streaming-cache API admission e2b633d grants four dedicated paths for the
+paired 5a7239d1 repair, source-only while root validates. Producer af934061, actual
+Android root output retirement and constructor budget ownership remain the next
+root phase; current giant producer refusal is retained. Parent-started verification,
+Air Actions and capture-picker leaves keep exclusive ownership and send minimal
+interfaces to root. Krita, PDF runtime activation, external authority and all
+physical/product gates remain deferred/open. Preserved worktrees and archives
+are untouched.

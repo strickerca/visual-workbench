@@ -1,0 +1,1734 @@
+{
+  "date_utc": "2026-10-18",
+  "scope": "T3.07 document/layer/saved-view/rotation/tone and T3.11 durable offline-review root integration; restricted candidate for review",
+  "base_main": "6f3e2f3b9ed7a760d4dd7f4c6f26fa44dc5ad88d",
+  "code_commit": "454abe75a997f18c3792578cd408a52f4bfb862c",
+  "branch": "cloud/editing-offline-integration-20261018",
+  "leaf_sources": [
+    {
+      "scope": "local views store",
+      "commit": "258f500",
+      "composed": "d8d47f8"
+    },
+    {
+      "scope": "local views/navigation",
+      "commit": "88cb9b3",
+      "composed": "1e7fc1e"
+    },
+    {
+      "scope": "native local views",
+      "commit": "f37ea51",
+      "composed": "a25581c"
+    },
+    {
+      "scope": "document controls",
+      "commit": "ff9d335",
+      "composed": "b669662"
+    },
+    {
+      "scope": "rotation contacts",
+      "commit": "f12433c6",
+      "composed": "adb79d2"
+    },
+    {
+      "scope": "durable conflict drafts",
+      "commit": "7f5ff6f",
+      "composed": "41ab07a"
+    },
+    {
+      "scope": "review facade/UI",
+      "commit": "df5c62bb68e012c899d2f0b36d5b9757caf9bccf",
+      "composed": "7555081"
+    },
+    {
+      "scope": "canonical rotation",
+      "commit": "7099232",
+      "composed": "9526d0c"
+    },
+    {
+      "scope": "tone controls",
+      "commit": "96f7a60",
+      "composed": "70b4571"
+    }
+  ],
+  "native": {
+    "packages": [
+      "vw-ffi",
+      "vw-store",
+      "vw-geom"
+    ],
+    "passed": 504,
+    "failed": 0,
+    "ignored": 2,
+    "result_blocks": 37,
+    "note": "Counts include two actual private subprocess test executions. Their parent-harness entries are ignored and invoked by the owning process-death tests. This three-package scope differs from the prior four-package giant receipt."
+  },
+  "jvm": {
+    "shared": {
+      "tests": 460,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 460,
+      "reports": 56,
+      "skipped_cases": [],
+      "suites": [
+        {
+          "suite": "AgentCaptureObserverTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "AiCandidateRecoveryTest[desktop]",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "AiInteractionTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "AiOwnershipTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "BudgetedDocumentJobsTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "CaptureArrivalsTest[desktop]",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "DesktopCoreSmokeTest[desktop]",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "DiagnosticsBundleTest[desktop]",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "DocumentControllerTest[desktop]",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "DocumentControlsInteractionTest[desktop]",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "DocumentDrawFrameTest[desktop]",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "DocumentFramesTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "DocumentInteractionTest[desktop]",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "DocumentJobsOwnerTest[desktop]",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "DocumentNavigatorTest[desktop]",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "DocumentWireIdentityTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "EditorWorkflowsTest[desktop]",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "EraserContractTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "EraserInteractionTest[desktop]",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "GiantAttachmentOwnerTest[desktop]",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "GiantViewGeometryTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "GiantViewportSessionTest[desktop]",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "InstructionEditorTest[desktop]",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "InstructionFocusControllerTest[desktop]",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "LocalViewsInteractionTest[desktop]",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "MarkerFocusFollowerTest[desktop]",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "MaskContractTest[desktop]",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "McpInboxAdmissionTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "ObjectRotationContactTest[desktop]",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "ObjectRotationHandleTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "ObjectRotationInteractionTest[desktop]",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "OfflineReviewInteractionTest[desktop]",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "OriginalFormatsTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "PackageOwnershipTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "PairingQrTest[desktop]",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "PeerLabelStoreTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "PrecisionPlacementTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "PrecisionTest[desktop]",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "RemoteAuthorityObservationTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "RemoteConsumerOwnershipTest[desktop]",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "RemoteEditCompositionTest[desktop]",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "RemoteEditorCompatibilityTest[desktop]",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "RemoteEditorPaletteTest[desktop]",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "RemoteGhostInkTest[desktop]",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "RemoteNativeCompositionTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "RemoteOwnerPublicationTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "RemotePenAxesTest[desktop]",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "RemoteStreamPublicationTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "SelectionInteractionTest[desktop]",
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "SelectionPolygonTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "SemanticDropTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "SemanticEditorTest[desktop]",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "StylusTiltContractTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "ToneControlFormTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "ToneControlsInteractionTest[desktop]",
+          "tests": 28,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "WorkflowOwnershipTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "desktop": {
+      "tests": 355,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 7,
+      "passed": 348,
+      "reports": 51,
+      "skipped_cases": [
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realLongWindowsPinsStillRefuseWritesAndReplacement",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.boundedDosParserRefusesOtherNamespacesAndNoncanonicalForms",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.longNativeGuardPathsAreExplicitWithoutChangingTheShortAnchorNamespace",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realWindowsAnchorHandleIsCanonicalAndOrdinaryPinsRemainExactAndExclusive",
+        "com.visualworkbench.desktop.mcp.McpStartupTest.expiredAndFutureOwnerMarkersRetireWithoutStartingService",
+        "com.visualworkbench.desktop.mcp.McpStartupTest.markerDeletionBindsValidatedHandleAndMalformedDataSurvives",
+        "com.visualworkbench.desktop.mcp.McpStartupTest.realWindowsOwnerLockPreventsDuplicateAndReleasesExactly"
+      ],
+      "suites": [
+        {
+          "suite": "com.visualworkbench.desktop.AiEditorOwnershipTest",
+          "tests": 20,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.AiResultPainterTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.AiServiceControllerTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.AiViewGeometryTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.ConnectionAssistanceTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.ConnectionDraftTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopBackgroundDisplayTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopCoherenceTest",
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopDiagnosticsLifecycleTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopInkTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopInstructionFocusAdmissionTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopInstructionFocusTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopNativeRuntimeTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopPeerLabelsTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopPrecisionTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopRemoteCatalogAdmissionTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopRemoteCatalogTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopRenderTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopSessionsTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopStateTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DesktopTransferTest",
+          "tests": 22,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.DocumentWorkflowEditorTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.EditorPageRefreshTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.EraserGeometryTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.EraserPageBindingTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.GiantCanvasBoundaryTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.GiantNativeBoundaryTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.NativeRuntimeAnchorTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 4
+        },
+        {
+          "suite": "com.visualworkbench.desktop.OrdinaryFormatSelectionTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.PolygonEditorTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.ProjectFilePickerRequestTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.RemoteIntegrationPublicationTest",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.RemoteIntegrationReadinessTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.RemoteOwnedEditorContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.RotationEditorTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.SelectionControllerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.capture.CaptureAdmissionTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.diagnostics.DiagnosticsPublicationTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.documents.DocumentJobLifetimeTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.documents.DocumentNativeRetirementTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.documents.DocumentRuntimeManifestTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.documents.DocumentTileOwnershipTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.instructions.WindowsInstructionFieldTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.mcp.CodexHandoffTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.mcp.McpCoordinatorTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.mcp.McpGrantTelemetryTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.mcp.McpJsonTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.mcp.McpOwnerWorkTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.mcp.McpProcessTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.desktop.mcp.McpStartupTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3
+        },
+        {
+          "suite": "com.visualworkbench.desktop.remote.RemoteWindowSelectionTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "android": {
+      "tests": 136,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 136,
+      "reports": 26,
+      "skipped_cases": [],
+      "suites": [
+        {
+          "suite": "com.visualworkbench.android.capture.CaptureAdmissionTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.capture.CaptureOwnerTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.diagnostics.DiagnosticReportWriterTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.documents.DocumentJobLifetimeTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.documents.DocumentPublicationTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.documents.DocumentRuntimePinTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.documents.DocumentServiceSignalsTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.documents.DocumentTileOwnershipTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.documents.DocumentWireTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.editor.CanvasRetirementOwnerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.editor.EditorPageRefreshTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.editor.EraserPageBindingTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.editor.GiantAndroidBoundaryTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.editor.OrdinaryFormatSelectionTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.editor.ProjectCounterFloorTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.editor.ProjectReceiveCompletionTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.input.CanvasGestureCancellationTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.remote.DecoderOutputGeometryTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.remote.DecoderRenderIdentityTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.remote.RemoteDecoderRecoveryTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.remote.RemoteDecoderStartupTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.remote.RemoteInputGrantFenceTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.remote.RemoteRenderScheduleTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.remote.RemoteUiCommandsTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.remote.RemoteUiInputAdmissionTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "com.visualworkbench.android.session.QrLuminanceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    }
+  },
+  "jvm_total_passed": 944,
+  "jvm_total_skipped": 7,
+  "checks": {
+    "strict_clippy": "PASS three affected packages/all targets on Linux, warnings denied",
+    "rustfmt": "PASS workspace",
+    "common_imports": "PASS HOOK-002",
+    "cargo_policy": "PASS licenses/bans/sources, existing duplicate warnings",
+    "gradle_licenses": "PASS 264 exact modules/12 runtime configurations/5 bound parent POMs; graph unchanged",
+    "linux_core_host_generator": "PASS fresh phase build",
+    "android_arm64_library": "PASS fresh phase build",
+    "android_load_alignment": "PASS four 16 KiB LOAD segments",
+    "bindings": "Core and host regenerated once for phase DTO/registration changes; subsequent app retries reused unchanged outputs",
+    "android_instrumentation": "All current instrumentation sources COMPILED ONLY; no device execution",
+    "android_lint": {
+      "errors": 0,
+      "warnings": 60,
+      "hints": 12
+    },
+    "whitespace": "PASS",
+    "secrets": "Staged source and prior candidate history PASS; final evidence/history scanned before publication"
+  },
+  "commands": [
+    "cargo test --locked -p vw-ffi -p vw-store -p vw-geom --lib --tests -j2",
+    "cargo clippy --locked -p vw-ffi -p vw-store -p vw-geom --all-targets -j2 -- -D warnings",
+    "cargo fmt --all --check",
+    "cargo deny --locked check licenses bans sources",
+    "bash apps/gradlew -p apps checkDependencyLicenses :shared:desktopTest :desktop:test :android:testDebugUnitTest :android:compileDebugAndroidTestKotlin :android:lintDebug -x :desktop:packageConnectionRuntime --console=plain --no-daemon --no-parallel --max-workers=2",
+    "bash apps/gradlew -p apps :desktop:test :android:testDebugUnitTest :android:compileDebugAndroidTestKotlin :android:lintDebug -x :desktop:packageConnectionRuntime --console=plain --no-daemon --no-parallel --max-workers=2"
+  ],
+  "command_notes": [
+    "First complete phase command has failed attempts retained. Shared desktopTest last executed successfully in attempt5; only root Kotlin changed afterward. Final command passes desktop/Android and recompiles current instrumentation/lint. Linux/arm64 native code has not changed since its passing batch.",
+    "All heavy commands serialized; at most two workers. build.ps1 is Windows-only; equivalent Linux commands use the separately tested setup without changing pins."
+  ],
+  "meaningful_regressions": [
+    "Actual Desktop controller and JNI/native journal: 24 document catalog, switch/return with one borrowed project, same-device camera and named bookmark survive reopen.",
+    "Actual Desktop controller precision input and native journal: rotation handle produces one accepted transaction; ordinary Undo restores the original transform.",
+    "Nine shared coordinator cases cover observed hash fences, unchanged ordered receipts, stale completions, cancellation before gate wait, joined cleanup, saved-camera device/viewport identity, review resume and paged/modal refusals.",
+    "Native history restores durable conflict-review Lamport floor before any review read or ordinary edit; Android merges floors without allocating per observed revision.",
+    "Tone preview accounts for its added layer/object before allocation; recognized tone metadata remains outside unsupported vector rendering and sets an explicit snapshot flag."
+  ],
+  "corrected_failures": [
+    "Missing native geometry registration and invalid rusqlite usize conversion corrected without weakening record checks.",
+    "Tone preview underestimated geometry of its own metadata by 64 bytes; reserve both added objects before render.",
+    "Five store regressions failed before their asserted operation because a synthetic fixture lacked the required Role::None; fixture corrected, validator retained.",
+    "Saved-camera fake used revision zero with nonempty state; fixture now uses a valid saved-state revision.",
+    "Initial observed-revision gate interfered with existing ordinary CAS behavior; gate applies workflow admission while ordinary edits retain existing CAS.",
+    "Detached offline-review busy state blocked replacing a closed project; coordinator retains detached state until resume and excludes its inactive busy flag.",
+    "Ordered duplicate receipt invalidated document catalog without rebind; same-state branch rebinds workflows without reconciling an unconfirmed rotation.",
+    "Actual multi-document regression found paused instruction/semantic owners after teardown; successful adoption and confirmed metadata-retirement failure paths resume them. Failure paths reattach original subscriptions under NonCancellable cleanup."
+  ],
+  "remaining_gaps": [
+    "T3.07 remains partial: crop/rotate/resize broader document editing and full-canvas tonal display are not complete. Dedicated tone preview and marked exports evaluate tones; original canvas is explicitly labeled.",
+    "No actual Desktop Window, Windows runtime/GPU, Android instrumentation/device or physical rotation/snap/pen acceptance.",
+    "T3.11 remains partial: scaled rebase, USB/Wi-Fi carrier switching <=2s, phone-only AI loop and A14/A25 are not verified by this UI/draft integration.",
+    "Giant producer af934061 and paired streaming-read proposals 5a7239d1 remain outside this branch; current main giant import/rebuild remains Missing/Unsupported.",
+    "PDF runtime/OS worker isolation and activation remain blocked on exact approved runtime inputs; no substitute binary loaded.",
+    "No live provider, signing, package install, device identity, external authority, performance or product gate change."
+  ],
+  "source_sha256": [
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/DocumentNavigatorPanel.kt",
+      "bytes": 2468,
+      "sha256": "477485db940f947322ea8263be6bf1a255bff2aba10a0765c0f44b9257ce93b3"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt",
+      "bytes": 127770,
+      "sha256": "48e93d62d6bb9e2586f49e14266125c94a0169a47c6b3831c1f62904d901bf7e"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt",
+      "bytes": 18972,
+      "sha256": "4bb6f7cde7cf85ae0300df17c10cdabe5d62e9a1bc1745813740d022cda91fc8"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorWorkflowControls.kt",
+      "bytes": 2277,
+      "sha256": "07d367efed9bf215142117fd7767aa570196436bac54cd48a72ab3a97f2e2b34"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/LayersPanel.kt",
+      "bytes": 12187,
+      "sha256": "4189d965321403913e95527f0f1d3e7bc7ecec98e5b90ec045ab009bf40083d1"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/LocalViewsPanel.kt",
+      "bytes": 3664,
+      "sha256": "241ecf5fd68c220b1dab4ae4286b52ddb0ce52f7248a69975e5046d08ac49207"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/ProjectRepository.kt",
+      "bytes": 7970,
+      "sha256": "5c9265ea3e3ce04f04326dcd45d2140ccd9facaf7e4293aaeef571c72f880189"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/RotationSnapControl.kt",
+      "bytes": 1005,
+      "sha256": "28295776a48b6ada6adc58c55b3ba675f275055159c4f6c82d192722a280011d"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/ToneControlsPanel.kt",
+      "bytes": 10371,
+      "sha256": "6c88107ae5310bf487f6bffe575d47f5b3bce828cdd38e4d1e8c1fce2a4106e0"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/TonePreviewBitmap.kt",
+      "bytes": 3744,
+      "sha256": "5c7d639205c23e4c51a607a3c14879071fed1c966918c2f7d30a299082ff42ab"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/offline/OfflineReviewPanel.kt",
+      "bytes": 5249,
+      "sha256": "f0e728f457d98a4b7215f23d02ac63e5d4afa84af848e2a76a8ea957f27d8bd6"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt",
+      "bytes": 29727,
+      "sha256": "6f4c8454807fcfeca4982d00dbfe62121d8fbab3b16aa248f7d8cc825945335b"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/editor/ProjectCounterFloorTest.kt",
+      "bytes": 1303,
+      "sha256": "c0fde4528c667b5bd9aa27adad5941f9b1f3e5b082812b45780e92af13c843a1"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopLiveLink.kt",
+      "bytes": 11432,
+      "sha256": "141a3c0b4a569551748694f5263434c084ed71fef787ee4caa182b054026ebbf"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DocumentNavigatorPanel.kt",
+      "bytes": 2461,
+      "sha256": "a19e478af56ba30786f3c51d22b8988f3f27e2b529b03e939b85c5ba6527e72f"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt",
+      "bytes": 18652,
+      "sha256": "74a192fcf511cdcce8ac7c2388ab0400e00202e4e945401899f0777515f70f58"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt",
+      "bytes": 90433,
+      "sha256": "ec1dea081510c561ce8e9d64673d99981e5e66f98c8d4e62feda5759506db50f"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorWorkflowControls.kt",
+      "bytes": 1983,
+      "sha256": "5710921ed4073bfd2dd9738d0b8ac9f4bd2bc8077b16aea248a8417df807daa5"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/LayersPanel.kt",
+      "bytes": 12180,
+      "sha256": "1a4b6edbcfeda85d6ded9048c48a0cb69db1c1eca1cde0d97a39499344207244"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/LocalViewsPanel.kt",
+      "bytes": 3657,
+      "sha256": "8f3d8c18717d94de352dc40ba8ac835caa8f5c8d76427499bac4c4855ba09b70"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt",
+      "bytes": 56118,
+      "sha256": "7b2d8c39057254a0605bee9f744df83f7550950b574ebb89fc785d8cb2f962ad"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/ToneControlsPanel.kt",
+      "bytes": 10364,
+      "sha256": "0a3676558df0e2229a0ec908d9be5814b8658823362b6b28dc3e4bd39e0d7584"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/TonePreviewBitmap.kt",
+      "bytes": 4763,
+      "sha256": "a559989c9a0b5c12c958a175060830ba447d2baeec9bdb3b410876365ddd6549"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/offline/OfflineReviewPanel.kt",
+      "bytes": 5249,
+      "sha256": "5e09fa71bf2d96496879ad294414a3424d5d678e24f96a506f616b43a4e29780"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DocumentWorkflowEditorTest.kt",
+      "bytes": 5602,
+      "sha256": "f3e85940b1425ba25d87c95c722cc1e1ce5baac0255103ec4facb35d08b80319"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/RotationEditorTest.kt",
+      "bytes": 4384,
+      "sha256": "03a856c81b69fe3d2b367b4de979a889b510a20063fdf692f77be741378204f3"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CoreApi.kt",
+      "bytes": 10102,
+      "sha256": "5ffdefdc6a98413a7f97496c7399cfa9e662f4fe8681af3f5c566d6eac21912e"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentControlDrawing.kt",
+      "bytes": 563,
+      "sha256": "e51b63f719f2f8af0e1bb8d60be18190bde90a502ee07a06418d67ca7a206afd"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentControlsApi.kt",
+      "bytes": 8112,
+      "sha256": "c026d39ba1ac90422e38c239354f61c78ac07b0c4a1c9932925d4f0e31b78ad2"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentControlsInteraction.kt",
+      "bytes": 16169,
+      "sha256": "6e5265335c86f4f92c0d0950131a3405082c98665068e1b6253f8d86b1dac3a6"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentNavigator.kt",
+      "bytes": 5610,
+      "sha256": "5b63022241f1ca7369f2e29d92a56bc886f67a465d6d8e4e36069d35d65566fd"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/EditorWorkflows.kt",
+      "bytes": 13891,
+      "sha256": "cd8620682f52c25599530c114e9c380f33905e8ac2a4b4b1c478db8f56a0a988"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/LocalViewsApi.kt",
+      "bytes": 2460,
+      "sha256": "696c62d166aac0d42e2a1d498463f6ddaaeecb67c9661b74bf1a578a9465fe27"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/LocalViewsInteraction.kt",
+      "bytes": 13104,
+      "sha256": "40cf20c469bc8562c5627ad35908ec190f1d14821da41b2c0dff9a0fc6044a01"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/ObjectRotationContact.kt",
+      "bytes": 3653,
+      "sha256": "bd154f2cf5ac82deb0af1b473344cc291d1f477a2b1eaa780c6746e79684433e"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/ObjectRotationHandle.kt",
+      "bytes": 1672,
+      "sha256": "23d9b24b865cdca838fd523f7e518a359a2d5a01d608312e3cbe111cab0023c6"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/ObjectRotationInteraction.kt",
+      "bytes": 9287,
+      "sha256": "6ae9363056b4ebe7a302ad43d39be6e20d596b077d9e5d2c35980dcd6bc81783"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/OfflineReviewApi.kt",
+      "bytes": 4989,
+      "sha256": "c7d18fc5c08133e389cf3b788ece4cae6317bd9c67292bf13674f9ed8b516919"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/OfflineReviewInteraction.kt",
+      "bytes": 13927,
+      "sha256": "b210289caef7da2904dbc886ac85fb789e086e5b85d671c76f05b8ca03f226c5"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/ToneControlForm.kt",
+      "bytes": 2457,
+      "sha256": "53d251dd4ff8bfdc2dace5f9610fd7d1c4972cb4bce942b49ae237f3acd5e746"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/ToneControlsApi.kt",
+      "bytes": 5731,
+      "sha256": "99b194bb04d257c46850e3ed21f7396e0f0546c7798787edc3c95e3b941a7c76"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/ToneControlsInteraction.kt",
+      "bytes": 23384,
+      "sha256": "e5ad33952f193e40891afd9108cc57a41d9c9f1c7c7d79bf97debc8d58dd5cbb"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt",
+      "bytes": 19744,
+      "sha256": "3df04c474af43a394f216c75d0445328ed9132cde9479d08d839bace856d0552"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeDocumentControls.kt",
+      "bytes": 3473,
+      "sha256": "86abd04c949176e416a246760fee8c293f85c2bae3f69e55f2d6f172bd2f1218"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeDocuments.kt",
+      "bytes": 11835,
+      "sha256": "72f3c2b994caf05089a944843fb73558862d729dec4365d4b6db76299ed0bb93"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeLocalViews.kt",
+      "bytes": 2862,
+      "sha256": "201abe35cf567778c5024908aa69a8a3c25b5f4e15afec0022086c73e13d0837"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeObjectRotation.kt",
+      "bytes": 826,
+      "sha256": "95dc9b7961588fb19198bff7ea0d681c747e58eecfaaeaacbf9cef2a5d708d69"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeOfflineReview.kt",
+      "bytes": 4342,
+      "sha256": "3923afe369f8cbc99cfe978aefcccd46cd34485f5eda1da1775f2ffbc09c0a8c"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeToneControls.kt",
+      "bytes": 3673,
+      "sha256": "6bc820b959ca312c92b20c90e905aff84b9444804bc286f5c4d47470d8f7f7b1"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/DocumentControlsInteractionTest.kt",
+      "bytes": 17597,
+      "sha256": "ef2e091d61686eaa1d61472d7c761e9113459e6559c6f9f7afeae2bb09a0edd7"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/DocumentNavigatorTest.kt",
+      "bytes": 9194,
+      "sha256": "28e05a20e3285041dbea611f776fc95419165eaec76f74599273c6ae40df1c17"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/EditorWorkflowsTest.kt",
+      "bytes": 11500,
+      "sha256": "3377bab76ecb4a15e8231462684a68d5699fc3d4bc766da406a43344c1b82dc2"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/LocalViewsInteractionTest.kt",
+      "bytes": 17451,
+      "sha256": "87497c51a0d7af0487caf5f9e94a2935db08c4f935057ec32849d15dd02a5142"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/ObjectRotationContactTest.kt",
+      "bytes": 4350,
+      "sha256": "981e3b34dae7304130f3d78668b9785eedc35deb44c6f64165a2984ceb446874"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/ObjectRotationHandleTest.kt",
+      "bytes": 1989,
+      "sha256": "b8f26dfc112d816b9dc3acddd99dee7ddae1214ef16f21f4d77ed18d9d332554"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/ObjectRotationInteractionTest.kt",
+      "bytes": 12481,
+      "sha256": "ca323c654d4f071716663c50d6790844d3cc770fa471bfb456c6ecd2eece1974"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/OfflineReviewInteractionTest.kt",
+      "bytes": 12035,
+      "sha256": "0edecdb287b7346875ed03b6fe5d231ca2f2ce67c17672c0921653423f98a4d0"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/ToneControlFormTest.kt",
+      "bytes": 3646,
+      "sha256": "a7a64ab4e7d1a210e38e05b8af91b438cd82e6acdbe85ede2af38efd37092ec6"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/ToneControlsInteractionTest.kt",
+      "bytes": 31931,
+      "sha256": "227349b3eb476c00705d925d5ebf5737748df86379a7130d5677c211e984923b"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/document_controls.rs",
+      "bytes": 4554,
+      "sha256": "eeaa3979443aaf173d7fc73472d9e09fc2719d0265885eef43453276c22b2fc8"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/document_controls/dto.rs",
+      "bytes": 3167,
+      "sha256": "b56739a6a9d033246b2c795ba9bc0c74514dfba265191dc8b20458bfe81adffe"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/document_controls/plan.rs",
+      "bytes": 19990,
+      "sha256": "e5fb1338bac4275c0e1e6bfa07711f3df9f81448267d77c9751e8a2652cf5209"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/document_controls/snapshot.rs",
+      "bytes": 5743,
+      "sha256": "df05830dc7e3541b04aff5d3fe8031b7f574d7a38c6f36485dcd8f5fe351e1ea"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/documents.rs",
+      "bytes": 22556,
+      "sha256": "72a741d7a2111bc80c215ae61400f16e846ce08d8f61ebd1652d52f5fe55dd93"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/dto.rs",
+      "bytes": 7715,
+      "sha256": "4344cd928089285c59f314d60d5a20edaaf107494b01eefdf031510eb64cb598"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/editor.rs",
+      "bytes": 28076,
+      "sha256": "ab4f7ed94d7caa3b0cba4f881e0e1a4e800a87f1a157f7fc9a7a39aaa22bde29"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/lib.rs",
+      "bytes": 4683,
+      "sha256": "4d21714a50debb7910629aa7fc7e6946fa66952dd0a1a37e359643fe7e75dd28"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/local_views.rs",
+      "bytes": 8009,
+      "sha256": "765477881f1f67078bacd2049ebc8744edc1c1ce9e7a28c8ba80927c16431b9d"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/object_rotation.rs",
+      "bytes": 1430,
+      "sha256": "130cb09777049f41d77b4cfca7054894fd93b3454479761d8404ccf73755c934"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/offline_review.rs",
+      "bytes": 18939,
+      "sha256": "d866084688b428bade5b71515585f7c35767995abb5f2946c4d347daedde1463"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/offline_review/dto.rs",
+      "bytes": 2288,
+      "sha256": "ca1efc0047bafd3e09f2273915ced9d3a8f53c38a46fe51b3818b62975863238"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/offline_review/tests.rs",
+      "bytes": 10658,
+      "sha256": "92673eb82f6ae0608299ee00b90da68c01b42eb3fd157261689c34bdd5d866ff"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/queries.rs",
+      "bytes": 33356,
+      "sha256": "7bb2723a93d74bee7eac09ec81ce014fe4c74b0501520254d1df7bebb400dd2e"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/tone_controls.rs",
+      "bytes": 6827,
+      "sha256": "0ea38218681d383c37b845e88676af3107a49dfc8f2299dc44d81eeab8d0805b"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/tone_controls/dto.rs",
+      "bytes": 3174,
+      "sha256": "7f7ffa2e4be37e881fa691548a859b8f8fca87c8d2c42f9e0c5e2c3453629ab5"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/tone_controls/editing_view.rs",
+      "bytes": 661,
+      "sha256": "aa584d8c0eeacae5ab0a4204cf3c7aef77f4641ae3076dc509bbadb5c75a2aef"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/tone_controls/plan.rs",
+      "bytes": 9308,
+      "sha256": "96381b0521456fcbab5cad78988ba41330b826687e9980a00b62525a27bd33e9"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/tone_controls/preview.rs",
+      "bytes": 13430,
+      "sha256": "76c68cec8dfe402e11fe08aa386b630d116c49a739ff5343a8d8c7d76e2b7124"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/tone_controls/snapshot.rs",
+      "bytes": 2188,
+      "sha256": "d6d5e0113bdf501da183f994d49b9775e4587213b890358dcebf3e87be24ea41"
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/document_controls.rs",
+      "bytes": 16680,
+      "sha256": "fdfe2b4f5ec5a77a38620359abc28f3a5d98652b6e2318dd5827c79f5cd0a1b9"
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/local_views.rs",
+      "bytes": 10367,
+      "sha256": "2fab0b7f6b60530c760da4b895edf87d3a16c6f03e8c312c7386b4319c7b12a0"
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/object_rotation.rs",
+      "bytes": 7391,
+      "sha256": "418a0d416008e5b6595568231f3ffe5a51e452c2a8cb6c54aa65182b269c7b4c"
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/tone_controls.rs",
+      "bytes": 21307,
+      "sha256": "7252876d0cd4513df84f8ad44a574ff6be7a43f8660241fc5fc2da88431722dc"
+    },
+    {
+      "path": "core/crates/vw-geom/src/lib.rs",
+      "bytes": 4193,
+      "sha256": "c03f9b418a2abc6d077327ce8962843a3a3fa21a61759c38e9c1aa1184e4ed91"
+    },
+    {
+      "path": "core/crates/vw-geom/src/object_rotation.rs",
+      "bytes": 2351,
+      "sha256": "d92b5e1a0e9382a32a9cd1d58b00a5d5cb422ba61d5d92d80f27de1440941125"
+    },
+    {
+      "path": "core/crates/vw-geom/tests/object_rotation.rs",
+      "bytes": 5368,
+      "sha256": "67413062c1a8f24df1773c4f7002052ecfffbf703c308142da7e289c47ee6760"
+    },
+    {
+      "path": "core/crates/vw-store/src/archive.rs",
+      "bytes": 22008,
+      "sha256": "5cce9424ccf87097b910399f5e397994a7a6445ad05fc8ccffb97e3d50f6b09e"
+    },
+    {
+      "path": "core/crates/vw-store/src/conflict_review.rs",
+      "bytes": 26348,
+      "sha256": "dddaad7cb3092cab52912c881401decf060cce4b180a3aa1b109d398d1d05b71"
+    },
+    {
+      "path": "core/crates/vw-store/src/lib.rs",
+      "bytes": 1326,
+      "sha256": "ad24519a4912bfbf6f3dd3e43e5e80e5164ed3bca45e7c0851296605d7fab806"
+    },
+    {
+      "path": "core/crates/vw-store/src/local_views.rs",
+      "bytes": 16192,
+      "sha256": "1cd2498afcd21aaef99c2a0d775aaaee7319b77a8419d54f47c95610b4c6a2d8"
+    },
+    {
+      "path": "core/crates/vw-store/tests/conflict_review.rs",
+      "bytes": 26319,
+      "sha256": "d7704e6d53201ab1512b5f71064261c93d62c49fc3dbc49955a2e27fe187d6f7"
+    },
+    {
+      "path": "core/crates/vw-store/tests/local_views.rs",
+      "bytes": 15363,
+      "sha256": "83d5f226a6e938aa84b0da58358dffa5025b4085a2c97b10313214f6089db03f"
+    },
+    {
+      "path": "docs/GIANT_STREAMING_STORE_API_ADMISSION_20261018.md",
+      "bytes": 3365,
+      "sha256": "e397b8c2c6b52269653b37babee8274727625930af8fa3dd3092acd8a6ac70f1"
+    },
+    {
+      "path": "docs/T3_07_EDITING_LEAVES_HANDOFF_20261018.md",
+      "bytes": 17934,
+      "sha256": "7d0438e7f60b148d76009c24dcc4d58c348be8adc37d81514d5467d26688b9e8"
+    },
+    {
+      "path": "docs/T3_07_SAVED_VIEWS_HANDOFF_20261018.md",
+      "bytes": 12195,
+      "sha256": "67facabb65342086eddadf41a53ee1b5f56760ce3695b053ec9406492be090b3"
+    },
+    {
+      "path": "docs/T3_11_OFFLINE_REVIEW_CALLER_HANDOFF_20261018.md",
+      "bytes": 13964,
+      "sha256": "ffa49fd271cda118614c029dfe009e73b7b83631aea93fb6c0bc25a66318994e"
+    },
+    {
+      "path": "docs/T3_11_OFFLINE_REVIEW_HANDOFF_20261018.md",
+      "bytes": 11561,
+      "sha256": "7e334eb6c972130645cbdea975e55711c97d77d1dd9419e89fbae61c7124fad9"
+    },
+    {
+      "path": "docs/evidence/T3.07-LAYER-CONTROL-LEAVES-20261018.json",
+      "bytes": 9370,
+      "sha256": "a1557f46400476778b86a4538d7b0a3cf88ac56e2516d2f0918d2e8fc98b7d3c"
+    },
+    {
+      "path": "docs/evidence/T3.07-LOCAL-VIEWS-NATIVE-SOURCE-20261018.json",
+      "bytes": 3406,
+      "sha256": "e761ee9426124af399b29a3cc023d588e489d103b5bdabe7f07b7158100193bc"
+    },
+    {
+      "path": "docs/evidence/T3.07-ROTATION-CONTACT-LEAVES-20261018.json",
+      "bytes": 4316,
+      "sha256": "fd38379a8e92c5905d2d56c90c3d6f0ef2e8ae2bd720478276484786104f1c68"
+    },
+    {
+      "path": "docs/evidence/T3.07-SAVED-VIEWS-LEAVES-20261018.json",
+      "bytes": 9578,
+      "sha256": "8ae16ac668bbe9835be668bb776afc572c2269734812309d65144e65050400ef"
+    },
+    {
+      "path": "docs/evidence/T3.11-offline-review-callers-source-20261018.json",
+      "bytes": 4267,
+      "sha256": "c05eca905e3b3d006c43e473261f5a22acd4ecac09e5eb686a6a1d34326f6212"
+    },
+    {
+      "path": "docs/evidence/T3.11-offline-review-source-20261018.json",
+      "bytes": 2453,
+      "sha256": "d7406ca2b8ffd608f26445afaa7c2cacf68ca8e99a64e03251de56d1e31afa0d"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "target/debug/libvw_core.so",
+      "bytes": 246912848,
+      "sha256": "6e2a1da6a65593a6700bb9e9ffb28c03d25272e490708136d551d9c5983712ed"
+    },
+    {
+      "path": "target/debug/libvw_host.so",
+      "bytes": 86144024,
+      "sha256": "ea933ac88b21e64f99a761802104fb23284b01c5c7778b615bfc8ea8d9cc2d7d"
+    },
+    {
+      "path": "target/debug/vw-bindgen",
+      "bytes": 65737848,
+      "sha256": "61a2a9b8ee85685408ca8ce5428c98fe12bb6371de96da18d4179ea2433204d6"
+    },
+    {
+      "path": "target/android-jni/arm64-v8a/libvw_core.so",
+      "bytes": 233108416,
+      "sha256": "e4ec27a9832b0e07474b792abbfa5d6102e070e1740a9322e0a23e85762bdbd8"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/core/com/visualworkbench/bindings/core/vw_core.kt",
+      "bytes": 1162737,
+      "sha256": "60c9e722ea679b35c260e57edb2e9042b9faf6659ab0d8dfeab2c9108fe785de"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/host/com/visualworkbench/bindings/host/vw_host.kt",
+      "bytes": 274624,
+      "sha256": "a26d23de6b9219bd449e0274890469a3199c1406f637fffbf25751f637cc5e5f"
+    }
+  ],
+  "logs": [
+    {
+      "path": "vw-editing-android-build.log",
+      "bytes": 1759,
+      "sha256": "cab507c8e4049212a2212b9a3213d501dc2429223d60f7bde6bb6421428fc2a6"
+    },
+    {
+      "path": "vw-editing-apps-attempt1.log",
+      "bytes": 12504,
+      "sha256": "ac22b2de200b6505c2e06fb85959e913117f08cf777d3caebcb30c3dbc9cf1d0"
+    },
+    {
+      "path": "vw-editing-apps-attempt2.log",
+      "bytes": 11923,
+      "sha256": "6760865b87abacac13dd6d550756dc18cb50bbe9f83b0b6f45dc5d62511dbbec"
+    },
+    {
+      "path": "vw-editing-apps-attempt3.log",
+      "bytes": 7592,
+      "sha256": "241a942dca96d3a165e5504ec66021ed86498ba8a72827807b9012b4628b1a15"
+    },
+    {
+      "path": "vw-editing-apps-attempt4.log",
+      "bytes": 9793,
+      "sha256": "d4355efca77fa6b9bcfce1ce0ab0dc5c9d95ab2fddc488226c86ecc51529c16b"
+    },
+    {
+      "path": "vw-editing-apps-attempt5.log",
+      "bytes": 6300,
+      "sha256": "f556ebcc64181cf2517b3913bec5da51f491a05c5dfcb023c241da3dbb324cf1"
+    },
+    {
+      "path": "vw-editing-apps-attempt6.log",
+      "bytes": 9454,
+      "sha256": "93aaed43edc1d588c67eb7777edbdf2b4134e4f2f35d19e7ac2f1443978a5861"
+    },
+    {
+      "path": "vw-editing-apps-final.log",
+      "bytes": 9712,
+      "sha256": "dd30c041feafd12a94529904c878f3b7f3dd216e3f26d44039d962888b41945f"
+    },
+    {
+      "path": "vw-editing-clippy-attempt1.log",
+      "bytes": 1639,
+      "sha256": "f438576e390f7afb71a058797af31e1a408837e67cf42fcbec305776923fc262"
+    },
+    {
+      "path": "vw-editing-linux-build.log",
+      "bytes": 1735,
+      "sha256": "80120f1993e66efd9a51804992e8a5f7639b34ccadebf1d93b9e0627e7c9640a"
+    },
+    {
+      "path": "vw-editing-native-attempt1.log",
+      "bytes": 1822,
+      "sha256": "8607da92c30add771e2a654b2db8e34d09bf33e5554260a2b0ac5dd6dd382575"
+    },
+    {
+      "path": "vw-editing-native-attempt2.log",
+      "bytes": 42300,
+      "sha256": "6bc191185fabc1dd366544aa2d90d3b477609d91176c4500bba2b18d072ceba1"
+    },
+    {
+      "path": "vw-editing-native-attempt3.log",
+      "bytes": 52102,
+      "sha256": "db3990b3987df4974de84bc6583e40afe103ac16af27fac42472949566eadf6b"
+    },
+    {
+      "path": "vw-editing-native-attempt4.log",
+      "bytes": 54745,
+      "sha256": "07b078c020319eba04da3d24ec6c324751c897a535cdaa5333620aa08d486014"
+    },
+    {
+      "path": "vw-editing-policy.log",
+      "bytes": 91343,
+      "sha256": "85bc96ef28c43ae1b2e906fb66ebb4da482c5bde34046d6402b3ec1c49780e56"
+    },
+    {
+      "path": "vw-editing-tone-attempt2.log",
+      "bytes": 2381,
+      "sha256": "a8fc128f5e4013e54494fd0942d802591d8bb00af2ae2ba6e31d82c8d4c10c6f"
+    }
+  ],
+  "temporary_fixture_disposal": {
+    "owned_fixture_directories_remaining": [],
+    "method": "Synthetic in-memory PNG fixtures and task-owned temporary project directories only; test finally blocks removed them. No screenshots created."
+  },
+  "disposition": "Candidate published for independent composed-source review; main remains reviewed6f3e2f3. Frozen roadmap ref, preserved archives and old worktrees unchanged."
+}

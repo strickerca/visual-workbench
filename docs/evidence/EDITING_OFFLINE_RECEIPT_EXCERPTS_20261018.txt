@@ -1,0 +1,75 @@
+Editing/offline phase execution excerpts — 2026-10-18
+Code: 454abe75a997f18c3792578cd408a52f4bfb862c
+Base: 6f3e2f3b9ed7a760d4dd7f4c6f26fa44dc5ad88d
+No hardware, actual Window, device or performance acceptance inferred.
+
+LOG vw-editing-native-attempt4.log
+test result: ok. 233 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.76s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.86s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.10s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.64s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.22s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+test crash_worker ... ignored, private subprocess entry point for crash recovery
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.95s
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.18s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+test sync_checkpoint_crash_worker ... ignored, private owned subprocess for process-death checkpoint recovery
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.50s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+LOG vw-editing-clippy-attempt1.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.69s
+
+LOG vw-editing-linux-build.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 31.01s
+
+LOG vw-editing-android-build.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 34.49s
+
+LOG vw-editing-apps-attempt1.log
+Application license census: 264 exact modules across 12 runtime configurations; 5 bound parent POMs
+GRADLE LICENSES: PASS (264 dependency entries)
+Android 16 KiB LOAD alignment: PASS; segments=4
+BUILD FAILED in 2m 50s
+
+LOG vw-editing-apps-attempt5.log
+DocumentWorkflowEditorTest > twentyFourDocumentsSwitchAndSavedViewSurvivesReturnAndReopen FAILED
+BUILD FAILED in 57s
+
+LOG vw-editing-apps-final.log
+Android 16 KiB LOAD alignment: PASS; segments=4
+BUILD SUCCESSFUL in 2m 50s
+
+LOG vw-editing-policy.log
+bans ok, licenses ok, sources ok
+
+Final XML census: shared460 passed; desktop348 passed/7 Windows-only skipped; Android136 passed.
+Android lint: zero errors, 60 warnings, 12 hints.
+Source, artifact, generated binding and full log SHA256 records are in EDITING_OFFLINE_INTEGRATION_20261018.json.
