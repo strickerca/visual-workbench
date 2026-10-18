@@ -638,3 +638,16 @@ tests pass137 cases; full native/bindings/app validation is running as one phase
 The disk-exhaustion failure and targeted generated-executable disposal inventory
 are retained. See CAPTURE_AIR_CALLER_COMPOSITION_20261018.md. Physical gates,
 Windows runtime, packaged distribution and provider/device authority are unchanged.
+
+Caller batch complete, **held**:137 native pass plus strict Clippy/policy/fresh
+Linux+arm64 libraries and one phase binding generation. Shared499 and Android151
+JVM cases pass; Desktop400 reports392pass/1fail/7Windows skips. The sole failing
+retirement fixture expects Throwable identity across coroutine recovery; an
+unchanged-source diagnostic with recovery disabled passes3/3 but does not waive
+the normal-policy failure. Android instrumentation source compiles; lint reports
+3RestrictedApi errors in the Air Activity dispatchKeyEvent override/super call,
+60warnings/12hints. Both platform owners retain their source/test files and must
+return scoped corrections. Main remains6d505416. Exact receipts are in
+evidence/CAPTURE_AIR_CALLERS_COMPOSED_20261018.json and the composition handoff.
+Public giant intake's next root ownership/staging boundary is recorded separately;
+it is not yet implemented. Heavy slot released; no hardware gate passed.

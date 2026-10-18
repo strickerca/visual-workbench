@@ -1,0 +1,2447 @@
+{
+  "schema": 1,
+  "status": "HOLD: one Desktop retirement fixture fails under normal coroutine stacktrace recovery; Android MainActivity dispatchKeyEvent triggers three RestrictedApi lint errors; owner corrections and root composition review pending",
+  "base_main": "6d505416963fb42009921bd3fb8639994e73752a",
+  "code_commit": "dfd0e3236d4d4f9e0e0b43815ac2f04c885a397d",
+  "validated_head": "f987aedfb6c20685286e0aa57845c174b4df790b",
+  "branch": "cloud/capture-air-caller-integration-20261018",
+  "native": {
+    "reported_passed": 137,
+    "failed": 0,
+    "ignored": 0,
+    "result_blocks": 8,
+    "clippy": "PASS capture/host/ffi all targets, warnings denied",
+    "libraries": "Fresh Linux core/host/bindgen and Android arm64 core built"
+  },
+  "policy": {
+    "setup": "PASS ids/third-party/workspace",
+    "rust": "PASS offline licenses/sources/bans",
+    "gradle_entries": 264,
+    "common_imports": "PASS",
+    "bounded_credential_marker_scan": "0 findings; not general proof"
+  },
+  "caller_byte_identity": {
+    "desktop": {
+      "reference": "6eba15562a0851ffaf0d27218ef4e6858d494fcf",
+      "changed_owned_paths": []
+    },
+    "android": {
+      "reference": "46df4c4f657f791c47e081bbb39ac7ad8a93e07e",
+      "changed_owned_paths": []
+    }
+  },
+  "junit": {
+    "shared": {
+      "totals": {
+        "tests": 499,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "suites": [
+        {
+          "name": "AgentCaptureObserverTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.AgentCaptureObserverTest.xml",
+            "bytes": 1336,
+            "sha256": "92bcb3c3d5472ea486119595155556a667ce2f2a0e1141232841a9ca215b231a"
+          }
+        },
+        {
+          "name": "AiCandidateRecoveryTest[desktop]",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.AiCandidateRecoveryTest.xml",
+            "bytes": 641,
+            "sha256": "22eec5bb23ec3d2ec2756565cc248bf43c9ec77174c2c3dbc13a7eb3fa1c767d"
+          }
+        },
+        {
+          "name": "AiInteractionTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.AiInteractionTest.xml",
+            "bytes": 761,
+            "sha256": "406592c67e902e440dac6083c663484509b72d5db6b566aa4fd657c3b275b0a0"
+          }
+        },
+        {
+          "name": "AiOwnershipTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.AiOwnershipTest.xml",
+            "bytes": 745,
+            "sha256": "be41fcb9be1358a3584944b112200a2a474d2a7aad89e5c93fdbc0c6c3438ccd"
+          }
+        },
+        {
+          "name": "AirActionRouterTest[desktop]",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.AirActionRouterTest.xml",
+            "bytes": 448,
+            "sha256": "e2bbbcbe4090daae1cd6a4ef6c866e08dcfa4f5ece76f5d16ee47d1df6ef5792"
+          }
+        },
+        {
+          "name": "BudgetedDocumentJobsTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.BudgetedDocumentJobsTest.xml",
+            "bytes": 993,
+            "sha256": "880d37ca1981033f519e5c69e11db978f4d30656fb28f622e2a33d3faadc504d"
+          }
+        },
+        {
+          "name": "CaptureArrivalsTest[desktop]",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.CaptureArrivalsTest.xml",
+            "bytes": 1126,
+            "sha256": "4477b46d1deb16608455ff65dc660d78a6e4c17aac44604388ef3df81270d346"
+          }
+        },
+        {
+          "name": "CaptureRegionEditorTest[desktop]",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.CaptureRegionEditorTest.xml",
+            "bytes": 3398,
+            "sha256": "da0f3d1581f98b45ebfd079231f239440a7275714be1b34756025ae566c4ac06"
+          }
+        },
+        {
+          "name": "DesktopCoreSmokeTest[desktop]",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DesktopCoreSmokeTest.xml",
+            "bytes": 1124,
+            "sha256": "db8496bf0a14bef9bd72e4d9c221ce2c26a695ec99d7586ba16f9ce124aa3ab3"
+          }
+        },
+        {
+          "name": "DiagnosticsBundleTest[desktop]",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DiagnosticsBundleTest.xml",
+            "bytes": 1896,
+            "sha256": "2b9cbd898ba9c30075d649d6181fdb5cb9cf2c3c31102ea38f75a47d13c35e29"
+          }
+        },
+        {
+          "name": "DiagnosticsPrivacyAuditTest[desktop]",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DiagnosticsPrivacyAuditTest.xml",
+            "bytes": 2356,
+            "sha256": "86026152c9d87bd7b1c27dfe91d92dd52558a59134012229d125a5807d1b3178"
+          }
+        },
+        {
+          "name": "DocumentControllerTest[desktop]",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DocumentControllerTest.xml",
+            "bytes": 2430,
+            "sha256": "42c91398d6f6edcf47fc03b3677a0643efe12d49f22d8d3ea105978131b5f822"
+          }
+        },
+        {
+          "name": "DocumentControlsInteractionTest[desktop]",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DocumentControlsInteractionTest.xml",
+            "bytes": 3704,
+            "sha256": "110b05b098a6409021a7af8194ecdab10c643b3a0257e4e9e70b221e794cdb09"
+          }
+        },
+        {
+          "name": "DocumentDrawFrameTest[desktop]",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DocumentDrawFrameTest.xml",
+            "bytes": 1098,
+            "sha256": "3c2a52ebe7da8564c095a71cec894a97ff12efd70d7e3f0de11b26fc49b11d03"
+          }
+        },
+        {
+          "name": "DocumentFramesTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DocumentFramesTest.xml",
+            "bytes": 929,
+            "sha256": "354981a88d9935634b849060c814b7c711df9e244c0e76aa95faf3ef93b3169a"
+          }
+        },
+        {
+          "name": "DocumentInteractionTest[desktop]",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DocumentInteractionTest.xml",
+            "bytes": 1375,
+            "sha256": "0fed267800341d189dab333d8c37e05c68622ff048a60a7e7205167adc198da6"
+          }
+        },
+        {
+          "name": "DocumentJobsOwnerTest[desktop]",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DocumentJobsOwnerTest.xml",
+            "bytes": 1109,
+            "sha256": "c276dae58a0d61d3198a078b3f220f1cdf872a4413dc873f50e85d226af97fed"
+          }
+        },
+        {
+          "name": "DocumentNavigatorTest[desktop]",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DocumentNavigatorTest.xml",
+            "bytes": 2284,
+            "sha256": "29500c52dc863b8712411d4a33f6e5acbffd95ad3b6fd38d24e4ccf776f0ad34"
+          }
+        },
+        {
+          "name": "DocumentObserverRetirementTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DocumentObserverRetirementTest.xml",
+            "bytes": 1051,
+            "sha256": "c8d4f82b7c4efed9d23cc748f4dbc86f26e397859f23db2f407149962b5de367"
+          }
+        },
+        {
+          "name": "DocumentWireIdentityTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.DocumentWireIdentityTest.xml",
+            "bytes": 825,
+            "sha256": "7ec5382159ee3f58abb68b1167eca4ea1a9066ae1f285f644a20708622c2ac12"
+          }
+        },
+        {
+          "name": "EditorWorkflowsTest[desktop]",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.EditorWorkflowsTest.xml",
+            "bytes": 1822,
+            "sha256": "7bf7ef74b53dfba02fb5f6ed508a22778a1fac74afa98fa0c305ed0cf386310a"
+          }
+        },
+        {
+          "name": "EraserContractTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.EraserContractTest.xml",
+            "bytes": 913,
+            "sha256": "906cbdc5c4b44bc029ace205009a6ed03691a0e770fe23a88b2cee4de6bfddcb"
+          }
+        },
+        {
+          "name": "EraserInteractionTest[desktop]",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.EraserInteractionTest.xml",
+            "bytes": 2988,
+            "sha256": "778590fb4715c72f7a4432065cc4c9e3ba9cdaa1c72dcce072f408eeef954d12"
+          }
+        },
+        {
+          "name": "GiantAttachmentOwnerTest[desktop]",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.GiantAttachmentOwnerTest.xml",
+            "bytes": 1866,
+            "sha256": "46d9c5721d1dae8d3649415843f97fc7a421ebc25c62eb4332bfd0b4ffc4e719"
+          }
+        },
+        {
+          "name": "GiantViewGeometryTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.GiantViewGeometryTest.xml",
+            "bytes": 818,
+            "sha256": "a27a0d76f5e9720b657047ad9bb5a1b23f5071921f3b04d45146ad0ebfb3a24f"
+          }
+        },
+        {
+          "name": "GiantViewportSessionTest[desktop]",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.GiantViewportSessionTest.xml",
+            "bytes": 3059,
+            "sha256": "a409496446094cdb415e9d621086b0131700b41b65d25b1aba8b53dde87a26ab"
+          }
+        },
+        {
+          "name": "InstructionEditorTest[desktop]",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.InstructionEditorTest.xml",
+            "bytes": 2500,
+            "sha256": "ff896c018866ec0f843fd04303a4904f40fe2f6da6efeeded7c332dac40f369c"
+          }
+        },
+        {
+          "name": "InstructionFocusControllerTest[desktop]",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.InstructionFocusControllerTest.xml",
+            "bytes": 2619,
+            "sha256": "9ea70b5d957e25050cee3068593a0f3b16309ab743fb40827daf468d0dfa39ec"
+          }
+        },
+        {
+          "name": "LocalViewsInteractionTest[desktop]",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.LocalViewsInteractionTest.xml",
+            "bytes": 3573,
+            "sha256": "0bc2728c63e87a0d35ea86e6673717cc10d5595f1a8b467faaf64e51f7a7d1ef"
+          }
+        },
+        {
+          "name": "MarkerFocusFollowerTest[desktop]",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.MarkerFocusFollowerTest.xml",
+            "bytes": 1945,
+            "sha256": "7f73dc2e0d4ec2850a0b67dd7e69191ac44fd6a058ef01ff9f946e1cafac24e5"
+          }
+        },
+        {
+          "name": "MaskContractTest[desktop]",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.MaskContractTest.xml",
+            "bytes": 1354,
+            "sha256": "a03751aa6eb98546646f35089b317a201afe36c4d8672f7eb50f08cd7a279a1c"
+          }
+        },
+        {
+          "name": "McpInboxAdmissionTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.McpInboxAdmissionTest.xml",
+            "bytes": 780,
+            "sha256": "fdeef78fdaf0288429978fac4aa9261c12c135270dab07ab4a7afc814d2b2916"
+          }
+        },
+        {
+          "name": "ObjectRotationContactTest[desktop]",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.ObjectRotationContactTest.xml",
+            "bytes": 1478,
+            "sha256": "c5da3ae3f8e459eb9b4ee0bba29b38a0bda1f6b52c5befa0d5d2e821ef5c891a"
+          }
+        },
+        {
+          "name": "ObjectRotationHandleTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.ObjectRotationHandleTest.xml",
+            "bytes": 788,
+            "sha256": "c54a570bc234a40efac5efe5ee1879b0484c4d0864fc5cea1db59b40b4bd486e"
+          }
+        },
+        {
+          "name": "ObjectRotationInteractionTest[desktop]",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.ObjectRotationInteractionTest.xml",
+            "bytes": 2611,
+            "sha256": "8446a128620ce92fa277cff6cd7d67d084548fa96f050f118cd5e81d6059fdac"
+          }
+        },
+        {
+          "name": "OfflineReviewInteractionTest[desktop]",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.OfflineReviewInteractionTest.xml",
+            "bytes": 1618,
+            "sha256": "310a9b197652dca15d1491c77f52e353359c9b176a8b5b5771a3c830a83d5fdb"
+          }
+        },
+        {
+          "name": "OriginalFormatsTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.OriginalFormatsTest.xml",
+            "bytes": 1224,
+            "sha256": "f22bad6717e380761f73235da49cf153c857557676c74fc151812bc99c6c1f2a"
+          }
+        },
+        {
+          "name": "PackageOwnershipTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.PackageOwnershipTest.xml",
+            "bytes": 938,
+            "sha256": "eccba87d65196b527edf711c4bca050167c0474445cc0a25dd46c5b4ede7bf18"
+          }
+        },
+        {
+          "name": "PairingQrTest[desktop]",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.PairingQrTest.xml",
+            "bytes": 604,
+            "sha256": "eee01086ba42d148651ed2934f9cd8d8477a1cfa6fb421f233f474188e45e2cf"
+          }
+        },
+        {
+          "name": "PeerLabelStoreTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.PeerLabelStoreTest.xml",
+            "bytes": 946,
+            "sha256": "0bedd24d93cff0c717837d51bff54ed78462a51aa86816463e2c70a459793e2c"
+          }
+        },
+        {
+          "name": "PrecisionPlacementTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.PrecisionPlacementTest.xml",
+            "bytes": 1264,
+            "sha256": "ed9bf4ed69ff68a5d27fc772209422e7206ce5c91361a629f3b84d705a1219f4"
+          }
+        },
+        {
+          "name": "PrecisionTest[desktop]",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.PrecisionTest.xml",
+            "bytes": 2846,
+            "sha256": "4eb7bff998147f292859f066c477adef90859be3c8ae09bb74a29282edb3a828"
+          }
+        },
+        {
+          "name": "RemoteAuthorityObservationTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.RemoteAuthorityObservationTest.xml",
+            "bytes": 991,
+            "sha256": "85166c10e949afc7ed2b50e71d48fcd002fbe4f45f7dc4414e25a9005b0d62d0"
+          }
+        },
+        {
+          "name": "RemoteConsumerOwnershipTest[desktop]",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.RemoteConsumerOwnershipTest.xml",
+            "bytes": 3001,
+            "sha256": "ac03efbc3f3a0c645b37dc2b7dae00d7c00273018f0e0d6c68b236918f58db49"
+          }
+        },
+        {
+          "name": "RemoteEditCompositionTest[desktop]",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.RemoteEditCompositionTest.xml",
+            "bytes": 1709,
+            "sha256": "e188a3ce316fad8821bcd5e3b08e5dec0f2e7215ec022898dd701e6b62157fa0"
+          }
+        },
+        {
+          "name": "RemoteEditorCompatibilityTest[desktop]",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.RemoteEditorCompatibilityTest.xml",
+            "bytes": 1490,
+            "sha256": "36f8c8a7e3eab460ec3495257a415b00c293a7f6f670c32e1624c50ca39cb80f"
+          }
+        },
+        {
+          "name": "RemoteEditorPaletteTest[desktop]",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.RemoteEditorPaletteTest.xml",
+            "bytes": 2816,
+            "sha256": "96b19de18d6ffa4e4ecd0db55b49f02f4412fdfcf1340ab6df4b2ea987139aed"
+          }
+        },
+        {
+          "name": "RemoteGhostInkTest[desktop]",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.RemoteGhostInkTest.xml",
+            "bytes": 2175,
+            "sha256": "b7b80a85d14743f2b254a1618881dec5693e92fc9017ce1c458386de02b2b205"
+          }
+        },
+        {
+          "name": "RemoteNativeCompositionTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.RemoteNativeCompositionTest.xml",
+            "bytes": 1359,
+            "sha256": "e67199cedd629c251b99ad6acfed95e4bff75a26cfe38947b3b9f978fa1fbe52"
+          }
+        },
+        {
+          "name": "RemoteOwnerPublicationTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.RemoteOwnerPublicationTest.xml",
+            "bytes": 1319,
+            "sha256": "c045754729ea3153aac2f36b8a7f1245edd178875682bc51d6ed050468789ec2"
+          }
+        },
+        {
+          "name": "RemotePenAxesTest[desktop]",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.RemotePenAxesTest.xml",
+            "bytes": 645,
+            "sha256": "5fb02a4e94f9572b4e85fd5f18dbded98f3b46bc76d29547bfbba60490076de3"
+          }
+        },
+        {
+          "name": "RemoteStreamPublicationTest[desktop]",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.RemoteStreamPublicationTest.xml",
+            "bytes": 958,
+            "sha256": "da3e4ccf27d56ecaa9e1f11eda33b6fa213e3aa33a1b8a6e699a1852042ead16"
+          }
+        },
+        {
+          "name": "SelectionInteractionTest[desktop]",
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.SelectionInteractionTest.xml",
+            "bytes": 4386,
+            "sha256": "0b64d6a45ab4ab1de11aa8a283cd5c8bdc797cfd55ca2d99df70049dcb3fbb02"
+          }
+        },
+        {
+          "name": "SelectionPolygonTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.SelectionPolygonTest.xml",
+            "bytes": 1235,
+            "sha256": "0499b227e308fd304a729dcc21f77979dac04cfec66896e3daccf6fd226d8a47"
+          }
+        },
+        {
+          "name": "SemanticDropTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.SemanticDropTest.xml",
+            "bytes": 782,
+            "sha256": "2dc83aa893f4f7b7a244d2aefe000a1b9ff7faa19c3d7e44bf3651c1def67129"
+          }
+        },
+        {
+          "name": "SemanticEditorTest[desktop]",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.SemanticEditorTest.xml",
+            "bytes": 2272,
+            "sha256": "1e794eb705b9646c37de96395ff86a58a56b138000317677a5f762777345deb6"
+          }
+        },
+        {
+          "name": "StylusTiltContractTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.StylusTiltContractTest.xml",
+            "bytes": 837,
+            "sha256": "4a53478efe5d6b224bd87002a5f4f57764504f847e129a4878ee9a69cd32c52d"
+          }
+        },
+        {
+          "name": "ToneControlFormTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.ToneControlFormTest.xml",
+            "bytes": 1239,
+            "sha256": "f6c75a31b4efd5460491128213af57e3dde7fb996e82656805fe0288c26b17e5"
+          }
+        },
+        {
+          "name": "ToneControlsInteractionTest[desktop]",
+          "tests": 28,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.ToneControlsInteractionTest.xml",
+            "bytes": 5140,
+            "sha256": "eaf3a6403151bde45c56262780a42fd13dd34226cff7bd53298c680a67eb49f3"
+          }
+        },
+        {
+          "name": "WorkflowOwnershipTest[desktop]",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.WorkflowOwnershipTest.xml",
+            "bytes": 1265,
+            "sha256": "f7e1193877a823c2cf1c189d54fa6af6b9fb5337a57b0376e26e1142c31198e7"
+          }
+        }
+      ]
+    },
+    "desktop": {
+      "totals": {
+        "tests": 400,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 7
+      },
+      "suites": [
+        {
+          "name": "com.visualworkbench.desktop.AiEditorOwnershipTest",
+          "tests": 20,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.AiEditorOwnershipTest.xml",
+            "bytes": 3397,
+            "sha256": "573a98a6e00a0841ba15c7e611cbce49c15222371ad2735a6cd510418f6d30d5"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.AiResultPainterTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.AiResultPainterTest.xml",
+            "bytes": 477,
+            "sha256": "cd7178fc033d570bdd98377d825bb828ebe360498300878083ec494054a81bfe"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.AiServiceControllerTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.AiServiceControllerTest.xml",
+            "bytes": 2329,
+            "sha256": "b4b5bbcfcf806db1c704d3da2751d79498f3d3a5e9085ef6d90bffe6af3a0e2a"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.AiViewGeometryTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.AiViewGeometryTest.xml",
+            "bytes": 1997,
+            "sha256": "f12c44d8fa3a92edce47d1d2274b87142c986d10afbaaf0d4f14d00c170a4bcc"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.ConnectionAssistanceTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.ConnectionAssistanceTest.xml",
+            "bytes": 2762,
+            "sha256": "cdf1e53daa9a2e58c92bd90f1420dd0d54f4a0adcb0306d25d2580d2bd58a980"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.ConnectionDraftTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.ConnectionDraftTest.xml",
+            "bytes": 2090,
+            "sha256": "eec75214fee5da474b3f94f99cb63101da3e1507712e123bf67f2e195fc8f119"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopBackgroundDisplayTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopBackgroundDisplayTest.xml",
+            "bytes": 1512,
+            "sha256": "f2873532c460fd2b8e0fc44d62c4b8d3e3e87281c5378a30ecff3f0c96d7a407"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopCoherenceTest",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopCoherenceTest.xml",
+            "bytes": 2971,
+            "sha256": "484c9abc1f075a6dea01a93bd1ddbf476729f21c3ad6f2788a2373fe2e94dbb7"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopDiagnosticsLifecycleTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopDiagnosticsLifecycleTest.xml",
+            "bytes": 1478,
+            "sha256": "f45044ed1444704c2bd5f313267232e06e860572ea0302955126c861e37664af"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopInkTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopInkTest.xml",
+            "bytes": 1658,
+            "sha256": "6237562bded571b8a762b3b290935aced16716e9e599fec77f1426811dfc401f"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopInstructionFocusAdmissionTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopInstructionFocusAdmissionTest.xml",
+            "bytes": 711,
+            "sha256": "91f6b8c609cae6fcd3d838bc5f0d1e2bc5951f8fb91127411ed5ac71ac854d24"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopInstructionFocusTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopInstructionFocusTest.xml",
+            "bytes": 674,
+            "sha256": "ba81f54b18f060ec560aa8311f2fb248fdc625fcae59e6ec357e08c95bac05c5"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopNativeRuntimeTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopNativeRuntimeTest.xml",
+            "bytes": 1758,
+            "sha256": "7d75b0945a64385a1245baeb12bbc7d752efd03a90b03b8afdb706b965184cb8"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopPeerLabelsTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopPeerLabelsTest.xml",
+            "bytes": 634,
+            "sha256": "bc6e1c7f814509cfe073f9878b466a53642793f8d1d1034b1a3152d9c6251af6"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopPrecisionTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopPrecisionTest.xml",
+            "bytes": 1135,
+            "sha256": "51af04ec0d423740cd5b2b017b06c8725e785620e2c55b12caafa91677d6416d"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopRemoteCatalogAdmissionTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopRemoteCatalogAdmissionTest.xml",
+            "bytes": 843,
+            "sha256": "e244b0a838f35a8071e1c30ab7b3425cd70dfe7cfa53090be7c93d31beb5a202"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopRemoteCatalogTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopRemoteCatalogTest.xml",
+            "bytes": 2076,
+            "sha256": "ae1024ce4554948afd61136863588c766599a3cec6287a580932b50baec09fb3"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopRenderTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopRenderTest.xml",
+            "bytes": 923,
+            "sha256": "d6b1586e2964de98a832f890754ffeed198af2863a333824fe6ff8a4161df14a"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopSessionsTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopSessionsTest.xml",
+            "bytes": 1759,
+            "sha256": "7e1050ee0aa36669c40a46910140036f84f50ca2deeace42562ea4f620591ae7"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopStateTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopStateTest.xml",
+            "bytes": 878,
+            "sha256": "0bf1ef69bf004323f20672731162cf7912c2ae7b99abef693a1f6764b857bcdb"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopTransferTest",
+          "tests": 22,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DesktopTransferTest.xml",
+            "bytes": 3717,
+            "sha256": "f2b3d5a5e9921b039534630abacd5509e80245eac638e3a764fca6901908b968"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.DocumentWorkflowEditorTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.DocumentWorkflowEditorTest.xml",
+            "bytes": 504,
+            "sha256": "aabac4f3eaf3c04737e1e5ed7f53f00bbba5ca0d95150fa578259bb20968f633"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.EditorPageRefreshTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.EditorPageRefreshTest.xml",
+            "bytes": 637,
+            "sha256": "1901bf26f00b0042fe130a68919393e810a9483467a48291a0376946a0b9af5e"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.EraserGeometryTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.EraserGeometryTest.xml",
+            "bytes": 933,
+            "sha256": "a01a01d1621ca6ee5b06ac607a54a2d1ed763181423d6554a13aab5f8f9acb6d"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.EraserPageBindingTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.EraserPageBindingTest.xml",
+            "bytes": 492,
+            "sha256": "ec54ea4be064ec42fb6c3f2ac03cd4c529709112aade73d13f31f11b6c846042"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.GiantCanvasBoundaryTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.GiantCanvasBoundaryTest.xml",
+            "bytes": 2650,
+            "sha256": "9f190fcd4f2c5d2b77076eb2c9b6dfbc7df6af3841b392edacbc38588503b161"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.GiantNativeBoundaryTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.GiantNativeBoundaryTest.xml",
+            "bytes": 657,
+            "sha256": "1cf2908f813508e1058e6ce076cbbf624ca35eea7da26e7a0dfdfd241c412edb"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.NativeRuntimeAnchorTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 4,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.NativeRuntimeAnchorTest.xml",
+            "bytes": 20061,
+            "sha256": "bd398440b0ccdcf118fcb086336f0e08808c5c99a9a14780b73a332f82c1a971"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.OrdinaryFormatSelectionTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.OrdinaryFormatSelectionTest.xml",
+            "bytes": 807,
+            "sha256": "254bc16cba449bae0b7cd0ecec061de20c7db93d56bccb951378ccbc2786a6e5"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.PolygonEditorTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.PolygonEditorTest.xml",
+            "bytes": 649,
+            "sha256": "7d6e7a0f7dfe6ee775faa518579f30f74206258084e0e3f1c62b03b9f17e99f0"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.ProjectFilePickerRequestTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.ProjectFilePickerRequestTest.xml",
+            "bytes": 2822,
+            "sha256": "a305c03344503ce54e1dc03fab1e13b7cae6c833399a5024dfb746ac864196a3"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.RemoteIntegrationPublicationTest",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.RemoteIntegrationPublicationTest.xml",
+            "bytes": 2529,
+            "sha256": "80505e11fcbc065502ab3c552360308fac1442d74d3e313fa0078915601906ff"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.RemoteIntegrationReadinessTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.RemoteIntegrationReadinessTest.xml",
+            "bytes": 929,
+            "sha256": "c87e52d4da3732d09c9b9961379797cf10ee02e8ba822178b70831c5c42b769b"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.RemoteOwnedEditorContractTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.RemoteOwnedEditorContractTest.xml",
+            "bytes": 652,
+            "sha256": "8071b8081947ee783e360a1f6cab51e4c3b152a9169dfe5d84641687146ba070"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.RotationEditorTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.RotationEditorTest.xml",
+            "bytes": 500,
+            "sha256": "d3dc8eadcc235ab166d775836c4bec3ed330bc2ad5a390c61b6fa3763c7fd5d5"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.SelectionControllerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.SelectionControllerTest.xml",
+            "bytes": 937,
+            "sha256": "4a853adc18a461c6de22c70837a07596d05466d55edcea94c295eddad0bfd26d"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.capture.CaptureAdmissionTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.capture.CaptureAdmissionTest.xml",
+            "bytes": 982,
+            "sha256": "1367ff27800b13d1aa3b62b1a7506232bc5d67b2d5f0313066fc923c80882bc5"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.capture.CaptureCallerRetirementTest",
+          "tests": 3,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.capture.CaptureCallerRetirementTest.xml",
+            "bytes": 6176,
+            "sha256": "924f885b2fb594354ff969ef15f8c2687d882e2f0904387e37aa66c123aeb22b"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.capture.CaptureDeliveryTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.capture.CaptureDeliveryTest.xml",
+            "bytes": 847,
+            "sha256": "49bb111ae916d5c8417434733d8e61183c7f6764dc53615b0066ff5f8da4631b"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.capture.CapturePickerTest",
+          "tests": 31,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.capture.CapturePickerTest.xml",
+            "bytes": 5105,
+            "sha256": "6fd435facba3993da1a8c291612b2f4af8fdbccd3da2f596fa712f3c45a4ed13"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.diagnostics.DiagnosticsPublicationTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.diagnostics.DiagnosticsPublicationTest.xml",
+            "bytes": 2203,
+            "sha256": "88cf60aebadb88b018d6ba9b6db42882eaf6af87521cd152df4217db969367a7"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.documents.DocumentJobLifetimeTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.documents.DocumentJobLifetimeTest.xml",
+            "bytes": 1210,
+            "sha256": "b354574a3de3189427e0321cfd0393544c6c3522cf1f9b46dafb2f4e28a24c26"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.documents.DocumentNativeRetirementTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.documents.DocumentNativeRetirementTest.xml",
+            "bytes": 1510,
+            "sha256": "dc8312fe075dc7fc7cc549c26e38751cd9f01d281be089a21ddc8838c9f098c7"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.documents.DocumentRuntimeManifestTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.documents.DocumentRuntimeManifestTest.xml",
+            "bytes": 994,
+            "sha256": "69e7c722528eeacac1590fd1f918b690ced3dc7c8c88681935414968517d6ada"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.documents.DocumentTileOwnershipTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.documents.DocumentTileOwnershipTest.xml",
+            "bytes": 1674,
+            "sha256": "f0f8af3fc669ac2a724c80c1d4bb8587bddbef0abce27f052afb48b4b83baeec"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.instructions.WindowsInstructionFieldTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.instructions.WindowsInstructionFieldTest.xml",
+            "bytes": 1020,
+            "sha256": "3dbc1d548079484dac96803b6ecf00618379ea86f19baab3d63d973b89e72ff3"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.mcp.CodexHandoffTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.mcp.CodexHandoffTest.xml",
+            "bytes": 1728,
+            "sha256": "f9660fcb105e49192e2afbb52c653945f38ab0dc0f2c445d58ec1b4db2c89469"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.mcp.McpCoordinatorTest",
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.mcp.McpCoordinatorTest.xml",
+            "bytes": 2877,
+            "sha256": "0b3eb3d768d4658ef03b3fbc7dfbc377e96551f6686e5a0094f5d1b1ac8e9940"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.mcp.McpGrantTelemetryTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.mcp.McpGrantTelemetryTest.xml",
+            "bytes": 995,
+            "sha256": "26bd103a56a082b6fb15747104086419e78c9253d2a013162f1324f1f0b892e9"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.mcp.McpJsonTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.mcp.McpJsonTest.xml",
+            "bytes": 744,
+            "sha256": "0ac732bf71078f84f5126e0cfd29b0105fdd60a8a0459f32f47266246ebb8743"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.mcp.McpOwnerWorkTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.mcp.McpOwnerWorkTest.xml",
+            "bytes": 813,
+            "sha256": "ded6fdb828c2d5b54bbf193d7dff935d4655b9994ae56d0f49fbbb17815d63a5"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.mcp.McpProcessTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.mcp.McpProcessTest.xml",
+            "bytes": 485,
+            "sha256": "0e9e9524c84ebadcb0102ce7cb04c3cc78dae24a06a3d8c994072df8f004361a"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.mcp.McpStartupTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.mcp.McpStartupTest.xml",
+            "bytes": 14875,
+            "sha256": "bcd21171f790925fb4781444695129f56c945a3021d157c0b6c28ee7f3a92dde"
+          }
+        },
+        {
+          "name": "com.visualworkbench.desktop.remote.RemoteWindowSelectionTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "TEST-com.visualworkbench.desktop.remote.RemoteWindowSelectionTest.xml",
+            "bytes": 825,
+            "sha256": "71cb23b6de8f1f3ac447fa0a756929c50b40dfbb73b61d76b48a784d05628ef7"
+          }
+        }
+      ]
+    },
+    "android": {
+      "totals": {
+        "tests": 151,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "suites": [
+        {
+          "name": "com.visualworkbench.android.airactions.AirActionCallerTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.airactions.AirActionCallerTest.xml",
+            "bytes": 2443,
+            "sha256": "e3a95b88f59cde755bb6f29692d7abfeacb2044dc0a4d1821cb683f1b2a03811"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.airactions.AirActionKeysTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.airactions.AirActionKeysTest.xml",
+            "bytes": 479,
+            "sha256": "633bd3eb4db3604751e66aef4dc2afe3e15d6c327666269b5a6c37b2e4bf22bb"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.airactions.AirActionRemoteMotionTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.airactions.AirActionRemoteMotionTest.xml",
+            "bytes": 506,
+            "sha256": "021cf84fd13e31acfad8f567a1f12a555df0176e1421110c60b47f7143d54c11"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.capture.CaptureAdmissionTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.capture.CaptureAdmissionTest.xml",
+            "bytes": 933,
+            "sha256": "1b7925b80a6319fdfef3fefd9f6ba5ade615ed510d5c1255be936ddc2c1a0be8"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.capture.CaptureOwnerTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.capture.CaptureOwnerTest.xml",
+            "bytes": 634,
+            "sha256": "02d008b8e6d19e0cb80c1d14842c642fa97a2438eb5d3fa86895c9c0fdeca700"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.diagnostics.DiagnosticReportWriterTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.diagnostics.DiagnosticReportWriterTest.xml",
+            "bytes": 2490,
+            "sha256": "caf874cd7cf3ff8ca7fe16e0cd16a5a0bd71bb17b24b20268bd6115ba9225bbe"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.documents.DocumentJobLifetimeTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.documents.DocumentJobLifetimeTest.xml",
+            "bytes": 1209,
+            "sha256": "f62a5716099c11d42d363c169ddff12e1a115d0000a955131b2515e14b0c3a53"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.documents.DocumentPublicationTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.documents.DocumentPublicationTest.xml",
+            "bytes": 1498,
+            "sha256": "49a444d170af608a562182e956a7bc4adf6f154ec5077cab31f3d002c6dd54c5"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.documents.DocumentRuntimePinTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.documents.DocumentRuntimePinTest.xml",
+            "bytes": 797,
+            "sha256": "937310a5a6c4786929bd9312bed9a1f41a0424d9dc30c608928dc663a1ec5ec1"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.documents.DocumentServiceSignalsTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.documents.DocumentServiceSignalsTest.xml",
+            "bytes": 1132,
+            "sha256": "bd93c0c9fbe88bc15296f2997fa61649a8b1ef5e06b0b75db7d934665521c0e6"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.documents.DocumentTileOwnershipTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.documents.DocumentTileOwnershipTest.xml",
+            "bytes": 1676,
+            "sha256": "d2734adb8051bd9f53b26af0cb14b19ec5276a650524346ee744c47ead71f09d"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.documents.DocumentWireTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.documents.DocumentWireTest.xml",
+            "bytes": 1531,
+            "sha256": "53dc61dbaac1d98965c8eeb14dd1de7b8aacfd03653e8aeafc471d49aafbea9e"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.editor.CanvasRetirementOwnerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.editor.CanvasRetirementOwnerTest.xml",
+            "bytes": 1002,
+            "sha256": "5635fdf961fc2513f060373922959b447bdb3db69e56b990ac0b4e0ecd646ba2"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.editor.EditorPageRefreshTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.editor.EditorPageRefreshTest.xml",
+            "bytes": 826,
+            "sha256": "47bda9c376b72cbc106482cdcaadf4504857aa5868abffb2c5eab4dad8bde57d"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.editor.EraserPageBindingTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.editor.EraserPageBindingTest.xml",
+            "bytes": 506,
+            "sha256": "c48f5ccc183fe1daf9a4684c1efd7ee218c89fdcb264e8bd949fc752a5491a52"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.editor.GiantAndroidBoundaryTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.editor.GiantAndroidBoundaryTest.xml",
+            "bytes": 1456,
+            "sha256": "968215832a9588681b26228d14cd51db224ce9ce1005263241b0931b42550273"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.editor.OrdinaryFormatSelectionTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.editor.OrdinaryFormatSelectionTest.xml",
+            "bytes": 832,
+            "sha256": "f21f0d23c7affc613fc47c61a68af3b3b96fddd6fe730e7d5ee689e13250b682"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.editor.ProjectCounterFloorTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.editor.ProjectCounterFloorTest.xml",
+            "bytes": 831,
+            "sha256": "1555b9d6dfbf7a241658befe00eeb1dab391d9f264fee1ec2a6c8bd3c5ab412a"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.editor.ProjectReceiveCompletionTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.editor.ProjectReceiveCompletionTest.xml",
+            "bytes": 864,
+            "sha256": "425ac5be2ee7c422dcb670701d533d2664774a56737a82741c2516118b061806"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.input.CanvasGestureCancellationTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.input.CanvasGestureCancellationTest.xml",
+            "bytes": 847,
+            "sha256": "78aa6611384e98c364777c9270cd348130e818ad4ec4db69ffbc858aad79328e"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.remote.DecoderOutputGeometryTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.remote.DecoderOutputGeometryTest.xml",
+            "bytes": 1523,
+            "sha256": "615d903b00ba9bc7a55f56d32f22f2f889c3576af7492276d8d47dd95741d618"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.remote.DecoderRenderIdentityTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.remote.DecoderRenderIdentityTest.xml",
+            "bytes": 1732,
+            "sha256": "250465b84af091a171e96a28941ae74112c89019530e4129cfc2d0fa4007cdd6"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.remote.RemoteDecoderRecoveryTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.remote.RemoteDecoderRecoveryTest.xml",
+            "bytes": 827,
+            "sha256": "dd17e019a391074f9ca0b51f79bd9812c38708fc0850c8bf0fee51f8cbd700b8"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.remote.RemoteDecoderStartupTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.remote.RemoteDecoderStartupTest.xml",
+            "bytes": 2200,
+            "sha256": "3d378b2bf7880002c7f65150055d32c1eef4330cdea8744f8f6422ccca276527"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.remote.RemoteInputGrantFenceTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.remote.RemoteInputGrantFenceTest.xml",
+            "bytes": 685,
+            "sha256": "7d90198a7c8f0330be015c16f49783397d084f37d2d0cdc312e7af78f056cefe"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.remote.RemoteRenderScheduleTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.remote.RemoteRenderScheduleTest.xml",
+            "bytes": 1160,
+            "sha256": "5661de688254539fbce913b01753f8d36c0fcc2047dbf136cbb4df08595a31fd"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.remote.RemoteUiCommandsTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.remote.RemoteUiCommandsTest.xml",
+            "bytes": 1429,
+            "sha256": "ea0beb387fce3fa1a20dca01ee78b1352ce6414969cfaa746f5dc77c7239a247"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.remote.RemoteUiInputAdmissionTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.remote.RemoteUiInputAdmissionTest.xml",
+            "bytes": 1340,
+            "sha256": "4cef3415660f85101a15026d5c34fb16085cd7ab5cfb96405fda3c79e1e797c4"
+          }
+        },
+        {
+          "name": "com.visualworkbench.android.session.QrLuminanceTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": {
+            "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.session.QrLuminanceTest.xml",
+            "bytes": 812,
+            "sha256": "08e95596b1e69f66f3d5b9abf2eb96f90611594605b83f8f583a32a7103c374a"
+          }
+        }
+      ]
+    }
+  },
+  "focused_suites": [
+    {
+      "module": "shared",
+      "name": "AirActionRouterTest[desktop]",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": {
+        "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.AirActionRouterTest.xml",
+        "bytes": 448,
+        "sha256": "e2bbbcbe4090daae1cd6a4ef6c866e08dcfa4f5ece76f5d16ee47d1df6ef5792"
+      }
+    },
+    {
+      "module": "shared",
+      "name": "CaptureRegionEditorTest[desktop]",
+      "tests": 19,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": {
+        "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.CaptureRegionEditorTest.xml",
+        "bytes": 3398,
+        "sha256": "da0f3d1581f98b45ebfd079231f239440a7275714be1b34756025ae566c4ac06"
+      }
+    },
+    {
+      "module": "desktop",
+      "name": "com.visualworkbench.desktop.capture.CaptureAdmissionTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": {
+        "path": "TEST-com.visualworkbench.desktop.capture.CaptureAdmissionTest.xml",
+        "bytes": 982,
+        "sha256": "1367ff27800b13d1aa3b62b1a7506232bc5d67b2d5f0313066fc923c80882bc5"
+      }
+    },
+    {
+      "module": "desktop",
+      "name": "com.visualworkbench.desktop.capture.CaptureCallerRetirementTest",
+      "tests": 3,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "report": {
+        "path": "TEST-com.visualworkbench.desktop.capture.CaptureCallerRetirementTest.xml",
+        "bytes": 6176,
+        "sha256": "924f885b2fb594354ff969ef15f8c2687d882e2f0904387e37aa66c123aeb22b"
+      }
+    },
+    {
+      "module": "desktop",
+      "name": "com.visualworkbench.desktop.capture.CaptureDeliveryTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": {
+        "path": "TEST-com.visualworkbench.desktop.capture.CaptureDeliveryTest.xml",
+        "bytes": 847,
+        "sha256": "49bb111ae916d5c8417434733d8e61183c7f6764dc53615b0066ff5f8da4631b"
+      }
+    },
+    {
+      "module": "desktop",
+      "name": "com.visualworkbench.desktop.capture.CapturePickerTest",
+      "tests": 31,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": {
+        "path": "TEST-com.visualworkbench.desktop.capture.CapturePickerTest.xml",
+        "bytes": 5105,
+        "sha256": "6fd435facba3993da1a8c291612b2f4af8fdbccd3da2f596fa712f3c45a4ed13"
+      }
+    },
+    {
+      "module": "android",
+      "name": "com.visualworkbench.android.airactions.AirActionCallerTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": {
+        "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.airactions.AirActionCallerTest.xml",
+        "bytes": 2443,
+        "sha256": "e3a95b88f59cde755bb6f29692d7abfeacb2044dc0a4d1821cb683f1b2a03811"
+      }
+    },
+    {
+      "module": "android",
+      "name": "com.visualworkbench.android.airactions.AirActionKeysTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": {
+        "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.airactions.AirActionKeysTest.xml",
+        "bytes": 479,
+        "sha256": "633bd3eb4db3604751e66aef4dc2afe3e15d6c327666269b5a6c37b2e4bf22bb"
+      }
+    },
+    {
+      "module": "android",
+      "name": "com.visualworkbench.android.airactions.AirActionRemoteMotionTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": {
+        "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.airactions.AirActionRemoteMotionTest.xml",
+        "bytes": 506,
+        "sha256": "021cf84fd13e31acfad8f567a1f12a555df0176e1421110c60b47f7143d54c11"
+      }
+    },
+    {
+      "module": "android",
+      "name": "com.visualworkbench.android.capture.CaptureAdmissionTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": {
+        "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.capture.CaptureAdmissionTest.xml",
+        "bytes": 933,
+        "sha256": "1b7925b80a6319fdfef3fefd9f6ba5ade615ed510d5c1255be936ddc2c1a0be8"
+      }
+    }
+  ],
+  "android_lint": {
+    "counts": {
+      "Warning": 60,
+      "Error": 3,
+      "Hint": 12
+    },
+    "report": {
+      "path": "apps/android/build/reports/lint-results-debug.xml",
+      "bytes": 90453,
+      "sha256": "d44d90802855d4298eb049aa6484f4ec9b7a13aee2d2fcd53fa964604e79f4d5"
+    },
+    "errors": [
+      {
+        "id": "RestrictedApi",
+        "message": "ComponentActivity.dispatchKeyEvent can only be called from within the same library group prefix (referenced groupId=`androidx.core` with prefix androidx from groupId=`visual-workbench-apps`)",
+        "locations": [
+          {
+            "file": "apps/android/src/main/kotlin/com/visualworkbench/android/MainActivity.kt",
+            "line": "111"
+          }
+        ]
+      },
+      {
+        "id": "RestrictedApi",
+        "message": "ComponentActivity.dispatchKeyEvent can only be called from within the same library group prefix (referenced groupId=`androidx.core` with prefix androidx from groupId=`visual-workbench-apps`)",
+        "locations": [
+          {
+            "file": "apps/android/src/main/kotlin/com/visualworkbench/android/MainActivity.kt",
+            "line": "113"
+          }
+        ]
+      },
+      {
+        "id": "RestrictedApi",
+        "message": "ComponentActivity.dispatchKeyEvent can only be called from within the same library group prefix (referenced groupId=`androidx.core` with prefix androidx from groupId=`visual-workbench-apps`)",
+        "locations": [
+          {
+            "file": "apps/android/src/main/kotlin/com/visualworkbench/android/MainActivity.kt",
+            "line": "113"
+          }
+        ]
+      }
+    ]
+  },
+  "instrumentation": "Source compilation passed; no device execution",
+  "binding_generation": "One phase generation for each core/host component in attempt1; attempt2 up-to-date",
+  "linux_exclusion": ":desktop:packageConnectionRuntime excluded: Windows helper packaging unavailable; no shipping package claim",
+  "failures_preserved": [
+    "Native attempt1: rustfmt differences only in three earlier root registration files; normalized.",
+    "Native attempt2: ENOSPC and linker Bus error before tests; generated test executables inventoried/removed only.",
+    "Clippy attempt1: large helper response variant; scoped root allow documents deliberate inline metadata, no image bytes.",
+    "App attempt1: Kotlin incremental compiler DirtyData/FqName cache error for PreparedDiagnosticsReport; production Desktop compiled.",
+    "App attempt2: non-incremental production and test compilation passed; shared499 and Android151 pass; Desktop400 has one failure and seven Windows skips.",
+    "Desktop failure: CaptureCallerRetirementTest.eitherCaptureRefusalKeepsParentsAliveAndRetainsTheOriginalFailure assertSame sees a recovered Throwable copy across withContext. Owned test/source remain unchanged.",
+    "Separate Android lint run reports three RestrictedApi errors at MainActivity dispatchKeyEvent declaration/super call, lines111/113, plus60warnings/12hints; no baseline or suppression applied.",
+    "The isolated recovery-disabled diagnostic is not normal-policy acceptance; full original Desktop results are preserved separately."
+  ],
+  "disk_recovery": {
+    "removed_executables": 221,
+    "bytes": 17198561536,
+    "inventory": {
+      "path": "vw-caller-disk-recovery-20261018.json",
+      "bytes": 29048,
+      "sha256": "aa530731720a1109642e93b72e7bdf8252672d95e5fa6b18ac388132c1b82372"
+    },
+    "scope": "ENOSPC recovery; regenerate native test executables from committed source; preserve libraries and all source/evidence/worktrees"
+  },
+  "limits": [
+    "No Windows compilation/runtime or helper packaging",
+    "No actual framework MotionEvent/native remote ACK",
+    "No Android device, S23/S Pen/Bluetooth/A09 acceptance",
+    "No GPU presentation, DPI/latency/performance/owner gates",
+    "No live provider, credentials, signing, deployment, emulator or driver changes",
+    "Verification FFI/UI/agent activation and public giant intake remain unfinished"
+  ],
+  "logs": [
+    {
+      "path": "vw-callers-native-attempt1.log",
+      "bytes": 96460,
+      "sha256": "c5111a50c414392727ab66471268132929990286b8f0f022df70ad5c5c2f2e72"
+    },
+    {
+      "path": "vw-callers-native-attempt2.log",
+      "bytes": 3558,
+      "sha256": "201e7f2e1319e3a898757833c437551eb6f26fb0a1e15e49fb8473ababdabc1a"
+    },
+    {
+      "path": "vw-callers-native-attempt3.log",
+      "bytes": 14820,
+      "sha256": "c083c794a94200d35b93befef8fef16f5449d733d5f65a586893b2b33f5fc035"
+    },
+    {
+      "path": "vw-callers-clippy-attempt1.log",
+      "bytes": 1595,
+      "sha256": "e7e8f91fa922ab5e5f1b4f18cf987e35538ea650947db52d17b28c46b343eb6b"
+    },
+    {
+      "path": "vw-callers-clippy-attempt2.log",
+      "bytes": 323,
+      "sha256": "3babe2b8cfffec4744938ba3aca01b0bfa6b326cfcc0beeae3b387131a21e168"
+    },
+    {
+      "path": "vw-callers-gradle-policy-attempt1.log",
+      "bytes": 1593,
+      "sha256": "5683932d47880aaf95c4940f021fd7a66c594195dfc6be2d544cf6cc27503560"
+    },
+    {
+      "path": "vw-callers-libraries-attempt1.log",
+      "bytes": 2275,
+      "sha256": "7c4d6445a2e6f645e17eda763b319e3b4b6f2525a46bc3690129c0c09d12009b"
+    },
+    {
+      "path": "vw-callers-apps-attempt1.log",
+      "bytes": 24875,
+      "sha256": "3aa4e947544ec87dea954bb1dcc2b4fdf810c9b837ac66c5e811f6e35ad6d7db"
+    },
+    {
+      "path": "vw-callers-apps-attempt2.log",
+      "bytes": 16733,
+      "sha256": "c088c954ae47c008717cf5a5fdd0c1ba9e48f9614fad112bea6dc1fcd92a27a4"
+    },
+    {
+      "path": "vw-callers-lint-attempt1.log",
+      "bytes": 7728,
+      "sha256": "75c2ff5ee00e7cd28b359d3b62ace6b1f636f1350c489e1524485fae8a0db9b2"
+    },
+    {
+      "path": "vw-callers-recovery-disabled-diagnostic.log",
+      "bytes": 4006,
+      "sha256": "a5c885a7a014d7bf1b7398c6da0d7f06c4cb208b698d4c9207d26f76df338f31"
+    }
+  ],
+  "source": [
+    {
+      "path": "Cargo.lock",
+      "bytes": 104732,
+      "sha256": "a2343f9bd4f070ab023f244240d1445148ec8ff2d9a03f18fddc6f714d7bc0dd"
+    },
+    {
+      "path": "apps/android/src/main/AndroidManifest.xml",
+      "bytes": 3411,
+      "sha256": "b722a54ff0a9aa4703f524dae42db94fcff4e3e5d386dc78fd18520aae1a61c2"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/MainActivity.kt",
+      "bytes": 6551,
+      "sha256": "80bc761381169b31ee25137227b4c538a1583be4a00e2f2f4ab3adf463f81379"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionBarrelCorrelation.kt",
+      "bytes": 1180,
+      "sha256": "5270e7ab95a08f00ddd84b61303df4f4beb13b1ba6f5006f7bcd3b14cd131d27"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionCommands.kt",
+      "bytes": 518,
+      "sha256": "985cd8328ff2a4639fce8cac6643418934f0d0a4d7721c2def8554a4a55060b5"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionControls.kt",
+      "bytes": 1893,
+      "sha256": "7dcf4c15cbf0e9bdba41bd1f1a3d7643206c0a9800f3843975bd75dafc6bc9e7"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionDialogControls.kt",
+      "bytes": 3344,
+      "sha256": "15080861680c090bd6b19e672aee91172f60bf66a24c0323036cd6ced953ad4b"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionKeys.kt",
+      "bytes": 3674,
+      "sha256": "d8e19f847ff37349c42b1f353c8984cf26eeeb118ca1115e070827d3a1cae14e"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionPreferences.kt",
+      "bytes": 934,
+      "sha256": "acda02e0edc4490980e23ba4cb98f55feef0acef72dd89be7972710697f9d4d5"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionRemoteMotion.kt",
+      "bytes": 4396,
+      "sha256": "6b744bbf7f80c57b28a78fe2f962a61b2ffda9a23d49cd820682a2abc2425a02"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionRemoteMotionEvent.kt",
+      "bytes": 1579,
+      "sha256": "ad8aecb1086f55b9ee8efc9e444aea2742257cc5864aa4e2c060797e39a3da4c"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionViewRestore.kt",
+      "bytes": 852,
+      "sha256": "56f4b42555678152c2429987243864492b718a3d96c6c2c8a00264f05ef96d11"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionsPanel.kt",
+      "bytes": 4981,
+      "sha256": "01b337364a6455dc4694165def27de1c0747ad2e0f8e1d63ef108e0c286b414d"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt",
+      "bytes": 14022,
+      "sha256": "7a6dbb5fc8e7d3d8ff6e04b4c35a39a98c8aebaefc5416d9325964ec7ed582e9"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt",
+      "bytes": 147414,
+      "sha256": "3b667355e9a136fbdc6d3869221abb32914cf12bc15168ee077dd6f3d8362310"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorPreferences.kt",
+      "bytes": 6117,
+      "sha256": "0df44f70a1e7123bddbdb28aed35f8018c4bd36f790dc84b47c1e0c907119742"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditPanel.kt",
+      "bytes": 6654,
+      "sha256": "ea08c568e802e651a86ad855d6d5279a08126e06a487754041b4bfb5107c3ffd"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt",
+      "bytes": 31788,
+      "sha256": "801b2d9ecd61a1c17237d5d841592eccb6a7fd7f88ea41c8b8efa85529bae760"
+    },
+    {
+      "path": "apps/android/src/main/res/values/air_actions.xml",
+      "bytes": 648,
+      "sha256": "b1625f3ed11e79fb4f845fa9857f7188c515ec1ca761f198ad48b130a59040f2"
+    },
+    {
+      "path": "apps/android/src/main/res/xml/workbench_air_actions.xml",
+      "bytes": 1525,
+      "sha256": "2b1b2f4c5bc32b4a62c26d09644cfad2e8bc87aee21755d6e2cd0841b263517c"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionCallerTest.kt",
+      "bytes": 7294,
+      "sha256": "943dc4e902005f9364f7819d956c3448f600d2839a15af695f35ee56a60f0c00"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionKeyContract.kt",
+      "bytes": 1832,
+      "sha256": "67aaf00f7098916e47536f1ef59c7c836e04c1958a1e10d75a963af64557bc87"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionKeysTest.kt",
+      "bytes": 334,
+      "sha256": "b4b9a597a099d679335ccb48a645029c58086932a30cb2ddbb63f089f701510d"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionRemoteMotionContract.kt",
+      "bytes": 12139,
+      "sha256": "08380de852aa37d6e8b415ced4f7b1537d56e24243640222e7391370bc109932"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionRemoteMotionTest.kt",
+      "bytes": 362,
+      "sha256": "f118286000fb1e6874efe690b261cb0fcca0cb891a7326866e900bb7a5c83a7a"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/airactions/check_caller_source.py",
+      "bytes": 10281,
+      "sha256": "9b27f71062c7901789e561ff0a732fcec78316a2652532cbdf2f2412a72ab7cc"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/airactions/check_remote_motion.py",
+      "bytes": 4647,
+      "sha256": "e2c540c0fe58564f8455dcb69794160affdabc67850640064bfaa023d55b7487"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt",
+      "bytes": 59741,
+      "sha256": "ad0309764f856d4deadd78a87e72dd6573ce05ab318a308aac76f7a0257373f5"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureAdmission.kt",
+      "bytes": 1020,
+      "sha256": "8938d51888c82b74629cd2c0b85241335fa53e4047c4fd87a6669a8f3f1f5f79"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirement.kt",
+      "bytes": 545,
+      "sha256": "0a38cd414a3dfd15d1165b9e41fa5b8260f5a6b55038c627c927d5933414a20e"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureDelivery.kt",
+      "bytes": 886,
+      "sha256": "added7a03ac9b7b9e2670fa0722a7cce4a202cdecd245e4db72c416624228cdf"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CapturePickerController.kt",
+      "bytes": 19403,
+      "sha256": "5768043cb8371c6b0faf2154b61e0269f4375aea8a11695bfbf868e3cd4de438"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CapturePickerWindow.kt",
+      "bytes": 11058,
+      "sha256": "c41ac8eba13d5c480c3acf8abc347eb022cc8c9f77481c31f41e55736a36f12c"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureSettings.kt",
+      "bytes": 1451,
+      "sha256": "428e69493587bcff83c5e79e7d97affb65a67d7b9a9e2cb4609d8656f70a3180"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/DesktopCaptureController.kt",
+      "bytes": 12420,
+      "sha256": "8f17f245c6d2e08e7c8b19d9ca79d7a03685bcc263b0710be9d1d089b22f7667"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/PickerDisplay.kt",
+      "bytes": 4043,
+      "sha256": "f08a1a5d6b5eef1e8a38a4c43081fef65f4a336667c4799d1f124f26130b446b"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/PickerOwnership.kt",
+      "bytes": 3905,
+      "sha256": "73536e02591520e9f7d425b549b9fbfa108a8af0874b4f33d4b491c252f983f8"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/PickerWorkspace.kt",
+      "bytes": 5550,
+      "sha256": "1d834052466625f92f0812d52d05a6f85affec6a8c95bb9577ccc9fd994e1a82"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureAdmissionTest.kt",
+      "bytes": 3948,
+      "sha256": "96488b08a59dd30ea9ff57531161c9abd16422d29d3323e1a61eae3dbd059e1d"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirementTest.kt",
+      "bytes": 3161,
+      "sha256": "49fe0e5321da0a1adf56c379b62bd6c4d10826254bf7acdf3fa260a33375b9ad"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureDeliveryTest.kt",
+      "bytes": 3451,
+      "sha256": "43c3e1a7199bb3af36b42fc5c4163811ab8538d3975c764428015b1db9f5327a"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt",
+      "bytes": 20887,
+      "sha256": "d1896ad1b70b3c9d1c97544a29c62fbcbfa622c28129c785e3c0fc24007ea3e3"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/AirActionRouter.kt",
+      "bytes": 8973,
+      "sha256": "7dc09b08cbccc73ec6861a3278a3edcc5cf70834f7a5e8a6fdcda5a87d453c04"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/AirActions.kt",
+      "bytes": 4954,
+      "sha256": "79b507ceed2e3cacaa65c8c457e37829722c6707f4a5e4a8380194f31ab90a5d"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureRegionEditor.kt",
+      "bytes": 4384,
+      "sha256": "71bb63866ee6f69f86c2daa3fcfa5507bee17a279df603291e58d63d1090d73b"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/AirActionContract.kt",
+      "bytes": 16355,
+      "sha256": "9071be65638eeea1b3f53a250a9d4f7edcf8824bbd923ce811f97c2e51679865"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/AirActionRouterTest.kt",
+      "bytes": 319,
+      "sha256": "3d9a9809760987b238bb68d0ac18d1a23ed9e9a0ba17a8c9a37a57b86fa79204"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt",
+      "bytes": 11277,
+      "sha256": "6907573c782e49a1b39c403639d6a4a827a5923cb482eda1259034f9b1b655f6"
+    },
+    {
+      "path": "core/crates/vw-capture/Cargo.toml",
+      "bytes": 1362,
+      "sha256": "b9d06da1d42ca9f7432edab802239e99b41c4d35ef8c13eff336d6425dfd17a8"
+    },
+    {
+      "path": "core/crates/vw-capture/src/admission.rs",
+      "bytes": 6262,
+      "sha256": "d6d60904a810278eeeb2362ea2fe7adcb93c0e5922d5b54df376040a6526c0a9"
+    },
+    {
+      "path": "core/crates/vw-capture/src/bin/helper.rs",
+      "bytes": 5017,
+      "sha256": "f1c7810d588ce2bf4cb9e24eba481ba5d67037cb6f17e5e450f17367e2b30088"
+    },
+    {
+      "path": "core/crates/vw-capture/src/lib.rs",
+      "bytes": 10883,
+      "sha256": "f2ae6cbd0e07e977797be83174dbf1d32b5e4ca20fcd9b648f37ad6f967060a8"
+    },
+    {
+      "path": "core/crates/vw-capture/src/picker.rs",
+      "bytes": 12571,
+      "sha256": "7fa44d40fde40174bb99c4eea3766e63d3dac0165d40d2048f240947a08e414a"
+    },
+    {
+      "path": "core/crates/vw-capture/src/process.rs",
+      "bytes": 9053,
+      "sha256": "4f5a86a0e276388c073c061cc96a683710d2ab3fcb66e07b471ae965ccb94dff"
+    },
+    {
+      "path": "core/crates/vw-capture/src/windows/mod.rs",
+      "bytes": 7118,
+      "sha256": "a531af5280c92bd881760fd48b3367b9b0b354d849fc023c473b5f0a90c8168d"
+    },
+    {
+      "path": "core/crates/vw-capture/src/windows/picker.rs",
+      "bytes": 8612,
+      "sha256": "59aae6013c322c55cecedd2418ef6db724ed68d6c856c0cffc1d972d3df99d05"
+    },
+    {
+      "path": "core/crates/vw-capture/src/windows/picker_capture.rs",
+      "bytes": 15583,
+      "sha256": "15d0a06ed7cd35dd5eaceb9b0ca5b2b694195300c5a528df2d9bce495e133f91"
+    },
+    {
+      "path": "core/crates/vw-capture/src/windows/region_hotkey.rs",
+      "bytes": 3902,
+      "sha256": "6a9b1cc2d8301fc88cbe11340ada3dcd2ab19699f0e9addef06ae636544dec8e"
+    },
+    {
+      "path": "core/crates/vw-capture/tests/picker.rs",
+      "bytes": 20053,
+      "sha256": "a56205864b583651533a667e1e5df8a5b99161d216db1a62fe85b9a070e8423e"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/capture_import.rs",
+      "bytes": 6501,
+      "sha256": "1717d5a2a0c1d30af488708f8bf940eb08b2176aa3c675772ab0c074e61b7f44"
+    },
+    {
+      "path": "docs/CAPTURE_AIR_CALLER_COMPOSITION_20261018.md",
+      "bytes": 3005,
+      "sha256": "fb76db4611e64b5bba52158f2729309f0bd646eeb272bde37dc70cbde26f9954"
+    },
+    {
+      "path": "docs/ROADMAP_EXECUTION_LEDGER.md",
+      "bytes": 46426,
+      "sha256": "e8cd6b9c9fd1b46a1f5dd0ae0ca3cc35508e90b68a73cc7f82a273a7b294f4a3"
+    },
+    {
+      "path": "docs/T3_01_CAPTURE_PICKER_HANDOFF_20261018.md",
+      "bytes": 8121,
+      "sha256": "bbfac40a816234635412516cc9e09036950fd4cda07cb5c741581c0fbc7c4dad"
+    },
+    {
+      "path": "docs/T3_01_DESKTOP_CALLER_HANDOFF_20261018.md",
+      "bytes": 7942,
+      "sha256": "7a28188a2095b55ba2d7dc920e54857b6128a4e262da0f4e8bdb1bff8e3e1ec7"
+    },
+    {
+      "path": "docs/T5_04_AIR_ACTIONS_HANDOFF_20261018.md",
+      "bytes": 13285,
+      "sha256": "814bf3291f2abb736166cc3dddf8c9e260c02dd9e439a044f96347ff4bd57066"
+    },
+    {
+      "path": "evidence/T3_01_DESKTOP_CALLER_SOURCE_20261018.json",
+      "bytes": 11533,
+      "sha256": "2172a5d69c3c2bb0d40d836ef8ce59557c6b8e4964fb69f1ae5b9b33fe0e1e49"
+    },
+    {
+      "path": "evidence/T3_01_DESKTOP_CALLER_STATIC_CHECK_20261018.py",
+      "bytes": 9577,
+      "sha256": "4e4ded4831b0453d90688d46fa202816e360a58887fe5bd037de73fc118aaaab"
+    },
+    {
+      "path": "host-win/crates/vw-host-ffi/src/capture.rs",
+      "bytes": 12304,
+      "sha256": "1da402f3a9ae466aa546550161017404538a123c79038952dc0899ecf3da1cfc"
+    },
+    {
+      "path": "host-win/crates/vw-host-ffi/src/capture_picker.rs",
+      "bytes": 13543,
+      "sha256": "8bce310ad27f755313ec54d6d1e763b32df864e958147363b8cfb170522469f3"
+    },
+    {
+      "path": "host-win/crates/vw-host-ffi/src/capture_picker_preview.rs",
+      "bytes": 17084,
+      "sha256": "5971e104804e6a890b61dbb82e658f61790f4fcb7ccdc9346b624746ec0dfe50"
+    },
+    {
+      "path": "integration/t3-01/capture-picker-prerequisites.patch",
+      "bytes": 5249,
+      "sha256": "cc05c7c277346372d297d47e87324a216cc2b2ec6c71e328b10614e9ad77b0ab"
+    },
+    {
+      "path": "tools/air-actions/check.py",
+      "bytes": 7321,
+      "sha256": "409f675919147bc0838bafe91abc1e3f0b54c80d64859e785398ea7b9c0790a0"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "target/debug/libvw_core.so",
+      "bytes": 247895464,
+      "sha256": "ef1446662d828d6537068d17ff0458e9604b575b5ee8b6ba0fbce13fb7b62026"
+    },
+    {
+      "path": "target/debug/libvw_host.so",
+      "bytes": 88234616,
+      "sha256": "27473b179ae164efac5cdae8ea001f22062ce8e9106f3c545b98adac1f900773"
+    },
+    {
+      "path": "target/debug/vw-bindgen",
+      "bytes": 65737848,
+      "sha256": "61a2a9b8ee85685408ca8ce5428c98fe12bb6371de96da18d4179ea2433204d6"
+    },
+    {
+      "path": "target/android-jni/arm64-v8a/libvw_core.so",
+      "bytes": 234845064,
+      "sha256": "dbf4fd921170b053f37d044b0fbd69e55863012cf30de800a13c6e1a8a5e1a9c"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/core/com/visualworkbench/bindings/core/vw_core.kt",
+      "bytes": 1183328,
+      "sha256": "72f0b0266f8b74beeb8e7f1e615ea1728824ad4e4e856a609a0d3936f7ed9b7b"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/host/com/visualworkbench/bindings/host/vw_host.kt",
+      "bytes": 322003,
+      "sha256": "79f1ab7a5a7d758b49279e5a303878965f9d9ff8fffac6b4581aaba9eecc7e3a"
+    }
+  ],
+  "retirement_diagnostic": {
+    "source_unchanged": true,
+    "stacktrace_recovery": "disabled only for this diagnostic in an external Gradle init script",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "meaning": "Supports recovered-exception identity diagnosis; does not pass the failing normal-policy fixture or waive owner repair"
+  }
+}

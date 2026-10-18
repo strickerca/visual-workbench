@@ -47,3 +47,54 @@ against its lane-only frozen base and therefore refuses this broader integration
 branch. Its original receipt remains applicable to the unchanged caller bytes;
 the composed batch validates the actual application source instead of weakening
 that audit's exclusive-path predicate.
+
+## Executed batch: promotion held for two owner corrections
+
+The composed production source and tests compile with the repository-pinned
+toolchain. Shared passes499/499 and Android passes151/151. Desktop reports400
+cases:392 pass, one fails, seven existing Windows-only cases skip. Within the
+five capture/region suites,59 of60 pass. All13 new Air caller regressions pass;
+the real-router JUnit wrappers also execute the shared/key and17 remote-motion
+scenarios. Android instrumentation source compilation and 16 KiB native LOAD
+alignment pass. Strict capture/host/ffi all-target Clippy, Rust policy and all264
+Gradle dependency license entries pass. Fresh Linux core/host/bindgen and arm64
+core libraries were built; core/host bindings generated once for the phase.
+
+The first app attempt failed in Kotlin incremental DirtyData/FqName calculation
+for PreparedDiagnosticsReport. The second used `-Pkotlin.incremental=false`
+without a source repair and completed actual production/test compilation.
+Both failure receipts are retained. The batch does not pass as a whole:
+
+1. Desktop owner `01a15080-f8b9-7495-9194-b33660abf005` retains
+   CaptureCallerRetirementTest.kt. Its
+   `eitherCaptureRefusalKeepsParentsAliveAndRetainsTheOriginalFailure` fails at
+   line33: assertSame sees a distinct IllegalStateException with the same message
+   after crossing `withContext(NonCancellable)`. An isolated diagnostic with
+   coroutine stacktrace recovery disabled passes all3 retirement tests on
+   unchanged source. This supports a recovered-exception identity issue; it
+   does not pass the normal-policy fixture. The owner should preserve checks of
+   the actual retained original/cause, one destructor attempt and no parent
+   closure, while making the fixture valid under normal coroutine recovery.
+   No shared test property or recovery setting has been changed in the repository.
+2. Android owner `01a1507a-7956-7594-8687-9e7a9a18900b` retains
+   MainActivity.kt. Android lint reports3 RestrictedApi errors at lines111/113:
+   the dispatchKeyEvent override and its super call inherit ComponentActivity's
+   library-group restriction. The correction must preserve one actual event
+   observation before fallback and existing lifecycle retirement. No baseline,
+   global lint suppression or independent platform-root edit was applied.
+   Lint also reports60 warnings and12 hints.
+
+Exact source/artifact/JUnit/log hashes and error locations are in
+`evidence/CAPTURE_AIR_CALLERS_COMPOSED_20261018.json`; selected failures and
+success lines are retained beside it. Full Desktop phase XML was copied to a
+private temporary directory before the isolated diagnostic, so its3-case result
+cannot replace the original400-case result. Native137-pass results remain valid;
+do not repeat native builds or binding generation for a fixture-only correction.
+After returned owner repairs/review, run one coherent affected caller/test/lint
+batch under normal coroutine recovery. Then obtain root composition review
+before main promotion. The heavy build slot is released after this receipt.
+
+The next independent root intake contract is
+GIANT_PUBLIC_INTAKE_ROOT_CONTRACT_20261018.md. Its API is still planned. No old
+worktree/archive was removed; only regenerable test executables were disposed as
+described above. All physical/runtime gates remain open.

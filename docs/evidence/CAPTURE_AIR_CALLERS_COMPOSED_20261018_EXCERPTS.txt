@@ -1,0 +1,83 @@
+vw-callers-native-attempt1.log
+bans ok, licenses ok, sources ok
+Diff in /workspace/visual-workbench/core/crates/vw-capture/src/bin/helper.rs:36:
+Diff in /workspace/visual-workbench/core/crates/vw-capture/src/bin/helper.rs:80:
+Diff in /workspace/visual-workbench/core/crates/vw-capture/src/lib.rs:7:
+Diff in /workspace/visual-workbench/core/crates/vw-capture/src/process.rs:101:
+
+vw-callers-native-attempt2.log
+error: linking with `cc` failed: exit status: 1
+error: could not compile `vw-proto` (build script) due to 1 previous error
+error: couldn't create a temp dir: No space left on device (os error 28) at path "/workspace/visual-workbench/target/debug/deps/rustct8xIfm"
+error: could not compile `syn` (lib) due to 1 previous error
+
+vw-callers-native-attempt3.log
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.02s
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 80 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+vw-callers-clippy-attempt1.log
+error: large size difference between variants
+error: could not compile `vw-capture` (lib) due to 1 previous error
+
+vw-callers-clippy-attempt2.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 19.65s
+
+vw-callers-gradle-policy-attempt1.log
+GRADLE LICENSES: PASS (264 dependency entries)
+BUILD SUCCESSFUL in 10s
+
+vw-callers-libraries-attempt1.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.50s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 49.32s
+
+vw-callers-apps-attempt1.log
+e: Incremental compilation failed: The following FqNames can't be derived from DirtyData.dirtyLookupSymbols: com.visualworkbench.shared.PreparedDiagnosticsReport.
+         Incremental compilation failed: The following FqNames can't be derived from DirtyData.dirtyLookupSymbols: com.visualworkbench.shared.PreparedDiagnosticsReport.
+BUILD FAILED in 1m 47s
+
+vw-callers-apps-attempt2.log
+CaptureCallerRetirementTest > eitherCaptureRefusalKeepsParentsAliveAndRetainsTheOriginalFailure FAILED
+400 tests completed, 1 failed, 7 skipped
+BUILD FAILED in 2m 56s
+
+vw-callers-lint-attempt1.log
+Lint found 3 errors, 60 warnings and 12 hints. First failure:
+/workspace/visual-workbench/apps/android/src/main/kotlin/com/visualworkbench/android/MainActivity.kt:111: Error: ComponentActivity.dispatchKeyEvent can only be called from within the same library group prefix (referenced groupId=androidx.core with prefix androidx from groupId=visual-workbench-apps) [RestrictedApi]
+Lint found 3 errors, 60 warnings, 12 hints. First failure:
+/workspace/visual-workbench/apps/android/src/main/kotlin/com/visualworkbench/android/MainActivity.kt:111: Error: ComponentActivity.dispatchKeyEvent can only be called from within the same library group prefix (referenced groupId=androidx.core with prefix androidx from groupId=visual-workbench-apps) [RestrictedApi]
+  Lint found 3 errors, 60 warnings, 12 hints. First failure:
+  /workspace/visual-workbench/apps/android/src/main/kotlin/com/visualworkbench/android/MainActivity.kt:111: Error: ComponentActivity.dispatchKeyEvent can only be called from within the same library group prefix (referenced groupId=androidx.core with prefix androidx from groupId=visual-workbench-apps) [RestrictedApi]
+BUILD FAILED in 1m 26s
+
+vw-callers-recovery-disabled-diagnostic.log
+BUILD SUCCESSFUL in 11s
+
+Full default-policy Desktop failure excerpt:
+eitherCaptureRefusalKeepsParentsAliveAndRetainsTheOriginalFailure
+{'message': 'java.lang.AssertionError: expected same:<java.lang.IllegalStateException: unknown source retirement> was not:<java.lang.IllegalStateException: unknown source retirement>', 'type': 'java.lang.AssertionError'}
+java.lang.AssertionError: expected same:<java.lang.IllegalStateException: unknown source retirement> was not:<java.lang.IllegalStateException: unknown source retirement>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotSame(Assert.java:829)
+	at org.junit.Assert.assertSame(Assert.java:772)
+	at org.junit.Assert.assertSame(Assert.java:783)
+	at com.visualworkbench.desktop.capture.CaptureCallerRetirementTest$eitherCaptureRefusalKeepsParentsAliveAndRetainsTheOriginalFailure$1.invokeSuspend(CaptureCallerRetirementTest.kt:33)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:101)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:95)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:69)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:47)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+	at com.visualworkbench.desktop.capture.CaptureCallerRetirementTest.eitherCaptureRefusalKeepsParentsAliveAndRetainsTheOriginalFailure(CaptureCallerRetirementTest.kt:21)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+
+The recovery-disabled diagnostic is not normal-policy acceptance.
