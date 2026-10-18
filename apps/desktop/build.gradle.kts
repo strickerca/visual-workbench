@@ -10,6 +10,12 @@ plugins {
     alias(libs.plugins.compose.multiplatform)
 }
 kotlin { jvmToolchain(21) }
+// Compose's currentOs chooses different native modules on Linux. Keep the
+// shipping Windows graph intact while locking the cloud validation graph too.
+// https://docs.gradle.org/current/userguide/dependency_locking.html#sec:configuring_the_lock_file_name_and_location
+if (providers.systemProperty("os.name").get().startsWith("Linux", ignoreCase = true)) {
+    dependencyLocking { lockFile = file("gradle-linux.lockfile") }
+}
 sourceSets.main { resources.srcDir(rootProject.file("../third_party/notices")) }
 dependencies {
     implementation(project(":shared"))
