@@ -1,0 +1,197 @@
+{
+  "base": "f37ea514f6036ae236a4f2fe65e7de6dc5157920",
+  "recovery_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "status": "dedicated layer/group source leaves; coordinator registration/root composition and native/Compose validation pending",
+  "owned_sources": [
+    {
+      "path": "core/crates/vw-ffi/src/document_controls.rs",
+      "bytes": 4554,
+      "sha256": "eeaa3979443aaf173d7fc73472d9e09fc2719d0265885eef43453276c22b2fc8"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/document_controls/dto.rs",
+      "bytes": 3167,
+      "sha256": "b56739a6a9d033246b2c795ba9bc0c74514dfba265191dc8b20458bfe81adffe"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/document_controls/plan.rs",
+      "bytes": 19990,
+      "sha256": "e5fb1338bac4275c0e1e6bfa07711f3df9f81448267d77c9751e8a2652cf5209"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/document_controls/snapshot.rs",
+      "bytes": 5743,
+      "sha256": "df05830dc7e3541b04aff5d3fe8031b7f574d7a38c6f36485dcd8f5fe351e1ea"
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/document_controls.rs",
+      "bytes": 16680,
+      "sha256": "fdfe2b4f5ec5a77a38620359abc28f3a5d98652b6e2318dd5827c79f5cd0a1b9"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentControlsApi.kt",
+      "bytes": 8112,
+      "sha256": "c026d39ba1ac90422e38c239354f61c78ac07b0c4a1c9932925d4f0e31b78ad2"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentControlsInteraction.kt",
+      "bytes": 15930,
+      "sha256": "b84d32d06129947862f3a0b36c637988a96727628a8ab5e582a39d2ec0d5cf59"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentControlDrawing.kt",
+      "bytes": 563,
+      "sha256": "e51b63f719f2f8af0e1bb8d60be18190bde90a502ee07a06418d67ca7a206afd"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeDocumentControls.kt",
+      "bytes": 3473,
+      "sha256": "86abd04c949176e416a246760fee8c293f85c2bae3f69e55f2d6f172bd2f1218"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/DocumentControlsInteractionTest.kt",
+      "bytes": 16665,
+      "sha256": "5e2dbd1f5f611196b2ddbd4ed965b3887d0fccc3b74e812e6d12e6fbe8856878"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/LayersPanel.kt",
+      "bytes": 12180,
+      "sha256": "1a4b6edbcfeda85d6ded9048c48a0cb69db1c1eca1cde0d97a39499344207244"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/LayersPanel.kt",
+      "bytes": 12187,
+      "sha256": "4189d965321403913e95527f0f1d3e7bc7ecec98e5b90ec045ab009bf40083d1"
+    },
+    {
+      "path": "docs/T3_07_EDITING_LEAVES_HANDOFF_20261018.md",
+      "bytes": 9993,
+      "sha256": "0f1b8c30e67fa69d0fa94364b8572b728b092dc2e5b6a841bd88eb3cb748948f"
+    }
+  ],
+  "checks": {
+    "focused_shared_cases": {
+      "passed": 18,
+      "failed": 0,
+      "runner": "saved Kotlin 2.4.0 compiler, setup JDK 21, coroutines 1.9.0, JUnit 4.13.2; test-only unused CoreApi factory actuals",
+      "result": "JUnit version 4.13.2\n..................\nTime: 0.18\n\nOK (18 tests)",
+      "heap_caps_mib": {
+        "compiler": 384,
+        "tests": 128
+      }
+    },
+    "strict_explicit_api": "passed with warnings denied for exact shared leaves and unchanged CoreApi/WorkflowApi",
+    "kotlin_psi": "nine source/test files parsed without syntax errors, including both panels and JVM adapter; not Compose/generated-binding semantic compilation",
+    "rustfmt": "passed edition 2024 skip_children=true on five native files",
+    "common_import_guard": "PASS",
+    "whitespace": "git diff --check passed",
+    "native_tests": {
+      "written": 7,
+      "run": false,
+      "reason": "image owns heavy slot; coordinator FFI registration absent"
+    },
+    "native_compile_clippy_full_app_device": "not run",
+    "dependencies_or_license_allowances": "none changed; prior gates not rerun or promoted",
+    "staged_privacy": "passed unchanged gitleaks rules; no leaks found"
+  },
+  "interfaces": {
+    "snapshot": "ProjectSession::document_controls_snapshot(&self, document_id: String, memory_budget_bytes: u64, cancellation: Arc<Cancellation>) -> WorkflowResult<DocumentControlSnapshot>",
+    "prepare": "ProjectSession::prepare_document_control(self: Arc<Self>, binding: WorkflowBinding, metadata: WorkflowMetadata, command: DocumentControlCommand, memory_budget_bytes: u64, cancellation: Arc<Cancellation>) -> WorkflowResult<Arc<WorkflowPlan>>",
+    "jvm_factory": "documentControlWorkflows(WorkbenchProject): WorkbenchDocumentControls",
+    "controller": "DocumentControlsInteraction with injected capability and existing mutation mutex; captured DocumentControlsToken required by every action",
+    "panel": "LayersPanel(controls, newId, selectedObjectIds, activate); no new document chooser/manager"
+  },
+  "review": {
+    "mode": "independent read-only review; no reviewer builds/tests",
+    "finding": "unfenced local inspected-layer callback on same-binding reopen",
+    "repair": "local fields/inspection keyed by complete token and row callback guarded; ready actions require token",
+    "final": "no remaining concrete defects found"
+  },
+  "source_repairs": [
+    "injected capability, no new common expect",
+    "epoch/serial/revision/page token fences actions including retry/reload/cancel",
+    "per-operation cancelled reads keep reader reloadable",
+    "owned bounded catalogs with duplicate/reference checks",
+    "empty updates and oversized UTF8 names reject before prepare",
+    "metadata cancellation checked before plan acquisition",
+    "existing navigator remains sole chooser"
+  ],
+  "native_cases": [
+    "immutable layer plan, exact retry, undo and reopen",
+    "locked edits atomic refusal",
+    "nested groups/flags/moves preserve identities",
+    "twenty documents share original bytes",
+    "stale/cancelled/budget refusal",
+    "offline visible CAS with accepted transaction base",
+    "cross-document/duplicate/populated-layer deletion refusal"
+  ],
+  "root_hooks": "docs/T3_07_EDITING_LEAVES_HANDOFF_20261018.md",
+  "untouched": "FFI registration; existing shared APIs/protocol/schema; both EditorControllers; Main/WorkbenchApp; root build/locks; image/stream/viewport/document/precision/renderer owners",
+  "tonal": "existing native adjustment parameters/rendering retained, interactive canvas refusal remains pending owning editing-view composition",
+  "rotation": "separate contact-model source checkpoint and receipt; no native solver or renderer edits",
+  "gates": "no requirement/gate status promoted; Krita deferred; no paid API/credential/binary/device operation",
+  "logs": [
+    {
+      "path": "/tmp/vw-t307-controls-tests/strict-compile.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/vw-t307-controls-tests/compile.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/vw-t307-controls-tests/tests.log",
+      "bytes": 67,
+      "sha256": "d8c3381c25fb1372b5614a26a3decd452ef2eb20086ea8055b7657f8e33ac159"
+    },
+    {
+      "path": "/tmp/vw-t307-controls-tests/syntax.log",
+      "bytes": 32,
+      "sha256": "980d9072360dabed8acbc8a82ad91c0d6341778de7c2a8068f3c80cb7ec5d3bc"
+    }
+  ],
+  "recovered_sources": [
+    {
+      "path": "core/crates/vw-ffi/src/document_controls.rs",
+      "recovery_sha256": "eb735fb73037b855461b78d095411d669f309eb94b412ca4102b17e90e46e72d"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/document_controls/dto.rs",
+      "recovery_sha256": "ea845c6af753e126d56175eae39596d027d666db8a23a8e7955b784c93b6d9f3"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/document_controls/plan.rs",
+      "recovery_sha256": "1da178f904283df902e1be0214f404650552728c1f8569b5b040c32d07506879"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/document_controls/snapshot.rs",
+      "recovery_sha256": "de17e7240cde425272580114fca2808b8b3d937e7832c559121a1e590f24c877"
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/document_controls.rs",
+      "recovery_sha256": "d5ee209d9e2e584ad0771a9e3f07ffb70787fcd17ccaadeb02801c24b683a8fd"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentControlsApi.kt",
+      "recovery_sha256": "b4b1a420d614ed47c8c70c0a22d24c8bd8d63a19ee64d050267cc760fc5cf8b6"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentControlsInteraction.kt",
+      "recovery_sha256": "ee94a9493e86c6fd7e734dba7601b59a30d161f67d358e25c62d5c35df0cb166"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentControlDrawing.kt",
+      "recovery_sha256": "e51b63f719f2f8af0e1bb8d60be18190bde90a502ee07a06418d67ca7a206afd"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeDocumentControls.kt",
+      "recovery_sha256": "7de1323256bc428323ab9b839ecdbdffe63aa76d65125eeb10f2f8d246125dc0"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/DocumentControlsInteractionTest.kt",
+      "recovery_sha256": "7a8d1a8c60ac9fd78d035d1dfde7c2b0637dd7a624cd3f321a909059e927cbc8"
+    }
+  ]
+}
