@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "status": "exact-integration source contract review passed; no leaf mismatch found; compilation/runtime not performed",
+  "reviewed_integration": "ed65d8698c8b9e83718f734022fcf0d91f87ce13",
+  "dedicated_source_checkpoint": "260b4f5e3fc47772cfa28f012c94ed1f29d48cf4",
+  "dedicated_files_identical": 18,
+  "dedicated_sources": [
+    {
+      "path": "apps/android/src/androidTest/kotlin/com/visualworkbench/android/PrecisionInstrumentedTest.kt",
+      "sha256": "a0da95dd94c8f5ee78190334615c77f2e0221c4fc549dd22287dfea2a1de2cec",
+      "bytes": 8339
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionControls.kt",
+      "sha256": "6eb5deb733837a230eac7c2878686ef47325b3a0638d0ef773d6a34485fe7225",
+      "bytes": 3387
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionDrawing.kt",
+      "sha256": "35e2c42ece81a96f05b8848ae1384fcda7670452b9d151295eff071e4b3fb65d",
+      "bytes": 3343
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionHit.kt",
+      "sha256": "07bceb6d3a53f5d42fc39b5edc8caab7295c3ebb6ccd2b584bda9225bf6cd681",
+      "bytes": 1811
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionInput.kt",
+      "sha256": "204a2bbb02ab2be0da1c9e91d101b700a5d0fefb06f18ba05e0f1c44a17e651d",
+      "bytes": 1996
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/precision/PrecisionControls.kt",
+      "sha256": "ba299bad295976b21b0aefcb3009afa7950633af20a9cc56d1afd0541d5b015a",
+      "bytes": 3220
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/precision/PrecisionDrawing.kt",
+      "sha256": "88023fa0c76fa6328e7f3761f8ef729800136482c4e5f330a94347b4cdb7fe84",
+      "bytes": 2120
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/precision/PrecisionHit.kt",
+      "sha256": "816846eeca776c4863b56fb79de47dd7f03d958b7116c3892a8c5e39cba27d35",
+      "bytes": 1023
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopPrecisionTest.kt",
+      "sha256": "bcf9cbcf9bbcfba9ff3f40e691fdbfd84ab394e43ae4f6fc2fc9999b3fd7766c",
+      "bytes": 4369
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PrecisionApi.kt",
+      "sha256": "0cff9dbede35d6a1cedcd2452cfe6c2fb7c37496fb554234367b7d11a5f5e2ff",
+      "bytes": 862
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PrecisionController.kt",
+      "sha256": "81013ccf77e0ba754f009e8fd352c6cf7bb49fc9f0fad3ff8900886c0963968a",
+      "bytes": 12664
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PrecisionGrid.kt",
+      "sha256": "e4c2e6fb06d23cda8274b35c8c4b3702139b786306455bce54c626524c7de354",
+      "bytes": 1537
+    },
+    {
+      "path": "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/PrecisionPlacementTest.kt",
+      "sha256": "3f0d1189dc85732c7cda4c3ecff0b2f0c96993aac2a1da52924274f1f657477e",
+      "bytes": 3851
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativePrecision.kt",
+      "sha256": "2082be9bf46e965f235a0cf8f7ef6848324e89aa12dd761635c2b2568e19ed0e",
+      "bytes": 2542
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PrecisionTest.kt",
+      "sha256": "df41706373dbabcd1feb71ef7db11dfb8d61fb0a251011a18d8134b3567a9fc7",
+      "bytes": 10456
+    },
+    {
+      "path": "core/crates/vw-ffi/src/precision.rs",
+      "sha256": "42733305a2904dab97a43a56cd42af92dbed4ebf439728c450fdb18c20fe11af",
+      "bytes": 5299
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/precision.rs",
+      "sha256": "68db00fab3ed328d23d0d68289aa996431c321b6413eabd09e2fb097c3628db8",
+      "bytes": 6701
+    },
+    {
+      "path": "core/crates/vw-geom/tests/precision_recovery.rs",
+      "sha256": "9ed73b113c2a81df444c6577184316fcfef78092c7ae9020e17786d6002041eb",
+      "bytes": 5739
+    }
+  ],
+  "shared_inputs_reviewed": [
+    {
+      "path": "core/crates/vw-ffi/src/lib.rs",
+      "sha256": "90865ea348eb7c494420eb4e2e34dc287d330bc0b6fbbe0059f5c080f2719540"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/camera.rs",
+      "sha256": "b7680c10b4315b91372eb5f46b3a0380a68cd8300d31105abaf9cb53d43e0747"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/dto.rs",
+      "sha256": "a1c6350197b31b44bf302897c5a52f3178686ffffeefc1894cc7ace0267b6407"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CoreApi.kt",
+      "sha256": "fb4b9d960731ac534100486a74881a8ad20c02abfb99a23c999f70494ae05346"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt",
+      "sha256": "c8059b2d0a7c0b4be5dfc6ea821f1be3b2a538e6b88e6902710d7c171f51195b"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt",
+      "sha256": "23a50c2623b1a231d015cc261cd370b7d3d6c48f639ac2b8269e143e1461b36e"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt",
+      "sha256": "700890947b5a9c0e3c37d62d4b85a575b8a9a8993825e483402cbf3a9ffd530e"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt",
+      "sha256": "8fdc0088b5e29938e2ac65c9bffbc3fc9dc4851feb2dc4e6b7ca1ec8fdffcb8c"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt",
+      "sha256": "a81a89e653a24eab1d4563634c85f59e6fc445bbb98765fbfe841966cf2643d7"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt",
+      "sha256": "ec058d6a9687ae149b3e58e5d20f85c0c93fbdafcb89984df9bfc76efc116724"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt",
+      "sha256": "368ecdea50d231f10c0106df2d6536825f621d852b7f45988a74d28e5a07e10d"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt",
+      "sha256": "cd3aff3c2e8245257bbafe2d6e3ebe551e81cceb86b042d983580b7aca5bcedc"
+    }
+  ],
+  "source_checks": {
+    "native_module_registration": "present",
+    "native_camera_math": "unchanged",
+    "geometry_dto_fields": "unchanged; DTO diff adds image format variants only",
+    "expect_actual_signatures": "matched",
+    "native_methods": "7 matched plus close -> dispose/destroy",
+    "android_scene_fields": "precision and smoothBackground present",
+    "android_source_bitmap_filter": "uses scene.smoothBackground",
+    "pen_metadata": "routePen copies only x/y",
+    "button_constructor": "explicit PrecisionController + admission predicate",
+    "desktop_render_callback": "Transform, Double scale, Boolean smooth",
+    "CoreFailure_translation": "reuses updated mapFailure; new image error variant handled by coordinator",
+    "common_import_guard": "pass on lane branch and exact integration",
+    "rustfmt": "pass for precision native, native tests, canonical geometry tests",
+    "leaf_production_changes_needed": false
+  },
+  "active_written_tests": {
+    "apps/android/src/androidTest/kotlin/com/visualworkbench/android/PrecisionInstrumentedTest.kt": 9,
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopPrecisionTest.kt": 5,
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/PrecisionPlacementTest.kt": 6,
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PrecisionTest.kt": 17,
+    "core/crates/vw-ffi/tests/precision.rs": 8,
+    "core/crates/vw-geom/tests/precision_recovery.rs": 6
+  },
+  "active_written_total": 51,
+  "executed_on_reviewed_integration": 0,
+  "heavy_slot": "image lane; no Cargo/Kotlin/Gradle compilation or test execution started",
+  "validation_checkout": "/workspace/precision-validation-ed65 (detached exact integration; source unchanged)",
+  "remaining_shared_hooks": [
+    "Android controller precision owner plus once-only routing, captured matrices, final-UP end and cancellation/disposal",
+    "CanvasSurface explicit button helper predicate and both PrecisionDrawing draw calls",
+    "Desktop controller/state wrappers and canonical document render callback",
+    "WorkbenchApp/Main guarded controls and pane headers"
+  ],
+  "safety_and_acceptance": [
+    "Reserved app/controller/registration files were read only",
+    "No device/provider/security/credentials/deployment actions",
+    "No screenshots created",
+    "Nine Android runtime cases unrun",
+    "Prior 42 host results remain historical; no new execution claim",
+    "A03/A04/A05, physical calibration and owner acceptance pending"
+  ]
+}
