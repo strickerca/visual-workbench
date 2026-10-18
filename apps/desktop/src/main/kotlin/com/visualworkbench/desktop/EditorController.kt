@@ -320,6 +320,28 @@ if(giantMode&&next.document!==before.document)giantOwner.invalidate()
         if(rotation.state.value.preview.isNotEmpty())next=next.copy(preview=next.preview+rotation.state.value.preview)
         next=next.copy(giantActive=giantMode,giantViewport=if(giantMode)runCatching{giantViewport(core,next.view.camera,next.precision)}.getOrNull()else null)
 if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.close();preparedDrag=null;next=next.copy(dragPrepared=false)};if(next.exportCheck?.request?.matches(next)==false)next=next.copy(exportCheck=null);mutable.value=next;if(next.document!==before.document)ai.changed();if(next.document!==before.document||next.view.camera!=before.view.camera||next.preview!=before.preview||next.peerFrame!=before.peerFrame)aiResults.request();selections.viewport(next.view.camera);erasers.viewport(next.view.camera);documents.viewport(next.view.camera);workflows.remember(next.view.camera);syncGiant();if(next.shareViewport&&(next.view.camera!=before.view.camera||!before.shareViewport))scheduleViewport()}
+    /** Select an editor source by identity only. Admission happens under edits. */
+    internal fun ownsVerificationOriginal(expected:PackageInfo):Boolean {
+        val document=mutable.value.document?:return false
+        return !closing&&project!=null&&document.documentId==expected.binding.documentId&&
+            document.render.revision.projectId==expected.binding.projectId
+    }
+    /** Borrow the current original for private history before its pair is known. */
+    internal suspend fun <T> withCurrentVerificationOriginal(body:suspend(WorkbenchProject)->T):T = edits.withLock {
+        val view=mutable.value;val document=view.document?:throw PackageFailure(PackageFailureKind.Invalid)
+        if(closing||view.busy||ai.state.value.open||semanticEditor.state.value.busy||instructionEditor.state.value.busy||drag!=null||ink!=null||inkWork!=null||widthGesture!=null||instructionEditor.hasUnsaved())throw PackageFailure(PackageFailureKind.Busy)
+        val current=project?:throw PackageFailure(PackageFailureKind.Closed)
+        val expected=document.render.revision;val epoch=generation;val actual=current.info()
+        if(closing||project!==current||generation!=epoch||mutable.value.document?.documentId!=document.documentId)throw PackageFailure(PackageFailureKind.Stale)
+        if(actual.projectId!=expected.projectId||actual.hostSeq!=expected.hostSeq||actual.stateHash!=expected.stateHash||document.documentId !in actual.documentIds)throw PackageFailure(PackageFailureKind.Stale)
+        body(current)
+    }
+    internal suspend fun <T> withVerificationOriginal(expected:PackageInfo,body:suspend(WorkbenchProject)->T):T = withCurrentVerificationOriginal { current ->
+        val document=mutable.value.document?:throw PackageFailure(PackageFailureKind.Stale)
+        val actual=current.info();val binding=expected.binding
+        if(closing||document.documentId!=binding.documentId||actual.projectId!=binding.projectId||actual.hostSeq!=binding.hostSeq||actual.stateHash!=binding.stateHash)throw PackageFailure(PackageFailureKind.Stale)
+        body(current)
+    }
     internal suspend fun compileForMcp(choice:com.visualworkbench.desktop.mcp.McpCompileChoice):WorkbenchCompiledPackage = edits.withLock {
         val view=mutable.value;val document=view.document?:throw PackageFailure(PackageFailureKind.Invalid)
         if(closing||view.busy||ai.state.value.open||semanticEditor.state.value.busy||instructionEditor.state.value.busy||drag!=null||ink!=null||inkWork!=null||widthGesture!=null||instructionEditor.hasUnsaved())throw PackageFailure(PackageFailureKind.Busy)

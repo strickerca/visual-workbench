@@ -528,6 +528,44 @@ pub async fn open_package_catalog(
     })
     .await?
 }
+impl PackageCatalog {
+    /// Read the catalog's checked immutable package under its existing worker
+    /// guard, with exact index/manifest identity and no caller-supplied path.
+    pub(crate) async fn verification_package(
+        &self,
+        package_id: String,
+        target: String,
+        manifest_sha256: String,
+        cancellation: Arc<Cancellation>,
+    ) -> PackageResult<vw_package::Package> {
+        let k = key(&package_id, &target)?;
+        hash(&manifest_sha256)?;
+        let closed = self.closed.clone();
+        self.worker
+            .call(move |state| {
+                Ok((|| {
+                    check(&closed, &cancellation)?;
+                    state.guard()?;
+                    let entry = state.entries.get(&k).ok_or(PackageError::Stale)?;
+                    if entry.manifest_sha256 != manifest_sha256 {
+                        return Err(PackageError::Identity);
+                    }
+                    let package = files::package(&state.root.join(&k), &cancellation)?;
+                    let info = dto::describe(&package)?;
+                    if info.package_id != entry.package_id
+                        || info.target != entry.target
+                        || info.manifest_sha256 != entry.manifest_sha256
+                    {
+                        return Err(PackageError::Integrity);
+                    }
+                    check(&closed, &cancellation)?;
+                    Ok(package)
+                })())
+            })
+            .await?
+    }
+}
+
 #[uniffi::export]
 impl PackageCatalog {
     pub async fn publish(

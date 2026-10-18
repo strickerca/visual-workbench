@@ -31,8 +31,9 @@ public actual suspend fun openMcpResultInbox(applicationPrivateDirectory:String)
     prepareCoreLibrary()
     return settled(release={it.close()}){NativeInbox(com.visualworkbench.bindings.core.openMcpResultInbox(applicationPrivateDirectory,it))}
 }
-private class NativeInbox(private val handle:NInbox):WorkbenchMcpInbox {
+private class NativeInbox(val handle:NInbox):WorkbenchMcpInbox {
     private val closer=JoinedPackageClose()
+    fun check(){closer.check()}
     override suspend fun submit(catalog:WorkbenchPackageCatalog,submission:McpInboxSubmission):McpInboxReceipt {
         closer.check();val value=ownedMcpSubmission(submission);val nativeCatalog=nativePackageCatalog(catalog)
         return settled{handle.submit(nativeCatalog,NSubmission(value.receiptId,value.packageId,value.target,value.manifestSha256,value.connection,value.createdAtMs,value.text,value.png,value.note),it).public()}
@@ -51,4 +52,10 @@ private class NativeInbox(private val handle:NInbox):WorkbenchMcpInbox {
         closer.check();return settled{handle.retire(receiptId,receiptBlake3,it).let{r->McpInboxRetirement(r.receiptId,r.receiptBlake3,r.filesRemoved)}}
     }
     override suspend fun close(){closer.begin();releaseNative{closer.close{try{handle.shutdown()}finally{handle.destroy()}}}}
+}
+
+/** Borrow for a settled verification operation; the inbox stays caller-owned. */
+internal fun nativeMcpInbox(value:WorkbenchMcpInbox):NInbox {
+    val inbox=value as? NativeInbox?:throw PackageFailure(PackageFailureKind.Invalid)
+    inbox.check();return inbox.handle
 }

@@ -24,6 +24,8 @@ mod editor;
 mod gesture;
 mod instructions;
 mod packages;
+mod verification;
+pub use verification::*;
 mod payload;
 pub use packages::*;
 mod project;
@@ -46,6 +48,11 @@ pub use document_controls::{
 };
 mod object_rotation;
 pub use object_rotation::rotate_object_transforms;
+mod image_frames;
+pub use image_frames::{
+    ImageEditingBackground, ImageEditingPreview, ImageFrameCommand, ImageFrameEntry,
+    ImageFramePreview, ImageFrameSettings, ImageFramesSnapshot,
+};
 mod tone_controls;
 pub use tone_controls::{
     ImageToneSettings, ToneControlCommand, ToneControlEntry, ToneControlPreview,

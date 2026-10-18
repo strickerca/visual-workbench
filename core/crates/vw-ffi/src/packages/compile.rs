@@ -32,6 +32,20 @@ pub struct CompiledPackage {
     prepared: Mutex<Option<Arc<Prepared>>>,
 }
 impl CompiledPackage {
+    /// Admit through the same bounded compiled-owner pool before verification
+    /// clones originals or invokes the ordinary package compiler.
+    pub(crate) fn verification_builder()
+    -> PackageResult<impl FnOnce(vw_package::Package) -> Arc<Self> + Send + 'static> {
+        let permit = Permit::acquire()?;
+        Ok(move |package| {
+            Arc::new(Self {
+                prepared: Mutex::new(Some(Arc::new(Prepared {
+                    package,
+                    _permit: permit,
+                }))),
+            })
+        })
+    }
     pub(super) fn get(&self) -> PackageResult<Arc<Prepared>> {
         self.prepared
             .lock()
@@ -138,6 +152,26 @@ fn originals(
     }
     Ok(out)
 }
+/// Borrow the ordinary exact full-original resolver; no verification filesystem
+/// path or independent source lifetime enters this boundary.
+pub(crate) fn verification_originals(
+    state: &ProjectState,
+    document: &Id,
+    budget: u64,
+    closed: &AtomicBool,
+    cancellation: &Cancellation,
+) -> PackageResult<BTreeMap<AssetId, Vec<u8>>> {
+    originals(
+        state,
+        document,
+        budget,
+        &Stop {
+            closed,
+            cancel: cancellation,
+        },
+    )
+}
+
 pub(super) fn compile(
     state: &ProjectState,
     options: PackageCompileOptions,

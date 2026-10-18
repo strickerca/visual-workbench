@@ -80,7 +80,12 @@ impl SessionService {
                     &link::hello(local.clone()),
                 )
                 .await?;
-                if !connection.session().capabilities().contains("app_sync_v1") {
+                if !connection.session().capabilities().contains("app_sync_v1")
+                    || !connection
+                        .session()
+                        .capabilities()
+                        .contains(vw_model::IMAGE_OUTPUT_CAPABILITY)
+                {
                     return Err(SessionError::Invalid);
                 }
                 let (sender, mut receiver) = connection.into_duplex()?;

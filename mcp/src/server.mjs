@@ -1,5 +1,6 @@
 import { McpServer, ResourceTemplate, fromJsonSchema } from '@modelcontextprotocol/server';
 import { LIMITS, ID_PATTERN, Slots, boundedString, encoded, identifier, requireThat, safeCode } from './bounds.mjs';
+import { registerVerificationTools } from './verification.mjs';
 const id = { type: 'string', pattern: ID_PATTERN };
 const object = (properties, required = Object.keys(properties)) => fromJsonSchema({ type: 'object', properties, required, additionalProperties: false });
 const text = { type: 'string', maxLength: LIMITS.text };
@@ -20,6 +21,7 @@ export function factory({ packages, owner, grants, principal, slots = new Slots(
         } catch (error) { return { isError: true, content: [{ type: 'text', text: safeCode(error) }] }; }
       });
     }
+    registerVerificationTools(tool, { packages, owner, principal });
     tool('list_packages', { limit: { type: 'integer', minimum: 1, maximum: 64 }, since: { type: 'string', maxLength: 24 } }, [],
       async args => ({ content: [{ type: 'text', text: 'Published immutable visual instruction packages.' }], structuredContent: { packages: packages.list(args.limit, args.since) } }));
     tool('get_package', { id, target: { enum: ['claude', 'openai', 'gemini', 'generic'] } }, ['id', 'target'], (args, signal) => packages.get(args.id, args.target, signal));

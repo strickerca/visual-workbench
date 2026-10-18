@@ -412,6 +412,7 @@ pub(super) fn hello(device: DeviceId) -> LocalHello {
             "original_upload_v1".into(),
             "new_shape_preview_v1".into(),
             "marker_focus_v1".into(),
+            vw_model::IMAGE_OUTPUT_CAPABILITY.into(),
             agent_capture::CAPABILITY.into(),
             vw_remote::CAPABILITY.into(),
         ]),
@@ -748,6 +749,7 @@ async fn drive(mut driver: Driver) {
                     "original_upload_v1",
                     "new_shape_preview_v1",
                     "marker_focus_v1",
+                    vw_model::IMAGE_OUTPUT_CAPABILITY,
                 ]
                 .iter()
                 .any(|capability| !connection.session().capabilities().contains(*capability))
@@ -940,6 +942,10 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         .session()
         .capabilities()
         .contains("preview_lifecycle_v2")
+        || !connection
+            .session()
+            .capabilities()
+            .contains(vw_model::IMAGE_OUTPUT_CAPABILITY)
     {
         return Err(SessionError::Invalid);
     }

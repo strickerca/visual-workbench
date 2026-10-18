@@ -44,6 +44,15 @@ private class NativeCompiled(val handle:NCompiled):WorkbenchCompiledPackage {
     fun check(){closer.check()}
     override suspend fun close(){closer.begin();releaseNative{closer.close{try{handle.dispose()}finally{handle.destroy()}}}}
 }
+/** Adopt through the ordinary compiled owner, including construction failure. */
+internal fun ownNativeCompiled(handle:NCompiled):WorkbenchCompiledPackage {
+    try { return NativeCompiled(handle) }
+    catch(error:Throwable) {
+        try { handle.dispose() } catch(cleanup:Throwable) { error.addSuppressed(cleanup) }
+        finally { try { handle.destroy() } catch(cleanup:Throwable) { error.addSuppressed(cleanup) } }
+        throw error
+    }
+}
 public actual suspend fun openPackageCatalog(applicationPrivateDirectory:String):WorkbenchPackageCatalog {
     if(applicationPrivateDirectory.length>32767)throw PackageFailure(PackageFailureKind.Invalid)
     prepareCoreLibrary()

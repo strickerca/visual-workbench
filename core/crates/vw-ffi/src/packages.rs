@@ -11,6 +11,7 @@ pub use inbox::*;
 use crate::{Cancellation, CoreError, WorkflowError};
 pub use catalog::{PackageCatalog, PackageRetirement, open_package_catalog};
 pub use compile::CompiledPackage;
+pub(crate) use compile::verification_originals;
 pub use dto::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 const MAX_MEMORY: u64 = 256 * 1024 * 1024;
