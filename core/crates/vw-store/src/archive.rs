@@ -60,6 +60,12 @@ pub fn export_vwbz(
     let copy_connection = Connection::open_with_flags(&copy, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
     copy_connection.pragma_update(None, "journal_mode", "DELETE")?;
     copy_connection.execute("UPDATE devices SET label = NULL", [])?;
+    // Installation-local camera positions and bookmark names never leave this
+    // installation. VACUUM below also removes their former page contents.
+    copy_connection.execute(
+        "DELETE FROM settings WHERE key GLOB ?1",
+        [format!("{}*", crate::LOCAL_VIEW_PREFIX)],
+    )?;
     copy_connection.execute("VACUUM INTO ?1", [sqlite_path(&clean)?])?;
     copy_connection
         .close()
