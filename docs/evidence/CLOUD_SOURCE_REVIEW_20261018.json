@@ -1,12 +1,18 @@
 {
   "source_head": "fb824935a331d7d16a7e50620b5ed611dccceb4a",
-  "status": "source-only findings for module owners; fixes and regression execution pending",
+  "status": "Document findings resolved in reviewed owner checkpoint; image owner fixes and combined app validation pending",
   "findings": [
     {
       "owner": "document lane",
       "location": "core/crates/vw-svg/src/engine.rs:158",
       "issue": "Tile-based reservation does not bound pattern surfaces. Pinned resvg 0.47.0 path.rs render_pattern_pixmap allocates pattern.rect multiplied by the effective transform, independently of output tile dimensions.",
-      "action": "Refuse patterns until their transformed surfaces and nested rendering are admitted, or implement conservative accounting before renderer entry. Add a bounded rejection/budget regression. This is separate from the already-reported marker expansion finding."
+      "action": "Refuse patterns until their transformed surfaces and nested rendering are admitted, or implement conservative accounting before renderer entry. Add a bounded rejection/budget regression. This is separate from the already-reported marker expansion finding.",
+      "resolution": {
+        "owner_commit": "3d2839de8cfdecf1e0afeab5e93b67a268004c2b",
+        "source_review": "Marker and pattern definitions are refused before Tree::from_xmltree, including unused and CSS-selected definitions. Regression cases cover ordinary/large pattern geometry and per-vertex/inherited/style markers. Quoted URL scanner alignment also tightened.",
+        "owner_tests": "73 passed, 0 failed, 2 ignored; one Windows-only native runtime test excluded on Linux. Linux and Windows-target PDF Clippy and Cargo license/source/bans passed.",
+        "runtime_limits": "PDFium/qpdf runtime, exported output, app wiring and physical acceptance remain pending. No repeated build in integration lane."
+      }
     },
     {
       "owner": "image lane",
