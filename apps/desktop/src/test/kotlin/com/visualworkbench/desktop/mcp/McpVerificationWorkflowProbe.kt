@@ -38,19 +38,89 @@ internal object McpVerificationWorkflowProbe {
         var submission:McpInboxSubmission?=null
         var receipt:McpInboxReceipt?=null
         val regions=mutableListOf<Pair<McpInboxSide,McpInboxRegion>>()
+        var savedPng=byteArrayOf(1,2,3,4)
         override suspend fun submit(catalog:WorkbenchPackageCatalog,submission:McpInboxSubmission):McpInboxReceipt {
             this.submission=submission;val info=catalog.lookup(submission.packageId,submission.target,submission.manifestSha256).info
             val image=McpInboxImage(256u,256u,8u,64uL,"a".repeat(64),null,1u)
             return McpInboxReceipt(submission.receiptId,"9".repeat(64),info.packageId,info.target,info.manifestSha256,info.binding,info.sourceAssetId,submission.connection,submission.createdAtMs,null,"",image,image,false).also{receipt=it}
         }
         override suspend fun list()=listOfNotNull(receipt)
-        override suspend fun readPng(receiptId:String,receiptBlake3:String,side:McpInboxSide)=error("unused")
+        override suspend fun readPng(receiptId:String,receiptBlake3:String,side:McpInboxSide):ByteArray {
+            require(receipt?.receiptId==receiptId&&receipt?.receiptBlake3==receiptBlake3)
+            return savedPng.copyOf()
+        }
         override suspend fun pixels(receiptId:String,receiptBlake3:String,side:McpInboxSide,region:McpInboxRegion,assumeUntaggedSrgb:Boolean,allowDepthReduction:Boolean):McpInboxPixels {
             require(this.receipt?.receiptId==receiptId&&this.receipt?.receiptBlake3==receiptBlake3);regions+=side to region
             return McpInboxPixels(receiptId,receiptBlake3,side,region,256u,256u,ByteArray(region.width.toInt()*region.height.toInt()*4))
         }
         override suspend fun retire(receiptId:String,receiptBlake3:String):McpInboxRetirement=error("unused")
         override suspend fun close(){}
+    }
+    private suspend fun historyCases() {
+        val catalog=Catalog();val inbox=Inbox();val capture=Capture();val backend=Backend()
+        val relation=McpVerificationRecapture(McpVerificationPackage.of(original),McpVerificationPackage.of(after))
+        val first=McpVerificationWorkflow(catalog,inbox,capture,{catalog.lookup(it.packageId,it.target,it.manifestSha256)},{id(300)},{_,_,_,_->backend})
+        first.remember(relation,"a".repeat(32))
+        val receipt=requireNotNull(inbox.receipt)
+        val saved=VerificationReviewSnapshot(VerificationPair(original.verificationKey(),after.verificationKey(),receipt.receiptId,receipt.receiptBlake3),
+            original.binding.projectId,1u,2uL,listOf(VerificationMarkerReview(1u,VerificationVerdict.Fail,"private restart note")))
+        first.close()
+        var actual=saved
+        var projectId=original.binding.projectId
+        var checks=0
+        val requests=mutableListOf<String?>()
+        val cursor="vw.verification-review.v1."+"1".repeat(64)
+        val history=object:WorkbenchVerificationHistory {
+            override suspend fun page(after:String?,limit:UInt):VerificationReviewHistoryPage {
+                check(limit==8u);requests+=after
+                return if(after==null)VerificationReviewHistoryPage(listOf(saved),cursor)else VerificationReviewHistoryPage(emptyList(),null)
+            }
+            override suspend fun check(expected:VerificationReviewSnapshot){checks++;require(expected==actual)}
+        }
+        // Same store, deliberately newer document revision. Historical display
+        // may read saved notes, while ordinary mutation still refuses stale D.
+        val project=Proxy.newProxyInstance(WorkbenchProject::class.java.classLoader,arrayOf(WorkbenchProject::class.java)){_,method,_->
+            if(method.name=="info")ProjectInfo(projectId,"synthetic",id(90),1uL,false,false,99uL,"8".repeat(64),listOf(original.binding.documentId))
+            else error("Unexpected historical source call ${method.name}")
+        } as WorkbenchProject
+        val restarted=McpVerificationWorkflow(catalog,inbox,capture,{catalog.lookup(it.packageId,it.target,it.manifestSha256)},{id(301)},{_,_,_,_->backend},{history})
+        refused{restarted.history(null)};println("PASS history requires a currently borrowed original owner")
+        restarted.originalAccess=object:McpVerificationOriginalAccess {
+            override fun owns(expected:PackageInfo)=true
+            override suspend fun<T> withOriginal(expected:PackageInfo,body:suspend(WorkbenchProject)->T):T=throw PackageFailure(PackageFailureKind.Stale)
+            override suspend fun<T> withCurrentVerificationOriginal(body:suspend(WorkbenchProject)->T):T=body(project)
+        }
+        check(restarted.history(null).snapshots==listOf(saved))
+        refused{restarted.openHistory(saved.copy(version=3uL))};check(checks==0)
+        println("PASS history selection requires the exact displayed saved row")
+        check(restarted.openHistory(saved)==receipt&&restarted.review(receipt)==saved&&capture.borrows==0)
+        val comparison=restarted.comparison(original.verificationKey(),receipt.receiptId,receipt.receiptBlake3,1u)
+        check(comparison.method=="semantic"&&comparison.before!=null&&comparison.after!=null)
+        check(comparison.wire().toString().contains("private restart note").not())
+        println("PASS restart restores saved notes and checked comparisons without capture selectors or source borrowing")
+        refused{restarted.change(VerificationOwnerChange(saved.pair,saved.version,id(302),1u,VerificationVerdict.Pass,"manual"))}
+        refused{restarted.compile(saved,id(303),0,false,false)}
+        check(capture.borrows==0&&backend.compileCalls==0)
+        println("PASS historical display retains strict source currentness for save and failure compilation")
+        actual=saved.copy(version=3uL)
+        refused{restarted.review(receipt)};actual=saved
+        println("PASS changed durable review refuses a stale historical selection")
+        inbox.savedPng=byteArrayOf(9)
+        refused{restarted.openHistory(saved)};inbox.savedPng=byteArrayOf(1,2,3,4)
+        println("PASS history refuses mismatched retained comparison PNG bytes")
+        val published=catalog.saved.remove(after.packageId)
+        refused{restarted.openHistory(saved)};catalog.saved[after.packageId]=requireNotNull(published)
+        println("PASS history refuses missing checked after package")
+        inbox.receipt=receipt.copy(retired=true)
+        refused{restarted.openHistory(saved)};inbox.receipt=receipt
+        println("PASS history refuses retired comparison receipt")
+        projectId=id(91)
+        refused{restarted.review(receipt)};projectId=original.binding.projectId
+        println("PASS switched current original refuses saved notes from another store")
+        check(restarted.history(cursor).snapshots.isEmpty()&&requests==listOf(null,cursor))
+        refused{restarted.openHistory(saved)}
+        println("PASS exact exclusive history cursor advances and old page cannot select")
+        restarted.close()
     }
     private class Capture: McpCaptureEngine {
         var borrows=0
@@ -132,6 +202,7 @@ internal object McpVerificationWorkflowProbe {
         refused{workflow.compile(review.copy(markers=listOf(VerificationMarkerReview(1u,VerificationVerdict.Fail,""))),id(200),0,false,false)}
         check(backend.compileCalls==2);println("PASS uniform equal-size images do not invent alignment or compile failures")
         workflow.retire(after);refused{workflow.review(receipt)};println("PASS after retirement invalidates pair")
-        println("14 synthetic workflow-routing cases passed; native, app, OS and device gates remain unrun.")
+        historyCases()
+        println("24 synthetic workflow-routing cases passed; native, app, OS and device gates remain unrun.")
     }
 }

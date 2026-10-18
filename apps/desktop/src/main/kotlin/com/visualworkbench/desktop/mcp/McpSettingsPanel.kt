@@ -74,6 +74,16 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
         Button(enabled=!busy&&state.agents.any{it.connection==grantAgent}&&grantTarget!=null,onClick={if(grantAgent!=null&&grantTarget!=null)act{owner.grant(grantAgent,listOf(grantTarget),60_000)}}){Text("Grant selected bridge 60 seconds for this window")}
         state.grants.forEach{grant->Row{Text("${grant.connection.take(8)} | ${grant.selectors.size} window(s)",Modifier.weight(1f));TextButton(onClick={act{owner.revoke(grant.connection)}},enabled=!busy){Text("Revoke")}}}
         Text("Grants expire, are lost on restart/disconnect, and never permit capture of app-owned windows. A visible capture indicator must draw before every request.",style=MaterialTheme.typography.caption)
+        Divider();Text("Saved verification reviews",style=MaterialTheme.typography.h6)
+        Text("Load private saved decisions from the original project currently open in the editor. Targets and capture grants are never restored.",style=MaterialTheme.typography.caption)
+        TextButton(enabled=!busy,onClick={act{owner.loadVerificationHistory()}}){Text("Load saved reviews from open original")}
+        state.verificationHistory?.let{page->
+            page.snapshots.forEach{saved->Row{
+                Text("${saved.pair.original.target} | ${saved.markerCount} markers | review ${saved.version} | ${saved.pair.receiptId.take(8)}",Modifier.weight(1f))
+                TextButton(enabled=!busy,onClick={act{onCompare(owner.openVerificationHistory(saved))}}){Text("Open saved review")}
+            }}
+            page.nextCursor?.let{cursor->TextButton(enabled=!busy,onClick={act{owner.loadVerificationHistory(cursor)}}){Text("Next saved reviews")}}
+        }
         Divider();Text("Compare inbox",style=MaterialTheme.typography.h6)
         state.inbox.filterNot{it.retired}.forEach{receipt->Row{
             Text("${if(receipt.receiptId in state.verificationReceipts)"Verification"else if(receipt.after!=null)"PNG"else"Text"} | revision ${receipt.binding.hostSeq} | ${receipt.receiptId.take(8)}",Modifier.weight(1f))
