@@ -28,13 +28,16 @@ public fun retireRemoteEditLater(remote:WorkbenchRemoteEdit) {
     (remote as? NativeRemoteEdit)?.retireLater() ?: remote.seal("owner_pause")
 }
 private val retirementScope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
-internal class NativeRemoteEdit(private val handle:LiveSession,private val linkOwner:Any):WorkbenchRemoteEdit {
+internal class NativeRemoteEdit(private val handle:LiveSession,private val linkOwner:Any,
+    private val compatibilityObservations:NativeCompatibilityObservationAccess?=null,
+):WorkbenchRemoteEdit,RemoteCompatibilityImportCapability {
     private val closing=AtomicBoolean(false)
     private val retired=AtomicBoolean(false)
     private val frameCollector=AtomicBoolean(false)
     private val retirementScheduled=AtomicBoolean(false)
     private val consumers=RemoteConsumerRegistry()
     private val closeMutex=Mutex()
+    private val compatibilityBorrows=NativeCompatibilityBorrowOwner()
     private val job=SupervisorJob()
     private val ownerScope=CoroutineScope(job+Dispatchers.Default)
     private val mutableState=MutableStateFlow(RemoteEditState(0uL,RemoteEditStatus.Disconnected,null,null,null,null,null))
@@ -151,9 +154,27 @@ internal class NativeRemoteEdit(private val handle:LiveSession,private val linkO
             }
         })
     }
-    override suspend fun close(){releaseNative{closeMutex.withLock{
+    /** Close cancels and joins this read before touching the native handle. */
+    override suspend fun admitCompatibilityReceipt(expected:RemoteTargetState,bytes:ByteArray):RemoteCompatibilityAdmission? = native {
+        compatibilityBorrows.borrow {
+            open()
+            val before=handle.remoteDisplay().common().target
+            if(before?.binding!=expected.binding||before.identity!=expected.identity)return@borrow null
+            val access=compatibilityObservations?:return@borrow null
+            val admitted=NativeRemoteCompatibility.admitCurrent(expected,bytes,
+                current={handle.remoteDisplay().common().target},access=access)
+            currentCoroutineContext().ensureActive()
+            open()
+            val after=handle.remoteDisplay().common().target
+            if(after?.binding!=expected.binding||after.identity!=expected.identity)null else admitted
+        }
+    }
+    override suspend fun close(){releaseNative{
+        closing.set(true)
+        compatibilityBorrows.closeAndJoin()
+        closeMutex.withLock{
         if(retired.get())return@withLock
-        closing.set(true);val ownedConsumers=consumers.fence();consumers.invalidate()
+        val ownedConsumers=consumers.fence();consumers.invalidate()
         try{handle.remotePause("owner_pause")}catch(error:SessionException){if(error !is SessionException.Closed)throw sessionFailure(error)}
         for(consumer in ownedConsumers){if(!consumer.retire())throw SessionFailure(SessionFailureKind.RemoteRetirementPending);consumers.retired(consumer)}
         try{handle.remoteClose()}catch(error:SessionException){throw sessionFailure(error)}

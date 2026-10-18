@@ -119,6 +119,45 @@ public class RemoteEditorPalette(
         // Refuse a race; imported records are never queued or retried.
         return mutable.compareAndSet(snapshot,snapshot.copy(toolId=tool,settingsDigest=settings,compatibility=records.toList()))
     }
+    /** Owned by the same palette scope/admission as commands. Closing joins the
+     * importer; target replacement or cancellation never queues/retries evidence. */
+    public fun importCompatibilityReceipt(bytes:ByteArray,expectedTarget:RemoteTargetState?=null):Boolean {
+        if(bytes.size !in 1..REMOTE_COMPATIBILITY_IMPORT_LIMIT||!admission.tryLock())return false
+        val snapshot=mutable.value
+        val target=snapshot.target
+        if(snapshot.closed||snapshot.busy||target==null||(expectedTarget!=null&&target!=expectedTarget)||!target.identity.valid()||
+            target.identity.editor!=RemoteEditorKind.Paint||dispatcher.target.value!=target){admission.unlock();return false}
+        val capability=dispatcher as? RemoteCompatibilityImportCapability
+        if(capability==null){mutable.update{it.copy(message="The current runtime has no owned compatibility receipt reader. No observations were imported.")};admission.unlock();return false}
+        val ownedBytes=bytes.copyOf()
+        mutable.update{it.copy(busy=true,message=null)}
+        scope.launch(start=CoroutineStart.ATOMIC) {
+            try {
+                ensureActive()
+                if(mutable.value.closed||mutable.value.targetRevision!=snapshot.targetRevision||dispatcher.target.value!=target)return@launch
+                val admitted=capability.admitCompatibilityReceipt(target,ownedBytes)
+                ensureActive()
+                val current=mutable.value
+                if(!current.closed&&current.targetRevision==snapshot.targetRevision&&
+                    current.target==target&&dispatcher.target.value==target) {
+                    val adopted=admitted!=null&&admitted.validFor(target)&&
+                        compatibility(admitted.toolId,admitted.settingsDigest,admitted.records)
+                    mutable.update { latest ->
+                        if(latest.closed||latest.targetRevision!=snapshot.targetRevision||
+                            latest.target!=target||dispatcher.target.value!=target)latest
+                        else latest.copy(message=if(adopted&&latest.toolId==admitted.toolId&&
+                            latest.settingsDigest==admitted.settingsDigest&&latest.compatibility==admitted.records)
+                            "Imported historical compatibility observations; command permissions are unchanged."
+                        else "The receipt is unavailable or was not admitted by its observation owner. No observations were imported.")
+                    }
+                }
+            }catch(cancelled:CancellationException){throw cancelled}
+            catch(_:Exception){mutable.update{current->if(!current.closed&&current.targetRevision==snapshot.targetRevision&&
+                current.target==target&&dispatcher.target.value==target)current.copy(message="Compatibility import was refused. No observations were imported.")else current}}
+            finally{ownedBytes.fill(0);mutable.update{it.copy(busy=false)};admission.unlock()}
+        }
+        return true
+    }
     public suspend fun close():Unit = withContext(NonCancellable) {
         mutable.update{it.copy(closed=true,target=null,message=null,toolId=null,settingsDigest=null,compatibility=emptyList())}
         owner.cancelAndJoin()

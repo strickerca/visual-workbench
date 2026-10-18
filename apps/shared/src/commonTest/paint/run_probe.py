@@ -28,7 +28,7 @@ def main() -> None:
     production = ROOT / "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared"
     cases = ROOT / "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemotePaintPaletteCases.kt"
     sources = [production / (name + ".kt") for name in (
-        "RemoteEditApi", "RemoteEditorCompatibility", "RemoteEditorPalette", "RemoteEditorProfileEvidence",
+        "RemoteEditApi", "RemoteEditorCompatibility", "RemoteEditorPalette", "RemoteEditorProfileEvidence", "RemoteCompatibilityImport",
     )]
     print(f"Cached leaf compiler: {compilers[-1].name}; actual production sources, no stubs", flush=True)
     with tempfile.TemporaryDirectory(prefix="vw-paint-palette-") as temp:
