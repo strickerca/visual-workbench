@@ -185,16 +185,16 @@ impl Resources {
 struct RunGuard(Option<Resources>);
 impl RunGuard {
     fn settle(&mut self) -> Result<()> {
-        if let Some(mut resources) = self.0.take() {
-            if resources.cleanup().is_err() {
-                // Exactly one admitted owner can reach this slot. Retain all
-                // resources once; do not repeat a blocking join in Drop.
-                let mut slot = QUARANTINE
-                    .lock()
-                    .unwrap_or_else(|poison| poison.into_inner());
-                *slot = Some(resources);
-                return Err(Error::CleanupPending);
-            }
+        if let Some(mut resources) = self.0.take()
+            && resources.cleanup().is_err()
+        {
+            // Exactly one admitted owner can reach this slot. Retain all
+            // resources once; do not repeat a blocking join in Drop.
+            let mut slot = QUARANTINE
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner());
+            *slot = Some(resources);
+            return Err(Error::CleanupPending);
         }
         Ok(())
     }
@@ -258,6 +258,10 @@ impl WorkerReply {
 
 /// Blocking bounded worker operation; call from an application-owned bounded
 /// background executor. No arbitrary command/path is accepted from Request.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Keep the bounded source, cancellation, and two independently borrowed reply callbacks explicit at this transport boundary"
+)]
 pub fn run(
     runtime: Arc<PinnedRuntime>,
     scratch_root: &Path,

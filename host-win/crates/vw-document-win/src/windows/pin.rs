@@ -252,7 +252,7 @@ fn pin(
     }
     if tag.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
         || (tag.FileAttributes & FILE_ATTRIBUTE_DIRECTORY != 0) != directory
-        || info.DeletePending != 0
+        || info.DeletePending
         || (!directory && info.NumberOfLinks != 1)
     {
         return Err(Error::Integrity);
@@ -417,7 +417,7 @@ impl Marker {
         if self.removed {
             return Ok(());
         }
-        let disposition = FILE_DISPOSITION_INFO { DeleteFile: 1 };
+        let disposition = FILE_DISPOSITION_INFO { DeleteFile: true };
         // SAFETY: deletes this exact originally created file by retained handle,
         // after joined child, restored ACLs and owned profile deletion only.
         if unsafe {

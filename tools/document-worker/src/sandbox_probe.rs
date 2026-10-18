@@ -88,7 +88,7 @@ fn run() -> Result<i32, Box<dyn std::error::Error>> {
         return Ok(91);
     }
     let mut data = [0_u8; 32];
-    for pixel in data.chunks_exact_mut(4) {
+    for pixel in data.as_chunks_mut::<4>().0 {
         pixel[3] = 255;
     }
     for (index, allowed) in [read, write, network, spawned, true]
