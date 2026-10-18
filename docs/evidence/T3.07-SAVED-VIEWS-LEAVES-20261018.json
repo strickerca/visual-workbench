@@ -1,0 +1,194 @@
+{
+  "base": "83663107d864b21d22d2e746b9ca6eb80d47beac",
+  "branch": "feat/t3-07-saved-views-navigation",
+  "status": "bounded source leaves with focused shared tests; coordinator composition and product acceptance pending",
+  "recovery_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "owned_sources": [
+    {
+      "path": "core/crates/vw-store/src/local_views.rs",
+      "bytes": 16192,
+      "sha256": "1cd2498afcd21aaef99c2a0d775aaaee7319b77a8419d54f47c95610b4c6a2d8"
+    },
+    {
+      "path": "core/crates/vw-store/src/archive.rs",
+      "bytes": 22008,
+      "sha256": "5cce9424ccf87097b910399f5e397994a7a6445ad05fc8ccffb97e3d50f6b09e"
+    },
+    {
+      "path": "core/crates/vw-store/src/lib.rs",
+      "bytes": 1277,
+      "sha256": "f64ebd3a9f2612a5eea90efc6b909b14d4da1ba841718426606f49f347d40dea"
+    },
+    {
+      "path": "core/crates/vw-store/tests/local_views.rs",
+      "bytes": 15363,
+      "sha256": "83d5f226a6e938aa84b0da58358dffa5025b4085a2c97b10313214f6089db03f"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/LocalViewsApi.kt",
+      "bytes": 2460,
+      "sha256": "696c62d166aac0d42e2a1d498463f6ddaaeecb67c9661b74bf1a578a9465fe27"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/LocalViewsInteraction.kt",
+      "bytes": 13104,
+      "sha256": "40cf20c469bc8562c5627ad35908ec190f1d14821da41b2c0dff9a0fc6044a01"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentNavigator.kt",
+      "bytes": 5610,
+      "sha256": "5b63022241f1ca7369f2e29d92a56bc886f67a465d6d8e4e36069d35d65566fd"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/LocalViewsInteractionTest.kt",
+      "bytes": 17451,
+      "sha256": "87497c51a0d7af0487caf5f9e94a2935db08c4f935057ec32849d15dd02a5142"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/DocumentNavigatorTest.kt",
+      "bytes": 9194,
+      "sha256": "28e05a20e3285041dbea611f776fc95419165eaec76f74599273c6ae40df1c17"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/LocalViewsPanel.kt",
+      "bytes": 3657,
+      "sha256": "8f3d8c18717d94de352dc40ba8ac835caa8f5c8d76427499bac4c4855ba09b70"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DocumentNavigatorPanel.kt",
+      "bytes": 2461,
+      "sha256": "a19e478af56ba30786f3c51d22b8988f3f27e2b529b03e939b85c5ba6527e72f"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/LocalViewsPanel.kt",
+      "bytes": 3664,
+      "sha256": "241ecf5fd68c220b1dab4ae4286b52ddb0ce52f7248a69975e5046d08ac49207"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/DocumentNavigatorPanel.kt",
+      "bytes": 2468,
+      "sha256": "477485db940f947322ea8263be6bf1a255bff2aba10a0765c0f44b9257ce93b3"
+    },
+    {
+      "path": "docs/T3_07_SAVED_VIEWS_HANDOFF_20261018.md",
+      "bytes": 12195,
+      "sha256": "67facabb65342086eddadf41a53ee1b5f56760ce3695b053ec9406492be090b3"
+    }
+  ],
+  "checks": {
+    "focused_shared_tests": {
+      "passed": 31,
+      "failed": 0,
+      "local_views": 19,
+      "navigation": 12,
+      "compiler": "saved Gradle-bundled Kotlin 2.4.0; not pinned product Kotlin 2.4.20",
+      "runtime": "setup JDK 21; coroutines 1.9.0; JUnit 4.13.2; Hamcrest 1.3",
+      "heap_caps_mib": {
+        "compiler": 384,
+        "runner": 128
+      },
+      "scope": "real shared source and test files, with test-only CoreApi factory actuals that fail if called; no native facade or rendering",
+      "result": "JUnit version 4.13.2\n...............................\nTime: 0.228\n\nOK (31 tests)"
+    },
+    "strict_explicit_api": "passed for current shared leaves plus unchanged CoreApi and WorkflowApi using the same bounded harness",
+    "kotlin_psi": "11 files parsed, zero syntax errors, including all four Compose panels; no Compose semantic compilation",
+    "rustfmt": "passed on four owned Rust files with edition 2024 and skip_children=true",
+    "common_import_guard": "HOOK-002 commonMain platform imports: PASS",
+    "whitespace": "git diff --check passed",
+    "license_gate": "no product dependencies, versions, allowances or lockfiles changed; prior admitted gate is not rerun or promoted",
+    "native_store_tests": {
+      "written": 11,
+      "run": false,
+      "reason": "no shared heavy build slot granted"
+    },
+    "recovered_ffi_tests": {
+      "available": 4,
+      "admitted": false,
+      "run": false,
+      "reason": "coordinator owns native schemas and FFI registration"
+    },
+    "full_app_build": "not run; no shared heavy slot granted",
+    "compose_runtime": "not run",
+    "physical_or_device_tests": "not run; no device operations performed",
+    "staged_secret_scan": "gitleaks staged scan passed for both source checkpoints using unchanged repository rules; no leaks found"
+  },
+  "review": {
+    "mode": "independent read-only review requested on gpt-6.1-sol/xhigh",
+    "initial_findings": "operation cancellation killed actor while leaving Retry enabled; lazy actor launch could miss terminal publication on early owner cancellation",
+    "repairs": "recoverable operation cancellation retains exact pending request and actor; terminal owner disables recovery; post-read scope check and undispatched startup cover cancellation before actor entry",
+    "final_result": "no remaining concrete defects found in focused repair; reviewer ran no builds/tests"
+  },
+  "behavior_limits": [
+    "not composed in either EditorController or app root",
+    "native LocalViews facade/schema not registered by lane",
+    "document switching must use existing root owner retirement and final epoch/revision admission",
+    "bookmarks are image-document only; recovered schema has no page field",
+    "layer/group editing, object rotation handle and nondestructive tonal output remain open; no requirement or gate status promoted"
+  ],
+  "caller_hooks": "docs/T3_07_SAVED_VIEWS_HANDOFF_20261018.md",
+  "protected_paths": "both EditorControllers, Main, WorkbenchApp, existing shared schemas, root build/lock files, FFI registration and separately owned image/stream/document/precision paths untouched",
+  "images": "none created",
+  "publication": "source/text only; normal branch push to integration owner, no main merge or binaries",
+  "validation_commands": [
+    "source /workspace/.vw-tools/cloud-setup/start.sh",
+    "java -Xmx384m -cp <saved Gradle lib/*> org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -no-reflect -jvm-target 21 -Xexplicit-api=strict -Xmulti-platform -Xcommon-sources=<unchanged CoreApi.kt> -classpath <stdlib:coroutines:annotations> -d <owned temporary classes> <five production sources and test-only CoreActuals.kt>",
+    "java -Xmx384m -cp <saved Gradle lib/*> org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -no-reflect -jvm-target 21 -Xmulti-platform -Xcommon-sources=<unchanged CoreApi.kt> -classpath <stdlib:coroutines:annotations:JUnit:Hamcrest> -d <owned temporary classes> <same production sources and both focused test files>",
+    "java -Xmx128m -cp <owned classes and same runtime dependencies> org.junit.runner.JUnitCore com.visualworkbench.shared.LocalViewsInteractionTest com.visualworkbench.shared.DocumentNavigatorTest",
+    "rustfmt --edition 2024 --check --config skip_children=true <four owned Rust sources>",
+    "python3 tools/ffi-test/check_imports.py apps/shared/src/commonMain",
+    "git diff --check"
+  ],
+  "external_logs": [
+    {
+      "name": "compile.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "strict-compile.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "tests.log",
+      "bytes": 81,
+      "sha256": "3d5ea1d0eac3af371b8db9ffcb6d95d5569508d35afed0d0b28aab9d5aeaac2c"
+    },
+    {
+      "name": "syntax.log",
+      "bytes": 33,
+      "sha256": "3168f88a198eb4d2a1d3c1cfe2d1e2793bbf1065ec72a4fe592ab8a42c957ab7"
+    }
+  ],
+  "recovered_sources": [
+    {
+      "path": "core/crates/vw-store/src/local_views.rs",
+      "recovery_sha256": "5790774971b94cd340fda7e2dc16204fbc22891bc28cbce5ac1581e6f2c1a731"
+    },
+    {
+      "path": "core/crates/vw-store/tests/local_views.rs",
+      "recovery_sha256": "8177a3a3f32b2a8c605473519a8f5c68cd8df00b7807c266fe513257465b7857"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/LocalViewsApi.kt",
+      "recovery_sha256": "c874a22e590941cfa5fc5571747793de51e6e1af7c98b8c2afced048aab0e20d"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/LocalViewsInteraction.kt",
+      "recovery_sha256": "26fb77c53271462341a880bb1972b6010dba8759737fa993b8d7d6c7834e9b5a"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/LocalViewsInteractionTest.kt",
+      "recovery_sha256": "057a3cba3889998327d44a984df36e8c720ac97a051e0b0bf60d2f865127ceac"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/LocalViewsPanel.kt",
+      "recovery_sha256": "acd27f1d7d13d7631062ed147b9f89b57ba082cc07d964c52804a2eb02e77330"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/LocalViewsPanel.kt",
+      "recovery_sha256": "038e9336fcdc39f696a00de26e3ad6fbcd851d574646e6ac94ee40bfc461c28b"
+    }
+  ],
+  "storage_checkpoint": "258f500"
+}
