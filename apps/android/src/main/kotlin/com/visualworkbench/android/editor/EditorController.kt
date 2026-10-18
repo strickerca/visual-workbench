@@ -73,6 +73,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var airSchedule: (() -> Unit)? = null
     private var airRemotePalette: RemoteEditorPalette? = null
     private var airRemoteOwner: WorkbenchRemoteEdit? = null
+    private var airRemoteRegistration: Any? = null
+    private var airRemoteMotion: AirActionRemoteMotion? = null
+    private var airRemoteContactActive by mutableStateOf(false)
     private var airRegisteredRemote: WorkbenchRemoteEdit? = null
     private var airRemoteChanges: Job? = null
     private var airObservedPage = 0u
@@ -184,7 +187,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         try{interruptAirInput(clearBarrel = true);remoteCapability=remoteCapability?:remoteEdit(checkNotNull(link));remoteOpen=true;remoteCapability?.let(::observeAirRemote)}
         catch(_:Exception){message="Remote editing is unavailable on this authenticated link."}
     }
-    fun remoteClosed(){interruptAirInput(clearBarrel = true);airRemoteChanges?.cancel();airRemoteChanges=null;airRemotePalette=null;airRemoteOwner=null;airRemoteFocused=false;remoteOpen=false;remoteCapability=null}
+    fun remoteClosed(){
+        val remote=airRemoteOwner;val palette=airRemotePalette;val registration=airRemoteRegistration
+        if(remote!=null&&palette!=null&&registration!=null)detachAirRemotePalette(remote,palette,registration)
+        interruptAirInput(clearBarrel = true);airRemoteChanges?.cancel();airRemoteChanges=null
+        airRemoteMotion=null;airRemoteContactActive=false;airRemotePalette=null;airRemoteOwner=null;airRemoteRegistration=null;airRemoteFocused=false;remoteOpen=false;remoteCapability=null
+    }
     private var linkChanges: Job? = null
     private var peerWorker: Job? = null
     private var connectionJob: Job? = null
@@ -546,6 +554,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         airActivity === owner && airActivityFocused && !remoteOpen && airKey(event)
     internal fun airActivityResumed(owner: Any, resumed: Boolean) {
         if (airActivity !== owner || airResumed == resumed) return
+        if (!resumed) resetAirRemoteMotion()
         interruptAirInput(clearBarrel = true); airResumed = resumed
     }
     internal fun airActivityFocus(owner: Any, focused: Boolean) {
@@ -554,6 +563,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     internal fun detachAirActivity(owner: Any) {
         if (airActivity !== owner) return
+        resetAirRemoteMotion()
         interruptAirInput(clearBarrel = true); airActivity = null; airResumed = false; airActivityFocused = false
         airKeyReceiver = null; airSchedule = null
     }
@@ -588,8 +598,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             it.tool == PointerTool.Pen || it.tool == PointerTool.Eraser
         } ?: return
         val down = sample.buttons and MotionEvent.BUTTON_STYLUS_PRIMARY != 0
-        airBarrel.observe(down, sample.timeMs)
-        airActionRouter.barrel(down, sample.timeMs)
+        observeAirBarrelState(down, sample.timeMs)
+    }
+    private fun observeAirBarrelState(down: Boolean, timeMs: Long) {
+        airBarrel.observe(down, timeMs)
+        airActionRouter.barrel(down, timeMs)
         airSchedule?.invoke()
     }
     private fun airBinding(): AirActionBinding? {
@@ -622,7 +635,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 val action = remoteAirAction(command) ?: return false
                 val palette = airRemotePalette ?: return false
                 val target = remoteCapability?.target?.value ?: return false
-                !busy && pending == 0 && !workflows.blocksInput() && !rotationUnavailable() &&
+                !airRemoteContactActive && !busy && pending == 0 && !workflows.blocksInput() && !rotationUnavailable() &&
                     !instructionEditor.state.value.busy && !instructionEditor.hasUnsaved() && !semanticEditor.state.value.busy &&
                     !ai.state.value.open && !ai.needsDecision() && !documents.state.value.busy &&
                     !selections.state.value.busy && !erasers.state.value.busy && !rotation.state.value.active &&
@@ -700,20 +713,47 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             }
         } finally { applyingAirView = false }
     }
-    internal fun attachAirRemotePalette(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette) {
+    internal fun attachAirRemotePalette(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette, registration: Any) {
         if (remoteCapability !== remote) return
+        val previousRemote = airRemoteOwner; val previousPalette = airRemotePalette
+        if (previousRemote != null && previousPalette != null) airRemoteMotion?.detach(previousRemote, previousPalette)
         interruptAirInput(clearBarrel = true); airRemoteOwner = remote; airRemotePalette = palette; airRemoteFocused = false
+        airRemoteRegistration = registration
+        airRemoteContactActive = false
+        airRemoteMotion = AirActionRemoteMotion(remote, palette,
+            { clear -> interruptAirInput(clearBarrel = clear) }, ::observeAirBarrelState)
     }
-    internal fun detachAirRemotePalette(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette) {
-        if (airRemoteOwner !== remote || airRemotePalette !== palette) return
-        interruptAirInput(); airRemoteOwner = null; airRemotePalette = null; airRemoteFocused = false
+    internal fun detachAirRemotePalette(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette, registration: Any) {
+        if (airRemoteOwner !== remote || airRemotePalette !== palette || airRemoteRegistration !== registration) return
+        airRemoteMotion?.detach(remote, palette)
+        interruptAirInput(clearBarrel = true); airRemoteMotion = null; airRemoteContactActive = false
+        airRemoteOwner = null; airRemotePalette = null; airRemoteRegistration = null; airRemoteFocused = false
     }
-    internal fun airRemoteFocus(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette, focused: Boolean) {
-        if (airRemoteOwner !== remote || airRemotePalette !== palette) return
-        if (airRemoteFocused != focused) { interruptAirInput(); airRemoteFocused = focused }
+    internal fun airRemoteFocus(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette, registration: Any, focused: Boolean) {
+        if (airRemoteOwner !== remote || airRemotePalette !== palette || airRemoteRegistration !== registration) return
+        val observer = airRemoteMotion
+        if (observer?.focus(remote, palette, focused) == true) airRemoteContactActive = observer.contactActive
+        if (airRemoteFocused != focused) { interruptAirInput(clearBarrel = true); airRemoteFocused = focused }
     }
-    internal fun airRemoteKey(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette, event: KeyEvent): Boolean =
-        airRemoteOwner === remote && airRemotePalette === palette && airKey(event)
+    internal fun airRemoteKey(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette, registration: Any, event: KeyEvent): Boolean =
+        airRemoteOwner === remote && airRemotePalette === palette && airRemoteRegistration === registration && airKey(event)
+    internal fun observeAirRemoteMotion(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette, registration: Any, event: MotionEvent) {
+        if (airRemoteOwner !== remote || airRemotePalette !== palette || airRemoteRegistration !== registration || !airRemoteFocused) return
+        val observer = airRemoteMotion ?: return
+        observer.observe(remote, palette, airRemoteMotionFrame(event))
+        airRemoteContactActive = observer.contactActive
+    }
+    internal fun airRemoteMotionFailed(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette, registration: Any) {
+        if (airRemoteOwner !== remote || airRemotePalette !== palette || airRemoteRegistration !== registration) return
+        // Mark blocked before optional observer/timer work. Even an observer
+        // failure cannot leave an old offer eligible after the motion delegate.
+        airRemoteContactActive = true
+        interruptAirInput(clearBarrel = true)
+    }
+    private fun resetAirRemoteMotion() {
+        val remote = airRemoteOwner ?: return; val palette = airRemotePalette ?: return
+        airRemoteMotion?.reset(remote, palette); airRemoteContactActive = false
+    }
     private fun observeAirRemote(remote: WorkbenchRemoteEdit) {
         if (airRegisteredRemote !== remote) {
             airRegisteredRemote = remote
@@ -2136,7 +2176,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
     override fun onCleared() {
-        interruptAirInput(clearView = true, clearBarrel = true); airActionRouter.close(); airDispatcher.close()
+        interruptAirInput(clearView = true, clearBarrel = true); resetAirRemoteMotion(); airActionRouter.close(); airDispatcher.close()
         workflows.beginDeparture();rotation.cancel()
         giantOwner.invalidate()
         disposing = true

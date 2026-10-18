@@ -138,12 +138,25 @@ def run():
     check("exact existing palette passed once from inside remote Dialog", panel_body.count(slot) == 1 and panel_body.index(slot) > panel_body.index("Dialog("))
     check("remote input/lifecycle/retirement body preserved", "\n".join(line for line in panel_body.splitlines() if line != slot) == body(previous(panel_path), "RemoteEditPanel"))
     helper = (ROOT / (KOTLIN + "airactions/AirActionDialogControls.kt")).read_text()
-    check("Dialog receives full KeyEvent before original fallback", "editor.airRemoteKey(remote, palette, event) || previous.dispatchKeyEvent(event)" in helper)
+    check("Dialog receives full KeyEvent before original fallback", "editor.airRemoteKey(remote, palette, registration, event) || previous.dispatchKeyEvent(event)" in helper)
     check("Dialog callback restores only its owned slot", "if (window.callback === callback) window.callback = previous" in helper)
     check("Dialog never constructs another remote controller or palette", "RemoteEditController(" not in helper and "RemoteEditorPalette(" not in helper)
     app = (ROOT / (KOTLIN + "ui/WorkbenchApp.kt")).read_text()
     check("actual WorkbenchApp remote caller supplies hook", "airActions = { palette, blocked -> AirActionDialogControls(editor, remote, palette, blocked) }" in app)
-    check("retired Dialog callback cannot dispatch into replacement palette", "airRemoteOwner === remote && airRemotePalette === palette && airKey(event)" in controller)
+    check("retired Dialog callback cannot dispatch into replacement palette", "airRemoteOwner === remote && airRemotePalette === palette && airRemoteRegistration === registration && airKey(event)" in controller)
+    for method, delegate in [("dispatchTouchEvent", "previous::dispatchTouchEvent"),
+                             ("dispatchGenericMotionEvent", "previous::dispatchGenericMotionEvent")]:
+        check("motion callback observes before forwarding " + method,
+              "override fun " + method + "(event: MotionEvent): Boolean = observeAirRemoteMotionBeforeForward(event," in helper and
+              delegate in helper)
+    check("motion observer uses exact remote/palette registration",
+          "if (airRemoteOwner !== remote || airRemotePalette !== palette || airRemoteRegistration !== registration || !airRemoteFocused) return" in body(controller, "observeAirRemoteMotion"))
+    for method in ["detachAirRemotePalette", "airRemoteFocus", "airRemoteMotionFailed"]:
+        check("obsolete registration cannot mutate current motion state " + method,
+              "airRemoteRegistration !== registration" in body(controller, method))
+    check("remote command guard rejects pen contact", "!airRemoteContactActive" in body(controller, "airCommandAllowed"))
+    for path in ["remote/RemoteSurfaceView.kt", "remote/RemoteEditController.kt"]:
+        check("real remote motion/input source unchanged " + path, (ROOT / (KOTLIN + path)).read_text() == previous(KOTLIN + path))
     check("Air command awaits native mutation without launching detached work", "scope.launch" not in body(controller, "executeAirCommand"))
     check("Air command reuses UI native commit", "commitUndoRedo(" in body(controller, "executeAirCommand") and "commitUndoRedo(" in body(controller, "undoRedo"))
     canvas = (ROOT / (KOTLIN + "editor/CanvasSurface.kt")).read_text()
