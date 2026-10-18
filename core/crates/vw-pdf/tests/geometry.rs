@@ -16,7 +16,7 @@ fn all_four_crop_rotation_corners_have_independent_known_answers() {
         assert_eq!(page.document_to_pdf(PdfPoint { x, y }).unwrap(), raw);
         assert_eq!(
             (page.width(), page.height()),
-            if rotation % 2 == 0 {
+            if rotation.is_multiple_of(2) {
                 (100.0, 200.0)
             } else {
                 (200.0, 100.0)

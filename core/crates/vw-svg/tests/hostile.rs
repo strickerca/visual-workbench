@@ -195,3 +195,59 @@ fn split_or_commented_css_cannot_hide_reference_expansion() {
         SvgError::UnsupportedCss,
     );
 }
+
+#[test]
+fn markers_refuse_before_per_vertex_or_nested_definition_expansion() {
+    let points = "1,1 ".repeat(20_000);
+    for shape in [
+        format!("<polyline points='{points}' marker-mid='url(#m)'/>"),
+        "<g marker-start='url(#m)'><path d='M0 0L1 1L2 2'/></g>".to_owned(),
+        "<style>path{marker:url(#m)}</style><path d='M0 0L1 1'/>".to_owned(),
+        "<path style='marker-start:url(#m);marker-end:url(#m)' d='M0 0L1 1'/>".to_owned(),
+    ] {
+        refused(
+            &format!(
+                "<svg width='32' height='32'><defs><marker id='m'><path d='M0 0L1 1' marker-end='url(#nested)'/></marker><marker id='nested'><rect width='1' height='1'/></marker></defs>{shape}</svg>"
+            ),
+            SvgError::Malformed,
+        );
+    }
+    // Unused definitions must not become an admission bypass through CSS/use.
+    refused(
+        "<svg width='1' height='1'><marker id='unused'/></svg>",
+        SvgError::Malformed,
+    );
+}
+
+#[test]
+fn pattern_surfaces_cannot_escape_the_requested_tile_memory_budget() {
+    for size in ["1", "1000000000"] {
+        refused(
+            &format!(
+                "<svg width='32' height='32'><defs><pattern id='p' width='{size}' height='{size}' patternUnits='userSpaceOnUse' patternTransform='scale(4096)'><rect width='1' height='1'/></pattern></defs><rect width='32' height='32' fill='url(#p)'/></svg>"
+            ),
+            SvgError::Malformed,
+        );
+    }
+    refused(
+        "<svg width='1' height='1'><pattern id='unused'/></svg>",
+        SvgError::Malformed,
+    );
+}
+
+#[test]
+fn quoted_url_delimiters_cannot_hide_the_actual_reference_target() {
+    for target in [
+        "&quot;#a)b&quot;",
+        "&apos;#a)b&apos;",
+        "&quot;#a&apos;",
+        "#a b",
+    ] {
+        refused(
+            &format!(
+                "<svg width='1' height='1'><defs><g id='a)b'><rect width='1' height='1'/></g></defs><rect fill='url({target})'/></svg>"
+            ),
+            SvgError::UnsupportedCss,
+        );
+    }
+}

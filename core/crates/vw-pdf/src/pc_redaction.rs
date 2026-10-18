@@ -512,7 +512,7 @@ impl PcRedactionPlan {
                 let mut rgb = Vec::new();
                 rgb.try_reserve_exact(tile.width as usize * tile.height as usize * 3)
                     .map_err(|_| PdfError::Allocation)?;
-                for pixel in pixels.chunks_exact(4) {
+                for pixel in pixels.as_chunks::<4>().0.iter() {
                     if pixel[3] != 255 {
                         return Err(PcRedactionError::Verification);
                     }

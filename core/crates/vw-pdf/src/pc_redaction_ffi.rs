@@ -193,7 +193,7 @@ impl Page<'_> {
             .map_err(|_| PdfError::Allocation)?;
         let mut contour_open = false;
         for ordinal in 0..count {
-            if ordinal % 256 == 0 {
+            if ordinal.is_multiple_of(256) {
                 cancel.check()?;
             }
             // SAFETY: index range was admitted above; segment remains path-owned.

@@ -37,7 +37,7 @@ fn affine_mapping_is_d_space_and_rejects_singular_or_nonfinite_input() {
     );
     path.transform = [1.0, 2.0, 2.0, 4.0, 0.0, 0.0];
     assert!(matches!(
-        validate_overlays(&[path.clone()], 1, &PdfCancellation::default()),
+        validate_overlays(std::slice::from_ref(&path), 1, &PdfCancellation::default()),
         Err(PdfError::Invalid)
     ));
     path.transform[0] = f64::NAN;
@@ -62,7 +62,12 @@ fn outer_and_inner_headers_are_bounded_before_point_traversal() {
 #[test]
 fn point_capacity_is_charged_even_for_a_small_visible_triangle() {
     let regular = triangle();
-    let expected = validate_overlays(&[regular.clone()], 1, &PdfCancellation::default()).unwrap();
+    let expected = validate_overlays(
+        std::slice::from_ref(&regular),
+        1,
+        &PdfCancellation::default(),
+    )
+    .unwrap();
     let mut reserved = regular;
     reserved.contours[0].reserve_exact(1000);
     let actual = validate_overlays(&[reserved], 1, &PdfCancellation::default()).unwrap();
