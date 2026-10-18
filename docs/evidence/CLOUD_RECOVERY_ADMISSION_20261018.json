@@ -1,0 +1,20 @@
+{
+  "status": "dependency and source admission only; product validation pending",
+  "baseline": "67b0af376612f999a0ea2543ad99a98fddd69b22",
+  "recovery_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "document_candidate_commit": "aab363326fd3df16d6856da427ae5e572ce0abda",
+  "setup_commit": "a79728a254b6afffd1d34cc7078b28a2777ee30a",
+  "admission": {
+    "manifest": "796/796 recovered file sizes and SHA-256 values match",
+    "lock_resolution": "32 packages added, including vw-document-protocol; no existing package version changed or removed",
+    "dependency_pins": "Document crate pins retained exactly; text-only resvg/usvg 0.47.0 and pdfium-render 0.9.4 with ABI7881",
+    "cargo_license_sources_bans": "passed offline with cargo-deny 0.20.2; existing duplicate-version/unencountered-allowance warnings retained in task-local log",
+    "setup_policy": "passed tools/check_setup.py all",
+    "npm_policy": "reviewed lock policy passed; installed runtime not verified by this initial policy command",
+    "plan_coverage": "passed: 189 requirements, 66 tasks, 26 prompts",
+    "native_compilation": "not run in integration lane",
+    "native_tests_clippy": "not run; document lane owns next heavy build slot"
+  },
+  "boundary": "No FFI registration, generated bindings, app wiring, Windows-native runtime, provider, emulator or physical-device acceptance is asserted. Main is untouched. Krita implementation/reactivation is deferred and its source is preserved.",
+  "verification_images": "none created"
+}

@@ -1,0 +1,26 @@
+{
+  "status": "source reviewed; compilation and runtime tests pending",
+  "base_commit": "67b0af376612f999a0ea2543ad99a98fddd69b22",
+  "recovery_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "composition": [
+    "ink-core/core/crates/vw-document-protocol (R2)",
+    "ink-core/t3-document-pc-redaction/after/core/crates/vw-document-protocol/src/job.rs"
+  ],
+  "changes_from_candidates": [
+    "rustfmt 1.99.0",
+    "narrow test-only unwrap allowances; production lints unchanged",
+    "retry Interrupted during final source EOF probe, with a regression case"
+  ],
+  "review": "Independent source review checked bounded hostile input, aggregate wire overhead, poisoned failure state, source/reply identity and EOF. Both findings were fixed and re-reviewed; no remaining concrete findings.",
+  "checks": {
+    "manifest_resolution": "passed; Rust edition 2024 workspace member",
+    "rustfmt": "passed",
+    "tests": "not run; global next heavy slot reserved for document lane",
+    "clippy": "not run"
+  },
+  "caller_obligations": [
+    "Bound process time and memory, signal cancellation, join worker exit and cleanup before releasing owners.",
+    "Validate operation-specific metadata before consuming derived output, require successful process exit and EOF-complete reply, then enforce revision and publication fences.",
+    "Framing integrity does not prove PDFium/qpdf sandboxing, document fidelity, true redaction, app integration or physical acceptance."
+  ]
+}

@@ -7,7 +7,10 @@ The archive is preserved outside the active build roots. Its publication and
 syntax checks do not establish compilation, integration, or product acceptance.
 
 The owner's roadmap continuation supersedes the historical pause and M4-only
-scope. Original requirement clauses, performance targets and physical gates
+scope. Latest steering defers Krita implementation/reactivation; preserve its
+existing source. Paint and independent non-Krita roadmap work proceed. The owner
+reports an S23 connected for separately coordinated Windows/device validation.
+Original requirement clauses, performance targets and physical gates
 remain in force. This ledger records software disposition separately from gates;
 it does not change `REQUIREMENTS.json` or approve a product gate.
 
@@ -22,7 +25,7 @@ it does not change `REQUIREMENTS.json` or approve a product gate.
 | 2e | T3.08/10 giant images and formats | `vw-assets` is a stub; `vw-formats` and `vw-avif-os` are absent. Prefer foundation R2, Windows producer R3, Android intake/viewport R2, PNG export R2 and ordinary-format composition. Color changes overlap raster and stream code. | Image lane reviews its three crates/fixtures; integration owns store, raster, FFI and apps. Test bounds, source hashes, cache leases, stale viewport, original-byte preservation, BMP/TIFF and AVIF refusal. Native decoder, GPU, A10/A11 and PERF-005/006/008 measurements remain open. |
 | 2f | T3.09 PDF/SVG/redaction | `vw-pdf` and `vw-svg` are stubs. Prefer SVG R3, protocol/raster-redaction/Windows-worker R2 and restricted PC redaction. | Document lane reviews PDF/SVG crates/fixtures. Integration owns protocol, worker registration and apps. Validate malformed input, deny-all SVG resources, bounded framing, password privacy, cancellation and verifiable redaction refusal. PDFium/qpdf runtime and A12 remain open. |
 | 2g | T3.11/12 sync and Phase 3 acceptance | Existing transport/reconnect code is partial evidence; no integrated T3.11 or G3 acceptance was found. | Implement scale rebase/conflict review, carrier switching and phone-only AI sends after relevant contracts. A14/A25 and complete G3 reruns remain open. |
-| 3 | Phase 4 Krita/Paint and deferred scope | Main contains R164/R166/R167 source with historical streaming, input, controls and packaging receipts. Normal transfer/rendering, palette/Zoom/Undo eligibility, shutdown and Krita acceptance remain open. | Integrate the separately owned picker repair without replacing current Main with the R169 diagnostic overlay. Preserve original receipts. Five scoped build tasks remain per checkpoint; physical S Pen, 30 fps, 80 ms p95, A27 and owner drawing acceptance are unpassed. Full G4 includes retained deferred tasks. |
+| 3 | Phase 4 Paint and deferred scope | Main contains R164/R166/R167 source with historical streaming, input, controls and packaging receipts. Normal transfer/rendering, Paint palette/Zoom/Undo eligibility and shutdown remain open. Krita work is deferred; preserve its source and acceptance gaps. | Integrate the separately owned picker repair without replacing current Main with the R169 diagnostic overlay. Preserve original receipts. Five scoped build tasks remain per checkpoint, with Krita clauses deferred; physical S Pen, 30 fps, 80 ms p95, A27 and owner drawing acceptance are unpassed. Full G4 includes retained deferred tasks. |
 | 4 | Phase 5 verification/providers/diagnostics/tunnel/release | No complete verification loop, Gemini/FLUX image adapters, Android tunnel, Air Actions or release acceptance is established. Nine R169 diagnostic source files are preserved; their 20 written tests were unrun at preservation. | Finish preceding software dependencies, then offline provider/verification/diagnostic contracts and tests. Explicit Send, budget and credential boundaries persist. Signing, live providers, drivers, physical tests and owner gate decisions need their actual external authority. G5 remains open. |
 
 ## Current ownership and integration order
