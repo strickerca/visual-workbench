@@ -2706,6 +2706,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tiff"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b63feaf3343d35b6ca4d50483f94843803b0f51634937cc2ec519fc32232bc52"
+dependencies = [
+ "flate2",
+ "half",
+ "quick-error",
+ "weezl",
+ "zune-jpeg",
+]
+
+[[package]]
 name = "time"
 version = "0.3.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3294,6 +3307,20 @@ dependencies = [
 [[package]]
 name = "vw-assets"
 version = "0.1.0"
+dependencies = [
+ "blake3",
+ "thiserror",
+]
+
+[[package]]
+name = "vw-avif-os"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+ "vw-model",
+ "vw-raster",
+ "windows",
+]
 
 [[package]]
 name = "vw-capture"
@@ -3372,6 +3399,18 @@ dependencies = [
  "vw-semantics",
  "vw-store",
  "zeroize",
+]
+
+[[package]]
+name = "vw-formats"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "thiserror",
+ "tiff",
+ "vw-model",
+ "vw-raster",
+ "weezl",
 ]
 
 [[package]]
@@ -3901,6 +3940,12 @@ checksum = "998d2c24ec099a87daf9467808859f9d82b61f1d9c9701251aea037f514eae0e"
 dependencies = [
  "nom",
 ]
+
+[[package]]
+name = "weezl"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a751b3277700db47d3e574514de2eced5e54dc8a5436a3bf7a0b248b2cee16f3"
 
 [[package]]
 name = "winapi"

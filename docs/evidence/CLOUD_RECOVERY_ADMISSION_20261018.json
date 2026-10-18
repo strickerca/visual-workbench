@@ -16,5 +16,16 @@
     "native_tests_clippy": "not run; document lane owns next heavy build slot"
   },
   "boundary": "No FFI registration, generated bindings, app wiring, Windows-native runtime, provider, emulator or physical-device acceptance is asserted. Main is untouched. Krita implementation/reactivation is deferred and its source is preserved.",
-  "verification_images": "none created"
+  "verification_images": "none created",
+  "image_candidate_commit": "f93f1018019c2fc9585770e9cedd5c045a136d1f",
+  "image_admission": {
+    "pins": [
+      "tiff =0.11.3",
+      "weezl =0.1.10 (test-only)"
+    ],
+    "lock_resolution": "Two registry packages plus vw-formats and vw-avif-os added; no previous package version changed or removed",
+    "cargo_license_sources_bans": "passed offline with cargo-deny 0.20.2",
+    "tests": "not run; image lane follows reserved document heavy slot"
+  },
+  "open_document_review": "SVG marker expansion accounting: preflight visits each marker reference once, while usvg 0.47.0 marker.rs:202-212 converts marker children per path vertex. Bound instance expansion or explicitly refuse this subset before acceptance."
 }
