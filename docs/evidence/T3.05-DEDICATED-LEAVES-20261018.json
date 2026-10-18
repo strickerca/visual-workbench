@@ -1,0 +1,244 @@
+{
+  "schema": 1,
+  "status": "bounded T3.05 dedicated-leaf source checkpoint; uncompiled until coordinator hooks and heavy-slot grant",
+  "base_candidate": "5f4f581c84d9215c06c0029f8dd042fc8453f26d",
+  "base_validated_code": "b0ace63b075fee190515f8e0c45fb6062f3809d0",
+  "recovered_source_commit": "473395197f6437586a8b0c05fa8cd35aa6800441",
+  "recovered_prefix": "recovery/source-candidates/ink-core/",
+  "new_dedicated_source_test_files": 14,
+  "sources": [
+    {
+      "path": "apps/android/src/androidTest/kotlin/com/visualworkbench/android/PolygonEditorInstrumentedTest.kt",
+      "sha256": "3a6d17b48aa7696056303445142c7b3c11bcae58c9f128ec63597d6166d1113b",
+      "recovered_sha256": "3a6d17b48aa7696056303445142c7b3c11bcae58c9f128ec63597d6166d1113b",
+      "byte_identical": true
+    },
+    {
+      "path": "apps/android/src/androidTest/kotlin/com/visualworkbench/android/StylusTiltInstrumentedTest.kt",
+      "sha256": "40b5ce3ceb5f2059d24306ee1faca07f3f8724ae572979fdf72d164c90dab099",
+      "recovered_sha256": "40b5ce3ceb5f2059d24306ee1faca07f3f8724ae572979fdf72d164c90dab099",
+      "byte_identical": true
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SelectionPolygon.kt",
+      "sha256": "e35abae04e13609b9f4bf8c5045c76fb6f60c0edbfeb1f1d7cc40f1e538288d8",
+      "recovered_sha256": "e35abae04e13609b9f4bf8c5045c76fb6f60c0edbfeb1f1d7cc40f1e538288d8",
+      "byte_identical": true
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/StylusTiltApi.kt",
+      "sha256": "cd4b3a47e3e1df65fcf2c9e4ef10b8248828273e2bd3b0c11f857f8ff9901a9a",
+      "recovered_sha256": "cd4b3a47e3e1df65fcf2c9e4ef10b8248828273e2bd3b0c11f857f8ff9901a9a",
+      "byte_identical": true
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeStylusTilt.kt",
+      "sha256": "1adf74bfc18265a1abd022b0b4ca64760964bbfd6fe007f4319263bfd6d0836c",
+      "recovered_sha256": "1adf74bfc18265a1abd022b0b4ca64760964bbfd6fe007f4319263bfd6d0836c",
+      "byte_identical": true
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/SelectionPolygonTest.kt",
+      "sha256": "c19c613ef552a6c51f9edb4b08cd56927c916b25f94952d8f5d14f4c657ede9e",
+      "recovered_sha256": "292a5af035f71b3ac1fb0a14d77c684124dd277675d3d68a2a9d683932a4816e",
+      "byte_identical": false
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/StylusTiltContractTest.kt",
+      "sha256": "c188a4cd49c3aeb3c9f0effedfaaf3d8d538a74c538eb0e169c6ccb33fbfd9ea",
+      "recovered_sha256": "c188a4cd49c3aeb3c9f0effedfaaf3d8d538a74c538eb0e169c6ccb33fbfd9ea",
+      "byte_identical": true
+    },
+    {
+      "path": "core/crates/vw-ffi/src/stylus_tilt.rs",
+      "sha256": "d83021ccf2a2080a1f7b25bd9d92146d57d857c2a576e76acf53b4517102df1d",
+      "recovered_sha256": "21f2a6fd6fc9332012258cbf0d23bb06ee4630b1b2a64741fd1111160ea4887d",
+      "byte_identical": false
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/selection_shapes.rs",
+      "sha256": "9d7b91750eeb2a67211f26df977f5ee02e3bd55067c8167ca39c3dbe2a01204e",
+      "recovered_sha256": "b282cc484baa8b9cb0222612902ff6bc368d7af0d96b447d4b1b04b07f8b00db",
+      "byte_identical": false
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/stylus_tilt.rs",
+      "sha256": "390f120bf13dc9827ccedf42aee1f4238f27c9bc7b56e758dfbcf6da4ca909a5",
+      "recovered_sha256": "96ad3ae30153cb25fd32509804a4931551d177a5a046d8d7fbe751a4fd111e6d",
+      "byte_identical": false
+    },
+    {
+      "path": "core/crates/vw-geom/src/stylus_tilt.rs",
+      "sha256": "82bd05b3c08d17d50171f5fd2bb7c664132d5f47b49b7fd89cc87c79c60fb718",
+      "recovered_sha256": "9a29661028871989619b4c87fb3bb7cd0a72135a011b326b6420c00c6065d3b3",
+      "byte_identical": false
+    },
+    {
+      "path": "core/crates/vw-geom/tests/stylus_tilt.rs",
+      "sha256": "fdfacf8eb75fbe36ef414188031e8a08427dc3e93650716bce7ef3b63c4fd925",
+      "recovered_sha256": "3faee282625e5ccbc7a1f539316190853c01298b5877a8ab79b840d78867dd7d",
+      "byte_identical": false
+    },
+    {
+      "path": "core/crates/vw-mask/src/shape_selection.rs",
+      "sha256": "9d60e67a9429f49bdf878885a150283c5f850414ed2dfffb683047de233ad448",
+      "recovered_sha256": "09f3f2782d6a7954b54cd79e715bf3c175e250a9fb57b3dddb031802aba05329",
+      "byte_identical": false
+    },
+    {
+      "path": "core/crates/vw-mask/tests/shape_selection.rs",
+      "sha256": "69e2e96f4ddaa05e01450f6af7c1883d7c8e3f1eec774cfb105072badb2af26a",
+      "recovered_sha256": "daa31ea12a6d482dc7e5f325888f6444c6020942a96e371eda0d1abadab57af1",
+      "byte_identical": false
+    }
+  ],
+  "existing_file_extension": {
+    "path": "core/crates/vw-mask/src/coverage.rs",
+    "sha256": "398f6087d585760800e9e296cd70322e2b68c84e95e8451a51e9833423f5832c",
+    "scope": "only recovered ellipse primitive, low/high/event spans and rasterize_ellipse; canonical coverage integrator unchanged",
+    "reviewed_patch": "t3-selections/T3.05-SELECTIONS.patch",
+    "full_stale_patch_applied": false
+  },
+  "no_change_covered_behavior": [
+    "Existing reported raw stroke tilt/orientation forwarding and stored arrays remain intact",
+    "Existing Rectangle/Lasso/Paint/MaskEraser paths and mask combine/serialization remain authoritative",
+    "Existing ordinary ellipse/polygon annotation shapes are separate from missing pixel-mask selection tools"
+  ],
+  "written_tests": {
+    "apps/android/src/androidTest/kotlin/com/visualworkbench/android/PolygonEditorInstrumentedTest.kt": 2,
+    "apps/android/src/androidTest/kotlin/com/visualworkbench/android/StylusTiltInstrumentedTest.kt": 3,
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/SelectionPolygonTest.kt": 6,
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/StylusTiltContractTest.kt": 3,
+    "core/crates/vw-ffi/tests/selection_shapes.rs": 3,
+    "core/crates/vw-ffi/tests/stylus_tilt.rs": 2,
+    "core/crates/vw-geom/tests/stylus_tilt.rs": 8,
+    "core/crates/vw-mask/tests/shape_selection.rs": 8
+  },
+  "written_total": 35,
+  "recovered_written": 31,
+  "added_regressions": [
+    "odd quantized ellipse center reflection",
+    "equal-axis ellipse / existing opaque round-dab exact coverage",
+    "duplicate UP does not append phantom vertex",
+    "full-draft refusal atomic and undo restores capacity"
+  ],
+  "executed_tests": 0,
+  "cheap_checks": {
+    "common_import_guard": "pass",
+    "rustfmt_direct_files": "pass",
+    "whitespace": "pass",
+    "no_new_dependencies": true
+  },
+  "shared_hooks": [
+    {
+      "path": "core/crates/vw-geom/src/lib.rs",
+      "code": "mod stylus_tilt; pub use stylus_tilt::{TiltAxisSign, TiltCalibration, TiltError, WindowsTilt, windows_tilt};"
+    },
+    {
+      "path": "core/crates/vw-mask/src/lib.rs",
+      "code": "mod shape_selection;",
+      "note": "coverage.rs ellipse primitive is already implemented by this lane; existing rectangle/lasso/paint math is unchanged"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/lib.rs",
+      "code": "mod stylus_tilt; pub use stylus_tilt::*;"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/masks/dto.rs",
+      "code": "SelectionOperation::Ellipse { rectangle: QueryRect, combine: SelectionCombine }; SelectionOperation::Polygon { vertices: Vec<Point>, combine: SelectionCombine }"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/masks/edit.rs",
+      "requirements": [
+        "Admit polygon vertex count 3..=vw_mask::MAX_PATH_POINTS with existing lasso; charge vertices.len()*256 in bounded request memory",
+        "Mask::admit_ellipse(size, rectangle) BEFORE reading/loading target mask assets",
+        "Dispatch Mask::ellipse / Mask::polygon and existing combine function; preserve atomic source/mask version/history/journal path"
+      ]
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/MaskApi.kt",
+      "code": "SelectionOperation.Ellipse(Rect, SelectionCombine); SelectionOperation.Polygon(List<Point>, SelectionCombine)",
+      "requirements": [
+        "ownedSelectionRequest validates Polygon 3..16_384 and copies vertices before async submission"
+      ]
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeMasks.kt",
+      "code": "map Ellipse to generated NOperation.Ellipse(QueryRect(...), combine.native()); map Polygon to NOperation.Polygon(vertices.map(::NPoint), combine.native())"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SelectionInteraction.kt",
+      "code": "SelectionTool { Rectangle, Ellipse, Polygon, Lasso, Paint, MaskEraser }; finishPolygon(): Boolean; undoPolygonVertex(): Boolean; canResumePolygonContact(Camera): Boolean",
+      "requirements": [
+        "Use recovered internal SelectionPolygon for retained tapped vertices; begin/move/end adjust/freeze one contact; UP must not submit the polygon",
+        "Retain existing captured document/version/target/combine and camera across contacts; Finish explicitly owns copied vertices, one existing atomic submit",
+        "Cancel on view/revision/project/attachment/tool/refinement changes and real interruption; never resume an active/invalidated contact",
+        "Ellipse uses down/up bounding rectangle; canonical mask coverage remains native",
+        "Recovered patch includes 8 common interaction regressions to rebase into existing fixture; do not paste stale controller postimages"
+      ]
+    },
+    {
+      "paths": [
+        "apps/android/src/main/kotlin/com/visualworkbench/android/ui/SelectionPanel.kt",
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/SelectionPanel.kt",
+        "apps/android/src/main/kotlin/com/visualworkbench/android/editor/SelectionOverlay.kt",
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/SelectionOverlay.kt"
+      ],
+      "requirements": [
+        "Label Ellipse/Polygon; expose Finish polygon and Undo vertex while draft is idle; close outline and show vertices; use existing canvas/D transforms",
+        "Keep 48dp controls, modal and native selection admission guards"
+      ]
+    },
+    {
+      "paths": [
+        "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt",
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt",
+        "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt"
+      ],
+      "requirements": [
+        "Normal new polygon contacts must preserve only an admitted idle polygon via canResumePolygonContact(camera); existing unconditional cancelTool/cancelInput at begin and desktop post-UP cancelDrag otherwise erase it",
+        "Real cancellation, camera/project/page change and disposal still cancel unconditionally; ordinary tools keep prior behavior",
+        "Preserve precision raw -> base routing once per sample, final-UP-before-end, prediction separation, native hit/snap matrices and document retirement guards"
+      ]
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditController.kt",
+      "code": "projectStylusTilt(reportedTiltOrNull, reportedOrientationOrNull, actualViewToFrameRotation, measuredPerDeviceCalibrationOrNull)",
+      "requirements": [
+        "Replace linear sin(phi)*theta / -cos(phi)*theta projection only after calibrated adapter/capability seam is integrated",
+        "Preserve raw stored stroke axes; never treat Android orientation as twist; rotationDegrees is zero without a separately reported twist axis",
+        "Absent hardware axes remain null; present axes with no measured calibration yield Uncalibrated; no vendor/name/sign default",
+        "Ordinary pressure/drawing remains independent of conditional tilt; do not enable a calibrated-tilt claim or block unrelated input just because calibration is pending"
+      ]
+    },
+    {
+      "paths": [
+        "core/crates/vw-remote/src/wire.rs",
+        "host-win/crates/vw-remote-host/src/platform/native_guard.rs"
+      ],
+      "requirements": [
+        "Current wire uses numeric tilt fields and injector always sets penMask=15; this cannot express absence/unverified axes. Coordinator must preserve actual capability/calibration validity before declaring injected tilt support",
+        "No protocol/driver/injection changes were made by this leaf checkpoint; physical sign/pressure/latency acceptance remains pending"
+      ]
+    }
+  ],
+  "original_shared_hook_sources": [
+    {
+      "path": "t3-selections/T3.05-SELECTIONS.patch",
+      "sha256": "ebb18bcdd40ba7cc6c312c9b2315963871afd2d983691dfb4df101ce49d6202c"
+    },
+    {
+      "path": "t3-tilt/T3.05-TILT.patch",
+      "sha256": "8d74fa6df830290fcc23fbfedf2ce8fac2d4b98e30e026be25e74f68f17236d2"
+    }
+  ],
+  "scope_guards": [
+    "No shared controller, root registration, Main or WorkbenchApp edited",
+    "No device/provider/paid-service/credentials/security/deployment actions",
+    "No captures or screenshots created",
+    "Physical directional signs are not measured; synthetic test signs do not establish calibration",
+    "No PEN-014/EDIT-013 or roadmap gate pass claimed",
+    "Krita remains deferred"
+  ],
+  "heavy_slot": "coordinator; no compilation started"
+}

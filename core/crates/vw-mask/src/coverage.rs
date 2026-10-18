@@ -144,18 +144,26 @@ enum Fill {
 enum Primitive {
     Edge { low: Q, high: Q, winding: i32 },
     Circle { center: Q, radius: i64 },
+    // Twice the quantized center preserves odd (1/256 px) bounding widths.
+    Ellipse { center2: Q, width: i64, height: i64 },
 }
 impl Primitive {
     fn low(self) -> i64 {
         match self {
             Self::Edge { low, .. } => low.y,
             Self::Circle { center, radius } => center.y - radius,
+            Self::Ellipse {
+                center2, height, ..
+            } => (center2.y - height) / 2,
         }
     }
     fn high(self) -> i64 {
         match self {
             Self::Edge { high, .. } => high.y,
             Self::Circle { center, radius } => center.y + radius,
+            Self::Ellipse {
+                center2, height, ..
+            } => (center2.y + height) / 2,
         }
     }
     fn events(self, y2: i64, out: &mut Vec<(i64, i32)>) {
@@ -167,6 +175,19 @@ impl Primitive {
                 // are checked before this arithmetic and fit comfortably in i128.
                 let offset = (numerator + denominator / 2).div_euclid(denominator);
                 out.push((low.x * 256 + offset as i64, winding));
+            }
+            Self::Ellipse {
+                center2,
+                width,
+                height,
+            } => {
+                let dy = (y2 - center2.y) as f64 / height as f64;
+                let square = 1.0 - dy * dy;
+                if square > 0.0 {
+                    let offset = libm::round(libm::sqrt(square) * width as f64 * 128.0) as i64;
+                    out.push((center2.x * 128 - offset, -1));
+                    out.push((center2.x * 128 + offset, 1));
+                }
             }
             Self::Circle { center, radius } => {
                 let dy = y2 - 2 * center.y;
@@ -180,6 +201,23 @@ impl Primitive {
         }
     }
 }
+/// Called only after the nonallocating ellipse geometry/work admission.
+pub(crate) fn rasterize_ellipse(size: Size, [left, top, right, bottom]: [i64; 4]) -> Result<Mask> {
+    rasterize(
+        size,
+        vec![Primitive::Ellipse {
+            center2: Q {
+                x: left + right,
+                y: top + bottom,
+            },
+            width: right - left,
+            height: bottom - top,
+        }],
+        Fill::NonZero,
+        255,
+    )
+}
+
 fn add_polygon(primitives: &mut Vec<Primitive>, points: &[Q]) {
     for (&a, &b) in points
         .iter()
