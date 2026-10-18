@@ -196,11 +196,7 @@ pub fn render_image_output_region(
                 let area = u128::from(dx) * u128::from(dy);
                 pixels.set_sample(at + 3, ((sums[3] + area / 2) / area) as u16);
                 for (channel, sum) in sums[..3].iter().enumerate() {
-                    let sample = if sums[3] == 0 {
-                        0
-                    } else {
-                        (*sum + sums[3] / 2) / sums[3]
-                    };
+                    let sample = (*sum + sums[3] / 2).checked_div(sums[3]).unwrap_or(0);
                     pixels.set_sample(at + channel, sample as u16);
                 }
             }
