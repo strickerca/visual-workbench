@@ -6,6 +6,8 @@ import android.content.Intent
 import android.Manifest
 import android.content.pm.PackageManager
 import android.view.WindowManager
+import android.view.KeyEvent
+import com.visualworkbench.android.airactions.AirActionKeys
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,6 +28,8 @@ class MainActivity : ComponentActivity() {
     private val handoff by lazy { MediaHandoff(this) }
     private var cameraToken: String? = null
     private var cameraStarting = false
+    private val airActivityOwner = Any()
+    private var airKeys: AirActionKeys? = null
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) takePhoto()
         else editor.transferMessage("Camera permission was not granted. Choose an image from Photos or Files, or try the camera again.")
@@ -58,6 +62,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         editor = ViewModelProvider(this)[EditorController::class.java]
+        airKeys = AirActionKeys(editor.airActionRouter)
+        editor.attachAirActivity(airActivityOwner, { event -> airKeys?.accept(event) == true }, { airKeys?.schedule() })
         cameraToken = savedInstanceState?.getString("camera-token")
         val activeCamera = cameraToken
         editor.scope.launch { editor.cleanupTransfer { handoff.prune(System.currentTimeMillis(), activeCamera) } }
@@ -102,5 +108,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onPause() { editor.onBackground(); super.onPause() }
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (::editor.isInitialized && editor.airActivityKey(airActivityOwner, event)) return true
+        return super.dispatchKeyEvent(event)
+    }
+    override fun onResume() {
+        super.onResume()
+        if (::editor.isInitialized) {
+            editor.airActivityResumed(airActivityOwner, true)
+            editor.airActivityFocus(airActivityOwner, window.decorView.hasWindowFocus())
+        }
+    }
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (::editor.isInitialized) editor.airActivityFocus(airActivityOwner, hasFocus)
+    }
+    override fun onPause() {
+        editor.airActivityResumed(airActivityOwner, false)
+        editor.onBackground(); super.onPause()
+    }
+    override fun onDestroy() {
+        airKeys?.detach(interruptRouter = !::editor.isInitialized || editor.airActivityCurrent(airActivityOwner)); airKeys = null
+        if (::editor.isInitialized) editor.detachAirActivity(airActivityOwner)
+        super.onDestroy()
+    }
 }

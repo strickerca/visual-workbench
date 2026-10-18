@@ -4,6 +4,10 @@ import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import com.visualworkbench.shared.AirActionBindings
+import com.visualworkbench.shared.AirActionGesture
+import com.visualworkbench.android.airactions.decodeAirActionPreferences
+import com.visualworkbench.android.airactions.encodeAirActionPreferences
 
 internal enum class EditorTool(val label: String, val shortLabel: String) {
     Pen("Pen", "Pen"), Highlighter("Highlighter", "High"), Marker("Marker brush", "Mark"), Callout("Numbered marker", "1 2"),
@@ -44,6 +48,7 @@ internal data class EditorPreferences(
         EditorTool.Highlighter to BrushPreference(24.0, 0x66ffc857, 0.08f),
         EditorTool.Marker to BrushPreference(12.0, 0xffec8792, 0.10f),
     ),
+    val airActions: AirActionBindings = AirActionBindings(),
 ) {
     init { require(railOffset.isFinite() && railOffset in 0f..1f) }
     fun brush(tool: EditorTool): BrushPreference = brushes[tool] ?: brushes.getValue(EditorTool.Pen)
@@ -69,7 +74,8 @@ internal class EditorPreferencesStore(context: Context) {
                         curve.getDouble("x2").toFloat(), curve.getDouble("y2").toFloat()))
             }
             EditorPreferences(value.optBoolean("drawWithFinger"), value.optBoolean("leftHanded"),
-                value.optBoolean("darkTheme", true), value.optBoolean("reducedMotion"), value.optDouble("railOffset", 0.25).toFloat(), brushes)
+                value.optBoolean("darkTheme", true), value.optBoolean("reducedMotion"), value.optDouble("railOffset", 0.25).toFloat(), brushes,
+                readAirActionBindings(value.optJSONObject("airActions")))
         } catch (_: IllegalArgumentException) { defaults }
         catch (_: org.json.JSONException) { defaults }
     }
@@ -77,6 +83,7 @@ internal class EditorPreferencesStore(context: Context) {
         val json = JSONObject().put("schema", 1).put("drawWithFinger", settings.drawWithFinger)
             .put("leftHanded", settings.leftHanded).put("darkTheme", settings.darkTheme)
             .put("reducedMotion", settings.reducedMotion).put("railOffset", settings.railOffset.toDouble())
+            .put("airActions", writeAirActionBindings(settings.airActions))
         settings.brushes.forEach { (tool, brush) ->
             json.put(tool.name, JSONObject().put("width", brush.width).put("argb", brush.colorArgb)
                 .put("stabilization", brush.stabilization.toDouble()).put("pressure", JSONObject()
@@ -87,4 +94,16 @@ internal class EditorPreferencesStore(context: Context) {
             "Settings could not be saved"
         }
     }
+}
+
+/** Missing entries keep v1 defaults. Explicit null, malformed values and unknown
+ * command names disable that known slot without discarding unrelated settings. */
+internal fun readAirActionBindings(value: JSONObject?): AirActionBindings {
+    val values = AirActionGesture.entries.filter { value?.has(it.name) == true }
+        .associate { it.name to value?.opt(it.name) }
+    return decodeAirActionPreferences(values)
+}
+
+internal fun writeAirActionBindings(bindings: AirActionBindings): JSONObject = JSONObject().also { json ->
+    encodeAirActionPreferences(bindings).forEach { (gesture, command) -> json.put(gesture, command ?: JSONObject.NULL) }
 }

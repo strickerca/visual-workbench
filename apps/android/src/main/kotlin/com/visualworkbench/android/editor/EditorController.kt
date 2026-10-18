@@ -6,6 +6,9 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Path
 import android.net.Uri
+import android.view.KeyEvent
+import android.view.MotionEvent
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -13,6 +16,7 @@ import androidx.lifecycle.AndroidViewModel
 import com.visualworkbench.android.diagnostics.DiagnosticsController
 import com.visualworkbench.android.input.*
 import com.visualworkbench.android.precision.*
+import com.visualworkbench.android.airactions.*
 import com.visualworkbench.android.ui.ProjectCard
 import com.visualworkbench.shared.*
 import com.visualworkbench.android.session.PairingController
@@ -21,9 +25,11 @@ import com.visualworkbench.android.session.sessionMessage
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.*
 
 internal enum class WorkbenchScreen { Projects, Canvas, Settings, Diagnostics, Pairing, Instructions }
@@ -54,6 +60,31 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private val captureArrivalQuery: suspend (WorkbenchProject, ULong) -> ReceivedCapture? = { p, after -> p.receivedCapture(after) },
     sessionFactory: suspend (android.content.Context, String) -> WorkbenchSessions = ::createAndroidSessions) : AndroidViewModel(application), CanvasGestureSink {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val airEpoch = AtomicLong()
+    private var airInitialized = false
+    private val airViewRestore = AirActionViewRestore()
+    private val airBarrel = AirActionBarrelCorrelation()
+    private var applyingAirView = false
+    private var airActivity: Any? = null
+    private var airResumed by mutableStateOf(false)
+    private var airActivityFocused by mutableStateOf(false)
+    private var airRemoteFocused by mutableStateOf(false)
+    private var airKeyReceiver: ((KeyEvent) -> Boolean)? = null
+    private var airSchedule: (() -> Unit)? = null
+    private var airRemotePalette: RemoteEditorPalette? = null
+    private var airRemoteOwner: WorkbenchRemoteEdit? = null
+    private var airRegisteredRemote: WorkbenchRemoteEdit? = null
+    private var airRemoteChanges: Job? = null
+    private var airObservedPage = 0u
+    private val airModals = mutableSetOf<Any>()
+    internal var airSetup by mutableStateOf(AirActionSetup()); private set
+    internal var airCommandBusy by mutableStateOf(false); private set
+    private val airDispatcher = CommandDispatcher(scope)
+    internal val airActionRouter: AirActionRouter by lazy(LazyThreadSafetyMode.NONE) {
+        AirActionRouter(airDispatcher, SystemClock::uptimeMillis, ::airBinding,
+            { ticket, command -> airCommandAllowed(ticket, command) }, ::executeAirCommand,
+            { message = "The action queue is full. Finish the current action, then try again." })
+    }
     private var precisionClosed=false
     internal fun cancelPrecision(){if(!precisionClosed)precision.cancel()}
     private fun closePrecision(){precision.close();precisionClosed=true}
@@ -150,10 +181,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     var remoteOpen by mutableStateOf(false); private set
     fun openRemoteComputer(){
         if(connection?.carrier!=SessionCarrier.QuicTether){message="Connect the selected USB tether route first.";return}
-        try{remoteCapability=remoteCapability?:remoteEdit(checkNotNull(link));remoteOpen=true}
+        try{interruptAirInput(clearBarrel = true);remoteCapability=remoteCapability?:remoteEdit(checkNotNull(link));remoteOpen=true;remoteCapability?.let(::observeAirRemote)}
         catch(_:Exception){message="Remote editing is unavailable on this authenticated link."}
     }
-    fun remoteClosed(){remoteOpen=false;remoteCapability=null}
+    fun remoteClosed(){interruptAirInput(clearBarrel = true);airRemoteChanges?.cancel();airRemoteChanges=null;airRemotePalette=null;airRemoteOwner=null;airRemoteFocused=false;remoteOpen=false;remoteCapability=null}
     private var linkChanges: Job? = null
     private var peerWorker: Job? = null
     private var connectionJob: Job? = null
@@ -168,7 +199,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var sliderSequence = 0u
     private var sliderRevision: ProjectInfo? = null
     val diagnostics = DiagnosticsController(application, scope)
-    var screen by mutableStateOf(WorkbenchScreen.Projects); private set
+    private var screenState by mutableStateOf(WorkbenchScreen.Projects)
+    var screen: WorkbenchScreen
+        get() = screenState
+        private set(value) { if (screenState != value) interruptAirInput(clearBarrel = true); screenState = value }
     var preferences by mutableStateOf(EditorPreferences()); private set
     var tool by mutableStateOf(EditorTool.Pen); private set
     var projects by mutableStateOf<List<ProjectCard>>(emptyList()); private set
@@ -178,22 +212,41 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var busyState by mutableStateOf(true)
     var busy: Boolean
         get() = busyState
-        private set(value) { busyState = value; importReadiness.busy(value) }
+        private set(value) { if (busyState != value) interruptAirInput(); busyState = value; importReadiness.busy(value) }
     var transferLabel by mutableStateOf<String?>(null); private set
     private var pendingState by mutableStateOf(0)
     var pending: Int
         get() = pendingState
-        private set(value) { pendingState = value; importReadiness.pending(value) }
+        private set(value) { if (pendingState != value) interruptAirInput(); pendingState = value; importReadiness.pending(value) }
     var message by mutableStateOf<String?>(null); private set
-    var blockingMessage by mutableStateOf<String?>(null); private set
+    private var blockingMessageState by mutableStateOf<String?>(null)
+    var blockingMessage: String?
+        get() = blockingMessageState
+        private set(value) { if (blockingMessageState != value) interruptAirInput(); blockingMessageState = value }
     var needsColorConsent by mutableStateOf(false); private set
     var originalFormatNotice by mutableStateOf<String?>(null); private set
     var info by mutableStateOf<ProjectInfo?>(null); private set
-    var document by mutableStateOf<DocumentSnapshot?>(null); private set
+    private var documentState by mutableStateOf<DocumentSnapshot?>(null)
+    var document: DocumentSnapshot?
+        get() = documentState
+        private set(value) {
+            if (documentState !== value) interruptAirInput(clearView = documentState?.documentId != value?.documentId ||
+                documentState?.width != value?.width || documentState?.height != value?.height)
+            documentState = value
+        }
     var selected by mutableStateOf<String?>(null); private set
-    var textDraft by mutableStateOf<TextDraft?>(null); private set
-    var showContext by mutableStateOf(false)
-    var showBrush by mutableStateOf(false); private set
+    private var textDraftState by mutableStateOf<TextDraft?>(null)
+    var textDraft: TextDraft?
+        get() = textDraftState
+        private set(value) { if (textDraftState != value) interruptAirInput(); textDraftState = value }
+    private var showContextState by mutableStateOf(false)
+    var showContext: Boolean
+        get() = showContextState
+        set(value) { if (showContextState != value) interruptAirInput(); showContextState = value }
+    private var showBrushState by mutableStateOf(false)
+    var showBrush: Boolean
+        get() = showBrushState
+        private set(value) { if (showBrushState != value) interruptAirInput(); showBrushState = value }
     var brushPreview by mutableStateOf<Path?>(null); private set
     var capabilities by mutableStateOf<StylusCapabilities?>(null); private set
     var scene by mutableStateOf<CanvasScene?>(null); private set
@@ -207,6 +260,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var checkedExport: ExportOptions? = null
     private var pickerTicket: ExportTicket? = null
     private var project: WorkbenchProject? = null
+        set(value) { if (field !== value) interruptAirInput(clearView = true, clearBarrel = true); field = value }
     private var transferJob: Job? = null
     private var incomingJob: Job? = null
     private var incomingProducer: Job? = null
@@ -214,10 +268,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var shareLease: MediaHandoff.Lease? = null
     private var disposing = false
     private var epoch = 0L
+        set(value) { if (field != value) interruptAirInput(clearView = true, clearBarrel = true); field = value }
     private var sceneRevision = 0L
     private var background: Bitmap? = null
     private var objects = emptyList<DrawObject>()
     private var camera = Camera(Point(800.0, 600.0), 1.0, 0.0, 1.0, 1.0)
+        set(value) { if (field != value) interruptAirInput(clearView = !applyingAirView); field = value }
     private var cameraFitted = false
     private var unsnappedRotation = 0.0
     private var density = 1f
@@ -280,7 +336,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         { id, peer -> selected = id; if (peer) screen = WorkbenchScreen.Instructions; publish() }, selectedObject = { selected })
     private fun localInstructionFocused(field: InstructionField) { instructionFocus.localField(field) }
     internal var captureAdmissionVersion by mutableStateOf(0L); private set
-    fun instructionInteractionChanged() { captureAdmissionVersion++; instructionFocus.interactionChanged() }
+    fun instructionInteractionChanged() { interruptAirInput(); captureAdmissionVersion++; instructionFocus.interactionChanged() }
     internal fun instructionModal(owner: com.visualworkbench.android.instructions.InstructionFocusModal, active: Boolean) { instructionAdmission.modal(owner, active) }
     internal fun clearInstructionModals() { instructionAdmission.clear() }
     fun editInstruction() {
@@ -432,6 +488,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private val preferencesWriter: Job
 
     init {
+        airInitialized = true
         scope.launch { rotation.state.collect{value->
             if(!value.active&&!value.busy){rotationDisplay=null;rotationPhysical=null}
             publish()
@@ -450,7 +507,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
         scope.launch {
             try {
-                repository.initialize(); preferences = preferencesStore.read(); refreshProjects(); refreshCaptures()
+                repository.initialize(); preferences = preferencesStore.read(); configureAirActions(); refreshProjects(); refreshCaptures()
                 if (disposing || !kotlinx.coroutines.currentCoroutineContext().isActive) return@launch
                 val owner = com.visualworkbench.android.capture.CaptureRuntime(core, repository.deviceId,
                     repository::checkedPath, { repository.lamport() }) { captured, warning ->
@@ -480,9 +537,215 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     fun dismissMessage() { message = null }
     fun transferMessage(value: String) { message = value }
+    internal fun attachAirActivity(owner: Any, receive: (KeyEvent) -> Boolean, schedule: () -> Unit) {
+        interruptAirInput(clearBarrel = true); airActivity = owner; airResumed = false; airActivityFocused = false
+        airKeyReceiver = receive; airSchedule = schedule; configureAirActions()
+    }
+    internal fun airActivityCurrent(owner: Any): Boolean = airActivity === owner
+    internal fun airActivityKey(owner: Any, event: KeyEvent): Boolean =
+        airActivity === owner && airActivityFocused && !remoteOpen && airKey(event)
+    internal fun airActivityResumed(owner: Any, resumed: Boolean) {
+        if (airActivity !== owner || airResumed == resumed) return
+        interruptAirInput(clearBarrel = true); airResumed = resumed
+    }
+    internal fun airActivityFocus(owner: Any, focused: Boolean) {
+        if (airActivity !== owner || airActivityFocused == focused) return
+        interruptAirInput(clearBarrel = true); airActivityFocused = focused
+    }
+    internal fun detachAirActivity(owner: Any) {
+        if (airActivity !== owner) return
+        interruptAirInput(clearBarrel = true); airActivity = null; airResumed = false; airActivityFocused = false
+        airKeyReceiver = null; airSchedule = null
+    }
+    private fun airKey(event: KeyEvent): Boolean {
+        val received = airKeyReceiver?.invoke(event) == true
+        if (received && !event.isCanceled) airSetup = airSetup.copy(keyDeliveryObserved = true)
+        return received
+    }
+    internal fun configureAirSetup(value: AirActionSetup) {
+        interruptAirInput(); airSetup = value; configureAirActions()
+    }
+    internal fun remapAirAction(gesture: AirActionGesture, command: AirActionCommand?) {
+        settings(preferences.copy(airActions = preferences.airActions.remap(gesture, command)))
+    }
+    private fun configureAirActions() {
+        if (!airInitialized) return
+        airActionRouter.configure(preferences.airActions, airSetup.routingReady)
+        airBarrel.restore(airActionRouter, SystemClock.uptimeMillis())
+        airSchedule?.invoke()
+    }
+    internal fun interruptAirInput(clearView: Boolean = false, clearBarrel: Boolean = false) {
+        airEpoch.incrementAndGet()
+        if (clearView) airViewRestore.clear()
+        if (clearBarrel) airBarrel.clear()
+        if (airInitialized) {
+            airActionRouter.interrupt(); airBarrel.restore(airActionRouter, SystemClock.uptimeMillis()); airSchedule?.invoke()
+        }
+    }
+    internal fun observeAirBarrel(packet: PointerPacket) {
+        if (packet.canceled || !precisionInputAllowed()) { interruptAirInput(clearBarrel = true); return }
+        val sample = packet.frames.lastOrNull()?.pointers?.firstOrNull {
+            it.tool == PointerTool.Pen || it.tool == PointerTool.Eraser
+        } ?: return
+        val down = sample.buttons and MotionEvent.BUTTON_STYLUS_PRIMARY != 0
+        airBarrel.observe(down, sample.timeMs)
+        airActionRouter.barrel(down, sample.timeMs)
+        airSchedule?.invoke()
+    }
+    private fun airBinding(): AirActionBinding? {
+        if (disposing || airActivity == null || !airResumed) return null
+        if (airModals.isNotEmpty()) return AirActionBinding(airEpoch.get(), AirActionContext.Dialog)
+        val context = if (remoteOpen) {
+            if (!airRemoteFocused || airRemoteOwner !== remoteCapability || airRemotePalette == null) return null
+            AirActionContext.RemoteApp
+        } else {
+            if (!airActivityFocused) return null
+            if (screen == WorkbenchScreen.Canvas) AirActionContext.Canvas else AirActionContext.Dialog
+        }
+        return AirActionBinding(airEpoch.get(), context)
+    }
+    internal fun airCommandEnabled(command: AirActionCommand): Boolean =
+        airBinding()?.let { airCommandAllowed(it, command) } == true
+    private fun airCommandAllowed(ticket: AirActionBinding, command: AirActionCommand, ownCommand: Boolean = false): Boolean {
+        if (ticket != airBinding() || (!ownCommand && airCommandBusy)) return false
+        return when (ticket.context) {
+            AirActionContext.Canvas -> workflowIdle() && precisionInputAllowed() && !precision.state.value.latched &&
+                camera.viewportWidth > 1 && camera.viewportHeight > 1 && precision.baseCamera() == camera &&
+                when (command) {
+                    AirActionCommand.Undo -> info?.canUndo == true
+                    AirActionCommand.Redo -> info?.canRedo == true
+                    AirActionCommand.LensMagnificationUp -> precision.state.value.magnification < 8
+                    AirActionCommand.LensMagnificationDown -> precision.state.value.magnification > 2
+                    else -> true
+                }
+            AirActionContext.RemoteApp -> {
+                val action = remoteAirAction(command) ?: return false
+                val palette = airRemotePalette ?: return false
+                val target = remoteCapability?.target?.value ?: return false
+                !busy && pending == 0 && !workflows.blocksInput() && !rotationUnavailable() &&
+                    !instructionEditor.state.value.busy && !instructionEditor.hasUnsaved() && !semanticEditor.state.value.busy &&
+                    !ai.state.value.open && !ai.needsDecision() && !documents.state.value.busy &&
+                    !selections.state.value.busy && !erasers.state.value.busy && !rotation.state.value.active &&
+                    instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) &&
+                    remoteCapability?.state?.value?.status == RemoteEditStatus.Controlling &&
+                    target.identity.editor == RemoteEditorKind.Paint && !palette.state.value.closed && !palette.state.value.busy &&
+                    palette.state.value.target == target && remoteEditorActionEnabled(target, action)
+            }
+            AirActionContext.Dialog -> false
+        }
+    }
+    internal fun airModal(owner: Any, active: Boolean) {
+        val changed = if (active) airModals.add(owner) else airModals.remove(owner)
+        if (changed) interruptAirInput()
+    }
+    internal fun airControl(command: AirActionCommand) {
+        val ticket = airBinding() ?: return
+        if (!airCommandAllowed(ticket, command)) return
+        val time = SystemClock.uptimeMillis()
+        if (!airDispatcher.offer {
+            if (SystemClock.uptimeMillis() - time in 0L..AirActionRouter.MaximumPressMs && airCommandAllowed(ticket, command))
+                executeAirCommand(ticket, command)
+        }) message = "The action queue is full. Finish the current action, then try again."
+    }
+    private suspend fun executeAirCommand(ticket: AirActionBinding, command: AirActionCommand) {
+        if (!airCommandAllowed(ticket, command)) return
+        airCommandBusy = true
+        try {
+            if (ticket.context == AirActionContext.RemoteApp) {
+                val palette = airRemotePalette ?: return
+                val action = remoteAirAction(command) ?: return
+                if (palette.command(action)) palette.state.first { !it.busy }
+                else message = "The current PC command was refused. Check its grant and canvas, then try again."
+            } else when (command) {
+                AirActionCommand.Undo, AirActionCommand.Redo -> mutations.withLock {
+                    // Recheck after lock acquisition before creating metadata or
+                    // crossing the native commit point. This call is awaited.
+                    if (!airCommandAllowed(ticket, command, ownCommand = true)) return@withLock
+                    cancelTool()
+                    val current = project ?: return@withLock
+                    val token = epoch; val options = editOptions(512)
+                    invalidateExport(); pending++
+                    try { commitUndoRedo(current, token, options, command == AirActionCommand.Redo) }
+                    finally { pending-- }
+                }
+                AirActionCommand.TogglePrecisionLens -> precision.toggle()
+                AirActionCommand.FitRestoreView -> airFitRestore()
+                AirActionCommand.PreviousTool, AirActionCommand.NextTool -> {
+                    val tools = EditorTool.entries
+                    val selection = selections.state.value
+                    val active = if (erasers.state.value.active || (selection.active && selection.tool == SelectionTool.MaskEraser)) EditorTool.Eraser else tool
+                    val offset = if (command == AirActionCommand.PreviousTool) -1 else 1
+                    chooseTool(tools[(tools.indexOf(active) + offset + tools.size) % tools.size])
+                }
+                AirActionCommand.LensMagnificationUp, AirActionCommand.LensMagnificationDown -> {
+                    val levels = listOf(2, 4, 8); val index = levels.indexOf(precision.state.value.magnification)
+                    precision.magnification(levels[(index + if (command == AirActionCommand.LensMagnificationUp) 1 else -1).coerceIn(0, 2)])
+                }
+            }
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (error: Exception) { report(error) }
+        finally { airCommandBusy = false }
+    }
+    private fun airFitRestore() {
+        val doc = document ?: return
+        val owner = AirActionViewOwner(epoch, doc.documentId, documents.state.value.page, camera.viewportWidth, camera.viewportHeight)
+        val before = camera
+        val restore = airViewRestore.take(owner, before)
+        applyingAirView = true
+        try {
+            if (restore == null) { fit(); airViewRestore.remember(owner, before, camera) }
+            else {
+                cancelTool(); invalidateViewCheck(); followPeer = false
+                camera = restore; cameraFitted = true; unsnappedRotation = restore.rotation; publish()
+            }
+        } finally { applyingAirView = false }
+    }
+    internal fun attachAirRemotePalette(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette) {
+        if (remoteCapability !== remote) return
+        interruptAirInput(clearBarrel = true); airRemoteOwner = remote; airRemotePalette = palette; airRemoteFocused = false
+    }
+    internal fun detachAirRemotePalette(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette) {
+        if (airRemoteOwner !== remote || airRemotePalette !== palette) return
+        interruptAirInput(); airRemoteOwner = null; airRemotePalette = null; airRemoteFocused = false
+    }
+    internal fun airRemoteFocus(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette, focused: Boolean) {
+        if (airRemoteOwner !== remote || airRemotePalette !== palette) return
+        if (airRemoteFocused != focused) { interruptAirInput(); airRemoteFocused = focused }
+    }
+    internal fun airRemoteKey(remote: WorkbenchRemoteEdit, palette: RemoteEditorPalette, event: KeyEvent): Boolean =
+        airRemoteOwner === remote && airRemotePalette === palette && airKey(event)
+    private fun observeAirRemote(remote: WorkbenchRemoteEdit) {
+        if (airRegisteredRemote !== remote) {
+            airRegisteredRemote = remote
+            remote.registerConsumer(object : RemoteConsumerOwner {
+                override fun invalidate() {
+                    // Native invalidation may precede a Main-dispatcher state
+                    // publication. Retire the ticket synchronously on any thread.
+                    airEpoch.incrementAndGet()
+                    scope.launch { interruptAirInput() }
+                }
+                override suspend fun retire(): Boolean { invalidate(); return true }
+            })
+        }
+        airRemoteChanges?.cancel()
+        airRemoteChanges = scope.launch {
+            var observed: List<Any?>? = null
+            remote.target.collect { target ->
+                // A newer timestamp for the same proof is not a new owner.
+                val next = listOf(target?.binding, target?.identity, target?.verifiedActions,
+                    target?.grantActive, target?.pauseReason, target?.commandBusy,
+                    target?.focusProof?.runtimeIdHash, target?.focusProof?.canvasRectHost,
+                    target?.selectedCanvasProof?.runtimeIdHash, target?.selectedCanvasProof?.canvasRectHost)
+                if (next != observed) { observed = next; interruptAirInput() }
+            }
+        }
+    }
     fun configureExport(value: ExportSelection) { if (!value.encoding.exportAvailable) { message = "BMP export is unavailable until its file metadata can carry the revision and source identity."; return }; if (exportSelection != value) { exportSelection = value; exportPreflight = null; checkedExport = null } }
     private fun invalidateExport() { exportReady = null; exportPreflight = null; checkedExport = null }
-    private fun invalidateViewCheck() { if (exportSelection.viewOnly) { exportPreflight = null; checkedExport = null } }
+    private fun invalidateViewCheck() {
+        if (!applyingAirView) airViewRestore.clear()
+        if (exportSelection.viewOnly) { exportPreflight = null; checkedExport = null }
+    }
     suspend fun cleanupTransfer(action: suspend () -> Unit) { cleanupHandoff(action) { message = "Temporary image cleanup could not finish. Retained files have not been deleted; you can retry or discard camera captures from Projects." } }
     private suspend fun refreshCaptures() {
         try { cameraCaptures = withContext(Dispatchers.IO) { MediaHandoff(getApplication()).captures().map { CameraCapture(it.token, it.file.length()) } } }
@@ -531,7 +794,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         message = "No app could receive this PNG. Try saving it to Files."
     }
     fun settings(value: EditorPreferences) {
-        preferences = value; preferencesQueue.trySend(value); publish()
+        preferences = value; configureAirActions(); preferencesQueue.trySend(value); publish()
     }
     fun chooseTool(value: EditorTool) {
         if (value == EditorTool.Eraser) {
@@ -611,6 +874,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     fun returnFromSettings() { captureNavigationGeneration++; screen = if (project == null) WorkbenchScreen.Projects else WorkbenchScreen.Canvas }
     fun onBackground() {
+        interruptAirInput()
         remoteCapability?.seal("background")
         captureNavigationGeneration++
         ai.background();instructionInteractionChanged()
@@ -831,6 +1095,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         nextWork.start()
     }
     private suspend fun closeCurrent() {
+        interruptAirInput(clearView = true, clearBarrel = true)
         withContext(NonCancellable) {
         workflows.detach();rotation.detach()
         documentOwner.detach()
@@ -1001,6 +1266,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private fun clearPeerObjects() { peerAdmission++; peerObjects = emptyList() }
 
     private suspend fun detachLink() {
+        interruptAirInput()
         withContext(NonCancellable) {
         agentCapture.detach()
         instructionFocus.detach()
@@ -1141,6 +1407,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     private fun publish() {
         if(synchronizingPrecision||updatingGiant)return
+        if (airInitialized && airObservedPage != documents.state.value.page) {
+            airObservedPage = documents.state.value.page; interruptAirInput(clearView = true, clearBarrel = true)
+        }
         if(giantMode&&(scene?.camera!=camera||scene?.document!==document||scene?.precision!=precision.frame())){giantDraw.set(null);giantRenderReady=false}
         ai.changed()
         val doc = document ?: return
@@ -1219,6 +1488,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         !ai.state.value.open&&aiResultReady()&&blockingMessage==null&&textDraft==null&&!showBrush&&!showContext&&instructionAdmission.allows(false,false,false,false)&&
         document?.let{background!=null||documentOwner.matchingFrame(it,epoch)!=null||giantInputReady(it)}==true
     override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
+        interruptAirInput()
         if(rotationUnavailable()||workflows.blocksInput()||ai.state.value.open||!aiResultReady())return
         val retainPolygon = !selectionPointer && !eraserPointer && gesture == null && documentPress == null &&
             precisionInputAllowed() && erasers.tools.route(rawSample.tool == PointerTool.Eraser) == EraserInputRoute.Selection &&
@@ -1436,7 +1706,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         publish()
     }
 
-    override fun cancelTool() { rotationGesture=null;rotation.cancel();clearToolContact(false) }
+    override fun cancelTool() { interruptAirInput(); rotationGesture=null;rotation.cancel();clearToolContact(false) }
     private fun clearToolContact(retainPolygon: Boolean) {
         if(rotationGesture!=null){rotationGesture=null;rotation.cancel()}
         documentPress=null
@@ -1656,10 +1926,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (if (redo) info?.canRedo != true else info?.canUndo != true) return
         val options = editOptions(512); val token = epoch; invalidateExport(); pending++
         scope.launch {
-            try { mutations.withLock { if (token == epoch) refresh(current, current.undoRedo(options, redo), token) } }
+            try { mutations.withLock { commitUndoRedo(current, token, options, redo) } }
             catch (error: Exception) { report(error) }
             finally { pending-- }
         }
+    }
+    private suspend fun commitUndoRedo(current: WorkbenchProject, token: Long, options: EditOptions, redo: Boolean) {
+        if (token == epoch && current === project) refresh(current, current.undoRedo(options, redo), token)
     }
 
     override fun pan(dx: Double, dy: Double) {
@@ -1863,6 +2136,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
     override fun onCleared() {
+        interruptAirInput(clearView = true, clearBarrel = true); airActionRouter.close(); airDispatcher.close()
         workflows.beginDeparture();rotation.cancel()
         giantOwner.invalidate()
         disposing = true

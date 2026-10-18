@@ -26,6 +26,8 @@
         </activity>
         <activity android:name=".capture.CaptureInboxActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter><action android:name="com.samsung.android.support.REMOTE_ACTION" /></intent-filter>
+            <meta-data android:name="com.samsung.android.support.REMOTE_ACTION" android:resource="@xml/workbench_air_actions" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
