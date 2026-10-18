@@ -215,9 +215,6 @@ fn append(
     if contours.is_empty() {
         return Ok(());
     }
-    let alpha = ((rgba & 255) as f64 * item.layer_opacity)
-        .round()
-        .clamp(0.0, 255.0) as u32;
     if result.len() >= 4096 {
         return Err(CoreError::Backpressure);
     }
@@ -225,7 +222,7 @@ fn append(
         page,
         contours,
         transform: IDENTITY,
-        rgba: rgba & 0xffff_ff00 | alpha,
+        rgba,
     });
     Ok(())
 }
@@ -277,6 +274,20 @@ pub(super) fn outlines(items: &[RenderItem], page: u32) -> Result<Vec<EditableOv
     for item in items {
         if matches!(item.shape, DrawShape::Guide { .. }) {
             continue;
+        }
+        if !item.layer_opacity.is_finite() || !(0.0..=1.0).contains(&item.layer_opacity) {
+            return Err(CoreError::Invalid);
+        }
+        if item.layer_opacity == 0.0 {
+            continue;
+        }
+        // Annotated PDF, flattened PDF and SVG all consume the same flat
+        // per-path overlay records. They cannot represent an isolated layer
+        // group: applying layer opacity to each path darkens overlaps, even
+        // between the fill and stroke of a single object. Refuse until the
+        // shared protocol and all writers carry actual group compositing.
+        if item.layer_opacity != 1.0 {
+            return Err(CoreError::Unsupported);
         }
         if item.layer_blend != "normal" {
             return Err(CoreError::Unsupported);
@@ -463,4 +474,103 @@ pub(super) fn outlines(items: &[RenderItem], page: u32) -> Result<Vec<EditableOv
         }
     }
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rectangle_item(x: f64, layer_opacity: f64, rgba: u32) -> RenderItem {
+        let rectangle = QueryRect {
+            x,
+            y: 0.0,
+            width: 10.0,
+            height: 10.0,
+        };
+        RenderItem {
+            object_id: format!("rectangle-{x}"),
+            layer_id: "same-layer".into(),
+            layer_opacity,
+            layer_blend: "normal".into(),
+            bounds: rectangle,
+            object_protobuf: Vec::new(),
+            stroke_contours: Contours::default(),
+            transform: IDENTITY,
+            style: ObjectStyle {
+                rgba,
+                width: 0.0,
+                screen_constant_width: false,
+                fill: Some(rgba),
+            },
+            shape: DrawShape::Rectangle { rectangle },
+            locked: false,
+        }
+    }
+
+    #[test]
+    fn overlapping_objects_on_partial_opacity_layer_refuse_all_overlay_exports() {
+        // These exact overlays feed Annotated/Flattened PDF and SVG exports.
+        // Per-path alpha128 would produce overlap alpha~0.752, whereas the
+        // editor composites the completed opaque layer once at opacity0.5.
+        let items = [
+            rectangle_item(0.0, 0.5, 0x0000_00ff),
+            rectangle_item(5.0, 0.5, 0x0000_00ff),
+        ];
+        assert!(matches!(outlines(&items, 0), Err(CoreError::Unsupported)));
+    }
+
+    #[test]
+    fn one_object_with_overlapping_fill_and_stroke_also_refuses() {
+        let mut item = rectangle_item(0.0, 0.5, 0x0000_00ff);
+        item.style.width = 2.0;
+        assert!(matches!(outlines(&[item], 0), Err(CoreError::Unsupported)));
+    }
+
+    #[test]
+    fn partial_opacity_never_rounds_to_supported_full_or_zero_opacity() {
+        for opacity in [f64::EPSILON, 1.0 - f64::EPSILON] {
+            let item = rectangle_item(0.0, opacity, 0x0000_00ff);
+            assert!(matches!(outlines(&[item], 0), Err(CoreError::Unsupported)));
+        }
+    }
+
+    #[test]
+    fn full_opacity_preserves_separate_paths_page_geometry_and_object_alpha() -> Result<()> {
+        let items = [
+            rectangle_item(0.0, 1.0, 0x0000_00ff),
+            rectangle_item(5.0, 1.0, 0x1234_5680),
+        ];
+        let overlays = outlines(&items, 7)?;
+        assert_eq!(overlays.len(), 2);
+        for (index, overlay) in overlays.iter().enumerate() {
+            assert_eq!(overlay.page, 7);
+            assert_eq!(overlay.rgba, items[index].style.rgba);
+            assert_eq!(overlay.contours.len(), 1);
+            assert_eq!(overlay.contours[0].len(), 4);
+            assert_eq!(overlay.contours[0][0].x, index as f64 * 5.0);
+            assert_eq!(overlay.contours[0][0].y, 0.0);
+            assert_eq!(overlay.transform.a, 1.0);
+            assert_eq!(overlay.transform.d, 1.0);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn invisible_layers_and_non_exported_guides_contribute_nothing() -> Result<()> {
+        let invisible = rectangle_item(0.0, 0.0, 0x0000_00ff);
+        let mut guide = rectangle_item(0.0, 0.5, 0x0000_00ff);
+        guide.shape = DrawShape::Guide {
+            rectangle: guide.bounds,
+        };
+        assert!(outlines(&[invisible, guide], 0)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_layer_opacity_is_invalid() {
+        for opacity in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -0.1, 1.1] {
+            let item = rectangle_item(0.0, opacity, 0x0000_00ff);
+            assert!(matches!(outlines(&[item], 0), Err(CoreError::Invalid)));
+        }
+    }
 }
