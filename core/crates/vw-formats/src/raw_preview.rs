@@ -26,6 +26,47 @@ pub struct Preview<'a> {
     estimated_peak_bytes: u64,
     srgb: bool,
     source_bytes: u64,
+    profile: JpegProfile<'a>,
+}
+
+// Borrowed, bounded profile declaration. No ICC allocation before admission.
+struct JpegProfile<'a> {
+    chunks: [Option<&'a [u8]>; 255],
+    count: u8,
+    bytes: usize,
+}
+impl JpegProfile<'_> {
+    fn complete(&self) -> Result<()> {
+        if self.chunks[..usize::from(self.count)]
+            .iter()
+            .any(Option::is_none)
+        {
+            return Err(Error::Color);
+        }
+        Ok(())
+    }
+    fn matches(&self, decoded: Option<&[u8]>) -> bool {
+        if self.count == 0 {
+            return decoded.is_none();
+        }
+        let Some(decoded) = decoded else {
+            return false;
+        };
+        if decoded.len() != self.bytes {
+            return false;
+        }
+        let mut at = 0;
+        for chunk in &self.chunks[..usize::from(self.count)] {
+            let Some(chunk) = chunk else {
+                return false;
+            };
+            if decoded.get(at..at + chunk.len()) != Some(*chunk) {
+                return false;
+            }
+            at += chunk.len();
+        }
+        true
+    }
 }
 
 struct Tiff<'a> {
@@ -146,6 +187,7 @@ pub(crate) fn exif_orientation(bytes: &[u8]) -> Result<u8> {
 
 #[derive(Default)]
 struct Fields {
+    subfile_type: Option<u32>,
     jpeg: Option<u32>,
     length: Option<u32>,
     strip: Option<u32>,
@@ -154,6 +196,7 @@ struct Fields {
     photometric: Option<u32>,
     orientation: Option<u8>,
     color: Option<u32>,
+    ifd_icc: bool,
 }
 
 struct Candidate<'a> {
@@ -163,10 +206,15 @@ struct Candidate<'a> {
     orientation: u8,
     srgb: bool,
     peak: u64,
+    profile: JpegProfile<'a>,
+    ifd_icc: bool,
 }
 
 /// No allocation or codec call until the complete bounded IFD graph is admitted.
-/// Selects the largest declared JPEG preview; dimensions come from that JPEG.
+/// Selects the largest declared primary JPEG preview (NewSubFileType=1).
+/// DNG 1.7.1 p20 alternatives/masks/enhanced images are never automatic choices.
+/// Non-DNG legacy IFDs without NewSubFileType are eligible only if no primary
+/// exists. No explicit alternative-rendering selector is exposed by this API.
 /// Ordinary TIFFs, BigTIFF and proprietary non-TIFF RAW containers are refused.
 pub fn embedded<'a>(
     bytes: &'a [u8],
@@ -183,7 +231,8 @@ pub fn embedded<'a>(
     let mut dng = false;
     let mut cfa = false;
     let cr2 = bytes.get(8..12) == Some(b"CR\x02\0");
-    let mut best: Option<Candidate<'_>> = None;
+    let mut primary: Option<Candidate<'_>> = None;
+    let mut legacy: Option<Candidate<'_>> = None;
     let mut entry_total = 0;
     let mut scanned_bytes = 0_u64;
     for index in 0..64 {
@@ -209,6 +258,12 @@ pub fn embedded<'a>(
             }
             previous = Some(tag);
             match tag {
+                254 => {
+                    if t.u16(at + 2)? != 4 {
+                        return Err(Error::Invalid);
+                    }
+                    fields.subfile_type = Some(t.scalar(at)?);
+                }
                 262 => {
                     let v = t.scalar(at)?;
                     cfa |= matches!(v, 32803 | 34892);
@@ -243,6 +298,10 @@ pub fn embedded<'a>(
                 }
                 513 => fields.jpeg = Some(t.scalar(at)?),
                 514 => fields.length = Some(t.scalar(at)?),
+                // A containing-IFD profile cannot be silently discarded or
+                // treated as the JPEG's own profile. Selected tagged previews
+                // explicitly refuse until reconciliation is implemented.
+                34675 => fields.ifd_icc = true,
                 50706 => {
                     if dng || t.u16(at + 2)? != 1 || t.u32(at + 4)? != 4 {
                         return Err(Error::Invalid);
@@ -260,6 +319,9 @@ pub fn embedded<'a>(
             }
         }
         enqueue(&mut queue, &mut queued, t.u32(start + n * 12)?)?;
+        if fields.subfile_type.is_some_and(|v| v != 1) || (dng && fields.subfile_type != Some(1)) {
+            continue;
+        }
         let pair = match (fields.jpeg, fields.length) {
             (Some(a), Some(b)) => Some((a, b)),
             (None, None)
@@ -279,23 +341,30 @@ pub fn embedded<'a>(
                 return Err(Error::Limit);
             }
             let preview = range(bytes, u64::from(at), u64::from(len))?;
-            let (width, height) = jpeg_extent(preview, cancel)?;
+            let (width, height, profile) = jpeg_extent(preview, cancel)?;
             let peak = limits.admit(width, height, bytes.len() as u64, 4 * 1024 * 1024)?;
             if fields.color.is_some_and(|v| v != 0 && v != 2) {
                 return Err(Error::Color);
             }
             let area = u64::from(width) * u64::from(height);
+            let best = if fields.subfile_type == Some(1) {
+                &mut primary
+            } else {
+                &mut legacy
+            };
             if best
                 .as_ref()
                 .is_none_or(|p| area > u64::from(p.width) * u64::from(p.height))
             {
-                best = Some(Candidate {
+                *best = Some(Candidate {
                     encoded: preview,
                     width,
                     height,
                     orientation: fields.orientation.unwrap_or(root_orientation),
                     srgb: fields.color == Some(2),
                     peak,
+                    profile,
+                    ifd_icc: fields.ifd_icc,
                 });
             }
         }
@@ -316,7 +385,14 @@ pub fn embedded<'a>(
         orientation,
         srgb,
         peak,
-    } = best.ok_or(Error::Unsupported)?;
+        profile,
+        ifd_icc,
+    } = primary
+        .or(if dng { None } else { legacy })
+        .ok_or(Error::Unsupported)?;
+    if ifd_icc {
+        return Err(Error::Color);
+    }
     check(cancel)?;
     Ok(Preview {
         encoded,
@@ -328,6 +404,7 @@ pub fn embedded<'a>(
         srgb,
         estimated_peak_bytes: peak,
         source_bytes: bytes.len() as u64,
+        profile,
     })
 }
 
@@ -346,13 +423,20 @@ fn enqueue(queue: &mut [u32; 64], len: &mut usize, value: u32) -> Result<()> {
 
 // Admit extent, precision, channel count and bounded JPEG metadata before the
 // existing raster decoder can allocate a native buffer/profile. No bytes search.
-fn jpeg_extent(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<(u32, u32)> {
+fn jpeg_extent<'a>(
+    bytes: &'a [u8],
+    cancel: &dyn Fn() -> bool,
+) -> Result<(u32, u32, JpegProfile<'a>)> {
     if !bytes.starts_with(&[255, 216]) || !bytes.ends_with(&[255, 217]) {
         return Err(Error::Invalid);
     }
     let mut at = 2_usize;
     let mut extent = None;
-    let mut profile_bytes = 0_usize;
+    let mut profile = JpegProfile {
+        chunks: [None; 255],
+        count: 0,
+        bytes: 0,
+    };
     let mut scans = 0;
     for _ in 0..1024 {
         check(cancel)?;
@@ -366,7 +450,9 @@ fn jpeg_extent(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<(u32, u32)> {
         at += 1;
         if marker == 0xd9 {
             return if at == bytes.len() && scans > 0 {
-                extent.ok_or(Error::Invalid)
+                profile.complete()?;
+                let (width, height) = extent.ok_or(Error::Invalid)?;
+                Ok((width, height, profile))
             } else {
                 Err(Error::Invalid)
             };
@@ -434,9 +520,30 @@ fn jpeg_extent(bytes: &[u8], cancel: &dyn Fn() -> bool) -> Result<(u32, u32)> {
                     }
                 }
             }
-            0xe2 if data.starts_with(b"ICC_PROFILE\0") => {
-                profile_bytes = profile_bytes.checked_add(data.len()).ok_or(Error::Limit)?;
-                if profile_bytes > 4 * 1024 * 1024 {
+            0xe2 if data.starts_with(b"ICC_PROFILE") => {
+                if data.len() <= 14 || !data.starts_with(b"ICC_PROFILE\0") {
+                    return Err(Error::Color);
+                }
+                let sequence = data[12];
+                let count = data[13];
+                if count == 0
+                    || sequence == 0
+                    || sequence > count
+                    || (profile.count != 0 && profile.count != count)
+                {
+                    return Err(Error::Color);
+                }
+                let slot = &mut profile.chunks[usize::from(sequence - 1)];
+                if slot.is_some() {
+                    return Err(Error::Color);
+                }
+                *slot = Some(&data[14..]);
+                profile.count = count;
+                profile.bytes = profile
+                    .bytes
+                    .checked_add(data.len() - 14)
+                    .ok_or(Error::Limit)?;
+                if profile.bytes > 4 * 1024 * 1024 {
                     return Err(Error::Color);
                 }
             }
@@ -495,6 +602,9 @@ impl Preview<'_> {
             _ => Error::Codec,
         })?;
         check(cancel)?;
+        if !self.profile.matches(image.icc.as_deref()) {
+            return Err(Error::Color);
+        }
         let decoded_extent = if image.orientation_applied >= 5 {
             (self.height, self.width)
         } else {
