@@ -63,5 +63,9 @@ internal class AirActionKeys(private val router: AirActionRouter) {
     }
 
     fun interrupt() { handler.removeCallbacks(flush); router.interrupt() }
+    /** Activity recreation retires this timer without closing its retained editor. */
+    fun detach(interruptRouter: Boolean = true) {
+        if (!closed) { closed = true; handler.removeCallbacks(flush); if (interruptRouter) router.interrupt() }
+    }
     fun close() { if (!closed) { closed = true; handler.removeCallbacks(flush); router.close() } }
 }

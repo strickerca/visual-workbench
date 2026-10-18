@@ -87,11 +87,17 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     }
 
     fun cancelInput() {
+        controller.interruptAirInput(clearBarrel = true)
         main.removeCallbacks(longPress);buttons.reset();router.cancel();controller.cancelPrecision()
         predictor = MotionEventPredictor.newInstance(this)
     }
 
     fun updatePreferences() { router.drawWithFinger = controller.preferences.drawWithFinger }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (!hasWindowFocus) cancelInput()
+    }
 
     private fun publish(scene: CanvasScene) {
         latest = scene
@@ -223,6 +229,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
             }
             predictor.record(event)
             val packet = stylus.snapshot(event)
+            controller.observeAirBarrel(packet)
             if(event.actionMasked!=MotionEvent.ACTION_DOWN)buttons.accept(packet)
             router.accept(packet)
             if(event.actionMasked==MotionEvent.ACTION_DOWN)buttons.accept(packet)
@@ -244,7 +251,8 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         return true
     }
     override fun onHoverEvent(event: MotionEvent): Boolean {
-        try { val packet=stylus.snapshot(event);buttons.accept(packet);router.accept(packet) } catch (_: IllegalArgumentException) { controller.predict(null) }
+        try { val packet=stylus.snapshot(event);controller.observeAirBarrel(packet);buttons.accept(packet);router.accept(packet) }
+        catch (_: IllegalArgumentException) { controller.interruptAirInput();controller.predict(null) }
         return true
     }
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {

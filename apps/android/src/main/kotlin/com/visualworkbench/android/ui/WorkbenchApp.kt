@@ -26,6 +26,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.visualworkbench.android.editor.*
+import com.visualworkbench.android.airactions.AirActionControls
+import com.visualworkbench.android.airactions.AirActionsPanel
 import com.visualworkbench.shared.Shape
 import com.visualworkbench.shared.EditableKind
 import com.visualworkbench.shared.DocumentExport
@@ -41,6 +43,7 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
     val context = LocalContext.current
     val documentState by editor.documents.state.collectAsState()
     var showExport by remember { mutableStateOf(false) }
+    var showAirSettings by remember(editor) { mutableStateOf(false) }
     fun exportDialog(value: Boolean) { editor.instructionModal(InstructionFocusModal.ExportDialog, value); showExport = value }
     // Deliberately not saveable across process death: without its live project
     // attachment, a returned destination is discarded rather than rebound.
@@ -51,6 +54,7 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
     }
     fun saveSelection(ticket: SelectionSaveTicket) {
         if (selectionPicker != null) return
+        editor.interruptAirInput()
         selectionPicker = ticket
         try { selectionExporter.launch("selection-${ticket.kind.name.lowercase()}-${ticket.binding.hostSeq}.png") }
         catch (_: Exception) { selectionPicker = null; editor.transferMessage("The PNG destination picker is unavailable.") }
@@ -62,6 +66,13 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
     var documentKind by remember{mutableStateOf(EditableKind.Pdf)}
     var documentPassword by remember{mutableStateOf("")}
     var documentCopy by remember{mutableStateOf<DocumentExport?>(null)}
+    val airModalOwner = remember(editor) { Any() }
+    val airModalActive = showExport || selectionPicker != null || pickerTicketId != null || cameraSaveToken != null ||
+        cameraDiscardToken != null || documentUri != null || documentCopy != null
+    DisposableEffect(editor, airModalActive) {
+        editor.airModal(airModalOwner, airModalActive)
+        onDispose { editor.airModal(airModalOwner, false) }
+    }
     DisposableEffect(editor){onDispose{editor.instructionModal(InstructionFocusModal.DocumentImport,false);editor.instructionModal(InstructionFocusModal.DocumentPicker,false)}}
     val documentPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
         documentUri=uri
@@ -157,7 +168,16 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
                 WorkbenchScreen.Canvas -> EditorScreen(editor, { exportDialog(true) }, ::saveSelection,::saveDocument)
                 WorkbenchScreen.Settings -> Column {
                     TextButton(onClick = { context.startActivity(Intent(context, com.visualworkbench.android.capture.CaptureEntryActivity::class.java)) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Screen capture and accessibility") }
-                    Box(Modifier.weight(1f)) { SettingsScreen(editor.preferences, editor::settings, editor::returnFromSettings) }
+                    TextButton(onClick = { showAirSettings = !showAirSettings }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(if (showAirSettings) "Back to editor settings" else "Air Actions setup and remapping")
+                    }
+                    if (showAirSettings) {
+                        TextButton(onClick = editor::returnFromSettings, modifier = Modifier.heightIn(min = 48.dp)) { Text("Back to document") }
+                        AndroidView(factory = { AirActionsPanel(it) }, update = { panel ->
+                            panel.render(editor.airSetup, editor.preferences.airActions, editor::airCommandEnabled,
+                                editor::configureAirSetup, editor::remapAirAction, editor::airControl)
+                        }, modifier = Modifier.weight(1f).fillMaxWidth())
+                    } else Box(Modifier.weight(1f)) { SettingsScreen(editor.preferences, editor::settings, editor::returnFromSettings) }
                 }
                 WorkbenchScreen.Diagnostics -> DiagnosticsScreen(editor.diagnostics) { editor.navigate(WorkbenchScreen.Projects) }
                 WorkbenchScreen.Pairing -> PairingScreen(editor)
@@ -214,6 +234,11 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
     val eraserSelected = eraserState.active || (selectionState.active && selectionState.tool == com.visualworkbench.shared.SelectionTool.MaskEraser)
     var projectActionsOpen by remember(editor.document?.documentId) { mutableStateOf(false) }
     var pixelSelectionOpen by remember(editor.document?.documentId) { mutableStateOf(false) }
+    val airModalOwner = remember(editor) { Any() }
+    DisposableEffect(editor, projectActionsOpen, pixelSelectionOpen) {
+        editor.airModal(airModalOwner, projectActionsOpen || pixelSelectionOpen)
+        onDispose { editor.airModal(airModalOwner, false) }
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val contextHeight = (maxHeight * .24f).coerceIn(48.dp, 144.dp)
     Column(Modifier.fillMaxSize()) {
@@ -224,7 +249,7 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                     Text(editor.document?.title ?: "Opening…", modifier = Modifier.weight(1f).padding(horizontal = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.subtitle1)
                     Box {
-                        TextButton(onClick = { projectActionsOpen = true }, modifier = Modifier.heightIn(min = 48.dp)
+                        TextButton(onClick = { editor.interruptAirInput(); projectActionsOpen = true }, modifier = Modifier.heightIn(min = 48.dp)
                             .semantics { contentDescription = "More project actions" }) { Text("More") }
                         DropdownMenu(projectActionsOpen, { projectActionsOpen = false }) {
                             DropdownMenuItem(onClick = { projectActionsOpen = false; editor.openAi() }, enabled = !editor.busy && editor.pending == 0) { Text("AI edit") }
@@ -253,6 +278,7 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
             }
         }
         PrecisionControls(editor.precision)
+        AirActionControls(editor)
         EditorWorkflowControls(editor)
         if(documentState.descriptor!=null)Column(Modifier.fillMaxWidth().heightIn(max=220.dp).verticalScroll(rememberScrollState())){EditableDocumentControls(editor.documents,onDocumentSave)}
         AiResultStatus(editor)
@@ -308,7 +334,7 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
             Column(Modifier.fillMaxWidth().heightIn(max = contextHeight).verticalScroll(rememberScrollState())) {
                 if (eraserControlsVisible) EraserControls(editor.erasers, editor::chooseEraser, editor::stopErasing, Modifier.fillMaxWidth())
                 if (selectionControlsVisible) SelectionControls(editor.selections, editor.selected, onSelectionSave, Modifier.fillMaxWidth(),
-                    onOpen = { pixelSelectionOpen = true })
+                    onOpen = { editor.interruptAirInput(); pixelSelectionOpen = true })
                 inactiveEraseMessage?.let { status ->
                     Row(Modifier.fillMaxWidth().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(status, Modifier.weight(1f), style = MaterialTheme.typography.caption)
