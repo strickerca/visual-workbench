@@ -131,6 +131,12 @@ pub struct Redaction {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Extensions {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "image_output"
+    )]
+    pub image_output: Option<vw_raster::ImageOutputMetadata>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verification_origin: Option<crate::VerificationOrigin>,
     pub compiler: String,
@@ -161,4 +167,49 @@ pub struct InstructionBinding {
     pub entry_method: String,
     pub language: String,
     pub updated_at_ms: i64,
+}
+
+// Region is a general raster API and permits unknown JSON members. This closed
+// portable contract must not retain arbitrary nested data inside manifest.json.
+// Only wire shape is checked here; all frame math uses the canonical validator.
+fn image_output<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<vw_raster::ImageOutputMetadata>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Crop {
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+    }
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Output {
+        version: u32,
+        source_width: u32,
+        source_height: u32,
+        crop: Crop,
+        clockwise_degrees: u16,
+        output_width: u32,
+        output_height: u32,
+        resampling: vw_raster::ImageOutputResampling,
+    }
+    Output::deserialize(deserializer).map(|value| {
+        Some(vw_raster::ImageOutputMetadata {
+            version: value.version,
+            source_width: value.source_width,
+            source_height: value.source_height,
+            crop: vw_raster::Region {
+                x: value.crop.x,
+                y: value.crop.y,
+                width: value.crop.width,
+                height: value.crop.height,
+            },
+            clockwise_degrees: value.clockwise_degrees,
+            output_width: value.output_width,
+            output_height: value.output_height,
+            resampling: value.resampling,
+        })
+    })
 }

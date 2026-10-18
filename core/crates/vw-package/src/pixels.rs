@@ -8,7 +8,7 @@ pub(crate) struct Frame {
     pub bytes: Vec<u8>,
 }
 /// Rational area resampling in premultiplied alpha. Integer arithmetic makes
-/// pixels identical on both architectures. One uniform scale covers D geometry;
+/// pixels identical on both architectures. One uniform scale covers the input grid (D, or admitted O);
 /// any fractional last row/column and minimum-side padding are white context.
 pub(crate) fn resample(
     source: &DecodedImage,
