@@ -608,3 +608,17 @@ store Clippy passes. No native worker/lineage activation or other granted source
 edit. New root code awaits review. See VERIFICATION_ARCHIVE_PRIVACY_20261018.md
 and its receipt/excerpts. Both complete platform caller candidates are fetched
 only pending admission for a coherent next batch. Main remains reviewed074b6c6.
+
+## Admitted native verification sources composed, root review pending
+
+Source `1a3e8e2f32713b4af6f8a4538f35c1c450911ecb` composes8912cc39 and lineage88946ba with one public record/
+validator, consuming helpers and mandatory export/import privacy. Incoming
+private owner-review rows refuse portable import before publication; source/input
+bytes remain intact. New root changes await review. Final native batch passes154
+reported executions/19blocks with two private parent entrypoints ignored and
+exercised by wrappers, including all14leaf and7lineage cases. Strict package/store
+all-target Clippy passes. One unrun SQLite fixture's usize parameter is lowered to
+checked i64 after first compile failure. No bindings/platform/agent/UI activation.
+Exact scope/source/failures: VERIFICATION_NATIVE_COMPOSED_20261018.md and evidence.
+Held remote Air Actionssource is uncomposed; actual alignment/owner/device gates
+remain open. Main remains reviewed074b6c6 until root recheck.

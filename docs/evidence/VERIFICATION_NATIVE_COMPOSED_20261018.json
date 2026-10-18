@@ -1,0 +1,170 @@
+{
+  "date_utc": "2026-10-18",
+  "scope": "Durable native review/CAS and pure failure-package foundation with root lineage, consuming helpers and mandatory portable-data privacy; no FFI/UI/agent activation",
+  "source_commit": "1a3e8e2f32713b4af6f8a4538f35c1c450911ecb",
+  "branch": "cloud/verification-native-integration-20261018",
+  "base_and_remote_main": "074b6c603f68f19e137b7d5c0ee0a60f88c8e855",
+  "accepted_sources": {
+    "verification_leaf": "8912cc39ff72329a71c7c4ece6a72aaf43fd7016",
+    "lineage_code": "88946bae68a265bf98a4e30f2f75b6066a1afc88",
+    "lineage_receipt": "8bf738ad72c86ee3e7c752e98e6d8b54bb03eed8"
+  },
+  "review_status": "Both input source slices admitted. New root composition/privacy/helpers/import guard and fixture lowering await Astra recheck before main promotion.",
+  "composition": [
+    "Register exactly two native modules and their re-exports; same source fields, schema version, dependency pins. Keep one VerificationOrigin record from accepted worker, reference it from Extensions; ordinary None omitted.",
+    "Use the accepted single lineage validator from normal Package::from_files after preflight/count checks, preserving all seven root contract invariants. Bounded leaf BTreeSet replaces former root stack-only validator; original_marker_numbers preflight remains capped512/configured marker limit.",
+    "Add private consuming Package parts and checked allocation-capacity helpers; output encoded owners move without cloning, original/after remain borrowed.",
+    "Archive private copy validates existing bounded schema before scrub, deletes exact VERIFICATION_REVIEW_PREFIX and VACUUMs before export. Source notes/ordinary settings/identity/originals preserved.",
+    "Incoming archive with this installation-local review namespace refuses before destination publication; source archive remains unchanged. Foreign portable data cannot establish local manual verdicts.",
+    "One worker test fixture converts its oversize byte-count from usize to checked i64 for rusqlite ToSql; three other source/test leaves byte-identical to accepted8912cc39."
+  ],
+  "native": {
+    "reported_passed": 154,
+    "failed": 0,
+    "ignored": 2,
+    "result_blocks": 19,
+    "note": "Package/store --lib --tests report totals; two private crash/recovery entrypoints ignored in parent and exercised by owning wrappers. Counts are not hardware acceptance.",
+    "worker_leaf_cases": {
+      "store": 8,
+      "package": 6
+    },
+    "root_lineage_cases": 7,
+    "archive_cases": 16,
+    "local_view_cases": 11,
+    "new_import_case": "Valid privately authored pass/notes record embedded in an incoming SQLite archive refuses import before publication and preserves archive bytes/source snapshot"
+  },
+  "checks": {
+    "strict_native_clippy": "PASS store/package all targets, warnings denied",
+    "format_whitespace": "PASS",
+    "source_secret_scan": "PASS",
+    "dependency_policy": "Cargo/lock identical to accepted main, no new dependency/version/license-policy change",
+    "bindings_platforms": "No UniFFI/shared DTO or platform caller registration; zero binding generation or app/device reruns"
+  },
+  "commands": [
+    "cargo test --locked -p vw-store -p vw-package --lib --tests -j2 -- --test-threads=2",
+    "cargo clippy --locked -p vw-store -p vw-package --all-targets -j2 -- -D warnings"
+  ],
+  "corrected_failure": "First combined compile found usize not implementing rusqlite ToSql in unrun owner fixture. Changed only test parameter to checked i64; second batch passed. Final complete batch adds incoming-owner-claim rejection and passes154.",
+  "source_sha256": [
+    {
+      "path": "contracts/package.schema.json",
+      "bytes": 12518,
+      "sha256": "71e2ed966f050569f5a48c1e48510391ca1f4f2b70b2396ff5e035e555ab4c7b"
+    },
+    {
+      "path": "core/crates/vw-package/src/admission.rs",
+      "bytes": 6782,
+      "sha256": "70c2d1f8b5c65d73b825ba06155f637d97b8c1f309f3e5797eaebd013984773a"
+    },
+    {
+      "path": "core/crates/vw-package/src/compiler.rs",
+      "bytes": 19466,
+      "sha256": "ffb6aa5283f03b8132dcf6a5c63160012fbe5e0e8f4145c2149ed3dd840a9851"
+    },
+    {
+      "path": "core/crates/vw-package/src/lib.rs",
+      "bytes": 1800,
+      "sha256": "d680fb87fca21dc266499c0bd524011398f4f64de33ac1ead9d61b3d4b0576ad"
+    },
+    {
+      "path": "core/crates/vw-package/src/manifest.rs",
+      "bytes": 4802,
+      "sha256": "d44a65d61e57fdcc84d021ad4971580888eaed9b4090475fb58adf5023e302c0"
+    },
+    {
+      "path": "core/crates/vw-package/src/verification.rs",
+      "bytes": 12659,
+      "sha256": "b5016af606248476df95bf3ac7cde8943362cf914d0d7729898eb69f93e00127"
+    },
+    {
+      "path": "core/crates/vw-package/src/verify.rs",
+      "bytes": 16950,
+      "sha256": "7cb77927bad3f099f9b7327eb68b33a13fb6dad68d2ab879daf615a35807a187"
+    },
+    {
+      "path": "core/crates/vw-package/tests/verification.rs",
+      "bytes": 12146,
+      "sha256": "a1fc68fa37ee68e54fe39bc9d12934b30956f8aeb84b16021ad9f5e83a35efa7"
+    },
+    {
+      "path": "core/crates/vw-package/tests/verification_origin_contract.rs",
+      "bytes": 9564,
+      "sha256": "6163bbe2368347a7815433bd65b28451dfbf9110aa0006faac1e31c8336b2e20"
+    },
+    {
+      "path": "core/crates/vw-store/src/archive.rs",
+      "bytes": 23128,
+      "sha256": "8084d8544569970de72b4c43af630cb07105084dc72d6a9594c9cbb45dec856e"
+    },
+    {
+      "path": "core/crates/vw-store/src/lib.rs",
+      "bytes": 1383,
+      "sha256": "937fd122476a90b4b3013604ad16b94b6b467f6a026ebe73237adb77e0c4dd12"
+    },
+    {
+      "path": "core/crates/vw-store/src/verification_review.rs",
+      "bytes": 15661,
+      "sha256": "09c17734e6a787e37692a5cbebee42a3e917eb776c77e7c6c98ab60dad38e73f"
+    },
+    {
+      "path": "core/crates/vw-store/tests/archives.rs",
+      "bytes": 32716,
+      "sha256": "d8619885662fc56be7efd829c24ff70d3d643f29696ad1bbfae870f818d18368"
+    },
+    {
+      "path": "core/crates/vw-store/tests/verification_review.rs",
+      "bytes": 13785,
+      "sha256": "b414b9b82ef4feba1ea1c6296aace3de801e773534ea0d6204dffd13bf9f322c"
+    },
+    {
+      "path": "docs/ROADMAP_EXECUTION_LEDGER.md",
+      "bytes": 44435,
+      "sha256": "2b17456fcabe1fdb22cb2b44b6706f0f65ac89b6dee9f1f6edffda9346bdf955"
+    },
+    {
+      "path": "docs/VERIFICATION_ARCHIVE_PRIVACY_20261018.md",
+      "bytes": 2161,
+      "sha256": "45f5f5075497d7fc44551db5520d75f66f160a5be34e933e8855cc2614b8b921"
+    },
+    {
+      "path": "docs/evidence/VERIFICATION_ARCHIVE_PRIVACY_20261018.json",
+      "bytes": 4036,
+      "sha256": "e37adb8f334f50d9958bd5baf48ec99b6f6d50124c4f7de3730eb07792a202e7"
+    },
+    {
+      "path": "docs/evidence/VERIFICATION_ARCHIVE_PRIVACY_EXCERPTS_20261018.txt",
+      "bytes": 1347,
+      "sha256": "69dfa8f3f53bf62bbe8a2f01e59c5de3b35f894f6c3dfbf72f82c8c5f24c8bef"
+    }
+  ],
+  "logs": [
+    {
+      "path": "vw-verification-native-clippy-attempt1.log",
+      "bytes": 821,
+      "sha256": "7b07fe326eca989bc2c931f4a0dd4079f929d0c77d04beaf1acb975aca0981dc"
+    },
+    {
+      "path": "vw-verification-native-tests-attempt1.log",
+      "bytes": 2159,
+      "sha256": "daf549d3b6af9734258bb02cd3b76baefd3c4479808521084038622221f67d6c"
+    },
+    {
+      "path": "vw-verification-native-tests-attempt2.log",
+      "bytes": 16423,
+      "sha256": "d78c21fd049586f9fe15fe88f41c26c32ffd3e0ba96109a2f997cda8a3e643aa"
+    },
+    {
+      "path": "vw-verification-native-tests-final.log",
+      "bytes": 16498,
+      "sha256": "a10ef0eb811ffbd65c73dd4554aedf9e799ff4294633238ea244e65dc307be8d"
+    }
+  ],
+  "remaining": [
+    "Astra recheck of new root composition/import/export privacy and fixture adjustment before coherent main promotion",
+    "Actual checked catalog/receipt/pair/version owner wiring and normally compiled/aligned failed subset preparation",
+    "Project/session/cancellation/budget ownership across future shared/FFI and owner review UI registration; no agent verdict setter",
+    "Public verification tools, genuine alignment/recapture runtime/device/physical/fullT5.01 acceptance",
+    "Platform caller batch after repaired remote Air Actions source verdict; heldcd3c6437 remote candidate is not composed"
+  ],
+  "operations": "Only synthetic SQLite/package/archive fixtures. Both platform caller candidates fetched only; Android/Desktop grants untouched. No live provider, credential, signing/deployment, SDK/device operation or worktree deletion."
+}
