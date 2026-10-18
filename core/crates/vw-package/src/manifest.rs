@@ -132,7 +132,7 @@ pub struct Redaction {
 #[serde(deny_unknown_fields)]
 pub struct Extensions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub verification_origin: Option<VerificationOrigin>,
+    pub verification_origin: Option<crate::VerificationOrigin>,
     pub compiler: String,
     pub state_hash: String,
     pub host_seq: u64,
@@ -161,18 +161,4 @@ pub struct InstructionBinding {
     pub entry_method: String,
     pub language: String,
     pub updated_at_ms: i64,
-}
-
-/// Descriptive public lineage, not capture/alignment authority or proof that an
-/// imported author's review claims are true. Private notes and OS targets never
-/// belong here. Entry n maps follow-up marker n+1 to its original marker number.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct VerificationOrigin {
-    pub original_package_id: Id,
-    pub original_target: String,
-    pub original_manifest_sha256: String,
-    pub comparison_receipt_id: Id,
-    pub comparison_receipt_blake3: String,
-    pub original_marker_numbers: Vec<u32>,
 }

@@ -30,6 +30,18 @@ impl Package {
     pub fn manifest_sha256(&self) -> &str {
         &self.manifest_sha256
     }
+    /// Move the checked encoded owners into the private failure-package builder;
+    /// retaining borrowed original/after packages remains that caller's duty.
+    pub(crate) fn into_verification_parts(self) -> (Manifest, BTreeMap<String, Vec<u8>>) {
+        (self.manifest, self.files)
+    }
+    pub(crate) fn verification_allocation_bytes(&self) -> Result<u64> {
+        self.files.values().try_fold(0_u64, |retained, bytes| {
+            retained
+                .checked_add(bytes.capacity() as u64)
+                .ok_or(Error::Limit("package allocation"))
+        })
+    }
     /// Input file names are data, never filesystem paths. Admission happens
     /// before deserialization or codec work; duplicate names fail explicitly.
     pub fn from_files(
@@ -330,36 +342,7 @@ pub(crate) fn from_compiler(
     {
         return Err(Error::Integrity);
     }
-    if let Some(origin) = &m.extensions.verification_origin {
-        if origin.original_package_id == m.package_id
-            || origin.original_target != m.compiled_for.target
-            || !matches!(
-                origin.original_target.as_str(),
-                "claude" | "openai" | "gemini" | "generic"
-            )
-            || !bounded::hash_valid(&origin.original_manifest_sha256)
-            || !bounded::hash_valid(&origin.comparison_receipt_blake3)
-            || origin.original_marker_numbers.is_empty()
-            || origin.original_marker_numbers.len() != m.markers.len()
-        {
-            return Err(Error::Integrity);
-        }
-        // Admission caps this vector before serde allocation. Check identity and
-        // uniqueness with fixed stack storage, never a second growing inventory.
-        let mut seen = [false; 512];
-        for number in &origin.original_marker_numbers {
-            let Some(slot) = number
-                .checked_sub(1)
-                .and_then(|index| usize::try_from(index).ok())
-                .and_then(|index| seen.get_mut(index))
-            else {
-                return Err(Error::Integrity);
-            };
-            if std::mem::replace(slot, true) {
-                return Err(Error::Integrity);
-            }
-        }
-    }
+    crate::validate_verification_origin(&m)?;
     let mut inventory = BTreeSet::new();
     for f in &m.files {
         if f.path == "manifest.json"

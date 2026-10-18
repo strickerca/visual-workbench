@@ -330,7 +330,7 @@ fn corrupt_rows_and_failed_schema_write_do_not_replace_private_progress() {
     }
     sql.execute(
         "UPDATE settings SET value=zeroblob(?1) WHERE key GLOB 'vw.verification-review.v1.*'",
-        [VERIFICATION_REVIEW_MAX_BYTES + 1],
+        [i64::try_from(VERIFICATION_REVIEW_MAX_BYTES + 1).unwrap()],
     )
     .unwrap();
     assert!(matches!(

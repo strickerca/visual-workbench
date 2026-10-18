@@ -767,6 +767,76 @@ fn failed_export_after_copy_scrubbing_keeps_private_source_progress_and_publishe
     temporary.close().unwrap();
 }
 
+#[test]
+fn imported_archive_cannot_mint_installation_local_owner_verdicts() {
+    use vw_store::{
+        VerificationPackageKey, VerificationReviewChange, VerificationReviewPair,
+        VerificationVerdict,
+    };
+    let temporary = temporary();
+    let (mut source, _) = fixture(temporary.path());
+    let pair = VerificationReviewPair {
+        project_id: source.project().id.clone(),
+        original: VerificationPackageKey {
+            package_id: id(30),
+            target: "generic".into(),
+            manifest_sha256: "a".repeat(64),
+        },
+        after: VerificationPackageKey {
+            package_id: id(31),
+            target: "generic".into(),
+            manifest_sha256: "b".repeat(64),
+        },
+        comparison_receipt_id: id(32),
+        comparison_receipt_blake3: "c".repeat(64),
+        marker_count: 1,
+    };
+    let snapshot = source
+        .change_verification_review(
+            &pair,
+            0,
+            &id(33),
+            VerificationReviewChange {
+                original_number: 1,
+                verdict: VerificationVerdict::Pass,
+                note: PRIVATE_REVIEW_NOTE.into(),
+            },
+            || false,
+        )
+        .unwrap();
+    assert_eq!(snapshot.version, 1);
+    let private_copy = temporary.path().join("author-private.sqlite");
+    let sql =
+        rusqlite::Connection::open(temporary.path().join("source.vwb/project.sqlite")).unwrap();
+    sql.execute("VACUUM INTO ?1", [private_copy.to_str().unwrap()])
+        .unwrap();
+    drop(sql);
+    let normal = temporary.path().join("normal-public.vwbz");
+    export_vwbz(&mut source, &normal).unwrap();
+    let mut members = entries(&normal);
+    members
+        .iter_mut()
+        .find(|(name, _)| name == "project.sqlite")
+        .unwrap()
+        .1 = fs::read(private_copy).unwrap();
+    let incoming = temporary.path().join("foreign-private-review.vwbz");
+    write_raw(&incoming, &members, None, None);
+    let original_input = fs::read(&incoming).unwrap();
+    let destination = temporary.path().join("must-not-import-owner-claims.vwb");
+    assert!(matches!(
+        import_vwbz(&incoming, &destination, ImportLimits::default()),
+        Err(vw_store::StoreError::Invalid(
+            "installation-local verification review"
+        ))
+    ));
+    assert!(!destination.exists());
+    assert_eq!(fs::read(incoming).unwrap(), original_input);
+    assert!(source.verification_review(&pair).unwrap() == snapshot);
+    drop(source);
+    clean_staging(temporary.path());
+    temporary.close().unwrap();
+}
+
 // A tiny, deliberately permissive fixture writer is independent of zip-rs's
 // duplicate-name/type defenses, allowing those malformed inputs to reach ours.
 fn write_raw(

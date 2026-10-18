@@ -69,12 +69,11 @@ pub fn export_vwbz(
         "DELETE FROM settings WHERE key GLOB ?1",
         [format!("{}*", crate::LOCAL_VIEW_PREFIX)],
     )?;
-    // Reserved by the durable verification leaf before that module is wired.
-    // Strip even malformed records; no private review is parsed/exported here.
-    // On module admission this literal is lowered through its exact prefix const.
+    // Strip even malformed private reviews before the final VACUUM. The source
+    // database and its manual owner progress remain unchanged.
     copy_connection.execute(
         "DELETE FROM settings WHERE key GLOB ?1",
-        ["vw.verification-review.v1.*"],
+        [format!("{}*", crate::VERIFICATION_REVIEW_PREFIX)],
     )?;
     copy_connection.execute("VACUUM INTO ?1", [sqlite_path(&clean)?])?;
     copy_connection
@@ -194,6 +193,19 @@ pub fn import_vwbz(
     drop(reader);
     // All copied bytes and paths are verified before SQLite sees the database.
     let restored = ProjectStore::open(staging.path())?;
+    // Portable input cannot establish an installation-local owner's decisions.
+    // Normal exports omit this namespace; retain the incoming archive untouched
+    // and refuse before publishing a project containing imported review claims.
+    let private_reviews: bool = restored.connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM settings WHERE key GLOB ?1)",
+        [format!("{}*", crate::VERIFICATION_REVIEW_PREFIX)],
+        |row| row.get(0),
+    )?;
+    if private_reviews {
+        return Err(StoreError::Invalid(
+            "installation-local verification review",
+        ));
+    }
     if inventory(&restored.connection)? != extracted {
         return Err(StoreError::Corrupt("archive asset inventory"));
     }
