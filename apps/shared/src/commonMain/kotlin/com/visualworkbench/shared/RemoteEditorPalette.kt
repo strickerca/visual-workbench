@@ -12,6 +12,10 @@ public data class RemoteEditorPaletteState(
     public val toolId:String?=null,
     public val settingsDigest:String?=null,
     public val compatibility:List<RemoteToolCompatibility> = emptyList(),
+    /** UI observation fence, not native grant authority. */
+    public val targetRevision:ULong=0uL,
+    /** A partial input receipt blocks this input session until a new session. */
+    public val sealedBinding:RemoteTargetBinding?=null,
 )
 
 /** UI ownership only. Native dispatch owns the actual inference/input permit,
@@ -32,10 +36,13 @@ public class RemoteEditorPalette(
             dispatcher.target.collect { next ->
                 mutable.update { old ->
                     if(old.closed)old else {
-                        val same=old.target?.binding==next?.binding&&old.target?.identity==next?.identity
+                        val same=sameCommandSession(old.target,next)
                         old.copy(target=next,toolId=if(same)old.toolId else null,
                             settingsDigest=if(same)old.settingsDigest else null,
                             compatibility=if(same)old.compatibility else emptyList(),
+                            targetRevision=if(same)old.targetRevision else old.targetRevision+1uL,
+                            // A null observation is not evidence of a new input session.
+                            sealedBinding=old.sealedBinding?.takeIf{next==null||sameInputSession(next.binding,it)},
                             message=if(same&&next?.grantActive==true)old.message else null)
                     }
                 }
@@ -46,7 +53,7 @@ public class RemoteEditorPalette(
         if(!admission.tryLock())return false
         val snapshot=mutable.value
         val target=snapshot.target
-        if(target==null||snapshot.closed||snapshot.busy||!remoteEditorActionEnabled(target,action)){
+        if(target==null||snapshot.closed||snapshot.busy||dispatcher.target.value!=target||snapshot.sealedBinding?.let{sameInputSession(it,target.binding)}==true||!remoteEditorActionEnabled(target,action)){
             admission.unlock();return false
         }
         mutable.update{it.copy(busy=true,message=null)}
@@ -56,20 +63,36 @@ public class RemoteEditorPalette(
                 ensureActive()
                 val receipt=dispatcher.dispatch(target.binding,action)
                 mutable.update { current ->
-                    if(current.closed||current.target?.binding!=target.binding||current.target.identity!=target.identity)current
-                    else if(receipt.binding!=target.binding||receipt.action!=action||(receipt.status!=RemoteCommandStatus.Injected&&(receipt.inputSequence!=0uL||receipt.acceptedQpc100ns!=0uL)))current.copy(message="Remote command receipt was refused.")
-                    else current.copy(message=when(receipt.status){
-                        RemoteCommandStatus.Injected->if(!remoteEditorActionEnabled(current.target,action))null else if(receipt.inputSequence!=0uL&&receipt.acceptedQpc100ns!=0uL)"Input sent to ${target.identity.editor.name}; editor effect is unverified." else "Remote command receipt was refused."
-                        RemoteCommandStatus.Refused->if(receipt.reason=="input_busy"||receipt.reason=="Backpressure")"Finish the stroke, then retry the editor command." else "${target.identity.editor.name} command refused; check the current grant and canvas focus."
-                        RemoteCommandStatus.SealedPartial->"Input was partially accepted. Control is sealed; check the editor before granting again."
-                    })
+                    val latest=dispatcher.target.value
+                    val sameTarget=current.target?.binding==target.binding&&current.target.identity==target.identity&&
+                        sameCommandSession(target,latest)
+                    val validReceipt=receipt.binding==target.binding&&receipt.action==action&&
+                        (receipt.status==RemoteCommandStatus.Injected||(receipt.inputSequence==0uL&&receipt.acceptedQpc100ns==0uL))
+                    when {
+                        current.closed->current
+                        // Partial input is session safety information even when
+                        // the grant was revoked/restored or its geometry changed.
+                        // It never becomes an editor-effect success observation.
+                        validReceipt&&receipt.status==RemoteCommandStatus.SealedPartial&&
+                            (current.target==null||sameInputSession(current.target.binding,target.binding))->
+                            current.copy(sealedBinding=target.binding,message=if(current.target==null)null else
+                                "Input was partially accepted. Control is sealed; check the editor before granting again.")
+                        !sameTarget||current.targetRevision!=snapshot.targetRevision->current
+                        !validReceipt->current.copy(message="Remote command receipt was refused.")
+                        else->current.copy(message=when(receipt.status){
+                            RemoteCommandStatus.Injected->if(!remoteEditorActionEnabled(latest?:current.target,action))null else if(receipt.inputSequence!=0uL&&receipt.acceptedQpc100ns!=0uL)"Input sent to ${target.identity.editor.name}; editor effect is unverified." else "Remote command receipt was refused."
+                            RemoteCommandStatus.Refused->if(receipt.reason=="input_busy"||receipt.reason=="Backpressure")"Finish the stroke, then retry the editor command." else "${target.identity.editor.name} command refused; check the current grant and canvas focus."
+                            RemoteCommandStatus.SealedPartial->null // handled by the session fence above
+                        })
+                    }
                 }
             } catch(cancelled:CancellationException) { throw cancelled }
             catch(_:Exception) {
                 mutable.update { current ->
                     val currentTarget=current.target
-                    if(!current.closed&&currentTarget?.binding==target.binding&&
-                        currentTarget.identity==target.identity&&remoteEditorActionEnabled(currentTarget,action))
+                    if(!current.closed&&current.targetRevision==snapshot.targetRevision&&currentTarget?.binding==target.binding&&
+                        currentTarget.identity==target.identity&&sameCommandSession(target,dispatcher.target.value)&&
+                        remoteEditorActionEnabled(currentTarget,action))
                         current.copy(message="Remote command failed; no retry was sent.") else current
                 }
             } finally {
@@ -95,19 +118,36 @@ public class RemoteEditorPalette(
     }
 }
 
-public fun remoteEditorActionEnabled(target:RemoteTargetState,action:RemoteEditorAction):Boolean {
-    if(!target.identity.valid()||!target.grantActive||target.commandBusy||target.pauseReason!=null||action !in remoteEditorActions(target.identity.editor)||action !in target.verifiedActions)return false
-    // Exactly one variant. Selection-only proof supports the closed essential
-    // action set; legacy keyboard actions retain actual canvas focus.
-    if((target.focusProof==null)==(target.selectedCanvasProof==null))return false
-    if(target.selectedCanvasProof!=null&&action.ordinal>=10)return false
-    val proof:RemoteCanvasIdentityProof=target.focusProof?:target.selectedCanvasProof?:return false
-    // This is an additional UI fence. Only native current proof can authorize
-    // dispatch; an arbitrary caller-created descriptor has no authority.
-    return target.identity.shortcutProfileDigest!=null&&proof.shortcutProfileDigest==target.identity.shortcutProfileDigest&&
-        proof.targetToken==target.binding.targetToken&&proof.geometryRevision==target.binding.geometryRevision&&proof.sampledQpc100ns!=0uL&&
-        proof.provider.length in 1..128&&proof.provider.none{it.code<32||it.code==127}&&proof.processId!=0u&&
-        proof.runtimeIdHash.length==64&&proof.runtimeIdHash.all{it in '0'..'9'||it in 'a'..'f'}
+/** Presentation and command admission share one reason, so a disabled route is
+ * visible on both platforms. Native dispatch still owns all actual authority. */
+public fun remoteEditorActionUnavailableReason(target:RemoteTargetState?,action:RemoteEditorAction):String? {
+    remoteEditorPaletteReason(target)?.let{return it}
+    target?:return "Select a remote editor on the PC."
+    if(action !in remoteEditorActions(target.identity.editor))return "This command is unavailable for the selected editor."
+    if(target.selectedCanvasProof!=null&&action !in essentialEditorActions)return "This command requires verified canvas keyboard focus."
+    if(action !in target.verifiedActions)return "This route is unavailable for the current editor, tool and settings."
+    return null
+}
+public fun remoteEditorActionEnabled(target:RemoteTargetState,action:RemoteEditorAction):Boolean =
+    remoteEditorActionUnavailableReason(target,action)==null
+
+private val essentialEditorActions:Set<RemoteEditorAction> = setOf(
+    RemoteEditorAction.Undo,RemoteEditorAction.Redo,RemoteEditorAction.SelectFreehandBrush,
+    RemoteEditorAction.ToggleEraserMode,RemoteEditorAction.SelectEraser,
+    RemoteEditorAction.BrushSmaller,RemoteEditorAction.BrushLarger,
+    RemoteEditorAction.ZoomIn,RemoteEditorAction.ZoomOut,RemoteEditorAction.FitCanvas,
+)
+private fun RemoteCanvasIdentityProof.validFor(target:RemoteTargetState):Boolean {
+    val rect=canvasRectHost
+    val className=when(this){is RemoteCanvasFocusProof->focusedClassName;is RemoteSelectedCanvasProof->selectedClassName}
+    val controlType=when(this){is RemoteCanvasFocusProof->focusedControlType;is RemoteSelectedCanvasProof->selectedControlType}
+    return shortcutProfileDigest==target.identity.shortcutProfileDigest&&targetToken==target.binding.targetToken&&
+        geometryRevision==target.binding.geometryRevision&&sampledQpc100ns!=0uL&&processId!=0u&&
+        provider.length in 1..128&&provider.none{it.isISOControl()}&&
+        className.length in 1..256&&className.none{it.isISOControl()}&&controlType in 50000..50100&&
+        runtimeIdHash.length==64&&runtimeIdHash.all{it in '0'..'9'||it in 'a'..'f'}&&
+        rect.width in 1u..32768u&&rect.height in 1u..32768u&&
+        rect.x.toLong()+rect.width.toLong()<=Int.MAX_VALUE&&rect.y.toLong()+rect.height.toLong()<=Int.MAX_VALUE
 }
 public fun remoteEditorPaletteReason(target:RemoteTargetState?):String? = when {
     target==null->"Select a remote editor on the PC."
@@ -116,6 +156,28 @@ public fun remoteEditorPaletteReason(target:RemoteTargetState?):String? = when {
     target.commandBusy->"Finishing the editor command; drawing resumes when the canvas is checked."
     target.pauseReason!=null->"Remote control is paused. Revalidate the selected editor on the PC."
     target.focusProof==null&&target.selectedCanvasProof==null->"Focus the verified editor canvas on the PC."
-    target.identity.shortcutProfileDigest==null||target.verifiedActions.isEmpty()->"Shortcuts for this exact editor version have not been verified."
+    target.identity.shortcutProfileDigest==null->"Shortcuts for this exact editor version have not been verified."
+    (target.focusProof==null)==(target.selectedCanvasProof==null)->"The current editor canvas proof is invalid. Revalidate on the PC."
+    (target.focusProof?:target.selectedCanvasProof)?.validFor(target)!=true->"The editor canvas proof is stale or invalid. Revalidate on the PC."
+    target.verifiedActions.none{it in remoteEditorActions(target.identity.editor)&&
+        (target.selectedCanvasProof==null||it in essentialEditorActions)}->"No verified command route is available for the current editor, tool and settings."
     else->null
 }
+/** The palette may retain a local partial-input fence while native state catches
+ * up. Dropping an observation or refreshing its proof cannot clear that fence. */
+public fun remoteEditorPaletteStateReason(state:RemoteEditorPaletteState):String? = when {
+    state.closed->"Remote editor controls are closed."
+    state.target!=null&&state.sealedBinding?.let{sameInputSession(it,state.target.binding)}==true->"Input was partially accepted. Control is sealed; grant a new input session on the PC."
+    else->remoteEditorPaletteReason(state.target)
+}
+private fun sameCommandSession(before:RemoteTargetState?,after:RemoteTargetState?):Boolean {
+    if(before==null||after==null)return before==after
+    val previous=before.focusProof?:before.selectedCanvasProof
+    val next=after.focusProof?:after.selectedCanvasProof
+    return before.binding==after.binding&&before.identity==after.identity&&
+        before.grantActive==after.grantActive&&before.pauseReason==after.pauseReason&&
+        previous?.runtimeIdHash==next?.runtimeIdHash&&previous?.processId==next?.processId
+}
+
+private fun sameInputSession(before:RemoteTargetBinding,after:RemoteTargetBinding):Boolean =
+    before.connectionEpoch==after.connectionEpoch&&before.inputSessionId==after.inputSessionId
