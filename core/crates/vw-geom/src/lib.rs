@@ -21,6 +21,7 @@ mod affine;
 mod asset;
 mod capture;
 mod display;
+mod image_output;
 mod lens;
 mod object_rotation;
 pub use object_rotation::object_rotation;
@@ -31,6 +32,7 @@ pub use affine::{Affine, Camera, Point, Rect, Size, snap_edge, snap_pixel_center
 pub use asset::{ExifOrientation, PdfPage, SvgFit, SvgViewport};
 pub use capture::{CaptureGeometry, GeometryRevision, HostRect, PixelPoint};
 pub use display::{Insets, QuarterTurn, ScreenTransform};
+pub use image_output::{IMAGE_OUTPUT_MAX_SIDE, ImageOutputFrame};
 pub use lens::LensTransform;
 
 /// Invalid or unrepresentable geometry is rejected before crossing an input API.

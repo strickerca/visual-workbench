@@ -109,6 +109,20 @@ pub(crate) fn render_buffer(
     options: RenderOptions,
     region: RegionRender<'_>,
 ) -> Result<DecodedImage, RasterError> {
+    render_buffer_mode(source, project, document, assets, options, region, true)
+}
+
+/// The same compositor also supplies clean tonal output, omitting annotations
+/// and results while retaining the existing adjustment order and blend policy.
+pub(crate) fn render_buffer_mode(
+    source: &DecodedImage,
+    project: &Project,
+    document: &Id,
+    assets: &impl AssetResolver,
+    options: RenderOptions,
+    region: RegionRender<'_>,
+    annotations: bool,
+) -> Result<DecodedImage, RasterError> {
     let RegionRender {
         origin,
         estimated,
@@ -134,6 +148,9 @@ pub(crate) fn render_buffer(
     let mut scratch = Pixmap::new(source.width, source.height).ok_or(RasterError::Allocation)?;
     for (layer_id, layer) in layers {
         crate::source::check_cancel(cancelled)?;
+        if layer.definition.kind == vw_model::IMAGE_OUTPUT_LAYER_KIND {
+            continue;
+        }
         let mut objects = project
             .objects
             .iter()
@@ -159,6 +176,9 @@ pub(crate) fn render_buffer(
             if let Some(Shape::Adjustment(value)) = &objects[0].1.state.shape {
                 apply_adjustment(&mut result, value, layer.opacity)?;
             }
+            continue;
+        }
+        if !annotations {
             continue;
         }
         let replacement = objects.iter().try_fold(false, |found, (_, object)| {

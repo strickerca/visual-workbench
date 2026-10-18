@@ -264,3 +264,17 @@ fn malformed_or_unsupported_source_and_fractional_crop_refuse() {
         assert!(p.image_output(&id(2)).is_err(), "case {change}");
     }
 }
+
+#[test]
+fn registering_output_validation_does_not_restrict_legacy_source_dimensions() {
+    let mut project = fixture("annotation");
+    project.assets.values_mut().next().unwrap().width = vw_geom::IMAGE_OUTPUT_MAX_SIDE + 1;
+    project.validate().unwrap();
+    assert!(project.active_image_output(&id(2)).unwrap().is_none());
+    project.layers.get_mut(&id(3)).unwrap().definition.kind =
+        vw_model::IMAGE_OUTPUT_LAYER_KIND.into();
+    for visible in [true, false] {
+        project.layers.get_mut(&id(3)).unwrap().visible = visible;
+        assert!(project.validate().is_err());
+    }
+}
