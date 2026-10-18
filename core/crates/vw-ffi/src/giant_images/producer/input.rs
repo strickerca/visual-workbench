@@ -13,7 +13,7 @@ use std::{
 };
 use vw_assets::Source;
 use vw_store::{FreeSpaceQuery, disk_reserve_bytes};
-use vw_stream::{MemoryKind, SessionBudget};
+use vw_stream::{MemoryCharge, MemoryKind, SessionBudget};
 
 const OWNER_BYTES: u64 = 4 * 1024 * 1024;
 static INPUTS: AtomicUsize = AtomicUsize::new(0);
@@ -32,6 +32,52 @@ impl Drop for InputPermit {
     fn drop(&mut self) {
         INPUTS.fetch_sub(1, Ordering::AcqRel);
     }
+}
+
+/// One admission follows the actual picked/prepared directory. The counter is
+/// shared with legacy prepare callers; no picked-input counter or pool exists.
+pub(super) struct InputAdmission {
+    _permit: InputPermit,
+    _charge: MemoryCharge,
+}
+pub(super) fn reserve_admission(budget: &SessionBudget) -> Result<InputAdmission> {
+    let charge = source::reserve(budget, MemoryKind::Transfer, OWNER_BYTES)?;
+    let permit = InputPermit::acquire()?;
+    Ok(InputAdmission {
+        _permit: permit,
+        _charge: charge,
+    })
+}
+
+/// Bundle before validation: the File retires before directory cleanup can
+/// release or quarantine this exact admission. No fallible operation intervenes.
+pub(super) struct AdmittedInput {
+    file: File,
+    staging: super::cleanup::OwnedDirectory,
+}
+impl AdmittedInput {
+    pub fn attach(original: RootOwnedPickedOriginal, admission: InputAdmission) -> Self {
+        Self {
+            file: original.file,
+            staging: super::cleanup::OwnedDirectory::new(original.work, admission),
+        }
+    }
+    pub fn release(self) -> Result<()> {
+        let Self { file, mut staging } = self;
+        drop(file);
+        staging.cleanup()
+    }
+}
+pub(super) fn validate_limits(limits: &GiantInputLimits) -> Result<()> {
+    if !limits.assume_untagged_srgb {
+        return Err(Error::Unsupported);
+    }
+    if !(1..=source::MAX_ORIGINAL).contains(&limits.max_original_bytes)
+        || !(1..=super::MAX_DISK_BYTES).contains(&limits.max_work_disk_bytes)
+    {
+        return Err(Error::Limit);
+    }
+    Ok(())
 }
 
 /// Both values are already owned by the root picker/blob adapter before async dispatch.
@@ -140,99 +186,140 @@ pub(super) fn prepare(
     query: &impl FreeSpaceQuery,
 ) -> Result<Arc<PreparedSource>> {
     source::live(closed, cancel)?;
-    if !limits.assume_untagged_srgb {
-        return Err(Error::Unsupported);
-    }
-    if !(1..=source::MAX_ORIGINAL).contains(&limits.max_original_bytes)
-        || !(1..=super::MAX_DISK_BYTES).contains(&limits.max_work_disk_bytes)
-    {
-        return Err(Error::Limit);
-    }
-    let owner_charge = source::reserve(budget, MemoryKind::Transfer, OWNER_BYTES)?;
-    let permit = InputPermit::acquire()?;
-    let RootOwnedPickedOriginal {
-        file: mut original,
-        work: temporary,
-    } = original;
-    if !original.metadata().map_err(io_error)?.is_file() {
-        return Err(Error::Invalid);
-    }
-    let original_size = original.metadata().map_err(io_error)?.len();
-    if !(33..=limits.max_original_bytes).contains(&original_size)
-        || original_size > limits.max_work_disk_bytes
-    {
-        return Err(Error::Limit);
-    }
-    let work = checked_directory(temporary.path())?;
-    admit_space(&work, original_size, query)?;
-    let staging = super::cleanup::OwnedDirectory::new(temporary, (permit, owner_charge));
-    let path = staging.path().join("original.input");
-    let mut output = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path)
-        .map_err(io_error)?;
-    let (hash, sha256, bytes) = source::hash_copy_checked(
-        &mut original,
-        Some(&mut output),
-        limits.max_original_bytes,
-        || {
-            if closed.load(Ordering::Acquire) {
-                return Err(crate::CoreError::Closed);
-            }
-            cancel.check()
-        },
+    // Preserve legacy consent/limit errors before resource admission. New root
+    // intake reserves before opening and enters prepare_admitted directly.
+    validate_limits(&limits)?;
+    let admission = reserve_admission(budget)?;
+    prepare_admitted(
+        AdmittedInput::attach(original, admission),
+        limits,
+        closed,
+        cancel,
+        query,
     )
-    .map_err(Error::from)?;
-    if bytes != original_size {
-        return Err(Error::Stale);
+}
+
+/// Consume an existing picked admission, never reacquiring its permit or charge.
+/// Every error cleans the actual File/directory before returning, or quarantines
+/// the exact admission if deletion fails. Success moves it into PreparedSource.
+pub(super) fn prepare_admitted(
+    owned: AdmittedInput,
+    limits: GiantInputLimits,
+    closed: &AtomicBool,
+    cancel: &Cancellation,
+    query: &impl FreeSpaceQuery,
+) -> Result<Arc<PreparedSource>> {
+    prepare_admitted_report(owned, limits, closed, cancel, query).map_err(|failure| failure.error)
+}
+
+/// Keep operation errors distinct from actual retirement. Root close must not
+/// invent a cleanup quarantine merely because an I/O operation failed earlier.
+pub(super) struct PreparationFailure {
+    pub error: Error,
+    pub retirement: Result<()>,
+}
+pub(super) fn prepare_admitted_report(
+    mut owned: AdmittedInput,
+    limits: GiantInputLimits,
+    closed: &AtomicBool,
+    cancel: &Cancellation,
+    query: &impl FreeSpaceQuery,
+) -> std::result::Result<Arc<PreparedSource>, PreparationFailure> {
+    let result = (|| {
+        source::live(closed, cancel)?;
+        validate_limits(&limits)?;
+        if !owned.file.metadata().map_err(io_error)?.is_file() {
+            return Err(Error::Invalid);
+        }
+        let original_size = owned.file.metadata().map_err(io_error)?.len();
+        if !(33..=limits.max_original_bytes).contains(&original_size)
+            || original_size > limits.max_work_disk_bytes
+        {
+            return Err(Error::Limit);
+        }
+        let work = checked_directory(owned.staging.path())?;
+        admit_space(&work, original_size, query)?;
+        let path = owned.staging.path().join("original.input");
+        let mut output = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map_err(io_error)?;
+        let (hash, sha256, bytes) = source::hash_copy_checked(
+            &mut owned.file,
+            Some(&mut output),
+            limits.max_original_bytes,
+            || {
+                if closed.load(Ordering::Acquire) {
+                    return Err(crate::CoreError::Closed);
+                }
+                cancel.check()
+            },
+        )
+        .map_err(Error::from)?;
+        if bytes != original_size {
+            return Err(Error::Stale);
+        }
+        output
+            .flush()
+            .and_then(|()| output.sync_all())
+            .map_err(io_error)?;
+        drop(output);
+        let mut input = source::regular(&path).map_err(Error::from)?;
+        let metadata = source::inspect(&mut input, cancel).map_err(Error::from)?;
+        let (width, height) = metadata.dimensions();
+        let source = Source {
+            original: hash,
+            original_bytes: bytes,
+            width,
+            height,
+            orientation: metadata.orientation,
+            bit_depth: 8,
+            icc: None,
+            display_conversion: false,
+        };
+        source.validate().map_err(|_| Error::Limit)?;
+        let required_work_bytes = work_bytes(&source)?;
+        if required_work_bytes > limits.max_work_disk_bytes {
+            return Err(Error::Limit);
+        }
+        admit_space(&work, required_work_bytes, query)?;
+        source::live(closed, cancel)?;
+        let info = GiantSourceInfo {
+            source_path: path,
+            asset_id: hash,
+            sha256: parse_hash(&sha256)?,
+            encoded_bytes: bytes,
+            raw_width: metadata.width,
+            raw_height: metadata.height,
+            width,
+            height,
+            orientation: metadata.orientation,
+            format: metadata.format.into(),
+        };
+        Ok((input, info, source, metadata.format, required_work_bytes))
+    })();
+    match result {
+        Ok((input, info, source, format, required_work_bytes)) => {
+            drop(owned.file);
+            Ok(Arc::new(PreparedSource {
+                _input: input,
+                info,
+                source,
+                format,
+                max_work_bytes: limits.max_work_disk_bytes,
+                required_work_bytes,
+                staging: owned.staging,
+            }))
+        }
+        Err(error) => {
+            let retirement = owned.release();
+            Err(PreparationFailure {
+                error: retirement.as_ref().err().cloned().unwrap_or(error),
+                retirement,
+            })
+        }
     }
-    output
-        .flush()
-        .and_then(|()| output.sync_all())
-        .map_err(io_error)?;
-    drop(output);
-    let mut input = source::regular(&path).map_err(Error::from)?;
-    let metadata = source::inspect(&mut input, cancel).map_err(Error::from)?;
-    let (width, height) = metadata.dimensions();
-    let source = Source {
-        original: hash,
-        original_bytes: bytes,
-        width,
-        height,
-        orientation: metadata.orientation,
-        bit_depth: 8,
-        icc: None,
-        display_conversion: false,
-    };
-    source.validate().map_err(|_| Error::Limit)?;
-    let required_work_bytes = work_bytes(&source)?;
-    if required_work_bytes > limits.max_work_disk_bytes {
-        return Err(Error::Limit);
-    }
-    admit_space(&work, required_work_bytes, query)?;
-    source::live(closed, cancel)?;
-    let info = GiantSourceInfo {
-        source_path: path,
-        asset_id: hash,
-        sha256: parse_hash(&sha256)?,
-        encoded_bytes: bytes,
-        raw_width: metadata.width,
-        raw_height: metadata.height,
-        width,
-        height,
-        orientation: metadata.orientation,
-        format: metadata.format.into(),
-    };
-    Ok(Arc::new(PreparedSource {
-        _input: input,
-        info,
-        source,
-        format: metadata.format,
-        max_work_bytes: limits.max_work_disk_bytes,
-        required_work_bytes,
-        staging,
-    }))
 }
 
 /// Retire the exact source only after every typed producer output has released
