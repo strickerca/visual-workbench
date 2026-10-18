@@ -327,6 +327,111 @@ class ImageFramesInteractionTest {
         } finally { f.close() }
     }
 
+    @Test fun failedDiscardRetainsTheExactRetirementOwnerAndFencesReentrantCallbacksUntilDetachSucceeds() = runBlocking {
+        val f = Fixture()
+        try {
+            f.open(); f.failFirstCommit = true
+            assertTrue(f.controls.apply(f.token())); f.idle(); val old = f.token()
+            val capabilities = f.capabilities; f.closeFailures = 1
+            f.closeHook = {
+                assertNull(f.controls.capture()); assertTrue(f.controls.state.value.retirementPending)
+                assertFalse(f.controls.state.value.ready); assertFalse(f.controls.state.value.mayLeave)
+                assertFalse(f.controls.apply(old)); assertFalse(f.controls.retry(old)); assertFalse(f.controls.active(true))
+                f.controls.bind(f.project,f.document(),1,0uL); assertEquals(capabilities,f.capabilities)
+            }
+            assertFalse(f.controls.discardRetry(old))
+            assertEquals(1,f.closeCalls); assertEquals(0,f.closedPlans)
+            assertTrue(f.controls.state.value.departing); assertTrue(f.controls.state.value.retirementPending)
+            assertNull(f.controls.state.value.retry); assertNull(f.controls.capture())
+            assertFalse(f.controls.apply(old)); assertFalse(f.controls.discardFormAndReload(old))
+            f.closeHook = null; f.controls.detach()
+            assertEquals(2,f.closeCalls); assertEquals(1,f.closedPlans)
+            assertEquals(1,f.prepares); assertEquals(1,f.commits)
+            assertFalse(f.controls.state.value.departing); assertFalse(f.controls.state.value.retirementPending)
+            f.publish(); f.idle(); assertTrue(f.controls.state.value.ready)
+        } finally { f.closeFailures = 0; f.closeHook = null; f.close() }
+    }
+
+    @Test fun failedCommittedCloseKeepsItsReceiptAndRetriesOnlyRetirementDespiteRefreshFailure() = runBlocking {
+        for (refreshFails in listOf(false,true)) {
+            val f = Fixture()
+            try {
+                f.open(); val old = f.token(); f.closeFailures = 1; f.failRefresh = refreshFails
+                f.closeHook = {
+                    assertNotNull(f.controls.state.value.lastReceipt)
+                    assertNull(f.controls.state.value.retry); assertNull(f.controls.capture())
+                    assertFalse(f.controls.retry(old)); assertFalse(f.controls.apply(old))
+                }
+                assertTrue(f.controls.apply(old)); f.idle()
+                val receipt = f.controls.state.value.lastReceipt!!
+                assertTrue(f.controls.state.value.departing); assertTrue(f.controls.state.value.retirementPending)
+                assertNull(f.controls.state.value.retry); assertTrue(f.controls.state.value.issue!!.contains("edit was saved"))
+                assertEquals(1,f.prepares); assertEquals(1,f.commits); assertEquals(1,f.closeCalls); assertEquals(0,f.closedPlans)
+                assertEquals(1,f.refreshCalls); assertFalse(f.controls.retry(old))
+                f.closeHook = null; f.controls.detach()
+                assertEquals(receipt,f.controls.state.value.lastReceipt)
+                assertEquals(1,f.prepares); assertEquals(1,f.commits); assertEquals(2,f.closeCalls); assertEquals(1,f.closedPlans)
+                assertFalse(f.controls.state.value.retirementPending); assertFalse(f.controls.state.value.departing)
+            } finally { f.closeFailures = 0; f.closeHook = null; f.close() }
+        }
+    }
+
+    @Test fun failedDetachKeepsDepartureFencedUntilASeparateExplicitDetachSettlesTheSamePlan() = runBlocking {
+        val f = Fixture()
+        try {
+            f.open(); f.failFirstCommit = true
+            assertTrue(f.controls.apply(f.token())); f.idle(); val old = f.token(); f.closeFailures = 1
+            try { f.controls.detach(); fail("Failed plan retirement allowed detach") }
+            catch (_: IllegalStateException) { }
+            assertTrue(f.controls.state.value.departing); assertTrue(f.controls.state.value.retirementPending)
+            assertNull(f.controls.capture()); assertFalse(f.controls.state.value.mayLeave)
+            assertFalse(f.controls.active(true)); assertFalse(f.controls.apply(old)); assertFalse(f.controls.retry(old))
+            val calls = f.capabilities; f.publish(); assertEquals(calls,f.capabilities)
+            assertEquals(1,f.closeCalls); assertEquals(0,f.closedPlans)
+            f.controls.detach(); assertEquals(2,f.closeCalls); assertEquals(1,f.closedPlans)
+            assertFalse(f.controls.state.value.departing); assertFalse(f.controls.state.value.retirementPending)
+            assertEquals(1,f.prepares); assertEquals(1,f.commits)
+            f.publish(); f.idle(); assertTrue(f.controls.state.value.ready)
+        } finally { f.closeFailures = 0; f.close() }
+    }
+
+    @Test fun concurrentCloseCallersJoinOneFailedAttemptThenExplicitCloseOnlyRetriesRetirement() = runBlocking {
+        val f = Fixture(); val entered = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
+        var first: Deferred<Result<Unit>>? = null; var second: Deferred<Result<Unit>>? = null
+        try {
+            f.open(); f.previewGate = { withContext(NonCancellable) { entered.complete(Unit); release.await() } }
+            assertTrue(f.controls.preview(f.token(),0u,0u,false)); entered.await()
+            f.failFirstCommit = true; assertTrue(f.controls.apply(f.token())); f.idle(); f.closeFailures = 1
+            first = async(start=CoroutineStart.UNDISPATCHED) { runCatching { f.controls.close() } }
+            second = async(start=CoroutineStart.UNDISPATCHED) { runCatching { f.controls.close() } }
+            assertFalse(first.isCompleted); assertFalse(second.isCompleted)
+            release.complete(Unit)
+            withTimeout(3000) { assertTrue(first.await().isFailure); assertTrue(second.await().isFailure) }
+            assertEquals(1,f.closeCalls); assertEquals(0,f.closedPlans)
+            assertTrue(f.controls.state.value.departing); assertTrue(f.controls.state.value.retirementPending)
+            f.controls.close()
+            assertEquals(2,f.closeCalls); assertEquals(1,f.closedPlans)
+            assertEquals(1,f.prepares); assertEquals(1,f.commits); assertNull(f.controls.capture())
+            assertFalse(f.controls.state.value.retirementPending)
+        } finally {
+            release.complete(Unit); f.closeFailures = 0
+            withContext(NonCancellable) { first?.join(); second?.join(); f.close() }
+        }
+    }
+
+    @Test fun failedDescribeAndFailedCloseRetainTheUncommittedPlanWithoutEverCommittingIt() = runBlocking {
+        val f = Fixture()
+        try {
+            f.open(); f.describeFailure = IllegalStateException("describe failed"); f.closeFailures = 1
+            assertTrue(f.controls.apply(f.token())); f.idle()
+            assertEquals(1,f.prepares); assertEquals(0,f.commits); assertEquals(1,f.closeCalls); assertEquals(0,f.closedPlans)
+            assertNull(f.controls.state.value.lastReceipt); assertNull(f.controls.state.value.retry)
+            assertTrue(f.controls.state.value.retirementPending); assertTrue(f.controls.state.value.departing)
+            f.controls.detach()
+            assertEquals(2,f.closeCalls); assertEquals(1,f.closedPlans); assertEquals(0,f.commits)
+        } finally { f.closeFailures = 0; f.close() }
+    }
+
     private class Fixture {
         val scope = CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
         val mutations = Mutex()
@@ -344,6 +449,9 @@ class ImageFramesInteractionTest {
         var corruptEditing: ((ImageEditingPreview) -> ImageEditingPreview)? = null
         var rawPreview: ImageFramePreview? = null
         var failFirstCommit = false; var failRefresh = false
+        var closeCalls = 0; var closeFailures = 0
+        var closeHook: (() -> Unit)? = null
+        var describeFailure: Exception? = null
         val commands = mutableListOf<ImageFrameCommand>()
         val previewCommands = mutableListOf<ImageFrameCommand?>()
         val previewMarks = mutableListOf<Boolean>()
@@ -387,13 +495,22 @@ class ImageFramesInteractionTest {
                     prepares++; commands += command
                     return object : WorkbenchWorkflowPlan {
                         var closed = false
-                        override fun describe(): WorkflowPlanInfo = WorkflowPlanInfo(metadata.transactionId,binding,1u,metadata.firstLamport+1uL)
+                        override fun describe(): WorkflowPlanInfo {
+                            describeFailure?.let { throw it }
+                            return WorkflowPlanInfo(metadata.transactionId,binding,1u,metadata.firstLamport+1uL)
+                        }
                         override suspend fun commit(): WorkflowReceipt {
                             commits++; commitGate?.invoke()
                             if (failFirstCommit && commits == 1) throw WorkflowFailure(WorkflowFailureKind.Storage)
                             return WorkflowReceipt(metadata.transactionId,info,duplicate=commits > 1)
                         }
-                        override fun close() { if (!closed) { closed = true; closedPlans++ } }
+                        override fun close() {
+                            if (!closed) {
+                                closeCalls++; closeHook?.invoke()
+                                if (closeFailures > 0) { closeFailures--; throw IllegalStateException("retirement failed") }
+                                closed = true; closedPlans++
+                            }
+                        }
                     }
                 }
             }

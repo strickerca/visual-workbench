@@ -12,6 +12,22 @@ all giant paths, existing platform callers and both EditorControllers remain
 untouched. Registering these sources alone does not complete the caller journeys.
 Krita, actual model admission and all unperformed device/product gates remain open.
 
+## Existing T3.07 workflows: no replacement needed
+
+The accepted base already composes layer/group controls, canonical object
+rotation, tonal controls, local cameras/bookmarks and multi-document navigation
+through the existing project and mutation owners. Both platform
+`EditorWorkflowControls.kt` files compose the navigator, saved-view, layer and
+tone panels; both existing EditorControllers own canonical object rotation.
+Their prior integration and
+24-document headless regression evidence are recorded in
+`EDITING_OFFLINE_INTEGRATION_HANDOFF_20261018.md`; those are historical receipts,
+not fresh checks of this candidate. No replacement manager or duplicate controls
+are added here. The remaining independent editing gap is the nondestructive
+document output frame and canonical tonal editing composition. This candidate
+supplies the bounded leaves; the reserved root hooks below remain necessary for
+the actual canvas/export journeys.
+
 ## Exact additive interfaces
 
 The new `ImageFramesApi.kt` defines `ImageFrameSettings` (integer D crop,
@@ -192,6 +208,11 @@ Check departure permission before signaling beginDeparture (which intentionally
 makes the control unready); signal it before waiting for the root mutation gate.
 Do not re-admit UI callbacks during that wait. Await detach
 before project/document replacement and close before parent-scope disposal.
+The committed callback runs under the shared mutation gate; refresh without
+reacquiring that gate, and defer this owner's retirement until the callback
+returns. A failed plan close retains its exact retirement owner and blocks
+further edits and departure. Keep that owner and borrowed project; retry
+detach/close to settle cleanup without recommitting an already saved edit.
 
 Full-canvas tones use the EXISTING background/viewport owner, not the frame-panel
 reader. Request editingBackground with the captured complete binding, convert its
@@ -267,7 +288,8 @@ candidate does not complete SEL-001.
 ## Checks and proposed deferred-ledger rows
 
 Output checkpoint: `f8a5bc8201873a7688a1b72e3d17c45801a52b76`.
-Twenty-five focused ImageFrames form/API/lifecycle JVM cases pass, with warnings
+Assisted checkpoint: `6e7c017b6eb5feb21ec7ed2b495afc271fd54fe2`.
+Thirty focused ImageFrames form/API/lifecycle JVM cases pass, with warnings
 denied and strict explicit API common compilation. The focused harness uses the
 saved Kotlin compiler and native expect stubs only; product generated bindings
 and Compose are not compiled by this check. Twenty-one focused assisted-source
@@ -275,10 +297,20 @@ cases also pass with warnings denied and strict common compilation. Their test
 fixtures inject native capabilities/resource charges; no actual model inference
 runs. The earlier test-only unnecessary-nonnull warning failure and one failed
 retirement-status assertion were repaired, then the full focused suite reran
-successfully. Forty-six focused JVM cases pass in total. All owned Kotlin syntax and commonMain import checks, native rustfmt
+successfully. Fifty-one focused JVM cases pass in total. All owned Kotlin syntax and commonMain import checks, native rustfmt
 and scoped whitespace checks pass. Review findings were repaired with cases for
 departure, source-side bounds, reentrant ownership, terminal cancellation and
 failed retirement. No expensive native/platform/device run was performed.
+
+The requested independent Astra source review found one further frame-plan
+retirement defect: a throwing close could lose its owner and permit reuse.
+The final repair retains separate retirement ownership, preserves committed
+receipts without recommitting, fences callbacks and joins concurrent cleanup
+attempts. Five injected-close regressions pass in the 30-case frame suite,
+including discard, commit/refresh, detach, concurrent close and describe failure.
+Astra confirmed that finding resolved and found no additional blocker in the
+reviewed output/assisted source scope. It inspected source only; this disposition
+does not claim native compilation, generated-ABI or caller/device acceptance.
 
 | Scope | Exact deferred command/journey | Prerequisites | Expected result | Status |
 |---|---|---|---|---|

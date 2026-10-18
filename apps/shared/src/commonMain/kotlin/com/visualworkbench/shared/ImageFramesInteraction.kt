@@ -32,10 +32,11 @@ public data class ImageFramesState(
     public val previewMarked: Boolean = true,
     public val issue: String? = null,
     public val departing: Boolean = false,
+    public val retirementPending: Boolean = false,
 ) {
-    public val ready: Boolean get() = active && !departing && !loading && !busy && !stale && snapshot != null && form != null &&
+    public val ready: Boolean get() = active && !departing && !retirementPending && !loading && !busy && !stale && snapshot != null && form != null &&
         snapshot.binding == formBinding && retry == null
-    public val mayLeave: Boolean get() = !departing && !busy && retry == null && !dirty
+    public val mayLeave: Boolean get() = !departing && !retirementPending && !busy && retry == null && !dirty
     public val blocksInput: Boolean get() = active || !mayLeave
 }
 
@@ -54,6 +55,7 @@ public class ImageFramesInteraction(
 ) {
     private data class Attachment(val project: WorkbenchProject, val documentId: String, val epoch: Long, val page: UInt?)
     private data class Pending(val attachment: Attachment, val plan: WorkbenchWorkflowPlan)
+    private data class Retirement(val owner: Pending, val receipt: WorkflowReceipt? = null)
     private data class DraftCommand(val value: ImageFrameCommand.Set, val allocatedIds: Pair<String,String>?)
     private sealed interface Read {
         val owner: Attachment
@@ -83,21 +85,24 @@ public class ImageFramesInteraction(
     private var reader: Job? = null
     private var action: Job? = null
     private var pending: Pending? = null
+    private var retiring: Retirement? = null
+    private var settlingRetirement: Boolean = false
+    private var detachment: CompletableDeferred<Unit>? = null
     private var closed: Boolean = false
     private var departing: Boolean = false
 
     public fun capture(): ImageFramesToken? {
         val owner = attachment ?: return null
         val expected = binding ?: return null
-        if (closed || departing || !supervisor.isActive || awaitingBinding) return null
+        if (closed || departing || retiring != null || !supervisor.isActive || awaitingBinding) return null
         return ImageFramesToken(expected,owner.epoch,ticket,owner.page)
     }
     private fun accepts(token: ImageFramesToken): Boolean = capture() == token
     private fun matches(owner: Attachment, captured: Long): Boolean =
-        !closed && !departing && !awaitingBinding && attachment == owner && ticket == captured
+        !closed && !departing && retiring == null && !awaitingBinding && attachment == owner && ticket == captured
 
     public fun bind(project: WorkbenchProject, document: DocumentSnapshot, epoch: Long, changeSequence: ULong) {
-        if (closed || departing || !supervisor.isActive) return
+        if (closed || departing || retiring != null || !supervisor.isActive) return
         val next = Attachment(project,document.documentId,epoch,document.page)
         val revision = document.render.revision
         val expected = WorkflowBinding(revision.projectId,document.documentId,revision.hostSeq,revision.stateHash)
@@ -123,13 +128,13 @@ public class ImageFramesInteraction(
 
     /** Immediately fence results on OPS before the slower root render refresh. */
     public fun observe(changeSequence: ULong) {
-        if (closed || departing || !supervisor.isActive || changeSequence <= sequence) return
+        if (closed || departing || retiring != null || !supervisor.isActive || changeSequence <= sequence) return
         sequence = changeSequence; ticket++; previewSerial++; awaitingBinding = true
         mutable.value = mutable.value.copy(snapshot=null,preview=null,editingPreview=null,previewLoading=false,stale=true,loading=mutable.value.active)
     }
 
     public fun active(value: Boolean): Boolean {
-        if (closed || departing || !supervisor.isActive || (!value && !mutable.value.mayLeave)) return false
+        if (closed || departing || retiring != null || !supervisor.isActive || (!value && !mutable.value.mayLeave)) return false
         if (value != mutable.value.active) { ticket++; previewSerial++ }
         mutable.value = mutable.value.copy(active=value,loading=value && mutable.value.snapshot == null,
             preview=if (value) mutable.value.preview else null,
@@ -234,43 +239,49 @@ public class ImageFramesInteraction(
         val value = pending ?: throw WorkflowFailure(WorkflowFailureKind.Missing)
         if (value.attachment != owner) throw WorkflowFailure(WorkflowFailureKind.Detached)
         val receipt = value.plan.commit()
-        pending = null
+        // Once committed this handle can only retire, never commit again.
+        // Install its owner before publishing state or calling a fallible close.
+        retiring = Retirement(value,receipt); pending = null
         // Receipt bookkeeping is durable before a fallible close/root refresh.
         if (attachment == owner) {
             baseline = null; draftIds = null; ticket++; previewSerial++
-            mutable.value = mutable.value.copy(lastReceipt=receipt,retry=null,form=null,formBinding=null,dirty=false,stale=false,
-                snapshot=null,preview=null,editingPreview=null,previewLoading=false,loading=mutable.value.active)
-        }
-        try { value.plan.close() }
+            mutable.value = mutable.value.copy(lastReceipt=receipt,retry=null,retirementPending=true,
+                form=null,formBinding=null,dirty=false,stale=false,snapshot=null,preview=null,editingPreview=null,
+                previewLoading=false,loading=mutable.value.active)
+        } else mutable.value = mutable.value.copy(retry=null,retirementPending=true)
+        try { settleRetirement() }
         finally { withContext(NonCancellable) { if (attachment == owner) committed(receipt) } }
     }
 
     public fun discardRetry(token: ImageFramesToken): Boolean {
         if (!accepts(token) || action != null) return false
-        val failure = try { releasePending(); null } catch (error: Exception) { error }
+        try { releasePending() } catch (_: Exception) { return false }
         discardFormAndReload(token)
-        mutable.value = mutable.value.copy(issue=if (failure == null)
-            "The local retry handle was discarded. A saved edit remains in history; reload to inspect it."
-            else "The retry handle could not be released. Close and reopen the project before continuing.")
-        return failure == null
+        mutable.value = mutable.value.copy(issue=
+            "The local retry handle was discarded. A saved edit remains in history; reload to inspect it.")
+        return true
     }
 
     public fun cancel(token: ImageFramesToken): Unit { if (accepts(token)) action?.cancel() }
 
     private fun launch(owner: Attachment, block: suspend () -> Unit): Boolean {
-        if (closed || departing || !supervisor.isActive || action != null) return false
+        if (closed || departing || retiring != null || !supervisor.isActive || action != null) return false
         mutable.value = mutable.value.copy(busy=true,issue=null,preview=null,editingPreview=null,previewLoading=false); previewSerial++
         lateinit var job: Job
         job = scope.launch(start=CoroutineStart.LAZY) {
             try { block() }
             catch (cancel: CancellationException) {
-                if (attachment == owner) mutable.value = mutable.value.copy(issue=if (pending == null)
+                if (attachment == owner && retiring == null) mutable.value = mutable.value.copy(issue=if (pending == null)
                     "The action was cancelled. Private values are still here."
                     else "Cancellation settled. Retry the exact retained edit to learn whether it was saved.")
                 throw cancel
             } catch (error: Exception) {
-                if (attachment == owner) mutable.value = mutable.value.copy(issue=message(error))
-            } finally { if (attachment != owner) releasePending() }
+                if (attachment == owner && retiring == null) mutable.value = mutable.value.copy(issue=message(error))
+            } finally {
+                // Joined detach owns retirement after departure begins. A late
+                // replacement may still retire here, retaining any failed close.
+                if (attachment != owner && !departing) try { releasePending() } catch (_: Exception) { }
+            }
         }
         action = job
         job.invokeOnCompletion {
@@ -357,13 +368,13 @@ public class ImageFramesInteraction(
     private fun requestSnapshot() {
         val owner = attachment ?: return
         val expected = binding ?: return
-        if (closed || departing || !supervisor.isActive || awaitingBinding || !mutable.value.active || action != null) return
+        if (closed || departing || retiring != null || !supervisor.isActive || awaitingBinding || !mutable.value.active || action != null) return
         if (mutable.value.snapshot?.binding == expected && !mutable.value.loading) return
         enqueue(Read.Snapshot(owner,expected,ticket))
     }
 
     private fun enqueue(value: Read) {
-        if (closed || departing || !supervisor.isActive) return
+        if (closed || departing || retiring != null || !supervisor.isActive) return
         if (reader == null) {
             val requests = Channel<Read>(Channel.CONFLATED); queue = requests
             reader = scope.launch {
@@ -427,9 +438,30 @@ public class ImageFramesInteraction(
     }
 
     private fun releasePending() {
-        val value = pending; pending = null
-        mutable.value = mutable.value.copy(retry=null)
-        value?.plan?.close()
+        pending?.let {
+            retiring = Retirement(it); pending = null
+            mutable.value = mutable.value.copy(retry=null,retirementPending=true)
+        }
+        settleRetirement()
+    }
+
+    private fun settleRetirement() {
+        val value = retiring ?: return
+        if (settlingRetirement) throw WorkflowFailure(WorkflowFailureKind.Backpressure)
+        settlingRetirement = true
+        try {
+            value.owner.plan.close()
+        } catch (error: Throwable) {
+            // Failure is not proof of release. Keep this exact owner and fence
+            // the borrowed project until an explicit detach/close settles it.
+            beginDeparture()
+            mutable.value = mutable.value.copy(retirementPending=true,issue=if (value.receipt != null)
+                "The edit was saved, but its plan could not be released. Retry closing this project before continuing."
+                else "The retained plan could not be released. Retry closing this project before continuing.")
+            throw error
+        } finally { settlingRetirement = false }
+        retiring = null
+        mutable.value = mutable.value.copy(retirementPending=false)
     }
 
     /** Fence every callback immediately, before the parent waits for the shared
@@ -444,16 +476,27 @@ public class ImageFramesInteraction(
     }
 
     public suspend fun detach(): Unit = withContext(NonCancellable) {
-        beginDeparture()
-        attachment = null; binding = null; sequence = 0uL; ticket++; previewSerial++; awaitingBinding = false
-        val writing = action; val reading = reader
-        writing?.cancel(); reading?.cancel(); queue?.close(); queue = null
-        writing?.join(); reading?.join(); action = null; reader = null
-        try { releasePending() }
-        finally {
+        // Concurrent callers join the same attempt, including its failure. A
+        // later explicit call retries retirement without preparing/committing.
+        detachment?.let { it.await(); return@withContext }
+        val completion = CompletableDeferred<Unit>()
+        detachment = completion
+        try {
+            beginDeparture()
+            attachment = null; binding = null; sequence = 0uL; ticket++; previewSerial++; awaitingBinding = false
+            val writing = action; val reading = reader
+            writing?.cancel(); reading?.cancel(); queue?.close(); queue = null
+            writing?.join(); reading?.join(); action = null; reader = null
+            releasePending()
             baseline = null; draftIds = null
-            mutable.value = ImageFramesState(active=mutable.value.active)
-            departing = false
+            val current = mutable.value
+            detachment = null; departing = false
+            mutable.value = ImageFramesState(active=current.active,lastReceipt=current.lastReceipt)
+            completion.complete(Unit)
+        } catch (error: Throwable) {
+            detachment = null
+            completion.completeExceptionally(error)
+            throw error
         }
     }
 
