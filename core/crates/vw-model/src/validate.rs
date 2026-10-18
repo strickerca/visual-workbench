@@ -283,6 +283,12 @@ pub fn validate_asset(value: &v1::AddAsset) -> Result<(), ModelError> {
             .as_object()
             .ok_or(ModelError::Invalid("metadata object"))?;
         for (key, value) in entries {
+            if key == "first_tiff_page_only" {
+                if !value.is_boolean() {
+                    return Err(ModelError::Invalid("TIFF first-page notice"));
+                }
+                continue;
+            }
             one_of(
                 key,
                 &["description", "copyright", "software", "color_profile"],

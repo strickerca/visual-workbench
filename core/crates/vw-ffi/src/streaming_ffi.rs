@@ -1168,7 +1168,7 @@ fn export_file(
                     vw_raster::ExportFormat::Png8 | vw_raster::ExportFormat::Png16
                 ) {
                     return export_buffered(
-                        source, state, &document, &options, &request, cancel, &mut sink,
+                        source, state, &document, &options, &request, cancel, sink,
                     );
                 }
                 let mut adapter = SourceView(source);

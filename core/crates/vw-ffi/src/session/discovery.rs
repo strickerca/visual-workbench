@@ -230,23 +230,30 @@ impl SessionDiscovery {
     pub async fn snapshot(&self) -> SessionResult<Vec<DiscoveredPeer>> {
         self.worker
             .call(|state| {
-                Ok((|| -> SessionResult<_> {
-                    #[cfg(windows)]
-                    if let Some(desktop) = &state.desktop {
-                        let hints = desktop.browse_for(std::time::Duration::from_millis(500))?;
-                        for hint in hints {
-                            if let Err(error) = observe(state, hint)
-                                && !matches!(
-                                    error,
-                                    SessionError::Backpressure | SessionError::Invalid
-                                )
-                            {
-                                return Err(error);
+                #[cfg(windows)]
+                {
+                    Ok((|| -> SessionResult<_> {
+                        if let Some(desktop) = &state.desktop {
+                            let hints =
+                                desktop.browse_for(std::time::Duration::from_millis(500))?;
+                            for hint in hints {
+                                if let Err(error) = observe(state, hint)
+                                    && !matches!(
+                                        error,
+                                        SessionError::Backpressure | SessionError::Invalid
+                                    )
+                                {
+                                    return Err(error);
+                                }
                             }
                         }
-                    }
-                    Ok(snapshot(state))
-                })())
+                        Ok(snapshot(state))
+                    })())
+                }
+                #[cfg(not(windows))]
+                {
+                    Ok(Ok(snapshot(state)))
+                }
             })
             .await?
     }

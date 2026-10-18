@@ -1,15 +1,18 @@
 use super::*;
 use crate::worker::{Worker, startup};
+#[cfg(any(windows, target_os = "android"))]
+use std::time::{Duration, Instant};
 use std::{
     path::PathBuf,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
-    time::{Duration, Instant},
 };
 use vw_ai::budget::{BudgetLedger, SqliteBudgetLedger};
-use vw_ai_provider::{OpenAiAdapter, PlatformTrust, SecretProvider};
+#[cfg(any(windows, target_os = "android"))]
+use vw_ai_provider::SecretProvider;
+use vw_ai_provider::{OpenAiAdapter, PlatformTrust};
 
 static OWNERS: AtomicUsize = AtomicUsize::new(0);
 pub(super) struct OwnerPermit;
@@ -250,7 +253,7 @@ pub(super) fn adapter(cancel: &crate::Cancellation) -> AiEditResult<OpenAiAdapte
     );
     #[cfg(not(any(windows, target_os = "android")))]
     {
-        return Err(AiEditError::Unsupported);
+        Err(AiEditError::Unsupported)
     }
     #[cfg(any(windows, target_os = "android"))]
     OpenAiAdapter::new(

@@ -828,3 +828,25 @@ fn asset_metadata_is_whitelisted_and_result_candidates_require_outside_proof() {
         .cost_estimate_usd = f64::INFINITY;
     assert!(project.state_hash().is_err());
 }
+
+#[test]
+fn tiff_first_page_notice_admits_only_a_boolean_without_widening_descriptive_metadata() {
+    let mut original = asset();
+    for text in [
+        r#"{"first_tiff_page_only":true}"#,
+        r#"{"first_tiff_page_only":false,"description":"fixture"}"#,
+    ] {
+        original.metadata_json = text.into();
+        assert!(vw_model::validate_asset(&original).is_ok());
+    }
+    for text in [
+        r#"{"first_tiff_page_only":"true"}"#,
+        r#"{"first_tiff_page_only":{}}"#,
+        r#"{"first_tiff_page_only":null}"#,
+        r#"{"first_tiff_page_only":true,"unknown":false}"#,
+        r#"{"description":false}"#,
+    ] {
+        original.metadata_json = text.into();
+        assert!(vw_model::validate_asset(&original).is_err());
+    }
+}
