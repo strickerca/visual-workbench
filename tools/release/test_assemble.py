@@ -1,0 +1,420 @@
+"""Small synthetic, stdlib-only checks. No builds, real packages or devices."""
+from contextlib import ExitStack, redirect_stdout
+import copy
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import re
+import sys
+import tempfile
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+
+import assemble as a
+
+
+class Assembly(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="vw-release-unit-")
+        self.base = Path(self.temp.name)
+        self.root = self.base / "source"
+        self.root.mkdir()
+        self.destination = self.base / "delivery"
+        self.put("project.txt", b"synthetic source\n")
+        self.put("built/artifact.bin", b"synthetic compiled bytes\n")
+        self.put("third_party/notices/MIT.txt", b"synthetic full notice\n")
+        self.put("third_party/LICENSES", a.json_bytes({"schema_version": 1, "files": [
+            {"path": "notices/MIT.txt", "license": "MIT", "source_url": "https://example.test/notice",
+             "sha256": self.row("third_party/notices/MIT.txt")["sha256"]}]}))
+        artifact = self.row("built/artifact.bin") | {"destination": "artifacts/artifact.bin", "kind": "opaque"}
+        self.proof = {"schema": "vw-release-source-binding-v1", "source_revision": "1" * 40,
+                      "sources": [self.row("project.txt")], "artifacts": [a.descriptor({key: artifact[key] for key in ("path", "bytes", "sha256")})]}
+        self.spec = {"schema": "vw-release-assembly-v1", "release_id": "synthetic-1", "binding": {},
+                     "artifacts": [artifact], "notice_manifest": self.row("third_party/LICENSES"),
+                     "notices": [self.row("third_party/notices/MIT.txt")], "catalog": None}
+        self.refresh()
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def put(self, relative, body):
+        path = self.root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(body)
+        return path
+
+    def row(self, relative):
+        body = (self.root / relative).read_bytes()
+        return {"path": relative, "bytes": len(body), "sha256": hashlib.sha256(body).hexdigest()}
+
+    def refresh(self):
+        self.put(".local/binding.json", a.json_bytes(self.proof))
+        self.spec["binding"] = self.row(".local/binding.json")
+        self.put(".local/manifest.json", a.json_bytes(self.spec))
+        self.digest = self.row(".local/manifest.json")["sha256"]
+
+    def run_assembly(self):
+        return a.assemble(self.root, ".local/manifest.json", self.digest, self.destination)
+
+    def refuses(self, code, call=None):
+        with self.assertRaisesRegex((ValueError, OSError), "^" + re.escape(code) + "$"):
+            (call or self.run_assembly)()
+
+    def before(self):
+        return {p.relative_to(self.root).as_posix(): (p.read_bytes(), a.snapshot(p.stat()))
+                for p in self.root.rglob("*") if p.is_file()}
+
+    def replace_artifact(self, relative, body, kind):
+        self.put(relative, body)
+        self.spec["artifacts"] = [self.row(relative) | {"destination": "artifacts/" + Path(relative).name, "kind": kind}]
+        self.proof["artifacts"] = [self.row(relative)]
+        self.refresh()
+
+    def test_assembly_hashes_inventory_and_preserves_originals(self):
+        before = self.before()
+        result = self.run_assembly()
+        self.assertEqual(self.before(), before)
+        self.assertEqual(result["status"], "assembled-hash-verified")
+        self.assertFalse(result["built"])
+        self.assertFalse(result["signed_or_signature_verified"])
+        self.assertFalse(result["installed_or_launched"])
+        self.assertFalse(result["device_or_physical_acceptance"])
+        self.assertEqual((self.destination / "artifacts/artifact.bin").read_bytes(), b"synthetic compiled bytes\n")
+        inventory = json.loads((self.destination / "inventory.json").read_bytes())
+        self.assertEqual(inventory, result)
+        delivered = {p.relative_to(self.destination).as_posix() for p in self.destination.rglob("*") if p.is_file()}
+        self.assertEqual(delivered, set(result["files"]) | {"inventory.json", "SHA256SUMS", "COMPLETE"})
+        for line in (self.destination / "SHA256SUMS").read_text().splitlines():
+            digest, relative = line.split("  ", 1)
+            self.assertEqual(hashlib.sha256((self.destination / relative).read_bytes()).hexdigest(), digest)
+        marker = (self.destination / "COMPLETE").read_text()
+        self.assertEqual(marker, hashlib.sha256((self.destination / "inventory.json").read_bytes()).hexdigest() + "  inventory.json\n")
+        input_names = {row["path"] for row in result["inputs"]}
+        self.assertEqual(input_names, {"project.txt", "built/artifact.bin", ".local/binding.json", ".local/manifest.json",
+                                      "third_party/LICENSES", "third_party/notices/MIT.txt"})
+        text = (self.destination / "THIRD-PARTY-NOTICES.txt").read_text()
+        self.assertIn(self.row("third_party/notices/MIT.txt")["sha256"], text)
+        self.assertIn("https://example.test/notice", text)
+        self.assertEqual(result["notices"][0]["bytes"], len(b"synthetic full notice\n"))
+
+    def test_existing_destination_is_preserved(self):
+        self.destination.mkdir()
+        (self.destination / "keep").write_bytes(b"old delivery")
+        with self.assertRaises(FileExistsError):
+            self.run_assembly()
+        self.assertEqual((self.destination / "keep").read_bytes(), b"old delivery")
+        self.assertEqual(len(list(self.destination.iterdir())), 1)
+
+    def test_manifest_hash_and_source_hash_refuse_before_destination(self):
+        self.digest = "0" * 64
+        self.refuses("manifest_binding")
+        self.assertFalse(self.destination.exists())
+        self.refresh()
+        self.put("project.txt", b"wrong current source")
+        self.refuses("input_binding")
+        self.assertFalse(self.destination.exists())
+
+    def test_bad_artifact_hash_cleans_staging_and_preserves_source(self):
+        self.put("built/artifact.bin", b"wrong built bytes")
+        before = self.before()
+        self.refuses("input_binding")
+        self.assertFalse(self.destination.exists())
+        self.assertEqual(self.before(), before)
+
+    def test_explicit_build_binding_must_exactly_cover_artifacts(self):
+        self.proof["artifacts"] = []
+        self.refresh()
+        self.refuses("binding_artifacts")
+        self.assertFalse(self.destination.exists())
+
+    def test_descriptors_are_typed_and_bounded_before_io(self):
+        for field, value, code in (("bytes", True, "descriptor_binding"), ("bytes", a.MAX_FILE + 1, "descriptor_binding"),
+                                   ("sha256", "A" * 64, "descriptor_binding")):
+            spec = copy.deepcopy(self.spec)
+            spec["artifacts"][0][field] = value
+            self.refuses(code, lambda: a.manifest(spec))
+        with patch.object(a, "MAX_ARTIFACTS", 0):
+            self.refuses("artifact_count", lambda: a.manifest(self.spec))
+        with patch.object(a, "MAX_TOTAL", 1):
+            self.refuses("artifact_total", lambda: a.manifest(self.spec))
+        with patch.object(a, "MAX_SOURCE_TOTAL", 1):
+            self.refuses("source_total", lambda: a.binding(self.proof, self.spec["artifacts"]))
+        with patch.object(a, "MAX_JSON", 2):
+            self.refuses("input_size")
+
+    def test_unsafe_paths_case_aliases_and_prefix_collisions_refuse(self):
+        for value in ("../escape", "/absolute", "a//b", "a/./b", "a\\b", "a:stream", "CON.txt", "trailing.", "x/COM1.log", "a\nname", "a?b"):
+            with self.subTest(value=value):
+                self.refuses("unsafe_relative_path", lambda: a.name(value))
+        self.refuses("duplicate_path", lambda: a.unique_paths([{"path": "A.txt"}, {"path": "a.txt"}]))
+        self.refuses("path_collision", lambda: a.unique_paths([{"path": "a"}, {"path": "a/b"}]))
+        self.refuses("path_collision", lambda: a.unique_paths([{"path": "a"}, {"path": "a-"}, {"path": "a/b"}]))
+        self.spec["artifacts"][0]["destination"] = "inventory.json"
+        self.refresh()
+        self.refuses("artifact_kind_or_destination")
+
+    def test_global_source_case_alias_is_refused(self):
+        self.proof["sources"].append(self.row("built/artifact.bin") | {"path": "BUILT/artifact.bin"})
+        self.refresh()
+        self.refuses("input_case_alias")
+
+    def test_json_duplicates_unknown_keys_and_constants_refuse(self):
+        self.refuses("json_duplicate", lambda: a.parse(b'{"schema":1,"schema":2}'))
+        self.refuses("json_constant", lambda: a.parse(b'{"x":NaN}'))
+        self.refuses("json_encoding_or_structure", lambda: a.parse(b'\xff'))
+        self.refuses("json_object", lambda: a.parse(b'[]'))
+        self.refuses("manifest_schema", lambda: a.manifest(self.spec | {"build": True}))
+
+    def test_notice_gate_uses_actual_bounded_input_inventory(self):
+        self.spec["notices"].append(self.row("third_party/notices/MIT.txt") | {"path": "third_party/notices/extra.txt"})
+        self.put("third_party/notices/extra.txt", b"synthetic full notice\n")
+        self.refresh()
+        self.refuses("notice_unlisted_source")
+        self.assertFalse(self.destination.exists())
+
+    def test_notice_manifest_requires_every_declared_notice(self):
+        source = json.loads((self.root / "third_party/LICENSES").read_bytes())
+        source["files"].append(source["files"][0] | {"path": "notices/missing.txt"})
+        self.put("third_party/LICENSES", a.json_bytes(source))
+        self.spec["notice_manifest"] = self.row("third_party/LICENSES")
+        self.refresh()
+        with self.assertRaises(OSError):
+            self.run_assembly()
+        self.assertFalse(self.destination.exists())
+
+    def test_notice_hash_change_and_printable_metadata_gate(self):
+        source = json.loads((self.root / "third_party/LICENSES").read_bytes())
+        source["files"][0]["license"] = "MIT\nforged line"
+        self.put("third_party/LICENSES", a.json_bytes(source))
+        self.spec["notice_manifest"] = self.row("third_party/LICENSES")
+        self.refresh()
+        self.refuses("notice_metadata")
+        self.assertFalse(self.destination.exists())
+
+    def test_real_apk_validator_is_reused_and_no_acceptance_added(self):
+        path = Path(a.__file__).absolute().parents[1] / "ffi-test/test_apk.py"
+        with patch.dict(sys.modules, {"check_apk": a.APK}):
+            fixtures = a._module("vw_release_apk_test_fixtures", path)
+        self.replace_artifact("built/test.apk", fixtures.apk(), "apk")
+        result = self.run_assembly()
+        checked = result["package_checks"]["artifacts/test.apk"]
+        self.assertEqual(checked["status"], "PASS")
+        self.assertFalse(checked["signature_verified"])
+        self.assertFalse(checked["runtime_16k_verified"])
+        self.assertEqual(checked["extracted_files"], 0)
+        self.assertEqual(len(checked["libraries"]), 2)
+
+    def test_corrupt_apk_refuses_with_no_delivered_tree(self):
+        self.replace_artifact("built/test.apk", b"not an apk" * 10, "apk")
+        self.refuses("missing_eocd")
+        self.assertFalse(self.destination.exists())
+
+    def test_msi_is_only_hash_bound_external_input(self):
+        self.replace_artifact("built/test.msi", b"synthetic opaque external package", "external-package")
+        result = self.run_assembly()
+        self.assertEqual(result["package_checks"], {})
+        self.assertIn("MSI/opaque inputs receive hash binding only", result["external_package_validation"])
+
+    def test_missing_release_documents_are_explicit_prerequisites(self):
+        result = self.run_assembly()
+        self.assertFalse(result["release_ready"])
+        self.assertEqual(result["release_prerequisites"], {
+            key: {"status": "missing-release-prerequisite"} for key in a.DOCUMENTS})
+
+    def test_release_documents_copy_exact_inputs_without_claiming_tool_versions(self):
+        self.put("docs/toolchain.md", b"synthetic recorded pins; producer versions unverified\n")
+        self.put("docs/recovery.md", b"synthetic reviewed guide; installation unverified\n")
+        self.spec["release_documents"] = {"toolchain_record": self.row("docs/toolchain.md"),
+                                          "uninstall_recovery_guide": self.row("docs/recovery.md")}
+        self.spec["external_dependencies"] = [{"id": "licensed-decoder", "reason": "No admitted licensed binary supplied"}]
+        self.refresh()
+        result = self.run_assembly()
+        for role, target in a.DOCUMENTS.items():
+            row = self.spec["release_documents"][role]
+            self.assertEqual((self.destination / target).read_bytes(), (self.root / row["path"]).read_bytes())
+            self.assertEqual(result["release_prerequisites"][role]["status"], "supplied-hash-verified-content-not-accepted")
+            self.assertEqual(result["files"][target], a.blob(row))
+        self.assertFalse(result["release_ready"])
+        self.assertEqual(result["external_dependencies"], self.spec["external_dependencies"])
+
+    def test_release_document_and_dependency_limits_refuse(self):
+        self.spec["release_documents"] = {"toolchain_record": self.row("project.txt")}
+        self.refuses("release_documents", lambda: a.manifest(self.spec))
+        del self.spec["release_documents"]
+        self.spec["external_dependencies"] = [{"id": "decoder", "reason": "a\nb"}]
+        self.refuses("external_dependency", lambda: a.manifest(self.spec))
+
+    def test_packaged_types_cannot_silently_skip_existing_gate(self):
+        for relative, kind, code in (("built/test.apk", "opaque", "apk_kind"), ("built/test.msi", "opaque", "msi_kind"),
+                                     (a.DESKTOP + "file.bin", "opaque", "desktop_kind")):
+            spec = copy.deepcopy(self.spec)
+            spec["artifacts"][0].update(path=relative, kind=kind)
+            self.refuses(code, lambda: a.manifest(spec))
+
+    def test_desktop_adapter_requires_explicit_apk_and_full_layout(self):
+        self.replace_artifact(a.DESKTOP + "app/item.bin", b"synthetic desktop", "desktop-file")
+        self.refuses("personal_package_requires_explicit_apk")
+        self.assertFalse(self.destination.exists())
+
+    def test_fresh_destination_constructor_failure_cleans_owned_directory(self):
+        original = a.get_dir
+        def fail(path, stack, cache):
+            if path == self.destination:
+                raise OSError("synthetic directory lease failure")
+            return original(path, stack, cache)
+        with patch.object(a, "get_dir", fail):
+            with self.assertRaises(OSError):
+                self.run_assembly()
+        self.assertFalse(self.destination.exists())
+
+    def test_copy_failure_cleans_only_new_tree(self):
+        original = a.Output.write
+        def fail(owner, relative, *args, **kwargs):
+            value = original(owner, relative, *args, **kwargs)
+            if relative == "artifacts/artifact.bin":
+                raise OSError("synthetic disk error")
+            return value
+        before = self.before()
+        with patch.object(a.Output, "write", fail):
+            with self.assertRaises(OSError):
+                self.run_assembly()
+        self.assertFalse(self.destination.exists())
+        self.assertEqual(self.before(), before)
+
+    def test_same_bytes_replacement_after_copy_is_detected(self):
+        original = a.Output.write
+        def swap(owner, relative, *args, **kwargs):
+            value = original(owner, relative, *args, **kwargs)
+            if relative == "artifacts/artifact.bin":
+                path = self.root / "built/artifact.bin"
+                replacement = path.with_suffix(".replacement")
+                replacement.write_bytes(path.read_bytes())
+                os.replace(replacement, path)
+            return value
+        with patch.object(a.Output, "write", swap):
+            self.refuses("input_identity_changed")
+        self.assertFalse(self.destination.exists())
+
+    def test_same_bytes_output_replacement_refuses_and_preserves_foreign_file(self):
+        original = a.Output.write
+        def swap(owner, relative, *args, **kwargs):
+            value = original(owner, relative, *args, **kwargs)
+            if relative == "artifacts/artifact.bin":
+                path = owner.root / relative
+                replacement = path.with_suffix(".replacement")
+                replacement.write_bytes(path.read_bytes())
+                os.replace(replacement, path)
+            return value
+        with patch.object(a.Output, "write", swap):
+            self.refuses("cleanup_refused_foreign_or_changed_path")
+        self.assertEqual((self.destination / "artifacts/artifact.bin").read_bytes(), b"synthetic compiled bytes\n")
+        self.assertFalse((self.destination / "COMPLETE").exists())
+
+    def test_source_mutation_while_streaming_is_detected(self):
+        original = a.Directory.open
+        source_path = self.root / "built/artifact.bin"
+        class MutatingStream:
+            def __init__(self, stream): self.stream, self.changed = stream, False
+            def __enter__(self): return self
+            def __exit__(self, *args): return self.stream.__exit__(*args)
+            def fileno(self): return self.stream.fileno()
+            def read(self, count):
+                data = self.stream.read(count)
+                if data and not self.changed:
+                    self.changed = True
+                    source_path.write_bytes(b"concurrently changed bytes")
+                return data
+        def changed(parent, leaf, write=False):
+            stream = original(parent, leaf, write)
+            return MutatingStream(stream) if parent.path / leaf == source_path and not write else stream
+        with patch.object(a.Directory, "open", changed):
+            self.refuses("input_changed")
+        self.assertFalse(self.destination.exists())
+
+    def test_simulated_windows_reparse_attributes_refuse(self):
+        info = (self.root / "project.txt").stat()
+        proxy = SimpleNamespace(st_mode=info.st_mode, st_nlink=1, st_file_attributes=0x400)
+        self.refuses("redirected_path", lambda: a.ordinary(proxy, False))
+
+    @unittest.skipUnless(os.name == "posix", "POSIX output hardlink race fixture")
+    def test_output_hardlink_created_during_open_refuses_before_writing(self):
+        original = a.Directory.open
+        alias = self.base / "foreign-output-alias"
+        def linked(parent, leaf, write=False):
+            stream = original(parent, leaf, write)
+            if write and leaf == "artifact.bin":
+                os.link(parent.path / leaf, alias)
+            return stream
+        with patch.object(a.Directory, "open", linked):
+            self.refuses("cleanup_refused_foreign_or_changed_path")
+        self.assertEqual(alias.read_bytes(), b"")
+        self.assertFalse((self.destination / "COMPLETE").exists())
+
+    @unittest.skipUnless(os.name == "posix", "POSIX no-follow race fixture")
+    def test_symlink_leaf_parent_and_root_ancestor_refuse(self):
+        path = self.root / "built/artifact.bin"
+        target = self.base / "target.bin"
+        target.write_bytes(path.read_bytes())
+        path.unlink()
+        path.symlink_to(target)
+        self.refuses("redirected_path")
+        self.assertFalse(self.destination.exists())
+        path.unlink()
+        path.write_bytes(target.read_bytes())
+        (self.root / "built").rename(self.root / "original-built")
+        (self.root / "built").symlink_to("original-built", target_is_directory=True)
+        self.refuses("redirected_path")
+        self.assertFalse(self.destination.exists())
+        alias = self.base / "alias"
+        alias.symlink_to(self.root, target_is_directory=True)
+        self.refuses("redirected_path", lambda: a.assemble(alias, ".local/manifest.json", self.digest, self.destination))
+
+    @unittest.skipUnless(os.name == "posix", "POSIX descriptor-relative race fixture")
+    def test_parent_substitution_after_copy_refuses_without_following_link(self):
+        original = a.Output.write
+        def swap(owner, relative, *args, **kwargs):
+            value = original(owner, relative, *args, **kwargs)
+            if relative == "artifacts/artifact.bin":
+                (self.root / "built").rename(self.root / "prior-built")
+                (self.root / "built").symlink_to("prior-built", target_is_directory=True)
+            return value
+        with patch.object(a.Output, "write", swap):
+            self.refuses("redirected_path")
+        self.assertFalse(self.destination.exists())
+
+    @unittest.skipUnless(os.name == "posix", "POSIX hardlink/FIFO fixtures")
+    def test_hardlink_and_fifo_are_refused_without_reading(self):
+        path = self.root / "built/artifact.bin"
+        os.link(path, self.base / "hardlink")
+        self.refuses("hardlinked_input")
+        self.assertFalse(self.destination.exists())
+        (self.base / "hardlink").unlink()
+        path.unlink()
+        os.mkfifo(path)
+        self.refuses("path_type")
+        self.assertFalse(self.destination.exists())
+
+    def test_output_containment_and_missing_parent_refuse(self):
+        self.destination = self.root
+        self.refuses("output_root")
+        self.destination = self.root / "built/artifact.bin/child"
+        self.refuses("output_overlaps_input")
+        self.destination = self.base / "missing/child"
+        with self.assertRaises(FileNotFoundError):
+            self.run_assembly()
+        self.assertFalse(self.destination.parent.exists())
+
+    def test_cli_returns_only_static_refusal_without_private_paths(self):
+        argv = ["assemble.py", "--root", str(self.root), "--manifest", ".local/manifest.json",
+                "--manifest-sha256", "0" * 64, "--destination", str(self.destination)]
+        output = io.StringIO()
+        with patch.object(sys, "argv", argv), redirect_stdout(output):
+            self.assertEqual(a.main(), 1)
+        self.assertEqual(output.getvalue(), "RELEASE_ASSEMBLY_REJECTED:manifest_binding\n")
+
+
+if __name__ == "__main__":
+    unittest.main()
