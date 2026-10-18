@@ -100,6 +100,14 @@ pub fn run(helper: &LockedHelper, request: Request, cancel: Arc<Cancellation>) -
             value.limits.validate()?;
             value.limits.capture_ms + 2000
         }
+        Request::PickerCatalog { owner_process_id } => {
+            if *owner_process_id == 0 { return Err(Error::Invalid); }
+            5000
+        }
+        Request::PickerCapture(value) => {
+            value.validate(&cancel)?;
+            value.limits.capture_ms + 2000
+        }
         // Only the retained suspended harness parent owns canvas fixtures.
         Request::CanvasFixture(_) => return Err(Error::Invalid),
         Request::Tree(value) => {

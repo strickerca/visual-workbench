@@ -1,6 +1,10 @@
 //! All foreign handles are queried, never dereferenced. Provider calls run only
 //! in the owned helper; the editor uses process::run to enforce cancellation.
 pub mod hotkey;
+pub mod picker;
+mod picker_capture;
+pub mod region_hotkey;
+pub use picker_capture::capture as capture_picker;
 mod uia;
 mod wgc;
 use crate::*;

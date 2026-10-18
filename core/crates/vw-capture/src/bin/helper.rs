@@ -35,6 +35,14 @@ fn run() -> Result<()> {
     let request: Request = serde_json::from_slice(&request).map_err(|_| Error::Invalid)?;
     let remaining = match &request {
         Request::Capture(value) => value.limits.validate()?.capture_ms + 1000,
+        Request::PickerCatalog { owner_process_id } => {
+            if *owner_process_id == 0 { return Err(Error::Invalid); }
+            4000
+        }
+        Request::PickerCapture(value) => {
+            value.validate(&Cancellation::default())?;
+            value.limits.capture_ms + 1000
+        }
         Request::CanvasFixture(value) => {
             value.validate()?;
             value.capture.limits.capture_ms + 1000
@@ -72,6 +80,8 @@ fn run() -> Result<()> {
                     .map(Response::CanvasFixture)
             }
             Request::Tree(value) => windows::collect(value, &cancel).map(Response::Tree),
+            Request::PickerCatalog { owner_process_id } => windows::picker::enumerate(owner_process_id, &cancel).map(Response::PickerCatalog),
+            Request::PickerCapture(value) => windows::capture_picker(value, &cancel).map(Response::PickerFrame),
         };
         // SAFETY: paired successful RoInitialize on this thread.
         unsafe {

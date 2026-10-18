@@ -3350,6 +3350,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror",
+ "vw-geom",
  "vw-model",
  "windows",
 ]

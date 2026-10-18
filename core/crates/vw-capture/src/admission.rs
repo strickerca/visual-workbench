@@ -141,7 +141,7 @@ impl FrameIdentity {
             || self.dpi_scale <= 0.0
             || self.dpi_scale > 10.0
             || !matches!(self.platform.as_str(), "windows" | "android")
-            || !matches!(self.source_kind.as_str(), "window" | "monitor")
+            || !matches!(self.source_kind.as_str(), "window" | "monitor" | "region")
             || self.monitor_id.len() > 256
         {
             return Err(Error::Invalid);
