@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "checked_utc": "2026-10-18T19:14:18.525774+00:00",
+  "base_commit": "af934061e0b19fb3a128cd40a803dd91cff58d30",
+  "status": "unapplied source repair proposal; coordinator store review and scheduled validation required",
+  "files": {
+    "core/crates/vw-assets/PHONE_READ_BUDGET_HANDOFF_20261018.md": {
+      "bytes": 8474,
+      "sha256": "6131dccd4512456b90a5a9e227ec115f60b4433a131485a7e40c03ed45c969e7"
+    },
+    "core/crates/vw-assets/android-sdk-local-path-recheck-20261018.json": {
+      "bytes": 1542,
+      "sha256": "b86ea2696e8c8c3656f1b3d4c012250818d1573bc568e02b426e307cf88876fb"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/ANDROID_BRIDGE_AND_RETIREMENT_TRACE_20261018.md": {
+      "bytes": 26292,
+      "sha256": "4da10d2b0f280c65180c0b2aad612d98b041b1b8c6d7746044b1c46d1673daef"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/PHONE_STREAMING_READ_ADAPTER_PROPOSAL_20261018.patch": {
+      "bytes": 8464,
+      "sha256": "ed0b59093a6441b528ece69b92cfc9e4c6f24e763c12973e2fea648cc20a63e5"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/STORE_STREAMING_READ_PROOF_20261018.md": {
+      "bytes": 8062,
+      "sha256": "d6ccd05f03e66decf020d02bc88b262d8f5a569e7a104ee81b1b23d71a873823"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/STORE_STREAMING_READ_PROPOSAL_20261018.patch": {
+      "bytes": 13453,
+      "sha256": "8fcaf43c30054d276cfa741a90e3ff793cfc3f7a30ee1dc876e4e0b63603e4a6"
+    }
+  },
+  "source_checks": {
+    "paired_git_apply_check": "passed; neither patch applied",
+    "adapter_complete_postimage_rustfmt": "passed in /tmp; syntax/format only",
+    "previous_checkpoint_source_hashes_unchanged": 27,
+    "reserved_working_files_identical_to_HEAD": [
+      "Cargo.toml",
+      "Cargo.lock",
+      "core/crates/vw-ffi/Cargo.toml",
+      "core/crates/vw-ffi/src/lib.rs",
+      "core/crates/vw-ffi/src/giant_images.rs",
+      "core/crates/vw-ffi/src/project.rs",
+      "core/crates/vw-store/src/cache.rs",
+      "core/crates/vw-store/tests/blobs_cache.rs"
+    ],
+    "patch_context_whitespace": "Store patch has six intentional space-only unified-diff context lines; no added postimage trailing whitespace."
+  },
+  "new_test_cases": {
+    "store_integration": 3,
+    "store_private_library_default_disabled": 2,
+    "native_phone_budget_integration": 1,
+    "status": "ALL UNRUN"
+  },
+  "builds_typechecks_lints_tests_device_calls_downloads_installs": false,
+  "heavy_slot": "held by coordinator; not used",
+  "runtime_or_phone_usability_approved": false,
+  "root_required": [
+    "Review/apply new DiskCache::get_bounded_streaming contract and paired native adapter",
+    "Provide retained32MiB from_store_budgeted owner before any fallible work",
+    "Implement trusted typed Android runner bridge with independent native output copy and actual Android80MiB retirement",
+    "Validate staged old-surface/input/output retirement and end-to-end platform allocation/ABI/render lifetimes"
+  ],
+  "scope_limits": [
+    "Fixed buffer and returned Vec bounds are source enforced only after patch application",
+    "Path/OS/allocator bookkeeping remains an engineering envelope, not measured RSS",
+    "SDK root absent in this worker after exact published startup; separate coordinator environment unaffected",
+    "Existing64MiB constructor/install envelope and256MiB phone cap unchanged"
+  ]
+}

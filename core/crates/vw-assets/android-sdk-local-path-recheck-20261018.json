@@ -1,0 +1,43 @@
+{
+  "checked_utc": "2026-10-18T19:11:08.636290+00:00",
+  "base_source": "af934061e0b19fb3a128cd40a803dd91cff58d30",
+  "scope": "This worker filesystem after sourcing its published startup. Not evidence about coordinator filesystem.",
+  "startup_sourced": true,
+  "environment_checks": {
+    "ANDROID_HOME": {
+      "value": "/workspace/.vw-tools/android-sdk",
+      "exists": false,
+      "is_symlink": false
+    },
+    "ANDROID_SDK_ROOT": {
+      "value": "/workspace/.vw-tools/android-sdk",
+      "exists": false,
+      "is_symlink": false
+    },
+    "/workspace/.vw-tools/android-sdk": {
+      "exists": false,
+      "error": "ENOENT"
+    },
+    "/workspace/.vw-tools/android-sdk/platforms": {
+      "exists": false,
+      "error": "ENOENT"
+    },
+    "/workspace/.vw-tools/android-sdk/platforms/android-37.0": {
+      "exists": false,
+      "error": "ENOENT"
+    },
+    "/workspace/.vw-tools/android-sdk/platforms/android-37.0/android.jar": {
+      "exists": false,
+      "error": "ENOENT"
+    }
+  },
+  "source_sha256": {
+    "/workspace/.vw-tools/cloud-setup/start.sh": "59687fc864cebc291a14e14b6addc799058d0fd076d7a1dec2eb828ed43db2ce",
+    "/workspace/.vw-tools/cloud-setup/pins.json": "bf6c026cd881e7df880325f782238857f8728dfb059b57a3cd86675b290e45fd",
+    "/workspace/.vw-tools/setup-state/verification.json": "e8aabfaf03e7361bb63904b31e0adf893f11bdd695e13bae503976288da4e2b1"
+  },
+  "verification_android": null,
+  "pins_contain_requested_platform": true,
+  "sdk_installed_or_downloaded": false,
+  "builds_or_device_calls": false
+}
