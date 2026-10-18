@@ -61,6 +61,10 @@ public class RemoteEditorPalette(
         scope.launch(start=CoroutineStart.ATOMIC) {
             try {
                 ensureActive()
+                // Admission may precede execution on a queued UI dispatcher.
+                // A changed producer observation is not a queued command permit.
+                if(mutable.value.closed||mutable.value.targetRevision!=snapshot.targetRevision||
+                    dispatcher.target.value!=target)return@launch
                 val receipt=dispatcher.dispatch(target.binding,action)
                 mutable.update { current ->
                     val latest=dispatcher.target.value
@@ -106,11 +110,14 @@ public class RemoteEditorPalette(
     /** Imported observations never enable an action or grant control. The root
      * admission lane binds receipt bytes; this function validates scope only. */
     public fun compatibility(tool:String,settings:String,records:List<RemoteToolCompatibility>):Boolean {
-        val current=mutable.value.target?.identity ?: return false
-        if(mutable.value.closed||records.size>64||tool.length !in 1..128||tool.any{it.code<32||it.code==127}||settings.length!=64||settings.any{it !in '0'..'9'&&it !in 'a'..'f'})return false
+        val snapshot=mutable.value
+        val target=snapshot.target?:return false
+        val current=target.identity
+        if(snapshot.closed||dispatcher.target.value!=target||records.size>64||tool.length !in 1..128||tool.any{it.code<32||it.code==127}||settings.length!=64||settings.any{it !in '0'..'9'&&it !in 'a'..'f'})return false
         if(records.map{it.aspect}.distinct().size!=records.size||records.any{!it.validFor(current,tool,settings)})return false
-        mutable.update{old->if(old.target?.identity==current&&!old.closed)old.copy(toolId=tool,settingsDigest=settings,compatibility=records.toList())else old}
-        return true
+        // Do not return success after another owner/observation won adoption.
+        // Refuse a race; imported records are never queued or retried.
+        return mutable.compareAndSet(snapshot,snapshot.copy(toolId=tool,settingsDigest=settings,compatibility=records.toList()))
     }
     public suspend fun close():Unit = withContext(NonCancellable) {
         mutable.update{it.copy(closed=true,target=null,message=null,toolId=null,settingsDigest=null,compatibility=emptyList())}
