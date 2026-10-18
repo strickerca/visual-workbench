@@ -274,7 +274,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     fun detachCanvas() { canvasSink = null; cancelTool(); hoverPoint = null }
     fun dismissMessage() { message = null }
     fun transferMessage(value: String) { message = value }
-    fun configureExport(value: ExportSelection) { if (exportSelection != value) { exportSelection = value; exportPreflight = null; checkedExport = null } }
+    fun configureExport(value: ExportSelection) { if (!value.encoding.exportAvailable) { message = "BMP export is unavailable until its file metadata can carry the revision and source identity."; return }; if (exportSelection != value) { exportSelection = value; exportPreflight = null; checkedExport = null } }
     private fun invalidateExport() { exportReady = null; exportPreflight = null; checkedExport = null }
     private fun invalidateViewCheck() { if (exportSelection.viewOnly) { exportPreflight = null; checkedExport = null } }
     suspend fun cleanupTransfer(action: suspend () -> Unit) { cleanupHandoff(action) { message = "Temporary image cleanup could not finish. Retained files have not been deleted; you can retry or discard camera captures from Projects." } }

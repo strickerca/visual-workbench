@@ -1,0 +1,14 @@
+{
+  "status": "source gate; validation pending",
+  "requirement": "docs/REQUIREMENTS.json CORE-006 requires revision and source identity embedded in every exported file",
+  "leaf_repair": "b0fee0aead798fe43fbb680125e082ccbf02afc8",
+  "behavior": [
+    "BMP import remains admitted.",
+    "BMP export is absent from both chooser lists and refused by controller/programmatic selection admission.",
+    "File preflight rejects BMP as Unsupported before staging; existing leaf refuses direct buffered/private publication.",
+    "TIFF embeds bounded provenance in final bytes via the image-owned repair; no broader BMP metadata design is adopted."
+  ],
+  "written_root_public_path_regressions": 1,
+  "regression_executed": false,
+  "remaining": "Image owner owns focused repair tests; app/source tests and combined bindings remain pending. No full ordinary-format delivery or acceptance is claimed."
+}

@@ -35,7 +35,7 @@ internal fun ExportDialog(controller: EditorController, state: EditorState, save
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Choice("Format", settings.encoding.label, ExportEncoding.entries.map { it.label }, !state.busy) { label ->
+                    Choice("Format", settings.encoding.label, ExportEncoding.entries.filter { it.exportAvailable }.map { it.label }, !state.busy) { label ->
                         controller.exportSettings(settings.copy(encoding = ExportEncoding.entries.first { it.label == label }))
                     }
                     Choice("Transparency", settings.matte.label, ExportMatte.entries.map { it.label }, !state.busy) { label ->

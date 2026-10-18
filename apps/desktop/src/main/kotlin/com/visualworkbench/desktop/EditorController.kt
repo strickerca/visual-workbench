@@ -534,7 +534,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     suspend fun disconnectPeer(peer:String){if(mutable.value.sync?.peerDeviceId!=peer)return;cancelInput();edits.withLock{if(mutable.value.sync?.peerDeviceId==peer)live.close()}}
     fun showExport(){if(mutable.value.document==null){report("Open a document before exporting.");return};update{it.copy(exportOpen=true)}}
     fun dismissExport(){update{it.copy(exportOpen=false)}}
-    fun exportSettings(settings:ExportSettings){update{it.copy(exportSettings=settings.copy(quality=settings.quality.coerceIn(1,100)),message=null)}}
+    fun exportSettings(settings:ExportSettings){if(!settings.encoding.exportAvailable){report("BMP export is unavailable until its file metadata can carry the revision and source identity.");return};update{it.copy(exportSettings=settings.copy(quality=settings.quality.coerceIn(1,100)),message=null)}}
     fun exportRequest():ExportRequest?=try{captureExport(mutable.value,core)}catch(error:HandoffFailure){report(error.message?:"Export region unavailable.");null}
     private fun requireCurrent(request:ExportRequest){if(!request.matches(mutable.value))throw HandoffFailure("The project, revision, region or export settings changed. Review them and prepare the export again.")}
     private fun transferApi():WorkbenchFileTransfers=project as? WorkbenchFileTransfers?:throw HandoffFailure("File export is unavailable in this core binding.")

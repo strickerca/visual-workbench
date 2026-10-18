@@ -23,7 +23,7 @@ internal fun ExportDialog(editor: EditorController, onDismiss: () -> Unit, onSav
             if (choice.viewOnly) Text("Exports the image-aligned rectangle enclosing the current view, clipped to the original. A rotated view is not a rotated crop.", style = MaterialTheme.typography.caption)
             Text("Format", style = MaterialTheme.typography.subtitle2)
             editor.originalFormatNotice?.let { Text(it, style = MaterialTheme.typography.caption) }
-            ExportEncoding.entries.forEach { encoding ->
+            ExportEncoding.entries.filter { it.exportAvailable }.forEach { encoding ->
                 TextButton(onClick = { editor.configureExport(choice.copy(encoding = encoding)) }, enabled = enabled,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(if (choice.encoding == encoding) "✓ ${encoding.label}" else encoding.label) }
             }

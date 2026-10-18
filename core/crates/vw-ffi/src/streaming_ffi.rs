@@ -557,6 +557,10 @@ fn preflight_file(
     state: &ProjectState,
     options: &FileExportOptions,
 ) -> TransferResult<FilePreflight> {
+    // CORE-006 requires provenance in the delivered bytes; BMP has no admitted carrier.
+    if matches!(options.export.format, ImageFormat::Bmp8) {
+        return Err(TransferError::Unsupported);
+    }
     limits(
         options.export.memory_budget_bytes,
         options.max_encoded_bytes,
@@ -1708,6 +1712,31 @@ mod tests {
                 .to_string_lossy()
                 .starts_with("vw-raster-")
         }));
+    }
+    #[tokio::test]
+    async fn bmp_preflight_is_refused_before_staging_a_provenance_free_export() {
+        let root = temp();
+        let (bytes, _) = image();
+        let source = root.path().join("source.png");
+        std::fs::write(&source, &bytes).unwrap();
+        let options = creation(root.path(), &source);
+        let document = options.document_id.clone();
+        let project = create_file_image_project(options, Arc::new(Cancellation::new()))
+            .await
+            .unwrap();
+        let mut output = exporting(root.path(), document);
+        output.export.format = ImageFormat::Bmp8;
+        output.output_path = root.path().join("gated.bmp").to_string_lossy().into_owned();
+        assert!(matches!(
+            project
+                .preflight_image_file(output, Arc::new(Cancellation::new()))
+                .await,
+            Err(TransferError::Unsupported)
+        ));
+        assert!(!root.path().join("gated.bmp").exists());
+        assert_eq!(std::fs::read(source).unwrap(), bytes);
+        no_scratch(root.path());
+        project.close().await.unwrap();
     }
     #[tokio::test]
     async fn file_import_export_preserves_original_16bit_alpha_and_bound_revision() {
