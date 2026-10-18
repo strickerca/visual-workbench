@@ -120,7 +120,9 @@ fn table_end(
     loop {
         let before = cursor.at;
         if cursor.token()? == b"trailer" {
-            cursor.at = before;
+            // Preserve every byte of the preceding entry, including padding
+            // and its complete EOL. `before` may precede skipped whitespace.
+            cursor.at -= b"trailer".len();
             return Ok(previous_end);
         }
         cursor.at = before;
@@ -132,17 +134,46 @@ fn table_end(
             return Err(PdfError::Malformed);
         }
         previous_end = end;
+        while cursor
+            .bytes
+            .get(cursor.at)
+            .is_some_and(|v| matches!(v, b' ' | b'\t'))
+        {
+            cursor.at += 1;
+        }
+        match cursor.bytes.get(cursor.at..) {
+            Some([b'\r', b'\n', ..]) => cursor.at += 2,
+            Some([b'\r' | b'\n', ..]) => cursor.at += 1,
+            _ => return Err(PdfError::Malformed),
+        }
         for index in first..end {
             if index % 256 == 0 {
                 cancel.check()?;
             }
-            let offset = cursor.number()?;
-            let generation = u16::try_from(cursor.number()?).map_err(|_| PdfError::Malformed)?;
-            let live = match cursor.token()? {
+            let row_end = cursor.at.checked_add(20).ok_or(PdfError::Limit)?;
+            let row = cursor
+                .bytes
+                .get(cursor.at..row_end)
+                .ok_or(PdfError::Malformed)?;
+            // Classic xref rows are exactly20 bytes. A single-character EOL
+            // needs the padding space; CRLF already occupies both bytes.
+            if !row[..10].iter().all(u8::is_ascii_digit)
+                || row[10] != b' '
+                || !row[11..16].iter().all(u8::is_ascii_digit)
+                || row[16] != b' '
+                || !matches!(&row[18..], b" \n" | b" \r" | b"\r\n")
+            {
+                return Err(PdfError::Malformed);
+            }
+            let mut entry = Cursor { bytes: row, at: 0 };
+            let offset = entry.number()?;
+            let generation = u16::try_from(entry.number()?).map_err(|_| PdfError::Malformed)?;
+            let live = match entry.token()? {
                 b"n" => true,
                 b"f" => false,
                 _ => return Err(PdfError::Malformed),
             };
+            cursor.at = row_end;
             visit(index, generation, offset, live)?;
             if cursor.at > MAX_XREF_BYTES {
                 return Err(PdfError::Limit);
@@ -309,7 +340,7 @@ pub fn embed_pdf_copy_metadata(
     use std::fmt::Write;
     write!(
         suffix,
-        "\n{} 1\n{info_at:010} 00000 n \ntrailer\n<< /Size {new_size} /Root {} {} R /Info {} 0 R",
+        "{} 1\n{info_at:010} 00000 n \ntrailer\n<< /Size {new_size} /Root {} {} R /Info {} 0 R",
         xref.size, xref.root.0, xref.root.1, xref.size
     )
     .map_err(|_| PdfError::Allocation)?;
@@ -410,6 +441,101 @@ pub(crate) mod tests {
             "a".repeat(56),
             "b".repeat(64)
         )
+    }
+    fn raw_line<'a>(bytes: &mut &'a [u8]) -> &'a [u8] {
+        let end = bytes
+            .iter()
+            .position(|v| matches!(v, b'\r' | b'\n'))
+            .unwrap();
+        let length = end
+            + if bytes[end] == b'\r' && bytes.get(end + 1) == Some(&b'\n') {
+                2
+            } else {
+                1
+            };
+        let (line, rest) = bytes.split_at(length);
+        *bytes = rest;
+        line
+    }
+    /// Independent fixed-width inspection; do not use the production lexer.
+    fn assert_strict_xref_rows_and_offsets(bytes: &[u8]) -> usize {
+        let marker = bytes
+            .windows(10)
+            .rposition(|v| v == b"startxref\n")
+            .unwrap();
+        let offset_line = bytes[marker + 10..].split(|v| *v == b'\n').next().unwrap();
+        let offset: usize = std::str::from_utf8(offset_line).unwrap().parse().unwrap();
+        let mut remaining = &bytes[offset..];
+        assert_eq!(raw_line(&mut remaining), b"xref\n");
+        let mut rows = 0;
+        while !remaining.starts_with(b"trailer") {
+            let header = std::str::from_utf8(raw_line(&mut remaining)).unwrap();
+            let parts: Vec<_> = header.split_ascii_whitespace().collect();
+            assert_eq!(parts.len(), 2);
+            let first: usize = parts[0].parse().unwrap();
+            let count: usize = parts[1].parse().unwrap();
+            for object in first..first + count {
+                let row = raw_line(&mut remaining);
+                assert_eq!(row.len(), 20, "xref object {object} has a short/long row");
+                assert!(row[..10].iter().all(u8::is_ascii_digit));
+                assert_eq!(row[10], b' ');
+                assert!(row[11..16].iter().all(u8::is_ascii_digit));
+                assert_eq!(row[16], b' ');
+                assert!(matches!(&row[18..], b" \n" | b" \r" | b"\r\n"));
+                assert!(matches!(row[17], b'n' | b'f'));
+                if row[17] == b'n' {
+                    let at: usize = std::str::from_utf8(&row[..10]).unwrap().parse().unwrap();
+                    let generation: u16 =
+                        std::str::from_utf8(&row[11..16]).unwrap().parse().unwrap();
+                    assert!(
+                        bytes[at..].starts_with(format!("{object} {generation} obj\n").as_bytes())
+                    );
+                }
+                rows += 1;
+            }
+        }
+        rows
+    }
+    #[test]
+    fn stamped_xref_keeps_full_twenty_byte_rows_and_exact_object_offsets() {
+        let cancel = PdfCancellation::default();
+        for ending in [" \n", "\r\n", " \r"] {
+            // Only xref row endings change, each still20 bytes, so existing
+            // object/startxref offsets remain valid in all three fixtures.
+            let mut bytes = String::from_utf8(fixture())
+                .unwrap()
+                .replace(" n \n", &format!(" n{ending}"))
+                .replace(" f \n", &format!(" f{ending}"))
+                .into_bytes();
+            assert_eq!(assert_strict_xref_rows_and_offsets(&bytes), 5);
+            embed_pdf_copy_metadata(&mut bytes, &identity(), PdfLimits::default(), &cancel)
+                .unwrap();
+            assert_eq!(assert_strict_xref_rows_and_offsets(&bytes), 6);
+            // Repeated stamps exercise the last row of every old subsection,
+            // including the generated metadata entry, as well as the new one.
+            embed_pdf_copy_metadata(&mut bytes, &identity(), PdfLimits::default(), &cancel)
+                .unwrap();
+            assert_eq!(assert_strict_xref_rows_and_offsets(&bytes), 7);
+        }
+    }
+    #[test]
+    fn nineteen_byte_xref_entry_is_rejected_by_readback_and_restamping() {
+        let cancel = PdfCancellation::default();
+        let mut bytes = fixture();
+        embed_pdf_copy_metadata(&mut bytes, &identity(), PdfLimits::default(), &cancel).unwrap();
+        let padding = bytes
+            .windows(b"n \ntrailer".len())
+            .rposition(|v| v == b"n \ntrailer")
+            .unwrap()
+            + 1;
+        bytes.remove(padding);
+        assert!(verify_pdf_copy_metadata(&bytes, &identity(), u64::MAX, &cancel).is_err());
+        let original = bytes.clone();
+        assert!(
+            embed_pdf_copy_metadata(&mut bytes, &identity(), PdfLimits::default(), &cancel)
+                .is_err()
+        );
+        assert_eq!(bytes, original);
     }
     #[test]
     fn final_info_subject_contains_exact_json_and_page_bytes_are_unchanged() {

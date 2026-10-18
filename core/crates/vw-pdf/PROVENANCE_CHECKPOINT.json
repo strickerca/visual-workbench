@@ -31,7 +31,7 @@
     "diff_whitespace": "passed",
     "gitleaks": "Zero findings in PDF/SVG/host document runtime/worker trees and targeted FFI document engine tree.",
     "compilation": "NOT RUN: parent assigned heavy slot to another lane",
-    "new_regression_definitions": 18,
+    "new_regression_definitions": 20,
     "new_tests_executed": 0,
     "existing_native_contracts_extended": 3,
     "native_contracts_executed": 0
@@ -67,8 +67,8 @@
     },
     {
       "path": "core/crates/vw-pdf/src/metadata.rs",
-      "bytes": 20388,
-      "sha256": "10cd8f1a19d82018768f9259d7e78de07d30ba97b5184deba6f71afdc88cdd89"
+      "bytes": 26124,
+      "sha256": "39c983029d937d31d258b875e47dbb61103065fd3920dc11c4b7fed026905d15"
     },
     {
       "path": "core/crates/vw-pdf/src/pc_redaction.rs",
@@ -140,5 +140,13 @@
       "bytes": 29463,
       "sha256": "7284b604c8385b14e0090ce8bff6f5311fc3534e734c39931c32fcc04ff42809"
     }
-  ]
+  ],
+  "xref_row_repair": {
+    "base": "cf01b29c8f2538afeb250b8cbce936bd757af5b9",
+    "finding": "Astra actual-module repro observed a19-byte copied final xref entry; loose local readback had accepted it. No own compilation or reproduction was run for this repair.",
+    "repair": "Preserve copied row padding and complete EOL through actual trailer token start; append new subsection without substituting its newline. Require exact20-byte classic xref entries in production readback.",
+    "coverage": "Two added regressions independently read row widths and object/startxref offsets for SP+LF, CRLF, SP+CR and repeated stamping; reject19-byte final row on readback and before restamping.",
+    "affected_modes": "Shared stamper used by Annotated/Flattened and both redaction wrappers on Windows/Android; no dispatcher or redaction behavior changes.",
+    "tests_executed": 0
+  }
 }
