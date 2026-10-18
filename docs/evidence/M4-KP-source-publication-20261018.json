@@ -1,0 +1,89 @@
+{
+  "status": "passed-software-checkpoint-with-acceptance-gaps",
+  "date": "2026-10-18",
+  "scope": "R164 native/tooling and R166/R167 normal-app source; unbuilt R168 picker excluded",
+  "source_closure": {
+    "name": "m4-r167-android-clip-06cd35d433c74d8a89c7336c06a46529-closure.json",
+    "sha256": "c479d2171a59cfcb747cef37a3e99a6d46223d7b8c1d249022e7d06c9223f160",
+    "inputs": 1447,
+    "all_selected_working_inputs_match": true,
+    "binding_check_precedes_publication_metadata_changes": true
+  },
+  "desktop_main": {
+    "packaged_working_bytes_sha256": "516da4ca61803ddb05df989cb9cd90b18e15ae8ad64ff6c88e8ea6b71aa3c500",
+    "excluded_unbuilt_working_bytes_sha256": "67267a39495af3b72d7f422cbe0d8466ddb6c677e6adcf9615997d71e8861ca2"
+  },
+  "reused_private_receipts": [
+    {
+      "name": "m4-r164-background-build-93c7c6560a954f63bb79c8297ac8c696.json",
+      "sha256": "25b796955e33c734438f0385554ad8d81de6ed6b5f7da793e0b9f387a9ffdc07",
+      "status": "passed"
+    },
+    {
+      "name": "m4-r164-background-native-tests-93c7c6560a954f63bb79c8297ac8c696.json",
+      "sha256": "8a88e5bd17044d65c9a2abec9fbe48e8cddae363f7e5699f40f006ace6bf566f",
+      "status": "passed"
+    },
+    {
+      "name": "m4-r164-background-license-carry-93c7c6560a954f63bb79c8297ac8c696.json",
+      "sha256": "615aabadcdd58f70e36d4afd2b114be4b5aa926afcb047d3e2667c4ff7fe18ee",
+      "status": "reviewed-prior-licensing-evidence-only"
+    },
+    {
+      "name": "m4-r166-tests-package-recovered-ff8db10c68604a4299adc535c22a95a1.json",
+      "sha256": "bc6e9e99a9595245b262057ec28ef92bc7199cd621a5b6554942650899d0602a",
+      "status": "passed"
+    },
+    {
+      "name": "m4-r166-desktop-package-ff8db10c68604a4299adc535c22a95a1.json",
+      "sha256": "711aa3c8397ece6be714b974a5c5eda7924dbdff8977d4408b5b81f50f501e04",
+      "status": "passed"
+    },
+    {
+      "name": "m4-r166-android-package-06cd35d433c74d8a89c7336c06a46529.json",
+      "sha256": "9ec01348e9f1c75c28f52a4cc6a0f39e045a92dc325e02b55c1ae37a2893508b",
+      "status": "passed"
+    }
+  ],
+  "prior_checks": {
+    "r164_completed_build_phases": 22,
+    "native_background_cases": 12,
+    "r166_focused_jvm_cases": 5,
+    "license_inputs_unchanged": true
+  },
+  "fresh_checks": {
+    "personal_package_cases": 16,
+    "report_cases": 96,
+    "owned_editor_contract_cases": 32,
+    "plan_requirements": 189,
+    "plan_tasks": 66,
+    "offline_policy": "passed",
+    "bounded_runner": true
+  },
+  "no_fresh_heavy_build": "Active unrelated database tests and low available memory; exact passing source bindings reused",
+  "remaining": [
+    "Unbuilt R168 Desktop picker repair",
+    "Normal Windows picker/import/display and stable project proof",
+    "Actual USB project receive/rendering",
+    "Remote Paint palette/Zoom/input/history/viewing/reconnection/normal shutdown",
+    "Krita acceptance",
+    "R169 diagnostics promotion and execution",
+    "Physical S23/S Pen, latency and owner gates",
+    "Remaining planned roadmap"
+  ],
+  "device_actions": false,
+  "release_or_deployment": false,
+  "product_gate_passed": false,
+  "publication_metadata_changes": [
+    ".gitleaks.toml",
+    "docs/M4_KP_CHECKPOINT.md",
+    "docs/evidence/M4-KP.md",
+    "docs/evidence/M4-KP-source-publication-20261018.json"
+  ],
+  "secret_scan": {
+    "native_and_managed_staged": "passed",
+    "historic_two_commits": "passed",
+    "r126_false_positives": "three exact source-hash lines retained with file/path/hash-specific allowlist",
+    "failed_scan_receipt_retained_privately": true
+  }
+}

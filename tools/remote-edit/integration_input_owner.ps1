@@ -10,7 +10,11 @@ param(
     [Parameter(Mandatory)][string]$PcUsbAddress,
     [Parameter(Mandatory)][string]$PhoneUsbAddress,
     [Parameter(Mandatory)][int]$Port,
-    [ValidateSet("balanced","pause-held","background-held","disconnect-held")][string]$InputScenario="balanced"
+    [ValidateSet("balanced","pause-held","background-held","disconnect-held")][string]$InputScenario="balanced",
+    [string]$OwnedEditorContract,
+    [string]$OwnedEditorContractSha256,
+    [object]$OwnedEditorOwner,
+    [ref]$CompletedReceiptPath
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
@@ -20,6 +24,25 @@ Import-Module (Join-Path $root 'tools/process.psm1')
 . (Join-Path $PSScriptRoot 'input_owner_contracts.ps1')
 . (Join-Path $PSScriptRoot 'input_owner_startup.ps1')
 Initialize-M4InputReaders
+$editorContractLease=$null
+if($OwnedEditorContract -or $OwnedEditorContractSha256 -or $null -ne $OwnedEditorOwner){
+    # This route is callable only by the in-process retained editor parent.
+    # A path/JSON string without its live native Job owner is never sufficient.
+    if($InputScenario -cne 'balanced' -or -not $OwnedEditorContract -or $OwnedEditorContractSha256 -cnotmatch '\A[a-f0-9]{64}\z' -or $null -eq $OwnedEditorOwner -or $OwnedEditorOwner.GetType().FullName -cne 'M4FrameChild'){throw 'Actual retained editor owner required'}
+    . (Join-Path $PSScriptRoot 'owned_editor_contract.ps1')
+    $item=Get-Item -LiteralPath $OwnedEditorContract
+    while($null -ne $item){if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){throw 'Redirected editor contract'};$item=if($item -is [IO.DirectoryInfo]){$item.Parent}else{$item.Directory}}
+    $editorContractLease=[IO.File]::Open($OwnedEditorContract,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+    try{
+        if($editorContractLease.Length -le 0 -or $editorContractLease.Length -gt 8192 -or [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($editorContractLease)).ToLowerInvariant() -cne $OwnedEditorContractSha256){throw 'Exact editor contract refused'}
+        $editorContractLease.Position=0
+        $editorContract=Get-Content -Raw -LiteralPath $OwnedEditorContract|ConvertFrom-Json -AsHashtable
+        $self=[Diagnostics.Process]::GetCurrentProcess()
+        try{Assert-M4OwnedEditorContract $editorContract $PID ([string]$self.StartTime.ToUniversalTime().ToFileTimeUtc())}finally{$self.Dispose()}
+        Assert-M4OwnedEditorAlive $editorContract
+        Assert-M4OwnedEditorOwner $OwnedEditorOwner $editorContract
+    }catch{$editorContractLease.Dispose();$editorContractLease=$null;throw}
+}
 $nonce=[guid]::NewGuid().ToString('N')
 $gateDirectory=Join-Path ([IO.Path]::GetTempPath()) ('VisualWorkbench-input-parent-'+$nonce)
 [void][IO.Directory]::CreateDirectory($gateDirectory)
@@ -34,6 +57,9 @@ foreach($arg in @('-NoProfile','-File',(Join-Path $PSScriptRoot 'integration.ps1
 }
 foreach($name in @('ArtifactManifest','ArtifactManifestSha256','UsbInterfaceIndex','UsbDeviceInstanceSha256','PcUsbAddress','PhoneUsbAddress','Port')){
     [void]$process.StartInfo.ArgumentList.Add('-'+$name);[void]$process.StartInfo.ArgumentList.Add([string]$PSBoundParameters[$name])
+}
+if($null -ne $editorContractLease){
+    foreach($name in @('OwnedEditorContract','OwnedEditorContractSha256')){[void]$process.StartInfo.ArgumentList.Add('-'+$name);[void]$process.StartInfo.ArgumentList.Add([string]$PSBoundParameters[$name])}
 }
 foreach($key in @($process.StartInfo.Environment.Keys)){
     if($key -match '(?i)(TOKEN|SECRET|PASSWORD|API_KEY|PRIVATE_KEY|CREDENTIAL|AUTH_KEY)'){[void]$process.StartInfo.Environment.Remove($key)}
@@ -89,7 +115,7 @@ try{
         # including a valid gate rejected by the inner owner before startup.
         Complete-M4InputOuterOwner $entry {Wait-RetainedInputOwner};$complete=$true
     }
-    if($complete){$job.Dispose();$process.Dispose()}
+    if($complete){$job.Dispose();$process.Dispose();if($null -ne $editorContractLease){$editorContractLease.Dispose()}}
     if($complete){
         foreach($name in @('assigned.json','assigned.json.pending')){
             $candidate=[IO.Path]::Combine([IO.Path]::GetFullPath($gateDirectory),$name)
@@ -100,4 +126,5 @@ try{
     }
 }
 
+if($null -ne $CompletedReceiptPath){$CompletedReceiptPath.Value=Join-Path $root ('.local/remote-normal-integration-'+$nonce+'.json')}
 exit $exitCode

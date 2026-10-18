@@ -76,7 +76,7 @@ function Test-McpRuntime {
 }
 
 function Build-McpServerResources {
-    param([string]$Nonce)
+    param([string]$Nonce, [switch]$ReuseNative)
     if ($Nonce -cnotmatch '^[0-9a-f]{32}$') { throw 'MCP build nonce refused' }
     $nodeDirectory = Get-McpNodeDirectory
     $work = Join-Path $projectRoot ('.local/mcp-build/' + $Nonce)
@@ -86,8 +86,10 @@ function Build-McpServerResources {
         Copy-Item -LiteralPath (Join-Path $projectRoot ('mcp/' + $name)) -Destination (Join-Path $work ('stage/mcp/' + $name)) -ErrorAction Stop
     }
     Install-McpDependencies (Join-Path $work 'stage/mcp') $nodeDirectory -Production
-    Invoke-McpManifestScope -Manifest $null -Body {
-        Run-Cargo 'build-mcp-server-native' @('build','--locked','-p','vw-mcp-native','--bin','vw-mcp-host','--bin','vw-mcp-package','--bin','vw-codex-host')
+    if (-not $ReuseNative) {
+        Invoke-McpManifestScope -Manifest $null -Body {
+            Run-Cargo 'build-mcp-server-native' @('build','--locked','-p','vw-mcp-native','--bin','vw-mcp-host','--bin','vw-mcp-package','--bin','vw-codex-host')
+        }
     }
     Run-Step 'stage-mcp-runtime' 'python.exe' @('tools/stage_mcp_runtime.py',$work,$nodeDirectory)
     Run-Step 'inventory-mcp-runtime' 'python.exe' @('mcp/package_runtime.py','server',(Join-Path $work 'stage'),(Join-Path $work 'resources'))

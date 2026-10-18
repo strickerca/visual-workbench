@@ -43,7 +43,7 @@ def pointer_stroke(events,complete=True,allow_cancelled_up=False):
     require(state==('after' if complete else 'contact'),'complete_pointer_contact')
     return hovers
 
-def validate(inputs,views,counts,events):
+def validate_phone(inputs,views):
     validate_views(views)
     require(isinstance(inputs,list) and len(inputs)==1,'input_census')
     r=inputs[0];require(isinstance(r,dict) and set(r)==KEYS and all(isinstance(v,str) and len(v)<=2048 for v in r.values()),'input_shape')
@@ -60,6 +60,10 @@ def validate(inputs,views,counts,events):
     require(created<=rendered<=callback and created<=first_ack<=callback<=gone and first_ack+150_000_000<=gone<created+500_000_000,'actual_ack_fade_before_creation_expiry')
     require(r['remote_input_echo']=='3,0,0','matching_echo_coverage')
     require(r['remote_input_route']==ROUTE,'software_input_limits')
+    return {'schema':1,'controller_input_records':1,'actual_local_admissions':3,'native_retained_ack_producer_required':True,'text_correlation_only':True,'receiver_observed':False,'editor_effect':False,'physical_pen_fidelity':False,'latency_acceptance':False}
+
+def validate(inputs,views,counts,events):
+    validate_phone(inputs,views)
     require(isinstance(counts,list) and len(counts)==6,'receiver_categories')
     counts=[uint(v,20000)for v in counts]
     require(sum(counts)<=20000 and counts[0]==1 and counts[1]>=1 and counts[2]==1 and counts[3:]==[0,0,0],'balanced_native_pointer_receiver')

@@ -1,9 +1,40 @@
+## Source publication checkpoint, 2026-10-18
+
+The completed R164 native/tooling and R166/R167 normal-app source is being
+integrated with its original build and test bindings. The 1,447 R167 source
+inputs match, using the preserved packaged Desktop Main rather than the later
+unbuilt picker repair. Current publication evidence is
+`evidence/M4-KP-source-publication-20261018.json`.
+
+The newer picker repair remains preserved locally, reviewed but unbuilt and
+unaccepted. Its working source is not replaced by this publication. R169
+diagnostics candidates remain outside canonical source, unbuilt and untested.
+The roadmap continuation authorization supersedes historical pause/scope/device
+notes below. This source-only integration performs no device installation or
+binary release. Normal project transfer/rendering, remote Paint controls and
+shutdown, Krita acceptance, full gates and physical S23/S Pen acceptance remain
+open. Publication does not close any milestone or product gate.
+
 # Krita/Paint milestone checkpoint
 
 The owner requested a checkpoint and pause on 2026-10-04. This is an unfinished
 milestone checkpoint, not a personal distribution or full acceptance release.
 Resume only on a new owner instruction, within the Krita/Paint scope in
 `IMPLEMENTATION_PLAN.md` and D20.
+
+Latest owner instruction (2026-10-08): resume the local Paint implementation
+from the saved R161 checkpoint. Krita is deferred; use only the authorized S23
+and retain the owner's selected model/effort. The reviewed 750 ms provider
+budget, targeted installer-session query and bounded calibration timing are
+compiled. Current Size restoration, S23 viewing/recovery, balanced input and
+automated phone-to-Paint history causality passed with actual retirement.
+The measured eight-action catalog and ordinary Android/Windows packages are
+archived; the normal S23 same-signer update/readback/launch and Windows startup
+passed. Original 121/32 checks and scoped Paint runtime passes retain their
+original source bindings; no unchanged checks were rerun. Normal paired palette,
+first-use Zoom, automatic post-pen-lift Undo eligibility, sustained normal
+viewing and normal shutdown remain pending. Older checkpoint details below are
+historical; current receipts and stopped-agent drafts remain preserved locally.
 
 Five build tasks remain: T4.03 control/guard/input lifecycle, T4.04 complete ghost
 integration, the active Krita/Paint portion of T4.07, essential T4.08 controls,
@@ -13,6 +44,21 @@ at least 30 fps, at most 80 ms p95, physical A27 and owner drawing acceptance
 remain separate and unpassed.
 
 ## Validated work
+
+- Current local delivery: one 13-phase integration build, then serial ordinary
+  Android (10 phases) and Windows (17 phases) packaging. Source map `d8405c3e…`
+  retains a separate script overlay over compiled `48ffe7eb…`; the earlier
+  installer failures and their recovery companions remain preserved.
+- Current Size pair restored whole pixels, settings and geometry. Automated
+  S23 pen input changed Paint pixels, Undo/Redo/final Undo restored the exact
+  observed images, and all input/editor/Job/IO owners retired. These are scoped
+  software checks; no physical S Pen or normal palette acceptance is inferred.
+- Normal package resource verification passed, including eight configured
+  actions, 30 notices and runtime legal files. Complete archive receipt
+  `59973e6b…` binds actual delivered bytes. S23 install/readback/launch receipt
+  `d59cce76…` proves the same-signer owner-user update without an app-data clear.
+  Hidden trust/data equivalence is unverified. See `M4_KP_INSTALLATION.md` for
+  full delivery hashes and current pending acceptance.
 
 - Streaming capture/keyframe/publication/decoder recovery, with actual S23
   hardware-decoder render and internal retirement evidence.

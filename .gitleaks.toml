@@ -84,3 +84,14 @@ regexes = ['''(?i)(?:[\\/])(?:redacted|synthetic-user|example-user)$''']
 id = "vw-mcp-token"
 description = "Reserved token rule; the final format is defined in T2.09"
 regex = '''\bvw_mcp_[A-Za-z0-9_-]{32,}\b'''
+
+[[allowlists]]
+description = "Exact R126 source file SHA-256 entries; not credentials"
+condition = "AND"
+paths = ['''(^|/)docs/evidence/M4-KP-integration-build-r126\.json$''']
+regexTarget = "line"
+regexes = [
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/FocusApi\.kt": "ee2cffb80b6159df04033a92228cb8f8d7045ddba16ef437e35ab36db057e903",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditApi\.kt": "09d8e0972e9dd23a8e3d09044084cc0994f5d75d94af0319cd0cf0e506329fe3",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionApi\.kt": "c4c2c7625fcb546f636d6620009f58a00ecde851e89823e3d6861f6c92e67741",?\s*$''',
+]

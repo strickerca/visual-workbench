@@ -13,7 +13,9 @@ param(
     [switch]$ControllerInput,
     [ValidateSet("balanced","pause-held","background-held","disconnect-held")][string]$InputScenario="balanced",
     [string]$RetainedInputGate,
-    [string]$RetainedInputNonce
+    [string]$RetainedInputNonce,
+    [string]$OwnedEditorContract,
+    [string]$OwnedEditorContractSha256
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
@@ -27,6 +29,8 @@ $packages=@('com.visualworkbench.android.hil','com.visualworkbench.android.hil.t
 $instrumentationSelection='com.visualworkbench.android.remote.RemoteNormalPathInstrumentedTest'
 if($ControllerInput){if([string]::IsNullOrEmpty($RetainedInputGate) -or $RetainedInputNonce -cnotmatch '^[a-f0-9]{32}$'){throw 'Use the retained input owner entry point.'}}elseif($RetainedInputGate -or $RetainedInputNonce){throw 'Unexpected retained input parent gate.'}
 if(-not $ControllerInput -and $InputScenario -cne 'balanced'){throw 'Held scenario requires retained controller-input owner.'}
+if($OwnedEditorContract -or $OwnedEditorContractSha256){if(-not $ControllerInput -or $InputScenario -cne 'balanced' -or -not $OwnedEditorContract -or $OwnedEditorContractSha256 -cnotmatch '\A[a-f0-9]{64}\z'){throw 'Explicit balanced retained editor route required'}}
+$ownedEditor=$null
 $runId=if($ControllerInput){$RetainedInputNonce}else{[guid]::NewGuid().ToString('N')}
 $temporaryParent=[IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
 $owned=Join-Path $temporaryParent ('VisualWorkbench-remote-integration-'+$runId)
@@ -66,14 +70,14 @@ public static class VwRemoteIntegrationDirectoryLeaseV1 {
 }
 '@
 }
-$installed=@{};$attempted=@{};$preAbsent=@{};$allClean=$true;$passed=$false;$created=$false;$records=[Collections.Generic.List[object]]::new()
+$installed=@{};$attempted=@{};$installOwners=@{};$preAbsent=@{};$allClean=$true;$passed=$false;$created=$false;$records=[Collections.Generic.List[object]]::new()
 $inputRecords=[Collections.Generic.List[object]]::new();$inputRecord=@{}
 $lifecycleRecords=[Collections.Generic.List[object]]::new();$lifecycleRecord=@{};$heldPrefix=$null;$lifecycleTriggered=$false
 $streamCounters=@{phone=@{};host=@{}}
 $hostStreamCounterKeys=@('capture_polls','capture_idle','encoded_frames','config_enqueued','media_enqueued','config_received','media_received','media_no_config','media_retired','media_admitted','frame_taken')
 $streamCounterKeys=@('capture_polls','capture_idle','encoded_frames','config_enqueued','media_enqueued','config_received','media_received','media_no_config','media_retired','media_admitted','frame_taken','state_published','state_stale','frames_emitted','frame_scope_discarded','frames_received','scope_discarded','inactive_discarded','surface_waited','surface_deadline','surface_invalidated','decoder_opened','decoder_refused','startup_failed','frames_queued','queue_refused','rendered')
 $diagnostics=[Collections.Generic.List[object]]::new();$diagnosticTotal=0;$diagnosticDropped=0;$phoneRetired=$false;$startupProof=$null
-$receipt=[ordered]@{schema=1;kind='normal-native-remote-usb-integration';status='failed';failure_phase=$phase;run_id=$runId;model='SM-S918U';source_count=0;artifact_manifest_sha256=$ArtifactManifestSha256;carrier='QuicTether';physical_route_verified=$false;owner_user=0;profiles_preserved=$false;phone_render_records=@();phone_render_observed_count=0;phone_render_records_validated=$false;render_validation_reason_code=$null;phone_render_partial_record=$null;phone_render_observations_omitted=0;phone_phase_transitions=@();phone_phase_transitions_omitted=0;phone_last_phase=$null;phone_stream_snapshots=[ordered]@{};host_source_selections=@();host_carrier_diagnostic=$null;host_first_carrier_failure=$null;host_carrier_snapshot_available=$false;host_first_run_failure=$null;host_retirement_diagnostic=$null;host_grant_diagnostic=$null;host_grant_failure=$null;receiver_observation=$null;receiver_journal_evidence=$null;receiver_evidence_capture_failed=$false;controller_input_validation_reason=$null;controller_input_records_validated=$false;phone_actual_retirement=$false;host_actual_retirement=$false;process_cleanup=$false;owned_packages_cleanup=$false;private_work_disposed=$false;input_grant_attempted=$false;input_granted=$false;input_attempted=$false;input_dispatch_completed=$false;input_retirement_confirmed=$false;retained_input_nonce=$RetainedInputNonce;controller_input_requested=[bool]$ControllerInput;controller_input_scenario=$InputScenario;held_lifecycle_records=@();held_lifecycle_records_validated=$false;held_lifecycle_validation_reason=$null;held_lifecycle_evidence=$null;held_evidence_capture_failed=$false;controller_input_records=@();owned_receiver_counts=$null;software_generated_input=$false;physical_pen_fidelity=$false;editor_effect=$false;latency_acceptance=$false;screenshots_created=0;failure_error_type=$null;failure_error_code=$null;diagnostic_records=@();diagnostic_total=0;diagnostic_dropped=0;phone_retirement_phase_seen=$false;phone_no_owner_startup_proven=$false;host_no_owner_startup_proven=$false}
+$receipt=[ordered]@{schema=1;kind='normal-native-remote-usb-integration';status='failed';failure_phase=$phase;run_id=$runId;model='SM-S918U';source_count=0;artifact_manifest_sha256=$ArtifactManifestSha256;carrier='QuicTether';physical_route_verified=$false;owner_user=0;profiles_preserved=$false;phone_render_records=@();phone_render_observed_count=0;phone_render_records_validated=$false;render_validation_reason_code=$null;phone_render_partial_record=$null;phone_render_observations_omitted=0;phone_phase_transitions=@();phone_phase_transitions_omitted=0;phone_last_phase=$null;phone_stream_snapshots=[ordered]@{};host_source_selections=@();host_carrier_diagnostic=$null;host_first_carrier_failure=$null;host_carrier_snapshot_available=$false;host_first_run_failure=$null;host_retirement_diagnostic=$null;host_grant_diagnostic=$null;host_grant_failure=$null;receiver_observation=$null;receiver_journal_evidence=$null;receiver_evidence_capture_failed=$false;controller_input_validation_reason=$null;controller_input_records_validated=$false;editor_phone_records_validated=$false;owned_editor_contract_sha256=$OwnedEditorContractSha256;external_editor_destination_retained=$false;phone_actual_retirement=$false;host_actual_retirement=$false;process_cleanup=$false;owned_packages_cleanup=$false;private_work_disposed=$false;input_grant_attempted=$false;input_granted=$false;input_attempted=$false;input_dispatch_completed=$false;input_retirement_confirmed=$false;retained_input_nonce=$RetainedInputNonce;controller_input_requested=[bool]$ControllerInput;controller_input_scenario=$InputScenario;held_lifecycle_records=@();held_lifecycle_records_validated=$false;held_lifecycle_validation_reason=$null;held_lifecycle_evidence=$null;held_evidence_capture_failed=$false;controller_input_records=@();owned_receiver_counts=$null;software_generated_input=$false;physical_pen_fidelity=$false;editor_effect=$false;latency_acceptance=$false;screenshots_created=0;failure_error_type=$null;failure_error_code=$null;diagnostic_records=@();diagnostic_total=0;diagnostic_dropped=0;phone_retirement_phase_seen=$false;phone_no_owner_startup_proven=$false;host_no_owner_startup_proven=$false}
 . (Join-Path $PSScriptRoot 'render_observation_evidence.ps1')
 . (Join-Path $PSScriptRoot 'receiver_observation.ps1')
 . (Join-Path $PSScriptRoot 'input_observation_evidence.ps1')
@@ -83,6 +87,7 @@ $renderObservationEvidence=New-M4RenderObservationEvidence
 # Only these source-owned text shapes enter the bounded public failure record.
 # Raw redirected output, exception messages, URLs, QR/bootstrap and media stay out.
 function Publish-InputSettlement {
+    if($null -ne $ownedEditor){return} # The editor is held by the actual assigned parent, never this child list.
     $settled=Join-Path $owned 'window/input-settled'
     if(-not(Test-Path -LiteralPath (Split-Path -Parent $settled) -PathType Container)){return}
     if(Test-Path -LiteralPath $settled){
@@ -297,17 +302,17 @@ function Save-M4ControllerValidationReport($Result){
     return $report
 }
 function Save-M4HeldValidationReport($Result){
-    $text=$Result.Lines -join "`n"
-    if($text.Length -gt 65536){throw 'Bounded held validator response unavailable.'}
-    try{$report=$text|ConvertFrom-Json -ErrorAction Stop}catch{throw 'Bounded held validator response unavailable.'}
-    if($report.schema -ne 3 -or $report.status -cnotin @('passed','rejected','observed') -or $report.records_validated -isnot [bool] -or $report.rejection_reason -cnotin @('actual_ack_fade_before_creation_expiry','actual_cause_after_gate_same_clock','actual_device_release_after_requested_cause','actual_host_cause_binding','actual_host_cause_run','actual_host_cause_shape','actual_native_prefix_deadline','actual_native_safety_release','actual_pointer_info','actual_pointer_message','actual_receive_clock','actual_requested_host_cause','actual_three_sequence_census','all_six_receiver_journal_categories','arguments','background_and_reconnect_epochs','balanced_native_pointer_receiver','cancelled_pointer','capability_shape','carrier_loss_and_reconnect_epochs','cause_binding_shape','cause_scope_shape','clock_shape','codec_name','complete_journal','complete_pointer_contact','contact_update_before_up','covering_frame','covering_pts','covering_ticket','down_move_no_up_before_trigger','duplicate_json_key','event_shape','exact_native_release_held_binding','exact_pointer_identity','fresh_owner_capture_scope','fresh_ready_receipt','held_prefix_already_invalid_or_released','initial_grant_binding','input_binding','input_census','input_decoder_owner','input_scope','input_session','input_shape','input_timing','integer_bound','integer_shape','journal_bound','journal_file','journal_file_bytes','lifecycle_census','lifecycle_shape','local_callback_order','matching_echo_coverage','native_integer','native_pointer_qpc_order','native_release_shape','no_mouse_contamination','no_phone_up','none','not_validated','one_contact_down','one_contact_up','only_noncontact_update_after_up','owner_uuid','pointer_info','pointer_order','pointer_transition_flags','receipt_file','receipt_file_bytes','receiver_categories','receiver_clock_actual','receiver_clock_shape','receiver_count_order','receiver_counts','receiver_event_census','receiver_event_shape','receiver_provenance_shape','record_shape','release_strictly_after_trigger','render_census','retirement_and_no_regrant','same_host_qpc_clock','scenario','scenario_binding','scope_shape','scope_uuid','software_input_limits','timing_shape','trigger_binding','trigger_shape','unaltered_pen_flags','unchanged_native_held_prefix','unclassified') -or $report.held_evidence.schema -ne 1 -or @($report.held_evidence.records).Count -gt 4 -or $report.held_evidence.acceptance -ne $false -or $report.held_evidence.records_validated -ne $false){throw 'Bounded held validator response unavailable.'}
-    $receipt.held_lifecycle_evidence=$report.held_evidence
-    # These are sanitized observations until the caller proves strict success.
-    $receipt.held_lifecycle_records=@($report.held_evidence.records)
-    if($report.status -cne 'observed'){$receipt.held_lifecycle_validation_reason=$report.rejection_reason}
-    return $report
-}
-function Adb([string]$name,[string[]]$arguments,[int]$seconds=30){Run $name $device.AdbPath (@('-s',$device.Serial)+$arguments) $seconds}
+        $text=$Result.Lines -join "`n"
+        if($text.Length -gt 65536){throw 'Bounded held validator response unavailable.'}
+        try{$report=$text|ConvertFrom-Json -ErrorAction Stop}catch{throw 'Bounded held validator response unavailable.'}
+        if($report.schema -ne 3 -or $report.status -cnotin @('passed','rejected','observed') -or $report.records_validated -isnot [bool] -or $report.rejection_reason -cnotin @('actual_ack_fade_before_creation_expiry','actual_cause_after_gate_same_clock','actual_device_release_after_requested_cause','actual_host_cause_binding','actual_host_cause_run','actual_host_cause_shape','actual_native_prefix_deadline','actual_native_safety_release','actual_pointer_info','actual_pointer_message','actual_receive_clock','actual_requested_host_cause','actual_three_sequence_census','all_six_receiver_journal_categories','arguments','background_and_reconnect_epochs','balanced_native_pointer_receiver','cancelled_pointer','capability_shape','carrier_loss_and_reconnect_epochs','cause_binding_shape','cause_scope_shape','clock_shape','codec_name','complete_journal','complete_pointer_contact','contact_update_before_up','covering_frame','covering_pts','covering_ticket','down_move_no_up_before_trigger','duplicate_json_key','event_shape','exact_native_release_held_binding','exact_pointer_identity','fresh_owner_capture_scope','fresh_ready_receipt','held_prefix_already_invalid_or_released','initial_grant_binding','input_binding','input_census','input_decoder_owner','input_scope','input_session','input_shape','input_timing','integer_bound','integer_shape','journal_bound','journal_file','journal_file_bytes','lifecycle_census','lifecycle_shape','local_callback_order','matching_echo_coverage','native_integer','native_pointer_qpc_order','native_release_shape','no_mouse_contamination','no_phone_up','none','not_validated','one_contact_down','one_contact_up','only_noncontact_update_after_up','owner_uuid','pointer_info','pointer_order','pointer_transition_flags','receipt_file','receipt_file_bytes','receiver_categories','receiver_clock_actual','receiver_clock_shape','receiver_count_order','receiver_counts','receiver_event_census','receiver_event_shape','receiver_provenance_shape','record_shape','release_strictly_after_trigger','render_census','retirement_and_no_regrant','same_host_qpc_clock','scenario','scenario_binding','scope_shape','scope_uuid','software_input_limits','timing_shape','trigger_binding','trigger_shape','unaltered_pen_flags','unchanged_native_held_prefix','unclassified') -or $report.held_evidence.schema -ne 1 -or @($report.held_evidence.records).Count -gt 4 -or $report.held_evidence.acceptance -ne $false -or $report.held_evidence.records_validated -ne $false){throw 'Bounded held validator response unavailable.'}
+        $receipt.held_lifecycle_evidence=$report.held_evidence
+        # These are sanitized observations until the caller proves strict success.
+        $receipt.held_lifecycle_records=@($report.held_evidence.records)
+        if($report.status -cne 'observed'){$receipt.held_lifecycle_validation_reason=$report.rejection_reason}
+        return $report
+    }
+    function Adb([string]$name,[string[]]$arguments,[int]$seconds=30){Run $name $device.AdbPath (@('-s',$device.Serial)+$arguments) $seconds}
 function Start-Owned([string]$name,[string]$file,[string[]]$arguments,[bool]$visible=$false){
     $info=[Diagnostics.ProcessStartInfo]::new($file);$info.WorkingDirectory=$projectRoot;$info.UseShellExecute=$false;$info.CreateNoWindow=-not $visible
     foreach($arg in $arguments){[void]$info.ArgumentList.Add($arg)}
@@ -331,6 +336,198 @@ function Start-Owned([string]$name,[string]$file,[string[]]$arguments,[bool]$vis
     try{$job.Assign($p);$entry.Assigned=$true}catch{try{$p.Kill($true);[void]$p.WaitForExit(5000)}catch{};throw}
     $p.BeginOutputReadLine();$p.BeginErrorReadLine();return $entry
 }
+# The session journal survives host ADB retirement. Package absence alone is not settlement.
+function ConvertFrom-M4InstallSession([string]$Text,[long]$SessionId){
+    if($Text.Length -gt 33554432 -or $SessionId -le 0){throw 'Installer census bound refused.'}
+    $headers=[regex]::Matches($Text,'(?m)^ {2}(?<active>Active )?Session (?<id>[0-9]+):[ \t]*\r?$')
+    $found=@($headers|Where-Object{[long]$_.Groups['id'].Value -eq $SessionId})
+    if($found.Count -ne 1){throw 'Exact installer session unavailable or ambiguous.'}
+    $h=$found[0];$end=$Text.Length
+    foreach($other in $headers){if($other.Index -gt $h.Index){$end=$other.Index;break}}
+    $tail=$Text.Substring($h.Index,$end-$h.Index)
+    $boundary=[regex]::Match($tail,'(?m)^(?:\S[^\r\n]*:| {4,}(?:Active )?Child Session [0-9]+:)');if($boundary.Success){$tail=$tail.Substring(0,$boundary.Index)}
+    if($tail.Length -gt 32768){throw 'Exact installer record bound refused.'}
+    # Android's dump wraps at a fixed width, retaining four-space indentation.
+    # Join only the observed 120-column continuation. Unwrapped token boundaries
+    # remain intact; missing or duplicate required fields are refused.
+    $joined=[Text.StringBuilder]::new();$previousWidth=0
+    foreach($line in ($tail -split '\r?\n')){
+        if($previousWidth -eq 120 -and $line.StartsWith('    ')){[void]$joined.Append($line.Substring(4))}else{[void]$joined.Append("`n");[void]$joined.Append($line)}
+        $previousWidth=$line.Length
+    }
+    $tail=$joined.ToString()
+    $result=[ordered]@{session_id=$SessionId;active=$h.Groups['active'].Success}
+    foreach($key in @('userId','mOriginalInstallerUid','mInstallerUid','createdMillis','sizeBytes','mFinalStatus')){
+        $m=[regex]::Matches($tail,'(?<!\S)'+$key+'=(-?[0-9]+)(?=\s|$)');if($m.Count -ne 1){throw 'Installer scalar missing or duplicated.'};$result[$key]=[long]$m[0].Groups[1].Value
+    }
+    foreach($key in @('isStaged','isMultiPackage','mCommitted','mSealed','mDestroyed','mSessionApplied','mSessionFailed')){
+        $m=[regex]::Matches($tail,'(?<!\S)'+$key+'=(true|false)(?=\s|$)');if($m.Count -ne 1){throw 'Installer flag missing or duplicated.'};$result[$key]=$m[0].Groups[1].Value -ceq 'true'
+    }
+    foreach($key in @('mClientProgress','mProgress')){
+        $m=[regex]::Matches($tail,'(?<!\S)'+$key+'=([0-9]+(?:\.[0-9]+)?)(?=\s|$)');if($m.Count -ne 1){throw 'Installer progress missing or duplicated.'};$result[$key]=[double]::Parse($m[0].Groups[1].Value,[Globalization.CultureInfo]::InvariantCulture)
+        # Client progress is a raw diagnostic counter; Android may report a small
+        # write-completion overshoot. Aggregate progress remains a fraction.
+        if([double]::IsNaN($result[$key]) -or [double]::IsInfinity($result[$key]) -or $result[$key] -lt 0 -or ($key -ceq 'mProgress' -and $result[$key] -gt 1)){throw 'Installer progress out of range.'}
+    }
+    foreach($key in @('installInitiatingPackageName','appPackageName','mAppPackageName')){
+        $m=[regex]::Matches($tail,'(?<!\S)'+$key+'=([A-Za-z0-9_.]+)(?=\s|$)');if($key -ceq 'mAppPackageName' -and $m.Count -eq 0){$result[$key]='null';continue}
+        if($m.Count -ne 1){throw 'Installer identity missing or duplicated.'};$result[$key]=$m[0].Groups[1].Value
+    }
+    return $result
+}
+function Assert-M4InstallIdentity($Record,$Snapshot){
+    if($Snapshot.session_id -ne $Record.session_id -or $Snapshot.userId -ne 0 -or $Snapshot.mOriginalInstallerUid -ne 2000 -or $Snapshot.mInstallerUid -ne 2000 -or $Snapshot.installInitiatingPackageName -cne 'com.android.shell' -or $Snapshot.sizeBytes -ne $Record.apk_bytes -or $Snapshot.isStaged -or $Snapshot.isMultiPackage){throw 'Exact installer ownership mismatch.'}
+    $names=@($Snapshot.appPackageName,$Snapshot.mAppPackageName)|Where-Object{$_ -cne 'null'}
+    if(@($names).Count -eq 0 -or @($names|Where-Object{$_ -cne $Record.package}).Count -ne 0){throw 'Exact installer package mismatch.'}
+    if($Snapshot.createdMillis -le 0 -or ($null -ne $Record.created_millis -and $Snapshot.createdMillis -ne $Record.created_millis)){throw 'Installer creation identity mismatch.'}
+}
+function Test-M4InstallTerminal($Snapshot){
+    # An active destroyed record is not terminal: require its historical result.
+    return -not $Snapshot.active -and $Snapshot.mDestroyed -and $Snapshot.mFinalStatus -ne 0 -and -not ($Snapshot.mSessionApplied -and $Snapshot.mSessionFailed)
+}
+function Test-M4InstallProgress($Previous,$Current){
+    if($null -eq $Previous){return $false}
+    # Raw client overshoot stays visible but cannot advance the commit budget.
+    return $Current.mProgress -gt $Previous.mProgress -or ($Current.mClientProgress -le 1 -and $Current.mClientProgress -gt $Previous.mClientProgress) -or (-not $Previous.mCommitted -and $Current.mCommitted) -or (-not $Previous.mSealed -and $Current.mSealed) -or (-not (Test-M4InstallTerminal $Previous) -and (Test-M4InstallTerminal $Current))
+}
+function Save-M4InstallOwner($Record,[string]$Event){
+    $Record.event=$Event;$Record.observed_utc=[DateTime]::UtcNow.ToString('o')
+    $path=Join-Path $projectRoot ('.local/remote-install-owner-'+$runId+'-'+$Record.key+'.jsonl')
+    $mode=if($Record.journal_started){[IO.FileMode]::Append}else{[IO.FileMode]::CreateNew}
+    $stream=[IO.File]::Open($path,$mode,[IO.FileAccess]::Write,[IO.FileShare]::Read)
+    try{$bytes=[Text.Encoding]::UTF8.GetBytes(($Record|ConvertTo-Json -Depth 12 -Compress)+"`n");$stream.Write($bytes);$stream.Flush($true);$Record.journal_started=$true}finally{$stream.Dispose()}
+}
+function Read-M4InstallOwner($Record){
+    if($null -eq $Record.session_id){throw 'Created installer session ID is unknown; recovery Pending.'}
+    $r=Adb 'observe-exact-owned-install-session' @('shell','dumpsys','package','installs') 30
+    $snapshot=ConvertFrom-M4InstallSession ($r.Lines -join "`n") $Record.session_id
+    Assert-M4InstallIdentity $Record $snapshot
+    if($null -eq $Record.created_millis){$Record.created_millis=$snapshot.createdMillis}
+    $Record.last_session=$snapshot;$Record.terminal=Test-M4InstallTerminal $snapshot
+    Save-M4InstallOwner $Record 'session-observed'
+    return $snapshot
+}
+function Add-M4InstallCallback($Record,[string]$Line){
+    $Record.output_lines++
+    if($Record.output_lines -gt 64 -or $Line.Length -gt 4096){throw 'Installer commit output bound exceeded.'}
+    $value=$null
+    if($Line.Trim() -ceq 'Success'){$value='Success'}
+    elseif($Line -cmatch '^Failure \[.*\][ \t]*$'){$value='Failure'}
+    if($null -ne $value){
+        if($null -ne $Record.callback){$Record.callback='Ambiguous';throw 'Installer callback duplicated or conflicting.'}
+        $Record.callback=$value
+    }
+}
+function Drain-M4InstallCommit($Entry,$Record){
+    $line=''
+    while($Entry.Output.Lines.TryDequeue([ref]$line)){Add-M4InstallCallback $Record $line}
+}
+function Test-M4InstallCommitSuccess($Record){
+    return $Record.host_commit_retired -and $Record.commit_exit_code -eq 0 -and $Record.callback -ceq 'Success' -and $Record.terminal -and $null -ne $Record.created_millis -and $null -ne $Record.last_session -and (Test-M4InstallTerminal $Record.last_session) -and $Record.last_session.mFinalStatus -eq 1 -and $Record.last_session.mSessionApplied -and -not $Record.last_session.mSessionFailed
+}
+function Test-M4InstallExtension([double]$Elapsed,[double]$Deadline,[double]$LastAdvance){
+    return $Deadline -lt 900 -and $Elapsed -ge $Deadline -and $LastAdvance -ge 0 -and ($Elapsed-$LastAdvance) -le 60
+}
+function Wait-M4InstallCommit($Entry,$Record){
+    $clock=[Diagnostics.Stopwatch]::StartNew();$deadline=300.0;$next=0.0;$previous=$null;$lastAdvance=-1000.0
+    while($true){
+        Drain-M4InstallCommit $Entry $Record
+        # Observe actual host retirement before the next device query. Neither
+        # this nor callback text substitutes for the bound historical session.
+        if($Entry.Process.HasExited -and $Entry.Job.ActiveProcessCount -eq 0 -and $Entry.Output.IsComplete){
+            Drain-M4InstallCommit $Entry $Record
+            $Record.host_commit_retired=$true;$Record.commit_exit_code=$Entry.Process.ExitCode
+            if($Record.callback -cne 'Success' -or $Record.commit_exit_code -ne 0){Save-M4InstallOwner $Record 'commit-host-failed';throw 'Installer commit callback failed or unavailable.'}
+        }
+        if($clock.Elapsed.TotalSeconds -ge $next){
+            try{
+                $snapshot=Read-M4InstallOwner $Record
+                if(Test-M4InstallProgress $previous $snapshot){$lastAdvance=$clock.Elapsed.TotalSeconds}
+                $previous=$snapshot
+            }catch{
+                # A session can move from active to historical while dumpsys is
+                # traversing it. Preserve uncertainty and retry within the same
+                # absolute budget; never promote callback/absence to terminal.
+                Save-M4InstallOwner $Record 'session-observation-pending'
+            }
+            $next=$clock.Elapsed.TotalSeconds+15
+            Write-Host "Remote integration installer=$($Record.key) elapsed=$([int]$clock.Elapsed.TotalSeconds)s terminal=$($Record.terminal) host_retired=$($Record.host_commit_retired)"
+        }
+        if(Test-M4InstallCommitSuccess $Record){return}
+        if($clock.Elapsed.TotalSeconds -ge $deadline){
+            if(Test-M4InstallExtension $clock.Elapsed.TotalSeconds $deadline $lastAdvance){
+                $deadline=[Math]::Min(900,$deadline+120);$Record.budget_seconds=$deadline
+                Save-M4InstallOwner $Record 'extended-on-device-progress'
+                Write-Host "Remote integration installer=$($Record.key) continuing same commit after actual device progress; budget=$deadline seconds"
+            }else{Save-M4InstallOwner $Record 'commit-budget-pending';throw 'Owned device installer completion Pending.'}
+        }
+        Start-Sleep -Milliseconds 100
+    }
+}
+function Install-M4OwnedPackage([string]$Key,[string]$Package){
+    $apk=$artifact.apk.$Key;$length=(Get-Item -LiteralPath $apk.path).Length
+    $record=[ordered]@{schema=1;run_id=$runId;key=$Key;package=$Package;apk_sha256=$apk.sha256;apk_bytes=$length;owner_user=0;model='SM-S918U';device_serial_sha256=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($device.Serial))).ToLowerInvariant();session_id=$null;created_millis=$null;terminal=$false;callback=$null;host_commit_retired=$false;commit_exit_code=$null;output_lines=0;budget_seconds=300;last_session=$null;journal_started=$false;event=$null;observed_utc=$null;stage_directory='/data/local/tmp/vw-install-'+$runId+'-'+$Key;stage_attempted=$false;stage_owned=$false;stage_removed=$false;cleanup_pending=$true}
+    $installOwners[$Package]=$record;$attempted[$Package]=$apk.sha256
+    Save-M4InstallOwner $record 'before-create'
+    $r=Adb 'create-owned-integration-install' @('shell','pm','install-create','--user','0','-t','--pkg',$Package,'-S',[string]$length)
+    $lines=@($r.Lines|Where-Object{$_.Trim()})
+    if($lines.Count -ne 1 -or $lines[0] -cnotmatch '^Success: created install session \[([0-9]+)\]\s*$'){throw 'Created installer ID unknown; cleanup Pending.'}
+    $record.session_id=[long]$Matches[1];Save-M4InstallOwner $record 'session-created'
+    [void](Read-M4InstallOwner $record)
+    # mkdir without -p proves this closed run/key path was newly created. A lost
+    # response is not ownership and is left Pending for exact recovery.
+    $record.stage_attempted=$true;Save-M4InstallOwner $record 'before-stage-create'
+    [void](Adb 'create-owned-install-stage' @('shell','mkdir',$record.stage_directory))
+    $record.stage_owned=$true;Save-M4InstallOwner $record 'stage-created'
+    $remote=$record.stage_directory+'/base.apk'
+    [void](Adb 'push-owned-install-apk' @('push',$apk.path,$remote) 300)
+    $r=Adb 'bind-owned-install-apk' @('shell','sha256sum',$remote)
+    if(($r.Lines -join "`n").Trim() -cne ($apk.sha256+'  '+$remote)){throw 'Transferred APK digest mismatch.'}
+    $r=Adb 'write-owned-integration-install' @('shell','pm','install-write','-S',[string]$length,[string]$record.session_id,'base.apk',$remote) 300
+    if(($r.Lines -join "`n").Trim() -cne ('Success: streamed '+$length+' bytes')){throw 'Installer write success unavailable.'}
+    [void](Read-M4InstallOwner $record);Save-M4InstallOwner $record 'before-commit'
+    $entry=Start-Owned ('owned-installer-'+$Key) $device.AdbPath @('-s',$device.Serial,'shell','pm','install-commit',[string]$record.session_id)
+    Wait-M4InstallCommit $entry $record
+    if(-not(Check-Installed $Package $apk.sha256)){throw 'Installed exact APK mismatch.'}
+    $installed[$Package]=$apk.sha256
+}
+function Stop-M4OwnedInstallerClient($Entry){
+    if($Entry.Name -cin @('owned-installer-main','owned-installer-test')){
+        # Only these input-free ADB commit clients use this path. Stopping the
+        # host client does not terminate its device session; Settle below still
+        # requires exact historical terminal proof before package cleanup.
+        Stop-M4InputPregrantChild $Entry
+    }
+}
+function Settle-M4InstallOwner($Record){
+    # Called only after the existing child Job/IO retirement loop has settled.
+    if(-not $allClean){throw 'Installer host ownership Pending; preserve package.'}
+    $clock=[Diagnostics.Stopwatch]::StartNew();$abandonAttempted=$false
+    while(-not $Record.terminal -and $clock.Elapsed.TotalSeconds -lt 60){
+        $snapshot=$null
+        try{$snapshot=Read-M4InstallOwner $Record}catch{Save-M4InstallOwner $Record 'settlement-observation-pending'}
+        if($Record.terminal){break}
+        if($null -ne $snapshot -and $snapshot.active -and -not $abandonAttempted){
+            # Read just checked the exact user/package/UID/creation identity.
+            # A lost abandon response is not terminal; continue observing.
+            $abandonAttempted=$true;Save-M4InstallOwner $Record 'before-abandon'
+            try{[void](Run 'abandon-exact-owned-install' $device.AdbPath @('-s',$device.Serial,'shell','pm','install-abandon',[string]$Record.session_id) 30 -AllowNonzero)}catch{}
+        }
+        Write-Host "Retaining device installer recovery: owned installer=$($Record.key) remains Pending"
+        Start-Sleep -Seconds 2
+    }
+    if(-not $Record.terminal){throw 'Device installer remains Pending; package absence cannot prove cleanup.'}
+    if($Record.stage_attempted -and -not $Record.stage_owned){throw 'Device staging creation outcome unknown; cleanup Pending.'}
+    if($Record.stage_owned -and -not $Record.stage_removed){
+        $expected='/data/local/tmp/vw-install-'+$runId+'-'+$Record.key
+        if($Record.key -cnotin @('main','test') -or $Record.stage_directory -cne $expected){throw 'Owned device staging containment refused.'}
+        # Delete only this exact task APK and then its empty directory.
+        [void](Adb 'remove-owned-install-stage-apk' @('shell','rm','-f',($expected+'/base.apk')))
+        [void](Adb 'remove-owned-install-stage-directory' @('shell','rmdir',$expected))
+        $Record.stage_removed=$true;Save-M4InstallOwner $Record 'stage-retired'
+    }
+}
+
 function Await-File([string]$name,[int]$seconds,$Producer){
     $script:phase=$name;$clock=[Diagnostics.Stopwatch]::StartNew();$next=0
     $path=Join-Path $owned $name
@@ -440,7 +637,7 @@ try {
     if($artifact.inventory_only -ne $true -or $artifact.root_build_review_required -ne $true -or @($artifact.build_receipts).Count -lt 3){throw 'Root-reviewed fresh build receipt bindings required.'}
     Pin-File $artifact.source_map.path $artifact.source_map.sha256
     foreach($item in $artifact.build_receipts){Pin-File $item.path $item.sha256}
-    $requiredSources=@('tools/remote-edit/input_observation_evidence.ps1','tools/remote-edit/test_input_observation_evidence.ps1','tools/remote-edit/receiver_observation.ps1','tools/remote-edit/test_receiver_observation.ps1','tools/remote-edit/test_integration_diagnostics.ps1','apps/desktop/src/test/kotlin/com/visualworkbench/desktop/RemoteIntegrationPublicationTest.kt','tools/remote-edit/test_integration_producer_wait.ps1','tools/remote-edit/test_startup_owner_proofs.ps1','tools/ffi-test/core-unit.ps1','tools/ffi-test/test_core_unit_census.ps1','tools/remote-edit/android_entrypoint_preflight.py','tools/remote-edit/test_android_entrypoint_preflight.py','tools/remote-edit/remote_instrumentation_contract.json','tools/remote-edit/render_observation_evidence.ps1','tools/remote-edit/test_render_observation_evidence.ps1','apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditController.kt','apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteHardwareDecoder.kt','apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteSurfaceView.kt','apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeRemoteEdit.kt','core/crates/vw-ffi/src/session/remote_edit.rs','core/crates/vw-ffi/src/session/remote_host.rs','host-win/crates/vw-remote-host/src/process.rs','host-win/crates/vw-remote-host/src/process/windows.rs','host-win/crates/vw-remote-host/src/process/input_retirement.rs','host-win/crates/vw-remote-host/src/platform/native_guard/release_witness.rs','host-win/crates/vw-remote-host/src/platform/input.rs','host-win/crates/vw-remote-host/src/platform/video.rs','tools/remote-edit/controller_lifecycle_reports.py','tools/remote-edit/test_controller_lifecycle_reports.py','tools/remote-edit/lifecycle_clock.cs','core/crates/vw-ffi/Cargo.toml','core/crates/vw-ffi/src/session/remote_integration_fault.rs','apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/RemoteIntegrationCarrierFault.kt','tools/remote-edit/input_owner_contracts.ps1','tools/remote-edit/input_owner_startup.ps1','tools/remote-edit/input_process_output.cs','tools/remote-edit/test_input_owner_startup.ps1','tools/remote-edit/integration_input_owner.ps1','tools/remote-edit/test_input_owner_contracts.ps1','apps/desktop/src/main/kotlin/com/visualworkbench/desktop/RemoteIntegrationHost.kt','apps/android/src/remoteIntegrationTest/kotlin/com/visualworkbench/android/remote/RemoteNormalPathInstrumentedTest.kt')
+    $requiredSources=@('tools/remote-edit/editor_phone_owner.ps1','apps/desktop/src/test/kotlin/com/visualworkbench/desktop/RemoteOwnedEditorContractTest.kt','tools/remote-edit/owned_editor_contract.ps1','tools/remote-edit/test_owned_editor_contract.ps1','tools/remote-edit/editor_phone_reports.py','tools/remote-edit/test_editor_phone_reports.py','tools/remote-edit/input_observation_evidence.ps1','tools/remote-edit/test_input_observation_evidence.ps1','tools/remote-edit/receiver_observation.ps1','tools/remote-edit/test_receiver_observation.ps1','tools/remote-edit/test_integration_diagnostics.ps1','apps/desktop/src/test/kotlin/com/visualworkbench/desktop/RemoteIntegrationPublicationTest.kt','tools/remote-edit/test_integration_producer_wait.ps1','tools/remote-edit/test_startup_owner_proofs.ps1','tools/ffi-test/core-unit.ps1','tools/ffi-test/test_core_unit_census.ps1','tools/remote-edit/android_entrypoint_preflight.py','tools/remote-edit/test_android_entrypoint_preflight.py','tools/remote-edit/remote_instrumentation_contract.json','tools/remote-edit/render_observation_evidence.ps1','tools/remote-edit/test_render_observation_evidence.ps1','apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditController.kt','apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteHardwareDecoder.kt','apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteSurfaceView.kt','apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeRemoteEdit.kt','core/crates/vw-ffi/src/session/remote_edit.rs','core/crates/vw-ffi/src/session/remote_host.rs','host-win/crates/vw-remote-host/src/process.rs','host-win/crates/vw-remote-host/src/process/windows.rs','host-win/crates/vw-remote-host/src/process/input_retirement.rs','host-win/crates/vw-remote-host/src/platform/native_guard/release_witness.rs','host-win/crates/vw-remote-host/src/platform/input.rs','host-win/crates/vw-remote-host/src/platform/video.rs','tools/remote-edit/controller_lifecycle_reports.py','tools/remote-edit/test_controller_lifecycle_reports.py','tools/remote-edit/lifecycle_clock.cs','core/crates/vw-ffi/Cargo.toml','core/crates/vw-ffi/src/session/remote_integration_fault.rs','apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/RemoteIntegrationCarrierFault.kt','tools/remote-edit/input_owner_contracts.ps1','tools/remote-edit/input_owner_startup.ps1','tools/remote-edit/input_process_output.cs','tools/remote-edit/test_input_owner_startup.ps1','tools/remote-edit/integration_input_owner.ps1','tools/remote-edit/test_input_owner_contracts.ps1','apps/desktop/src/main/kotlin/com/visualworkbench/desktop/RemoteIntegrationHost.kt','apps/android/src/remoteIntegrationTest/kotlin/com/visualworkbench/android/remote/RemoteNormalPathInstrumentedTest.kt')
     foreach($name in $requiredSources){if(@($artifact.sources|Where-Object{$_.path -ceq $name}).Count -ne 1){throw 'Critical normal remote pipeline source missing.'}}
     foreach($item in $artifact.sources){
         if($item.path -cnotmatch '^[A-Za-z0-9_./-]+$' -or $item.path -match '(?:^|/)\.\.(?:/|$)'){throw 'Source inventory path refused.'}
@@ -501,16 +698,20 @@ try {
     }finally{$zip.Dispose()}
     foreach($key in @('main','test')){
         $package=if($key -ceq 'main'){$packages[0]}else{$packages[1]}
-        # ADB timeout can occur after actual installation. Retain its reviewed
-        # expected digest before invoking the command, independent of success text.
-        $attempted[$package]=$artifact.apk.$key.sha256
-        $v=Adb 'install-owned-integration' @('install','--user','0','-t',$artifact.apk.$key.path) 120
-        if(($v.Lines -join "`n") -cnotmatch '(?m)^Success\s*$'){throw 'APK install success unavailable.'}
-        $installed[$package]=$artifact.apk.$key.sha256
-        if(-not(Check-Installed $package $installed[$package])){throw 'Installed exact APK mismatch.'}
+        Install-M4OwnedPackage $key $package
+    }
+    if($OwnedEditorContract){
+        . (Join-Path $PSScriptRoot 'owned_editor_contract.ps1')
+        Pin-File $OwnedEditorContract $OwnedEditorContractSha256
+        if((Get-Item -LiteralPath $OwnedEditorContract).Length -gt 8192){throw 'Owned editor contract bound'}
+        $ownedEditor=Get-Content -LiteralPath $OwnedEditorContract -Raw|ConvertFrom-Json -AsHashtable
+        Assert-M4OwnedEditorContract $ownedEditor ([int]$gate.parent_pid) ([string]$gate.parent_created)
+        Assert-M4OwnedEditorAlive $ownedEditor
+        $receipt.external_editor_destination_retained=$true
     }
     if($InputScenario -cne 'balanced'){[IO.File]::WriteAllText((Join-Path $owned 'held-scenario'),$InputScenario,[Text.UTF8Encoding]::new($false))}
     if($ControllerInput){[IO.File]::WriteAllText((Join-Path $owned 'controller-input-owner'),$runId,[Text.UTF8Encoding]::new($false))}
+    if($null -eq $ownedEditor){
     $surfaceMode=if($ControllerInput){'--surface-controller'}else{'--surface'}
     $surface=Start-Owned 'owned-wgc-target' $artifact.harness.path @($surfaceMode,(Join-Path $owned 'window'),'80') $true
     $script:phase='owned_target_readiness';$clock=[Diagnostics.Stopwatch]::StartNew()
@@ -518,6 +719,14 @@ try {
     while(-not(Test-Path -LiteralPath $targetFile -PathType Leaf)){if($surface.Process.HasExited -or $clock.Elapsed.TotalSeconds -ge 15){throw 'Owned target native readiness failed.'};Write-Host 'Waiting for owned capture target';Start-Sleep -Milliseconds 250}
     Assert-Plain $targetFile;$target=Get-Content -Raw -LiteralPath $targetFile|ConvertFrom-Json
     if($target.process_id -ne $surface.Process.Id){throw 'Target child/native PID mismatch.'}
+    }else{
+        # External retained destination never enters $children: inner failure,
+        # Stop and finally cannot close or kill the editor or its private Job.
+        $target=[pscustomobject]@{window=$ownedEditor.window;process_id=$ownedEditor.editor_pid;process_created=$ownedEditor.editor_created}
+        $parentMillis=[DateTimeOffset]::new([DateTime]::FromFileTimeUtc([long]$ownedEditor.parent_created)).ToUnixTimeMilliseconds()
+        $editorLines=@('M4_REMOTE_OWNED_EDITOR_V1',$runId,$OwnedEditorContractSha256,$ownedEditor.editor_kind,[string]$ownedEditor.parent_pid,[string]$parentMillis,$ownedEditor.nonce,[string]$target.window,[string]$target.process_id,[string]$target.process_created,($ownedEditor.stroke_ppm -join ','),$ownedEditor.executable_sha256)
+        [IO.File]::WriteAllLines((Join-Path $owned 'owned-editor.txt'),[string[]]$editorLines,[Text.UTF8Encoding]::new($false))
+    }
     $config=@('M4_REMOTE_INTEGRATION_V1',$PcUsbAddress,[string]$target.window,[string]$target.process_id,[string]$target.process_created,[string]$Port)
     foreach($name in $names){$config+=[string]$artifact.native.$name}
     $configPath=Join-Path $owned 'host-config.txt';[IO.File]::WriteAllLines($configPath,$config,[Text.UTF8Encoding]::new($false))
@@ -539,6 +748,7 @@ try {
     # invocation. It and addresses are redacted before any output/log recording.
     $instrumentArgs=@('-s',$device.Serial,'shell','am','instrument','--user','0','-w','-r','-e','class',$instrumentationSelection,'-e','remoteRunId',$runId,'-e','remoteBootstrap',$bootstrap)
     if($ControllerInput){$instrumentArgs+=@('-e','remoteControllerInput','true','-e','remoteInputScenario',$InputScenario)}
+    if($null -ne $ownedEditor){Assert-M4OwnedEditorAlive $ownedEditor;$instrumentArgs+=@('-e','remoteOwnedEditorKind',$ownedEditor.editor_kind,'-e','remoteEditorStroke',($ownedEditor.stroke_ppm -join ','))}
     $instrumentArgs+=($packages[1]+'/androidx.test.runner.AndroidJUnitRunner')
     $instrument=Start-Owned 'real-phone-controller' $device.AdbPath $instrumentArgs
     $clock=[Diagnostics.Stopwatch]::StartNew();$next=0;$restart=1;$phoneRetired=$false;$ok=$false;$failure=$false;$record=@{}
@@ -646,6 +856,7 @@ try {
         # Close the paint-only owned surface after both actual native host and
         # phone owners retired, then read its complete real receiver journal.
         if(-not(Test-M4InputHostRetired $proof $runId $hostOwner.Process.Id)){throw 'Host actual retirement binding failed.'}
+        if($null -eq $ownedEditor){
         Publish-InputSettlement
         [void]$surface.Process.CloseMainWindow()
         if(-not $surface.Process.WaitForExit(5000) -or $surface.Process.ExitCode -ne 0){throw 'Owned input receiver retirement failed.'}
@@ -664,11 +875,23 @@ try {
         }else{
             $lifecyclePath=Join-Path $owned 'controller-lifecycle-records.json';[IO.File]::WriteAllText($lifecyclePath,(ConvertTo-Json -InputObject @($lifecycleRecords) -Depth 8),[Text.UTF8Encoding]::new($false))
             $heldValidation=Run 'validate-held-lifecycle-release' 'python.exe' @((Join-Path $PSScriptRoot 'controller_lifecycle_reports.py'),$lifecyclePath,(Join-Path $owned 'render-records.json'),$receiverFile,$receivedFile,(Join-Path $owned 'held-native-prefix.json'),(Join-Path $owned 'held-trigger.json'),(Join-Path $owned 'held-release-witness.json')) 30 -AllowNonzero
-            $heldVerdict=Save-M4HeldValidationReport $heldValidation
-            if($heldValidation.ExitCode -ne 0 -or $heldVerdict.status -cne 'passed' -or $heldVerdict.records_validated -ne $true){throw 'Actual held lifecycle validation rejected.'}
-            $receipt.held_lifecycle_records_validated=$true
+                $heldVerdict=Save-M4HeldValidationReport $heldValidation
+                if($heldValidation.ExitCode -ne 0 -or $heldVerdict.status -cne 'passed' -or $heldVerdict.records_validated -ne $true){throw 'Actual held lifecycle validation rejected.'}
+                $receipt.held_lifecycle_records_validated=$true
         }
-        $receipt.controller_input_records=@($inputRecords);$receipt.owned_receiver_counts=$receiver;$receipt.input_granted=$true;$receipt.input_attempted=$true;$receipt.input_dispatch_completed=$true;$receipt.software_generated_input=$true
+        $receipt.owned_receiver_counts=$receiver
+        }else{
+            # Preserve the strict phone admission/ACK/ghost correlation while
+            # leaving actual editor pixels to the still-retained parent.
+            Assert-M4OwnedEditorAlive $ownedEditor
+            $inputPath=Join-Path $owned 'controller-input-records.json';[IO.File]::WriteAllText($inputPath,(ConvertTo-Json -InputObject @($inputRecords) -Depth 8),[Text.UTF8Encoding]::new($false))
+            $inputValidation=Run 'validate-editor-phone-correlation' 'python.exe' @((Join-Path $PSScriptRoot 'editor_phone_reports.py'),$inputPath,(Join-Path $owned 'render-records.json')) 30 -AllowNonzero
+            if($inputValidation.Lines.Count -ne 1){throw 'Bounded editor phone verdict required'}
+            $inputVerdict=$inputValidation.Lines[0]|ConvertFrom-Json -AsHashtable
+            if($inputValidation.ExitCode -ne 0 -or $inputVerdict.status -cne 'passed' -or $inputVerdict.operation -cne 'owned-editor-phone-correlation' -or $inputVerdict.phone_records_validated -ne $true -or $inputVerdict.receiver_observed -ne $false -or $inputVerdict.editor_effect -ne $false){throw 'Editor phone correlation refused'}
+            $receipt.editor_phone_records_validated=$true
+        }
+        $receipt.controller_input_records=@($inputRecords);$receipt.input_granted=$true;$receipt.input_attempted=$true;$receipt.input_dispatch_completed=$true;$receipt.software_generated_input=$true
     }elseif($inputRecords.Count -ne 0 -or $inputRecord.Count -ne 0){throw 'Unexpected controller input receipt in viewing-only route.'}
     $receipt.host_actual_retirement=$true
     if($ControllerInput){$receipt.input_retirement_confirmed=$true}
@@ -733,6 +956,7 @@ try {
         # Publish only after both native and phone owners actually settled.
         Publish-InputSettlement
         foreach($entry in $children){
+            Stop-M4OwnedInstallerClient $entry
             if($entry.Name -ceq 'owned-wgc-target' -and -not(Test-M4InputChildExited $entry)){
                 if($entry.OutputStarted -and $entry.ErrorStarted){[void]$entry.Process.CloseMainWindow()}
                 else{Stop-M4InputPregrantChild $entry}
@@ -770,21 +994,22 @@ try {
         }
     }
     if($ControllerInput -and $InputScenario -cne 'balanced' -and $created -and $allClean -and $null -eq $receipt.held_lifecycle_evidence){
-        $savedPhase=$phase
-        try{
-            $lifecyclePath=Join-Path $owned 'controller-lifecycle-observed.json'
-            [IO.File]::WriteAllText($lifecyclePath,(ConvertTo-Json -InputObject @($lifecycleRecords) -Depth 8),[Text.UTF8Encoding]::new($false))
-            $observation=Run 'retain-final-held-evidence' 'python.exe' @((Join-Path $PSScriptRoot 'controller_lifecycle_reports.py'),'observe',$lifecyclePath,(Join-Path $owned 'held-native-prefix.json'),(Join-Path $owned 'held-trigger.json'),(Join-Path $owned 'held-release-witness.json')) 30 -AllowNonzero
-            $observed=Save-M4HeldValidationReport $observation
-            if($observation.ExitCode -ne 0 -or $observed.status -cne 'observed'){throw 'Held observation unavailable.'}
-        }catch{$receiverEvidenceRetained=$false;$receipt.held_evidence_capture_failed=$true}
-        finally{$script:phase=$savedPhase}
-    }
-    $packageClean=$true
+            $savedPhase=$phase
+            try{
+                $lifecyclePath=Join-Path $owned 'controller-lifecycle-observed.json'
+                [IO.File]::WriteAllText($lifecyclePath,(ConvertTo-Json -InputObject @($lifecycleRecords) -Depth 8),[Text.UTF8Encoding]::new($false))
+                $observation=Run 'retain-final-held-evidence' 'python.exe' @((Join-Path $PSScriptRoot 'controller_lifecycle_reports.py'),'observe',$lifecyclePath,(Join-Path $owned 'held-native-prefix.json'),(Join-Path $owned 'held-trigger.json'),(Join-Path $owned 'held-release-witness.json')) 30 -AllowNonzero
+                $observed=Save-M4HeldValidationReport $observation
+                if($observation.ExitCode -ne 0 -or $observed.status -cne 'observed'){throw 'Held observation unavailable.'}
+            }catch{$receiverEvidenceRetained=$false;$receipt.held_evidence_capture_failed=$true}
+            finally{$script:phase=$savedPhase}
+        }
+        $packageClean=$true
     if($null -ne $device){foreach($package in @($packages[1],$packages[0])){
         if(-not $attempted.ContainsKey($package)){continue}
         try{
             if($preAbsent[$package] -ne $true){throw 'Pre-install global ownership is unknown; preserve package.'}
+            Settle-M4InstallOwner $installOwners[$package]
             $v=Adb 'attempted-owner-package-inventory' @('shell','pm','list','packages','--user','0',$package)
             $actual=@($v.Lines|Where-Object{$_.Trim()})
             if(@($actual|Where-Object{$_ -cnotmatch '^package:[A-Za-z0-9_.]+$'}).Count -ne 0){throw 'Attempted package inventory is ambiguous.'}
@@ -799,6 +1024,7 @@ try {
             $v=Adb 'confirm-attempted-owner-package-absence' @('shell','pm','list','packages','--user','0',$package)
             $actual=@($v.Lines|Where-Object{$_.Trim()})
             if(@($actual|Where-Object{$_ -cnotmatch '^package:[A-Za-z0-9_.]+$'}).Count -ne 0 -or @($actual|Where-Object{$_ -ceq ('package:'+$package)}).Count -ne 0){throw 'Attempted user0 package absence unconfirmed; cleanup Pending.'}
+                    $installOwners[$package].cleanup_pending=$false;Save-M4InstallOwner $installOwners[$package] 'package-absence-confirmed'
         }catch{$packageClean=$false}
     }}
     if($allClean){foreach($entry in $children){$entry.Process.Dispose();$entry.Job.Dispose()};foreach($pin in $pins){$pin.Dispose()}}
@@ -807,7 +1033,7 @@ try {
         # until this centrally owned runner itself is actually retired.
         $global:VwRemoteIntegrationPendingOwners=@($children.ToArray(),$pins.ToArray())
     }
-    if($created -and $allClean -and $receiverEvidenceRetained){try{
+    if($created -and $allClean -and $packageClean -and $receiverEvidenceRetained){try{
         $resolved=[IO.Path]::GetFullPath($owned)
         if([IO.Path]::GetDirectoryName($resolved) -cne $temporaryParent -or [IO.Path]::GetFileName($resolved) -cne ('VisualWorkbench-remote-integration-'+$runId)){throw 'Private work containment refused.'}
         Assert-Plain $resolved
@@ -819,6 +1045,7 @@ try {
     $receipt.stream_counter_maxima=$streamCounters
     $receipt.diagnostic_records=@($diagnostics);$receipt.diagnostic_total=$diagnosticTotal;$receipt.diagnostic_dropped=$diagnosticDropped
     $receipt.phone_retirement_phase_seen=$phoneRetired
+    $receipt.device_installer_owners=@($installOwners.Values);$receipt.device_installer_pending=@($installOwners.Values|Where-Object{$_.cleanup_pending}).Count -gt 0
     $receipt.process_cleanup=$allClean;$receipt.owned_packages_cleanup=$packageClean
     if($passed -and $allClean -and $packageClean -and $receipt.private_work_disposed){$receipt.status='passed';$receipt.failure_phase=$null}
     $destination=Join-Path $projectRoot ('.local/remote-normal-integration-'+$runId+'.json')
