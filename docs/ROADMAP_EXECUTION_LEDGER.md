@@ -597,3 +597,14 @@ software scope, with no numeric provenance or general secret-redaction claim.
 Exact source/JUnit/log receipts are in evidence/DIAGNOSTICS_PRIVACY_COMPOSED_20261018.json.
 No native/API/binding or other caller change; hardware/export-runtime gates remain
 separate. Root lineage88946ba/8bf738a still awaits independent source review.
+
+## Root archive privacy prerequisite prepared independently
+
+Source `58508058555b51f0c5e8f73d597fd4b861729b0f` strips the exact future verification private prefix from the
+owned SQLite export copy before VACUUM and validates existing schema before scrub
+to reject note-redirecting triggers. All15 archive and11 local-view tests pass,
+including three new source-retention/privacy/failure cases; strict all-target
+store Clippy passes. No native worker/lineage activation or other granted source
+edit. New root code awaits review. See VERIFICATION_ARCHIVE_PRIVACY_20261018.md
+and its receipt/excerpts. Both complete platform caller candidates are fetched
+only pending admission for a coherent next batch. Main remains reviewed074b6c6.
