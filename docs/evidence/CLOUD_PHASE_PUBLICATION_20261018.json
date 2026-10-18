@@ -1,0 +1,58 @@
+{
+  "operation": "Authorized independent source-checkpoint publication; no task/product gate completion",
+  "candidate": "e33242ad2f1aecff88fe37f1628106673fd2dd04",
+  "implementation_tested_at": "6dcdcdfde4acdba76c710c16187e19d3f4489d4a",
+  "fresh_remote_main": "67b0af376612f999a0ea2543ad99a98fddd69b22",
+  "main_is_ancestor": true,
+  "candidate_changed_files": 98,
+  "policy": {
+    "authority": "Current parent/owner instruction authorizes assessing and normally publishing this coherent independent source phase. docs/IMPLEMENTATION_PLAN.md Automatic phase publishing permits validated dependency integration and records external gaps separately.",
+    "completion_scope": "The Definition of done requires test-all, lint-all and license-check for task completion. No task/numbered-phase/product gate is declared complete here; the broader completion checks remain open.",
+    "windows_scope": "docs/M4_KP_CHECKPOINT.md requires affected Windows outputs/build checks for the next editor delivery. No Windows delivery binary or package is published in this source checkpoint; Windows build/runtime acceptance remains pending.",
+    "no_workflow_changes": "Fresh main and candidate have no tracked .github workflow; this publication adds none. No paid Actions or external deployment is requested.",
+    "github_rule_visibility": "GitHub REST branch/protection/rule reads returned Forbidden. Normal Git push is used without force, administrator override or branch-rule changes; any server rejection must remain a blocker."
+  },
+  "review_disposition": [
+    {
+      "scope": "document engines",
+      "commit": "3d2839de8cfdecf1e0afeab5e93b67a268004c2b",
+      "result": "Parent reports independent Astra acceptance in restricted module scope; marker/pattern and quoted-URL findings resolved."
+    },
+    {
+      "scope": "image engines",
+      "commit": "d406b755effd90da7a748a1fb84a1fa862f753af",
+      "result": "Parent reports independent Astra acceptance in restricted module scope; TIFF bit-order/color and viewport generation/requeue findings resolved."
+    },
+    {
+      "scope": "diagnostics module and Desktop callers",
+      "commit": "aaa1014c8f91f3f86fc326cbc8e2f2430a17f13d",
+      "result": "Parent reports independent Astra acceptance of c219e33 modules and exact 6e8649a..aaa1014 Desktop delta."
+    },
+    {
+      "scope": "Android diagnostics outcome settlement",
+      "commit": "74ed9e5ac7fbe1f2b9543c076511a138649b954f",
+      "integrated_as": "b19a81fe5b49f45035d1a664a22be5234fae0e4c",
+      "result": "Parent reports Astra recheck closed the sole diagnostics cancellation finding; actual app-unit regression suite passes 13 cases in combined run."
+    }
+  ],
+  "checks": {
+    "combined": "docs/evidence/CLOUD_COMBINED_VALIDATION_20261018.json; all commands terminal exit 0",
+    "secret_scan": "gitleaks git --log-opts origin/main..HEAD --redact --no-banner .: 21 commits, approximately one megabyte scanned, zero leaks",
+    "offline_setup_policy": "tools/check_setup.py all passed again before publication",
+    "npm_lock_license_policy": "tools/check_npm_licenses.py passed: 20 admitted packages; no installed-payload or Node-runtime claim from this lock-only invocation",
+    "plan_coverage": "189 requirements, 66 tasks and 26 prompt files passed; requirement statuses unchanged"
+  },
+  "preserved": {
+    "picker": "Separately owned unbuilt local Main picker repair; no local files/worktrees touched. Compose its route/ownership fixes with the published diagnostics delta before its build.",
+    "precision": "1d0f2fd4030272db0acb29a47a4d18d1a1fea79e remains staged on cloud/precision-r2-20261018, excluded from this candidate.",
+    "recovery": "Exact original recovery base 0d91b705 and later precision archive 4733951 remain preserved; no archive tree was merged into active build roots.",
+    "old_worktrees": "No removal, reset or private-backup deletion performed"
+  },
+  "pending": [
+    "Full task/phase test-all and lint-all completion receipts",
+    "Affected Windows build/package and native provider/runtime/chooser checks",
+    "Verified PDFium/qpdf and OS decoder runtime artifacts/licenses and actual acceptance",
+    "Document/image native registration, storage/facade and usable app caller flows",
+    "Device/physical S Pen/latency/owner gates; Krita remains deferred"
+  ]
+}
