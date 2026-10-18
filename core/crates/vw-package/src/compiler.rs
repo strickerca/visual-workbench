@@ -202,6 +202,15 @@ pub fn compile(
         }
     };
     let asset = AssetId::try_from(definition.primary_asset_id.clone())?;
+    // D remains the immutable source authority. The current portable mapping
+    // has only a rectangle and uniform scale; it cannot truthfully express a
+    // crop/quarter-turn/independent-axis resize. Refuse before decoding until
+    // the coordinator admits the explicit output-provenance contract and the
+    // canonical output compositor is connected to this compiler.
+    if let Some(output) = input.project.active_image_output(input.document)? {
+        geometry::admit_output_instructions(output.crop(), &instructions)?;
+        return Err(Error::Unsupported("package image output provenance"));
+    }
     let original = input.originals.get(&asset).ok_or(Error::Original)?;
     let source = vw_raster::decode(
         original,
