@@ -25,7 +25,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@Composable internal fun RemoteEditPanel(remote:WorkbenchRemoteEdit,onDismiss:()->Unit) {
+@Composable internal fun RemoteEditPanel(remote:WorkbenchRemoteEdit,onDismiss:()->Unit,
+    airActions: @Composable (com.visualworkbench.shared.RemoteEditorPalette, Boolean) -> Unit = { _, _ -> }) {
     val ownerScope=rememberCoroutineScope()
     val controller=remember(remote){RemoteEditController(remote,ownerScope)}
     val state by remote.state.collectAsState();val display by controller.display.collectAsState();val echo by controller.echo.collectAsState()
@@ -83,6 +84,7 @@ import kotlinx.coroutines.withContext
                 Text("Validated render callbacks: ${echo.observed}; missing: ${echo.missing}; pending: ${echo.pending}. Callback p95: ${echo.p95Nanos?.let{it/1_000_000L}?:"—"} ms. Editor completion and photons are unmeasured.",Modifier.padding(8.dp),style=MaterialTheme.typography.caption)
             }
             RemoteEditorPalettePanel(controller.palette)
+            airActions(controller.palette, closing || commandBusy)
         }}
     }
 }

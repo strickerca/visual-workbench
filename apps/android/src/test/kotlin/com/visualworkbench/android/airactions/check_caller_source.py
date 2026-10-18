@@ -87,7 +87,7 @@ def run():
     untracked = subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard"], cwd=ROOT, text=True).splitlines()
     paths = sorted(set(changed + untracked))
     exact = {KOTLIN + path for path in ["MainActivity.kt", "editor/EditorController.kt", "editor/CanvasSurface.kt",
-                                      "editor/EditorPreferences.kt", "ui/WorkbenchApp.kt"]}
+                                      "editor/EditorPreferences.kt", "ui/WorkbenchApp.kt", "remote/RemoteEditPanel.kt"]}
     exact |= {MAIN + "AndroidManifest.xml", MAIN + "res/xml/workbench_air_actions.xml", MAIN + "res/xml/air_actions.xml",
               "docs/T5_04_AIR_ACTIONS_HANDOFF_20261018.md"}
     prefixes = [KOTLIN + "airactions/", "apps/android/src/test/kotlin/com/visualworkbench/android/airactions/"]
@@ -131,6 +131,19 @@ def run():
         actual_body = body(controller, name)
         lines = [line for line in actual_body.splitlines() if not line.strip().startswith("interruptAirInput(")]
         check("retirement logic preserved " + name, "\n".join(lines) == body(frozen, name))
+    panel_path = KOTLIN + "remote/RemoteEditPanel.kt"
+    panel = (ROOT / panel_path).read_text()
+    panel_body = body(panel, "RemoteEditPanel")
+    slot = "            airActions(controller.palette, closing || commandBusy)"
+    check("exact existing palette passed once from inside remote Dialog", panel_body.count(slot) == 1 and panel_body.index(slot) > panel_body.index("Dialog("))
+    check("remote input/lifecycle/retirement body preserved", "\n".join(line for line in panel_body.splitlines() if line != slot) == body(previous(panel_path), "RemoteEditPanel"))
+    helper = (ROOT / (KOTLIN + "airactions/AirActionDialogControls.kt")).read_text()
+    check("Dialog receives full KeyEvent before original fallback", "editor.airRemoteKey(remote, palette, event) || previous.dispatchKeyEvent(event)" in helper)
+    check("Dialog callback restores only its owned slot", "if (window.callback === callback) window.callback = previous" in helper)
+    check("Dialog never constructs another remote controller or palette", "RemoteEditController(" not in helper and "RemoteEditorPalette(" not in helper)
+    app = (ROOT / (KOTLIN + "ui/WorkbenchApp.kt")).read_text()
+    check("actual WorkbenchApp remote caller supplies hook", "airActions = { palette, blocked -> AirActionDialogControls(editor, remote, palette, blocked) }" in app)
+    check("retired Dialog callback cannot dispatch into replacement palette", "airRemoteOwner === remote && airRemotePalette === palette && airKey(event)" in controller)
     check("Air command awaits native mutation without launching detached work", "scope.launch" not in body(controller, "executeAirCommand"))
     check("Air command reuses UI native commit", "commitUndoRedo(" in body(controller, "executeAirCommand") and "commitUndoRedo(" in body(controller, "undoRedo"))
     canvas = (ROOT / (KOTLIN + "editor/CanvasSurface.kt")).read_text()
@@ -140,7 +153,7 @@ def run():
 
     result = {"status": "source/ownership audit passed", "base": BASE, "checks": len(checks),
               "changed_source_sha256": {path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest() for path in paths},
-              "limits": ["No Kotlin/Gradle/compiler execution", "New JUnit regressions unrun", "No Android runtime/device/BLE/S23/A09 acceptance"]}
+              "limits": ["Source audit only; not Kotlin type checking", "Caller JUnit regressions are not run by this audit", "No Android runtime/device/BLE/S23/A09 acceptance"]}
     print(json.dumps(result, indent=2))
 
 

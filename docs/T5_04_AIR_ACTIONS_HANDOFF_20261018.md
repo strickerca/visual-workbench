@@ -1,15 +1,15 @@
 # T5.04 Android caller handoff — 2026-10-18
 
-**Disposition:** local Android caller candidate wired in source; uncompiled and
-unaccepted. No installed-app or physical user outcome is claimed. Remote Dialog
-activation is held for one missing path grant, with its exact patch prepared.
-Krita, device activity and paid services remain deferred.
+**Disposition:** Android local and remote caller candidate wired in source; full
+caller compilation and acceptance remain pending. No installed-app or physical
+user outcome is claimed. The extra remote Dialog grant is resolved. Krita, device
+activity and paid services remain deferred.
 
 ## Source and ownership
 
 Frozen caller base: `f661eca9d2f6d6d6ebe4fc31ed2d0a5c6ec095e0`, fetched by full
-SHA before creating `codex/t5-04-air-actions-callers`. Exact grant A is
-[`CALLER_PARALLEL_GRANTS_20261018.md` at 30b7761](https://github.com/strickerca/visual-workbench/blob/30b77615fe0ce79b2b1a044a0704ae2c7d186c14/docs/CALLER_PARALLEL_GRANTS_20261018.md).
+SHA before creating `codex/t5-04-air-actions-callers`. Exact grant A, including its additional RemoteEditPanel path, is
+[`CALLER_PARALLEL_GRANTS_20261018.md` at 074b6c6](https://github.com/strickerca/visual-workbench/blob/074b6c603f68f19e137b7d5c0ee0a60f88c8e855/docs/CALLER_PARALLEL_GRANTS_20261018.md).
 Read its full paths/interfaces, AGENTS, current Android callers and accepted
 shared interfaces before editing. There are no repository `.agents/skills`.
 
@@ -21,6 +21,7 @@ apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController
 apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt
 apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorPreferences.kt
 apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
+apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditPanel.kt
 apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionKeys.kt
 apps/android/src/main/AndroidManifest.xml
 ```
@@ -78,28 +79,25 @@ router SHA-256 remains
 - MainActivity has exactly one REMOTE_ACTION registration, pointing at the
   accepted eight-key declaration. The manifest permission set is unchanged.
 
-## Remote hook scope blocker
+## Remote Dialog composition
 
-Grant A omits `apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditPanel.kt`.
-That existing file owns both the separate Dialog Window and its exact
-RemoteEditController.palette. Its Window does not use Activity.dispatchKeyEvent.
-An async scope question is pending; this file remains untouched.
+The coordinator's explicit extra grant at `074b6c6` resolves the earlier path
+blocker. Applied the exact prepared patch: RemoteEditPanel adds one defaulted
+composable slot inside its existing Dialog and passes its exact
+RemoteEditController.palette plus closing/command-busy state. WorkbenchApp wires
+that slot to AirActionDialogControls. Its prior input, lifecycle and retirement
+body is byte-for-byte preserved after removing this one slot call. No new remote
+controller or palette is created, and no existing native owner is replaced.
 
-The prepared, unapplied patch is:
-`/tmp/vw-air-actions-remote-dialog-hook/remote-dialog-hook.patch`.
-`git apply --check` passes against this candidate. It adds one defaulted composable
-slot to RemoteEditPanel and passes the existing palette plus closing/command-busy
-state from inside its Dialog; WorkbenchApp connects that slot to the owned
-AirActionDialogControls. No RemoteEditController edit or replacement is needed.
-
-AirActionDialogControls is implemented as an inactive leaf pending that hook.
-It borrows/restores the real Dialog Window.Callback before fallback, fences its
-focus and callback owner, and borrows the exact existing palette. Only verified
-Paint Undo/Redo map remotely; there is no local undo fallback, generic key
-injection, new grant, guessed fit/restore or new tool order. Its serial command
-waits for the palette's actual busy interval to end. Six unsupported remote
-commands remain disabled. Until the slot is admitted/applied, **all remote Air
-Actions remain unavailable**, without affecting the existing remote controls.
+AirActionDialogControls borrows/restores the real Dialog Window.Callback before
+fallback, fences focus and the exact callback/palette owner, and exposes the
+same guarded visible controls. A retired Dialog callback cannot dispatch into a
+replacement palette. Only verified Paint Undo/Redo map remotely; there is no local
+undo fallback, generic key injection, new grant, guessed fit/restore or new tool
+order. Its serial command waits for the palette's actual busy interval to end.
+Six unsupported remote commands remain disabled. The former unapplied patch is
+preserved at `/tmp/vw-air-actions-remote-dialog-hook/remote-dialog-hook.patch` as
+historical preparation evidence; it is now composed in this candidate.
 
 ## Executed evidence and remaining gates
 
@@ -113,25 +111,31 @@ The audit passes lexical delimiter, exclusive-path, unchanged-permission,
 one-Activity registration, barrel-order, shared-commit and exact frozen-method
 checks. It confirms preserved giant renderer, document observers, camera/share
 operations and retirement logic; it is not a Kotlin type checker or Android test.
-Source-hash receipts are retained at `/tmp/vw-air-actions-callers-source-r4.json`
-and subsequent final receipts. Whitespace checks pass.
+The final audit passes **91 distinct source/ownership checks**; source-hash
+receipts are at `/tmp/vw-air-actions-remote-source-final.json`. Whitespace and
+staged-byte Gitleaks checks pass. These counts are static checks, not JUnit cases.
 
 Thirteen new JUnit caller regressions are written for legacy preference migration,
 disabled/remapped values, malformed/unknown command refusal, unrelated preference
 preservation, exact camera restore, stale project/document/page/viewport/navigation
 refusal, barrel correlation across ordinary/full interruption and the closed
 remote mapping. **These thirteen tests have not been compiled or executed.**
-The prior 37 accepted leaf scenarios and their original receipts
-remain historical evidence, not a rerun of this caller candidate.
+The first local candidate used source-only validation while the image lane held
+the build slot. After the coordinator reported the slot free, the existing
+bounded leaf checker was rerun: **37/37 host scenarios pass**, strict explicit-API
+shared leaf compilation passes, the current native-Android key adapter/settings
+panel compiles against API 37, and the two declarative resources compile/link.
+This uses cached Kotlin 2.4.0, coroutines 1.9.0, JVM 21 and AAPT2 36.1.0, with
+warnings denied; it is not whole shared/app compilation. Exact commands, source
+hashes and results are in `/tmp/vw-air-actions-callers-leaf-recheck/receipt.json`.
+Temporary compiler/resource artifacts were disposed. No Gradle, native build,
+installation, provider or device activity ran. Existing `/tmp/vw-air-actions-*`
+receipts and preparation drafts remain preserved.
 
-The image lane holds the heavy slot. Grant restrictions prohibit compiler/build
-processes while it is occupied; no Kotlin, Gradle, native build, AAPT2 or device
-process ran for this caller slice. Preserve the existing `/tmp/vw-air-actions-*`
-leaf success/failure receipts; no drafts or unrelated worktrees were removed.
-
-Next: obtain the one-file remote slot grant, apply/review its prepared patch,
-then Astra reviews the complete caller candidate before any main merge. With the
-serialized slot, run the repository-pinned Android/shared compilation and focused
-JUnit checks, then actual UI/lifecycle/recreation/modal and native completion
-checks. Runtime capability/interference detection, S23 stylus/Bluetooth/barrel/Air
-Actions, A09 and all physical/performance/product gates remain unverified.
+Next: Astra reviews this complete caller source candidate before any main merge.
+The coordinator owns combined repository-pinned Android/shared compilation and
+execution of the thirteen new JUnit checks, followed by actual UI/lifecycle/
+recreation/modal and native completion checks. The new Compose Dialog/caller code
+has not been compiled in this lane. Runtime capability/interference detection,
+S23 stylus/Bluetooth/barrel/Air Actions, A09 and all physical/performance/product
+gates remain unverified.
