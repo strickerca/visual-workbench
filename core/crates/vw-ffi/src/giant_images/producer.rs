@@ -8,6 +8,7 @@ mod android_bridge;
 mod cache;
 mod cleanup;
 mod input;
+mod picked;
 mod publish;
 #[cfg(windows)]
 mod windows;
@@ -21,6 +22,11 @@ use std::sync::{
 use vw_stream::SessionBudget;
 
 pub(crate) use input::{GiantInputLimits, GiantSourceInfo, RootOwnedPickedOriginal};
+#[allow(
+    unused_imports,
+    reason = "Private pre-open admission awaits the root public owned-input callers"
+)]
+pub(crate) use picked::{PendingInputAdmission, PickedOriginal, reserve_picked_input};
 pub(crate) use publish::{GiantPublishOptions, PublishedProject};
 #[cfg(windows)]
 #[allow(
