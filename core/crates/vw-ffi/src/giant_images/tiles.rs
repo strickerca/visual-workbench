@@ -14,6 +14,9 @@ use vw_stream::{MemoryCharge, MemoryKind, SessionBudget};
 // prevent any Android decode beside the required 96 MiB rendering surface.
 pub(super) const STORE_RESIDENT: u64 = 64 * 1024 * 1024;
 pub(super) const STORE_WORKSPACE: u64 = 64 * 1024 * 1024;
+// Requires DiskCache::get_bounded_streaming's fixed-buffer persistence contract.
+// Constructor and cache mutations retain the full STORE_WORKSPACE envelope.
+pub(super) const STORE_READ_WORKSPACE: u64 = 1024 * 1024;
 pub(super) const MANIFEST_WORKSPACE: u64 = 24 * 1024 * 1024;
 pub(super) const DECODE_WORKSPACE: u64 = 32 * 1024 * 1024;
 pub(super) const TILE_RGBA_BYTES: u64 = 256 * 256 * 4;
@@ -47,9 +50,9 @@ fn read_manifest<Q: vw_store::FreeSpaceQuery>(
     cancel.check().map_err(Error::from)?;
     let charge = reserve(budget, MemoryKind::Transfer, MANIFEST_WORKSPACE)?;
     let raw = {
-        let _index = reserve(budget, MemoryKind::CodecWorkspace, STORE_WORKSPACE)?;
+        let _index = reserve(budget, MemoryKind::CodecWorkspace, STORE_READ_WORKSPACE)?;
         cache
-            .get_bounded(&manifest_key(source), MAX_MANIFEST_BYTES as u64)
+            .get_bounded_streaming(&manifest_key(source), MAX_MANIFEST_BYTES as u64)
             .map_err(store_error)?
             .ok_or(Error::Missing)?
     };
@@ -107,9 +110,9 @@ impl CachedTile {
         // DiskCache reserves one sentinel byte in addition to the declared size.
         let encoded_charge = reserve(budget, MemoryKind::EncodedTiles, len + 1)?;
         let encoded = {
-            let _index = reserve(budget, MemoryKind::CodecWorkspace, STORE_WORKSPACE)?;
+            let _index = reserve(budget, MemoryKind::CodecWorkspace, STORE_READ_WORKSPACE)?;
             cache
-                .get_bounded(&tile_key(manifest.source(), key), len)
+                .get_bounded_streaming(&tile_key(manifest.source(), key), len)
                 .map_err(store_error)?
                 .ok_or(Error::Missing)?
         };
