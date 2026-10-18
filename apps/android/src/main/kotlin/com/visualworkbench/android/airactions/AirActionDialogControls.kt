@@ -2,10 +2,12 @@ package com.visualworkbench.android.airactions
 
 import android.view.KeyEvent
 import android.view.Window
+import android.view.MotionEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
 import com.visualworkbench.android.editor.EditorController
@@ -20,30 +22,37 @@ internal fun AirActionDialogControls(editor: EditorController, remote: Workbench
     palette: RemoteEditorPalette, blocked: Boolean) {
     val view = LocalView.current
     val window = (view.parent as? DialogWindowProvider)?.window
+    val registration = remember(editor, remote, palette, window) { Any() }
     val latestBlocked = rememberUpdatedState(blocked)
     DisposableEffect(editor, remote, palette, window) {
         val previous = window?.callback
         if (window == null || previous == null) onDispose { }
         else {
-            editor.attachAirRemotePalette(remote, palette)
+            editor.attachAirRemotePalette(remote, palette, registration)
             val callback = object : Window.Callback by previous {
                 override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-                    if (latestBlocked.value) editor.airRemoteFocus(remote, palette, false)
-                    return editor.airRemoteKey(remote, palette, event) || previous.dispatchKeyEvent(event)
+                    if (latestBlocked.value) editor.airRemoteFocus(remote, palette, registration, false)
+                    return editor.airRemoteKey(remote, palette, registration, event) || previous.dispatchKeyEvent(event)
                 }
+                override fun dispatchTouchEvent(event: MotionEvent): Boolean = observeAirRemoteMotionBeforeForward(event,
+                    { editor.observeAirRemoteMotion(remote, palette, registration, it) },
+                    { editor.airRemoteMotionFailed(remote, palette, registration) }, previous::dispatchTouchEvent)
+                override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean = observeAirRemoteMotionBeforeForward(event,
+                    { editor.observeAirRemoteMotion(remote, palette, registration, it) },
+                    { editor.airRemoteMotionFailed(remote, palette, registration) }, previous::dispatchGenericMotionEvent)
                 override fun onWindowFocusChanged(hasFocus: Boolean) {
-                    editor.airRemoteFocus(remote, palette, hasFocus && !latestBlocked.value)
+                    editor.airRemoteFocus(remote, palette, registration, hasFocus && !latestBlocked.value)
                     previous.onWindowFocusChanged(hasFocus)
                 }
             }
             window.callback = callback
-            editor.airRemoteFocus(remote, palette, window.decorView.hasWindowFocus() && !latestBlocked.value)
+            editor.airRemoteFocus(remote, palette, registration, window.decorView.hasWindowFocus() && !latestBlocked.value)
             onDispose {
                 if (window.callback === callback) window.callback = previous
-                editor.detachAirRemotePalette(remote, palette)
+                editor.detachAirRemotePalette(remote, palette, registration)
             }
         }
     }
-    SideEffect { editor.airRemoteFocus(remote, palette, window?.decorView?.hasWindowFocus() == true && !blocked) }
+    SideEffect { editor.airRemoteFocus(remote, palette, registration, window?.decorView?.hasWindowFocus() == true && !blocked) }
     AirActionControls(editor)
 }
