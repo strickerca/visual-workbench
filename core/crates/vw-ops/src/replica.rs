@@ -7,6 +7,21 @@ use std::collections::{BTreeMap, BTreeSet};
 use vw_model::{DeviceId, Id, Project};
 use vw_proto::{Message, v1};
 
+// SYNC-002 requires recovery of 5,000 offline transactions. Keep the queue
+// finite independently of the existing 4,096-operation per-transaction bound.
+const MAX_PENDING_TRANSACTIONS: usize = 5_000;
+// Match the durable store's 64 MiB encoded-record ceiling, and also bound the
+// combined retained outbox and raw batch input before payload allocations.
+// This is a wire-payload bound, not a replacement for caller workspace budgets.
+const MAX_PENDING_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
+
+fn admit_payload_bytes(total: usize, transaction: &v1::Transaction) -> Result<usize, OpsError> {
+    total
+        .checked_add(transaction.encoded_len())
+        .filter(|bytes| *bytes <= MAX_PENDING_PAYLOAD_BYTES)
+        .ok_or(OpsError::Invalid("pending payload bounds"))
+}
+
 /// Pending work remains available after rebase rejection; it is never silently
 /// discarded because an object was removed or a layer became locked remotely.
 #[derive(Debug, Clone)]
@@ -78,47 +93,98 @@ impl Replica {
     /// conflict semantics; failed optimistic replays remain visibly blocked.
     /// This is recovery, not admission of a newly authored stale-base edit.
     pub fn queue_recovered(&mut self, transaction: v1::Transaction) -> Result<(), OpsError> {
-        if transaction.device_id != self.device.as_str() {
-            return Err(OpsError::DeviceMismatch);
-        }
-        if Id::from_proto(transaction.project_id.as_ref())? != self.authoritative.id {
-            return Err(OpsError::Invalid("project identity"));
-        }
-        let base = transaction
-            .base_revision
-            .as_ref()
-            .ok_or(OpsError::RevisionMismatch)?;
-        if base.host_seq > self.revision.host_seq
-            || base.state_hash.len() != 32
-            || (base.host_seq == self.revision.host_seq && base != &self.revision)
-        {
-            return Err(OpsError::RevisionMismatch);
-        }
-        let id = Id::from_proto(transaction.txn_id.as_ref())?;
-        if let Some(old) = self
-            .pending
-            .iter()
-            .find(|p| p.transaction.txn_id == transaction.txn_id)
-        {
-            return if old.transaction.encode_to_vec() == transaction.encode_to_vec() {
-                Ok(())
-            } else {
-                Err(OpsError::IdCollision)
-            };
-        }
-        if self.authoritative_inverses.contains_key(&id) {
-            return Err(OpsError::IdCollision);
-        }
-        if self.pending.len() >= 4096 || transaction.ops.is_empty() || transaction.ops.len() > 4096
-        {
+        self.queue_recovered_batch(vec![transaction])
+    }
+    /// Restore one bounded durable outbox in its original order. Validate the
+    /// whole input before cloning/replaying the queue, then publish once. Exact
+    /// duplicate identities are no-ops; any invalid/colliding item leaves all
+    /// visible, pending and inverse state unchanged. A failed optimistic edit
+    /// stays in the queue with its normal blocked reason, rather than failing
+    /// recovery or being silently discarded. Both the raw input batch and the
+    /// combined unique retained queue must fit 64 MiB of encoded transactions.
+    /// Refusal leaves the original durable source owned by the caller untouched.
+    pub fn queue_recovered_batch(
+        &mut self,
+        transactions: Vec<v1::Transaction>,
+    ) -> Result<(), OpsError> {
+        if transactions.len() > MAX_PENDING_TRANSACTIONS {
             return Err(OpsError::Invalid("pending queue bounds"));
         }
-        validate_transaction(&transaction)?;
+        // encoded_len borrows payloads; reject oversized input before even
+        // duplicate equality allocates encodings. Count duplicate input bytes as
+        // work, but only unique new transactions against the retained queue.
+        transactions.iter().try_fold(0, admit_payload_bytes)?;
+        if transactions.is_empty() {
+            return Ok(());
+        }
+        let mut retained_bytes = self.pending.iter().try_fold(0, |bytes, pending| {
+            admit_payload_bytes(bytes, &pending.transaction)
+        })?;
+        // This bounded identity index borrows input; it does not clone payloads
+        // or grow the retained queue before every item has been admitted.
+        let mut identities = BTreeMap::new();
+        for pending in &self.pending {
+            identities.insert(
+                Id::from_proto(pending.transaction.txn_id.as_ref())?,
+                &pending.transaction,
+            );
+        }
+        let mut admitted = Vec::new();
+        for (index, transaction) in transactions.iter().enumerate() {
+            if transaction.device_id != self.device.as_str() {
+                return Err(OpsError::DeviceMismatch);
+            }
+            if Id::from_proto(transaction.project_id.as_ref())? != self.authoritative.id {
+                return Err(OpsError::Invalid("project identity"));
+            }
+            let base = transaction
+                .base_revision
+                .as_ref()
+                .ok_or(OpsError::RevisionMismatch)?;
+            if base.host_seq > self.revision.host_seq
+                || base.state_hash.len() != 32
+                || (base.host_seq == self.revision.host_seq && base != &self.revision)
+            {
+                return Err(OpsError::RevisionMismatch);
+            }
+            let id = Id::from_proto(transaction.txn_id.as_ref())?;
+            if let Some(previous) = identities.get(&id) {
+                if previous.encode_to_vec() != transaction.encode_to_vec() {
+                    return Err(OpsError::IdCollision);
+                }
+                continue;
+            }
+            if self.authoritative_inverses.contains_key(&id) {
+                return Err(OpsError::IdCollision);
+            }
+            if identities.len() >= MAX_PENDING_TRANSACTIONS
+                || transaction.ops.is_empty()
+                || transaction.ops.len() > 4096
+            {
+                return Err(OpsError::Invalid("pending queue bounds"));
+            }
+            retained_bytes = admit_payload_bytes(retained_bytes, transaction)?;
+            validate_transaction(transaction)?;
+            identities.insert(id, transaction);
+            admitted.push(index);
+        }
+        drop(identities);
+        if admitted.is_empty() {
+            return Ok(());
+        }
         let mut pending = self.pending.clone();
-        pending.push(PendingTransaction {
-            transaction,
-            blocked_reason: None,
-        });
+        pending.reserve(admitted.len());
+        let mut admitted = admitted.into_iter();
+        let mut next = admitted.next();
+        for (index, transaction) in transactions.into_iter().enumerate() {
+            if next == Some(index) {
+                pending.push(PendingTransaction {
+                    transaction,
+                    blocked_reason: None,
+                });
+                next = admitted.next();
+            }
+        }
         let (visible, inverses) = replay(
             &self.authoritative,
             &mut pending,
@@ -191,6 +257,7 @@ impl Replica {
         if Id::from_proto(transaction.project_id.as_ref())? != self.authoritative.id {
             return Err(OpsError::Invalid("project identity"));
         }
+        admit_payload_bytes(0, &transaction)?;
         let id = Id::from_proto(transaction.txn_id.as_ref())?;
         if let Some(existing) = self
             .pending
@@ -203,10 +270,17 @@ impl Replica {
                 Err(OpsError::IdCollision)
             };
         }
-        if self.pending.len() >= 4096 || transaction.ops.is_empty() || transaction.ops.len() > 4096
+        if self.pending.len() >= MAX_PENDING_TRANSACTIONS
+            || transaction.ops.is_empty()
+            || transaction.ops.len() > 4096
         {
             return Err(OpsError::Invalid("pending queue bounds"));
         }
+        self.pending
+            .iter()
+            .try_fold(transaction.encoded_len(), |bytes, pending| {
+                admit_payload_bytes(bytes, &pending.transaction)
+            })?;
         validate_transaction(&transaction)?;
         let project = optimistic(&self.visible, &transaction, &self.inverse_previews)?;
         let inverse = patch::between(&self.visible, &project)?
