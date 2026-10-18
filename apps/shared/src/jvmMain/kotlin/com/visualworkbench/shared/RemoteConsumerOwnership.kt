@@ -4,6 +4,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /** A bounded atomic admission/close fence. Pending consumers remain strongly
  * owned until their actual retirement returns success. */
@@ -23,6 +25,24 @@ internal suspend fun <T> ownRemoteTicket(ticket:ULong,discard:suspend(ULong)->Un
         withContext(NonCancellable){try{discard(ticket)}catch(cleanup:Throwable){error.addSuppressed(cleanup)}}
         throw error
     }
+}
+
+/** Receipt observation covers the command AND its authority refresh: two
+ * native Paint exchanges of at most 1 s, plus 500 ms transport/scheduling margin.
+ * This shared wait grants no additional provider, input or retirement lifetime. */
+internal const val REMOTE_COMMAND_RECEIPT_WAIT_NANOS:Long=2_500_000_000L
+internal suspend fun <T:Any> awaitRemoteCommandReceipt(
+    take:suspend()->T?,
+    nowNanos:()->Long=System::nanoTime,
+    waitForNextPoll:suspend()->Unit={delay(5)},
+):T? {
+    val started=nowNanos()
+    while(nowNanos()-started<REMOTE_COMMAND_RECEIPT_WAIT_NANOS){
+        currentCoroutineContext().ensureActive()
+        take()?.let{return it}
+        waitForNextPoll()
+    }
+    return null
 }
 
 /** A consumed/malformed receipt still owns the grant's retirement. Primary

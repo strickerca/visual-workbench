@@ -117,4 +117,28 @@ class RemoteConsumerOwnershipTest {
         catch(error:IllegalArgumentException){assertTrue(error.suppressed.isEmpty())}
         assertTrue(paused);assertTrue(retired)
     }
+
+    @Test fun command_receipt_wait_covers_injection_and_later_authority_refresh()=runBlocking {
+        var now=0L;var polls=0;val complete=Any()
+        val receipt=awaitRemoteCommandReceipt(take={polls++;if(now>=1_200_000_000L)complete else null},
+            nowNanos={now},waitForNextPoll={now+=300_000_000L})
+        assertSame(complete,receipt);assertEquals(5,polls);assertEquals(1_200_000_000L,now)
+    }
+    @Test fun absent_command_receipt_uses_one_deadline_and_retires_once()=runBlocking {
+        var now=0L;var polls=0;var retired=0
+        val receipt=ownRemoteCommandAttempt({awaitRemoteCommandReceipt<Any>(take={polls++;null},
+            nowNanos={now},waitForNextPoll={now+=250_000_000L})},{retired++})
+        assertNull(receipt);assertEquals(10,polls);assertEquals(2_500_000_000L,now);assertEquals(1,retired)
+    }
+    @Test fun cancelling_command_receipt_wait_still_awaits_actual_retirement()=runBlocking {
+        val waiting=CompletableDeferred<Unit>();val retiring=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>()
+        var polls=0
+        val operation=launch{ownRemoteCommandAttempt({awaitRemoteCommandReceipt<Any>(take={polls++;null},
+            waitForNextPoll={waiting.complete(Unit);awaitCancellation()})},{retiring.complete(Unit);release.await()})}
+        try{
+            withTimeout(3000){waiting.await()};operation.cancel();withTimeout(3000){retiring.await()}
+            assertFalse(operation.isCompleted);assertEquals(1,polls)
+            release.complete(Unit);withTimeout(3000){operation.join()};assertTrue(operation.isCancelled)
+        }finally{release.complete(Unit);operation.cancelAndJoin()}
+    }
 }

@@ -38,7 +38,16 @@ public interface SessionDiscovery {
 }
 public enum class TetherRouteRisk { Preferred, Tied, OnlyDefault }
 public data class TetherRouteWarning(public val family: String, public val interfaceIndex: UInt, public val risk: TetherRouteRisk, public val fixCommand: String?, public val revertCommand: String?)
-public data class LocalSessionAddress(public val address: String, public val interfaceIndex: UInt)
+/** Adapter text is presentation metadata, never a hostname or carrier proof. */
+public data class LocalSessionAddress(
+    public val address: String,
+    public val interfaceIndex: UInt,
+    public val interfaceName: String? = null,
+    public val loopback: Boolean = false,
+) {
+    /** Refresh descriptions without changing the explicitly selected route. */
+    public fun sameConnection(other: LocalSessionAddress): Boolean = address == other.address && interfaceIndex == other.interfaceIndex
+}
 /** Lists candidates only. The user selects the interface, port, and carrier. */
 public expect suspend fun localSessionAddresses(): List<LocalSessionAddress>
 public expect fun encodePairingQr(qr: ByteArray): String

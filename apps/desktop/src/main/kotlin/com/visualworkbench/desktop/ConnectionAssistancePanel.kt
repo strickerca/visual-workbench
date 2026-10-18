@@ -8,10 +8,8 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 internal fun ConnectionAssistancePanel(controller: ConnectionAssistanceController, selectedInterface: UInt?, chooseTool: () -> Unit,
-    useListener: (String) -> Unit) {
+    useListener: (String) -> Unit, phonePort: String, changePhonePort: (String) -> Unit, hostPort: String, changeHostPort: (String) -> Unit) {
     val state by controller.state.collectAsState()
-    var phonePort by remember { mutableStateOf("47191") }
-    var hostPort by remember { mutableStateOf("47191") }
     Text("Developer USB connection", style = MaterialTheme.typography.h6)
     Text("Choose your installed ADB tool and one device. Recovery uses the existing local server; it never starts or resets ADB, changes another mapping, or touches another device.", style = MaterialTheme.typography.body2)
     TextButton(onClick = chooseTool, enabled = !state.busy && !state.watching) { Text("Choose installed adb.exe…") }
@@ -24,9 +22,9 @@ internal fun ConnectionAssistancePanel(controller: ConnectionAssistanceControlle
         }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(phonePort, { phonePort = it.filter(Char::isDigit).take(5) }, label = { Text("Phone TCP port") }, singleLine = true,
+        OutlinedTextField(phonePort, { changePhonePort(it.filter(Char::isDigit).take(5)) }, label = { Text("Phone TCP port") }, singleLine = true,
             enabled = !state.busy && !state.watching, modifier = Modifier.weight(1f))
-        OutlinedTextField(hostPort, { hostPort = it.filter(Char::isDigit).take(5) }, label = { Text("PC TCP listener port") }, singleLine = true,
+        OutlinedTextField(hostPort, { changeHostPort(it.filter(Char::isDigit).take(5)) }, label = { Text("PC TCP listener port") }, singleLine = true,
             enabled = !state.busy && !state.watching, modifier = Modifier.weight(1f))
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

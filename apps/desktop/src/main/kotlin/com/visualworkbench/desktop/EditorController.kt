@@ -21,7 +21,8 @@ data class EditorState(val document:DocumentSnapshot?=null,val background:ImageB
     val exportCheck:ExportCheck?=null,val exportReceipt:CompletedExport?=null,val dragPrepared:Boolean=false,
     val sync:SessionStatus?=null,val peerFrame:PeerFrame?=null,val peerViewport:PeerViewport?=null,
     val routeWarnings:List<TetherRouteWarning> = emptyList(),val previewStyles:Map<String,ObjectStyle> = emptyMap(),
-    val wetStroke:RenderItem?=null,val shareViewport:Boolean=false,val sessionRole:ProjectSessionRole?=null) {
+    val wetStroke:RenderItem?=null,val shareViewport:Boolean=false,val sessionRole:ProjectSessionRole?=null,
+    val backgroundIssue:String?=null,val backgroundFailureKind:CoreFailureKind?=null) {
     val exportReady:Boolean get()=exportReceipt?.request?.matches(this)==true
 }
 private data class Drag(val start:Point,val initial:ViewState,val selected:List<RenderItem>,val bounds:Rect?,val resize:Boolean,val pan:Boolean,val binding:RenderBinding,val live:ObjectPreviewLease?=null,val newObject:NewObjectPreviewLease?=null,val tool:Tool=Tool.Select)
@@ -240,7 +241,28 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
             finally { if(instructionSeal&&!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
         }}
     }
-    private suspend fun loadBackground(){val p=project?:return;val doc=mutable.value.document?:return;try{val pixels=p.background(doc.documentId,256uL*1024uL*1024uL,assumeUntaggedSrgb=colorAssumed);val image=withContext(Dispatchers.Default){bitmap(pixels)};if(project===p)update{it.copy(background=image,needsColorConsent=false)}}catch(error:CoreFailure){update{it.copy(needsColorConsent=error.kind==CoreFailureKind.Raster&&!colorAssumed)};report("The original is saved unchanged. Full-resolution display needs a supported color profile and enough memory within 256 MiB. For untagged images, explicitly choose the sRGB assumption.")}}
+    private suspend fun loadBackground(){
+        val p=project?:return;val doc=mutable.value.document?:return;val epoch=generation;val assumed=colorAssumed
+        fun current()=!closing&&project===p&&generation==epoch&&mutable.value.document?.documentId==doc.documentId
+        if(!current())return
+        update{it.copy(backgroundIssue=null,backgroundFailureKind=null)}
+        try{
+            val pixels=p.background(doc.documentId,256uL*1024uL*1024uL,assumeUntaggedSrgb=assumed)
+            currentCoroutineContext().ensureActive()
+            val image=withContext(Dispatchers.Default){bitmap(pixels)}
+            currentCoroutineContext().ensureActive()
+            if(current())update{it.copy(background=image,needsColorConsent=false,backgroundIssue=null,backgroundFailureKind=null)}
+        }catch(cancel:CancellationException){throw cancel}
+        catch(error:CoreFailure){
+            currentCoroutineContext().ensureActive()
+            if(current())update{it.copy(needsColorConsent=error.kind==CoreFailureKind.Raster&&!assumed,
+                backgroundIssue=backgroundFailureMessage(error.kind),backgroundFailureKind=error.kind)}
+        }catch(_:Exception){
+            currentCoroutineContext().ensureActive()
+            if(current())update{it.copy(backgroundIssue="Image display could not finish. The project remains open; retry the image display.",backgroundFailureKind=null)}
+        }
+    }
+    fun retryBackground():Job?=task(generation){loadBackground()}
     fun assumeSrgb(){task(generation){colorAssumed=true;loadBackground()}}
     private fun validateDrawing(snapshot:DocumentSnapshot){if(snapshot.render.items.any{it.shape is Shape.Adjustment})throw UnsupportedOperationException("This document contains adjustment objects that the desktop canvas cannot display yet. Its original and saved edits are preserved.")}
     fun importImage(path:Path)=importFile(ImportRequest(generation,path.toAbsolutePath().normalize()))
@@ -510,6 +532,17 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     fun cancelTransfer(){transferJob?.cancel();report("Cancelling transfer; waiting for native work to release its files.")}
 }
 private fun <T> Set<T>.toggle(value:T):Set<T> = if(value in this)this-value else this+value
+private fun backgroundFailureMessage(kind:CoreFailureKind):String=when(kind){
+    CoreFailureKind.Invalid->"The image display request was refused as invalid. The project remains open."
+    CoreFailureKind.Backpressure->"Image display was refused by the work queue or fixed 256 MiB budget. Retry when current work finishes."
+    CoreFailureKind.Closed->"Image display could not finish because the project was closed. Reopen the saved project to retry."
+    CoreFailureKind.Cancelled->"Image display was cancelled. Retry when current work finishes."
+    CoreFailureKind.Storage->"Image display could not read project storage. Check the saved project and retry."
+    CoreFailureKind.Unsupported->"This original uses an image feature that cannot be displayed here."
+    CoreFailureKind.Worker->"Image display could not finish in its worker. Retry the image display."
+    CoreFailureKind.Stroke->"Image display could not finish because of a drawing failure. Retry the image display."
+    CoreFailureKind.Raster->"The original could not be displayed because of a source, color, decoding or image-processing failure. If the image is untagged, choose sRGB explicitly."
+}
 private fun bitmap(value:BackgroundImage):ImageBitmap {
     val width=value.width.toInt();val height=value.height.toInt();val image=BufferedImage(width,height,BufferedImage.TYPE_INT_ARGB);val row=IntArray(width)
     for(y in 0 until height){for(x in 0 until width){val i=(y*width+x)*4;row[x]=((value.rgba[i+3].toInt() and 255) shl 24) or ((value.rgba[i].toInt() and 255) shl 16) or ((value.rgba[i+1].toInt() and 255) shl 8) or (value.rgba[i+2].toInt() and 255)};image.setRGB(0,y,width,1,row,0,width)}

@@ -24,6 +24,8 @@ data class DesktopSessionState(
     val discovered: List<DiscoveredPeer> = emptyList(),
     val discovering: Boolean = false,
     val message: String? = null,
+    val labels: PeerLabelSnapshot? = null,
+    val labelSaving: Boolean = false,
 ) {
     override fun toString(): String = "DesktopSessionState(ready=$ready,pairing=$pairing)"
 }
@@ -37,6 +39,7 @@ class DesktopSessionController(
     private val installationDevice: String,
     private val factory: suspend (String) -> WorkbenchSessions = ::createDesktopSessions,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val labelStore: PeerLabelStore? = null,
 ) {
     private val lifetime = SupervisorJob(parent.coroutineContext[Job])
     private val scope = CoroutineScope(parent.coroutineContext + lifetime)
@@ -48,6 +51,7 @@ class DesktopSessionController(
     private var pairingJob: Job? = null
     private var trustJob: Job? = null
     private var discoveryJob: Job? = null
+    private var labelJob: Job? = null
     private var confirmationDecision: CompletableDeferred<Boolean>? = null
     private var confirmationText: String? = null
     private val initialized = scope.async {
@@ -78,6 +82,30 @@ class DesktopSessionController(
     }
 
     fun clearMessage() { mutable.value = mutable.value.copy(message = null) }
+
+    init {
+        labelStore?.let { store ->
+            labelJob = scope.launch {
+                val labels = withContext(Dispatchers.IO) { store.load() }
+                if (!closed) mutable.value = mutable.value.copy(labels = labels)
+            }
+        }
+    }
+
+    /** Local presentation only; exact current peer and certificate remain the
+     * selection/operation keys. Naming errors never change session readiness. */
+    fun renamePeer(deviceId: String, fingerprint: String, label: String) {
+        val store = labelStore ?: return
+        if (closed || labelJob?.isActive == true || mutable.value.paired.none {
+                it.deviceId == deviceId && it.fingerprint == fingerprint && it.revokedAtMs == null }) return
+        mutable.value = mutable.value.copy(labelSaving = true)
+        labelJob = scope.launch {
+            try {
+                val labels = withContext(Dispatchers.IO) { store.rename(deviceId, fingerprint, label) }
+                if (!closed) mutable.value = mutable.value.copy(labels = labels)
+            } finally { mutable.value = mutable.value.copy(labelSaving = false) }
+        }
+    }
 
     fun browse(localAddresses: List<String>) {
         if (closed || discoveryJob?.isActive == true) return
@@ -226,6 +254,7 @@ class DesktopSessionController(
             pairingJob?.cancelAndJoin()
             trustJob?.cancelAndJoin()
             discoveryJob?.cancelAndJoin()
+            labelJob?.cancelAndJoin()
             initialized.cancelAndJoin()
             try { service?.close() } finally {
                 service = null

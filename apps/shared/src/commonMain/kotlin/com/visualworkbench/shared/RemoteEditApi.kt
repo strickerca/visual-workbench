@@ -6,8 +6,23 @@ import kotlinx.coroutines.flow.StateFlow
 public data class RemotePhysicalRect(public val x:Int,public val y:Int,public val width:UInt,public val height:UInt)
 public data class RemoteVideoScope(public val connectionEpoch:ULong,public val captureSessionId:String,public val sourceGeneration:ULong,public val targetToken:String,public val geometryRevision:UInt)
 public data class RemoteTargetBinding(public val connectionEpoch:ULong,public val captureSessionId:String,public val sourceGeneration:ULong,public val targetToken:String,public val geometryRevision:UInt,public val inputSessionId:String)
-public data class RemoteCanvasFocusProof(public val provider:String,public val runtimeIdHash:String,public val processId:UInt,public val targetToken:String,public val geometryRevision:UInt,public val sampledQpc100ns:ULong,public val focusedClassName:String,public val focusedControlType:Int,public val canvasRectHost:RemotePhysicalRect,public val shortcutProfileDigest:String)
-public data class RemoteTargetState(public val binding:RemoteTargetBinding,public val identity:RemoteEditorIdentity,public val verifiedActions:Set<RemoteEditorAction>,public val focusProof:RemoteCanvasFocusProof?,public val grantActive:Boolean,public val pauseReason:String?,public val commandBusy:Boolean=false)
+/** Current native canvas identity; only RemoteCanvasFocusProof asserts keyboard
+ * focus. A selected observation cannot authorize an unverified action. */
+public sealed interface RemoteCanvasIdentityProof {
+    public val provider:String
+    public val runtimeIdHash:String
+    public val processId:UInt
+    public val targetToken:String
+    public val geometryRevision:UInt
+    public val sampledQpc100ns:ULong
+    public val canvasRectHost:RemotePhysicalRect
+    public val shortcutProfileDigest:String
+}
+public data class RemoteCanvasFocusProof(override val provider:String,override val runtimeIdHash:String,override val processId:UInt,override val targetToken:String,override val geometryRevision:UInt,override val sampledQpc100ns:ULong,public val focusedClassName:String,public val focusedControlType:Int,override val canvasRectHost:RemotePhysicalRect,override val shortcutProfileDigest:String):RemoteCanvasIdentityProof
+/** Essential toolbar/numeric commands revalidate their own destination and any
+ * required numeric focus before input. This observation does not assert focus. */
+public data class RemoteSelectedCanvasProof(override val provider:String,override val runtimeIdHash:String,override val processId:UInt,override val targetToken:String,override val geometryRevision:UInt,override val sampledQpc100ns:ULong,public val selectedClassName:String,public val selectedControlType:Int,override val canvasRectHost:RemotePhysicalRect,override val shortcutProfileDigest:String):RemoteCanvasIdentityProof
+public data class RemoteTargetState(public val binding:RemoteTargetBinding,public val identity:RemoteEditorIdentity,public val verifiedActions:Set<RemoteEditorAction>,public val focusProof:RemoteCanvasFocusProof?,public val grantActive:Boolean,public val pauseReason:String?,public val commandBusy:Boolean=false,public val selectedCanvasProof:RemoteSelectedCanvasProof?=null)
 public enum class RemoteCommandStatus { Injected,Refused,SealedPartial }
 public data class RemoteCommandReceipt(public val binding:RemoteTargetBinding,public val action:RemoteEditorAction,public val inputSequence:ULong,public val acceptedQpc100ns:ULong,public val status:RemoteCommandStatus,public val reason:String?)
 public interface RemoteCommandDispatcher { public val target:StateFlow<RemoteTargetState?>;public suspend fun dispatch(binding:RemoteTargetBinding,action:RemoteEditorAction):RemoteCommandReceipt }

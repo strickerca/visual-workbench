@@ -84,6 +84,21 @@ internal fun validDecoderConfig(config: DecoderConfig): Boolean {
         config.vps.size + config.sps.size + config.pps.size <= MAX_REMOTE_CONFIG
 }
 
+/** MediaCodec crop right/bottom are inclusive. Surface output applies this
+ * rectangle before the app clips its separate even-coded padding. The wire
+ * contract has no translated origin, so only a complete origin-zero rectangle
+ * can change the decoder's effective dimensions. */
+internal fun decoderOutputDimensions(width: Int, height: Int,
+    cropLeft: Int?, cropRight: Int?, cropTop: Int?, cropBottom: Int?): Pair<Int, Int>? {
+    if (width !in 2..4096 || height !in 2..4096) return null
+    if (cropLeft == null && cropRight == null && cropTop == null && cropBottom == null)
+        return Pair(width, height)
+    if (cropLeft == null || cropRight == null || cropTop == null || cropBottom == null) return null
+    if (cropLeft != 0 || cropTop != 0 || cropRight !in cropLeft until width ||
+        cropBottom !in cropTop until height) return null
+    return Pair(cropRight + 1 - cropLeft, cropBottom + 1 - cropTop)
+}
+
 /** Closed callback diagnostics only. All values are relative and clamped; no
  * scope/ticket/frame IDs, absolute clocks or codec body are exposed. Mask bits:
  * 1 absent ticket, 2 absent release request, 4 absent release return, 8 PTS,
@@ -507,8 +522,15 @@ private class AndroidDecoderEngine : DecoderEngine {
         MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED -> DecoderOutput.None
         else -> { check(index >= 0); DecoderOutput.Buffer(index, info.presentationTimeUs, info.flags) }
     }
-    override fun outputDimensions(): Pair<Int, Int> = checkNotNull(codec).outputFormat.let {
-        Pair(it.getInteger(MediaFormat.KEY_WIDTH), it.getInteger(MediaFormat.KEY_HEIGHT))
+    override fun outputDimensions(): Pair<Int, Int> = checkNotNull(codec).outputFormat.let { format ->
+        // Standard keys also exist on supported API 30-32, before the API 33 constants.
+        // A present non-integer value throws and retires this decoder; it is not absent.
+        fun crop(key: String): Int? = if (format.containsKey(key)) format.getInteger(key) else null
+        checkNotNull(decoderOutputDimensions(
+            format.getInteger(MediaFormat.KEY_WIDTH), format.getInteger(MediaFormat.KEY_HEIGHT),
+            crop("crop-left"), crop("crop-right"), crop("crop-top"), crop("crop-bottom"))) {
+            "InvalidOutputGeometry"
+        }
     }
     override fun discardOutput(index: Int) { checkNotNull(codec).releaseOutputBuffer(index, false) }
     override fun renderOutput(index: Int, requestedLocalNanos: Long) {

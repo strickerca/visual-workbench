@@ -13,6 +13,17 @@ import kotlinx.coroutines.*
  * owner project or Windows trust registry is changed. The explicit opt-in input
  * marker enables one ordinary local grant into the exact owned guard target. */
 internal object RemoteIntegrationHost {
+    /** Fixture metadata only; actual Job and normal native grant remain required. */
+    internal fun ownedEditorKind(values:List<String>,runId:String,window:ULong,pid:UInt,created:ULong,parentPid:Long,parentCreatedMillis:Long):String {
+        require(values.size==12&&values[0]=="M4_REMOTE_OWNED_EDITOR_V1"&&values[1]==runId)
+        require(values[2].matches(Regex("[a-f0-9]{64}"))&&values[3] in setOf("krita","paint"))
+        require(values[4]==parentPid.toString()&&values[5]==parentCreatedMillis.toString())
+        require(values[6].matches(Regex("[a-f0-9]{32}"))&&values[7]==window.toString()&&values[8]==pid.toString()&&values[9]==created.toString())
+        require(values[10].matches(Regex("[0-9]{4,6}(,[0-9]{4,6}){5}"))&&values[11].matches(Regex("[a-f0-9]{64}")))
+        val points=values[10].split(',').map{it.toInt()}
+        require(points.all{it in 1000..999000}&&points[2]-points[0]==1000&&points[4]-points[0]==2000&&points[1]==points[3]&&points[1]==points[5])
+        return values[3]
+    }
     private val retained=ConcurrentHashMap.newKeySet<Any>()
     private class Startup {
         var protectedOwnersEntered=false
@@ -67,6 +78,15 @@ internal object RemoteIntegrationHost {
             require(Files.size(heldScenarioPath) in 1..64)
             Files.readString(heldScenarioPath).also{require(it in setOf("pause-held","background-held","disconnect-held"))}
         }else null
+        val editorMarker=root.resolve("owned-editor.txt")
+        val editorKind=if(Files.exists(editorMarker,LinkOption.NOFOLLOW_LINKS)){
+            require(controllerInput&&heldScenario==null)
+            WindowsNativeFileGuard().check(editorMarker)
+            require(Files.isRegularFile(editorMarker,LinkOption.NOFOLLOW_LINKS)&&Files.size(editorMarker) in 1..2048)
+            val values=Files.readAllLines(editorMarker)
+            val retainedParent=ProcessHandle.current().parent().orElseThrow().parent().orElseThrow()
+            ownedEditorKind(values,runId,window,pid,created,retainedParent.pid(),retainedParent.info().startInstant().orElseThrow().toEpochMilli())
+        }else null
         var witnessWritten=false
         var inputAttempted=false;var inputGranted:Boolean?=false;var inputComplete=false
         var cancellation:Cancellation?=null;var nativeOwnersStarted=false
@@ -114,7 +134,13 @@ internal object RemoteIntegrationHost {
                     if(controllerInput&&next==1&&inputGranted!=true&&Files.isRegularFile(root.resolve("input-ready"),LinkOption.NOFOLLOW_LINKS)){
                         require(Files.readString(root.resolve("input-ready"))==runId&&status.status==SyncStatus.SYNCED&&status.carrier==AppCarrier.QUIC_TETHER)
                         val selected=active.remoteWindows().singleOrNull{it.window==window&&it.processId==pid&&it.processCreated==created}?:error("Owned input target changed")
-                        require(selected.executableName=="vw-remote-guard-hil.exe")
+                        val expectedExecutable=when(editorKind){
+                            null->"vw-remote-guard-hil.exe"
+                            "krita"->"krita.exe"
+                            "paint"->"mspaint.exe"
+                            else->error("Unknown owned editor")
+                        }
+                        require(selected.executableName==expectedExecutable)
                         // Exactly the normal local PC grant operation. OS focus,
                         // target snapshot, helper admission and every pen batch
                         // retain their production guards; any refusal fails.

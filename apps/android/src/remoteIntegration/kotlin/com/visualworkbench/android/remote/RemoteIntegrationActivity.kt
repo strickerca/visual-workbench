@@ -28,7 +28,7 @@ internal class RemoteIntegrationActivity:ComponentActivity() {
     }
     /** Isolated integration variant only: software-generated events enter the
      * actual SurfaceView dispatch route, never native input/ACK methods. */
-    fun dispatchOwnedStylusBatch(binding:RemoteTargetBinding,held:Boolean=false):RemoteRenderedFrameObservation {
+    fun dispatchOwnedStylusBatch(binding:RemoteTargetBinding,held:Boolean=false,editorStroke:List<Int>?=null):RemoteRenderedFrameObservation {
         check(lifecycle.currentState==Lifecycle.State.RESUMED&&hasWindowFocus())
         val target=requireNotNull(controller.remote.target.value)
         check(target.grantActive&&target.binding==binding)
@@ -39,6 +39,11 @@ internal class RemoteIntegrationActivity:ComponentActivity() {
             current.scope.targetToken==binding.targetToken&&current.scope.geometryRevision==binding.geometryRevision)
         val viewport=requireNotNull(RemoteViewport.fit(display.viewWidth,display.viewHeight,config.visibleWidth,config.visibleHeight))
         check(view.width==display.viewWidth&&view.height==display.viewHeight&&viewport.width>=32f&&viewport.height>=32f)
+        if(editorStroke!=null){
+            check(!held&&editorStroke.size==6&&editorStroke.all{it in 1000..999000})
+            check(editorStroke[2]-editorStroke[0]==1000&&editorStroke[4]-editorStroke[0]==2000)
+            check(editorStroke[1]==editorStroke[3]&&editorStroke[1]==editorStroke[5])
+        }
         val downTime=SystemClock.uptimeMillis()
         try {
             val actions=if(held)listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_MOVE)else listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_MOVE,MotionEvent.ACTION_UP)
@@ -46,7 +51,12 @@ internal class RemoteIntegrationActivity:ComponentActivity() {
                 check(lifecycle.currentState==Lifecycle.State.RESUMED&&hasWindowFocus()&&controller.remote.target.value?.let{it.grantActive&&it.binding==binding}==true)
                 val properties=MotionEvent.PointerProperties().apply{id=0;toolType=MotionEvent.TOOL_TYPE_STYLUS}
                 val point=MotionEvent.PointerCoords().apply{
-                    x=viewport.left+viewport.width/2f+index*2f;y=viewport.top+viewport.height/2f
+                    if(editorStroke==null){
+                        x=viewport.left+viewport.width/2f+index*2f;y=viewport.top+viewport.height/2f
+                    }else{
+                        x=viewport.left+viewport.width*editorStroke[index*2]/1_000_000f
+                        y=viewport.top+viewport.height*editorStroke[index*2+1]/1_000_000f
+                    }
                     pressure=if(action==MotionEvent.ACTION_UP)0f else 0.5f;size=1f
                     setAxisValue(MotionEvent.AXIS_TILT,0f);setAxisValue(MotionEvent.AXIS_ORIENTATION,0f)
                 }

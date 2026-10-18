@@ -36,6 +36,17 @@ class RemoteNormalPathInstrumentedTest {
         val inputScenario=args.getString("remoteInputScenario")?:"balanced"
         check(inputScenario in setOf("balanced","pause-held","background-held","disconnect-held"))
         check(controllerInput||inputScenario=="balanced")
+        val editorKind=args.getString("remoteOwnedEditorKind")
+        val editorStrokeText=args.getString("remoteEditorStroke")
+        check((editorKind==null)==(editorStrokeText==null))
+        val editorStroke=if(editorKind==null)null else{
+            check(controllerInput&&inputScenario=="balanced"&&editorKind in setOf("krita","paint"))
+            val text=requireNotNull(editorStrokeText)
+            check(text.matches(Regex("[0-9]{4,6}(,[0-9]{4,6}){5}")))
+            text.split(',').map{it.toInt()}.also{
+                check(it.all{v->v in 1000..999000}&&it[2]-it[0]==1000&&it[4]-it[0]==2000&&it[1]==it[3]&&it[1]==it[5])
+            }
+        }
         var heldReceipt:Bundle?=null
         val bootstrap=requireNotNull(args.getString("remoteBootstrap"))
         check(bootstrap.length in 1..8192)
@@ -173,7 +184,7 @@ class RemoteNormalPathInstrumentedTest {
             val exact=actualGrant(first)
             var prior:RemoteRenderedFrameObservation?=null
             phase("controller_input_dispatch_attempted")
-            requireNotNull(scenario).onActivity{prior=it.dispatchOwnedStylusBatch(exact)}
+            requireNotNull(scenario).onActivity{prior=it.dispatchOwnedStylusBatch(exact,editorStroke=editorStroke)}
             phase("controller_input_dispatch_completed")
             val before=requireNotNull(prior)
             val admissionDeadline=System.nanoTime()+500_000_000L

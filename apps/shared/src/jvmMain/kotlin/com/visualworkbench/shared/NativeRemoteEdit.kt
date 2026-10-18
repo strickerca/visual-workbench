@@ -125,18 +125,14 @@ internal class NativeRemoteEdit(private val handle:LiveSession,private val linkO
             try {
                 val requestTicket=native{handle.remoteBeginCommand(RemoteNativeJson.binding(binding),ordinal)}
                 ticket=requestTicket
-                val started=System.nanoTime()
-                while(System.nanoTime()-started<500_000_000L) {
-                    currentCoroutineContext().ensureActive()
-                    val result=native{handle.remoteTakeCommand(requestTicket)}
-                    if(result!=null){
-                        // The native take has consumed this ticket even if later DTO checks fail.
-                        receiptTaken=true
-                        require(result.requestTicket==requestTicket&&result.action==ordinal&&RemoteNativeJson.binding(RemoteNativeJson.read(result.bindingJson))==binding)
-                        val receipt=checkedRemoteCommandReceipt(binding,action,result.status,result.inputSequence,result.acceptedQpc100ns,result.reason)
-                        completed=true
-                        return@command receipt
-                    };delay(5)
+                val result=awaitRemoteCommandReceipt(take={native{handle.remoteTakeCommand(requestTicket)}})
+                if(result!=null){
+                    // The native take has consumed this ticket even if later DTO checks fail.
+                    receiptTaken=true
+                    require(result.requestTicket==requestTicket&&result.action==ordinal&&RemoteNativeJson.binding(RemoteNativeJson.read(result.bindingJson))==binding)
+                    val receipt=checkedRemoteCommandReceipt(binding,action,result.status,result.inputSequence,result.acceptedQpc100ns,result.reason)
+                    completed=true
+                    return@command receipt
                 }
                 RemoteCommandReceipt(binding,action,0uL,0uL,RemoteCommandStatus.Refused,"command_timeout")
             }catch(error:SessionFailure){
@@ -177,8 +173,8 @@ private fun com.visualworkbench.bindings.core.RemoteDisplay.common():RemoteEditS
             RemoteEditorIdentity(when(name.lowercase()){ "krita.exe"->RemoteEditorKind.Krita;"mspaint.exe"->RemoteEditorKind.Paint;else->RemoteEditorKind.Unknown},name,RemoteNativeJson.string(identity["executableBlake3"]),RemoteNativeJson.ulong(identity["executableBytes"]),RemoteNativeJson.optional(identity["fileVersion"]),RemoteNativeJson.optional(identity["packageFullName"]),RemoteNativeJson.optional(identity["packageVersion"]),digest)
         }
         val actions=authority?.get("verified_actions")?.let(RemoteNativeJson::array)?.map{RemoteNativeJson.uint(it).toInt().also{n->require(n in 1..RemoteEditorAction.entries.size)}-1}?.map{RemoteEditorAction.entries[it]}?.toSet()?:emptySet()
-        val proof=authority?.get("focus")?.let{RemoteNativeJson.obj(it)}?.let{RemoteCanvasFocusProof("Windows UIA",RemoteNativeJson.string(it["runtime_id_hash"]),RemoteNativeJson.uint(it["process_id"]),binding.targetToken,binding.geometryRevision,RemoteNativeJson.ulong(it["sampled_qpc_100ns"]),RemoteNativeJson.string(it["class_name"]),RemoteNativeJson.int(it["control_type"]),RemoteNativeJson.rect(RemoteNativeJson.obj(it["canvas_rect"])),RemoteNativeJson.string(it["profile_digest"]))}
-        RemoteTargetState(binding,nativeIdentity,actions,proof,status=="controlling",reason,commandBusy)
+        val observation=authority?.let{remoteAuthorityObservation(it,binding)}
+        RemoteTargetState(binding,nativeIdentity,actions,observation?.focus,status=="controlling",reason,commandBusy,observation?.selected)
     }
     val kind=when(status){"unavailable"->RemoteEditStatus.Unavailable;"disconnected"->RemoteEditStatus.Disconnected;"selecting"->RemoteEditStatus.Selecting;"viewing"->RemoteEditStatus.Viewing;"pending_focus"->RemoteEditStatus.PendingFocus;"pending_grant"->RemoteEditStatus.PendingGrant;"controlling"->RemoteEditStatus.Controlling;"paused"->RemoteEditStatus.Paused;"sealed"->RemoteEditStatus.Sealed;"closing"->RemoteEditStatus.Closing;"closed"->RemoteEditStatus.Closed;else->error("Unknown native remote status")}
     return RemoteEditState(sequence,kind,scope,rectangle,target,reason,encoderDescription,destinationLabel)

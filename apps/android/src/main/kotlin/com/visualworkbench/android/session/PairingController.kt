@@ -24,9 +24,20 @@ internal class PairingController(
     private var secretEpoch = 0L
     private var qr: ByteArray? = null
     private var confirmation: PairingConfirmation? = null
+    private var confirmationEndpoint: String? = null
     private var expiry: Job? = null
+    private val peerLabels by lazy { PeerLabelStore(context.noBackupFilesDir.canonicalFile.toPath().resolve("peer-labels.properties")) }
+    private var labels by mutableStateOf<PeerLabelSnapshot?>(null)
+    private var namingOperation: Job? = null
+    private var connectionHint by mutableStateOf<PairingConnectionHint?>(null)
+    var namingWorking by mutableStateOf(false); private set
+    var namingProblem by mutableStateOf<String?>(null); private set
+    val namesWritable: Boolean get() = labels?.writable == true
     var working by mutableStateOf(false); private set
     var peers by mutableStateOf<List<PairedDevice>>(emptyList()); private set
+    var peersLoaded by mutableStateOf(false); private set
+    var pairingCompletion by mutableStateOf(0L); private set
+    val scanRequestEpoch: Long get() = secretEpoch
     var selectedPeer by mutableStateOf<String?>(null); private set
     var local by mutableStateOf<SessionDevice?>(null); private set
     var localAddresses by mutableStateOf<List<LocalSessionAddress>>(emptyList()); private set
@@ -37,11 +48,11 @@ internal class PairingController(
     private var tetherAddress by mutableStateOf("")
     private var wifiAddress by mutableStateOf("")
     private var adbAddress by mutableStateOf("")
-    var carrier by mutableStateOf(SessionCarrier.QuicWifi)
+    var carrier by mutableStateOf(SessionCarrier.QuicTether)
     var sessionAddress: String
         get() = when (carrier) { SessionCarrier.QuicTether -> tetherAddress; SessionCarrier.QuicWifi -> wifiAddress; SessionCarrier.TcpAdb -> adbAddress }
         set(value) { when (carrier) { SessionCarrier.QuicTether -> tetherAddress = value; SessionCarrier.QuicWifi -> wifiAddress = value; SessionCarrier.TcpAdb -> adbAddress = value } }
-    var scanner by mutableStateOf(true)
+    var scanner by mutableStateOf(false)
     var problem by mutableStateOf<String?>(null); private set
 
     suspend fun service(): WorkbenchSessions = serviceLock.withLock {
@@ -53,17 +64,96 @@ internal class PairingController(
         created
     }
     fun enter() { launch {
-        val native = service(); local = native.localDevice(); peers = native.pairedDevices()
-        localAddresses = localSessionAddresses()
+        val token = secretEpoch
+        val native = service()
+        val paired = native.pairedDevices()
+        currentCoroutineContext().ensureActive()
+        if (token != secretEpoch || closed) return@launch
+        updatePeers(paired); peersLoaded = true
+        loadNames(token)
+        // Optional address enumeration cannot turn loaded trust into unknown-empty.
+        val device = native.localDevice()
+        currentCoroutineContext().ensureActive()
+        if (token != secretEpoch || closed) return@launch
+        local = device
+        val addresses = localSessionAddresses()
+        currentCoroutineContext().ensureActive()
+        if (token == secretEpoch && !closed) localAddresses = addresses
     } }
-    fun choosePeer(peer: String) { if (peers.any { it.deviceId == peer && it.revokedAtMs == null }) selectedPeer = peer }
+    fun choosePeer(peer: String) {
+        if (peers.any { it.deviceId == peer && it.revokedAtMs == null }) {
+            if (selectedPeer != peer) connectionHint = null
+            selectedPeer = peer
+        }
+    }
+    fun activePeers(): List<PairedDevice> = peers.filter { it.revokedAtMs == null }
+        .sortedWith(compareBy<PairedDevice> { it.pairedAtMs }.thenBy { it.deviceId })
+    fun peerName(peer: PairedDevice): String = labels?.nameFor(peer.deviceId, peer.fingerprint)
+        ?: "Computer ${activePeers().indexOfFirst { it.deviceId == peer.deviceId }.let { if (it < 0) 1 else it + 1 }}"
+    fun peerDisplayName(peer: PairedDevice): String {
+        val name = peerName(peer)
+        val duplicates = activePeers().filter { peerName(it).equals(name, ignoreCase = true) }
+        if (duplicates.size < 2) return name
+        val suffix = peer.fingerprint.take(12)
+        return if (duplicates.count { it.fingerprint.take(12) == suffix } == 1) "$name · $suffix"
+        else "$name · Computer ${activePeers().indexOfFirst { it.deviceId == peer.deviceId } + 1}"
+    }
+    private suspend fun loadNames(token: Long) {
+        val loaded = try { withContext(Dispatchers.IO) { peerLabels.load() } }
+        catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { null }
+        currentCoroutineContext().ensureActive()
+        if (token != secretEpoch || closed) return
+        labels = loaded
+        namingProblem = if (loaded == null) "Computer names could not be loaded. Pairing and connections remain available."
+        else labelMessage(loaded.issue)
+    }
+    fun renamePeer(peerId: String, expectedFingerprint: String, value: String) {
+        if (working || namingWorking || closed) return
+        val peer = activePeers().singleOrNull { it.deviceId == peerId && it.fingerprint == expectedFingerprint }
+        if (peer == null || selectedPeer != peerId) { namingProblem = "This computer changed. Choose it again before renaming."; return }
+        val checked = checkedPeerLabel(value)
+        if (checked == null) { namingProblem = "Use a single-line name with 1–64 characters, without control or direction characters."; return }
+        if (!namesWritable) { namingProblem = "Saved computer names are unavailable. Existing naming data is preserved."; return }
+        val token = secretEpoch
+        namingWorking = true; namingProblem = null
+        namingOperation = scope.launch {
+            try {
+                val saved = withContext(Dispatchers.IO) { peerLabels.rename(peer.deviceId, peer.fingerprint, checked) }
+                currentCoroutineContext().ensureActive()
+                if (token == secretEpoch && !closed) { labels = saved; namingProblem = labelMessage(saved.issue) }
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (_: Exception) { if (token == secretEpoch && !closed) namingProblem = "The computer name could not be saved. Pairing and connections remain available." }
+            finally { namingWorking = false }
+        }
+    }
+    private fun updatePeers(paired: List<PairedDevice>) {
+        peers = paired
+        if (currentHint() == null) connectionHint = null
+    }
+    private fun currentHint(): PairingConnectionHint? {
+        val hint = connectionHint ?: return null
+        return hint.takeIf { it.peerDeviceId == selectedPeer && validEndpoint(it.endpoint) &&
+            peers.count { peer -> peer.revokedAtMs == null && peer.deviceId == it.peerDeviceId && peer.fingerprint == it.fingerprint } == 1 }
+    }
+    fun canUsePairingConnection(): Boolean = !working && !closed && currentHint() != null
+    /** Explicit UI action; updates only the currently chosen route, never trust or a live link. */
+    fun usePairingConnection() {
+        if (working || closed) return
+        val hint = currentHint() ?: return
+        sessionAddress = hint.endpoint
+    }
+    fun configuredCarriers(): List<SessionCarrier> =
+        listOf(SessionCarrier.QuicTether to tetherAddress, SessionCarrier.QuicWifi to wifiAddress, SessionCarrier.TcpAdb to adbAddress)
+            .filter { it.second.isNotBlank() }.map { it.first }
     fun endpoint(): List<SessionEndpoint> {
         val configured = listOf(SessionCarrier.QuicTether to tetherAddress, SessionCarrier.QuicWifi to wifiAddress, SessionCarrier.TcpAdb to adbAddress).filter { it.second.isNotBlank() }
         require(configured.isNotEmpty() && configured.all { validEndpoint(it.second) }) { "Enter a numeric session address and port for each configured route." }
         return configured.map { SessionEndpoint(it.first, it.second.trim()) }
     }
-    fun scan(bytes: ByteArray) {
-        if (working || closed || bytes.size !in 1..4096) { bytes.fill(0); return }
+    fun scan(bytes: ByteArray): Boolean {
+        if (working || closed || bytes.size !in 1..4096) { bytes.fill(0); return false }
+        connectionHint = null
         scanner = false
         val owned = bytes.copyOf(); bytes.fill(0)
         launch {
@@ -84,13 +174,15 @@ internal class PairingController(
             } catch (error: Exception) { clearSecret(); throw error }
             finally { if (qr !== owned) owned.fill(0) }
         }
+        return true
     }
     fun pairQr() {
         val parsed = details ?: return
         if (pairingEndpoint !in parsed.endpoints) return
+        val selectedEndpoint = pairingEndpoint
         launch {
             val owned = qr ?: throw SessionFailure(SessionFailureKind.Expired)
-            try { paired(service().joinQr(owned, pairingEndpoint)) }
+            try { paired(service().joinQr(owned, selectedEndpoint), selectedEndpoint, parsed.fingerprint, parsed.peerDeviceId) }
             finally { clearSecret() }
         }
     }
@@ -98,28 +190,37 @@ internal class PairingController(
         if (code.length != 8 || code.any { it !in '0'..'9' } || !validEndpoint(pairingEndpoint)) {
             problem = "Enter the eight-digit code and the numeric pairing address shown on the computer."; return
         }
-        val entered = code; code = ""
+        val entered = code; code = ""; connectionHint = null
+        val selectedEndpoint = pairingEndpoint.trim()
         launch {
             clearSecret()
             val token = secretEpoch
-            val handle = service().joinCode(entered, pairingEndpoint.trim())
+            val handle = service().joinCode(entered, selectedEndpoint)
             if (token != secretEpoch || closed) { withContext(NonCancellable) { handle.close() }; return@launch }
-            confirmation = handle; fingerprint = handle.fingerprint
+            confirmation = handle; confirmationEndpoint = selectedEndpoint; fingerprint = handle.fingerprint
             expiry = scope.launch { delay(300_000); if (token == secretEpoch) { expiry = null; clearSecret(); problem = "Confirmation expired. Request a new code." } }
         }
     }
     fun confirmFingerprint() {
         val handle = confirmation ?: return
         val displayed = fingerprint ?: return
-        launch { try { paired(handle.confirm(displayed)) } finally { clearSecret() } }
+        val selectedEndpoint = confirmationEndpoint ?: return
+        launch { try { paired(handle.confirm(displayed), selectedEndpoint, displayed) } finally { clearSecret() } }
     }
     fun decline() { launch { try { confirmation?.decline() } finally { clearSecret() } } }
-    private suspend fun paired(peer: String) {
-        peers = service().pairedDevices(); selectedPeer = peer
-        notify("Computer paired. Choose its session address to open or receive a project.")
+    private suspend fun paired(peer: String, selectedEndpoint: String, expectedFingerprint: String, expectedPeer: String? = null) {
+        val paired = service().pairedDevices()
+        currentCoroutineContext().ensureActive()
+        updatePeers(paired); peersLoaded = true; selectedPeer = peer
+        val authenticated = paired.singleOrNull { it.deviceId == peer && it.revokedAtMs == null && it.fingerprint == expectedFingerprint }
+        connectionHint = authenticated?.takeIf { (expectedPeer == null || it.deviceId == expectedPeer) && validEndpoint(selectedEndpoint) }
+            ?.let { PairingConnectionHint(it.deviceId, it.fingerprint, selectedEndpoint) }
+        loadNames(secretEpoch); pairingCompletion++
+        notify("Computer paired. On the PC, start its project connection; then use the pairing connection here or enter its session address.")
     }
     fun revoke(peer: String, before: suspend () -> Unit) = launch {
-        before(); service().revoke(peer); peers = service().pairedDevices()
+        before(); service().revoke(peer); updatePeers(service().pairedDevices())
+        if (connectionHint?.peerDeviceId == peer) connectionHint = null
         if (selectedPeer == peer) selectedPeer = null
     }
     private fun launch(action: suspend () -> Unit) {
@@ -135,21 +236,34 @@ internal class PairingController(
     }
     /** Called on screen exit/background: no QR, code or pending confirmation survives. */
     fun leave() {
-        secretEpoch++; operation?.cancel(); code = ""; scanner = false
+        secretEpoch++; operation?.cancel(); namingOperation?.cancel(); connectionHint = null; code = ""; scanner = false
+        confirmationEndpoint = null
         val pending = confirmation; confirmation = null
         qr?.fill(0); qr = null; details = null; fingerprint = null; expiry?.cancel(); expiry = null
         if (pending != null) scope.launch { withContext(NonCancellable) { runCatching { pending.close() } } }
     }
     private suspend fun clearSecret() {
         secretEpoch++; expiry?.cancel(); expiry = null
-        qr?.fill(0); qr = null; details = null; fingerprint = null; code = ""
+        qr?.fill(0); qr = null; details = null; fingerprint = null; code = ""; confirmationEndpoint = null
         val pending = confirmation; confirmation = null
         if (pending != null) withContext(NonCancellable) { pending.close() }
     }
     suspend fun close() {
-        closed = true; leave(); operation?.join()
+        closed = true; leave(); operation?.join(); namingOperation?.join()
         serviceLock.withLock { service?.close(); service = null }
     }
+}
+
+/** Numeric public hint only; never contains QR credentials and is never persisted. */
+private class PairingConnectionHint(val peerDeviceId: String, val fingerprint: String, val endpoint: String)
+
+private fun labelMessage(issue: PeerLabelIssue?): String? = when (issue) {
+    null -> null
+    PeerLabelIssue.InvalidName -> "Use a single-line name with 1–64 characters, without control or direction characters."
+    PeerLabelIssue.InvalidPeer -> "This computer changed. Choose it again before renaming."
+    PeerLabelIssue.SaveFailed -> "The computer name could not be saved. Pairing and connections remain available."
+    PeerLabelIssue.Unreadable, PeerLabelIssue.InvalidStore, PeerLabelIssue.ChangedStore ->
+        "Saved computer names are unavailable. Existing naming data is preserved; pairing and connections remain available."
 }
 
 internal fun validEndpoint(value: String): Boolean {

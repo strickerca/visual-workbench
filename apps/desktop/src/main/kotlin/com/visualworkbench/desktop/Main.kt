@@ -55,7 +55,7 @@ fun main(args: Array<String>) {
     Runtime.getRuntime().addShutdownHook(Thread({appOwner.close();appAnchor.close()},"vw-app-owner-release"))
     val core=workbenchCore()
     nativeRuntime.armRetirementFence(::assertRemoteEditRetired)
-    val remoteCatalog=try{nativeRuntime.packagedRemoteCatalog()}catch(_:NativeRuntimeFailure){null}
+    val remoteCatalog=loadRemoteCatalog{nativeRuntime.packagedRemoteCatalog()}
     val preferences=DesktopPreferences(local.resolve("Visual Workbench/settings.properties"));val saved=preferences.window();val device=preferences.device(core)
     val documents=FileSystemView.getFileSystemView().defaultDirectory.toPath()
     val clouds=listOf("OneDrive","OneDriveConsumer","OneDriveCommercial","DROPBOX").mapNotNull{System.getenv(it)?.takeIf(String::isNotBlank)?.let{v->Path.of(v)}}
@@ -64,16 +64,19 @@ fun main(args: Array<String>) {
     val captureService=runBlocking(Dispatchers.Default){com.visualworkbench.desktop.capture.openDesktopCaptureService(
         nativeRuntime.directory.resolve("vw-capture-helper.exe"),nativeRuntime.packagedHash("vw-capture-helper.exe"))}
     application {
-        val scope=rememberCoroutineScope();val sessions=remember{DesktopSessionController(scope,device)};val assistance=remember{ConnectionAssistanceController(scope,NativeConnectionAssistance())};val controller=remember{EditorController(scope,core,host,location,device,local.resolve("VisualWorkbench/transfer-work")).also{it.useSessionService(sessions);it.useAiDirectory(local.resolve("Visual Workbench"))}};val editor by controller.state.collectAsState()
+        val scope=rememberCoroutineScope();val sessions=remember{DesktopSessionController(scope,device,labelStore=PeerLabelStore(local.resolve("Visual Workbench/peer-labels.properties")))};val assistance=remember{ConnectionAssistanceController(scope,NativeConnectionAssistance())};val controller=remember{EditorController(scope,core,host,location,device,local.resolve("VisualWorkbench/transfer-work")).also{it.useSessionService(sessions);it.useAiDirectory(local.resolve("Visual Workbench"))}};val editor by controller.state.collectAsState()
         val capture=remember{com.visualworkbench.desktop.capture.DesktopCaptureController(scope,core,captureService,location.path,device,
             controller::captureDestination,controller::report)}
         var captureSettings by remember{mutableStateOf(false)}
         var remoteView by remember{mutableStateOf<WorkbenchRemoteEdit?>(null)}
         fun openRemoteView(){
-            try{val remote=controller.remoteCapability()
-                configureRemoteEditRuntime(remote,nativeRuntime.directory.resolve("vw-hevc-helper.exe").toString(),nativeRuntime.packagedHash("vw-hevc-helper.exe"),nativeRuntime.directory.resolve("vw-input-helper.exe").toString(),nativeRuntime.packagedHash("vw-input-helper.exe"),remoteCatalog?.path?.toString(),remoteCatalog?.sha256)
-                remoteView=remote
-            }catch(_:Exception){controller.report("Remote editing requires an authenticated USB tether link and the packaged helpers.")}
+            var candidate:WorkbenchRemoteEdit?=null
+            try{withAdmittedRemoteCatalog(remoteCatalog){catalog->
+                val remote=controller.remoteCapability();candidate=remote
+                configureRemoteEditRuntime(remote,nativeRuntime.directory.resolve("vw-hevc-helper.exe").toString(),nativeRuntime.packagedHash("vw-hevc-helper.exe"),nativeRuntime.directory.resolve("vw-input-helper.exe").toString(),nativeRuntime.packagedHash("vw-input-helper.exe"),catalog?.path?.toString(),catalog?.sha256)
+                remoteView=remote;candidate=null
+            }}catch(error:NativeRuntimeFailure){candidate?.let(::retireRemoteEditLater);controller.report(error.message?:"The packaged remote runtime was refused.")}
+            catch(_:Exception){candidate?.let(::retireRemoteEditLater);controller.report("Remote editing requires an authenticated USB tether link and the packaged helpers.")}
         }
         var captureFocusLease by remember { mutableStateOf<AutoCloseable?>(null) }
         fun captureDialog(value: Boolean) {
@@ -101,6 +104,8 @@ fun main(args: Array<String>) {
         val state=rememberWindowState(isMinimized=mcpMinimized,placement=saved.mode.placement(),position=restoredPosition(saved),width=saved.width.dp,height=saved.height.dp)
         var prior by remember{mutableStateOf(if(saved.mode==WindowMode.Fullscreen)WindowMode.Windowed else saved.mode)}
         var floating by remember{mutableStateOf(saved.copy(mode=WindowMode.Windowed))};var dialog by remember{mutableStateOf<Command?>(null)}
+        var connectionDraft by remember { mutableStateOf(ConnectionDraft()) }
+        var pickerReturnsToConnection by remember { mutableStateOf(false) }
         var quitting by remember{mutableStateOf(false)};var dpiText by remember{mutableStateOf("Checking display scale…")};var startupMs by remember{mutableStateOf<Long?>(null)}
         fun instructionDialog(value: Command?) { controller.instructionModal(value != null); dialog = value }
         fun quit() {
@@ -157,7 +162,7 @@ fun main(args: Array<String>) {
             fun file(command:Command){controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,command.label,FileDialog.LOAD)
                 try{chooser.directory=(if(command==Command.Import)documents else location.path).toString();if(command==Command.Open)chooser.file="project.sqlite";chooser.isVisible=true
                     val filename=chooser.file?:return;val chosen=Path.of(chooser.directory,filename)
-                    when(command){Command.Import->controller.importFile(ImportRequest(epoch,chosen.toAbsolutePath().normalize()));Command.Open->controller.open(chosen.parent,epoch);else->Unit}
+                    when(command){Command.Import->controller.importFile(ImportRequest(epoch,chosen.toAbsolutePath().normalize()));Command.Open->{val projectDirectory=projectDirectoryFromPicker(chosen);if(projectDirectory==null)controller.report("Choose project.sqlite inside the saved project folder. The current project is unchanged.")else controller.open(projectDirectory,epoch)};else->Unit}
                 }finally{chooser.dispose()}}}
             fun save(request:ExportRequest){controller.instructionPicker().use { val chooser=FileDialog(window,"Save ${request.settings.encoding.label} · ${request.revision}",FileDialog.SAVE)
                 try{chooser.directory=documents.toString();chooser.file="export-${request.revision}.${request.settings.encoding.extension}";chooser.isVisible=true;val filename=chooser.file?:return
@@ -191,7 +196,19 @@ fun main(args: Array<String>) {
             }
             fun action(command:Command){if(command in listOf(Command.Import,Command.Open))file(command)else dispatch(command,false,controller,{mode(it)},{instructionDialog(it)},{quit()})}
             LaunchedEffect(editor.textAnchor != null, editor.exportOpen, editor.pasteOpen) { controller.instructionFocus.interactionChanged() }
-            LaunchedEffect(dialog){val pending=dialog;if(pending in listOf(Command.Import,Command.Open)){instructionDialog(null);file(checkNotNull(pending))}}
+            LaunchedEffect(dialog) {
+                val pending = dialog
+                if (pending in listOf(Command.Import, Command.Open)) {
+                    val returnToConnection = pickerReturnsToConnection
+                    pickerReturnsToConnection = false
+                    instructionDialog(null)
+                    try { file(checkNotNull(pending)) }
+                    finally {
+                        val next = dialogAfterProjectPicker(returnToConnection, dialog, quitting)
+                        if (next != dialog) instructionDialog(next)
+                    }
+                }
+            }
             DisposableEffect(window,controller){val drop=DesktopDropTarget(window.contentPane,controller);val focus=object:java.awt.event.WindowAdapter(){override fun windowDeactivated(event:java.awt.event.WindowEvent){controller.cancelInput()}};window.addWindowListener(focus);onDispose{window.removeWindowListener(focus);controller.cancelInput();drop.close()}}
             val density=LocalDensity.current.density
             LaunchedEffect(density,state.position){try{val info=host.windowDpiInfo(window.windowHandle.toULong());dpiText="Windows ${info.windowDpi} DPI · Compose ${"%.2f".format(density)}× · PMv2 ${info.windowPerMonitorV2}"}catch(_:Exception){dpiText="Display DPI query unavailable"}}
@@ -260,7 +277,9 @@ fun main(args: Array<String>) {
                 if(captureSettings)com.visualworkbench.desktop.capture.CaptureSettings(capture){captureDialog(false)}
                 if(editor.exportOpen&&editor.document!=null)ExportDialog(controller,editor,::save)
                 if(editor.pasteOpen)PasteDialog(controller,editor)
-                if(dialog==Command.Pairing)SessionDialog(sessions,controller,assistance){instructionDialog(null)}
+                if(dialog==Command.Pairing)SessionDialog(sessions,controller,assistance,connectionDraft,{change -> connectionDraft=change(connectionDraft)},
+                    importFile={pickerReturnsToConnection=true;instructionDialog(Command.Import)},
+                    openProject={pickerReturnsToConnection=true;instructionDialog(Command.Open)}){instructionDialog(null)}
                 if(dialog in listOf(Command.Settings,Command.Diagnostics)){
                     val command=checkNotNull(dialog);val timing=editor.sync?.let{"${it.echoSamples} echoes · RTT p50 ${it.echoRttP50Ms?:0.0} ms · p95 ${it.echoRttP95Ms?:0.0} ms · clock offset ${it.clockOffsetMs?:0.0} ms"}?:"No echo samples"
                     val text=when(command){Command.Settings->"${location.reason}\n${location.path}\n\nDisplay budget: 256 MiB, full resolution. Original image bytes are preserved. Finger and trackpad gestures navigate the local camera.";Command.Diagnostics->"$dpiText\nFirst frame: ${startupMs?:0} ms\nCore binding: 1\n${syncLabel(editor.sync)}\n$timing\nEcho RTT is not end-to-end drawing latency.\nDocument rendering and edits use the native core.";else->"Open the instruction panel to edit saved marker and object instructions."}
@@ -295,8 +314,14 @@ fun main(args: Array<String>) {
                 if(editor.canvasReady&&editor.background!=null)EraserOverlay(controller.erasers,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
                 if(editor.canvasReady&&editor.background!=null)SelectionOverlay(controller.selections,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
                 if(editor.document!=null&&(editor.renderIssue!=null||!editor.canvasReady||editor.background==null)){
-                    val status=editor.renderIssue?:if(!editor.canvasReady)"Preparing this revision…"else if(editor.busy)"Loading the original image…"else"The source image is unavailable. Review its color and memory settings."
-                    Text(status,Modifier.align(Alignment.Center).widthIn(max=440.dp).padding(24.dp),color=Color(0xffaebccb))
+                    val status=editor.backgroundIssue?.takeIf{editor.background==null}?:editor.renderIssue?:if(!editor.canvasReady)"Preparing this revision…"else if(editor.busy)"Loading the original image…"else"The original image is not currently displayed. Retry image display or review the project status."
+                    Column(Modifier.align(Alignment.Center).widthIn(max=440.dp).padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+                        Text(status,color=Color(0xffaebccb))
+                        if(editor.background==null){
+                            if(editor.needsColorConsent)Button(onClick=controller::assumeSrgb,enabled=!editor.busy&&!quitting){Text("Treat untagged colors as sRGB")}
+                            TextButton(onClick={controller.retryBackground()},enabled=!editor.busy&&!quitting){Text("Retry image display")}
+                        }
+                    }
                 }
                 if(editor.document==null)Column(Modifier.align(Alignment.Center).widthIn(max=420.dp).padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(18.dp)){
                     Text("Make the detail clear.",style=MaterialTheme.typography.h4,fontWeight=FontWeight.Medium);Text("Open an image to annotate, refine and export at its original resolution.",color=Color(0xffaebccb));Button(onClick={action(Command.Import)}){Text("Import image  ·  Ctrl+I")};TextButton(onClick={action(Command.Open)}){Text("Open a saved project")}
@@ -307,7 +332,6 @@ fun main(args: Array<String>) {
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){palette.forEach{rgba->Box(Modifier.size(24.dp).background(Color(((rgba and 255u)shl 24 or(rgba shr 8)).toInt()),RoundedCornerShape(5.dp)).border(if(editor.color==rgba)2.dp else 0.dp,Color.White,RoundedCornerShape(5.dp)).clickable{controller.color(rgba)})}}
                 Text("Width  ${"%.1f".format(editor.width)} px",style=MaterialTheme.typography.body2);Slider(value=editor.width.toFloat(),onValueChange={controller.width(it.toDouble(),false)},onValueChangeFinished={controller.commitWidth()},valueRange=.25f..256f,enabled=!editor.busy)
                 Text("Drag selected objects to move. Drag the lower-right handle to resize. Each gesture saves one undo step.",style=MaterialTheme.typography.caption,color=Color(0xff9cabbc));Divider();Text("LOCAL VIEW",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc));commandButton(Command.Fit,action);commandButton(Command.ActualPixels,action);commandButton(Command.MatchPeer,action)
-                if(editor.needsColorConsent)Button(onClick={controller.assumeSrgb()}){Text("Treat untagged colors as sRGB")}
                 commandButton(Command.Pairing,action);if(editor.sync?.blocked?.let{it>0u}==true)Text("${editor.sync?.blocked} pending edits need conflict review.",color=MaterialTheme.colors.secondary,style=MaterialTheme.typography.caption)
                 if(editor.routeWarnings.isNotEmpty())Text("Tether default-route warning. Open Devices for the metric fix and revert.",color=MaterialTheme.colors.secondary,style=MaterialTheme.typography.caption)
                 InstructionsPanel(controller.instructionEditor,controller.instructionFocus,controller.semanticEditor,editor.selected.firstOrNull(),Modifier.weight(1f),onTextFocus={controller.canvasFocus(false)})

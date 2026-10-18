@@ -37,6 +37,8 @@ public actual suspend fun localSessionAddresses(): List<LocalSessionAddress> = L
             if(++count>256) throw SessionFailure(SessionFailureKind.Backpressure)
             val network=interfaces.nextElement()
             if(network.index<=0||!network.isUp) continue
+            val interfaceName=checkedPeerLabel(network.displayName ?: "") ?: checkedPeerLabel(network.name ?: "")
+            val loopback=network.isLoopback
             val addresses=network.inetAddresses
             var addressCount=0
             while(addresses.hasMoreElements()) {
@@ -47,7 +49,7 @@ public actual suspend fun localSessionAddresses(): List<LocalSessionAddress> = L
                 val endpoint=if(address is Inet6Address) "[$numeric]:0" else "$numeric:0"
                 try { validateSessionEndpoint(endpoint,true) } catch(_: SessionException.Invalid) { continue }
                 if(result.size>=256) throw SessionFailure(SessionFailureKind.Backpressure)
-                result.add(LocalSessionAddress(numeric,network.index.toUInt()))
+                result.add(LocalSessionAddress(numeric,network.index.toUInt(),interfaceName,loopback))
             }
         }
     } catch(error: SessionFailure) { throw error }
