@@ -232,7 +232,47 @@ pub(crate) fn decode(
     Ok(Pixels::Rgba8(rgba))
 }
 
-pub(crate) fn encode(image: &DecodedImage, out: &mut crate::io::Output<'_>) -> Result<()> {
+// Candidate private metadata carrier, never an ICC profile or a reserved-field
+// extension. At absolute offset 138 (after the complete V5 header):
+// [8-byte magic][u32 LE version=1][u32 LE ASCII length][payload][0..3 zero pad].
+// bfOffBits points past this gap. bfSize covers every byte, biSizeImage covers
+// only pixels; a real ICC profile follows pixels with its own adjusted offset.
+// Microsoft defines bfOffBits independently of the header end. Existing BMP
+// readers skip the gap; other applications may strip it on re-encoding.
+const META_MAGIC: &[u8; 8] = b"VWBMETA\0";
+
+pub(crate) fn provenance(bytes: &[u8], limits: Limits) -> Result<Option<&str>> {
+    let _header = inspect(bytes, limits)?;
+    if le32(bytes, 14)? != 124 || le32(bytes, 10)? <= 138 || bytes.get(138..146) != Some(META_MAGIC)
+    {
+        return Ok(None);
+    }
+    if le32(bytes, 146)? != 1 {
+        return Err(Error::Unsupported);
+    }
+    let len = le32(bytes, 150)? as usize;
+    if len > crate::MAX_METADATA_BYTES {
+        return Err(Error::Limit);
+    }
+    let padded = len.div_ceil(4) * 4;
+    if le32(bytes, 10)? as usize != 154 + padded
+        || range(bytes, (154 + len) as u64, (padded - len) as u64)?
+            .iter()
+            .any(|&b| b != 0)
+    {
+        return Err(Error::Invalid);
+    }
+    let payload = range(bytes, 154, len as u64)?;
+    let metadata = std::str::from_utf8(payload).map_err(|_| Error::Invalid)?;
+    crate::validate_metadata(metadata)?;
+    Ok(Some(metadata))
+}
+
+pub(crate) fn encode(
+    image: &DecodedImage,
+    out: &mut crate::io::Output<'_>,
+    metadata: Option<&str>,
+) -> Result<()> {
     let Pixels::Rgba8(pixels) = &image.pixels else {
         return Err(Error::Depth);
     };
@@ -245,8 +285,10 @@ pub(crate) fn encode(image: &DecodedImage, out: &mut crate::io::Output<'_>) -> R
     }
     let pixel_bytes = u64::from(image.width) * u64::from(image.height) * 4;
     let profile_bytes = image.icc.as_ref().map_or(0, Vec::len) as u64;
+    let gap = metadata.map_or(0, |s| 16 + s.len().div_ceil(4) * 4) as u64;
     let total = 138_u64
-        .checked_add(pixel_bytes)
+        .checked_add(gap)
+        .and_then(|n| n.checked_add(pixel_bytes))
         .and_then(|n| n.checked_add(profile_bytes))
         .ok_or(Error::Limit)?;
     if total > u64::from(u32::MAX) {
@@ -255,7 +297,7 @@ pub(crate) fn encode(image: &DecodedImage, out: &mut crate::io::Output<'_>) -> R
     let mut h = [0_u8; 138];
     h[..2].copy_from_slice(b"BM");
     h[2..6].copy_from_slice(&(total as u32).to_le_bytes());
-    h[10..14].copy_from_slice(&138_u32.to_le_bytes());
+    h[10..14].copy_from_slice(&((138 + gap) as u32).to_le_bytes());
     h[14..18].copy_from_slice(&124_u32.to_le_bytes());
     h[18..22].copy_from_slice(&image.width.to_le_bytes());
     h[22..26].copy_from_slice(&(-(image.height as i32)).to_le_bytes());
@@ -281,10 +323,17 @@ pub(crate) fn encode(image: &DecodedImage, out: &mut crate::io::Output<'_>) -> R
     );
     h[122..126].copy_from_slice(&4_u32.to_le_bytes());
     if image.icc.is_some() {
-        h[126..130].copy_from_slice(&((124 + pixel_bytes) as u32).to_le_bytes());
+        h[126..130].copy_from_slice(&((124 + gap + pixel_bytes) as u32).to_le_bytes());
         h[130..134].copy_from_slice(&(profile_bytes as u32).to_le_bytes());
     }
     out.bytes(&h)?;
+    if let Some(metadata) = metadata {
+        out.bytes(META_MAGIC)?;
+        out.bytes(&1_u32.to_le_bytes())?;
+        out.bytes(&(metadata.len() as u32).to_le_bytes())?;
+        out.bytes(metadata.as_bytes())?;
+        out.bytes(&[0; 3][..(4 - metadata.len() % 4) % 4])?;
+    }
     let mut row = alloc(image.width as usize * 4)?;
     for src in pixels.chunks_exact(image.width as usize * 4) {
         for (a, b) in src
