@@ -480,43 +480,71 @@ interfaces to root. Krita, PDF runtime activation, external authority and all
 physical/product gates remain deferred/open. Preserved worktrees and archives
 are untouched.
 
-## Private giant producer root batch
+## Editing lifecycle correction accepted and published
 
-Code 4a87aac on cloud/giant-producer-draft-20261018 composes the reviewed unchanged
-af934061 leaves and accepted 9b05bea read repair, plus new root ownership/JNI code
-that awaits Astra review. It is based on editing 707e940; the separately published
-correction 35ad8b4/a1ad07f is awaiting recheck and is not in this branch. Main stays
-reviewed 6f3e2f3. Do not promote this draft until the reviewed editing correction
-and independent composed root-source review are complete.
+Astra accepted a1ad07f (code 35ad8b4) after independently checking all four
+observer-retirement scenarios. Both P2 findings on 707e940 are closed: retirement
+starts inside the restoration guard, and rotation clears Unconfirmed only after
+an admitted snapshot. Main was advanced normally from 6f3e2f3 to exact a1ad07f
+and its remote SHA verified. The corrected roots and common guard are merged
+into this producer correction branch; the merge changes no producer code.
 
-All four publication parts now enter one payload before fallible construction.
-The same 32 MiB charge drops last in actual ProjectState; its permit retires with
-that state. A real native publication/adoption regression verifies prepared/build
-retirement, the retained project charge, exact original bytes and database reopen.
-Three additional worker tests cover constructor refusal, cancelled close and
-abandoned startup delivery. The private Android runner bridge invokes the real
-fixed JVM producer, admits same-pool ownership and copies checked typed output
-under withRootOutput into independent native storage. It withholds the build until
-actual Java close succeeds. JNI symbols/descriptors are checked; actual ART/codec/
-GPU execution remains open. Fixed producer file reads add three sentinel/capacity/
-admission regressions without changing the accepted 256 MiB phone cap.
+The exact correction receipt passes 949 JVM/unit cases (464 shared, 349 Desktop,
+136 Android), with seven Windows-only skips. Instrumentation source compiles and
+Android app lint has zero errors, 60 warnings and 12 hints. That receipt is bound
+to the correction source, not the new producer fix. No physical/device run,
+native rerun or extra binding generation is claimed for the editing correction.
+See `evidence/EDITING_LIFECYCLE_CORRECTION_20261018.json` and its excerpts.
 
-Final checks pass 547 native executions in 38 result blocks (two private child
-entrypoints ignored in the parent harness and exercised by owning tests), strict
-Linux and arm64 library Clippy, fresh libraries, one core-binding generation,
-944 JVM/unit cases and both instrumentation source sets. Seven Windows cases skip;
-the 19 Android producer cases compile only. Android app lint has zero errors,
-60 warnings and 12 hints. The lock adds only the internal Windows producer and
-FFI edge; external pins and license policy remain intact. Precise scope, source/
-artifact bindings and failed attempts are recorded in
-`evidence/GIANT_PRODUCER_ROOT_VALIDATION_20261018.json`.
+## Giant producer review and foreign source retirement correction
 
-This is private producer/root composition, not a user giant intake/import/rebuild/
-export pass. Public owned-input and caller APIs, existing-project budget adoption,
-actual Android JNI/codec/renderer retirement and Windows dynamic runtime remain
-next work. The exact three-file pending-input continuation grant lets the image
-owner proceed after root freezes without moving root registration or controllers.
-Capture-picker 9769d218 is narrowly accepted for a separate caller batch; later
-Air Actions wiring uses 2a66b8. T5.01 semantic/recapture proposals remain held until
-their repaired 4436382 source receives a verdict. No physical/product gate, private
-capture, provider call, signing/install or old-worktree disposition changes.
+The c0d1e602 producer draft (code 4a87aac) composed the accepted af934061 producer
+leaves and 9b05bea streaming read repair. Its original source-bound receipt records
+547 native executions/38 result blocks, strict Linux and Android Clippy, fresh
+libraries, one core binding generation, 944 JVM/unit passes, instrumentation
+source compilation and lint zero errors. Two private child cases were ignored in
+the parent and exercised by their owning tests; seven Windows cases skipped.
+Nineteen Android producer cases compiled, without executing a device codec.
+See `evidence/GIANT_PRODUCER_ROOT_VALIDATION_20261018.json` for exact source and
+artifact bindings. Those checks do not validate subsequent changes.
+
+Astra accepted the four-part retained-publication constructor and fixed-capacity
+reads but held c0d1e602 for G1/P2: failed Java cleanup quarantined its owner while
+JNI released the native PreparedSource. Closing the native input then recursively
+removed Java output/marker, preventing its exact retry and stranding its 80 MiB
+reservation/producer slot. Source correction 181e4a4 adds a bounded native pin of
+the exact PreparedSource before Java invocation. Every unproven JNI/error/cancel/
+timeout/unwind exit retains it. Only the pinned Java runtime's exact operation
+retirement callback releases it, after actual files/charge/slot retirement or a
+later successful quarantine retry. Status zero alone cannot approve a build.
+
+Two new portable tests cover seven exit conditions and exact bounded pins. They
+close the actual native input, assert source/output-marker and 84 MiB ownership
+survive, simulate exact foreign retry, and assert final deletion/zero charge.
+One additional Android case checks actual Java quarantine identity/slot/charge
+tracking. These new tests are WRITTEN, NOT RUN. Only Rust formatting, whitespace
+and source secret scans have run on this correction. The image owner retains the
+heavy build slot and exclusive picked.rs/picked_tests.rs/input.rs lane; root has
+not touched those three files or started a compiler. Focused native/Android
+compilation, runtime evidence and Astra recheck remain pending.
+
+## Other source-only caller candidates and next dependencies
+
+Capture/Air Actions/T5.01 accepted leaf commits plus initial capture root wiring
+are preserved at a5b683d on cloud/capture-air-verification-draft-20261018. This is
+an explicitly uncompiled WIP checkpoint, separate from main and this correction.
+It retains the exact capture prerequisite patch, recovered shared physical-pixel
+region helper and six written cases, an independently owned picker service,
+protection outcome, modal guards and visible cleanup retry. Air Actions uses the
+accepted ninth-press correction 2a66b8; its platform callers remain to compose.
+T5.01 repaired 4436382 leaf is accepted; private recapture/current-catalog and
+optional publication registration guards still need deliberate root integration.
+No picked local project is falsely treated as a retained OS verification target.
+
+Public giant intake/caller APIs, opened-project/rebuild budget adoption, actual
+Android JNI/codec/GPU execution, Windows pinned runtime/Job evidence and device
+performance remain open. The four-file T5.01 continuation grant and three-file
+giant picked-input grant preserve root DTO/FFI/schema/controller ownership.
+Krita and live provider work remain deferred; no signing, installation, external
+authority, physical/product gate or old-worktree disposition changed.
+

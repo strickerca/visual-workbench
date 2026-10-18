@@ -389,11 +389,23 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         cancelTool();followPeer=false
         // Keep the authenticated ProjectLink and native project/history. Only
         // subscriptions carrying the old attachment token retire here.
-        changesJob?.cancelAndJoin();changesJob=null;refreshQueue?.close();refreshQueue=null
-        refreshJob?.cancelAndJoin();refreshJob=null
-        linkChanges?.cancelAndJoin();linkChanges=null;peerWorker?.cancelAndJoin();peerWorker=null
+        suspend fun retireObservers(){
+            changesJob?.cancelAndJoin();changesJob=null;refreshQueue?.close();refreshQueue=null
+            refreshJob?.cancelAndJoin();refreshJob=null
+            linkChanges?.cancelAndJoin();linkChanges=null;peerWorker?.cancelAndJoin();peerWorker=null
+        }
         var metadataRetired=false
-        try {
+        withDocumentObserversRetired(
+            retire={retireObservers()},
+            restore={if(!disposing&&project===a.project){
+                try {
+                    if(metadataRetired){instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()}
+                } finally {
+                    observeProject(a.project,epoch);refreshQueue?.trySend(Unit)
+                    link?.let{observeLink(it,a.project,epoch,linkEpoch,reattachAgent=false);instructionFocus.attach(it)}
+                }
+            }},
+        ) {
             refreshMutex.withLock {
                 rotation.detach();semanticEditor.detach();instructionEditor.detach();instructionFocus.detach()
                 metadataRetired=true
@@ -415,16 +427,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();documentOwner.bind(a.project,target)
                 fit();bindWorkflows();refreshOriginalFormatNotice();loadBackground()
             }
-        } finally {withContext(NonCancellable){
-            if(!disposing&&project===a.project){
-                try {
-                    if(metadataRetired){instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()}
-                } finally {
-                    observeProject(a.project,epoch);refreshQueue?.trySend(Unit)
-                    link?.let{observeLink(it,a.project,epoch,linkEpoch,reattachAgent=false);instructionFocus.attach(it)}
-                }
-            }
-        }}
+        }
     }
     private val preferencesWriter: Job
 
@@ -435,7 +438,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             if(value.failure==ObjectRotationFailure.Unconfirmed&&!disposing){
                 val current=project;val token=epoch
                 if(current!=null)scope.launch{mutations.withLock{
-                    if(current===project&&token==epoch&&!disposing)try{refresh(current,current.info(),token);rotation.reconciled()}
+                    if(current===project&&token==epoch&&!disposing)try{refresh(current,current.info(),token)}
                     catch(error:Exception){report(error)}
                 }}
             }
