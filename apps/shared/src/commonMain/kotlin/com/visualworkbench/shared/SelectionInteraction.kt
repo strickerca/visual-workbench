@@ -44,8 +44,8 @@ public data class SelectionUiState(
     public val loading: Boolean = false,
     public val message: String? = null,
 ) {
-    public val canFinishPolygon: Boolean get() = canDraw && !polygonContactActive && draft?.tool == SelectionTool.Polygon && (draft?.points?.size ?: 0) >= 3
-    public val canUndoPolygonVertex: Boolean get() = canDraw && !polygonContactActive && draft?.tool == SelectionTool.Polygon && !draft?.points.isNullOrEmpty()
+    public val canFinishPolygon: Boolean get() = canDraw && !polygonContactActive && (draft?.let { it.tool == SelectionTool.Polygon && it.points.size >= 3 } == true)
+    public val canUndoPolygonVertex: Boolean get() = canDraw && !polygonContactActive && (draft?.let { it.tool == SelectionTool.Polygon && it.points.isNotEmpty() } == true)
     public val canDraw: Boolean get() = active && document != null && !busy && !loading &&
         (selection?.editable != false) && (tool != SelectionTool.MaskEraser || selection != null)
     public val canRefine: Boolean get() = document != null && selection?.editable == true && !busy && !loading
@@ -160,7 +160,7 @@ public class SelectionInteraction(
         cancelGesture(); mutableState.value = mutableState.value.copy(radius = radius, opacity = opacity)
     }
     public fun refinementRadius(value: UInt) {
-        require(value in 1u..256u); mutableState.value = mutableState.value.copy(refinementRadius = value)
+        require(value in 1u..256u); cancelGesture(); mutableState.value = mutableState.value.copy(refinementRadius = value)
     }
     public fun dismissMessage() { mutableState.value = mutableState.value.copy(message = null) }
     public fun newSelection() {

@@ -72,6 +72,10 @@ class PolygonEditorTest {
                 }, LocationPolicy(root, true, "owned synthetic fixture"), device)
                 try {
                     editor.viewport(100.0, 100.0); editor.open(path)
+                    await { !editor.state.value.busy && (editor.state.value.background != null || editor.state.value.needsColorConsent || editor.state.value.backgroundIssue != null) }
+                    // This fixture owns this synthetic untagged PNG. Exercise the
+                    // ordinary explicit consent action rather than weakening admission.
+                    if (editor.state.value.needsColorConsent) editor.assumeSrgb()
                     await { !editor.state.value.busy && editor.state.value.background != null && !editor.instructionEditor.state.value.busy && !editor.semanticEditor.state.value.busy }
                     val state = editor.state.value
                     editor.canvasPrepared(checkNotNull(state.document).binding(state.projectEpoch))
@@ -79,7 +83,7 @@ class PolygonEditorTest {
                     withTimeout(5000) { editor.selections.state.first { it.canDraw } }
                     block(editor)
                 } finally {
-                    withContext(NonCancellable) { editor.close() }; scope.cancel()
+                    withContext(NonCancellable) { editor.close(); scope.coroutineContext[Job]?.cancelAndJoin() }
                     Files.walk(root).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach { Files.delete(it) } }
                 }
             }

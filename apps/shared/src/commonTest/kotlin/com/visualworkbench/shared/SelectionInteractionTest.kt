@@ -84,7 +84,7 @@ class SelectionInteractionTest {
         } finally { f.close() }
     }
     @Test fun polygonRevisionViewportAttachmentAndToolChangesCannotPublishOldVertices() {
-        for (reason in 0..3) {
+        for (reason in 0..4) {
             val f = SelectionFixture()
             try {
                 f.ui.tool(SelectionTool.Polygon)
@@ -93,6 +93,7 @@ class SelectionInteractionTest {
                     0 -> f.ui.observe(f.info.copy(stateHash = "new-pending-visible-hash"), 2u)
                     1 -> f.ui.viewport(f.camera.copy(rotation = .5))
                     2 -> immediate { f.ui.detach() }
+                    3 -> f.ui.refinementRadius(8u)
                     else -> f.ui.tool(SelectionTool.Ellipse)
                 }
                 assertFalse(f.ui.finishPolygon()); assertTrue(f.api.edits.isEmpty()); assertNull(f.ui.state.value.draft)
