@@ -108,3 +108,37 @@ pub(crate) fn crop(bounds: [f64; 4], w: u32, h: u32, edge: u32) -> Result<ImageM
     let (y, height) = axis(bounds[1], bounds[3], h);
     ImageMapping::new([x, y, width, height], edge, 256)
 }
+
+/// Refuse omitted owner meaning before allocating package pixel buffers. Hidden
+/// markers still belong to the export. Bounds are validated in immutable D;
+/// checking only a marker center would silently clip a partially cropped box.
+pub(crate) fn admit_output_instructions(
+    crop: [u32; 4],
+    instructions: &vw_instructions::InstructionExport,
+) -> Result<()> {
+    let [left, top, width, height] = crop.map(f64::from);
+    for marker in instructions.markers() {
+        let [x, y] = marker.point_document;
+        if !x.is_finite()
+            || !y.is_finite()
+            || x < left
+            || y < top
+            || x >= left + width
+            || y >= top + height
+        {
+            return Err(Error::Invalid("image output omits instruction"));
+        }
+        if let Some([x, y, w, h]) = marker.bounds_document
+            && (![x, y, w, h].iter().all(|value| value.is_finite())
+                || w <= 0.0
+                || h <= 0.0
+                || x < left
+                || y < top
+                || x + w > left + width
+                || y + h > top + height)
+        {
+            return Err(Error::Invalid("image output omits instruction"));
+        }
+    }
+    Ok(())
+}
