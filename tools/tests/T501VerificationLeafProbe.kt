@@ -12,6 +12,7 @@ internal object T501VerificationLeafProbe {
         var refused = false
         try { body() } catch (_: IllegalArgumentException) { refused = true }
         catch (_: IllegalStateException) { refused = true }
+        catch (_: java.nio.charset.CharacterCodingException) { refused = true }
         check(refused) { "Expected refusal" }
     }
     private fun uuid(n: Int) = "019a3aaa-0123-789a-8abc-${n.toString(16).padStart(12, '0')}"
@@ -26,6 +27,16 @@ internal object T501VerificationLeafProbe {
         McpInboxImage(256u, 128u, 8u, 64uL, "1".repeat(64), null, 1u), false)
     private fun bound(original: PackageInfo = info()): McpVerificationTargets = McpVerificationTargets().also {
         it.rememberCapture(original, "chosen-window"); check(it.rememberPackage(original))
+    }
+    private fun semanticJson(count: Int, name: String = "untrusted"): ByteArray {
+        val source = info(); val snapshot = uuid(400)
+        val rows = (0 until count).joinToString(",") { n ->
+            McpJson.encode(linkedMapOf("eid" to "$snapshot/${n.toString().padStart(4, '0')}", "parent" to null,
+                "name" to name, "role" to "button", "automation_id" to "stable$n", "resource_id" to null,
+                "html_id" to null, "bounds_document" to listOf(10, 20, 30, 40), "bounds_clipped" to false,
+                "text" to "untrusted", "enabled" to true, "focused" to false)).toString(Charsets.UTF_8)
+        }
+        return """{"schema_version":1,"project_id":"${source.binding.projectId}","document_id":"${source.binding.documentId}","snapshot_id":"$snapshot","platform":"uia","frame_delta_ms":17,"text_is_untrusted":true,"elements":[$rows]}""".toByteArray()
     }
 
     @JvmStatic fun main(args: Array<String>) {
@@ -182,6 +193,37 @@ internal object T501VerificationLeafProbe {
             refuses { McpAlignmentSnapshot.fromCheckedPackage(original.copy(binding = original.binding.copy(documentId = uuid(800))), json) }
             val noSnapshot = """{"schema_version":1,"project_id":"${original.binding.projectId}","document_id":"${original.binding.documentId}","text_is_untrusted":true,"elements":[]}""".toByteArray()
             check(McpAlignmentSnapshot.fromCheckedPackage(original, noSnapshot) == null)
+        }
+        test("valid 2000 and maximum 4096 element snapshots retain all records") {
+            for (count in listOf(2000, 4096)) {
+                val json = semanticJson(count)
+                // Preserve the deliberately smaller owner-IPC node allowance.
+                refuses { McpJson.decode(json) }
+                val decoded = requireNotNull(McpAlignmentSnapshot.fromCheckedPackage(original, json))
+                check(decoded.elements.size == count)
+                check(decoded.elements.last().automationId == "stable${count - 1}")
+            }
+        }
+        test("semantic byte element and aggregate text ceilings refuse oversized input") {
+            refuses { McpAlignmentSnapshot.fromCheckedPackage(original, semanticJson(4097)) }
+            refuses { McpAlignmentSnapshot.fromCheckedPackage(original, ByteArray(4 * 1024 * 1024 + 1) { 32 }) }
+            val tooMuchText = semanticJson(2000, "x".repeat(1100))
+            check(tooMuchText.size < 4 * 1024 * 1024)
+            refuses { McpAlignmentSnapshot.fromCheckedPackage(original, tooMuchText) }
+        }
+        test("semantic record framing preserves quoted delimiters and rejects malformed collections") {
+            val quoted = "name has \\\"elements\\\":[{}], ] and }"
+            check(McpAlignmentSnapshot.fromCheckedPackage(original, semanticJson(2, quoted))!!.elements.all { it.name == quoted })
+            val text = semanticJson(2).toString(Charsets.UTF_8)
+            for (bad in listOf(text.replace("},{", "}{"), text.dropLast(2) + ",]}",
+                text.dropLast(1) + ",\"elements\":[]}", text.replace("\"role\":\"button\"", "\"role\":\"button\",\"role\":\"button\""),
+                text.dropLast(8), text.replace("[10,20,30,40]", "[10,20,30,1e999]"),
+                text.replace("\"name\":\"untrusted\"", "\"name\":\"\\uD800\""),
+                text.replace("\"name\":\"untrusted\"", "\"name\":" + "[".repeat(34) + "0" + "]".repeat(34)))) {
+                refuses { McpAlignmentSnapshot.fromCheckedPackage(original, bad.toByteArray()) }
+            }
+            val invalidUtf8 = semanticJson(1).also { it[it.indexOf('u'.code.toByte())] = 0xff.toByte() }
+            refuses { McpAlignmentSnapshot.fromCheckedPackage(original, invalidUtf8) }
         }
         println("$passed verification leaf cases passed; no device/capture/alignment acceptance asserted.")
     }
