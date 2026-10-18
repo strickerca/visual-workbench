@@ -10,7 +10,7 @@ fn lossless_frame_roundtrip_binds_hash_extent_geometry_and_every_rgba_sample() {
     let mut w = r
         .begin_frame(identity(1, 32, 16), &Cancellation::default())
         .unwrap();
-    for (n, p) in w.rgba_mut().chunks_exact_mut(4).enumerate() {
+    for (n, p) in w.rgba_mut().as_chunks_mut::<4>().0.iter_mut().enumerate() {
         p.copy_from_slice(&[n as u8, (n / 32) as u8, (n * 13) as u8, 255]);
     }
     let f = w.finish(&Cancellation::default()).unwrap();

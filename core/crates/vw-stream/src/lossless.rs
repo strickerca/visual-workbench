@@ -1,12 +1,13 @@
 use crate::{
-    AcceptedRegion, Cancellation, FrameIdentity, OriginalFrame, Result, StreamError,
-    StreamGeometry, TileRect, rgba_bytes,
+    AcceptedRegion, BudgetedBytes, Cancellation, FrameIdentity, MemoryCharge, MemoryKind,
+    OriginalFrame, Result, SessionBudget, StreamError, StreamGeometry, TileRect, rgba_bytes,
 };
 use std::io::{Cursor, Write};
 use vw_model::AssetId;
 
 pub const MAX_LOSSLESS_BYTES: usize = 64 * 1024 * 1024;
 const PNG_WORK: u64 = 16 * 1024 * 1024;
+const ORIGINAL_OVERHEAD: u64 = 4096;
 
 /// Exact PNG plus its immutable content-address receipt. Publication to a store
 /// or BLOB transport is deliberately performed by the existing storage adapter.
@@ -23,12 +24,57 @@ impl EncodedOriginal {
         self.bytes
     }
 }
+
+/// A charged transport PNG receipt. This remains a transport DTO, not a
+/// metadata-complete user export. Moving to BLOB ownership keeps its admission.
+pub struct BudgetedEncodedOriginal {
+    original: EncodedOriginal,
+    charge: MemoryCharge,
+}
+impl BudgetedEncodedOriginal {
+    pub fn identity(&self) -> &FrameIdentity {
+        &self.original.identity
+    }
+    pub fn asset_id(&self) -> &AssetId {
+        &self.original.asset_id
+    }
+    pub fn bytes(&self) -> &[u8] {
+        self.original.bytes()
+    }
+    pub fn charge(&self) -> &MemoryCharge {
+        &self.charge
+    }
+    pub fn into_transfer(self) -> Result<BudgetedBytes> {
+        BudgetedBytes::from_parts(
+            self.original.bytes,
+            self.charge.reclassify(MemoryKind::Transfer),
+        )
+    }
+    pub fn verify(
+        &self,
+        budget: &SessionBudget,
+        cancel: &Cancellation,
+    ) -> Result<VerifiedOriginal> {
+        if !self.charge.belongs_to(budget) {
+            return Err(StreamError::Invalid);
+        }
+        verify_original_inner(
+            self.identity(),
+            self.asset_id(),
+            self.bytes(),
+            budget.limit_bytes(),
+            Some(budget),
+            cancel,
+        )
+    }
+}
 /// Only a bounded, hash-checked decoder can construct this value. It binds the
 /// exact requested frame/geometry to admitted lossless SDR RGBA8 pixels.
 pub struct VerifiedOriginal {
     identity: FrameIdentity,
     asset_id: AssetId,
     rgba: Vec<u8>,
+    charge: Option<MemoryCharge>,
 }
 impl VerifiedOriginal {
     pub fn identity(&self) -> &FrameIdentity {
@@ -39,6 +85,33 @@ impl VerifiedOriginal {
     }
     pub fn rgba(&self) -> &[u8] {
         &self.rgba
+    }
+    pub fn belongs_to(&self, budget: &SessionBudget) -> bool {
+        self.charge
+            .as_ref()
+            .is_some_and(|charge| charge.belongs_to(budget))
+    }
+    pub fn charged_bytes(&self) -> u64 {
+        self.charge.as_ref().map_or(0, MemoryCharge::bytes)
+    }
+    pub fn copy_into_transfer(
+        &self,
+        budget: &SessionBudget,
+        cancel: &Cancellation,
+    ) -> Result<BudgetedBytes> {
+        if !self.belongs_to(budget) {
+            return Err(StreamError::Invalid);
+        }
+        BudgetedBytes::copy_from(budget, MemoryKind::Transfer, &self.rgba, cancel)
+    }
+}
+impl std::fmt::Debug for VerifiedOriginal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VerifiedOriginal")
+            .field("identity", &self.identity)
+            .field("asset_id", &self.asset_id)
+            .field("charged_bytes", &self.charged_bytes())
+            .finish_non_exhaustive()
     }
 }
 struct Output<'a> {
@@ -67,6 +140,7 @@ impl Write for Output<'_> {
         Ok(())
     }
 }
+/// Isolated codec utility. Production originals use encode_original_budgeted.
 pub fn encode_original(
     frame: &OriginalFrame,
     encoded_limit: usize,
@@ -88,8 +162,31 @@ pub fn encode_original(
         cancel,
     )
 }
+
+pub fn encode_original_budgeted(
+    frame: &OriginalFrame,
+    encoded_limit: usize,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<BudgetedEncodedOriginal> {
+    let g = &frame.identity().geometry;
+    encode_budgeted(
+        frame,
+        TileRect {
+            x: 0,
+            y: 0,
+            width: g.width(),
+            height: g.height(),
+        },
+        frame.identity().clone(),
+        encoded_limit,
+        budget,
+        cancel,
+    )
+}
 /// Crop the exact locally approved original, not another capture. Host-space
 /// origin shifts by F edges, never by DPI; frame/session/time remain unchanged.
+/// Isolated codec utility; production callers use encode_region_budgeted.
 pub fn encode_region(
     region: &AcceptedRegion,
     encoded_limit: usize,
@@ -98,6 +195,29 @@ pub fn encode_region(
 ) -> Result<EncodedOriginal> {
     let frame = region.frame();
     let r = region.rectangle();
+    let id = region_identity(frame, r)?;
+    encode(frame, r, id, encoded_limit, workspace, cancel)
+}
+
+pub fn encode_region_budgeted(
+    region: &AcceptedRegion,
+    encoded_limit: usize,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<BudgetedEncodedOriginal> {
+    let frame = region.frame();
+    let r = region.rectangle();
+    encode_budgeted(
+        frame,
+        r,
+        region_identity(frame, r)?,
+        encoded_limit,
+        budget,
+        cancel,
+    )
+}
+
+fn region_identity(frame: &OriginalFrame, r: TileRect) -> Result<FrameIdentity> {
     let mut id = frame.identity().clone();
     let mut wire = id.geometry.wire().clone();
     let h = wire.client_rect_host.as_mut().ok_or(StreamError::Invalid)?;
@@ -108,7 +228,39 @@ pub fn encode_region(
     // Preserve the exact window/monitor identity while distinguishing the crop.
     wire.source_kind = "region".into();
     id.geometry = StreamGeometry::new(&wire, r.width, r.height)?;
-    encode(frame, r, id, encoded_limit, workspace, cancel)
+    Ok(id)
+}
+
+fn encode_budgeted(
+    frame: &OriginalFrame,
+    r: TileRect,
+    identity: FrameIdentity,
+    encoded_limit: usize,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<BudgetedEncodedOriginal> {
+    cancel.check()?;
+    if !frame.belongs_to(budget) {
+        return Err(StreamError::Invalid);
+    }
+    if encoded_limit == 0 || encoded_limit > MAX_LOSSLESS_BYTES {
+        return Err(StreamError::Limit);
+    }
+    let work = PNG_WORK + u64::from(r.width) * 16;
+    let _codec = budget.reserve(MemoryKind::CodecWorkspace, work)?;
+    let charge = budget.reserve(
+        MemoryKind::Transfer,
+        encoded_limit as u64 + ORIGINAL_OVERHEAD,
+    )?;
+    let original = encode(
+        frame,
+        r,
+        identity,
+        encoded_limit,
+        work + encoded_limit as u64,
+        cancel,
+    )?;
+    Ok(BudgetedEncodedOriginal { original, charge })
 }
 fn encode(
     frame: &OriginalFrame,
@@ -166,11 +318,46 @@ fn encode(
     })
 }
 
+/// Isolated codec utility. Production verification requires an already charged
+/// PNG via verify_original_budgeted or BudgetedEncodedOriginal::verify.
 pub fn verify_original(
     identity: &FrameIdentity,
     expected: &AssetId,
     encoded: &[u8],
     budget: u64,
+    cancel: &Cancellation,
+) -> Result<VerifiedOriginal> {
+    verify_original_inner(identity, expected, encoded, budget, None, cancel)
+}
+
+/// The inbound PNG allocation must already have a reservation from this pool.
+/// Hash/header checks and decode allocations cannot escape aggregate admission.
+pub fn verify_original_budgeted(
+    identity: &FrameIdentity,
+    expected: &AssetId,
+    encoded: &BudgetedBytes,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<VerifiedOriginal> {
+    if !encoded.charge().belongs_to(budget) {
+        return Err(StreamError::Invalid);
+    }
+    verify_original_inner(
+        identity,
+        expected,
+        encoded.bytes(),
+        budget.limit_bytes(),
+        Some(budget),
+        cancel,
+    )
+}
+
+fn verify_original_inner(
+    identity: &FrameIdentity,
+    expected: &AssetId,
+    encoded: &[u8],
+    budget: u64,
+    session: Option<&SessionBudget>,
     cancel: &Cancellation,
 ) -> Result<VerifiedOriginal> {
     cancel.check()?;
@@ -192,6 +379,12 @@ pub fn verify_original(
         identity.geometry.height(),
         cancel,
     )?;
+    let _codec = session
+        .map(|pool| pool.reserve(MemoryKind::CodecWorkspace, PNG_WORK))
+        .transpose()?;
+    let charge = session
+        .map(|pool| pool.reserve(MemoryKind::VerifiedOriginal, raw as u64 + ORIGINAL_OVERHEAD))
+        .transpose()?;
     let mut decoder = png::Decoder::new_with_limits(
         Cursor::new(encoded),
         png::Limits {
@@ -237,6 +430,7 @@ pub fn verify_original(
         identity: identity.clone(),
         asset_id: expected.clone(),
         rgba,
+        charge,
     })
 }
 

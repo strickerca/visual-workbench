@@ -1,4 +1,4 @@
-use crate::{DisplayFrame, FrameIdentity, Result, StreamError, VerifiedOriginal};
+use crate::{DisplayFrame, FrameIdentity, Result, SessionBudget, StreamError, VerifiedOriginal};
 use std::sync::Arc;
 use vw_model::{AssetId, Id};
 
@@ -33,6 +33,12 @@ pub struct FrozenDraft {
     pub displayed: Arc<DisplayFrame>,
     pub quality: FreezeQuality,
     started_ms: u64,
+    lossless_original: Option<Arc<VerifiedOriginal>>,
+}
+impl FrozenDraft {
+    pub fn lossless_original(&self) -> Option<&Arc<VerifiedOriginal>> {
+        self.lossless_original.as_ref()
+    }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PresentationToken {
@@ -49,8 +55,10 @@ pub struct PresentedFrames {
     queued: Option<Arc<DisplayFrame>>,
     in_flight: Option<(PresentationToken, Arc<DisplayFrame>)>,
     displayed: Option<Arc<DisplayFrame>>,
+    budget: Option<SessionBudget>,
 }
 impl PresentedFrames {
+    /// Isolated state-machine utility. Production owners use new_budgeted.
     pub fn new(epoch: u64) -> Result<Self> {
         if epoch == 0 {
             return Err(StreamError::Invalid);
@@ -61,10 +69,25 @@ impl PresentedFrames {
             queued: None,
             in_flight: None,
             displayed: None,
+            budget: None,
         })
+    }
+    /// Production presentation owner. Every queued/drawing/displayed frame must
+    /// carry a reservation from the supplied endpoint pool.
+    pub fn new_budgeted(epoch: u64, budget: SessionBudget) -> Result<Self> {
+        let mut owner = Self::new(epoch)?;
+        owner.budget = Some(budget);
+        Ok(owner)
     }
     /// Enqueue only. This never grants permission to draw the offered frame.
     pub fn offer(&mut self, frame: Arc<DisplayFrame>) -> Result<()> {
+        if self
+            .budget
+            .as_ref()
+            .is_some_and(|pool| !frame.belongs_to(pool))
+        {
+            return Err(StreamError::Invalid);
+        }
         let last = self
             .queued
             .as_ref()
@@ -145,8 +168,10 @@ pub struct FreezeMachine {
     phase: FreezePhase,
     draft: Option<FrozenDraft>,
     source_available: bool,
+    budget: Option<SessionBudget>,
 }
 impl FreezeMachine {
+    /// Isolated state-machine utility. Production owners use new_budgeted.
     pub fn new(epoch: u64, mode: StreamMode) -> Result<Self> {
         if epoch == 0 {
             return Err(StreamError::Invalid);
@@ -157,7 +182,13 @@ impl FreezeMachine {
             phase: FreezePhase::Live,
             draft: None,
             source_available: true,
+            budget: None,
         })
+    }
+    pub fn new_budgeted(epoch: u64, mode: StreamMode, budget: SessionBudget) -> Result<Self> {
+        let mut machine = Self::new(epoch, mode)?;
+        machine.budget = Some(budget);
+        Ok(machine)
     }
     pub fn phase(&self) -> FreezePhase {
         self.phase
@@ -190,6 +221,14 @@ impl FreezeMachine {
         if shown.epoch() != self.epoch {
             return Err(StreamError::Stale);
         }
+        if self.budget.as_ref().is_some_and(|pool| {
+            shown
+                .budget
+                .as_ref()
+                .is_none_or(|shown_pool| !pool.same_pool(shown_pool))
+        }) {
+            return Err(StreamError::Invalid);
+        }
         let displayed = shown.displayed().cloned().ok_or(StreamError::Unavailable)?;
         let request = FreezeRequest {
             draft_id,
@@ -201,6 +240,7 @@ impl FreezeMachine {
             displayed,
             quality: FreezeQuality::Waiting,
             started_ms: now_ms,
+            lossless_original: None,
         });
         self.phase = FreezePhase::Freezing;
         Ok(Some(request))
@@ -208,6 +248,36 @@ impl FreezeMachine {
     /// Only the complete verified BLOB can settle a lossless swap. The request
     /// identity also fences late responses after cancel/new draft.
     pub fn lossless(
+        &mut self,
+        request: &FreezeRequest,
+        original: &VerifiedOriginal,
+    ) -> Result<bool> {
+        // Borrowed compatibility settlement cannot own the charged pixel
+        // allocation. Production settlement must retain the supplied Arc.
+        if self.budget.is_some() {
+            return Err(StreamError::Invalid);
+        }
+        self.settle_lossless(request, original)
+    }
+    pub fn lossless_budgeted(
+        &mut self,
+        request: &FreezeRequest,
+        original: Arc<VerifiedOriginal>,
+    ) -> Result<bool> {
+        let budget = self.budget.as_ref().ok_or(StreamError::Invalid)?;
+        if !original.belongs_to(budget) {
+            return Err(StreamError::Invalid);
+        }
+        if !self.settle_lossless(request, &original)? {
+            return Ok(false);
+        }
+        self.draft
+            .as_mut()
+            .ok_or(StreamError::Invalid)?
+            .lossless_original = Some(original);
+        Ok(true)
+    }
+    fn settle_lossless(
         &mut self,
         request: &FreezeRequest,
         original: &VerifiedOriginal,
