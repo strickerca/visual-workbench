@@ -12,6 +12,7 @@ use std::{
     },
     time::Instant,
 };
+use vw_ai::config::ProviderKind;
 use vw_ai_provider::{AndroidRuntime, CredentialFailure, Secret, SecretProvider};
 use zeroize::Zeroizing;
 
@@ -162,13 +163,18 @@ fn unavailable(_: jni::errors::Error) -> CredentialFailure {
 
 /// Cannot be created until real Android verifier classes were loaded. Construct
 /// the adapter and validate readiness before reserve/begin_attempt, not after it.
-pub struct AndroidCredentials;
+pub struct AndroidCredentials {
+    kind: ProviderKind,
+}
 impl AndroidCredentials {
     pub fn ready() -> Result<Self> {
+        Self::for_provider(ProviderKind::OpenAiImageEdits)
+    }
+    pub fn for_provider(kind: ProviderKind) -> Result<Self> {
         if !READY.load(Ordering::Acquire) {
             return Err(CredentialFailure::Unavailable);
         }
-        Ok(Self)
+        Ok(Self { kind })
     }
     pub fn is_configured(&self, stop: &dyn vw_ai::Cancellation, deadline: Instant) -> Result<bool> {
         match self.load(stop, deadline) {
@@ -191,7 +197,7 @@ impl SecretProvider for AndroidCredentials {
         runtime
             .vm
             .attach_current_thread_for_scope(|env| {
-                let result = read(env, runtime, stop, deadline);
+                let result = read(env, runtime, self.kind, stop, deadline);
                 env.exception_clear();
                 Ok::<Result<Secret>, jni::errors::Error>(result)
             })
@@ -201,6 +207,7 @@ impl SecretProvider for AndroidCredentials {
 fn read(
     env: &mut Env<'_>,
     runtime: &Runtime,
+    kind: ProviderKind,
     stop: &dyn vw_ai::Cancellation,
     deadline: Instant,
 ) -> Result<Secret> {
@@ -213,8 +220,15 @@ fn read(
         .call_method(
             &runtime.store,
             jni_str!("loadForNative"),
-            jni_sig!("(J)[B"),
-            &[JValue::Long(remaining)],
+            jni_sig!("(IJ)[B"),
+            &[
+                JValue::Int(match kind {
+                    ProviderKind::OpenAiImageEdits => 0,
+                    ProviderKind::GeminiImageGeneration => 1,
+                    ProviderKind::Flux1Fill { .. } => 2,
+                }),
+                JValue::Long(remaining),
+            ],
         )
         .and_then(|v| v.l())
         .map_err(unavailable)?;

@@ -21,8 +21,29 @@ public class ProviderCredentialsInstrumentedTest {
     private val app: Application get() = ApplicationProvider.getApplicationContext()
     private fun fixture(block: (AndroidProviderKeyStore) -> Unit) {
         val store = AndroidProviderKeyStore.fixture(app)
-        try { block(store) } finally { store.fixtureAwaitWorkers(); store.disposeFixture() }
+        try { block(store) } finally {
+            store.fixtureAwaitWorkers()
+            for (kind in listOf(AiProviderKind.GeminiImageGeneration, AiProviderKind.Flux1Fill))
+                store.forProvider(kind).disposeFixture()
+            store.disposeFixture()
+        }
     }
+    @Test public fun syntheticProviderNamespacesDoNotReadOrDeleteEachOther(): Unit = fixture { store -> runBlocking {
+        val gemini = store.forProvider(AiProviderKind.GeminiImageGeneration)
+        val flux = store.forProvider(AiProviderKind.Flux1Fill)
+        gemini.save("synthetic-gemini-only".toByteArray())
+        flux.save("synthetic-flux-only".toByteArray())
+        assertFalse(store.isConfigured())
+        val geminiBytes = requireNotNull(store.loadForNative(1, 5000))
+        val fluxBytes = requireNotNull(store.loadForNative(2, 5000))
+        try {
+            assertArrayEquals("synthetic-gemini-only".toByteArray(), geminiBytes)
+            assertArrayEquals("synthetic-flux-only".toByteArray(), fluxBytes)
+        } finally { store.clearForNative(geminiBytes); store.clearForNative(fluxBytes) }
+        gemini.remove()
+        assertFalse(gemini.isConfigured())
+        assertTrue(flux.isConfigured())
+    } }
     @Test public fun encryptedRoundtripFreshArrayOwnershipAndRemove(): Unit = fixture { store -> runBlocking {
         assertFalse(store.isConfigured())
         val input = "synthetic-only-provider-key".toByteArray()

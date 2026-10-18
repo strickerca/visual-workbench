@@ -10,9 +10,11 @@ use std::{
     },
 };
 use vw_ai::budget::{BudgetLedger, SqliteBudgetLedger};
+use vw_ai::budget::{BudgetPolicy, Confirmation};
+use vw_ai::config::ProviderKind;
 #[cfg(any(windows, target_os = "android"))]
 use vw_ai_provider::SecretProvider;
-use vw_ai_provider::{OpenAiAdapter, PlatformTrust};
+use vw_ai_provider::{FluxFillAdapter, GeminiAdapter, OpenAiAdapter, PlatformTrust, SendOutcome};
 
 static OWNERS: AtomicUsize = AtomicUsize::new(0);
 pub(super) struct OwnerPermit;
@@ -159,15 +161,9 @@ impl AiService {
                     check(&stop, &cancellation)?;
                     let state = shared.try_lock().map_err(|_| AiEditError::Busy)?;
                     let today = configuration::today()?;
-                    // The present protected store contains only the OpenAI
-                    // credential. Never present it as readiness for another
-                    // provider or read it on that provider's behalf.
-                    let provider_ready = matches!(
-                        state.configuration.provider.kind,
-                        vw_ai::config::ProviderKind::OpenAiImageEdits
-                    );
+                    let provider_ready = cfg!(any(windows, target_os = "android"));
                     let configured = if provider_ready {
-                        credential_ready(&cancellation)?
+                        credential_ready(state.configuration.provider.kind, &cancellation)?
                     } else {
                         false
                     };
@@ -192,13 +188,20 @@ impl AiService {
     ) -> AiEditResult<()> {
         let bytes = zeroize::Zeroizing::new(bytes);
         let stop = self.closed.clone();
+        let shared = self.state.clone();
         self.worker
             .call(move |_| {
                 Ok((|| {
                     check(&stop, &cancellation)?;
                     #[cfg(windows)]
                     {
-                        vw_ai_platform::windows::WindowsCredentials
+                        let kind = shared
+                            .try_lock()
+                            .map_err(|_| AiEditError::Busy)?
+                            .configuration
+                            .provider
+                            .kind;
+                        vw_ai_platform::windows::WindowsCredentials::for_provider(kind)
                             .save(
                                 bytes,
                                 cancellation.as_ref(),
@@ -208,6 +211,7 @@ impl AiService {
                     }
                     #[cfg(not(windows))]
                     {
+                        let _ = shared;
                         let _ = bytes;
                         Err(AiEditError::Unsupported)
                     }
@@ -220,13 +224,20 @@ impl AiService {
         cancellation: Arc<crate::Cancellation>,
     ) -> AiEditResult<()> {
         let stop = self.closed.clone();
+        let shared = self.state.clone();
         self.worker
             .call(move |_| {
                 Ok((|| {
                     check(&stop, &cancellation)?;
                     #[cfg(windows)]
                     {
-                        vw_ai_platform::windows::WindowsCredentials
+                        let kind = shared
+                            .try_lock()
+                            .map_err(|_| AiEditError::Busy)?
+                            .configuration
+                            .provider
+                            .kind;
+                        vw_ai_platform::windows::WindowsCredentials::for_provider(kind)
                             .remove(
                                 cancellation.as_ref(),
                                 Instant::now() + Duration::from_secs(5),
@@ -235,6 +246,7 @@ impl AiService {
                     }
                     #[cfg(not(windows))]
                     {
+                        let _ = shared;
                         Err(AiEditError::Unsupported)
                     }
                 })())
@@ -252,15 +264,47 @@ impl Drop for AiService {
         self.closed.store(true, Ordering::Release);
     }
 }
-pub(super) fn adapter(cancel: &crate::Cancellation) -> AiEditResult<OpenAiAdapter> {
-    if !credential_ready(cancel)? {
+pub(super) enum ProviderAdapter {
+    OpenAi(OpenAiAdapter),
+    Gemini(GeminiAdapter),
+    Flux(FluxFillAdapter),
+}
+impl ProviderAdapter {
+    pub fn send_confirmed(
+        &mut self,
+        prepared: &vw_ai::Prepared,
+        ledger: &mut impl BudgetLedger,
+        confirmation: Confirmation,
+        policy: BudgetPolicy,
+        cancel: &dyn vw_ai::Cancellation,
+    ) -> vw_ai_provider::Result<SendOutcome> {
+        match self {
+            Self::OpenAi(adapter) => {
+                adapter.send_confirmed(prepared, ledger, confirmation, policy, cancel)
+            }
+            Self::Gemini(adapter) => {
+                adapter.send_confirmed(prepared, ledger, confirmation, policy, cancel)
+            }
+            Self::Flux(adapter) => {
+                adapter.send_confirmed(prepared, ledger, confirmation, policy, cancel)
+            }
+        }
+    }
+}
+pub(super) fn adapter(
+    kind: ProviderKind,
+    cancel: &crate::Cancellation,
+) -> AiEditResult<ProviderAdapter> {
+    if !credential_ready(kind, cancel)? {
         return Err(AiEditError::Credentials);
     }
     #[cfg(windows)]
-    let secrets: Arc<dyn SecretProvider> = Arc::new(vw_ai_platform::windows::WindowsCredentials);
+    let secrets: Arc<dyn SecretProvider> = Arc::new(
+        vw_ai_platform::windows::WindowsCredentials::for_provider(kind),
+    );
     #[cfg(target_os = "android")]
     let secrets: Arc<dyn SecretProvider> = Arc::new(
-        vw_ai_platform::android::AndroidCredentials::ready()
+        vw_ai_platform::android::AndroidCredentials::for_provider(kind)
             .map_err(|_| AiEditError::Credentials)?,
     );
     #[cfg(not(any(windows, target_os = "android")))]
@@ -268,28 +312,40 @@ pub(super) fn adapter(cancel: &crate::Cancellation) -> AiEditResult<OpenAiAdapte
         Err(AiEditError::Unsupported)
     }
     #[cfg(any(windows, target_os = "android"))]
-    OpenAiAdapter::new(
-        PlatformTrust::system().map_err(|_| AiEditError::Credentials)?,
-        secrets,
-    )
-    .map_err(AiEditError::from)
+    {
+        let trust = PlatformTrust::system().map_err(|_| AiEditError::Credentials)?;
+        match kind {
+            ProviderKind::OpenAiImageEdits => {
+                OpenAiAdapter::new(trust, secrets).map(ProviderAdapter::OpenAi)
+            }
+            ProviderKind::GeminiImageGeneration => {
+                GeminiAdapter::new(trust, secrets, vw_ai_provider::Secret::api_key_header)
+                    .map(ProviderAdapter::Gemini)
+            }
+            ProviderKind::Flux1Fill { .. } => {
+                FluxFillAdapter::new(trust, secrets, vw_ai_provider::Secret::api_key_header)
+                    .map(ProviderAdapter::Flux)
+            }
+        }
+        .map_err(AiEditError::from)
+    }
 }
-fn credential_ready(cancel: &crate::Cancellation) -> AiEditResult<bool> {
+fn credential_ready(kind: ProviderKind, cancel: &crate::Cancellation) -> AiEditResult<bool> {
     #[cfg(windows)]
     {
-        vw_ai_platform::windows::WindowsCredentials
+        vw_ai_platform::windows::WindowsCredentials::for_provider(kind)
             .is_configured(cancel, Instant::now() + Duration::from_secs(5))
             .map_err(|_| AiEditError::Credentials)
     }
     #[cfg(target_os = "android")]
     {
-        vw_ai_platform::android::AndroidCredentials::ready()
+        vw_ai_platform::android::AndroidCredentials::for_provider(kind)
             .and_then(|store| store.is_configured(cancel, Instant::now() + Duration::from_secs(5)))
             .map_err(|_| AiEditError::Credentials)
     }
     #[cfg(not(any(windows, target_os = "android")))]
     {
-        let _ = cancel;
+        let _ = (kind, cancel);
         Err(AiEditError::Unsupported)
     }
 }

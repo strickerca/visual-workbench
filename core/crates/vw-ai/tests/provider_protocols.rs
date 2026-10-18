@@ -33,7 +33,19 @@ fn gemini_config() -> ProviderConfig {
     config
 }
 fn prepared_provider(config: ProviderConfig) -> Result<Prepared> {
+    prepared_provider_with_instruction(config, None)
+}
+fn prepared_provider_with_instruction(
+    config: ProviderConfig,
+    instruction: Option<&str>,
+) -> Result<Prepared> {
     let mut opt = options(1).map_err(|_| Error::Invalid("fixture id"))?;
+    if let Some(text) = instruction {
+        opt.instructions = vec![Instruction {
+            role: InstructionRole::Change,
+            text: text.into(),
+        }];
+    }
     opt.estimated_tokens = if matches!(config.kind, ProviderKind::Flux1Fill { .. }) {
         None
     } else {
@@ -44,6 +56,29 @@ fn prepared_provider(config: ProviderConfig) -> Result<Prepared> {
         png8(256, 256, |_, _| [20, 40, 60, 255]).map_err(|_| Error::Invalid("fixture PNG"))?;
     let mask = region(256, 256, 100, 100, 156, 156).map_err(|_| Error::Invalid("fixture mask"))?;
     Prepared::new(&source, &[mask], opt, &NeverCancel)
+}
+
+#[test]
+fn provider_mask_preamble_does_not_rewrite_quoted_user_instructions() -> TestResult {
+    let quoted = "The attached transparent-alpha mask guides the change region.";
+    for kind in [gemini_config(), flux_config()] {
+        let prepared = prepared_provider_with_instruction(kind, Some(quoted))?;
+        let request = authorize(&prepared)?;
+        let body: serde_json::Value = serde_json::from_slice(request.body())?;
+        let prompt = if request.provider_kind() == ProviderKind::GeminiImageGeneration {
+            body["contents"][0]["parts"][0]["text"]
+                .as_str()
+                .ok_or("Gemini prompt")?
+        } else {
+            body["prompt"].as_str().ok_or("FLUX prompt")?
+        };
+        assert!(prompt.contains("The second image is a black/white change-region mask"));
+        assert_eq!(prompt.matches(quoted).count(), 1);
+        let instructions: serde_json::Value =
+            serde_json::from_str(prompt.split_once('\n').ok_or("preamble")?.1)?;
+        assert_eq!(instructions[0]["text"], quoted);
+    }
+    Ok(())
 }
 fn authorize(
     prepared: &Prepared,
@@ -245,5 +280,52 @@ fn flux_download_keeps_attempt_unsettled_and_local_exterior_proof() -> TestResul
         Err(Error::Exterior(_))
     ));
     assert!(request.parse_response(b"{}").is_err());
+    Ok(())
+}
+
+#[test]
+fn exact_flux_credit_receipt_settles_the_original_attempt_only() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let prepared = prepared_provider(flux_config())?;
+    let mut ledger = SqliteBudgetLedger::create(&root.path().join("ledger.sqlite"))?;
+    ledger.reserve(
+        prepared.review(),
+        Confirmation::explicit_send(prepared.review(), 20_000, false)?,
+        BudgetPolicy::default(),
+    )?;
+    let _permit = ledger.begin_attempt(prepared.review())?;
+    let credits: serde_json::Number = serde_json::from_str("0.25")?;
+    let receipt = FluxCostReceipt::from_provider("fixture-task", &credits).ok_or("receipt")?;
+    assert_eq!(receipt.microusd(), Some(2_500));
+    assert_eq!(
+        ledger.settle_flux(
+            prepared.review().request_id(),
+            prepared.provider(),
+            &receipt
+        )?,
+        2_500
+    );
+    assert_eq!(ledger.spent_on(20_000)?, 2_500);
+    assert_eq!(
+        ledger
+            .entry(prepared.review().request_id())?
+            .ok_or("entry")?
+            .state,
+        EntryState::Settled
+    );
+    assert_eq!(
+        ledger.settle_flux(
+            prepared.review().request_id(),
+            prepared.provider(),
+            &receipt
+        )?,
+        2_500
+    );
+    let other = prepared_provider(gemini_config())?;
+    assert!(
+        ledger
+            .settle_flux(prepared.review().request_id(), other.provider(), &receipt)
+            .is_err()
+    );
     Ok(())
 }

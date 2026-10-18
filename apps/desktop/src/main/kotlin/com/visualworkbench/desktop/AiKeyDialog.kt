@@ -46,6 +46,12 @@ internal class AiPasswordField : JPasswordField() {
 @Composable
 internal fun AiKeyDialog(owner: AiServiceController, dismiss: () -> Unit) {
     val state by owner.state.collectAsState()
+    val providerName = when (state.configuration?.providerKind) {
+        com.visualworkbench.shared.AiProviderKind.OpenAiImageEdits -> "OpenAI"
+        com.visualworkbench.shared.AiProviderKind.GeminiImageGeneration -> "Gemini"
+        com.visualworkbench.shared.AiProviderKind.Flux1Fill -> "FLUX"
+        null -> "Selected provider"
+    }
     val field = remember { AiPasswordField() }
     fun finish() { field.clearInput(); owner.cancelSettings(); dismiss() }
     DialogWindow(onCloseRequest = ::finish, title = "Image provider API key",
@@ -60,7 +66,7 @@ internal fun AiKeyDialog(owner: AiServiceController, dismiss: () -> Unit) {
         MaterialTheme {
             Surface(Modifier.fillMaxSize()) {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Protected API key", style = MaterialTheme.typography.h6)
+                    Text("$providerName protected API key", style = MaterialTheme.typography.h6)
                     Text("Saved in Windows Credential Manager for this user. Saving a key does not send a request or authorize spending.")
                     SwingPanel(factory = { field }, update = { it.isEnabled = !state.busy },
                         modifier = Modifier.fillMaxWidth().height(42.dp))

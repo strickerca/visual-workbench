@@ -6,6 +6,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.AlertDialog
@@ -21,6 +22,7 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.visualworkbench.shared.AndroidProviderKeyStore
+import com.visualworkbench.shared.AiProviderKind
 import com.visualworkbench.shared.ProviderCredentialException
 import com.visualworkbench.shared.ProviderCredentialProblem
 import kotlinx.coroutines.CancellationException
@@ -31,6 +33,8 @@ import kotlinx.coroutines.launch
  * Never reads the saved value into the field. Input is not remembered/saved. */
 @Composable
 internal fun ProviderKeyDialog(store: AndroidProviderKeyStore, lifecycle: Lifecycle, onDismiss: () -> Unit) {
+    var provider by remember { mutableStateOf(AiProviderKind.OpenAiImageEdits) }
+    val selectedStore = remember(store, provider) { store.forProvider(provider) }
     var field by remember { mutableStateOf<EditText?>(null) }
     var message by remember { mutableStateOf("Checking protected storage…") }
     var busy by remember { mutableStateOf(false) }
@@ -44,10 +48,10 @@ internal fun ProviderKeyDialog(store: AndroidProviderKeyStore, lifecycle: Lifecy
         ProviderCredentialProblem.Busy -> "Protected storage is busy. Try again when the previous operation has finished."
         ProviderCredentialProblem.Unavailable -> "Protected storage is unavailable. No key was shown."
     }
-    LaunchedEffect(store) {
+    LaunchedEffect(selectedStore) {
         val entered = generation
         try {
-            val configured = store.isConfigured()
+            val configured = selectedStore.isConfigured()
             if (generation == entered) message = if (configured) "A key is saved in protected storage." else "No key is saved."
         }
         catch (cancelled: CancellationException) { throw cancelled }
@@ -66,9 +70,23 @@ internal fun ProviderKeyDialog(store: AndroidProviderKeyStore, lifecycle: Lifecy
         title = { Text("Image provider API key") },
         text = { Column {
             Text("Saved only in this app's protected device storage. Saving a key does not send a request or authorize spending.")
+            Row {
+                for (choice in AiProviderKind.values()) {
+                    TextButton(onClick = {
+                        clear(); operation?.cancel(); generation++
+                        provider = choice; message = "Checking protected storage…"
+                    }, enabled = !busy && provider != choice) {
+                        Text(when (choice) {
+                            AiProviderKind.OpenAiImageEdits -> "OpenAI"
+                            AiProviderKind.GeminiImageGeneration -> "Gemini"
+                            AiProviderKind.Flux1Fill -> "FLUX"
+                        })
+                    }
+                }
+            }
             AndroidView(modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), factory = { context ->
                 EditText(context).apply {
-                    hint = "OpenAI API key"
+                    hint = "${provider.name} API key"
                     inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
                     isSingleLine = true
                     isSaveEnabled = false
@@ -77,13 +95,13 @@ internal fun ProviderKeyDialog(store: AndroidProviderKeyStore, lifecycle: Lifecy
                     filters = arrayOf(InputFilter.LengthFilter(AndroidProviderKeyStore.MAX_KEY_BYTES))
                     field = this
                 }
-            }, update = { it.isEnabled = !busy })
+            }, update = { it.isEnabled = !busy; it.hint = "${provider.name} API key" })
             Text(message, style = MaterialTheme.typography.caption)
             Text("Input clearing is best effort: keyboard, Android and HTTP libraries may retain internal copies.", style = MaterialTheme.typography.caption)
             TextButton(enabled = !busy, onClick = {
                 clear(); generation++; busy = true
                 operation = scope.launch {
-                    try { store.remove(); message = "Saved key removed." }
+                    try { selectedStore.remove(); message = "Saved key removed." }
                     catch (cancelled: CancellationException) { throw cancelled }
                     catch (failure: ProviderCredentialException) { message = describe(failure) }
                     finally { busy = false }
@@ -98,7 +116,7 @@ internal fun ProviderKeyDialog(store: AndroidProviderKeyStore, lifecycle: Lifecy
                 val bytes = ByteArray(editable.length) { editable[it].code.toByte() }
                 clear(); generation++; busy = true
                 operation = scope.launch {
-                    try { store.save(bytes); message = "Key saved in protected storage." }
+                    try { selectedStore.save(bytes); message = "Key saved in protected storage." }
                     catch (cancelled: CancellationException) { throw cancelled }
                     catch (failure: ProviderCredentialException) { message = describe(failure) }
                     finally { bytes.fill(0); busy = false }

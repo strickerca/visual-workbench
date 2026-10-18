@@ -277,13 +277,26 @@ impl ApiKeyAdapter {
         let permit = ledger.begin_attempt(prepared.review())?;
         let request = prepared.authorize(permit, cancel)?;
         let response = self.send_admitted(request, slot, cancel)?;
-        let settlement = match response.tokens() {
-            None => Settlement::UsageMissing,
-            Some(tokens) => match ledger.settle(response.request_id(), prepared.provider(), tokens)
-            {
-                Ok(microusd) => Settlement::UsagePriced { microusd },
-                Err(_) => Settlement::LedgerUnavailable,
-            },
+        let settlement = if matches!(self.protocol, ApiKeyProtocol::Flux) {
+            match response.flux_cost_receipt() {
+                None => Settlement::UsageMissing,
+                Some(receipt) => {
+                    match ledger.settle_flux(response.request_id(), prepared.provider(), receipt) {
+                        Ok(microusd) => Settlement::UsagePriced { microusd },
+                        Err(_) => Settlement::LedgerUnavailable,
+                    }
+                }
+            }
+        } else {
+            match response.tokens() {
+                None => Settlement::UsageMissing,
+                Some(tokens) => {
+                    match ledger.settle(response.request_id(), prepared.provider(), tokens) {
+                        Ok(microusd) => Settlement::UsagePriced { microusd },
+                        Err(_) => Settlement::LedgerUnavailable,
+                    }
+                }
+            }
         };
         Ok(SendOutcome {
             response,

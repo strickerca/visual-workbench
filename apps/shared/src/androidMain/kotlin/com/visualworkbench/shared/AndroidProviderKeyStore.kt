@@ -44,6 +44,14 @@ public class AndroidProviderKeyStore private constructor(
 ) {
     private val root: File get() = File(application.noBackupFilesDir.canonicalFile, directoryName)
 
+    /** Each provider owns a distinct protected file and Keystore alias. The
+     * original OpenAI namespace remains the legacy production namespace. */
+    public fun forProvider(kind: AiProviderKind): AndroidProviderKeyStore = when (kind) {
+        AiProviderKind.OpenAiImageEdits -> this
+        AiProviderKind.GeminiImageGeneration -> AndroidProviderKeyStore(application, "$directoryName-gemini", "$alias.gemini", fixture)
+        AiProviderKind.Flux1Fill -> AndroidProviderKeyStore(application, "$directoryName-flux", "$alias.flux", fixture)
+    }
+
     /** Ownership of input transfers at entry. It is wiped even on rejection. */
     public suspend fun save(input: ByteArray): Unit {
         val owned = try { validate(input); input.copyOf() } finally { input.fill(0) }
@@ -68,6 +76,16 @@ public class AndroidProviderKeyStore private constructor(
     public fun loadForNative(timeoutMillis: Long): ByteArray? = redacted {
         require(timeoutMillis in 1..WAIT_MS)
         locked(AtomicBoolean(false), timeoutMillis) { readLocked() }
+    }
+    @Suppress("unused")
+    public fun loadForNative(provider: Int, timeoutMillis: Long): ByteArray? {
+        val kind = when (provider) {
+            0 -> AiProviderKind.OpenAiImageEdits
+            1 -> AiProviderKind.GeminiImageGeneration
+            2 -> AiProviderKind.Flux1Fill
+            else -> throw ProviderCredentialException(ProviderCredentialProblem.Invalid)
+        }
+        return forProvider(kind).loadForNative(timeoutMillis)
     }
     @Suppress("unused")
     public fun clearForNative(bytes: ByteArray): Unit { bytes.fill(0) }

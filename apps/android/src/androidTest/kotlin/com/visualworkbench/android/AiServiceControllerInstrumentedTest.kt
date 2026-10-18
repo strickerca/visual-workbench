@@ -192,11 +192,30 @@ class AiServiceControllerInstrumentedTest {
         assertEquals(1, service.closes)
         assertEquals(AiFailureKind.Closed, owner.state.value.failure)
     }
-    @Test fun laterCloseCallersObserveTheSameSettledFailure() = runBlocking {
+    @Test fun failedCloseRetainsOwnerForASecondRealRetirement() = runBlocking {
         val service=Service();val owner=AiServiceController(this,"fixture-private"){_,_->service}
         owner.activate();idle(owner);service.closeFailure=AiFailure(AiFailureKind.Storage)
-        repeat(2){try{owner.close();fail("Expected retained closure failure")}catch(failure:AiFailure){assertSame(service.closeFailure,failure)}}
+        try{owner.close();fail("Expected closure failure")}catch(failure:AiFailure){assertTrue(service.closeFailure === failure)}
         assertEquals(1,service.closes)
+        service.closeFailure=null
+        owner.close(); owner.close()
+        assertEquals(2,service.closes)
+    }
+    @Test fun failedLateDeliveryRetirementRemainsOwnedUntilCloseRetries() = runBlocking {
+        val service=Service();val gate=CompletableDeferred<Unit>();val entered=CompletableDeferred<Unit>()
+        val owner=AiServiceController(this,"fixture-private"){_,_->
+            entered.complete(Unit)
+            withContext(NonCancellable){gate.await()}
+            service
+        }
+        owner.activate();entered.await();service.closeFailure=AiFailure(AiFailureKind.Storage)
+        val closing=async { runCatching { owner.close() } }
+        gate.complete(Unit)
+        assertTrue(closing.await().isFailure)
+        assertEquals(2,service.closes)
+        service.closeFailure=null
+        owner.close()
+        assertEquals(3,service.closes)
     }
     @Test fun currencyAndBudgetChecksUseExactIntegersWithoutOverflow() {
         assertEquals("$0.00", aiMoney(0u))
