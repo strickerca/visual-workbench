@@ -119,35 +119,68 @@ an additional transient stale-callback fence using the existing snapshot page;
 it does not grant page-wide layer behavior or introduce a page bookmark schema.
 Paged layer/canvas acceptance remains with the document/rendering owners.
 
-## Rotation contact model and remaining owner hooks
+## Rotation solver, contact and one-edit lifecycle
 
-Owned leaves: commonMain `ObjectRotationContact.kt` and jvmTest
-`ObjectRotationContactTest.kt`, plus Android editor `RotationSnapControl.kt`.
-This recovers only the contact/frame/target
-model, not the original platform handle painters or affine implementation.
-It requires an injected solver:
+Continuation ownership adds isolated `vw-geom/src/object_rotation.rs` and its
+native test, FFI `object_rotation.rs` and its native test, JVM
+`NativeObjectRotation.kt`, and common/test `ObjectRotationInteraction.kt` /
+`ObjectRotationInteractionTest.kt`. Existing `ObjectRotationContact.kt` and
+Android `RotationSnapControl.kt` remain the reusable contact and context control.
+The native solver/facade were recovered from source candidate
+`0d91b70558a995fa7654021de7465b1d3f615e3d`; they compose the existing `Affine`
+with pinned libm rather than introducing another transform engine.
 
-```kotlin
-ObjectRotationContact.begin(frame, items, pivot, first,
-    solve: (List<Transform>, Point, Point, Point, Boolean) -> List<Transform>)
+Coordinator-only native registration:
+
+```rust
+// vw-geom/src/lib.rs
+mod object_rotation;
+pub use object_rotation::object_rotation;
+// vw-ffi/src/lib.rs
+mod object_rotation;
+pub use object_rotation::rotate_object_transforms;
 ```
 
-The geometry owner supplies the canonical solver over immutable originals.
-No native solver registration, transform math, handle hit geometry, renderer or
-precision file is added here. Each real preview solves again from pen-down
-originals; stale project/document/hash/attachment/page/camera seals the contact.
-Nonfinite samples/results refuse. Finish emits `EditCommand.SetTransform` once.
+Regenerate the existing Kotlin bindings. The plain JVM function
+`objectRotationTransforms(originals, pivot, first, current, snap15)` requires no
+common expect/actual declaration. It preflights at most 256 invertible transforms,
+left-composes a document-space pivot rotation, and returns absolute transforms.
+The delta snaps to 15 degrees from the original pointer vector. Every contact
+sample starts from immutable originals; no incremental matrix drift occurs.
 
-The root needs only to create `snapshot.objectRotationFrame(epoch, camera)` at
-contact start, feed real samples/current frame/current snap state, display the
-returned preview through its existing preview owner, then submit the one final
-command list through its existing guarded edit/gesture transaction. Cancel on
-input/lifecycle/selection changes, and clear root preview state after retirement.
-Use current Shift state on desktop; compose `RotationSnapControl(checked,
-enabled, changed)` in the existing Android context bar with a root-owned snap
-preference read on each sample. The geometry/renderer owners retain handle hit-testing and
-painting, native pinned-math solving, export parity and goldens. The model tests
-use injected test solvers and do not verify those outstanding capabilities.
+Instantiate `ObjectRotationInteraction(scope, existingMutationMutex, newId,
+::objectRotationTransforms, current, mayMutate, commit)`. `current` returns one
+`ObjectRotationAttachment(project, snapshot, epoch, camera, selectedObjectIds)`
+read together from the existing UI owner. The guard must admit this rotation's
+own commit while fencing competing gestures/modal/workflow routes. The existing
+viewport owner retains handle painting, hit-testing, pointer-to-document mapping
+and preview rendering. It calls `begin(pivot, first)`, `move(token, point,
+snap15)`, and `finish(token, realUpPoint, snap15)`, displaying `state.preview`
+through its current preview lease. Selection, camera, page, attachment, document,
+project and full visible revision are fenced again under the mutation mutex.
+
+`commit(ObjectRotationCommit)` uses the existing absolute-edit path with the
+captured full binding/page and stable gesture ID, allocating metadata through the
+root's existing allocator. Return false for a refused stale edit and true only
+for an accepted edit. Finish seals synchronously and calls this callback at most
+once for the entire selection; no-op/cancelled drags create no edit. The callback
+must settle its native producer before returning or throwing. Cancellation keeps
+`busy` until settlement; await `detach()` before changing/closing the borrowed
+project and `close()` before disposing the UI scope. An uncertain callback result
+blocks new rotation gestures. After admitting a fresh native document snapshot,
+call `reconciled()`; this never generates a retry or another undo transaction.
+Use the current desktop Shift value or Android snap preference on each sample.
+
+Cheap verification passed: strict shared explicit-API/warnings compilation,
+20 focused contact/lifecycle JVM tests, rustfmt on the four new native files,
+and the commonMain platform-import guard. The JVM suite covers real up-point and
+snap state, immutable originals, one callback, queued stale CAS admission,
+cancellation settlement, pre-body parent cancellation, reentrant callbacks and
+old-token refusal. Nine geometry and three FFI integration tests are written but
+unrun. The FFI oracle compares all exported pixels against independently placed
+rectangles, retries the same transaction, performs one undo/redo, reopens the
+project and verifies original asset bytes. These sources are not an executed
+native, Compose, viewport, export or one-undo acceptance claim.
 
 ## Tonal inspection: no duplicate output or renderer
 
