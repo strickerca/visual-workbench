@@ -30,7 +30,15 @@ class CaptureCallerRetirementTest {
                         { if (failed == "foreground") retained.close() else calls += "foreground" },
                     ) { calls += "parents" }
                 }
-                assertSame(failure, result.exceptionOrNull())
+                val reported = checkNotNull(result.exceptionOrNull())
+                assertEquals(failure.javaClass, reported.javaClass)
+                assertEquals(failure.message, reported.message)
+                // Coroutine recovery may copy the reported Throwable. Its
+                // cause must still identify the exact retained original.
+                assertSame(failure, if (reported === failure) reported else reported.cause)
+                // No suspension boundary here: the owner must retain the
+                // original failure rather than credit another destruction.
+                assertSame(failure, runCatching { retained.close() }.exceptionOrNull())
             }
             assertEquals(1, calls.count { it == failed })
             assertFalse("parents" in calls)
