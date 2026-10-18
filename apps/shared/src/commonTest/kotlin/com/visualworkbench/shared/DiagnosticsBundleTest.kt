@@ -14,21 +14,10 @@ class DiagnosticsBundleTest {
             startupMillis = 12, heapUsedBytes = 4096, traceSampleCount = 7,
             framesDecoded = 10, framesDropped = 2, echoRoundTripMillis = 3,
         ))
-        val allowed = setOf(
-            "schema_version", "platform", "android", "metrics", "startup_ms",
-            "heap_used_bytes", "trace_samples", "frames_decoded", "frames_dropped",
-            "echo_rtt_ms", "events_rotated", "events", "elapsed_ms", "code",
-            "app_started", "trace_started", "trace_saved", "trace_interrupted",
-            "trace_rejected", "report_prepared", "export_succeeded",
-            "export_failed", "export_cancelled",
-        )
-        val strings = Regex("\"([^\"]*)\"").findAll(report.jsonText).map { it.groupValues[1] }.toList()
-        assertTrue(strings.all { it in allowed })
+        val expected = """{"schema_version":1,"platform":"android","metrics":{"startup_ms":12,"heap_used_bytes":4096,"trace_samples":7,"frames_decoded":10,"frames_dropped":2,"echo_rtt_ms":3},"events_rotated":0,"events":[{"elapsed_ms":0,"code":"app_started"},{"elapsed_ms":1,"code":"trace_started"},{"elapsed_ms":2,"code":"trace_saved"},{"elapsed_ms":3,"code":"trace_interrupted"},{"elapsed_ms":4,"code":"trace_rejected"},{"elapsed_ms":5,"code":"report_prepared"},{"elapsed_ms":6,"code":"export_succeeded"},{"elapsed_ms":7,"code":"export_failed"},{"elapsed_ms":8,"code":"export_cancelled"}]}""" + "\n"
+        assertEquals(expected, report.jsonText)
+        assertTrue(diagnosticsPrivacyAudit(report.jsonText, report.eventCount, report.rotatedEventCount))
         assertEquals(9, report.eventCount)
-        assertTrue(report.jsonText.contains("\"heap_used_bytes\":4096"))
-        assertFalse(report.jsonText.contains("serial"))
-        assertFalse(report.jsonText.contains("account"))
-        assertFalse(report.jsonText.contains("window_title"))
     }
 
     @Test fun unavailableMetricsStayUnknownRatherThanBecomingZero() {
@@ -101,5 +90,53 @@ class DiagnosticsBundleTest {
         assertEquals(before.jsonText, after.jsonText)
         assertEquals(0L, after.rotatedEventCount)
         assertFalse(after.jsonText.contains("export_succeeded"))
+    }
+    @Test fun androidCallerUsesOnlyHeapAndSampleCountsAndKeepsExactExportPreview() {
+        // The actual DiagnosticsController.prepareReport inputs, with fake measurements.
+        val log = PrivateDiagnosticLog().also { it.append(0L, DiagnosticEventCode.AppStarted) }
+        log.append(10L, DiagnosticEventCode.TraceStarted)
+        log.append(20L, DiagnosticEventCode.TraceSaved)
+        log.append(30L, DiagnosticEventCode.ReportPrepared)
+        val frozen = log.prepare(DiagnosticPlatform.Android, DiagnosticMetrics(heapUsedBytes = 4096L, traceSampleCount = 7))
+        val expected = """{"schema_version":1,"platform":"android","metrics":{"startup_ms":null,"heap_used_bytes":4096,"trace_samples":7,"frames_decoded":null,"frames_dropped":null,"echo_rtt_ms":null},"events_rotated":0,"events":[{"elapsed_ms":0,"code":"app_started"},{"elapsed_ms":10,"code":"trace_started"},{"elapsed_ms":20,"code":"trace_saved"},{"elapsed_ms":30,"code":"report_prepared"}]}""" + "\n"
+        assertEquals(expected, frozen.jsonText)
+        assertTrue(diagnosticsPrivacyAudit(frozen.jsonText, 4, 0L))
+        log.append(40L, DiagnosticEventCode.ExportSucceeded)
+        // Both exporters consume this exact immutable string as UTF-8, not a new report.
+        assertTrue(expected.encodeToByteArray().contentEquals(frozen.jsonText.encodeToByteArray()))
+        assertFalse(frozen.jsonText.contains("export_succeeded"))
+    }
+
+    @Test fun desktopCallerKeepsUnknownFrameCountsAndEchoDistinctFromDrawingLatency() {
+        // Main's actual diagnostic preparation path uses startup, heap and measured echo only.
+        val log = PrivateDiagnosticLog().also { it.append(0L, DiagnosticEventCode.AppStarted) }
+        log.append(47L, DiagnosticEventCode.ReportPrepared)
+        val frozen = log.prepare(DiagnosticPlatform.Windows, DiagnosticMetrics(startupMillis = 47L,
+            heapUsedBytes = 8192L, echoRoundTripMillis = 3L))
+        val expected = """{"schema_version":1,"platform":"windows","metrics":{"startup_ms":47,"heap_used_bytes":8192,"trace_samples":null,"frames_decoded":null,"frames_dropped":null,"echo_rtt_ms":3},"events_rotated":0,"events":[{"elapsed_ms":0,"code":"app_started"},{"elapsed_ms":47,"code":"report_prepared"}]}""" + "\n"
+        assertEquals(expected, frozen.jsonText)
+        assertTrue(diagnosticsPrivacyAudit(frozen.jsonText, 2, 0L))
+        log.append(48L, DiagnosticEventCode.ExportCancelled)
+        assertEquals(expected, frozen.jsonText)
+    }
+
+    @Test fun failedAuditAndRejectedPreparationLeaveSourceLogAndPriorPreviewIntact() {
+        val log = PrivateDiagnosticLog(capacity = 2)
+        log.append(1L, DiagnosticEventCode.AppStarted)
+        log.append(2L, DiagnosticEventCode.ReportPrepared)
+        log.append(3L, DiagnosticEventCode.ExportCancelled)
+        val before = log.prepare(DiagnosticPlatform.Windows, DiagnosticMetrics(heapUsedBytes = 16L))
+        val malformed = before.jsonText.replace("\"heap_used_bytes\":16", "\"heap_used_bytes\":\"fake-test-credential\"")
+        repeat(32) { assertFalse(diagnosticsPrivacyAudit(malformed, before.eventCount, before.rotatedEventCount)) }
+        assertFailsWith<IllegalArgumentException> {
+            PreparedDiagnosticsReport.create(DiagnosticPlatform.Windows, DiagnosticMetrics(), listOf(
+                PrivateDiagnosticEvent(2L, DiagnosticEventCode.AppStarted),
+                PrivateDiagnosticEvent(1L, DiagnosticEventCode.ReportPrepared)), 0L)
+        }
+        val after = log.prepare(DiagnosticPlatform.Windows, DiagnosticMetrics(heapUsedBytes = 16L))
+        assertEquals(before.jsonText, after.jsonText)
+        assertEquals(before.eventCount, after.eventCount)
+        assertEquals(before.rotatedEventCount, after.rotatedEventCount)
+        assertTrue(diagnosticsPrivacyAudit(before.jsonText, before.eventCount, before.rotatedEventCount))
     }
 }

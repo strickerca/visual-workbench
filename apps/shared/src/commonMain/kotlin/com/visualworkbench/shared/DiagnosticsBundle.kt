@@ -2,7 +2,6 @@ package com.visualworkbench.shared
 
 private const val MAX_DIAGNOSTIC_VALUE: Long = 9_007_199_254_740_991L
 private const val MAX_DIAGNOSTIC_EVENTS: Int = 256
-private const val MAX_DIAGNOSTIC_REPORT_CHARS: Int = 65_536
 
 public enum class DiagnosticPlatform { Android, Windows }
 
@@ -97,7 +96,9 @@ public class PreparedDiagnosticsReport private constructor(
                 }
                 append("]}\n")
             }
-            check(text.length <= MAX_DIAGNOSTIC_REPORT_CHARS && text.all { it.code in 0..127 })
+            check(diagnosticsPrivacyAudit(text, events.size, rotated)) {
+                "Diagnostics report failed its privacy audit"
+            }
             return PreparedDiagnosticsReport(text, events.size, rotated)
         }
     }
