@@ -2,6 +2,7 @@
 package com.visualworkbench.desktop
 
 import com.visualworkbench.desktop.instructions.InstructionsPanel
+import com.visualworkbench.desktop.diagnostics.*
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -65,11 +66,24 @@ fun main(args: Array<String>) {
         nativeRuntime.directory.resolve("vw-capture-helper.exe"),nativeRuntime.packagedHash("vw-capture-helper.exe"))}
     application {
         val scope=rememberCoroutineScope();val sessions=remember{DesktopSessionController(scope,device,labelStore=PeerLabelStore(local.resolve("Visual Workbench/peer-labels.properties")))};val assistance=remember{ConnectionAssistanceController(scope,NativeConnectionAssistance())};val controller=remember{EditorController(scope,core,host,location,device,local.resolve("VisualWorkbench/transfer-work")).also{it.useSessionService(sessions);it.useAiDirectory(local.resolve("Visual Workbench"))}};val editor by controller.state.collectAsState()
+        var quitting by remember { mutableStateOf(false) }
+        var startupMs by remember { mutableStateOf<Long?>(null) }
+        var nativePickerCount by remember { mutableStateOf(0) }
+        val diagnosticLog = remember { PrivateDiagnosticLog().apply { append(0L, DiagnosticEventCode.AppStarted) } }
+        fun diagnosticEvent(code: DiagnosticEventCode) {
+            diagnosticLog.append((System.nanoTime() - started) / 1_000_000, code)
+        }
+        val diagnostics = remember(scope) { DiagnosticsExportOwner(scope, ::diagnosticEvent) }
+        val diagnosticsLifecycle = remember(diagnostics) {
+            DesktopDiagnosticsLifecycle({ diagnostics.held }, diagnostics::requestClose, { diagnostics.closeWithin() })
+        }
+        fun commandsAllowed(): Boolean = diagnosticsLifecycle.allowsCommand(quitting)
         val capture=remember{com.visualworkbench.desktop.capture.DesktopCaptureController(scope,core,captureService,location.path,device,
             controller::captureDestination,controller::report)}
         var captureSettings by remember{mutableStateOf(false)}
         var remoteView by remember{mutableStateOf<WorkbenchRemoteEdit?>(null)}
         fun openRemoteView(){
+            if (!commandsAllowed()) return
             var candidate:WorkbenchRemoteEdit?=null
             try{withAdmittedRemoteCatalog(remoteCatalog){catalog->
                 val remote=controller.remoteCapability();candidate=remote
@@ -80,6 +94,7 @@ fun main(args: Array<String>) {
         }
         var captureFocusLease by remember { mutableStateOf<AutoCloseable?>(null) }
         fun captureDialog(value: Boolean) {
+            if (value && !commandsAllowed()) return
             if (value && !captureSettings) captureFocusLease = controller.instructionPicker()
             captureSettings = value
             if (!value) { val prior = captureFocusLease; captureFocusLease = null; prior?.close() }
@@ -106,33 +121,65 @@ fun main(args: Array<String>) {
         var floating by remember{mutableStateOf(saved.copy(mode=WindowMode.Windowed))};var dialog by remember{mutableStateOf<Command?>(null)}
         var connectionDraft by remember { mutableStateOf(ConnectionDraft()) }
         var pickerReturnsToConnection by remember { mutableStateOf(false) }
-        var quitting by remember{mutableStateOf(false)};var dpiText by remember{mutableStateOf("Checking display scale…")};var startupMs by remember{mutableStateOf<Long?>(null)}
-        fun instructionDialog(value: Command?) { controller.instructionModal(value != null); dialog = value }
+        var dpiText by remember{mutableStateOf("Checking display scale…")}
+        fun competingModal(): Boolean {
+            val current = controller.state.value
+            return nativePickerCount != 0 || codexModal.state.value.settings ||
+                mcpModal.state.value.let { it.settings || it.compare != null } || captureSettings || remoteView != null ||
+                current.textAnchor != null || current.exportOpen || current.pasteOpen || controller.ai.state.value.open
+        }
+        fun instructionDialog(value: Command?) {
+            if (value == Command.Diagnostics && competingModal()) return
+            val changed = diagnosticsLifecycle.changeRoute(value == Command.Diagnostics, quitting, prepare = {
+                controller.cancelInput()
+                val memory = Runtime.getRuntime()
+                val sync = controller.state.value.sync
+                diagnosticEvent(DiagnosticEventCode.ReportPrepared)
+                diagnostics.prepare(diagnosticLog.prepare(DiagnosticPlatform.Windows, DiagnosticMetrics(
+                    startupMillis = measuredDiagnosticValue(startupMs),
+                    heapUsedBytes = measuredDiagnosticValue(memory.totalMemory() - memory.freeMemory()),
+                    echoRoundTripMillis = measuredEchoRoundTripMillis(sync?.echoSamples ?: 0u, sync?.echoRttP50Ms),
+                )))
+            }, apply = {
+                controller.instructionModal(value != null)
+                dialog = value
+            })
+            if (!changed && value != Command.Diagnostics && !quitting) {
+                controller.report("Diagnostic export is still retiring. Close it before opening another dialog.")
+            }
+        }
+        LaunchedEffect(diagnostics.held, dialog, quitting) {
+            if (!quitting && dialog == Command.Diagnostics && !diagnostics.held) instructionDialog(null)
+        }
         fun quit() {
             if(!controller.mayCloseAi())return
-            if (quitting || !controller.sealInstructionsForClose()) return
+            if (quitting || !controller.mayCloseInstructions()) return
             if (!quitting) {
                 quitting = true
                 scope.launch { withContext(NonCancellable) {
                     var clean = false
                     try {
-                        remoteView?.let{it.seal("owner_pause");it.close()}
-                        // Retire link-owned helpers before foreign parent teardown.
-                        controller.close();assertRemoteEditRetired()
-                        try { codex.close() } finally { codexModal.close()
-                        try { mcpTasks.close() } finally { try { mcp.close() } finally {
-                        mcpModal.close()
-                        try { try { capture.shutdown() } finally { assistance.close() } } finally {
-                            try { controller.close() } finally {
-                                try { sessions.close() } finally {
-                                    try { host.shutdown() } finally { host.destroy() }
+                        clean = diagnosticsLifecycle.closeParentsAfterRetirement(
+                            admit = { controller.mayCloseAi() && controller.sealInstructionsForClose() },
+                            closeParents = {
+                                remoteView?.let{it.seal("owner_pause");it.close()}
+                                // Retire link-owned helpers before foreign parent teardown.
+                                controller.close();assertRemoteEditRetired()
+                                try { codex.close() } finally { codexModal.close()
+                                try { mcpTasks.close() } finally { try { mcp.close() } finally {
+                                mcpModal.close()
+                                try { try { capture.shutdown() } finally { assistance.close() } } finally {
+                                    try { controller.close() } finally {
+                                        try { sessions.close() } finally {
+                                            try { host.shutdown() } finally { host.destroy() }
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                        } }
-                        }
-                        appOwner.close();appAnchor.close()
-                        clean = true
+                                } }
+                                }
+                                appOwner.close();appAnchor.close()
+                            },
+                        )
                     } finally {
                         if (startupSmoke) println(if (clean)
                             "VW_DESKTOP_EXIT startup_smoke=true cleanup=complete"
@@ -145,8 +192,9 @@ fun main(args: Array<String>) {
         }
         LaunchedEffect(appOwner){
             suspend fun startMcp(){
+                if (!commandsAllowed()) { controller.report("Close the diagnostic report before opening local agent access."); return }
                 try{mcpTasks.run{mcp.start()}}catch(error:CancellationException){throw error}catch(_:Exception){controller.report("The local service could not start. Existing project owners were preserved.")}
-                if(mcp.state.value.issue!=null){state.isMinimized=false;mcpModal.settings()}
+                if(mcp.state.value.issue!=null && commandsAllowed()){state.isMinimized=false;mcpModal.settings()}
             }
             if(mcpMinimized)startMcp()
             while(isActive&&!quitting){
@@ -158,25 +206,37 @@ fun main(args: Array<String>) {
         mcpState.owner?.let{McpCaptureIndicator(it)}
         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
-            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
-            fun file(command:Command){controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,command.label,FileDialog.LOAD)
+            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
+            fun file(command:Command){
+                if (!commandsAllowed()) return
+                nativePickerCount++
+                try { controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,command.label,FileDialog.LOAD)
                 try{chooser.directory=(if(command==Command.Import)documents else location.path).toString();if(command==Command.Open)chooser.file="project.sqlite";chooser.isVisible=true
                     val filename=chooser.file?:return;val chosen=Path.of(chooser.directory,filename)
                     when(command){Command.Import->controller.importFile(ImportRequest(epoch,chosen.toAbsolutePath().normalize()));Command.Open->{val projectDirectory=projectDirectoryFromPicker(chosen);if(projectDirectory==null)controller.report("Choose project.sqlite inside the saved project folder. The current project is unchanged.")else controller.open(projectDirectory,epoch)};else->Unit}
-                }finally{chooser.dispose()}}}
-            fun save(request:ExportRequest){controller.instructionPicker().use { val chooser=FileDialog(window,"Save ${request.settings.encoding.label} · ${request.revision}",FileDialog.SAVE)
+                }finally{chooser.dispose()}} } finally { nativePickerCount-- }
+            }
+            fun save(request:ExportRequest){
+                if (!commandsAllowed()) return
+                nativePickerCount++
+                try { controller.instructionPicker().use { val chooser=FileDialog(window,"Save ${request.settings.encoding.label} · ${request.revision}",FileDialog.SAVE)
                 try{chooser.directory=documents.toString();chooser.file="export-${request.revision}.${request.settings.encoding.extension}";chooser.isVisible=true;val filename=chooser.file?:return
                     val extension=filename.substringAfterLast('.',"").lowercase();val allowed=if(request.settings.encoding==ExportEncoding.Jpeg)setOf("jpg","jpeg")else setOf(request.settings.encoding.extension)
                     if(extension !in allowed){controller.report("Use a .${request.settings.encoding.extension} filename for the selected format.");return}
                     controller.saveExport(request,Path.of(chooser.directory,filename))
-                }finally{chooser.dispose()}}}
-            fun saveSelection(ticket:SelectionSaveTicket){controller.instructionPicker().use {
+                }finally{chooser.dispose()}} } finally { nativePickerCount-- }
+            }
+            fun saveSelection(ticket:SelectionSaveTicket){
+                if (!commandsAllowed()) return
+                nativePickerCount++
+                try { controller.instructionPicker().use {
                 val chooser=FileDialog(window,"Save selection PNG",FileDialog.SAVE)
                 try{chooser.directory=documents.toString();chooser.file="selection-${ticket.kind.name.lowercase()}-${ticket.binding.hostSeq}.png";chooser.isVisible=true
                     val name=chooser.file?:return
                     if(!controller.selections.save(ticket,Path.of(chooser.directory,name).toAbsolutePath().normalize()))controller.report("The selection changed or another save is active. Choose Export again.")
                 }finally{chooser.dispose()}
-            }}
+                } } finally { nativePickerCount-- }
+            }
             fun chooseCodexExecutable():Path?{
                 val lease=codexModal.retain()
                 val chooser=try{FileDialog(window,"Select installed codex.exe",FileDialog.LOAD)}catch(error:Throwable){lease.close();throw error}
@@ -194,7 +254,10 @@ fun main(args: Array<String>) {
                         catch(error:CancellationException){throw error}catch(_:Exception){controller.report("The exact PNG export was refused or cleanup is uncertain. Existing destination files were preserved.")}}
                 }finally{try{chooser.dispose()}finally{chooserLease.close()}}
             }
-            fun action(command:Command){if(command in listOf(Command.Import,Command.Open))file(command)else dispatch(command,false,controller,{mode(it)},{instructionDialog(it)},{quit()})}
+            fun action(command:Command){
+                if (!diagnosticsLifecycle.allowsCommand(quitting,command==Command.Diagnostics,command==Command.Quit)) return
+                if(command in listOf(Command.Import,Command.Open))file(command)else dispatch(command,false,controller,{mode(it)},{instructionDialog(it)},{quit()})
+            }
             LaunchedEffect(editor.textAnchor != null, editor.exportOpen, editor.pasteOpen) { controller.instructionFocus.interactionChanged() }
             LaunchedEffect(dialog) {
                 val pending = dialog
@@ -209,7 +272,7 @@ fun main(args: Array<String>) {
                     }
                 }
             }
-            DisposableEffect(window,controller){val drop=DesktopDropTarget(window.contentPane,controller);val focus=object:java.awt.event.WindowAdapter(){override fun windowDeactivated(event:java.awt.event.WindowEvent){controller.cancelInput()}};window.addWindowListener(focus);onDispose{window.removeWindowListener(focus);controller.cancelInput();drop.close()}}
+            DisposableEffect(window,controller){val drop=DesktopDropTarget(window.contentPane,controller);val focus=object:java.awt.event.WindowAdapter(){override fun windowDeactivated(event:java.awt.event.WindowEvent){controller.cancelInput()}};window.addWindowListener(focus);onDispose{diagnostics.requestClose();window.removeWindowListener(focus);controller.cancelInput();drop.close()}}
             val density=LocalDensity.current.density
             LaunchedEffect(density,state.position){try{val info=host.windowDpiInfo(window.windowHandle.toULong());dpiText="Windows ${info.windowDpi} DPI · Compose ${"%.2f".format(density)}× · PMv2 ${info.windowPerMonitorV2}"}catch(_:Exception){dpiText="Display DPI query unavailable"}}
             val firstDraw = remember { CompletableDeferred<Unit>() }
@@ -248,7 +311,7 @@ fun main(args: Array<String>) {
                 Menu("Edit"){for(c in listOf(Command.Undo,Command.Redo,Command.Delete,Command.SelectAll,Command.ClearSelection,Command.Color,Command.WidthUp,Command.WidthDown,Command.NudgeLeft,Command.NudgeRight,Command.NudgeUp,Command.NudgeDown))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
                 Menu("Tools"){for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout,Command.CycleMarker,Command.Instructions))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
                 Menu("View"){for(c in listOf(Command.Fit,Command.ActualPixels,Command.ZoomIn,Command.ZoomOut,Command.Windowed,Command.Maximized,Command.Fullscreen,Command.FollowPeer,Command.MatchPeer,Command.PeerOutline))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
-                Menu("Workbench"){Item("Remote Krita / Paint…",enabled=editor.sync?.carrier==SessionCarrier.QuicTether,onClick={openRemoteView()});Item("Send package to Codex",onClick={controller.cancelInput();codexModal.settings();mcpModal.dismiss()});Item("Local agents and Compare",onClick={controller.cancelInput();mcpModal.settings();codexModal.dismiss()});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Foreground capture…",enabled=captureProtected,onClick={captureDialog(true)})}
+                Menu("Workbench"){Item("Remote Krita / Paint…",enabled=commandsAllowed()&&editor.sync?.carrier==SessionCarrier.QuicTether,onClick={openRemoteView()});Item("Send package to Codex",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();codexModal.settings();mcpModal.dismiss()}});Item("Local agents and Compare",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();mcpModal.settings();codexModal.dismiss()}});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Foreground capture…",enabled=captureProtected&&commandsAllowed(),onClick={captureDialog(true)})}
             }
             MaterialTheme(colors=darkColors(primary=accent,secondary=Color(0xffe8bb75),background=Color(0xff101720),surface=Color(0xff18222e))){
                 Box(Modifier.fillMaxSize().drawWithContent {
@@ -280,10 +343,18 @@ fun main(args: Array<String>) {
                 if(dialog==Command.Pairing)SessionDialog(sessions,controller,assistance,connectionDraft,{change -> connectionDraft=change(connectionDraft)},
                     importFile={pickerReturnsToConnection=true;instructionDialog(Command.Import)},
                     openProject={pickerReturnsToConnection=true;instructionDialog(Command.Open)}){instructionDialog(null)}
-                if(dialog in listOf(Command.Settings,Command.Diagnostics)){
-                    val command=checkNotNull(dialog);val timing=editor.sync?.let{"${it.echoSamples} echoes · RTT p50 ${it.echoRttP50Ms?:0.0} ms · p95 ${it.echoRttP95Ms?:0.0} ms · clock offset ${it.clockOffsetMs?:0.0} ms"}?:"No echo samples"
-                    val text=when(command){Command.Settings->"${location.reason}\n${location.path}\n\nDisplay budget: 256 MiB, full resolution. Original image bytes are preserved. Finger and trackpad gestures navigate the local camera.";Command.Diagnostics->"$dpiText\nFirst frame: ${startupMs?:0} ms\nCore binding: 1\n${syncLabel(editor.sync)}\n$timing\nEcho RTT is not end-to-end drawing latency.\nDocument rendering and edits use the native core.";else->"Open the instruction panel to edit saved marker and object instructions."}
-                    AlertDialog(onDismissRequest={instructionDialog(null)},title={Text(command.label)},text={Text(text)},confirmButton={TextButton(onClick={instructionDialog(null)}){Text("Close")}})
+                if(dialog==Command.Diagnostics){
+                    val route = diagnosticsLifecycle.route()
+                    DiagnosticsExportDialog(diagnostics, onSave = {
+                        diagnostics.choose(window, documents, controller::instructionPicker) {
+                            diagnosticsLifecycle.mayChoose(route, quitting, window.isDisplayable,
+                                dialog == Command.Diagnostics, competingModal())
+                        }
+                    }, onClose = { instructionDialog(null) })
+                }
+                if(dialog==Command.Settings){
+                    val text="${location.reason}\n${location.path}\n\nDisplay budget: 256 MiB, full resolution. Original image bytes are preserved. Finger and trackpad gestures navigate the local camera."
+                    AlertDialog(onDismissRequest={instructionDialog(null)},title={Text(Command.Settings.label)},text={Text(text)},confirmButton={TextButton(onClick={instructionDialog(null)}){Text("Close")}})
                 }
                 editor.textAnchor?.let{var text by remember{mutableStateOf("")};AlertDialog(onDismissRequest={if(!editor.busy)controller.clearSelection()},title={Text("Text annotation")},text={Column{OutlinedTextField(text,{text=it.take(16384)},enabled=!editor.busy,label={Text("Text · Inter 18 px")});editor.message?.let{Text(it,style=MaterialTheme.typography.caption)}}},confirmButton={Button(onClick={controller.acceptText(text)},enabled=text.isNotBlank()&&!editor.busy){Text("Add text")}},dismissButton={TextButton(onClick={controller.clearSelection()},enabled=!editor.busy){Text("Cancel")}})}
             }
