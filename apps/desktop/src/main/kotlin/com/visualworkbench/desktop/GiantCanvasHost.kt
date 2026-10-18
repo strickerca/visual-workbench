@@ -40,7 +40,7 @@ import org.jetbrains.skia.Image
 import org.jetbrains.skia.ImageInfo
 import kotlin.math.ceil
 
-internal const val GIANT_DESKTOP_SURFACE_BYTES: ULong = 128uL * 1024uL * 1024uL
+internal const val GIANT_DESKTOP_SURFACE_BYTES: ULong = 134_217_728uL
 private const val TILE_RGBA_BYTES: Long = 256L * 256L * 4L
 private const val TILE_BOOKKEEPING_BYTES: Long = 16L * 1024L
 

@@ -847,3 +847,46 @@ async fn closure_joins_actual_worker_and_cancelled_late_read_never_returns_pixel
     image.close_worker().await.unwrap();
     project.close().await.unwrap();
 }
+
+#[tokio::test]
+async fn public_provider_caps_canonical_workspace_with_process_pool() {
+    let root = tempfile::tempdir().unwrap();
+    // Exact synthetic 2x2 opaque RGB PNG from JDK ImageIO; no private pixels.
+    let source = vec![
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 2, 0, 0, 0, 2, 8, 2,
+        0, 0, 0, 253, 212, 154, 115, 0, 0, 0, 11, 73, 68, 65, 84, 120, 94, 99, 96, 64, 6, 0, 0, 14,
+        0, 1, 213, 219, 173, 45, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+    ];
+    let project = crate::create_image_project(
+        crate::CreateImageProject {
+            path: root.path().join("project").to_string_lossy().into_owned(),
+            project_id: id(1),
+            document_id: id(2),
+            layer_id: id(3),
+            device_id: DeviceId::from_bytes([4; 16]).to_string(),
+            title: "public ABI fixture".into(),
+            source,
+            now_ms: 1_700_000_000_000,
+        },
+        Arc::new(Cancellation::new()),
+    )
+    .await
+    .unwrap();
+    let binding = binding(&project).await;
+    let result = project
+        .open_giant_image(
+            GiantOpenOptions {
+                binding,
+                disk_cache_bytes: 64 * 1024 * 1024,
+                ram_cache_bytes: 16 * 1024 * 1024,
+            },
+            Arc::new(Cancellation::new()),
+        )
+        .await;
+    assert!(
+        matches!(result, Err(Error::Missing)),
+        "unexpected boundary: {:?}",
+        result.err()
+    );
+    project.close().await.unwrap();
+}

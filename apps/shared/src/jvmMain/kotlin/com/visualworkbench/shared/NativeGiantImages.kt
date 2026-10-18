@@ -23,9 +23,16 @@ public actual fun sessionResources(): SessionResources {
             try {
                 currentCoroutineContext().ensureActive()
                 return NativeResourceCharge(charge, bytes)
-            } catch(error:Throwable) { try{charge.close()}finally{charge.destroy()};throw error }
+            } catch(error:Throwable) { retireNativeDelivery(charge);throw error }
         }
     }
+}
+// Unknown release failures keep the exact opaque owner alive. A final wrapper
+// drop must not silently return quota while its native lease remains uncertain.
+private val failedDeliveryCharges=mutableListOf<NCharge>()
+private fun retireNativeDelivery(charge:NCharge) {
+    try {giantNative{charge.releaseCharge()};charge.destroy()}
+    catch(error:Throwable){synchronized(failedDeliveryCharges){failedDeliveryCharges+=charge};throw error}
 }
 private class NativeResourceCharge(private val native: NCharge,private val bytes:ULong):SessionResourceCharge {
     @Synchronized fun requireLive(minimum:ULong) {
@@ -34,7 +41,7 @@ private class NativeResourceCharge(private val native: NCharge,private val bytes
     private var closed=false
     @Synchronized override fun close() {
         if(closed)return
-        giantNative{native.close()};closed=true;native.destroy()
+        giantNative{native.releaseCharge()};closed=true;native.destroy()
     }
 }
 private inline fun <T> giantNative(block:()->T):T = try{block()}catch(error:GiantImageException){throw mapGiantFailure(error)}
@@ -61,7 +68,7 @@ internal suspend fun disposeUnadoptedGiantImage(image:GiantImage):Unit=withConte
         try{image.close()}catch(error:Throwable){unadoptedGiants+=image;throw error}
     }
 }
-private suspend fun drainUnadoptedGiants():Unit=withContext(NonCancellable){giantRetirement.withLock{
+internal suspend fun drainUnadoptedGiants():Unit=withContext(NonCancellable){giantRetirement.withLock{
     val iterator=unadoptedGiants.iterator()
     while(iterator.hasNext()){iterator.next().close();iterator.remove()}
 }}
@@ -69,7 +76,7 @@ internal suspend fun openGiantImageNative(project: ProjectSession,binding:Workfl
     diskCacheBytes:ULong,ramCacheBytes:ULong):GiantImage {
     drainUnadoptedGiants()
     val options=GiantOpenOptions(NBinding(binding.projectId,binding.documentId,binding.hostSeq,binding.stateHash),diskCacheBytes,ramCacheBytes)
-    val native=try{settledStream(release={value:NImage->try{value.close()}finally{value.destroy()}}){project.openGiantImage(options,it)}}
+    val native=try{settledStream(release={value:NImage->disposeUnadoptedGiantImage(NativeGiantImage(value))}){project.openGiantImage(options,it)}}
         catch(error:GiantImageException){throw mapGiantFailure(error)}
     return NativeGiantImage(native)
 }
@@ -91,7 +98,7 @@ private class NativeGiantImage(private val native:NImage):GiantImage {
         // decoding via this opaque lease. The caller's global foreign reservation
         // was admitted before this call and outlives actual renderer retirement.
         val delivery=try{settledStream(release={value:com.visualworkbench.bindings.core.GiantTileDelivery->
-            try{value.nativeLease.close()}finally{value.nativeLease.destroy()}
+            retireNativeDelivery(value.nativeLease)
         }){native.tile(NAddress(address.level,address.x,address.y),it)}}
             catch(error:GiantImageException){throw mapGiantFailure(error)}
         try {
@@ -99,9 +106,9 @@ private class NativeGiantImage(private val native:NImage):GiantImage {
             val value=delivery.pixels
             GiantTilePixels(value.assetId,value.manifestHash,GiantTileAddress(value.address.level,value.address.x,value.address.y),
                 value.documentX,value.documentY,value.documentWidth,value.documentHeight,value.width,value.height,value.rgba)
-        } finally {try{delivery.nativeLease.close()}finally{delivery.nativeLease.destroy()}}
+        } finally {retireNativeDelivery(delivery.nativeLease)}
     }
     override suspend fun close():Unit=withContext(NonCancellable){gate.withLock{
-        if(!closed){giantNative{native.close()};closed=true;native.destroy()}
+        if(!closed){giantNative{native.closeSession()};closed=true;native.destroy()}
     }}
 }

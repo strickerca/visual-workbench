@@ -215,4 +215,14 @@ class GiantViewportSessionTest {
         assertEquals(GiantViewportSession.TILE_CHARGE.toULong(),resources.used)
     }
 
+    @Test fun reentrantUiPublicationOfSameViewDoesNotRecursivelyRestartRequest()=runBlocking {
+        val source=Source();val backend=Renderer()
+        val session=session(this,source,backend,binding,1L,{_,_->true})
+        var publications=0;var closing=false
+        backend.onPresent={if(!closing){check(++publications<10);session.request(view(0.0))}}
+        try {session.request(view(0.0));until{session.state.value.ready}
+            assertEquals(1,source.reads.size);assertTrue(publications<=2)
+        }finally{closing=true;session.close()}
+    }
+
 }

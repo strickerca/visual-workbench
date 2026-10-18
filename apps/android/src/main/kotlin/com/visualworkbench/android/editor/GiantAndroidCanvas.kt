@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal const val GIANT_ANDROID_SURFACE_BYTES: ULong = 96uL * 1024uL * 1024uL
+internal const val GIANT_ANDROID_SURFACE_BYTES: ULong = 100_663_296uL
 private const val GIANT_ANDROID_TILE_BYTES: Long = 96L * 1024L * 1024L
 
 /** Physical pixels, already scaled by the window/camera. Four tightly packed

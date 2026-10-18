@@ -249,7 +249,7 @@ impl GiantImage {
                         .viewport(view, &budget)?;
                     source.verify_owned(&closed, &local_closed, &cancel, &budget)?;
                     live(&local_closed, &cancel)?;
-                    Ok(plan)
+                    Ok::<_, Error>(plan)
                 })())
             })
             .await
@@ -280,7 +280,7 @@ impl GiantImage {
                         .tile(address, &cancel, &budget)?;
                     source.verify_owned(&closed, &local_closed, &cancel, &budget)?;
                     live(&local_closed, &cancel)?;
-                    Ok(tile)
+                    Ok::<_, Error>(tile)
                 })())
             })
             .await

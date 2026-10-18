@@ -8,6 +8,12 @@ import org.junit.Test
 /** Synthetic owner/callback tests are not ComposePanel/GPU retirement proof.
  * No window, native pixel upload, device, provider or screenshot is used here. */
 class GiantCanvasBoundaryTest {
+    /** Coroutine stack recovery may copy an exception around a dispatcher hop.
+     * Keep the original failure in its cause chain and verify cleanup counts. */
+    private fun sameFailure(expected:Throwable,actual:Throwable?){
+        assertTrue(actual?.let{generateSequence(it){value->value.cause}.take(16).any{it===expected}}==true)
+    }
+
     private val binding = WorkflowBinding("project", "document", 1uL, "c".repeat(64))
     private val viewport = GiantViewport(0.0, 0.0, 256.0, 256.0, 1.0, 0.0, 0.0, 1.0)
 
@@ -148,8 +154,8 @@ class GiantCanvasBoundaryTest {
                 credits++; if (stage == "surface") throw error
                 bytes = 0uL
             })
-            assertSame(error, runCatching { owner.close() }.exceptionOrNull())
-            assertSame(error, runCatching { owner.close() }.exceptionOrNull())
+            sameFailure(error, runCatching { owner.close() }.exceptionOrNull())
+            sameFailure(error, runCatching { owner.close() }.exceptionOrNull())
             assertTrue(owner.sealed); assertEquals(GIANT_DESKTOP_SURFACE_BYTES, bytes)
             assertEquals(1, settlements); assertEquals(if (stage == "surface") 1 else 0, credits)
         }
@@ -190,7 +196,7 @@ class GiantCanvasBoundaryTest {
         assertTrue(failure is GiantDesktopCreationFailure)
         val retained = (failure as GiantDesktopCreationFailure).owner
         assertFalse(retained.surfaceReserved); assertFalse(retained.status.ready)
-        assertSame(error, runCatching { retained.close() }.exceptionOrNull())
+        sameFailure(error, runCatching { retained.close() }.exceptionOrNull())
         assertEquals(1, image.closed); assertEquals(0, credits)
     }
 

@@ -43,6 +43,8 @@ internal data class CanvasScene(
     val documentFrame:DocumentDrawFrame<PreparedDocumentTile>?=null,
     val documentTiles:List<PreparedDocumentTile> = emptyList(),
     val documentDraft:Pair<Point,Point>?=null,
+    val giantMode:Boolean=false,
+    val giantFrame:GiantVisibleFrame<Bitmap>?=null,
 )
 
 internal object EditorDrawing {
@@ -213,6 +215,7 @@ internal object EditorDrawing {
         val documentLayer=canvas.saveLayer(null,null)
         val sourceSave=canvas.save()
         canvas.concat(matrix(scene.matrix))
+        scene.giantFrame?.let{drawGiantAndroidTiles(canvas,it)}
         scene.background?.let{canvas.drawBitmap(it,0f,0f,Paint(if(scene.smoothBackground) Paint.FILTER_BITMAP_FLAG else 0))}
         scene.documentFrame?.let{drawDocumentTiles(canvas,scene.documentTiles,it.binding)}
         scene.documentDraft?.let{(a,b)->

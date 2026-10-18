@@ -178,6 +178,9 @@ private class NativeProject(val handle: ProjectSession) : WorkbenchProject, Work
     }
     override suspend fun close(): Unit = releaseNative {
         closeMutex.withLock { if(!closed.get()) {
+            // A cancelled open may retain a native child whose close failed.
+            // Its actual retirement must settle before the parent worker closes.
+            drainUnadoptedGiants()
             try { handle.closeSession() } catch(error:CoreException) { throw mapFailure(error) }
             finally { closed.set(true);documentPasswords.clear();documentPages.clear();handle.destroy() }
         } }

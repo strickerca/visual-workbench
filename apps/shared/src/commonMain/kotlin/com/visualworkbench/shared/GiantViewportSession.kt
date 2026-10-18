@@ -104,9 +104,9 @@ public class GiantViewportSession<T : Any>(
         require((view.a / magnitude) * (view.d / magnitude) - (view.b / magnitude) * (view.c / magnitude) != 0.0)
         // A camera/revision change hides the previous display immediately. Its
         // resources remain charged until the renderer acknowledges retirement.
-        backend.present(null)
         lastView = view; generation++
         mutable.value = mutable.value.copy(generation = generation, ready = false, busy = true, message = null)
+        backend.present(null)
         requests.trySend(Request(generation, view))
     }
     public fun retry(): Unit { val prior = lastView ?: return; lastView = null; request(prior) }

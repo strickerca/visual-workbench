@@ -121,7 +121,8 @@ internal fun DrawScope.drawGeometry(item:RenderItem,geometry:CanvasGeometry,prev
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier=Modifier){
+internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier=Modifier,giantFrame:GiantVisibleFrame<GiantBitmap>?=null){
+    val latestGiant by rememberUpdatedState(giantFrame)
     val latest by rememberUpdatedState(state)
     val aiResultState by controller.aiResults.state.collectAsState()
     val focus=remember{FocusRequester()}
@@ -185,7 +186,9 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
         val current=latest
         val frame=prepared?.current(current)?:return@Canvas
         val background=current.background
-        if(background==null&&current.documentFrame==null)return@Canvas
+        val giant=latestGiant
+        if(current.giantActive&&(giant==null||!controller.giantFrameCurrent(giant,current)))return@Canvas
+        if(background==null&&current.documentFrame==null&&giant==null)return@Canvas
         if(current.documentFrame!=null&&documentReader?.binding!=current.documentFrame.binding)return@Canvas
         val doc=frame.document
         val aiFrame=controller.aiResultFrame()
@@ -202,6 +205,7 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
             // white presentation page stays outside this composited stack.
             drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f,0f,doc.width.toFloat(),doc.height.toFloat()),Paint())
             try {
+            giant?.let{drawGiantTiles(it)}
             if(background!=null)drawImage(background,filterQuality=if(smooth)FilterQuality.Low else FilterQuality.None)
             documentTiles?.let{tiles->current.documentFrame?.binding?.let{binding->drawDocumentTiles(tiles,binding)}}
             clipRect(0f,0f,doc.width.toFloat(),doc.height.toFloat()){

@@ -258,7 +258,7 @@ fn jpeg(input: &mut File, total: u64, cancel: &Cancellation) -> Result<Metadata>
             return Err(CoreError::Unsupported);
         }
         if matches!(marker[1], 0xc0..=0xcf) && !matches!(marker[1], 0xc4 | 0xc8 | 0xcc) {
-            if !matches!(marker[1], 0xc0 | 0xc1 | 0xc2)
+            if !matches!(marker[1], 0xc0..=0xc2)
                 || payload.len() != 15
                 || payload[0] != 8
                 || payload[5] != 3
@@ -411,8 +411,12 @@ pub(super) fn capture(
     budget: &SessionBudget,
 ) -> ImageResult<CapturedSource> {
     live(closed, cancel)?;
-    let estimated = crate::workflow::canonical_workspace(state, budget.limit_bytes(), false)
-        .map_err(workflow_error)?;
+    let estimated = crate::workflow::canonical_workspace(
+        state,
+        budget.limit_bytes().min(crate::workflow::MAX_MEMORY),
+        false,
+    )
+    .map_err(workflow_error)?;
     let _canonical = reserve(budget, MemoryKind::CodecWorkspace, estimated)?;
     crate::workflow::check_binding(state, binding).map_err(workflow_error)?;
     let project = state.project().map_err(Error::from)?;

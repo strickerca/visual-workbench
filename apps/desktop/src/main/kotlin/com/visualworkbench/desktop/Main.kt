@@ -249,8 +249,9 @@ fun main(args: Array<String>) {
         }
         mcpState.owner?.let{McpCaptureIndicator(it)}
         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
+        val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
-            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
+            onPreviewKeyEvent=canvasShortcut) {
             DisposableEffect(window, controller) {
                 onDispose {
                     if (projectPicker?.owner === window) retireProjectPicker()
@@ -434,7 +435,7 @@ fun main(args: Array<String>) {
                 Box(Modifier.fillMaxSize().drawWithContent {
                     drawContent()
                     if (startupSmoke) firstDraw.complete(Unit)
-                }) { EditorShell(controller,editor,dpiText,quitting,::action,::saveSelection,::saveDocument) }
+                }) { EditorShell(controller,editor,dpiText,quitting,::action,::saveSelection,::saveDocument,canvasShortcut) }
                 if(codexPanels.settings){
                     val catalogOwner=mcpState.owner
                     val published=if(catalogOwner!=null){val catalog by catalogOwner.state.collectAsState();catalog.packages}else emptyList()
@@ -483,7 +484,7 @@ fun main(args: Array<String>) {
         }
     }
 }
-@Composable private fun EditorShell(controller:EditorController,editor:EditorState,dpiText:String,quitting:Boolean,action:(Command)->Unit,saveSelection:(SelectionSaveTicket)->Unit,saveDocument:(DocumentExport)->Unit){
+@Composable private fun EditorShell(controller:EditorController,editor:EditorState,dpiText:String,quitting:Boolean,action:(Command)->Unit,saveSelection:(SelectionSaveTicket)->Unit,saveDocument:(DocumentExport)->Unit,onShortcut:(KeyEvent)->Boolean){
     val documentState by controller.documents.state.collectAsState()
     val eraserState by controller.erasers.state.collectAsState()
     val selectionState by controller.selections.state.collectAsState()
@@ -506,12 +507,31 @@ fun main(args: Array<String>) {
                 editor.document?.layers?.forEach{layer->Text(layer.name,Modifier.padding(top=8.dp),fontWeight=FontWeight.Medium);editor.document?.render?.items?.filter{it.layerId==layer.id}?.forEach{item->Text(item.shape.javaClass.simpleName,Modifier.fillMaxWidth().clickable(enabled=!item.locked){controller.select(item.objectId)}.background(if(item.objectId in editor.selected)Color(0xff294a49)else Color.Transparent).padding(8.dp),style=MaterialTheme.typography.body2)}}
             }
             Box(Modifier.weight(1f).fillMaxHeight()){
-                EditorCanvas(controller,editor)
-                PrecisionHandles(controller.precision)
-                if(editor.canvasReady&&(editor.background!=null||editor.documentFrame!=null))EraserOverlay(controller.erasers,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
-                if(editor.canvasReady&&(editor.background!=null||editor.documentFrame!=null))SelectionOverlay(controller.selections,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
-                if(editor.document!=null&&(editor.renderIssue!=null||!editor.canvasReady||(editor.background==null&&editor.documentFrame==null))){
-                    val status=editor.backgroundIssue?.takeIf{editor.background==null}?:editor.renderIssue?:if(!editor.canvasReady)"Preparing this revision…"else if(editor.busy)"Loading the original image…"else"The original image is not currently displayed. Retry image display or review the project status."
+                if(editor.giantActive){
+                    controller.giantView?.takeIf{it.surfaceReserved}?.let{view->
+                        GiantEditorCanvas(view,onShortcut){frame->Box(Modifier.fillMaxSize()){
+                            EditorCanvas(controller,editor,giantFrame=frame)
+                            PrecisionHandles(controller.precision)
+                            if(frame==null||!editor.canvasReady||editor.renderIssue!=null){
+                                Column(Modifier.align(Alignment.Center).widthIn(max=440.dp).padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+                                    Text(editor.renderIssue?:editor.giantIssue?:"Preparing verified tiles…",color=Color(0xffaebccb))
+                                    TextButton(onClick={controller.retryBackground()},enabled=!editor.busy&&!quitting){Text("Retry image display")}
+                                }
+                            }
+                            if(editor.canvasReady&&frame?.let{controller.giantFrameCurrent(it,editor)}==true){
+                                EraserOverlay(controller.erasers,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
+                                SelectionOverlay(controller.selections,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
+                            }
+                        }}
+                    }
+                }else{
+                    EditorCanvas(controller,editor)
+                    PrecisionHandles(controller.precision)
+                    if(editor.canvasReady&&(editor.background!=null||editor.documentFrame!=null))EraserOverlay(controller.erasers,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
+                    if(editor.canvasReady&&(editor.background!=null||editor.documentFrame!=null))SelectionOverlay(controller.selections,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
+                }
+                if(editor.document!=null&&(editor.renderIssue!=null||!editor.canvasReady||(editor.background==null&&editor.documentFrame==null&&(!editor.giantActive||!editor.giantReady)))){
+                    val status=editor.backgroundIssue?.takeIf{editor.background==null}?:editor.renderIssue?:editor.giantIssue?:if(editor.giantActive)"Preparing verified tiles…"else if(!editor.canvasReady)"Preparing this revision…"else if(editor.busy)"Loading the original image…"else"The original image is not currently displayed. Retry image display or review the project status."
                     Column(Modifier.align(Alignment.Center).widthIn(max=440.dp).padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
                         Text(status,color=Color(0xffaebccb))
                         if(editor.background==null){

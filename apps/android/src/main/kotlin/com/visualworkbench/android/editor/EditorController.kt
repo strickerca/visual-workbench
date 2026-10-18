@@ -64,14 +64,63 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var documentPressRevision:ProjectInfo?=null
     private var documentPressEpoch:Long=0
     private var documentPressRegion=false
-    private var canvasRetirement:suspend()->Unit = {}
+    private val canvasOwners=CanvasRetirementOwner()
+    private var giantRenderReady=false
+    private var updatingGiant=false
+    private val canvasRetirement:suspend()->Unit = {giantRenderReady=false;canvasOwners.retireAll()}
+    internal var giantMode by mutableStateOf(false); private set
+    internal var giantIssue by mutableStateOf<String?>(null); private set
+    private val giantDraw = java.util.concurrent.atomic.AtomicReference<GiantVisibleFrame<Bitmap>?>(null)
+    private val giantOwner = GiantAttachmentOwner<GiantAndroidCanvas>(
+        attachment={val p=project;val doc=document;if(p!=null&&doc!=null&&!disposing)DocumentAttachment(p,doc,epoch)else null},
+        create={image,resources,binding,attached,current->
+            GiantAndroidCanvas.create(scope,image,resources,binding,attached,current,{canvasRetirement()}){publish()}
+        }, closeView={it.close()}, changed={giantDraw.set(null);publish()},
+        diskCacheBytes=2uL*1024uL*1024uL*1024uL,ramCacheBytes=64uL*1024uL*1024uL,
+        failedCreationOwner={ (it as? GiantAndroidCreationFailure)?.owner })
+    internal fun giantSurfaceReady():Boolean = !giantMode || giantOwner.current?.surfaceReserved == true
+    internal fun canCreateCanvas(hook:suspend()->Unit):Boolean = canvasOwners.canCreate(hook)&&giantSurfaceReady()
+    internal fun canvasRendererRetired(hook:suspend()->Unit){canvasOwners.confirmed(hook)}
+    internal fun canvasRendererRetiring(){giantRenderReady=false}
+    internal fun giantRenderCompleted(frame:GiantVisibleFrame<Bitmap>,hook:suspend()->Unit){
+        if(canvasOwners.canCreate(hook)&&giantDraw.get()===frame)giantRenderReady=true
+    }
+    private fun giantInputReady(doc:DocumentSnapshot):Boolean = giantRenderReady&&giantFrame(doc)!=null
+    internal fun giantFrameCurrent(frame:GiantVisibleFrame<Bitmap>):Boolean = giantDraw.get() === frame
+    private fun giantFrame(doc:DocumentSnapshot):GiantVisibleFrame<Bitmap>? {
+        if(!giantMode)return null
+        val view=giantOwner.current?:return null
+        val revision=doc.render.revision
+        return runCatching{view.matchingFrame(WorkflowBinding(revision.projectId,doc.documentId,revision.hostSeq,revision.stateHash),epoch,
+            giantViewport(core,camera,precision.frame()))}.getOrNull()
+    }
+    private suspend fun detachGiant() {giantOwner.detach();giantMode=false;giantIssue=null;giantDraw.set(null)}
+    private suspend fun loadGiantBackground(current:WorkbenchProject,doc:DocumentSnapshot) {
+        giantMode=true;background=null;giantDraw.set(null);giantRenderReady=false;giantOwner.invalidate()
+        if(!colorAssumed){
+            needsColorConsent=true;blockingMessage="Tiled display requires an explicit sRGB assumption for this untagged source. The original remains unchanged."
+            publish();return
+        }
+        needsColorConsent=false;blockingMessage=null;giantIssue=null
+        canvasRetirement()
+        try {
+            val view=giantOwner.bind(DocumentAttachment(current,doc,epoch))?:return
+            view.update(core,camera,precision.frame())
+        } catch(cancel:CancellationException){throw cancel}
+        catch(_:Exception){giantIssue="The original is preserved. Its verified tiled display is unavailable. Retry display or reopen the project."}
+        publish()
+    }
+    internal fun retryGiantDisplay() {
+        if(!giantMode||disposing||busy)return
+        busy=true;scope.launch{try{loadBackground()}catch(error:Exception){report(error)}finally{busy=false;publish()}}
+    }
     private val documentOwner:EditorDocuments=EditorDocuments(scope,core,
         { val p=project;val snapshot=document;if(p!=null&&snapshot!=null&&!disposing)DocumentAttachment(p,snapshot,epoch)else null },
         { !disposing&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
         { attached,page -> mutations.withLock {
             if(project!==attached.project||epoch!=attached.epoch||!documentRevisionMatches(attached))throw DocumentFailure(DocumentFailureKind.Stale)
             refreshAdmission.invalidate();documentRefresh.invalidate()
-            cancelTool();erasers.detach();selections.detach();documentOwnerDiscardDraw()
+            cancelTool();detachGiant();erasers.detach();selections.detach();documentOwnerDiscardDraw()
             val next=(attached.project as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
             val drawing=prepareEditorObjects(core,next.render.items)
             if(project!==attached.project||epoch!=attached.epoch||disposing)throw DocumentFailure(DocumentFailureKind.Stale)
@@ -302,8 +351,15 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
 
-    fun attachCanvas(sink: (CanvasScene) -> Unit,retire:suspend()->Unit = {}) { canvasSink = sink;canvasRetirement=retire;scene?.let(sink) }
-    fun detachCanvas() { canvasSink = null; cancelTool(); hoverPoint = null }
+    private var canvasHook:(suspend()->Unit)?=null
+    fun attachCanvas(sink:(CanvasScene)->Unit,retire:suspend()->Unit = {},ready:()->Unit = {}) {
+        canvasOwners.attach(retire,ready);canvasHook=retire;canvasSink=sink;giantRenderReady=false;scene?.let(sink)
+    }
+    fun detachCanvas(retire:(suspend()->Unit)?=null) {
+        val hook=retire?:canvasHook
+        if(hook==null||canvasOwners.detach(hook)){canvasSink=null;canvasHook=null;giantRenderReady=false}
+        cancelTool();hoverPoint=null
+    }
     fun dismissMessage() { message = null }
     fun transferMessage(value: String) { message = value }
     fun configureExport(value: ExportSelection) { if (!value.encoding.exportAvailable) { message = "BMP export is unavailable until its file metadata can carry the revision and source identity."; return }; if (exportSelection != value) { exportSelection = value; exportPreflight = null; checkedExport = null } }
@@ -618,7 +674,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                             val checked = current.info()
                             if (!stillOwned() || !receivedCaptureIdle(ownInstructions = true) || checked.hostSeq != next.render.revision.hostSeq ||
                                 checked.stateHash != next.render.revision.stateHash) return@capture
-                            semanticEditor.detach(); instructionEditor.detach(); selections.detach(); erasers.detach(); retireAi()
+                            semanticEditor.detach(); instructionEditor.detach(); detachGiant(); selections.detach(); erasers.detach(); retireAi()
                             // Modal entry may run while the owners above settle.
                             if (!stillOwned() || !receivedCaptureIdle(ownInstructions = true, ownSemantics = true)) return@capture
                             cancelTool(); invalidateExport(); clearPeerObjects(); aiRetiring = false
@@ -661,6 +717,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         scene=null
         exportReady = null
         exportPreflight = null; checkedExport = null
+        detachGiant()
         erasers.detach(); selections.detach()
         instructionFocus.detach()
         semanticEditor.detach()
@@ -705,6 +762,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     if (change.kind in setOf(ChangeKind.Committed, ChangeKind.Opened) && token == epoch && current === project && change.project.projectId == info?.projectId &&
                         refreshAdmission.observe(change.sequence)) {
                         captureArrivals.changed(current, token)
+                        giantOwner.observe(change.project)
                         erasers.observe(change); selections.observe(change)
                         clearPeerObjects(); publish()
                         invalidateExport(); queue.trySend(Unit)
@@ -895,7 +953,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val current = project ?: return
         val doc = document ?: return
         val token = epoch
-        if(documents.state.value.descriptor!=null){background=null;blockingMessage=null;needsColorConsent=false;publish();return}
+        if(documents.state.value.descriptor!=null){detachGiant();background=null;blockingMessage=null;needsColorConsent=false;publish();return}
+        if(giantDisplayRequired(doc)){loadGiantBackground(current,doc);return}
+        if(giantMode||giantOwner.retaining)detachGiant()
         try {
             val image = current.background(doc.documentId, assumeUntaggedSrgb = colorAssumed)
             val bitmap = withContext(Dispatchers.Default) {
@@ -958,7 +1018,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         publish()
     }
     private fun publish() {
-        if(synchronizingPrecision)return
+        if(synchronizingPrecision||updatingGiant)return
+        if(giantMode&&(scene?.camera!=camera||scene?.document!==document||scene?.precision!=precision.frame())){giantDraw.set(null);giantRenderReady=false}
         ai.changed()
         val doc = document ?: return
         project?.let { selections.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera); erasers.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera) }
@@ -980,10 +1041,20 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val provisional = localProvisional + admittedPeers.filter { it.item.objectId !in savedIds && it.item.objectId !in localIds }
         val allTransforms = pendingTransforms.values.fold(emptyMap<String, Transform>()) { a, b -> a + b } + transformed
         val allErased = pendingErases.values.fold(emptySet<String>()) { a, b -> a + b } + erased
+        var giantUpdateFailed=false
+        giantOwner.current?.let{view->
+            updatingGiant=true
+            try{view.update(core,camera,precision.frame());giantIssue=view.status.message}
+            catch(_:Exception){giantUpdateFailed=true;giantDraw.set(null);giantIssue="This tiled viewport exceeds its display allowance. Reduce the viewport or retry display."}
+            finally{updatingGiant=false}
+        }
+        val giantFrame=if(giantUpdateFailed)null else giantFrame(doc)
+        if(giantDraw.get()!==giantFrame)giantRenderReady=false
+        giantDraw.set(giantFrame)
         val next = CanvasScene(++sceneRevision, doc, background, camera, core.cameraMatrix(camera), visibleObjects,
             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
-            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress)
+            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame)
         scene = next; canvasSink?.invoke(next)
         documents.viewport(camera)
         val viewport = PeerViewport(doc.documentId, core.mapPoints(camera, true, listOf(Point(0.0, 0.0),
@@ -1023,14 +1094,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     internal fun precisionInputAllowed():Boolean = !disposing&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
         !instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&
         !ai.state.value.open&&aiResultReady()&&blockingMessage==null&&textDraft==null&&!showBrush&&!showContext&&instructionAdmission.allows(false,false,false,false)&&
-        document?.let{background!=null||documentOwner.matchingFrame(it,epoch)!=null}==true
+        document?.let{background!=null||documentOwner.matchingFrame(it,epoch)!=null||giantInputReady(it)}==true
     override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
         if(ai.state.value.open||!aiResultReady())return
         val retainPolygon = !selectionPointer && !eraserPointer && gesture == null && documentPress == null &&
             precisionInputAllowed() && erasers.tools.route(rawSample.tool == PointerTool.Eraser) == EraserInputRoute.Selection &&
             selections.interaction.canResumePolygonContact(camera)
         clearToolContact(retainPolygon); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
-        if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || (background == null && document?.let{documentOwner.matchingFrame(it,epoch)}==null) || documents.state.value.busy || strokes.size >= 3) {
+        if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || (background == null && document?.let{documentOwner.matchingFrame(it,epoch)}==null && document?.let{giantInputReady(it)}!=true) || documents.state.value.busy || strokes.size >= 3) {
             if (strokes.size >= 3) message = "The save queue is full. Wait for the current strokes to finish."
             return
         }
@@ -1382,8 +1453,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         // alone cannot order optimistic edits sharing the same accepted base.
         if (document?.render?.revision != next.render.revision) clearPeerObjects()
         info = next.render.revision
+        if(giantMode||giantOwner.retaining)giantOwner.invalidate()
         document = next; objects = drawing
         documentOwner.bind(current,next)
+        if(giantMode||giantDisplayRequired(next))loadBackground()
         refreshOriginalFormatNotice()
         instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
         if (exportReady?.matches(info, document) != true) exportReady = null
@@ -1646,6 +1719,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
     override fun onCleared() {
+        giantOwner.invalidate()
         disposing = true
         remoteCapability?.let{it.seal("background");retireRemoteEditLater(it)}
         captureOwner.close()
