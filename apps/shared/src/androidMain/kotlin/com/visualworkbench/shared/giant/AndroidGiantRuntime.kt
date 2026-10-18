@@ -26,7 +26,7 @@ internal object AndroidGiantRuntime {
             if (cancelledNative(operation)) throw CancellationException("giant build cancelled")
             val input = JpegTileInput.fromRootPrepared(File(source), File(work), sha256,
                 rawWidth, rawHeight, orientation, encodedBytes, maxDiskBytes,
-                assumeUntaggedSrgb = true) // Native preparation already requires explicit consent.
+                assumeUntaggedSrgb = true, rootOperation = operation) // Native preparation already requires explicit consent.
             val build = AndroidJpegPyramid.build(input, sessionResources()) {
                 if (cancelledNative(operation)) throw CancellationException("giant build cancelled")
             }
@@ -57,6 +57,21 @@ internal object AndroidGiantRuntime {
     catch (error: TileBuildFailure) { if(error.reason == "busy") 3 else 5 }
     catch (_: OutOfMemoryError) { 7 }
     catch (_: Throwable) { 1 }
+    finally {
+        // Before acquisition, after joined build failure, or after successful
+        // close there is no Java owner. Failed cleanup remains active/quarantined
+        // and its later successful close supplies this same exact notification.
+        if (!AndroidJpegPyramid.ownsRootOperation(operation)) ownerRetired(operation)
+    }
+
+    internal fun ownerRetired(operation: Long): Unit {
+        if (operation > 0) {
+            // A failed JNI notification conservatively leaves the native pin.
+            // It must not convert successful Java retirement into a fake live
+            // Java owner or release a different operation's source.
+            try { retiredNative(operation) } catch (_: Throwable) { }
+        }
+    }
 
     /** Called only within build.withRootOutput by the nested native callback.
      * This describes its private typed owner; it never accepts external paths. */
@@ -66,6 +81,7 @@ internal object AndroidGiantRuntime {
         output.width.toString(), output.height.toString(), output.previewWidth.toString(), output.previewHeight.toString(),
     )
     @JvmStatic private external fun initializeNative(): Int
+    @JvmStatic private external fun retiredNative(operation: Long): Int
     @JvmStatic private external fun cancelledNative(operation: Long): Boolean
     @JvmStatic private external fun consumeNative(operation: Long, output: AndroidTileBuild): Int
 }

@@ -263,6 +263,38 @@ public class AndroidJpegPyramidTest {
         assertEquals(0L, ledger.used)
     }
 
+    /** Java ownership half of the native source-pin contract; actual cross-JNI
+     * close/retry remains a separate device acceptance case. */
+    @Test public fun rootOperationRemainsOwnedUntilSuccessfulQuarantineRetry(): Unit = runBlocking {
+        assumeTrue(Build.VERSION.SDK_INT >= 30)
+        val root = root(); val work = work(root); val file = jpeg(root); val ledger = Ledger()
+        val base = input(file, work)
+        val operation = 127L
+        val rootInput = JpegTileInput.fromRootPrepared(file, work, base.sha256, base.rawWidth,
+            base.rawHeight, base.orientation, base.encodedBytes, base.maxDiskBytes,
+            base.assumeUntaggedSrgb, rootOperation = operation)
+        val result = AndroidJpegPyramid.build(rootInput, ledger) { }
+        val directory = result.directory
+        val marker = File(directory, ".owner").readText()
+        val foreign = File(directory, "unrelated.txt").also { it.writeText("keep") }
+        try {
+            assertTrue(AndroidJpegPyramid.ownsRootOperation(operation))
+            assertFalse(AndroidJpegPyramid.ownsRootOperation(operation + 1))
+            assertEquals("cleanup foreign entry", refuse { result.close() }.reason)
+            assertTrue(AndroidJpegPyramid.ownsRootOperation(operation))
+            assertEquals(marker, File(directory, ".owner").readText())
+            assertEquals(AndroidJpegPyramid.SESSION_ENVELOPE_BYTES, ledger.used)
+            check(foreign.delete())
+            AndroidJpegPyramid.retryQuarantinedCleanup()
+            assertFalse(AndroidJpegPyramid.ownsRootOperation(operation))
+            assertEquals(0L, ledger.used)
+            assertFalse(directory.exists())
+        } finally {
+            if (foreign.exists()) check(foreign.delete())
+            result.close(); dispose(root, work, file)
+        }
+    }
+
     @Test public fun failedNativeChargeReleaseRetainsQuarantineForExplicitRetry(): Unit = runBlocking {
         assumeTrue(Build.VERSION.SDK_INT >= 30)
         val root = root(); val work = work(root); val file = jpeg(root); val ledger = Ledger()

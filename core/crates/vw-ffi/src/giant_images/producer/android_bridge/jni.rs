@@ -23,6 +23,10 @@ struct Runtime {
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 static INITIALIZING: Mutex<()> = Mutex::new(());
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+static FOREIGN_SOURCES: OnceLock<foreign_retirement::ForeignSources> = OnceLock::new();
+fn foreign_sources() -> &'static foreign_retirement::ForeignSources {
+    FOREIGN_SOURCES.get_or_init(foreign_retirement::ForeignSources::new)
+}
 struct Probe {
     id: u64,
     closed: Arc<AtomicBool>,
@@ -140,7 +144,7 @@ pub(in crate::giant_images::producer) fn build(
     budget: SessionBudget,
 ) -> Result<cache::ApprovedBuild> {
     let runtime = RUNTIME.get().ok_or(Error::Unsupported)?;
-    // Kotlin reserves its 80 MiB owner through sharedSessionResources(). Native
+    // Kotlin reserves its 80 MiB owner through sessionResources(). Native
     // preparation/copy must be the exact same process pool, never a local cap.
     if !budget.same_pool(&crate::session_resources::shared_budget()?) {
         return Err(Error::Invalid);
@@ -193,6 +197,14 @@ pub(in crate::giant_images::producer) fn build(
         })
     });
     let _guard = ActiveGuard(id);
+    let foreign_retired = ACTIVE.with(|cell| {
+        let active = cell.borrow();
+        let pending = active.as_ref().ok_or(Error::Storage)?;
+        foreign_sources().retain(id, pending.context.source.clone())
+    })?;
+    // This pin has no scope guard: JNI/attachment errors, panic, cancellation,
+    // timeout and unsuccessful Java cleanup must all retain the exact source.
+    // Only retiredNative may remove it, including after an explicit Java retry.
     // Synchronous scoped attachment remains on the admitted input worker. Java
     // runBlocking joins its retained codec worker and actual output close.
     let status = runtime
@@ -206,6 +218,8 @@ pub(in crate::giant_images::producer) fn build(
     let mut pending = ACTIVE
         .with(|cell| cell.borrow_mut().take())
         .ok_or(Error::Storage)?;
+    // A status code is not proof of retirement, including status zero.
+    foreign_retired.require_confirmed()?;
     after_android_retirement(
         &pending.context,
         pending.consumed,
@@ -251,6 +265,39 @@ fn invoke(env: &mut Env<'_>, runtime: &Runtime, id: u64, work: &std::path::Path)
     )
     .and_then(|v| v.i())
     .map_err(|_| Error::Storage)
+}
+/// The pinned runner calls this only after its exact operation has no live or
+/// quarantined Java producer owner. It also runs after a later successful retry.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_visualworkbench_shared_giant_AndroidGiantRuntime_retiredNative<
+    'local,
+>(
+    mut owner: EnvUnowned<'local>,
+    class: JClass<'local>,
+    id: jlong,
+) -> jint {
+    let outcome = owner
+        .with_env(|env| {
+            let valid = id > 0
+                && RUNTIME
+                    .get()
+                    .is_some_and(|r| env.is_same_object(&class, &r.class).unwrap_or(false));
+            let status = if valid && foreign_sources().confirm_retired(id as u64).is_ok() {
+                0
+            } else {
+                1
+            };
+            env.exception_clear();
+            Ok::<jint, ::jni::errors::Error>(status)
+        })
+        .into_outcome();
+    match outcome {
+        Outcome::Ok(v) => v,
+        Outcome::Err(_) | Outcome::Panic(_) => {
+            clear_exception(&mut owner);
+            1
+        }
+    }
 }
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_visualworkbench_shared_giant_AndroidGiantRuntime_cancelledNative<

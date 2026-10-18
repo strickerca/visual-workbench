@@ -107,9 +107,12 @@ impl Fixture {
         }
     }
     fn output(&self) -> CompletedOutput {
-        let info = &self.context.source.info;
+        Self::describe(&self.context, &self.android)
+    }
+    fn describe(context: &Context, android: &std::path::Path) -> CompletedOutput {
+        let info = &context.source.info;
         CompletedOutput {
-            directory: self.android.clone(),
+            directory: android.to_path_buf(),
             source_sha256: tiles::hex(&info.sha256),
             encoded_bytes: info.encoded_bytes,
             raw_width: info.raw_width,
@@ -274,4 +277,135 @@ async fn real_publication_adopts_all_four_parts_and_keeps_only_its_project_charg
         .unwrap()
         .integrity_check()
         .unwrap();
+}
+
+/// Portable foreign-retirement witness, not Android/JNI execution. The real
+/// PreparedSource/OwnedDirectory and 4 MiB admission are closed after each
+/// failed exit, while the simulated Java owner still holds its exact 80 MiB.
+#[tokio::test]
+async fn closing_native_input_after_uncertain_foreign_exit_preserves_marker_until_retry() {
+    let _serial = SERIAL.lock().await;
+    for exit in [
+        "cleanup",
+        "jni",
+        "cancel",
+        "timeout",
+        "closed",
+        "unwind",
+        "false-success",
+    ] {
+        let Fixture {
+            mut context,
+            android,
+            original,
+        } = Fixture::new();
+        let budget = context.budget.clone();
+        let native_root = context.source.staging.path().to_path_buf();
+        let original_path = context.source.info.source_path.clone();
+        let marker_path = android.join(".owner");
+        let marker = std::fs::read(&marker_path).unwrap();
+        let pins = foreign_retirement::ForeignSources::new();
+        let retired = pins.retain(19, context.source.clone()).unwrap();
+        let foreign_charge = budget.reserve(MemoryKind::Foreign, 80 * MIB).unwrap();
+        match exit {
+            "cleanup" => {
+                assert!(matches!(
+                    after_android_retirement(
+                        &context,
+                        true,
+                        1,
+                        Some(Ok(copy_output(
+                            Fixture::describe(&context, &android),
+                            &context
+                        )
+                        .unwrap()))
+                    ),
+                    Err(Error::Storage)
+                ));
+            }
+            "cancel" => {
+                context.cancel.cancel();
+                assert!(matches!(
+                    after_android_retirement(&context, false, 2, None),
+                    Err(Error::Cancelled)
+                ));
+            }
+            "timeout" => {
+                context.deadline = Instant::now();
+                assert!(matches!(
+                    after_android_retirement(&context, false, 7, None),
+                    Err(Error::Limit)
+                ));
+            }
+            "closed" => {
+                context
+                    .closed
+                    .store(true, std::sync::atomic::Ordering::Release);
+                assert!(matches!(
+                    after_android_retirement(&context, false, 8, None),
+                    Err(Error::Closed)
+                ));
+            }
+            "unwind" => {
+                assert!(
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        let _scoped_source = context.source.clone();
+                        std::panic::resume_unwind(Box::new("fixture JNI unwind"));
+                    }))
+                    .is_err()
+                );
+            }
+            // No Java retirement callback on failed attachment/JNI or a bogus
+            // success status. Exiting ACTIVE must not remove the source pin.
+            "jni" | "false-success" => {}
+            _ => unreachable!(),
+        }
+        let Context { source, .. } = context;
+        input::release(source).unwrap();
+        assert!(
+            matches!(retired.require_confirmed(), Err(Error::Storage)),
+            "{exit}"
+        );
+        assert_eq!(std::fs::read(&original_path).unwrap(), original, "{exit}");
+        assert_eq!(std::fs::read(&marker_path).unwrap(), marker, "{exit}");
+        assert_eq!(budget.used_bytes(), 84 * MIB, "{exit}");
+        // Simulate the exact Java retry: the preserved identity permits actual
+        // output deletion, then its 80 MiB release, then native confirmation.
+        std::fs::remove_dir_all(&android).unwrap();
+        drop(foreign_charge);
+        pins.confirm_retired(19).unwrap();
+        retired.require_confirmed().unwrap();
+        assert!(!native_root.exists(), "{exit}");
+        assert_eq!(budget.used_bytes(), 0, "{exit}");
+        pins.confirm_retired(19).unwrap(); // Repeated callback credits nothing.
+    }
+}
+
+#[tokio::test]
+async fn foreign_source_pins_are_bounded_and_confirmation_is_exact() {
+    let _serial = SERIAL.lock().await;
+    let f = Fixture::new();
+    let pins = foreign_retirement::ForeignSources::new();
+    assert!(matches!(
+        pins.retain(0, f.context.source.clone()),
+        Err(Error::Invalid)
+    ));
+    let first = pins.retain(1, f.context.source.clone()).unwrap();
+    assert!(matches!(
+        pins.retain(1, f.context.source.clone()),
+        Err(Error::Invalid)
+    ));
+    let second = pins.retain(2, f.context.source.clone()).unwrap();
+    assert!(matches!(
+        pins.retain(3, f.context.source.clone()),
+        Err(Error::Backpressure)
+    ));
+    pins.confirm_retired(999).unwrap();
+    assert!(first.require_confirmed().is_err());
+    assert!(second.require_confirmed().is_err());
+    pins.confirm_retired(1).unwrap();
+    first.require_confirmed().unwrap();
+    assert!(second.require_confirmed().is_err());
+    pins.confirm_retired(2).unwrap();
+    second.require_confirmed().unwrap();
 }
