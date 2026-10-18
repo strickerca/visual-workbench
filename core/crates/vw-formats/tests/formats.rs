@@ -112,7 +112,11 @@ fn tiff_orientation_is_exact_permutation_and_retained_provenance() {
             panic!("depth changed")
         };
         assert_eq!(
-            p.chunks_exact(4).map(|p| p[0]).collect::<Vec<_>>(),
+            p.as_chunks::<4>()
+                .0
+                .iter()
+                .map(|p| p[0])
+                .collect::<Vec<_>>(),
             expected[orientation as usize - 1]
         );
     }
