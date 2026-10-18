@@ -79,6 +79,24 @@ impl ProjectStore {
         Ok(result)
     }
 
+    /// Small existing projection fields for a bounded review list. No retained
+    /// value or draft body is loaded merely to label an entry.
+    pub fn conflict_review_label(&self, conflict: &Id) -> Result<(String, bool), StoreError> {
+        let length: i64 = self.connection.query_row(
+            "SELECT length(CAST(property AS BLOB)) FROM conflicts WHERE conflict_id=?1",
+            [conflict.as_str()],
+            |r| r.get(0),
+        )?;
+        if !(1..=1024).contains(&length) {
+            return Err(StoreError::Corrupt("review property size"));
+        }
+        Ok(self.connection.query_row(
+            "SELECT property,delete_vs_edit FROM conflicts WHERE conflict_id=?1",
+            [conflict.as_str()],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?)
+    }
+
     pub fn conflict_review(&self, conflict: &Id) -> Result<ConflictReview, StoreError> {
         let (record, resolution) = self.review_record(conflict)?;
         let draft = self.review_draft(conflict)?;
@@ -179,18 +197,53 @@ impl ProjectStore {
         if now_ms < 0 {
             return Err(StoreError::Invalid("review time"));
         }
-        let (record, _) = self.review_record(conflict)?;
+        let transaction = self.conflict_review_submission(conflict, now_ms)?;
         let draft = self
             .review_draft(conflict)?
             .ok_or(StoreError::Invalid("review not staged"))?;
-        self.validate_review_binding(&record, &draft)?;
-        match self.review_delivery(&draft.transaction)? {
+        match self.review_delivery(&transaction)? {
             ConflictReviewStatus::Applied => {
                 self.finish_review(conflict, &draft.choice, now_ms)?;
                 return Ok(ConflictReviewStatus::Applied);
             }
             ConflictReviewStatus::Queued => return Ok(ConflictReviewStatus::Queued),
             _ => {}
+        }
+        let local = self.local_device()?;
+        if &local == self.host_device() {
+            self.commit(&transaction, &local, now_ms)?;
+            // If this metadata write fails, the journal still proves Applied.
+            // The next exact retry settles metadata without another acceptance.
+            self.finish_review(conflict, &draft.choice, now_ms)?;
+            Ok(ConflictReviewStatus::Applied)
+        } else {
+            self.enqueue_pending(&transaction)?;
+            Ok(ConflictReviewStatus::Queued)
+        }
+    }
+
+    /// Validate a saved submission without crossing its durable commit point.
+    /// The existing application ProjectState::commit may then stage optimistic
+    /// replica/history owners before persistence, on the same single worker.
+    /// After commit call submit_conflict_review to settle local metadata only.
+    pub fn conflict_review_submission(
+        &self,
+        conflict: &Id,
+        now_ms: i64,
+    ) -> Result<pb::Transaction, StoreError> {
+        if now_ms < 0 {
+            return Err(StoreError::Invalid("review time"));
+        }
+        let (record, _) = self.review_record(conflict)?;
+        let draft = self
+            .review_draft(conflict)?
+            .ok_or(StoreError::Invalid("review not staged"))?;
+        self.validate_review_binding(&record, &draft)?;
+        if matches!(
+            self.review_delivery(&draft.transaction)?,
+            ConflictReviewStatus::Applied | ConflictReviewStatus::Queued
+        ) {
+            return Ok(draft.transaction);
         }
         self.review_fence(
             draft
@@ -211,16 +264,7 @@ impl ProjectStore {
             return Err(StoreError::Corrupt("review operation binding"));
         }
         self.validate_transaction(&draft.transaction, &local, now_ms)?;
-        if &local == self.host_device() {
-            self.commit(&draft.transaction, &local, now_ms)?;
-            // If this metadata write fails, the journal still proves Applied.
-            // The next exact retry settles metadata without another acceptance.
-            self.finish_review(conflict, &draft.choice, now_ms)?;
-            Ok(ConflictReviewStatus::Applied)
-        } else {
-            self.enqueue_pending(&draft.transaction)?;
-            Ok(ConflictReviewStatus::Queued)
-        }
+        Ok(draft.transaction)
     }
 
     /// Explicitly dismiss a conflict at the exact reviewed state. This changes
