@@ -21,8 +21,20 @@ internal class NativeMcpCaptureEngine private constructor(
 ):McpCaptureEngine {
     private val gate=Mutex()
     private val targets=LinkedHashMap<String,CaptureTarget>()
+    private data class Source(val project:String,val document:String,val asset:String)
+    private val sources=LinkedHashMap<Source,Path>()
+    private fun source(info:PackageInfo)=Source(info.binding.projectId,info.binding.documentId,info.sourceAssetId)
     private var closed=false
     private val producers=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+    private suspend fun retainEditorTarget(target:CaptureTarget,receipt:CaptureFrameInfo):McpSelectedTarget=gate.withLock {
+        check(!closed)
+        require(receipt.borderVisible&&receipt.windowHandle==target.window)
+        val exact=hostCall{service.refreshTarget(target)}
+        require(exact.window==target.window&&exact.processId==target.processId&&exact.processCreated==target.processCreated)
+        val existing=targets.entries.singleOrNull{it.value.window==target.window&&it.value.processId==target.processId&&it.value.processCreated==target.processCreated}
+        val selector=existing?.key?:run{require(targets.size<16);UUID.randomUUID().toString().also{targets[it]=target}}
+        McpSelectedTarget(selector,"Captured window | ${receipt.width} x ${receipt.height} px")
+    }
     override suspend fun select():McpSelectedTarget=gate.withLock {
         check(!closed);require(targets.size<16)
         // Owner activates another window and presses Ctrl+Alt+M. Native callback
@@ -35,7 +47,9 @@ internal class NativeMcpCaptureEngine private constructor(
             McpSelectedTarget(selector,"Window ${targets.size} | ${selected.clientWidth} x ${selected.clientHeight} px")
         } finally {withContext(NonCancellable){try{key.shutdown()}finally{key.destroy()}}}
     }
-    override suspend fun compile(selector:String,checkGrant:suspend()->Unit):WorkbenchCompiledPackage=gate.withLock {
+    override suspend fun compile(selector:String,checkGrant:suspend()->Unit):WorkbenchCompiledPackage =
+        compileVerification(selector,McpCaptureProfile(PackageTarget.Generic(),false),checkGrant)
+    override suspend fun compileVerification(selector:String,profile:McpCaptureProfile,checkGrant:suspend()->Unit):WorkbenchCompiledPackage=gate.withLock {
         check(!closed);val selected=targets[selector]?:throw McpRefused();checkGrant()
         val fresh=hostCall{service.refreshTarget(selected)};checkGrant()
         val work=withContext(Dispatchers.IO){McpCaptureWork.create(root)}
@@ -66,8 +80,10 @@ internal class NativeMcpCaptureEngine private constructor(
             catch(_:Exception){withContext(Dispatchers.IO){work.semanticUnavailable()}}
             finally{withContext(NonCancellable){ticket.close()}}
             checkGrant();val current=opened.info()
-            val result=opened.compilePackage(PackageCompileOptions(WorkflowBinding(current.projectId,document,current.hostSeq,current.stateHash),id(),System.currentTimeMillis(),PackageTarget.Generic(),snapshot))
+            val result=opened.compilePackage(PackageCompileOptions(WorkflowBinding(current.projectId,document,current.hostSeq,current.stateHash),id(),System.currentTimeMillis(),profile.target,snapshot,profile.includeWindowTitle))
             compiled=result;checkGrant();currentCoroutineContext().ensureActive()
+            require(sources.size<32 || source(result.info) in sources)
+            sources[source(result.info)]=destination
             // Keep the immutable original and canonical project for recovery,
             // including after revocation or a lost publication receipt.
             withContext(NonCancellable){opened.close()};project=null
@@ -77,6 +93,37 @@ internal class NativeMcpCaptureEngine private constructor(
             withContext(NonCancellable){try{compiled?.close()}finally{try{project?.close()}finally{frame?.destroy()}}}
         }
     }
+    override suspend fun <T> withVerificationSources(original:PackageInfo,after:PackageInfo,body:suspend(WorkbenchProject,WorkbenchProject)->T):T = gate.withLock {
+        check(!closed)
+        val beforePath=sources[source(original)]?:throw McpRefused()
+        val afterPath=sources[source(after)]?:throw McpRefused()
+        require(beforePath!=afterPath)
+        // These exact paths were minted by this engine's capture operation.
+        // Reopening leases uses the canonical project API; the operation joins
+        // before either owner closes or another capture/engine shutdown proceeds.
+        var before:WorkbenchProject?=null;var next:WorkbenchProject?=null
+        try {
+            before=core.open(beforePath.toString());next=core.open(afterPath.toString())
+            suspend fun check(project:WorkbenchProject,expected:PackageInfo){
+                val info=project.info()
+                require(info.projectId==expected.binding.projectId && expected.binding.documentId in info.documentIds &&
+                    info.hostSeq==expected.binding.hostSeq && info.stateHash==expected.binding.stateHash)
+            }
+            check(before,original);check(next,after)
+            body(before,next)
+        } finally {withContext(NonCancellable){try{next?.close()}finally{before?.close()}}}
+    }
+    override suspend fun <T> withVerificationSource(after:PackageInfo,body:suspend(WorkbenchProject)->T):T = gate.withLock {
+        check(!closed)
+        val path=sources[source(after)]?:throw McpRefused()
+        val project=core.open(path.toString())
+        try {
+            val info=project.info()
+            require(info.projectId==after.binding.projectId&&after.binding.documentId in info.documentIds&&
+                info.hostSeq==after.binding.hostSeq&&info.stateHash==after.binding.stateHash)
+            body(project)
+        } finally {withContext(NonCancellable){project.close()}}
+    }
     private suspend fun <T> hostCall(release:(T)->Unit={},body:suspend(CaptureOperation)->T):T {
         val operation=CaptureOperation();val owned=AtomicReference<T?>(null)
         val producer=producers.async{body(operation).also{owned.set(it)}}
@@ -84,8 +131,19 @@ internal class NativeMcpCaptureEngine private constructor(
         catch(error:CancellationException){operation.cancel();withContext(NonCancellable){try{producer.await()}catch(_:Exception){};owned.getAndSet(null)?.let(release)};throw error}
         finally{operation.destroy()}
     }
-    override suspend fun close(){withContext(NonCancellable){gate.withLock{if(!closed){closed=true;targets.clear();service.destroy();producers.cancel()}}}}
+    override suspend fun close(){withContext(NonCancellable){gate.withLock{if(!closed){closed=true;targets.clear();sources.clear();service.destroy();producers.cancel()}}}}
     companion object {
+        /** The capture owner calls this with the same target, native receipt
+         * and newly opened project it is delivering to the editor. Never create
+         * it from an imported manifest, a window title or an agent request. */
+        fun editorOrigin(target:CaptureTarget,receipt:CaptureFrameInfo,project:ProjectInfo,documentId:String):McpEditorCaptureOrigin {
+            require(receipt.borderVisible&&receipt.windowHandle==target.window&&documentId in project.documentIds)
+            val binding=WorkflowBinding(project.projectId,documentId,project.hostSeq,project.stateHash)
+            return McpEditorCaptureOrigin(binding,receipt.sourceAssetId){engine->
+                val native=engine as? NativeMcpCaptureEngine?:throw McpRefused()
+                native.retainEditorTarget(target,receipt)
+            }
+        }
         suspend fun open(helper:Path,expectedSha256:String,core:WorkbenchCore,deviceId:String,privateParent:Path):NativeMcpCaptureEngine {
             val captureRoot=withContext(Dispatchers.IO){McpCaptureWork.prepare(privateParent)}
             val native=openDesktopCaptureService(helper,expectedSha256)

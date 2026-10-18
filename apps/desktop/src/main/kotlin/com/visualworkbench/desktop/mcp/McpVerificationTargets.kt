@@ -48,9 +48,16 @@ internal class McpVerificationTargets {
     /** Owner calls only after the existing native compile for this selector
      * settles. Package metadata supplied by an agent cannot establish a route. */
     @Synchronized fun rememberCapture(info: PackageInfo, selector: String) {
-        live(); require(selector.matches(Regex("[a-zA-Z0-9_-]{1,64}")))
         val identity = McpVerificationPackage.of(info)
-        val source = source(identity)
+        rememberSource(identity.binding,identity.sourceAssetId,selector)
+    }
+
+    /** Existing Desktop capture delivery supplies this private association;
+     * native retains its exact target before any marked revision is published. */
+    @Synchronized fun rememberSource(binding:WorkflowBinding,asset:String,selector:String) {
+        live(); require(selector.matches(Regex("[a-zA-Z0-9_-]{1,64}")))
+        require(binding.projectId.matches(Regex("[0-9a-f-]{36}"))&&binding.documentId.matches(Regex("[0-9a-f-]{36}"))&&asset.matches(Regex("[0-9a-f]{64}")))
+        val source = Source(binding.projectId,binding.documentId,asset)
         val previous = origins[source]
         // An identical image in another selected window is not target proof.
         require(previous == null || previous.selector == selector)
@@ -95,7 +102,7 @@ internal class McpVerificationTargets {
         try {
             checkCurrent(ticket)
             val result = McpVerificationPackage.of(after)
-            require(result.packageId != ticket.original.packageId)
+            require(result.packageId != ticket.original.packageId && result.target == ticket.original.target)
             return McpVerificationRecapture(ticket.original, result)
         } finally { pending.remove(ticket) }
     }

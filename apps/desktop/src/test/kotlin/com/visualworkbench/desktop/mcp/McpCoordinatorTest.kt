@@ -11,6 +11,8 @@ import java.util.Base64
 class McpCoordinatorTest {
     private val session="a".repeat(32)
     private val hash="b".repeat(64)
+    private var receiptCounter=0
+    private fun receiptId()="019a3aaa-0123-789a-8abc-${(++receiptCounter).toString(16).padStart(12,'0')}"
     private fun id(value:String)=java.util.UUID.nameUUIDFromBytes(value.toByteArray(Charsets.UTF_8)).toString()
     private val binding=WorkflowBinding(id("project"),id("document"),7uL,"c".repeat(64))
     private fun info(id:String="package",target:String="generic")=PackageInfo(this.id(id),target,null,binding,"d".repeat(64),hash,"2026-10-03",1024uL,0u,emptyList(),true,false)
@@ -21,7 +23,10 @@ class McpCoordinatorTest {
         override suspend fun publish(packageValue:WorkbenchCompiledPackage):PublishedPackage {publishEntered?.complete(Unit);publishFinish?.await();return PublishedPackage(packageValue.info,"C:/private/${packageValue.info.packageId}").also{values+=it}}
         override suspend fun list()=values.toList()
         override suspend fun lookup(packageId:String,target:String,manifestSha256:String)=values.single{it.info.packageId==packageId&&it.info.target==target&&it.info.manifestSha256==manifestSha256}
-        override suspend fun readFile(packageId:String,target:String,manifestSha256:String,name:String,maxBytes:UInt):ByteArray=error("unused")
+        override suspend fun readFile(packageId:String,target:String,manifestSha256:String,name:String,maxBytes:UInt):ByteArray {
+            require(name=="manifest.json");val value=lookup(packageId,target,manifestSha256).info
+            return """{"package_id":"${value.packageId}","source":{"project_id":"${value.binding.projectId}","document_id":"${value.binding.documentId}","asset_hash":"${value.sourceAssetId}","width":256,"height":128},"compiled_for":{"target":"${value.target}","max_long_edge":2048,"scale":1},"markers":[]}""".toByteArray()
+        }
         override suspend fun pendingRetirement():PackageRetirement?=null
         override suspend fun retire(packageId:String,target:String,manifestSha256:String):PackageRetirement {retired++;values.removeAll{it.info.packageId==packageId&&it.info.target==target};return PackageRetirement(packageId,target,manifestSha256,true)}
         override suspend fun close(){closed++}
@@ -75,7 +80,7 @@ class McpCoordinatorTest {
         val bytes=byteArrayOf(0,1,2,3);assertArrayEquals(bytes,decodeMcpReturn(null,Base64.getEncoder().encodeToString(bytes),"").second)
     }
     @Test fun publicationNeverSendsAndOnlyDisplayedPreviewMaySend()=runBlocking {
-        val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture)
+        val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture,newId={receiptId()})
         try {
             val saved=owner.publish(Compiled(info(target="claude")));assertEquals(0,wire.sends)
             val displayed=owner.previewClaude(saved)
@@ -84,7 +89,7 @@ class McpCoordinatorTest {
         }finally{owner.close()}
     }
     @Test fun captureWaitsForDrawnIndicatorAndRevocationSettlesIt()=runBlocking {
-        val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();capture.waitForever=true;capture.enter=CompletableDeferred();val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture)
+        val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();capture.waitForever=true;capture.enter=CompletableDeferred();val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture,newId={receiptId()})
         var request:Job?=null
         try {
             owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
@@ -96,7 +101,7 @@ class McpCoordinatorTest {
         }finally{request?.cancelAndJoin();owner.close()}
     }
     @Test fun retirementDrainDoesNotLockUnrelatedPublication()=runBlocking {
-        val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture)
+        val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture,newId={receiptId()})
         val entered=CompletableDeferred<Unit>();val finish=CompletableDeferred<Unit>();wire.unpublishEntered=entered;wire.unpublishFinish=finish
         var retirement:Deferred<Unit>?=null
         try {
@@ -106,7 +111,7 @@ class McpCoordinatorTest {
         }finally{finish.complete(Unit);withContext(NonCancellable){retirement?.await();owner.close()}}
     }
     @Test fun closeWaitsForDurablySubmittedLateReturnWithoutDeletingIt()=runBlocking {
-        val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture)
+        val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture,newId={receiptId()})
         val entered=CompletableDeferred<Unit>();val finish=CompletableDeferred<Unit>();inbox.submitting=entered;inbox.settle=finish
         var submit:Job?=null;var closing:Deferred<Unit>?=null
         try {
@@ -122,7 +127,7 @@ class McpCoordinatorTest {
     }
     @Test fun ownerRevokeBypassesFourOccupiedCallbacksAndStopsFurtherCapture()=runBlocking {
         val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();capture.waitForever=true;capture.enter=CompletableDeferred()
-        val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture);val jobs=mutableListOf<Job>()
+        val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture,newId={receiptId()});val jobs=mutableListOf<Job>()
         try{
             owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
             repeat(4){jobs+=launch(start=CoroutineStart.UNDISPATCHED){owner.capture(session,"chosen")}}
@@ -134,7 +139,7 @@ class McpCoordinatorTest {
         }finally{withContext(NonCancellable){jobs.forEach{it.cancel()};jobs.joinAll();owner.close()}}
     }
     @Test fun revokeInvalidatesAnInFlightGrantBeforeItsRemoteReply()=runBlocking {
-        val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture)
+        val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture,newId={receiptId()})
         val entered=CompletableDeferred<Unit>();val finish=CompletableDeferred<Unit>();wire.grantEntered=entered;wire.grantFinish=finish
         var granting:Job?=null;var revoking:Deferred<Unit>?=null
         try{
@@ -158,7 +163,7 @@ class McpCoordinatorTest {
             waitForever = true; enter = CompletableDeferred()
             cleanupEntered = CompletableDeferred(); cleanupFinish = CompletableDeferred()
         }
-        val owner = DesktopMcpCoordinator(Catalog(), Inbox(), wire, capture)
+        val owner = DesktopMcpCoordinator(Catalog(), Inbox(), wire, capture,newId={receiptId()})
         val requests = mutableListOf<Job>(); var batch: Deferred<Boolean>? = null
         try {
             owner.selectTarget(); owner.grant(session, listOf("chosen"), 60_000); owner.grant(second, listOf("chosen"), 60_000)
@@ -187,7 +192,7 @@ class McpCoordinatorTest {
         }
     }
     @Test fun duplicateStartDuringHeldStopPreservesTheActualIndicatorOwner() = runBlocking {
-        val owner = DesktopMcpCoordinator(Catalog(), Inbox(), Connection(), Capture())
+        val owner = DesktopMcpCoordinator(Catalog(), Inbox(), Connection(), Capture(),newId={receiptId()})
         val entered = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
         val lifetime = DesktopMcpLifetime {
             object : McpDesktopServiceOwner {
@@ -221,7 +226,7 @@ class McpCoordinatorTest {
 
     @Test fun verificationRecaptureUsesOnlyTheCheckedOriginalAndJoinedAfterPackage()=runBlocking {
         val catalog=Catalog();val capture=Capture();val wire=Connection()
-        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture)
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture,newId={receiptId()})
         try {
             owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
             drawCapture(owner){owner.capture(session,"chosen")}
@@ -237,7 +242,7 @@ class McpCoordinatorTest {
 
     @Test fun verificationRefusesMissingCurrentOriginalBeforeStartingAnotherCapture()=runBlocking {
         val catalog=Catalog();val capture=Capture()
-        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture)
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture,newId={receiptId()})
         try {
             owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
             drawCapture(owner){owner.capture(session,"chosen")}
@@ -251,7 +256,7 @@ class McpCoordinatorTest {
 
     @Test fun verificationRechecksActualOriginalCatalogAfterTheRecaptureSettles()=runBlocking {
         val catalog=Catalog();val capture=Capture();val wire=Connection()
-        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture)
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture,newId={receiptId()})
         try {
             owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
             drawCapture(owner){owner.capture(session,"chosen")}
@@ -269,7 +274,7 @@ class McpCoordinatorTest {
 
     @Test fun verificationRegistrySaturationCannotFailAnOrdinaryDurablePublication()=runBlocking {
         val catalog=Catalog();val capture=Capture();val wire=Connection()
-        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture)
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture,newId={receiptId()})
         try {
             owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
             drawCapture(owner){owner.capture(session,"chosen")}
@@ -287,7 +292,7 @@ class McpCoordinatorTest {
 
     @Test fun identicalCaptureBytesCannotInheritAnotherSelectedWindowsVerificationRoute()=runBlocking {
         val catalog=Catalog();val capture=Capture()
-        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture)
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture,newId={receiptId()})
         try {
             owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
             drawCapture(owner){owner.capture(session,"chosen")}
@@ -305,7 +310,7 @@ class McpCoordinatorTest {
 
     @Test fun originalRetirementDuringJoinedRecapturePreventsPublicationAndClosesCompiledOwner()=runBlocking {
         val catalog=Catalog();val capture=Capture();val wire=Connection()
-        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture)
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture,newId={receiptId()})
         val release=CompletableDeferred<Unit>();var pending:Deferred<Boolean>?=null
         try {
             owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)

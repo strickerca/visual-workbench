@@ -49,6 +49,10 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
                 Row{
                     TextButton(enabled=!busy,onClick={act{owner.expose(published)}}){Text("Expose this saved package")}
                     if(info.target=="claude")TextButton(enabled=!busy,onClick={act{owner.previewClaude(published)}}){Text("Review Claude Send")}
+                    TextButton(enabled=!busy&&state.agents.any{it.connection==selectedAgent},onClick={val agent=selectedAgent;if(agent!=null)act{
+                        val comparison=owner.recaptureVerification(agent,info.packageId,info.target,info.manifestSha256)
+                        owner.state.value.inbox.singleOrNull{it.receiptId==comparison.receiptId&&it.receiptBlake3==comparison.receiptBlake3}?.let(onCompare)
+                    }}){Text("Recapture original window")}
                     TextButton(enabled=!busy,onClick={act{owner.retirePackage(published)}}){Text("Unpublish and retire")}
                 }
             }
@@ -72,7 +76,7 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
         Text("Grants expire, are lost on restart/disconnect, and never permit capture of app-owned windows. A visible capture indicator must draw before every request.",style=MaterialTheme.typography.caption)
         Divider();Text("Compare inbox",style=MaterialTheme.typography.h6)
         state.inbox.filterNot{it.retired}.forEach{receipt->Row{
-            Text("${if(receipt.after!=null)"PNG"else"Text"} | revision ${receipt.binding.hostSeq} | ${receipt.receiptId.take(8)}",Modifier.weight(1f))
+            Text("${if(receipt.receiptId in state.verificationReceipts)"Verification"else if(receipt.after!=null)"PNG"else"Text"} | revision ${receipt.binding.hostSeq} | ${receipt.receiptId.take(8)}",Modifier.weight(1f))
             TextButton(onClick={onCompare(receipt)},enabled=!busy){Text("Compare")}
             TextButton(onClick={act{owner.retireReturn(receipt)}},enabled=!busy){Text("Retire")}
         }}

@@ -24,6 +24,8 @@ internal interface McpOwnerActions {
     suspend fun capture(session: String, selector: String): McpCaptureReceipt
     suspend fun submitResult(session: String, packageId: String, manifestHash: String,
         text: String?, pngBase64: String?, note: String): String
+    suspend fun recaptureVerification(session:String,packageId:String,target:String,manifestHash:String):McpVerificationReceipt = throw McpRefused()
+    suspend fun markerComparison(session:String,packageId:String,target:String,manifestHash:String,receiptId:String,receiptHash:String,number:UInt):McpMarkerComparison = throw McpRefused()
 }
 internal data class McpCaptureReceipt(val packageId: String,val target: String,val indicatorAcknowledged: Boolean,val lossless: Boolean)
 internal data class McpClaudePreview(val packageId:String,val manifestSha256:String,val folder:String,val content:String,val metadata:Map<String,String>) {
@@ -135,6 +137,11 @@ internal class DesktopMcpHost private constructor(private val process: Process, 
                         "capture" -> {require(agents.value.any{it.connection==session});val receipt=actions.capture(session,payload["selector"] as? String ?: throw McpRefused());
                             mapOf("package_id" to receipt.packageId,"target" to receipt.target,"indicator_acknowledged" to receipt.indicatorAcknowledged,"lossless" to receipt.lossless)}
                         "submit_result" -> {val receipt=actions.submitResult(session,payload["package_id"] as? String ?: throw McpRefused(),payload["manifest_sha256"] as? String ?: throw McpRefused(),payload["text"] as? String,payload["image"] as? String,payload["note"] as? String ?: throw McpRefused());mapOf("persisted" to true,"receipt_id" to receipt)}
+                        "verification_recapture" -> {require(agents.value.any{it.connection==session});actions.recaptureVerification(session,
+                            payload["package_id"] as? String?:throw McpRefused(),payload["target"] as? String?:throw McpRefused(),payload["manifest_sha256"] as? String?:throw McpRefused()).wire()}
+                        "verification_compare" -> {require(agents.value.any{it.connection==session});val number=(payload["n"] as? BigDecimal)?.longValueExact()?:throw McpRefused();require(number in 1..512)
+                            actions.markerComparison(session,payload["package_id"] as? String?:throw McpRefused(),payload["target"] as? String?:throw McpRefused(),payload["manifest_sha256"] as? String?:throw McpRefused(),
+                                payload["receipt_id"] as? String?:throw McpRefused(),payload["receipt_blake3"] as? String?:throw McpRefused(),number.toUInt()).wire()}
                         else -> throw McpRefused()
                     }}
                 }

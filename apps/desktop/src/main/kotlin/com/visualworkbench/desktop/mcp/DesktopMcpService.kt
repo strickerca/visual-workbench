@@ -33,11 +33,13 @@ internal object DesktopMcpService {
                 val actions=object:McpOwnerActions {
                     override suspend fun capture(session:String,selector:String)=requireNotNull(delegate.get()).capture(session,selector)
                     override suspend fun submitResult(session:String,packageId:String,manifestHash:String,text:String?,pngBase64:String?,note:String)=requireNotNull(delegate.get()).submitResult(session,packageId,manifestHash,text,pngBase64,note)
+                    override suspend fun recaptureVerification(session:String,packageId:String,target:String,manifestHash:String)=requireNotNull(delegate.get()).recaptureVerification(session,packageId,target,manifestHash)
+                    override suspend fun markerComparison(session:String,packageId:String,target:String,manifestHash:String,receiptId:String,receiptHash:String,number:UInt)=requireNotNull(delegate.get()).markerComparison(session,packageId,target,manifestHash,receiptId,receiptHash,number)
                 }
                 stage=McpFailureStage.host_ready
                 val native=DesktopMcpHost.open(runtime,parent.resolve("service"),actions)
                 val connected=NativeMcpConnection(native);connection=connected
-                val result=DesktopMcpCoordinator(local,returned,connected,captureOwner)
+                val result=DesktopMcpCoordinator(local,returned,connected,captureOwner,newId={core.newId(System.currentTimeMillis().toULong())})
                 // The coordinator owns every resource before any suspending work.
                 catalog=null;inbox=null;capture=null;connection=null;owned.set(result);delegate.set(result)
                 stage=McpFailureStage.coordinator
