@@ -45,7 +45,10 @@ class PrecisionInstrumentedTest {
     @Test fun physicalHoldAcrossHoverToContactDoesNotBecomeAShortClick()=fixture{_,p->
         val buttons=PrecisionButtons(p){true}
         p.hover(Point(200.0,200.0));buttons.accept(packet(sample(time=100,buttons=MotionEvent.BUTTON_STYLUS_PRIMARY)))
-        // Production beginTool cancels the old hover/gesture, then latches.
+        // CanvasSurface forwards a held-button HOVER_EXIT without resetting
+        // the physical clock; router hover(null) precedes beginTool cancel/down.
+        buttons.accept(packet(sample(time=400,buttons=MotionEvent.BUTTON_STYLUS_PRIMARY)).copy(action=MotionEvent.ACTION_HOVER_EXIT))
+        p.hover(null)
         p.cancel();p.down(Point(200.0,200.0))
         buttons.accept(packet(sample(time=500,buttons=MotionEvent.BUTTON_STYLUS_PRIMARY)))
         buttons.accept(packet(sample(time=550)))

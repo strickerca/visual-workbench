@@ -58,7 +58,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     internal fun cancelPrecision(){if(!precisionClosed)precision.cancel()}
     private fun closePrecision(){precision.close();precisionClosed=true}
     private var synchronizingPrecision=false
-    val precision:PrecisionController=PrecisionController(core){if(!disposing&&!synchronizingPrecision)publish()}
+    val precision:PrecisionController=PrecisionController(core,changed={if(!disposing&&!synchronizingPrecision)publish()})
     private var documentPress:Pair<Point,Point>?=null
     private var documentPressPage:UInt=0u
     private var documentPressRevision:ProjectInfo?=null
