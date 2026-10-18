@@ -1,12 +1,16 @@
-//! One-attempt GPT Image HTTP transport. No built-in key, key-file or environment
+//! One-attempt image HTTP transports. No built-in key, key-file or environment
 //! fallback; no logging. Call blocking entry points on an application worker.
 #![forbid(unsafe_code)]
 
+mod flux;
+mod gemini;
 mod http;
 mod secret;
 mod trust;
 mod worker;
 
+pub use flux::FluxFillAdapter;
+pub use gemini::GeminiAdapter;
 pub use secret::{CredentialFailure, Secret, SecretProvider};
 pub use trust::PlatformTrust;
 #[cfg(target_os = "android")]
@@ -14,7 +18,13 @@ pub use trust::{AndroidRuntime, initialize_android};
 
 use std::sync::Arc;
 use vw_ai::budget::{BudgetLedger, BudgetPolicy, Confirmation};
+use vw_ai::config::ProviderKind;
 use vw_ai::{AuthorizedRequest, Cancellation, Prepared, ProviderResponse};
+
+/// A narrow capability supplied by the trusted protected-credential layer.
+/// It must derive a sensitive raw API-key header from this loaded Secret.
+/// The transport never gains a key-byte accessor or another credential source.
+pub type ApiKeyHeader = fn(&Secret) -> Result<reqwest::header::HeaderValue>;
 
 pub const MAX_ACTIVE_ATTEMPTS: usize = 2;
 pub const UPLOAD_CHUNK_BYTES: usize = 16 * 1024;
@@ -103,6 +113,9 @@ impl OpenAiAdapter {
         policy: BudgetPolicy,
         cancel: &dyn Cancellation,
     ) -> Result<SendOutcome> {
+        if prepared.provider().kind != ProviderKind::OpenAiImageEdits {
+            return Err(Error::Representation);
+        }
         check_cancel(cancel)?;
         let slot = worker::Slot::acquire()?;
         ledger.reserve(prepared.review(), confirmation, policy)?;
@@ -136,6 +149,9 @@ impl OpenAiAdapter {
         request: AuthorizedRequest,
         cancel: &dyn Cancellation,
     ) -> Result<ProviderResponse> {
+        if request.provider_kind() != ProviderKind::OpenAiImageEdits {
+            return Err(Error::Representation);
+        }
         check_cancel(cancel)?;
         let slot = worker::Slot::acquire()?;
         self.send_admitted(request, slot, cancel)
@@ -199,6 +215,158 @@ fn check_cancel(cancel: &dyn Cancellation) -> Result<()> {
         Err(Error::Cancelled)
     } else {
         Ok(())
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ApiKeyProtocol {
+    Gemini,
+    Flux,
+}
+impl ApiKeyProtocol {
+    fn accepts(self, kind: ProviderKind) -> bool {
+        matches!(
+            (self, kind),
+            (Self::Gemini, ProviderKind::GeminiImageGeneration)
+                | (Self::Flux, ProviderKind::Flux1Fill { .. })
+        )
+    }
+}
+struct ApiKeyAdapter {
+    client: reqwest::Client,
+    secrets: Arc<dyn SecretProvider>,
+    api_key_header: ApiKeyHeader,
+    protocol: ApiKeyProtocol,
+    #[cfg(test)]
+    fixture_target: Option<String>,
+}
+impl ApiKeyAdapter {
+    fn new(
+        trust: PlatformTrust,
+        secrets: Arc<dyn SecretProvider>,
+        api_key_header: ApiKeyHeader,
+        protocol: ApiKeyProtocol,
+    ) -> Result<Self> {
+        Ok(Self {
+            client: http::client(trust)?,
+            secrets,
+            api_key_header,
+            protocol,
+            #[cfg(test)]
+            fixture_target: None,
+        })
+    }
+    fn send_confirmed(
+        &mut self,
+        prepared: &Prepared,
+        ledger: &mut impl BudgetLedger,
+        confirmation: Confirmation,
+        policy: BudgetPolicy,
+        cancel: &dyn Cancellation,
+    ) -> Result<SendOutcome> {
+        if !self.protocol.accepts(prepared.provider().kind) {
+            return Err(Error::Representation);
+        }
+        check_cancel(cancel)?;
+        let slot = worker::Slot::acquire()?;
+        ledger.reserve(prepared.review(), confirmation, policy)?;
+        if cancel.is_cancelled() {
+            ledger.cancel_unattempted(prepared.review().request_id())?;
+            return Err(Error::Cancelled);
+        }
+        let permit = ledger.begin_attempt(prepared.review())?;
+        let request = prepared.authorize(permit, cancel)?;
+        let response = self.send_admitted(request, slot, cancel)?;
+        let settlement = match response.tokens() {
+            None => Settlement::UsageMissing,
+            Some(tokens) => match ledger.settle(response.request_id(), prepared.provider(), tokens)
+            {
+                Ok(microusd) => Settlement::UsagePriced { microusd },
+                Err(_) => Settlement::LedgerUnavailable,
+            },
+        };
+        Ok(SendOutcome {
+            response,
+            settlement,
+        })
+    }
+    fn send_typed(
+        &mut self,
+        request: AuthorizedRequest,
+        cancel: &dyn Cancellation,
+    ) -> Result<ProviderResponse> {
+        if !self.protocol.accepts(request.provider_kind()) {
+            return Err(Error::Representation);
+        }
+        check_cancel(cancel)?;
+        let slot = worker::Slot::acquire()?;
+        self.send_admitted(request, slot, cancel)
+    }
+    fn send_admitted(
+        &self,
+        request: AuthorizedRequest,
+        slot: worker::Slot,
+        cancel: &dyn Cancellation,
+    ) -> Result<ProviderResponse> {
+        let duration = std::time::Duration::from_secs(u64::from(request.timeout_seconds()));
+        let client = self.client.clone();
+        let secrets = Arc::clone(&self.secrets);
+        let api_key_header = self.api_key_header;
+        let protocol = self.protocol;
+        #[cfg(test)]
+        let fixture_target = self.fixture_target.clone();
+        worker::run(slot, duration, cancel, move |stop, deadline| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .max_blocking_threads(1)
+                .build()
+                .map_err(|_| Error::Worker)?;
+            let target = match protocol {
+                ApiKeyProtocol::Gemini => gemini::ENDPOINT,
+                ApiKeyProtocol::Flux => flux::ENDPOINT,
+            };
+            #[cfg(test)]
+            let target = fixture_target.as_deref().unwrap_or(target);
+            let result = runtime.block_on(async {
+                match protocol {
+                    ApiKeyProtocol::Gemini => {
+                        gemini::send(
+                            client,
+                            request,
+                            secrets,
+                            api_key_header,
+                            stop,
+                            deadline,
+                            target,
+                        )
+                        .await
+                    }
+                    ApiKeyProtocol::Flux => {
+                        flux::send(
+                            client,
+                            request,
+                            secrets,
+                            api_key_header,
+                            stop,
+                            deadline,
+                            target,
+                        )
+                        .await
+                    }
+                }
+            });
+            // Keep slot ownership through actual runtime and blocking DNS exit.
+            drop(runtime);
+            result
+        })
+    }
+}
+fn core_transport_error(error: Error) -> vw_ai::Error {
+    match error {
+        Error::Core(error) => error,
+        Error::Cancelled => vw_ai::Error::Cancelled,
+        Error::ResponseLimit | Error::Busy => vw_ai::Error::Limit("provider transport admission"),
+        _ => vw_ai::Error::Unsupported,
     }
 }
 
