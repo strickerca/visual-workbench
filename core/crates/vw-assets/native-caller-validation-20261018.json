@@ -1,0 +1,473 @@
+{
+  "schema": 1,
+  "status": "BLOCKED: production callers compiled, targeted tests executed, 9 public import failures and strict FFI lint failures require coordinator-owned repairs; no promotion",
+  "source_commit": "b0fee0aead798fe43fbb680125e082ccbf02afc8",
+  "source_branch": "integration/image-caller-source-checkpoint-20261018",
+  "platform": "Linux x86_64; Rust 1.99.0; at most 2 Cargo build jobs / 2 test threads",
+  "source_bindings": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "926e65a8241e89a2f7d55568069536f4ffec5b2cd248e149d9fa252133698ab0"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "207c30a34a3bacbc9e0b9bbbf40d5fb33ea4517b5efe72b8c921cf7cb856a83c"
+    },
+    {
+      "path": "core/crates/vw-model/src/validate.rs",
+      "sha256": "29cdfa8fe50b9930be5fe8838724d5b55abcbd7536918f1bf8651796f001f0d1"
+    },
+    {
+      "path": "core/crates/vw-raster/src/export.rs",
+      "sha256": "1f5742e5b2830d8def274814c26d5ff46acc15bc9388d7a499a5231fe230181d"
+    },
+    {
+      "path": "core/crates/vw-raster/src/display.rs",
+      "sha256": "64bf78579c6ecfc0831bd46168cca75d94aa2702aa6925fdcafa8d7b3395d507"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/lib.rs",
+      "sha256": "01d0b2b2810fb1832cddc4457d1cb1eda98e2182f551ec26beada2a6200b4f0d"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/project.rs",
+      "sha256": "ce8d449ff10999f9ffbcab7bcf5cd45ac98e30ef76120c7d81a0d0cdd8919c46"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/streaming_ffi.rs",
+      "sha256": "e2dd01f76b1faa135456aeb6761c1227378a1027f1144c4edd745526454ff8f5"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/ai_edit/owner.rs",
+      "sha256": "19d2758f977edb79f202bd7e954d7f1c5d2f7fa7cea2d9c2c2507bc00a623e3d"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session/discovery.rs",
+      "sha256": "63497a6ee7599808467ff40a4e9b581205ca8bf0bbef8f30ed98bf4e34ac5dd1"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/format_images.rs",
+      "sha256": "efc15e102c31b3fd3e4a94e014567bd2d7dee2ea7dbddaa5c717100ea9338bf9"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/avif_images.rs",
+      "sha256": "4ca03f6cdeeca4fff25a684f7410a22d9e3fae7dd960834face19b0a2ebefe49"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/format_seek_tests.rs",
+      "sha256": "a795d4daadb889c44008332ac3c0131d7f6feee749de813755c6ee1f86cfb9e8"
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/ordinary_formats.rs",
+      "sha256": "698e274ed358afe63f681f2b7bc09138f19611f4bf288075fb63b7249b4152d3"
+    },
+    {
+      "path": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+      "sha256": "52c87368533e9b0d1612e8b84ac61d7e3d2d7e656c2b46e99c1cad8597064982"
+    },
+    {
+      "path": "core/crates/vw-formats/src/lib.rs",
+      "sha256": "0e4f217ff5109f64fdbefe14a9985d1363889e4705905c02e143598d09a24541"
+    },
+    {
+      "path": "core/crates/vw-formats/src/tiff.rs",
+      "sha256": "972e2083a00b886ad4e0a90f02aabde492472e187ca16f3a13cd30e661232339"
+    },
+    {
+      "path": "core/crates/vw-formats/tests/provenance.rs",
+      "sha256": "3953a689063f07a0e35a9f0faf552de481b6cba1376bd2826b058af1905c7d8e"
+    }
+  ],
+  "license_gate": {
+    "status": "passed licenses/sources/bans before build, unchanged dependency graph",
+    "log_sha256": "eaac6577618f8fd6bc6b9d2a755ce5fbe8082b9f2b85a5015510c9073f287089",
+    "cargo_lock_sha256": "207c30a34a3bacbc9e0b9bbbf40d5fb33ea4517b5efe72b8c921cf7cb856a83c",
+    "new_dependencies_in_provenance_repair": false
+  },
+  "execution": {
+    "total": {
+      "passed": 120,
+      "failed": 9,
+      "ignored": 0
+    },
+    "zero_case_unit_or_doc_targets": "not counted as passes or skips",
+    "selected_tests_ignored": 0,
+    "groups": [
+      {
+        "log": "focused-initial.log",
+        "log_sha256": "dfd406ddb663c417033a2a519c5c85a2243ab216aad2ffb01cf131bc32de9a99",
+        "command": "cargo test --locked -p vw-formats; cargo test --locked -p vw-ffi --test ordinary_formats --test background --test streaming_ffi --test lifecycle; --test-threads=2",
+        "exit_code": 101,
+        "passed": 47,
+        "failed": 9,
+        "ignored": 0,
+        "passing_cases": [
+          "associated_alpha_and_float_tiff_refuse_implicit_conversion",
+          "admitted_baseline_gray_jpeg_strip_decodes_without_color_conversion",
+          "big_endian_planar_rgb_reads_all_planes",
+          "big_tiff_gray_alpha_preserves_sixteen_bit_values",
+          "bmp_linked_profile_and_more_than_eight_bit_channels_are_refused",
+          "duplicate_tiff_tags_and_alias_amplification_fail_in_header_admission",
+          "embedded_jpeg_extent_is_checked_before_unbounded_nested_decoder",
+          "bmp_v5_retains_hidden_rgb_and_straight_alpha_and_icc",
+          "multipage_tiff_warns_and_does_not_visit_an_unrequested_ifd",
+          "output_cap_empty_destination_and_cancellation_have_no_success_receipt",
+          "tiff_16_keeps_adjacent_samples_and_zero_alpha_color_exact",
+          "tiff_budget_and_pixel_limit_refuse_before_codec_allocation",
+          "tiff_multiple_strips_have_exact_rows_including_last_short_strip",
+          "white_is_zero_alpha_is_refused_before_pinned_decoder_can_invert_alpha",
+          "tiff_orientation_is_exact_permutation_and_retained_provenance",
+          "encoder_charges_retained_capacity_before_writing_or_parsing_profiles",
+          "late_export_cancellation_returns_no_receipt_and_never_changes_source",
+          "preview_without_original_never_writes_an_export",
+          "independently_compressed_tiff_strips_keep_exact_samples_and_source_hash",
+          "tiff16_original_and_r164_display_derivative_keep_separate_depth_and_identity",
+          "reversed_fill_order_refuses_before_ignoring_its_pixel_semantics",
+          "ordinary_untagged_and_icc_color_still_preserve_their_exact_declarations",
+          "unsupported_explicit_color_never_becomes_untagged_even_with_an_icc",
+          "metadata_admission_is_bounded_and_refuses_non_ascii_nul_or_empty_before_writes",
+          "normal_tiff_decoder_reads_embedded_metadata_without_changing_pixels_or_icc",
+          "provenance_path_cannot_publish_bmp_or_a_cancelled_tiff",
+          "maximum_metadata_keeps_multiple_strips_exact_and_counts_toward_output_limit",
+          "background_cancellation_and_closed_session_do_not_publish_pixels",
+          "corrupt_or_missing_original_is_refused_without_changing_revision",
+          "full_resolution_srgb_background_fits_256_mib_without_encoding",
+          "insufficient_background_budget_is_backpressure_and_retry_succeeds",
+          "sixteen_bit_background_reduces_display_only_and_preserves_source",
+          "tagged_icc_background_preserves_alpha_source_and_revision",
+          "untagged_jpeg_background_requires_explicit_consent_and_never_changes_original",
+          "camera_keeps_f64_and_rejects_unbounded_batches",
+          "absolute_edit_precondition_is_atomic_but_exact_retry_survives_a_new_revision",
+          "highlighter_uses_atomic_multiply_layer_and_cancelled_calls_do_not_commit",
+          "create_stroke_export_reopen_undo_redo_is_durable",
+          "prediction_retry_cancel_and_malformed_batch_leave_history_unchanged",
+          "shutdown_after_commit_preserves_the_durable_receipt",
+          "shutdown_releases_capacity_while_closed_gesture_handles_remain_alive",
+          "source_and_retained_region_pixels_obey_the_callers_export_budget",
+          "stroke_style_width_rebuilds_geometry_and_undo_restores_it",
+          "typed_edits_are_atomic_exact_retries_and_text_keeps_identity",
+          "hundred_thousand_samples_cross_bounded_batches_without_prediction_persistence",
+          "avif_missing_codec::admitted_avif_file_import_keeps_the_typed_missing_codec_failure",
+          "avif_missing_codec::admitted_avif_reports_missing_codec_before_any_project_is_published"
+        ],
+        "failing_cases": [
+          "bmp_export_is_refused_instead_of_publishing_a_file_without_required_provenance",
+          "file_tiff_intake_persists_first_page_notice_and_original_orientation",
+          "file_overwrite_and_cancellation_keep_existing_bytes_and_remove_owned_temporaries",
+          "finalized_tiff_bytes_contain_source_revision_and_exact_clean_pixels_at_both_depths",
+          "multipage_tiff_memory_notice_precedes_display_consent_and_keeps_original_pages",
+          "ordinary_memory_bmp_intake_preserves_immutable_encoded_original_and_profile",
+          "ordinary_memory_tiff16_export_keeps_samples_profile_and_revision",
+          "original_format_query_refuses_stale_revision_cancellation_and_closed_project",
+          "ordinary_attachment_intake_retains_tiff_notice_depth_and_hash"
+        ]
+      },
+      {
+        "log": "raster.log",
+        "log_sha256": "deb667ecf04ec3a8388c3dbdd82b59395a34ae179aed4fb864b792414ad9c22a",
+        "command": "cargo test --locked -p vw-raster --test ordinary_format_preparation --test display --test formats -- --test-threads=2",
+        "exit_code": 0,
+        "passed": 28,
+        "failed": 0,
+        "ignored": 0,
+        "passing_cases": [
+          "direct_display_cancellation_at_conversion_boundary_returns_no_image",
+          "display_admission_counts_conversion_resident_capacity_and_profile",
+          "display_shape_and_original_availability_are_checked_before_parsing",
+          "profile_alias_workspace_is_admitted_before_semantic_parsing",
+          "direct_display_preserves_orientation_alpha_and_source_identity",
+          "all_eight_exif_orientations_move_pixels_into_document_space_once",
+          "clean_region_is_exact_source_samples_without_scale",
+          "clean_rgb_icc_is_preserved_in_png_jpeg_and_webp",
+          "ai_color_conversion_requires_explicit_untagged_assumption_and_records_profile",
+          "hostile_headers_truncation_and_mutations_respect_decode_limits",
+          "jpeg_alpha_preflight_uses_the_selected_region",
+          "jpeg_and_lossy_webp_decode_at_exact_requested_dimensions",
+          "limits_preflight_before_allocations_and_never_silently_reduce",
+          "lossless_webp_roundtrip_alpha_and_rgb",
+          "metadata_revision_hash_settings_and_capture_identity_in_every_format",
+          "native_lossy_encoder_version_is_the_reviewed_bundled_release",
+          "png_8_and_16_roundtrip_preserve_every_channel_including_transparent_rgb",
+          "grayscale_profile_16bit_png_roundtrip_and_explicit_srgb_conversion",
+          "preview_missing_revision_bad_buffer_and_bounded_decode_fail",
+          "png_explicit_color_metadata_is_preserved_or_refused",
+          "bmp_and_tiff8_refuse_silent_depth_reduction_and_record_explicit_permission",
+          "cancellation_during_depth_promotion_does_not_modify_source",
+          "eight_to_sixteen_promotion_is_exact_and_needs_no_depth_reduction_permission",
+          "format_limits_refuse_oversized_sides_and_preserve_exact_crop_without_scaling",
+          "missing_original_or_insufficient_workspace_refuses_before_preparation",
+          "raster_memory_encoder_refuses_external_formats_and_existing_png_still_roundtrips",
+          "tiff16_preserves_adjacent_samples_and_original_provenance_without_permission",
+          "gray_icc_can_label_tiff_but_bmp_requires_explicit_conversion"
+        ],
+        "failing_cases": []
+      },
+      {
+        "log": "unit-run.log",
+        "log_sha256": "40349e5e8f3b83ae289059b9f48862d697c34420750d70bf52e05f65a0fe073a",
+        "command": "current compiler-artifact executable; filters format_images::tests::, avif_images::tests::, streaming_ffi::format_seek_tests::; --test-threads=2",
+        "exit_code": 0,
+        "passed": 7,
+        "failed": 0,
+        "ignored": 0,
+        "passing_cases": [
+          "format_images::tests::a_tiny_crop_still_charges_the_entire_retained_source_allocation",
+          "format_images::tests::buffered_bytes_keep_requested_policy_original_identity_and_capture_provenance",
+          "format_images::tests::cancellation_after_the_generic_decoder_returns_discards_its_pixels",
+          "avif_images::tests::missing_codec_is_typed_separately_from_corrupt_or_unsupported_data",
+          "avif_images::tests::inspection_and_cancel_refusal_do_not_need_an_os_decoder",
+          "streaming_ffi::format_seek_tests::final_hash_refuses_cancelled_and_wrong_length_receipts",
+          "streaming_ffi::format_seek_tests::final_hash_includes_header_rewrites_and_ignores_the_write_order"
+        ],
+        "failing_cases": []
+      },
+      {
+        "log": "streaming.log",
+        "log_sha256": "b0b96e385e2bac39d5fb9834ff0b246ff6ffab3e44eecfaa6d0fd636908d5c4f",
+        "command": "cargo test --locked -p vw-ffi --test streaming_ffi -- --test-threads=2",
+        "exit_code": 0,
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "passing_cases": [
+          "buffered_jpeg_and_webp_keep_revision_metadata_and_no_clobber_publication",
+          "depth_and_alpha_reductions_require_explicit_export_choices",
+          "malformed_video_and_cancelled_attachment_leave_history_unchanged",
+          "file_attachments_are_exact_retryable_immutable_assets_without_documents",
+          "typed_memory_encoded_and_cancel_failures_publish_nothing",
+          "typed_format_and_source_binding_failures_precede_publication"
+        ],
+        "failing_cases": []
+      },
+      {
+        "log": "assets-avif.log",
+        "log_sha256": "aea370131d93cbcfb22aee06a64361ae86a8a3dae8cfa762f627d0bbb947038d",
+        "command": "cargo test --locked -p vw-assets -p vw-avif-os -- --test-threads=2",
+        "exit_code": 0,
+        "passed": 32,
+        "failed": 0,
+        "ignored": 0,
+        "passing_cases": [
+          "anisotropic_and_sheared_views_use_largest_physical_scale",
+          "actual_200mp_dimensions_have_bounded_complete_odd_edge_pyramid",
+          "cancelled_or_superseded_generation_cannot_reenter_a_revisited_view",
+          "concurrent_last_leases_release_retired_payload_exactly_once",
+          "dimension_limits_refuse_before_tile_allocation",
+          "display_profile_or_depth_conversion_must_be_explicit",
+          "eviction_remains_charged_until_the_actual_resource_destructor_returns",
+          "cancel_view_keeps_producer_slots_until_exact_retirement",
+          "fractional_edges_do_not_fetch_neighbor_as_visible",
+          "live_cache_evicts_only_unleased_lru_and_failed_allocation_releases_reserve",
+          "fixed_manifest_roundtrip_bound_to_original_and_exact_inventory",
+          "manifest_cannot_drop_duplicate_reorder_or_overclaim_tiles",
+          "manifest_count_bomb_is_rejected_before_allocation_even_with_valid_checksum",
+          "maximum_physical_scale_refuses_nonfinite_and_handles_extreme_finite_values",
+          "pins_and_decode_reservations_charge_actual_lifetimes",
+          "retiring_skipped_old_request_requeues_visible_tile_before_prefetch",
+          "priority_is_visible_before_prefetch_and_cached_tiles_never_request",
+          "retrying_an_old_request_requeues_once_under_the_latest_generation",
+          "viewport_selects_native_density_and_exact_single_ring",
+          "superseded_view_does_not_release_inflight_slots_or_accept_forged_receipt",
+          "actual_bitstream_depth_cannot_hide_behind_av1c",
+          "animated_brand_and_hdr_container_color_are_explicit_refusals",
+          "callback_cannot_substitute_proxy_or_alpha",
+          "callback_spare_allocation_is_part_of_the_decode_budget",
+          "later_sequence_or_frame_cannot_reallocate_decoder",
+          "malformed_lengths_and_insufficient_memory_refuse_before_os_work",
+          "nclx_must_match_coded_matrix_and_range",
+          "public_receipt_cannot_expand_the_restricted_adapter_capability",
+          "render_resize_and_container_rotation_refuse",
+          "sequence_dimensions_cannot_hide_behind_ispe",
+          "source_and_exact_color_declaration_survive",
+          "sniffing_does_not_steal_heic_mif1_sources"
+        ],
+        "failing_cases": []
+      }
+    ]
+  },
+  "unit_artifact": {
+    "executable": "target/debug/deps/vw_core-c04f4f7ef065d1ea",
+    "executable_sha256": "2dd5a5fb6cb7666dca9485c4491f1d6ff8c530be47a14c1351ec2653f8d58e6a",
+    "compiler_json_sha256": "025369be179799746d882bbe2c14bad656481b97b3e2d70b0957f636f1d7b344",
+    "results": [
+      {
+        "filter": "format_images::tests::",
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 178,
+        "names": [
+          "format_images::tests::a_tiny_crop_still_charges_the_entire_retained_source_allocation",
+          "format_images::tests::buffered_bytes_keep_requested_policy_original_identity_and_capture_provenance",
+          "format_images::tests::cancellation_after_the_generic_decoder_returns_discards_its_pixels"
+        ],
+        "log_sha256": "b8b6c7b7d6d433ced9775db8ee35c1f6815930b7f68a1ca0502736dba65b7721"
+      },
+      {
+        "filter": "avif_images::tests::",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 179,
+        "names": [
+          "avif_images::tests::missing_codec_is_typed_separately_from_corrupt_or_unsupported_data",
+          "avif_images::tests::inspection_and_cancel_refusal_do_not_need_an_os_decoder"
+        ],
+        "log_sha256": "66f4183d7a98fddfcd847a89e4e4f45f887f47333649965ab77246888ce62533"
+      },
+      {
+        "filter": "streaming_ffi::format_seek_tests::",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 179,
+        "names": [
+          "streaming_ffi::format_seek_tests::final_hash_refuses_cancelled_and_wrong_length_receipts",
+          "streaming_ffi::format_seek_tests::final_hash_includes_header_rewrites_and_ignores_the_write_order"
+        ],
+        "log_sha256": "cc79a9941fb3f6f932745f3e869a10cf7b02cf144c562b7c905f523ef8e3edf7"
+      }
+    ]
+  },
+  "unit_artifact_scope": "7 selected of 181 unit cases; 174 unrelated cases not selected. Per-filter filtered counts overlap and must not be summed as skips.",
+  "suites": {
+    "vw_formats": {
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "provenance_subset": 4
+    },
+    "vw_assets": {
+      "passed": 20,
+      "failed": 0,
+      "ignored": 0
+    },
+    "vw_avif_os": {
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ffi_background": {
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ffi_lifecycle": {
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ffi_ordinary_formats": {
+      "passed": 2,
+      "failed": 9,
+      "ignored": 0
+    },
+    "ffi_streaming": {
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ffi_selected_unit": {
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0
+    },
+    "raster_display_R164": {
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0
+    },
+    "raster_existing_formats": {
+      "passed": 15,
+      "failed": 0,
+      "ignored": 0
+    },
+    "raster_ordinary_preparation": {
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "lint": [
+    {
+      "scope": "vw-assets, vw-formats, vw-avif-os --all-targets --no-deps -- -D warnings",
+      "exit_code": 0,
+      "log_sha256": "a94a191e9a2ca84beb26c00c1c2809c72e8b426e74b6ba94f5521a4c75d1b228"
+    },
+    {
+      "scope": "vw-raster --lib --test display --test formats --test ordinary_format_preparation --no-deps -- -D warnings",
+      "exit_code": 0,
+      "log_sha256": "db58adbf7a21693cb8977226b6cded49d262a5a89417ca7beef6dbd314e667b5"
+    },
+    {
+      "scope": "vw-ffi --lib --test ordinary_formats --no-deps -- -D warnings",
+      "exit_code": 101,
+      "log_sha256": "8756c95d23855235e8da8a6fb034064fbabecfa2a1482ec249d2b7368cd09dd7",
+      "errors": 5,
+      "owned_leaf_test_lint": "not reached after reserved library lint failure"
+    }
+  ],
+  "blockers": [
+    {
+      "owner": "coordinator/shared contract",
+      "path": "core/crates/vw-model/src/validate.rs",
+      "line": 281,
+      "issue": "validate_asset permits only descriptive string metadata keys; format import_metadata emits first_tiff_page_only as a boolean, so all BMP/TIFF public imports reject canonical assets with Invalid.",
+      "evidence": "All 9 non-AVIF ordinary-format cases fail on create or attachment admission; the 2 Linux typed missing-codec cases pass.",
+      "proposed_repair": "Permit only the exact first_tiff_page_only key with boolean type, retaining flat descriptive-string allowlist for all existing keys and rejection of other/nested data; add model regression cases for wrong type/unknown key."
+    },
+    {
+      "owner": "coordinator/AI owner",
+      "path": "core/crates/vw-ffi/src/ai_edit/owner.rs",
+      "lines": [
+        9,
+        12,
+        253
+      ],
+      "issue": "Linux unused Duration/Instant, unused SecretProvider, needless return in unsupported-platform branch.",
+      "proposed_repair": "Platform-gate the time and SecretProvider imports for Windows/Android; make the unsupported-platform branch a tail expression while preserving supported-platform adapters."
+    },
+    {
+      "owner": "coordinator/streaming",
+      "path": "core/crates/vw-ffi/src/streaming_ffi.rs",
+      "line": 1167,
+      "issue": "needless_borrow: sink is already a mutable reference; passing &mut sink adds a needless reference.",
+      "proposed_repair": "Pass sink directly, retaining original staging lifetime and no-clobber behavior."
+    },
+    {
+      "owner": "coordinator/discovery",
+      "path": "core/crates/vw-ffi/src/session/discovery.rs",
+      "line": 233,
+      "issue": "Linux cfg erases the Windows fallible body, leaving a redundant immediately called closure.",
+      "proposed_repair": "Use platform-specific closure/block structure that preserves Windows propagation and removes the Linux redundant closure."
+    },
+    {
+      "owner": "coordinator/preflight and UI",
+      "issue": "Application BMP encoding refuses publication because no supported standalone provenance carrier is admitted. Raw BMP codec and intake remain supported.",
+      "proposed_repair": "Gate BMP application export selection/preflight until a compatible CORE-006 carrier is implemented and independently validated."
+    }
+  ],
+  "provenance_evidence": {
+    "passed": "Portable encoder tag read by independent pinned TIFF decoder at 8/16-bit depth with exact samples, own decoder exact ICC/pixels, maximum payload and multi-strip output cap; real adapter buffered bytes carry source/revision/capture/max-u64 frame.",
+    "blocked": "Finalized public TIFF file source/revision/hash assertions and public BMP publication refusal cannot reach export until model admits the bounded boolean notice.",
+    "stream_policy_note": "Shared streaming caller replaces returned settings after encoding; embedded source/revision/capture are exact, but embedded internal memory budget may differ from returned caller policy."
+  },
+  "failure_receipts": "Initial failures retained externally and bound by SHA256; no broad lint suppression or root edits applied by image owner.",
+  "remaining_platform_gaps": [
+    "No Android SDK app build, JNI/generated Kotlin binding compilation, emulator, instrumentation or physical device run.",
+    "No Windows WIC or native Windows caller execution.",
+    "Restricted AVIF tests verify container/admission and callback receipts; no actual installed OS entropy decode/fidelity is established. No HDR, multiframe, encoder, alpha/grid or unsupported-transform capability claimed.",
+    "No giant JPEG/HEIC routing, original blob transport, libvips/worker/GPU/performance or product gate acceptance is established.",
+    "16 earlier standalone Kotlin helper/admission harness cases remain separate historical evidence with test enum/DTO shims, not real app or generated ABI coverage."
+  ],
+  "cleanup": {
+    "temporary_image_fixtures": "Rust tempfile-owned paths drop during success/unwinding; no screenshots or image artifacts committed",
+    "build_processes": "all scheduled commands completed before slot release",
+    "slot": "released after focused work; no further heavy work until parent grants a new slot"
+  },
+  "next_checks_after_coordinator_repairs": [
+    "Run all 11 ordinary_formats cases against repaired model admission and root BMP gating.",
+    "Run strict FFI library/ordinary-format test lint after the five reserved diagnostics are fixed; owned leaf test lint was not reached on this run.",
+    "Rebuild/validate the exact FFI unit artifact if production sources change; retain existing failure receipts and distinguish rerun results."
+  ]
+}
