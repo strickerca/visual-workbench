@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "task": "T3.11 offline conflict review/recovery leaf",
+  "status": "source-only-unbuilt-tests-unrun",
+  "base_main": "83663107d864b21d22d2e746b9ca6eb80d47beac",
+  "branch": "feat/t3-11-offline-review",
+  "recovery_reference": "473395197f6437586a8b0c05fa8cd35aa6800441",
+  "recovered_manifest_entries": 796,
+  "matching_recovery_candidate_found": false,
+  "root_integration_owner_required": true,
+  "written_regression_cases": 15,
+  "executed_regression_cases": 0,
+  "compilation_started": false,
+  "checks": {
+    "rustfmt_parse_and_check": "pass",
+    "diff_whitespace": "pass",
+    "locked_offline_cargo_metadata_no_deps": "pass",
+    "source_setup_policy": "pass",
+    "reviewed_npm_lock_license_policy": "pass-installed-and-node-verification-false",
+    "cargo_deny_offline": "blocked-existing-pdfium-render-index-entry-not-cached",
+    "staged_redacted_secret_scan": "pass-no-leaks-5-files",
+    "main_reconciliation_before_publication": "unchanged-at-base-main",
+    "read_only_source_review": "completed-one-fill-setter-side-effect-repaired-no-compile-or-runtime-claim"
+  },
+  "remaining": [
+    "FFI/shared DTO admission and project worker hooks",
+    "History counter-floor restore and normal history publication",
+    "active gesture/attachment/revision-fenced review UI",
+    "mirror Replica queue_recovered and OPS notification",
+    "focused Rust tests and Clippy after parent shared slot/license admission",
+    "actual Android/desktop UI recovery validation",
+    "carrier switch authentication/lifecycle and measured <=2-second switching",
+    "scale rebase/performance and A14/A25/G3 acceptance"
+  ],
+  "excluded": [
+    "phone AI/provider execution",
+    "live stream transport modules",
+    "Krita",
+    "paid services",
+    "credentials",
+    "binaries",
+    "devices"
+  ],
+  "sources": [
+    {
+      "path": "core/crates/vw-store/src/conflict_review.rs",
+      "sha256": "a82e680106a50d540f4fe7dca0cb191ee8ba2f29cb4d94052093895878055416"
+    },
+    {
+      "path": "core/crates/vw-store/src/lib.rs",
+      "sha256": "b89cdd4e4fade3554be190f39f74b1995f27765bc8e27b85fb0574d03e3279af"
+    },
+    {
+      "path": "core/crates/vw-store/tests/conflict_review.rs",
+      "sha256": "8f002072fc13b749a26ae29e090e6a7b02f8cc896fc7e37acc1eaeb023cd03c6"
+    },
+    {
+      "path": "docs/T3_11_OFFLINE_REVIEW_HANDOFF_20261018.md",
+      "sha256": "7e334eb6c972130645cbdea975e55711c97d77d1dd9419e89fbae61c7124fad9"
+    }
+  ]
+}

@@ -3,12 +3,14 @@
 mod archive;
 mod blobs;
 mod cache;
+mod conflict_review;
 mod database;
 mod migrations;
 mod projections;
 pub use archive::*;
 pub use blobs::*;
 pub use cache::*;
+pub use conflict_review::*;
 pub use database::*;
 
 /// Storage errors expose categories without captured text or private paths.
