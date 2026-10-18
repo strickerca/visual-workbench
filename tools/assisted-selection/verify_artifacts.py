@@ -179,11 +179,15 @@ def verify_child(root, child, limit=MAX_ARTIFACT):
         require(digest.hexdigest() == child["sha256"], "artifact hash mismatch")
 
 
-def load_catalog():
-    path = Path(__file__).absolute().parent
-    value = parse_canonical(read_checked(path, "model-runtime-candidate.json"))
+def parse_catalog(data):
+    value = parse_canonical(data)
     require(value.get("schema") == "vw-assisted-candidate-catalog-v1" and value.get("production_admissions") == [], "candidate is not production admission")
     return value
+
+
+def load_catalog():
+    path = Path(__file__).absolute().parent
+    return parse_catalog(read_checked(path, "model-runtime-candidate.json"))
 
 
 class Flatbuffer:
@@ -321,7 +325,9 @@ def inspect_tflite(data, role):
             bindings[name] = fb.scalar(binding, 1)
         expected = CONTRACTS[role][direction]
         require(set(bindings) == {name for name, _, _ in expected}, "signature binding names")
+        require(len(set(bindings.values())) == len(bindings), "duplicate signature tensor index")
         indices = fb.integers(graph, 1 if direction == "inputs" else 2, cap=8)
+        require(len(set(indices)) == len(indices), "duplicate graph IO tensor index")
         require(len(indices) == len(expected) and set(indices) == set(bindings.values()), "graph IO binding")
         rows = []
         for name, dtype, shape in expected:

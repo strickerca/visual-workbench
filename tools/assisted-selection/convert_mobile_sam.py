@@ -26,6 +26,33 @@ import uuid
 import verify_artifacts as verify
 
 
+TOOL_FILES = ("convert_mobile_sam.py", "verify_artifacts.py", "model-runtime-candidate.json")
+TOOLS_ROOT = Path(__file__).absolute().parent
+
+
+def capture_tool_snapshot(root):
+    """Retain immutable source bytes before imports/conversion can run."""
+    return tuple((name, verify.read_checked(root, name)) for name in TOOL_FILES)
+
+
+def tool_provenance(snapshot):
+    return [{"path": name, "bytes": len(data), "sha256": verify.sha256(data)} for name, data in snapshot]
+
+
+def revalidate_tool_snapshot(root, snapshot):
+    for name, original in snapshot:
+        verify.require(verify.read_checked(root, name) == original, "conversion tool changed after startup: " + name)
+
+
+STARTUP_TOOL_SNAPSHOT = capture_tool_snapshot(TOOLS_ROOT)
+
+
+def conversion_catalog(snapshot):
+    # Configuration and its manifest identity must describe the same retained
+    # bytes, even if the on-disk candidate file changes during a long conversion.
+    return verify.parse_catalog(dict(snapshot)["model-runtime-candidate.json"])
+
+
 def verify_versions(catalog):
     verify.require(sys.platform == "linux", "converter requires Linux")
     verify.require(platform.machine() == "x86_64", "converter requires pinned x86_64 CPU wheels")
@@ -242,9 +269,16 @@ def _write_at(directory, name, data):
         os.fsync(stream.fileno())
 
 
+def _publish_with_tool_snapshot(parent, staging_name, output_name, tools_root, snapshot):
+    revalidate_tool_snapshot(tools_root, snapshot)
+    atomic_publish(parent, staging_name, output_name)
+
+
 def convert(source_root, checkpoint, output):
     """Only entry point allowed to import torch/converter or construct models."""
-    catalog = verify.load_catalog()
+    revalidate_tool_snapshot(TOOLS_ROOT, STARTUP_TOOL_SNAPSHOT)
+    provenance = tool_provenance(STARTUP_TOOL_SNAPSHOT)
+    catalog = conversion_catalog(STARTUP_TOOL_SNAPSHOT)
     sources = verify_source(source_root, catalog)
     checkpoint = Path(checkpoint).absolute()
     output = Path(output).absolute()
@@ -325,18 +359,13 @@ def convert(source_root, checkpoint, output):
                         _write_at(staging, name, data)
                         artifacts.append({"role": role, "path": name, "bytes": len(data), "sha256": verify.sha256(data), **inspected})
                         del edge, data
-                    provenance = []
-                    tools_root = Path(__file__).absolute().parent
-                    for name in ("convert_mobile_sam.py", "verify_artifacts.py", "model-runtime-candidate.json"):
-                        data = verify.read_checked(tools_root, name)
-                        provenance.append({"path": name, "bytes": len(data), "sha256": verify.sha256(data)})
                     manifest = {"schema": "vw-assisted-model-v1", "status": "pending-admission", "model": "MobileSAM-vit_t", "source_commit": catalog["model"]["source_commit"], "checkpoint": {key: pin[key] for key in ("bytes", "sha256")}, "graph_contract": verify.GRAPH_CONTRACT, "artifacts": artifacts, "preprocessing": verify.PREPROCESSING, "postprocessing": verify.POSTPROCESSING, "converter": {"packages": catalog["converter"]["packages"], "files": provenance}}
                     raw = verify.canonical_bytes(manifest)
                     _write_at(staging, "model-manifest.json", raw)
                     os.fsync(staging)
                 verify.verify_model(output.parent / staging_name, manifest, catalog)
                 unchanged_checkpoint()
-                atomic_publish(parent, staging_name, output.name)
+                _publish_with_tool_snapshot(parent, staging_name, output.name, TOOLS_ROOT, STARTUP_TOOL_SNAPSHOT)
                 print("pending-admission modelArtifactSha256=" + verify.sha256(raw))
         finally:
             if finder in sys.meta_path:

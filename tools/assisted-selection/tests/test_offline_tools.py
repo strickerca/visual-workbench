@@ -73,7 +73,8 @@ class MetadataBuilder:
         return position
 
 
-def synthetic_metadata(role="encoder", code=0, custom="", dtype_override=None, dynamic=False):
+def synthetic_metadata(role="encoder", code=0, custom="", dtype_override=None, dynamic=False,
+                       alias_graph_inputs=False, alias_signature_inputs=False):
     b = MetadataBuilder()
     model = b.table(8)
     struct.pack_into("<I", b.data, 0, model)
@@ -105,6 +106,8 @@ def synthetic_metadata(role="encoder", code=0, custom="", dtype_override=None, d
             b.ref(tensor, 7, b.vector([-1] + shape[1:]))
     inputs = list(range(len(contract["inputs"])))
     outputs = list(range(len(inputs), len(all_tensors)))
+    if alias_graph_inputs:
+        inputs[3] = inputs[2]  # point_valid aliases point_labels: same dtype/shape.
     b.ref(graph, 1, b.vector(list(reversed(inputs))))
     b.ref(graph, 2, b.vector(list(reversed(outputs))))
     operator_vector = b.references(1)
@@ -128,7 +131,8 @@ def synthetic_metadata(role="encoder", code=0, custom="", dtype_override=None, d
         for index, (name, _, _) in enumerate(rows):
             entry = b.table(2)
             b.set_reference(maps, index, entry)
-            b.scalar(entry, 1, offset + index)
+            bound_index = 2 if field == 0 and index == 3 and alias_signature_inputs else offset + index
+            b.scalar(entry, 1, bound_index)
             b.ref(entry, 0, b.string(name))
     return bytes(b.data)
 
@@ -249,6 +253,18 @@ class FlatbufferTests(unittest.TestCase):
     def test_swapped_role_contract_refuses(self):
         with self.assertRaises(verify.VerificationError):
             verify.inspect_tflite(synthetic_metadata("encoder"), "prompt_decoder")
+
+    def test_signature_tensor_indices_must_be_unique_even_when_graph_aliases_match(self):
+        # Both aliases previously passed the set-equality check: labels and
+        # valid masks have identical dtype/shape but independent meanings.
+        for alias_graph in (False, True):
+            with self.subTest(alias_graph=alias_graph), self.assertRaisesRegex(verify.VerificationError, "duplicate signature tensor index"):
+                verify.inspect_tflite(synthetic_metadata("prompt_decoder", alias_graph_inputs=alias_graph,
+                    alias_signature_inputs=True), "prompt_decoder")
+
+    def test_graph_io_tensor_indices_must_be_unique(self):
+        with self.assertRaisesRegex(verify.VerificationError, "duplicate graph IO tensor index"):
+            verify.inspect_tflite(synthetic_metadata("prompt_decoder", alias_graph_inputs=True), "prompt_decoder")
 
     def test_metadata_work_budget_stops_aliased_repeated_reads(self):
         fb = verify.Flatbuffer(synthetic_metadata())
@@ -382,7 +398,7 @@ class ConverterBoundaryTests(unittest.TestCase):
             checkpoint = root / "checkpoint.pt"
             checkpoint.write_bytes(b"evil")
             catalog = {"model": {"checkpoint": {"bytes": 4, "sha256": verify.sha256(b"good")}}}
-            with mock.patch.object(convert.verify, "load_catalog", return_value=catalog), \
+            with mock.patch.object(convert, "conversion_catalog", return_value=catalog), \
                  mock.patch.object(convert, "verify_source", return_value={}), \
                  mock.patch.object(convert, "verify_versions", side_effect=AssertionError("must not reach package checks")):
                 with self.assertRaises(verify.VerificationError):
@@ -436,6 +452,52 @@ class ConverterBoundaryTests(unittest.TestCase):
         fake.__version__ = "2.12.0"
         with self.assertRaises(verify.VerificationError):
             convert.verify_imported_cpu(fake, catalog)
+
+
+class ToolSnapshotTests(unittest.TestCase):
+    def fixture(self, root):
+        for name in convert.TOOL_FILES:
+            (root / name).write_bytes(verify.read_checked(TOOLS, name))
+        return convert.capture_tool_snapshot(root)
+
+    def test_provenance_retains_startup_bytes_and_detects_same_size_file_change(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            snapshot = self.fixture(root)
+            original = dict(snapshot)["convert_mobile_sam.py"]
+            provenance = convert.tool_provenance(snapshot)
+            changed = bytes([original[0] ^ 1]) + original[1:]
+            (root / "convert_mobile_sam.py").write_bytes(changed)
+            self.assertEqual(provenance[0]["sha256"], verify.sha256(original))
+            self.assertNotEqual(provenance[0]["sha256"], verify.sha256(changed))
+            self.assertIsInstance(snapshot, tuple)
+            self.assertTrue(all(isinstance(data, bytes) for _, data in snapshot))
+            with self.assertRaisesRegex(verify.VerificationError, "tool changed after startup"):
+                convert.revalidate_tool_snapshot(root, snapshot)
+
+    def test_configuration_uses_retained_snapshot_and_changed_disk_config_refuses(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            snapshot = self.fixture(root)
+            original = convert.conversion_catalog(snapshot)
+            changed = copy.deepcopy(original)
+            changed["model"]["checkpoint"]["sha256"] = "0" * 64
+            (root / "model-runtime-candidate.json").write_bytes(verify.canonical_bytes(changed))
+            self.assertEqual(convert.conversion_catalog(snapshot), original)
+            with self.assertRaisesRegex(verify.VerificationError, "tool changed after startup"):
+                convert.revalidate_tool_snapshot(root, snapshot)
+
+    def test_changed_tool_prevents_publication_without_ml_import_or_execution(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            snapshot = self.fixture(root)
+            (root / "verify_artifacts.py").write_bytes(b"changed verifier source\n")
+            with convert.directory_fd(root) as parent, mock.patch.object(convert, "atomic_publish") as publish:
+                with self.assertRaisesRegex(verify.VerificationError, "tool changed after startup"):
+                    convert._publish_with_tool_snapshot(parent, "staging", "output", root, snapshot)
+                publish.assert_not_called()
+            self.assertNotIn("torch", sys.modules)
+            self.assertNotIn("litert_torch", sys.modules)
 
 
 if __name__ == "__main__":
