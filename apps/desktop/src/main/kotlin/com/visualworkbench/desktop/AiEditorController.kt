@@ -18,6 +18,14 @@ internal data class AiAttachment(val project: WorkbenchProject, val document: Do
 internal data class AiDraftOptions(val instruction: String, val estimate: AiTokenEstimate?, val feather: UInt = 8u,
     val allow16bitCopy: Boolean = false, val assumeUntaggedSrgb: Boolean = false)
 internal enum class AiView { Before, After, Wipe, Blink, Split, Difference }
+internal const val AI_CANDIDATE_LIMIT = 4
+/** Published images follow the same renderer/GC lifetime as AiDisplayFrame.
+ * Only a preview refused before publication may call abandonImage. */
+internal data class AiCandidatePreview<T>(val candidateId: String, val region: AiRegion, val image: T)
+/** A request is the grid identity: two providers may return identical pixel hashes. */
+internal data class AiCandidateEntry<T>(val review: AiReview, val candidate: AiCandidateInfo? = null,
+    val attempted: Boolean = false, val retrySave: Boolean = false, val receipt: AiResultReceipt? = null,
+    val stale: Boolean = false, val preview: AiCandidatePreview<T>? = null, val instruction: String = "", val clearNext: Boolean = true)
 internal data class AiSavedResultLabel(val resultId: String, val label: String)
 internal data class AiDisplayTile<T>(val region: AiRegion, val image: T)
 internal data class AiDisplayFrame<T>(val candidateId: String, val binding: WorkflowBinding, val camera: Camera,
@@ -32,6 +40,7 @@ internal data class AiEditorState<T>(
     val brush: Boolean = false, val radius: Double = 32.0, val subtract: Boolean = false,
     val clearNext: Boolean = true, val contact: List<Point> = emptyList(), val frame: AiDisplayFrame<T>? = null,
     val savedResults: List<AiSavedResultLabel> = emptyList(),
+    val entries: List<AiCandidateEntry<T>> = emptyList(), val pendingCleanup: Int = 0,
 ) {
     val idle: Boolean get() = busy == AiStage.Idle
 }
@@ -79,8 +88,15 @@ internal class AiEditorController<T>(
 ) {
     private val mutable = MutableStateFlow(AiEditorState<T>())
     val state: StateFlow<AiEditorState<T>> = mutable.asStateFlow()
-    private var driver: AiDriver? = null
-    private var owner: AiAttachment? = null
+    private class Retained<T>(val driver: AiDriver, val owner: AiAttachment, var entry: AiCandidateEntry<T>) {
+        var saveOptions: Pair<String, AiSaveOptions>? = null
+    }
+    private val retained = mutableListOf<Retained<T>>()
+    // A failed close must keep its actual driver, even if preparation never returned a review.
+    private val failedRetirements = mutableListOf<AiDriver>()
+    private var active: Retained<T>? = null
+    private val driver: AiDriver? get() = active?.driver
+    private val owner: AiAttachment? get() = active?.owner
     private var action: Job? = null
     private val pixels = AiLatestTask(scope)
     private var ticket = 0L
@@ -90,7 +106,9 @@ internal class AiEditorController<T>(
     private var retirements = 0
     private val retirement = Mutex()
     private val contact = AiContactCollector()
-    private var saveOptions: Pair<String, AiSaveOptions>? = null
+    private var saveOptions: Pair<String, AiSaveOptions>?
+        get() = active?.saveOptions
+        set(value) { active?.saveOptions = value }
 
     private fun id(): String = core.newId(now().toULong())
     private fun same(value: AiAttachment): Boolean = value.sameProject(attachment()) && value.binding == attachment()?.binding
@@ -122,14 +140,59 @@ internal class AiEditorController<T>(
         mutable.value = mutable.value.copy(open = false)
         cancelContact(); invalidatePixels()
     }
-    fun needsDecision(): Boolean = (mutable.value.attempted || mutable.value.busy == AiStage.Sending) && mutable.value.receipt == null
-    /** Explicit discard releases a retained paid/private result. Its durable
-     * billing history stays intact. Merely hiding the panel never discards it. */
+    private fun rememberActive() {
+        val value = mutable.value
+        active?.let { slot ->
+            val review = value.review ?: return@let
+            slot.entry = slot.entry.copy(review = review, candidate = value.candidate, attempted = value.attempted,
+                retrySave = value.retrySave, receipt = value.receipt, stale = !same(slot.owner), clearNext = value.clearNext,
+                preview = slot.entry.preview?.takeIf { it.candidateId == value.candidate?.candidateId })
+        }
+    }
+    private fun publishEntries() { mutable.value = mutable.value.copy(entries = retained.map { it.entry }, pendingCleanup = failedRetirements.size) }
+    fun retryCleanup() = launch(AiStage.Comparing) {
+        withContext(NonCancellable) {
+            for (pending in failedRetirements.toList()) { pending.close(); failedRetirements.remove(pending) }
+        }
+    }
+    private fun select(slot: Retained<T>?) {
+        active = slot
+        val value = slot?.entry
+        mutable.value = mutable.value.copy(review = value?.review, candidate = value?.candidate,
+            attempted = value?.attempted ?: false, retrySave = value?.retrySave ?: false, receipt = value?.receipt,
+            stale = slot?.let { !same(it.owner) } ?: false, brush = false, clearNext = value?.clearNext ?: true, frame = null)
+        publishEntries()
+    }
+    /** Main editor lifecycle guards include every retained unsaved/uncertain attempt. */
+    fun needsDecision(): Boolean {
+        rememberActive()
+        return failedRetirements.isNotEmpty() || mutable.value.busy == AiStage.Sending ||
+            retained.any { it.entry.attempted && it.entry.receipt == null }
+    }
+    fun canPrepare(): Boolean {
+        rememberActive()
+        return failedRetirements.isEmpty() && retained.size < AI_CANDIDATE_LIMIT &&
+            retained.none { it.entry.retrySave || (it.entry.attempted && it.entry.candidate == null) } &&
+            retained.all { same(it.owner) }
+    }
+    /** Selecting a retained owner never prepares or sends another request. */
+    fun selectCandidate(requestId: String) = launch(AiStage.Comparing) {
+        rememberActive()
+        val next = retained.firstOrNull { it.entry.review.requestId == requestId }
+            ?: throw AiFailure(AiFailureKind.Stale)
+        if (!next.owner.sameProject(attachment())) throw AiFailure(AiFailureKind.Stale)
+        select(next); fit()
+    }
+    /** Explicit discard releases only the selected request after joined close.
+     * Other paid/private results and durable billing history remain owned. */
     fun discard() = launch(AiStage.Comparing) {
-        withContext(NonCancellable) { driver?.close() }
-        driver=null;owner=null;saveOptions=null
-        mutable.value=AiEditorState(open=mutable.value.open,context=mutable.value.context,savedResults=savedResults(),
-            message="Review discarded. Recorded or uncertain charges remain in private budget history.")
+        val selected = active
+        if (selected != null) {
+            withContext(NonCancellable) { selected.driver.close() }
+            retained.remove(selected)
+            select(retained.firstOrNull())
+        }
+        message("Selected review discarded. Recorded or uncertain charges remain in private budget history.")
     }
     /** Lifecycle pause is explicit cancellation; it cannot promise a refund for
      * an already admitted provider request. Nothing is automatically resent. */
@@ -144,6 +207,8 @@ internal class AiEditorController<T>(
     /** Call only after the editor admits its exact new render snapshot. */
     fun changed() {
         mutable.value = mutable.value.copy(savedResults = savedResults())
+        retained.forEach { it.entry = it.entry.copy(stale = !same(it.owner)) }
+        publishEntries()
         val current = attachment()
         val review = mutable.value.review
         if (owner?.sameProject(current) == false || (review != null && review.binding != current?.binding)) {
@@ -181,8 +246,8 @@ internal class AiEditorController<T>(
     }
 
     fun prepare(draft: AiDraftOptions): Job? {
-        if (needsDecision()) {
-            message("Save the paid Result or explicitly discard its review before preparing another request.")
+        if (!canPrepare()) {
+            message("The grid is full, its source changed, or an attempt needs recovery/save. Resolve or discard that retained review first.")
             return null
         }
         return launch(AiStage.Preparing) {
@@ -194,12 +259,8 @@ internal class AiEditorController<T>(
         val provider = service.requireService()
         val context = results(selected.project).context(selected.binding)
         if (!same(selected) || context.binding != selected.binding) throw AiFailure(AiFailureKind.Stale)
-        // A paid/uncertain unsaved request was refused before this action. Old requests settle
-        // before their native global request slot is acquired by a new one.
-        withContext(NonCancellable) { driver?.close(); driver = null; owner = null }
-        saveOptions = null
-        mutable.value = mutable.value.copy(context = context, review = null, candidate = null, receipt = null,
-            attempted = false, retrySave = false, stale = false, frame = null)
+        if (!canPrepare()) throw AiFailure(AiFailureKind.Busy)
+        rememberActive()
         val next = driverFactory(selected.project, provider, scope)
         var adopted = false
         try {
@@ -208,10 +269,25 @@ internal class AiEditorController<T>(
                 draft.allow16bitCopy, draft.assumeUntaggedSrgb))
             currentCoroutineContext().ensureActive()
             if (!same(selected) || review.binding != selected.binding || review.sourceAssetId != context.sourceAssetId ||
-                review.configurationFingerprint != configuration.fingerprint) throw AiFailure(AiFailureKind.Stale)
-            driver = next; owner = selected; adopted = true
-            mutable.value = mutable.value.copy(review = review, stale = false, clearNext = true)
-        } finally { if (!adopted) withContext(NonCancellable) { next.close() } }
+                review.configurationFingerprint != configuration.fingerprint || review.providerKind != configuration.providerKind ||
+                review.sourceWidth != context.width || review.sourceHeight != context.height || review.sourceBitDepth.toUInt() != context.bitDepth ||
+                retained.any { it.entry.review.requestId == review.requestId }) throw AiFailure(AiFailureKind.Stale)
+            retained.firstOrNull()?.entry?.review?.let { original ->
+                if (review.binding != original.binding || review.sourceAssetId != original.sourceAssetId ||
+                    review.sourceFileSha256 != original.sourceFileSha256 || review.maskSha256 != original.maskSha256)
+                    throw AiFailure(AiFailureKind.Stale)
+            }
+            val slot = Retained<T>(next, selected, AiCandidateEntry(review, instruction = draft.instruction))
+            retained += slot; adopted = true
+            mutable.value = mutable.value.copy(context = context)
+            select(slot)
+        } finally {
+            if (!adopted) withContext(NonCancellable) {
+                failedRetirements += next
+                next.close()
+                failedRetirements.remove(next)
+            }
+        }
         }
     }
 
@@ -224,11 +300,18 @@ internal class AiEditorController<T>(
         if (!same(selected) || mutable.value.stale || mutable.value.attempted ||
             review.requestId != requestId || review.estimatedMicrousd != displayedEstimate)
             throw AiFailure(AiFailureKind.Stale)
+        val settings = service.state.value
+        val configuration = settings.configuration ?: throw AiFailure(AiFailureKind.Unsupported)
+        if (configuration.fingerprint != review.configurationFingerprint ||
+            configuration.providerKind != review.providerKind) throw AiFailure(AiFailureKind.Stale)
+        val readiness = settings.readiness ?: throw AiFailure(AiFailureKind.Unsupported)
+        if (!readiness.providerReady || !readiness.configured) throw AiFailure(AiFailureKind.Unsupported)
+        if (!readiness.trustReady) throw AiFailure(AiFailureKind.Credentials)
+        if (!readiness.configurationCurrent) throw AiFailure(AiFailureKind.Estimate)
         mutable.value = mutable.value.copy(attempted = true)
         try {
             val candidate = checkNotNull(driver).send(requestId, displayedEstimate, acknowledge)
-            if (candidate.requestId != review.requestId || candidate.binding != review.binding)
-                throw AiFailure(AiFailureKind.Proof)
+            checkCandidate(review, candidate)
             mutable.value = mutable.value.copy(candidate = candidate, stale = !same(selected), receipt = null,
                 clearNext = true, brush = false)
             fit()
@@ -247,7 +330,7 @@ internal class AiEditorController<T>(
         val review=mutable.value.review?:throw AiFailure(AiFailureKind.Invalid)
         if(!selected.sameProject(attachment())||!mutable.value.attempted)throw AiFailure(AiFailureKind.Stale)
         val candidate=checkNotNull(driver).recover()
-        if(candidate.requestId!=review.requestId||candidate.binding!=review.binding)throw AiFailure(AiFailureKind.Proof)
+        checkCandidate(review, candidate)
         mutable.value=mutable.value.copy(candidate=candidate,stale=!same(selected))
         fit()
     }
@@ -311,7 +394,7 @@ internal class AiEditorController<T>(
     fun contactDown(point: Point): Boolean {
         val s = mutable.value; val candidate = s.candidate ?: return false
         val frame = s.frame ?: return false
-        if (!s.brush || !s.idle || s.stale || s.retrySave || frame.candidateId != candidate.candidateId ||
+        if (!s.brush || !s.idle || s.stale || s.retrySave || s.receipt != null || frame.candidateId != candidate.candidateId ||
             frame.camera != s.camera || frame.mode != mode()) return false
         return try {
             contact.begin(candidate.candidateId, s.camera, candidate.width, candidate.height, s.view == AiView.Split,
@@ -334,11 +417,11 @@ internal class AiEditorController<T>(
         mutable.value = mutable.value.copy(contact = emptyList())
         if (value != null) launch(AiStage.Accepting) {
             val selected = owner ?: throw AiFailure(AiFailureKind.Invalid)
-            if (!same(selected) || mutable.value.stale || value.candidateId != mutable.value.candidate?.candidateId)
+            if (!same(selected) || mutable.value.stale || mutable.value.receipt != null || value.candidateId != mutable.value.candidate?.candidateId)
                 throw AiFailure(AiFailureKind.Stale)
             val candidate = checkNotNull(driver).brush(AiAcceptanceBrush(value.candidateId, id(), value.points,
                 value.radius, 255u, value.subtract, value.clearFirst))
-            if (candidate.binding != selected.binding) throw AiFailure(AiFailureKind.Proof)
+            checkCandidate(mutable.value.review ?: throw AiFailure(AiFailureKind.Invalid), candidate)
             mutable.value = mutable.value.copy(candidate = candidate, receipt = null, clearNext = false, stale = !same(selected))
         }
     }
@@ -347,6 +430,7 @@ internal class AiEditorController<T>(
     fun save() = launch(AiStage.Saving) {
         val selected = owner ?: throw AiFailure(AiFailureKind.Invalid)
         val candidate = mutable.value.candidate ?: throw AiFailure(AiFailureKind.Invalid)
+        if (mutable.value.receipt != null) throw AiFailure(AiFailureKind.Stale)
         mutationGate.withLock {
             if (!selected.sameProject(attachment())) throw AiFailure(AiFailureKind.Stale)
             val prior = saveOptions
@@ -362,6 +446,10 @@ internal class AiEditorController<T>(
             }
             try {
                 val receipt = checkNotNull(driver).save(options)
+                if (receipt.transactionId != options.metadata.transactionId || receipt.resultId != options.resultId ||
+                    receipt.objectId != options.objectId || receipt.layerId != options.layerId ||
+                    receipt.revision.projectId != selected.binding.projectId || receipt.proof != candidate.proof)
+                    throw AiFailure(AiFailureKind.Proof)
                 // Accepted receipt bookkeeping precedes any refresh that might
                 // fail or observe a newer remote revision.
                 mutable.value = mutable.value.copy(receipt = receipt, retrySave = false)
@@ -392,7 +480,9 @@ internal class AiEditorController<T>(
         // only this exact job may clear its slot or restart pixel work.
         job.invokeOnCompletion {
             if (entered == lifetime && action === job && !detaching) {
-                action = null; mutable.value = mutable.value.copy(busy = AiStage.Idle)
+                action = null
+                rememberActive(); publishEntries()
+                mutable.value = mutable.value.copy(busy = AiStage.Idle)
                 requestPixels()
             }
         }
@@ -400,9 +490,10 @@ internal class AiEditorController<T>(
     }
     private fun requestPixels() {
         val s = mutable.value
-        if (!s.open || !s.idle || s.stale || closed || detaching || action?.isCompleted == false) return
-        val candidate = s.candidate ?: return
+        if (!s.open || !s.idle || closed || detaching || action?.isCompleted == false) return
+        val candidate = s.candidate
         val owner = owner ?: return
+        if (!owner.sameProject(attachment())) return
         val driver = driver ?: return
         val chosen = mode(); val camera = s.camera; val entered = ++ticket; val epoch = lifetime
         mutable.value = mutable.value.copy(frame = null, loadingPixels = true)
@@ -410,26 +501,48 @@ internal class AiEditorController<T>(
             val acquired = ArrayList<AiDisplayTile<T>>()
             var published = false
             try {
-                val width = aiCanvasWidth(candidate.width, chosen)
-                val corners = core.mapPoints(camera, true, listOf(Point(0.0, 0.0), Point(camera.viewportWidth, 0.0),
-                    Point(camera.viewportWidth, camera.viewportHeight), Point(0.0, camera.viewportHeight)))
-                val plan = aiTilePlan(width, candidate.height, corners)
-                for (region in plan.regions) {
+                // A grid preview is a bounded, exact center region, never an invented
+                // full-image thumbnail. The same serialized reader owns every handoff.
+                for (slot in retained.toList()) {
+                    val current = slot.entry.candidate ?: continue
+                    if (slot.entry.preview?.candidateId == current.candidateId) continue
                     currentCoroutineContext().ensureActive()
-                    val value = driver.pixels(chosen, region)
-                    if (value.candidateId != candidate.candidateId || value.region != region ||
-                        value.canvasWidth != width || value.canvasHeight != candidate.height) throw AiFailure(AiFailureKind.Proof)
-                    aiCheckPixels(value.region, value.canvasWidth, value.canvasHeight, value.rgbaSrgb)
+                    val w = minOf(current.width, 256u); val h = minOf(current.height, 256u)
+                    val region = AiRegion((current.width - w) / 2u, (current.height - h) / 2u, w, h)
+                    val value = slot.driver.pixels(AiCompareMode.After, region)
+                    if (value.candidateId != current.candidateId || value.region != region ||
+                        value.canvasWidth != current.width || value.canvasHeight != current.height) throw AiFailure(AiFailureKind.Proof)
+                    aiCheckPixels(region, value.canvasWidth, value.canvasHeight, value.rgbaSrgb)
                     val bitmap = image(value)
-                    // No cancellable dispatcher handoff after ownership return.
-                    acquired += AiDisplayTile(region, bitmap)
+                    if (epoch != lifetime || entered != ticket || !slot.owner.sameProject(attachment()) ||
+                        !mutable.value.open || slot !in retained || slot.entry.candidate?.candidateId != current.candidateId) {
+                        abandonImage(bitmap); return@offer
+                    }
+                    slot.entry = slot.entry.copy(preview = AiCandidatePreview(current.candidateId, region, bitmap))
+                    publishEntries()
                 }
-                currentCoroutineContext().ensureActive()
-                if (epoch != lifetime || entered != ticket || !same(owner) || !mutable.value.open || mutable.value.stale ||
-                    mutable.value.candidate?.candidateId != candidate.candidateId || mutable.value.camera != camera || mode() != chosen) return@offer
-                mutable.value = mutable.value.copy(frame = AiDisplayFrame(candidate.candidateId, candidate.binding,
-                    camera, chosen, width, candidate.height, acquired.toList()), loadingPixels = false)
-                published = true
+                if (candidate != null) {
+                    val width = aiCanvasWidth(candidate.width, chosen)
+                    val corners = core.mapPoints(camera, true, listOf(Point(0.0, 0.0), Point(camera.viewportWidth, 0.0),
+                        Point(camera.viewportWidth, camera.viewportHeight), Point(0.0, camera.viewportHeight)))
+                    val plan = aiTilePlan(width, candidate.height, corners)
+                    for (region in plan.regions) {
+                        currentCoroutineContext().ensureActive()
+                        val value = driver.pixels(chosen, region)
+                        if (value.candidateId != candidate.candidateId || value.region != region ||
+                            value.canvasWidth != width || value.canvasHeight != candidate.height) throw AiFailure(AiFailureKind.Proof)
+                        aiCheckPixels(value.region, value.canvasWidth, value.canvasHeight, value.rgbaSrgb)
+                        val bitmap = image(value)
+                        // No cancellable dispatcher handoff after ownership return.
+                        acquired += AiDisplayTile(region, bitmap)
+                    }
+                    currentCoroutineContext().ensureActive()
+                    if (epoch != lifetime || entered != ticket || !owner.sameProject(attachment()) || !mutable.value.open ||
+                        mutable.value.candidate?.candidateId != candidate.candidateId || mutable.value.camera != camera || mode() != chosen) return@offer
+                    mutable.value = mutable.value.copy(frame = AiDisplayFrame(candidate.candidateId, candidate.binding,
+                        camera, chosen, width, candidate.height, acquired.toList()), loadingPixels = false)
+                    published = true
+                }
             } catch (cancel: CancellationException) { throw cancel }
             catch (error: Exception) { if (epoch == lifetime && entered == ticket) message(describe(error)) }
             finally {
@@ -439,13 +552,38 @@ internal class AiEditorController<T>(
         }
     }
 
+    private fun checkCandidate(review: AiReview, candidate: AiCandidateInfo) {
+        val proof = candidate.proof
+        if (candidate.requestId != review.requestId || candidate.binding != review.binding ||
+            candidate.candidateId.isEmpty() || candidate.width != review.sourceWidth || candidate.height != review.sourceHeight ||
+            candidate.bitDepth != review.sourceBitDepth || proof.changedOutside != 0uL ||
+            proof.outsideSha256Before.length != 64 || proof.outsideSha256Before != proof.outsideSha256After ||
+            !proof.deltaE2000Mean.isFinite() || !proof.deltaE2000Max.isFinite() || !proof.ssimInsideMask.isFinite() ||
+            (candidate.partial && (proof.changedUnaccepted != 0uL || proof.unacceptedSha256Before == null ||
+                proof.unacceptedSha256Before.length != 64 || proof.unacceptedSha256Before != proof.unacceptedSha256After))) throw AiFailure(AiFailureKind.Proof)
+    }
+
     suspend fun detach() {
         retirements++; detaching = true; lifetime++; invalidatePixels(); cancelContact()
         withContext(NonCancellable) { retirement.withLock {
-            action?.cancelAndJoin(); action = null
-            pixels.pause()
-            try { driver?.close() }
-            finally { driver = null; owner = null; saveOptions = null; mutable.value = AiEditorState(); retirements--; detaching = closed || retirements != 0 }
+            try {
+                action?.cancelAndJoin(); action = null
+                pixels.pause(); rememberActive()
+                var failure: Exception? = null
+                for (slot in retained.toList()) {
+                    try { slot.driver.close(); retained.remove(slot) }
+                    catch (error: Exception) { if (failure == null) failure = error }
+                }
+                for (pending in failedRetirements.toList()) {
+                    try { pending.close(); failedRetirements.remove(pending) }
+                    catch (error: Exception) { if (failure == null) failure = error }
+                }
+                if (failure != null) {
+                    select(retained.firstOrNull())
+                    throw failure
+                }
+                active = null; mutable.value = AiEditorState()
+            } finally { retirements--; detaching = closed || retirements != 0 || retained.isNotEmpty() || failedRetirements.isNotEmpty() }
         } }
     }
     suspend fun close() { closed = true; try { detach() } finally { pixels.close() } }

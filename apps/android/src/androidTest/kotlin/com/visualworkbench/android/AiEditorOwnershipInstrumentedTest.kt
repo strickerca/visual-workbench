@@ -46,7 +46,7 @@ class AiEditorOwnershipInstrumentedTest {
         assertTrue(editor.state.value.retrySave); assertEquals(1, driver.prepares); assertEquals(0, driver.closes)
         editor.save()?.join()
         assertEquals(2, driver.saved.size); assertEquals(driver.saved[0], driver.saved[1])
-        assertEquals("saved", editor.state.value.receipt?.resultId)
+        assertEquals(driver.saved.last().resultId, editor.state.value.receipt?.resultId)
     }
     @Test fun preparingAfterAnUncertainAttemptKeepsTheRecoverablePaidRequest() = fixture {
         prepared(); val gate = hold(); driver.sendGate = gate
@@ -164,7 +164,7 @@ class AiEditorOwnershipInstrumentedTest {
         editor.save()?.join()
         assertEquals(2, driver.saved.size)
         assertEquals(driver.saved[0], driver.saved[1])
-        assertEquals("saved", editor.state.value.receipt?.resultId)
+        assertEquals(driver.saved.last().resultId, editor.state.value.receipt?.resultId)
         assertFalse(editor.state.value.retrySave)
     }
     @Test fun partialAcceptanceHasOneUpAndCancelledOrMovedViewHasNone() = fixture {
@@ -180,6 +180,182 @@ class AiEditorOwnershipInstrumentedTest {
         assertTrue(editor.contactDown(Point(.2, .2)))
         editor.contactUp(); editor.contactUp(); idle(); assertEquals(1, driver.brushes)
     }
+    @Test fun gridRetainsIndependentExplicitSendOwnersAndExactSelection() = fixture {
+        prepared(); editor.send("request",7u,false)?.join()
+        until { editor.state.value.entries.single().preview != null }
+        val original = editor.state.value.candidate
+        assertTrue(editor.canPrepare()); assertTrue(editor.needsDecision())
+        editor.prepare(AiDraftOptions("another option",null))?.join()
+        assertEquals(2,editor.state.value.entries.size)
+        assertEquals(1,driver.sends); assertEquals(0,drivers[1].sends); assertEquals(0,driver.closes)
+        assertNull(editor.state.value.candidate)
+        editor.send("request",7u,false)?.join(); assertEquals(0,drivers[1].sends)
+        editor.send("request-2",7u,false)?.join()
+        until { editor.state.value.entries.all { it.preview != null } }
+        editor.selectCandidate("request")?.join()
+        assertEquals(original,editor.state.value.candidate)
+        assertEquals("request",editor.state.value.review?.requestId)
+        assertEquals(listOf(1,1),drivers.map { it.sends })
+        assertEquals(listOf("request","request-2"),editor.state.value.entries.map { it.review.requestId })
+        assertEquals(listOf("candidate","candidate-request-2"),editor.state.value.entries.map { it.preview?.candidateId })
+    }
+    @Test fun gridBoundRefusesFifthBeforeCreatingAnotherOwnerAndDiscardFreesOneSlot() = fixture {
+        prepared()
+        repeat(3) { editor.prepare(AiDraftOptions("",null))?.join() }
+        assertEquals(AI_CANDIDATE_LIMIT,editor.state.value.entries.size)
+        assertFalse(editor.canPrepare()); assertNull(editor.prepare(AiDraftOptions("",null)))
+        assertEquals(AI_CANDIDATE_LIMIT,createdDrivers)
+        editor.discard()?.join()
+        assertEquals(3,editor.state.value.entries.size); assertTrue(editor.canPrepare())
+        assertEquals(1,drivers.last().closes); assertEquals(0,driver.closes)
+    }
+    @Test fun gridNeverReplacesPaidOwnerWhenNextPreparationFailsOrSourceProofChanges() = fixture {
+        prepared(); editor.send("request",7u,false)?.join()
+        val candidate = editor.state.value.candidate
+        drivers += Driver("request-2").apply { sourceSha = "z".repeat(64) }
+        editor.prepare(AiDraftOptions("",null))?.join()
+        assertEquals(1,editor.state.value.entries.size); assertEquals(candidate,editor.state.value.candidate)
+        assertEquals(0,driver.closes); assertEquals(1,drivers[1].closes); assertEquals(1,driver.sends)
+    }
+    @Test fun identicalPixelCandidateIdsRemainDistinctRequestOwners() = fixture {
+        prepared(); editor.send("request",7u,false)?.join()
+        drivers += Driver("request-2").apply { candidateId = "candidate" }
+        editor.prepare(AiDraftOptions("",null))?.join(); editor.send("request-2",7u,false)?.join()
+        assertEquals(2,editor.state.value.entries.size)
+        editor.selectCandidate("request")?.join(); editor.save()?.join()
+        assertEquals(1,driver.saved.size); assertTrue(drivers[1].saved.isEmpty())
+        editor.selectCandidate("request-2")?.join(); assertNull(editor.state.value.receipt)
+        assertTrue(editor.needsDecision())
+        editor.selectCandidate("request")?.join()
+        assertEquals(driver.saved.single().resultId,editor.state.value.receipt?.resultId)
+    }
+    @Test fun partialMaskAndExactSaveRetryStayWithTheirSelectedRequest() = fixture {
+        prepared(); editor.send("request",7u,false)?.join()
+        editor.prepare(AiDraftOptions("",null))?.join(); editor.send("request-2",7u,false)?.join()
+        editor.selectCandidate("request")?.join(); until { editor.state.value.frame != null }
+        editor.brush(true); until { editor.state.value.frame != null }
+        assertTrue(editor.contactDown(Point(.2,.2))); editor.contactUp(); idle()
+        val partial = editor.state.value.candidate
+        assertTrue(partial!!.partial); assertEquals(1,driver.brushes); assertEquals(0,drivers[1].brushes)
+        driver.failSaveOnce = true; editor.save()?.join(); assertTrue(editor.state.value.retrySave)
+        editor.selectCandidate("request-2")?.join(); assertFalse(editor.state.value.retrySave); assertFalse(editor.state.value.candidate!!.partial)
+        editor.selectCandidate("request")?.join(); assertTrue(editor.state.value.retrySave); assertEquals(partial,editor.state.value.candidate)
+        assertFalse(editor.state.value.clearNext)
+        editor.save()?.join(); assertEquals(driver.saved[0],driver.saved[1]); assertNotNull(editor.state.value.receipt)
+        assertTrue(drivers[1].saved.isEmpty())
+    }
+    @Test fun staleGridKeepsComparisonsButCannotSendApplyOrAcceptAndCannotPrepareNewGroup() = fixture {
+        prepared(); editor.send("request",7u,false)?.join()
+        editor.prepare(AiDraftOptions("",null))?.join(); editor.send("request-2",7u,false)?.join()
+        attachment = attachment.copy(document=snapshot(2u)); editor.changed()
+        assertFalse(editor.canPrepare()); assertTrue(editor.state.value.entries.all { it.stale })
+        editor.selectCandidate("request")?.join(); until { editor.state.value.frame != null }
+        editor.save()?.join(); assertTrue(driver.saved.isEmpty())
+        editor.brush(true); until { editor.state.value.frame != null }; assertFalse(editor.contactDown(Point(.2,.2)))
+        editor.send("request",7u,false)?.join(); assertEquals(1,driver.sends)
+        assertEquals(2,editor.state.value.entries.size)
+    }
+    @Test fun switchingGridEntryWaitsForItsCancelledPixelProducer() = fixture {
+        prepared(); editor.send("request",7u,false)?.join()
+        editor.prepare(AiDraftOptions("",null))?.join(); editor.send("request-2",7u,false)?.join()
+        until { editor.state.value.entries.all { it.preview != null } }
+        val gate = hold(); drivers[1].pixelGate = gate
+        val reads = drivers[1].reads; editor.zoom(1.25); until { drivers[1].reads > reads }
+        val selecting = editor.selectCandidate("request")!!; yield()
+        assertFalse(selecting.isCompleted); assertEquals("request-2",editor.state.value.review?.requestId)
+        gate.complete(Unit); selecting.join()
+        until { editor.state.value.frame != null }
+        assertEquals("request",editor.state.value.review?.requestId); assertEquals("candidate",editor.state.value.frame?.candidateId)
+        assertEquals(listOf(1,1),drivers.map { it.sends })
+    }
+    @Test fun refusedOutsideProofCannotEnterGridOrBeAppliedAndRecoveryDoesNotResend() = fixture {
+        prepared()
+        driver.candidateOverride=AiCandidateInfo("request","bad",attachment.binding,2u,2u,8u,false,AiSettlement.UsagePriced,7u,
+            proof.copy(changedOutside=1u))
+        editor.send("request",7u,false)?.join()
+        assertNull(editor.state.value.candidate); assertNull(editor.state.value.entries.single().candidate)
+        assertTrue(editor.needsDecision()); assertFalse(editor.canPrepare())
+        driver.candidateOverride=null; editor.recoverCandidate()?.join()
+        assertEquals("candidate",editor.state.value.candidate?.candidateId); assertEquals(1,driver.sends)
+    }
+    @Test fun failedDiscardRetainsPaidOwnerAndRetryOnlyClosesSelectedRequest() = fixture {
+        prepared(); editor.send("request",7u,false)?.join()
+        editor.prepare(AiDraftOptions("",null))?.join(); editor.send("request-2",7u,false)?.join()
+        drivers[1].closeFailures=1; editor.discard()?.join()
+        assertEquals(2,editor.state.value.entries.size); assertEquals("request-2",editor.state.value.review?.requestId)
+        assertTrue(editor.needsDecision()); assertEquals(0,driver.closes)
+        editor.discard()?.join()
+        assertEquals(1,editor.state.value.entries.size); assertEquals("request",editor.state.value.review?.requestId)
+        assertEquals(2,drivers[1].closes); assertEquals(0,driver.closes)
+    }
+    @Test fun detachClosesEveryGridOwnerButRetainsFailedCloseForJoinedRetry() = fixture {
+        prepared(); editor.send("request",7u,false)?.join()
+        editor.prepare(AiDraftOptions("",null))?.join(); editor.send("request-2",7u,false)?.join()
+        driver.closeFailures=1
+        try { editor.detach(); fail("Close failure must be reported") } catch (error:AiFailure) { assertEquals(AiFailureKind.Storage,error.kind) }
+        assertTrue(editor.needsDecision()); assertEquals(1,editor.state.value.entries.size)
+        assertEquals("request",editor.state.value.review?.requestId); assertEquals(1,drivers[1].closes)
+        editor.detach(); assertEquals(2,driver.closes); assertTrue(editor.state.value.entries.isEmpty())
+    }
+    @Test fun unsupportedProviderReadinessCannotConsumeAnAttemptEvenThroughDirectControllerCall() = fixture {
+        prepared(); serviceApi.providerReady=false; settings()
+        editor.send("request",7u,false)?.join()
+        assertEquals(0,driver.sends); assertFalse(editor.state.value.attempted)
+        assertFalse(editor.needsDecision())
+        serviceApi.providerReady=true; serviceApi.configured=false; settings()
+        editor.send("request",7u,false)?.join(); assertEquals(0,driver.sends); assertFalse(editor.state.value.attempted)
+        serviceApi.configured=true; settings(); editor.send("request",7u,false)?.join()
+        assertEquals(1,driver.sends)
+    }
+    @Test fun eachGridReviewKeepsItsExactConfigurationAndOnlyCurrentConfigurationCanSend() = fixture {
+        prepared(); serviceApi.fingerprint="second-policy"; settings()
+        editor.prepare(AiDraftOptions("",null))?.join()
+        assertEquals(listOf("policy","second-policy"),editor.state.value.entries.map { it.review.configurationFingerprint })
+        editor.selectCandidate("request")?.join(); editor.send("request",7u,false)?.join()
+        assertEquals(0,driver.sends); assertFalse(editor.state.value.attempted)
+        editor.selectCandidate("request-2")?.join(); editor.send("request-2",7u,false)?.join()
+        assertEquals(1,drivers[1].sends)
+    }
+    @Test fun mismatchedSaveReceiptCannotReplaceTheExactRetainedSaveTransaction() = fixture {
+        prepared(); editor.send("request",7u,false)?.join(); driver.wrongReceiptOnce=true
+        editor.save()?.join(); assertNull(editor.state.value.receipt); assertTrue(editor.state.value.retrySave)
+        editor.save()?.join()
+        assertEquals(driver.saved[0],driver.saved[1]); assertEquals(driver.saved.last().resultId,editor.state.value.receipt?.resultId)
+        assertEquals(1,driver.sends)
+    }
+    @Test fun publishedGridPreviewFollowsRendererLifetimeWhenItsOwnerIsDiscarded() = fixture {
+        prepared(); editor.send("request",7u,false)?.join()
+        until { editor.state.value.entries.single().preview != null && editor.state.value.frame != null }
+        val publishedPreview = editor.state.value.entries.single().preview!!.image
+        editor.discard()?.join()
+        assertTrue(editor.state.value.entries.isEmpty())
+        assertFalse(abandoned.contains(publishedPreview))
+    }
+    @Test fun cancelledUnpublishedPreviewIsAbandonedBeforeDiscardReturns() = fixture {
+        prepared(); val gate=hold();val entered=CompletableDeferred<Unit>();imageGate=gate;imageEntered=entered
+        editor.send("request",7u,false)?.join(); withTimeout(3000){entered.await()}
+        val preview = made.last();val discarding=editor.discard()!!;yield()
+        assertFalse(discarding.isCompleted)
+        gate.complete(Unit);discarding.join()
+        assertTrue(abandoned.contains(preview));assertTrue(editor.state.value.entries.isEmpty())
+    }
+    @Test fun largeCandidateGridPreviewRemainsBoundedWhenFullDetailIsRefused() = fixture {
+        attachment = attachment.copy(document=snapshot(1u,width=8192u,height=8192u))
+        api.width=8192u;api.height=8192u;driver.width=8192u;driver.height=8192u
+        prepared();editor.viewport(8192.0,8192.0);editor.send("request",7u,false)?.join()
+        until { editor.state.value.entries.single().preview != null && editor.state.value.message != null && !editor.state.value.loadingPixels }
+        assertEquals(AiRegion(3968u,3968u,256u,256u),editor.state.value.entries.single().preview?.region)
+        assertEquals(listOf(AiRegion(3968u,3968u,256u,256u)),driver.regions)
+        assertNull(editor.state.value.frame);assertEquals(1,driver.sends)
+        assertTrue(editor.state.value.message!!.contains("64 MiB"))
+    }
+    @Test fun reviewedGlobalInstructionStaysWithEachGridEntry() = fixture {
+        prepared();editor.prepare(AiDraftOptions("second immutable instruction",null))?.join()
+        assertEquals(listOf("","second immutable instruction"),editor.state.value.entries.map { it.instruction })
+        editor.selectCandidate("request")?.join()
+        assertEquals("",editor.state.value.entries.first { it.review.requestId == editor.state.value.review?.requestId }.instruction)
+        assertEquals(listOf(0,0),drivers.map { it.sends })
+    }
     @Test fun estimateInputRequiresExplicitBoundedDatesAndIntegerCounts() {
         assertNull(aiEstimateInput("", "", "", "", "", ""))
         assertEquals(3uL, aiEstimateInput("1", "2", "3", "owner calculation", "2026-10-01", "2026-10-31")!!.imageOutput)
@@ -192,11 +368,11 @@ class AiEditorOwnershipInstrumentedTest {
 
 private suspend fun until(check: () -> Boolean) { withTimeout(3_000) { while (!check()) yield() } }
 private val proof = AiProofInfo(0u, "a".repeat(64), "a".repeat(64), null, null, null, 0.0, 0.0, 1.0)
-private fun snapshot(seq: ULong, results: Boolean = true): DocumentSnapshot {
+private fun snapshot(seq: ULong, results: Boolean = true, width: UInt = 2u, height: UInt = 2u): DocumentSnapshot {
     val info = ProjectInfo("project", "fixture", "device", seq + 1u, true, false, seq, seq.toString().padStart(64, '0'), listOf("document"))
     val items = if (!results) emptyList() else listOf(RenderItem("object", "layer", 1.0, "normal", Rect(0.0,0.0,2.0,2.0),
         Contours(longArrayOf(),longArrayOf(),uintArrayOf()), Transform(), ObjectStyle(0xffffffffu,0.0), Shape.Result("c".repeat(64), "saved"), false))
-    return DocumentSnapshot("document", "fixture", 2u, 2u, 8u, listOf(LayerInfo("layer","Result",true,false,1.0,"normal")), RenderList(info, items))
+    return DocumentSnapshot("document", "fixture", width, height, 8u, listOf(LayerInfo("layer","Result",true,false,1.0,"normal")), RenderList(info, items))
 }
 private class Project : WorkbenchProject {
     override val changes = MutableSharedFlow<ProjectChange>()
@@ -221,18 +397,20 @@ private class Core : WorkbenchCore {
     override fun mapPoints(camera: Camera, inverse: Boolean, points: List<Point>) = points
 }
 private class Service : WorkbenchAiService {
-    override suspend fun configuration() = AiConfiguration("{}","policy","2026-10-01","2026-10-31","fixture","fixture",1_000_000u)
+    var fingerprint = "policy"; var providerReady = true; var configured = true
+    override suspend fun configuration() = AiConfiguration("{}",fingerprint,"2026-10-01","2026-10-31","fixture","fixture",1_000_000u)
     override suspend fun configure(json: String, expectedFingerprint: String) = configuration()
     override suspend fun configureDailyBudget(expectedFingerprint: String, dailySoftBudgetMicrousd: ULong) = configuration()
-    override suspend fun readiness() = AiReadiness(true,true,true,0u,1_000_000u)
+    override suspend fun readiness() = AiReadiness(configured,true,true,0u,1_000_000u,providerReady)
     override suspend fun saveWindowsKey(bytes: ByteArray) = error("No credentials in fixture")
     override suspend fun removeWindowsKey() = error("No credentials in fixture")
     override suspend fun close() = Unit
 }
 private class Api : WorkbenchAiResults {
+    var width = 2u; var height = 2u
     var contexts = 0; var reads = 0; var refuse = false; var pixelGate: CompletableDeferred<Unit>? = null
     override suspend fun context(binding: WorkflowBinding, memoryBudgetBytes: ULong): AiContext {
-        contexts++; return AiContext(binding,"s".repeat(64),2u,2u,8u,emptyList(),emptyList())
+        contexts++; return AiContext(binding,"s".repeat(64),width,height,8u,emptyList(),emptyList())
     }
     override suspend fun resultPixels(binding: WorkflowBinding, resultId: String, region: AiRegion, memoryBudgetBytes: ULong): AiResultPixels {
         reads++; val gate = pixelGate; pixelGate = null
@@ -242,47 +420,73 @@ private class Api : WorkbenchAiResults {
     }
     override suspend fun resultStatus(binding: WorkflowBinding, resultId: String, accepted: Boolean, metadata: WorkflowMetadata): WorkflowReceipt = error("No status in fixture")
 }
-private class Driver : AiDriver {
+private class Driver(val requestId: String = "request") : AiDriver {
     var prepares = 0; var sends = 0; var closes = 0; var brushes = 0; var failSaveOnce = false; var failPrepare = false
     var prepareGate: CompletableDeferred<Unit>? = null; var sendGate: CompletableDeferred<Unit>? = null
     lateinit var binding: WorkflowBinding
     val saved = mutableListOf<AiSaveOptions>()
-    var candidateId="candidate";var recoveries=0
-    private fun candidate() = AiCandidateInfo("request",candidateId,binding,2u,2u,8u,false,AiSettlement.UsagePriced,7u,proof)
+    var candidateId = if (requestId == "request") "candidate" else "candidate-$requestId"
+    var recoveries = 0; var closeFailures = 0; var partial = false
+    var sourceSha = "a".repeat(64); var maskSha = "b".repeat(64); var width = 2u; var height = 2u
+    val regions = mutableListOf<AiRegion>()
+    var candidateOverride: AiCandidateInfo? = null; var wrongReceiptOnce = false
+    var pixelGate: CompletableDeferred<Unit>? = null; var reads = 0
+    private fun candidate() = candidateOverride ?: AiCandidateInfo(requestId,candidateId,binding,width,height,8u,partial,AiSettlement.UsagePriced,7u,
+        if (partial) proof.copy(changedUnaccepted=0u,unacceptedSha256Before="a".repeat(64),unacceptedSha256After="a".repeat(64)) else proof)
     override suspend fun recover():AiCandidateInfo{recoveries++;return candidate()}
     override suspend fun prepare(options: AiPrepareOptions): AiReview {
         prepares++; binding = options.binding
         if (failPrepare) throw AiFailure(AiFailureKind.Invalid)
         prepareGate?.let { withContext(NonCancellable) { it.await() } }
-        return AiReview("request",binding,"s".repeat(64),"a".repeat(64),"b".repeat(64),"policy","fixture","fixture",2u,2u,8u,
-            2u,2u,0,0,2u,2u,8u,7u,"fixture","2026-10-31","2026-10-31",false)
+        return AiReview(requestId,binding,"s".repeat(64),sourceSha,maskSha,options.configurationFingerprint,"fixture","fixture",width,height,8u,
+            width,height,0,0,width,height,8u,7u,"fixture","2026-10-31","2026-10-31",false)
     }
     override suspend fun send(request: String, estimate: ULong, acknowledge: Boolean): AiCandidateInfo {
         sends++; sendGate?.let { withContext(NonCancellable) { it.await() } }; currentCoroutineContext().ensureActive(); return candidate()
     }
-    override suspend fun pixels(mode: AiCompareMode, region: AiRegion) = AiPixels("candidate",region,if(mode==AiCompareMode.Split)4u else 2u,2u,ByteArray((region.width*region.height*4u).toInt()))
-    override suspend fun brush(value: AiAcceptanceBrush): AiCandidateInfo { brushes++; return candidate().copy(candidateId=value.nextCandidateId,partial=true) }
+    override suspend fun pixels(mode: AiCompareMode, region: AiRegion): AiPixels {
+        reads++; regions += region; val gate = pixelGate; pixelGate = null
+        gate?.let { withContext(NonCancellable) { it.await() } }
+        return AiPixels(candidateId,region,if(mode==AiCompareMode.Split)width*2u else width,height,ByteArray((region.width*region.height*4u).toInt()))
+    }
+    override suspend fun brush(value: AiAcceptanceBrush): AiCandidateInfo {
+        check(value.expectedCandidateId == candidateId); brushes++; candidateId = value.nextCandidateId; partial = true; return candidate()
+    }
     override suspend fun save(value: AiSaveOptions): AiResultReceipt {
         saved += value
         if (failSaveOnce) { failSaveOnce=false; throw AiFailure(AiFailureKind.Storage) }
-        return AiResultReceipt(value.metadata.transactionId,"saved","object","layer","o".repeat(64),"c".repeat(64),null,snapshot(2u).render.revision,proof)
+        val resultId = if (wrongReceiptOnce) { wrongReceiptOnce=false; "wrong-result" } else value.resultId
+        return AiResultReceipt(value.metadata.transactionId,resultId,value.objectId,value.layerId,"o".repeat(64),"c".repeat(64),null,snapshot(2u).render.revision,candidate().proof)
     }
-    override suspend fun close() { closes++ }
+    override suspend fun close() { closes++; if (closeFailures > 0) { closeFailures--; throw AiFailure(AiFailureKind.Storage) } }
 }
 private class Fixture(val scope: CoroutineScope) : CoroutineScope by scope {
     val gates = mutableListOf<CompletableDeferred<Unit>>()
     fun hold() = CompletableDeferred<Unit>().also { gates += it }
-    val core = Core(); val project = Project(); val api = Api(); val driver = Driver()
+    val core = Core(); val project = Project(); val api = Api()
+    val drivers = mutableListOf(Driver()); val driver get() = drivers.first()
+    var createdDrivers = 0
     var attachment = AiAttachment(project,snapshot(1u),1)
     var serviceCreates = 0; var failRefresh = false; private var bitmaps = 0
-    val abandoned = mutableListOf<Int>()
-    val service = AiServiceController(scope,"unused") { _, _ -> serviceCreates++; Service() }
+    val abandoned = mutableListOf<Int>(); val made = mutableListOf<Int>()
+    var imageGate: CompletableDeferred<Unit>? = null; var imageEntered: CompletableDeferred<Unit>? = null
+    val serviceApi = Service()
+    val service = AiServiceController(scope,"unused") { _, _ -> serviceCreates++; serviceApi }
     val result = AiResultController(scope,core,{attachment},{Camera(Point(1.0,1.0),1.0,0.0,2.0,2.0)},
         image = { ++bitmaps }, abandonImage = { abandoned += it }, results = { api })
     val editor = AiEditorController(scope,core,service,{attachment},Mutex(),
         metadata = { WorkflowMetadata("txn","device",3u,0) },
         refreshAfterMutation = { if(failRefresh) throw AiFailure(AiFailureKind.Storage) },
-        image = { ++bitmaps }, abandonImage = { abandoned += it }, results = { api }, driverFactory = { _,_,_ -> driver })
+        image = {
+            val bitmap = ++bitmaps; made += bitmap
+            val gate = imageGate; imageGate = null
+            imageEntered?.complete(Unit)
+            gate?.let { withContext(NonCancellable) { it.await() } }
+            bitmap
+        }, abandonImage = { abandoned += it }, results = { api }, driverFactory = { _,_,_ ->
+            if (createdDrivers == drivers.size) drivers += Driver("request-${createdDrivers+1}")
+            drivers[createdDrivers++]
+        })
     suspend fun idle() = until { editor.state.value.idle }
     suspend fun settings() { service.activate(); until { !service.state.value.busy } }
     suspend fun prepared() { settings(); editor.open(); idle(); editor.prepare(AiDraftOptions("",null))?.join() }

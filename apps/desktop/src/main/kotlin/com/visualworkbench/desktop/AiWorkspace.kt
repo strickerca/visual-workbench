@@ -1,5 +1,7 @@
 package com.visualworkbench.desktop
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +11,7 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.visualworkbench.shared.*
 
@@ -27,6 +30,7 @@ internal fun AiWorkspace(controller: AiEditorController<AiBitmap>, service: AiSe
                 TextButton({ controller.cancel() }, enabled = !state.idle || state.loadingPixels) { Text("Cancel operation") }
                 TextButton(onDismiss) { Text("Close") }
             }
+            AiCandidateGrid(controller, state)
             BoxWithConstraints(Modifier.weight(1f)) {
                 if (maxWidth > 760.dp) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     AiControls(controller, service, state, settings, onKeys, Modifier.width(360.dp).fillMaxHeight())
@@ -57,6 +61,7 @@ private fun AiControls(controller: AiEditorController<AiBitmap>, service: AiServ
     var localMessage by remember { mutableStateOf<String?>(null) }
     var acknowledge by remember(state.review?.requestId) { mutableStateOf(false) }
     val enabled = state.idle && !settings.busy
+    val flatImagePrice = settings.configuration?.providerKind == AiProviderKind.Flux1Fill
     Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton({ showSettings = !showSettings; if (showSettings) service.activate() }, Modifier.fillMaxWidth(), enabled = state.idle) { Text("Provider settings & budget") }
         if (showSettings) AiSettings(service, settings, onKeys, state.idle)
@@ -69,6 +74,7 @@ private fun AiControls(controller: AiEditorController<AiBitmap>, service: AiServ
         }
         TextButton({ controller.reloadContext() }, enabled = enabled) { Text("Refresh document context") }
         OutlinedTextField(instruction, { instruction = it.take(16_384) }, label = { Text("Additional global Change instruction (optional)") }, enabled = enabled, modifier = Modifier.fillMaxWidth())
+        if (!flatImagePrice) {
         Text("Explicit token estimate", style = MaterialTheme.typography.subtitle2)
         Text("Use current provider-supported figures and cite their source. The app does not invent a token formula.", style = MaterialTheme.typography.caption)
         AiSmallInput("Text input tokens", textTokens, { textTokens = it.take(9) }, enabled)
@@ -77,23 +83,28 @@ private fun AiControls(controller: AiEditorController<AiBitmap>, service: AiServ
         AiSmallInput("Estimate source", provenance, { provenance = it.take(1024) }, enabled)
         AiSmallInput("Verified on · YYYY-MM-DD", verified, { verified = it.take(10) }, enabled)
         AiSmallInput("Expires on · YYYY-MM-DD", expires, { expires = it.take(10) }, enabled)
+        } else Text("FLUX.1 Fill uses the explicit per-image price and dated provenance in the provider configuration.", style = MaterialTheme.typography.caption)
         Text("Feather ${feather.toInt()} px")
         Slider(feather, { feather = it }, valueRange = 0f..64f, steps = 63, enabled = enabled)
         AiCheck("Allow an 8-bit provider copy of a 16-bit source", depth, { depth = it }, enabled)
         AiCheck("Treat an untagged source as sRGB", untagged, { untagged = it }, enabled)
         Button({
             try {
-                val estimate = aiEstimateInput(textTokens, inputTokens, outputTokens, provenance, verified, expires)
+                val estimate = if (flatImagePrice) null else aiEstimateInput(textTokens, inputTokens, outputTokens, provenance, verified, expires)
                 localMessage = null
                 controller.prepare(AiDraftOptions(instruction, estimate, feather.toInt().toUInt(), depth, untagged))
             } catch (error: IllegalArgumentException) { localMessage = error.message }
-        }, Modifier.fillMaxWidth(), enabled = enabled && settings.configuration != null && !controller.needsDecision()) { Text("Prepare request review") }
-        if (controller.needsDecision()) Text("Save or explicitly discard the retained paid review before preparing a new request.", style = MaterialTheme.typography.caption)
+        }, Modifier.fillMaxWidth(), enabled = enabled && settings.configuration != null && controller.canPrepare()) { Text(if (state.entries.isEmpty()) "Prepare request review" else "Prepare another candidate review") }
+        if (!controller.canPrepare()) Text("Up to $AI_CANDIDATE_LIMIT reviews share this source. Recover uncertain attempts, finish an exact save retry, or discard a review to free its slot. A changed source needs a new grid.", style = MaterialTheme.typography.caption)
         val review = state.review
         if (review != null) {
             Divider()
             Text("Review request", style = MaterialTheme.typography.subtitle1)
-            Text("${review.model} · ${review.quality}")
+            Text("${aiProviderLabel(review.providerKind)} · ${review.model} · ${review.quality}")
+            Text("Request ${review.requestId} · source revision ${review.binding.hostSeq}\nSource ${review.sourceAssetId}\nConfiguration ${review.configurationFingerprint}", style = MaterialTheme.typography.caption)
+            state.entries.firstOrNull { it.review.requestId == review.requestId }?.let {
+                Text("Additional Change instruction used: ${it.instruction.ifEmpty { "none" }}", style = MaterialTheme.typography.caption)
+            }
             Text("${review.sourceWidth} × ${review.sourceHeight} source → ${review.modelWidth} × ${review.modelHeight} provider copy\nCrop (${review.cropX}, ${review.cropY}), ${review.cropWidth} × ${review.cropHeight}; feather ${review.featherPx} px")
             if (review.providerCopyReducesDepth) Text("The provider receives an explicitly approved 8-bit copy.")
             Text("Estimate: ${review.estimatedMicrousd?.let(::aiMoney) ?: "Unavailable — Send disabled"}")
@@ -104,23 +115,25 @@ private fun AiControls(controller: AiEditorController<AiBitmap>, service: AiServ
             if (cost != null && readiness != null && aiBudgetExceeded(readiness, cost)) Text("This estimate exceeds the remaining daily soft budget.", color = MaterialTheme.colors.error)
             AiCheck("I acknowledge a request that exceeds the daily soft budget", acknowledge, { acknowledge = it }, enabled && !state.attempted)
             Button({ if (cost != null) controller.send(review.requestId, cost, acknowledge) }, Modifier.fillMaxWidth(),
-                enabled = enabled && !state.stale && !state.attempted && cost != null && readiness?.trustReady == true && readiness?.configurationCurrent == true &&
+                enabled = enabled && !state.stale && !state.attempted && cost != null && readiness?.trustReady == true && readiness?.configurationCurrent == true && readiness?.providerReady == true && readiness?.configured == true &&
                     settings.configuration?.fingerprint == review.configurationFingerprint) {
                 Text(if (state.attempted) "Send attempt used" else "Send · ${cost?.let(::aiMoney).orEmpty()}")
             }
+            if (readiness?.providerReady == false) Text("This provider's protected credential and live transport capability are unavailable. Offline review remains available; Send is disabled.", style = MaterialTheme.typography.caption)
             if(state.attempted){
                 TextButton({controller.recoverCandidate()},enabled=state.idle){Text("Reload paid candidate · no Send")}
                 Text("Keep this project open until you save or explicitly discard the candidate. An unsaved candidate cannot survive final app/process disposal.",style=MaterialTheme.typography.caption)
             }
-            TextButton({controller.discard()},enabled=state.idle){Text("Discard review and unsaved candidate")}
+            TextButton({controller.discard()},enabled=state.idle){Text("Discard selected review and unsaved candidate")}
         }
         state.candidate?.let { candidate ->
             Divider()
             Text(if (candidate.partial) "Partial candidate" else "Provider candidate", style = MaterialTheme.typography.subtitle1)
+            Text("Candidate ${candidate.candidateId}", style = MaterialTheme.typography.caption)
             AiView.entries.chunked(3).forEach { row -> Row { row.forEach { mode -> TextButton({ controller.view(mode) }, enabled = state.idle) { Text((if (state.view == mode) "• " else "") + mode.name) } } } }
             if (state.view == AiView.Wipe) Slider(state.wipe, controller::wipe, enabled = state.idle)
             if (state.view == AiView.Difference) { Text("Difference gain ${state.differenceGain}×"); Slider(state.differenceGain.toFloat(), { controller.difference(it.toInt()) }, valueRange = 1f..16f, steps = 14, enabled = state.idle) }
-            AiCheck("Partial-accept brush", state.brush, controller::brush, state.idle && !state.stale && !state.retrySave)
+            AiCheck("Partial-accept brush", state.brush, controller::brush, state.idle && !state.stale && !state.retrySave && state.receipt == null)
             if (state.brush) {
                 Text("Radius ${state.radius.toInt()} document px")
                 Slider(state.radius.toFloat(), { controller.radius(it.toDouble()) }, valueRange = .5f..256f, enabled = state.idle)
@@ -133,7 +146,7 @@ private fun AiControls(controller: AiEditorController<AiBitmap>, service: AiServ
                 AiSettlement.UsageMissing -> "Provider usage is missing; charge remains unresolved."
                 AiSettlement.LedgerUnavailable -> "Charge settlement could not be recorded. Existing history is preserved." }, style = MaterialTheme.typography.caption)
             Button({ controller.save() }, Modifier.fillMaxWidth(), enabled = state.idle && state.receipt == null && (!state.stale || state.retrySave)) {
-                Text(if (state.retrySave) "Retry exact Result save" else "Save as Result layer")
+                Text(if (state.retrySave) "Retry exact Result save" else "Apply selected candidate as Result layer")
             }
         }
         state.receipt?.let { receipt ->
@@ -148,10 +161,59 @@ private fun AiControls(controller: AiEditorController<AiBitmap>, service: AiServ
                 TextButton({ controller.savedStatus(result.resultId, false) }, enabled = enabled) { Text("Hide") }
             }
         }
+        if (state.pendingCleanup > 0) TextButton({ controller.retryCleanup() }, enabled = state.idle) { Text("Retry retained request cleanup") }
         if (!state.idle) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(state.busy.name) }
-        if (state.stale) Text("Document changed. A new review is required; a prior send is never repeated automatically.", color = MaterialTheme.colors.error)
+        if (state.stale) Text("This grid belongs to an earlier source revision. Comparison remains available; Send, acceptance strokes and a new apply require the exact source. Saved Results use normal Undo/Redo.", color = MaterialTheme.colors.error)
         localMessage?.let { Text(it, color = MaterialTheme.colors.error) }
         state.message?.let { Text(it, style = MaterialTheme.typography.caption) }
+    }
+}
+
+/** Images are real native After pixels. Large candidates show a labelled center
+ * crop; selecting a card opens the existing full-resolution comparison tools. */
+@Composable
+private fun AiCandidateGrid(controller: AiEditorController<AiBitmap>, state: AiEditorState<AiBitmap>) {
+    if (state.entries.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Candidate grid · ${state.entries.size}/$AI_CANDIDATE_LIMIT · each review requires explicit Send", style = MaterialTheme.typography.subtitle2)
+        BoxWithConstraints {
+            val columns = if (maxWidth > 760.dp) 4 else 2
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                state.entries.chunked(columns).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        row.forEach { entry ->
+                            val selected = state.review?.requestId == entry.review.requestId
+                            Card(Modifier.weight(1f), border = BorderStroke(if (selected) 2.dp else 1.dp,
+                                if (selected) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface.copy(alpha = .25f))) {
+                                Column(Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text("${aiProviderLabel(entry.review.providerKind)} · ${entry.review.model}", style = MaterialTheme.typography.caption, maxLines = 1)
+                                    val preview = entry.preview?.takeIf { it.candidateId == entry.candidate?.candidateId }
+                                    if (preview != null) {
+                                        Image(preview.image.display, "Candidate ${entry.review.requestId}",
+                                            Modifier.fillMaxWidth().height(72.dp), contentScale = ContentScale.Fit)
+                                        val region = preview.region
+                                        Text(if (entry.candidate?.width == region.width && entry.candidate?.height == region.height) "Whole image"
+                                            else "Center crop (${region.x}, ${region.y}) ${region.width} × ${region.height}", style = MaterialTheme.typography.caption)
+                                    } else Text(if (entry.candidate != null) "Preview unavailable · select to inspect" else "No generated pixels", style = MaterialTheme.typography.caption)
+                                    Text(when {
+                                        entry.receipt != null -> "Saved Result · revision ${entry.receipt.revision.hostSeq}"
+                                        entry.retrySave -> "Exact save retry retained"
+                                        entry.candidate != null -> "${if (entry.candidate.partial) "Partial" else "Candidate"} · outside changed ${entry.candidate.proof.changedOutside}"
+                                        entry.attempted -> "Attempt used · recover or discard"
+                                        else -> "Review ready · Send required"
+                                    }, style = MaterialTheme.typography.caption)
+                                    Text(entry.candidate?.actualMicrousd?.let { "Recorded ${aiMoney(it)}" }
+                                        ?: entry.review.estimatedMicrousd?.let { "Estimate ${aiMoney(it)}" }.orEmpty(), style = MaterialTheme.typography.caption)
+                                    TextButton({ controller.selectCandidate(entry.review.requestId) }, enabled = state.idle,
+                                        modifier = Modifier.fillMaxWidth()) { Text(if (selected) "Selected" else "Select / compare") }
+                                }
+                            }
+                        }
+                        repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -171,7 +233,7 @@ private fun AiControls(controller: AiEditorController<AiBitmap>, service: AiServ
     Row { TextButton({ service.activate() }, enabled = enabled) { Text("Open / refresh") }
         TextButton({ service.initialize() }, enabled = enabled && configuration == null) { Text("Initialize first-use history") } }
     if (configuration != null) {
-        Text("${configuration.model} · ${configuration.quality}\nVerified ${configuration.verifiedOn}; expires ${configuration.expiresOn}")
+        Text("${aiProviderLabel(configuration.providerKind)} · ${configuration.model} · ${configuration.quality}\nVerified ${configuration.verifiedOn}; expires ${configuration.expiresOn}")
         AiSmallInput("Daily soft budget in USD", dollars, { dollars = it.take(27) }, enabled)
         val amount = aiParseMoney(dollars)
         TextButton({ amount?.let { service.configureDailyBudget(configuration.fingerprint, it) } }, enabled = enabled && amount != null) { Text("Save daily budget") }
@@ -182,4 +244,10 @@ private fun AiControls(controller: AiEditorController<AiBitmap>, service: AiServ
     state.readiness?.let { Text("Recorded today ${aiMoney(it.spentTodayMicrousd)} of ${aiMoney(it.dailySoftBudgetMicrousd)} soft budget.\nCredentials ${if (it.trustReady) "ready" else "unavailable"}; configuration ${if (it.configurationCurrent) "current" else "expired"}.", style = MaterialTheme.typography.caption) }
     state.failure?.let { Text(aiFailureText(it), color = MaterialTheme.colors.error) }
     if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+}
+
+private fun aiProviderLabel(provider: AiProviderKind): String = when (provider) {
+    AiProviderKind.OpenAiImageEdits -> "OpenAI"
+    AiProviderKind.GeminiImageGeneration -> "Gemini"
+    AiProviderKind.Flux1Fill -> "FLUX.1 Fill"
 }

@@ -8,13 +8,14 @@ class AiInteractionTest {
     private fun options()=AiPrepareOptions(binding,emptyList(),"intent","instruction","e".repeat(64),null)
     private inner class Request(val id:String):WorkbenchAiRequest{
         override val review=review(id);var sends=0;var closed=0;var failure:AiFailureKind?=null
+        var closeFailures=0
         var entered:CompletableDeferred<Unit>?=null;var finish:CompletableDeferred<Unit>?=null
         override suspend fun send(requestId:String,displayedEstimateMicrousd:ULong,acknowledgeSoftBudget:Boolean):AiCandidateInfo{sends++;entered?.complete(Unit);finish?.await();throw AiFailure(failure?:AiFailureKind.Provider)}
         override suspend fun candidate():AiCandidateInfo=error("unused")
         override suspend fun compare(candidateId:String,mode:AiCompareMode,region:AiRegion):AiPixels=error("unused")
         override suspend fun acceptBrush(brush:AiAcceptanceBrush):AiCandidateInfo=error("unused")
         override suspend fun save(candidateId:String,options:AiSaveOptions):AiResultReceipt=error("unused")
-        override suspend fun close(){closed++}
+        override suspend fun close(){closed++;if(closeFailures>0){closeFailures--;throw AiFailure(AiFailureKind.Storage)}}
     }
     private fun edits(request:WorkbenchAiRequest)=object:WorkbenchAiEdits{
         override suspend fun context(binding:WorkflowBinding,memoryBudgetBytes:ULong):AiContext=error("unused")
@@ -29,6 +30,32 @@ class AiInteractionTest {
     @Test fun staleDisplayedReviewCannotSendTheCurrentRequest(): Unit = runBlocking{
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default);val request=Request("current");val owner=AiInteraction(edits(request),scope)
         try{owner.prepare(options());assertAiFailure<AiFailure>{owner.send("old",50uL,false)};assertAiFailure<AiFailure>{owner.send("current",51uL,false)};assertEquals(0,request.sends)}finally{owner.close();scope.cancel()}
+    }
+    @Test fun failedRequestCloseRemainsOwnedForExplicitJoinedRetry(): Unit = runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default);val request=Request("review");val owner=AiInteraction(edits(request),scope)
+        try {
+            owner.prepare(options());request.closeFailures=1
+            assertAiFailure<AiFailure>{owner.close()}
+            assertEquals(1,request.closed);assertEquals(AiStage.Closed,owner.state.value.stage)
+            owner.close();assertEquals(2,request.closed)
+            owner.close();assertEquals(2,request.closed)
+        } finally { owner.close();scope.cancel() }
+    }
+    @Test fun cancelledLatePreparationRetainsFailedCloseUntilOwnerCleanupRetry(): Unit = runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default);val request=Request("late");request.closeFailures=1
+        val entered=CompletableDeferred<Unit>();val settle=CompletableDeferred<Unit>()
+        val api=object:WorkbenchAiEdits by edits(request) {
+            override suspend fun prepare(options:AiPrepareOptions):WorkbenchAiRequest {
+                entered.complete(Unit);withContext(NonCancellable){settle.await()};return request
+            }
+        }
+        val owner=AiInteraction(api,scope)
+        try {
+            val preparing=launch{try{owner.prepare(options())}catch(_:CancellationException){}}
+            withTimeout(5000){entered.await()};preparing.cancel();settle.complete(Unit);preparing.join()
+            assertEquals(1,request.closed)
+            owner.close();assertEquals(2,request.closed)
+        } finally { settle.complete(Unit);owner.close();scope.cancel() }
     }
     @Test fun closeCancelsOperationBeforeClosingItsRequest(): Unit = runBlocking{
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default);val request=Request("review");request.entered=CompletableDeferred();request.finish=CompletableDeferred();val owner=AiInteraction(edits(request),scope)

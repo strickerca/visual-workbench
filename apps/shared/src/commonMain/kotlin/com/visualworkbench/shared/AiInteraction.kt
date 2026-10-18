@@ -19,6 +19,7 @@ public class AiInteraction private constructor(private val edits:()->WorkbenchAi
     private var closed=false
     private var operation:Deferred<*>?=null
     private var request:WorkbenchAiRequest?=null
+    private val failedRetirements=mutableListOf<WorkbenchAiRequest>()
     private val mutable=MutableStateFlow(AiInteractionState())
     public val state:StateFlow<AiInteractionState> = mutable.asStateFlow()
     private suspend fun <T> run(stage:AiStage,body:suspend()->T):T{
@@ -40,6 +41,7 @@ public class AiInteraction private constructor(private val edits:()->WorkbenchAi
         finally{withContext(NonCancellable){guard.withLock{if(operation===job)operation=null}}}
     }
     public suspend fun prepare(options:AiPrepareOptions):AiReview=run(AiStage.Preparing){
+        if(failedRetirements.isNotEmpty())throw AiFailure(AiFailureKind.Busy)
         withContext(NonCancellable){request?.close();request=null}
         mutable.value=AiInteractionState(stage=AiStage.Preparing)
         var acquired:WorkbenchAiRequest?=null
@@ -47,7 +49,11 @@ public class AiInteraction private constructor(private val edits:()->WorkbenchAi
             currentCoroutineContext().ensureActive()
             guard.withLock{if(closed)throw AiFailure(AiFailureKind.Closed);request=next;acquired=null}
             mutable.value=mutable.value.copy(review=next.review);next.review
-        }finally{withContext(NonCancellable){acquired?.close()}}
+        }finally{withContext(NonCancellable){acquired?.let{
+            failedRetirements+=it
+            it.close()
+            failedRetirements.remove(it)
+        }}}
     }
     public suspend fun send(requestId:String,displayedEstimateMicrousd:ULong,acknowledgeSoftBudget:Boolean):AiCandidateInfo=run(AiStage.Sending){
         val active=request?:throw AiFailure(AiFailureKind.Invalid);val review=active.review
@@ -75,6 +81,14 @@ public class AiInteraction private constructor(private val edits:()->WorkbenchAi
     public suspend fun cancel(){val job=guard.withLock{operation};job?.cancel();withContext(NonCancellable){job?.join();guard.withLock{if(operation===job)operation=null}}}
     public suspend fun close(){withContext(NonCancellable){
         val job=guard.withLock{closed=true;operation};job?.cancel();job?.join()
-        guard.withLock{request?.close();request=null;operation=null;lifetime.cancel();mutable.value=mutable.value.copy(stage=AiStage.Closed)}
+        guard.withLock{
+            var failure:Exception?=null
+            request?.let{try{it.close();request=null}catch(error:Exception){failure=error}}
+            for(pending in failedRetirements.toList()){
+                try{pending.close();failedRetirements.remove(pending)}catch(error:Exception){if(failure==null)failure=error}
+            }
+            operation=null;lifetime.cancel();mutable.value=mutable.value.copy(stage=AiStage.Closed)
+            failure?.let{throw it}
+        }
     }}
 }
