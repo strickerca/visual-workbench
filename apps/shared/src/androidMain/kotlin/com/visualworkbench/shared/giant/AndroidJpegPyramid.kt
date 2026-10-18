@@ -53,6 +53,7 @@ internal class JpegTileInput private constructor(
     internal val encodedBytes: Long,
     internal val maxDiskBytes: Long,
     internal val assumeUntaggedSrgb: Boolean,
+    internal val rootOperation: Long,
 ) {
     internal companion object {
         internal fun fromRootPrepared(
@@ -65,8 +66,9 @@ internal class JpegTileInput private constructor(
             encodedBytes: Long,
             maxDiskBytes: Long,
             assumeUntaggedSrgb: Boolean,
+            rootOperation: Long = 0,
         ): JpegTileInput = JpegTileInput(source, privateWork, sha256, rawWidth, rawHeight,
-            orientation, encodedBytes, maxDiskBytes, assumeUntaggedSrgb)
+            orientation, encodedBytes, maxDiskBytes, assumeUntaggedSrgb, rootOperation)
     }
 }
 
@@ -160,6 +162,8 @@ internal object AndroidJpegPyramid {
         resources: SessionResources,
         progress: (TileBuildProgress) -> Unit,
     ): AndroidTileBuild = AndroidTileBuild.build(input, resources, progress)
+
+    internal fun ownsRootOperation(operation: Long): Boolean = ProducerRuntime.ownsRootOperation(operation)
 
     /** Explicit retry only; an uncertain owner otherwise blocks new work and
      * retains its slot/charge. This never turns cancellation into retirement. */
@@ -263,6 +267,8 @@ private object ProducerRuntime {
         quarantine.remove(owner); active = null; slots.release()
     }
     @Synchronized fun quarantined(): List<ProducerOwner> = quarantine.toList()
+    @Synchronized fun ownsRootOperation(operation: Long): Boolean = operation > 0 &&
+        (active?.input?.rootOperation == operation || quarantine.any { it.input.rootOperation == operation })
 }
 
 private fun requireInput(input: JpegTileInput): Unit {
@@ -542,6 +548,9 @@ private class ProducerOwner(val input: JpegTileInput) {
             ProducerRuntime.retain(this)
             throw error
         }
+        // The source pin survives every failed close. Notify only after files,
+        // native charge and slot have all actually retired, including on retry.
+        AndroidGiantRuntime.ownerRetired(input.rootOperation)
     }
 
     private fun cleanupFiles(): Unit {

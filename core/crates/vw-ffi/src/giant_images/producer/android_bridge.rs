@@ -16,6 +16,7 @@ use std::{
 use vw_assets::{MAX_ENCODED_TILE_BYTES, MAX_MANIFEST_BYTES, Manifest, TileRecord};
 use vw_stream::{MemoryKind, SessionBudget};
 
+mod foreign_retirement;
 #[cfg(target_os = "android")]
 mod jni;
 #[cfg(target_os = "android")]

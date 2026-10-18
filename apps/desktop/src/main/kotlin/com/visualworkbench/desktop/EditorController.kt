@@ -277,9 +277,15 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
             throw WorkflowFailure(WorkflowFailureKind.Stale)
         validateDrawing(target)
         cancelInput();update{it.copy(view=it.view.copy(followPeer=false))}
-        live.documentChanging()
         var metadataRetired=false
-        try {
+        withDocumentObserversRetired(
+            retire={live.documentChanging()},
+            restore={if(!closing&&project===a.project){
+                try {
+                    if(metadataRetired){instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()}
+                } finally {live.documentChanged();live.attachment()?.link?.let{instructionFocus.attach(it)}}
+            }},
+        ) {
             viewportJob?.cancelAndJoin();viewportJob=null;sessionWork?.cancelAndJoin();sessionWork=null
             discardExport();rotation.detach();semanticEditor.detach();instructionEditor.detach();instructionFocus.detach()
             metadataRetired=true
@@ -300,11 +306,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
             instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();documentOwner.bind(a.project,target)
             live.attachment()?.link?.let{instructionFocus.attach(it)}
             fit();bindWorkflows();refreshOriginalFormatNotice();loadBackground();refreshRole(a.project,generation)
-        } finally {withContext(NonCancellable){if(!closing&&project===a.project){
-            try {
-                if(metadataRetired){instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()}
-            } finally {live.documentChanged();live.attachment()?.link?.let{instructionFocus.attach(it)}}
-        }}}
+        }
     }
     fun chooseEraser(value:EraserChoice){cancelInput();erasers.tools.choose(value,mutable.value.selected.singleOrNull());update{it.copy(textAnchor=null)}}
     fun stopErasing(){cancelInput();erasers.tools.drawing()}
@@ -821,7 +823,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
             val previous=rotationPreviewIds;rotationPreviewIds=value.preview.keys.toSet()
             update{it.copy(preview=(it.preview-previous)+value.preview)}
             if(value.failure==ObjectRotationFailure.Unconfirmed&&!closing)scope.launch{edits.withLock{
-                try{refresh();rotation.reconciled()}catch(_:Exception){report("Refresh or reopen the project before rotating again. Any accepted edit remains in history.")}
+                try{refresh()}catch(_:Exception){report("Refresh or reopen the project before rotating again. Any accepted edit remains in history.")}
             }}
         }}
     }

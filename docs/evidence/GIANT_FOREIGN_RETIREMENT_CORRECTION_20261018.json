@@ -1,0 +1,82 @@
+{
+  "date_utc": "2026-10-18",
+  "scope": "G1/P2 exact native source retention until proven foreign retirement; private producer only",
+  "branch": "cloud/giant-foreign-retirement-fix-20261018",
+  "fix_code_commit": "181e4a40968583ea5511f0aad335b07f80a180d9",
+  "composed_code_commit": "2b8d159db1eab49225b1d1199f2867ba59da17b9",
+  "original_held_candidate": "c0d1e602dc3609fe7eb37688aa2674345db645d5",
+  "reviewed_editing_correction_merged": "a1ad07f9fecdd3ce78a9a80c978d45cfc815e641",
+  "remote_main_verified": "a1ad07f9fecdd3ce78a9a80c978d45cfc815e641",
+  "review_status": "G1 remains open pending focused execution and Astra recheck; no giant main promotion",
+  "implementation": [
+    "Bounded two-entry registry owns the exact PreparedSource Arc before Java invocation and has no drop/cancellation/timeout eviction.",
+    "Pinned-class retiredNative callback confirms exact monotonically unique operation after Java files, foreign charge and slot retire; successful explicit quarantine retry uses the same callback.",
+    "Java finally confirms only an operation absent from active/quarantined Java owners, including failure before acquisition. Failed cleanup does not confirm.",
+    "Native publication requires the read-only retirement receipt, not merely status zero. Unproven JNI attachment, Java exception, cancellation, timeout and unwind retain native source.",
+    "Uncertain attachment or failed retirement notification remains fail-closed/bounded and may require verified recovery/process restart; no force-clear API is added."
+  ],
+  "written_not_run": {
+    "portable_tests": [
+      "closing_native_input_after_uncertain_foreign_exit_preserves_marker_until_retry: seven exit conditions, real PreparedSource close, original/marker survival, 84MiB ownership, simulated exact foreign retry and final zero charge/deletion",
+      "foreign_source_pins_are_bounded_and_confirmation_is_exact: invalid/duplicate IDs, two-entry bound, unknown/repeated callback, independent receipt confirmation"
+    ],
+    "android_device_test": "rootOperationRemainsOwnedUntilSuccessfulQuarantineRetry: actual Java producer ownership/marker/80MiB/slot across failed close and explicit retry; not executed",
+    "cross_jni_runtime": "Not executed; portable foreign owner and retry are synthetic witnesses"
+  },
+  "checks_executed": {
+    "rustfmt_affected": "PASS",
+    "git_diff_check": "PASS",
+    "source_secret_scans": "PASS",
+    "compilers": "NOT STARTED; image owner holds heavy build slot",
+    "test_executions": 0,
+    "binding_generation": 0
+  },
+  "next_validation_after_slot_handoff": [
+    "cargo test --locked -p vw-ffi --lib giant_images::producer::android_bridge::tests -j2 -- --test-threads=1",
+    "cargo clippy --locked -p vw-ffi --all-targets -j2 -- -D warnings",
+    "cargo ndk -t arm64-v8a clippy --locked -p vw-ffi --lib -j2 -- -D warnings",
+    "Fresh Linux/Android native library build, then shared Android main + instrumentation compilation, shared/Desktop/Android unit checks on composed source; retain bounded process receipts",
+    "Verify new retiredNative compiled (J)I descriptor and arm64 export; no UniFFI contract change requires per-commit binding regeneration",
+    "Astra source/receipt recheck before coherent main promotion; actual Android failure/close/retry JNI runtime remains a separate device gate"
+  ],
+  "ownership_boundary": "Image owner retains picked.rs, picked_tests.rs, input.rs and heavy slot; all three files unchanged by this fix",
+  "other_preserved_draft": "cloud/capture-air-verification-draft-20261018 at a5b683d2ab6431e0f8330faecac3cbc5d954f9f5, uncompiled source-only WIP",
+  "hardware_provider_authority": "No device/emulator/provider/signing/deployment/credential actions; no gate passed; no worktree deletion",
+  "source_sha256": [
+    {
+      "path": "apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/giant/AndroidJpegPyramidTest.kt",
+      "bytes": 26275,
+      "sha256": "c24541ab0780e7d3d497cb60a31eb139ab2e82644c129754845b0d6a772ac6c3"
+    },
+    {
+      "path": "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/giant/AndroidGiantRuntime.kt",
+      "bytes": 4538,
+      "sha256": "ab255e056adce036b10212e6642b685d12bbe6d5d94c1468b8f532f37d22ed16"
+    },
+    {
+      "path": "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/giant/AndroidJpegPyramid.kt",
+      "bytes": 36603,
+      "sha256": "afe1753e7b1884860c92859694f940acc46a192c1fc10385974caf4a2bed70bb"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/android_bridge.rs",
+      "bytes": 11354,
+      "sha256": "5d830345896662429952d30220c2167ec3b4806497440e21ebf158cc562ab9af"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/android_bridge/foreign_retirement.rs",
+      "bytes": 2521,
+      "sha256": "e990b49c7acfc76f50368e9f899d3422e6bba9228d9e2a3eca43bdd9511ae0bf"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/android_bridge/jni.rs",
+      "bytes": 15441,
+      "sha256": "b3978afb668aae06663a17e60884f2a7e7f49a095db24b8b6749a4254e988ae5"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/android_bridge/tests.rs",
+      "bytes": 15475,
+      "sha256": "5c57cf931c8762b80f12c0f9c27b89505b37c445887193367bb5950b5ca56437"
+    }
+  ]
+}

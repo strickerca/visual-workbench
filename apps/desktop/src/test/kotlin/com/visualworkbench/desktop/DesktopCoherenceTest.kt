@@ -253,6 +253,30 @@ class DesktopCoherenceTest {
         }finally{f.editor.disconnectSession();withTimeout(5000){f.editor.state.first{!it.busy&&it.sync==null}};sessions.close()}
     }
 
+    @Test fun unconfirmedRotationStaysBlockedAfterRejectedRefreshUntilAnAdmittedSnapshotWithoutReplay()=fixture { f ->
+        f.editor.tool(Tool.Select);f.ready()
+        val before=f.project.current;val reads=f.project.documentReads
+        f.project.afterNextEdit={
+            f.project.staleDocument=before
+            throw CoreFailure(CoreFailureKind.Storage) // Accepted edit, lost delivery.
+        }
+        val token=checkNotNull(f.editor.rotation.begin(Point(30.0,30.0),Point(30.0,2.0)))
+        assertTrue(f.editor.rotation.finish(token,Point(58.0,30.0),false))
+        withTimeout(5000){while(f.editor.rotation.state.value.busy||f.project.documentReads<=reads)yield()}
+        // The controller's automatic refresh fetched the old snapshot while the
+        // native info is newer. Returning without adoption is not reconciliation.
+        assertEquals(ObjectRotationFailure.Unconfirmed,f.editor.rotation.state.value.failure)
+        assertEquals(before,f.editor.state.value.document)
+        assertNull(f.editor.rotation.begin(Point(30.0,30.0),Point(30.0,2.0)))
+        assertEquals(1,f.project.accepted.size)
+        f.project.staleDocument=null;f.project.announce()
+        withTimeout(5000){while(f.editor.state.value.document?.render?.revision?.hostSeq!=before.render.revision.hostSeq+1u||f.editor.rotation.state.value.failure!=null)yield()}
+        assertEquals(1,f.project.accepted.size)
+        f.ready() // Admitted snapshot metadata owners must also settle before input.
+        assertNotNull(f.editor.rotation.begin(Point(30.0,30.0),Point(30.0,2.0)))
+        f.editor.rotation.cancel()
+    }
+
     @Test fun oldPeerOverlayCannotCrossARevisionOrAttachment() {
         val doc=snapshot(7u,"hash-7");val replacement=doc.render.items.single().copy(transform=Transform(e=90.0))
         val peer=PeerFrame(doc.binding(1),4,PeerPreviews(12u,listOf("gesture"),listOf(replacement)))
@@ -320,7 +344,9 @@ private class FixtureProject:WorkbenchProject,WorkbenchDocumentsProject {
     override suspend fun documentOverlays(documentId:String,page:UInt,expected:ProjectInfo):List<DocumentOverlay> = emptyList()
     override suspend fun publishDocumentCopy(documentId:String,destination:String,copy:DocumentExport):String=error("No publication in fixture")
     var current=snapshot(7u,"hash-7");var nextDocumentGate:DocumentGate?=null;var beforeNextEdit:(()->Unit)?=null
-    var beforeClose:(()->Unit)?=null;var lastOptions:EditOptions?=null;private var eventSequence=0uL
+    var beforeClose:(()->Unit)?=null;var afterNextEdit:(()->Unit)?=null
+    var staleDocument:DocumentSnapshot?=null;var documentReads=0
+    var lastOptions:EditOptions?=null;private var eventSequence=0uL
     var strokeFactory:((StrokeOptions)->WorkbenchStroke)?=null
     val accepted=mutableListOf<List<EditCommand>>()
     override val changes=MutableSharedFlow<ProjectChange>(extraBufferCapacity=16)
@@ -329,7 +355,8 @@ private class FixtureProject:WorkbenchProject,WorkbenchDocumentsProject {
     suspend fun announce(){changes.emit(ProjectChange(++eventSequence,ChangeKind.Committed,current.render.revision))}
     override suspend fun info():ProjectInfo=current.render.revision
     override suspend fun document(documentId:String):DocumentSnapshot{
-        val captured=if(pdf)documentPage(documentId,page)else current;val gate=nextDocumentGate;nextDocumentGate=null
+        documentReads++
+        val captured=staleDocument?:if(pdf)documentPage(documentId,page)else current;val gate=nextDocumentGate;nextDocumentGate=null
         if(gate!=null){gate.captured.complete(Unit);gate.release.await();gate.delivered.complete(Unit)}
         return captured
     }
@@ -344,6 +371,7 @@ private class FixtureProject:WorkbenchProject,WorkbenchDocumentsProject {
         val next=current.render.revision.hostSeq+1u
         val transform=commands.filterIsInstance<EditCommand.SetTransform>().lastOrNull()?.transform?:current.render.items.first().transform
         current=snapshot(next,"hash-$next",transform)
+        afterNextEdit?.also{afterNextEdit=null;it()}
         return current.render.revision
     }
     override suspend fun beginStroke(options:StrokeOptions):WorkbenchStroke=strokeFactory?.invoke(options)?:error("not used by fixture")
