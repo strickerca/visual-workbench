@@ -1,207 +1,122 @@
 # T5.04 Android caller handoff — 2026-10-18
 
-**Disposition:** Android local and remote caller candidate wired in source; full
-caller compilation and acceptance remain pending. No installed-app or physical
-user outcome is claimed. The extra remote Dialog grant is resolved. Krita, device
-activity and paid services remain deferred.
+**Disposition:** public Window callback repair for the composed caller candidate;
+review and final application lint remain pending. The earlier composed source
+compiled and passed 151 Android tests. That evidence predates this repair. No
+installed-app, physical S23/S Pen/Bluetooth/Air Actions or A09 outcome is claimed.
+Krita remains deferred.
 
 ## Source and ownership
 
-Frozen caller base: `f661eca9d2f6d6d6ebe4fc31ed2d0a5c6ec095e0`, fetched by full
-SHA before creating `codex/t5-04-air-actions-callers`. Exact grant A, including its additional RemoteEditPanel path, is
-[`CALLER_PARALLEL_GRANTS_20261018.md` at 074b6c6](https://github.com/strickerca/visual-workbench/blob/074b6c603f68f19e137b7d5c0ee0a60f88c8e855/docs/CALLER_PARALLEL_GRANTS_20261018.md).
-Read its full paths/interfaces, AGENTS, current Android callers and accepted
-shared interfaces before editing. There are no repository `.agents/skills`.
+Repair base: `70475b818b2ca5bf02b4a3539fb038c864410d83` on
+`cloud/capture-air-caller-integration-20261018`. Repair branch:
+`codex/t5-04-supported-key-hook`. Read AGENTS, implementation plan/requirements,
+latest checkpoints and `CAPTURE_AIR_CALLER_COMPOSITION_20261018.md`; compare actual
+accepted main and recovered callers before editing. The composed callers match
+reviewed Air source `766d1f2`, `cd3c643`, `cc606a02`, `46df4c4`. The original
+lane-only base/audit remains `f661eca9d2f6d6d6ebe4fc31ed2d0a5c6ec095e0` and
+is not weakened to accept the broader combined tree. No `.agents/skills` exists.
 
-Existing modified paths:
+The coordinator's exclusive Android grant includes MainActivity. This repair
+changes exactly these source/test paths, plus this single handoff:
 
 ```text
 apps/android/src/main/kotlin/com/visualworkbench/android/MainActivity.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorPreferences.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/remote/RemoteEditPanel.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionKeys.kt
-apps/android/src/main/AndroidManifest.xml
-```
-
-New owned leaves and tests:
-
-```text
-apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionCommands.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionBarrelCorrelation.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionRemoteMotion.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionRemoteMotionEvent.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionControls.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionDialogControls.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionPreferences.kt
-apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionViewRestore.kt
-apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionCallerTest.kt
-apps/android/src/test/kotlin/com/visualworkbench/android/airactions/check_caller_source.py
-apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionRemoteMotionContract.kt
-apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionRemoteMotionTest.kt
+apps/android/src/main/kotlin/com/visualworkbench/android/airactions/AirActionWindowKeyHook.kt
+apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionWindowKeyContract.kt
+apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionWindowKeyTest.kt
 apps/android/src/test/kotlin/com/visualworkbench/android/airactions/check_remote_motion.py
 ```
 
-This is the only handoff document changed. No Desktop, shared, native, bindings,
-protocol, Gradle, Cargo, MCP or unrelated Android file changed. Accepted shared
-router SHA-256 remains
-`7dc09b08cbccc73ec6861a3278a3edcc5cf70834f7a5e8a6fdcda5a87d453c04`.
+Controller, CanvasSurface, Dialog callback, remote panel/input source, manifest,
+shared router and dispatcher are byte-identical to the repair base. No Desktop,
+shared/native, generated bindings, build/lock/configuration, permission or MCP
+source changes. No main merge, installation, device access or native rebuild.
 
-## Implemented caller behavior
+## Repair and exact integration hooks
 
-- Activity sends each full KeyEvent once through the accepted `AirActionKeys`
-  before its original fallback. A retained editor owns the existing serial
-  `CommandDispatcher` and accepted `AirActionRouter`; the Activity owns only its
-  callback/timer. Pause, focus loss, replacement and disposal retire presses and
-  queued offers. Activity recreation detaches its timer without closing the
-  retained router; final ViewModel disposal closes it.
-- Touch and hover observe accepted MotionEvent barrel state before the existing
-  PrecisionButtons handler. Its contact ordering, hold clock, peek, click,
-  cancellation and pen-up behavior remain authoritative. No synthetic F keys or
-  second pointer pipeline was added. Ordinary canvas cancellation preserves the
-  observed barrel hold/release correlation; full input/focus loss clears it and
-  resets PrecisionButtons. Native renderer/reader methods are unchanged.
-- The local command guard combines current activity/context tickets with the
-  existing workflow, precision, draft/modal, AI/result, operation/pending, contact,
-  renderer and undo/redo guards. Ownership changes retire tickets synchronously;
-  native remote invalidation also increments the ticket on its calling thread
-  before Main publication. Queued UI controls check ownership and freshness again.
-- All eight safe commands have visible Canvas controls, independently of hardware
-  setup. Lens commands use PrecisionController; tool stepping uses the actual
-  visible EditorTool order, including the selected mask eraser. Undo/redo uses
-  the same native commit helper as existing UI, under the existing mutation lock,
-  and awaits completion. It never treats a detached launched operation as done.
-- Fit/Restore saves the exact borrowed Camera, including rotation, and matches
-  project epoch/document/page/viewport ownership. Intervening navigation and
-  ownership replacement clear it; a second Fit is not substituted for Restore.
-- Settings exposes the accepted setup/remapping panel. Stable gesture/command
-  enum names and explicit null/disabled entries use the existing preference
-  writer and schema, preserving brushes and unrelated settings. Unknown command
-  names disable only that known slot. Support, connection, interference and key
-  observations remain ephemeral. Receiving a key never infers Bluetooth support.
-- MainActivity has exactly one REMOTE_ACTION registration, pointing at the
-  accepted eight-key declaration. The manifest permission set is unchanged.
+MainActivity's `dispatchKeyEvent` override and super call inherited AndroidX
+ComponentActivity's library-group restriction, producing the composed batch's
+three RestrictedApi errors. MainActivity now installs `AirActionWindowKeyHook`
+after `editor.attachAirActivity(...)` and before Compose content. This uses the
+public platform [Window.Callback](https://developer.android.com/reference/android/view/Window.Callback)
+and [Window.setCallback](https://developer.android.com/reference/android/view/Window#setCallback(android.view.Window.Callback))
+contracts. No lint suppression, baseline or cast around a restricted API is used.
 
-## Remote Dialog composition
+The hook sends the same actual KeyEvent once to
+`editor.airActivityKey(airActivityOwner, event)`. Consumed events return immediately;
+unconsumed events call the previous callback exactly once and preserve its
+result/exception. Other Window callbacks delegate unchanged. MainActivity closes
+the hook first in `onDestroy`, then detaches its existing timer and owner. Close
+retires observation even when another callback has chained it and restores the
+previous callback only while it still owns the Window slot.
 
-The coordinator's explicit extra grant at `074b6c6` resolves the earlier path
-blocker. Applied the exact prepared patch: RemoteEditPanel adds one defaulted
-composable slot inside its existing Dialog and passes its exact
-RemoteEditController.palette plus closing/command-busy state. WorkbenchApp wires
-that slot to AirActionDialogControls. Its prior input, lifecycle and retirement
-body is byte-for-byte preserved after removing this one slot call. No new remote
-controller or palette is created, and no existing native owner is replaced.
+Existing pause/resume/focus, retained-router, replacement and disposal guards are
+unchanged. Activity declines remote context; `AirActionDialogControls` continues
+to own the remote Dialog Window with its exact registration token/remote/palette
+references. Its touch/generic-motion observer still retires pending offers on
+contact/cancel/focus loss/detach/replacement and feeds barrel correlation before
+existing input. RemoteSurfaceView -> RemoteEditController.touch is unchanged.
+The stale queued Undo correction remains intact: negative control one stale
+Undo; hooked contact trace zero; fresh idle trace one Undo.
 
-AirActionDialogControls borrows/restores the real Dialog Window.Callback before
-fallback, fences focus and the exact callback/palette owner, and exposes the
-same guarded visible controls. A retired Dialog callback cannot dispatch into a
-replacement palette. Only verified Paint Undo/Redo map remotely; there is no local
-undo fallback, generic key injection, new grant, guessed fit/restore or new tool
-order. Its serial command waits for the palette's actual busy interval to end.
-Six unsupported remote commands remain disabled. The former unapplied patch is
-preserved at `/tmp/vw-air-actions-remote-dialog-hook/remote-dialog-hook.patch` as
-historical preparation evidence; it is now composed in this candidate.
+Existing caller behavior is preserved: closed eight-command mapping and remaps;
+visible safe Canvas controls; explicit setup state without inferring Bluetooth
+from keys; current activity/context/draft/modal/readiness/contact/native-completion
+guards; exact owned Camera restore; current native mutation completion; verified
+remote Paint undo/redo only. The manifest retains one REMOTE_ACTION registration
+and unchanged permissions. No alternative input pipeline or synthetic F keys.
 
-## Astra remote-motion correction
+## Executed evidence and limits
 
-Astra found that a delayed Air Undo could survive pen contact and execute after
-its covering ACK made native commands eligible again. The Dialog callback now
-observes touch AND generic motion before forwarding each original event exactly
-once, preserving the previous delegate result/exception. Read-only snapshots
-contain only tool/pointer/contact/cancel/primary-barrel information; the real
-RemoteSurfaceView and RemoteEditController input source remains unchanged.
-
-Pen-down retires pending/queued Air offers before marking contact active. Air
-commands are refused throughout contact; up/cancel retire again before clearing.
-Barrel observations use the existing correlation/router/timer. Focus, detach and
-replacement retire/clear the observer. Every callback now also carries an exact
-per-Window registration token, so even replacement reusing the same remote/palette
-cannot let an obsolete callback change the new owner's state. Conditional Window
-callback restoration is preserved. Observer failure blocks Air before forwarding.
-
-The new production observer + real AirActionRouter contract contains **17 named
-scenarios**, including the exact 1000 configure, 1001/1002 SwipeLeft, 1010–1040 pen,
-1100 simulated ACK, 1252 advance case (expected zero commands), with an unhooked
-negative control (expected Undo). It also covers queued offers, contact keys,
-cancel/focus/detach/replacement, barrel-remapped click suppression, fresh idle
-Undo, and motion forwarding identity/order/result/exception. Native readiness/ACK
-is a fixture flag, not an actual native or device measurement.
-
-**Authorized focused execution passes all 17/17 scenarios on exact source
-`cc606a0243fe18d2468f8aabab0ceee560c2f907`.** The isolated resource check found a
-16 GiB local memory limit, about 162 MB in use, over 17 GB headroom, and no other
-compiler/build process. Cached jars/SDK are read-only; outputs used a unique
-private temporary directory. Compiler heap was capped at 512 MiB, runtime at
-256 MiB. No Gradle/native build, daemon, installation or shared build/cache writes.
-The standalone command is:
+Focused command (cached compiler, one bounded worker):
 
 ```sh
-python3 apps/android/src/test/kotlin/com/visualworkbench/android/airactions/check_remote_motion.py --tools-root /workspace/.vw-tools --receipt-dir /tmp/vw-air-remote-motion-NEW
+python3 apps/android/src/test/kotlin/com/visualworkbench/android/airactions/check_remote_motion.py --tools-root /workspace/.vw-tools --receipt-dir /tmp/vw-air-key-hook-validation/focused-contracts
 ```
 
-Executed with cached Kotlin **2.4.0**, coroutines **1.9.0**, JVM 21 and `-Werror`;
-the MotionEvent adapter also compiles against API 37. The negative control produces
-**one stale Undo**, the hooked exact timing trace **zero commands**, and fresh
-idle input **one Undo**. All contact/queued/cancel/focus/detach/replacement/barrel
-and exactly-once delegate scenarios pass. Exact command exit codes, source hashes
-and limits: `/tmp/vw-air-remote-motion-executed-r1/receipt.json`; named results:
-`host-contracts.log`; resource/collision evidence:
-`/tmp/vw-air-remote-motion-resource-check.json`. Temporary compiler artifacts were
-disposed and the post-run build-process count is zero.
+**25/25 scenarios pass:** original 17 real-router remote-contact cases plus eight
+new callback cases: consume/fallback order, exact event identity, retired callback,
+original exception propagation, balanced/repeated key deduplication, interrupted
+press and Activity/Dialog ownership. Production Window hook and MotionEvent
+adapter compile against API 37 with warnings denied, cached Kotlin 2.4.0,
+coroutines 1.9.0 and JVM 21. One new JUnit wrapper contains the eight callback
+scenarios; this lane's standalone execution is not the full app JUnit run.
+Receipt and named log: `/tmp/vw-air-key-hook-validation/focused-contracts/`.
+Temporary standalone compiler artifacts were disposed.
 
-Current source hashes (SHA-256):
+**15/15 static comparisons pass**, proving only the stated MainActivity edits,
+attach/install/content and retirement order, and unchanged guarded inputs/shared
+leaves. Receipt: `/tmp/vw-air-key-hook-validation/source-ownership.json`.
+Current SHA-256:
 
-- AirActionRouter.kt: `7dc09b08cbccc73ec6861a3278a3edcc5cf70834f7a5e8a6fdcda5a87d453c04`
-- AirActionRemoteMotion.kt: `6b744bbf7f80c57b28a78fe2f962a61b2ffda9a23d49cd820682a2abc2425a02`
-- AirActionRemoteMotionEvent.kt: `ad8aecb1086f55b9ee8efc9e444aea2742257cc5864aa4e2c060797e39a3da4c`
-- AirActionRemoteMotionContract.kt: `08380de852aa37d6e8b415ced4f7b1537d56e24243640222e7391370bc109932`
+- MainActivity.kt: `1f7b1de6b858baa9445d15c012111dd57053181776f67f0d749cd414e51ccf2c`
+- `bd3ab7f11ad8a18ad28965597b36629fde87b293dfe332e52ee2311bddb24589` — SHA-256 of `AirActionWindowKeyHook.kt`.
+- `a739fdfdf9e3fca43a4f3e310163072ad83985643ff5b1f27f327f0c4a864724` — SHA-256 of `AirActionWindowKeyContract.kt`.
+- AirActionRouter.kt (unchanged): `7dc09b08cbccc73ec6861a3278a3edcc5cf70834f7a5e8a6fdcda5a87d453c04`
 
-The source/ownership audit also passes **113 distinct checks**, including byte
-identity of both real remote-input source files and exact callback-registration
-fences. Receipt: `/tmp/vw-air-remote-motion-source-final.json`. Whitespace and
-staged secret checks pass. This was standalone host execution, not a JUnit runner
-or full Compose/EditorController compilation. Native ACK/input, actual MotionEvent
-framework execution, Android runtime and physical S23/A09 acceptance stay unverified.
+**Focused pinned-AGP RestrictedApi check passes.** An isolated Android app with
+AGP 9.3.1, Kotlin 2.4.20, Activity 1.11.0, Core 1.16.0 and the frozen app's
+resolved-version constraints compiles the byte-identical production hook and a
+minimal Activity install/close caller. The original override/super-call control
+fails with **two RestrictedApi errors** at those two sites; the replacement
+compiles and `lintDebug` succeeds with **zero issues**. This is a RestrictedApi-only
+probe, not full Visual Workbench lint; the composed application reported three
+errors. Probe source/configuration, reports, logs and exact hashes are retained
+under `/tmp/vw-air-key-hook-validation/`; receipt:
+`focused-lint-receipt.json`. No lint baseline/suppression or repository build edit.
 
-## Executed evidence and remaining gates
+Full `:android:lintDebug` cannot run here without absent generated/native/shared
+outputs. Skipping their compilation fails at `:shared:processAndroidMainJavaRes`
+because the KMP compile provider has no completed output. Failure logs and all
+isolated diagnostic attempts remain in `/tmp/vw-air-key-hook-validation/`.
+Empty standalone CLI reports that did not reproduce the original error are
+inconclusive and are not passing lint evidence. No SDK package/license setup,
+full native rebuild or binding regeneration was performed to bypass this limit.
 
-Source-only command:
-
-```sh
-python3 apps/android/src/test/kotlin/com/visualworkbench/android/airactions/check_caller_source.py
-```
-
-The audit passes lexical delimiter, exclusive-path, unchanged-permission,
-one-Activity registration, barrel-order, shared-commit and exact frozen-method
-checks. It confirms preserved giant renderer, document observers, camera/share
-operations and retirement logic; it is not a Kotlin type checker or Android test.
-The earlier caller audit passed **91 distinct source/ownership checks**; source-hash
-receipts are at `/tmp/vw-air-actions-remote-source-final.json`. Whitespace and
-staged-byte Gitleaks checks pass. These counts are static checks, not JUnit cases.
-
-Thirteen new JUnit caller regressions are written for legacy preference migration,
-disabled/remapped values, malformed/unknown command refusal, unrelated preference
-preservation, exact camera restore, stale project/document/page/viewport/navigation
-refusal, barrel correlation across ordinary/full interruption and the closed
-remote mapping. **These thirteen tests have not been compiled or executed in this lane.**
-The first local candidate used source-only validation while the image lane held
-the build slot. After the coordinator reported the slot free, the existing
-bounded leaf checker was rerun: **37/37 host scenarios pass**, strict explicit-API
-shared leaf compilation passes, the current native-Android key adapter/settings
-panel compiles against API 37, and the two declarative resources compile/link.
-This uses cached Kotlin 2.4.0, coroutines 1.9.0, JVM 21 and AAPT2 36.1.0, with
-warnings denied; it is not whole shared/app compilation. Exact commands, source
-hashes and results are in `/tmp/vw-air-actions-callers-leaf-recheck/receipt.json`.
-Temporary compiler/resource artifacts were disposed. No Gradle, native build,
-installation, provider or device activity ran. Existing `/tmp/vw-air-actions-*`
-receipts and preparation drafts remain preserved.
-
-Next: Astra reviews this complete caller source candidate before any main merge.
-The coordinator owns combined repository-pinned Android/shared compilation and
-execution of the thirteen new JUnit checks, followed by actual UI/lifecycle/
-recreation/modal and native completion checks. The new Compose Dialog/caller code
-has not been compiled in this lane. Runtime capability/interference detection,
-S23 stylus/Bluetooth/barrel/Air Actions, A09 and all physical/performance/product
-gates remain unverified.
+Next: Astra review, then the coordinator's affected Android test/lint batch using
+the preserved composed artifacts, under normal coroutine recovery. Previous
+shared 499/499 and Android 151/151 results remain bound to `70475b8`; Desktop's
+separate fixture correction remains its owner's lane. Actual Android callback,
+UI/recreation/modal, native remote ACK/input and physical S23/Bluetooth/A09,
+performance and owner acceptance remain unverified. No product gate is passed.

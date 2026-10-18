@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded actual-router/caller-observer host checks; no Gradle/native/device run.
+"""Bounded actual-router/motion-observer/Window-key checks; no Gradle/native/device run.
 Run only with the coordinator's focused compiler slot or cheap-test authorization.
 """
 import argparse
@@ -33,8 +33,9 @@ def main():
     shared = root / "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared"
     caller = root / "apps/android/src/main/kotlin/com/visualworkbench/android/airactions"
     sources = [shared / name for name in ["AirActions.kt", "AirActionRouter.kt", "EditorSupport.kt"]]
-    sources += [caller / name for name in ["AirActionBarrelCorrelation.kt", "AirActionRemoteMotion.kt", "AirActionRemoteMotionEvent.kt"]]
+    sources += [caller / name for name in ["AirActionBarrelCorrelation.kt", "AirActionRemoteMotion.kt", "AirActionRemoteMotionEvent.kt", "AirActionWindowKeyHook.kt"]]
     sources += [Path(__file__).resolve().with_name("AirActionRemoteMotionContract.kt")]
+    sources += [Path(__file__).resolve().with_name("AirActionWindowKeyContract.kt")]
     commands = []
 
     def run(name, command):
@@ -50,8 +51,9 @@ def main():
             scratch = Path(folder)
             runner = scratch / "RemoteMotionCheck.kt"
             runner.write_text('''import com.visualworkbench.android.airactions.AirActionRemoteMotionContract
+import com.visualworkbench.android.airactions.AirActionWindowKeyContract
 fun main() {
-    val scenarios = AirActionRemoteMotionContract.scenarios()
+    val scenarios = AirActionRemoteMotionContract.scenarios() + AirActionWindowKeyContract.scenarios()
     for ((name, scenario) in scenarios) { scenario(); println("PASS: " + name) }
     println("SCENARIOS=" + scenarios.size)
 }
@@ -63,12 +65,12 @@ fun main() {
                             f"{stdlib}:{coroutines}:{android}", "-d", classes, *sources, runner])
             result = run("host-contracts", [java, "-Xmx256m", "-cp", f"{stdlib}:{coroutines}:{classes}", "RemoteMotionCheckKt"])
             count = int(result.strip().split("SCENARIOS=")[-1])
-        receipt = {"status": "focused remote-motion contracts passed", "compiler": compiler.name,
+        receipt = {"status": "focused motion and Window-key contracts passed", "compiler": compiler.name,
                    "scenarios": count, "commands": commands,
                    "source_sha256": {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
                    "temporary_artifacts_disposed": True,
                    "limits": ["Real router and production observer; native readiness/ACK is a simulated admission flag",
-                              "MotionEvent adapter compiled against API 37; framework methods are not executed",
+                              "MotionEvent adapter and public Window callback compiled against API 37; framework methods are not executed",
                               "No full Compose/EditorController compilation or JUnit runner",
                               "No Android runtime, native input, device/BLE/S23/A09 acceptance"]}
         (output / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
