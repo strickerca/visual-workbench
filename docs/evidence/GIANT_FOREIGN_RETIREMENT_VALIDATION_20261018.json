@@ -1,0 +1,186 @@
+{
+  "date_utc": "2026-10-18",
+  "scope": "G1 focused validation on exact conditionally accepted private producer source, composed with accepted editing correction",
+  "source_commit": "0dca21f54ad740d4529dac57e74c7b4f39edceb8",
+  "fix_code_commit": "181e4a40968583ea5511f0aad335b07f80a180d9",
+  "composed_code_commit": "2b8d159db1eab49225b1d1199f2867ba59da17b9",
+  "review": "Astra conditionally accepted G1 source at 0dca21f; source hashes unchanged during checks. Focused execution conditions now met; parent to reconcile final review/promotion.",
+  "native": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0,
+    "scope": "vw-ffi --lib giant_images::producer::android_bridge::tests, --test-threads=1; two existing plus two new tests, seven unproven-exit conditions inside new close/retry case",
+    "foreign_runtime": "Synthetic foreign owner/retirement; actual native PreparedSource/File/OwnedDirectory and budget used"
+  },
+  "jvm": {
+    "shared": {
+      "tests": 464,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 464,
+      "skipped_cases": []
+    },
+    "desktop": {
+      "tests": 356,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 7,
+      "passed": 349,
+      "skipped_cases": [
+        "com.visualworkbench.desktop.mcp.McpStartupTest.expiredAndFutureOwnerMarkersRetireWithoutStartingService",
+        "com.visualworkbench.desktop.mcp.McpStartupTest.markerDeletionBindsValidatedHandleAndMalformedDataSurvives",
+        "com.visualworkbench.desktop.mcp.McpStartupTest.realWindowsOwnerLockPreventsDuplicateAndReleasesExactly",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realLongWindowsPinsStillRefuseWritesAndReplacement",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.boundedDosParserRefusesOtherNamespacesAndNoncanonicalForms",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.longNativeGuardPathsAreExplicitWithoutChangingTheShortAnchorNamespace",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realWindowsAnchorHandleIsCanonicalAndOrdinaryPinsRemainExactAndExclusive"
+      ]
+    },
+    "android": {
+      "tests": 136,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 136,
+      "skipped_cases": []
+    }
+  },
+  "jvm_total_passed": 949,
+  "jvm_total_skipped": 7,
+  "checks": {
+    "strict_linux_clippy": "PASS vw-ffi all targets, warnings denied",
+    "strict_arm64_clippy": "PASS vw-ffi lib plus dependencies, warnings denied",
+    "fresh_linux_library": "PASS",
+    "fresh_arm64_library": "PASS",
+    "android_alignment": "PASS 16 KiB LOAD alignment",
+    "android_main": "PASS actual compilation",
+    "shared_android_instrumentation": "PASS source compilation, 20 AndroidJpegPyramid cases NOT RUN",
+    "app_android_instrumentation": "PASS source compilation, NOT RUN",
+    "android_lint": {
+      "errors": 0,
+      "warnings": 60,
+      "hints": 12
+    },
+    "private_jni": "PASS compiled retiredNative (J)I and matching fresh arm64 export; four native runtime symbols present",
+    "bindings": "No generation: public UniFFI contract unchanged; both generated sources match previous phase hashes and compile/load with new library",
+    "gradle_licenses": "PASS 264 dependency entries; external pins unchanged",
+    "common_imports": "HOOK-002 PASS",
+    "rustfmt_whitespace": "PASS",
+    "secret_scans": "PASS source/receipt/history before publication"
+  },
+  "no_new_failures": "All first attempts pass. Existing Kotlin expect/actual beta, desktop fixture named-parameter, SDK metrics/cache and Gradle deprecation warnings retained; no setup changes.",
+  "source_sha256": [
+    {
+      "path": "apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/giant/AndroidJpegPyramidTest.kt",
+      "bytes": 26275,
+      "sha256": "c24541ab0780e7d3d497cb60a31eb139ab2e82644c129754845b0d6a772ac6c3"
+    },
+    {
+      "path": "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/giant/AndroidGiantRuntime.kt",
+      "bytes": 4538,
+      "sha256": "ab255e056adce036b10212e6642b685d12bbe6d5d94c1468b8f532f37d22ed16"
+    },
+    {
+      "path": "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/giant/AndroidJpegPyramid.kt",
+      "bytes": 36603,
+      "sha256": "afe1753e7b1884860c92859694f940acc46a192c1fc10385974caf4a2bed70bb"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/android_bridge.rs",
+      "bytes": 11354,
+      "sha256": "5d830345896662429952d30220c2167ec3b4806497440e21ebf158cc562ab9af"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/android_bridge/foreign_retirement.rs",
+      "bytes": 2521,
+      "sha256": "e990b49c7acfc76f50368e9f899d3422e6bba9228d9e2a3eca43bdd9511ae0bf"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/android_bridge/jni.rs",
+      "bytes": 15441,
+      "sha256": "b3978afb668aae06663a17e60884f2a7e7f49a095db24b8b6749a4254e988ae5"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/android_bridge/tests.rs",
+      "bytes": 15475,
+      "sha256": "5c57cf931c8762b80f12c0f9c27b89505b37c445887193367bb5950b5ca56437"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "target/debug/libvw_core.so",
+      "bytes": 213073336,
+      "sha256": "97e46bed8f6f83692b4dd9cb6144f23d5b4d5243dec781c9e6b014825a159406"
+    },
+    {
+      "path": "target/android-jni/arm64-v8a/libvw_core.so",
+      "bytes": 235991696,
+      "sha256": "e37c01db76c856ad81103f86635fb0c1030fb3b67a88d74201dd32e61fe5245c"
+    },
+    {
+      "path": "apps/shared/build/classes/kotlin/android/main/com/visualworkbench/shared/giant/AndroidGiantRuntime.class",
+      "bytes": 5898,
+      "sha256": "139de568b9cbe4c1b2b8249ce8836a3ee8e332cea4b507138624cfbfbec8a7f0"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/core/com/visualworkbench/bindings/core/vw_core.kt",
+      "bytes": 1183328,
+      "sha256": "72f0b0266f8b74beeb8e7f1e615ea1728824ad4e4e856a609a0d3936f7ed9b7b"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/host/com/visualworkbench/bindings/host/vw_host.kt",
+      "bytes": 274624,
+      "sha256": "a26d23de6b9219bd449e0274890469a3199c1406f637fffbf25751f637cc5e5f"
+    }
+  ],
+  "logs": [
+    {
+      "path": "vw-g1-apps-attempt1.log",
+      "bytes": 12227,
+      "sha256": "b2274b7d95d6992614dfcfde624842678a8db71c7649f79d251bb11d1f15b04b"
+    },
+    {
+      "path": "vw-g1-build-android-attempt1.log",
+      "bytes": 269,
+      "sha256": "3ea933c32a46687621ce5ab7248cb546b0390df14094051261dac8e04877f978"
+    },
+    {
+      "path": "vw-g1-build-linux-attempt1.log",
+      "bytes": 1561,
+      "sha256": "aeb40511c353d008b1adecef7a5cce5c6c2c4dd279bee65ec33fba8d371d08e4"
+    },
+    {
+      "path": "vw-g1-clippy-android-attempt1.log",
+      "bytes": 196,
+      "sha256": "228524515dfbf36645213974aa283c8691810c94413fe140793e15a4f07e324c"
+    },
+    {
+      "path": "vw-g1-clippy-linux-attempt1.log",
+      "bytes": 149,
+      "sha256": "8e7c86c0ece773b5ef6f82cb5263b91ac6aa91190c0eaadf80b799f1824ab4a7"
+    },
+    {
+      "path": "vw-g1-jni-descriptors.log",
+      "bytes": 1693,
+      "sha256": "1f347d1713caa71887a6068d41989b07d0031f03f13aa79dccf310e9ed27a59a"
+    },
+    {
+      "path": "vw-g1-jni-symbols.log",
+      "bytes": 369,
+      "sha256": "3942a8e830d38a45be82222ab8454c65a88374f803c1618ea3950c4e6f3f5d4b"
+    },
+    {
+      "path": "vw-g1-native-focused-attempt1.log",
+      "bytes": 887,
+      "sha256": "3adff28b51891a8fca97e075cc596781d87a6ceac693957e40c022a3af0c7067"
+    }
+  ],
+  "remaining": [
+    "Actual Android cross-JNI build/failed cleanup/input-close/retry, codec/GPU retirement and peak memory/performance execution",
+    "Public picked-input/user import/opened-project/rebuild/caller completion",
+    "Windows pinned runtime/Job and physical owner/product gates"
+  ],
+  "worker_boundary": "Picked-input d9fd8a5 fetched only; not composed or credited to this receipt. No edits to its three granted files.",
+  "operations": "No live provider calls, credentials, signing/deployment, SDK installation, emulator/device operations, private captures or old-worktree cleanup. Only synthetic test-owned fixtures; no screenshots."
+}

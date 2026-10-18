@@ -37,3 +37,25 @@ The image worker's picked.rs/picked_tests.rs/input.rs grant is unchanged and non
 of those files was edited. Capture/Air Actions/T5.01 accepted leaves and initial
 picker caller work are preserved on the separate uncompiled a5b683d draft.
 Old worktrees, archives, failed cleanup receipts, providers and devices are untouched.
+
+## Focused validation completed
+
+Astra conditionally accepted the exact 0dca21f source; the seven reviewed source
+hashes remain unchanged. The heavy slot was explicitly released by the image
+owner. All first attempts now pass: four focused native bridge cases run serially,
+strict Linux all-target and arm64 library Clippy, fresh Linux/Android libraries,
+949 composed JVM/unit cases (464 shared, 349 Desktop, 136 Android), with seven
+Windows-only skips. Actual Android main and both instrumentation source sets
+compile; 20 producer instrumentation cases remain unexecuted. Lint remains zero
+errors, 60 warnings, 12 hints; dependency licenses pass.
+
+The actual compiled retiredNative method is private/static/native `(J)I`, and the
+fresh arm64 library exports its exact JNI name. The two existing generated UniFFI
+sources retain their prior hashes and compile/load against the fresh native core;
+no binding generation or public contract change was needed. See
+`evidence/GIANT_FOREIGN_RETIREMENT_VALIDATION_20261018.json` and its execution
+excerpts. These are the focused software conditions for Astra's conditional G1
+acceptance; parent review reconciliation/main promotion remains separate. Actual
+cross-JNI/device/codec/GPU and performance acceptance is still open. Picked-input
+d9fd8a5 was fetched only, awaits its independent review, and is not part of this
+receipt. No provider/device/tooling/authority or old-worktree operation occurred.

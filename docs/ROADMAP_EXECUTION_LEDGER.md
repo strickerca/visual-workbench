@@ -522,11 +522,19 @@ Two new portable tests cover seven exit conditions and exact bounded pins. They
 close the actual native input, assert source/output-marker and 84 MiB ownership
 survive, simulate exact foreign retry, and assert final deletion/zero charge.
 One additional Android case checks actual Java quarantine identity/slot/charge
-tracking. These new tests are WRITTEN, NOT RUN. Only Rust formatting, whitespace
-and source secret scans have run on this correction. The image owner retains the
-heavy build slot and exclusive picked.rs/picked_tests.rs/input.rs lane; root has
-not touched those three files or started a compiler. Focused native/Android
-compilation, runtime evidence and Astra recheck remain pending.
+tracking. Astra conditionally accepted the exact 0dca21f source and all seven
+hashes remain unchanged. After the image owner explicitly released the heavy slot,
+four focused native cases, strict Linux/arm64 Clippy and fresh libraries pass.
+The composed unit batch passes 949 cases with seven Windows-only skips. Actual
+Android main and instrumentation source compile, including 20 producer cases
+that remain unexecuted. Lint remains zero errors/60 warnings/12 hints. Compiled
+retiredNative `(J)I` matches the fresh arm64 export. No binding regeneration:
+both generated sources keep their prior hashes and compile/load with new core.
+Exact software results are in `evidence/GIANT_FOREIGN_RETIREMENT_VALIDATION_20261018.json`.
+Parent must reconcile the conditional review/results before giant main promotion;
+actual Android cross-JNI/codec/GPU/performance and physical gates remain open.
+The image owner's three granted files remain untouched; fetched d9fd8a5 awaits
+its independent review and is not credited to this G1 receipt.
 
 ## Other source-only caller candidates and next dependencies
 
