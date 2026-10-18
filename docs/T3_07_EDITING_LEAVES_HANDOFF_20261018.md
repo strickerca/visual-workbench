@@ -1,10 +1,21 @@
 # T3.07 editing leaves: layers, rotation and tonal controls
 
-Continuation from `88cb9b374c52e8a751879797f8152771f11af6b8`; main was fetched
-again and remains `83663107d864b21d22d2e746b9ca6eb80d47beac`. Recovery remains
+Continuation from `88cb9b374c52e8a751879797f8152771f11af6b8`; initial main
+fetch was `83663107d864b21d22d2e746b9ca6eb80d47beac`. Recovery remains
 `0d91b70558a995fa7654021de7465b1d3f615e3d`. These are source leaves for the
 coordinator's phase composition. No root/controller/build/renderer/precision
 file is edited, and the image owner retains the heavy build slot.
+
+Published continuation source checkpoints are rotation
+`70992320f67d53d9f7b7f187c211f759b700260d` and tonal controls
+`96f7a60a7b7faffa2e07461664749e7107fc33ef` on
+`feat/t3-07-saved-views-navigation`. The final fetch found newer image-owner main
+`6f3e2f3b9ed7a760d4dd7f4c6f26fa44dc5ad88d`. A read-only `git merge-tree
+--write-tree` reports no merge conflicts (combined tree
+`3029acb1e3251d6f5d76311e8b2ccfbc8a2d1a35`). Its changes to the native project
+wrapper/store are additive; the borrowed core/workflow/affine/raster ports used
+here are unchanged. This is source reconciliation, not a combined build pass.
+The coordinator retains the actual integration merge and reserved root edits.
 
 ## Local-view facade checkpoint
 
