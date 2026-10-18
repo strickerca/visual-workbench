@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "status": "source-only; not compiled in this phase; coordinator registration/caller hooks and heavy-slot grant pending",
+  "parent_module_checkpoint": "1d0f2fd4030272db0acb29a47a4d18d1a1fea79e",
+  "preserved_source_commit": "473395197f6437586a8b0c05fa8cd35aa6800441",
+  "integration_source_reviewed": "7be9da7372f686d3d864ed0817fdcdb0833be138",
+  "promoted_dedicated_code_files": 12,
+  "sources": [
+    {
+      "path": "apps/android/src/androidTest/kotlin/com/visualworkbench/android/PrecisionInstrumentedTest.kt",
+      "bytes": 8339,
+      "sha256": "a0da95dd94c8f5ee78190334615c77f2e0221c4fc549dd22287dfea2a1de2cec",
+      "preserved_sha256": "a0da95dd94c8f5ee78190334615c77f2e0221c4fc549dd22287dfea2a1de2cec",
+      "byte_identical": true
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionControls.kt",
+      "bytes": 3387,
+      "sha256": "6eb5deb733837a230eac7c2878686ef47325b3a0638d0ef773d6a34485fe7225",
+      "preserved_sha256": "75c482191038390f3f8021b0c2dd88ddb55d3ac2cf4b92edf6adf79ae95df1e0",
+      "byte_identical": false
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionDrawing.kt",
+      "bytes": 3343,
+      "sha256": "35e2c42ece81a96f05b8848ae1384fcda7670452b9d151295eff071e4b3fb65d",
+      "preserved_sha256": "35e2c42ece81a96f05b8848ae1384fcda7670452b9d151295eff071e4b3fb65d",
+      "byte_identical": true
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionHit.kt",
+      "bytes": 1811,
+      "sha256": "07bceb6d3a53f5d42fc39b5edc8caab7295c3ebb6ccd2b584bda9225bf6cd681",
+      "preserved_sha256": "07bceb6d3a53f5d42fc39b5edc8caab7295c3ebb6ccd2b584bda9225bf6cd681",
+      "byte_identical": true
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionInput.kt",
+      "bytes": 1996,
+      "sha256": "204a2bbb02ab2be0da1c9e91d101b700a5d0fefb06f18ba05e0f1c44a17e651d",
+      "preserved_sha256": "dcb606a83f696d15155485405b26a06a210671799f03432dceba12ec81184489",
+      "byte_identical": false
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/precision/PrecisionControls.kt",
+      "bytes": 3220,
+      "sha256": "ba299bad295976b21b0aefcb3009afa7950633af20a9cc56d1afd0541d5b015a",
+      "preserved_sha256": "a009b8975b25b9c44902240f8b3d3a9a34244d42ed2d576cb6232fee5fa74ccb",
+      "byte_identical": false
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/precision/PrecisionDrawing.kt",
+      "bytes": 2120,
+      "sha256": "88023fa0c76fa6328e7f3761f8ef729800136482c4e5f330a94347b4cdb7fe84",
+      "preserved_sha256": "88023fa0c76fa6328e7f3761f8ef729800136482c4e5f330a94347b4cdb7fe84",
+      "byte_identical": true
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/precision/PrecisionHit.kt",
+      "bytes": 1023,
+      "sha256": "816846eeca776c4863b56fb79de47dd7f03d958b7116c3892a8c5e39cba27d35",
+      "preserved_sha256": "816846eeca776c4863b56fb79de47dd7f03d958b7116c3892a8c5e39cba27d35",
+      "byte_identical": true
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopPrecisionTest.kt",
+      "bytes": 4369,
+      "sha256": "bcf9cbcf9bbcfba9ff3f40e691fdbfd84ab394e43ae4f6fc2fc9999b3fd7766c",
+      "preserved_sha256": "bcf9cbcf9bbcfba9ff3f40e691fdbfd84ab394e43ae4f6fc2fc9999b3fd7766c",
+      "byte_identical": true
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativePrecision.kt",
+      "bytes": 2542,
+      "sha256": "2082be9bf46e965f235a0cf8f7ef6848324e89aa12dd761635c2b2568e19ed0e",
+      "preserved_sha256": "2082be9bf46e965f235a0cf8f7ef6848324e89aa12dd761635c2b2568e19ed0e",
+      "byte_identical": true
+    },
+    {
+      "path": "core/crates/vw-ffi/src/precision.rs",
+      "bytes": 5299,
+      "sha256": "42733305a2904dab97a43a56cd42af92dbed4ebf439728c450fdb18c20fe11af",
+      "preserved_sha256": "2ffade145e6551c25657ac7c76b0841f627392dc007cf2d8b743b743d44540f9",
+      "byte_identical": false
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/precision.rs",
+      "bytes": 6701,
+      "sha256": "68db00fab3ed328d23d0d68289aa996431c321b6413eabd09e2fb097c3628db8",
+      "preserved_sha256": "5172b41e69b50152f00bdc3b9ec478f1385b3767c6fd14f8df5be4d55b404bc5",
+      "byte_identical": false
+    }
+  ],
+  "written_tests_promoted_this_phase": {
+    "native": 8,
+    "desktop": 5,
+    "android_instrumentation": 9,
+    "executed_this_phase": 0
+  },
+  "active_written_precision_cases": 51,
+  "cheap_checks": {
+    "rustfmt": "pass",
+    "common_import_guard": "pass",
+    "no_new_dependencies": true,
+    "no_coordinator_owned_controller_main_workbenchapp_registration_protocol_manifest_changes": true
+  },
+  "heavy_slot": "documents lane; no compilation started",
+  "limits": [
+    "Native module intentionally awaits coordinator registration",
+    "Android CanvasScene fields/renderer filter and real input/UI callers await coordinator",
+    "Prior 42-pass result is historical; no new compilation claim",
+    "Nine Android runtime cases and physical calibration/acceptance pending",
+    "No gates or requirements marked passed"
+  ]
+}
