@@ -4,12 +4,14 @@ mod archive;
 mod blobs;
 mod cache;
 mod database;
+mod local_views;
 mod migrations;
 mod projections;
 pub use archive::*;
 pub use blobs::*;
 pub use cache::*;
 pub use database::*;
+pub use local_views::*;
 
 /// Storage errors expose categories without captured text or private paths.
 #[derive(Debug, thiserror::Error)]
