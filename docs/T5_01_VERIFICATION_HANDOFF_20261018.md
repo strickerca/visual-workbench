@@ -1,85 +1,116 @@
-# T5.01 verification loop: dependency handoff, 2026-10-18
+# T5.01 verification leaves and admission, 2026-10-18
 
-**Disposition: no product-source change; existing result Compare is reused.**
-Integration owner: `01a14eea-d204-762c-94b8-f07105b5001e`. This lane owns only
-this file. No manifests, lockfiles, schemas, generated bindings, FFI registration,
-controllers, app roots, giant-image or T3.07/T3.11 leaves were changed.
+Integration owner: `01a14eea-d204-762c-94b8-f07105b5001e`.
+Baseline queried/fetched before implementation: remote main and checkout both
+`6f3e2f3b9ed7a760d4dd7f4c6f26fa44dc5ad88d`. Compared recovery
+`0d91b70558a995fa7654021de7465b1d3f615e3d` and tip
+`473395197f6437586a8b0c05fa8cd35aa6800441`, including stream-finish package/inbox
+postimages. No T5.01 implementation was found there; saved-frame provenance is
+not a package-to-retained-target relation. Read AGENTS, the v2 plan/requirements,
+latest checkpoint/ledger and lane admission. `/workspace/.agents` is empty.
+Existing `submit_result`, immutable inbox and `McpComparePanel` are preserved.
 
-## Compared sources
+## Exact ownership and delivered code
 
-Remote `refs/heads/main` was queried and fetched before this decision:
-`6f3e2f3b9ed7a760d4dd7f4c6f26fa44dc5ad88d`, exactly the starting checkout.
-Read `AGENTS.md`, v2 requirements/specification/plan, the latest roadmap ledger,
-M4 checkpoint and giant-producer/following-lane admission. `/workspace/.agents`
-is empty; the repository has no `.agents/skills` directory. T5.01's plan
-dependency remains T4.09; the resumed software scope does not pass that gate.
+Only these additive leaves/artifacts and this handoff are owned:
 
-Inspected recovery commit `0d91b70558a995fa7654021de7465b1d3f615e3d` and fetched
-recovery tip `473395197f6437586a8b0c05fa8cd35aa6800441`, including the manifest
-and relevant `transport/t3-stream-finish/after` package, inbox and shared API
-postimages. No dedicated T5.01 implementation was found. Recovered
-`PackageInfo.captureProvenanceJson` / `Capture.stream_save` adds saved-frame
-provenance; it does not supply the package-to-selected-window relation or a
-verification alignment/review receipt. No recovered postimage was overlaid.
+- `apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/`:
+  `McpVerificationTargets.kt`, `McpMarkerAssessments.kt`,
+  `McpSemanticMarkerAlignment.kt`.
+- `tools/tests/T501VerificationLeafProbe.kt` and
+  `tools/tests/test_t501_verification_leaves.py`.
+- `integration/t5-01/private-recapture-owner.patch` and
+  `integration/t5-01/verification-origin-admission.patch`, **unapplied**.
 
-## Actual coverage and the narrow dependency
+No existing product source, manifests/locks, controllers, app roots, schemas,
+registration, generated bindings, or other workers' leaves were edited.
 
-| Requirement | Existing implementation / missing behavior |
-| --- | --- |
-| AGENT-006 | `mcp/src/server.mjs` already implements `submit_result`; `DesktopMcpCoordinator.submitResult` persists an exact package/hash-bound inbox receipt. `McpComparePanel.kt` displays literal text or immutable Before/After regions. Reuse this path; source coverage is not fresh hardware acceptance. |
-| VERIFY-001 | `NativeMcpCaptureEngine` already retains `selector -> CaptureTarget` and calls `CaptureService.refreshTarget(selected)` before capture. The native target includes HWND, PID and process creation time. There is no retained relation from the original published package/hash to that selector. Each compile creates a fresh capture/project/package. The public manifest's `Capture` has session/frame metadata, not this private target relation. A caller choosing a selector anew cannot prove it is the original package's target. |
-| VERIFY-002 | Package marker bounds, crop mappings and semantic references already exist. Inbox `pixels` reads bounded regions; its Before is the package's compiled clean image. Compare currently takes manual X/Y within the shared extent. There is no registration transform, correspondence receipt or per-marker aligned pair. Equal extents do not establish alignment. Semantic `eid` values are snapshot-prefixed (`vw-semantics/src/snapshot.rs`); matching raw EIDs between fresh snapshots is insufficient. |
-| VERIFY-003 | No owner pass/fail persistence or failure-only package operation was found. `vw-package/src/verify.rs::from_compiler` requires contiguous marker numbers `index + 1` and matching image/crop names. Simply deleting passed markers breaks verification; silently renumbering loses original references. `Manifest`/`Extensions` reject unknown fields and currently have no typed follow-up origin mapping. |
-| VERIFY-004 | The six registered tools are `list_packages`, `get_package`, `get_marker`, `get_semantic`, `capture_window`, `submit_result`. `McpOwnerActions` and the host owner/request dispatcher support capture/submission only. There is no recapture/comparison callback to register. Preserve `Grants.admit`, the exact principal/selector boundary, indicator acknowledgement, cancellation settlement and publication drain. |
+## Three concrete links
 
-The immediate blocker is the missing **private original-package-to-target and
-review receipt contract**, not missing hardware evidence. Implementing a second
-capture service, accepting an agent-supplied alignment boolean, or inventing a
-parallel failures format would bypass the existing owners. This lane therefore
-returns a dependency finding rather than unregistered speculative scaffolding.
+**1. Original package to retained target.** `McpVerificationTargets` consumes the
+existing `PackageInfo` / `WorkflowBinding`; it stores only an opaque selector.
+The native/picker owner remains the sole owner of its exact target. Picker thread
+`01a15080-f8b9-7495-9194-b33660abf005` needs only this private hook:
+`rememberCapture(info: PackageInfo, selector: String)` after the exact capture
+settles. No shared target model, OS handle or public selector field is needed.
+`rememberPackage(info)` binds later marked revisions of the same project,
+document and source asset. `begin(info)` yields a session-only ticket; root must
+use its selector through the existing grant/indicator/joined-cancellation path.
+`complete(ticket, afterInfo)` associates that exact completed route, **not image
+alignment**. Changed full bindings, ambiguous source routes, retirement, foreign
+or consumed tickets, close and capacity limits refuse. Retiring an original
+invalidates pending tickets without prematurely releasing their admission.
 
-## Exact integration hooks needed to resume
+The unapplied `private-recapture-owner.patch` adds those calls plus
+`recaptureOriginal(session: String, original: PackageInfo)` to the existing
+coordinator. It factors the current capture body into `captureInside`, preserving
+its ownership/grant checks, and invalidates before unpublish. Both patches pass
+`git apply --check` against the baseline; neither postimage is compiled.
 
-1. Integration must retain the exact published `(package ID, target, manifest
-   SHA-256, WorkflowBinding, source asset)` to the existing private selector and
-   selected `CaptureTarget`, with retirement/service-close behavior defined.
-   Reuse `NativeMcpCaptureEngine.compile`, `CaptureService.refreshTarget` and
-   `DesktopMcpCoordinator.capture`'s grant/indicator/owned-work path. Do not put
-   HWND/PID or another device identity into the public package. An unavailable
-   original selection must refuse rather than use the foreground window.
-2. Admit a source-bound before/after review receipt and its alignment/crop
-   representation, using existing package mappings, semantic data and
-   `WorkbenchMcpInbox.pixels` where applicable. Bind owner assessments to that
-   exact pair and original marker numbers; missing or ambiguous correspondence
-   remains unresolved. A returned agent PNG alone carries no capture proof.
-3. Decide the compatible origin-reference representation before failure-only
-   compilation. Preserve `Package::from_files` validation and existing
-   compile/catalog publication APIs; do not relax contiguous numbering or replace
-   the compiler. Integration owns any schema/DTO/FFI registration and the new
-   `McpOwnerActions`/host-dispatch/tool registration. A subsequent independent
-   leaf lane can then test alignment refusal, stale review edits, explicit owner
-   verdicts and failed-subset original-number references against those contracts.
+**2. Aligned marker correspondence and owner assessment.** Read `semantic.json`
+with existing `WorkbenchPackageCatalog.readFile(id, target, manifestSha256,
+"semantic.json", 16 MiB)`. `McpAlignmentSnapshot.fromCheckedPackage(info, bytes)`
+uses existing `McpJson` and `SemanticElement` records without inventing the
+collection timing omitted from exports. No snapshot returns unresolved.
+`alignMcpMarker(recapture, originalNumber, markerBounds: Rect,
+anchor: SemanticReference, before, after)` returns paired canonical Rects only
+for a unique stable-ID translation across the exact bindings/platform. Source
+and destination duplicate IDs, absent IDs, clipping, resized elements or stale
+bindings refuse/unresolve. Names/text and raw snapshot-local EIDs are never
+matching evidence. This supplies semantic translation; image registration is
+still pending. Root must apply the verified package overview mappings and check
+pixel bounds before using existing inbox `pixels` (maximum 512 by 512).
 
-## Checks and remaining gates
+`McpMarkerAssessments.open(original: PackageInfo, receipt: McpInboxReceipt)` uses
+an existing exact image-return receipt. `snapshot` / `record(snapshot, number,
+verdict, note)` fence the immutable pair and review version. `failures(snapshot)`
+returns original failed numbers; pending markers refuse, all-pass returns null.
+`checkCurrent(selection)` rejects an older selection after any owner change.
+Notes are literal, byte/total bounded and excluded from routing/lineage. These
+are session-only manual decisions; durable review persistence and UI wiring
+remain unimplemented. The leaf never infers an owner verdict or alignment.
 
-Ran the existing focused suites with the saved pinned Node `v24.21.0`:
+**3. Failures selection to existing compiler.** `McpFailureSelection` is a private
+input selection, not a package format. The minimal admission patch proposes
+optional `Extensions.verification_origin` with these exact fields:
+`original_package_id: Id`, `original_target: String`,
+`original_manifest_sha256: String`, `comparison_receipt_id: Id`,
+`comparison_receipt_blake3: String`, `original_marker_numbers: Vec<u32>`.
+Entry n maps follow-up marker n+1 to the original number. The patch initializes
+None for unchanged compilation, bounds preflight allocation and validates hashes,
+target, nonempty/unique numbers and the mapping count. It does not loosen current
+contiguous marker numbering. Root admission is needed before the next native
+leaf can attach checked lineage to normal compiler output and reuse
+`Package::from_files` validation. Final failure-package compilation is not done.
+The existing schema's `extensions` object is already an extension point; native
+Extensions currently rejects unknown fields. No schema file was changed.
 
-```text
-timeout --signal=TERM --kill-after=5s 60s \
-  /workspace/.vw-tools/node-v24.21.0-linux-x64/bin/node --test \
-  test/bounds.test.mjs test/packages.test.mjs test/protocol.test.mjs
-24 passed; 0 failed, cancelled or skipped; exit 0.
-```
+Minimal MCP owner callback admission: `verification_recapture(session,
+package_id, target, manifest_sha256)` resolves the private retained route and
+returns original/recaptured package identities. A comparison callback accepts
+those original identity fields plus `receipt_id`, `receipt_blake3`, `n`; it must
+recheck the same existing selector grant and return the checked correspondence /
+bounded crops or unresolved. No agent selector, grant minting or verdict setter
+is needed. Root retains host dispatch, tool registration and public DTO decisions.
 
-These are offline/synthetic boundary regressions, including authenticated
-loopback HTTP and both MCP protocol eras. No new tests or product code were
-needed for this dependency-only result. No heavy build slot was granted or used;
-Rust/Kotlin compilation, Windows recapture, phone capture, alignment quality,
-owner per-marker review/follow-up and A30 end-to-end were not run. Requirements,
-pass/fail targets and gates are unchanged. No verification images were created;
-there are none to dispose. Existing drafts and recovery evidence are preserved.
+## Results and remaining acceptance
 
-Next: integration resolves the three hooks, then resume T5.01 (L). The plan lists
-gpt-6-astra/max; this delegated session uses the inherited settings without an
-override, and its exact model/effort is not exposed by a session inspection tool.
-Krita remains deferred.
+`python3 tools/tests/test_t501_verification_leaves.py`: **20 cases pass**.
+It compiles the three leaves and existing McpJson with the cached Kotlin 2.4.0
+compiler, warnings denied, against exact unmodified production DTO declaration
+slices. This is a bounded leaf test, not a Gradle build or pinned app-toolchain
+receipt. Temporary classes/type slices are disposed. The first run exposed an
+unnormalized malformed-UTF-8 note exception; fixed refusal then passed all cases.
+Previously run pinned Node 24.21.0 MCP bounds/packages/protocol suites: **24 pass**.
+
+No heavy slot was granted/used. Both root patches are unapplied and uncompiled;
+full Kotlin/native builds, durable review storage, pixel crop/UI composition,
+MCP registration, final failure-package publication, Windows/phone recapture,
+image-registration quality and A30 hardware/owner acceptance are unrun. No new
+user-visible flow is wired yet. Requirement targets/statuses and gates remain
+unchanged. No verification images were created. Existing drafts/evidence remain.
+
+Next decision: admit the two narrow patches and assign the follow-up native
+lineage leaf; coordinator/picker composition can proceed independently. T5.01 is
+L (plan: gpt-6-astra/max); inherited session settings were not changed. Krita
+remains deferred.

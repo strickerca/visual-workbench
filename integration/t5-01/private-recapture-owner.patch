@@ -1,0 +1,74 @@
+--- a/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/DesktopMcpCoordinator.kt
++++ b/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/DesktopMcpCoordinator.kt
+@@ -41,6 +41,7 @@
+     private val active=LinkedHashMap<Job,String?>()
+     private val stopped=CompletableDeferred<Unit>()
+     private val catalogGate=Mutex();private val inboxGate=Mutex();private val captureGate=Mutex()
++    private val verificationTargets=McpVerificationTargets()
+     private val grantGate=Mutex()
+     private val controls=LinkedHashMap<String,Deferred<Unit>>()
+     private var batchControl:Deferred<Unit>?=null
+@@ -83,6 +84,7 @@
+     private suspend fun publishInside(value:WorkbenchCompiledPackage,beforeExpose:suspend()->Unit={}):PublishedPackage = catalogGate.withLock {
+         require(key(value.info.packageId,value.info.target) !in mutable.value.retiring)
+         val saved=catalog.publish(value)
++        verificationTargets.rememberPackage(saved.info)
+         mutable.update{state->state.copy(packages=(state.packages.filterNot{it.info.packageId==saved.info.packageId&&it.info.target==saved.info.target}+saved),sendPreview=null)}
+         beforeExpose();connection.publish(Path.of(saved.directory),saved.info.manifestSha256)
+         saved
+@@ -97,7 +99,7 @@
+     }
+     suspend fun retirePackage(selected:PublishedPackage)=owned {
+         val itemKey=key(selected.info.packageId,selected.info.target)
+-        catalogGate.withLock{mutable.update{it.copy(retiring=it.retiring+itemKey,sendPreview=null)}}
++        catalogGate.withLock{verificationTargets.retire(selected.info);mutable.update{it.copy(retiring=it.retiring+itemKey,sendPreview=null)}}
+         // Do not hold catalogGate while draining callbacks: an unrelated capture
+         // callback may be publishing, and must settle before this receipt.
+         connection.unpublish(selected.info.packageId,selected.info.target,selected.info.manifestSha256)
+@@ -210,7 +212,28 @@
+     }
+     fun indicatorDrawn(id:String) { synchronized(lifecycle){indicator?.takeIf{it.first==id}?.second?.complete(Unit)} }
+     override suspend fun capture(session:String,selector:String):McpCaptureReceipt=owned(session) {
+-        captureGate.withLock {
++        captureInside(session,selector)
++    }
++    /** Private owner callback: callers resolve the original through the checked
++     * catalog first. The ticket supplies a retained selector, never a new target.
++     * This association does not establish semantic/image alignment. */
++    suspend fun recaptureOriginal(session:String,original:PackageInfo):McpVerificationRecapture=owned(session) {
++        val ticket=verificationTargets.begin(original)
++        try {
++            checkGrant(session,ticket.selector);verificationTargets.checkCurrent(ticket)
++            val receipt=captureInside(session,ticket.selector)
++            val after=catalogGate.withLock {
++                require(key(receipt.packageId,receipt.target) !in mutable.value.retiring)
++                val matches=catalog.list().filter{it.info.packageId==receipt.packageId && it.info.target==receipt.target}
++                require(matches.size==1);val found=matches.single()
++                catalog.lookup(found.info.packageId,found.info.target,found.info.manifestSha256)
++            }
++            checkGrant(session,ticket.selector)
++            verificationTargets.complete(ticket,after.info)
++        } finally {verificationTargets.abandon(ticket)}
++    }
++    private suspend fun captureInside(session:String,selector:String):McpCaptureReceipt {
++        return captureGate.withLock {
+             checkGrant(session,selector)
+             val id=UUID.randomUUID().toString();val drawn=CompletableDeferred<Unit>()
+             synchronized(lifecycle){indicator=id to drawn}
+@@ -218,7 +241,7 @@
+             try {
+                 withTimeout(2_000){drawn.await()};checkGrant(session,selector)
+                 val compiled=captureEngine.compile(selector){checkGrant(session,selector)}
+-                try { checkGrant(session,selector);val published=publishInside(compiled){checkGrant(session,selector)};checkGrant(session,selector)
++                try { checkGrant(session,selector);verificationTargets.rememberCapture(compiled.info,selector);val published=publishInside(compiled){checkGrant(session,selector)};checkGrant(session,selector)
+                     McpCaptureReceipt(published.info.packageId,published.info.target,true,true)
+                 } finally {withContext(NonCancellable){compiled.close()}}
+             } finally {
+@@ -257,6 +280,7 @@
+             var failure:Throwable?=null
+             suspend fun settle(body:suspend()->Unit){try{body()}catch(error:Throwable){if(failure==null)failure=error}}
+             val jobs=synchronized(lifecycle){grants.clear();grantAdmissions.clear();publishGrants();active.keys.toList()+controls.values.toList()+listOfNotNull(batchControl)};jobs.forEach{it.cancel()};jobs.joinAll()
++            verificationTargets.close()
+             settle{connection.close()};settle{captureEngine.close()};settle{inbox.close()};settle{catalog.close()}
+             scope.cancel();mutable.update{it.copy(agents=emptyList(),grants=emptyList(),activeCapture=null,closed=true)}
+             val error=failure;if(error==null)stopped.complete(Unit)else stopped.completeExceptionally(error)
