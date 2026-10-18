@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "leaf source recovered/adapted; helper harness passed; real native ABI and caller validation await coordinator seams",
+  "status": "source checkpoint composed with coordinator seams; provenance repair prepared; actual native validation queued behind document heavy slot",
   "contract_commit": "6dcdcdfde4acdba76c710c16187e19d3f4489d4a",
   "contract": "docs/RECOVERY_CALLER_ASSIGNMENTS_20261018.md",
   "preservation_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
@@ -9,7 +9,7 @@
       "path": "core/crates/vw-ffi/src/format_images.rs",
       "candidate": "desktop/t3-formats/new/core/crates/vw-ffi/src/format_images.rs",
       "preserved_sha256": "7460171b3171966c24839bd0f5ceb20d78b286ccd646cbcd9fd1094d2b3fb577",
-      "current_sha256": "cc7ceddad6b58676630147b4c935354b12f98f5e1b273dad415703192c740825"
+      "current_sha256": "efc15e102c31b3fd3e4a94e014567bd2d7dee2ea7dbddaa5c717100ea9338bf9"
     },
     {
       "path": "core/crates/vw-ffi/src/avif_images.rs",
@@ -27,7 +27,7 @@
       "path": "core/crates/vw-ffi/tests/ordinary_formats.rs",
       "candidate": "desktop/t3-formats/new/core/crates/vw-ffi/tests/ordinary_formats.rs",
       "preserved_sha256": "08f35495bd4bb8baa6da0f077fb9d480980917ee76a71f5379368fc57049b3ec",
-      "current_sha256": "b1572cac49eec85108a2ed8914f45bd36215d670ed1e492d5ba56cc0daa72826"
+      "current_sha256": "698e274ed358afe63f681f2b7bc09138f19611f4bf288075fb63b7249b4152d3"
     },
     {
       "path": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
@@ -100,7 +100,8 @@
   "source_checks": {
     "rustfmt": "passed for new Rust source/tests",
     "git_diff_check": "passed",
-    "preservation_hashes": "11 assigned preserved files verified before recovery"
+    "preservation_hashes": "11 assigned preserved files verified before recovery",
+    "provenance_staged_gitleaks": "passed: 6 explicit text files, 81887 bytes, no leaks; no native build started"
   },
   "focused_harness": {
     "compiler": "Kotlin 2.4.20, strict explicit API, JVM17, one backend worker; JVM capped at 512 MiB/2 processors",
@@ -133,11 +134,15 @@
     },
     {
       "path": "core/crates/vw-ffi/tests/ordinary_formats.rs",
-      "cases": 9
+      "cases": 11
     },
     {
       "path": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
       "cases": 8
+    },
+    {
+      "path": "core/crates/vw-formats/tests/provenance.rs",
+      "cases": 4
     }
   ],
   "written_kotlin_cases": [
@@ -172,13 +177,14 @@
     "The new Linux public-import regression uses an admitted structural AVIF fixture without tile entropy to verify typed missing codec before project publication; it is not a decoder fidelity test."
   ],
   "remaining_limits": [
-    "New Rust adapters are not registered or typechecked in the active crate yet; root preparation/enums/error/registration seams are absent at this source checkpoint.",
-    "24 written Rust caller/preparation/adapter cases and 12 Kotlin platform/instrumented cases await actual root wiring; 16 standalone helper harness cases are a separate count.",
+    "Coordinator production preparation/enums/error/registration seams are now composed at 5cecb8343ed5442a6646b402295c06c850fee3d8 plus file-import codec error repair bf0d5f4b067aa0f255097a0fa56a1979d4234d73; these callers have not been compiled or executed in this lane.",
+    "30 written Rust caller/preparation/adapter/provenance cases and 12 Kotlin platform/instrumented cases await actual production validation; 16 passed standalone helper harness cases remain a separate historical count.",
     "No Android SDK build, instrumentation, emulator, Windows WIC execution, real AVIF entropy fixture, app caller, picker/provider or generated-binding ABI validation occurred in this phase.",
     "Restricted Android AVIF remains opaque 8-bit identity orientation, no ICC and declared sRGB only; unsupported HDR/multiframe/alpha/transforms never fall back to generic decoding.",
-    "No giant image routing, blob transfer, GPU/performance or product acceptance is claimed; preceding 55 module + 5 R164 tests are historical evidence, not new adapter coverage."
+    "No giant image routing, blob transfer, GPU/performance or product acceptance is claimed; preceding 55 module + 5 R164 tests are historical evidence, not new adapter coverage.",
+    "BMP intake/raw codec remains supported, but application BMP exports are refused because no compatible bounded standalone CORE-006 provenance carrier is admitted; coordinator must gate BMP preflight and selection."
   ],
-  "heavy_slot": "Not acquired for this leaf phase; coordinator/document lane can use it until native root seams are composed.",
+  "heavy_slot": "Documents remains owner per parent; no native compilation started for this caller phase.",
   "verification_images_created": 0,
   "publication": {
     "kind": "reviewed source checkpoint; not acceptance or promotion",
@@ -197,5 +203,72 @@
     "CoreError::ImageCodecUnavailable and shared CoreFailureKind.ImageCodecUnavailable retain the missing-codec distinction",
     "Native project facade: originalFormatInfo(binding: WorkflowBinding): OriginalFormatInfo delegates originalFormatInfoNative(handle, binding)",
     "Platform helper calls: encoding.exportMimeType(), encoding.exportFileSuffix(), encoding.acceptsFileSuffix(suffix: String)"
-  ]
+  ],
+  "current_seam_review": {
+    "commit": "bf0d5f4b067aa0f255097a0fa56a1979d4234d73",
+    "merged": "fast-forward; no reserved file edits by image owner",
+    "native_prerequisites": "present in source; not yet compiled in this lane",
+    "confirmed_reserved_defect": {
+      "path": "core/crates/vw-ffi/src/streaming_ffi.rs",
+      "location": "impl From<TransferError> for CoreError",
+      "issue": "TransferError::ImageCodecUnavailable falls through to CoreError::Raster on file import.",
+      "requested_fix": "Add TransferError::ImageCodecUnavailable => Self::ImageCodecUnavailable to that shared conversion.",
+      "owned_regression": "ordinary_formats::avif_missing_codec::admitted_avif_file_import_keeps_the_typed_missing_codec_failure",
+      "executed": false,
+      "resolution": "Parent supplied bf0d5f4b067aa0f255097a0fa56a1979d4234d73; fetched and fast-forwarded without editing reserved mapper."
+    },
+    "prepared_checks": [
+      "Actual public memory/file/attachment/export/notice/lifecycle Rust callers with real vw_core and vw_raster crates.",
+      "Build exact current Rust unit artifact and run format_images, avif_images and streaming_ffi::format_seek_tests filters.",
+      "Existing raster display and ordinary-format legacy cases after shared preparation extraction.",
+      "Owned leaf clippy with warnings denied and final source scans after source fixes."
+    ],
+    "slot": "documents owns heavy slot; no compilation started during preparation"
+  },
+  "provenance_repair": {
+    "requirement": "docs/REQUIREMENTS.json CORE-006: exported file metadata includes revision and source asset hash; capture session/frame when applicable",
+    "status": "source-reviewed, formatted, not compiled or executed",
+    "api": "vw_formats::encode_to_with_metadata(&DecodedImage, ExportFormat, Limits, &str, &mut dyn WriteSeek, &dyn Fn()->bool) -> Result<ExportReceipt>",
+    "carrier": "TIFF 6.0 ImageDescription tag 270, ASCII type 2 with terminating NUL; 16 KiB ASCII payload cap, no embedded NUL; sorted IFD, unchanged ICC/samples",
+    "metadata": "Existing serialized vw_raster::ExportMetadata, bound to actual source and revision. Source/revision/capture fields must match finalized file result. Internal workspace budget may differ from the root caller policy receipt because the shared streaming seam replaces returned settings after encoding.",
+    "memory": "Three bounded metadata copies plus IFD storage fit inside the already charged 64 MiB TIFF metadata/workspace reserve; encoded output includes tag/header bytes in existing output cap.",
+    "bmp": "No admitted standard BMP carrier preserving exact ICC; application adapter refuses before write/publication. Raw codec primitive and intake remain supported. Root preflight/selection gating belongs to coordinator.",
+    "tests_written": [
+      "normal pinned TIFF decoder reads tag and exact 8/16-bit samples; own decoder preserves exact ICC/pixels",
+      "maximum 16 KiB payload, multiple strips and short last strip, output byte cap",
+      "empty, non-ASCII, NUL and oversized metadata rejected before writes",
+      "BMP and cancelled TIFF rejected before writes",
+      "buffered real adapter output parses original/revision/capture session/max-u64 frame from bytes",
+      "finalized public TIFF file parses source/revision at both depths and verifies finalized hash",
+      "public BMP memory/file exports fail without publishing output or leaving scratch",
+      "admitted AVIF file import retains typed codec-unavailable failure"
+    ],
+    "references": [
+      "https://www.itu.int/itudoc/itu-t/com16/tiff-fx/docs/tiff6.pdf",
+      "https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-bitmapv5header"
+    ],
+    "files": [
+      {
+        "path": "core/crates/vw-formats/src/lib.rs",
+        "sha256": "0e4f217ff5109f64fdbefe14a9985d1363889e4705905c02e143598d09a24541"
+      },
+      {
+        "path": "core/crates/vw-formats/src/tiff.rs",
+        "sha256": "972e2083a00b886ad4e0a90f02aabde492472e187ca16f3a13cd30e661232339"
+      },
+      {
+        "path": "core/crates/vw-formats/tests/provenance.rs",
+        "sha256": "3953a689063f07a0e35a9f0faf552de481b6cba1376bd2826b058af1905c7d8e"
+      },
+      {
+        "path": "core/crates/vw-ffi/src/format_images.rs",
+        "sha256": "efc15e102c31b3fd3e4a94e014567bd2d7dee2ea7dbddaa5c717100ea9338bf9"
+      },
+      {
+        "path": "core/crates/vw-ffi/tests/ordinary_formats.rs",
+        "sha256": "698e274ed358afe63f681f2b7bc09138f19611f4bf288075fb63b7249b4152d3"
+      }
+    ],
+    "publication": "Explicitly uncompiled source checkpoint on the authorized integration branch; acceptance and promotion remain gated on actual production tests."
+  }
 }

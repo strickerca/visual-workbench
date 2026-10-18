@@ -97,7 +97,11 @@ pub(crate) fn decode(
 
 // Uncompressed classic TIFF, written in bounded rows. ICC bytes and 8/16-bit
 // channel values survive exactly. The original encoded asset is never replaced.
-pub(crate) fn encode(image: &DecodedImage, out: &mut crate::io::Output<'_>) -> Result<()> {
+pub(crate) fn encode(
+    image: &DecodedImage,
+    out: &mut crate::io::Output<'_>,
+    provenance: Option<&str>,
+) -> Result<()> {
     struct Entry {
         tag: u16,
         kind: u16,
@@ -115,7 +119,8 @@ pub(crate) fn encode(image: &DecodedImage, out: &mut crate::io::Output<'_>) -> R
     };
     let row = u64::from(image.width) * u64::from(samples) * u64::from(depth / 8);
     let strips = image.height.div_ceil(16);
-    let base_entries = 13_usize + usize::from(image.icc.is_some());
+    let base_entries =
+        13_usize + usize::from(image.icc.is_some()) + usize::from(provenance.is_some());
     let fixed = 8 + 2 + base_entries * 12 + 4;
     let bits = (0..samples)
         .flat_map(|_| depth.to_le_bytes())
@@ -208,6 +213,16 @@ pub(crate) fn encode(image: &DecodedImage, out: &mut crate::io::Output<'_>) -> R
             data: profile.clone(),
         });
     }
+    if let Some(provenance) = provenance {
+        let mut description = alloc(provenance.len() + 1)?;
+        description[..provenance.len()].copy_from_slice(provenance.as_bytes());
+        entries.push(Entry {
+            tag: 270,
+            kind: 2,
+            count: u32::try_from(description.len()).map_err(|_| Error::Limit)?,
+            data: description,
+        });
+    }
     let mut data_start = fixed;
     for e in &entries {
         if e.data.len() > 4 {
@@ -234,6 +249,9 @@ pub(crate) fn encode(image: &DecodedImage, out: &mut crate::io::Output<'_>) -> R
         entries[9].data[at..at + 4].copy_from_slice(&(len as u32).to_le_bytes());
         cursor += len;
     }
+    // Strip entries above use their fixed constructor positions; sort only
+    // after final offsets/counts are known, as required for the TIFF IFD.
+    entries.sort_unstable_by_key(|entry| entry.tag);
     let mut metadata = alloc(data_start)?;
     metadata[..4].copy_from_slice(b"II*\0");
     metadata[4..8].copy_from_slice(&8_u32.to_le_bytes());

@@ -161,6 +161,11 @@ pub(crate) fn encode_private(
     file: &mut File,
     cancel: &Cancellation,
 ) -> Result<(u64, vw_raster::ExportMetadata), RasterError> {
+    if request.format == ExportFormat::Bmp8 {
+        return Err(RasterError::Unsupported(
+            "BMP standalone provenance is not supported; use TIFF or PNG",
+        ));
+    }
     if output_bound(source, request)? > cap {
         return Err(RasterError::EncodedLimit { limit: cap });
     }
@@ -179,10 +184,13 @@ pub(crate) fn encode_private(
         memory_bytes: admitted.memory_budget_bytes,
         ..vw_formats::Limits::default()
     };
-    let result = vw_formats::encode_to(
+    let provenance =
+        serde_json::to_string(&prepared.metadata).map_err(|_| RasterError::Metadata)?;
+    let result = vw_formats::encode_to_with_metadata(
         &prepared.image,
         external_format(request.format)?,
         limits,
+        &provenance,
         file,
         &|| cancel.is_cancelled(),
     )
@@ -345,7 +353,7 @@ mod tests {
     }
     fn request() -> ExportRequest {
         ExportRequest {
-            format: ExportFormat::Bmp8,
+            format: ExportFormat::Tiff8,
             region: None,
             revision: vw_proto::v1::Revision {
                 host_seq: 1,
@@ -397,9 +405,11 @@ mod tests {
         ));
     }
     #[test]
-    fn buffered_receipt_keeps_the_requested_policy_and_original_identity() {
+    fn buffered_bytes_keep_requested_policy_original_identity_and_capture_provenance() {
         let source = image();
-        let r = request();
+        let mut r = request();
+        r.capture_session = Some(Id::from_parts(1_700_000_000_000, [55; 10]).unwrap());
+        r.frame_id = Some(u64::MAX);
         let result = encode_buffered(&source, &r, &Cancellation::new()).unwrap();
         assert_eq!(
             result.metadata.settings.memory_budget_bytes,
@@ -413,5 +423,23 @@ mod tests {
         let decoded =
             vw_formats::decode(&result.bytes, vw_formats::Limits::default(), &|| false).unwrap();
         assert_eq!(decoded.image.pixels, source.pixels);
+        // Read the actual file bytes independently of the returned metadata.
+        let bytes = &result.bytes;
+        assert_eq!(&bytes[..4], b"II*\0");
+        let ifd = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
+        let count = u16::from_le_bytes(bytes[ifd..ifd + 2].try_into().unwrap()) as usize;
+        let at = (0..count)
+            .map(|i| ifd + 2 + i * 12)
+            .find(|&at| u16::from_le_bytes(bytes[at..at + 2].try_into().unwrap()) == 270)
+            .unwrap();
+        let len = u32::from_le_bytes(bytes[at + 4..at + 8].try_into().unwrap()) as usize;
+        let offset = u32::from_le_bytes(bytes[at + 8..at + 12].try_into().unwrap()) as usize;
+        let text = &bytes[offset..offset + len];
+        assert_eq!(text.last(), Some(&0));
+        let embedded: vw_raster::ExportMetadata = serde_json::from_slice(&text[..len - 1]).unwrap();
+        assert_eq!(embedded.source_asset, source.source_asset.to_string());
+        assert_eq!(embedded.revision, result.metadata.revision);
+        assert_eq!(embedded.settings.capture_session, r.capture_session);
+        assert_eq!(embedded.settings.frame_id, Some(u64::MAX));
     }
 }
