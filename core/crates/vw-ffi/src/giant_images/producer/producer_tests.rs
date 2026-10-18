@@ -60,8 +60,11 @@ struct Fixture {
     budget: SessionBudget,
 }
 fn fixture() -> Fixture {
+    fixture_with_budget(vw_stream::DESKTOP_SESSION_BYTES)
+}
+fn fixture_with_budget(bytes: u64) -> Fixture {
     let (owned, limits) = request(&png());
-    let budget = SessionBudget::new(vw_stream::DESKTOP_SESSION_BYTES).unwrap();
+    let budget = SessionBudget::new(bytes).unwrap();
     let source = input::prepare(
         owned,
         limits,
@@ -873,5 +876,190 @@ fn joined_rebuild_fences_full_binding_and_reads_only_approved_tiles() {
         cap.close_worker().await.unwrap();
         retained.project.close().await.unwrap();
     });
+    drop(retained);
+}
+
+// Exercises the real local publication/cache/provider path with a test-only
+// producer witness. It does not execute Android/JNI or measure codec/GPU RSS.
+#[test]
+fn phone_provider_reads_beside_surface_after_actual_producer_retirement() {
+    let _guard = serial();
+    let fixture = fixture_with_budget(vw_stream::PHONE_SESSION_BYTES);
+    let budget = fixture.budget.clone();
+    let original = png();
+    let original_id = fixture.source.source.original;
+    let build = synthetic(&fixture);
+    let parent = tempfile::tempdir().unwrap();
+    let destination = parent.path().join("project");
+    let options = publication_options(&destination, build.disk_cache_bytes);
+    let document_id = options.document_id.clone();
+    let published = publish::publish(
+        &build,
+        options,
+        &AtomicBool::new(false),
+        &Cancellation::new(),
+        &budget,
+    )
+    .unwrap();
+    // Retire actual output/manifest and private input owners; do not merely
+    // credit their envelopes while their directories or payloads remain alive.
+    drop(build);
+    drop(fixture);
+    struct FixtureProject {
+        project: Arc<crate::ProjectSession>,
+        _charge: vw_stream::MemoryCharge,
+    }
+    let (store, blobs, permit, charge) = published.into_parts();
+    let asset = vw_model::AssetId::try_from(super::super::tiles::hex(&original_id)).unwrap();
+    let original_path = blobs.path(&asset).unwrap();
+    let retained = FixtureProject {
+        project: crate::ProjectSession::from_store(store, blobs, permit).unwrap(),
+        _charge: charge,
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let info = retained.project.info().await.unwrap();
+        let binding = WorkflowBinding {
+            project_id: info.project_id,
+            document_id,
+            host_seq: info.host_seq,
+            state_hash: info.state_hash,
+        };
+        let options = super::super::GiantOpenOptions {
+            binding,
+            disk_cache_bytes: 32 * 1024 * 1024,
+            ram_cache_bytes: 1024 * 1024,
+        };
+        // Constructor JSON parsing still requires64MiB. An old96MiB surface
+        // must really retire before a new provider opens in the same phone pool.
+        let old_surface = budget
+            .reserve(MemoryKind::DisplayFrame, 96 * 1024 * 1024)
+            .unwrap();
+        assert!(matches!(
+            super::super::provider::open_image(
+                retained.project.worker.clone(),
+                retained.project.closed.clone(),
+                options.clone(),
+                budget.clone(),
+                Arc::new(Cancellation::new()),
+            )
+            .await,
+            Err(Error::Memory { .. })
+        ));
+        drop(old_surface);
+        let image = super::super::provider::open_image(
+            retained.project.worker.clone(),
+            retained.project.closed.clone(),
+            options,
+            budget.clone(),
+            Arc::new(Cancellation::new()),
+        )
+        .await
+        .unwrap();
+        let surface = budget
+            .reserve(MemoryKind::DisplayFrame, 96 * 1024 * 1024)
+            .unwrap();
+        // Matches Android's pre-call 3RGBA +16KiB per-tile owner envelope.
+        let foreign = budget
+            .reserve(MemoryKind::Foreign, 256 * 256 * 12 + 16 * 1024)
+            .unwrap();
+        let before = budget.used_bytes();
+        // One live approval entry retains64KiB after the actual producer/input
+        // owners retire. The floor includes real project/provider/surface owners.
+        assert_eq!(before, 216 * 1024 * 1024 + foreign.bytes() + 64 * 1024);
+        // The former per-read index envelope cannot fit this actual live state.
+        assert!(
+            budget
+                .reserve(
+                    MemoryKind::CodecWorkspace,
+                    super::super::tiles::STORE_WORKSPACE,
+                )
+                .is_err()
+        );
+        assert_eq!(budget.used_bytes(), before);
+        // Read/index scratch fits, but a live16MiB foreign owner leaves less
+        // than the32MiB codec workspace. The real miss must refuse, release its
+        // transient encoded/index owners, and keep that foreign owner charged.
+        let pressure = budget
+            .reserve(MemoryKind::Foreign, 16 * 1024 * 1024)
+            .unwrap();
+        let pressured = budget.used_bytes();
+        assert!(matches!(
+            image
+                .read_tile(
+                    super::super::GiantTileAddress {
+                        level: 0,
+                        x: 0,
+                        y: 0,
+                    },
+                    Arc::new(Cancellation::new()),
+                )
+                .await,
+            Err(Error::Memory { .. })
+        ));
+        assert_eq!(budget.used_bytes(), pressured);
+        assert_eq!(pressure.bytes(), 16 * 1024 * 1024);
+        drop(pressure);
+        assert_eq!(budget.used_bytes(), before);
+        let tile = image
+            .read_tile(
+                super::super::GiantTileAddress {
+                    level: 0,
+                    x: 0,
+                    y: 0,
+                },
+                Arc::new(Cancellation::new()),
+            )
+            .await
+            .unwrap();
+        let (pixels, outgoing) = tile.into_parts();
+        assert_eq!(pixels.rgba, [21, 42, 84, 255]);
+        assert!(outgoing.belongs_to(&budget));
+        assert_eq!(
+            budget.used_bytes(),
+            before + super::super::tiles::TILE_RGBA_BYTES + outgoing.bytes()
+        );
+        assert!(budget.used_bytes() <= vw_stream::PHONE_SESSION_BYTES);
+        let cancelled = Arc::new(Cancellation::new());
+        cancelled.cancel();
+        let before_cancel = budget.used_bytes();
+        assert!(matches!(
+            image
+                .read_tile(
+                    super::super::GiantTileAddress {
+                        level: 0,
+                        x: 0,
+                        y: 0,
+                    },
+                    cancelled,
+                )
+                .await,
+            Err(Error::Cancelled)
+        ));
+        assert_eq!(budget.used_bytes(), before_cancel);
+        image.close_worker().await.unwrap();
+        // Provider close may retire its cached payload; it cannot credit the
+        // outgoing payload or renderer's independent foreign/surface owners.
+        let after_close = budget.used_bytes();
+        assert_eq!(
+            after_close,
+            before - super::super::tiles::STORE_RESIDENT - super::super::tiles::MANIFEST_WORKSPACE
+                + outgoing.bytes()
+        );
+        assert!(after_close >= foreign.bytes() + surface.bytes() + outgoing.bytes());
+        drop(pixels);
+        let outgoing_bytes = outgoing.bytes();
+        drop(outgoing);
+        assert_eq!(budget.used_bytes(), after_close - outgoing_bytes);
+        let foreign_bytes = foreign.bytes();
+        let before_foreign = budget.used_bytes();
+        drop(foreign);
+        assert_eq!(budget.used_bytes(), before_foreign - foreign_bytes);
+        drop(surface);
+        retained.project.close().await.unwrap();
+    });
+    assert_eq!(std::fs::read(original_path).unwrap(), original);
     drop(retained);
 }

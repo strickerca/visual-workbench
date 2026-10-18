@@ -5,7 +5,7 @@ use crate::blobs::{
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use vw_model::AssetId;
 
@@ -15,6 +15,8 @@ pub const PHONE_RAM_CACHE_BYTES: u64 = 256 * 1024 * 1024;
 pub const DESKTOP_RAM_CACHE_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_ENTRIES: usize = 100_000;
 const MANIFEST_MAX_BYTES: u64 = 16 * 1024 * 1024;
+const MANIFEST_BUFFER_BYTES: usize = 64 * 1024;
+const STREAMING_READ_PATH_BYTES: usize = 16 * 1024;
 
 /// Identity returned to cache owners when their payload must be released.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -392,6 +394,28 @@ impl<Q: FreeSpaceQuery> DiskCache<Q> {
         Ok(Some(bytes))
     }
 
+    /// Verified bounded bytes with durable LRU and fixed-size index-write work.
+    /// Before calling, reserve max_bytes + 1 for the returned allocation (or the
+    /// exact known entry length + 1) and a separate 1 MiB transient envelope.
+    /// Retain the existing resident index charge; opening/parsing this manager
+    /// still requires its larger workspace admission. This API creates no pool.
+    /// The transient envelope applies to source-controlled allocations, not RSS.
+    pub fn get_bounded_streaming(
+        &mut self,
+        key: &str,
+        max_bytes: u64,
+    ) -> Result<Option<Vec<u8>>, StoreError> {
+        // Bound PathBuf/temporary/OS path-conversion scratch before allocation.
+        // Existing metadata entries already have <=128-byte keys, fixed 70-byte
+        // filenames and 64-byte content hashes from with_query/put validation.
+        if self.root.as_os_str().as_encoded_bytes().len() > STREAMING_READ_PATH_BYTES
+            || self.directory.as_os_str().as_encoded_bytes().len() > STREAMING_READ_PATH_BYTES
+        {
+            return Err(StoreError::Invalid("cache read path limit"));
+        }
+        self.get_bounded(key, max_bytes)
+    }
+
     /// Add derived bytes after budget and drive-reserve checks. Cache entries may
     /// be evicted to make room; originals and unrecognized files never are.
     pub fn put(&mut self, key: &str, bytes: &[u8]) -> Result<(), StoreError> {
@@ -556,21 +580,7 @@ impl<Q: FreeSpaceQuery> DiskCache<Q> {
         if file.metadata()?.len() != entry.bytes {
             return Err(StoreError::Corrupt("cache size"));
         }
-        let limit = entry
-            .bytes
-            .checked_add(1)
-            .ok_or(StoreError::Invalid("cache size overflow"))?;
-        let size =
-            usize::try_from(limit).map_err(|_| StoreError::Invalid("cache address space"))?;
-        let mut bytes = Vec::new();
-        bytes
-            .try_reserve_exact(size)
-            .map_err(|_| StoreError::Invalid("cache allocation"))?;
-        file.take(limit).read_to_end(&mut bytes)?;
-        if bytes.len() as u64 != entry.bytes || AssetId::hash(&bytes) != entry.hash {
-            return Err(StoreError::Corrupt("cache content"));
-        }
-        Ok(bytes)
+        read_payload(file, entry)
     }
 
     fn verify_entry(&self, entry: &DiskEntry) -> Result<(), StoreError> {
@@ -617,6 +627,13 @@ impl<Q: FreeSpaceQuery> DiskCache<Q> {
     }
 
     fn save_manifest(&self) -> Result<(), StoreError> {
+        self.save_manifest_with_limit(MANIFEST_MAX_BYTES)
+    }
+
+    fn save_manifest_with_limit(&self, limit: u64) -> Result<(), StoreError> {
+        if limit > MANIFEST_MAX_BYTES {
+            return Err(StoreError::Invalid("cache manifest size"));
+        }
         self.check_paths()?;
         let path = self.directory.join("index.json");
         match fs::symlink_metadata(&path) {
@@ -624,20 +641,108 @@ impl<Q: FreeSpaceQuery> DiskCache<Q> {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(error.into()),
         }
-        let bytes = serde_json::to_vec(&self.manifest)?;
-        if bytes.len() as u64 > MANIFEST_MAX_BYTES {
-            return Err(StoreError::Invalid("cache manifest size"));
-        }
         let mut temporary = tempfile::Builder::new()
             .prefix(".manifest-")
             .tempfile_in(&self.directory)?;
-        temporary.write_all(&bytes)?;
+        {
+            let buffered = BufWriter::with_capacity(MANIFEST_BUFFER_BYTES, &mut temporary);
+            if buffered.capacity() != MANIFEST_BUFFER_BYTES {
+                return Err(StoreError::Invalid("cache manifest allocation"));
+            }
+            let mut bounded = ManifestWriter {
+                inner: buffered,
+                written: 0,
+                limit,
+                exceeded: false,
+            };
+            let serialized = serde_json::to_writer(&mut bounded, &self.manifest);
+            if bounded.exceeded {
+                return Err(StoreError::Invalid("cache manifest size"));
+            }
+            serialized?;
+            bounded.flush()?;
+        }
         temporary.as_file().sync_all()?;
         let file = temporary
             .persist(&path)
             .map_err(|error| StoreError::Io(error.error))?;
         file.sync_all()?;
         sync_directory(&self.directory)
+    }
+}
+
+// Metadata was checked on the opened regular file before this call. A later
+// truncate/growth still fails via read_exact/the stack sentinel, with no Vec
+// append or allocation beyond the declared-length admission.
+fn read_payload(mut file: impl Read, entry: &DiskEntry) -> Result<Vec<u8>, StoreError> {
+    let limit = entry
+        .bytes
+        .checked_add(1)
+        .ok_or(StoreError::Invalid("cache size overflow"))?;
+    let size = usize::try_from(limit).map_err(|_| StoreError::Invalid("cache address space"))?;
+    let declared = size - 1;
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(size)
+        .map_err(|_| StoreError::Invalid("cache allocation"))?;
+    if bytes.capacity() > size {
+        return Err(StoreError::Invalid("cache allocation"));
+    }
+    bytes.resize(declared, 0);
+    if let Err(error) = file.read_exact(&mut bytes) {
+        return Err(if error.kind() == std::io::ErrorKind::UnexpectedEof {
+            StoreError::Corrupt("cache content")
+        } else {
+            error.into()
+        });
+    }
+    // A stack sentinel detects growth without extending or reallocating Vec.
+    let mut sentinel = [0];
+    loop {
+        match file.read(&mut sentinel) {
+            Ok(0) => break,
+            Ok(_) => return Err(StoreError::Corrupt("cache content")),
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    if AssetId::hash(&bytes) != entry.hash {
+        return Err(StoreError::Corrupt("cache content"));
+    }
+    Ok(bytes)
+}
+
+/// Counts serialized bytes before they enter BufWriter, including buffered data.
+/// An over-limit write is refused wholly; it never reaches the temporary file.
+struct ManifestWriter<W> {
+    inner: W,
+    written: u64,
+    limit: u64,
+    exceeded: bool,
+}
+impl<W: Write> Write for ManifestWriter<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let count = match u64::try_from(bytes.len()) {
+            Ok(count) => count,
+            Err(_) => {
+                self.exceeded = true;
+                return Err(std::io::Error::other("cache manifest size"));
+            }
+        };
+        if self
+            .written
+            .checked_add(count)
+            .is_none_or(|end| end > self.limit)
+        {
+            self.exceeded = true;
+            return Err(std::io::Error::other("cache manifest size"));
+        }
+        let written = self.inner.write(bytes)?;
+        self.written += written as u64;
+        Ok(written)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
     }
 }
 
@@ -679,4 +784,114 @@ fn open_lock(path: &Path) -> Result<File, StoreError> {
     let file = options.open(path)?;
     check_regular_metadata(&file.metadata()?)?;
     Ok(file)
+}
+
+#[cfg(test)]
+mod streaming_tests {
+    use super::*;
+
+    #[test]
+    fn post_metadata_growth_and_truncation_refuse_without_vec_growth() -> Result<(), StoreError> {
+        let mut original = tempfile::NamedTempFile::new()?;
+        original.write_all(b"abcdef")?;
+        let entry = DiskEntry {
+            filename: String::new(),
+            bytes: 6,
+            hash: AssetId::hash(b"abcdef"),
+            touched: 0,
+        };
+        let reader = open_regular_file(original.path())?;
+        assert_eq!(reader.metadata()?.len(), entry.bytes);
+        original.write_all(b"g")?;
+        assert!(matches!(
+            read_payload(reader, &entry),
+            Err(StoreError::Corrupt("cache content"))
+        ));
+        original.as_file().set_len(6)?;
+        let reader = open_regular_file(original.path())?;
+        assert_eq!(reader.metadata()?.len(), entry.bytes);
+        original.as_file().set_len(5)?;
+        assert!(matches!(
+            read_payload(reader, &entry),
+            Err(StoreError::Corrupt("cache content"))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn manifest_writer_accepts_exact_limit_and_never_forwards_an_excess_byte()
+    -> Result<(), StoreError> {
+        let mut sink = Vec::new();
+        let mut writer = ManifestWriter {
+            inner: &mut sink,
+            written: 0,
+            limit: 7,
+            exceeded: false,
+        };
+        writer.write_all(b"1234567")?;
+        assert!(writer.write_all(b"8").is_err());
+        assert!(writer.exceeded);
+        assert_eq!(writer.written, 7);
+        assert_eq!(sink, b"1234567");
+        Ok(())
+    }
+
+    #[test]
+    fn production_manifest_limit_and_buffer_capacity_are_exact() -> Result<(), StoreError> {
+        let buffer = BufWriter::with_capacity(MANIFEST_BUFFER_BYTES, std::io::sink());
+        assert_eq!(buffer.capacity(), 64 * 1024);
+        let mut writer = ManifestWriter {
+            inner: buffer,
+            written: 0,
+            limit: MANIFEST_MAX_BYTES,
+            exceeded: false,
+        };
+        let chunk = [b'x'; MANIFEST_BUFFER_BYTES];
+        for _ in 0..MANIFEST_MAX_BYTES / MANIFEST_BUFFER_BYTES as u64 {
+            writer.write_all(&chunk)?;
+        }
+        assert_eq!(writer.written, 16 * 1024 * 1024);
+        assert!(writer.write_all(b"x").is_err());
+        assert!(writer.exceeded);
+        assert_eq!(writer.written, MANIFEST_MAX_BYTES);
+        writer.flush()?;
+        Ok(())
+    }
+
+    #[test]
+    fn serialization_limit_failure_preserves_old_index_and_leaves_no_temporary()
+    -> Result<(), StoreError> {
+        struct Plenty;
+        impl FreeSpaceQuery for Plenty {
+            fn query(&self, _path: &Path) -> Result<DiskSpace, StoreError> {
+                Ok(DiskSpace {
+                    total_bytes: 200_000_000_000,
+                    available_bytes: 150_000_000_000,
+                })
+            }
+        }
+        let owned = tempfile::tempdir()?;
+        let mut cache = DiskCache::with_query(owned.path(), 32, Plenty)?;
+        cache.put("tile", b"encoded")?;
+        let index = cache.directory.join("index.json");
+        let before = fs::read(&index)?;
+        assert!(matches!(
+            cache.save_manifest_with_limit(8),
+            Err(StoreError::Invalid("cache manifest size"))
+        ));
+        assert_eq!(fs::read(&index)?, before);
+        for entry in fs::read_dir(&cache.directory)? {
+            assert!(
+                !entry?
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".manifest-")
+            );
+        }
+        assert_eq!(
+            cache.get_bounded_streaming("tile", 7)?,
+            Some(b"encoded".to_vec())
+        );
+        Ok(())
+    }
 }

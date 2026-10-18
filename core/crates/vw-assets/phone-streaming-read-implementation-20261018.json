@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "checked_utc": "2026-10-18T19:46:26.732261+00:00",
+  "base_commit": "5a7239d1d650af87825126335e38f6a821b5e26e",
+  "admission": {
+    "commit": "707e940841373b076ebbe750c01319df2d992eed",
+    "path": "docs/GIANT_STREAMING_STORE_API_ADMISSION_20261018.md",
+    "sha256": "e397b8c2c6b52269653b37babee8274727625930af8fa3dd3092acd8a6ac70f1",
+    "scope": "four admitted source/test paths plus existing image-owner receipt lane; no root overlay"
+  },
+  "status": "paired repair applied; focused Linux host validation passed; coordinator project/Android composition pending",
+  "source": {
+    "core/crates/vw-store/src/cache.rs": {
+      "bytes": 31072,
+      "sha256": "aad84f2207dcdffdfccbef4f1df05a4e3c9d2440aef1d7a719fc4354719b47b4"
+    },
+    "core/crates/vw-store/tests/blobs_cache.rs": {
+      "bytes": 29020,
+      "sha256": "5765881a20b0e3c807905586ceea2c33e992cd327c233eb6dc44e4b54a2400b1"
+    },
+    "core/crates/vw-ffi/src/giant_images/tiles.rs": {
+      "bytes": 7399,
+      "sha256": "4d183a255831fb91d1d0e1debff1b21b2ad1f5b6c3e4fc942966736881d0cab4"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/producer_tests.rs": {
+      "bytes": 35228,
+      "sha256": "bc9f82328ec9167d336da9bbf6ece261e75435044f6a857cb0239456cec9c07b"
+    }
+  },
+  "handoff": {
+    "bytes": 7290,
+    "sha256": "6100bac470d43aa88c555902bd86820d1d106aa90faef16405f01d128c738b46"
+  },
+  "validation": {
+    "worktree": "/tmp/vw-producer-validation-20261018",
+    "source_matches_task_branch": true,
+    "workers": 2,
+    "test_threads": 2,
+    "bounded_process_tree": true,
+    "offline_locked": true,
+    "counts": {
+      "native_giant": 53,
+      "store_blobs_cache": 30,
+      "store_private_explicit_lib": 4,
+      "total": 87,
+      "new_cases": 8
+    },
+    "strict_clippy_store_and_ffi_all_targets": "passed on Linux",
+    "offline_licenses_bans_sources": "passed; warnings only",
+    "failures": [],
+    "logs": {
+      "/tmp/vw-assets-validation/phone-streaming-read/clippy.log": {
+        "bytes": 332,
+        "sha256": "0bd726171168ee6ff72bd76b2b81b1925ce4f6e88918536962bd674b975eeb1e"
+      },
+      "/tmp/vw-assets-validation/phone-streaming-read/licenses.log": {
+        "bytes": 94201,
+        "sha256": "0ada2ec8740a62bca89b52d392ba523e58f76602567bf734c127cadf87f93289"
+      },
+      "/tmp/vw-assets-validation/phone-streaming-read/native-giant-final.log": {
+        "bytes": 6385,
+        "sha256": "ec53fa2d66f1b88ef38ba52be9ee5152e3b487e922add685447a1d776ebe6a5f"
+      },
+      "/tmp/vw-assets-validation/phone-streaming-read/native-giant.log": {
+        "bytes": 9772,
+        "sha256": "7574c48a3bcff3a8fad43ed8fa349924d1fb22d6bff0c97693879113221b5179"
+      },
+      "/tmp/vw-assets-validation/phone-streaming-read/store-blobs-cache.log": {
+        "bytes": 2566,
+        "sha256": "731676f859ca6fd96b37b19965b25ef705bdf300f35c40583e49e65938ad96ee"
+      },
+      "/tmp/vw-assets-validation/phone-streaming-read/store-final.log": {
+        "bytes": 3191,
+        "sha256": "d1c402364d01c88b596604b9ec37e5b4096fa0b2d659f0be9a9205bdc81cf474"
+      },
+      "/tmp/vw-assets-validation/phone-streaming-read/store-private-final.log": {
+        "bytes": 787,
+        "sha256": "22f7ca1fdab922116f5f0445e16f24cc3fea598d4184cc2bab22ed88e088f698"
+      },
+      "/tmp/vw-assets-validation/phone-streaming-read/store-private.log": {
+        "bytes": 1177,
+        "sha256": "926cdada0864db9a922c998073d311ec28b4a25869df315a27e26a06a6138c19"
+      }
+    }
+  },
+  "lifetime_evidence": {
+    "phone_limit_bytes": 268435456,
+    "live_floor_bytes": 227360768,
+    "former_64MiB_read_reservation": "refused at exact live floor",
+    "live_16MiB_foreign_pressure": "real tile miss refuses; all transient charges return to exact prior total",
+    "after_success": "floor plus one256KiB cached payload plus exact outgoing charge; encoded/index/codec retired",
+    "provider_close": "exact64MiB resident plus24MiB manifest plus cached pixels retired; outgoing/surface/foreign retained",
+    "payload_before_credit": true,
+    "original_blob_bytes_after_close": "unchanged",
+    "fixed_payload": "declared len+1 capacity checked before read; exact slice plus stack sentinel",
+    "index_buffer_bytes": 65536,
+    "index_output_limit_bytes": 16777216,
+    "read_scratch_bytes": 1048576,
+    "constructor_install_workspace_bytes": 67108864,
+    "root_and_cache_path_limit_bytes": 16384
+  },
+  "reserved_working_paths_unchanged": [
+    "Cargo.toml",
+    "Cargo.lock",
+    "core/crates/vw-ffi/Cargo.toml",
+    "core/crates/vw-store/Cargo.toml",
+    "core/crates/vw-store/src/lib.rs",
+    "core/crates/vw-ffi/src/lib.rs",
+    "core/crates/vw-ffi/src/giant_images.rs",
+    "core/crates/vw-ffi/src/project.rs"
+  ],
+  "root_manifest_change_in_isolated_validation": "previously proposed Windows workspace edge and lock only; not task branch",
+  "heavy_build_slot": "released after final checks; no heavy process remains",
+  "sdk_runtime_device_provider_download_install_license_acceptance": false,
+  "unchanged_capabilities": [
+    "R164 display conversion",
+    "restricted still-image AVIF; no HDR/multiframe/encoder claims"
+  ],
+  "remaining": [
+    "Coordinator retained32MiB ProjectState constructor and aggregation of four publication owners",
+    "Trusted Android withRootOutput bridge and independent native output copy, joined Android80MiB retirement",
+    "Coordinator composition onto editing/offline candidate",
+    "Maximum inventory, platform codec/driver/RSS, JNI/renderer retirement, Windows runtime and import/display/export/physical acceptance"
+  ],
+  "source_bound_not_runtime_rss_proof": true
+}
