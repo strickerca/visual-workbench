@@ -380,3 +380,58 @@ under separate owners while root retains controllers, actual framework draw
 callbacks, Main/WorkbenchApp, public/native contracts and registration. Both
 renderer lanes must keep builds serialized behind image. Current main stays
 reviewed `83663107`; no giant/stream feature or hardware gate is passed.
+
+## Giant caller/provider composition, 2026-10-18
+
+The candidate now composes native573ddaf, Desktop382a36f, Androidf79ef01 and
+preserved picker repaira6454c1 through reserved root source. It retains the
+picker's queued AWT/stale-result/cleanup ownership changes while sharing the
+current Window shortcut handler with the nested giant drawing scene. Existing
+ordinary image, PDF/SVG and deferred Paint paths remain their prior owners.
+
+Native giant methods are registered against the existing project worker and one
+process-wide budget. Outgoing pixels precede their charge on every early drop;
+marshalling verifies the process pool and actual Vec capacity before an additional
+ABI reservation. Native/foreign handles have distinct shutdown/release versus
+AutoCloseable names. Late unadopted native children must retire before parent
+close. A real generated-adapter test exposed and corrected the Desktop512MiB
+pool being passed to a canonical-workspace API capped at256MiB: the estimate is
+capped there and its charge still belongs to the original shared process pool.
+
+The common attachment owner fences full visible binding, geometry and epoch,
+cancels and joins pending opens, retains failed factory owners and blocks parent
+replacement on unknown retirement. Draw callbacks use a published permit rather
+than UI-confined project fields. Both controllers now select the giant route,
+retain explicit color interpretation, update canonical/precision viewport demand,
+hide stale frames before refresh, and join rendering/native ownership on close.
+Actual draws repeat current frame/view/generation fences under their renderer
+boundary. Android aggregates even surfaces attached during suspended retirement;
+a failed release stays blocked. Its render-complete guard does not acknowledge
+actual frame-stream presentation. Desktop joins scene detachment/disposal before
+releasing tile and surface charges.
+
+This remains a partial giant/stream implementation. No approved producer is
+admitted: Missing cache and Unsupported inventory are intentional production
+refusals. The cache reader, pure stream utilities and compiled renderer cannot
+complete original-size import, rebuild, export, BLOB transfer or a stream cadence
+milestone. Exact private producer interfaces and next-lane source admissions are
+in `GIANT_PRODUCER_AND_NEXT_LANE_ADMISSION_20261018.md`. Android JPEG band/region
+production and pinned Windows worker/runtime implementation remain next work.
+
+Final native tests:491passed/0failed;35suites, two ignored private subprocess
+entrypoints exercised by their owning process tests. Strict Linux Clippy passes
+for the four affected crates. Fresh Linux and Androidarm64 libraries build;
+Android's four LOAD segments retain16KiB alignment. Final JVM tests pass816cases (shared337, Desktop346, Android133), with seven
+Windows-only skips. Android instrumentation source compiles; lint has zero errors,
+59warnings and12hints. Failures, source/artifact bindings and exact scope are in
+`evidence/GIANT_CALLER_INTEGRATION_20261018.json` and its receipt excerpts. No APK signing/install, app launch, device, Windows GPU/runtime,
+performance or physical gate is inferred from these checks.
+
+Following reviewed source remains separate: T3.07f12433c6 needs native admission,
+root chooser/saved-view/layer workflow wiring, real rotation solver/handles and
+tonal composition; T3.11df5c62bb needs the history counter floor, registration,
+under-mutex root callbacks, admission, refresh and joined detach. Their leaf
+reviews do not establish user workflows, carrier switching, scale rebase or phone
+AI acceptance. Phase5 provider/verification/release gaps and all physical gates
+remain open. Main remains83663107 until the composed candidate is reviewed.
+No old worktree or preserved source archive is disposed by this integration lane.

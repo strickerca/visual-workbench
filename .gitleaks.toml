@@ -95,3 +95,25 @@ regexes = [
   '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditApi\.kt": "09d8e0972e9dd23a8e3d09044084cc0994f5d75d94af0319cd0cf0e506329fe3",?\s*$''',
   '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionApi\.kt": "c4c2c7625fcb546f636d6620009f58a00ecde851e89823e3d6861f6c92e67741",?\s*$''',
 ]
+
+[[allowlists]]
+description = "Exact giant integration source SHA256 pairs verified against tracked source; no general credential exemption"
+condition = "AND"
+paths = ['''(^|/)docs/evidence/GIANT_CALLER_INTEGRATION_20261018\.json$''']
+regexTarget = "line"
+regexes = [
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImagesApi\.kt": "07eacea34d19332bbaec31facc96f69250c36037fd6031d5bca7f471e154cf27",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionResourcesApi\.kt": "ded5b6811373b4b3f19b79bb9eaccb2b1cac8004e8fa8f42e120038f2a10c1b2",?\s*$''',
+]
+
+[[allowlists]]
+description = "Exact returned giant-provider source SHA256 pairs verified against its8d95427/573ddaf source; no general credential exemption"
+condition = "AND"
+paths = ['''(^|/)core/crates/vw\-assets/giant\-provider\-accounting\-20261018\.json$''']
+regexTarget = "line"
+regexes = [
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/WorkflowApi\.kt": "92ae94685bc9594c863db9d81b62ce2dbd769544bf331f5b2d647635820c26ee",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImagesApi\.kt": "07eacea34d19332bbaec31facc96f69250c36037fd6031d5bca7f471e154cf27",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CoreApi\.kt": "ce4d637aa01689b60bc8f0789c5d9f752430be462676feb39e4e53201a22ee0d",?\s*$''',
+  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionResourcesApi\.kt": "ded5b6811373b4b3f19b79bb9eaccb2b1cac8004e8fa8f42e120038f2a10c1b2",?\s*$''',
+]
