@@ -15,7 +15,7 @@ private class NativeVectorEraser(private val handle: ProjectSession, private val
         val owned = options.ownedEraseRequest()
         val documents = project as? WorkbenchDocumentsProject
         val descriptor = documents?.documentDescriptor(owned.binding.documentId)
-        val page = descriptor?.let { documents.selectedDocumentPage(owned.binding.documentId) }
+        val page = documents?.takeIf { descriptor != null }?.selectedDocumentPage(owned.binding.documentId)
         if (owned.page != page) throw WorkflowFailure(WorkflowFailureKind.Stale)
         val request = NOptions(workflowBinding(owned.binding), workflowMetadata(owned.metadata),
             owned.targets.map { NTarget(it.objectId, it.replacementId) }, owned.centers.map { NPoint(it.x, it.y) },

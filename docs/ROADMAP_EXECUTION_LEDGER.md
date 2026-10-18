@@ -166,3 +166,24 @@ feature. Partial-opacity overlays also remain Unsupported. Native artifact
 packaging, regenerated ABI/app compilation, repaired image and focused precision
 checks, actual GUI/provider/GPU behavior and hardware gates remain open. Main is
 still the previously validated `7be9da7` checkpoint; Krita remains deferred.
+
+
+### Caller review repairs — 2026-10-18
+
+Frozen candidate `070758a` remains unchanged while independent validation runs.
+Separate branch `cloud/document-copy-identity-20261018` adds the source-bound
+CORE-006 copy DTO/handoff (`5d0e39a`), then page/eraser and fidelity notice repairs
+(`968ffa0`). Both actual app page callbacks join eraser/selection owners before
+changing pages and rebind them afterward. Page identity now fences shared
+commands, gestures and picker tickets; native fresh PDF edits/erasures require
+page membership atomically. Source-fenced admitted notice inspection runs after
+runtime installation on import/reopen and retains valid warnings across same-source
+edits. The copy capability remains disabled pending final-byte exporter proof.
+
+Affected bounded checks: 70 Kotlin cases passed (including actual app eraser
+adapters with injected hit input), 24 protocol cases passed, 21 Kotlin source files
+syntax-parsed. Native two-page admission regression is written but unrun. The next
+combined phase must regenerate bindings once for `EditPrecondition.page_index` and
+`VectorEraseOptions.page_index`, then validate native APIs and actual apps. This
+source batch does not pass device, UI, sandbox runtime or hardware acceptance.
+See `docs/evidence/CLOUD_PAGE_AND_NOTICE_REPAIRS_20261018.json`.
