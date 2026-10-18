@@ -4,6 +4,7 @@ members = [
     "core/crates/*",
     "host-win/crates/*",
     "tools/hello",
+    "tools/document-worker",
     "tools/diag-win",
     "tools/pen-inject/core",
     "tools/pen-inject/harness",

@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 public actual fun workbenchCore(): WorkbenchCore { prepareCoreLibrary(); check(bindingContractVersion() == 1u); return NativeCore() }
 
@@ -48,7 +50,10 @@ private suspend fun <T> native(block: suspend (Cancellation) -> T): T = withCont
     try { block(cancellation) } catch (error: CancellationException) { cancellation.cancel(); throw error }
     catch (error: CoreException) { throw mapFailure(error) } finally { cancellation.destroy() }
 }
-private class NativeCore : WorkbenchCore, WorkbenchStreamingCore {
+private class NativeCore : WorkbenchCore, WorkbenchStreamingCore, WorkbenchDocumentsCore {
+    override suspend fun createDocument(options: CreateDocument): WorkbenchProject = createDocumentNative(options) {
+        NativeProject(it).also { project -> project.documentPassword(options.documentId,options.password) }
+    }
     override suspend fun createFile(options: CreateFileProject): WorkbenchProject = createFileNative(options) { NativeProject(it) }
     override fun newId(unixMs: ULong): String = generateId(unixMs)
     override fun newDeviceId(): String = generateDeviceId()
@@ -61,7 +66,40 @@ private class NativeCore : WorkbenchCore, WorkbenchStreamingCore {
         TextLayout(value.algorithmVersion,value.glyphs.map { GlyphOutline(it.glyphId,it.cluster,it.font,it.x,it.y,it.advance,it.outline.map { p -> p.common() }) },value.width,value.height,value.lineHeight)
     }
 }
-private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats {
+private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject {
+    private val documentPasswords = mutableMapOf<String,String>()
+    private val documentPages = mutableMapOf<String,UInt>()
+    private fun checkDocumentOpen() { if(closed.get()) throw CoreFailure(CoreFailureKind.Closed) }
+    override fun documentPassword(documentId: String): String? { checkDocumentOpen(); return documentPasswords[documentId] }
+    override fun documentPassword(documentId: String,password: String?) {
+        checkDocumentOpen()
+        require(password == null || (password.length <= 1024 && '\u0000' !in password))
+        if(password == null) documentPasswords.remove(documentId) else documentPasswords[documentId] = password
+    }
+    override fun selectedDocumentPage(documentId: String): UInt { checkDocumentOpen(); return documentPages[documentId] ?: 0u }
+    override suspend fun documentDescriptor(documentId: String): EditableDescriptor? = documentNativeCall {
+        checkDocumentOpen(); handle.editableDocumentDescriptor(documentId,it)?.documentCommon()
+    }
+    override suspend fun documentSource(documentId: String,expected: ProjectInfo): EditableSource = documentNativeCall {
+        checkDocumentOpen(); val value=handle.editableDocumentSource(documentId,expected.documentNative(),it)
+        EditableSource(value.descriptor.documentCommon(),value.bytes)
+    }
+    override suspend fun documentPage(documentId: String,page: UInt): DocumentSnapshot = documentNativeCall {
+        checkDocumentOpen(); handle.editableDocumentPage(documentId,page,it).documentCommon()
+    }
+    override suspend fun selectDocumentPage(documentId: String,page: UInt): DocumentSnapshot {
+        val value=documentPage(documentId,page)
+        currentCoroutineContext().ensureActive();checkDocumentOpen();documentPages[documentId]=page
+        return value
+    }
+    override suspend fun documentOverlays(documentId: String,page: UInt,expected: ProjectInfo): List<DocumentOverlay> = documentNativeCall {
+        checkDocumentOpen(); handle.editableDocumentOverlays(documentId,page,expected.documentNative(),it).map { value ->
+            DocumentOverlay(value.page,value.contours.map { contour -> contour.map { point -> Point(point.x,point.y) } },Transform(value.transform.a,value.transform.b,value.transform.c,value.transform.d,value.transform.e,value.transform.f),value.rgba)
+        }
+    }
+    override suspend fun publishDocumentCopy(documentId: String,destination: String,copy: DocumentExport): String = documentNativeCall {
+        checkDocumentOpen(); handle.publishEditableCopy(PublishEditableCopy(documentId,copy.sourceAssetId,copy.revision.documentNative(),destination,copy.bytes,copy.blake3),it)
+    }
     override suspend fun originalFormatInfo(binding: WorkflowBinding): OriginalFormatInfo {
         if (closed.get()) throw WorkflowFailure(WorkflowFailureKind.Closed)
         return originalFormatInfoNative(handle, binding)
@@ -117,7 +155,7 @@ private class NativeProject(val handle: ProjectSession) : WorkbenchProject, Work
     override suspend fun close(): Unit = releaseNative {
         closeMutex.withLock { if(!closed.get()) {
             try { handle.closeSession() } catch(error:CoreException) { throw mapFailure(error) }
-            finally { closed.set(true);handle.destroy() }
+            finally { closed.set(true);documentPasswords.clear();documentPages.clear();handle.destroy() }
         } }
     }
 }

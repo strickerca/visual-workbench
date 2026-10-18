@@ -1569,7 +1569,7 @@ fn destination(path: &str, work: &Path) -> Result<PathBuf> {
         Err(e) => Err(e.into()),
     }
 }
-fn read_bounded(path: &Path, limit: u64, cancel: &Cancellation) -> Result<Vec<u8>> {
+pub(crate) fn read_bounded(path: &Path, limit: u64, cancel: &Cancellation) -> Result<Vec<u8>> {
     check_components(path)?;
     let mut options = OpenOptions::new();
     options.read(true);

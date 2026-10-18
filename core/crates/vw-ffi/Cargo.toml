@@ -47,10 +47,15 @@ vw-codec-os = { version = "=0.1.0", path = "../vw-codec-os" }
 vw-instructions = { version = "=0.1.0", path = "../vw-instructions" }
 vw-semantics = { version = "=0.1.0", path = "../vw-semantics" }
 vw-mask = { version = "=0.1.0", path = "../vw-mask" }
+vw-document-protocol = { version = "=0.1.0", path = "../vw-document-protocol" }
+vw-document-win = { version = "=0.1.0", path = "../../../host-win/crates/vw-document-win" }
+vw-pdf = { version = "=0.1.0", path = "../vw-pdf" }
+tiny-skia = { version = "=0.12.0", default-features = false, features = ["std"] }
+sha2 = "=0.11.0"
 png = "=0.18.1"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
-rustix = { version = "=1.1.5", features = ["fs"] }
+rustix = { version = "=1.1.5", features = ["fs", "process"] }
 
 [target.'cfg(windows)'.dependencies]
 vw-remote-host = { version = "=0.1.0", path = "../../../host-win/crates/vw-remote-host" }
@@ -58,6 +63,8 @@ vw-host-win = { version = "=0.1.0", path = "../../../host-win/crates/vw-host-win
 vw-net = { version = "=0.1.0", path = "../vw-net", features = ["mdns"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
+vw-svg = { version = "=0.1.0", path = "../vw-svg" }
+pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881"] }
 jni = { version = "=0.22.4", default-features = false }
 
 [dev-dependencies]

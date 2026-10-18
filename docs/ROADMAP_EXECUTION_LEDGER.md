@@ -107,6 +107,37 @@ and remaining gates are in `evidence/CLOUD_IMAGE_CALLER_SEAMS_20261018.json`.
 Precision adapters `260b4f5` are recorded for the following reserved-hook batch;
 their earlier module tests do not cover those new leaves.
 
+## Document/precision native and shared seam source checkpoint
+
+Document platform source `4c130504169f516d6825cdf1f5a09a690c5463d8` and precision
+source `260b4f5e3fc47772cfa28f012c94ed1f29d48cf4` are composed on the integration
+branch. Root native registration, document storage/page/overlay/copy facade,
+request/reply transport, shared injected interaction and isolated Android service
+registration now have concrete source implementations. Windows runtime/worker
+source is admitted without packaged native artifacts; SVG no longer requires a
+PDFium artifact. The new exact-runtime retirement retry must be called by the
+document owner's retained Desktop worker before it can release quarantine.
+
+This source batch is not compiled or promoted to main. It passed Rustfmt,
+locked offline metadata, Cargo source/license/bans policy, Kotlin syntax,
+manifest XML and whitespace checks. Newly written root interaction/storage/job
+cases remain unrun. Exact provenance, corrections and execution limits are in
+`evidence/CLOUD_DOCUMENT_NATIVE_SOURCE_20261018.json`. Android hard memory policy
+needs actual isolated ART process verification; compilation cannot establish it.
+
+Next root composition retains the app-owned document transport and draw leases,
+then connects page/import/export UI and precision input/render/control hooks.
+Those actual app flows are still open. Heavy validation remains serialized by
+the parent. Image error fix `bf0d5f4` was independently published directly atop
+`5cecb83`, allowing its focused run without this wider uncompiled source batch.
+Image source repair `b0fee0a` adds embedded TIFF provenance. CORE-006 requires
+revision and source identity in the exported file itself; BMP has no admitted
+carrier. Root `2fc64bc` therefore gates BMP file preflight and both export UIs,
+while retaining BMP import. Ordinary-format delivery remains partial. The image
+owner now holds the focused heavy slot. Documents' last completed pure harness
+passed 47 cases; its final three privacy/handoff cases are still uncompiled.
+No existing hardware or runtime gate is passed by these source checkpoints.
+
 ## Verification recorded by this ledger
 
 The initial ledger recorded only exact baseline/ref checks, clean branch creation,

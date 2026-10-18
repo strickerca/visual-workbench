@@ -1,0 +1,30 @@
+[package]
+name = "vw-document-worker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+vw-document-protocol = { path = "../../core/crates/vw-document-protocol", version = "=0.1.0" }
+vw-document-win = { path = "../../host-win/crates/vw-document-win", version = "=0.1.0" }
+vw-svg = { path = "../../core/crates/vw-svg", version = "=0.1.0" }
+vw-pdf = { path = "../../core/crates/vw-pdf", version = "=0.1.0" }
+pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881"] }
+serde_json = "=1.0.151"
+serde = { version = "=1.0.229", features = ["derive"] }
+
+[features]
+sandbox-fixture = []
+
+[[bin]]
+name = "vw-document-sandbox-probe"
+path = "src/sandbox_probe.rs"
+required-features = ["sandbox-fixture"]
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_System_SystemInformation"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,166 @@
+{
+  "status": "composed source checkpoint; uncompiled, not main promotion or acceptance",
+  "recovery": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "promoted_absent_module_sources": [
+    {
+      "path": "host-win/crates/vw-document-win/Cargo.toml",
+      "candidate": "host-win/crates/vw-document-win/Cargo.toml",
+      "sha256": "757ef008db2595e5af2f8a216f9a124f1965c111c67667de6ff34ad71b93bf35"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/tests/windows_worker.rs",
+      "candidate": "host-win/crates/vw-document-win/tests/windows_worker.rs",
+      "sha256": "3aac7aaf3cfbc980217ab7eef404da0e629f4b1160d9fd6e34b8d01bdf6aae6c"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/tests/pc_redaction_metadata.rs",
+      "candidate": "host-win/crates/vw-document-win/tests/pc_redaction_metadata.rs",
+      "sha256": "faf2714e3743a5946c5024416eae1a69123afe49074c64cbdcb365ce6e06d0b3"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/tests/admission.rs",
+      "candidate": "host-win/crates/vw-document-win/tests/admission.rs",
+      "sha256": "ed83b15f80b68c66b7ce5443246eef548b49cb6afddaad8487195bf9a1590194"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/src/windows.rs",
+      "candidate": "t3-document-pc-redaction/after/host-win/crates/vw-document-win/src/windows.rs",
+      "sha256": "a1997dc97cc9f393ecc364905b3d6df3adf7557351577a5e475442e074ad82cb"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/src/policy.rs",
+      "candidate": "host-win/crates/vw-document-win/src/policy.rs",
+      "sha256": "9e16ec0decd9405153816e2ae6102e23b2b25172f1a3a3f4c0d135bfa4a668e6"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/src/metadata.rs",
+      "candidate": "t3-document-pc-redaction/after/host-win/crates/vw-document-win/src/metadata.rs",
+      "sha256": "5cd0f09b149738cea6da108ca2212c5c92d25c1953ea1efeb110bf960cca5198"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/src/lib.rs",
+      "candidate": "host-win/crates/vw-document-win/src/lib.rs",
+      "sha256": "2a7281e4b5ddd28701162303765a4875a41e144f4e987b7d088e91f729f2bfd0"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/src/windows/process.rs",
+      "candidate": "host-win/crates/vw-document-win/src/windows/process.rs",
+      "sha256": "294f0c0068bdcae049c83ba07af019d4a2e09cace6e8168c77b08eb4f042906c"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/src/windows/pin.rs",
+      "candidate": "t3-document-pc-redaction/after/host-win/crates/vw-document-win/src/windows/pin.rs",
+      "sha256": "56d75ef551849afb627ab7f646dcdc098994ba44e8d39c4da9c72925cdac45a3"
+    },
+    {
+      "path": "host-win/crates/vw-document-win/src/windows/acl.rs",
+      "candidate": "host-win/crates/vw-document-win/src/windows/acl.rs",
+      "sha256": "5f035217deeda55e0ef617938b33fabae6f25622846b03936d88252d0574de2f"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/documents.rs",
+      "candidate": "core/crates/vw-ffi/src/documents.rs",
+      "sha256": "f8ed5e861ea29e86c07931276246a46a79afe88d02e97225a4ac9bdb9d07b27f"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/documents/jobs.rs",
+      "candidate": "core/crates/vw-ffi/src/documents/jobs.rs",
+      "sha256": "b75503334ef090fd1cb6c1f9b3f59d99498aa539810d3459bfff84e25245164c"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/documents/jobs_tests.rs",
+      "candidate": "core/crates/vw-ffi/src/documents/jobs_tests.rs",
+      "sha256": "e8ce9d5d7e68003a6dd21f81a6611959a3589a5b592187f7ac4ead2104e77c36"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/documents/engine.rs",
+      "candidate": "core/crates/vw-ffi/src/documents/engine.rs",
+      "sha256": "07a2657000e023185ae0dcef9447ede62e577f8267600cda3ad6b304734b1973"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/documents/overlays.rs",
+      "candidate": "core/crates/vw-ffi/src/documents/overlays.rs",
+      "sha256": "fe625482ca56702d47e0fa9bfd90bcb4b56eb5b8b3e672ca73137a391dbc40f9"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeDocuments.kt",
+      "candidate": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeDocuments.kt",
+      "sha256": "56f34b4cf5da401910c4bc12c4186123e4973e5e1f527c30c4348c00c2c751ad"
+    },
+    {
+      "path": "tools/document-worker/Cargo.toml",
+      "candidate": "tools/document-worker/Cargo.toml",
+      "sha256": "4fe57e75a32f82b33bc7423800e2d52985b592020addfac67d34aa87b4b35f3f"
+    },
+    {
+      "path": "tools/document-worker/src/sandbox_probe.rs",
+      "candidate": "tools/document-worker/src/sandbox_probe.rs",
+      "sha256": "306db03d318bb71cd8c00bc7cd29e48679835b904589e737ae951501c0dc8337"
+    },
+    {
+      "path": "tools/document-worker/src/main.rs",
+      "candidate": "tools/document-worker/src/main.rs",
+      "sha256": "a5346e43a04d89e6d0a91579b0f3fc3fb2f5c1a3cdf2f9e3c04f7e65abbdfef9"
+    },
+    {
+      "path": "tools/document-worker/src/dispatch.rs",
+      "candidate": "t3-document-pc-redaction/after/tools/document-worker/src/dispatch.rs",
+      "sha256": "88648c56d8ccc538918ce73d0f55a887a69996e50f4ea0f3ad8a51cc4b30b7c1"
+    }
+  ],
+  "platform_source": "4c130504169f516d6825cdf1f5a09a690c5463d8",
+  "precision_source": "260b4f5e3fc47772cfa28f012c94ed1f29d48cf4",
+  "shared_image_fix": "bf0d5f4b067aa0f255097a0fa56a1979d4234d73; independently published for focused image validation",
+  "root_changes": [
+    "Register document and precision native exports; admit workspace worker, pinned Windows runtime host and existing engine dependency edges.",
+    "Compose PC-redaction metadata/runtime admission from its separately reviewed recovery delta, retaining explicit capability checks.",
+    "Expose bounded page-aware storage/facade operations, original hash/geometry checks, full project/device/optimistic revision fences and no-clobber copy publication.",
+    "Inject DocumentJobs through DocumentInteraction; remove recovered process-wide global installer. Native storage calls reuse joined settledStream ownership; creation releases undelivered native projects.",
+    "Admit operation-specific native result validation, output hashing through128MiB including empty info payloads, typed metadata decoding, bounded UTF8/password/request inputs.",
+    "Allow worker-only SVG runtime manifests; PDF still requires pinned PDFium, PC redaction requires pinned qpdf. Absent artifacts remain Unavailable.",
+    "Add exact-runtime quarantine retry DesktopDocumentRuntime.retryRetirement; it retains crash markers and does not adopt old-process ownership.",
+    "Android native repeats isolated UID, installs hard AS/CPU rlimits before parser execution, validates packaged library bytes, generates random per-job binding, and allows empty PDFium only for validated SVG.",
+    "Register nonexported isolated Android service; add precision scene/sampling fields for the admitted drawing helper without app input routing yet."
+  ],
+  "source_checks": {
+    "rustfmt_all": "passed",
+    "cargo_metadata_offline_locked": "passed; no new registry version selected",
+    "cargo_deny_offline": "licenses sources bans passed",
+    "git_diff_check": "passed",
+    "android_manifest_xml": "parsed; isolated nonexported service registered",
+    "kotlin_psi_syntax": {
+      "files": 49,
+      "passed": true,
+      "log_sha256": "ffbafbd420eb9fbb62703b18fe7442d2b69287239eb3d5a486569493488cfedb"
+    },
+    "cargo_metadata_offline_locked_log_sha256": "6a788c58479469095ca52430b99307f8a87cd154756dee70d5ea1cc764730666"
+  },
+  "written_root_test_cases_including_recovered": {
+    "common_document_interaction": 7,
+    "native_job_result_and_source": 9,
+    "native_page_revision_and_geometry": 2,
+    "worker_only_manifest_addition": 1,
+    "executed": 0
+  },
+  "pending": [
+    "Native/Linux and Windows-target type checking, strict Clippy and focused source tests; Android ABI compilation and one combined UniFFI regeneration/app compile remain unrun.",
+    "The document owner must replace its conservative permanent Isolation refusal with the new runtime.retryRetirement call in its retained Desktop DocumentCall.retire path; only clear uncertainty after success.",
+    "No trusted native document resources are packaged yet. Windows PDFium/qpdf/worker execution, isolation probes, and Android isolated Binder/ART VM execution remain pending.",
+    "Strict Android AS512MiB may refuse allocation in a larger ART process. Do not relax it from compilation or claim runtime capability before measuring the actual isolated process.",
+    "DocumentController/frame adoption, app-owned jobs installation/drain, page/import/export picker controls and prepared tile draw-reader retirement remain to compose. AndroidDocumentIO.close and DesktopDocumentRuntimeCache.closePending must be joined by app shutdown.",
+    "Precision actual app input, captured hit matrices, rendering and controls remain to compose; native registration and helper source alone do not enable the feature.",
+    "Image provenance repair b0fee0a is merged as source. Its owner is running focused validation separately; BMP publication remains explicitly gated by 2fc64bc until an embedded carrier is admitted.",
+    "No provider, app launch, Windows sandbox, Android decoder, device gesture, runtime fidelity/performance or product gate acceptance is claimed."
+  ],
+  "heavy_builds_run": 0,
+  "heavy_slot": "Parent retains allocation; documents focused phase precedes image run",
+  "verification_images_created": 0,
+  "platform_validation_scope": {
+    "last_completed_harness_cases": 47,
+    "latest_source_cases": 50,
+    "latest_three_privacy_handoff_cases": "uncompiled; no result extrapolation"
+  },
+  "image_leaf_repair": "b0fee0aead798fe43fbb680125e082ccbf02afc8",
+  "precision_registration_commit": "f765ea2",
+  "bmp_ui_preflight_gate_commit": "2fc64bc"
+}

@@ -81,6 +81,22 @@ pub(crate) fn render_list(
     document: &str,
     query: Option<QueryRect>,
 ) -> Result<RenderList> {
+    render_list_for_page(state, document, None, query)
+}
+pub(crate) fn render_list_page(
+    state: &ProjectState,
+    document: &str,
+    page: u32,
+    query: Option<QueryRect>,
+) -> Result<RenderList> {
+    render_list_for_page(state, document, Some(page), query)
+}
+fn render_list_for_page(
+    state: &ProjectState,
+    document: &str,
+    selected_page: Option<u32>,
+    query: Option<QueryRect>,
+) -> Result<RenderList> {
     let query = query.map(rect).transpose()?;
     let project = state.project()?;
     let document = Id::try_from(document.to_owned())?;
@@ -93,10 +109,28 @@ pub(crate) fn render_list(
         .assets
         .get(&AssetId::try_from(definition.primary_asset_id.clone())?)
         .ok_or(CoreError::Invalid)?;
-    let (w, h) = if source.orientation >= 5 {
+    let (mut w, mut h) = if source.orientation >= 5 {
         (source.height, source.width)
     } else {
         (source.width, source.height)
+    };
+    let page_index = if let Some(page) = selected_page {
+        let descriptor = crate::documents::descriptor(state, &document.to_string())?
+            .ok_or(CoreError::Unsupported)?;
+        let geometry = descriptor
+            .pages
+            .get(page as usize)
+            .filter(|item| item.page == page)
+            .ok_or(CoreError::Invalid)?;
+        w = geometry.width.ceil() as u32;
+        h = geometry.height.ceil() as u32;
+        Some(if descriptor.kind == crate::EditableDocumentKind::Pdf {
+            page as i32
+        } else {
+            -1
+        })
+    } else {
+        None
     };
     let page = QueryRect {
         x: 0.0,
@@ -109,6 +143,7 @@ pub(crate) fn render_list(
         .iter()
         .filter(|(_, layer)| {
             layer.definition.document_id.as_ref() == Some(&document.to_proto())
+                && page_index.is_none_or(|index| layer.definition.page_index == index)
                 && layer.visible
                 && layer.opacity > 0.0
         })
