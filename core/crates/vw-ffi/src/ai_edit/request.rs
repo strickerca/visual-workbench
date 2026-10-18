@@ -116,6 +116,7 @@ impl AiRequest {
             estimate_expires_on: options.estimate.as_ref().map(|e| e.expires_on.clone()),
             configuration_expires_on: configuration.expires_on.clone(),
             provider_copy_reduces_depth: r.source_bit_depth() == 16,
+            provider_kind: configuration.provider.kind.into(),
         };
         let state = RequestState {
             prepared,
@@ -210,6 +211,15 @@ impl AiRequest {
                     stop.check()?;
                     if state.send_consumed {
                         return Err(AiEditError::AttemptConsumed);
+                    }
+                    // Provider-specific protected keys and flat-price settlement
+                    // need the coordinator's reserved credential/ledger hooks.
+                    // Refuse before reading any key or reserving an attempt.
+                    if !matches!(
+                        state.configuration.provider.kind,
+                        vw_ai::config::ProviderKind::OpenAiImageEdits
+                    ) {
+                        return Err(AiEditError::Unsupported);
                     }
                     if request_id != state.prepared.review().request_id()
                         || state.prepared.review().estimated_microusd()

@@ -149,7 +149,7 @@ async fn fixture(
         options,
         metadata,
         config,
-        prepare::RequestPermit::acquire().unwrap(),
+        prepare::RequestPermit::acquire(MAX_MEMORY).unwrap(),
     )
     .unwrap();
     request
@@ -501,8 +501,79 @@ async fn wrong_send_binding_never_reads_credentials_or_reserves_and_shutdown_rel
         );
     }
     close(p, s, r).await;
-    let permit = prepare::RequestPermit::acquire().unwrap();
+    let permit = prepare::RequestPermit::acquire(MAX_MEMORY).unwrap();
     drop(permit);
+}
+
+#[tokio::test]
+async fn candidate_grid_admission_retains_budgets_until_owned_requests_drop() {
+    let _serial = SERIAL.lock().await;
+    let quarter = 256 * 1024 * 1024;
+    let owners: Vec<_> = (0..4)
+        .map(|_| prepare::RequestPermit::acquire(quarter).unwrap())
+        .collect();
+    assert!(matches!(
+        prepare::RequestPermit::acquire(quarter),
+        Err(AiEditError::Busy)
+    ));
+    assert!(matches!(
+        prepare::RequestPermit::acquire(0),
+        Err(AiEditError::Limit)
+    ));
+    drop(owners);
+    let large = prepare::RequestPermit::acquire(MAX_MEMORY).unwrap();
+    let second = prepare::RequestPermit::acquire(MAX_MEMORY).unwrap();
+    assert!(matches!(
+        prepare::RequestPermit::acquire(quarter),
+        Err(AiEditError::Busy)
+    ));
+    drop(large);
+    let replacement = prepare::RequestPermit::acquire(quarter).unwrap();
+    drop(replacement);
+    drop(second);
+}
+
+#[tokio::test]
+async fn unavailable_provider_cannot_consume_send_or_ledger_attempt() {
+    let _serial = SERIAL.lock().await;
+    let dir = temp();
+    let (project, service, request, _) = fixture(dir.path(), 8).await;
+    request
+        .worker
+        .call(|state| {
+            state.send_consumed = false;
+            state.configuration.provider.kind = vw_ai::config::ProviderKind::GeminiImageGeneration;
+            Ok(())
+        })
+        .await
+        .unwrap();
+    assert!(matches!(
+        request
+            .send(request.describe().request_id.clone(), 1, false, cancel())
+            .await,
+        Err(AiEditError::Unsupported)
+    ));
+    assert!(
+        !request
+            .worker
+            .call(|state| Ok(state.send_consumed))
+            .await
+            .unwrap()
+    );
+    {
+        use vw_ai::budget::BudgetLedger;
+        assert!(
+            service
+                .state
+                .lock()
+                .unwrap()
+                .ledger
+                .entry(&request.describe().request_id)
+                .unwrap()
+                .is_none()
+        );
+    }
+    close(project, service, request).await;
 }
 #[test]
 fn ledger_provisioning_is_exclusive_and_missing_history_never_resets() {
