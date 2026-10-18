@@ -17,7 +17,8 @@ Only these additive leaves/artifacts and this handoff are owned:
 - `apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/`:
   `McpVerificationTargets.kt`, `McpMarkerAssessments.kt`,
   `McpSemanticMarkerAlignment.kt`.
-- `tools/tests/T501VerificationLeafProbe.kt` and
+- `tools/tests/T501VerificationLeafProbe.kt`,
+  `tools/tests/T501RecapturePublicationProbe.kt` and
   `tools/tests/test_t501_verification_leaves.py`.
 - `integration/t5-01/private-recapture-owner.patch` and
   `integration/t5-01/verification-origin-admission.patch`, **unapplied**.
@@ -41,16 +42,24 @@ alignment**. Changed full bindings, ambiguous source routes, retirement, foreign
 or consumed tickets, close and capacity limits refuse. Retiring an original
 invalidates pending tickets without prematurely releasing their admission.
 
-The unapplied `private-recapture-owner.patch` adds those calls plus
+The repaired, unapplied `private-recapture-owner.patch` adds those calls plus
 `recaptureOriginal(session: String, original: PackageInfo)` to the existing
 coordinator. It factors the current capture body into `captureInside`, preserving
-its ownership/grant checks, and invalidates before unpublish. Both patches pass
-`git apply --check` against the baseline; neither postimage is compiled.
+its ownership/grant checks, and invalidates before unpublish. Its optional private
+`checkOriginal` callback combines with the grant check after captureGate, indicator
+wait, native compilation and **inside catalogGate before catalog.publish**.
+The same guard still runs before exposure, and final ticket validation, abandon
+and joined cleanup remain. Both patches pass `git apply --check` against the
+baseline. The coordinator proposal now has focused executable race coverage;
+the native lineage postimage remains uncompiled.
 
 **2. Aligned marker correspondence and owner assessment.** Read `semantic.json`
 with existing `WorkbenchPackageCatalog.readFile(id, target, manifestSha256,
-"semantic.json", 16 MiB)`. `McpAlignmentSnapshot.fromCheckedPackage(info, bytes)`
-uses existing `McpJson` and `SemanticElement` records without inventing the
+"semantic.json", 4 MiB)`. `McpAlignmentSnapshot.fromCheckedPackage(info, bytes)`
+matches native admission: 4 MiB JSON, 4,096 elements, 2 MiB UTF-8 text. A bounded
+structural framer separates the flat element records; unchanged `McpJson` validates
+the header and each record, avoiding the IPC codec's 32,768-node whole-tree limit.
+The decoder retains existing `SemanticElement` records without inventing the
 collection timing omitted from exports. No snapshot returns unresolved.
 `alignMcpMarker(recapture, originalNumber, markerBounds: Rect,
 anchor: SemanticReference, before, after)` returns paired canonical Rects only
@@ -95,15 +104,32 @@ is needed. Root retains host dispatch, tool registration and public DTO decision
 
 ## Results and remaining acceptance
 
-`python3 tools/tests/test_t501_verification_leaves.py`: **20 cases pass**.
-It compiles the three leaves and existing McpJson with the cached Kotlin 2.4.0
-compiler, warnings denied, against exact unmodified production DTO declaration
-slices. This is a bounded leaf test, not a Gradle build or pinned app-toolchain
-receipt. Temporary classes/type slices are disposed. The first run exposed an
-unnormalized malformed-UTF-8 note exception; fixed refusal then passed all cases.
+`python3 tools/tests/test_t501_verification_leaves.py`: **23 leaf cases and five
+coordinator proposal race cases pass**. Valid 2,000/4,096-element snapshots retain
+all records; count/byte/text oversize, duplicate keys/arrays, broken collection
+grammar, Unicode, excessive nesting and nonfinite bounds refuse. The unchanged
+IPC codec still rejects these large whole snapshots at its existing node ceiling.
+
+The Kotlin 2.4.0 focused compiler uses warnings denied, cached pinned coroutines
+1.9.0 and exact production DTO/interface declarations. The proposal is applied
+only to a temporary coordinator copy; its scope dispatcher alone is replaced
+with Unconfined to establish exact mutex waiter order without sleeps/polling.
+All guard, grant, publication, retirement and cleanup function bodies are the
+proposal's code. Tests cover retirement queued at catalogGate (no durable publish
+or exposure), during compile, queued at captureGate, delivered cancellation with
+joined cleanup, and an already admitted publication winning before retirement.
+The IO fixture closes untransferred results and waits for delivered producer
+cancellation rather than treating the outer caller's request as a commit barrier.
+
+`--negative-publication-control` removes only the invocation inside catalogGate
+in that temporary copy. It compiles and exits 1 at the exact assertion
+`Retirement-winning recapture crossed catalog publication`, proving the race
+regression detects this finding even with the later exposure guard retained.
+Temporary candidates/classes/type slices are disposed. These are focused tests,
+not a Gradle build or pinned app-toolchain receipt.
 Previously run pinned Node 24.21.0 MCP bounds/packages/protocol suites: **24 pass**.
 
-No heavy slot was granted/used. Both root patches are unapplied and uncompiled;
+No heavy slot was granted/used. Both root patches remain unapplied;
 full Kotlin/native builds, durable review storage, pixel crop/UI composition,
 MCP registration, final failure-package publication, Windows/phone recapture,
 image-registration quality and A30 hardware/owner acceptance are unrun. No new
