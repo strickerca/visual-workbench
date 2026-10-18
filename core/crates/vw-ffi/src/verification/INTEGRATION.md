@@ -203,7 +203,10 @@ ownership through native calls and final publication.
    than reconstructing this from a manifest/title. It currently routes only
    `(opened,destination,warning)`, so this callback is a real reserved capture
    seam. Retain the origin after successful destination delivery, even if
-   semantic collection was unavailable. Main may need to initialize its `mcp`
+   semantic collection was unavailable. Failure of this optional MCP callback
+   must preserve the already delivered project/transfer and report verification
+   unavailable; it must not close that transferred editor owner. Main may need
+   to initialize its `mcp`
    lifetime before the capture controller to pass the callback. The native
    adapter refreshes exact HWND/PID/process-created identity, then returns its
    existing private selector. Coordinator records source→selector association;

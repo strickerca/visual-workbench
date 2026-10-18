@@ -32,7 +32,7 @@ internal data class McpAlignmentSnapshot(
             // IPC's 32,768-node ceiling cannot admit a whole 4,096-element tree.
             require(semanticJson.size <= 4 * 1024 * 1024)
             val identity = McpVerificationPackage.of(info)
-            val parts = semanticJsonParts(semanticJson)
+            val parts = checkedJsonArrayParts(semanticJson, "elements", 4096)
             val data = parts.header
             require(data["schema_version"] == BigDecimal.ONE && data["text_is_untrusted"] == true)
             require(data["project_id"] == identity.binding.projectId && data["document_id"] == identity.binding.documentId)
@@ -92,13 +92,15 @@ internal data class McpAlignmentSnapshot(
     }
 }
 
-private data class SemanticJsonParts(val header: Map<String, Any?>, val elements: List<IntRange>)
+internal data class McpJsonArrayParts(val header: Map<String, Any?>, val elements: List<IntRange>)
 
 /** Schema-specific record framing, not a second JSON value parser. The existing
  * codec validates the complete root and each element (UTF-8, syntax, duplicate
  * keys, numeric bounds and nesting). Only the flat elements array is split so
  * its accepted 4,096 records do not share IPC's much smaller node allowance. */
-private fun semanticJsonParts(bytes: ByteArray): SemanticJsonParts {
+internal fun checkedJsonArrayParts(bytes: ByteArray, field: String, maxRecords: Int): McpJsonArrayParts {
+    require(field.matches(Regex("[a-z_]{1,32}")) && maxRecords in 1..4096)
+    val fieldBytes = "\"$field\"".toByteArray(Charsets.UTF_8)
     fun whitespace(at: Int): Int {
         var end = at
         while (end < bytes.size) {
@@ -139,13 +141,13 @@ private fun semanticJsonParts(bytes: ByteArray): SemanticJsonParts {
             34 -> {
                 val end = stringEnd(at)
                 val colon = whitespace(end)
-                if (depth == 1 && end - at == 10 && bytes.copyOfRange(at, end).contentEquals("\"elements\"".toByteArray()) &&
+                if (depth == 1 && end - at == fieldBytes.size && bytes.copyOfRange(at, end).contentEquals(fieldBytes) &&
                     colon < bytes.size && bytes[colon].toInt() == 58) {
                     require(start < 0)
                     start = whitespace(colon + 1); require(start < bytes.size && bytes[start].toInt() == 91)
                     var next = whitespace(start + 1)
                     while (next < bytes.size && bytes[next].toInt() != 93) {
-                        require(ranges.size < 4096 && bytes[next].toInt() == 123)
+                        require(ranges.size < maxRecords && bytes[next].toInt() == 123)
                         val limit = recordEnd(next); ranges.add(next until limit); next = whitespace(limit)
                         require(next < bytes.size)
                         if (bytes[next].toInt() == 93) break
@@ -167,7 +169,7 @@ private fun semanticJsonParts(bytes: ByteArray): SemanticJsonParts {
     bytes.copyInto(header, 0, 0, start)
     header[start] = 91; header[start + 1] = 93
     bytes.copyInto(header, start + 2, finish, bytes.size)
-    return SemanticJsonParts(McpJson.decode(header), ranges)
+    return McpJsonArrayParts(McpJson.decode(header), ranges)
 }
 
 /** Explicit correspondence from two native semantic snapshots. Coordinates are

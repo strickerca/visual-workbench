@@ -15,8 +15,17 @@ internal interface McpCaptureEngine {
     suspend fun select():McpSelectedTarget
     /** Captures only that selector's retained exact process/window identity. */
     suspend fun compile(selector:String,checkGrant:suspend()->Unit):WorkbenchCompiledPackage
+    suspend fun compileVerification(selector:String,profile:McpCaptureProfile,checkGrant:suspend()->Unit):WorkbenchCompiledPackage {
+        if(profile!=McpCaptureProfile(PackageTarget.Generic(),false))throw McpRefused()
+        return compile(selector,checkGrant)
+    }
+    /** Borrow only previously retained native capture sources. Never resolve a
+     * project from a public package directory or a caller-supplied filesystem path. */
+    suspend fun <T> withVerificationSources(original:PackageInfo,after:PackageInfo,body:suspend(WorkbenchProject,WorkbenchProject)->T):T = throw McpRefused()
+    suspend fun <T> withVerificationSource(after:PackageInfo,body:suspend(WorkbenchProject)->T):T = throw McpRefused()
     suspend fun close()
 }
+internal data class McpCaptureProfile(val target:PackageTarget,val includeWindowTitle:Boolean)
 internal data class McpCaptureGrant(val connection:String,val selectors:List<String>,val expiresNs:Long)
 internal data class McpCaptureActivity(val id:String,val connection:String,val selector:String)
 internal data class McpDesktopState(
@@ -24,6 +33,7 @@ internal data class McpDesktopState(
     val inbox:List<McpInboxReceipt> = emptyList(),val targets:List<McpSelectedTarget> = emptyList(),
     val grants:List<McpCaptureGrant> = emptyList(),val activeCapture:McpCaptureActivity?=null,
     val retiring:Set<String> = emptySet(),val sendPreview:McpClaudePreview?=null,
+    val verificationReceipts:Set<String> = emptySet(),
     val message:String?=null,val closed:Boolean=false,
 )
 
@@ -33,6 +43,7 @@ internal data class McpDesktopState(
 internal class DesktopMcpCoordinator(
     private val catalog:WorkbenchPackageCatalog,private val inbox:WorkbenchMcpInbox,
     private val connection:McpConnection,private val captureEngine:McpCaptureEngine,
+    private val newId:()->String={throw McpRefused()},
     private val nowNs:()->Long=System::nanoTime,
 ):McpOwnerActions {
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
@@ -42,6 +53,8 @@ internal class DesktopMcpCoordinator(
     private val stopped=CompletableDeferred<Unit>()
     private val catalogGate=Mutex();private val inboxGate=Mutex();private val captureGate=Mutex()
     private val verificationTargets=McpVerificationTargets()
+    private val verificationGate=Mutex()
+    private val verification=McpVerificationWorkflow(catalog,inbox,captureEngine,::checkedVerificationPackage,newId)
     private val grantGate=Mutex()
     private val controls=LinkedHashMap<String,Deferred<Unit>>()
     private var batchControl:Deferred<Unit>?=null
@@ -107,7 +120,7 @@ internal class DesktopMcpCoordinator(
     }
     suspend fun retirePackage(selected:PublishedPackage)=owned {
         val itemKey=key(selected.info.packageId,selected.info.target)
-        catalogGate.withLock{verificationTargets.retire(selected.info);mutable.update{it.copy(retiring=it.retiring+itemKey,sendPreview=null)}}
+        catalogGate.withLock{verificationTargets.retire(selected.info);verification.retire(selected.info);mutable.update{it.copy(retiring=it.retiring+itemKey,sendPreview=null)}}
         // Do not hold catalogGate while draining callbacks: an unrelated capture
         // callback may be publishing, and must settle before this receipt.
         connection.unpublish(selected.info.packageId,selected.info.target,selected.info.manifestSha256)
@@ -226,12 +239,14 @@ internal class DesktopMcpCoordinator(
      * original under the same gate used by retirement before ticket admission,
      * and again with completion. This grants no capture or alignment authority. */
     suspend fun recaptureOriginal(session:String,original:PackageInfo):McpVerificationRecapture=owned(session) {
-        val ticket=catalogGate.withLock {
-            verificationTargets.begin(checkedVerificationPackage(original).info)
+        val (ticket,profile)=catalogGate.withLock {
+            val exact=checkedVerificationPackage(original).info
+            val profile=verification.profile(exact)
+            verificationTargets.begin(exact) to profile
         }
         try {
             checkGrant(session,ticket.selector);verificationTargets.checkCurrent(ticket)
-            val receipt=captureInside(session,ticket.selector){verificationTargets.checkCurrent(ticket)}
+            val receipt=captureInside(session,ticket.selector,profile){verificationTargets.checkCurrent(ticket)}
             catalogGate.withLock {
                 require(key(receipt.packageId,receipt.target) !in mutable.value.retiring)
                 val matches=catalog.list().filter{it.info.packageId==receipt.packageId && it.info.target==receipt.target}
@@ -253,7 +268,7 @@ internal class DesktopMcpCoordinator(
         require(McpVerificationPackage.of(exact.info)==McpVerificationPackage.of(expected))
         return exact
     }
-    private suspend fun captureInside(session:String,selector:String,checkOriginal:()->Unit={}):McpCaptureReceipt {
+    private suspend fun captureInside(session:String,selector:String,profile:McpCaptureProfile?=null,checkOriginal:()->Unit={}):McpCaptureReceipt {
         suspend fun checkCapture(){checkGrant(session,selector);checkOriginal()}
         return captureGate.withLock {
             checkCapture()
@@ -262,7 +277,7 @@ internal class DesktopMcpCoordinator(
             mutable.update{it.copy(activeCapture=McpCaptureActivity(id,session,selector))}
             try {
                 withTimeout(2_000){drawn.await()};checkCapture()
-                val compiled=captureEngine.compile(selector){checkCapture()}
+                val compiled=if(profile==null)captureEngine.compile(selector){checkCapture()} else captureEngine.compileVerification(selector,profile){checkCapture()}
                 try {
                     checkCapture()
                     val verificationEligible=try {
@@ -279,6 +294,71 @@ internal class DesktopMcpCoordinator(
             }
         }
     }
+    /** Installed by the existing editor owner under its lifecycle ownership. */
+    fun attachVerificationOriginal(access:McpVerificationOriginalAccess) {
+        synchronized(lifecycle){check(!closing);verification.originalAccess=access}
+    }
+    /** Called by the existing capture delivery, before compiling/exposing its
+     * marked package. Retaining a route mints no connection or capture grant. */
+    suspend fun rememberEditorCapture(origin:McpEditorCaptureOrigin)=owned {
+        val selected=captureGate.withLock{origin.retain(captureEngine)}
+        catalogGate.withLock{verificationTargets.rememberSource(origin.binding,origin.sourceAssetId,selected.selector)}
+        mutable.update{it.copy(targets=if(it.targets.any{target->target.selector==selected.selector})it.targets else it.targets+selected)}
+    }
+    override suspend fun recaptureVerification(session:String,packageId:String,target:String,manifestHash:String):McpVerificationReceipt {
+        live(session)
+        val original=owned(session){catalogGate.withLock{catalog.lookup(packageId,target,manifestHash).info.also{checkedVerificationPackage(it)}}}
+        val recaptured=recaptureOriginal(session,original)
+        return owned(session){verificationGate.withLock{catalogGate.withLock{inboxGate.withLock{
+            withVerificationGrant(session,original){
+                val result=verification.remember(recaptured,session)
+                val returns=inbox.list()
+                mutable.update{it.copy(inbox=returns,verificationReceipts=it.verificationReceipts+result.receiptId,message="Original window recaptured. Manual marker review is ready.")}
+                result
+            }
+        }}}}
+    }
+    override suspend fun markerComparison(session:String,packageId:String,target:String,manifestHash:String,receiptId:String,receiptHash:String,number:UInt):McpMarkerComparison=owned(session) {
+        live(session)
+        verificationGate.withLock{catalogGate.withLock{inboxGate.withLock{
+            val original=catalog.lookup(packageId,target,manifestHash).info
+            withVerificationGrant(session,original){verification.comparison(VerificationPackageKey(packageId,target,manifestHash),receiptId,receiptHash,number)}
+        }}}
+    }
+    /** Same private selector and live grant for both agent verification tools.
+     * Read-only comparison has no new OS capture and needs no second indicator. */
+    private suspend fun <T> withVerificationGrant(session:String,original:PackageInfo,body:suspend()->T):T {
+        val ticket=verificationTargets.begin(checkedVerificationPackage(original).info)
+        try {
+            checkGrant(session,ticket.selector);verificationTargets.checkCurrent(ticket)
+            val result=body()
+            checkGrant(session,ticket.selector);verificationTargets.checkCurrent(ticket)
+            return result
+        } finally {verificationTargets.abandon(ticket)}
+    }
+    suspend fun verificationReview(receipt:McpInboxReceipt):VerificationReviewSnapshot=owned {
+        verificationGate.withLock{catalogGate.withLock{inboxGate.withLock{verification.review(receipt)}}}
+    }
+    /** Explicit local owner action. No McpOwnerActions method exposes this. */
+    fun verificationOperationId():String=synchronized(lifecycle){check(!closing);newId()}
+    suspend fun reviewMarker(request:VerificationOwnerChange):VerificationReviewSnapshot=owned {
+        verificationGate.withLock{catalogGate.withLock{inboxGate.withLock{verification.change(request)}}}
+    }
+    suspend fun comparison(receipt:McpInboxReceipt,number:UInt,assumeSrgb:Boolean,allowDepth:Boolean):McpMarkerComparison=owned {
+        verificationGate.withLock{catalogGate.withLock{inboxGate.withLock{
+            val review=verification.review(receipt)
+            verification.comparison(review.pair.original,receipt.receiptId,receipt.receiptBlake3,number,assumeSrgb,allowDepth)
+        }}}
+    }
+    suspend fun compileVerificationFailures(expected:VerificationReviewSnapshot,assumeSrgb:Boolean,allowDepth:Boolean):PublishedPackage?=owned {
+        verificationGate.withLock {
+            val compiled=catalogGate.withLock{inboxGate.withLock{verification.compile(expected,newId(),System.currentTimeMillis(),assumeSrgb,allowDepth)}}
+            if(compiled==null){mutable.update{it.copy(message="All reviewed markers pass. No follow-up package was created.")};null}
+            else try{publishInside(compiled,verificationEligible=false,beforePublish={inboxGate.withLock{verification.checkReview(expected)}}).also{
+                mutable.update{it.copy(message="Failure-only follow-up saved against the checked recapture source. Original marker numbers are preserved in lineage.")}
+            }}finally{withContext(NonCancellable){compiled.close()}}
+        }
+    }
     override suspend fun submitResult(session:String,packageId:String,manifestHash:String,text:String?,pngBase64:String?,note:String):String=owned(session) {
         live(session)
         val body=decodeMcpReturn(text,pngBase64,note)
@@ -286,7 +366,7 @@ internal class DesktopMcpCoordinator(
             val matches=catalog.list().filter{it.info.packageId==packageId&&it.info.manifestSha256==manifestHash}
             require(matches.size==1);matches.single().also{require(key(packageId,it.info.target) !in mutable.value.retiring)}
         }
-        val submission=McpInboxSubmission(UUID.randomUUID().toString(),packageId,exact.info.target,manifestHash,session,System.currentTimeMillis(),body.first,body.second,note)
+        val submission=McpInboxSubmission(newId(),packageId,exact.info.target,manifestHash,session,System.currentTimeMillis(),body.first,body.second,note)
         val receipt=inboxGate.withLock{inbox.submit(catalog,submission)}
         // Persistence may finish after cancellation; list recovers the immutable
         // receipt. No transient failure can delete that paid/external output.
@@ -300,8 +380,8 @@ internal class DesktopMcpCoordinator(
         inboxGate.withLock{inbox.readPng(receipt.receiptId,receipt.receiptBlake3,side)}
     }
     suspend fun retireReturn(receipt:McpInboxReceipt)=owned {
-        val retired=inboxGate.withLock{inbox.retire(receipt.receiptId,receipt.receiptBlake3)}
-        mutable.update{it.copy(inbox=it.inbox.filterNot{old->old.receiptId==receipt.receiptId},message=if(retired.filesRemoved)"Return removed." else "Return retired; exact bytes remain pending supported cleanup.")}
+        val retired=verificationGate.withLock{catalogGate.withLock{inboxGate.withLock{inbox.retire(receipt.receiptId,receipt.receiptBlake3).also{verification.retire(receipt)}}}}
+        mutable.update{it.copy(inbox=it.inbox.filterNot{old->old.receiptId==receipt.receiptId},verificationReceipts=it.verificationReceipts-receipt.receiptId,message=if(retired.filesRemoved)"Return removed." else "Return retired; exact bytes remain pending supported cleanup.")}
     }
     suspend fun close() {
         val launch=synchronized(lifecycle){if(closing)false else{closing=true;true}}
@@ -309,7 +389,7 @@ internal class DesktopMcpCoordinator(
             var failure:Throwable?=null
             suspend fun settle(body:suspend()->Unit){try{body()}catch(error:Throwable){if(failure==null)failure=error}}
             val jobs=synchronized(lifecycle){grants.clear();grantAdmissions.clear();publishGrants();active.keys.toList()+controls.values.toList()+listOfNotNull(batchControl)};jobs.forEach{it.cancel()};jobs.joinAll()
-            verificationTargets.close()
+            verificationTargets.close();verification.close()
             settle{connection.close()};settle{captureEngine.close()};settle{inbox.close()};settle{catalog.close()}
             scope.cancel();mutable.update{it.copy(agents=emptyList(),grants=emptyList(),activeCapture=null,closed=true)}
             val error=failure;if(error==null)stopped.complete(Unit)else stopped.completeExceptionally(error)

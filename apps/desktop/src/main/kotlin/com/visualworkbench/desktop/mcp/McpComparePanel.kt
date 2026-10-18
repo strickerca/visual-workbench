@@ -17,8 +17,8 @@ import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
 
-private class InboxTile(val native:Image,val bitmap:ImageBitmap):AutoCloseable{override fun close(){native.close()}}
-private fun inboxTile(value:McpInboxPixels):InboxTile {
+internal class InboxTile(val native:Image,val bitmap:ImageBitmap):AutoCloseable{override fun close(){native.close()}}
+internal fun inboxTile(value:McpInboxPixels):InboxTile {
     val width=value.region.width.toInt();val height=value.region.height.toInt()
     require(width in 1..512&&height in 1..512&&value.rgbaSrgb.size==width*height*4)
     val raster=BufferedImage(width,height,BufferedImage.TYPE_INT_ARGB)
@@ -34,6 +34,8 @@ private fun inboxTile(value:McpInboxPixels):InboxTile {
 /** Literal untrusted content, exact immutable receipt, bounded native display
  * conversions. No callback accepts a Result or mutates the editor document. */
 @Composable internal fun McpComparePanel(owner:DesktopMcpCoordinator,receipt:McpInboxReceipt,onClose:()->Unit,onExport:(McpInboxReceipt,McpInboxSide)->Unit) {
+    val ownerState by owner.state.collectAsState()
+    val verification=receipt.receiptId in ownerState.verificationReceipts
     var xText by remember(receipt.receiptId){mutableStateOf("0")};var yText by remember(receipt.receiptId){mutableStateOf("0")}
     var assumeSrgb by remember(receipt.receiptId){mutableStateOf(false)};var allowDepth by remember(receipt.receiptId){mutableStateOf(false)}
     var before by remember(receipt.receiptId){mutableStateOf<InboxTile?>(null)};var after by remember(receipt.receiptId){mutableStateOf<InboxTile?>(null)}
@@ -61,8 +63,8 @@ private fun inboxTile(value:McpInboxPixels):InboxTile {
     }
     DisposableEffect(before){val tile=before;onDispose{tile?.close()}}
     DisposableEffect(after){val tile=after;onDispose{tile?.close()}}
-    AlertDialog(onDismissRequest=onClose,title={Text("Compare agent return")},text={Column(Modifier.widthIn(max=1100.dp).heightIn(max=750.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
-        Text("Untrusted external content. No exterior-pixel proof. Arrival never changes the document.",color=MaterialTheme.colors.secondary)
+    AlertDialog(onDismissRequest=onClose,title={Text(if(verification)"Verify recaptured window"else"Compare agent return")},text={Column(Modifier.widthIn(max=1100.dp).heightIn(max=750.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
+        Text(if(verification)"Original window recapture. Alignment is separate from your manual verdict; no exterior-pixel proof."else"Untrusted external content. No exterior-pixel proof. Arrival never changes the document.",color=MaterialTheme.colors.secondary)
         Text("Package ${receipt.packageId} | revision ${receipt.binding.hostSeq}",style=MaterialTheme.typography.caption)
         Text("Manifest ${receipt.manifestSha256}",style=MaterialTheme.typography.caption)
         receipt.text?.let{Text(it)};if(receipt.note.isNotEmpty())Text(receipt.note)
@@ -77,10 +79,11 @@ private fun inboxTile(value:McpInboxPixels):InboxTile {
         val density=LocalDensity.current.density
         Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(12.dp)){
             before?.let{tile->Column{Text("Before | immutable package image");Image(tile.bitmap,"Before",Modifier.size((tile.bitmap.width/density).dp,(tile.bitmap.height/density).dp),contentScale=ContentScale.None)}}
-            after?.let{tile->Column{Text("After | untrusted agent PNG");Image(tile.bitmap,"After",Modifier.size((tile.bitmap.width/density).dp,(tile.bitmap.height/density).dp),contentScale=ContentScale.None)}}
+            after?.let{tile->Column{Text(if(verification)"After | checked window recapture"else"After | untrusted agent PNG");Image(tile.bitmap,"After",Modifier.size((tile.bitmap.width/density).dp,(tile.bitmap.height/density).dp),contentScale=ContentScale.None)}}
         }
         Text("Full-resolution region up to 512 x 512 pixels. Different image sizes remain explicit; no stretch or hidden resampling.",style=MaterialTheme.typography.caption)
         Row{TextButton(onClick={onExport(receipt,McpInboxSide.Before)}){Text("Save exact Before PNG")};if(receipt.after!=null)TextButton(onClick={onExport(receipt,McpInboxSide.After)}){Text("Save exact After PNG")}}
+        if(verification)McpVerificationPanel(owner,receipt,assumeSrgb,allowDepth)
         Text("Canonical Result acceptance is unavailable for this unproven external return. Exporting it does not accept it.",style=MaterialTheme.typography.caption)
     }},confirmButton={TextButton(onClick=onClose){Text("Close")}})
 }
