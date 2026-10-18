@@ -17,7 +17,7 @@ impl Bits {
     }
     fn bytes(mut self) -> Vec<u8> {
         self.0.push(true);
-        while self.0.len() % 8 != 0 {
+        while !self.0.len().is_multiple_of(8) {
             self.0.push(false);
         }
         self.0

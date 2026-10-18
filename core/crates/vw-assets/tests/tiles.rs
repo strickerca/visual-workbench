@@ -377,3 +377,63 @@ fn eviction_remains_charged_until_the_actual_resource_destructor_returns() {
     assert!(matches!(replacement, Err(AssetError::Busy)));
     assert_eq!(cache.accounting().unwrap(), (0, 0));
 }
+
+#[test]
+fn cancelled_or_superseded_generation_cannot_reenter_a_revisited_view() {
+    for cancelled in [false, true] {
+        let mut scheduler = TileScheduler::new(manifest(1024, 1024), 1).unwrap();
+        scheduler.viewport(view(0., 0., 1., 1., 1.)).unwrap();
+        let old = scheduler.next(|_| false).unwrap().unwrap();
+        if cancelled {
+            scheduler.cancel_view().unwrap();
+        }
+        scheduler.viewport(view(0., 0., 1., 1., 1.)).unwrap();
+        assert_eq!(scheduler.active().count(), 1);
+        assert!(!scheduler.finish(old).unwrap());
+        let fresh = scheduler.next(|_| false).unwrap().unwrap();
+        assert_eq!(fresh.tile, old.tile);
+        assert_ne!(fresh.viewport, old.viewport);
+        assert_ne!(fresh.id, old.id);
+        assert!(scheduler.finish(fresh).unwrap());
+        assert!(scheduler.finish(old).is_err());
+        // Retirement did not duplicate a tile still queued in the new view.
+        assert_ne!(scheduler.next(|_| false).unwrap().unwrap().tile, old.tile);
+    }
+}
+
+#[test]
+fn retiring_skipped_old_request_requeues_visible_tile_before_prefetch() {
+    let mut scheduler = TileScheduler::new(manifest(1024, 1024), 2).unwrap();
+    let latest = view(0., 0., 1., 1., 1.);
+    scheduler.viewport(latest).unwrap();
+    let old = scheduler.next(|_| false).unwrap().unwrap();
+    scheduler.cancel_view().unwrap();
+    let plan = scheduler.viewport(latest).unwrap();
+    // next skips the desired tile while its old producer still owns a slot.
+    let prefetch = scheduler.next(|_| false).unwrap().unwrap();
+    assert!(plan.prefetch.contains(&prefetch.tile));
+    assert!(!scheduler.finish(old).unwrap());
+    let fresh = scheduler.next(|_| false).unwrap().unwrap();
+    assert_eq!(fresh.tile, old.tile);
+    assert!(plan.visible.contains(&fresh.tile));
+    assert_eq!(fresh.viewport, prefetch.viewport);
+    assert!(scheduler.finish(fresh).unwrap());
+    assert!(scheduler.finish(prefetch).unwrap());
+    assert_ne!(scheduler.next(|_| false).unwrap().unwrap().tile, old.tile);
+}
+
+#[test]
+fn retrying_an_old_request_requeues_once_under_the_latest_generation() {
+    let mut scheduler = TileScheduler::new(manifest(1024, 1024), 2).unwrap();
+    scheduler.viewport(view(0., 0., 1., 1., 1.)).unwrap();
+    let old = scheduler.next(|_| false).unwrap().unwrap();
+    scheduler.viewport(view(0., 0., 1., 1., 1.)).unwrap();
+    let other = scheduler.next(|_| false).unwrap().unwrap();
+    scheduler.retry(old).unwrap();
+    let fresh = scheduler.next(|_| false).unwrap().unwrap();
+    assert_eq!(fresh.tile, old.tile);
+    assert_ne!(fresh.viewport, old.viewport);
+    assert!(scheduler.finish(fresh).unwrap());
+    assert!(scheduler.finish(other).unwrap());
+    assert_ne!(scheduler.next(|_| false).unwrap().unwrap().tile, old.tile);
+}

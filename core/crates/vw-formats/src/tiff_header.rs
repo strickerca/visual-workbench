@@ -135,8 +135,24 @@ pub(crate) fn inspect(bytes: &[u8], limits: Limits) -> Result<Header> {
     let width = u32::try_from(scalar(&entries, 256, o, None)?).map_err(|_| Error::Limit)?;
     let height = u32::try_from(scalar(&entries, 257, o, None)?).map_err(|_| Error::Limit)?;
     let photo = scalar(&entries, 262, o, None)?;
-    if !matches!(photo, 0 | 1 | 2) {
+    if !matches!(photo, 0..=2) {
         return Err(Error::Unsupported);
+    }
+    // tiff 0.11.3 does not interpret FillOrder. An LSB-first source must not
+    // reach its decoder and silently become different channel values.
+    if scalar(&entries, 266, o, Some(1))? != 1 {
+        return Err(Error::Unsupported);
+    }
+    // These legacy declarations change the interpretation of samples. This
+    // adapter retains ICC only; accepting them as untagged would lose declared
+    // color semantics. Refuse even alongside ICC rather than guess precedence.
+    if entries.iter().any(|entry| {
+        matches!(
+            entry.tag,
+            290 | 291 | 300 | 301 | 318 | 319 | 320 | 342 | 529 | 532
+        )
+    }) {
+        return Err(Error::Color);
     }
     let base = if photo == 2 { 3 } else { 1 };
     let samples = scalar(&entries, 277, o, Some(1))?;

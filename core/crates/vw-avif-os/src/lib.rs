@@ -124,7 +124,7 @@ impl Decoded {
         let length = u64::from(expected.width) * u64::from(expected.height) * 4;
         if &self.header != expected
             || self.rgba.len() as u64 != length
-            || self.rgba.chunks_exact(4).any(|p| p[3] != 255)
+            || self.rgba.as_chunks::<4>().0.iter().any(|p| p[3] != 255)
         {
             return Err(Error::Decode);
         }

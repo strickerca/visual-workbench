@@ -19,6 +19,7 @@ pub struct TileScheduler {
     next: u64,
     capacity: usize,
     queue: VecDeque<TileKey>,
+    visible: BTreeSet<TileKey>,
     wanted: BTreeSet<TileKey>,
     active: BTreeMap<u64, Request>,
 }
@@ -35,6 +36,7 @@ impl TileScheduler {
             next: 0,
             capacity,
             queue: VecDeque::new(),
+            visible: BTreeSet::new(),
             wanted: BTreeSet::new(),
             active: BTreeMap::new(),
         })
@@ -55,6 +57,7 @@ impl TileScheduler {
             .copied()
             .collect();
         self.wanted = self.queue.iter().copied().collect();
+        self.visible = tiles.visible.iter().copied().collect();
         self.generation = generation;
         Ok(tiles)
     }
@@ -83,19 +86,35 @@ impl TileScheduler {
     }
     /// Exact completion consumes only its own active slot. true permits cache
     /// insertion for the current view after content verification; false discards
-    /// old bytes. Forged/duplicate completion cannot release another producer.
+    /// old bytes, including a cancelled view later revisited at the same tiles.
+    /// Retiring an older request requeues its tile if the latest view still
+    /// needs it. Forged/duplicate completion cannot release another producer.
     pub fn finish(&mut self, request: Request) -> Result<bool> {
         if self.active.get(&request.id) != Some(&request) {
             return Err(AssetError::Stale);
         }
         self.active.remove(&request.id);
+        if request.viewport != self.generation {
+            self.requeue(request.tile);
+            return Ok(false);
+        }
         Ok(self.wanted.contains(&request.tile))
     }
     pub fn retry(&mut self, request: Request) -> Result<()> {
         if self.finish(request)? {
-            self.queue.push_front(request.tile);
+            self.requeue(request.tile);
         }
         Ok(())
+    }
+    fn requeue(&mut self, tile: TileKey) {
+        if !self.wanted.contains(&tile) || self.queue.contains(&tile) {
+            return;
+        }
+        if self.visible.contains(&tile) {
+            self.queue.push_front(tile);
+        } else {
+            self.queue.push_back(tile);
+        }
     }
     pub fn cancel_view(&mut self) -> Result<()> {
         self.generation = self
@@ -103,6 +122,7 @@ impl TileScheduler {
             .checked_add(1)
             .ok_or(AssetError::Limit("viewport generation"))?;
         self.queue.clear();
+        self.visible.clear();
         self.wanted.clear();
         Ok(())
     }

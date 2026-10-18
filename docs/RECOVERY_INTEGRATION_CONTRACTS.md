@@ -71,6 +71,31 @@ accounting alone does not prove the app/GPU memory budget.
   joined close and source/revision-bound receipts. Integration owns shared APIs,
   store/cache plumbing, raster/color changes and all app/controller adoption.
 
+## Diagnostics lane and caller ownership
+
+- Admit the proposed closed-enum `PrivateDiagnosticLog` and immutable
+  `PreparedDiagnosticsReport` boundary: UI-dispatcher mutation, bounded numeric
+  metrics, at most 256 events and 65,536 ASCII characters. Unknown measurements
+  remain null; echo round-trip time is not physical drawing latency. Do not add
+  arbitrary provider errors, paths, identifiers, text or image payloads.
+- Preview and explicit export use the same prepared snapshot. Platform writers
+  receive that snapshot and the user-selected destination; they cannot rebuild
+  the report from changing app state. A rejected or cancelled picker has no write.
+- Android's bounded `awaitSave` is a pending-status boundary, not a completed
+  shutdown. Retain the immutable snapshot and stream through the structured IO
+  child's actual completion. Existing EditorController disposal may request scope
+  cancellation after this bounded wait; that request does not prove the writer
+  has stopped. Preserve its current structured child ownership and pending flag,
+  and never report a completed write/close from the elapsed deadline alone.
+- Desktop Main must retain `DiagnosticsExportOwner` while `held` is true. A false
+  result from bounded close leaves the owner, focus lease, producer and cleanup
+  pending; it cannot satisfy the final-close predicate. After publication's commit
+  point, settle the actual result rather than report cancellation as unwritten.
+- The diagnostics lane owns its eight standalone files/tests. Integration owns
+  shared API admission and all app-root/controller wiring; the stale Main overlay
+  is reference material only. No compilation or physical acceptance follows from
+  this source-level interface decision.
+
 ## Build and publication
 
 Specialist owners may edit their crate manifests and dedicated tests/fixtures.

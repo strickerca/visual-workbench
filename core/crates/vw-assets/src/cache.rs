@@ -218,10 +218,10 @@ impl<K: Ord + Clone, T> Drop for Reservation<K, T> {
             Ok(v) => v,
             Err(e) => e.into_inner(),
         };
-        if s.pending.get(&self.key).is_some_and(|p| p.id == self.id) {
-            if let Some(p) = s.pending.remove(&self.key) {
-                s.reserved -= p.bytes;
-            }
+        if s.pending.get(&self.key).is_some_and(|p| p.id == self.id)
+            && let Some(p) = s.pending.remove(&self.key)
+        {
+            s.reserved -= p.bytes;
         }
     }
 }
