@@ -1,0 +1,61 @@
+Source commit: 350f492b62627fac36b36e83715b15441918d435
+Combined base: 70475b818b2ca5bf02b4a3539fb038c864410d83
+
+BASELINE NORMAL POLICY (expected failure)
+VW_POLICY assertions=true debug=true recovery=true; no coroutine property overrides
+java.lang.AssertionError: expected same:<java.lang.IllegalStateException: unknown source retirement> was not:<java.lang.IllegalStateException: unknown source retirement>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotSame(Assert.java:829)
+	at org.junit.Assert.assertSame(Assert.java:772)
+	at org.junit.Assert.assertSame(Assert.java:783)
+	at com.visualworkbench.desktop.capture.CaptureCallerRetirementTest$eitherCaptureRefusalKeepsParentsAliveAndRetainsTheOriginalFailure$1.invokeSuspend(CaptureCallerRetirementTest.kt:33)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:101)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:95)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:69)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:47)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+	at com.visualworkbench.desktop.capture.CaptureCallerRetirementTest.eitherCaptureRefusalKeepsParentsAliveAndRetainsTheOriginalFailure(CaptureCallerRetirementTest.kt:21)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:63)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.junit.runners.Suite.runChild(Suite.java:128)
+	at org.junit.runners.Suite.runChild(Suite.java:27)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:105)
+	at org.junit.runner.JUnitCore.runClasses(JUnitCore.java:62)
+	at org.junit.runner.JUnitCore.runClasses(JUnitCore.java:49)
+	at FocusedJUnitKt.main(FocusedJUnit.kt:14)
+
+VW_RESULT tests=7 failures=1 ignored=0
+
+REPAIRED NORMAL POLICY
+VW_POLICY assertions=true debug=true recovery=true; no coroutine property overrides
+VW_RESULT tests=7 failures=0 ignored=0
+
+No coroutine property overrides; no full combined build/native/binding generation repeated.
