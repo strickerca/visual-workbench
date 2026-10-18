@@ -114,6 +114,14 @@ only bounded leaf compilation/policy/resource checks; it downloads nothing.
   R3 uses explicit public modifier bits and a narrowly documented suppression for
   consuming that legacy callback. R1/R2 logs and failure receipts remain under
   `/tmp/vw-air-actions-check-r1` and `/tmp/vw-air-actions-check-r2`.
+- Review repair: the ninth simultaneous press now calls `queueRefused()` once;
+  guard refusals and duplicate delivery remain silent, with no refused-event replay.
+  The deterministic regression reproduced `executed=8 capacity_refusals=0` before
+  the fix and verifies `executed=8 capacity_refusals=1` after it. All **37/37** host
+  scenarios, strict shared/Android compilation and resource/import checks pass.
+  Before/after text receipts remain in `/tmp/vw-air-actions-press-capacity-before`
+  and `/tmp/vw-air-actions-press-capacity-after`. Repaired router SHA-256:
+  `7dc09b08cbccc73ec6861a3278a3edcc5cf70834f7a5e8a6fdcda5a87d453c04`.
 
 **Unrun:** repository-pinned Kotlin/Gradle/JUnit wrappers, whole-app/native build,
 Android Handler/View lifecycle and visual behavior, manifest/controller composition,
