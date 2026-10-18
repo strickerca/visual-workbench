@@ -30,6 +30,45 @@ class OriginalFormatsTest {
         validateOriginalFormatInfo(value, binding)
         assertNull(originalFormatNotice(value))
     }
+    @Test fun flattenedCompositesAlwaysNameTheirUnchangedOriginalAndLayerLimit() {
+        for (format in listOf("psd", "psb")) for (depth in listOf<UByte>(8u, 16u)) {
+            val value = receipt(format, false, depth).copy(flattenedComposite = true)
+            validateOriginalFormatInfo(value, binding)
+            assertEquals("Flattened embedded composite only. Original layers remain in the unchanged source; layered round trips are unsupported.", originalFormatNotice(value))
+            assertEquals(depth, value.sourceBitDepth)
+        }
+    }
+    @Test fun rawPreviewsCannotClaimRawDevelopmentOrFullResolutionExport() {
+        for (format in listOf("dng", "cr2", "raw-preview")) {
+            val value = receipt(format, false, 8u).copy(rawPreview = true)
+            validateOriginalFormatInfo(value, binding)
+            assertEquals("Rendered embedded RAW preview only; sensor data is retained unchanged. RAW development and full-resolution export are unavailable.", originalFormatNotice(value))
+            assertFailsWith<IllegalArgumentException> { validateOriginalFormatInfo(value.copy(sourceBitDepth = 16u), binding) }
+        }
+    }
+    @Test fun noticeFlagsMustExactlyMatchTheAdmittedNativeFormat() {
+        for (format in listOf("psd", "psb")) {
+            assertFailsWith<IllegalArgumentException> { validateOriginalFormatInfo(receipt(format, false), binding) }
+        }
+        for (format in listOf("dng", "cr2", "raw-preview")) {
+            assertFailsWith<IllegalArgumentException> { validateOriginalFormatInfo(receipt(format, false, 8u), binding) }
+        }
+        for (format in listOf("png", "jpeg", "webp", "heic", "heif", "avif", "bmp", "tiff")) {
+            val value = receipt(format, false, 8u)
+            validateOriginalFormatInfo(value, binding)
+            assertFailsWith<IllegalArgumentException> { validateOriginalFormatInfo(value.copy(flattenedComposite = true), binding) }
+            assertFailsWith<IllegalArgumentException> { validateOriginalFormatInfo(value.copy(rawPreview = true), binding) }
+        }
+        val composite = receipt("psd", false, 8u).copy(flattenedComposite = true)
+        val preview = receipt("dng", false, 8u).copy(rawPreview = true)
+        for (value in listOf(composite.copy(rawPreview = true), preview.copy(flattenedComposite = true),
+            composite.copy(firstTiffPageOnly = true), preview.copy(firstTiffPageOnly = true))) {
+            assertFailsWith<IllegalArgumentException> { validateOriginalFormatInfo(value, binding) }
+        }
+        for (format in listOf("nef", "arw", "raw", "ai", "PSD", "raw-preview ")) {
+            assertFailsWith<IllegalArgumentException> { validateOriginalFormatInfo(receipt(format, false, 8u), binding) }
+        }
+    }
     @Test fun mismatchedFullRevisionCannotBeAccepted() {
         assertFailsWith<IllegalArgumentException> { validateOriginalFormatInfo(receipt().copy(binding = binding.copy(stateHash = "3".repeat(64))), binding) }
         assertFalse(originalFormatRevisionMatches(info().copy(stateHash = "3".repeat(64)), binding))

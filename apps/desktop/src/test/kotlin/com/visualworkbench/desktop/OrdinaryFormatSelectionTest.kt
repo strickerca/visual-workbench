@@ -1,11 +1,61 @@
 package com.visualworkbench.desktop
 
+import com.visualworkbench.shared.CreateFileProject
 import com.visualworkbench.shared.ImageFormat
+import com.visualworkbench.shared.WorkbenchProject
+import com.visualworkbench.shared.WorkbenchStreamingCore
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
+import org.junit.Assert.fail
 
 class OrdinaryFormatSelectionTest {
+    @Test fun ordinarySuffixesRetainImageIntake() {
+        for (suffix in listOf("png", "jpg", "jpeg", "webp", "heic", "heif", "avif", "bmp", "tif", "tiff", ".TIF", "TIFF")) {
+            assertEquals(OrdinaryImportKind.Image, ordinaryImportKind(suffix))
+        }
+    }
+    @Test fun compositesPreviewsAndAiRequestTheirExplicitImportRoute() {
+        for (suffix in listOf("psd", "psb", ".PSD", "PSB")) assertEquals(OrdinaryImportKind.FlattenedComposite, ordinaryImportKind(suffix))
+        for (suffix in listOf("dng", "cr2", "nef", "arw", ".DNG", "CR2", "NEF", "ARW")) assertEquals(OrdinaryImportKind.RawPreview, ordinaryImportKind(suffix))
+        for (suffix in listOf("ai", ".AI")) assertEquals(OrdinaryImportKind.PdfCompatibleAi, ordinaryImportKind(suffix))
+    }
+    @Test fun suffixSelectionDoesNotGuessFromNamesBytesOrUnadmittedRawVariants() {
+        for (suffix in listOf("", ".", "..psd", "image.psd", "photo.dng", "dng ", " psb", "raw", "raf", "orf", "rw2", "raw-preview", "image/x-adobe-dng", "II*", "8BPS", "pdf", "svg", "mp4")) {
+            assertEquals(OrdinaryImportKind.Unsupported, ordinaryImportKind(suffix))
+        }
+    }
+    @Test fun ordinaryAndCompositeRoutesPreserveTheOwnedStagingRequest() = runBlocking {
+        val request = CreateFileProject("project", "project-id", "document-id", "layer-id", "device-id", "fixture", "source", "work", 0L)
+        val reached = IllegalStateException("owned ordinary route")
+        var calls = 0
+        val core = object : WorkbenchStreamingCore {
+            override suspend fun createFile(options: CreateFileProject): WorkbenchProject {
+                calls++
+                assertSame(request, options)
+                throw reached
+            }
+        }
+        for (kind in listOf(OrdinaryImportKind.Image, OrdinaryImportKind.FlattenedComposite)) {
+            try { createOrdinaryImageProject(kind, core, request); fail("The native route should be reached") }
+            catch (error: IllegalStateException) { assertSame(reached, error) }
+        }
+        assertEquals(2, calls)
+    }
+    @Test fun aiAndUnsupportedSuffixesCannotFallThroughToOrdinaryImageDecoding() = runBlocking {
+        val options = CreateFileProject("project", "project-id", "document-id", "layer-id", "device-id", "fixture", "source", "work", 0L)
+        val core = object : WorkbenchStreamingCore {
+            override suspend fun createFile(options: CreateFileProject): WorkbenchProject = error("Image decoding must not run")
+        }
+        for (kind in listOf(OrdinaryImportKind.PdfCompatibleAi, OrdinaryImportKind.Unsupported)) {
+            try { createOrdinaryImageProject(kind, core, options); fail("A dedicated or unsupported route must refuse") }
+            catch (error: IllegalArgumentException) {
+                assertEquals(if (kind == OrdinaryImportKind.PdfCompatibleAi) "Import PDF-compatible AI through the PDF document importer." else "This image import suffix is unsupported.", error.message)
+            }
+        }
+    }
     @Test fun formatsRetainTheirDepthAndCannotBecomePngClipboardExports() {
         for (encoding in listOf(ExportEncoding.Bmp8, ExportEncoding.Tiff8, ExportEncoding.Tiff16)) assertFalse(encoding.png)
         assertEquals(ImageFormat.Bmp8, ExportSettings(encoding = ExportEncoding.Bmp8).format())
