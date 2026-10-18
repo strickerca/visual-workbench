@@ -4,6 +4,8 @@ mod bootstrap;
 mod discovery;
 mod integration;
 mod link;
+#[cfg(test)]
+mod offline_recovery_tests;
 mod pairing;
 mod preview;
 mod replication;

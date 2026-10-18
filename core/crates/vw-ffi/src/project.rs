@@ -216,9 +216,7 @@ impl ProjectSession {
         let replica = if store.local_device()? != *store.host_device() {
             let host = vw_ops::HostSequencer::from_checkpoint_bytes(&store.checkpoint_bytes()?)?;
             let mut replica = vw_ops::Replica::new(store.local_device()?, host.snapshot()?)?;
-            for txn in store.pending()? {
-                replica.queue_recovered(txn)?;
-            }
+            replica.queue_recovered_batch(store.pending()?)?;
             remote = Some(vw_net::SyncReceiver::new(host));
             Some(replica)
         } else {
