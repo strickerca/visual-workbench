@@ -1,4 +1,4 @@
-# T3.07 editing leaves: layer controls and rotation contacts
+# T3.07 editing leaves: layers, rotation and tonal controls
 
 Continuation from `88cb9b374c52e8a751879797f8152771f11af6b8`; main was fetched
 again and remains `83663107d864b21d22d2e746b9ca6eb80d47beac`. Recovery remains
@@ -182,33 +182,113 @@ rectangles, retries the same transaction, performs one undo/redo, reopens the
 project and verifies original asset bytes. These sources are not an executed
 native, Compose, viewport, export or one-undo acceptance claim.
 
-## Tonal inspection: no duplicate output or renderer
+## Tonal controls and exact composition hooks
 
-The actual model already validates brightness, contrast and five levels
-parameters, and `vw-raster/src/render.rs` already composites an adjustment on its
-own normal-blend layer. Both app canvases still refuse `Shape.Adjustment`.
-Consequently a new live tonal action would leave the interactive document
-unavailable until its owner composes the existing editing-view path.
+Inspection confirmed that model validation already covers brightness, contrast
+and five levels parameters, and the existing raster engine composites these
+adjustments on normal layers. Those engines, undo operations, asset storage,
+document lifetime, viewport and export implementations need no duplicate system.
+The new tonal adapter recovers the tone-only portion of the existing source
+candidate; output-frame/crop geometry is left with its owner.
 
-Recovery has `ImageOutputApi`, form/controller/panels and the native
-`image_outputs` adapter, but that composition also changes model/geometry,
-queries, raster output, preview pixels, transfer and rendering paths already
-owned elsewhere. None are copied over or forked here. Preserve that recovered
-system for the image/renderer owner, including explicit color consent and the
-separate original/editing/export representations. This is an unresolved tonal
-UI integration dependency, not tonal acceptance or an engine rewrite request.
+Exact new owned paths under `core/crates/vw-ffi/` are `src/tone_controls.rs`,
+`src/tone_controls/{dto,plan,snapshot,preview,editing_view}.rs` and
+`tests/tone_controls.rs`. Kotlin ownership under shared is commonMain
+`ToneControlsApi.kt`, `ToneControlForm.kt`, `ToneControlsInteraction.kt`, jvmMain
+`NativeToneControls.kt`, and jvmTest `ToneControlFormTest.kt` /
+`ToneControlsInteractionTest.kt`. Desktop and Android editor each add only
+`ToneControlsPanel.kt` and `TonePreviewBitmap.kt`. No existing engine, controller,
+query, rendering or root composition source was changed.
+
+Coordinator-only FFI registration and editing-query hook:
+
+```rust
+// vw-ffi/src/lib.rs, followed by existing binding generation
+mod tone_controls;
+pub use tone_controls::{ImageToneSettings, ToneControlEntry, ToneControlSnapshot,
+    ToneControlCommand, ToneControlPreview};
+// queries.rs render_list_for_page, before draw_shape/local_bounds for each object
+if crate::tone_controls::is_editing_metadata(project, &document, id) {
+    continue;
+}
+```
+
+This omission recognizes only a valid typed adjustment in its own normal-blend
+layer, with identity transform and no group/hidden/role semantics. Unsupported
+adjustments remain explicit errors. It keeps metadata out of the vector editing
+path that currently refuses `Shape.Adjustment`; it does not bake tone pixels into
+the original background. The dedicated panel preview and existing marked export
+use the canonical adjustment renderer. Root/viewport composition must preserve
+that distinction until its owner supplies any broader live editing view.
+
+Native methods are `tone_controls_snapshot(documentId, budget, cancellation)`,
+`prepare_tone_control(binding, metadata, command, budget, cancellation)` returning
+the existing `WorkflowPlan`, and `preview_tone_control(binding, command?, region,
+assumeUntaggedSrgb, budget, cancellation)`. Shared `WorkbenchToneControls` has
+`snapshot`, `prepare` and `preview` with the same fields. The plain JVM factory is
+`toneControlWorkflows(project)`; there is no new common expect declaration.
+
+Instantiate `ToneControlsInteraction(scope, existingMutationMutex, newId,
+metadata, mayMutate, committed, ::toneControlWorkflows)` and compose
+`ToneControlsPanel(controls, activate)`. Offer it only for image/capture documents.
+The root retains installation identity, Lamport allocation, project switching,
+modal admission and its normal admitted-snapshot refresh callback.
+
+- Feed `bind(project, snapshot, epoch, changeSequence)` on each admitted current
+  document snapshot and `observe(sequence)` immediately on OPS before refresh.
+  Use the panel's captured full token when delivering callbacks; never substitute
+  a fresh capture for an old event. Root guards cancel current input before entry
+  and fence competing actions while `state.blocksInput` is true.
+- Honor `state.mayLeave` for document/project/page departure and panel closing.
+  Dirty private values require Apply or explicit discard. New drafts retain one
+  identity pair across previews and Apply. Whole forms validate together; locked
+  targets refuse. Rapid field callbacks transform the latest current form.
+- Apply/Remove each prepare one immutable existing workflow plan and commit once
+  under the root's mutex. A failed or cancelled commit retains that exact plan
+  for explicit retry or discard; it never allocates replacement transaction IDs.
+  A received durable receipt is recorded and its plan released before any fallible
+  refresh. Discarding a retry handle does not reverse saved history.
+- Await `detach()` before switching or closing the borrowed project and `close()`
+  before disposing its UI scope. Actual reader and mutation producers are joined,
+  including cancellation and repeated concurrent close callers. Rebinding cannot
+  republish old snapshot/pixel results or adopt IDs allocated for an old owner.
+
+Preview is explicit and read-only, with private or saved settings, region origin
+and per-preview untagged-sRGB consent. A single conflated reader admits only the
+latest full binding/source/input serial and copies its at-most-512-by-512 RGBA8
+tile. Native draft evaluation applies the same transaction through a temporary
+canonical sequencer over the visible project; it writes no store, history, event,
+blob or offline pending transaction. The verified original decoder and current
+whole-document raster engine remain the pixel authorities, followed by exact
+cropping and display conversion. It never resizes a source to hide a budget
+failure. A complete render that exceeds 256MiB returns typed Memory; the bounded
+tile is not a promise that every large original can be previewed. Tagged-source
+ICC and result-asset work remain charged; untagged sources do not reserve a
+nonexistent ICC parser. Noninterruptible rendering retains producer ownership
+until it returns; cancelled pixels are discarded before publication.
 
 ## Verification limits and next composition
 
-Per-checkpoint JSON receipts bind the exact source and test scope. Focused shared
-checks use the saved Kotlin 2.4.0 compiler with warnings denied, strict explicit
-API and injected test capabilities; product Kotlin 2.4.20/Compose/native checks
-are not implied. Seven native layer/engine cases are written but unrun while
-the image owner retains the shared heavy slot. No device, paid provider, new
-credential, binary publication or main merge occurred. Requirement and gate
-statuses are unchanged.
+For this continuation, 20 rotation contact/lifecycle and 34 tonal form/controller
+JVM tests pass with the saved Kotlin compiler, warnings denied and strict shared
+explicit API. Read-only review findings were repaired and regression cases added.
+Kotlin syntax checks cover the isolated platform/native adapters; rustfmt,
+commonMain platform-import and staged privacy/whitespace checks pass. These cheap
+checks do not compile generated bindings or Compose and do not establish product
+Kotlin/ABI compatibility.
 
-Next: coordinator phase composition of these roots and native DTOs, then focused
-native/Compose validation when the shared slot is available (medium). The
-standing AGENTS executor recommendation remains `gpt-6.1-sol / xhigh`; session
-settings were not changed and the root's exact runtime settings are not exposed.
+Nine geometry, three rotation FFI and seven tonal FFI integration tests are
+written but unrun pending the coordinator's shared native build slot. The tonal
+cases cover preview/prepare immutability, commit/retry/undo/redo/remove/reopen,
+original bytes, stale revisions/locks, explicit color consent, cancellation,
+16-bit input, corrupt blobs, predecode memory refusal and offline visible drafts.
+Earlier checkpoint receipts retain their own exact check scopes; native layer,
+local-view and archive regressions also remain subject to coordinated execution.
+No device, paid provider, new credential, binary publication or main merge
+occurred. Krita stays deferred, bookmarks stay image-only, and no requirement,
+phase gate or end-to-end workflow acceptance is promoted.
+
+Next: coordinator registers/composes these leaves, then runs native and platform
+validation using the shared slot (medium). The standing AGENTS executor
+recommendation remains `gpt-6.1-sol / xhigh`; delegated leaf executors used those
+settings. The root's exact runtime settings are not exposed.
