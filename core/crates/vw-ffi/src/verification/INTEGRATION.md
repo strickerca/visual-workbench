@@ -248,12 +248,57 @@ history route requires admitted private pair enumeration/reassociation from the
 existing source owner, rather than inferring authorization from imported lineage
 or an agent PNG. That UI clause remains open; the native reopen test is separate.
 
+## VF1 budget correction and history grant request
+
+VF1 review of16afe4e1 found the shared128MiB default cannot fund any nonempty
+failure follow-up. Shared `WorkbenchVerification.compileFailures` now defaults
+to256MiB, exactly the existing native ceiling; explicit caller budgets and native
+16..256MiB admission remain unchanged. Call-chain audit:
+`McpVerificationPanel` → `DesktopMcpCoordinator.compileVerificationFailures` →
+`McpVerificationWorkflow.compile` → shared default → `NativeVerification` →
+`ProjectSession::compile_verification_failures`. Neither Desktop caller nor JVM
+adapter replaces the budget. Native fixtures still explicitly use256MiB and
+are **not** the regression for this fix.
+
+The focused probe now calls the real Desktop workflow with a nonempty failure,
+no budget argument/override, and real semantic translation. Its injected backend
+observes256MiB, returns a synthetic follow-up owner, and checks the exact after
+binding/failed marker mapping. This proves default forwarding, not native codec
+execution. Negative-control mode changes only the temporary shared default back
+to128MiB; the same actual caller fails the compiler-reserve guard with Limit.
+
+Historical-pair retrieval needs an extra grant for precisely:
+`core/crates/vw-store/src/verification_review.rs` and
+`core/crates/vw-store/tests/verification_review.rs` (existing foundation is
+read-only to this lane). Proposed additive API on the existing locked store:
+`verification_review_history(after: Option<String>, limit: u32) ->
+VerificationReviewResult<VerificationReviewHistoryPage>` with
+`VerificationReviewHistoryPage { snapshots: Vec<VerificationReviewSnapshot>,
+next_cursor: Option<String> }`. Cap limit at8, aggregate admitted bytes at2MiB;
+use canonical namespace/hash cursors, schema/row-size/key/project/record checks
+before allocating/returning, and the existing settings connection/transaction.
+No new DB/index, selector persistence, portable lineage authority or second
+catalog. Existing native/shared verification leaves and Desktop controls can
+consume that private page inside their current grant; only manually saved
+records exist today (fresh v0 reads do not persist a history row). Tests must
+cover reopen/pagination/corruption/bounds and unchanged portable privacy.
+
+The reserved editor/Main source hook also needs a narrow parent-applied way to
+borrow the **currently opened original** under the existing `edits` mutex before
+its historical pair is known. Add a `withCurrentVerificationOriginal(body)`
+overload alongside `withVerificationOriginal(expected,body)` and supply it via
+`McpVerificationOriginalAccess`; no raw paths or independent project lifetime.
+All later modifications/compiles retain exact pair/source currentness checks;
+history selection must not restore capture selectors or grants. The two store
+paths above remain unmodified pending that explicit grant.
+
 ## Focused checks and proposed deferred-ledger rows
 
-Executed against this source: pinned Node24 bounds/packages/verification39/39;
+Preserved prior unchanged Node24 bounds/packages/verification39/39 evidence;
+fresh VF1 correction checks:
 pinned Kotlin2.4 `-Werror` focused current coordinator/workflow/shared API,
 manual-review/late-result, six existing recapture regressions and routing
-regressions (30 cases); registration leaf13/13 via
+regressions (31 cases); registration leaf13/13 via
 temporary standalone JUnit-body facade; pinned Rust1.99 rustfmt parse/format of
 new leaves; commonMain import/whitespace guards. Temporary declarations/classes
 were disposed. The Kotlin probe deliberately substitutes the JNI factory only;
@@ -274,3 +319,14 @@ Cheap repeatable current-source probe:
 `python3 apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/probe_verification_workflow.py`.
 Use the central deferred ledger only in the coordinator's tree. Krita, phone
 screen recapture, S Pen/performance and all unperformed G0–G5/A30 gates stay open.
+
+VF1 focused regression commands (no native/Gradle build):
+
+```text
+python3 apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/probe_verification_workflow.py
+python3 apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/probe_verification_workflow.py --legacy-failure-budget-negative-control
+```
+
+The first passed44 focused Kotlin cases. The second failed as expected only
+after restoring the old default, with the nonempty default caller's `Package: Limit`;
+the earlier all-pass currentness case still passed. No native budget was changed.
