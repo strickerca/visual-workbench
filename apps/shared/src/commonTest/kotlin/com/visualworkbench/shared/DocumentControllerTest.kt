@@ -52,6 +52,7 @@ class DocumentControllerTest {
             release?.let{withContext(NonCancellable){it.await()}}
             if(request.operation==DocumentOperation.PdfInfo || request.operation==DocumentOperation.SvgInfo)
                 return DocumentReply(sourceHash,"c".repeat(64),DocumentMetadata.Info(kind,if(kind==EditableKind.Pdf)2u else 1u,100.0,100.0,false,notices),byteArrayOf())
+            (request.operation as? DocumentOperation.Copy)?.let { copy -> return DocumentReply(sourceHash,"c".repeat(64),DocumentMetadata.Copy(copy.kind,1uL,false,notices,null,request.exportIdentity),byteArrayOf(1)) }
             val tile=(request.operation as DocumentOperation.Tile)
             return DocumentReply("a".repeat(64),"c".repeat(64),DocumentMetadata.Tile(tile.page,tile.tile.origin,tile.tile.scale.toFloat().toDouble(),tile.tile.width,tile.tile.height),ByteArray(tile.tile.width.toInt()*tile.tile.height.toInt()*4))
         }
@@ -100,6 +101,14 @@ class DocumentControllerTest {
     @Test fun aDifferentSourceCannotSupplyFidelityNotices():Unit=runBlocking {
         val f=Fixture();try{f.bind();f.jobs.sourceHash="d".repeat(64);f.controller.scheduleNotices()
             assertTrue(f.controller.state.value.notices.isEmpty());assertNotNull(f.controller.state.value.message)
+        }finally{f.close()}
+    }
+    @Test fun onlyVerifiedSvgCopyCanReachPublicationAndKeepsFullIdentity():Unit=runBlocking {
+        val f=Fixture();try{f.project.descriptor=f.project.descriptor.copy(kind=EditableKind.Svg,pages=f.project.descriptor.pages.take(1));f.jobs.kind=EditableKind.Svg;f.bind()
+            assertTrue(f.controller.exportPublicationAvailable);assertTrue(f.controller.canExport(DocumentCopy.SvgAnnotations))
+            for(mode in DocumentCopy.entries.filter{it!=DocumentCopy.SvgAnnotations})assertFalse(f.controller.canExport(mode))
+            f.controller.export(DocumentCopy.SvgAnnotations)
+            val copy=assertNotNull(f.controller.checkedExport());assertEquals(DocumentExportIdentity(1u,f.project.revision.hostSeq,f.project.revision.stateHash,f.project.descriptor.sourceAssetId),copy.exportIdentity)
         }finally{f.close()}
     }
     @Test fun ordinaryViewportAdoptionCarriesAllAuthorityAndItsOwnGeneration():Unit=runBlocking {

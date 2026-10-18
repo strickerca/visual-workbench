@@ -70,6 +70,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         { !disposing&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
         { attached,page -> mutations.withLock {
             if(project!==attached.project||epoch!=attached.epoch||!documentRevisionMatches(attached))throw DocumentFailure(DocumentFailureKind.Stale)
+            refreshAdmission.invalidate();documentRefresh.invalidate()
             cancelTool();erasers.detach();selections.detach();documentOwnerDiscardDraw()
             val next=(attached.project as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
             val drawing=prepareEditorObjects(core,next.render.items)
@@ -88,6 +89,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private val mutations = Mutex()
     private val refreshMutex = Mutex()
     private val refreshAdmission = RefreshAdmission()
+    private val documentRefresh = DocumentRefreshAdmission()
     private var changesJob: Job? = null
     private var refreshJob: Job? = null
     private var refreshQueue: Channel<Unit>? = null
@@ -619,6 +621,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                             // Modal entry may run while the owners above settle.
                             if (!stillOwned() || !receivedCaptureIdle(ownInstructions = true, ownSemantics = true)) return@capture
                             cancelTool(); invalidateExport(); clearPeerObjects(); aiRetiring = false
+                            refreshAdmission.invalidate();documentRefresh.invalidate()
                             document = next; info = next.render.revision; objects = drawing; selected = null
                             background = staged; staged = null; blockingMessage = null; needsColorConsent = false; colorAssumed = false
                             screen = WorkbenchScreen.Canvas; cameraFitted = false; fit()
@@ -663,7 +666,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         instructionEditor.detach()
         retireAi()
         captureArrivals.detach(); failedCaptureOpen = null
-        epoch++; refreshAdmission.reset()
+        epoch++; refreshAdmission.reset();documentRefresh.invalidate()
         changesJob?.cancelAndJoin(); changesJob = null
         refreshQueue?.close(); refreshQueue = null
         refreshJob?.cancelAndJoin(); refreshJob = null
@@ -1365,9 +1368,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (token != epoch || current !== project || disposing || revision.projectId != info?.projectId) return
         val ticket = refreshAdmission.capture()
         val doc = document ?: return
-        val next = current.document(doc.documentId)
+        val fetched = documentRefresh.load(doc,{document}){current.document(doc.documentId)} ?: return
+        val next = fetched.snapshot
         val drawing = prepareEditorObjects(core, next.render.items)
-        if (token != epoch || project !== current || disposing || !refreshAdmission.accepts(ticket)) return
+        if (token != epoch || project !== current || disposing || !refreshAdmission.accepts(ticket) ||
+            !documentRefresh.accepts(fetched.ticket,document,next)) return
         // The document and its own revision are one native snapshot. Host sequence
         // alone cannot order optimistic edits sharing the same accepted base.
         if (document?.render?.revision != next.render.revision) clearPeerObjects()

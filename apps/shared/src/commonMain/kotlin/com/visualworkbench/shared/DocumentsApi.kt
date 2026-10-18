@@ -96,3 +96,8 @@ public class DocumentExport(public val bytes: ByteArray, public val blake3: Stri
     public override fun toString(): String = "DocumentExport(mode=$mode, bytes=${bytes.size}, redacted=$redacted)"
 }
 public fun ProjectInfo.sameDocumentRevision(other: ProjectInfo): Boolean = projectId == other.projectId && hostSeq == other.hostSeq && stateHash == other.stateHash && deviceId == other.deviceId && nextLamport == other.nextLamport
+
+/** SVG copies have a separately bounded parent/pipe reservation. PDF output
+ * retains its existing cap while its native final-file acceptance is pending. */
+internal fun documentOutputLimit(operation: DocumentOperation): Long =
+    if (operation is DocumentOperation.Copy && operation.kind == DocumentCopy.SvgAnnotations) 8L * 1024 * 1024 else 128L * 1024 * 1024

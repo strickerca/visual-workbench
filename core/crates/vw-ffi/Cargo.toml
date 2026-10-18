@@ -68,6 +68,8 @@ pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdf
 jni = { version = "=0.22.4", default-features = false }
 
 [dev-dependencies]
+vw-svg = { version = "=0.1.0", path = "../vw-svg" }
+pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881"] }
 tokio = { version = "=1.53.1", features = ["rt", "macros", "time"] }
 
 [[bin]]

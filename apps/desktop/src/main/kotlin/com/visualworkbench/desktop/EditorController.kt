@@ -49,6 +49,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
         { val s=mutable.value;!closing&&!s.busy&&queued==0&&!s.exportOpen&&!s.pasteOpen&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(s.textAnchor!=null,s.exportOpen,s.pasteOpen)&&drag==null&&ink==null&&markerPress==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
         { attached,page -> edits.withLock {
             if(project!==attached.project||generation!=attached.epoch||mutable.value.document?.render?.revision?.sameDocumentRevision(attached.snapshot.render.revision)!=true)throw DocumentFailure(DocumentFailureKind.Stale)
+            refreshTicket++;documentRefresh.invalidate()
             cancelInput();erasers.detach();selections.detach();documentOwnerDiscardDraw()
             val next=(attached.project as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
             validateDrawing(next)
@@ -69,6 +70,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     private var widthGesture:WidthGesture?=null
     private var ink:DesktopInkRun?=null;private var inkWork:Pair<DesktopInkRun,Job>?=null
     private var refreshTicket=0L;private var changeSequence=0uL
+    private val documentRefresh=DocumentRefreshAdmission()
     private var sessionWork:Job?=null;private var sessionProvider:DesktopSessionController?=null
     private var wetCommitted:String?=null
     private val live=DesktopLiveLink(scope,{mutable.value.document?.binding(generation)},::sessionStatus,
@@ -401,14 +403,16 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         finally { if(!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
     }}
     private suspend fun refresh(){
-        val p=project?:return;val epoch=generation;val id=mutable.value.document?.documentId?:return
-        val ticket=++refreshTicket;val observed=changeSequence;val snapshot=p.document(id)
-        if(project!==p||epoch!=generation||ticket!=refreshTicket||observed<changeSequence)return
+        val p=project?:return;val epoch=generation;val requested=mutable.value.document?:return
+        val ticket=++refreshTicket;val observed=changeSequence
+        val fetched=documentRefresh.load(requested,{mutable.value.document}){p.document(requested.documentId)}?:return
+        val snapshot=fetched.snapshot
+        if(project!==p||epoch!=generation||ticket!=refreshTicket||observed<changeSequence||!documentRefresh.accepts(fetched.ticket,mutable.value.document,snapshot))return
         // A host sequence is the accepted journal position, not the version of
         // the client's optimistic view. Confirm that this fetch still matches
         // the worker's current visible hash before admitting a same-seq change.
         val currentInfo=p.info()
-        if(project!==p||epoch!=generation||ticket!=refreshTicket||observed<changeSequence)return
+        if(project!==p||epoch!=generation||ticket!=refreshTicket||observed<changeSequence||!documentRefresh.accepts(fetched.ticket,mutable.value.document,snapshot))return
         if(currentInfo.hostSeq!=snapshot.render.revision.hostSeq||currentInfo.stateHash!=snapshot.render.revision.stateHash)return
         when(snapshotDecision(mutable.value.document,snapshot,allowVisibleChange=true)){
             SnapshotDecision.Stale->return

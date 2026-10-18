@@ -4,7 +4,8 @@ package com.visualworkbench.desktop
 import com.visualworkbench.shared.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.emptyFlow
-import kotlin.test.*
+import org.junit.Assert.*
+import org.junit.Test
 
 /** Actual app adapter with deterministic hit input; GPU geometry/native storage
  * are covered separately. Equal dimensions/revision must not hide a page change. */

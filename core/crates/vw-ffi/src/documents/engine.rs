@@ -575,6 +575,58 @@ mod tests {
         }
     }
     #[test]
+    fn svg_copy_embeds_exact_identity_before_typed_result_adoption() {
+        let source=b"<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8'><rect width='8' height='8' fill='red'/></svg>".to_vec();
+        let hash = blake3::hash(&source);
+        let identity = vw_document_protocol::CopyIdentity {
+            schema_version: 1,
+            host_seq: u64::MAX,
+            state_hash: "b".repeat(64),
+            source_asset: hash.to_hex().to_string(),
+            capture_session: None,
+            frame_id: None,
+        };
+        let mut request = request(
+            Operation::SvgCopy { overlays: vec![] },
+            512 * 1024 * 1024,
+            8 * 1024 * 1024,
+        );
+        request.export_identity = Some(identity.clone());
+        let output = execute(
+            Job {
+                binding: vw_document_protocol::JobBinding {
+                    nonce: [7; 16],
+                    source_blake3: *hash.as_bytes(),
+                },
+                request: request.clone(),
+                source,
+            },
+            Path::new(""),
+        )
+        .unwrap();
+        assert_eq!(output.metadata.export_identity(), Some(&identity));
+        let metadata = ResultMetadata::identity_metadata(&identity).unwrap();
+        vw_svg::verify_svg_copy_metadata(
+            &output.bytes,
+            &metadata,
+            vw_svg::Limits::default(),
+            &|| false,
+        )
+        .unwrap();
+        let result = super::super::DocumentJobResult {
+            source_blake3: identity.source_asset.clone(),
+            metadata_json: serde_json::to_string(&output.metadata).unwrap(),
+            output_blake3: blake3::hash(&output.bytes).to_hex().to_string(),
+            bytes: output.bytes,
+        };
+        super::super::validate_document_job_result(
+            serde_json::to_string(&request).unwrap(),
+            identity.source_asset.clone(),
+            result,
+        )
+        .unwrap();
+    }
+    #[test]
     fn copy_stage_capacity_is_reserved_before_native_binding_or_decode() {
         let value = request(
             Operation::PdfCopy {

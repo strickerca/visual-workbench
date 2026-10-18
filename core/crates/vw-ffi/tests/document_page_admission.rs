@@ -131,9 +131,47 @@ async fn same_revision_same_size_pages_cannot_delete_or_erase_each_others_object
         );
         assert_eq!(project.info().await.unwrap(), before);
     }
+    // Positive control uses the selected current page with the identical
+    // source/revision: page admission must not reject every vector erase.
+    let erased = project
+        .erase_vector_strokes(
+            VectorEraseOptions {
+                binding: WorkflowBinding {
+                    project_id: id(1),
+                    document_id: id(2),
+                    host_seq: before.host_seq,
+                    state_hash: before.state_hash.clone(),
+                },
+                metadata: WorkflowMetadata {
+                    transaction_id: id(43),
+                    device_id: device(),
+                    first_lamport: before.next_lamport,
+                    created_at_ms: TIME + 43,
+                },
+                targets: vec![VectorEraseTarget {
+                    object_id: id(11),
+                    replacement_id: id(51),
+                }],
+                centers: vec![Point { x: 24.0, y: 24.0 }],
+                radius: 8.0,
+                memory_budget_bytes: 256 * 1024 * 1024,
+                max_output_vertices: 8192,
+                max_work_units: 64_000_000,
+                page_index: Some(1),
+            },
+            cancel(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(erased.changed.len(), 1);
+    assert_eq!(erased.changed[0].original_id, id(11));
+    let remaining = erased.changed[0].outline_id.clone().unwrap();
+    let before = project.info().await.unwrap();
     let options = edit(42, before.next_lamport);
     let condition = expected(&project, Some(1)).await;
-    let commands = vec![EditCommand::Delete { object_id: id(11) }];
+    let commands = vec![EditCommand::Delete {
+        object_id: remaining,
+    }];
     let saved = project
         .apply_edit_at(
             options.clone(),

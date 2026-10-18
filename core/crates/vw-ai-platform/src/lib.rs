@@ -6,10 +6,12 @@ pub mod android;
 #[cfg(windows)]
 pub mod windows;
 
+#[cfg(any(test, windows, target_os = "android"))]
 use std::time::Instant;
 use vw_ai_provider::CredentialFailure;
 
 pub type Result<T> = std::result::Result<T, CredentialFailure>;
+#[cfg(any(test, windows, target_os = "android"))]
 pub(crate) fn check(stop: &dyn vw_ai::Cancellation, deadline: Instant) -> Result<()> {
     if stop.is_cancelled() || Instant::now() >= deadline {
         Err(CredentialFailure::Cancelled)
@@ -17,6 +19,7 @@ pub(crate) fn check(stop: &dyn vw_ai::Cancellation, deadline: Instant) -> Result
         Ok(())
     }
 }
+#[cfg(any(test, windows, target_os = "android"))]
 pub(crate) fn validate(bytes: &[u8], max: usize) -> Result<()> {
     if bytes.is_empty() || bytes.len() > max || !bytes.iter().all(u8::is_ascii_graphic) {
         return Err(CredentialFailure::Invalid);

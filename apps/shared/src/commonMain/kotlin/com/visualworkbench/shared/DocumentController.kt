@@ -35,9 +35,13 @@ public class DocumentController(private val scope: CoroutineScope, private val c
     private var noticesPending: Boolean = false
     private var noticesTask: Job? = null
     public val pcRedaction: Boolean get() = jobs.pcRedaction
-    /** Worker copy requests do not yet carry the revision/source identity needed
-     * by CORE-006. Do not offer publication until an embedded carrier is verified. */
-    public val exportPublicationAvailable:Boolean get() = false
+    /** SVG's portable final-byte carrier is verified. PDFium/qpdf final-file
+     * contracts remain separate and do not authorize PDF publication yet. */
+    public fun canExport(mode:DocumentCopy):Boolean = state.value.descriptor?.kind==EditableKind.Svg && mode==DocumentCopy.SvgAnnotations
+    public val exportPublicationAvailable:Boolean get() = canExport(DocumentCopy.SvgAnnotations)
+    public fun copyUnavailableText(mode:DocumentCopy):String = if(mode==DocumentCopy.Original)
+        "Exact original PDF copies cannot add the required revision and source metadata."
+        else "PDF copy export awaits final-file verification with the packaged PDF runtime."
     public fun bind(descriptor: EditableDescriptor?, page: UInt): Unit {
         val currentEpoch = attachment()?.epoch
         val old = state.value
@@ -154,7 +158,7 @@ public class DocumentController(private val scope: CoroutineScope, private val c
     }
     public fun clearRegions():Unit { if(!state.value.busy&&admitted())mutable.value=state.value.copy(regions=emptyList(),export=null) }
     public fun export(mode:DocumentCopy,removeEncryption:Boolean=false):Unit {
-        if(!exportPublicationAvailable){mutable.value=state.value.copy(message="Document copy export is unavailable until the file can carry its revision and source identity.");return}
+        if(!canExport(mode)){mutable.value=state.value.copy(message=copyUnavailableText(mode));return}
         prepareExport(mode,removeEncryption)
     }
     private fun prepareExport(mode:DocumentCopy,removeEncryption:Boolean):Unit = work { a,d,ticket,page ->
@@ -164,7 +168,7 @@ public class DocumentController(private val scope: CoroutineScope, private val c
     public fun checkedExport():DocumentExport? {
         val result=state.value.export ?: return null
         val (a,d)=try{capture()}catch(_:DocumentFailure){return null}
-        return result.takeIf{it.sourceAssetId==d.sourceAssetId&&a.snapshot.render.revision.sameDocumentRevision(it.revision)&&!state.value.busy}
+        return result.takeIf{canExport(it.mode)&&it.exportIdentity==DocumentExportIdentity(1u,d.revision.hostSeq,d.revision.stateHash,d.sourceAssetId)&&it.sourceAssetId==d.sourceAssetId&&a.snapshot.render.revision.sameDocumentRevision(it.revision)&&!state.value.busy}
     }
     public fun viewport(camera:Camera):Unit {
         if(state.value.descriptor==null||state.value.busy||!admitted()||camera.viewportWidth<=1||camera.viewportHeight<=1||viewport==camera)return

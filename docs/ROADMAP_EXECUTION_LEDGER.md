@@ -187,3 +187,26 @@ combined phase must regenerate bindings once for `EditPrecondition.page_index` a
 `VectorEraseOptions.page_index`, then validate native APIs and actual apps. This
 source batch does not pass device, UI, sandbox runtime or hardware acceptance.
 See `docs/evidence/CLOUD_PAGE_AND_NOTICE_REPAIRS_20261018.json`.
+
+### Combined caller/provenance candidate — 2026-10-18
+
+The separate identity branch now includes document provenance leaves `cf01b29`
+and the reviewed fixed-width xref repair `b16884a`, plus the two reproduced
+precision hook corrections. A local page-view generation and explicit page checks
+now fence both root refresh paths before snapshot/tool adoption, including after
+post-read suspensions. Native page admission has a positive current-page erase
+control. Android ordered refresh invalidation preserves its event sequence.
+
+Portable SVG carrier/fidelity tests and the actual Android engine adapter's SVG
+copy/host typed-adoption test pass. Only SVG publication is admitted by the common
+controller, with an 8 MiB output reservation in both the pipe and parent budget.
+Exact-original PDF is explicitly unsupported; other PDF copy controls remain
+unavailable pending verified PDFium/qpdf final-file runtime checks. Native redaction
+verification, opacity refusal and output caps remain in force. Runtime packaging,
+OS isolation and actual device/provider publication are still separate gates.
+
+Bounded Kotlin checks on this batch pass 77 cases. The composed native batch before
+the final xref leaf repair passes 248 cases; portable document leaves pass 131 with
+2 required-runtime contracts ignored. The final source is now entering serialized
+native lint/rebuild, one phase binding-generation pass and actual app validation;
+no final combined acceptance is claimed yet.

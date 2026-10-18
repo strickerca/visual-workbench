@@ -320,7 +320,7 @@ impl DesktopDocumentRuntime {
     }
 }
 
-#[cfg(target_os = "android")]
+#[cfg(any(test, target_os = "android"))]
 #[path = "engine.rs"]
 mod engine;
 /// Called only by the one-job isolated Android service. UID check is native and
