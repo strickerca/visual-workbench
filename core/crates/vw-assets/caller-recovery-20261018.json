@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "production callers compiled and tested; blocked by 9 public import failures at shared metadata admission and 5 reserved FFI lint diagnostics; no promotion",
+  "status": "Frozen 070758a image runtime repairs passed: 26 fresh cases, 0 failed/ignored; strict FFI lint remains blocked by one reserved document import diagnostic; no app/platform acceptance",
   "contract_commit": "6dcdcdfde4acdba76c710c16187e19d3f4489d4a",
   "contract": "docs/RECOVERY_CALLER_ASSIGNMENTS_20261018.md",
   "preservation_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
@@ -177,18 +177,19 @@
     "The new Linux public-import regression uses an admitted structural AVIF fixture without tile entropy to verify typed missing codec before project publication; it is not a decoder fidelity test."
   ],
   "remaining_limits": [
-    "Combined source b0fee0a executed 129 selected Rust cases: 120 passed, 9 failed, 0 ignored. All 9 non-AVIF ordinary-format public callers reject the first_tiff_page_only boolean at the coordinator-owned model asset metadata allowlist.",
-    "30 written Rust caller/preparation/adapter/provenance cases executed: 21 passed, 9 failed; 99 other selected module/regression cases passed. The 16 earlier standalone Kotlin harness cases are a separate historical count; no actual app/generated binding validation is claimed.",
-    "Strict portable-crate and selected raster lint passed. Strict FFI lint failed at 5 diagnostics in coordinator-owned AI/streaming/discovery files, so owned public-test lint was not reached.",
-    "No Android SDK build, instrumentation, emulator, Windows WIC execution, real AVIF entropy fixture, app caller, picker/provider or generated-binding ABI validation occurred in this phase.",
+    "Frozen 070758ac3b0537b4ea9efc0f6d21b23792d47762 executed 26 fresh cases: 26 passed, 0 failed, 0 ignored. All nine prior public import failures are resolved, and finalized TIFF source/revision/hash assertions now pass at both depths.",
+    "Strict FFI library/public-image-test lint fails only at unused crate::* in coordinator/document-owned core/crates/vw-ffi/src/documents/jobs.rs:5; public test lint was not reached after this diagnostic. The previous five FFI lint diagnostics are resolved.",
+    "87 identical-source portable/raster module cases and prior portable/raster strict lint are reused with explicit source bindings; they were not rerun on the changed frozen graph. The old 18 background/lifecycle FFI cases remain historical only.",
+    "No Android SDK build, instrumentation, emulator, Windows WIC execution, real AVIF entropy fixture, app caller, picker/provider or generated-binding ABI validation occurred in this lane.",
     "Restricted Android AVIF remains opaque 8-bit identity orientation, no ICC and declared sRGB only; unsupported HDR/multiframe/alpha/transforms never fall back to generic decoding.",
-    "No giant image routing, blob transfer, GPU/performance or product acceptance is claimed.",
-    "BMP intake/raw codec remains supported, but application BMP exports are refused because no compatible bounded standalone CORE-006 provenance carrier is admitted; coordinator must gate BMP preflight and selection."
+    "No giant image routing, original blob transfer, GPU/performance, document/precision app-flow or product acceptance is claimed.",
+    "BMP intake/raw codec remains supported. Application memory/file export and file preflight refuse BMP without an admitted provenance carrier; root UI filtering is source-visible but was not exercised in an app.",
+    "The shared streaming seam may replace returned memory-budget settings after encoding; embedded source/revision/capture is exact, but complete settings equality is not claimed."
   ],
-  "heavy_slot": "Granted by parent after documents released; focused commands finished, slot released; no active scheduled build/test process remains.",
+  "heavy_slot": "Parent granted focused rerun on frozen 070758a; all scheduled test/lint commands completed within two-worker/thread limits; slot released.",
   "verification_images_created": 0,
   "publication": {
-    "kind": "reviewed source checkpoint; not acceptance or promotion",
+    "kind": "reviewed source plus focused native validation evidence; no app acceptance or promotion",
     "branch": "integration/image-caller-source-checkpoint-20261018",
     "authorization": "Parent explicitly authorized recoverable branch publication of these 14 reviewed leaf files before root composition; final test gate stays before promotion.",
     "native_adapters_compiled": true,
@@ -231,7 +232,7 @@
   },
   "provenance_repair": {
     "requirement": "docs/REQUIREMENTS.json CORE-006: exported file metadata includes revision and source asset hash; capture session/frame when applicable",
-    "status": "4 portable provenance cases and real buffered adapter capture-provenance unit passed; finalized public TIFF export assertions blocked by shared model notice admission",
+    "status": "Final published public TIFF bytes at both depths and buffered capture provenance passed on frozen 070758a; source/revision/hash/ICC/exact pixels verified.",
     "api": "vw_formats::encode_to_with_metadata(&DecodedImage, ExportFormat, Limits, &str, &mut dyn WriteSeek, &dyn Fn()->bool) -> Result<ExportReceipt>",
     "carrier": "TIFF 6.0 ImageDescription tag 270, ASCII type 2 with terminating NUL; 16 KiB ASCII payload cap, no embedded NUL; sorted IFD, unchanged ICC/samples",
     "metadata": "Existing serialized vw_raster::ExportMetadata, bound to actual source and revision. Source/revision/capture fields must match finalized file result. Internal workspace budget may differ from the root caller policy receipt because the shared streaming seam replaces returned settings after encoding.",
@@ -273,7 +274,16 @@
         "sha256": "698e274ed358afe63f681f2b7bc09138f19611f4bf288075fb63b7249b4152d3"
       }
     ],
-    "publication": "Source repair b0fee0a compiled and partially validated; acceptance/promotion remains blocked by public model admission and strict FFI lint."
+    "publication": "Source repair b0fee0a validated through frozen 070758a real production callers; combined FFI strict lint and platform/app acceptance remain pending."
   },
-  "verification_images_note": "No screenshots created. New selected Rust tests create only tempfile-owned synthetic image fixtures; those paths are dropped during success/unwinding and no image artifact is committed."
+  "verification_images_note": "No screenshots created. New selected Rust tests create only tempfile-owned synthetic image fixtures; those paths are dropped during success/unwinding and no image artifact is committed.",
+  "latest_frozen_validation": {
+    "candidate": "070758ac3b0537b4ea9efc0f6d21b23792d47762",
+    "evidence": "core/crates/vw-assets/native-caller-validation-frozen-070758a-20261018.json",
+    "new_passed": 26,
+    "new_failed": 0,
+    "new_ignored": 0,
+    "reuse_module_cases": 87,
+    "strict_ffi_lint": "blocked by one reserved document wildcard import, no reserved edit by image owner"
+  }
 }

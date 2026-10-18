@@ -166,3 +166,114 @@ feature. Partial-opacity overlays also remain Unsupported. Native artifact
 packaging, regenerated ABI/app compilation, repaired image and focused precision
 checks, actual GUI/provider/GPU behavior and hardware gates remain open. Main is
 still the previously validated `7be9da7` checkpoint; Krita remains deferred.
+
+
+### Caller review repairs — 2026-10-18
+
+Frozen candidate `070758a` remains unchanged while independent validation runs.
+Separate branch `cloud/document-copy-identity-20261018` adds the source-bound
+CORE-006 copy DTO/handoff (`5d0e39a`), then page/eraser and fidelity notice repairs
+(`968ffa0`). Both actual app page callbacks join eraser/selection owners before
+changing pages and rebind them afterward. Page identity now fences shared
+commands, gestures and picker tickets; native fresh PDF edits/erasures require
+page membership atomically. Source-fenced admitted notice inspection runs after
+runtime installation on import/reopen and retains valid warnings across same-source
+edits. The copy capability remains disabled pending final-byte exporter proof.
+
+Affected bounded checks: 70 Kotlin cases passed (including actual app eraser
+adapters with injected hit input), 24 protocol cases passed, 21 Kotlin source files
+syntax-parsed. Native two-page admission regression is written but unrun. The next
+combined phase must regenerate bindings once for `EditPrecondition.page_index` and
+`VectorEraseOptions.page_index`, then validate native APIs and actual apps. This
+source batch does not pass device, UI, sandbox runtime or hardware acceptance.
+See `docs/evidence/CLOUD_PAGE_AND_NOTICE_REPAIRS_20261018.json`.
+
+### Combined caller/provenance candidate — 2026-10-18
+
+The separate identity branch now includes document provenance leaves `cf01b29`
+and the reviewed fixed-width xref repair `b16884a`, plus the two reproduced
+precision hook corrections. A local page-view generation and explicit page checks
+now fence both root refresh paths before snapshot/tool adoption, including after
+post-read suspensions. Native page admission has a positive current-page erase
+control. Android ordered refresh invalidation preserves its event sequence.
+
+Portable SVG carrier/fidelity tests and the actual Android engine adapter's SVG
+copy/host typed-adoption test pass. Only SVG publication is admitted by the common
+controller, with an 8 MiB output reservation in both the pipe and parent budget.
+Exact-original PDF is explicitly unsupported; other PDF copy controls remain
+unavailable pending verified PDFium/qpdf final-file runtime checks. Native redaction
+verification, opacity refusal and output caps remain in force. Runtime packaging,
+OS isolation and actual device/provider publication are still separate gates.
+
+Bounded Kotlin checks on this batch pass 77 cases. The composed native batch before
+the final xref leaf repair passes 248 cases; portable document leaves pass 131 with
+2 required-runtime contracts ignored. The final source is now entering serialized
+native lint/rebuild, one phase binding-generation pass and actual app validation;
+no final combined acceptance is claimed yet.
+
+### Completed cloud composition checks — 2026-10-18
+
+Code candidate `b0ace63b075fee190515f8e0c45fb6062f3809d0` is published on
+`cloud/document-copy-identity-20261018`. Frozen `070758a` and main `7be9da7`
+remain unchanged. The combined software check phase is complete:
+
+- 443 native cases passed; two required PDFium runtime contracts were ignored.
+- Actual shared, desktop and Android app compilation passed. The full host/unit
+  suites passed 718 cases: shared 287, desktop 312 and Android 119. Seven desktop
+  Windows-only cases were skipped, with their exact names in the receipt.
+- Android instrumentation sources compile, including the actual controller's
+  delayed-page-refresh regression; none were device-run. Android lint reports
+  zero errors, 58 warnings and 12 hints. All four arm64 LOAD segments pass16KiB
+  alignment. The real desktop controller page-race/eraser-target regression passes.
+- Native integration strict Clippy passed on Linux. Windows-target document
+  runtime/worker/probe Clippy passed with warnings denied after correcting pinned
+  Win32 Boolean fields. This is a type check, not Windows runtime evidence.
+- Fresh Linux core/host/generator and Android arm64 libraries built. Core/host
+  bindings were generated once for this phase; retries reused unchanged output.
+  Cargo policy and the264-module Gradle license census passed.
+
+SVG publication alone is enabled, with verified final-file identity and bounded
+output. PDF exact-original is explicitly unsupported; other PDF publication stays
+unavailable until actual PDFium/qpdf compatibility and final redaction verification
+are performed. OS worker isolation/retirement, Windows packaging/launch and actual
+Android provider/service delivery are still unverified. Krita and physical product
+and performance gates remain deferred. The source does not claim a gate pass.
+
+Resolved build failures and artifact/generated-binding hashes are recorded in
+`docs/evidence/CLOUD_COMPOSED_APP_VALIDATION_20261018.json`. The test-only Skiko
+cache now uses the owned build tree; three real Windows file/owner tests have
+explicit platform assumptions. The bounded API29 pin reader and unsigned maximum
+identity wire tests pass. No home/security/credential/signing/device change occurred.
+
+Next integration work remains: independent combined-source review/main promotion,
+then deliberate giant-image root viewport and stream-finish consumer integration,
+remaining controls/selection/tilt promotions and Phase5 software verification gaps.
+Current ordinary-format callers, image foundations and their source-bound tests do
+not establish complete giant-image UI or stream acceptance. Parent-owned old
+worktrees and dirty picker remain untouched pending their separate disposition.
+
+## Reviewed publication and PDF runtime feasibility
+
+Independent source review accepted restricted candidate `5f4f581` with no remaining
+source blocker. A normal, non-forced fast-forward push advanced remote main from
+`7be9da7` to exact `5f4f581c84d9215c06c0029f8dd042fc8453f26d`. The remote SHA
+was verified. GitHub returned no commit statuses or PR workflow runs for this
+commit; protection/check-run REST reads returned Forbidden. No protection,
+required check, security or workflow configuration was changed or overridden.
+This records server acceptance of the normal push, not Windows runtime evidence.
+The frozen roadmap validation ref remains `070758ac3b0537b4ea9efc0f6d21b23792d47762`.
+Durable sanitized execution excerpts supplement the full source-bound receipt in
+`evidence/CLOUD_COMPOSED_APP_RECEIPT_EXCERPTS_20261018.txt`; original logs and failed
+attempts remain in the cloud execution environment.
+
+The two ignored PDFium engine cases cannot safely run with the available approved
+inputs: the project requires verified build 7881 while the preinstalled Linux
+library is build 7999, and no reviewed artifact/trust pin or actual target worker
+boundary is available. System qpdf is 12.2.0 rather than required 12.4.2; its
+Windows LPAC path is unavailable on Linux. No substitute native binary was loaded
+or installed. Six strict pypdf cross-parser checks on actual Rust-stamped
+synthetic copies passed for LF, CRLF and CR xref rows and repeated stamping.
+This diagnostic does not close either ignored PDFium case, native isolation,
+Windows/Android execution or any product gate. PDF publication stays refused.
+Exact artifact identities, reproducible diagnostic sources, bounds and results
+are in `evidence/CLOUD_PDF_RUNTIME_FEASIBILITY_20261018.json`.

@@ -1,0 +1,186 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "status": "combined cloud software checks passed; platform/runtime/product gates remain open",
+  "validated_code_source": "b0ace63b075fee190515f8e0c45fb6062f3809d0",
+  "branch": "cloud/document-copy-identity-20261018",
+  "main_unchanged": "7be9da7372f686d3d864ed0817fdcdb0833be138",
+  "frozen_candidate_unchanged": "070758ac3b0537b4ea9efc0f6d21b23792d47762",
+  "admitted_leaves": {
+    "document_provenance": "cf01b29c8f2538afeb250b8cbce936bd757af5b9",
+    "document_xref_repair": "b16884a9e8cf03191729e1d708f72a9a53a71fa2",
+    "precision_validation": "353f59d2d109dd40b1c0c60bfb5ec2ad703392e8",
+    "image_validation": "ec69d4cb297875b3354ccd818ab7aabd4eb02cb8"
+  },
+  "behavior": [
+    "Both root page callbacks retire/rebind page-dependent owners, invalidate in-flight refresh admission and require page identity before snapshot/tool adoption. Same-sized/same-revision pages cannot revive an old-page view or gesture.",
+    "Native fresh PDF edits and vector erasures require selected-page target-layer membership. A positive current-page erase and exact committed-delete retry pass alongside wrong/missing-page rejection.",
+    "Import/reopen schedules source-fenced fidelity inspection after admission; validated notices survive same-source edits/page changes and are dropped on source/attachment replacement.",
+    "Only SVG document-copy publication is admitted. Its exact full revision/source identity is embedded and verified in final bytes before echo, with an8MiB parent/pipe output reservation. Original immutable bytes remain unchanged.",
+    "Exact-original PDF copies explicitly refuse. Annotated/flattened/redaction PDF publication stays disabled pending actual verified PDFium/qpdf final-file contracts. Redaction verification/output caps and opacity refusal are preserved.",
+    "Android precision callback construction is explicit and held barrel timestamps survive hover exit/contact. API29 runtime-pin intake uses a bounded reader, not API33 readNBytes."
+  ],
+  "checks": {
+    "native": {
+      "passed": 443,
+      "failed": 0,
+      "ignored": 2,
+      "test_binaries": 35,
+      "scope": "vw-ffi, vw-pdf, vw-svg, vw-document-win, vw-document-protocol; all lib/integration targets with bindgen; two test threads",
+      "required_runtime_ignored": [
+        "verified_pdfium_worker_contract",
+        "phone_copy_reconstructs_every_page_and_verifies_no_text_or_original_resources"
+      ],
+      "windows_only_runtime_contracts": "Excluded by target cfg; not executed."
+    },
+    "jvm": {
+      "shared": {
+        "total": 287,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 287,
+        "case_status_sha256": "56fa2f35b24b6a7b67fa3d472da4ef7bba3fd13ef2a309fc531ff731b6c6bbcf",
+        "skipped_cases": []
+      },
+      "desktop": {
+        "total": 319,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 7,
+        "passed": 312,
+        "case_status_sha256": "2d785fef823301a0ac632b40257e2a615ccc543aaa21fe32b3caf12b0cb5ef51",
+        "skipped_cases": [
+          "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realLongWindowsPinsStillRefuseWritesAndReplacement",
+          "com.visualworkbench.desktop.NativeRuntimeAnchorTest.boundedDosParserRefusesOtherNamespacesAndNoncanonicalForms",
+          "com.visualworkbench.desktop.NativeRuntimeAnchorTest.longNativeGuardPathsAreExplicitWithoutChangingTheShortAnchorNamespace",
+          "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realWindowsAnchorHandleIsCanonicalAndOrdinaryPinsRemainExactAndExclusive",
+          "com.visualworkbench.desktop.mcp.McpStartupTest.expiredAndFutureOwnerMarkersRetireWithoutStartingService",
+          "com.visualworkbench.desktop.mcp.McpStartupTest.markerDeletionBindsValidatedHandleAndMalformedDataSurvives",
+          "com.visualworkbench.desktop.mcp.McpStartupTest.realWindowsOwnerLockPreventsDuplicateAndReleasesExactly"
+        ]
+      },
+      "android_unit": {
+        "total": 119,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 119,
+        "case_status_sha256": "d8ae9d6fe9dfac46a3a2567de3caf91cac6a21c67806d2b49375d641d49b2835",
+        "skipped_cases": []
+      }
+    },
+    "actual_app_source_compilation": "Android debug, desktop main/test, shared desktop/Android and Android instrumentation test sources compile. Android instrumentation was not executed.",
+    "android_lint": {
+      "errors": 0,
+      "warnings": 58,
+      "hints": 12
+    },
+    "android_alignment": {
+      "load_segments": 4,
+      "alignment_bytes": 16384,
+      "status": "passed"
+    },
+    "linux_native_clippy": "passed with warnings denied across integration packages/all targets; source c0685ec (later Rust edits are Windows-only cfg/probe)",
+    "windows_document_clippy": "passed against x86_64-pc-windows-msvc, document runtime/worker/all targets including sandbox-fixture; compile/type checks only",
+    "dependency_policy": {
+      "cargo_licenses_sources_bans": "passed",
+      "gradle_runtime_modules": 264,
+      "runtime_configurations": 12,
+      "bound_parent_poms": 5
+    },
+    "bindings": "Core and host generated once for this phase from fresh Linux libraries; later app retries used Gradle up-to-date checks. No per-small-commit regeneration.",
+    "root_page_regressions": {
+      "desktop": "Actual EditorController paused after page0 acquisition, navigated to same-size page1 with matching full revision, then released old refresh. Page1 state and tool targets remain; bound eraser deletes page1 object only. No PDF parser/raster is installed in this fake-project port fixture.",
+      "android": "Equivalent actual EditorController instrumentation regression is written/compiled but not device-run; shared view-fence/unit adapter regressions execute on host."
+    }
+  },
+  "resolved_validation_failures": [
+    "Android generated bindings were missing from the app compile classpath; explicit bindings-core project dependency added without new external pins.",
+    "Unsigned JSON opt-ins and exact u64-max roundtrip/unknown-carrier/missing-identity tests added.",
+    "Two instrumentation attachCanvas lambdas were bound to retirement instead of sink; callers now name sink.",
+    "Skiko attempted a read-only home cache; desktop tests now use their own build/skikoTestCache. Three genuinely Windows-specific MCP owner/file tests now have explicit platform assumptions; all seven skips are listed.",
+    "MCP late-grant fixture now models joined/noncancellable remote settlement instead of racing cancellation before its late reply.",
+    "Android min29 lint rejected API33 readNBytes; bounded short-read/overflow/zero-progress cases pass with the compatible loop.",
+    "Windows target found pinned-API bool/integer field mismatches; corrected without weakening deletion, quarantine or retirement conditions. Strict source/probe lint repairs preserve behavior; fixed eight-argument transport boundary retains explicit independently borrowed callbacks with a documented lint expectation."
+  ],
+  "compiled_artifacts": [
+    {
+      "path": "target/debug/libvw_core.so",
+      "bytes": 236990888,
+      "sha256": "b69eca7ac7cb6f2733daa9e518562c9349b219614dff4e5ca6dc3c5c13f0d6f4"
+    },
+    {
+      "path": "target/debug/libvw_host.so",
+      "bytes": 86134120,
+      "sha256": "de76c623b89ec33253daaa6bfa0d84eb581d4f3c30508a94ad753226c92038c8"
+    },
+    {
+      "path": "target/debug/vw-bindgen",
+      "bytes": 65751848,
+      "sha256": "86525fcddefa7bb713d9135dfc36310dae97aca3f1ad105ee39f2059113fe856"
+    },
+    {
+      "path": "target/android-jni/arm64-v8a/libvw_core.so",
+      "bytes": 223355776,
+      "sha256": "6fac87b18748dd97035965c22b8d85b7b00688c1ddeb6c037c984ec594b099f6"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/core/com/visualworkbench/bindings/core/vw_core.kt",
+      "bytes": 1000082,
+      "sha256": "76c67d3d1c0c0c91847230bbccd09e6f479f6484725d886197418cfe76fd9dcb"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/host/com/visualworkbench/bindings/host/vw_host.kt",
+      "bytes": 274624,
+      "sha256": "a26d23de6b9219bd449e0274890469a3199c1406f637fffbf25751f637cc5e5f"
+    }
+  ],
+  "native_binary_source": "c0685ec: later Rust source edits are Windows-only runtime/probe; applicable Linux/Android native inputs are unchanged. Windows cfg paths are separately type-checked at validated_code_source.",
+  "logs": {
+    "native_tests": {
+      "file": "/tmp/vw-combined-source-bound-native-tests.log",
+      "sha256": "049a02e1e82738b4babcaae439a763cbf91d9621d4cda8e2350028ce8ac1257c"
+    },
+    "native_linux_clippy": {
+      "file": "/tmp/vw-combined-final-clippy-attempt6.log",
+      "sha256": "a45cfc769c5dd6bdca4bf9240cd4762a1bc195c5c3551c435df7b44c3e392b23"
+    },
+    "windows_document_target_clippy": {
+      "file": "/tmp/vw-combined-windows-document-check-attempt4.log",
+      "sha256": "d9f976b4c3fed1cb50cfda96adf541e7019dafdb357533b054b9daf828201cb2"
+    },
+    "gradle_policy": {
+      "file": "/tmp/vw-combined-final-gradle-policy-attempt3.log",
+      "sha256": "073e549b2eee0bc98e19f76f196b31c66b729a0f25407c315dca226594132511"
+    },
+    "linux_build": {
+      "file": "/tmp/vw-combined-final-linux-build.log",
+      "sha256": "0a6c610a54db84e302941a31a7119b73f7cef7ea380376e9055ffc273c61cef3"
+    },
+    "android_arm64_build": {
+      "file": "/tmp/vw-combined-final-android-build.log",
+      "sha256": "dc510ae9c8c6a3e92cc2f3339f94dc37a3356ea31a065e77b8f3587354d67eaa"
+    },
+    "apps_final": {
+      "file": "/tmp/vw-combined-final-apps-attempt9.log",
+      "sha256": "e78bf081661a91f63b33bb4be6fb3d9bba678c854fc6d44fb82ca85faa6ff688"
+    },
+    "bindings_generation": {
+      "file": "/tmp/vw-combined-final-apps-attempt1.log",
+      "sha256": "dd5e30dce6b98841dc0f8b15dfddc906976212dae9f952f0ee8528fa99abf894"
+    },
+    "focused_root_lifecycle": {
+      "file": "/tmp/vw-combined-focused-repair-attempt7.log",
+      "sha256": "022ae28feb45ebcd291084ffe0be0872c96f2d21cfdb72faacf62b1d9dff4133"
+    }
+  },
+  "limits": [
+    "No Windows OS execution, helper packaging/distribution, GUI launch, emulator/device run, physical pen/capture/latency measurement, or provider call.",
+    "Linux app validation excludes only desktop packageConnectionRuntime, which requires shipping Windows DLL/EXE artifacts.",
+    "Actual PDFium/qpdf compatibility, PDF final redaction runtime verification and OS sandbox retirement remain pending; compilation does not pass them.",
+    "SVG carrier/engine/typed-adoption proofs do not replace actual Android isolated-service or Windows AppContainer delivery/retirement acceptance.",
+    "Krita and hardware/product phase gates remain deferred. No paid Actions, deployment, credential/signing/device-identity changes.",
+    "Parent-owned old worktrees/dirty picker were not touched. Recovery manifests remain preserved; source archives were not promoted wholesale."
+  ]
+}

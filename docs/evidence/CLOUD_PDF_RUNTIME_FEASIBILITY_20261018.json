@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-18",
+  "source_commit": "5f4f581c84d9215c06c0029f8dd042fc8453f26d",
+  "scope": "Read-only feasibility inspection and bounded synthetic cross-parser diagnostic; no native PDFium/qpdf library loaded.",
+  "runtime_tests": [
+    {
+      "file": "core/crates/vw-pdf/tests/pdfium_worker.rs",
+      "name": "verified_pdfium_worker_contract",
+      "status": "not run",
+      "requires": "Verified PDFium 7881 ABI, explicit VW_PDFIUM_TEST_LIBRARY, centrally isolated resource-capped process."
+    },
+    {
+      "file": "core/crates/vw-pdf/tests/raster_redaction_worker.rs",
+      "name": "phone_copy_reconstructs_every_page_and_verifies_no_text_or_original_resources",
+      "status": "not run",
+      "requires": "Verified PDFium 7881 ABI, explicit VW_PDFIUM_TEST_LIBRARY, centrally isolated resource-capped process."
+    }
+  ],
+  "approved_project_runtime_artifacts_found": false,
+  "available_unaccepted_artifacts": [
+    {
+      "artifact": "preinstalled pypdfium2_raw/libpdfium.so",
+      "package": "pypdfium2 5.13.0",
+      "reported_version": "153.0.7999.0",
+      "format": "Linux x86_64 ELF",
+      "bytes": 7669256,
+      "sha256": "224f8ece41f7e35891f11c10073b7b7062d7a18e9ef870586162a85c46130f7d",
+      "decision": "Not loaded: build 7999 differs from required 7881; no project artifact trust pin; not a Windows or Android runtime."
+    },
+    {
+      "artifact": "system libqpdf.so.30.2.0",
+      "package": "libqpdf30 12.2.0-1",
+      "format": "Linux x86_64 ELF",
+      "bytes": 3322208,
+      "sha256": "0372f64fe1b42cef7793e7966e8756a1dfa41fa2c5ed7a6e79a39a28025a35c7",
+      "decision": "Not loaded: required qpdf 12.4.2 Windows DLL unavailable; qpdf CLI absent."
+    }
+  ],
+  "environment": {
+    "VW_PDFIUM_TEST_LIBRARY": "unset",
+    "VW_QPDF_TEST_LIBRARY": "unset",
+    "native_install_performed": false,
+    "live_provider_calls": false,
+    "permission_change": false
+  },
+  "platform_boundaries": [
+    "Windows document worker dispatch and qpdf loading are Windows-only; the LPAC process boundary cannot execute on this Linux host.",
+    "Android production native path requires an actual isolated UID and applies hard resource limits before engine construction; ordinary Linux execution does not validate that service boundary.",
+    "The two ignored engine tests could run in a suitable centrally capped runner after the exact ABI artifact and trust pin are approved and supplied; this inspection does not substitute a different library."
+  ],
+  "supported_diagnostic": {
+    "parser": "preinstalled pure-Python pypdf 6.10.0",
+    "parser_license_expression": "BSD-3-Clause",
+    "shipping_dependency_added": false,
+    "procedure": "Use actual built vw_pdf embed_pdf_copy_metadata and verify_pdf_copy_metadata on one-page synthetic PDFs, with LF/CRLF/CR classic-xref rows and two consecutive metadata stamps. Independently read all six with strict pypdf; check exact Subject JSON, u64 maxima, full hashes, paired capture identity, page box, no Prev/Encrypt.",
+    "inputs": {
+      "vw_pdf_rlib_sha256": "2262e953e4a753e1b71287a22e00a0892fde54026ec320c689eb978b2923c873",
+      "blake3_rlib_sha256": "edb749630a59126ffe789a9154ac1e9ac86b77509c459088f74a9a7cf43830ff",
+      "probe_source_sha256": "f70811960a523993884d4190664909d9c6d7a4a6e56ade92bd4bc4734b16abca",
+      "checker_source_sha256": "42145c705d0347ad82213b075e7defc1e37033aef6d742e6b8b39dd578cb323a",
+      "bounds": {
+        "as_bytes": 536870912,
+        "cpu_seconds": 10,
+        "wall_seconds_per_process": 20,
+        "file_bytes": 1048576,
+        "open_files": 32
+      }
+    },
+    "result": {
+      "parser": "pypdf6.10.0",
+      "synthetic_cases": [
+        {
+          "fixture": "cr-1.pdf",
+          "bytes": 1902,
+          "sha256": "6279154d39dcfbd2215d9c192cee21ef0ae93c12d771a75f653041fe7dc63f2b",
+          "strict_page_and_subject_readback": "passed"
+        },
+        {
+          "fixture": "cr-2.pdf",
+          "bytes": 3380,
+          "sha256": "1e9470c22e1dc20816f414f3a713db08da27bfd608f419d1d02ee2f08ab359b7",
+          "strict_page_and_subject_readback": "passed"
+        },
+        {
+          "fixture": "crlf-1.pdf",
+          "bytes": 1902,
+          "sha256": "74acbe7d80040f00c9e00be5d70373390ba3c5da3c96b725f8684e02e7ce9466",
+          "strict_page_and_subject_readback": "passed"
+        },
+        {
+          "fixture": "crlf-2.pdf",
+          "bytes": 3380,
+          "sha256": "069ab2d086faa12cde416ea262d3f651ede674b2d6086f38d780fae4967f917d",
+          "strict_page_and_subject_readback": "passed"
+        },
+        {
+          "fixture": "lf-1.pdf",
+          "bytes": 1902,
+          "sha256": "be6b4b91b99d343087e175bdfe26a0d232d2a29fcab391fe5acaa27366731b3f",
+          "strict_page_and_subject_readback": "passed"
+        },
+        {
+          "fixture": "lf-2.pdf",
+          "bytes": 3380,
+          "sha256": "a03ec57e0f00afc1e7b52ee539a22f5fa3d86de4ee61b1104ac053b45d4d5c9b",
+          "strict_page_and_subject_readback": "passed"
+        }
+      ],
+      "passed": 6,
+      "pdfium_gate_passed": false,
+      "native_runtime_or_isolation_claim": false
+    },
+    "probe_rust_source": "use std::{fs, io::Write, path::Path};\nuse vw_pdf::{PdfCancellation, PdfLimits, embed_pdf_copy_metadata, verify_pdf_copy_metadata};\nfn fixture() -> Vec<u8> {\n    let objects: [&[u8]; 4] = [b\"<< /Type /Catalog /Pages 2 0 R >>\", b\"<< /Type /Pages /Count 1 /Kids [3 0 R] >>\", b\"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 10 10] /Contents 4 0 R >>\", b\"<< /Length 0 >>\\nstream\\nendstream\"];\n    let mut bytes=b\"%PDF-1.7\\n\".to_vec();let mut offsets=Vec::new();\n    for (index,object) in objects.iter().enumerate(){offsets.push(bytes.len());writeln!(bytes,\"{} 0 obj\",index+1).unwrap();bytes.extend_from_slice(object);bytes.extend_from_slice(b\"\\nendobj\\n\");}\n    let xref=bytes.len();writeln!(bytes,\"xref\\n0 5\\n0000000000 65535 f \").unwrap();\n    for at in offsets{writeln!(bytes,\"{at:010} 00000 n \").unwrap();}\n    write!(bytes,\"trailer\\n<< /Size 5 /Root 1 0 R >>\\nstartxref\\n{xref}\\n%%EOF\\n\").unwrap();bytes\n}\nfn main()->Result<(),Box<dyn std::error::Error>> {\n    let root=std::env::args_os().nth(1).ok_or(\"output required\")?;let root=Path::new(&root);\n    let limit=PdfLimits{input_bytes:1024*1024,output_bytes:1024*1024,memory_bytes:32*1024*1024,..PdfLimits::default()};\n    for (name,ending) in [(\"lf\",\" \\n\"),(\"crlf\",\"\\r\\n\"),(\"cr\",\" \\r\")] {\n        let text=String::from_utf8(fixture())?;let mut bytes=text.replace(\" n \\n\",&format!(\" n{ending}\")).replace(\" f \\n\",&format!(\" f{ending}\")).into_bytes();\n        let original=blake3::hash(&bytes).to_hex().to_string();\n        let metadata=format!(r#\"{{\"schema_version\":1,\"host_seq\":18446744073709551615,\"state_hash\":\"{}\",\"revision\":\"r18446744073709551615-abababab\",\"source_asset\":\"{original}\",\"capture_session\":\"018bcfe5-6800-7000-8000-000000000001\",\"frame_id\":18446744073709551615}}\"#,\"ab\".repeat(32));\n        for round in 1..=2 {\n            embed_pdf_copy_metadata(&mut bytes,&metadata,limit,&PdfCancellation::default())?;\n            verify_pdf_copy_metadata(&bytes,&metadata,limit.output_bytes,&PdfCancellation::default())?;\n            fs::write(root.join(format!(\"{name}-{round}.pdf\")),&bytes)?;\n            fs::write(root.join(format!(\"{name}-{round}.expected.json\")),&metadata)?;\n        }\n    }\n    Ok(())\n}\n",
+    "checker_python_source": "from pathlib import Path\nfrom pypdf import PdfReader\nimport hashlib,json\nroot=Path('/tmp/vw-pdf-gate-feasibility');rows=[]\nfor path in sorted(root.glob('*.pdf')):\n    expected=json.loads(path.with_suffix('.expected.json').read_text())\n    reader=PdfReader(path,strict=True)\n    assert len(reader.pages)==1\n    assert list(reader.pages[0].mediabox)==[0,0,10,10]\n    assert reader.metadata is not None\n    actual=json.loads(reader.metadata.subject)\n    assert actual==expected\n    assert actual['host_seq']==2**64-1 and actual['frame_id']==2**64-1\n    assert actual['revision']=='r18446744073709551615-abababab'\n    assert len(actual['state_hash'])==len(actual['source_asset'])==64\n    assert '/Prev' not in reader.trailer and '/Encrypt' not in reader.trailer\n    rows.append({'fixture':path.name,'bytes':path.stat().st_size,'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'strict_page_and_subject_readback':'passed'})\n(root/'result.json').write_text(json.dumps({'parser':'pypdf6.10.0','synthetic_cases':rows,'passed':len(rows),'pdfium_gate_passed':False,'native_runtime_or_isolation_claim':False},indent=2)+'\\n')\nprint('Independent strict pypdf checks passed:',len(rows))\n",
+    "logs": [
+      {
+        "name": "compile.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      },
+      {
+        "name": "emit.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      },
+      {
+        "name": "independent-parser.log",
+        "sha256": "91af4f6ad42d278d4e1db879446f305f4c60e6a99f219c59677f441278db5577",
+        "text": "Independent strict pypdf checks passed: 6\n"
+      }
+    ],
+    "limits": "Each trusted-synthetic child was bounded to AS 512 MiB, CPU 10 s, wall 20 s, file 1 MiB and 32 open files. These bounds are not claimed as an approved native-worker sandbox."
+  },
+  "gates": {
+    "pdfium_runtime": false,
+    "qpdf_runtime": false,
+    "windows_worker_execution": false,
+    "android_isolated_service_execution": false,
+    "pdf_publication_enabled": false,
+    "device_or_product_acceptance": false
+  },
+  "next_action": "Supply reviewed hash-pinned PDFium 7881 artifacts for the actual target and an approved capped isolated runner; then run both ignored tests alone and the Windows qpdf case on Windows. Retain PDF publication refusal until native/runtime requirements pass."
+}

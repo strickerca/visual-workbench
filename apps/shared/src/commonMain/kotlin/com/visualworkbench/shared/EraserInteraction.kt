@@ -101,7 +101,7 @@ public class EraserInteraction(
             invalidate(); document = null; mutable.value = state.value.copy(ready = false); return
         }
         if (backend === value && attachment == epoch && eventSequence == sequence && document?.let {
-            it.documentId == snapshot.documentId && sameEraseRevision(it.render.revision, snapshot.render.revision)
+            it.documentId == snapshot.documentId && it.page == snapshot.page && sameEraseRevision(it.render.revision, snapshot.render.revision)
         } == true) return
         if (backend == null) owner = SupervisorJob(scope.coroutineContext[Job])
         if (backend !== value || attachment != epoch || eventSequence > sequence) observed = null
@@ -185,7 +185,7 @@ public class EraserInteraction(
                         if (targets.isNotEmpty()) {
                             // The exact IDs, samples, revision and metadata are captured once.
                             val request = VectorEraseEdit(run.document.eraseBinding(), metadata,
-                                targets.map { VectorEraseTarget(it, newId(now.toULong())) }, points, run.radius)
+                                targets.map { VectorEraseTarget(it, newId(now.toULong())) }, points, run.radius, page = run.document.page)
                             currentCoroutineContext().ensureActive()
                             if (!current(run)) throw WorkflowFailure(WorkflowFailureKind.Stale)
                             val result = run.backend.eraseStrokes(request)
@@ -211,7 +211,7 @@ public class EraserInteraction(
                         if (!current(run)) throw WorkflowFailure(WorkflowFailureKind.Stale)
                         if (ids.isNotEmpty()) {
                             val options = EditOptions(metadata.transactionId, run.document.documentId, metadata.deviceId,
-                                metadata.firstLamport, now, info.hostSeq, info.stateHash)
+                                metadata.firstLamport, now, info.hostSeq, info.stateHash, page = run.document.page)
                             val result = run.backend.deleteObjects(options, ids)
                             if (result.projectId != info.projectId) throw WorkflowFailure(WorkflowFailureKind.Storage)
                             receipt = EraserChange(result, ids.toSet(), emptyMap())
@@ -241,7 +241,7 @@ public class EraserInteraction(
         return true
     }
     private fun current(run: Gesture): Boolean = !detaching && backend === run.backend && attachment == run.attachment &&
-        admission == run.admission && document?.let { it.documentId == run.document.documentId &&
+        admission == run.admission && document?.let { it.documentId == run.document.documentId && it.page == run.document.page &&
             sameEraseRevision(it.render.revision, run.document.render.revision) } == true
     public fun cancelOperation() {
         cancelGesture(); operation?.cancel()
@@ -269,8 +269,7 @@ public class EraserInteraction(
 
 private fun DocumentSnapshot.eraseBinding(): WorkflowBinding = WorkflowBinding(render.revision.projectId, documentId,
     render.revision.hostSeq, render.revision.stateHash)
-private fun sameEraseRevision(a: ProjectInfo, b: ProjectInfo): Boolean = a.projectId == b.projectId &&
-    a.hostSeq == b.hostSeq && a.stateHash == b.stateHash && a.nextLamport == b.nextLamport
+private fun sameEraseRevision(a: ProjectInfo, b: ProjectInfo): Boolean = a.sameDocumentRevision(b)
 private fun validErasePoint(point: Point): Boolean = point.x.isFinite() && point.y.isFinite() && abs(point.x) <= 1e9 && abs(point.y) <= 1e9
 private fun validEraseCamera(camera: Camera): Boolean = validErasePoint(camera.center) && camera.scale.isFinite() && camera.scale > 0 &&
     camera.rotation.isFinite() && camera.viewportWidth.isFinite() && camera.viewportHeight.isFinite() && camera.viewportWidth > 0 && camera.viewportHeight > 0

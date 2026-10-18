@@ -28,8 +28,8 @@ import com.visualworkbench.shared.*
                 Text(state.glyphs.joinToString(""){it.text.orEmpty()},style=MaterialTheme.typography.body2)
                 TextButton(controller::redactSelection,enabled=!state.busy){Text("Mark selected text for redaction")}
             }
-            listOf(DocumentCopy.Original to "Original PDF",DocumentCopy.Annotated to "PDF with annotations",DocumentCopy.Flattened to "Flattened annotations",DocumentCopy.PcRedaction to "PC object removal",DocumentCopy.EveryPageRasterRedaction to "Rasterize every page").forEach{(choice,label)->
-                Row{RadioButton(mode==choice,{mode=choice},enabled=!state.busy&&(choice!=DocumentCopy.PcRedaction||controller.pcRedaction));Text(label,Modifier.padding(top=12.dp))}
+            listOf(DocumentCopy.Original to "Exact original PDF (unavailable)",DocumentCopy.Annotated to "PDF with annotations",DocumentCopy.Flattened to "Flattened annotations",DocumentCopy.PcRedaction to "PC object removal",DocumentCopy.EveryPageRasterRedaction to "Rasterize every page").forEach{(choice,label)->
+                Row{RadioButton(mode==choice,{mode=choice},enabled=!state.busy&&controller.canExport(choice)&&(choice!=DocumentCopy.PcRedaction||controller.pcRedaction));Text(label,Modifier.padding(top=12.dp))}
             }
             if(mode==DocumentCopy.PcRedaction||mode==DocumentCopy.EveryPageRasterRedaction){
                 Text("${state.regions.size} marked regions. Full-page raster redaction removes searchable text and vector features on every output page.",style=MaterialTheme.typography.caption)
@@ -43,8 +43,8 @@ import com.visualworkbench.shared.*
         }
         state.notices.forEach{Text(documentNoticeText(it),style=MaterialTheme.typography.caption)}
         TextButton(controller::retryViewport,enabled=!state.busy){Text("Retry page display")}
-        Button({controller.export(mode,removeEncryption)},enabled=!state.busy&&controller.exportPublicationAvailable){Text("Prepare document copy")}
-        if(!controller.exportPublicationAvailable)Text("Document copy export is not available in this build.",style=MaterialTheme.typography.caption)
+        Button({controller.export(mode,removeEncryption)},enabled=!state.busy&&controller.canExport(mode)){Text("Prepare document copy")}
+        if(!controller.canExport(mode))Text(controller.copyUnavailableText(mode),style=MaterialTheme.typography.caption)
         controller.checkedExport()?.let{copy->Button({save(copy)},enabled=!state.busy){Text("Save prepared copy")}}
         if(state.busy){LinearProgressIndicator(Modifier.fillMaxWidth());TextButton(controller::cancel){Text("Cancel document work")}}
         state.message?.let{Text(it,style=MaterialTheme.typography.caption)}

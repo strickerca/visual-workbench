@@ -18,11 +18,12 @@ public class BudgetedDocumentJobs(private val delegate:DocumentJobs,private val 
                 if(operation.tile.width !in 1u..512u||operation.tile.height !in 1u..512u||!operation.tile.scale.isFinite()||operation.tile.scale<=0||!operation.tile.origin.x.isFinite()||!operation.tile.origin.y.isFinite())throw DocumentFailure(DocumentFailureKind.Invalid)
                 operation.tile.width.toLong()*operation.tile.height.toLong()*4
             }
-            is DocumentOperation.Copy->128L*1024*1024
+            is DocumentOperation.Copy->documentOutputLimit(operation)
             else->0L
         }
         // Hard argument bounds precede multiplication/foreign copies.
-        if(source.size>64*1024*1024||reply<0||reply>128L*1024*1024)throw DocumentFailure(DocumentFailureKind.Limit)
+        val svg=when(val op=request.operation){DocumentOperation.SvgInfo->true;is DocumentOperation.Tile->op.kind==EditableKind.Svg;is DocumentOperation.Copy->op.kind==DocumentCopy.SvgAnnotations;else->false}
+        if(source.size>(if(svg)4 else 64)*1024*1024||reply<0||reply>128L*1024*1024)throw DocumentFailure(DocumentFailureKind.Limit)
         val peak=retained+source.size.toLong()*4+reply*4+36L*1024*1024
         if(peak>budgetBytes)throw DocumentFailure(DocumentFailureKind.Limit)
         delegate.run(request,source)

@@ -82,6 +82,29 @@ class DesktopCoherenceTest {
         assertEquals(SnapshotDecision.Newer,snapshotDecision(first,next))
     }
 
+    @Test fun oldPageRefreshCannotAdoptOrRebindAfterSameRevisionNavigation()=fixture { f ->
+        f.project.pdf=true;f.editor.open(Path.of("fixture"))
+        withTimeout(5000){f.editor.state.first{!it.busy&&it.document?.page==0u};f.project.changes.subscriptionCount.first{it>0}}
+        withTimeout(5000){while(f.editor.instructionEditor.state.value.busy||f.editor.semanticEditor.state.value.busy||f.editor.documents.state.value.busy)yield()}
+        val gate=DocumentGate();f.project.nextDocumentGate=gate
+        try {
+            f.project.bump(10.0);f.project.announce();withTimeout(5000){gate.captured.await()}
+            val capturedRevision=f.project.current.render.revision
+            f.editor.documents.page(1u)
+            withTimeout(5000){f.editor.state.first{it.document?.page==1u}}
+            val revision=f.editor.state.value.document!!.render.revision;assertEquals(capturedRevision,revision)
+            gate.release.complete(Unit);gate.delivered.await();yield()
+            assertEquals(1u,f.editor.state.value.document?.page);assertEquals(revision,f.editor.state.value.document?.render?.revision)
+            assertEquals(listOf("page-1-object"),f.editor.state.value.document?.render?.items?.map{it.objectId})
+            // This fixture has no PDF raster runtime; the surface correctly
+            // refuses input. Exercise the actual rebound tool owner separately.
+            f.editor.chooseEraser(EraserChoice.Object)
+            val eraser=f.editor.erasers.interaction
+            assertTrue(eraser.begin(Point(30.0,30.0),f.editor.state.value.view.camera));assertTrue(eraser.finish())
+            withTimeout(5000){while(f.project.accepted.isEmpty())yield()}
+            assertEquals(listOf("page-1-object"),f.project.accepted.single().map{(it as EditCommand.Delete).objectId});assertEquals(1u,f.project.lastOptions?.page)
+        }finally{gate.release.complete(Unit)}
+    }
     @Test fun delayedOlderSnapshotCannotOverwriteANewerAcceptedEdit()=fixture { f ->
         f.project.bump(10.0)
         val gate=DocumentGate();f.project.nextDocumentGate=gate
@@ -285,7 +308,17 @@ private fun snapshot(sequence:ULong,hash:String,transform:Transform=Transform(),
 private class DocumentGate {
     val captured=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();val delivered=CompletableDeferred<Unit>()
 }
-private class FixtureProject:WorkbenchProject {
+private class FixtureProject:WorkbenchProject,WorkbenchDocumentsProject {
+    var pdf=false;private var page=0u
+    override suspend fun documentDescriptor(documentId:String):EditableDescriptor?=if(pdf)EditableDescriptor(documentId,"a".repeat(64),EditableKind.Pdf,List(2){DocumentPage(it.toUInt(),64.0,64.0,listOf(0.0,0.0,64.0,64.0),0u,"page-$it-layer")},current.render.revision)else null
+    override suspend fun documentSource(documentId:String,expected:ProjectInfo):EditableSource=throw CoreFailure(CoreFailureKind.Unsupported)
+    override suspend fun documentPage(documentId:String,page:UInt):DocumentSnapshot=current.copy(page=page,layers=listOf(LayerInfo("page-$page-layer","Page",true,false,1.0,"normal")),render=current.render.copy(items=current.render.items.map{it.copy(objectId="page-$page-object",layerId="page-$page-layer")}))
+    override fun selectedDocumentPage(documentId:String):UInt=page
+    override suspend fun selectDocumentPage(documentId:String,page:UInt):DocumentSnapshot{this.page=page;return documentPage(documentId,page)}
+    override fun documentPassword(documentId:String):String?=null
+    override fun documentPassword(documentId:String,password:String?):Unit=Unit
+    override suspend fun documentOverlays(documentId:String,page:UInt,expected:ProjectInfo):List<DocumentOverlay> = emptyList()
+    override suspend fun publishDocumentCopy(documentId:String,destination:String,copy:DocumentExport):String=error("No publication in fixture")
     var current=snapshot(7u,"hash-7");var nextDocumentGate:DocumentGate?=null;var beforeNextEdit:(()->Unit)?=null
     var beforeClose:(()->Unit)?=null;var lastOptions:EditOptions?=null;private var eventSequence=0uL
     var strokeFactory:((StrokeOptions)->WorkbenchStroke)?=null
@@ -296,7 +329,7 @@ private class FixtureProject:WorkbenchProject {
     suspend fun announce(){changes.emit(ProjectChange(++eventSequence,ChangeKind.Committed,current.render.revision))}
     override suspend fun info():ProjectInfo=current.render.revision
     override suspend fun document(documentId:String):DocumentSnapshot{
-        val captured=current;val gate=nextDocumentGate;nextDocumentGate=null
+        val captured=if(pdf)documentPage(documentId,page)else current;val gate=nextDocumentGate;nextDocumentGate=null
         if(gate!=null){gate.captured.complete(Unit);gate.release.await();gate.delivered.complete(Unit)}
         return captured
     }

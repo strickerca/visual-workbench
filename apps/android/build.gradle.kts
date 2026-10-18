@@ -57,6 +57,7 @@ android {
 }
 dependencies {
     implementation(project(":shared"))
+    implementation(project(":bindings-core"))
     implementation(platform(libs.compose.bom))
     implementation(libs.activity.compose)
     implementation("androidx.compose.ui:ui")

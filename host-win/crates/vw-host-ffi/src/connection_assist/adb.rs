@@ -485,6 +485,7 @@ pub(super) fn start(
             if let Ok(mut state) = snapshot.lock() {
                 state.state = AdbReverseState::Stopped;
             }
+            #[cfg(windows)]
             drop(_tool_file_lease);
             drop(permit);
             let _ = done.send(true);

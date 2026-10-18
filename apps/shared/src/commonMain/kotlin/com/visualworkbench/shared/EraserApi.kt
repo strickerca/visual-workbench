@@ -6,6 +6,7 @@ public data class VectorEraseEdit(
     public val targets: List<VectorEraseTarget>, public val centers: List<Point>, public val radius: Double,
     public val memoryBudgetBytes: ULong = 256uL * 1024uL * 1024uL,
     public val maxOutputVertices: UInt = 8_192u, public val maxWorkUnits: ULong = 64_000_000uL,
+    public val page: UInt? = null,
 )
 public data class VectorEraseReplacement(public val originalId: String, public val outlineId: String?, public val contourCount: UInt)
 public data class VectorEraseReceipt(public val transactionId: String, public val changed: List<VectorEraseReplacement>,

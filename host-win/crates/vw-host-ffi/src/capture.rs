@@ -1,7 +1,9 @@
 //! Additive WGC/UIA API. All foreign providers execute in a hash-pinned owned
 //! process; dropped/cancelled callers signal that process without releasing its
 //! admission slot or private-output ownership before actual termination.
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+#[cfg(windows)]
+use std::sync::Mutex;
 use vw_capture as capture;
 #[path = "editor_identity.rs"]
 pub(crate) mod editor_identity;

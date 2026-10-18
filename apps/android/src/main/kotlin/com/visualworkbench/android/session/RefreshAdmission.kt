@@ -12,6 +12,7 @@ internal class RefreshAdmission {
         sequence = value
         return true
     }
+    fun invalidate() { epoch++ } // Preserve ordered event sequence during page navigation.
     fun capture(): Ticket = Ticket(epoch, sequence)
     fun accepts(ticket: Ticket): Boolean = ticket == capture()
 }

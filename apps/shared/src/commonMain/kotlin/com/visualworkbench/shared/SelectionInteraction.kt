@@ -93,10 +93,10 @@ public class SelectionInteraction(
         if (detaching) return
         check(project == null || project === value) { "Detach selection work before replacing the project" }
         if (project === value && attachment == epoch && eventSequence < sequence) return
-        if (project === value && attachment == epoch && displayed?.documentId == document.documentId &&
+        if (project === value && attachment == epoch && displayed?.documentId == document.documentId && displayed?.page == document.page &&
             displayed?.render?.revision?.let { sameRevision(it, document.render.revision) } == true &&
             eventSequence == sequence && (!state.value.active || mutableState.value.document != null)) return
-        val sameDocument = project === value && attachment == epoch && documentId == document.documentId
+        val sameDocument = project === value && attachment == epoch && documentId == document.documentId && displayed?.page == document.page
         if (project == null) {
             project = value // Native capability is acquired only after explicit tool activation.
             val job = SupervisorJob(scope.coroutineContext[Job]); owner = job

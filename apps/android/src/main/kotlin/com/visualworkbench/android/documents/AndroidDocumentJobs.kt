@@ -154,7 +154,8 @@ private class AndroidDocumentCall(private val context: Context) : DocumentCall {
         // this call's source. Otherwise the exact death proof above is required.
         withContext(Dispatchers.IO) {
             outputFile?.let { file ->
-                if (file.parentFile.canonicalFile != context.cacheDir.canonicalFile || !file.name.startsWith("vw-doc-job-"))
+                val parent=file.parentFile ?: throw DocumentFailure(DocumentFailureKind.Isolation)
+                if (parent.canonicalFile != context.cacheDir.canonicalFile || !file.name.startsWith("vw-doc-job-"))
                     throw DocumentFailure(DocumentFailureKind.Isolation)
                 if (file.exists() && !file.delete()) throw DocumentFailure(DocumentFailureKind.Isolation)
             }

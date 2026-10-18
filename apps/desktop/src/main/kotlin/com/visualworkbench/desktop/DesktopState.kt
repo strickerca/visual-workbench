@@ -53,6 +53,7 @@ internal enum class SnapshotDecision { Newer, Duplicate, Stale, Conflict }
 internal fun snapshotDecision(current:DocumentSnapshot?,incoming:DocumentSnapshot,allowVisibleChange:Boolean=false):SnapshotDecision {
     if(current==null)return SnapshotDecision.Newer
     if(current.documentId!=incoming.documentId||current.render.revision.projectId!=incoming.render.revision.projectId)return SnapshotDecision.Conflict
+    if(current.page!=incoming.page)return SnapshotDecision.Stale
     val before=current.render.revision;val after=incoming.render.revision
     return when {
         after.hostSeq<before.hostSeq->SnapshotDecision.Stale

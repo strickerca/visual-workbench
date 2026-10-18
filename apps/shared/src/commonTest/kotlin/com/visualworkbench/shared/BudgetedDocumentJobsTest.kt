@@ -21,6 +21,13 @@ class BudgetedDocumentJobsTest {
         for(side in listOf(0u,513u,UInt.MAX_VALUE))assertEquals(DocumentFailureKind.Invalid,assertFailsWith<DocumentFailure>{owner.run(DocumentRequest(DocumentOperation.Tile(EditableKind.Svg,0u,DocumentTileRequest(Point(0.0,0.0),1.0,side,side))),byteArrayOf(1))}.kind)
         assertEquals(0,jobs.calls)
     }
+    @Test fun svgCopyHasABoundedReservationEvenWithRetainedDisplayOwnership():Unit=runBlocking {
+        val jobs=Jobs();val owner=BudgetedDocumentJobs(jobs,{128L*1024*1024})
+        owner.run(DocumentRequest(DocumentOperation.Copy(DocumentCopy.SvgAnnotations)),ByteArray(4*1024*1024));assertEquals(1,jobs.calls)
+        assertEquals(8L*1024*1024,documentOutputLimit(DocumentOperation.Copy(DocumentCopy.SvgAnnotations)))
+        assertEquals(DocumentFailureKind.Limit,assertFailsWith<DocumentFailure>{owner.run(DocumentRequest(DocumentOperation.Copy(DocumentCopy.SvgAnnotations)),ByteArray(4*1024*1024+1))}.kind)
+        assertEquals(1,jobs.calls)
+    }
     @Test fun isolatedCapabilityAndJoinedCloseBelongToTheUnderlyingOwner():Unit=runBlocking {
         val jobs=Jobs();val owner=BudgetedDocumentJobs(jobs,{0});assertTrue(owner.pcRedaction);owner.close();assertTrue(jobs.closed)
     }

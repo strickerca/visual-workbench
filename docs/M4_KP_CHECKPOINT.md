@@ -141,3 +141,22 @@ Use the owner's selected model and effort; do not override settings. Select only
 the authorized S23, preserve unrelated apps, and serialize builds and device/
 capture/input execution. Keep pending owners and destinations until actual
 settlement. Deferred editors, drivers and Phase 5 remain deferred.
+
+## Cloud composition continuation — 2026-10-18
+
+The latest owner's broader roadmap continuation supersedes historical Phase5/M4
+scope deferrals above; Krita remains specifically deferred. Main remains `7be9da7`.
+Separate candidate `b0ace63b075fee190515f8e0c45fb6062f3809d0` composes admitted
+image/document/precision source with current app callers and review repairs.
+See `docs/ROADMAP_EXECUTION_LEDGER.md` and
+`docs/evidence/CLOUD_COMPOSED_APP_VALIDATION_20261018.json` for exact disposition.
+
+Cloud checks pass443 native and718 host/unit cases; two PDFium contracts and seven
+Windows-only host cases are unexecuted. Actual app and instrumentation source
+compilation, lint, arm64 alignment and Windows-target document type checks pass.
+Only verified SVG copy publication is enabled. PDF runtime/OS retirement,
+Windows distribution/launch, devices/providers, physical pen/performance and owner
+acceptance remain open. These results neither advance a product gate nor complete
+Krita, giant-image root viewport/stream work or the remaining milestone tasks.
+Parent-owned worktree/picker disposition and local Windows/device execution remain
+separately coordinated; this cloud phase did not access them.

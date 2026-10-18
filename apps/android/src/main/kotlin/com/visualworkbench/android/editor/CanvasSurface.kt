@@ -221,7 +221,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         return true
     }
     override fun onHoverEvent(event: MotionEvent): Boolean {
-        try { val packet=stylus.snapshot(event);if(event.actionMasked==MotionEvent.ACTION_HOVER_EXIT)buttons.reset()else buttons.accept(packet);router.accept(packet) } catch (_: IllegalArgumentException) { controller.predict(null) }
+        try { val packet=stylus.snapshot(event);buttons.accept(packet);router.accept(packet) } catch (_: IllegalArgumentException) { controller.predict(null) }
         return true
     }
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {

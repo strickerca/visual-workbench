@@ -75,10 +75,10 @@ public sealed interface Shape {
 public data class RenderItem(public val objectId: String, public val layerId: String, public val layerOpacity: Double, public val layerBlend: String, public val bounds: Rect, public val contours: Contours, public val transform: Transform, public val style: ObjectStyle, public val shape: Shape, public val locked: Boolean)
 public data class RenderList(public val revision: ProjectInfo, public val items: List<RenderItem>)
 public data class LayerInfo(public val id: String, public val name: String, public val visible: Boolean, public val locked: Boolean, public val opacity: Double, public val blend: String)
-public data class DocumentSnapshot(public val documentId: String, public val title: String, public val width: UInt, public val height: UInt, public val bitDepth: UInt, public val layers: List<LayerInfo>, public val render: RenderList)
+public data class DocumentSnapshot(public val documentId: String, public val title: String, public val width: UInt, public val height: UInt, public val bitDepth: UInt, public val layers: List<LayerInfo>, public val render: RenderList, public val page: UInt? = null)
 /** Display derivative only. Never persist/export these bytes as the original asset. */
 public data class BackgroundImage(public val width: UInt, public val height: UInt, public val rgba: ByteArray, public val sourceAssetId: String, public val sourceBitDepth: UByte, public val iccProfile: ByteArray)
-public data class EditOptions(public val transactionId: String, public val documentId: String, public val deviceId: String, public val lamport: ULong, public val createdAtMs: Long, public val expectedHostSeq: ULong? = null, public val expectedStateHash: String? = null, public val gestureId: String? = null)
+public data class EditOptions(public val transactionId: String, public val documentId: String, public val deviceId: String, public val lamport: ULong, public val createdAtMs: Long, public val expectedHostSeq: ULong? = null, public val expectedStateHash: String? = null, public val gestureId: String? = null, public val page: UInt? = null)
 public sealed interface EditCommand {
     public data class Create(public val objectId: String, public val layerId: String, public val shape: Shape, public val style: ObjectStyle, public val transform: Transform = Transform()) : EditCommand
     public data class Delete(public val objectId: String) : EditCommand

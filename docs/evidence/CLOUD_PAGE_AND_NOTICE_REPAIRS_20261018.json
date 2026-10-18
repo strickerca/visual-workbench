@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-18",
+  "base": "5d0e39a7ed11a293c6b905392683020ec9d515ff",
+  "frozen_validation_candidate_unchanged": "070758ac3b0537b4ea9efc0f6d21b23792d47762",
+  "source_changes": [
+    "Common document snapshots carry page identity; eraser admission, immutable stroke/delete requests and selection gesture/picker admission include it.",
+    "Both actual app page callbacks join eraser and selection retirement before selecting a new page, rebind both owners and refresh page-dependent instruction/semantic projections.",
+    "Native EditPrecondition and VectorEraseOptions carry page_index. Fresh PDF edits/erasures require it and atomically check every target layer. Exact committed edit retries remain idempotent.",
+    "Native common adapters reject a captured page that no longer matches the selected page before invoking mutation.",
+    "Both app document owners schedule admitted source-fenced fidelity inspection after runtime installation, including import/reopen. Common binding preserves validated notices across same-source edits/pages and clears them on source/attachment replacement."
+  ],
+  "new_regressions": {
+    "common": "Two eraser page regressions, selection gesture/picker page invalidation and five notice lifecycle/admission/source cases.",
+    "app_adapters": "Each actual Android/desktop EraserController tested with injected hit input, equal-size equal-revision pages and distinct object IDs; includes detach/rebind.",
+    "native": "Two-page source/storage fixture exercises cross-page and missing-page delete/vector erase refusal, unchanged revision, current-page deletion and exact retry."
+  },
+  "checks_before_publication": {
+    "rustfmt": "passed",
+    "diff_check": "passed",
+    "staged_secret_scan": "passed"
+  },
+  "validation": {
+    "kotlin": {
+      "passed": 70,
+      "failed": 0,
+      "ignored": 0,
+      "compiler": "Kotlin 2.4.20, JVM17, strict explicit production API and Werror",
+      "resources": "512MiB,2CPU,one compiler backend worker",
+      "scope": "Actual common controller/interaction/budget/frame/retirement/selection/eraser code, plus actual Android and desktop EraserController adapters. Fake project/jobs/bitmap owners, injected hit input, default geometry stub fails if called; temporary NativeLoader/SystemTime/selection/vector actuals. No native/app UI/provider execution.",
+      "production_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests_log_sha256": "c13234da8a3d5752f00e9ccf1f1bf2f693b1067ae8d3ed824dba1d4ae5e914b4",
+      "test_compile_warnings": 0
+    },
+    "protocol": {
+      "passed": 24,
+      "failed": 0,
+      "ignored": 0,
+      "resources": "One build worker, bounded120seconds, incremental protocol-only compile4.01seconds",
+      "scope": "Actual protocol including four new copy identity cases, framing, reply and PC redaction tests.",
+      "log_sha256": "20389f73cdd8b2575dd4345325aee89379c8ce3b99be48def5f12fab18cea079"
+    },
+    "kotlin_psi": {
+      "passed_files": 21,
+      "scope": "Syntax parse only; includes changed root app controllers and native adapters"
+    },
+    "native_page_admission": "Written, unrun: waiting for serialized heavy slot.",
+    "ffi_abi_and_apps": "EditPrecondition.page_index and VectorEraseOptions.page_index require the next phase binding regeneration and combined native/app compile. Not run in this slice."
+  },
+  "limits": [
+    "No device, GUI, GPU, real document parser or provider acceptance.",
+    "No binding regeneration in this source slice; next combined phase must regenerate after EditPrecondition/VectorEraseOptions changes.",
+    "Full runtime packaging, sandbox retirement and product/hardware gates remain open."
+  ],
+  "validated_source": "968ffa0f2fb96241f5c5e280c68c29182ecd4df0 plus follow-up unsigned-test opt-ins and nullable adapter source correction"
+}

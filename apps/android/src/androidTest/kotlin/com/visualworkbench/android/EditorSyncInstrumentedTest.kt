@@ -23,6 +23,33 @@ import org.junit.runner.RunWith
  * are not network, renderer parity, latency or physical-pen acceptance. */
 @RunWith(AndroidJUnit4::class)
 class EditorSyncInstrumentedTest {
+    @Test fun oldPageRefreshCannotAdoptOrRebindAfterSameRevisionNavigation()=runBlocking {
+        fixture { editor,core,_ ->
+            val project=core.current
+            withContext(Dispatchers.Main){project.pdf=true;project.change(1u,0xff0000ffu)}
+            waitUntil{editor.document?.page==0u&&!editor.documents.state.value.busy}
+            val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();val delivered=CompletableDeferred<Unit>()
+            try {
+                withContext(Dispatchers.Main){project.nextRead={captured->entered.complete(Unit);release.await();delivered.complete(Unit);captured};project.change(2u,0x00ff00ffu)}
+                withTimeout(5000){entered.await()}
+                withContext(Dispatchers.Main){editor.documents.page(1u)}
+                waitUntil{editor.document?.page==1u&&!editor.documents.state.value.busy}
+                val revision=withContext(Dispatchers.Main){checkNotNull(editor.document).render.revision}
+                release.complete(Unit);withTimeout(5000){delivered.await()};withContext(Dispatchers.Main){yield()}
+                withContext(Dispatchers.Main){
+                    assertEquals(1u,editor.document?.page);assertEquals(revision,editor.document?.render?.revision)
+                    assertEquals(listOf("page-1-object"),editor.document?.render?.items?.map{it.objectId})
+                    // No PDF raster/parser is installed in this synthetic port
+                    // fixture. Check the actual bound tool without surface input.
+                    editor.chooseEraser(EraserChoice.Object)
+                    val eraser=editor.erasers.interaction
+                    assertTrue(eraser.begin(Point(10.0,10.0),checkNotNull(editor.scene).camera));assertTrue(eraser.finish())
+                }
+                waitUntil{project.lastEdit!=null}
+                withContext(Dispatchers.Main){assertEquals(listOf("page-1-object"),project.lastEdit?.second?.map{(it as EditCommand.Delete).objectId});assertEquals(1u,project.lastEdit?.first?.page)}
+            }finally{release.complete(Unit)}
+        }
+    }
     @Test fun remoteChangesRefreshWithoutMovingCameraAndLateSnapshotCannotOverwrite() = runBlocking {
         fixture { editor, core, _ ->
             val project = core.current
@@ -143,7 +170,7 @@ class EditorSyncInstrumentedTest {
             withContext(Dispatchers.Main) { core.current.change(2uL, 0x00ff00ffu) }
             waitUntil { editor.info?.stateHash == "state-2" }
             withContext(Dispatchers.Main) {
-                editor.attachCanvas { scene -> observed += (scene.objects + scene.provisional).map { it.item.style.rgba } }
+                editor.attachCanvas(sink = { scene -> observed += (scene.objects + scene.provisional).map { it.item.style.rgba } })
             }
             release.complete(Unit)
             waitUntil { link.completedQueries >= 2 }
@@ -173,7 +200,7 @@ class EditorSyncInstrumentedTest {
             // allow that old result into the new connected generation.
             withContext(Dispatchers.Main) {
                 link.updates.value = link.status().copy(sequence = 3uL, status = SyncStatus.Synced)
-                editor.attachCanvas { scene -> observed += (scene.objects + scene.provisional).map { it.item.style.rgba } }
+                editor.attachCanvas(sink = { scene -> observed += (scene.objects + scene.provisional).map { it.item.style.rgba } })
             }
             waitUntil { editor.connection?.sequence == 3uL }
             release.complete(Unit)
@@ -340,7 +367,21 @@ class EditorSyncInstrumentedTest {
         else Transform(camera.scale, 0.0, 0.0, camera.scale, camera.viewportWidth / 2 - camera.center.x * camera.scale, camera.viewportHeight / 2 - camera.center.y * camera.scale)
         override fun mapPoints(camera: Camera, inverse: Boolean, points: List<Point>): List<Point> = cameraMatrix(camera, inverse).let { t -> points.map { Point(it.x * t.a + t.e, it.y * t.d + t.f) } }
     }
-    private class FakeProject(options: CreateProject, private val events: MutableList<String>) : WorkbenchProject {
+    private class FakeProject(options: CreateProject, private val events: MutableList<String>) : WorkbenchProject, WorkbenchDocumentsProject {
+        var pdf=false;private var page=0u
+        private fun pages()=List(2){DocumentPage(it.toUInt(),100.0,100.0,listOf(0.0,0.0,100.0,100.0),0u,"$layer-page-$it")}
+        override suspend fun documentDescriptor(documentId:String):EditableDescriptor?=if(pdf)EditableDescriptor(documentId,"a".repeat(64),EditableKind.Pdf,pages(),revision)else null
+        override suspend fun documentSource(documentId:String,expected:ProjectInfo):EditableSource=throw CoreFailure(CoreFailureKind.Unsupported)
+        override suspend fun documentPage(documentId:String,page:UInt):DocumentSnapshot {
+            val layerId="$layer-page-$page"
+            return DocumentSnapshot(documentId,"Synthetic",100u,100u,8u,listOf(LayerInfo(layerId,"Page",true,false,1.0,"normal")),RenderList(revision,items.map{it.copy(objectId="page-$page-object",layerId=layerId)}),page)
+        }
+        override fun selectedDocumentPage(documentId:String):UInt=page
+        override suspend fun selectDocumentPage(documentId:String,page:UInt):DocumentSnapshot{this.page=page;return documentPage(documentId,page)}
+        override fun documentPassword(documentId:String):String?=null
+        override fun documentPassword(documentId:String,password:String?):Unit=Unit
+        override suspend fun documentOverlays(documentId:String,page:UInt,expected:ProjectInfo):List<DocumentOverlay> = emptyList()
+        override suspend fun publishDocumentCopy(documentId:String,destination:String,copy:DocumentExport):String=error("No publication in fixture")
         val documentId = options.documentId
         private val layer = options.layerId
         private var revision = ProjectInfo(options.projectId, "Synthetic", options.deviceId, 1uL, false, false, 0uL, "initial", listOf(documentId))
@@ -363,7 +404,7 @@ class EditorSyncInstrumentedTest {
             changes.emit(ProjectChange(sequence, ChangeKind.Committed, revision))
         }
         override suspend fun document(documentId: String): DocumentSnapshot {
-            val value = DocumentSnapshot(documentId, "Synthetic", 100u, 100u, 8u, listOf(LayerInfo(layer, "Marks", true, false, 1.0, "normal")), RenderList(revision, items))
+            val value = if(pdf)documentPage(documentId,page)else DocumentSnapshot(documentId, "Synthetic", 100u, 100u, 8u, listOf(LayerInfo(layer, "Marks", true, false, 1.0, "normal")), RenderList(revision, items))
             val hook = nextRead; nextRead = null
             return hook?.invoke(value) ?: value
         }
