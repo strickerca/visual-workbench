@@ -494,6 +494,7 @@ pub fn compile(
             Vec::new()
         },
         extensions: Extensions {
+            verification_origin: None,
             compiler: "vw-package-1-area-integer".into(),
             state_hash: instructions.source().state_hash.to_string(),
             host_seq: input.revision.host_seq,

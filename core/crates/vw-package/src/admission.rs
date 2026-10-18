@@ -94,7 +94,7 @@ impl Scan<'_> {
     }
     fn array_limit(&self, key: &[u8]) -> usize {
         match key {
-            b"markers" | b"crops" => self.markers,
+            b"markers" | b"crops" | b"original_marker_numbers" => self.markers,
             b"images" => self.markers + 2,
             b"files" => self.markers + 4,
             b"constraints" | b"redactions" => 64,
