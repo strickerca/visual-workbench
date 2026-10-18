@@ -3413,6 +3413,7 @@ dependencies = [
  "vw-ai",
  "vw-ai-platform",
  "vw-ai-provider",
+ "vw-assets",
  "vw-avif-os",
  "vw-codec-os",
  "vw-document-protocol",
@@ -3434,6 +3435,7 @@ dependencies = [
  "vw-remote-host",
  "vw-semantics",
  "vw-store",
+ "vw-stream",
  "vw-svg",
  "zeroize",
 ]
@@ -3774,6 +3776,18 @@ dependencies = [
  "vw-proto",
  "windows",
  "zip",
+]
+
+[[package]]
+name = "vw-stream"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "png",
+ "thiserror",
+ "vw-geom",
+ "vw-model",
+ "vw-proto",
 ]
 
 [[package]]

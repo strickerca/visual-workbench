@@ -372,6 +372,26 @@ impl<Q: FreeSpaceQuery> DiskCache<Q> {
         Ok(Some(bytes))
     }
 
+    /// Refuse an encoded entry before allocation when a consumer admits a
+    /// smaller payload bound than the entire cache. Integrity/LRU semantics are
+    /// identical to get; unknown files remain untouched.
+    pub fn get_bounded(
+        &mut self,
+        key: &str,
+        max_bytes: u64,
+    ) -> Result<Option<Vec<u8>>, StoreError> {
+        self.check_paths()?;
+        let Some(entry) = self.manifest.entries.get(key).cloned() else {
+            return Ok(None);
+        };
+        if entry.bytes > max_bytes {
+            return Err(StoreError::Invalid("cache read limit"));
+        }
+        let bytes = self.read_entry(&entry)?;
+        self.touch(key)?;
+        Ok(Some(bytes))
+    }
+
     /// Add derived bytes after budget and drive-reserve checks. Cache entries may
     /// be evicted to make room; originals and unrecognized files never are.
     pub fn put(&mut self, key: &str, bytes: &[u8]) -> Result<(), StoreError> {

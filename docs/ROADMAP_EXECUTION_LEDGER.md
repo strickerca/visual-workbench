@@ -326,3 +326,28 @@ keeps registration, store APIs, shared contracts and actual controller/draw wiri
 No recovered controller postimage or unfinished stream workflow is promoted by
 this T3.05 candidate. Five scoped M4 build tasks and all physical/product gates
 retain their existing pending status; Krita remains deferred.
+
+## T3.05 promotion and viewport/stream contract handoff
+
+Astra's bounded review accepted restricted `83663107`; a normal fast-forward
+push published that exact commit to main and the remote SHA was verified. No
+Windows, mixed-version peer, measured calibration, device or product gate was
+closed. The earlier T3.05 receipt's main value describes its pre-publication
+validation boundary, not the current delivery ref.
+
+The next isolated branch is `cloud/giant-stream-integration-20261018`, stacked on
+that reviewed main. It admits `ca773ed` leaves, the minimal common viewport API,
+native DTO/error contracts, a separate foreign-resource charge interface, and
+bounded store access prerequisites. Root/native contract compilation, one
+pre-allocation cache-read regression, locked graph, imports, format and dependency
+policy passed. The51 written leaf tests and shared contract compilation are
+pending; no bindings are regenerated or giant/stream user workflow enabled.
+
+Exact producer/provider and pure-stream accounting file ownership, factory types,
+mandatory shared pool and test obligations are published in
+`GIANT_STREAM_OWNER_HANDOFF_20261018.md`. The image owner may take the single
+heavy slot after parent forwards that handoff; root continues reserved native/
+Kotlin/renderer source without a concurrent heavy build. Root retains all public
+FFI/shared contracts, registration, store APIs and app composition. Recovered
+local view counters alone do not satisfy session-wide resource accounting.
+Source-bound contract checks are in `evidence/GIANT_STREAM_CONTRACTS_20261018.json`.

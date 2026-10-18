@@ -663,3 +663,31 @@ fn post_publication_reserve_decline_reclaims_cache_or_reports_low_space() -> Tes
     }
     Ok(())
 }
+
+#[test]
+fn bounded_cache_read_refuses_before_file_access_and_preserves_integrity_checks() -> TestResult {
+    let temp = fixture();
+    let mut cache = DiskCache::with_query(temp.path(), 1024, SimulatedSpace::plenty())?;
+    cache.put("bounded", b"12345678")?;
+    assert_eq!(cache.get_bounded("missing", 0)?, None);
+    assert_eq!(cache.get_bounded("bounded", 8)?, Some(b"12345678".to_vec()));
+    let path = fs::read_dir(temp.path().join("cache/vw-store-v1"))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| path.extension().is_some_and(|value| value == "cache"))
+        .ok_or("missing fixture cache payload")?;
+    // A denied bound must not even open the payload. An admitted read still
+    // detects the absent/corrupt actual bytes instead of trusting the index.
+    fs::remove_file(&path)?;
+    assert!(matches!(
+        cache.get_bounded("bounded", 7),
+        Err(StoreError::Invalid("cache read limit"))
+    ));
+    assert!(cache.get_bounded("bounded", 8).is_err());
+    fs::write(path, b"87654321")?;
+    assert!(matches!(
+        cache.get_bounded("bounded", 8),
+        Err(StoreError::Corrupt(_))
+    ));
+    Ok(())
+}
