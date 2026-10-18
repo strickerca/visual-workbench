@@ -1,0 +1,114 @@
+{
+  "schema": "vw-research-only-admission-v1",
+  "date": "2026-10-18",
+  "candidate_sha": "707a92c641d05a22351eca01e481237b7a5430eb",
+  "branch": "feat/editing-output-assisted-20261018",
+  "review": {
+    "agent_canonical_name": "/root/astra_output_review",
+    "requested_model": "gpt-6-astra",
+    "requested_reasoning_effort": "xhigh",
+    "reviewed_base_sha": "6e7c017b6eb5feb21ec7ed2b495afc271fd54fe2",
+    "reviewed_repair_git_blobs": {
+      "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/ImageFramesInteraction.kt": "be478653d74bba070d0febfbdcfe274b82b8bab5",
+      "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/ImageFramesInteractionTest.kt": "bbda5467051e42c0ef01a5ad0be2f16f4f6355be"
+    },
+    "receipt_exact_text": "Narrow source acceptance for `6e7c017b6eb5feb21ec7ed2b495afc271fd54fe2` plus the reviewed frame repair.\n\nThe P2 failed-close ownership defect is resolved in these exact blobs:\n\n- Controller: `be478653d74bba070d0febfbdcfe274b82b8bab5`\n- Tests: `bbda5467051e42c0ef01a5ad0be2f16f4f6355be`\n\nFailed retirement now retains the plan and fences callbacks; successful commits preserve their receipt and retry cleanup without recommitting. The repair owner reports **30 focused frame tests passing** with strict compilation.\n\nNo additional concrete source blocker found in OUTPUT or assisted-selection additions, including the four existing-file edits. My review was read-only; I ran no builds or tests.\n\nAcceptance remains conditional on documented root integration, generated bindings, the **40 native and 3 Android tests**, and full caller/export journeys. Actual assisted inference remains unavailable pending admitted model/runtime artifacts. No product or hardware gate is passed.",
+    "binding_check": "The two reviewed blobs are identical in candidate707a92c; this is a Git identity check, not a repeat source review or claim that Astra reviewed the commit by SHA."
+  },
+  "recommendation": {
+    "model": "MobileSAM vit_t; exact upstream checkpoint as offline conversion input",
+    "model_source_commit": "f706ad9c4eb7f219c00d9050e46328518ffb65d2",
+    "model_source_license_url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/LICENSE",
+    "checkpoint": {
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/weights/mobile_sam.pt",
+      "bytes": 40728226,
+      "sha256": "6dbb90523a35330fedd7f1d3dfc66f995213d81b29a5ca8108dbcdd4e37d6c2f",
+      "declared_license": "Apache-2.0",
+      "role": "conversion input only; not an Android-loadable model"
+    },
+    "runtime": "Standalone LiteRT CompiledModel API, GPU + separate explicit CPU sessions; no Google Play runtime or vendor NPU package initially",
+    "runtime_source_commit": "4352e261d3f1b3cda00345db5dbd75859d3bf0d3",
+    "runtime_source_license_url": "https://raw.githubusercontent.com/google-ai-edge/LiteRT/v2.3.0/LICENSE",
+    "runtime_artifacts": [
+      {
+        "coordinate": "com.google.ai.edge.litert:litert-api:2.3.0",
+        "extension": "aar",
+        "bytes": 945619,
+        "sha256": "20f630e9ed0b4f0564da616fd3d6406f3013cacad7d492cbe2963330f519256b",
+        "pom_sha256": "ace008f44c8ce4715c0e0b3f506dd0aee0bfada54c09c10c1e6bf714857b639a",
+        "license": "Apache-2.0",
+        "artifact_url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert-api/2.3.0/litert-api-2.3.0.aar",
+        "pom_url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert-api/2.3.0/litert-api-2.3.0.pom"
+      },
+      {
+        "coordinate": "com.google.ai.edge.litert:litert:2.3.0",
+        "extension": "aar",
+        "bytes": 7640140,
+        "sha256": "9508c6e9142646f0f2bc1fe68b3925fb470ee7ddd29114540339a04a8ab189dc",
+        "pom_sha256": "912be63ad7aa3df18ed8c53deeb8c2e44ed407976d08253089e93c185963d774",
+        "license": "Apache-2.0",
+        "artifact_url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert/2.3.0/litert-2.3.0.aar",
+        "pom_url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert/2.3.0/litert-2.3.0.pom"
+      },
+      {
+        "coordinate": "com.google.ai.edge.litert:litert-gpu:2.3.0",
+        "extension": "aar",
+        "bytes": 4695499,
+        "sha256": "173a4c3813601f7e9542f4e6a49e237775e2f9ce1e0948f35407098bffb1824f",
+        "pom_sha256": "2996e64770ee2d43f8fd82f5ecda32eba8299d2507d19206c3136b0779512a54",
+        "license": "Apache-2.0",
+        "artifact_url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert-gpu/2.3.0/litert-gpu-2.3.0.aar",
+        "pom_url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert-gpu/2.3.0/litert-gpu-2.3.0.pom"
+      }
+    ],
+    "artifact_verification": "Public HTTPS responses stream-hashed under exact byte caps; no binary retained, deserialized, executed, installed or published. No production license admission IDs created.",
+    "required_deployable_artifacts": [
+      "Exact separately callable encoder.tflite and prompt_decoder.tflite plus a deterministic manifest binding both full SHA256s, tensor layouts/dtypes/shapes, preprocessing and inverse resize/padding mapping, threshold/mask selection policy, source checkpoint and converter/toolchain hashes.",
+      "Derived hashes are OPEN: these files do not exist in this lane. Do not fill AssistedSelectionPins.modelArtifactSha256 with the upstream .pt hash or a fabricated .tflite hash.",
+      "Hash the canonical model manifest for modelArtifactSha256, then verify every child artifact; hash an exact runtime manifest for runtimeArtifactSha256 and every child AAR/native runtime identity. These are proposed manifest semantics, not a changed shared API or closed admission.",
+      "Record exact converter/runtime transitive licenses and notices in the current gates; POM declarations alone do not prove bundled-native notice completeness.",
+      "Initial conversion must use operators supported by the admitted standalone CPU/GPU runtime without Flex/Select-TF/custom or vendor delegate additions; any such dependency changes need their own exact artifact/license admission. Float is a reference candidate, not proof of fitting the pool; quantized derivatives require new hashes and quality evidence."
+    ],
+    "interface": [
+      "Implement existing AssistedSelectionBackend.admit -> Runtime.encode -> Session.propose/close in NEW Android leaves only after root grants ownership.",
+      "admit verifies actual artifacts, closed license/runtime admissions, tensor/operator support, CPU capability and conservative total workingSetBytes without loading weights/source/embeddings.",
+      "Use existing SessionResources before allocations; stay within unchanged256MiB process pool including 20P+16MiB import reservation and source/render concurrent charges; refuse rather than exceed.",
+      "Read original pixels through an admitted existing source/decoder owner with actual hash, orientation and source/epoch/page/revision fences. Common source metadata is not pixel access. No display-background screenshot as original, no duplicate decoder/manager.",
+      "Encode once per admitted source; retain actual embeddings. Decode real positive/negative points and boxes against original-D mapping; validate exact export shape/count support, never silently drop/truncate/pad prompts with unverified semantics.",
+      "GPU and CPU capability names require observed real execution/provider support. A settled Unsupported preferred initialization may choose admitted CPU once; no retries on inference, cancellation or storage failures. Join producer/close before releasing charges and retain failed owners.",
+      "Postprocess bounded mask to full oriented D coverage with actual sequence/source identity, then reuse existing proposal/Accept/ImportCoverage/manual correction/undo paths."
+    ],
+    "why_not_other_shortcuts": [
+      "Official MobileSAM export_onnx_model.py exports prompt encoder/mask decoder only; it does not supply an Android image encoder.",
+      "Android NNAPI is deprecated since Android15; official Android guidance recommends alternatives for performance critical workloads. No new NNAPI-dependent backend recommended.",
+      "Qualcomm preexports are a potential source reference, not an admitted deployment: inspected card has no exact S23/8Gen2 acceptance evidence and reports encoder peak memory above256MiB on several other phone targets. Current inspected recipe defaults one point; it cannot be assumed to support the whole prompt contract.",
+      "Qualcomm custom export uses credentialed hosted AI Hub work, forbidden by current no-credential/no-external-model-call scope. No such call was made."
+    ],
+    "approvals_and_limits": [
+      "Parent must grant exact new Android backend/test paths and retain coordinator ownership of dependency manifests/lock, license records, source-pixel ports and actual app roots.",
+      "Ordinary Apache-2.0 candidate review can use current allowlist; exact model/runtime/transitive notices and local derived artifact admission still must close. No user signature/terms acceptance inferred.",
+      "Any gated weights, Qualcomm/vendor proprietary SDK or license terms, credential creation, cloud compile/profile/inference, binary publication or pool increase requires explicit authority outside this research; none is proposed as an automatic next action.",
+      "Heavy offline conversion/build and device work require parent allocation of the shared slot and applicable device authorization. No heavy check/inference/device operation ran.",
+      "SEL-001 remains open until actual S23 GPU/NPU prompt end-to-end <=100ms after one encoding, real CPU fallback, source/prompt correctness, cancellation/cleanup and manual correction/undo are demonstrated with current-source receipts."
+    ],
+    "official_sources": [
+      "https://github.com/ChaoningZhang/MobileSAM",
+      "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/master/scripts/export_onnx_model.py",
+      "https://github.com/google-ai-edge/LiteRT/releases/tag/v2.3.0",
+      "https://developers.google.com/edge/litert/android",
+      "https://developer.android.com/ndk/guides/neuralnetworks",
+      "https://huggingface.co/qualcomm/MobileSam",
+      "https://raw.githubusercontent.com/qualcomm/ai-hub-models/v0.64.0/src/qai_hub_models/models/mobilesam/model.py"
+    ],
+    "tensor_contract_open": [
+      "Exact encoder/decoder artifact hashes and their pair/manifest identity; neither deployable artifact exists in this lane.",
+      "Actual tensor names, dimensions, layouts, dtypes and supported operator sets for both CPU and GPU; do not assume checkpoint/ONNX metadata equals a converted LiteRT contract.",
+      "Verified oriented-source RGB/color/normalization, resize/padding rules and exact inverse mapping from model masks back to full D coverage.",
+      "Positive/negative point and box encoding; supported counts under the existing64-point bound, sentinel semantics and dynamic-shape behavior. No silent prompt truncation or unverified padding.",
+      "Actual embeddings and decoder mask/score outputs; deterministic mask selection, threshold/resampling and output coverage policy validated against reference outputs.",
+      "Conservative loaded-runtime/weights/activation/source/embedding/scratch/import peak and cancellation/retirement behavior, admitted before allocations within the unchanged process pool."
+    ]
+  },
+  "repository_changes": "Documentation-only follow-up to candidate707a92c; no backend, root, dependency, model asset or inference changes.",
+  "status": "research_only_not_runtime_or_license_admission"
+}

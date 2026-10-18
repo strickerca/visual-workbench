@@ -285,6 +285,28 @@ runtime. Actual model selection, hash/license/runtime pins, Android implementati
 and S23 NPU/GPU/CPU inference/timing remain external dependencies; this source
 candidate does not complete SEL-001.
 
+## Portable review receipt and SEL-001 admission research
+
+`evidence/SEL001_BACKEND_ADMISSION_RESEARCH_20261018.json` preserves the verbatim
+independent `/root/astra_output_review` disposition, reviewed source SHA and exact
+repair blobs. Both blobs were checked against candidate
+`707a92c641d05a22351eca01e481237b7a5430eb`; this binds that existing source review
+without claiming a repeat review of the final commit by SHA.
+
+The same record contains official source URLs, exact MobileSAM checkpoint and
+LiteRT 2.3.0 AAR/POM hashes, declared licenses, proposed CPU/GPU integration and
+the unresolved deployable-artifact/tensor contracts. The recommendation is a
+standalone LiteRT backend using the existing assisted interfaces and session
+pool. The checkpoint is conversion input, not a deployable Android model.
+No model/runtime admission IDs were issued; no production backend is enabled.
+
+Backend code awaits the coordinator's precise file grant. Root retains source
+pixel ports, dependency/license records and app composition. Exact encoder and
+decoder artifacts, their tensor/preprocessing/prompt contracts, transitive
+notices, bounded working-set evidence and S23 acceptance remain open. Conversion,
+inference, platform builds and hardware work await the shared validation slot.
+This documentation follow-up changes no implementation or prior test result.
+
 ## Checks and proposed deferred-ledger rows
 
 Output checkpoint: `f8a5bc8201873a7688a1b72e3d17c45801a52b76`.
