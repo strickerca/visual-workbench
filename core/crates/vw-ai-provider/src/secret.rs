@@ -36,6 +36,14 @@ impl Secret {
         header.set_sensitive(true);
         Ok(header)
     }
+    /// Provider raw API-key header, deliberately distinct from Bearer. Header
+    /// values are sensitive so HTTP diagnostics cannot print their contents.
+    pub fn api_key_header(&self) -> Result<reqwest::header::HeaderValue> {
+        let mut header = reqwest::header::HeaderValue::from_bytes(&self.0)
+            .map_err(|_| Error::Credential(CredentialFailure::Invalid))?;
+        header.set_sensitive(true);
+        Ok(header)
+    }
 }
 impl fmt::Debug for Secret {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

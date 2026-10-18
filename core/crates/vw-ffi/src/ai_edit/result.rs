@@ -6,6 +6,62 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use vw_model::{AssetId, DeviceId, Id, OrderKey};
 use vw_proto::v1 as pb;
+
+fn result_provider(
+    origin: vw_ai::ResponseOrigin,
+    kind: vw_ai::config::ProviderKind,
+) -> &'static str {
+    match origin {
+        vw_ai::ResponseOrigin::OfflineMock => "offline_mock",
+        vw_ai::ResponseOrigin::ProviderPayload => match kind {
+            vw_ai::config::ProviderKind::OpenAiImageEdits => "openai",
+            vw_ai::config::ProviderKind::GeminiImageGeneration => "gemini",
+            vw_ai::config::ProviderKind::Flux1Fill { .. } => "flux",
+        },
+    }
+}
+
+#[cfg(test)]
+mod provenance_tests {
+    use super::result_provider;
+    use vw_ai::{ResponseOrigin, config::ProviderKind};
+
+    #[test]
+    fn saved_provenance_uses_the_prepared_provider() {
+        assert_eq!(
+            result_provider(
+                ResponseOrigin::ProviderPayload,
+                ProviderKind::OpenAiImageEdits
+            ),
+            "openai"
+        );
+        assert_eq!(
+            result_provider(
+                ResponseOrigin::ProviderPayload,
+                ProviderKind::GeminiImageGeneration
+            ),
+            "gemini"
+        );
+        assert_eq!(
+            result_provider(
+                ResponseOrigin::ProviderPayload,
+                ProviderKind::Flux1Fill {
+                    image_price_microusd: 1
+                }
+            ),
+            "flux"
+        );
+        assert_eq!(
+            result_provider(
+                ResponseOrigin::OfflineMock,
+                ProviderKind::Flux1Fill {
+                    image_price_microusd: 1
+                }
+            ),
+            "offline_mock"
+        );
+    }
+}
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct MaterializedProof {
@@ -185,10 +241,7 @@ pub(super) fn prepare(
     let result = pb::AddResult {
         result_id: Some(Id::try_from(options.result_id.clone())?.to_proto()),
         document_id: Some(Id::try_from(options.expected.document_id.clone())?.to_proto()),
-        provider: match done.origin() {
-            vw_ai::ResponseOrigin::ProviderPayload => "openai".into(),
-            vw_ai::ResponseOrigin::OfflineMock => "offline_mock".into(),
-        },
+        provider: result_provider(done.origin(), s.configuration.provider.kind).into(),
         model: s.prepared.review().model().into(),
         request_json,
         output_asset_id: output_id.to_string(),

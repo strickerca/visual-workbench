@@ -28,6 +28,10 @@ import java.util.Collections
 // the Kotlin wrapper must not make an uncertain native request disappear.
 private val failedAiRequests = Collections.synchronizedSet(mutableSetOf<NativeAiRequest>())
 private val failedAiHandles = Collections.synchronizedSet(mutableSetOf<NRequest>())
+private val failedAiServices = Collections.synchronizedSet(mutableSetOf<NativeAiService>())
+private suspend fun retryAiServiceRetirements() {
+    for (service in synchronized(failedAiServices) { failedAiServices.toList() }) service.close()
+}
 private suspend fun retryAiRetirements() {
     for (request in synchronized(failedAiRequests) { failedAiRequests.toList() }) request.close()
     for (handle in synchronized(failedAiHandles) { failedAiHandles.toList() }) {
@@ -70,6 +74,9 @@ private fun AiCompareMode.native():NMode=when(this){AiCompareMode.Before->NMode.
 public actual fun defaultAiConfiguration():AiConfiguration{prepareCoreLibrary();return direct{com.visualworkbench.bindings.core.defaultAiConfiguration().public()}}
 public actual fun validateAiConfiguration(json:String):AiConfiguration{if(json.length>65_536)throw AiFailure(AiFailureKind.Limit);prepareCoreLibrary();return direct{com.visualworkbench.bindings.core.validateAiConfiguration(json).public()}}
 public actual suspend fun createAiService(applicationPrivateDirectory:String,provisionFirstInstall:Boolean):WorkbenchAiService{
+    // Also reaches a service delivered after its caller was cancelled: ownAiResult
+    // cannot give that late wrapper back to an application controller.
+    retryAiServiceRetirements()
     prepareCoreLibrary()
     return settledAi(release={it.close()}){cancel->NativeAiService(com.visualworkbench.bindings.core.createAiService(applicationPrivateDirectory,provisionFirstInstall,cancel))}
 }
@@ -84,15 +91,23 @@ private class NativeAiService(val handle:NService):WorkbenchAiService{
     override suspend fun readiness():AiReadiness{check();return settledAi{handle.readiness(it).let{v->AiReadiness(v.configured,v.trustReady,v.configurationCurrent,v.spentTodayMicrousd,v.dailySoftBudgetMicrousd,v.providerReady)}}}
     override suspend fun saveWindowsKey(bytes:ByteArray){try{check();if(bytes.isEmpty()||bytes.size>4096)throw AiFailure(AiFailureKind.Invalid);settledAi{handle.saveWindowsKey(bytes,it)}}finally{bytes.fill(0)}}
     override suspend fun removeWindowsKey(){check();settledAi{handle.removeWindowsKey(it)}}
-    override suspend fun close(){closed.set(true);retryAiRetirements();releaseNative{retirement.withLock{
-        if(!retired.get()){
-            // A failed shutdown retains the native handle for the owner's next
-            // explicit close. Worker completion includes state destruction.
-            handle.shutdown()
-            handle.destroy()
-            retired.set(true)
+    override suspend fun close(){
+        closed.set(true)
+        try {
+            retryAiRetirements()
+            releaseNative { retirement.withLock {
+                if(!retired.get()){
+                    handle.shutdown()
+                    handle.destroy()
+                    retired.set(true)
+                }
+            } }
+        } catch(error:Throwable) {
+            failedAiServices.add(this)
+            throw error
         }
-    }}}
+        failedAiServices.remove(this)
+    }
 }
 public actual fun WorkbenchProject.aiEdits(service:WorkbenchAiService):WorkbenchAiEdits{
     val owner=service as? NativeAiService?:throw AiFailure(AiFailureKind.Invalid);owner.check()

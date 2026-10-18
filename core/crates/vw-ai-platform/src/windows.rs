@@ -1,6 +1,7 @@
 //! The only Win32 unsafe boundary. Tests never call the operating-system backend.
 use crate::{Result, check, validate};
 use std::{ptr::NonNull, time::Instant};
+use vw_ai::config::ProviderKind;
 use vw_ai_provider::{CredentialFailure, Secret, SecretProvider};
 use windows_sys::Win32::{
     Foundation::{ERROR_NOT_FOUND, GetLastError},
@@ -18,7 +19,34 @@ const TARGET: &str = "VisualWorkbench/OpenAI/APIKey/v1";
 /// of this same user on this machine, not another user's credentials or roaming.
 #[derive(Default)]
 pub struct WindowsCredentials;
+pub struct ScopedWindowsCredentials {
+    kind: ProviderKind,
+}
 impl WindowsCredentials {
+    pub fn for_provider(kind: ProviderKind) -> ScopedWindowsCredentials {
+        ScopedWindowsCredentials { kind }
+    }
+    pub fn save(
+        &self,
+        bytes: Zeroizing<Vec<u8>>,
+        stop: &dyn vw_ai::Cancellation,
+        deadline: Instant,
+    ) -> Result<()> {
+        Self::for_provider(ProviderKind::OpenAiImageEdits).save(bytes, stop, deadline)
+    }
+    pub fn remove(&self, stop: &dyn vw_ai::Cancellation, deadline: Instant) -> Result<()> {
+        Self::for_provider(ProviderKind::OpenAiImageEdits).remove(stop, deadline)
+    }
+    pub fn is_configured(&self, stop: &dyn vw_ai::Cancellation, deadline: Instant) -> Result<bool> {
+        Self::for_provider(ProviderKind::OpenAiImageEdits).is_configured(stop, deadline)
+    }
+}
+impl SecretProvider for WindowsCredentials {
+    fn load(&self, stop: &dyn vw_ai::Cancellation, deadline: Instant) -> Result<Secret> {
+        Self::for_provider(ProviderKind::OpenAiImageEdits).load(stop, deadline)
+    }
+}
+impl ScopedWindowsCredentials {
     /// Blocking OS mutation; callers must use their bounded settings worker.
     /// Cancellation after the OS call may mean the explicit save already took
     /// effect. Never report that such cancellation rolled storage back.
@@ -30,7 +58,7 @@ impl WindowsCredentials {
     ) -> Result<()> {
         check(stop, deadline)?;
         validate(&bytes, MAX_WINDOWS_KEY_BYTES)?;
-        let mut target = target();
+        let mut target = target_for(self.kind);
         let credential = CREDENTIALW {
             Type: CRED_TYPE_GENERIC,
             TargetName: target.as_mut_ptr(),
@@ -50,7 +78,7 @@ impl WindowsCredentials {
     }
     pub fn remove(&self, stop: &dyn vw_ai::Cancellation, deadline: Instant) -> Result<()> {
         check(stop, deadline)?;
-        let target = target();
+        let target = target_for(self.kind);
         // SAFETY: target is our fixed, terminated UTF-16 credential name. This
         // never enumerates or deletes another credential's target.
         let removed = unsafe { CredDeleteW(target.as_ptr(), CRED_TYPE_GENERIC, 0) };
@@ -75,10 +103,10 @@ impl WindowsCredentials {
         }
     }
 }
-impl SecretProvider for WindowsCredentials {
+impl SecretProvider for ScopedWindowsCredentials {
     fn load(&self, stop: &dyn vw_ai::Cancellation, deadline: Instant) -> Result<Secret> {
         check(stop, deadline)?;
-        let target = target();
+        let target = target_for(self.kind);
         let mut pointer = std::ptr::null_mut();
         // SAFETY: fixed terminated target; pointer is initialized writable output
         // owned by CredReadW on success, then unconditionally freed by OwnedRecord.
@@ -99,6 +127,14 @@ impl SecretProvider for WindowsCredentials {
 }
 fn target() -> Vec<u16> {
     TARGET.encode_utf16().chain(std::iter::once(0)).collect()
+}
+fn target_for(kind: ProviderKind) -> Vec<u16> {
+    let name = match kind {
+        ProviderKind::OpenAiImageEdits => TARGET,
+        ProviderKind::GeminiImageGeneration => "VisualWorkbench/Gemini/APIKey/v1",
+        ProviderKind::Flux1Fill { .. } => "VisualWorkbench/Flux/APIKey/v1",
+    };
+    name.encode_utf16().chain(std::iter::once(0)).collect()
 }
 struct OwnedRecord(NonNull<CREDENTIALW>);
 impl OwnedRecord {
@@ -190,5 +226,12 @@ mod tests {
         assert_eq!(value.last(), Some(&0));
         assert_eq!(value.iter().filter(|&&v| v == 0).count(), 1);
         assert!(TARGET.starts_with("VisualWorkbench/"));
+        let gemini = target_for(ProviderKind::GeminiImageGeneration);
+        let flux = target_for(ProviderKind::Flux1Fill {
+            image_price_microusd: 1,
+        });
+        assert_ne!(value, gemini);
+        assert_ne!(value, flux);
+        assert_ne!(gemini, flux);
     }
 }

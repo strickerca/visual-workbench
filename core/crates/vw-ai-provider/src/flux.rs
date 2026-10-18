@@ -12,7 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 use vw_ai::{
-    AuthorizedRequest, Cancellation, Prepared, ProviderResponse,
+    AuthorizedRequest, Cancellation, FluxCostReceipt, Prepared, ProviderResponse,
     budget::{BudgetLedger, BudgetPolicy, Confirmation},
     config::ProviderKind,
 };
@@ -38,8 +38,8 @@ impl FluxFillAdapter {
             ApiKeyProtocol::Flux,
         )?))
     }
-    /// A successful image has UsageMissing settlement until a real fixed-charge
-    /// receipt is supported by the existing ledger. Never price fake tokens.
+    /// Only the task-bound settled cost from BFL's Ready response can settle
+    /// this attempt. An absent or inexact cost leaves the image unresolved.
     pub fn send_confirmed(
         &mut self,
         prepared: &Prepared,
@@ -79,6 +79,7 @@ struct PollResult {
     id: String,
     status: String,
     result: Option<Sample>,
+    cost: Option<serde_json::Value>,
 }
 #[derive(Deserialize)]
 struct Sample {
@@ -213,6 +214,11 @@ pub(crate) async fn send(
         match response.status.as_str() {
             "Pending" | "Reasoning" | "Generating" if response.result.is_none() => continue,
             "Ready" => {
+                let cost_receipt = response
+                    .cost
+                    .as_ref()
+                    .and_then(serde_json::Value::as_number)
+                    .and_then(|credits| FluxCostReceipt::from_provider(&submission.id, credits));
                 let sample = response.result.ok_or(Error::Representation)?;
                 let sample = transport_url(sample_url(&sample.sample)?, target)?;
                 drop(key);
@@ -227,7 +233,8 @@ pub(crate) async fn send(
                     "image/png",
                 )
                 .await?;
-                let result = request.parse_image_response(image.as_slice())?;
+                let result =
+                    request.parse_image_response_with_receipt(image.as_slice(), cost_receipt)?;
                 http::check(&stop, deadline)?;
                 return Ok(result);
             }

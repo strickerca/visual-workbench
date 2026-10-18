@@ -1,8 +1,8 @@
 //! App-owned durable accounting. An attempted request never becomes retryable
 //! through cancellation, timeout, process restart, or an absent provider receipt.
 use crate::{
-    Error, Result, ReviewSummary,
-    config::{ProviderConfig, Tokens},
+    Error, FluxCostReceipt, Result, ReviewSummary,
+    config::{ProviderConfig, ProviderKind, Tokens},
     valid_hash,
 };
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, limits::Limit, params};
@@ -115,6 +115,14 @@ pub trait BudgetLedger: sealed::Sealed {
         request_id: &str,
         provider: &ProviderConfig,
         tokens: Tokens,
+    ) -> Result<u64>;
+    /// Only the authenticated BFL Ready response supplies this actual credit
+    /// receipt; a configured per-image quote cannot settle an attempt.
+    fn settle_flux(
+        &mut self,
+        request_id: &str,
+        provider: &ProviderConfig,
+        receipt: &FluxCostReceipt,
     ) -> Result<u64>;
     fn entry(&self, request_id: &str) -> Result<Option<LedgerEntry>>;
     fn spent_on(&self, utc_day: u32) -> Result<u64>;
@@ -321,11 +329,54 @@ impl BudgetLedger for SqliteBudgetLedger {
         provider: &ProviderConfig,
         tokens: Tokens,
     ) -> Result<u64> {
-        let fingerprint = provider.fingerprint()?;
+        if matches!(provider.kind, ProviderKind::Flux1Fill { .. }) {
+            return Err(Error::Invalid("fixed settlement requires provider receipt"));
+        }
         if tokens.image_output == 0 {
             return Err(Error::Invalid("settlement usage"));
         }
         let actual = provider.prices.cost(tokens)?;
+        self.settle_actual(request_id, provider, actual)
+    }
+    fn settle_flux(
+        &mut self,
+        request_id: &str,
+        provider: &ProviderConfig,
+        receipt: &FluxCostReceipt,
+    ) -> Result<u64> {
+        if !matches!(provider.kind, ProviderKind::Flux1Fill { .. }) {
+            return Err(Error::Invalid("fixed settlement provider"));
+        }
+        let actual = receipt
+            .microusd()
+            .ok_or(Error::Invalid("fixed settlement cost"))?;
+        self.settle_actual(request_id, provider, actual)
+    }
+    fn entry(&self, request_id: &str) -> Result<Option<LedgerEntry>> {
+        validate_path(&self.path, true)?;
+        let tx = self.connection.unchecked_transaction()?;
+        validate_connection(&tx, &self.path)?;
+        let result = read_entry(&tx, request_id)?;
+        tx.commit()?;
+        Ok(result)
+    }
+    fn spent_on(&self, utc_day: u32) -> Result<u64> {
+        validate_path(&self.path, true)?;
+        let tx = self.connection.unchecked_transaction()?;
+        validate_connection(&tx, &self.path)?;
+        let result = spent_on_connection(&tx, utc_day)?;
+        tx.commit()?;
+        Ok(result)
+    }
+}
+impl SqliteBudgetLedger {
+    fn settle_actual(
+        &mut self,
+        request_id: &str,
+        provider: &ProviderConfig,
+        actual: u64,
+    ) -> Result<u64> {
+        let fingerprint = provider.fingerprint()?;
         let actual_i = i64::try_from(actual).map_err(|_| Error::Limit("ledger charge"))?;
         validate_path(&self.path, true)?;
         let tx = self
@@ -352,22 +403,6 @@ impl BudgetLedger for SqliteBudgetLedger {
         require_entry(&tx, &entry)?;
         tx.commit()?;
         Ok(actual)
-    }
-    fn entry(&self, request_id: &str) -> Result<Option<LedgerEntry>> {
-        validate_path(&self.path, true)?;
-        let tx = self.connection.unchecked_transaction()?;
-        validate_connection(&tx, &self.path)?;
-        let result = read_entry(&tx, request_id)?;
-        tx.commit()?;
-        Ok(result)
-    }
-    fn spent_on(&self, utc_day: u32) -> Result<u64> {
-        validate_path(&self.path, true)?;
-        let tx = self.connection.unchecked_transaction()?;
-        validate_connection(&tx, &self.path)?;
-        let result = spent_on_connection(&tx, utc_day)?;
-        tx.commit()?;
-        Ok(result)
     }
 }
 

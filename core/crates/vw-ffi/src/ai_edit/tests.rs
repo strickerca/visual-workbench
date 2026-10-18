@@ -534,7 +534,7 @@ async fn candidate_grid_admission_retains_budgets_until_owned_requests_drop() {
 }
 
 #[tokio::test]
-async fn unavailable_provider_cannot_consume_send_or_ledger_attempt() {
+async fn mismatched_prepared_provider_cannot_consume_send_or_ledger_attempt() {
     let _serial = SERIAL.lock().await;
     let dir = temp();
     let (project, service, request, _) = fixture(dir.path(), 8).await;
@@ -551,7 +551,7 @@ async fn unavailable_provider_cannot_consume_send_or_ledger_attempt() {
         request
             .send(request.describe().request_id.clone(), 1, false, cancel())
             .await,
-        Err(AiEditError::Unsupported)
+        Err(AiEditError::Stale)
     ));
     assert!(
         !request

@@ -7,6 +7,61 @@ use std::sync::{
 use vw_ai::{Completed, Prepared};
 use vw_mask::{Mask, Size};
 use vw_model::Id;
+fn admit_send_estimate(
+    kind: vw_ai::config::ProviderKind,
+    estimate: Option<&AiTokenEstimate>,
+    today: u32,
+) -> AiEditResult<()> {
+    if matches!(kind, vw_ai::config::ProviderKind::Flux1Fill { .. }) {
+        if estimate.is_some() {
+            return Err(AiEditError::Estimate);
+        }
+    } else {
+        configuration::estimate(estimate.ok_or(AiEditError::Estimate)?, today)?;
+    }
+    Ok(())
+}
+#[cfg(test)]
+mod send_estimate_tests {
+    use super::*;
+    #[test]
+    fn flux_uses_its_reviewed_flat_quote_while_token_providers_need_a_dated_estimate() {
+        let flux = vw_ai::config::ProviderKind::Flux1Fill {
+            image_price_microusd: 50_000,
+        };
+        let today = configuration::day("2026-10-18").unwrap();
+        let token = AiTokenEstimate {
+            schema: 1,
+            text_input: 10,
+            image_input: 20,
+            image_output: 30,
+            provenance: "synthetic provider estimate".into(),
+            verified_on: "2026-10-18".into(),
+            expires_on: "2026-10-18".into(),
+        };
+        assert!(admit_send_estimate(flux, None, today).is_ok());
+        assert!(matches!(
+            admit_send_estimate(flux, Some(&token), today),
+            Err(AiEditError::Estimate)
+        ));
+        assert!(matches!(
+            admit_send_estimate(
+                vw_ai::config::ProviderKind::GeminiImageGeneration,
+                None,
+                today
+            ),
+            Err(AiEditError::Estimate)
+        ));
+        assert!(
+            admit_send_estimate(
+                vw_ai::config::ProviderKind::GeminiImageGeneration,
+                Some(&token),
+                today
+            )
+            .is_ok()
+        );
+    }
+}
 pub(super) struct RequestState {
     pub prepared: Prepared,
     pub options: AiPrepareOptions,
@@ -212,14 +267,8 @@ impl AiRequest {
                     if state.send_consumed {
                         return Err(AiEditError::AttemptConsumed);
                     }
-                    // Provider-specific protected keys and flat-price settlement
-                    // need the coordinator's reserved credential/ledger hooks.
-                    // Refuse before reading any key or reserving an attempt.
-                    if !matches!(
-                        state.configuration.provider.kind,
-                        vw_ai::config::ProviderKind::OpenAiImageEdits
-                    ) {
-                        return Err(AiEditError::Unsupported);
+                    if state.configuration.provider.kind != state.prepared.provider().kind {
+                        return Err(AiEditError::Stale);
                     }
                     if request_id != state.prepared.review().request_id()
                         || state.prepared.review().estimated_microusd()
@@ -237,12 +286,9 @@ impl AiRequest {
                     if !owner.configuration.current(today)? {
                         return Err(AiEditError::Estimate);
                     }
-                    configuration::estimate(
-                        state
-                            .options
-                            .estimate
-                            .as_ref()
-                            .ok_or(AiEditError::Estimate)?,
+                    admit_send_estimate(
+                        state.configuration.provider.kind,
+                        state.options.estimate.as_ref(),
                         today,
                     )?;
                     let confirmation = vw_ai::budget::Confirmation::explicit_send(
@@ -253,7 +299,8 @@ impl AiRequest {
                     let policy = vw_ai::budget::BudgetPolicy {
                         daily_soft_limit_microusd: owner.configuration.daily_soft_budget_microusd,
                     };
-                    let mut adapter = owner::adapter(&cancellation)?;
+                    let mut adapter =
+                        owner::adapter(state.configuration.provider.kind, &cancellation)?;
                     // Consume the handle before crossing the provider boundary. Ledger
                     // refuses uncertain attempts across fresh handles/process restarts.
                     state.send_consumed = true;

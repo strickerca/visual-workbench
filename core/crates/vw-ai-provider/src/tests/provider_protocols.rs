@@ -106,6 +106,16 @@ fn fixture_key(_: &Secret) -> crate::Result<HeaderValue> {
     value.set_sensitive(true);
     Ok(value)
 }
+#[test]
+fn protected_secret_derives_sensitive_raw_header_without_bearer_prefix() -> TestResult {
+    let secret =
+        Secret::from_protected_bytes(zeroize::Zeroizing::new(b"synthetic-header-only".to_vec()))?;
+    let header = secret.api_key_header()?;
+    assert!(header.is_sensitive());
+    assert_eq!(header.as_bytes(), b"synthetic-header-only");
+    assert_ne!(header.as_bytes(), secret.authorization()?.as_bytes());
+    Ok(())
+}
 fn fixture_adapter(
     protocol: ApiKeyProtocol,
     target: Option<String>,
@@ -203,7 +213,7 @@ fn submission() -> serde_json::Value {
     serde_json::json!({"id":"fixture-task","polling_url":"https://api.us1.bfl.ai/v1/get_result?id=fixture-task","cost":5})
 }
 fn ready() -> serde_json::Value {
-    serde_json::json!({"id":"fixture-task","status":"Ready","result":{"sample":"https://delivery.eu1.bfl.ai/fixture.png?signature=fixture"},"cost":5})
+    serde_json::json!({"id":"fixture-task","status":"Ready","result":{"sample":"https://delivery.eu1.bfl.ai/fixture.png?signature=fixture"},"cost":0.25})
 }
 #[test]
 fn flux_real_async_wire_has_one_post_bound_poll_and_no_delivery_credential() -> TestResult {
@@ -235,15 +245,24 @@ fn flux_real_async_wire_has_one_post_bound_poll_and_no_delivery_credential() -> 
         BudgetPolicy::default(),
         &NeverCancel,
     )?;
-    assert_eq!(result.settlement, Settlement::UsageMissing);
+    assert_eq!(
+        result.settlement,
+        Settlement::UsagePriced { microusd: 2_500 }
+    );
     assert_eq!(result.response.image_png(), image);
     assert!(result.response.tokens().is_none());
+    let receipt = result
+        .response
+        .flux_cost_receipt()
+        .ok_or("missing FLUX cost receipt")?;
+    assert_eq!(receipt.task_id(), "fixture-task");
+    assert_eq!(receipt.credits_decimal(), "0.25");
     assert_eq!(
         ledger
             .entry(prepared.review().request_id())?
             .ok_or("entry")?
             .state,
-        EntryState::Attempted
+        EntryState::Settled
     );
     assert_eq!(secrets.calls.load(Ordering::Acquire), 1);
     let wire = server.finish()?;
@@ -280,6 +299,61 @@ fn flux_real_async_wire_has_one_post_bound_poll_and_no_delivery_credential() -> 
         STANDARD.encode(prepared.request_mask_png())
     );
     prepared.finish(result.response, &NeverCancel)?;
+    Ok(())
+}
+#[test]
+fn flux_missing_or_inexact_cost_keeps_the_single_attempt_unresolved() -> TestResult {
+    let _guard = workers()?;
+    for (index, cost) in [serde_json::Value::Null, serde_json::json!(0.00001)]
+        .into_iter()
+        .enumerate()
+    {
+        let root = temp()?;
+        let prepared = prepared_for(ApiKeyProtocol::Flux, 95 + index as u8, 1024 * 1024)?;
+        let crop = prepared.review().crop();
+        let image = fixtures::png(crop.model_width, crop.model_height)?;
+        let mut response = ready();
+        response["cost"] = cost;
+        let server = ScriptServer::start(vec![
+            WireReply::json(submission())?,
+            WireReply::json(response)?,
+            WireReply {
+                status: 200,
+                mime: "image/png",
+                body: image.clone(),
+            },
+        ])?;
+        let mut adapter = fixture_adapter(
+            ApiKeyProtocol::Flux,
+            Some(server.target.clone()),
+            Arc::new(FakeSecret::default()),
+        )?;
+        let mut ledger = SqliteBudgetLedger::create(&root.path().join("ledger.sqlite"))?;
+        let result = adapter.send_confirmed(
+            &prepared,
+            &mut ledger,
+            Confirmation::explicit_send(prepared.review(), 20_000, false)?,
+            BudgetPolicy::default(),
+            &NeverCancel,
+        )?;
+        assert_eq!(result.response.image_png(), image);
+        assert_eq!(
+            result.settlement,
+            if index == 0 {
+                Settlement::UsageMissing
+            } else {
+                Settlement::LedgerUnavailable
+            }
+        );
+        assert_eq!(
+            ledger
+                .entry(prepared.review().request_id())?
+                .ok_or("entry")?
+                .state,
+            EntryState::Attempted
+        );
+        assert_eq!(server.finish()?.len(), 3);
+    }
     Ok(())
 }
 #[test]

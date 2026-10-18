@@ -5,6 +5,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 internal data class AiServiceState(
     val busy: Boolean = false,
@@ -28,7 +30,16 @@ internal class AiServiceController(
     private var service: WorkbenchAiService? = null
     private var operation: Job? = null
     private var closing = false
-    private val closed = CompletableDeferred<Result<Unit>>()
+    private val retirement = Mutex()
+    private val pendingRetirements = mutableListOf<WorkbenchAiService>()
+    private var retired = false
+
+    private suspend fun retryPendingRetirements() {
+        for (owner in pendingRetirements.toList()) {
+            owner.close()
+            pendingRetirements.remove(owner)
+        }
+    }
 
     fun activate() { load(false) }
     fun initialize() { load(true) }
@@ -39,6 +50,7 @@ internal class AiServiceController(
     }
 
     private fun load(initialize: Boolean) = launch {
+        withContext(NonCancellable) { retryPendingRetirements() }
         val existing = service
         val selected = existing ?: create(privateDirectory, initialize)
         var adopted = existing != null
@@ -51,7 +63,11 @@ internal class AiServiceController(
             adopted = true
             mutable.value = AiServiceState(busy = true, configuration = configuration, readiness = readiness)
         } finally {
-            if (!adopted) withContext(NonCancellable) { selected.close() }
+            if (!adopted) withContext(NonCancellable) {
+                pendingRetirements.add(selected)
+                selected.close()
+                pendingRetirements.remove(selected)
+            }
         }
     }
 
@@ -148,22 +164,21 @@ internal class AiServiceController(
     /** Project request and tile owners must settle before this application owner.
      * Idempotent; a cancelled caller still waits for actual service closure. */
     suspend fun close() {
-        if (closing) { withContext(NonCancellable) { closed.await().getOrThrow() }; return }
         closing = true
         mutable.value = mutable.value.copy(closed = true, busy = true, configuration = null, readiness = null)
         withContext(NonCancellable) {
-            var outcome: Result<Unit> = Result.success(Unit)
-            try {
-                operation?.cancelAndJoin()
-                val owner = service
-                service = null
-                owner?.close()
-            } catch (error: Throwable) {
-                outcome = Result.failure(error)
-                throw error
-            } finally {
-                mutable.value = mutable.value.copy(busy = false)
-                closed.complete(outcome)
+            retirement.withLock {
+                try {
+                    if (!retired) {
+                        operation?.cancelAndJoin()
+                        retryPendingRetirements()
+                        service?.close()
+                        service = null
+                        retired = true
+                    }
+                } finally {
+                    mutable.value = mutable.value.copy(busy = false)
+                }
             }
         }
     }
