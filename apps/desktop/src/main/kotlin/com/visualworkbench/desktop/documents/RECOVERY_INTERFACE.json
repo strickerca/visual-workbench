@@ -1,5 +1,5 @@
 {
-  "status": "interface proposal for parent/coordinator admission; platform Kotlin not promoted or compiled",
+  "status": "admitted platform source implementation checkpoint; compilation/native/caller acceptance not yet established",
   "base_engine_commit": "3d2839de8cfdecf1e0afeab5e93b67a268004c2b",
   "recovery_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
   "scope": [
@@ -213,6 +213,16 @@
     "Rendering tests: reject zero/overflow/invalid byte count/scale; known straight-RGBA-to-ARGB pixels, no authority/generation revival, bounded32 tiles, no bitmap recycling during live frames.",
     "IO tests: source cap4MiB SVG/64MiB PDF, cancellation/stale checks, source/output hash mismatch and partial owned destination cleanup failure. Hardware/native tests stay separately pending."
   ],
-  "build_status": "No product compile/test performed in this phase. Precision owns the heavy slot. No Android SDK installed in this VM; Android build would need already-authorized pinned setup applied when scheduled.",
-  "admission_needed": "Parent/coordinator must admit candidate shared/native names and the frame binding (or supply exact alternative), choose coordinator-owned worker/native packaging recovery, and publish those contracts before dependent platform implementation/compilation. No root/shared/FFI/schema/manifest/Gradle edit requested from this lane."
+  "build_status": "Focused pure leaf harness being prepared. No full app compile, native execution or UI/provider/device acceptance yet.",
+  "admission_needed": "Parent/coordinator must admit candidate shared/native names and the frame binding (or supply exact alternative), choose coordinator-owned worker/native packaging recovery, and publish those contracts before dependent platform implementation/compilation. No root/shared/FFI/schema/manifest/Gradle edit requested from this lane.",
+  "admission_commit": "6dcdcdfde4acdba76c710c16187e19d3f4489d4a",
+  "root_seams_remaining": [
+    "Install admitted native job ABI and documentRequestJson/documentReply plus DocumentInteraction before full caller compilation.",
+    "Allow worker-only Desktop manifests and empty Android PDFium library/hash only for a native-validated SVG operation; PDF still requires verified artifacts.",
+    "Desktop Isolation requires an actual joined-retirement retry API/guarantee. Adapter retains runtime/token/pins and refuses close/new work until proof; destroy is not that proof.",
+    "documentSourceHash must support hashing output bytes up to128MiB, or provide an output verifier. Source parser limits stay4MiB SVG/64MiB PDF.",
+    "Root must close PreparedDocumentTile leases only after the last draw reader retires, then close cache; source reserves foreign copies independently. UI state replacement alone is not a retirement fence.",
+    "Root shutdown must drain DesktopDocumentRuntimeCache.closePending and AndroidDocumentIO.close, retaining same owner on failure.",
+    "Android UID/artifact/hard-memory/deadline checks and unique per-job binding nonce remain native/root responsibilities; no real native artifact or sandbox acceptance claimed."
+  ]
 }
