@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
  * retire must either join/release them or retain the SAME owner and throw
  * Isolation. Returning from execute alone is not a retirement assertion. */
 internal interface DocumentCall {
+    /** Idempotent, nonthrowing signal; it does not release owned resources. */
     fun cancel()
     suspend fun execute(request: DocumentRequest, source: ByteArray): DocumentReply
     suspend fun retire()
@@ -51,6 +52,13 @@ internal class JoinedDocumentJobs(private val backend: DocumentBackend) : Docume
                 if (caller?.isActive == false) throw CancellationException("Document call cancelled after retirement")
                 if (closing.get()) throw DocumentFailure(DocumentFailureKind.Cancelled)
                 result
+            } catch (error: Exception) {
+                // Killing a cancelled child commonly ends execute with a pipe
+                // or worker error. Preserve caller cancellation AFTER retirement;
+                // an uncertain retire still overrides this in finally below.
+                if (caller?.isActive == false) throw CancellationException("Document call cancelled after retirement")
+                if (closing.get()) throw DocumentFailure(DocumentFailureKind.Cancelled)
+                throw error
             } finally {
                 monitor.cancelAndJoin()
                 call.retire() // Failure retains call, source, pins and scratch.

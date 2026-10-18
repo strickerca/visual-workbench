@@ -20,10 +20,11 @@ private class AndroidDocumentBackend(private val context: Context) : DocumentBac
 
 private class AndroidDocumentCall(private val context: Context) : DocumentCall {
     private val connected = CompletableDeferred<IBinder>()
-    private val retired = CompletableDeferred<Unit>()
-    private val finished = CompletableDeferred<Unit>()
+    private val signals = DocumentServiceSignals()
+    private val retired = signals.retired
+    private val finished = signals.finished
     private val stopped = CompletableDeferred<Unit>()
-    private val failed = CompletableDeferred<DocumentFailureKind>()
+    private val failed = signals.failed
     private val cancellation = AtomicBoolean(false)
     private val provider = ProviderIo(context.contentResolver)
     @Volatile private var remote: Messenger? = null
@@ -33,10 +34,10 @@ private class AndroidDocumentCall(private val context: Context) : DocumentCall {
     private var output: ParcelFileDescriptor? = null
     @Volatile private var writer: Job? = null
     private var bound = false
-    private var dispatched = false
+    private val dispatched: Boolean get() = signals.dispatched
     private var heldSource: ByteArray? = null
     private var released = false
-    private val death = IBinder.DeathRecipient { retired.complete(Unit) }
+    private val death = IBinder.DeathRecipient { signals.processDied() }
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
             try {
@@ -46,8 +47,8 @@ private class AndroidDocumentCall(private val context: Context) : DocumentCall {
                 connected.complete(service)
             } catch (_: Exception) { failed.complete(DocumentFailureKind.Isolation) }
         }
-        override fun onServiceDisconnected(name: ComponentName) { failed.complete(DocumentFailureKind.Isolation) }
-        override fun onBindingDied(name: ComponentName) { failed.complete(DocumentFailureKind.Isolation) }
+        override fun onServiceDisconnected(name: ComponentName) { signals.disconnected() }
+        override fun onBindingDied(name: ComponentName) { signals.disconnected() }
         override fun onNullBinding(name: ComponentName) { failed.complete(DocumentFailureKind.Isolation) }
         // Only the installed death recipient proves process/Binder retirement.
     }
@@ -60,7 +61,11 @@ private class AndroidDocumentCall(private val context: Context) : DocumentCall {
 
     override suspend fun execute(request: DocumentRequest, source: ByteArray): DocumentReply {
         heldSource = source
-        if (request.operation is DocumentOperation.Copy && request.operation.kind == DocumentCopy.PcRedaction)
+        if (source.isEmpty()) throw DocumentFailure(DocumentFailureKind.Invalid)
+        if (source.size > if (documentSvgOperation(request.operation)) 4 * 1024 * 1024 else DocumentWire.MAX_SOURCE)
+            throw DocumentFailure(DocumentFailureKind.Limit)
+        val operation = request.operation
+        if (operation is DocumentOperation.Copy && operation.kind == DocumentCopy.PcRedaction)
             throw DocumentFailure(DocumentFailureKind.Unsupported)
         try {
             val text = documentRequestJson(request)
@@ -78,7 +83,7 @@ private class AndroidDocumentCall(private val context: Context) : DocumentCall {
             } }
             if (cancellation.get()) throw DocumentFailure(DocumentFailureKind.Cancelled)
             val receiver = Messenger(object : Handler(Looper.getMainLooper()) {
-                override fun handleMessage(message: Message) { if (message.what == DocumentWire.FINISHED) finished.complete(Unit) }
+                override fun handleMessage(message: Message) { if (message.what == DocumentWire.FINISHED) signals.resultReady() }
             })
             val message = Message.obtain(null, DocumentWire.JOB)
             message.replyTo = receiver
@@ -87,7 +92,7 @@ private class AndroidDocumentCall(private val context: Context) : DocumentCall {
                 putBoolean("pdfium", !documentSvgOperation(request.operation))
                 putParcelable("input", requireNotNull(pipe)[0]); putParcelable("output", requireNotNull(output))
             }
-            dispatched = true // send can fail after delivering; never infer absence of a worker.
+            signals.dispatching() // send can fail after delivering; never infer absence of a worker.
             requireNotNull(remote).send(message)
             requireNotNull(pipe)[0].close(); output?.close(); output = null
             val sourceFd = requireNotNull(pipe)[1]

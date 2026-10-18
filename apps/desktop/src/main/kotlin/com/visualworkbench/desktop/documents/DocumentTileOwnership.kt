@@ -2,6 +2,8 @@ package com.visualworkbench.desktop.documents
 
 import com.visualworkbench.shared.*
 import java.util.IdentityHashMap
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.*
 
 internal class DocumentForeignBudget(private val limit: Long) {
     private var used = 0L
@@ -81,6 +83,28 @@ internal class DocumentTileImages<T>(
             if (quarantine.isNotEmpty()) throw DocumentFailure(DocumentFailureKind.Isolation)
             throw error
         }
+    }
+    /** Capture the acquired frame BEFORE dispatcher return, so prompt
+     * cancellation cannot discard image leases that the caller never saw. */
+    suspend fun prepareOwned(frame: DocumentDisplayFrame, stillCurrent: () -> Boolean): List<PreparedTile<T>> {
+        val handoff = AtomicReference<List<PreparedTile<T>>?>(null)
+        val caller = currentCoroutineContext()[Job]
+        try {
+            val result = withContext(Dispatchers.Default) {
+                prepare(frame) { caller?.isActive != false && stillCurrent() }.also(handoff::set)
+            }
+            currentCoroutineContext().ensureActive()
+            if (!stillCurrent()) throw DocumentFailure(DocumentFailureKind.Stale)
+            handoff.set(null)
+            return result
+        } catch (error: Exception) {
+            if (caller?.isActive == false) throw CancellationException("Document bitmap preparation cancelled")
+            throw error
+        } finally { handoff.getAndSet(null)?.let { abandon(it) } }
+    }
+    @Synchronized private fun abandon(tiles: List<PreparedTile<T>>) {
+        for (tile in tiles) try { tile.close() } catch (_: Exception) { quarantine += tile }
+        if (quarantine.isNotEmpty()) throw DocumentFailure(DocumentFailureKind.Isolation)
     }
     @Synchronized fun retainedBytes(): Long = budget.retainedBytes()
     @Synchronized override fun close() {

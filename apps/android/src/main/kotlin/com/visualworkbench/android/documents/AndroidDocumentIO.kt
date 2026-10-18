@@ -22,7 +22,9 @@ internal class AndroidDocumentIO(context: Context, private val core: WorkbenchCo
     private val closing = AtomicBoolean(false)
     private val activeImport = AtomicReference<Job?>(null)
     private var pendingProject: WorkbenchProject? = null
-    private val publisher = DocumentPublisher { bytes -> withContext(Dispatchers.Default) { documentSourceHash(bytes) } }
+    private val publisher = DocumentPublisher { bytes -> withContext(Dispatchers.Default) {
+        try { documentSourceHash(bytes) } catch (error: DocumentJobException) { throw nativeDocumentFailure(error) }
+    } }
 
     suspend fun import(
         uri: Uri, kind: EditableKind, path: String, device: String, title: String,
@@ -33,6 +35,7 @@ internal class AndroidDocumentIO(context: Context, private val core: WorkbenchCo
         coroutineScope {
             val owner = currentCoroutineContext()[Job]
             activeImport.set(owner)
+            if (closing.get()) owner?.cancel()
             try { importOwned(uri, kind, path, device, title, password, progress) }
             catch (error: CancellationException) { throw error }
             catch (error: DocumentFailure) { throw error }
@@ -106,7 +109,7 @@ internal class AndroidDocumentIO(context: Context, private val core: WorkbenchCo
     }
 
     suspend fun close() {
-        closing.set(true); activeImport.get()?.cancel()
+        closing.set(true); publisher.closeAdmission(); activeImport.get()?.cancel()
         withContext(NonCancellable) {
             var failure: Exception? = null
             try { publisher.close() } catch (error: Exception) { failure = error }
