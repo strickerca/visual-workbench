@@ -36,7 +36,7 @@ impl ValidatedCapture {
     pub(crate) fn new(value: CaptureImportDescriptor) -> Result<Self> {
         if !value.explicit_owner_action
             || !matches!(value.platform.as_str(), "windows" | "android")
-            || !matches!(value.source_kind.as_str(), "window" | "monitor")
+            || !matches!(value.source_kind.as_str(), "window" | "monitor" | "region")
             || value.width == 0
             || value.height == 0
             || value.width > 32768

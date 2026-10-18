@@ -5,6 +5,10 @@ import com.visualworkbench.desktop.instructions.InstructionsPanel
 import com.visualworkbench.desktop.precision.PrecisionControls
 import com.visualworkbench.desktop.precision.PrecisionHandles
 import com.visualworkbench.desktop.diagnostics.*
+import com.visualworkbench.desktop.capture.CapturePickerController
+import com.visualworkbench.desktop.capture.CapturePickerWindow
+import com.visualworkbench.desktop.capture.PickerModal
+import com.visualworkbench.desktop.capture.initializePickerProtection
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -82,7 +86,9 @@ fun main(args: Array<String>) {
         val diagnosticsLifecycle = remember(diagnostics) {
             DesktopDiagnosticsLifecycle({ diagnostics.held }, diagnostics::requestClose, { diagnostics.closeWithin() })
         }
-        fun commandsAllowed(): Boolean = projectPicker == null && !controller.workflows.blocksInput() && diagnosticsLifecycle.allowsCommand(quitting)
+        val pickerOwner=remember{java.util.concurrent.atomic.AtomicReference<CapturePickerController?>(null)}
+        fun pickerBlocking():Boolean=pickerOwner.get()?.state?.value?.let{it.open||it.cleanupPending}==true
+        fun commandsAllowed(): Boolean = !pickerBlocking() && projectPicker == null && !controller.workflows.blocksInput() && diagnosticsLifecycle.allowsCommand(quitting)
         val capture=remember{com.visualworkbench.desktop.capture.DesktopCaptureController(scope,core,captureService,location.path,device,
             controller::captureDestination,controller::report)}
         var captureSettings by remember{mutableStateOf(false)}
@@ -134,11 +140,22 @@ fun main(args: Array<String>) {
         var dpiText by remember{mutableStateOf("Checking display scale…")}
         fun competingModal(ignorePicker: ProjectFilePickerRequest? = null): Boolean {
             val current = controller.state.value
-            return controller.workflows.blocksInput() || (projectPicker != null && projectPicker !== ignorePicker) ||
+            return pickerBlocking() || controller.workflows.blocksInput() || (projectPicker != null && projectPicker !== ignorePicker) ||
                 documentImport!=null||nativePickerCount != 0 || codexModal.state.value.settings ||
                 mcpModal.state.value.let { it.settings || it.compare != null } || captureSettings || remoteView != null ||
                 current.textAnchor != null || current.exportOpen || current.pasteOpen || controller.ai.state.value.open
         }
+        val pickerModal=remember(controller){PickerModal(controller::instructionPicker)}
+        val capturePicker=remember(scope,controller){CapturePickerController(scope,core,location.path,device,
+            openService={com.visualworkbench.desktop.capture.openDesktopCaptureService(
+                nativeRuntime.directory.resolve("vw-capture-helper.exe"),nativeRuntime.packagedHash("vw-capture-helper.exe"))},
+            saved=controller::captureDestination,modal=pickerModal::set,
+            mayOpen={captureProtected&&commandsAllowed()&&!competingModal()&&dialog==null&&!editor.busy&&
+                !diagnostics.held&&mcp.state.value.owner?.state?.value?.activeCapture==null})}
+        pickerOwner.set(capturePicker)
+        val capturePickerState by capturePicker.state.collectAsState()
+        fun retryPickerCleanup(){scope.launch{try{capturePicker.dismiss()}catch(error:CancellationException){throw error}
+            catch(_:Exception){controller.report("Capture cleanup is pending. Keep the editor open and retry after its work settles.")}}}
         fun instructionDialog(value: Command?) {
             if (value == Command.Diagnostics && competingModal()) return
             val changed = diagnosticsLifecycle.changeRoute(value == Command.Diagnostics, quitting, prepare = {
@@ -203,7 +220,8 @@ fun main(args: Array<String>) {
                 scope.launch { withContext(NonCancellable) {
                     var clean = false
                     try {
-                        clean = diagnosticsLifecycle.closeParentsAfterRetirement(
+                        val pickerRetired=try{capturePicker.shutdown();true}catch(_:Exception){false}
+                        if(pickerRetired)clean = diagnosticsLifecycle.closeParentsAfterRetirement(
                             admit = { controller.mayCloseAi() && controller.sealInstructionsForClose() },
                             closeParents = {
                                 remoteView?.let{it.seal("owner_pause");it.close()}
@@ -249,7 +267,7 @@ fun main(args: Array<String>) {
         }
         mcpState.owner?.let{McpCaptureIndicator(it)}
         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
-        val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,controller.workflows.blocksInput()||codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
+        val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,pickerBlocking()||controller.workflows.blocksInput()||codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
             onPreviewKeyEvent=canvasShortcut) {
             DisposableEffect(window, controller) {
@@ -377,7 +395,7 @@ fun main(args: Array<String>) {
                 }finally{try{chooser.dispose()}finally{chooserLease.close()}}
             }
             fun action(command:Command){
-                if ((projectPicker != null || documentImport != null) && command != Command.Quit) return
+                if ((pickerBlocking() || projectPicker != null || documentImport != null) && command != Command.Quit) return
                 if (!diagnosticsLifecycle.allowsCommand(quitting,command==Command.Diagnostics,command==Command.Quit)) return
                 dispatch(command,false,controller,{mode(it)},{instructionDialog(it)},{quit()})
             }
@@ -395,9 +413,9 @@ fun main(args: Array<String>) {
             LaunchedEffect(density,state.position){try{val info=host.windowDpiInfo(window.windowHandle.toULong());dpiText="Windows ${info.windowDpi} DPI · Compose ${"%.2f".format(density)}× · PMv2 ${info.windowPerMonitorV2}"}catch(_:Exception){dpiText="Display DPI query unavailable"}}
             val firstDraw = remember { CompletableDeferred<Unit>() }
             LaunchedEffect(Unit) {
-                try { excludeCaptureWindows(listOf(window.windowHandle.toULong())); captureProtected=true }
-                catch (_: Exception) { controller.report("Screen capture is unavailable because this editor window could not be excluded. Editing remains available.") }
-                finally { captureChecked=true }
+                val protection=initializePickerProtection { excludeCaptureWindows(listOf(window.windowHandle.toULong())) }
+                captureProtected=protection.captureAllowed;captureChecked=protection.editorVisible
+                if(!captureProtected)controller.report("Screen capture is unavailable because this editor window could not be excluded. Editing remains available.")
                 if (startupSmoke) {
                     // The actual EditorShell draw must return; the next frame
                     // callback moves the readiness effect out of that draw.
@@ -429,7 +447,7 @@ fun main(args: Array<String>) {
                 Menu("Edit"){for(c in listOf(Command.Undo,Command.Redo,Command.Delete,Command.SelectAll,Command.ClearSelection,Command.Color,Command.WidthUp,Command.WidthDown,Command.NudgeLeft,Command.NudgeRight,Command.NudgeUp,Command.NudgeDown))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
                 Menu("Tools"){for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout,Command.CycleMarker,Command.Instructions))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
                 Menu("View"){for(c in listOf(Command.Fit,Command.ActualPixels,Command.ZoomIn,Command.ZoomOut,Command.Windowed,Command.Maximized,Command.Fullscreen,Command.FollowPeer,Command.MatchPeer,Command.PeerOutline))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
-                Menu("Workbench"){Item("Remote Krita / Paint…",enabled=commandsAllowed()&&editor.sync?.carrier==SessionCarrier.QuicTether,onClick={openRemoteView()});Item("Send package to Codex",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();codexModal.settings();mcpModal.dismiss()}});Item("Local agents and Compare",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();mcpModal.settings();codexModal.dismiss()}});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Foreground capture…",enabled=captureProtected&&commandsAllowed(),onClick={captureDialog(true)})}
+                Menu("Workbench"){Item("Remote Krita / Paint…",enabled=commandsAllowed()&&editor.sync?.carrier==SessionCarrier.QuicTether,onClick={openRemoteView()});Item("Send package to Codex",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();codexModal.settings();mcpModal.dismiss()}});Item("Local agents and Compare",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();mcpModal.settings();codexModal.dismiss()}});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Capture source…",enabled=captureProtected&&commandsAllowed()&&!competingModal()&&dialog==null,onClick={capturePicker.open()});Item("Retry capture cleanup",enabled=capturePickerState.cleanupPending,onClick=::retryPickerCleanup);Item("Foreground capture settings…",enabled=captureProtected&&commandsAllowed(),onClick={captureDialog(true)})}
             }
             MaterialTheme(colors=darkColors(primary=accent,secondary=Color(0xffe8bb75),background=Color(0xff101720),surface=Color(0xff18222e))){
                 Box(Modifier.fillMaxSize().drawWithContent {
@@ -455,6 +473,7 @@ fun main(args: Array<String>) {
                 mcpCompare?.let{receipt->mcpState.owner?.let{owner->McpComparePanel(owner,receipt,{mcpModal.dismiss()},::saveMcp)}}
                 AiEditorOverlay(controller)
                 remoteView?.let{remote->com.visualworkbench.desktop.remote.RemoteEditPanel(remote){remoteView=null}}
+                CapturePickerWindow(capturePicker,controller::report)
                 if(captureSettings)com.visualworkbench.desktop.capture.CaptureSettings(capture){captureDialog(false)}
                 documentImport?.let{(path,epoch)->AlertDialog(onDismissRequest=::dismissDocumentImport,title={Text("Open PDF or SVG")},text={Column{
                     Text("The original file is preserved. Enter a password only if this PDF requires one.")

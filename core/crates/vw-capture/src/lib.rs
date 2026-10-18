@@ -8,6 +8,7 @@ mod fixed_target;
 pub use fixed_target::refreshed_target;
 mod image;
 pub mod process;
+pub mod picker;
 #[cfg(windows)]
 pub mod windows;
 pub use admission::*;
@@ -168,6 +169,8 @@ pub enum Request {
     Capture(CaptureRequest),
     CanvasFixture(CanvasCaptureRequest),
     Tree(TreeRequest),
+    PickerCatalog { owner_process_id: u32 },
+    PickerCapture(picker::PickerCaptureRequest),
 }
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
@@ -175,6 +178,8 @@ pub enum Response {
     Frame(FrameReceipt),
     CanvasFixture(CanvasFrameReceipt),
     Tree(TreeReceipt),
+    PickerCatalog(picker::PickerCatalog),
+    PickerFrame(picker::PickerFrameReceipt),
     Refused {
         error: Error,
         #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -10,6 +10,9 @@ pub(crate) mod editor_identity;
 #[path = "capture_fixed.rs"]
 mod fixed_target;
 pub use editor_identity::*;
+#[path = "capture_picker.rs"]
+mod picker;
+pub use picker::*;
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum CaptureError {
