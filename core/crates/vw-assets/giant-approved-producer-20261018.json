@@ -1,0 +1,359 @@
+{
+  "schema": 1,
+  "base_commit": "6f3e2f3b9ed7a760d4dd7f4c6f26fa44dc5ad88d",
+  "branch": "task/giant-approved-producer-v2-20261018",
+  "status": "bounded private producer/publication source; host validation passed; root/platform workflow still pending",
+  "source": {
+    "apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/giant/AndroidJpegPyramidTest.kt": {
+      "bytes": 24452,
+      "sha256": "e15a20a43fa91ff670b14d6fa22d40ed638ebc6b7fd260b68f86064bd76f6b97"
+    },
+    "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/giant/AndroidJpegPyramid.kt": {
+      "bytes": 35986,
+      "sha256": "397b297cb785d82ef23cf54e12c6ee9fd5f4c5a15783dbdec0b651a26f2de95e"
+    },
+    "core/crates/vw-assets/GIANT_APPROVED_PRODUCER_HANDOFF_20261018.md": {
+      "bytes": 12595,
+      "sha256": "aec83cd40f0623f355f3f51f2cdb08aef2165e4d07c521e715e631ea787e1ed9"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/cache.rs": {
+      "bytes": 11924,
+      "sha256": "8981345c17646d26ebb82b24b1fd7d07da11ab87acbd892981385f753c538f38"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/cleanup.rs": {
+      "bytes": 2486,
+      "sha256": "416ad151e033162d279a693a14b490b2823e8e6d99cc13cdf08c8dcecb026ed5"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/input.rs": {
+      "bytes": 8375,
+      "sha256": "8d9665425a0efd589df443f0e6542443a19d89d3ef6e0b420477dc2a4f916013"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/producer_tests.rs": {
+      "bytes": 27882,
+      "sha256": "7a9e0abf9c275df0b59628fe7067dfc47122591ca4393ea25b694bdf3fd8a727"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/publish.rs": {
+      "bytes": 22307,
+      "sha256": "00c119273fe8e789fcbee7a0e658139598d5bc7f510f69cd3a1364e1bd55c7d5"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/windows.rs": {
+      "bytes": 5570,
+      "sha256": "1a6dfd89c32bc484bc44e4e643ccd9d92227f2e552723ac04606c68fc040c581"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer.rs": {
+      "bytes": 13865,
+      "sha256": "ed8b30395f1bbaba6400395da4a813bf7ebbdd6a997935d2732c2e4f6467588e"
+    },
+    "core/crates/vw-ffi/src/giant_images/provider.rs": {
+      "bytes": 15155,
+      "sha256": "14345a2589d4e39a7618bbd20faf5d72073879899daa75c1fa5d50add289dc85"
+    },
+    "core/crates/vw-ffi/src/giant_images/source.rs": {
+      "bytes": 19185,
+      "sha256": "df007d412ef90545319664a775d5b58f7ce6f2eafc3b4bb22a3004ac0d365706"
+    },
+    "core/crates/vw-ffi/src/giant_images/tiles.rs": {
+      "bytes": 7152,
+      "sha256": "f88bae9def207629a4d60c14eaebaf83370c53276e1dfc7867cd3656a4dc4c2b"
+    },
+    "host-win/crates/vw-assets-win/Cargo.toml": {
+      "bytes": 1010,
+      "sha256": "faa133522c082fbbd00e81e26facf45141ff6463972bfa3b49623bc13f38ceae"
+    },
+    "host-win/crates/vw-assets-win/SOURCE_HANDOFF_20261018.md": {
+      "bytes": 4407,
+      "sha256": "b960dcffe79abdf58b95cecfb5d90deb8d38c22ac3557cfd58e8a95938090285"
+    },
+    "host-win/crates/vw-assets-win/runtime-pins.json": {
+      "bytes": 3611,
+      "sha256": "d1cd7a05d0799fb4c8f6ac0f2f3fa648e71bcf3aa6b2ca2a29902dedbf7e6949"
+    },
+    "host-win/crates/vw-assets-win/src/admission.rs": {
+      "bytes": 5277,
+      "sha256": "478a96c9a10acddf862bb7dcf5cdc51ae34356d968fb1b7864bb555e55f0ff3b"
+    },
+    "host-win/crates/vw-assets-win/src/bin/helper.rs": {
+      "bytes": 688,
+      "sha256": "fac12d9e061bdc522c1bacbfb07b6a5a54e98d4efe717a5dbd71129d7c712b24"
+    },
+    "host-win/crates/vw-assets-win/src/budget.rs": {
+      "bytes": 4909,
+      "sha256": "5f6c99cf323945f4f2f885dfb3c4f5dbf41112c31d66146e80bad8fb3c2940bd"
+    },
+    "host-win/crates/vw-assets-win/src/lib.rs": {
+      "bytes": 3572,
+      "sha256": "ec70716b261456ee484ec117b2eb982ba0e9ce759e9e8db52bf505056557332e"
+    },
+    "host-win/crates/vw-assets-win/src/native.rs": {
+      "bytes": 9683,
+      "sha256": "8304555d5bc3690be3efb54d520f810a052498c11a02111c0dda5200e1f4e33f"
+    },
+    "host-win/crates/vw-assets-win/src/ownership.rs": {
+      "bytes": 4971,
+      "sha256": "db2db6b500a761857575aa837c78e8d142ea976fe7dd7dd6971c40cf7daf6ff5"
+    },
+    "host-win/crates/vw-assets-win/src/process.rs": {
+      "bytes": 15178,
+      "sha256": "65a087731141087dfd6b33f5b3c2fe32c0e826096f01accf6983c14dda7547b4"
+    },
+    "host-win/crates/vw-assets-win/src/worker.rs": {
+      "bytes": 22307,
+      "sha256": "d6c9da0f52d5638835c963a04cc4ead7b1c6432165f39691edb2ff60027576f4"
+    },
+    "host-win/crates/vw-assets-win/tests/admission.rs": {
+      "bytes": 3319,
+      "sha256": "637805d327de1c0a538efc57f2a4bf6cb494404025348b8e6788432db7ca265c"
+    },
+    "host-win/crates/vw-assets-win/tests/cancellation.rs": {
+      "bytes": 1507,
+      "sha256": "87e686baa120a1c030dc14e54dd8135e769c44824705a74510bd1a24336bc7c7"
+    },
+    "host-win/crates/vw-assets-win/tests/windows_worker.rs": {
+      "bytes": 6804,
+      "sha256": "2c857579c4e806e06a6efacaffdf95b9a54eb2cc05a2d1e7eabfebc22a5b9f71"
+    }
+  },
+  "isolated_validation": {
+    "path": "/tmp/vw-producer-validation-20261018",
+    "rust_source_matches": true,
+    "root_manifests_edited": false,
+    "proposed_target_dependency": "[target.'cfg(windows)'.dependencies]\nvw-assets-win = { path = \"../../../host-win/crates/vw-assets-win\", version = \"=0.1.0\" }",
+    "proposed_lock_delta": "diff --git a/workspace/visual-workbench/Cargo.lock b/tmp/vw-producer-validation-20261018/Cargo.lock\nindex 33cc96f..029e4b1 100644\n--- a/workspace/visual-workbench/Cargo.lock\n+++ b/tmp/vw-producer-validation-20261018/Cargo.lock\n@@ -3312,6 +3312,23 @@ dependencies = [\n  \"thiserror\",\n ]\n \n+[[package]]\n+name = \"vw-assets-win\"\n+version = \"0.1.0\"\n+dependencies = [\n+ \"blake3\",\n+ \"png\",\n+ \"ring\",\n+ \"serde\",\n+ \"serde_json\",\n+ \"tempfile\",\n+ \"thiserror\",\n+ \"vw-assets\",\n+ \"vw-raster\",\n+ \"vw-stream\",\n+ \"windows-sys 0.61.2\",\n+]\n+\n [[package]]\n name = \"vw-avif-os\"\n version = \"0.1.0\"\n@@ -3414,6 +3431,7 @@ dependencies = [\n  \"vw-ai-platform\",\n  \"vw-ai-provider\",\n  \"vw-assets\",\n+ \"vw-assets-win\",\n  \"vw-avif-os\",\n  \"vw-codec-os\",\n  \"vw-document-protocol\",\n",
+    "rust_source_count": 21
+  },
+  "passed": {
+    "giant_native": 52,
+    "producer_new_subset": 29,
+    "provider_delivery_existing_subset": 23,
+    "windows_crate_portable": 14,
+    "total_current_cases": 66,
+    "native_cases": [
+      "giant_images::delivery_tests::reply_capacity_requires_prior_admission_and_valid_reply_keeps_both_leases",
+      "giant_images::delivery_tests::reply_rejects_an_outgoing_charge_from_another_pool",
+      "giant_images::producer::producer_tests::bounded_approval_inventory_evicts_the_oldest_witness",
+      "giant_images::producer::producer_tests::approval_is_bound_to_root_manifest_original_and_same_pool",
+      "giant_images::producer::producer_tests::bounded_tile_read_refuses_before_allocating_over_limit",
+      "giant_images::producer::producer_tests::cancellation_or_project_close_prevents_installation",
+      "giant_images::producer::producer_tests::cancelled_publication_leaves_no_destination_or_approved_cache",
+      "giant_images::producer::producer_tests::closed_and_cancelled_preparation_never_creates_input",
+      "giant_images::producer::producer_tests::failed_exact_cleanup_quarantines_its_actual_retained_credit",
+      "giant_images::producer::producer_tests::exact_cleanup_drops_retained_payload_before_its_memory_credit",
+      "giant_images::producer::producer_tests::installed_fixture_requires_final_admission_before_scoped_open",
+      "giant_images::producer::producer_tests::joined_rebuild_fences_full_binding_and_reads_only_approved_tiles",
+      "giant_images::producer::producer_tests::output_capability_retains_source_until_actual_release",
+      "giant_images::producer::producer_tests::output_damage_is_rejected_before_any_cache_mutation",
+      "giant_images::producer::producer_tests::output_unlisted_file_is_rejected",
+      "giant_images::producer::producer_tests::preparation_low_disk_refuses_and_releases_owner",
+      "giant_images::producer::producer_tests::preparation_requires_explicit_untagged_srgb_consent_before_io",
+      "giant_images::producer::producer_tests::preparation_reserves_shared_owner_before_source_io",
+      "giant_images::producer::producer_tests::preparation_work_cap_accounts_for_scratch_and_publication",
+      "giant_images::producer::producer_tests::prepared_cleanup_waits_for_last_actual_source_owner",
+      "giant_images::producer::producer_tests::prepared_facade_refuses_unavailable_platform_without_directory_approval",
+      "giant_images::producer::producer_tests::private_inventory_alone_never_grants_approval",
+      "giant_images::producer::producer_tests::private_publication_streams_exact_original_and_retains_project_resources",
+      "giant_images::producer::producer_tests::source_replacement_and_symlink_inputs_are_refused",
+      "giant_images::producer::producer_tests::streamed_private_input_preserves_original_hash_and_exact_bytes",
+      "giant_images::producer::publish::tests::provenance_records_explicit_interpretation_and_exact_runner_manifest",
+      "giant_images::producer::publish::tests::publish_options_are_bounded_and_cannot_override_the_approved_disk_policy",
+      "giant_images::producer::publish::tests::streamed_original_checks_close_and_cancellation_for_each_chunk",
+      "giant_images::producer::publish::tests::streamed_original_never_truncates_a_successful_blob",
+      "giant_images::producer::publish::tests::streamed_original_refuses_short_and_long_sources",
+      "giant_images::producer::producer_tests::valid_tile_bytes_through_a_symlink_cannot_enter_the_cache",
+      "giant_images::provider::tests::cleared_pinned_cache_payload_keeps_shared_charge_until_actual_lease_drop",
+      "giant_images::provider::tests::closed_or_cancelled_open_refuses_and_absent_cache_preserves_original",
+      "giant_images::provider::tests::codec_dimensions_metadata_and_trailing_payload_refuse",
+      "giant_images::provider::tests::codec_workspace_admission_precedes_decode_and_cancel_drops_actual_payload",
+      "giant_images::provider::tests::exact_encoded_length_and_hash_refuse_before_decoding",
+      "giant_images::provider::tests::closure_joins_actual_worker_and_cancelled_late_read_never_returns_pixels",
+      "giant_images::provider::tests::hash_copy_refuses_overrun_before_output_write_and_checks_cancellation",
+      "giant_images::provider::tests::missing_and_symlink_original_never_falls_back_to_derived_content",
+      "giant_images::provider::tests::full_state_hash_refuses_even_when_project_document_and_host_sequence_match",
+      "giant_images::provider::tests::native_delivery_copy_keeps_its_charge_after_cache_and_worker_state_drop",
+      "giant_images::provider::tests::nonuniform_scale_preserves_density_and_singular_transform_refuses",
+      "giant_images::provider::tests::oversized_declared_header_does_not_allocate_source_sized_memory",
+      "giant_images::provider::tests::provider_fences_actual_original_damage_before_native_result_adoption",
+      "giant_images::provider::tests::public_provider_caps_canonical_workspace_with_process_pool",
+      "giant_images::provider::tests::source_and_manifest_geometry_clip_odd_edges_without_scope_expansion",
+      "giant_images::provider::tests::source_cancellation_closure_and_workspace_refusal_precede_reads",
+      "giant_images::provider::tests::source_headers_preserve_all_eight_exif_orientations_without_decode",
+      "giant_images::provider::tests::source_stream_hash_and_length_refuse_damage_preserving_original_bytes",
+      "giant_images::provider::tests::staged_plan_is_bounded_but_neither_cache_nor_caller_paths_are_producer_approval",
+      "giant_images::provider::tests::unsupported_profile_depth_alpha_and_truncated_source_headers_refuse",
+      "giant_images::provider::tests::missing_malformed_oversized_and_unapproved_manifest_are_distinct_refusals"
+    ],
+    "windows_portable_cases": [
+      "budget::tests::returned_inventory_retains_its_charge_until_owner_retirement",
+      "budget::tests::failed_reservation_does_not_credit_other_owners",
+      "budget::tests::worker_admission_uses_the_callers_existing_pool",
+      "deadline_is_bounded_and_never_a_success_skip",
+      "disk_and_dimension_admission_are_checked_before_decode",
+      "jpeg_icc_or_truncated_segments_refuse_before_native_load",
+      "jpeg_sof_binds_real_dimensions_without_allocating_pixels",
+      "malformed_or_unknown_codec_refuses",
+      "png_header_admission_is_exact_and_orientation_bound",
+      "request_unknown_fields_cannot_change_worker_policy",
+      "unsupported_alpha_and_depth_never_enter_codec",
+      "local_cancellation_seals_default_and_probed_tokens",
+      "caller_cancellation_or_owner_close_is_observed_without_a_watcher",
+      "probe_retains_its_actual_caller_state_until_token_retirement"
+    ],
+    "clippy": "strict all targets on Linux: vw-ffi + vw-assets-win",
+    "cargo_deny": "offline licenses/bans/sources passed; existing warnings, no errors"
+  },
+  "pending": {
+    "windows_target": "check attempted; C native setup lacks lib.exe; no Windows-specific compilation/execution proof",
+    "windows_cases": 12,
+    "windows_opt_in_runtime_subset": 2,
+    "android_sdk_platform_jar_present": false,
+    "android_kotlin": "uncompiled/unrun; no SDK platform jar in this environment",
+    "android_instrumented_cases": [
+      "rawBandInverseCoversExactSourceForAllEightOrientations",
+      "sharedPoolRefusesBeforeSourceOrCodecAccessAndReleasesSlot",
+      "actualLosslessBaseMatchesDecodedJpegForAllEightOddEdgeOrientations",
+      "cancellationRetainsActualWorkerChargeAndSlotThroughCodecSettlement",
+      "lateCompletedWorkerIsCleanedAfterCancelledAwaitWithoutPublishingReceipt",
+      "returnedBuildKeepsChargeAndSlotUntilIdempotentClose",
+      "rootAdoptionGateKeepsFilesAndChargeUntilItsActualReaderReturns",
+      "failedCleanupQuarantinesChargeAndSlotWithoutDeletingForeignFile",
+      "failedNativeChargeReleaseRetainsQuarantineForExplicitRetry",
+      "callbackFailureCleansOnlyOwnedOutputAndPreservesOriginal",
+      "sourceHashOrientationAndDiskBindingRefuseWithoutPublishing",
+      "explicitConsentAndBandAdmissionPrecedeAnySessionOrPlatformCall",
+      "taggedHdrAndNonJpegInputsNeverEnterProductionDecode",
+      "immutablePathReplacementIsRefusedEvenWhenBytesAreIdentical",
+      "redirectedSourceAndWorkCannotBecomeProducerProvenance",
+      "oddPreviewUsesCeilingSampleAndRemainsWithinAdmittedEnvelope",
+      "postAllocationAdmissionRejectsAlphaDepthProfileAndExcessPreview",
+      "stridePaddingAndOverflowCannotBypassActualAllocationAdmission",
+      "sdkBelowThirtyRefusesBeforeSessionAdmission"
+    ],
+    "advisories": "full offline deny failed: local advisory database missing",
+    "root_integration": [
+      "target dependency and root lock",
+      "owned picker/blob/FD adapter and root registration",
+      "PublishedProject adoption by from_store_budgeted before fallible work; retain32MiB through actual ProjectState destruction",
+      "trusted typed Android runner JNI/native completion bridge",
+      "actual packaged Windows helper/runtime/notices/Job execution receipt",
+      "phone rendering admission: proposed32+96+64+24+64=280MiB exceeds256MiB before tile bytes; needs proved smaller project allowance or bounded immutable cache read path"
+    ],
+    "runtime": [
+      "Android codecs/stride/ColorSpace/retirement",
+      "Windows dynamic libvips/helper/Job teardown",
+      "actual GPU/RSS/performance and owner/hardware acceptance",
+      "network original BLOB transfer",
+      "giant PNG export wiring",
+      "HEIC/HDR/multiframe/AVIF encoder support not claimed"
+    ]
+  },
+  "commands": [
+    "cargo test --locked --offline -p vw-ffi --lib giant_images -- --test-threads=2",
+    "cargo test --locked --offline -p vw-assets-win -- --test-threads=2",
+    "cargo clippy --locked --offline -p vw-ffi -p vw-assets-win --all-targets -- -D warnings",
+    "cargo deny --offline check licenses bans sources",
+    "cargo check --locked --offline -p vw-assets-win --lib --target x86_64-pc-windows-msvc (blocked lib.exe)"
+  ],
+  "failure_receipts": {
+    "failures": [
+      {
+        "step": "root --locked offline test",
+        "result": "refused lock update for recovered workspace crate; root lock unchanged"
+      },
+      {
+        "step": "isolated initial compile",
+        "result": "E0308 fixture DiskCache<Space> vs DiskCache<RealFreeSpace>; one stale isolated-copy replay; fixed generic FreeSpaceQuery in owned tiles leaf"
+      },
+      {
+        "step": "first positive focused52",
+        "passed": 50,
+        "failed": 2,
+        "result": "actual model refused nested provenance metadata; preserved flat privacy allowlist and fixed producer strings"
+      },
+      {
+        "step": "strict clippy",
+        "result": "manual_range_patterns recovered Windows source and chunks_exact_to_as_chunks native hash parser fixed"
+      },
+      {
+        "step": "full offline deny",
+        "result": "local advisory database directory missing; licenses/bans/sources separately pass"
+      },
+      {
+        "step": "Windows target check",
+        "result": "native toolchain missing lib.exe; no tools installed"
+      }
+    ]
+  },
+  "log_artifacts": {
+    "android/recovery.json": {
+      "bytes": 650,
+      "sha256": "025e0d3727457453bc37338624ebb80699a9c6497882ff8c0d5e4e0a2d952193"
+    },
+    "android/source-review.json": {
+      "bytes": 4430,
+      "sha256": "a8210e5030b2bafc2e15419c34352c408e5e8526b53d598b192592e92a65c455"
+    },
+    "native/clippy-final.log": {
+      "bytes": 158,
+      "sha256": "d7e3162a53fd8312ceaaf43602ad94d059b3767670b79e48585e3d5ed0f63deb"
+    },
+    "native/clippy.log": {
+      "bytes": 261,
+      "sha256": "d0fcc44f46b37ea996bbb137bc9d3f9b2f814252cd582a5590d695a089f8158c"
+    },
+    "native/failure-receipts.json": {
+      "bytes": 1037,
+      "sha256": "c3370e106d28ce63a6cd69a6c54a78b46b727e7239d5fce2a8479949b48d73ad"
+    },
+    "native/giant-focused-tests-final.log": {
+      "bytes": 6090,
+      "sha256": "41b3393ef8dacb58382a43cce382e4346ba07bc999ec677192c1df622c88aa33"
+    },
+    "native/giant-focused-tests.log": {
+      "bytes": 6090,
+      "sha256": "648420cad03e91871949b7c59fcde20b81873133185a2f90e0a2a936cb69ebd7"
+    },
+    "native/initial-type-error.txt": {
+      "bytes": 387,
+      "sha256": "6446b7695bab6d776084188c16a8d30927b91e142bd879ecd0aec088ad378905"
+    },
+    "native/license-check.log": {
+      "bytes": 94201,
+      "sha256": "0ada2ec8740a62bca89b52d392ba523e58f76602567bf734c127cadf87f93289"
+    },
+    "native/producer-tests.log": {
+      "bytes": 6458,
+      "sha256": "e024cb25ff61526f0e40c84f622b692524f46677e6cb6326a40b5e64ba38ee47"
+    },
+    "native/proposed-lock.diff": {
+      "bytes": 747,
+      "sha256": "320147bcf44a3639d24308b67a921849cbef7a9a76bb6ce064f7ae218e0714af"
+    },
+    "native/publication-model-failure.txt": {
+      "bytes": 377,
+      "sha256": "ec1530202717e3ed153235cc4735a2c13fe5cfb836cca9c1ed1e2b8d25046169"
+    },
+    "native/windows-portable-tests.log": {
+      "bytes": 2999,
+      "sha256": "66fe16028890d4eb3d8efec27558493085ac53b08188e1663b346b3ddfc0a20b"
+    },
+    "native/windows-target-check.log": {
+      "bytes": 129000,
+      "sha256": "6f51687a54c40a06dc39011ee046b8354129e813226cdcfa982246007171ab7d"
+    },
+    "windows/archive-verification.json": {
+      "bytes": 3372,
+      "sha256": "a40af69ce733c6ce905104482bc3652ebc15ccac2412b2384e3ee4d41fece021"
+    },
+    "windows/publish-source-validation.json": {
+      "bytes": 3573,
+      "sha256": "888ea06c25b054706c45b91f210a02cc71fd8fcfe68b2d852acafafbdbd7a7ba"
+    },
+    "windows/source-validation.json": {
+      "bytes": 8635,
+      "sha256": "3fcbfc9a1b22200141988d3d1dd10d72f9c983abe4f8ff610810e1d613f60005"
+    }
+  },
+  "heavy_slot": "released after final focused checks",
+  "no_new_devices_services_installs_credentials_licenses": true,
+  "images": "synthetic temporary test fixtures only; none committed",
+  "prior_coordinator_counts": "491 native /816 JVM not unnecessarily rerun or added to these66 current cases"
+}

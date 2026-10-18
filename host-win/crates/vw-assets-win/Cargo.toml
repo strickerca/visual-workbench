@@ -1,0 +1,31 @@
+[package]
+name = "vw-assets-win"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+vw-stream = { path = "../../../core/crates/vw-stream", version = "=0.1.0" }
+vw-assets = { path = "../../../core/crates/vw-assets", version = "=0.1.0" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+ring = "=0.17.14"
+thiserror = "=2.0.21"
+tempfile = "=3.27.0"
+
+[target.'cfg(windows)'.dependencies]
+vw-raster = { path = "../../../core/crates/vw-raster", version = "=0.1.0" }
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_LibraryLoader", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_System_Pipes"] }
+
+[dev-dependencies]
+png = "=0.18.1"
+
+[[bin]]
+name = "vw-pyramid-helper"
+path = "src/bin/helper.rs"
+
+[lints]
+workspace = true

@@ -1,0 +1,106 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+use std::io::Cursor;
+use vw_assets_win::*;
+fn request() -> BuildRequest {
+    BuildRequest {
+        original_hash: [3; 32],
+        original_bytes: 33,
+        width: 513,
+        height: 257,
+        orientation: 1,
+        disk_budget: 3 * 1024 * 1024 * 1024,
+        timeout_ms: 60_000,
+    }
+}
+fn png(w: u32, h: u32, depth: u8, color: u8) -> Vec<u8> {
+    let mut b = vec![0; 33];
+    b[..16].copy_from_slice(b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR");
+    b[16..20].copy_from_slice(&w.to_be_bytes());
+    b[20..24].copy_from_slice(&h.to_be_bytes());
+    b[24] = depth;
+    b[25] = color;
+    b
+}
+#[test]
+fn png_header_admission_is_exact_and_orientation_bound() {
+    let mut r = request();
+    assert!(admit_input(&mut Cursor::new(png(513, 257, 8, 2)), &r).is_ok());
+    assert_eq!(
+        admit_input(&mut Cursor::new(png(512, 257, 8, 2)), &r),
+        Err(Error::Binding)
+    );
+    r.orientation = 6;
+    assert!(admit_input(&mut Cursor::new(png(257, 513, 8, 2)), &r).is_ok());
+}
+#[test]
+fn unsupported_alpha_and_depth_never_enter_codec() {
+    for (d, c) in [(16, 2), (8, 6), (8, 3), (8, 0)] {
+        assert_eq!(
+            admit_input(&mut Cursor::new(png(513, 257, d, c)), &request()),
+            Err(Error::Unsupported)
+        );
+    }
+}
+#[test]
+fn malformed_or_unknown_codec_refuses() {
+    assert_eq!(
+        admit_input(&mut Cursor::new([0u8; 33]), &request()),
+        Err(Error::Unsupported)
+    );
+    assert_eq!(
+        admit_input(&mut Cursor::new([0u8; 2]), &request()),
+        Err(Error::Invalid)
+    );
+    let mut p = png(513, 257, 8, 2);
+    p[11] = 0xff;
+    assert!(admit_input(&mut Cursor::new(p), &request()).is_err());
+}
+#[test]
+fn disk_and_dimension_admission_are_checked_before_decode() {
+    let mut r = request();
+    r.width = 16_320;
+    r.height = 12_240;
+    r.original_bytes = 102_470_031;
+    assert!(r.validate().is_ok());
+    r.disk_budget = 256 * 1024 * 1024;
+    assert_eq!(r.validate(), Err(Error::Limit));
+    r.width = u32::MAX;
+    r.height = u32::MAX;
+    assert_eq!(estimated_disk_bytes(&r), Err(Error::Limit));
+}
+#[test]
+fn deadline_is_bounded_and_never_a_success_skip() {
+    let mut r = request();
+    for v in [0, 999, 600_001, u64::MAX] {
+        r.timeout_ms = v;
+        assert_eq!(r.validate(), Err(Error::Limit));
+    }
+}
+#[test]
+fn request_unknown_fields_cannot_change_worker_policy() {
+    let mut json = serde_json::to_value(request()).unwrap();
+    json["suffix"] = serde_json::Value::String(".jpg".into());
+    assert!(serde_json::from_value::<BuildRequest>(json).is_err());
+}
+#[test]
+fn jpeg_icc_or_truncated_segments_refuse_before_native_load() {
+    let mut b = vec![0xff, 0xd8, 0xff, 0xe2, 0, 14];
+    b.extend_from_slice(b"ICC_PROFILE\0");
+    b.resize(33, 0);
+    assert_eq!(
+        admit_input(&mut Cursor::new(b), &request()),
+        Err(Error::Unsupported)
+    );
+    let mut b = vec![0xff, 0xd8, 0xff, 0xe1, 0, 1];
+    b.resize(33, 0);
+    assert_eq!(
+        admit_input(&mut Cursor::new(b), &request()),
+        Err(Error::Invalid)
+    );
+}
+#[test]
+fn jpeg_sof_binds_real_dimensions_without_allocating_pixels() {
+    let mut b = vec![0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, 1, 1, 2, 1, 3];
+    b.resize(33, 0);
+    assert!(admit_input(&mut Cursor::new(b), &request()).is_ok());
+}

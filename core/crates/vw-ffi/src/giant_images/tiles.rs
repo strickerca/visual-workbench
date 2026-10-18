@@ -34,15 +34,17 @@ pub(super) fn tile_key(source: &Source, key: TileKey) -> String {
     )
 }
 
-pub(super) fn manifest(
-    cache: &mut DiskCache,
+pub(super) struct AdmittedManifest {
+    pub manifest: Manifest,
+    pub charge: MemoryCharge,
+}
+fn read_manifest<Q: vw_store::FreeSpaceQuery>(
+    cache: &mut DiskCache<Q>,
     source: &Source,
     cancel: &Cancellation,
     budget: &SessionBudget,
-) -> Result<(Manifest, MemoryCharge)> {
+) -> Result<AdmittedManifest> {
     cancel.check().map_err(Error::from)?;
-    // Covers admitted raw manifest, parsed inventory, identity encoding and map
-    // bookkeeping; the separate store charge covers index parsing/serialization.
     let charge = reserve(budget, MemoryKind::Transfer, MANIFEST_WORKSPACE)?;
     let raw = {
         let _index = reserve(budget, MemoryKind::CodecWorkspace, STORE_WORKSPACE)?;
@@ -54,8 +56,31 @@ pub(super) fn manifest(
     cancel.check().map_err(Error::from)?;
     let manifest = Manifest::decode(&raw, source).map_err(|_| Error::Invalid)?;
     drop(raw);
-    super::producer::require_approved_producer(&manifest, cancel)?;
-    Ok((manifest, charge))
+    Ok(AdmittedManifest { manifest, charge })
+}
+/// Root-scoped process-private admission. Persisted caches cannot authenticate
+/// their producer after process restart; rebuilding mints a fresh witness.
+pub(super) fn manifest_scoped<Q: vw_store::FreeSpaceQuery>(
+    cache: &mut DiskCache<Q>,
+    root: &std::path::Path,
+    source: &Source,
+    cancel: &Cancellation,
+    budget: &SessionBudget,
+) -> Result<AdmittedManifest> {
+    let admitted = read_manifest(cache, source, cancel, budget)?;
+    super::producer::approved_manifest(root, &admitted.manifest, budget, cancel)?;
+    Ok(admitted)
+}
+#[cfg(test)]
+pub(super) fn manifest(
+    cache: &mut DiskCache,
+    source: &Source,
+    cancel: &Cancellation,
+    budget: &SessionBudget,
+) -> Result<(Manifest, MemoryCharge)> {
+    let admitted = read_manifest(cache, source, cancel, budget)?;
+    super::producer::require_approved_producer(&admitted.manifest, cancel)?;
+    Ok((admitted.manifest, admitted.charge))
 }
 
 /// The actual cache payload holds its shared-session charge through every Arc
