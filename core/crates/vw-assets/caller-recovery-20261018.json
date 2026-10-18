@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "source checkpoint composed with coordinator seams; provenance repair prepared; actual native validation queued behind document heavy slot",
+  "status": "production callers compiled and tested; blocked by 9 public import failures at shared metadata admission and 5 reserved FFI lint diagnostics; no promotion",
   "contract_commit": "6dcdcdfde4acdba76c710c16187e19d3f4489d4a",
   "contract": "docs/RECOVERY_CALLER_ASSIGNMENTS_20261018.md",
   "preservation_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
@@ -98,7 +98,7 @@
     "ExportEncoding.acceptsFileSuffix(String): Boolean"
   ],
   "source_checks": {
-    "rustfmt": "passed for new Rust source/tests",
+    "rustfmt": "passed for owned Rust source/tests; source unchanged since tested b0fee0a",
     "git_diff_check": "passed",
     "preservation_hashes": "11 assigned preserved files verified before recovery",
     "provenance_staged_gitleaks": "passed: 6 explicit text files, 81887 bytes, no leaks; no native build started"
@@ -177,22 +177,24 @@
     "The new Linux public-import regression uses an admitted structural AVIF fixture without tile entropy to verify typed missing codec before project publication; it is not a decoder fidelity test."
   ],
   "remaining_limits": [
-    "Coordinator production preparation/enums/error/registration seams are now composed at 5cecb8343ed5442a6646b402295c06c850fee3d8 plus file-import codec error repair bf0d5f4b067aa0f255097a0fa56a1979d4234d73; these callers have not been compiled or executed in this lane.",
-    "30 written Rust caller/preparation/adapter/provenance cases and 12 Kotlin platform/instrumented cases await actual production validation; 16 passed standalone helper harness cases remain a separate historical count.",
+    "Combined source b0fee0a executed 129 selected Rust cases: 120 passed, 9 failed, 0 ignored. All 9 non-AVIF ordinary-format public callers reject the first_tiff_page_only boolean at the coordinator-owned model asset metadata allowlist.",
+    "30 written Rust caller/preparation/adapter/provenance cases executed: 21 passed, 9 failed; 99 other selected module/regression cases passed. The 16 earlier standalone Kotlin harness cases are a separate historical count; no actual app/generated binding validation is claimed.",
+    "Strict portable-crate and selected raster lint passed. Strict FFI lint failed at 5 diagnostics in coordinator-owned AI/streaming/discovery files, so owned public-test lint was not reached.",
     "No Android SDK build, instrumentation, emulator, Windows WIC execution, real AVIF entropy fixture, app caller, picker/provider or generated-binding ABI validation occurred in this phase.",
     "Restricted Android AVIF remains opaque 8-bit identity orientation, no ICC and declared sRGB only; unsupported HDR/multiframe/alpha/transforms never fall back to generic decoding.",
-    "No giant image routing, blob transfer, GPU/performance or product acceptance is claimed; preceding 55 module + 5 R164 tests are historical evidence, not new adapter coverage.",
+    "No giant image routing, blob transfer, GPU/performance or product acceptance is claimed.",
     "BMP intake/raw codec remains supported, but application BMP exports are refused because no compatible bounded standalone CORE-006 provenance carrier is admitted; coordinator must gate BMP preflight and selection."
   ],
-  "heavy_slot": "Documents remains owner per parent; no native compilation started for this caller phase.",
+  "heavy_slot": "Granted by parent after documents released; focused commands finished, slot released; no active scheduled build/test process remains.",
   "verification_images_created": 0,
   "publication": {
     "kind": "reviewed source checkpoint; not acceptance or promotion",
     "branch": "integration/image-caller-source-checkpoint-20261018",
     "authorization": "Parent explicitly authorized recoverable branch publication of these 14 reviewed leaf files before root composition; final test gate stays before promotion.",
-    "native_adapters_compiled": false,
-    "real_native_caller_tests_executed": false,
-    "platform_generated_bindings_validated": false
+    "native_adapters_compiled": true,
+    "real_native_caller_tests_executed": true,
+    "platform_generated_bindings_validated": false,
+    "acceptance_or_promotion": false
   },
   "required_signatures": [
     "vw_raster::PreparedRaster { pub image: DecodedImage, pub metadata: ExportMetadata }",
@@ -207,15 +209,16 @@
   "current_seam_review": {
     "commit": "bf0d5f4b067aa0f255097a0fa56a1979d4234d73",
     "merged": "fast-forward; no reserved file edits by image owner",
-    "native_prerequisites": "present in source; not yet compiled in this lane",
+    "native_prerequisites": "Present and compiled against real production crates; public model notice admission mismatch blocks export assertions.",
     "confirmed_reserved_defect": {
       "path": "core/crates/vw-ffi/src/streaming_ffi.rs",
       "location": "impl From<TransferError> for CoreError",
       "issue": "TransferError::ImageCodecUnavailable falls through to CoreError::Raster on file import.",
       "requested_fix": "Add TransferError::ImageCodecUnavailable => Self::ImageCodecUnavailable to that shared conversion.",
       "owned_regression": "ordinary_formats::avif_missing_codec::admitted_avif_file_import_keeps_the_typed_missing_codec_failure",
-      "executed": false,
-      "resolution": "Parent supplied bf0d5f4b067aa0f255097a0fa56a1979d4234d73; fetched and fast-forwarded without editing reserved mapper."
+      "executed": true,
+      "resolution": "Parent supplied bf0d5f4b067aa0f255097a0fa56a1979d4234d73; fetched and fast-forwarded without editing reserved mapper.",
+      "regression_result": "passed on Linux, both memory and file public AVIF intake preserve typed missing-codec failure before project publication"
     },
     "prepared_checks": [
       "Actual public memory/file/attachment/export/notice/lifecycle Rust callers with real vw_core and vw_raster crates.",
@@ -223,11 +226,12 @@
       "Existing raster display and ordinary-format legacy cases after shared preparation extraction.",
       "Owned leaf clippy with warnings denied and final source scans after source fixes."
     ],
-    "slot": "documents owns heavy slot; no compilation started during preparation"
+    "slot": "focused heavy slot used within two-worker/test-thread limits and released",
+    "validation_evidence": "core/crates/vw-assets/native-caller-validation-20261018.json"
   },
   "provenance_repair": {
     "requirement": "docs/REQUIREMENTS.json CORE-006: exported file metadata includes revision and source asset hash; capture session/frame when applicable",
-    "status": "source-reviewed, formatted, not compiled or executed",
+    "status": "4 portable provenance cases and real buffered adapter capture-provenance unit passed; finalized public TIFF export assertions blocked by shared model notice admission",
     "api": "vw_formats::encode_to_with_metadata(&DecodedImage, ExportFormat, Limits, &str, &mut dyn WriteSeek, &dyn Fn()->bool) -> Result<ExportReceipt>",
     "carrier": "TIFF 6.0 ImageDescription tag 270, ASCII type 2 with terminating NUL; 16 KiB ASCII payload cap, no embedded NUL; sorted IFD, unchanged ICC/samples",
     "metadata": "Existing serialized vw_raster::ExportMetadata, bound to actual source and revision. Source/revision/capture fields must match finalized file result. Internal workspace budget may differ from the root caller policy receipt because the shared streaming seam replaces returned settings after encoding.",
@@ -269,6 +273,7 @@
         "sha256": "698e274ed358afe63f681f2b7bc09138f19611f4bf288075fb63b7249b4152d3"
       }
     ],
-    "publication": "Explicitly uncompiled source checkpoint on the authorized integration branch; acceptance and promotion remain gated on actual production tests."
-  }
+    "publication": "Source repair b0fee0a compiled and partially validated; acceptance/promotion remains blocked by public model admission and strict FFI lint."
+  },
+  "verification_images_note": "No screenshots created. New selected Rust tests create only tempfile-owned synthetic image fixtures; those paths are dropped during success/unwinding and no image artifact is committed."
 }
