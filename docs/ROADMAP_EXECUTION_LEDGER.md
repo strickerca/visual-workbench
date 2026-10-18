@@ -622,3 +622,19 @@ checked i64 after first compile failure. No bindings/platform/agent/UI activatio
 Exact scope/source/failures: VERIFICATION_NATIVE_COMPOSED_20261018.md and evidence.
 Held remote Air Actionssource is uncomposed; actual alignment/owner/device gates
 remain open. Main remains reviewed074b6c6 until root recheck.
+
+## Native verification promoted; reviewed platform callers composed
+
+Independent review accepts native candidate6d505416/code1a3e8e2 and its exact
+154 reported native executions, zero failures, two wrapper-invoked private
+entrypoints and strict Clippy. Main is now6d505416. Public verification FFI/UI/
+agent activation and actual marker alignment remain separate unfinished work.
+
+The next integration deliberately composes accepted capture leaves/root
+registration and final Desktop490ed8b/6eba155 with Air Actions766d1f2/cd3c643,
+remote-contact repaircc606a02 and its17/17 executed receipt46df4c4. Both platform
+roots remain byte-identical to their returned candidates. Native capture/host
+tests pass137 cases; full native/bindings/app validation is running as one phase.
+The disk-exhaustion failure and targeted generated-executable disposal inventory
+are retained. See CAPTURE_AIR_CALLER_COMPOSITION_20261018.md. Physical gates,
+Windows runtime, packaged distribution and provider/device authority are unchanged.

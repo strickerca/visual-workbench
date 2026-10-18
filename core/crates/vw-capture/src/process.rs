@@ -101,7 +101,9 @@ pub fn run(helper: &LockedHelper, request: Request, cancel: Arc<Cancellation>) -
             value.limits.capture_ms + 2000
         }
         Request::PickerCatalog { owner_process_id } => {
-            if *owner_process_id == 0 { return Err(Error::Invalid); }
+            if *owner_process_id == 0 {
+                return Err(Error::Invalid);
+            }
             5000
         }
         Request::PickerCapture(value) => {

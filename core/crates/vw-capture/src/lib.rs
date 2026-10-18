@@ -7,8 +7,8 @@ pub use canvas::{CanvasCaptureRequest, CanvasFrameReceipt};
 mod fixed_target;
 pub use fixed_target::refreshed_target;
 mod image;
-pub mod process;
 pub mod picker;
+pub mod process;
 #[cfg(windows)]
 pub mod windows;
 pub use admission::*;
@@ -174,6 +174,10 @@ pub enum Request {
 }
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "One bounded helper response is owned inline; picker receipts stay below 1 KiB and contain no image bytes"
+)]
 pub enum Response {
     Frame(FrameReceipt),
     CanvasFixture(CanvasFrameReceipt),
