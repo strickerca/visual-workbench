@@ -36,6 +36,8 @@ internal data class CanvasScene(
     val peerViewport: List<Point> = emptyList(),
     val aiResults: Map<String,AiResultImage<AiBitmap>> = emptyMap(),
     val resultDisplayReady: Boolean = true,
+    val precision: PrecisionFrame = PrecisionFrame(),
+    val smoothBackground: Boolean = true,
 )
 
 internal object EditorDrawing {
@@ -206,7 +208,7 @@ internal object EditorDrawing {
         val documentLayer=canvas.saveLayer(null,null)
         val sourceSave=canvas.save()
         canvas.concat(matrix(scene.matrix))
-        scene.background?.let{canvas.drawBitmap(it,0f,0f,Paint(Paint.FILTER_BITMAP_FLAG))}
+        scene.background?.let{canvas.drawBitmap(it,0f,0f,Paint(if(scene.smoothBackground) Paint.FILTER_BITMAP_FLAG else 0))}
         canvas.restoreToCount(sourceSave)
         val combined = (scene.objects + scene.provisional).filter { it.item.objectId !in scene.hidden }
         val orderedLayers = (scene.document.layers.map { it.id } + combined.map { it.item.layerId }).distinct()

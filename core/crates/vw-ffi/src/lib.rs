@@ -7,6 +7,8 @@ mod format_images;
 pub use format_images::OriginalFormatInfo;
 mod ai_edit;
 mod camera;
+mod precision;
+pub use precision::*;
 pub use ai_edit::*;
 mod creation;
 mod dto;
