@@ -13,7 +13,6 @@ import com.visualworkbench.shared.DiagnosticPlatform
 import com.visualworkbench.shared.PreparedDiagnosticsReport
 import com.visualworkbench.shared.PrivateDiagnosticLog
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -159,24 +158,14 @@ internal class DiagnosticsController(context: Context, private val scope: Corout
             return
         }
         reportMessage = "Saving the previewed report…"
-        reportSaveJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            var outcome = DiagnosticEventCode.ExportFailed
-            try {
-                outcome = withContext(Dispatchers.IO) {
-                    try {
-                        writePreparedDiagnosticsReport(report) {
-                            resolver.openOutputStream(uri, "wt") ?: throw IOException("Report destination unavailable")
-                        }
-                        DiagnosticEventCode.ExportSucceeded
-                    } catch (_: Exception) { DiagnosticEventCode.ExportFailed }
-                }
-            } finally {
-                reportShutdownPending = false
-                reportBusy = false
-                appendDiagnostic(outcome)
-                reportMessage = if (outcome == DiagnosticEventCode.ExportSucceeded) "Report saved."
-                    else "Report export failed. Your preview is still available; the selected file may be incomplete."
-            }
+        reportSaveJob = scope.launchPreparedReportWriter(report, open = {
+            resolver.openOutputStream(uri, "wt") ?: throw IOException("Report destination unavailable")
+        }) { outcome ->
+            reportShutdownPending = false
+            reportBusy = false
+            appendDiagnostic(outcome)
+            reportMessage = if (outcome == DiagnosticEventCode.ExportSucceeded) "Report saved."
+                else "Report export failed. Your preview is still available; the selected file may be incomplete."
         }
     }
 
