@@ -87,7 +87,7 @@ pub fn validate_overlays(
                 )
                 .ok_or(PdfError::Limit)?;
             for (index, point) in contour.iter().copied().enumerate() {
-                if index % 256 == 0 {
+                if index.is_multiple_of(256) {
                     cancel.check()?;
                 }
                 check_point(point)?;

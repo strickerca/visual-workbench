@@ -232,7 +232,7 @@ impl PdfDocument<'_> {
         }
         drop(bitmap); // External buffer is no longer referenced by PDFium.
         cancel.check()?;
-        for pixel in pixels.chunks_exact_mut(4) {
+        for pixel in pixels.as_chunks_mut::<4>().0.iter_mut() {
             pixel.swap(0, 2);
         }
         Ok(PdfTile {
@@ -603,7 +603,7 @@ impl Page<'_> {
         for contour in &overlay.contours {
             cancel.check()?;
             for (index, point) in contour.iter().copied().enumerate() {
-                if index % 256 == 0 {
+                if index.is_multiple_of(256) {
                     cancel.check()?;
                 }
                 let point = geometry.document_to_pdf(overlay.document_point(point)?)?;

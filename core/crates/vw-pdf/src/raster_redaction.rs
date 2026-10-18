@@ -505,7 +505,7 @@ impl RasterRedactionPlan {
                     let mut rgb = Vec::new();
                     rgb.try_reserve_exact(rgb_len)
                         .map_err(|_| PdfError::Allocation)?;
-                    for pixel in tile.rgba.chunks_exact(4) {
+                    for pixel in tile.rgba.as_chunks::<4>().0.iter() {
                         if pixel[3] != 255 {
                             return Err(RasterRedactionError::Verification);
                         }

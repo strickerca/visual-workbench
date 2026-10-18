@@ -59,7 +59,7 @@ impl PageGeometry {
         {
             return Err(PdfError::Invalid);
         }
-        let (width, height) = if quarter_turns % 2 == 0 {
+        let (width, height) = if quarter_turns.is_multiple_of(2) {
             (right - left, top - bottom)
         } else {
             (top - bottom, right - left)

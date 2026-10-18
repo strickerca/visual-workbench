@@ -140,8 +140,10 @@ fn phone_copy_reconstructs_every_page_and_verifies_no_text_or_original_resources
     )?;
     assert!(
         tile.rgba
-            .chunks_exact(4)
-            .all(|pixel| pixel == [0, 0, 0, 255])
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|pixel| *pixel == [0, 0, 0, 255])
     );
     let outside = reconstructed.render_tile(
         1,
@@ -155,6 +157,13 @@ fn phone_copy_reconstructs_every_page_and_verifies_no_text_or_original_resources
         },
         &cancel,
     )?;
-    assert!(outside.rgba.chunks_exact(4).any(|pixel| pixel[0] < 200));
+    assert!(
+        outside
+            .rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .any(|pixel| pixel[0] < 200)
+    );
     Ok(())
 }

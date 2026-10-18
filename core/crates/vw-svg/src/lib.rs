@@ -22,6 +22,8 @@ pub enum SvgError {
     Limit,
     #[error("SVG workspace needs {required} bytes; budget is {budget}")]
     Memory { required: u64, budget: u64 },
+    /// Includes marker/pattern definitions, which are excluded until their
+    /// per-instance expansion and intermediate surfaces have bounded admission.
     #[error("the SVG is malformed or unsupported")]
     Malformed,
     #[error("XML document type declarations and entities are disabled")]

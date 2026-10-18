@@ -83,14 +83,22 @@ pub(crate) fn inspect<'a>(
         if !node.is_element() {
             continue;
         }
-        if let Some(id) = node.attribute("id") {
-            if id.len() > 1024 || ids.insert(id, node).is_some() {
-                return Err(SvgError::Malformed);
-            }
+        if let Some(id) = node.attribute("id")
+            && (id.len() > 1024 || ids.insert(id, node).is_some())
+        {
+            return Err(SvgError::Malformed);
         }
         layers = layers.checked_add(1).ok_or(SvgError::Limit)?;
         let name = node.tag_name().name();
         match name {
+            // A marker's children are cloned per path vertex, not per URL
+            // occurrence (usvg0.47 marker::resolve). Patterns also allocate a
+            // separate, transform-sized raster surface outside resvg's output
+            // tile clamp (resvg0.47 path::render_pattern_pixmap). Neither cost
+            // is covered by our source/reference or tile-surface reservation.
+            // Refuse definitions before Tree::from_xmltree, including unused,
+            // nested and CSS-selected ones. Never silently drop their artwork.
+            "marker" | "pattern" => return Err(SvgError::Malformed),
             "script" => {
                 notices.insert(FidelityNotice::ScriptOrEventIgnored);
             }
@@ -109,7 +117,7 @@ pub(crate) fn inspect<'a>(
             "svg" | "g" | "defs" | "path" | "rect" | "circle" | "ellipse" | "line" | "polyline"
             | "polygon" | "text" | "tspan" | "textPath" | "a" | "title" | "desc" | "metadata"
             | "use" | "symbol" | "switch" | "linearGradient" | "radialGradient" | "stop"
-            | "clipPath" | "mask" | "pattern" | "marker" | "filter" => {}
+            | "clipPath" | "mask" | "filter" => {}
             value if value.starts_with("fe") => {
                 filters = filters.checked_add(1).ok_or(SvgError::Limit)?;
                 if !matches!(
@@ -164,7 +172,7 @@ pub(crate) fn inspect<'a>(
                 let Some(end) = rest.find(')') else {
                     return Err(SvgError::Malformed);
                 };
-                let target = rest[..end].trim().trim_matches(['\'', '"']);
+                let target = url_target(&rest[..end])?;
                 if !target.starts_with('#') {
                     notices.insert(FidelityNotice::ResourceDenied);
                 }
@@ -233,10 +241,10 @@ impl<'input, 'doc> Work<'_, 'input, 'doc> {
         }
         for attr in node.attributes() {
             self.charge(attr.value().len())?;
-            if attr.name() == "href" {
-                if let Some(id) = attr.value().trim().strip_prefix('#') {
-                    self.reference(id, stack)?;
-                }
+            if attr.name() == "href"
+                && let Some(id) = attr.value().trim().strip_prefix('#')
+            {
+                self.reference(id, stack)?;
             }
             if matches!(
                 attr.name(),
@@ -270,7 +278,7 @@ impl<'input, 'doc> Work<'_, 'input, 'doc> {
                 let Some(end) = rest.find(')') else {
                     return Err(SvgError::Malformed);
                 };
-                let id = rest[..end].trim().trim_matches(['\'', '"']);
+                let id = url_target(&rest[..end])?;
                 if let Some(id) = id.strip_prefix('#') {
                     self.reference(id, stack)?;
                 }
@@ -308,4 +316,27 @@ impl<'input, 'doc> Work<'_, 'input, 'doc> {
         }
         Ok(())
     }
+}
+
+// Keep the scanned reference exactly equal to the parser's target. A quoted
+// closing parenthesis or escaped token could otherwise hide a different ID
+// from this intentionally small URL grammar and bypass graph accounting.
+fn url_target(raw: &str) -> SvgResult<&str> {
+    let raw = raw.trim();
+    let target = if raw.starts_with(['\'', '"']) {
+        let quote = raw.as_bytes()[0] as char;
+        raw.strip_prefix(quote)
+            .and_then(|value| value.strip_suffix(quote))
+            .ok_or(SvgError::UnsupportedCss)?
+    } else {
+        raw
+    };
+    if target.is_empty()
+        || target
+            .chars()
+            .any(|value| value.is_whitespace() || matches!(value, '\\' | '\'' | '"' | '(' | ')'))
+    {
+        return Err(SvgError::UnsupportedCss);
+    }
+    Ok(target)
 }

@@ -73,7 +73,7 @@ impl SvgDocument {
             },
             font_resolver: FontResolver {
                 select_font: Box::new(move |font, database| {
-                    for family in &font.families {
+                    for family in font.families() {
                         let name = family.to_string();
                         let name = name.trim_matches(['\'', '"']);
                         if !matches!(
@@ -185,14 +185,12 @@ impl SvgDocument {
             return Err(SvgError::Cancelled);
         }
         let mut rgba = pixmap.take();
-        for pixel in rgba.chunks_exact_mut(4) {
+        for pixel in rgba.as_chunks_mut::<4>().0.iter_mut() {
             let alpha = u32::from(pixel[3]);
             for channel in &mut pixel[..3] {
-                *channel = if alpha == 0 {
-                    0
-                } else {
-                    ((u32::from(*channel) * 255 + alpha / 2) / alpha).min(255) as u8
-                };
+                *channel = (u32::from(*channel) * 255 + alpha / 2)
+                    .checked_div(alpha)
+                    .map_or(0, |value| value.min(255)) as u8;
             }
         }
         Ok(SvgTile {
