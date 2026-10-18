@@ -1,0 +1,218 @@
+{
+  "status": "interface proposal for parent/coordinator admission; platform Kotlin not promoted or compiled",
+  "base_engine_commit": "3d2839de8cfdecf1e0afeab5e93b67a268004c2b",
+  "recovery_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "scope": [
+    "apps/android/src/main/kotlin/com/visualworkbench/android/documents/**",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/documents/**",
+    "dedicated platform documents tests"
+  ],
+  "excluded": [
+    "controllers",
+    "Main/WorkbenchApp",
+    "AndroidManifest.xml",
+    "Gradle",
+    "shared APIs and native actuals",
+    "schema/protocol",
+    "FFI registration",
+    "root manifests/lock",
+    "native runtime artifacts/sandbox acceptance"
+  ],
+  "candidate_hashes_verified": [
+    {
+      "path": "ink-core/core/crates/vw-ffi/src/documents.rs",
+      "sha256": "f8ed5e861ea29e86c07931276246a46a79afe88d02e97225a4ac9bdb9d07b27f",
+      "bytes": 15898
+    },
+    {
+      "path": "ink-core/core/crates/vw-ffi/src/documents/engine.rs",
+      "sha256": "07a2657000e023185ae0dcef9447ede62e577f8267600cda3ad6b304734b1973",
+      "bytes": 15462
+    },
+    {
+      "path": "ink-core/core/crates/vw-ffi/src/documents/jobs.rs",
+      "sha256": "b75503334ef090fd1cb6c1f9b3f59d99498aa539810d3459bfff84e25245164c",
+      "bytes": 11763
+    },
+    {
+      "path": "ink-core/core/crates/vw-ffi/src/documents/jobs_tests.rs",
+      "sha256": "e8ce9d5d7e68003a6dd21f81a6611959a3589a5b592187f7ac4ead2104e77c36",
+      "bytes": 2312
+    },
+    {
+      "path": "ink-core/core/crates/vw-ffi/src/documents/overlays.rs",
+      "sha256": "fe625482ca56702d47e0fa9bfd90bcb4b56eb5b8b3e672ca73137a391dbc40f9",
+      "bytes": 9952
+    },
+    {
+      "path": "ink-core/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/documents/DesktopDocumentJobs.kt",
+      "sha256": "3b2b83fc1664aa49999ed942f0d1f6f95d548ba4fdcbb540ece3924b77cb24cb",
+      "bytes": 2670
+    },
+    {
+      "path": "ink-core/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/documents/DesktopDocumentRuntime.kt",
+      "sha256": "3a20b30f2b75677dcdc1b1b02bba1721605ce4c8cb2303c13756727913a7f791",
+      "bytes": 4705
+    },
+    {
+      "path": "ink-core/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/documents/DocumentPanel.kt",
+      "sha256": "6bf258080568eecb0b51b0993bb7aa32373f6db9eb9869656f37a7a401964f59",
+      "bytes": 3672
+    },
+    {
+      "path": "ink-core/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/documents/DocumentTextOverlay.kt",
+      "sha256": "f4100528becd3e8e5bb3851c48b34dc6ed8588f7197ae1c0f4184ae191d18855",
+      "bytes": 2544
+    },
+    {
+      "path": "ink-core/apps/desktop/src/main/kotlin/com/visualworkbench/desktop/documents/DocumentTiles.kt",
+      "sha256": "20e02f65b4a4a3129f888baca7ea9d8cfc31431c8b25d9a8c2ea284d5602950b",
+      "bytes": 1801
+    },
+    {
+      "path": "ink-core/apps/android/src/main/kotlin/com/visualworkbench/android/documents/AndroidDocumentIO.kt",
+      "sha256": "f5874f10e47a7d5becbcf071e4bb0d91203c53cdf0bc493cb93914d81c9d1608",
+      "bytes": 2656
+    },
+    {
+      "path": "ink-core/apps/android/src/main/kotlin/com/visualworkbench/android/documents/AndroidDocumentJobs.kt",
+      "sha256": "cdbf2c9cef1549e4b595cc07f7305888678d70cd5a7133f0c088dcc0c5bf7e46",
+      "bytes": 5726
+    },
+    {
+      "path": "ink-core/apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentControls.kt",
+      "sha256": "e22d3b31d490c6219c04e7a9ce9a4de71bb5fba1206c8c3fe472edab1f8c8cc3",
+      "bytes": 4369
+    },
+    {
+      "path": "ink-core/apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentPanel.kt",
+      "sha256": "7a88bc9fdc0822c68922de0ff8d678a0078fc18d25338ac41954d6f768776ba8",
+      "bytes": 3587
+    },
+    {
+      "path": "ink-core/apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentTextOverlay.kt",
+      "sha256": "403880957f458c0804a3882565702bb448ba1e53c7a0f0f3af3a71f1d26785e2",
+      "bytes": 2544
+    },
+    {
+      "path": "ink-core/apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentTiles.kt",
+      "sha256": "2ece7fec6d57f351773c75c8e5f468679790525b9743cd0be2c9c4343879c2c3",
+      "bytes": 1842
+    },
+    {
+      "path": "ink-core/apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentWire.kt",
+      "sha256": "7672ed3fa43f692ce1d0039b1428865f6bae3c32b1fe489f904c52db8708b7d9",
+      "bytes": 2689
+    },
+    {
+      "path": "ink-core/apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentWorkerService.kt",
+      "sha256": "ca9c3e462d0b3eb5536b9e47955cb8465d1fce55878cc828833668a59923dcda",
+      "bytes": 4310
+    },
+    {
+      "path": "ink-core/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentsApi.kt",
+      "sha256": "71d7b448e6643fb9c949972c0a732d391ec68b5719b6b56a3d08e5f4944c3842",
+      "bytes": 6128
+    }
+  ],
+  "existing_api_review": {
+    "current": "CoreApi.kt has WorkbenchCore, WorkbenchProject, ProjectInfo, Point, Rect, Transform, Camera, DocumentSnapshot and BackgroundImage. Current vw-pdf/vw-svg expose engine DTOs only; no active document FFI/app caller exists. Existing Android editor.ProviderIo already supplies bounded provider operations and cancellation-safe duplicate FD ownership; reuse it unchanged.",
+    "shared_candidate": "ink-core/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentsApi.kt plus DocumentInteraction.kt and DocumentController.kt are coordinator-owned review references, not a worker edit target.",
+    "native_candidate": "ink-core/core/crates/vw-ffi/src/documents/jobs.rs and ink-core/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeDocuments.kt are coordinator-owned review references."
+  },
+  "required_shared_contracts": {
+    "retain_candidate_names": [
+      "EditableKind",
+      "DocumentPage",
+      "EditableDescriptor",
+      "EditableSource",
+      "CreateDocument",
+      "WorkbenchDocumentsCore",
+      "WorkbenchDocumentsProject",
+      "DocumentTileRequest",
+      "DocumentOverlay",
+      "DocumentRegion",
+      "DocumentCopy",
+      "DocumentOperation",
+      "DocumentRequest",
+      "DocumentGlyph",
+      "DocumentMetadata",
+      "DocumentReply",
+      "DocumentFailureKind",
+      "DocumentFailure",
+      "DocumentJobs",
+      "DocumentExport",
+      "DocumentDisplayTile",
+      "DocumentState",
+      "DocumentController",
+      "DocumentInteraction"
+    ],
+    "jobs": [
+      "val pcRedaction: Boolean",
+      "suspend fun run(request: DocumentRequest, source: ByteArray): DocumentReply",
+      "suspend fun close(): Unit"
+    ],
+    "job_semantics": "One admitted active worker. Reject new work after close starts. Cancellation/close signal the active worker before waiting on the serialization gate; successful return/close requires actual worker/native-call retirement. Isolation failure retains the actual cleanup owner/quarantine for later joined retry. FINISHED/result-ready and service-disconnect notifications alone do not prove process retirement. No destination/project DB/ambient URI or network access crosses the worker boundary.",
+    "failure_kinds": [
+      "Unavailable",
+      "Invalid",
+      "Limit",
+      "Busy",
+      "Cancelled",
+      "Timeout",
+      "Isolation",
+      "Verification",
+      "Password",
+      "Unsupported",
+      "Malformed",
+      "Worker",
+      "Stale"
+    ],
+    "frame_binding_proposal": "public data class DocumentFrameBinding(public val sourceAssetId: String, public val documentId: String, public val page: UInt, public val revision: ProjectInfo, public val attachmentEpoch: Long, public val viewportGeneration: Long)",
+    "frame_binding_semantics": "Coordinator must capture/match the complete immutable binding before native completion adoption, bitmap preparation and canvas adoption; compare source identity, project identity/full revision, page, attachment epoch and viewport generation. Never revive a cancelled generation merely because the viewport looks identical.",
+    "frame_proposal": "public data class DocumentDisplayFrame(public val binding: DocumentFrameBinding, public val tiles: List<DocumentDisplayTile>)",
+    "pixel_contract": "DocumentDisplayTile retains candidate origin/scale/width/height/rgba. Nonzero dimensions <=512 each, finite positive native scale, finite origins, exact width*height*4 bytes, straight RGBA8 sRGB. These are display derivatives, never original assets or an export source.",
+    "privacy": "Do not use generated data-class toString/Debug that emits passwords, request JSON, source/output bytes, private paths or provider URIs. Exceptions exposed to UI/diagnostics remain fixed typed failure kinds. Password is private transient memory only.",
+    "installation": "Coordinator owns installDocumentJobs/installedDocumentJobs and replacement lifecycle. Platform constructors return a fresh owned jobs instance; do not add a permanent global Android singleton that can retain a closed jobs object."
+  },
+  "required_native_bindings": [
+    "DocumentJobResult(sourceBlake3: String, metadataJson: String, bytes: ByteArray, outputBlake3: String)",
+    "DocumentRuntimeArtifact(fileName: String, bytes: ULong, sha256: ByteArray)",
+    "DocumentRuntimeOptions(directory: String, artifacts: List<DocumentRuntimeArtifact>)",
+    "DocumentJobException with candidate typed variants matching DocumentFailureKind except Stale",
+    "DocumentJobCancellation(): cancel(), destroy()",
+    "DesktopDocumentRuntime.run(requestJson: String, source: ByteArray, cancellation: DocumentJobCancellation): DocumentJobResult; destroy() only after joined run retirement",
+    "suspend fun openDesktopDocumentRuntime(options: DocumentRuntimeOptions): DesktopDocumentRuntime",
+    "fun documentSourceHash(source: ByteArray): String",
+    "fun validateDocumentJobResult(requestJson: String, expectedSourceBlake3: String, result: DocumentJobResult): DocumentJobResult",
+    "fun runIsolatedAndroidDocumentJob(library: String, librarySha256: ByteArray, requestJson: String, source: ByteArray): DocumentJobResult",
+    "shared actual functions documentRequestJson(request: DocumentRequest): String and documentReply(result: DocumentJobResult): DocumentReply (must run only after strict native validation)"
+  ],
+  "platform_entrypoints_proposed": {
+    "desktop_runtime": "DesktopDocumentRuntimeCache.prepare(local: java.nio.file.Path): DocumentJobs; use existing NativeCacheAnchor/WindowsNativeFileGuard unchanged; return owned exact pins and joined cleanup. Absent approved resources => typed Unavailable, no system-library fallback.",
+    "android_runtime": "prepareAndroidDocumentJobs(context: android.content.Context): DocumentJobs returns owned instance to coordinator; service registration, isolatedProcess policy and native resource packaging are coordinator prerequisites.",
+    "android_io_import": "AndroidDocumentIO(context: Context, core: WorkbenchCore, jobs: DocumentJobs).import(uri: Uri, kind: EditableKind, path: String, device: String, title: String, password: String?, progress: (String)->Unit): WorkbenchProject. ProviderIo handles bounded copying; inspect original bytes, verify identity, create document, join cancelled acquired project before returning. Coordinator fences attachment/epoch adoption.",
+    "android_io_export": "AndroidDocumentIO.publish(uri: Uri, copy: DocumentExport, stillCurrent: ()->Boolean): Unit. New CreateDocument destination only; validate identity/revision before opening and during writes, join bounded ProviderIo operations, remove owned incomplete destinations on cancel/stale/failure; failed removal is explicit partial-file failure. Never call a partial provider write a ready export.",
+    "rendering": "DocumentTileCache.prepare(frame: DocumentDisplayFrame, stillCurrent: ()->Boolean): List<PreparedDocumentTile>; bounded conversion and source/generation-aware cache. Caller retains immutable prepared frame through drawing. No recycle/close of native bitmap while an in-flight frame can reference it; platform-copy budget is separate from engine tile bytes.",
+    "ui": "Recover DocumentPanel and DocumentTextOverlay only after coordinator admits DocumentController/state methods; refactor Android DocumentControls to callback parameters instead of direct EditorController dependency. Controller/root picker wiring stays coordinator-owned."
+  },
+  "candidate_corrections_before_promotion": [
+    "Android parent cancellation can race bind/connected wait, writer and output reading; the monitor must cover the entire admitted lifetime, not only post-send. Child FINISHED never substitutes for death proof. Quarantine must retain descriptors/output/native owner until proof.",
+    "Android raw blocking source-pipe writes and contentResolver stream calls can defeat joined cancellation; use bounded nonblocking descriptor paths/ProviderIo with retained per-operation ownership.",
+    "DocumentWire must reject truncated/oversized/malformed UTF8/unknown status or failure code/trailing bytes before adoption; never trust a child output length before bounded admission.",
+    "Desktop close must signal active cancellation before acquiring the run mutex, then join the native worker before destroying bindings or file pins. Attempt every owned close and retain failures instead of abandoning later grants after the first thrown close.",
+    "Original candidate Android publish does not delete partial owned SAF output; add truthful rollback failure behavior and revision checks.",
+    "Candidate tile caches key only object identity and lack authority/memory validation. Introduce the admitted source/revision/page/generation frame binding and account retained/temporary bitmap copies.",
+    "Password/source-bearing shared DTOs require safe diagnostic formatting; do not print candidate request/creation records.",
+    "Native artifact verification, Windows zero-capability worker and hard limits, Android isolated UID/native memory/time policy, and service/native resource packaging are coordinator prerequisites, not proven by these platform wrappers."
+  ],
+  "dedicated_test_plan": [
+    "Reuse preserved source tests where within lane; root DocumentSwitchTest and Android controller instrumentation remain coordinator references.",
+    "Pure codec tests: exact status/magic and cap boundaries, short read/EOF, strict UTF8, unknown failures, trailing bytes on success and failure, exact payload length.",
+    "Job lifecycle tests with injected fake worker/binder/runtime: cancel during connection/write/native-call/result race; close cancels before waiting; no return/destroy/delete before joined retirement; uncertain death quarantines and blocks new work; retry cleanup uses the same owner.",
+    "Rendering tests: reject zero/overflow/invalid byte count/scale; known straight-RGBA-to-ARGB pixels, no authority/generation revival, bounded32 tiles, no bitmap recycling during live frames.",
+    "IO tests: source cap4MiB SVG/64MiB PDF, cancellation/stale checks, source/output hash mismatch and partial owned destination cleanup failure. Hardware/native tests stay separately pending."
+  ],
+  "build_status": "No product compile/test performed in this phase. Precision owns the heavy slot. No Android SDK installed in this VM; Android build would need already-authorized pinned setup applied when scheduled.",
+  "admission_needed": "Parent/coordinator must admit candidate shared/native names and the frame binding (or supply exact alternative), choose coordinator-owned worker/native packaging recovery, and publish those contracts before dependent platform implementation/compilation. No root/shared/FFI/schema/manifest/Gradle edit requested from this lane."
+}
