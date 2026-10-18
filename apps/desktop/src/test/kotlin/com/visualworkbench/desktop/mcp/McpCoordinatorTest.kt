@@ -11,8 +11,9 @@ import java.util.Base64
 class McpCoordinatorTest {
     private val session="a".repeat(32)
     private val hash="b".repeat(64)
-    private val binding=WorkflowBinding("project","document",7uL,"c".repeat(64))
-    private fun info(id:String="package",target:String="generic")=PackageInfo(id,target,null,binding,"d".repeat(64),hash,"2026-10-03",1024uL,0u,emptyList(),true,false)
+    private fun id(value:String)=java.util.UUID.nameUUIDFromBytes(value.toByteArray(Charsets.UTF_8)).toString()
+    private val binding=WorkflowBinding(id("project"),id("document"),7uL,"c".repeat(64))
+    private fun info(id:String="package",target:String="generic")=PackageInfo(this.id(id),target,null,binding,"d".repeat(64),hash,"2026-10-03",1024uL,0u,emptyList(),true,false)
     private inner class Compiled(override val info:PackageInfo=info()):WorkbenchCompiledPackage{var closes=0;override suspend fun close(){closes++}}
     private inner class Catalog:WorkbenchPackageCatalog {
         val values=mutableListOf<PublishedPackage>();var closed=0;var retired=0
@@ -58,9 +59,13 @@ class McpCoordinatorTest {
     private inner class Capture:McpCaptureEngine {
         var calls=0;var closed=0;var enter:CompletableDeferred<Unit>?=null
         var waitForever=false
+        var result=info()
+        var beforeReturn:suspend()->Unit={}
+        var selected=McpSelectedTarget("chosen","Owner-selected window")
+        var returned:Compiled?=null
         var cleanupEntered:CompletableDeferred<Unit>?=null;var cleanupFinish:CompletableDeferred<Unit>?=null
-        override suspend fun select()=McpSelectedTarget("chosen","Owner-selected window")
-        override suspend fun compile(selector:String,checkGrant:suspend()->Unit):WorkbenchCompiledPackage {checkGrant();calls++;enter?.complete(Unit);try{if(waitForever)awaitCancellation();return Compiled()}finally{cleanupFinish?.let{withContext(NonCancellable){cleanupEntered?.complete(Unit);it.await()}}}}
+        override suspend fun select()=selected
+        override suspend fun compile(selector:String,checkGrant:suspend()->Unit):WorkbenchCompiledPackage {checkGrant();calls++;enter?.complete(Unit);try{if(waitForever)awaitCancellation();beforeReturn();return Compiled(result).also{returned=it}}finally{cleanupFinish?.let{withContext(NonCancellable){cleanupEntered?.complete(Unit);it.await()}}}}
         override suspend fun close(){closed++}
     }
     @Test fun decoderRefusesAmbiguousOversizeAndNoncanonicalBase64(){
@@ -106,7 +111,7 @@ class McpCoordinatorTest {
         var submit:Job?=null;var closing:Deferred<Unit>?=null
         try {
             owner.publish(Compiled())
-            val producer=launch{owner.submitResult(session,"package",hash,"literal ``` text",null,"untrusted")};submit=producer
+            val producer=launch{owner.submitResult(session,info().packageId,hash,"literal ``` text",null,"untrusted")};submit=producer
             withTimeout(5000){entered.await()}
             val close=async(start=CoroutineStart.UNDISPATCHED){owner.close()};closing=close
             assertFalse(close.isCompleted);assertEquals(0,inbox.closed);finish.complete(Unit)
@@ -205,6 +210,122 @@ class McpCoordinatorTest {
             release.complete(Unit); withTimeout(5000) { stop.await() }
             assertNull(lifetime.state.value.owner)
         } finally { release.complete(Unit); withContext(NonCancellable) { stopping?.await(); lifetime.close() } }
+    }
+
+    private suspend fun <T> drawCapture(owner:DesktopMcpCoordinator,body:suspend()->T):T = supervisorScope {
+        val pending=async{body()}
+        val activity=withTimeout(5000){owner.state.map{it.activeCapture}.filterNotNull().first()}
+        owner.indicatorDrawn(activity.id)
+        withTimeout(5000){pending.await()}
+    }
+
+    @Test fun verificationRecaptureUsesOnlyTheCheckedOriginalAndJoinedAfterPackage()=runBlocking {
+        val catalog=Catalog();val capture=Capture();val wire=Connection()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture)
+        try {
+            owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
+            drawCapture(owner){owner.capture(session,"chosen")}
+            val original=catalog.values.single().info
+            capture.result=info("after")
+            val pair=drawCapture(owner){owner.recaptureOriginal(session,original)}
+            assertEquals(McpVerificationPackage.of(original),pair.original)
+            assertEquals(McpVerificationPackage.of(capture.result),pair.recaptured)
+            assertEquals(2,capture.calls);assertEquals(2,wire.published.size)
+            assertNull(owner.state.value.activeCapture)
+        } finally {owner.close()}
+    }
+
+    @Test fun verificationRefusesMissingCurrentOriginalBeforeStartingAnotherCapture()=runBlocking {
+        val catalog=Catalog();val capture=Capture()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture)
+        try {
+            owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
+            drawCapture(owner){owner.capture(session,"chosen")}
+            val original=catalog.values.single().info
+            catalog.values.clear()
+            try {owner.recaptureOriginal(session,original);fail("Missing original admitted")}
+            catch(_:NoSuchElementException) { }
+            assertEquals(1,capture.calls);assertNull(owner.state.value.activeCapture)
+        } finally {owner.close()}
+    }
+
+    @Test fun verificationRechecksActualOriginalCatalogAfterTheRecaptureSettles()=runBlocking {
+        val catalog=Catalog();val capture=Capture();val wire=Connection()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture)
+        try {
+            owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
+            drawCapture(owner){owner.capture(session,"chosen")}
+            val original=catalog.values.single().info
+            capture.result=info("after-original-disappeared")
+            capture.beforeReturn={catalog.values.removeAll{it.info.packageId==original.packageId}}
+            try {drawCapture(owner){owner.recaptureOriginal(session,original)};fail("Stale original accepted")}
+            catch(_:NoSuchElementException) { }
+            assertEquals(2,capture.calls)
+            // The actual after package is durable, but no checked pair escapes.
+            assertEquals(capture.result,catalog.values.single().info)
+            assertEquals(2,wire.published.size);assertNull(owner.state.value.activeCapture)
+        } finally {owner.close()}
+    }
+
+    @Test fun verificationRegistrySaturationCannotFailAnOrdinaryDurablePublication()=runBlocking {
+        val catalog=Catalog();val capture=Capture();val wire=Connection()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture)
+        try {
+            owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
+            drawCapture(owner){owner.capture(session,"chosen")}
+            repeat(63){owner.publish(Compiled(info("marked-$it")))}
+            val unbound=info("registry-full")
+            val saved=owner.publish(Compiled(unbound))
+            assertEquals(unbound,saved.info);assertEquals(65,catalog.values.size)
+            assertEquals(65,wire.published.size)
+            assertTrue(checkNotNull(owner.state.value.message).contains("unavailable for verification"))
+            try {owner.recaptureOriginal(session,unbound);fail("Unregistered target recaptured")}
+            catch(_:IllegalStateException) { }
+            assertEquals(1,capture.calls);assertNull(owner.state.value.activeCapture)
+        } finally {owner.close()}
+    }
+
+    @Test fun identicalCaptureBytesCannotInheritAnotherSelectedWindowsVerificationRoute()=runBlocking {
+        val catalog=Catalog();val capture=Capture()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture)
+        try {
+            owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
+            drawCapture(owner){owner.capture(session,"chosen")}
+            capture.selected=McpSelectedTarget("other","Another owner-selected window")
+            owner.selectTarget();owner.grant(session,listOf("chosen","other"),60_000)
+            capture.result=info("identical-other-window")
+            drawCapture(owner){owner.capture(session,"other")}
+            val unbound=catalog.values.single{it.info.packageId==capture.result.packageId}
+            assertTrue(checkNotNull(owner.state.value.message).contains("unavailable for verification"))
+            try {owner.recaptureOriginal(session,unbound.info);fail("Inherited another OS target")}
+            catch(_:IllegalStateException) { }
+            assertEquals(2,capture.calls);assertNull(owner.state.value.activeCapture)
+        } finally {owner.close()}
+    }
+
+    @Test fun originalRetirementDuringJoinedRecapturePreventsPublicationAndClosesCompiledOwner()=runBlocking {
+        val catalog=Catalog();val capture=Capture();val wire=Connection()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture)
+        val release=CompletableDeferred<Unit>();var pending:Deferred<Boolean>?=null
+        try {
+            owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
+            drawCapture(owner){owner.capture(session,"chosen")}
+            val original=catalog.values.single()
+            capture.result=info("retired-original-after")
+            capture.enter=CompletableDeferred();capture.beforeReturn={release.await()}
+            val request=async {
+                try {drawCapture(owner){owner.recaptureOriginal(session,original.info)};false}
+                catch(_:IllegalStateException) {true}
+            };pending=request
+            withTimeout(5000){checkNotNull(capture.enter).await()}
+            owner.retirePackage(original)
+            assertFalse(request.isCompleted)
+            release.complete(Unit)
+            assertTrue(withTimeout(5000){request.await()})
+            assertEquals(1,checkNotNull(capture.returned).closes)
+            assertEquals(1,wire.published.size);assertTrue(catalog.values.isEmpty())
+            assertNull(owner.state.value.activeCapture)
+        } finally {release.complete(Unit);withContext(NonCancellable){pending?.await();owner.close()}}
     }
 
 }
