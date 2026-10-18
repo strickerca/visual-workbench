@@ -1,0 +1,343 @@
+{
+  "schema": 1,
+  "status": "Recovered/adapted source checkpoint only; 38 Rust and 13 JVM cases written, zero executed in this slice. Root API/lock admission and heavy-slot grant pending.",
+  "base_commit": "5f4f581c84d9215c06c0029f8dd042fc8453f26d",
+  "branch": "task/giant-viewport-stream-leaves-20261018",
+  "preservation_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "preservation_manifest_sha256": "b70be4e1b62fc62817c61496012a44f7e5c91070d91dbcb8c1afbafa74198f28",
+  "recovered": [
+    {
+      "path": "core/crates/vw-stream/Cargo.toml",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/Cargo.toml",
+      "preserved_sha256": "25b91e8088184c3d71cfc15ee0ac3cdb491b45ec2bf71808b504144803cbc271",
+      "current_sha256": "25b91e8088184c3d71cfc15ee0ac3cdb491b45ec2bf71808b504144803cbc271"
+    },
+    {
+      "path": "core/crates/vw-stream/src/consent.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/src/consent.rs",
+      "preserved_sha256": "62a545b4974e89ee18985fdccd512a4689b359363809a07fc6ac23286407d842",
+      "current_sha256": "0ea281e7390a0f8d27418d90a957804a99d5080b4e953e75e2e33372e0cb52cc"
+    },
+    {
+      "path": "core/crates/vw-stream/src/frame.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/src/frame.rs",
+      "preserved_sha256": "ea9979b1598682920608334bca5ee4c3b3c0515f4c49147b09a97b8eb4492ce0",
+      "current_sha256": "33e478e3103876d5622b6dabc460435b2efe90120db75733dd29a47d616d2529"
+    },
+    {
+      "path": "core/crates/vw-stream/src/freeze.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/src/freeze.rs",
+      "preserved_sha256": "7edb9dcd3128a31f49303b5347593d55dc3d64afe4c51c7eac0f472d33d15413",
+      "current_sha256": "59bc9a5e99cb86bc8c529a252118c0ae524720885a30516728eb04adb3e0a595"
+    },
+    {
+      "path": "core/crates/vw-stream/src/lib.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/src/lib.rs",
+      "preserved_sha256": "4e78aa25080d5f93a3fef73ed4d030a4f6ccde211cf3b1535eba8f1f745cf6f9",
+      "current_sha256": "6ccf32c3963a3b3cbbeb300530b2d3e159ead3c98838667ec49d47ad4027a4d2"
+    },
+    {
+      "path": "core/crates/vw-stream/src/lossless.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/src/lossless.rs",
+      "preserved_sha256": "f660409df11fe2cdaf0a772481d5581700cc58688fb541d4dd66c28639ace5d9",
+      "current_sha256": "5bcb5f486c88d40faca3862ec45986286725b61e5aecc1d0fd95b614855f1e3f"
+    },
+    {
+      "path": "core/crates/vw-stream/src/pacer.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/src/pacer.rs",
+      "preserved_sha256": "7214c07434dd166fed7ee0429d1a272740648100fe7884d5aa8f3f271d5b5f2d",
+      "current_sha256": "71618e9a761e6ba762181f75a987ebca04519e64d81cd76ba25bf78aa6e021dd"
+    },
+    {
+      "path": "core/crates/vw-stream/src/ring.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/src/ring.rs",
+      "preserved_sha256": "2473d17840fe730069d615794a7de70b6e3df53492dc2a365f1502a8fac90480",
+      "current_sha256": "2b1a6e0afe3be739baa53cf09b0f7205d034a9143048145a7a4f559608616923"
+    },
+    {
+      "path": "core/crates/vw-stream/src/tiles.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/src/tiles.rs",
+      "preserved_sha256": "13c7b42ecff30a248bc9c60598bc665a5410ab63767bb4dd761f04caeff5049b",
+      "current_sha256": "eb6c50bb4e2bd836c12f84a5359862344fc8ea58927c4a8932605eb3f21fb894"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/consent.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/tests/consent.rs",
+      "preserved_sha256": "6f5b47f28b6836e3283a23617010ea51cacc81fad9eeabd2fb71f91a4b48c5c3",
+      "current_sha256": "185d43b2aede225df54e4dfa15194f96ad72a3a3c1f2a35877a600194f4d8396"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/freeze.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/tests/freeze.rs",
+      "preserved_sha256": "d18ecc9da101791ea66baf61ac233046542ef281061abf42a6d8b673cc8d4664",
+      "current_sha256": "2b63c74c96592f52216a25fdf89c2048ff118f8e08e92ae68ffe04398588027d"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/lossless.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/tests/lossless.rs",
+      "preserved_sha256": "bad7e3a8dcec3fe1117fad3d219febdbf780e9a27622542a7d752b73cb62c2ab",
+      "current_sha256": "e4fe3f43ffee9c2f7263a89e739e66abf01aae5941fb4f31faf6dc814b08833a"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/ring.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/tests/ring.rs",
+      "preserved_sha256": "4d49ac781ef1a511575032512635e101d9ee56996471e1c25e6161ffb08aa804",
+      "current_sha256": "8582518cfc866283f3e2e2e6857c45071de01b3babdf5ea890d82859c1167b2f"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/tiles.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/tests/tiles.rs",
+      "preserved_sha256": "cc8e370f8d88a6d676b395c87f98846f865fb4e19ecfedfb8e29719ec04ed203",
+      "current_sha256": "28ddf4606f58fd6b1267aba5c1ce33b5b23a13d7447925da8a4a5eb8d876aa53"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/common/mod.rs",
+      "preserved_path": "transport/t3-stream-finish/new/core/crates/vw-stream/tests/common/mod.rs",
+      "preserved_sha256": "c98f13ad0464dd4bb22022a2b10a6b09aa9a27f615bf93675124ba1434230f65",
+      "current_sha256": "68ad97b6afebe1b488bb16b9735c029e16d9b846b0528ca9e57aa542ca9f59e3"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantViewportSession.kt",
+      "preserved_path": "desktop/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantViewportSession.kt",
+      "preserved_sha256": "2da15866395070f047bf4669a43672ad9e20a24a77f62e9b43e62bcc4a7c8917",
+      "current_sha256": "472a0a7cfe8e48905b56160c15ac9513aa9570d97e2ce8d847c7e6a0fd2f2d29"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantViewportSessionTest.kt",
+      "preserved_path": "desktop/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantViewportSessionTest.kt",
+      "preserved_sha256": "a117545af33c83c0a8d851aaaf26f6ec9d3b5621ecdbe4c6b7a697b120f9f5eb",
+      "current_sha256": "1e657bf0e067e43c2e8739319f819162548133ef4a5fde56c0dee203b5a89d1b"
+    }
+  ],
+  "source_census": {
+    "preserved_t3_stream_census_executed": false,
+    "preserved_t3_stream_total_cases": 289,
+    "recovered_portable_stream_cases": 35,
+    "portable_stream_written": [
+      {
+        "path": "core/crates/vw-stream/tests/consent.rs",
+        "cases": [
+          "incoming_request_never_grants_source_access_without_explicit_local_approval",
+          "foreign_peer_and_reconnected_epoch_cannot_use_an_old_offer",
+          "exact_frame_rectangle_and_offer_binding_prevent_scope_expansion",
+          "expiry_deny_and_revoke_release_authority_without_displacing_pending_request",
+          "stale_control_sequences_cannot_reopen_a_denied_prompt",
+          "approved_region_pins_original_after_ring_eviction"
+        ],
+        "executed": false
+      },
+      {
+        "path": "core/crates/vw-stream/tests/freeze.rs",
+        "cases": [
+          "first_pen_freezes_displayed_frame_not_newer_decode_or_capture",
+          "queued_frames_cannot_be_acknowledged_before_their_owned_draw_and_old_epoch_refuses",
+          "late_actual_b_presentation_survives_c_and_d_offers_and_freezes_b",
+          "explicitly_never_drawn_frame_releases_only_its_inflight_slot",
+          "remote_edit_and_invalid_hover_contact_never_freeze",
+          "timeout_flags_degraded_without_discarding_draft_then_exact_lossless_can_swap",
+          "cancel_then_new_contact_refuses_old_lossless_reply_and_saved_document_is_not_discarded",
+          "source_close_retains_current_frozen_draft_and_blocks_silent_substitution"
+        ],
+        "executed": false
+      },
+      {
+        "path": "core/crates/vw-stream/tests/lossless.rs",
+        "cases": [
+          "lossless_frame_roundtrip_binds_hash_extent_geometry_and_every_rgba_sample",
+          "approved_region_crops_same_original_with_negative_physical_origin_and_unchanged_time",
+          "corrupt_crc_hash_dimension_metadata_and_trailing_bytes_cannot_be_verified",
+          "complete_output_and_decode_budgets_are_admitted_before_codec"
+        ],
+        "executed": false
+      },
+      {
+        "path": "core/crates/vw-stream/tests/ring.rs",
+        "cases": [
+          "default_ring_retains_exact_last_eight_and_never_substitutes",
+          "pinned_evicted_original_stays_charged_and_pressure_refuses_before_allocating",
+          "dropped_writer_and_failed_opaque_validation_release_their_reservation",
+          "geometry_epoch_and_duplicate_frames_cannot_replace_history",
+          "eight_4k_frames_fit_hard_300mb_but_large_sources_cannot_relax_capacity",
+          "cancellation_precedes_eviction_and_allocation",
+          "platform_readback_can_adopt_one_pre_admitted_vec_without_a_second_frame_copy",
+          "excess_readback_capacity_cannot_hide_unaccounted_retained_bytes"
+        ],
+        "executed": false
+      },
+      {
+        "path": "core/crates/vw-stream/tests/tiles.rs",
+        "cases": [
+          "tiled_keyframe_and_dirty_delta_preserve_every_unchanged_pixel",
+          "unchanged_numbered_delta_keeps_id_continuity_without_reencoding",
+          "dropped_delta_requires_keyframe_and_keyframe_can_jump",
+          "missing_overlapping_outside_or_excess_keyframe_tiles_refuse_atomically",
+          "hostile_jpeg_header_metadata_dimensions_and_trailing_files_refuse",
+          "memory_and_cancellation_refuse_before_decoder_staging",
+          "negative_host_origin_and_dpi_never_scale_frame_pixels",
+          "adaptive_backpressure_demands_a_keyframe_without_unbounded_in_flight_work",
+          "repair_request_during_an_in_flight_encode_is_not_lost_on_completion"
+        ],
+        "executed": false
+      },
+      {
+        "path": "core/crates/vw-stream/tests/workflow_freshness.rs",
+        "cases": [
+          "keyframe_cannot_rewind_the_clock_or_change_source_without_an_explicit_reset",
+          "presentation_cannot_accept_a_new_id_with_an_old_capture_timestamp",
+          "freeze_uses_the_acknowledged_frame_and_swaps_only_its_verified_lossless_original"
+        ],
+        "executed": false
+      }
+    ],
+    "viewport_jvm_written": {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantViewportSessionTest.kt",
+      "cases": [
+        "evictionCreditsOnlyAfterActualRendererRetirement",
+        "staleNativeCompletionNeverBecomesAVisibleFrame",
+        "concurrentCancelledCloseJoinsInFlightReadAndAllImages",
+        "visibleSetOverBudgetFailsBeforeAnyPixelRead",
+        "changedSourceIdentityCannotReuseOldFrame",
+        "imageCloseWaitsForCrossActorExportOwner",
+        "cancelledParentStillRetiresOwnedNativeHandle",
+        "revisionOrAttachmentChangeDuringReadPreventsUploadAndPublication",
+        "newViewportHidesPreviousFrameWhileKeepingItsResourcesCharged",
+        "singularPhysicalTransformRefusesBeforeAnyTileRead",
+        "mismatchedTileDocumentGeometryRefusesBeforeForeignUpload",
+        "failedRendererRetirementRetainsEveryImageAndItsCharge",
+        "closeStillJoinsNativeReadWhenHidingTheBackendFails"
+      ],
+      "executed": false
+    },
+    "new_cases": {
+      "rust_workflow_freshness": 3,
+      "viewport_freshness_resource_retirement": 6
+    },
+    "executed": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "not_run": 51
+  },
+  "implementation": [
+    "Recovered 17 absent files only after manifest byte/hash verification; no old full-file root/controller/schema postimages applied.",
+    "Restored vw-stream bounded original ring with charged pins, JPEG keyframe/dirty-delta codec, display receipts, accepted-contact freeze, strict lossless PNG verifier, consent and pacing primitives. Existing protocol shapes were inspected; no schema expansion.",
+    "Reject same-session keyframes with non-increasing capture timestamps or changed source geometry unless the source owner explicitly resets; presentation queue also rejects timestamp rewind.",
+    "Recovered latest-viewport owner with one joined native read, conflated requests, bounded visible/prefetch set, actual renderer retirement before releasing any retained tile, and source/manifest identity lock.",
+    "Required full WorkflowBinding and exact attachment epoch predicate without a permissive default; emitted frames carry both and viewport generation. New camera requests hide the prior frame immediately.",
+    "Charge 802816 bytes per tile before native/foreign pixel allocation, covering incoming RGBA plus bitmap and texture; 192 MiB owner cap remains conservative and separate from codec/surface budgets.",
+    "Reject singular physical transforms, invalid tile document geometry/opacity/identity and overbudget visible sets before foreign upload.",
+    "Close joins native completion even if immediate hide fails; failed renderer retirement leaves every resource and charge retained for root quarantine. Exclusive borrowed operations recheck cancellation/freshness after return."
+  ],
+  "root_hooks": "core/crates/vw-assets/VIEWPORT_STREAM_HOOKS_20261018.md",
+  "coordination_status": "Exact minimal GiantImage/viewport DTOs, full-binding/attachment guard, native source/draw/retirement hooks and workspace lock admission proposed in the owned handoff; no root APIs assumed accepted and no root file edited.",
+  "checks": {
+    "rustfmt_1_99_edition_2024": "passed syntax/formatting for all recovered/new Rust files",
+    "diff_whitespace": "passed",
+    "archive_bytes_sha256": "17 recovered absent files matched preserved size and hash before editing",
+    "dependency_pins": "all six manifest dependencies already exist at exact versions in coordinator Cargo.lock; new vw-stream package entry is absent and must be admitted by coordinator",
+    "protocol_and_geometry_review": "existing CaptureGeometry/FrameTiles/TileImage/RectI/UUID shapes and vw-geom physical mapping signatures checked against base",
+    "heavy_build_or_runtime": "not started; no cargo/test/Gradle/JVM compiler invocation; parent may use slot for PDF runtime",
+    "kotlin_typecheck": "pending minimal root viewport API adoption; source-only edits have not been compiled",
+    "secret_scan": "recorded externally at staged publication"
+  },
+  "files": [
+    {
+      "path": "core/crates/vw-stream/Cargo.toml",
+      "sha256": "25b91e8088184c3d71cfc15ee0ac3cdb491b45ec2bf71808b504144803cbc271"
+    },
+    {
+      "path": "core/crates/vw-stream/src/consent.rs",
+      "sha256": "0ea281e7390a0f8d27418d90a957804a99d5080b4e953e75e2e33372e0cb52cc"
+    },
+    {
+      "path": "core/crates/vw-stream/src/frame.rs",
+      "sha256": "33e478e3103876d5622b6dabc460435b2efe90120db75733dd29a47d616d2529"
+    },
+    {
+      "path": "core/crates/vw-stream/src/freeze.rs",
+      "sha256": "59bc9a5e99cb86bc8c529a252118c0ae524720885a30516728eb04adb3e0a595"
+    },
+    {
+      "path": "core/crates/vw-stream/src/lib.rs",
+      "sha256": "6ccf32c3963a3b3cbbeb300530b2d3e159ead3c98838667ec49d47ad4027a4d2"
+    },
+    {
+      "path": "core/crates/vw-stream/src/lossless.rs",
+      "sha256": "5bcb5f486c88d40faca3862ec45986286725b61e5aecc1d0fd95b614855f1e3f"
+    },
+    {
+      "path": "core/crates/vw-stream/src/pacer.rs",
+      "sha256": "71618e9a761e6ba762181f75a987ebca04519e64d81cd76ba25bf78aa6e021dd"
+    },
+    {
+      "path": "core/crates/vw-stream/src/ring.rs",
+      "sha256": "2b1a6e0afe3be739baa53cf09b0f7205d034a9143048145a7a4f559608616923"
+    },
+    {
+      "path": "core/crates/vw-stream/src/tiles.rs",
+      "sha256": "eb6c50bb4e2bd836c12f84a5359862344fc8ea58927c4a8932605eb3f21fb894"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/consent.rs",
+      "sha256": "185d43b2aede225df54e4dfa15194f96ad72a3a3c1f2a35877a600194f4d8396"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/freeze.rs",
+      "sha256": "2b63c74c96592f52216a25fdf89c2048ff118f8e08e92ae68ffe04398588027d"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/lossless.rs",
+      "sha256": "e4fe3f43ffee9c2f7263a89e739e66abf01aae5941fb4f31faf6dc814b08833a"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/ring.rs",
+      "sha256": "8582518cfc866283f3e2e2e6857c45071de01b3babdf5ea890d82859c1167b2f"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/tiles.rs",
+      "sha256": "28ddf4606f58fd6b1267aba5c1ce33b5b23a13d7447925da8a4a5eb8d876aa53"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/common/mod.rs",
+      "sha256": "68ad97b6afebe1b488bb16b9735c029e16d9b846b0528ca9e57aa542ca9f59e3"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantViewportSession.kt",
+      "sha256": "472a0a7cfe8e48905b56160c15ac9513aa9570d97e2ce8d847c7e6a0fd2f2d29"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantViewportSessionTest.kt",
+      "sha256": "1e657bf0e067e43c2e8739319f819162548133ef4a5fde56c0dee203b5a89d1b"
+    },
+    {
+      "path": "core/crates/vw-stream/tests/workflow_freshness.rs",
+      "sha256": "4a5d03d56cbff6493bbea15f374df591a57c330313f7f1cbe2dd54843b7785a8"
+    },
+    {
+      "path": "core/crates/vw-assets/VIEWPORT_STREAM_HOOKS_20261018.md",
+      "sha256": "80cf148d1c0f0656281d6f5b0b10d06af280bf6e8454e454c76b76cce5cba4ae"
+    }
+  ],
+  "preserved_next_stages_reviewed": [
+    "T3.08 foundation R2 already implemented and previously validated",
+    "desktop native integration, PNG export R2, desktop viewport R2",
+    "Android producer/viewport/intake R2 and Android PNG composition",
+    "Windows producer R3",
+    "transport/t3-stream-finish leaf census and literal root modifications; no old generator executed"
+  ],
+  "remaining_gaps": [
+    "GiantImagesApi minimal DTO/interface subset and native open/provider/store access, approved producer import/rebuild, controller/draw/backend adoption and joined root quarantine are not yet admitted or connected.",
+    "Root Cargo.lock must admit vw-stream (workspace wildcard discovers the new owned crate); full locked metadata/license/build/lint checks are pending that coordinator edit.",
+    "T3.02 authenticated connection/grant/OS capture, actual presentation receipts, wire/native facade, lossless original BLOB transfer and durable capture/save remain separate root integration work. No HEVC or Krita expansion.",
+    "Stream PNGs are transport originals, not CORE-006 complete standalone exported files. Existing original/export fidelity and R164 conversion code are unchanged.",
+    "No tests or runtime acceptance in this slice: 51 cases remain unrun. No Android/Windows/JNI/generated bindings/GUI/device/GPU/RSS/latency/frame-rate proof, giant JPEG/HEIC routing, libvips/runtime packaging or A07/A10/A11 acceptance.",
+    "Root session ledger must jointly reserve queued/drawing/displayed/frozen/verified/transfer owners; per-ring/per-call bounds and the foreign tile policy cap are not global process/GPU/RSS measurements."
+  ],
+  "preserved_behavior": {
+    "R164_display_sha256": "64bf78579c6ecfc0831bd46168cca75d94aa2702aa6925fdcafa8d7b3395d507",
+    "existing_tracked_files_changed": false,
+    "restricted_avif": "unchanged; no HDR/multiframe/encoder/alpha/grid expansion",
+    "screenshots_or_image_artifacts_created": 0
+  },
+  "publication": "Authorized branch source checkpoint for coordinator review; not main merge, acceptance or promotion"
+}
