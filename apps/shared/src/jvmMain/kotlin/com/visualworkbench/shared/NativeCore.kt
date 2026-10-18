@@ -68,6 +68,10 @@ private class NativeCore : WorkbenchCore, WorkbenchStreamingCore, WorkbenchDocum
     }
 }
 private class NativeProject(val handle: ProjectSession, private val giantOwner: GiantImportOwner<ProjectSession>? = null) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject {
+    suspend fun <T> withGiantProject(block: suspend (ProjectSession) -> T): T = closeMutex.withLock {
+        if (closed.get()) throw GiantImageFailure(GiantImageFailureKind.Closed)
+        if (giantOwner != null) giantOwner.call(block) else block(handle)
+    }
     override suspend fun openGiantImage(binding:WorkflowBinding,diskCacheBytes:ULong,ramCacheBytes:ULong):GiantImage {
         if(closed.get())throw GiantImageFailure(GiantImageFailureKind.Closed)
         val image=openGiantImageNative(handle,binding,diskCacheBytes,ramCacheBytes)
@@ -178,18 +182,23 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
         ExportResult(e.bytes,e.blake3,e.metadataJson,e.revision.common())
     }
     override suspend fun close(): Unit = releaseNative {
-        closeMutex.withLock { if(!closed.get()) {
+        closeMutex.withLock {
             if (giantOwner != null) {
+                // Refuse new calls on an attempted close, but always retry the
+                // exact owner; a failed close must not become a no-op success.
+                closed.set(true)
                 giantOwner.close()
-                closed.set(true); documentPasswords.clear(); documentPages.clear()
+                documentPasswords.clear(); documentPages.clear()
                 return@withLock
             }
+            if(!closed.get()) {
             // A cancelled open may retain a native child whose close failed.
             // Its actual retirement must settle before the parent worker closes.
             drainUnadoptedGiants()
             try { handle.closeSession() } catch(error:CoreException) { throw mapFailure(error) }
             finally { closed.set(true);documentPasswords.clear();documentPages.clear();handle.destroy() }
-        } }
+            }
+        }
     }
 }
 private class NativeStroke(val handle: StrokeGesture) : WorkbenchStroke {
@@ -250,3 +259,7 @@ internal fun nativeStrokeHandle(stroke: WorkbenchStroke): StrokeGesture = (strok
 /** Ownership transfers only at the caller's cancellation-safe handoff. */
 internal fun wrapNativeProject(handle: ProjectSession): WorkbenchProject = NativeProject(handle)
 internal fun wrapNativeGiantProject(owner: GiantImportOwner<ProjectSession>): WorkbenchProject = NativeProject(owner.value, owner)
+internal suspend fun <T> withNativeGiantProject(project: WorkbenchProject, block: suspend (ProjectSession) -> T): T {
+    val native = project as? NativeProject ?: throw GiantImageFailure(GiantImageFailureKind.Invalid)
+    return native.withGiantProject(block)
+}

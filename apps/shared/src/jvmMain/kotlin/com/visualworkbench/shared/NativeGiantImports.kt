@@ -57,10 +57,10 @@ private class NativeBuilt(private val owner: GiantImportOwner<NBuilt>) : GiantBu
         importErrors { acquireGiantImport({ handle.publishProject(native, it) }, ::ownProject, ::wrapNativeGiantProject) }
     }
     override suspend fun rebuild(project: WorkbenchProject, binding: WorkflowBinding): Unit = owner.call { built ->
-        val nativeProject = try { nativeProjectHandle(project) }
-            catch (_: SessionFailure) { throw GiantImageFailure(GiantImageFailureKind.Invalid) }
-        importErrors { settledStream { nativeProject.rebuildGiantImage(built,
-            NBinding(binding.projectId, binding.documentId, binding.hostSeq, binding.stateHash), it) } }
+        withNativeGiantProject(project) { nativeProject ->
+            importErrors { settledStream { nativeProject.rebuildGiantImage(built,
+                NBinding(binding.projectId, binding.documentId, binding.hostSeq, binding.stateHash), it) } }
+        }
     }
     override suspend fun close(): Unit = owner.close()
 }
