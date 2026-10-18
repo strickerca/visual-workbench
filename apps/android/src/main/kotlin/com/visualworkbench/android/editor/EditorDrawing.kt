@@ -11,6 +11,8 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Region
 import com.visualworkbench.shared.*
+import com.visualworkbench.android.documents.PreparedDocumentTile
+import com.visualworkbench.android.documents.drawDocumentTiles
 import kotlin.math.hypot
 import kotlin.math.abs
 import kotlin.math.max
@@ -38,6 +40,9 @@ internal data class CanvasScene(
     val resultDisplayReady: Boolean = true,
     val precision: PrecisionFrame = PrecisionFrame(),
     val smoothBackground: Boolean = true,
+    val documentFrame:DocumentDrawFrame<PreparedDocumentTile>?=null,
+    val documentTiles:List<PreparedDocumentTile> = emptyList(),
+    val documentDraft:Pair<Point,Point>?=null,
 )
 
 internal object EditorDrawing {
@@ -209,6 +214,11 @@ internal object EditorDrawing {
         val sourceSave=canvas.save()
         canvas.concat(matrix(scene.matrix))
         scene.background?.let{canvas.drawBitmap(it,0f,0f,Paint(if(scene.smoothBackground) Paint.FILTER_BITMAP_FLAG else 0))}
+        scene.documentFrame?.let{drawDocumentTiles(canvas,scene.documentTiles,it.binding)}
+        scene.documentDraft?.let{(a,b)->
+            val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=0xffecc769.toInt();style=Paint.Style.STROKE;strokeWidth=(1.0/scene.camera.scale).toFloat()}
+            canvas.drawRect(minOf(a.x,b.x).toFloat(),minOf(a.y,b.y).toFloat(),maxOf(a.x,b.x).toFloat(),maxOf(a.y,b.y).toFloat(),paint)
+        }
         canvas.restoreToCount(sourceSave)
         val combined = (scene.objects + scene.provisional).filter { it.item.objectId !in scene.hidden }
         val orderedLayers = (scene.document.layers.map { it.id } + combined.map { it.item.layerId }).distinct()

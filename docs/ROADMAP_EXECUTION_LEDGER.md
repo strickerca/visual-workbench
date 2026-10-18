@@ -146,3 +146,23 @@ Gradle, emulator, Windows, provider or physical-device test had run at that poin
 Historical evidence is linked by task above and remains bound to its original
 source/artifacts/device. Later integration receipts must state their own source,
 commands, counts and limitations.
+
+
+## Actual app caller source freeze
+
+The next integration checkpoint wires PDF/SVG intake and private passwords,
+selected page reopening, page/text/region controls, viewport tile adoption,
+independent renderer leases, joined cancellation/project replacement/close, and
+precision input/prediction/hover/render/control paths in both current apps. Source
+and failure ownership remain explicit; this does not pass runtime or physical
+acceptance. Shared production state/ownership checks pass31 cases; dependency
+licenses pass264 entries. Exact source scope and limits are recorded in
+`evidence/CLOUD_REAL_APP_CALLERS_20261018.json`.
+
+Document file publication is intentionally disabled: copy requests still lack
+CORE-006 revision/source context and embedded final-file provenance. This is an
+independent protocol/engine integration prerequisite, not a successful export
+feature. Partial-opacity overlays also remain Unsupported. Native artifact
+packaging, regenerated ABI/app compilation, repaired image and focused precision
+checks, actual GUI/provider/GPU behavior and hardware gates remain open. Main is
+still the previously validated `7be9da7` checkpoint; Krita remains deferred.

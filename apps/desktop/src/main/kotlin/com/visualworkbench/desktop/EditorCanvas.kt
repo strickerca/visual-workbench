@@ -20,6 +20,9 @@ import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.layout.onSizeChanged
 import com.visualworkbench.shared.*
+import com.visualworkbench.desktop.documents.drawDocumentTiles
+import com.visualworkbench.desktop.documents.PreparedDocumentTile
+import com.visualworkbench.desktop.precision.drawPrecision
 import com.visualworkbench.shared.Outline
 import com.visualworkbench.shared.Shape
 import kotlinx.coroutines.Dispatchers
@@ -30,8 +33,8 @@ import kotlinx.coroutines.withContext
 internal enum class PaintKind { ObjectFill, StrokeFill, Outline }
 internal data class PaintPass(val path:Path,val kind:PaintKind,val documentPath:Path?=null)
 internal data class CanvasGeometry(val passes:List<PaintPass>)
-internal data class GeometryFrame<T>(val binding:RenderBinding,val document:DocumentSnapshot,val entries:Map<String,T>) {
-    fun current(state:EditorState):GeometryFrame<T>? = takeIf{geometryMatches(binding,state)}
+internal data class GeometryFrame<T>(val binding:RenderBinding,val document:DocumentSnapshot,val entries:Map<String,T>,val page:UInt=0u) {
+    fun current(state:EditorState):GeometryFrame<T>? = takeIf{geometryMatches(binding,state)&&document===state.document&&page==state.documentPage}
 }
 internal data class OverlayFrame(val binding:RenderBinding,val source:List<RenderItem>,val entries:Map<String,CanvasGeometry>)
 internal fun overlayItems(state:EditorState):List<RenderItem>{
@@ -125,7 +128,7 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
     var prepared by remember{mutableStateOf<GeometryFrame<CanvasGeometry>?>(null)}
     var overlay by remember{mutableStateOf<OverlayFrame?>(null)}
     val binding=state.document?.binding(state.projectEpoch)
-    val requestedOverlay=remember(binding,state.peerFrame,state.previewStyles,state.wetStroke){overlayItems(state)}
+    val requestedOverlay=remember(binding,state.documentPage,state.peerFrame,state.previewStyles,state.wetStroke){overlayItems(state)}
     val latestOverlay by rememberUpdatedState(requestedOverlay)
     LaunchedEffect(binding,requestedOverlay){
         overlay=null
@@ -140,7 +143,7 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
         }catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
         catch(_:Exception){controller.report("An intermediate preview could not be drawn. Saved edits remain available.")}
     }
-    LaunchedEffect(binding){
+    LaunchedEffect(binding,state.document,state.documentPage){
         prepared=null
         val document=state.document?:return@LaunchedEffect
         val requested=checkNotNull(binding)
@@ -155,7 +158,7 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
                     item.objectId to prepareGeometry(item,text){context.ensureActive()}
                 }
             }
-            val frame=GeometryFrame(requested,document,geometry)
+            val frame=GeometryFrame(requested,document,geometry,state.documentPage)
             if(frame.current(latest)!=null){prepared=frame;if(controller.aiResultReady())controller.canvasPrepared(requested)}
         }catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
         catch(_:Exception){prepared=null;controller.canvasFailed(requested,"Canvas geometry could not be prepared. Reopen the project before editing; saved data is intact.")}
@@ -163,21 +166,27 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
     LaunchedEffect(prepared,aiResultState.frame,state.view.camera,state.preview,state.peerFrame){
         prepared?.current(latest)?.takeIf{controller.aiResultReady()}?.let{controller.canvasPrepared(it.binding)}
     }
+    val documentReader=remember(state.documentFrame){controller.documentReader(state.documentFrame)}
+    DisposableEffect(documentReader){onDispose{documentReader?.close()}}
     Canvas(modifier.fillMaxSize().clipToBounds().focusRequester(focus).onFocusChanged{controller.canvasFocus(it.isFocused)}.focusable()
         .onSizeChanged{controller.viewport(it.width.toDouble(),it.height.toDouble())}
         .onPointerEvent(PointerEventType.Scroll){event->val change=event.changes.firstOrNull()?:return@onPointerEvent;val delta=change.scrollDelta;if(event.keyboardModifiers.isCtrlPressed){controller.zoom(kotlin.math.exp(-delta.y.toDouble()*0.12),Point(change.position.x.toDouble(),change.position.y.toDouble()))}else{controller.pan(-delta.x*28.0,-delta.y*28.0)};change.consume()}
+        .onPointerEvent(PointerEventType.Move){event->event.changes.firstOrNull()?.takeIf{!it.pressed}?.let{controller.precisionHover(Point(it.position.x.toDouble(),it.position.y.toDouble()))}}
+        .onPointerEvent(PointerEventType.Exit){controller.precisionHover(null)}
         .pointerInput(controller){awaitEachGesture{
             val down=awaitFirstDown(requireUnconsumed=false);focus.requestFocus()
-            controller.pointerDown(Point(down.position.x.toDouble(),down.position.y.toDouble()),currentEvent.keyboardModifiers.isShiftPressed,down.type==PointerType.Touch||currentEvent.buttons.isTertiaryPressed||currentEvent.buttons.isSecondaryPressed,down.uptimeMillis,semanticModifier=currentEvent.keyboardModifiers.isAltPressed);down.consume()
+            controller.precisionDown(Point(down.position.x.toDouble(),down.position.y.toDouble()),currentEvent.keyboardModifiers.isShiftPressed,down.type==PointerType.Touch||currentEvent.buttons.isTertiaryPressed||currentEvent.buttons.isSecondaryPressed,down.uptimeMillis,semanticModifier=currentEvent.keyboardModifiers.isAltPressed);down.consume()
             var completed=false
-            try{while(true){val event=awaitPointerEvent();val change=event.changes.firstOrNull{it.id==down.id}?:break;if(!change.pressed){controller.pointerUp(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);completed=true;change.consume();break};controller.pointerMove(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);change.consume()}}
+            try{while(true){val event=awaitPointerEvent();val change=event.changes.firstOrNull{it.id==down.id}?:break;if(!change.pressed){controller.precisionUp(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);completed=true;change.consume();break};controller.precisionMove(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);change.consume()}}
             finally{if(completed)controller.cancelDrag()else controller.cancelInput()}
         }}
     ){
         drawRect(Color(0xff0c1118))
         val current=latest
         val frame=prepared?.current(current)?:return@Canvas
-        val background=current.background?:return@Canvas
+        val background=current.background
+        if(background==null&&current.documentFrame==null)return@Canvas
+        if(current.documentFrame!=null&&documentReader?.binding!=current.documentFrame.binding)return@Canvas
         val doc=frame.document
         val aiFrame=controller.aiResultFrame()
         if(!controller.aiResultReady())return@Canvas
@@ -185,14 +194,16 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
         val replacements=currentOverlay?.source?.associateBy{it.objectId}.orEmpty()
         val originalIds=doc.render.items.mapTo(hashSetOf()){it.objectId}
         val displayed=doc.render.items.map{replacements[it.objectId]?:it}+replacements.values.filter{it.objectId !in originalIds}
-        val camera=controller.core.cameraMatrix(current.view.camera)
+        var documentTiles:List<PreparedDocumentTile>?=null
+        fun document(camera:Transform,scale:Double,smooth:Boolean){
         withTransform({transform(camera.matrix())}){
             drawRect(Color.White,size=Size(doc.width.toFloat(),doc.height.toFloat()))
             // Materialized Results replace transparent document samples. The
             // white presentation page stays outside this composited stack.
             drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f,0f,doc.width.toFloat(),doc.height.toFloat()),Paint())
             try {
-            drawImage(background,filterQuality=FilterQuality.None)
+            if(background!=null)drawImage(background,filterQuality=if(smooth)FilterQuality.Low else FilterQuality.None)
+            documentTiles?.let{tiles->current.documentFrame?.binding?.let{binding->drawDocumentTiles(tiles,binding)}}
             clipRect(0f,0f,doc.width.toFloat(),doc.height.toFloat()){
                 for((_,items)in displayed.groupBy{it.layerId}){
                     val first=items.first()
@@ -202,14 +213,21 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
                     }
                     val paint=Paint().apply{alpha=first.layerOpacity.toFloat();blendMode=if(first.layerBlend=="multiply")BlendMode.Multiply else BlendMode.SrcOver}
                     drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f,0f,doc.width.toFloat(),doc.height.toFloat()),paint)
-                    try{for(item in items)drawGeometry(item,checkNotNull(currentOverlay?.entries?.get(item.objectId)?:frame.entries[item.objectId]),current.preview[item.objectId],current.view.camera.scale)}finally{drawContext.canvas.restore()}
+                    try{for(item in items)drawGeometry(item,checkNotNull(currentOverlay?.entries?.get(item.objectId)?:frame.entries[item.objectId]),current.preview[item.objectId],scale)}finally{drawContext.canvas.restore()}
                 }
             }
             }finally{drawContext.canvas.restore()}
             val selected=doc.render.items.filter{it.objectId in current.selected}
-            union(selected.map{previewBounds(it,current.preview[it.objectId])})?.let{bounds->val width=(1.0/current.view.camera.scale).toFloat();drawRect(Color(0xff81e0c8),Offset(bounds.x.toFloat(),bounds.y.toFloat()),Size(bounds.width.toFloat(),bounds.height.toFloat()),style=Stroke(width));val side=(8.0/current.view.camera.scale).toFloat();drawRect(Color(0xff81e0c8),Offset((bounds.x+bounds.width).toFloat()-side/2,(bounds.y+bounds.height).toFloat()-side/2),Size(side,side))}
-            current.draft?.let{(a,b)->drawRect(color(current.color),Offset(minOf(a.x,b.x).toFloat(),minOf(a.y,b.y).toFloat()),Size(kotlin.math.abs(a.x-b.x).toFloat(),kotlin.math.abs(a.y-b.y).toFloat()),style=Stroke((1.0/current.view.camera.scale).toFloat()))}
-            if(current.view.showPeerOutline){current.peerViewport?.takeIf{it.documentId==doc.documentId}?.let{peer->drawPath(polyline(peer.corners,true),Color(0xffecbb72),style=Stroke((1.0/current.view.camera.scale).toFloat(),pathEffect=PathEffect.dashPathEffect(floatArrayOf((6/current.view.camera.scale).toFloat(),(4/current.view.camera.scale).toFloat()))))}}
+            union(selected.map{previewBounds(it,current.preview[it.objectId])})?.let{bounds->val width=(1.0/scale).toFloat();drawRect(Color(0xff81e0c8),Offset(bounds.x.toFloat(),bounds.y.toFloat()),Size(bounds.width.toFloat(),bounds.height.toFloat()),style=Stroke(width));val side=(8.0/scale).toFloat();drawRect(Color(0xff81e0c8),Offset((bounds.x+bounds.width).toFloat()-side/2,(bounds.y+bounds.height).toFloat()-side/2),Size(side,side))}
+            current.draft?.let{(a,b)->drawRect(color(current.color),Offset(minOf(a.x,b.x).toFloat(),minOf(a.y,b.y).toFloat()),Size(kotlin.math.abs(a.x-b.x).toFloat(),kotlin.math.abs(a.y-b.y).toFloat()),style=Stroke((1.0/scale).toFloat()))}
+            if(current.view.showPeerOutline){current.peerViewport?.takeIf{it.documentId==doc.documentId}?.let{peer->drawPath(polyline(peer.corners,true),Color(0xffecbb72),style=Stroke((1.0/scale).toFloat(),pathEffect=PathEffect.dashPathEffect(floatArrayOf((6/scale).toFloat(),(4/scale).toFloat()))))}}
         }
+        }
+        fun drawFrame(){
+            document(controller.core.cameraMatrix(current.view.camera),current.view.camera.scale,false)
+            drawPrecision(current.precision,current.view.camera,::document)
+        }
+        if(current.documentFrame==null)drawFrame()
+        else documentReader?.read{tiles->documentTiles=tiles;drawFrame()}
     }
 }

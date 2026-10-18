@@ -27,6 +27,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.visualworkbench.android.editor.*
 import com.visualworkbench.shared.Shape
+import com.visualworkbench.shared.EditableKind
+import com.visualworkbench.shared.DocumentExport
+import com.visualworkbench.android.precision.PrecisionControls
+import com.visualworkbench.android.precision.PrecisionHandles
 import com.visualworkbench.android.instructions.InstructionsScreen
 import com.visualworkbench.android.instructions.InstructionFocusModal
 import com.visualworkbench.shared.SelectionSaveTicket
@@ -35,6 +39,7 @@ import com.visualworkbench.shared.SelectionSaveTicket
 @Composable
 internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
     val context = LocalContext.current
+    val documentState by editor.documents.state.collectAsState()
     var showExport by remember { mutableStateOf(false) }
     fun exportDialog(value: Boolean) { editor.instructionModal(InstructionFocusModal.ExportDialog, value); showExport = value }
     // Deliberately not saveable across process death: without its live project
@@ -53,6 +58,34 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
     var pickerTicketId by rememberSaveable { mutableStateOf<String?>(null) }
     var cameraSaveToken by rememberSaveable { mutableStateOf<String?>(null) }
     var cameraDiscardToken by remember { mutableStateOf<String?>(null) }
+    var documentUri by remember{mutableStateOf<android.net.Uri?>(null)}
+    var documentKind by remember{mutableStateOf(EditableKind.Pdf)}
+    var documentPassword by remember{mutableStateOf("")}
+    var documentCopy by remember{mutableStateOf<DocumentExport?>(null)}
+    DisposableEffect(editor){onDispose{editor.instructionModal(InstructionFocusModal.DocumentImport,false);editor.instructionModal(InstructionFocusModal.DocumentPicker,false)}}
+    val documentPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+        documentUri=uri
+        if(uri==null)editor.instructionModal(InstructionFocusModal.DocumentImport,false)
+    }
+    val documentSaver=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()){result->
+        val copy=documentCopy;documentCopy=null
+        val uri=result.data?.data
+        try{if(result.resultCode==Activity.RESULT_OK&&uri!=null){if(copy!=null)editor.publishDocument(uri,copy)else editor.selections.discardUnused(uri)}}
+        finally{editor.instructionModal(InstructionFocusModal.DocumentPicker,false)}
+    }
+    fun saveDocument(copy:DocumentExport){
+        if(!editor.documents.exportPublicationAvailable||documentCopy!=null)return
+        documentCopy=copy;editor.instructionModal(InstructionFocusModal.DocumentPicker,true)
+        try{documentSaver.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(if(copy.mode==com.visualworkbench.shared.DocumentCopy.SvgAnnotations)"image/svg+xml" else "application/pdf").putExtra(Intent.EXTRA_TITLE,if(copy.mode==com.visualworkbench.shared.DocumentCopy.SvgAnnotations)"document.svg" else "document.pdf"))}
+        catch(_:Exception){documentCopy=null;editor.instructionModal(InstructionFocusModal.DocumentPicker,false);editor.transferMessage("A document destination picker is unavailable.")}
+    }
+    if(documentUri!=null){
+        fun dismissDocumentImport(){documentUri=null;documentPassword="";editor.instructionModal(InstructionFocusModal.DocumentImport,false)}
+        AlertDialog(onDismissRequest=::dismissDocumentImport,title={Text("Open document")},text={Column{
+            Row{RadioButton(documentKind==EditableKind.Pdf,{documentKind=EditableKind.Pdf});Text("PDF");RadioButton(documentKind==EditableKind.Svg,{documentKind=EditableKind.Svg});Text("SVG")}
+            if(documentKind==EditableKind.Pdf)OutlinedTextField(documentPassword,{documentPassword=it.take(1024)},label={Text("PDF password (if required)")},visualTransformation=androidx.compose.ui.text.input.PasswordVisualTransformation())
+        }},confirmButton={TextButton({val uri=documentUri;val password=documentPassword.takeIf{it.isNotEmpty()};val kind=documentKind;dismissDocumentImport();if(uri!=null)editor.importDocument(uri,kind,if(kind==EditableKind.Pdf)password else null)}){Text("Open")}},dismissButton={TextButton(::dismissDocumentImport){Text("Cancel")}})
+    }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { editor.receiveImage(it) } }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { editor.receiveImage(it) } }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -117,8 +150,11 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
                             try { cameraSaver.launch("camera-original") }
                             catch (_: Exception) { cameraSaveToken = null; editor.transferMessage("A file destination is unavailable on this device.") }
                         }
+                    },onDocument={
+                        editor.cancelTool();editor.instructionModal(InstructionFocusModal.DocumentImport,true)
+                        try{documentPicker.launch(arrayOf("application/pdf","image/svg+xml"))}catch(_:Exception){editor.instructionModal(InstructionFocusModal.DocumentImport,false);editor.transferMessage("A document picker is unavailable.")}
                     })
-                WorkbenchScreen.Canvas -> EditorScreen(editor, { exportDialog(true) }, ::saveSelection)
+                WorkbenchScreen.Canvas -> EditorScreen(editor, { exportDialog(true) }, ::saveSelection,::saveDocument)
                 WorkbenchScreen.Settings -> Column {
                     TextButton(onClick = { context.startActivity(Intent(context, com.visualworkbench.android.capture.CaptureEntryActivity::class.java)) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Screen capture and accessibility") }
                     Box(Modifier.weight(1f)) { SettingsScreen(editor.preferences, editor::settings, editor::returnFromSettings) }
@@ -148,7 +184,8 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
     AiEditorOverlay(editor)
     if (editor.showBrush) BrushDialog(editor.tool, editor.displayedBrush(), editor.brushPreview, editor::brush) { editor.brushDialog(false) }
     editor.textDraft?.let { draft -> TextEditor(draft, editor.busy || editor.pending != 0, editor::saveText, editor::dismissText) }
-    if (showExport && editor.document != null) ExportDialog(editor, onDismiss = { exportDialog(false) }, onSave = {
+    if(showExport&&documentState.descriptor!=null)AlertDialog(onDismissRequest={exportDialog(false)},title={Text("Document export")},text={Column(Modifier.heightIn(max=560.dp).verticalScroll(rememberScrollState())){EditableDocumentControls(editor.documents,::saveDocument)}},confirmButton={TextButton({exportDialog(false)}){Text("Close")}})
+    if (showExport && editor.document != null && documentState.descriptor==null) ExportDialog(editor, onDismiss = { exportDialog(false) }, onSave = {
         val ticket = editor.exportTicket()
         if (ticket == null) { if (editor.message == null) editor.transferMessage("The export settings changed. Check them again.") }
         else {
@@ -170,7 +207,8 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
 }
 
 @Composable
-private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelectionSave: (SelectionSaveTicket) -> Unit) {
+private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelectionSave: (SelectionSaveTicket) -> Unit,onDocumentSave:(DocumentExport)->Unit) {
+    val documentState by editor.documents.state.collectAsState()
     val eraserState by editor.erasers.state.collectAsState()
     val selectionState by editor.selections.state.collectAsState()
     val eraserSelected = eraserState.active || (selectionState.active && selectionState.tool == com.visualworkbench.shared.SelectionTool.MaskEraser)
@@ -199,7 +237,7 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                                 }
                             }
                             DropdownMenuItem(onClick = { projectActionsOpen = false; editor.editInstruction() }) { Text("Instructions") }
-                            DropdownMenuItem(onClick = { projectActionsOpen = false; pixelSelectionOpen = true }, enabled = !editor.busy && editor.document != null) { Text("Pixel selection") }
+                            DropdownMenuItem(onClick = { projectActionsOpen = false; pixelSelectionOpen = true }, enabled = !editor.busy && editor.document != null && documentState.descriptor==null) { Text("Pixel selection") }
                             DropdownMenuItem(onClick = { projectActionsOpen = false; onExport() }, enabled = !editor.busy && editor.pending == 0 && editor.document != null) { Text("Export") }
                         }
                     }
@@ -209,11 +247,13 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                         Text(if (editor.pending > 0) "Saving ${editor.pending} edit${if (editor.pending == 1) "" else "s"}…" else editor.exportReady?.takeIf { it.matches(editor.info, editor.document) }
                             ?.let { "EXPORT READY · revision ${it.hostSeq} · ${it.width} × ${it.height} px" } ?: editor.connectionLabel(),
                             style = MaterialTheme.typography.caption, color = MaterialTheme.colors.secondary)
-                        editor.document?.let { Text("${it.width} × ${it.height} px · ${it.bitDepth}-bit original", style = MaterialTheme.typography.caption) }
+                        editor.document?.let { Text(if(documentState.descriptor==null)"${it.width} × ${it.height} px · ${it.bitDepth}-bit original" else "${it.width} × ${it.height} document units", style = MaterialTheme.typography.caption) }
                     }
                 }
             }
         }
+        PrecisionControls(editor.precision)
+        if(documentState.descriptor!=null)Column(Modifier.fillMaxWidth().heightIn(max=220.dp).verticalScroll(rememberScrollState())){EditableDocumentControls(editor.documents,onDocumentSave)}
         AiResultStatus(editor)
         if (editor.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         editor.transferLabel?.let { label ->
@@ -224,8 +264,9 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
             AndroidView(factory = { context -> CanvasSurface(context, editor) }, update = { it.updatePreferences() }, modifier = Modifier.fillMaxSize().clipToBounds())
-            editor.scene?.takeIf { it.background != null && editor.blockingMessage == null }?.let { scene -> EraserOverlay(editor.erasers, scene.camera, scene.document.render.revision, scene.document.documentId) }
-            editor.scene?.takeIf { it.background != null && editor.blockingMessage == null }?.let { scene -> SelectionOverlay(editor.selections, scene.camera, scene.document.render.revision, scene.document.documentId) }
+            editor.scene?.takeIf { (it.background != null||it.documentFrame!=null) && editor.blockingMessage == null }?.let { scene -> EraserOverlay(editor.erasers, scene.camera, scene.document.render.revision, scene.document.documentId) }
+            editor.scene?.takeIf { (it.background != null||it.documentFrame!=null) && editor.blockingMessage == null }?.let { scene -> SelectionOverlay(editor.selections, scene.camera, scene.document.render.revision, scene.document.documentId) }
+            PrecisionHandles(editor.precision)
             val availableHeight = maxHeight
             val railHeight = minOf(availableHeight * .78f, 560.dp).coerceAtLeast(80.dp)
             val travel = (availableHeight - railHeight - 16.dp).coerceAtLeast(0.dp)

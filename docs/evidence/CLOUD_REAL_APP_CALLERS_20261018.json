@@ -1,0 +1,109 @@
+{
+  "status": "frozen caller source checkpoint for serialized native/binding/app validation; not main promotion",
+  "integration_parent": "0a2b015b580b0b83600c2257d965e06ae82210e2",
+  "main": "7be9da7372f686d3d864ed0817fdcdb0833be138",
+  "root_image_admission_lint_repair": "086b8ff117d3d95492d328f51a05c96b40793795",
+  "bmp_export_preflight_ui_gate": "2fc64bc",
+  "document_runtime_retirement_source": "9a828eda2b6e9d3bed52b8ddb30665c31a781779",
+  "document_opacity_refusal_source": "843f2793aa62d39571b7a48786ee5e573359a0ca",
+  "precision_review_read": "79f2795ae8a68705038b00bdd4fc691104c96888",
+  "implemented_callers": [
+    "Both apps expose PDF/SVG file intake with private transient PDF passwords; original/source/page metadata is validated before creation, project attachment remains fenced, and saved projects use selected page snapshots.",
+    "Injected app-owned document jobs install fresh platform transports; document operation/source borrows serialize and settle before replacement. Final Android failure retains its actual owner in a cleanup-only registry; Desktop shutdown retains its controller for retry.",
+    "Full source/project/device/clock/page/attachment/viewport generations fence tile, text and page results. Old operations settle before new source acquisition, and cancellation remains busy through retirement.",
+    "Parent document admission charges foreign source/reply copies and retained tile ownership independently of worker memory. Platform tile cache capped at128MiB; fitting every32-tile view or whole-app/GPU totals is not claimed.",
+    "Each platform renderer holds independent frame/read leases. Android joins CanvasFrontBufferedRenderer release before releasing session readers; Desktop composition and each complete base/lens draw hold readers. Tile caches close after readers retire, with failed cleanup retained.",
+    "Both editors expose page, text-selection, region and redaction-mode controls. Copy preparation/publication is explicitly disabled pending CORE-006 file provenance support; no unsafe copy is offered as ready.",
+    "Precision controllers borrow the exact base camera, cancel on view/project interruption, route accepted and predicted samples once, retain physical hit/semantic matrices, and end after final UP. Android primary barrel is reserved for precision, semantic inversion uses secondary; Desktop pan stays raw.",
+    "Base and clipped precision panes reuse canonical Result/background/geometry/layer rendering; source filtering, hover/exit, controls and consumed pane handles are connected in current app roots.",
+    "TIFF boolean metadata admission and five reserved FFI lint diagnostics repaired in086b8ff; image public caller rerun is still pending. BMP intake remains; BMP application export stays gated."
+  ],
+  "checks": {
+    "shared_contract_harness": {
+      "passed": 31,
+      "failed": 0,
+      "compiler": "Kotlin2.4.20 strict explicit API and warnings denied; JVM17; Xmx512MiB;2 processors",
+      "scope": "Actual shared production controller/interaction/budget/frame/registry code with injected fake core/jobs/images. Temporary workbenchCore/SystemTime actuals isolate native loading; app/native ABI and GUI behavior are excluded.",
+      "test_classes": [
+        "DocumentControllerTest",
+        "BudgetedDocumentJobsTest",
+        "DocumentDrawFrameTest",
+        "DocumentInteractionTest",
+        "DocumentJobsOwnerTest",
+        "DocumentFramesTest"
+      ],
+      "logs": [
+        {
+          "path": "/tmp/vw-real-caller-common-check/production.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/vw-real-caller-common-check/test-compile.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/vw-real-caller-common-check/tests.log",
+          "sha256": "93e4ed432997f5e8278911dec58778fbcb44125aeb4fbff997b733e1c8357afb",
+          "bytes": 80
+        }
+      ]
+    },
+    "kotlin_psi_files": 23,
+    "kotlin_psi_log": {
+      "path": "/tmp/vw-real-callers-final-psi.log",
+      "sha256": "55bc0bb7e82bb2df7c8cd3baa39ddd80132087c94e142f124ad47a1503c546a8",
+      "bytes": 2338
+    },
+    "gradle_license_entries": 264,
+    "gradle_license_log": {
+      "path": "/tmp/vw-real-callers-gradle-policy.log",
+      "sha256": "6d5b10b3e09b10d4ba07b1b23d39274d4d62d461111d1ae1bf59fd2c37ff12ab",
+      "bytes": 1593
+    },
+    "rustfmt_all": "passed",
+    "cargo_source_license_bans": "passed; no Rust dependency changes in caller slice",
+    "manifest_xml": "parsed",
+    "diff_whitespace": "passed",
+    "dependency_pin": "Recovered planned kotlinx-serialization-json1.7.3; runtime-only graph lock update; Windows mirror adds only the same two platform-neutral JSON module entries.",
+    "dependency_resolution_logs": [
+      {
+        "path": "/tmp/vw-caller-runtime-locks-attempt-2.log",
+        "sha256": "ccedf830d83583aca90012d871425059a26f9e107b794b5022890322f806ef7b",
+        "bytes": 1977
+      }
+    ],
+    "dependency_resolution_failure_preserved": {
+      "path": "/tmp/vw-caller-runtime-locks.log",
+      "sha256": "613728aa27768eb3d5c9d387889fcb84a3f0eecdaf2c5be1e85fde49a1a125bd",
+      "reason": "Artifact-level generic runtime resolution was ambiguous for Android KMP variants; corrected to strict graph resolution without altering artifact policy."
+    }
+  },
+  "known_remaining_capabilities": [
+    "CORE-006 document copy requests do not carry revision/source identity into PDF/SVG bytes. Publication stays disabled until protocol/request context, engine embedding and final-byte validation are implemented. Existing copy/redaction DTOs do not prove this.",
+    "Native document resources are not packaged. SVG-only runtime policy, PDFium/qpdf workers, Windows isolation and Android Binder/ART/hard-memory behavior need actual execution; strict Android AS limit may refuse allocation.",
+    "Partial layer opacity cannot be represented by flat document overlays and now refuses Unsupported; grouped-opacity export is not delivered.",
+    "Native and Windows-target type checking/Clippy, repaired11-case ordinary-format rerun, overlay regressions, real UniFFI regeneration, actual app compile and focused precision tests remain pending on this exact candidate.",
+    "Renderer/GPU lifetime behavior, provider picker/grant cleanup, process-death/configuration recovery, whole-app memory/performance, calibration and physical pen/owner gates remain pending. Krita stays deferred."
+  ],
+  "independent_document_engine_leaf": {
+    "required_interface": "Copy-only export identity context: revision r{seq}-{hash8}, immutable source asset hash (and capture identity where applicable); carry through validated request into isolated PDF/SVG exporter and verify in final bytes before clearing the caller gate. No sidecar-only proof.",
+    "root_reserved": [
+      "core/crates/vw-document-protocol/src/job.rs",
+      "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentsApi.kt",
+      "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentInteraction.kt",
+      "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeDocuments.kt"
+    ],
+    "engine_owner_candidates": [
+      "core/crates/vw-pdf/src/",
+      "core/crates/vw-svg/src/",
+      "tools/document-worker/src/dispatch.rs",
+      "core/crates/vw-ffi/src/documents/engine.rs",
+      "host-win/crates/vw-document-win/src/metadata.rs"
+    ]
+  },
+  "native_bindings_regenerated_in_this_slice": false,
+  "app_or_device_launches": 0,
+  "verification_images_created": 0
+}

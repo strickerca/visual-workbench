@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import com.visualworkbench.android.diagnostics.DiagnosticsController
 import com.visualworkbench.android.input.*
+import com.visualworkbench.android.precision.*
 import com.visualworkbench.android.ui.ProjectCard
 import com.visualworkbench.shared.*
 import com.visualworkbench.android.session.PairingController
@@ -53,6 +54,31 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private val captureArrivalQuery: suspend (WorkbenchProject, ULong) -> ReceivedCapture? = { p, after -> p.receivedCapture(after) },
     sessionFactory: suspend (android.content.Context, String) -> WorkbenchSessions = ::createAndroidSessions) : AndroidViewModel(application), CanvasGestureSink {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var precisionClosed=false
+    internal fun cancelPrecision(){if(!precisionClosed)precision.cancel()}
+    private fun closePrecision(){precision.close();precisionClosed=true}
+    private var synchronizingPrecision=false
+    val precision:PrecisionController=PrecisionController(core){if(!disposing&&!synchronizingPrecision)publish()}
+    private var documentPress:Pair<Point,Point>?=null
+    private var documentPressPage:UInt=0u
+    private var documentPressRevision:ProjectInfo?=null
+    private var documentPressEpoch:Long=0
+    private var documentPressRegion=false
+    private var canvasRetirement:suspend()->Unit = {}
+    private val documentOwner:EditorDocuments=EditorDocuments(scope,core,
+        { val p=project;val snapshot=document;if(p!=null&&snapshot!=null&&!disposing)DocumentAttachment(p,snapshot,epoch)else null },
+        { !disposing&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
+        { attached,page -> mutations.withLock {
+            if(project!==attached.project||epoch!=attached.epoch||!documentRevisionMatches(attached))throw DocumentFailure(DocumentFailureKind.Stale)
+            cancelTool();documentOwnerDiscardDraw()
+            val next=(attached.project as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
+            val drawing=prepareEditorObjects(core,next.render.items)
+            if(project!==attached.project||epoch!=attached.epoch||disposing)throw DocumentFailure(DocumentFailureKind.Stale)
+            document=next;info=next.render.revision;objects=drawing;background=null;selected=null;cameraFitted=false;fit()
+        } }, { publish() },application,{canvasRetirement()})
+    val documents:DocumentController get()=documentOwner.controller
+    private fun documentRevisionMatches(attached:DocumentAttachment):Boolean = document?.render?.revision?.sameDocumentRevision(attached.snapshot.render.revision)==true
+    private suspend fun documentOwnerDiscardDraw(){documentOwner.discardDraw()}
     private val repository = ProjectRepository(application, core)
     private val preferencesStore = EditorPreferencesStore(application)
     private val preferencesQueue = Channel<EditorPreferences>(Channel.CONFLATED)
@@ -225,6 +251,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private fun aiFrame()=aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),camera,aiPoses())}
     private fun aiResultReady()=document?.render?.items?.none{it.shape is Shape.Result}!=false||aiFrame()!=null
     fun openAi(){
+        if(documents.state.value.descriptor!=null){message="AI image edits require a raster image document.";return}
         if(disposing||busy||pending!=0||document==null||textDraft!=null||showBrush||showContext||blockingMessage!=null)return
         if(instructionEditor.hasUnsaved()){message="Save or discard the instruction draft before opening AI review.";return}
         cancelTool();ai.open();instructionInteractionChanged()
@@ -270,7 +297,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
 
-    fun attachCanvas(sink: (CanvasScene) -> Unit) { canvasSink = sink; scene?.let(sink) }
+    fun attachCanvas(sink: (CanvasScene) -> Unit,retire:suspend()->Unit = {}) { canvasSink = sink;canvasRetirement=retire;scene?.let(sink) }
     fun detachCanvas() { canvasSink = null; cancelTool(); hoverPoint = null }
     fun dismissMessage() { message = null }
     fun transferMessage(value: String) { message = value }
@@ -421,6 +448,20 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             ProjectRepository.modified(it.modifiedMs)) }
     }
     fun newCanvas() = openRequest(knownSrgb = true) { repository.createBlank() }
+    fun importDocument(uri:Uri,kind:EditableKind,password:String?=null) = openRequest(transfer=true) {
+        documentOwner.ensureJobs()
+        documentOwner.io.import(uri,kind,repository.receivePath(),repository.deviceId,"Imported document",password){transferLabel=it}
+    }
+    fun publishDocument(uri:Uri,copy:DocumentExport) {
+        if(!documents.exportPublicationAvailable||busy||pending!=0){selections.discardUnused(uri);return}
+        busy=true
+        transferJob=scope.launch {
+            try { documentOwner.io.publish(uri,copy){documents.checkedExport()===copy&&!disposing};message="Document copy saved." }
+            catch(cancel:CancellationException){throw cancel}
+            catch(error:Exception){report(error)}
+            finally{busy=false;transferJob=null}
+        }
+    }
     fun importImage(uri: Uri) = openRequest(transfer = true) { repository.importImage(uri) { transferLabel = it } }
     /** Copy transient picker/share grants while this process owns them; no persistent grant is needed. */
     fun receiveImage(uri: Uri, cleanup: suspend (ImportOutcome) -> Unit = {}) {
@@ -491,6 +532,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 val drawing = prepareEditorObjects(core, snapshot.render.items)
                 if (disposing || token != epoch || current !== project) return@launch
                 document = snapshot; info = snapshot.render.revision; objects = drawing
+                documentOwner.bind(current,snapshot)
                 instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
                 observeProject(current, token)
                 colorAssumed = knownSrgb; screen = WorkbenchScreen.Canvas; cameraFitted = false
@@ -607,6 +649,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     private suspend fun closeCurrent() {
         withContext(NonCancellable) {
+        documentOwner.detach()
+        if(!precisionClosed)precision.reset()
+        scene=null
         exportReady = null
         exportPreflight = null; checkedExport = null
         erasers.detach(); selections.detach()
@@ -816,6 +861,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
 
     private suspend fun refreshOriginalFormatNotice() {
+        if(documents.state.value.descriptor!=null){originalFormatNotice=null;return}
         val owner = project ?: return
         val formats = owner as? WorkbenchOriginalFormats ?: return
         val snapshot = document ?: return
@@ -842,6 +888,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val current = project ?: return
         val doc = document ?: return
         val token = epoch
+        if(documents.state.value.descriptor!=null){background=null;blockingMessage=null;needsColorConsent=false;publish();return}
         try {
             val image = current.background(doc.documentId, assumeUntaggedSrgb = colorAssumed)
             val bitmap = withContext(Dispatchers.Default) {
@@ -904,10 +951,15 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         publish()
     }
     private fun publish() {
+        if(synchronizingPrecision)return
         ai.changed()
         val doc = document ?: return
         project?.let { selections.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera); erasers.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera) }
         if (camera.viewportWidth <= 1 || camera.viewportHeight <= 1) return
+        if(precision.baseCamera()!=camera){
+            synchronizingPrecision=true
+            try{cancelTool();precision.synchronize(camera)}finally{synchronizingPrecision=false}
+        }
         aiResults.request()
         val resultFrame=aiFrame()
         val savedIds = objects.mapTo(HashSet()) { it.item.objectId }
@@ -924,8 +976,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val next = CanvasScene(++sceneRevision, doc, background, camera, core.cameraMatrix(camera), visibleObjects,
             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
-            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady())
+            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress)
         scene = next; canvasSink?.invoke(next)
+        documents.viewport(camera)
         val viewport = PeerViewport(doc.documentId, core.mapPoints(camera, true, listOf(Point(0.0, 0.0),
             Point(camera.viewportWidth, 0.0), Point(camera.viewportWidth, camera.viewportHeight), Point(0.0, camera.viewportHeight))))
         if (viewport != lastViewport) {
@@ -958,25 +1011,42 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                                    val item: RenderItem? = null, val resizeAnchor: Point? = null,
                                    val previewId: String? = null, val link: ProjectLink? = null, var previewSequence: UInt = 0u,
                                    val revision: ProjectInfo? = null, val newObjectId: String? = null,
-                                   val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false)
+                                   val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false,val physical:Transform=Transform())
 
-    override fun beginTool(sample: PenSample, capabilities: StylusCapabilities) {
+    internal fun precisionInputAllowed():Boolean = !disposing&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
+        !instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&
+        !ai.state.value.open&&aiResultReady()&&blockingMessage==null&&textDraft==null&&!showBrush&&!showContext&&instructionAdmission.allows(false,false,false,false)&&
+        document?.let{background!=null||documentOwner.matchingFrame(it,epoch)!=null}==true
+    override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
         if(ai.state.value.open||!aiResultReady())return
         cancelTool(); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
-        if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || background == null || strokes.size >= 3) {
+        if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || (background == null && document?.let{documentOwner.matchingFrame(it,epoch)}==null) || documents.state.value.busy || strokes.size >= 3) {
             if (strokes.size >= 3) message = "The save queue is full. Wait for the current strokes to finish."
             return
         }
         val current = project ?: return
-        when (erasers.tools.route(sample.tool == PointerTool.Eraser)) {
-            EraserInputRoute.Selection -> { selectionPointer = selections.interaction.begin(Point(sample.x, sample.y), camera); return }
-            EraserInputRoute.Eraser -> { eraserPointer = erasers.interaction.begin(Point(sample.x, sample.y), camera, sample.tool == PointerTool.Eraser); return }
+        if(!precisionInputAllowed())return
+        val route=erasers.tools.route(rawSample.tool==PointerTool.Eraser)
+        if(route==EraserInputRoute.Blocked)return
+        val raw=Point(rawSample.x,rawSample.y)
+        precision.down(raw)
+        val physical=precision.inputMatrix()
+        val sample=precision.routePen(listOf(rawSample)).single()
+        val documentMode=documents.state.value
+        if(documentMode.textTool||documentMode.regionTool){
+            val point=toDocument(sample,camera)
+            documentPress=point to point;documentPressPage=documentMode.page;documentPressRevision=info;documentPressEpoch=epoch;documentPressRegion=documentMode.regionTool
+            publish();return
+        }
+        when (route) {
+            EraserInputRoute.Selection -> { selectionPointer = selections.interaction.begin(Point(sample.x, sample.y), camera);if(!selectionPointer)precision.end();return }
+            EraserInputRoute.Eraser -> { eraserPointer = erasers.interaction.begin(Point(sample.x, sample.y), camera, sample.tool == PointerTool.Eraser,hypot(physical.a,physical.b));if(!eraserPointer)precision.end();return }
             EraserInputRoute.Blocked -> return
             EraserInputRoute.Editor -> Unit
         }
         this.capabilities = capabilities; hoverPoint = null
         val activeTool = tool
-        if (activeTool == EditorTool.Eraser) return // all erasers use the guarded route above
+        if (activeTool == EditorTool.Eraser) {precision.end();return} // all erasers use the guarded route above
         try {
             val layer = selectedLayer(); val brush = preferences.brush(activeTool); val first = toDocument(sample, camera)
             var run: StrokeRun? = null
@@ -994,19 +1064,18 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     if (family == "highlighter") "multiply" else "normal", link)
                 invalidateExport(); strokes += run; pending++; startStroke(current, run)
             } else if (activeTool == EditorTool.Select) {
-                val snapshot = scene
+                val snapshot = scene?.let{precisionHitScene(it,physical)}
                 val previous = objects.firstOrNull { it.item.objectId == selected }
                 if (snapshot != null && previous != null) {
-                    val handles = EditorDrawing.screenBounds(snapshot, previous.item)
-                    val near = handles.indices.minByOrNull { hypot(handles[it].x - sample.x, handles[it].y - sample.y) }
-                    if (near != null && hypot(handles[near].x - sample.x, handles[near].y - sample.y) <= 24 * density) {
+                    val near=precisionResizeHandle(snapshot,previous.item,raw,24*density)
+                    if(near!=null){
                         item = previous.item
                         val r = item.bounds
                         val corners = listOf(Point(r.x, r.y), Point(r.x + r.width, r.y), Point(r.x + r.width, r.y + r.height), Point(r.x, r.y + r.height))
                         anchor = corners[(near + 2) % 4]
                     }
                 }
-                if (item == null) item = scene?.let { EditorDrawing.hit(it, Point(sample.x, sample.y), 8 * density)?.item }
+                if (item == null) item = snapshot?.let { EditorDrawing.hit(it, raw, 8 * density)?.item }
                 selected = item?.objectId
                 instructionFocus.localSelection(selected)
                 if (item?.shape is Shape.Marker) item?.objectId?.let(instructionEditor::focusObject)
@@ -1018,18 +1087,24 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             }
             val newShape = activeTool in listOf(EditorTool.Line, EditorTool.Arrow, EditorTool.Rectangle, EditorTool.Ellipse)
             gesture = ToolGesture(activeTool, camera, first, Point(sample.x, sample.y), layer, brush, run, item, anchor,
-                if (item != null || newShape) newId() else null, link, revision = info, newObjectId = if (newShape || activeTool == EditorTool.Callout) newId() else null, semanticModifier = sample.buttons and android.view.MotionEvent.BUTTON_STYLUS_PRIMARY != 0)
+                if (item != null || newShape) newId() else null, link, revision = info, newObjectId = if (newShape || activeTool == EditorTool.Callout) newId() else null, semanticModifier = sample.buttons and android.view.MotionEvent.BUTTON_STYLUS_SECONDARY != 0,physical=physical)
             eraserLast = if (activeTool == EditorTool.Eraser) Point(sample.x, sample.y) else null
             if (activeTool == EditorTool.Text) {
-                val hit = scene?.let { EditorDrawing.hit(it, Point(sample.x, sample.y), 8 * density)?.item }
+                val hit = scene?.let { EditorDrawing.hit(precisionHitScene(it,physical),raw,8*density)?.item }
                 val text = hit?.shape as? Shape.Text
                 textDraft = if (text != null) TextDraft(hit.objectId, text.anchor, text.text, text.font, text.size) else TextDraft(null, first)
             }
-            extendTool(listOf(sample)); publish()
+            extendMappedTool(listOf(sample)); publish()
         } catch (error: Exception) { cancelTool(); report(error) }
     }
 
     override fun extendTool(samples: List<PenSample>) {
+        samples.lastOrNull()?.let{precision.move(Point(it.x,it.y))}
+        val mapped=precision.routePen(samples)
+        if(documentPress!=null){val end=mapped.lastOrNull()?.let{toDocument(it,camera)};if(end!=null)documentPress=documentPress!!.first to end;publish();return}
+        extendMappedTool(mapped)
+    }
+    private fun extendMappedTool(samples: List<PenSample>) {
         if (eraserPointer) { samples.forEach { erasers.interaction.append(Point(it.x, it.y)) }; return }
         if (selectionPointer) { samples.forEach { selections.interaction.append(Point(it.x, it.y)) }; return }
         val active = gesture ?: return
@@ -1044,7 +1119,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             when (active.tool) {
                 EditorTool.Callout -> {
                     active.semanticEnd = end
-                    transientShape = semanticDropBox(active.first, end, core.cameraMatrix(active.camera))?.let { previewShape(Shape.Rectangle(it), active) }
+                    transientShape = semanticDropBox(active.first, end, active.physical)?.let { previewShape(Shape.Rectangle(it), active) }
                 }
                 EditorTool.Line, EditorTool.Arrow, EditorTool.Rectangle, EditorTool.Ellipse -> {
                     val shape = shape(active.tool, active.first, end)
@@ -1090,10 +1165,26 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
 
     override fun finishTool(samples: List<PenSample>) {
+        try{
+            val mapped=precision.routePen(samples)
+            val press=documentPress
+            if(press!=null){
+                val end=mapped.lastOrNull()?.let{toDocument(it,camera)}?:press.second
+                documentPress=null
+                if(epoch==documentPressEpoch&&documents.state.value.page==documentPressPage&&documentPressRevision?.sameDocumentRevision(info?:return)==true){
+                    val region=Rect(minOf(press.first.x,end.x),minOf(press.first.y,end.y),abs(end.x-press.first.x),abs(end.y-press.first.y))
+                    if(documentPressRegion)documents.region(region)else documents.select(region)
+                }
+                publish();return
+            }
+            finishMappedTool(mapped)
+        }finally{precision.end()}
+    }
+    private fun finishMappedTool(samples: List<PenSample>) {
         if (eraserPointer) { samples.forEach { erasers.interaction.append(Point(it.x, it.y)) }; eraserPointer = false; erasers.interaction.finish(); return }
         if (selectionPointer) { samples.forEach { selections.interaction.append(Point(it.x, it.y)) }; selectionPointer = false; selections.interaction.finish(); return }
         val active = gesture ?: return
-        extendTool(samples)
+        extendMappedTool(samples)
         if (gesture !== active) return
         gesture = null
         val run = active.stroke
@@ -1103,8 +1194,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 screen = WorkbenchScreen.Instructions
                 val end = active.semanticEnd
                 transientShape = null
-                val box = semanticDropBox(active.first, end, core.cameraMatrix(active.camera))
-                semanticEditor.place(active.first, ObjectStyle(EditorDrawing.rgba(active.brush.colorArgb), active.brush.width), core.cameraMatrix(active.camera), box, active.semanticModifier)
+                val box = semanticDropBox(active.first, end, active.physical)
+                semanticEditor.place(active.first, ObjectStyle(EditorDrawing.rgba(active.brush.colorArgb), active.brush.width), active.physical, box, active.semanticModifier)
             } else message = "The document changed. Place the marker again on the current revision."
             publish(); return
         }
@@ -1124,6 +1215,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
 
     override fun cancelTool() {
+        documentPress=null
+        cancelPrecision()
         eraserPointer = false; erasers.interaction.cancelGesture()
         selectionPointer = false; selections.interaction.cancelGesture()
         gesture?.let { active -> finishRemotePreview(active.link, active.previewId, true) }
@@ -1138,7 +1231,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             if(error.kind!=CoreFailureKind.Closed&&error.kind!=CoreFailureKind.Cancelled)report(error)
         }
     }
-    fun predict(sample: PenSample?) { gesture?.stroke?.prediction = sample }
+    fun predict(sample: PenSample?) { gesture?.stroke?.prediction = sample?.let{precision.routePen(listOf(it)).single()} }
 
     private fun batch(run: StrokeRun, samples: List<PenSample>, predicted: Boolean = false): SampleBatch {
         require(samples.isNotEmpty() && samples.size <= if (predicted) 32 else 512)
@@ -1277,6 +1370,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (document?.render?.revision != next.render.revision) clearPeerObjects()
         info = next.render.revision
         document = next; objects = drawing
+        documentOwner.bind(current,next)
         refreshOriginalFormatNotice()
         instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
         if (exportReady?.matches(info, document) != true) exportReady = null
@@ -1365,7 +1459,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     override fun hover(sample: PenSample?, capabilities: StylusCapabilities) {
         this.capabilities = capabilities
-        hoverPoint = sample?.let { Point(it.x, it.y) }; publish()
+        hoverPoint = sample?.let { Point(it.x, it.y) };precision.hover(hoverPoint);publish()
     }
 
     private fun previewBrush() {
@@ -1510,6 +1604,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private fun report(error: Exception) {
         if (error is CancellationException) return
         message = when (error) {
+            is DocumentFailure -> documentFailureText(error)
             is TransferFailure -> when (error.kind) {
                 TransferFailureKind.PixelLimit -> "Images over 50 megapixels aren't supported yet. The original was not resized or changed."
                 TransferFailureKind.Dimensions -> "This format cannot represent the requested dimensions. Choose PNG or a smaller region; the original is unchanged."
@@ -1555,7 +1650,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 // can miss a project returned while the ViewModel is clearing.
                 try {
                     incomingJob?.join()
-                    try { connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin(); mutations.withLock { closeCurrent() } }
+                    try { connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin(); mutations.withLock { closeCurrent();documentOwner.close();closePrecision() } }
                     finally {
                         try { pairing.close() }
                         finally {
@@ -1563,8 +1658,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                             shareLease = null; shareUri = null
                         }
                     }
-                } catch (error: Exception) { report(error) }
-                finally { scope.cancel() }
+                } catch (error: Exception) {
+                    report(error)
+                    DocumentRetirementRegistry.retain(this@EditorController){mutations.withLock{closeCurrent();documentOwner.close();closePrecision()}}
+                } finally { scope.cancel() }
             }
         }
         super.onCleared()

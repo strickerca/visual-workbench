@@ -129,7 +129,11 @@ private class NativeProject(val handle: ProjectSession) : WorkbenchProject, Work
         awaitClose { subscription.unsubscribe(); subscription.destroy() }
     }.buffer(Channel.CONFLATED)
     override suspend fun info(): ProjectInfo = call { handle.info().common() }
-    override suspend fun document(documentId: String): DocumentSnapshot = call { cancel ->
+    override suspend fun document(documentId: String): DocumentSnapshot {
+        if(documentDescriptor(documentId)!=null)return documentPage(documentId,selectedDocumentPage(documentId))
+        return imageDocument(documentId)
+    }
+    private suspend fun imageDocument(documentId: String): DocumentSnapshot = call { cancel ->
         val d=handle.documentSnapshot(documentId,cancel)
         DocumentSnapshot(d.documentId,d.title,d.width,d.height,d.bitDepth,d.layers.map { LayerInfo(it.id,it.name,it.visible,it.locked,it.opacity,it.blend) },d.render.common())
     }
@@ -147,7 +151,10 @@ private class NativeProject(val handle: ProjectSession) : WorkbenchProject, Work
         handle.applyEditAt(options.native(),commands.map { it.native() },expected,options.gestureId,it).common()
     }
     override suspend fun undoRedo(options: EditOptions,redo: Boolean): ProjectInfo = call { handle.undoRedo(options.native(),redo,it).common() }
-    override suspend fun render(documentId: String,rectangle: Rect?): RenderList = call { handle.renderList(documentId,rectangle?.native(),it).common() }
+    override suspend fun render(documentId: String,rectangle: Rect?): RenderList {
+        if(documentDescriptor(documentId)!=null)return documentPage(documentId,selectedDocumentPage(documentId)).render
+        return call { handle.renderList(documentId,rectangle?.native(),it).common() }
+    }
     override suspend fun export(options: ExportOptions): ExportResult = call { cancel ->
         val e=handle.exportImage(NExportOptions(options.documentId,options.format.native(),options.marked,options.region?.native(),options.matteRgb,options.convertToSrgb,options.assumeUntaggedSrgb,options.allowDepthReduction,options.memoryBudgetBytes),cancel)
         ExportResult(e.bytes,e.blake3,e.metadataJson,e.revision.common())

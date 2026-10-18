@@ -1,6 +1,6 @@
 package com.visualworkbench.android.instructions
 
-internal enum class InstructionFocusModal { ExportDialog, ExportPicker }
+internal enum class InstructionFocusModal { ExportDialog, ExportPicker, DocumentImport, DocumentPicker }
 
 /** Owner UI dispatcher only. The two external modal lifetimes overlap while an
  * export dialog hands off to a document picker; dismissing one cannot unseal the other. */

@@ -119,13 +119,13 @@ public fun documentNoticeText(notice: String): String = when(notice) {
     else -> "The document renderer reported a fidelity limit."
 }
 public fun documentFailureText(error: DocumentFailure): String = when(error.kind) {
-    DocumentFailureKind.Unavailable -> "The packaged document runtime and its notices must be admitted before PDF/SVG can be opened."
+    DocumentFailureKind.Unavailable -> "PDF/SVG support is unavailable in this installation. The original is preserved."
     DocumentFailureKind.Password -> "This PDF requires a correct password."
     DocumentFailureKind.Unsupported -> "This content cannot be exported by that method. Choose a different method explicitly; the original is retained."
     DocumentFailureKind.Limit -> "This document exceeds the bounded page, tile, memory or export limit. The original is retained."
     DocumentFailureKind.Stale -> "The project, page or revision changed. Retry from the current document."
     DocumentFailureKind.Isolation -> "The document worker could not retire or isolate safely. Further document jobs are blocked."
-    DocumentFailureKind.Timeout -> "The isolated document worker exceeded its two-minute deadline."
+    DocumentFailureKind.Timeout -> "Document processing exceeded its two-minute limit."
     DocumentFailureKind.Cancelled -> "Document work was cancelled before result adoption."
     else -> "Document work failed its validation. The original is retained."
 }

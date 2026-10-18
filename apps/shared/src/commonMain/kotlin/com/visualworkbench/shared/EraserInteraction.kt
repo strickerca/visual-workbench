@@ -90,7 +90,7 @@ public class EraserInteraction(
     private var gesture: Gesture? = null
     private data class Gesture(val backend: EraserBackend, val document: DocumentSnapshot, val camera: Camera,
         val attachment: Long, val admission: Long, val mode: EraserMode, val radius: Double,
-        val points: MutableList<Point>)
+        val points: MutableList<Point>,val physicalScale:Double)
 
     public fun bind(value: EraserBackend, snapshot: DocumentSnapshot, epoch: Long, eventSequence: ULong) {
         if (detaching) return
@@ -131,13 +131,14 @@ public class EraserInteraction(
     }
     public fun dismissMessage() { mutable.value = state.value.copy(message = null) }
 
-    public fun begin(screenPoint: Point, capturedCamera: Camera, hardwareEraser: Boolean = false): Boolean {
+    public fun begin(screenPoint: Point, capturedCamera: Camera, hardwareEraser: Boolean = false,physicalScale:Double=capturedCamera.scale): Boolean {
+        if(!physicalScale.isFinite()||physicalScale<=0)return false
         if ((!state.value.active && !hardwareEraser) || !state.value.ready || state.value.busy ||
             !scope.isActive || owner?.isActive != true || capturedCamera != camera || !validEraseCamera(capturedCamera)) return false
         val source = document ?: return false; val target = backend ?: return false
         if (source.render.items.size > 4_096) { fail(WorkflowFailure(WorkflowFailureKind.Limit)); return false }
         val point = mapped(screenPoint, capturedCamera) ?: return false
-        gesture = Gesture(target, source, capturedCamera, attachment, admission, state.value.mode, state.value.radius, mutableListOf(point))
+        gesture = Gesture(target, source, capturedCamera, attachment, admission, state.value.mode, state.value.radius, mutableListOf(point),physicalScale)
         preview(); return true
     }
     public fun append(screenPoint: Point) {
@@ -198,7 +199,7 @@ public class EraserInteraction(
                         }
                     }
                     EraserMode.Object -> {
-                        val query = EraserHitQuery(run.document, run.camera, points, run.radius)
+                        val query = EraserHitQuery(run.document, run.camera.copy(scale=run.physicalScale), points, run.radius)
                         admitEraserHit(query)
                         val found = run.backend.objectHits(query)
                         if (found.size > 512) throw WorkflowFailure(WorkflowFailureKind.Limit)

@@ -2,6 +2,8 @@
 package com.visualworkbench.desktop
 
 import com.visualworkbench.desktop.instructions.InstructionsPanel
+import com.visualworkbench.desktop.precision.PrecisionControls
+import com.visualworkbench.desktop.precision.PrecisionHandles
 import com.visualworkbench.desktop.diagnostics.*
 
 import androidx.compose.foundation.*
@@ -66,6 +68,7 @@ fun main(args: Array<String>) {
         nativeRuntime.directory.resolve("vw-capture-helper.exe"),nativeRuntime.packagedHash("vw-capture-helper.exe"))}
     application {
         val scope=rememberCoroutineScope();val sessions=remember{DesktopSessionController(scope,device,labelStore=PeerLabelStore(local.resolve("Visual Workbench/peer-labels.properties")))};val assistance=remember{ConnectionAssistanceController(scope,NativeConnectionAssistance())};val controller=remember{EditorController(scope,core,host,location,device,local.resolve("VisualWorkbench/transfer-work")).also{it.useSessionService(sessions);it.useAiDirectory(local.resolve("Visual Workbench"))}};val editor by controller.state.collectAsState()
+        val documentState by controller.documents.state.collectAsState()
         var quitting by remember { mutableStateOf(false) }
         var startupMs by remember { mutableStateOf<Long?>(null) }
         var nativePickerCount by remember { mutableStateOf(0) }
@@ -119,12 +122,17 @@ fun main(args: Array<String>) {
         val state=rememberWindowState(isMinimized=mcpMinimized,placement=saved.mode.placement(),position=restoredPosition(saved),width=saved.width.dp,height=saved.height.dp)
         var prior by remember{mutableStateOf(if(saved.mode==WindowMode.Fullscreen)WindowMode.Windowed else saved.mode)}
         var floating by remember{mutableStateOf(saved.copy(mode=WindowMode.Windowed))};var dialog by remember{mutableStateOf<Command?>(null)}
+        var documentImport by remember{mutableStateOf<Pair<Path,Long>?>(null)}
+        var documentImportPassword by remember{mutableStateOf("")}
+        var documentImportLease by remember{mutableStateOf<AutoCloseable?>(null)}
+        fun dismissDocumentImport(){documentImport=null;documentImportPassword="";documentImportLease?.close();documentImportLease=null}
+        DisposableEffect(controller){onDispose{documentImportLease?.close();documentImportLease=null}}
         var connectionDraft by remember { mutableStateOf(ConnectionDraft()) }
         var pickerReturnsToConnection by remember { mutableStateOf(false) }
         var dpiText by remember{mutableStateOf("Checking display scale…")}
         fun competingModal(): Boolean {
             val current = controller.state.value
-            return nativePickerCount != 0 || codexModal.state.value.settings ||
+            return documentImport!=null||nativePickerCount != 0 || codexModal.state.value.settings ||
                 mcpModal.state.value.let { it.settings || it.compare != null } || captureSettings || remoteView != null ||
                 current.textAnchor != null || current.exportOpen || current.pasteOpen || controller.ai.state.value.open
         }
@@ -152,6 +160,7 @@ fun main(args: Array<String>) {
             if (!quitting && dialog == Command.Diagnostics && !diagnostics.held) instructionDialog(null)
         }
         fun quit() {
+            dismissDocumentImport()
             if(!controller.mayCloseAi())return
             if (quitting || !controller.mayCloseInstructions()) return
             if (!quitting) {
@@ -206,14 +215,19 @@ fun main(args: Array<String>) {
         mcpState.owner?.let{McpCaptureIndicator(it)}
         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
-            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
+            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
             fun file(command:Command){
-                if (!commandsAllowed()) return
+                if (!commandsAllowed()||documentImport!=null) return
                 nativePickerCount++
                 try { controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,command.label,FileDialog.LOAD)
                 try{chooser.directory=(if(command==Command.Import)documents else location.path).toString();if(command==Command.Open)chooser.file="project.sqlite";chooser.isVisible=true
                     val filename=chooser.file?:return;val chosen=Path.of(chooser.directory,filename)
-                    when(command){Command.Import->controller.importFile(ImportRequest(epoch,chosen.toAbsolutePath().normalize()));Command.Open->{val projectDirectory=projectDirectoryFromPicker(chosen);if(projectDirectory==null)controller.report("Choose project.sqlite inside the saved project folder. The current project is unchanged.")else controller.open(projectDirectory,epoch)};else->Unit}
+                    when(command){Command.Import->{
+                        val selected=chosen.toAbsolutePath().normalize()
+                        if(selected.fileName.toString().substringAfterLast('.',"").lowercase(java.util.Locale.ROOT) in setOf("pdf","svg")){
+                            documentImportLease=controller.instructionPicker();documentImport=selected to epoch
+                        }else controller.importFile(ImportRequest(epoch,selected))
+                    };Command.Open->{val projectDirectory=projectDirectoryFromPicker(chosen);if(projectDirectory==null)controller.report("Choose project.sqlite inside the saved project folder. The current project is unchanged.")else controller.open(projectDirectory,epoch)};else->Unit}
                 }finally{chooser.dispose()}} } finally { nativePickerCount-- }
             }
             fun save(request:ExportRequest){
@@ -225,6 +239,18 @@ fun main(args: Array<String>) {
                     if(!allowed){controller.report("Use a .${request.settings.encoding.exportFileSuffix()} filename for the selected format.");return}
                     controller.saveExport(request,Path.of(chooser.directory,filename))
                 }finally{chooser.dispose()}} } finally { nativePickerCount-- }
+            }
+            fun saveDocument(copy:DocumentExport){
+                if(!commandsAllowed()||!controller.documents.exportPublicationAvailable)return
+                nativePickerCount++
+                try{controller.instructionPicker().use{
+                    val chooser=FileDialog(window,"Save prepared document copy",FileDialog.SAVE)
+                    try{chooser.directory=documents.toString();val suffix=if(copy.mode==DocumentCopy.SvgAnnotations)"svg" else "pdf";chooser.file="document.$suffix";chooser.isVisible=true
+                        val name=chooser.file?:return
+                        if(!name.endsWith(".$suffix",true)){controller.report("Choose a .$suffix destination for this copy.");return}
+                        controller.saveDocument(copy,Path.of(chooser.directory,name))
+                    }finally{chooser.dispose()}
+                }}finally{nativePickerCount--}
             }
             fun saveSelection(ticket:SelectionSaveTicket){
                 if (!commandsAllowed()) return
@@ -255,6 +281,7 @@ fun main(args: Array<String>) {
                 }finally{try{chooser.dispose()}finally{chooserLease.close()}}
             }
             fun action(command:Command){
+                if(documentImport!=null&&command!=Command.Quit)return
                 if (!diagnosticsLifecycle.allowsCommand(quitting,command==Command.Diagnostics,command==Command.Quit)) return
                 if(command in listOf(Command.Import,Command.Open))file(command)else dispatch(command,false,controller,{mode(it)},{instructionDialog(it)},{quit()})
             }
@@ -317,7 +344,7 @@ fun main(args: Array<String>) {
                 Box(Modifier.fillMaxSize().drawWithContent {
                     drawContent()
                     if (startupSmoke) firstDraw.complete(Unit)
-                }) { EditorShell(controller,editor,dpiText,quitting,::action,::saveSelection) }
+                }) { EditorShell(controller,editor,dpiText,quitting,::action,::saveSelection,::saveDocument) }
                 if(codexPanels.settings){
                     val catalogOwner=mcpState.owner
                     val published=if(catalogOwner!=null){val catalog by catalogOwner.state.collectAsState();catalog.packages}else emptyList()
@@ -338,7 +365,12 @@ fun main(args: Array<String>) {
                 AiEditorOverlay(controller)
                 remoteView?.let{remote->com.visualworkbench.desktop.remote.RemoteEditPanel(remote){remoteView=null}}
                 if(captureSettings)com.visualworkbench.desktop.capture.CaptureSettings(capture){captureDialog(false)}
-                if(editor.exportOpen&&editor.document!=null)ExportDialog(controller,editor,::save)
+                documentImport?.let{(path,epoch)->AlertDialog(onDismissRequest=::dismissDocumentImport,title={Text("Open PDF or SVG")},text={Column{
+                    Text("The original file is preserved. Enter a password only if this PDF requires one.")
+                    if(path.fileName.toString().endsWith(".pdf",true))OutlinedTextField(documentImportPassword,{documentImportPassword=it.take(1024)},label={Text("PDF password (if required)")},visualTransformation=androidx.compose.ui.text.input.PasswordVisualTransformation())
+                }},confirmButton={TextButton({val password=documentImportPassword.takeIf{it.isNotEmpty()};dismissDocumentImport();controller.importEditable(path,password,epoch)}){Text("Open")}},dismissButton={TextButton(::dismissDocumentImport){Text("Cancel")}})}
+                if(editor.exportOpen&&editor.document!=null&&documentState.descriptor!=null)AlertDialog(onDismissRequest=controller::dismissExport,title={Text("Document export")},text={Column(Modifier.heightIn(max=560.dp).verticalScroll(rememberScrollState())){EditableDocumentControls(controller.documents,::saveDocument)}},confirmButton={TextButton(controller::dismissExport){Text("Close")}})
+                if(editor.exportOpen&&editor.document!=null&&documentState.descriptor==null)ExportDialog(controller,editor,::save)
                 if(editor.pasteOpen)PasteDialog(controller,editor)
                 if(dialog==Command.Pairing)SessionDialog(sessions,controller,assistance,connectionDraft,{change -> connectionDraft=change(connectionDraft)},
                     importFile={pickerReturnsToConnection=true;instructionDialog(Command.Import)},
@@ -361,17 +393,19 @@ fun main(args: Array<String>) {
         }
     }
 }
-@Composable private fun EditorShell(controller:EditorController,editor:EditorState,dpiText:String,quitting:Boolean,action:(Command)->Unit,saveSelection:(SelectionSaveTicket)->Unit){
+@Composable private fun EditorShell(controller:EditorController,editor:EditorState,dpiText:String,quitting:Boolean,action:(Command)->Unit,saveSelection:(SelectionSaveTicket)->Unit,saveDocument:(DocumentExport)->Unit){
+    val documentState by controller.documents.state.collectAsState()
     val eraserState by controller.erasers.state.collectAsState()
     val selectionState by controller.selections.state.collectAsState()
     Surface(Modifier.fillMaxSize()){Column{
         Row(Modifier.fillMaxWidth().background(Color(0xff15202c)).padding(horizontal=18.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
             Text("VW",color=accent,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.h5)
-            Column(Modifier.weight(1f)){Text(editor.document?.title?:"Visual Workbench",fontWeight=FontWeight.SemiBold);Text(editor.document?.let{"${it.width} × ${it.height} px · revision ${it.render.revision.hostSeq}"}?:"A precise workspace for shared visual work",style=MaterialTheme.typography.caption,color=Color(0xff9cabbc))}
-            TextButton(onClick=controller::openAi,enabled=editor.document!=null&&!editor.busy){Text("AI edit")}
+            Column(Modifier.weight(1f)){Text(editor.document?.title?:"Visual Workbench",fontWeight=FontWeight.SemiBold);Text(editor.document?.let{"${it.width} × ${it.height} ${if(documentState.descriptor==null)"px" else "document units"} · revision ${it.render.revision.hostSeq}"}?:"A precise workspace for shared visual work",style=MaterialTheme.typography.caption,color=Color(0xff9cabbc))}
+            TextButton(onClick=controller::openAi,enabled=editor.document!=null&&!editor.busy&&documentState.descriptor==null){Text("AI edit")}
             commandButton(Command.Import,action);commandButton(Command.Undo,action,enabled=editor.document?.render?.revision?.canUndo==true);commandButton(Command.Redo,action,enabled=editor.document?.render?.revision?.canRedo==true);commandButton(Command.Export,action,enabled=editor.document!=null)
         }
         editor.originalFormatNotice?.let{Text(it,Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=8.dp),style=MaterialTheme.typography.caption)}
+        PrecisionControls(controller.precision)
         AiResultStatus(controller)
         Row(Modifier.weight(1f)){
             Column(Modifier.width(178.dp).fillMaxHeight().background(Color(0xff141e29)).padding(12.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
@@ -383,9 +417,10 @@ fun main(args: Array<String>) {
             }
             Box(Modifier.weight(1f).fillMaxHeight()){
                 EditorCanvas(controller,editor)
-                if(editor.canvasReady&&editor.background!=null)EraserOverlay(controller.erasers,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
-                if(editor.canvasReady&&editor.background!=null)SelectionOverlay(controller.selections,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
-                if(editor.document!=null&&(editor.renderIssue!=null||!editor.canvasReady||editor.background==null)){
+                PrecisionHandles(controller.precision)
+                if(editor.canvasReady&&(editor.background!=null||editor.documentFrame!=null))EraserOverlay(controller.erasers,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
+                if(editor.canvasReady&&(editor.background!=null||editor.documentFrame!=null))SelectionOverlay(controller.selections,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
+                if(editor.document!=null&&(editor.renderIssue!=null||!editor.canvasReady||(editor.background==null&&editor.documentFrame==null))){
                     val status=editor.backgroundIssue?.takeIf{editor.background==null}?:editor.renderIssue?:if(!editor.canvasReady)"Preparing this revision…"else if(editor.busy)"Loading the original image…"else"The original image is not currently displayed. Retry image display or review the project status."
                     Column(Modifier.align(Alignment.Center).widthIn(max=440.dp).padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
                         Text(status,color=Color(0xffaebccb))
@@ -400,6 +435,7 @@ fun main(args: Array<String>) {
                 };if(editor.busy||quitting)LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
             }
             Column(Modifier.width(390.dp).fillMaxHeight().background(Color(0xff141e29)).padding(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
+                if(documentState.descriptor!=null)Column(Modifier.heightIn(max=330.dp).verticalScroll(rememberScrollState())){EditableDocumentControls(controller.documents,saveDocument)}
                 Text("PROPERTIES",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc));Text(if(editor.selected.isEmpty())"New marks"else"${editor.selected.size} selected",fontWeight=FontWeight.Medium)
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){palette.forEach{rgba->Box(Modifier.size(24.dp).background(Color(((rgba and 255u)shl 24 or(rgba shr 8)).toInt()),RoundedCornerShape(5.dp)).border(if(editor.color==rgba)2.dp else 0.dp,Color.White,RoundedCornerShape(5.dp)).clickable{controller.color(rgba)})}}
                 Text("Width  ${"%.1f".format(editor.width)} px",style=MaterialTheme.typography.body2);Slider(value=editor.width.toFloat(),onValueChange={controller.width(it.toDouble(),false)},onValueChangeFinished={controller.commitWidth()},valueRange=.25f..256f,enabled=!editor.busy)

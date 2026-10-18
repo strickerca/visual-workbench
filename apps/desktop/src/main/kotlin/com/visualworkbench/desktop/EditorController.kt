@@ -3,6 +3,7 @@ package com.visualworkbench.desktop
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import com.visualworkbench.shared.*
+import com.visualworkbench.desktop.precision.precisionResizeHit
 import com.visualworkbench.bindings.host.HostService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +23,8 @@ data class EditorState(val document:DocumentSnapshot?=null,val background:ImageB
     val sync:SessionStatus?=null,val peerFrame:PeerFrame?=null,val peerViewport:PeerViewport?=null,
     val routeWarnings:List<TetherRouteWarning> = emptyList(),val previewStyles:Map<String,ObjectStyle> = emptyMap(),
     val wetStroke:RenderItem?=null,val shareViewport:Boolean=false,val sessionRole:ProjectSessionRole?=null,
-    val backgroundIssue:String?=null,val backgroundFailureKind:CoreFailureKind?=null,val originalFormatNotice:String?=null) {
+    val backgroundIssue:String?=null,val backgroundFailureKind:CoreFailureKind?=null,val originalFormatNotice:String?=null,
+    val documentFrame:DocumentDrawFrame<AutoCloseable>?=null,val documentPage:UInt=0u,val precision:PrecisionFrame=PrecisionFrame()) {
     val exportReady:Boolean get()=exportReceipt?.request?.matches(this)==true
 }
 private data class Drag(val start:Point,val initial:ViewState,val selected:List<RenderItem>,val bounds:Rect?,val resize:Boolean,val pan:Boolean,val binding:RenderBinding,val live:ObjectPreviewLease?=null,val newObject:NewObjectPreviewLease?=null,val tool:Tool=Tool.Select)
@@ -31,6 +33,32 @@ private data class CachedExport(val workspace:TransferWorkspace,val receipt:Comp
 class EditorController internal constructor(private val scope:CoroutineScope,val core:WorkbenchCore,private val handoff:DesktopHandoff,val location:LocationPolicy,private val deviceId:String,workRoot:Path=location.path.resolve(".handoff")) {
     constructor(scope:CoroutineScope,core:WorkbenchCore,host:HostService,location:LocationPolicy,deviceId:String,workRoot:Path):this(scope,core,NativeDesktopHandoff(host),location,deviceId,workRoot)
     private val mutable=MutableStateFlow(EditorState());val state:StateFlow<EditorState> = mutable
+    private var precisionClosed=false
+    private fun cancelPrecision(){if(!precisionClosed)precision.cancel()}
+    private fun closePrecision(){precision.close();precisionClosed=true}
+    private var panningView=false
+    private var synchronizingPrecision=false
+    val precision:PrecisionController=PrecisionController(core,::precisionChanged)
+    private fun precisionChanged(){if(!closing&&!synchronizingPrecision)update{it.copy(precision=precision.frame())}}
+    private var precisionContact=false
+    private var documentPress:Pair<Point,Point>?=null
+    private var documentPressRegion=false
+    private var documentPressBinding:DocumentFrameBinding?=null
+    private val documentOwner:EditorDocuments=EditorDocuments(scope,core,
+        { val p=project;val snapshot=mutable.value.document;if(p!=null&&snapshot!=null&&!closing)DocumentAttachment(p,snapshot,generation)else null },
+        { val s=mutable.value;!closing&&!s.busy&&queued==0&&!s.exportOpen&&!s.pasteOpen&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(s.textAnchor!=null,s.exportOpen,s.pasteOpen)&&drag==null&&ink==null&&markerPress==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
+        { attached,page -> edits.withLock {
+            if(project!==attached.project||generation!=attached.epoch||mutable.value.document?.render?.revision?.sameDocumentRevision(attached.snapshot.render.revision)!=true)throw DocumentFailure(DocumentFailureKind.Stale)
+            cancelInput();documentOwnerDiscardDraw()
+            val next=(attached.project as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
+            validateDrawing(next)
+            if(closing||project!==attached.project||generation!=attached.epoch)throw DocumentFailure(DocumentFailureKind.Stale)
+            update{it.copy(document=next,documentPage=page,background=null,canvasReady=false,selected=emptySet())};fit()
+        } },{update{it.copy(documentFrame=it.document?.let{snapshot->documentOwnerFrame(snapshot)})}},location.path)
+    val documents:DocumentController get()=documentOwner.controller
+    internal fun documentReader(expected:DocumentDrawFrame<AutoCloseable>?):DocumentDrawLease<com.visualworkbench.desktop.documents.PreparedDocumentTile>? = documentOwner.frame?.takeIf{it===expected}?.acquire()
+    private fun documentOwnerFrame(snapshot:DocumentSnapshot)=documentOwner.matchingFrame(snapshot,generation)
+    private suspend fun documentOwnerDiscardDraw(){documentOwner.discardDraw()}
     private var project:WorkbenchProject?=null;private var changes:Job?=null;private val edits=Mutex();private var drag:Drag?=null
     private var closing=false;private var queued=0;private var colorAssumed=false;private var generation=0L
     private val transferFiles=TransferFiles(workRoot);private var transferJob:Job?=null;private var cachedExport:CachedExport?=null
@@ -73,6 +101,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     internal fun aiResultFrame(): AiResultFrame<AiBitmap>? = aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),mutable.value.view.camera,aiPoses())}
     internal fun aiResultReady(): Boolean = mutable.value.document?.render?.items?.none{it.shape is Shape.Result} != false || aiResultFrame()!=null
     fun openAi() {
+        if(documents.state.value.descriptor!=null){report("AI image edits require a raster image document.");return}
         val current=mutable.value
         if(closing||current.busy||current.document==null||current.textAnchor!=null||current.exportOpen||current.pasteOpen)return
         if(instructionEditor.hasUnsaved()){report("Save or discard the instruction draft before opening AI review.");return}
@@ -90,7 +119,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
         try{if(closing)ai.close()else ai.detach()}
         finally{try{if(closing)aiResults.close()else aiResults.detach()}finally{if(closing)aiService.close()}}
     }
-    private data class MarkerPress(val binding: RenderBinding, val first: Point, val camera: Camera, val invertSnapping: Boolean, var end: Point = first)
+    private data class MarkerPress(val binding: RenderBinding, val first: Point, val camera: Camera, val invertSnapping: Boolean, val physical:Transform, var end: Point = first)
     private var markerPress: MarkerPress? = null
     val instructionEditor = InstructionEditor(scope, edits,
         { val p = project; val d = mutable.value.document; if (p != null && d != null && !closing) InstructionAttachment(p, d) else null },
@@ -141,7 +170,12 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     }
     fun chooseEraser(value:EraserChoice){cancelInput();erasers.tools.choose(value,mutable.value.selected.singleOrNull());update{it.copy(textAnchor=null)}}
     fun stopErasing(){cancelInput();erasers.tools.drawing()}
-    private fun update(f:(EditorState)->EditorState){val before=mutable.value;var next=f(before);if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.close();preparedDrag=null;next=next.copy(dragPrepared=false)};if(next.exportCheck?.request?.matches(next)==false)next=next.copy(exportCheck=null);mutable.value=next;if(next.document!==before.document)ai.changed();if(next.document!==before.document||next.view.camera!=before.view.camera||next.preview!=before.preview||next.peerFrame!=before.peerFrame)aiResults.request();selections.viewport(next.view.camera);erasers.viewport(next.view.camera);if(next.shareViewport&&(next.view.camera!=before.view.camera||!before.shareViewport))scheduleViewport()}
+    private fun update(f:(EditorState)->EditorState){val before=mutable.value;var next=f(before);
+        if(!closing&&!synchronizingPrecision&&next.view.camera.viewportWidth>1&&next.view.camera.viewportHeight>1&&precision.baseCamera()!=next.view.camera){
+            synchronizingPrecision=true
+            try{if(panningView)cancelPrecision()else cancelInput();precision.synchronize(next.view.camera);next=next.copy(precision=precision.frame(),preview=emptyMap(),previewStyles=emptyMap(),draft=null,wetStroke=mutable.value.wetStroke)}finally{synchronizingPrecision=false}
+        }
+if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.close();preparedDrag=null;next=next.copy(dragPrepared=false)};if(next.exportCheck?.request?.matches(next)==false)next=next.copy(exportCheck=null);mutable.value=next;if(next.document!==before.document)ai.changed();if(next.document!==before.document||next.view.camera!=before.view.camera||next.preview!=before.preview||next.peerFrame!=before.peerFrame)aiResults.request();selections.viewport(next.view.camera);erasers.viewport(next.view.camera);documents.viewport(next.view.camera);if(next.shareViewport&&(next.view.camera!=before.view.camera||!before.shareViewport))scheduleViewport()}
     internal suspend fun compileForMcp(choice:com.visualworkbench.desktop.mcp.McpCompileChoice):WorkbenchCompiledPackage = edits.withLock {
         val view=mutable.value;val document=view.document?:throw PackageFailure(PackageFailureKind.Invalid)
         if(closing||view.busy||ai.state.value.open||semanticEditor.state.value.busy||instructionEditor.state.value.busy||drag!=null||ink!=null||inkWork!=null||widthGesture!=null||instructionEditor.hasUnsaved())throw PackageFailure(PackageFailureKind.Busy)
@@ -222,6 +256,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
                     } catch (error: Exception) {
                         report(when (error) {
                             is HandoffFailure, is TransferFailure, is java.nio.file.FileAlreadyExistsException -> transferMessage(error)
+                            is DocumentFailure -> documentFailureText(error)
                             is CoreFailure -> if(error.kind==CoreFailureKind.ImageCodecUnavailable) "A compatible image decoder is unavailable on this system. The original is preserved." else "Core ${error.kind.name.lowercase()}. The last accepted revision is preserved."
                             is SessionFailure -> sessionMessage(error)
                             is UnsupportedOperationException -> error.message ?: "This document feature is unavailable."
@@ -234,7 +269,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     }
     private fun transfer(epoch:Long,block:suspend()->Unit):Job?{if(transferJob?.isActive==true){report("A transfer is already running. Finish or cancel it first.");return null};val job=task(epoch,block);transferJob=job;return job}
     private suspend fun discardExport(){preparedDrag?.second?.close();preparedDrag=null;val prior=cachedExport;cachedExport=null;update{it.copy(exportReceipt=null,exportCheck=null,dragPrepared=false)};prior?.workspace?.close()}
-    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();refreshOriginalFormatNotice();loadBackground();refreshRole(value,generation)
+    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();documentOwner.detach();if(!precisionClosed)precision.reset();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();documentOwner.bind(value,snapshot);fit();refreshOriginalFormatNotice();loadBackground();refreshRole(value,generation)
         changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
         }finally{withContext(NonCancellable){
             try { if(!adopted)value.close() }
@@ -242,6 +277,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
         }}
     }
     private suspend fun refreshOriginalFormatNotice(){
+        if(documents.state.value.descriptor!=null){update{it.copy(originalFormatNotice=null)};return}
         val owner=project?:return
         val formats=owner as? WorkbenchOriginalFormats?:return
         val snapshot=mutable.value.document?:return
@@ -265,6 +301,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     }
     private suspend fun loadBackground(){
         val p=project?:return;val doc=mutable.value.document?:return;val epoch=generation;val assumed=colorAssumed
+        if(documents.state.value.descriptor!=null){update{it.copy(background=null,needsColorConsent=false,backgroundIssue=null,backgroundFailureKind=null)};return}
         fun current()=!closing&&project===p&&generation==epoch&&mutable.value.document?.documentId==doc.documentId
         if(!current())return
         update{it.copy(backgroundIssue=null,backgroundFailureKind=null)}
@@ -287,6 +324,32 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     fun retryBackground():Job?=task(generation){loadBackground()}
     fun assumeSrgb(){task(generation){colorAssumed=true;loadBackground()}}
     private fun validateDrawing(snapshot:DocumentSnapshot){if(snapshot.render.items.any{it.shape is Shape.Adjustment})throw UnsupportedOperationException("This document contains adjustment objects that the desktop canvas cannot display yet. Its original and saved edits are preserved.")}
+    fun importEditable(path:Path,password:String?,epoch:Long=generation):Job? = transfer(epoch){
+        documents.settle();documentOwner.discardDraw()
+        val suffix=path.fileName.toString().substringAfterLast('.',"").lowercase(java.util.Locale.ROOT)
+        val kind=when(suffix){"pdf"->EditableKind.Pdf;"svg"->EditableKind.Svg;else->throw DocumentFailure(DocumentFailureKind.Invalid)}
+        documentOwner.ensureJobs()
+        val bytes=withContext(Dispatchers.IO){
+            java.nio.channels.Channels.newInputStream(Files.newByteChannel(path,setOf(java.nio.file.StandardOpenOption.READ,java.nio.file.LinkOption.NOFOLLOW_LINKS))).use{input->
+                val cap=if(kind==EditableKind.Svg)4*1024*1024 else 64*1024*1024
+                val output=ByteArrayOutputStream();val buffer=ByteArray(65536)
+                while(true){ensureActive();val count=input.read(buffer);if(count<0)break;if(count==0||count>cap-output.size())throw DocumentFailure(DocumentFailureKind.Limit);output.write(buffer,0,count)}
+                output.toByteArray()
+            }
+        }
+        val inspected=DocumentInteraction(documentOwner.jobs,core).inspect(bytes,kind,password)
+        val time=System.currentTimeMillis();val id=core.newId(time.toULong());val destination=location.path.resolve("$id.vwb").toAbsolutePath()
+        val value=(core as? WorkbenchDocumentsCore?:throw DocumentFailure(DocumentFailureKind.Unavailable)).createDocument(CreateDocument(destination.toString(),id,core.newId(time.toULong()),deviceId,path.fileName.toString().take(256),bytes,inspected.first.sourceBlake3,kind,inspected.second,time,password))
+        attach(value,destination)
+    }
+    fun saveDocument(copy:DocumentExport,destination:Path):Job? = transfer(generation){
+        if(!documents.exportPublicationAvailable)throw DocumentFailure(DocumentFailureKind.Unsupported)
+        if(documents.checkedExport()!==copy)throw DocumentFailure(DocumentFailureKind.Stale)
+        val current=project as? WorkbenchDocumentsProject?:throw DocumentFailure(DocumentFailureKind.Unavailable)
+        val id=documents.state.value.descriptor?.documentId?:throw DocumentFailure(DocumentFailureKind.Stale)
+        current.publishDocumentCopy(id,destination.toAbsolutePath().toString(),copy)
+        report("Document copy saved.")
+    }
     fun importImage(path:Path)=importFile(ImportRequest(generation,path.toAbsolutePath().normalize()))
     fun importFile(request: ImportRequest, onStaged: (Boolean) -> Unit = {}, retainAcceptedDrop: Boolean = false): Job? {
         val completed = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -319,19 +382,19 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
         if (job == null) finish(false) else job.invokeOnCompletion { finish(false) }
         return job
     }
-    private suspend fun createImported(input:Path,work:Path,title:String){val streaming=core as? WorkbenchStreamingCore?:throw HandoffFailure("Streaming import is unavailable in this core binding.");val time=System.currentTimeMillis();val id=core.newId(time.toULong());val destination=location.path.toAbsolutePath().resolve("$id.vwb");withContext(Dispatchers.IO){Files.createDirectories(location.path)};val value=try{streaming.createFile(CreateFileProject(destination.toString(),id,core.newId(time.toULong()),core.newId(time.toULong()),deviceId,title.take(256),input.toString(),work.toString(),time))}catch(error:CoreFailure){if(error.kind==CoreFailureKind.Raster)throw HandoffFailure("Image import refused. Images over 50 MP, unsupported profiles and sources exceeding the 256 MiB memory budget are not accepted; the original was not resized.");throw error};attach(value,destination)}
+    private suspend fun createImported(input:Path,work:Path,title:String){if(documents.state.value.descriptor!=null){documents.settle();documentOwner.discardDraw()};val streaming=core as? WorkbenchStreamingCore?:throw HandoffFailure("Streaming import is unavailable in this core binding.");val time=System.currentTimeMillis();val id=core.newId(time.toULong());val destination=location.path.toAbsolutePath().resolve("$id.vwb");withContext(Dispatchers.IO){Files.createDirectories(location.path)};val value=try{streaming.createFile(CreateFileProject(destination.toString(),id,core.newId(time.toULong()),core.newId(time.toULong()),deviceId,title.take(256),input.toString(),work.toString(),time))}catch(error:CoreFailure){if(error.kind==CoreFailureKind.Raster)throw HandoffFailure("Image import refused. Images over 50 MP, unsupported profiles and sources exceeding the 256 MiB memory budget are not accepted; the original was not resized.");throw error};attach(value,destination)}
     fun showPaste(){if(!mutable.value.busy)update{it.copy(pasteOpen=true)}}
     fun dismissPaste(){update{it.copy(pasteOpen=false)}}
     fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
     fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one image or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension !in setOf("png","jpg","jpeg","webp","heic","heif","avif","bmp","tif","tiff","mp4")){report("This drop supports PNG, JPEG, WebP, BMP, TIFF, admitted HEIC/AVIF originals and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
     fun open(path:Path,epoch:Long=generation){task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
-    suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
+    suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();documentOwner.close();closePrecision();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
     fun closeProject(){if(!mayCloseAi())return;if(!mayCloseInstructions())return;cancelInput();sessionWork?.cancel();task(generation){
         // The pre-enqueue check can become stale while another owner holds
         // edits. task has now set busy under that same mutex, fencing Send.
         if(!mayCloseAi())return@task
         if(!sealInstructionsForClose())return@task
-        try { live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
+        try { live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();documentOwner.detach();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
         finally { if(!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
     }}
     private suspend fun refresh(){
@@ -355,6 +418,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
         }
         selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)
         instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh()
+        documentOwner.bind(p,snapshot)
         refreshOriginalFormatNotice()
         refreshRole(p,epoch)
     }
@@ -392,20 +456,61 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     fun select(id:String,extend:Boolean=false){val item=mutable.value.document?.render?.items?.firstOrNull{it.objectId==id}?:return;if(item.locked)return;cancelWidth();update{it.copy(selected=if(extend)it.selected.toggle(id)else setOf(id),color=item.style.rgba,width=item.style.width.coerceIn(.25,256.0))};instructionFocus.localSelection(mutable.value.selected.singleOrNull());if(item.shape is Shape.Marker)instructionEditor.focusObject(id)}
     fun selectAll(){instructionFocus.localSelection(null);update{it.copy(selected=it.document?.render?.items?.filterNot{item->item.locked}?.map{item->item.objectId}?.toSet()?:emptySet())}}
     fun clearSelection(){instructionFocus.localSelection(null);cancelInput();update{it.copy(selected=emptySet(),preview=emptyMap(),draft=null,textAnchor=null)}}
-    fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false){if(ai.state.value.open||(!panButton&&mutable.value.tool!=Tool.Pan&&!aiResultReady()))return;val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||s.background==null||(!s.canvasReady&&!panButton&&s.tool!=Tool.Pan)||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||(s.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
+    private fun pointerAllowed(panButton:Boolean):Boolean {
+        val s=mutable.value
+        return !closing&&!ai.state.value.open&&(panButton||s.tool==Tool.Pan||aiResultReady())&&!s.busy&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&s.document!=null&&(s.background!=null||s.documentFrame!=null)&&(s.canvasReady||panButton||s.tool==Tool.Pan)&&s.renderIssue==null&&s.textAnchor==null&&!s.exportOpen&&!s.pasteOpen&&instructionAdmission.allows(false,false,false)
+    }
+    fun precisionDown(raw:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long,pressure:Float=1f,semanticModifier:Boolean=false){
+        if(!pointerAllowed(panButton))return
+        cancelInput()
+        val state=mutable.value;val pan=panButton||(state.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
+        if(pan){pointerDown(raw,extend,panButton,uptimeMs,pressure,semanticModifier);return}
+        val physical=precision.inputMatrix(raw);val mapped=precision.route(listOf(raw)).single()
+        val documentMode=documents.state.value
+        if(documentMode.textTool||documentMode.regionTool){
+            val point=core.mapPoints(state.view.camera,true,listOf(mapped)).single()
+            documentPress=point to point;documentPressRegion=documentMode.regionTool
+            documentPressBinding=documentMode.descriptor?.let{DocumentFrameBinding(it.sourceAssetId,it.documentId,documentMode.page,it.revision,generation,0)}
+        }else pointerDown(mapped,extend,false,uptimeMs,pressure,semanticModifier,physical,raw)
+        if(documentPress!=null||eraserPointer||selectionPointer||ink!=null||drag!=null||markerPress!=null||mutable.value.textAnchor!=null){precision.down(raw);precisionContact=true}
+    }
+    fun precisionMove(raw:Point,uptimeMs:Long,pressure:Float=1f){
+        if(precisionContact)precision.move(raw)
+        val mapped=if(precisionContact)precision.route(listOf(raw)).single()else raw
+        val press=documentPress
+        if(press!=null){documentPress=press.first to core.mapPoints(mutable.value.view.camera,true,listOf(mapped)).single();return}
+        pointerMove(mapped,uptimeMs,pressure)
+    }
+    fun precisionUp(raw:Point,uptimeMs:Long,pressure:Float=1f){
+        try{
+            val mapped=if(precisionContact)precision.route(listOf(raw)).single()else raw
+            val press=documentPress
+            if(press!=null){
+                documentPress=null;val binding=documentPressBinding;documentPressBinding=null
+                val current=mutable.value.document
+                if(binding!=null&&generation==binding.attachmentEpoch&&current?.render?.revision?.sameDocumentRevision(binding.revision)==true&&documents.state.value.page==binding.page){
+                    val end=core.mapPoints(mutable.value.view.camera,true,listOf(mapped)).single()
+                    val region=Rect(minOf(press.first.x,end.x),minOf(press.first.y,end.y),kotlin.math.abs(end.x-press.first.x),kotlin.math.abs(end.y-press.first.y))
+                    if(documentPressRegion)documents.region(region)else documents.select(region)
+                }
+            }else pointerUp(mapped,uptimeMs,pressure)
+        }finally{precisionContact=false;precision.end()}
+    }
+    fun precisionHover(raw:Point?){if(!closing)precision.hover(raw)}
+    fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false,physical:Transform?=null,raw:Point=viewPoint){if(ai.state.value.open||(!panButton&&mutable.value.tool!=Tool.Pan&&!aiResultReady()))return;val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||(s.background==null&&s.documentFrame==null)||documents.state.value.busy||(!s.canvasReady&&!panButton&&s.tool!=Tool.Pan)||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||(s.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
         if(!pan)when(erasers.tools.route()){
             EraserInputRoute.Selection->{selectionPointer=selections.interaction.begin(viewPoint,s.view.camera);return}
-            EraserInputRoute.Eraser->{eraserPointer=erasers.interaction.begin(viewPoint,s.view.camera);return}
+            EraserInputRoute.Eraser->{eraserPointer=erasers.interaction.begin(viewPoint,s.view.camera,physicalScale=physical?.let{kotlin.math.hypot(it.a,it.b)}?:s.view.camera.scale);return}
             EraserInputRoute.Blocked->return
             EraserInputRoute.Editor->Unit
         }
         if(selections.state.value.busy||erasers.state.value.busy)return
-        if(s.tool==Tool.Callout&&!pan){markerPress=MarkerPress(binding,point,s.view.camera,semanticModifier);update{it.copy(draft=point to point)};return}
+        if(s.tool==Tool.Callout&&!pan){markerPress=MarkerPress(binding,point,s.view.camera,semanticModifier,physical?:core.cameraMatrix(s.view.camera));update{it.copy(draft=point to point)};return}
         if(s.tool==Tool.Pen&&!pan){beginInk(DesktopSample(point,uptimeMs,pressure),binding);return}
         if(s.tool==Tool.Text&&!pan){update{it.copy(textAnchor=point)};return}
         if(s.tool !in listOf(Tool.Select,Tool.Pan)&&!pan){update{it.copy(draft=point to point)};drag=Drag(point,s.view,emptyList(),null,false,false,binding,newObject=newObjectPreview(s,binding),tool=s.tool);return}
-        var selected=s.document?.render?.items?.filter{it.objectId in s.selected}?:emptyList();val bounds=union(selected.map{it.bounds});val tolerance=10.0/s.view.camera.scale
-        val resize=!pan&&bounds!=null&&kotlin.math.abs(point.x-bounds.x-bounds.width)<=tolerance&&kotlin.math.abs(point.y-bounds.y-bounds.height)<=tolerance
+        var selected=s.document?.render?.items?.filter{it.objectId in s.selected}?:emptyList();val bounds=union(selected.map{it.bounds})
+        val resize=!pan&&bounds!=null&&precisionResizeHit(bounds,physical?:core.cameraMatrix(s.view.camera),raw,10.0)
         if(!pan&&!resize){val item=s.document?.render?.items?.asReversed()?.firstOrNull{!it.locked&&point.x>=it.bounds.x&&point.x<=it.bounds.x+it.bounds.width&&point.y>=it.bounds.y&&point.y<=it.bounds.y+it.bounds.height};if(item!=null){if(item.objectId !in s.selected||extend)select(item.objectId,extend)}else if(!extend)clearSelection();selected=mutable.value.document?.render?.items?.filter{it.objectId in mutable.value.selected}?:emptyList()}
         if(!pan&&selected.any{it.shape is Shape.Guide}){report("Use selection tools to edit pixel coverage; guides keep their source coordinates.");return}
         drag=Drag(point,s.view,selected,union(selected.map{it.bounds}),resize,pan,binding,if(!pan)previewFor(selected,binding,PreviewKind.HandleDrag)else null)
@@ -417,7 +522,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
             update { it.copy(draft = press.first to press.end) }; return
         }
         if(eraserPointer){erasers.interaction.append(viewPoint);return};if(selectionPointer){selections.interaction.append(viewPoint);return};ink?.let{run->val point=core.mapPoints(run.camera,true,listOf(viewPoint)).single();if(!run.offer(DesktopSample(point,uptimeMs,pressure))){cancelInk();report("The input queue or stroke limit was reached. The unfinished stroke was cancelled.")};return};val d=drag?:return;if(!geometryMatches(d.binding,mutable.value)){cancelDrag();return};val point=core.mapPoints(d.initial.camera,true,listOf(viewPoint)).single();val dx=point.x-d.start.x;val dy=point.y-d.start.y
-        if(d.pan){update{it.copy(view=it.view.copy(camera=d.initial.camera.copy(center=Point(d.initial.camera.center.x-dx,d.initial.camera.center.y-dy))))};return}
+        if(d.pan){panningView=true;try{update{it.copy(view=it.view.copy(camera=d.initial.camera.copy(center=Point(d.initial.camera.center.x-dx,d.initial.camera.center.y-dy))))}}finally{panningView=false};return}
         if(mutable.value.draft!=null){update{it.copy(draft=d.start to point)};draftShape(d.tool,d.start,point)?.let{d.newObject?.update(it)};return}
         val b=d.bounds;val preview=d.selected.associate{item->item.objectId to if(d.resize&&b!=null&&b.width>0&&b.height>0)scaledAbout(item.transform,Point(b.x,b.y),((b.width+dx)/b.width).coerceIn(0.01,100.0),((b.height+dy)/b.height).coerceIn(0.01,100.0))else translated(item.transform,dx,dy)}
         update{it.copy(preview=preview)}
@@ -430,7 +535,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
             val current = mutable.value
             if (geometryMatches(binding, current)) {
                 val end = viewPoint?.let { core.mapPoints(press.camera, true, listOf(it)).single() } ?: press.end
-                val matrix = core.cameraMatrix(press.camera)
+                val matrix = press.physical
                 semanticEditor.place(point, ObjectStyle(current.color, current.width), matrix, semanticDropBox(point, end, matrix), press.invertSnapping)
             }
             else report("The document changed. Place the marker again on the current revision.")
@@ -440,7 +545,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
         if(s.draft!=null){val(a,b)=s.draft;val r=Rect(minOf(a.x,b.x),minOf(a.y,b.y),kotlin.math.abs(a.x-b.x),kotlin.math.abs(a.y-b.y));val shape=when(d.tool){Tool.Rectangle->Shape.Rectangle(r);Tool.Ellipse->Shape.Ellipse(r);Tool.Line->Shape.Line(listOf(a,b));Tool.Arrow->Shape.Arrow(listOf(a,b));else->null};update{it.copy(draft=null)};val provisional=d.newObject;val geometry=draftShape(d.tool,a,b);if(provisional!=null){if(geometry!=null)gestureEdit(listOf(EditCommand.Create(provisional.objectId,provisional.layer,geometry,provisional.style)),d.binding,provisional)else live.cancelLater(provisional.attachment,provisional.id)}else if(shape!=null&&r.width+r.height>0.01)create(shape,d.binding);return}
         val edits=s.preview.filter{(id,transform)->d.selected.any{it.objectId==id&&it.transform!=transform}}.map{EditCommand.SetTransform(it.key,it.value)};update{it.copy(preview=emptyMap())};gestureEdit(edits,d.binding,d.live)
     }
-    fun cancelDrag(){markerPress=null;eraserPointer=false;erasers.interaction.cancelGesture();selectionPointer=false;selections.interaction.cancelGesture();val old=drag?.let{it.live?:it.newObject};drag=null;live.cancelLater(old?.attachment,old?.id);update{it.copy(preview=emptyMap(),draft=null)}}
+    fun cancelDrag(){precisionContact=false;documentPress=null;documentPressBinding=null;cancelPrecision();markerPress=null;eraserPointer=false;erasers.interaction.cancelGesture();selectionPointer=false;selections.interaction.cancelGesture();val old=drag?.let{it.live?:it.newObject};drag=null;live.cancelLater(old?.attachment,old?.id);update{it.copy(preview=emptyMap(),draft=null)}}
     private fun newObjectPreview(state:EditorState,binding:RenderBinding):NewObjectPreviewLease?{
         val attachment=live.attachment()?:return null;val shape=draftTemplate(state.tool)?:return null
         val layer=state.document?.layers?.firstOrNull{it.visible&&!it.locked&&it.blend=="normal"}?:return null;val now=System.currentTimeMillis()
@@ -451,7 +556,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
         return ObjectPreviewLease(core.newId(System.currentTimeMillis().toULong()),attached,binding.documentId,item.objectId,kind)
     }
     private fun cancelWidth(){val old=widthGesture;widthGesture=null;live.cancelLater(old?.live?.attachment,old?.live?.id);update{it.copy(previewStyles=emptyMap())}}
-    fun cancelInput(){cancelDrag();cancelWidth();cancelInk()}
+    fun cancelInput(){precisionContact=false;documentPress=null;documentPressBinding=null;cancelPrecision();cancelDrag();cancelWidth();cancelInk()}
     private fun beginInk(first:DesktopSample,binding:RenderBinding){
         val s=mutable.value;val p=project?:return;val doc=s.document?:return;val layer=doc.layers.firstOrNull{it.visible&&!it.locked&&it.blend=="normal"}?:return
         val now=System.currentTimeMillis();val info=doc.render.revision

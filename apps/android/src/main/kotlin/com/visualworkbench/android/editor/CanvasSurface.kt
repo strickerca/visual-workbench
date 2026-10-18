@@ -18,6 +18,10 @@ import androidx.input.motionprediction.MotionEventPredictor
 import com.visualworkbench.android.input.CanvasGestureRouter
 import com.visualworkbench.android.input.PointerTool
 import com.visualworkbench.android.input.StylusInput
+import com.visualworkbench.android.documents.PreparedDocumentTile
+import com.visualworkbench.android.precision.*
+import com.visualworkbench.shared.DocumentDrawLease
+import kotlinx.coroutines.CompletableDeferred
 
 /** One immutable scene slot per surface generation bounds queued render memory. */
 internal class CanvasSurface(context: Context, val controller: EditorController) : SurfaceView(context) {
@@ -28,16 +32,19 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         var dryQueued = false
         var drawn = 0L
         var frontDrawn = 0L
+        var documentReader:DocumentDrawLease<PreparedDocumentTile>?=null
     }
     private data class Frame(val session: RenderSession, val dry: Boolean, val inputMs: Long)
     private val lock = Any()
     private val main = Handler(Looper.getMainLooper())
     private val stylus = StylusInput()
+    private val buttons=PrecisionButtons(controller.precision,controller::precisionInputAllowed)
     private val router = CanvasGestureRouter(controller, ViewConfiguration.get(context).scaledTouchSlop.toDouble())
     private var predictor = MotionEventPredictor.newInstance(this)
     private var renderer: CanvasFrontBufferedRenderer<Frame>? = null
     private var session: RenderSession? = null
     private var retiring = false
+    private var retirement=CompletableDeferred<Unit>().apply{complete(Unit)}
     private var surfaceWidth = 0
     private var surfaceHeight = 0
     private var latest: CanvasScene? = null
@@ -65,7 +72,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow(); attached = true
-        controller.attachCanvas(::publish)
+        controller.attachCanvas(::publish,::retireForProject)
         ensureRenderer()
     }
     override fun onDetachedFromWindow() {
@@ -74,7 +81,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     }
 
     fun cancelInput() {
-        main.removeCallbacks(longPress); router.cancel()
+        main.removeCallbacks(longPress);buttons.reset();router.cancel();controller.cancelPrecision()
         predictor = MotionEventPredictor.newInstance(this)
     }
 
@@ -83,6 +90,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private fun publish(scene: CanvasScene) {
         latest = scene
         val target = session ?: return
+        if(target.latest?.documentFrame!==scene.documentFrame){retireRenderer();return}
         synchronized(lock) { if (!target.closed) target.latest = scene }
         enqueue(target, !wet(scene))
     }
@@ -101,7 +109,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
 
     private fun ensureRenderer() {
         if (!attached || !holder.surface.isValid || width <= 0 || height <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0 || renderer != null || retiring) return
-        val currentSession = RenderSession().also { it.latest = latest }
+        val currentSession = RenderSession().also { it.latest = latest;it.documentReader=latest?.documentFrame?.acquire() }
         session = currentSession
         renderer = CanvasFrontBufferedRenderer(this, object : CanvasFrontBufferedRenderer.Callback<Frame> {
             override fun onDrawFrontBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, param: Frame) {
@@ -109,7 +117,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                     currentSession.frontQueued = false
                     if (currentSession.closed || param.session !== currentSession) null else currentSession.latest?.also { currentSession.frontDrawn = it.revision }
                 } ?: return
-                EditorDrawing.draw(canvas, snapshot)
+                drawOwned(canvas,snapshot,currentSession)
                 if (param.inputMs > 0) main.post { if (!currentSession.closed) controller.drawCallback(param.inputMs) }
             }
             override fun onDrawMultiBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, params: Collection<Frame>) {
@@ -118,7 +126,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                     if (currentSession.closed) null else currentSession.latest?.also { currentSession.drawn = it.revision }
                 }
                 if (snapshot == null) canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-                else EditorDrawing.draw(canvas, snapshot)
+                else drawOwned(canvas,snapshot,currentSession)
             }
             override fun onFrontBufferedLayerRenderComplete(frontBufferedLayerSurfaceControl: SurfaceControlCompat,
                                                             transaction: SurfaceControlCompat.Transaction) {
@@ -158,16 +166,29 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         if (state != null) enqueue(target, state)
     }
 
-    private fun wet(scene: CanvasScene) = scene.provisional.isNotEmpty() || scene.transformed.isNotEmpty() || scene.hidden.isNotEmpty()
+    private fun wet(scene: CanvasScene) = scene.provisional.isNotEmpty() || scene.transformed.isNotEmpty() || scene.hidden.isNotEmpty() || scene.documentDraft!=null
 
-    private fun retireRenderer() {
-        synchronized(lock) { session?.closed = true }
-        session = null
-        val previous = renderer; renderer = null
-        if (previous != null) {
-            retiring = true
-            previous.release(true) { main.post { retiring = false; ensureRenderer() } }
+    private fun drawOwned(canvas:Canvas,snapshot:CanvasScene,target:RenderSession) {
+        val reader=target.documentReader
+        if(snapshot.documentFrame==null)PrecisionDrawing.draw(canvas,snapshot)
+        else reader?.read{tiles->PrecisionDrawing.draw(canvas,snapshot.copy(documentTiles=tiles))}
+    }
+    private suspend fun retireForProject(){latest=null;retireRenderer().await()}
+    private fun retireRenderer():CompletableDeferred<Unit> {
+        val target=session
+        synchronized(lock) { target?.closed = true }
+        session=null
+        val previous=renderer;renderer=null
+        if(previous!=null){
+            retiring=true;retirement=CompletableDeferred()
+            val joined=retirement
+            previous.release(true){main.post{
+                try{target?.documentReader?.close();target?.documentReader=null;joined.complete(Unit)}
+                catch(error:Exception){joined.completeExceptionally(error)}
+                finally{retiring=false;ensureRenderer()}
+            }}
         }
+        return retirement
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -179,7 +200,9 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
             }
             predictor.record(event)
             val packet = stylus.snapshot(event)
+            if(event.actionMasked!=MotionEvent.ACTION_DOWN)buttons.accept(packet)
             router.accept(packet)
+            if(event.actionMasked==MotionEvent.ACTION_DOWN)buttons.accept(packet)
             if (event.actionMasked in setOf(MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL)) {
                 main.removeCallbacks(longPress); controller.predict(null)
                 predictor = MotionEventPredictor.newInstance(this)
@@ -198,7 +221,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         return true
     }
     override fun onHoverEvent(event: MotionEvent): Boolean {
-        try { router.accept(stylus.snapshot(event)) } catch (_: IllegalArgumentException) { controller.predict(null) }
+        try { val packet=stylus.snapshot(event);if(event.actionMasked==MotionEvent.ACTION_HOVER_EXIT)buttons.reset()else buttons.accept(packet);router.accept(packet) } catch (_: IllegalArgumentException) { controller.predict(null) }
         return true
     }
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {

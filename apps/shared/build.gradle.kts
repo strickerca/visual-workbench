@@ -164,7 +164,7 @@ kotlin {
     }
     jvm("desktop")
     sourceSets {
-        commonMain.dependencies { implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0") }
+        commonMain.dependencies { implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0"); implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3") }
         commonTest.dependencies { implementation(kotlin("test")) }
         androidMain {
             kotlin.srcDir("src/jvmMain/kotlin")

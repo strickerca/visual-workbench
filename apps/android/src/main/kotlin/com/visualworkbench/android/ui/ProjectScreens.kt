@@ -21,7 +21,7 @@ internal data class ProjectCard(val id: String, val title: String, val detail: S
 internal fun ProjectsScreen(projects: List<ProjectCard>, busy: Boolean, onOpenImage: () -> Unit, onNewCanvas: () -> Unit,
                             onOpen: (String) -> Unit, onSettings: () -> Unit, onDiagnostics: () -> Unit, onPairing: () -> Unit,
                             onFiles: () -> Unit, onCamera: () -> Unit, cameraCaptures: List<CameraCapture>,
-                            onRetryCamera: (String) -> Unit, onDiscardCamera: (String) -> Unit, onSaveCamera: (String) -> Unit) {
+                            onRetryCamera: (String) -> Unit, onDiscardCamera: (String) -> Unit, onSaveCamera: (String) -> Unit,onDocument:()->Unit = {}) {
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -39,6 +39,7 @@ internal fun ProjectsScreen(projects: List<ProjectCard>, busy: Boolean, onOpenIm
             OutlinedButton(onClick = onFiles, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Browse files") }
             OutlinedButton(onClick = onCamera, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Take photo") }
         }
+        OutlinedButton(onClick=onDocument,enabled=!busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){Text("Open PDF or SVG")}
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (cameraCaptures.isNotEmpty()) Column(Modifier.fillMaxWidth().heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {
             Text("Retained camera originals", style = MaterialTheme.typography.subtitle1)
