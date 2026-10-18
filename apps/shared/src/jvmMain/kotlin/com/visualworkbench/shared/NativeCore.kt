@@ -50,7 +50,8 @@ private suspend fun <T> native(block: suspend (Cancellation) -> T): T = withCont
     try { block(cancellation) } catch (error: CancellationException) { cancellation.cancel(); throw error }
     catch (error: CoreException) { throw mapFailure(error) } finally { cancellation.destroy() }
 }
-private class NativeCore : WorkbenchCore, WorkbenchStreamingCore, WorkbenchDocumentsCore {
+private class NativeCore : WorkbenchCore, WorkbenchStreamingCore, WorkbenchDocumentsCore, WorkbenchGiantImportCore {
+    override suspend fun openGiantOriginal(options: GiantOriginalOptions): GiantPickedOriginal = openGiantOriginalNative(options)
     override suspend fun createDocument(options: CreateDocument): WorkbenchProject = createDocumentNative(options) {
         NativeProject(it).also { project -> project.documentPassword(options.documentId,options.password) }
     }
@@ -66,7 +67,7 @@ private class NativeCore : WorkbenchCore, WorkbenchStreamingCore, WorkbenchDocum
         TextLayout(value.algorithmVersion,value.glyphs.map { GlyphOutline(it.glyphId,it.cluster,it.font,it.x,it.y,it.advance,it.outline.map { p -> p.common() }) },value.width,value.height,value.lineHeight)
     }
 }
-private class NativeProject(val handle: ProjectSession) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject {
+private class NativeProject(val handle: ProjectSession, private val giantOwner: GiantImportOwner<ProjectSession>? = null) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject {
     override suspend fun openGiantImage(binding:WorkflowBinding,diskCacheBytes:ULong,ramCacheBytes:ULong):GiantImage {
         if(closed.get())throw GiantImageFailure(GiantImageFailureKind.Closed)
         val image=openGiantImageNative(handle,binding,diskCacheBytes,ramCacheBytes)
@@ -178,6 +179,11 @@ private class NativeProject(val handle: ProjectSession) : WorkbenchProject, Work
     }
     override suspend fun close(): Unit = releaseNative {
         closeMutex.withLock { if(!closed.get()) {
+            if (giantOwner != null) {
+                giantOwner.close()
+                closed.set(true); documentPasswords.clear(); documentPages.clear()
+                return@withLock
+            }
             // A cancelled open may retain a native child whose close failed.
             // Its actual retirement must settle before the parent worker closes.
             drainUnadoptedGiants()
@@ -243,3 +249,4 @@ internal fun nativeStrokeHandle(stroke: WorkbenchStroke): StrokeGesture = (strok
 
 /** Ownership transfers only at the caller's cancellation-safe handoff. */
 internal fun wrapNativeProject(handle: ProjectSession): WorkbenchProject = NativeProject(handle)
+internal fun wrapNativeGiantProject(owner: GiantImportOwner<ProjectSession>): WorkbenchProject = NativeProject(owner.value, owner)

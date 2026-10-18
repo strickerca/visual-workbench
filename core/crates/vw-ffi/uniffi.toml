@@ -14,4 +14,7 @@ disable_java_cleaner = true
 "PairingServer.close" = "close_session"
 "SessionDiscovery.close" = "close_session"
 "GiantImage.close" = "close_session"
+"GiantPickedOriginal.close" = "close_session"
+"PreparedOriginal.close" = "close_session"
+"GiantBuiltCache.close" = "close_session"
 "SessionResourceCharge.close" = "release_charge"

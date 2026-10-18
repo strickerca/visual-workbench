@@ -1,21 +1,20 @@
-//! Giant-image contracts. Project/native provider registration is composed only
-//! after the dedicated owner returns reviewed source and bounded tests.
+//! Giant-image readers and owned-input facades. Only actual platform producers
+//! mint build capabilities; source paths and runtime admission stay private.
 mod dto;
+mod intake;
 mod producer;
 mod provider;
 mod source;
 mod tiles;
 use crate::ProjectSession;
+pub use intake::*;
+pub use producer::{GiantBuiltCache, PreparedOriginal};
 pub use provider::GiantImage;
 use std::sync::Arc;
 
 /// Consume the complete private publication owner without uncharged intermediate
 /// sessions. An undelivered Arc closes only after its worker state is destroyed;
 /// the accepted destination is never removed by facade construction failure.
-#[allow(
-    dead_code,
-    reason = "Private budgeted root facade awaits the reviewed producer import API"
-)]
 pub(crate) fn adopt_published_project(
     published: producer::PublishedProject,
 ) -> crate::Result<Arc<ProjectSession>> {
