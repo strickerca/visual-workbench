@@ -39,3 +39,16 @@ See `evidence/VERIFICATION_LINEAGE_CONTRACT_20261018.json` for exact paths/hashe
 No four-file verification leaf or other granted platform/privacy source was edited.
 After parent slot handoff, run focused package tests/strict Clippy and send exact
 source/results to Astra before coherent native review/privacy registration.
+
+## Native validation after slot handoff
+
+The image owner released the slot. On unchanged six-file source, all28 package
+unit/integration tests pass across six result blocks, including the seven new
+contract tests. Strict all-target package Clippy passes with warnings denied.
+Both first attempts succeed. Cargo manifests/lock remain identical to accepted
+main; no extra native app build or bindings were needed. Exact results are in
+`evidence/VERIFICATION_LINEAGE_VALIDATION_20261018.json` and its excerpts.
+New lineage source still requires Astra review before main promotion. The current
+verification owner can use this exact typed field/type contract while retaining
+its four-file grant; return tiny root exports/privacy hunks separately. PI1
+ba338ad is fetched only and remains uncomposed pending its independent verdict.

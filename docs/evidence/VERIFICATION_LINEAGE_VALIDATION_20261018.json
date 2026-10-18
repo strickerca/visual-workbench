@@ -1,0 +1,79 @@
+{
+  "date_utc": "2026-10-18",
+  "scope": "Focused native validation of optional verification lineage contract; full failure workflow remains unactivated",
+  "source_commit": "8b7e6ca3766132da8a12ffde2e7b463db8423682",
+  "lineage_code_commit": "88946bae68a265bf98a4e30f2f75b6066a1afc88",
+  "review_status": "New root lineage source awaits Astra review; not promoted to main",
+  "native": {
+    "package": "vw-package",
+    "passed": 28,
+    "failed": 0,
+    "ignored": 0,
+    "result_blocks": 6,
+    "new_contract_cases": 7,
+    "scope": "--lib --tests, two build workers/test threads; normal admission/integrity/semantic/workflow regressions included"
+  },
+  "checks": {
+    "strict_package_clippy": "PASS all targets, warnings denied",
+    "rustfmt_whitespace": "PASS",
+    "schema_validation": "Draft2020-12 structural check and15 lightweight schema fixtures PASS; native cross-field checks covered by executed package tests",
+    "dependency_policy": "Cargo manifests/lock match accepted main; no dependency/pin/license-policy change, prior accepted policy receipt retained",
+    "bindings": "No UniFFI record/export changes and zero regeneration",
+    "source_secret_scan": "PASS",
+    "application_or_device_runs": "None for this internal manifest contract"
+  },
+  "commands": [
+    "cargo test --locked -p vw-package --lib --tests -j2 -- --test-threads=2",
+    "cargo clippy --locked -p vw-package --all-targets -j2 -- -D warnings"
+  ],
+  "source_sha256": [
+    {
+      "path": "contracts/package.schema.json",
+      "bytes": 12518,
+      "sha256": "71e2ed966f050569f5a48c1e48510391ca1f4f2b70b2396ff5e035e555ab4c7b"
+    },
+    {
+      "path": "core/crates/vw-package/src/admission.rs",
+      "bytes": 6782,
+      "sha256": "70c2d1f8b5c65d73b825ba06155f637d97b8c1f309f3e5797eaebd013984773a"
+    },
+    {
+      "path": "core/crates/vw-package/src/compiler.rs",
+      "bytes": 19466,
+      "sha256": "ffb6aa5283f03b8132dcf6a5c63160012fbe5e0e8f4145c2149ed3dd840a9851"
+    },
+    {
+      "path": "core/crates/vw-package/src/manifest.rs",
+      "bytes": 5374,
+      "sha256": "f23aba1b9273b02b44288808495a9cd55618458b8180bf2d8a123bea0697a087"
+    },
+    {
+      "path": "core/crates/vw-package/src/verify.rs",
+      "bytes": 17627,
+      "sha256": "963106340852d0308c1bb78c01ed15e7dd289e2e158b8e37271e6b2b3caf69db"
+    },
+    {
+      "path": "core/crates/vw-package/tests/verification_origin_contract.rs",
+      "bytes": 9564,
+      "sha256": "6163bbe2368347a7815433bd65b28451dfbf9110aa0006faac1e31c8336b2e20"
+    }
+  ],
+  "logs": [
+    {
+      "path": "vw-lineage-package-tests-attempt1.log",
+      "bytes": 4784,
+      "sha256": "9bc1314393d146b9c68aa3442b329212451a692fa9a3791f6ae21ed0ffbc9b16"
+    },
+    {
+      "path": "vw-lineage-package-clippy-attempt1.log",
+      "bytes": 1321,
+      "sha256": "ad61045a2843a1888cd1c2aa3e90ccdae296c9f50ff72a867450f2ce8f174294"
+    }
+  ],
+  "remaining": [
+    "Independent root source review before main promotion",
+    "Compose reviewed store/package leaves, exact private archive-prefix filtering, module/FFI/shared/API registrations",
+    "Actual owner manual assessments, recapture/pixel alignment and full T5.01 activation/hardware acceptance"
+  ],
+  "operations": "No caller/privacy/image grant source edits; no live provider/credentials/signing/deployment/SDK/device action or worktree deletion. PI1 ba338ad fetched only and not integrated."
+}

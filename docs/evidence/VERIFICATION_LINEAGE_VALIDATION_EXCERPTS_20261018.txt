@@ -1,0 +1,27 @@
+Optional verification lineage — executed package validation
+Code: 88946bae68a265bf98a4e30f2f75b6066a1afc88
+Source hashes unchanged from root contract checkpoint. Main remains reviewed30b77615.
+
+LOG vw-lineage-package-tests-attempt1.log
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 27.58s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+test lineage_collection_preflight_precedes_typed_allocation_and_cannot_escape_its_key ... ok
+test lineage_denies_private_unknown_missing_and_duplicate_members ... ok
+test lineage_rejects_self_reference_target_mismatch_bad_hashes_and_malformed_ids ... ok
+test ordinary_packages_omit_lineage_and_absent_or_null_imports_remain_ordinary ... ok
+test lineage_requires_nonempty_unique_in_range_mapping_with_current_marker_count ... ok
+test valid_lineage_cannot_bypass_existing_package_payload_integrity ... ok
+test public_lineage_preserves_mapping_order_and_every_existing_image_and_proof ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.92s
+
+LOG vw-lineage-package-clippy-attempt1.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.29s
+
+Native:28 pass, zero failures/ignored, seven new contract cases.
+Schema:structure plus15 lightweight fixtures pass.
+Strict all-target package Clippy passes; no binding generation or dependency changes.
+No public failure workflow, review verdict, OS/provider/device or physical gate is activated/passed.

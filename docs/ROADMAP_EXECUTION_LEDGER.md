@@ -590,3 +590,9 @@ package functionality; source review/package tests and native leaf/privacy
 composition remain next. Details: VERIFICATION_LINEAGE_ROOT_CONTRACT_20261018.md
 and evidence/VERIFICATION_LINEAGE_CONTRACT_20261018.json. Granted worker files
 are untouched; old worktrees remain with parent disposition.
+
+After image's build-slot handoff, unchanged lineage88946ba passes all28 package
+unit/integration cases (seven new) and strict all-target Clippy on first attempts.
+No binding or dependency change. Native execution receipt/excerpts are
+evidence/VERIFICATION_LINEAGE_VALIDATION_20261018.json. Source review remains
+pending; main stays accepted30b77615 and other grants are untouched.
