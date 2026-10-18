@@ -27,6 +27,23 @@ pub(super) fn admit_options(options: &SelectionEdit) -> SelectionResult<()> {
         admit_version(other)?;
     }
     match &options.operation {
+        SelectionOperation::ImportCoverage {
+            width,
+            height,
+            coverage,
+            ..
+        } => {
+            let size = Size::new(*width, *height)?;
+            if coverage.len() != size.pixels() {
+                return Err(SelectionError::Invalid);
+            }
+            // Include the caller/proposal and marshaling copies in addition to
+            // the existing mask pipeline reservation, before worker allocation.
+            memory(
+                mask_estimate(size, coverage.len() as u64 * 4)?,
+                options.memory_budget_bytes,
+            )
+        }
         SelectionOperation::Lasso { points, .. }
         | SelectionOperation::Polygon {
             vertices: points, ..
@@ -48,7 +65,33 @@ pub(super) fn apply(
     cancel: &Cancellation,
 ) -> SelectionResult<SelectionReceipt> {
     let canonical = canonical_workspace(state, options.memory_budget_bytes, true)?;
+    if let SelectionOperation::ImportCoverage {
+        width,
+        height,
+        coverage,
+        ..
+    } = &options.operation
+    {
+        // Include the borrowed canonical estimate before check_binding hashes
+        // or clones visible state; input bytes were admitted before queueing.
+        memory(
+            mask_estimate(
+                Size::new(*width, *height)?,
+                canonical
+                    .checked_add(coverage.len() as u64 * 4)
+                    .ok_or(SelectionError::Limit)?,
+            )?,
+            options.memory_budget_bytes,
+        )?;
+    }
     let doc = check_binding(state, &options.binding)?;
+    if let SelectionOperation::ImportCoverage { width, height, .. } = &options.operation {
+        // The borrowed canonical estimate precedes binding hash/clone work.
+        // Refuse resampling and partial masks before any coverage allocation.
+        if doc.width != *width || doc.height != *height {
+            return Err(SelectionError::Invalid);
+        }
+    }
     let size = Size::new(doc.width, doc.height)?;
     let id = Id::try_from(options.transaction_id.clone())?.to_proto();
     if state.previous(&id)?.is_some() {
@@ -59,6 +102,7 @@ pub(super) fn apply(
         return Err(SelectionError::Invalid);
     }
     let input_bytes = match &options.operation {
+        SelectionOperation::ImportCoverage { coverage, .. } => coverage.len() as u64 * 4,
         SelectionOperation::Lasso { points, .. }
         | SelectionOperation::Paint { points, .. }
         | SelectionOperation::Polygon {
@@ -375,6 +419,20 @@ fn apply_math(
             .collect::<Vec<_>>()
     };
     match &options.operation {
+        SelectionOperation::ImportCoverage {
+            width,
+            height,
+            coverage,
+            combine: how,
+        } => {
+            let size = Size::new(*width, *height)?;
+            if size != base.size() || coverage.len() != size.pixels() {
+                return Err(SelectionError::Invalid);
+            }
+            // Existing closed add/subtract/intersect labels and mask algorithm
+            // record the resulting coverage in canonical MaskOp history.
+            combine(Mask::from_dense(size, coverage)?, *how)
+        }
         SelectionOperation::Rectangle {
             rectangle: r,
             combine: how,

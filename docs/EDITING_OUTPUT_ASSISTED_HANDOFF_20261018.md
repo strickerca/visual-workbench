@@ -188,7 +188,9 @@ mayMutate, committed, ::imageFrameWorkflows)`. Compose the new platform
 `ImageFramesPanel(controls, activate)` for image/capture documents. Feed bind on
 all admitted current snapshots and observe immediately on ordered OPS. Preserve
 captured full tokens, dirty-form/retry departure guards and state.blocksInput.
-Signal beginDeparture before waiting for the root mutation gate; await detach
+Check departure permission before signaling beginDeparture (which intentionally
+makes the control unready); signal it before waiting for the root mutation gate.
+Do not re-admit UI callbacks during that wait. Await detach
 before project/document replacement and close before parent-scope disposal.
 
 Full-canvas tones use the EXISTING background/viewport owner, not the frame-panel
@@ -209,11 +211,150 @@ explicit integration; no new tile/provider/cache manager was created here.
 
 ## Assisted proposal import and correction
 
-To be finalized after focused checks. No model/runtime artifacts are downloaded
-or selected by this lane. Existing manual selection remains authoritative.
+Only four existing source paths receive bounded additive changes: common
+`MaskApi.kt`, JVM `NativeMasks.kt`, native `masks/dto.rs` and `masks/edit.rs`.
+The new `SelectionOperation.ImportCoverage(width, height, coverage, combine)`
+checks full oriented-source dimensions/byte count and reserves input/canonical
+working copies before copying or hashing. It uses the ordinary selection target,
+version, native mask math, immutable blob, transaction identity and undo history.
+No protocol schema or second mutation/selection engine is introduced. Regenerate
+bindings once in the phase batch for this additional enum variant.
+
+New common `AssistedSelectionApi.kt` and `AssistedSelectionInteraction.kt` own
+one exact `AssistedSelectionSource(SelectionDocument, page, attachmentEpoch)`.
+The controller constructor receives the existing WorkbenchSelections, shared
+mutation mutex, metadata allocator, currentness predicate, afterMutation callback,
+mandatory existing process-pool factory, and optional admitted pins/backend.
+`prompt` owns at most 64 real document-space points and one latest queued prompt;
+one completed encoder session reuses its actual embeddings. Public proposal
+previews copy at most 256-square coverage regions. Explicit Accept imports once,
+returns the actual SelectionReceipt and never fabricates a workflow receipt.
+
+Required Android caller composition:
+
+1. Construct from the actual current SelectionDocument; `isCurrent` must compare
+   the real project reference, complete binding/source identity, page and epoch.
+   Do not use a constant predicate or derive validity from dimensions alone.
+2. Map real pen taps through the existing captured-camera mapping, then
+   `appendAssistedPenPrompt` and `prompt`. Compose the dedicated
+   `assistedselection/AssistedSelectionPanel.kt` without replacing its canvas,
+   manual SelectionInteraction, project or command dispatcher. For the main
+   canvas proposal overlay, request bounded current viewport regions through
+   proposal.tile under its source/sequence fence and reuse the existing overlay
+   painter; do not invent a committed SelectionVersion for an unsaved proposal.
+3. Invalidate before ordered refresh; await successful close before replacing or
+   closing the borrowed project. Preserve the owner and its exact charges after
+   failed retirement. Cancellation never credits an unjoined worker as retired.
+4. After any attempted import, refresh through afterMutation even if receipt is
+   null: the edit may have crossed its durable point. Once the callback returns,
+   schedule controller retirement; never synchronously call this same owner's
+   close from inside afterMutation (it would join its own operation). Route the
+   saved object ID to existing SelectionInteraction.useObject for Add/Subtract,
+   invert/expand/shrink/feather and ordinary mask editing.
+
+There is deliberately no selected production backend, model, artifact download
+or invented output. Missing pins/backend reports Unavailable and keeps manual
+selection usable. Runtime admission must hash real local artifacts and check
+closed model/runtime/license admissions before returning inspected execution and
+working-set bounds. It may not load weights/embeddings/source buffers before the
+existing session-pool reservation. CPU capability is mandatory; only a settled
+Unsupported preferred initialization may try that admitted CPU initialization
+once. Cancellation/storage/inference failures never loop or choose an unadmitted
+runtime. Actual model selection, hash/license/runtime pins, Android implementation
+and S23 NPU/GPU/CPU inference/timing remain external dependencies; this source
+candidate does not complete SEL-001.
 
 ## Checks and proposed deferred-ledger rows
 
-Focused results and final candidate identity are filled at source freeze. Native
-registration/bindings, broad compilation/Clippy/licensing, platform/device and
-end-to-end acceptance are deferred to the coordinator's aggregate batch.
+Output checkpoint: `f8a5bc8201873a7688a1b72e3d17c45801a52b76`.
+Twenty-five focused ImageFrames form/API/lifecycle JVM cases pass, with warnings
+denied and strict explicit API common compilation. The focused harness uses the
+saved Kotlin compiler and native expect stubs only; product generated bindings
+and Compose are not compiled by this check. Twenty-one focused assisted-source
+cases also pass with warnings denied and strict common compilation. Their test
+fixtures inject native capabilities/resource charges; no actual model inference
+runs. The earlier test-only unnecessary-nonnull warning failure and one failed
+retirement-status assertion were repaired, then the full focused suite reran
+successfully. Forty-six focused JVM cases pass in total. All owned Kotlin syntax and commonMain import checks, native rustfmt
+and scoped whitespace checks pass. Review findings were repaired with cases for
+departure, source-side bounds, reentrant ownership, terminal cancellation and
+failed retirement. No expensive native/platform/device run was performed.
+
+| Scope | Exact deferred command/journey | Prerequisites | Expected result | Status |
+|---|---|---|---|---|
+| Output engines: 30 written cases | `cargo test --locked -p vw-geom -p vw-model -p vw-raster --test image_output -j2 -- --test-threads=1` | Module, model validation, renderer and metadata hooks above | Exact independent quarter-turn pixels, premultiplied resize/alpha/ICC/depth, legacy guides, D-coordinate preservation, O metadata and cancellation pass | Unrun |
+| Frame/import FFI: 10 written cases | `cargo test --locked -p vw-ffi --test image_frames --test selection_import -j2 -- --test-threads=1` | Registered enum/FFI and metadata-aware external codec adapter | Read-only drafts, one undo/redo/retry, source bytes, ordinary correction, stale/lock/cancel/memory/corruption and embedded D/O provenance pass | Unrun |
+| Shared and platform callers | Final `:shared:desktopTest`, both-app unit tests, instrumentation source compile and lint | One fresh binding pass, exact root composition, frozen candidate | Current ImageFrames/Assisted tests and existing regressions pass; three Android pen-boundary cases execute; no stale rendered publication/double-paint | Deferred aggregate |
+| Full-canvas/export journey | Original + annotations + layered tones -> full D canvas -> private O crop/quarter-turn/resize -> Apply -> PNG/TIFF export -> Undo/Redo -> reopen | Both real platform roots and admitted codec path | Original unchanged; camera/hit tests remain in D; O pixels/provenance agree; guides/transient geometry are explicitly handled and painted once | Unrun |
+| Mixed-peer/package behavior | New/old peer capability handshake; package containing marker outside crop; output-frame context/lineage tests | Mandatory frame capability and current package mapper integration | Old peer refuses upgrade before sync; no silent omitted instruction or untransformed export; existing lineage/private-review boundaries retained | Unrun |
+| Assisted actual execution | Admitted artifact hashes/licenses -> phone encoder once -> positive/negative pen prompts -> GPU/NPU and admitted CPU fallback -> manual correction -> Undo | Real admitted model/runtime and authorized S23/device slot | Accurate editable mask; measured <=100ms prompts after encoding; cancellation/retirement/source fences and license gate pass | Unavailable external prerequisite; not a feature pass |
+| Final policy/runtime | Affected strict Clippy, root license/dependency checks, final ABI/platform build and device/performance journeys | Coherent reviewed integrated tree, one heavy slot/max two workers | Current-source/artifact receipts; no stale ABI or unsupported runtime claim | Deferred to central ledger |
+
+## Exact unapplied seekable-codec hook
+
+This delta is against the accepted base and belongs to the coordinator/format
+owner. It is included as reviewable text; protected format_images.rs is unchanged.
+
+```diff
+--- a/core/crates/vw-ffi/src/format_images.rs
++++ b/core/crates/vw-ffi/src/format_images.rs
+@@ -161,6 +161,17 @@
+     file: &mut File,
+     cancel: &Cancellation,
+ ) -> Result<(u64, vw_raster::ExportMetadata), RasterError> {
++    encode_private_with_output(source, request, None, cap, file, cancel)
++}
++
++pub(crate) fn encode_private_with_output(
++    source: &DecodedImage,
++    request: &ExportRequest,
++    image_output: Option<vw_raster::ImageOutputMetadata>,
++    cap: u64,
++    file: &mut File,
++    cancel: &Cancellation,
++) -> Result<(u64, vw_raster::ExportMetadata), RasterError> {
+     if request.format == ExportFormat::Bmp8 {
+         return Err(RasterError::Unsupported(
+             "BMP standalone provenance is not supported; use TIFF or PNG",
+@@ -176,8 +187,12 @@
+     let mut admitted = request.clone();
+     admitted.memory_budget_bytes =
+         subtract_retained(request.memory_budget_bytes, retained_source_bytes(source)?)?;
+-    let mut prepared =
+-        vw_raster::prepare_export_pixels(source, &admitted, &|| cancel.is_cancelled())?;
++    let mut prepared = vw_raster::prepare_export_pixels_with_output(
++        source,
++        &admitted,
++        image_output,
++        &|| cancel.is_cancelled(),
++    )?;
+     prepared.metadata.settings = request.clone();
+     let limits = vw_formats::Limits {
+         output_bytes: cap,
+@@ -206,6 +221,15 @@
+     request: &ExportRequest,
+     cancel: &Cancellation,
+ ) -> Result<ExportedImage, RasterError> {
++    encode_buffered_with_output(source, request, None, cancel)
++}
++
++pub(crate) fn encode_buffered_with_output(
++    source: &DecodedImage,
++    request: &ExportRequest,
++    image_output: Option<vw_raster::ImageOutputMetadata>,
++    cancel: &Cancellation,
++) -> Result<ExportedImage, RasterError> {
+     let bound = output_bound(source, request)?;
+     if bound > BUFFERED_LIMIT {
+         return Err(RasterError::EncodedLimit {
+@@ -235,7 +259,8 @@
+     let mut file = tempfile::tempfile().map_err(|_| RasterError::Io)?;
+     let mut admitted = request.clone();
+     admitted.memory_budget_bytes = subtract_retained(request.memory_budget_bytes, copies)?;
+-    let (length, mut metadata) = encode_private(source, &admitted, bound, &mut file, cancel)?;
++    let (length, mut metadata) =
++        encode_private_with_output(source, &admitted, image_output, bound, &mut file, cancel)?;
+     metadata.settings = request.clone();
+     file.seek(SeekFrom::Start(0)).map_err(|_| RasterError::Io)?;
+     let mut bytes = Vec::new();
+```

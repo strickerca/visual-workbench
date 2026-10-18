@@ -47,6 +47,10 @@ public sealed interface SelectionTarget {
     public data class Existing(public val selection: SelectionVersion) : SelectionTarget
 }
 public sealed interface SelectionOperation {
+    /** Full oriented document coverage from a validated source-bound proposal.
+     * The ordinary edit binding/target version remains authoritative. */
+    public data class ImportCoverage(public val width: UInt, public val height: UInt,
+        public val coverage: ByteArray, public val combine: SelectionCombine) : SelectionOperation
     public data class Rectangle(public val rectangle: Rect, public val combine: SelectionCombine) : SelectionOperation
     public data class Lasso(public val points: List<Point>, public val combine: SelectionCombine) : SelectionOperation
     public data class Ellipse(public val rectangle: Rect, public val combine: SelectionCombine) : SelectionOperation
@@ -97,6 +101,10 @@ public fun SelectionBinding.matches(info: ProjectInfo, displayedDocumentId: Stri
 
 internal fun SelectionEdit.ownedSelectionRequest(): SelectionEdit {
     val owned = when (val value = operation) {
+        is SelectionOperation.ImportCoverage -> {
+            admitSelectionCoverage(value.width, value.height, value.coverage.size, memoryBudgetBytes)
+            value.copy(coverage = value.coverage.copyOf())
+        }
         is SelectionOperation.Lasso -> {
             if (value.points.size !in 3..16_384) throw SelectionFailure(SelectionFailureKind.Limit)
             value.copy(points = value.points.toList())
@@ -112,4 +120,18 @@ internal fun SelectionEdit.ownedSelectionRequest(): SelectionEdit {
         else -> value
     }
     return copy(operation = owned)
+}
+
+/** Admit before copying caller bytes or crossing a dispatcher/FFI boundary.
+ * Native checks the dimensions against the actual source before mask allocation. */
+internal fun admitSelectionCoverage(width: UInt, height: UInt, byteCount: Int, budget: ULong): Unit {
+    if (width == 0u || height == 0u || width > 1_000_000u || height > 1_000_000u ||
+        budget == 0uL || budget > 256uL * 1024uL * 1024uL) throw SelectionFailure(SelectionFailureKind.Invalid)
+    val pixels = width.toULong() * height.toULong()
+    if (pixels > 50_000_000uL) throw SelectionFailure(SelectionFailureKind.Limit)
+    if (pixels != byteCount.toULong()) throw SelectionFailure(SelectionFailureKind.Invalid)
+    // Existing mask pipeline (16 bytes/pixel), retained proposal/owned/JVM/FFI
+    // copies (4 bytes/pixel), plus the existing 16 MiB codec reserve.
+    val estimated = pixels * 20uL + 16uL * 1024uL * 1024uL
+    if (estimated > budget) throw SelectionFailure(SelectionFailureKind.Memory, estimated, budget)
 }
