@@ -35,8 +35,10 @@ internal class CanvasGestureRouter(private val sink: CanvasGestureSink, private 
     private var contextShown = false
     private var lastToolTime = 0L
 
-    fun cancel() {
-        if (drawing != null) sink.cancelTool()
+    fun cancel() { resetContact(cancelIdle = true) }
+
+    private fun resetContact(cancelIdle: Boolean) {
+        if (drawing != null || cancelIdle) sink.cancelTool()
         drawing = null; fingerStroke = false; lastFrame = null; navigationStart = null
         maximumFingers = 0; moved = false; contextShown = false
     }
@@ -64,7 +66,7 @@ internal class CanvasGestureRouter(private val sink: CanvasGestureSink, private 
             else lastFrame = withoutLifted(current, packet)
             return
         }
-        if (packet.action == MotionEvent.ACTION_DOWN) cancel()
+        if (packet.action == MotionEvent.ACTION_DOWN) resetContact(cancelIdle = false)
         val fingers = current.pointers.filter { it.tool == PointerTool.Finger }
         val active = drawing
         if (active != null) {

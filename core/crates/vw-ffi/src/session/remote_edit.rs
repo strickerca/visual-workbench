@@ -1401,6 +1401,7 @@ impl LiveSession {
                 eraser: sample.pen_flags & 4 != 0,
                 t_ns: 0,
                 native_pen_flags: Some(sample.pen_flags),
+                native_pen_mask: Some(sample.pen_mask),
             })),
         };
         s.sender

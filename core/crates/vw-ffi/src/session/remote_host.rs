@@ -417,6 +417,7 @@ fn to_sample(target: &Target, event: pb::InputEvent) -> SessionResult<(u64, Eith
                 tilt_y: v.tilt_y.round() as i32,
                 rotation: v.rotation.round() as u32,
                 pen_flags: flags,
+                pen_mask: v.native_pen_mask.unwrap_or(1),
             })
         }
         pb::input_event::Event::Finite(v) => {

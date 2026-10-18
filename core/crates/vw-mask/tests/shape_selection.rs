@@ -19,8 +19,11 @@ fn ellipse_has_independent_small_area_goldens() {
         let mask = Mask::ellipse(size, rect(0.0, 0.0, f64::from(side), f64::from(side))).unwrap();
         assert_eq!(mask.to_dense().unwrap(), vec![200; (side * side) as usize]);
         assert_eq!(
-            Mask::decode_lossless(&mask.encode_lossless().unwrap()).unwrap(),
-            mask
+            Mask::decode_lossless(&mask.encode_lossless().unwrap())
+                .unwrap()
+                .encode_lossless()
+                .unwrap(),
+            mask.encode_lossless().unwrap()
         );
     }
 }
@@ -43,8 +46,11 @@ fn ellipse_translation_clipping_and_quantization_are_exact() {
         }
     }
     assert_eq!(
-        base,
-        Mask::ellipse(size, rect(2.001, 1.001, 2.0, 2.0)).unwrap()
+        base.to_dense().unwrap(),
+        Mask::ellipse(size, rect(2.001, 1.001, 2.0, 2.0))
+            .unwrap()
+            .to_dense()
+            .unwrap()
     );
     let clipped = Mask::ellipse(size, rect(-1.0, -1.0, 2.0, 2.0))
         .unwrap()
@@ -80,10 +86,16 @@ fn polygon_has_exact_rectangle_and_even_odd_hole_answers() {
         Point { x: 1.0, y: 7.0 },
     ];
     let expected = Mask::rectangle(size, rect(1.0, 2.0, 5.0, 5.0)).unwrap();
-    assert_eq!(Mask::polygon(size, &vertices).unwrap(), expected);
+    assert_eq!(
+        Mask::polygon(size, &vertices).unwrap().to_dense().unwrap(),
+        expected.to_dense().unwrap()
+    );
     vertices.reverse();
     vertices.push(vertices[0]);
-    assert_eq!(Mask::polygon(size, &vertices).unwrap(), expected);
+    assert_eq!(
+        Mask::polygon(size, &vertices).unwrap().to_dense().unwrap(),
+        expected.to_dense().unwrap()
+    );
     // Traversing a contour twice cancels under even-odd, regardless of winding.
     let twice: Vec<_> = vertices[..4].iter().copied().cycle().take(8).collect();
     assert_eq!(Mask::polygon(size, &twice).unwrap().tile_count(), 0);
@@ -143,14 +155,14 @@ fn ellipse_rejects_bad_geometry_and_work_before_allocating() {
         Mask::admit_ellipse(tall, rect(0.0, 0.0, 1.0, 1_000_000.0)),
         Err(MaskError::Limit)
     );
-    assert_eq!(
+    assert!(matches!(
         Mask::ellipse(tall, rect(0.0, 0.0, 1.0, 1_000_000.0)),
         Err(MaskError::Limit)
-    );
-    assert_eq!(
+    ));
+    assert!(matches!(
         Mask::polygon(size, &vec![Point { x: 0.0, y: 0.0 }; 16_385]),
         Err(MaskError::Invalid)
-    );
+    ));
 }
 
 #[test]
@@ -194,6 +206,6 @@ fn equal_axis_ellipses_share_existing_opaque_round_dab_coverage() {
         )
         .unwrap();
         let dab = Mask::paint(size, &[center], radius, 255).unwrap();
-        assert_eq!(ellipse, dab);
+        assert_eq!(ellipse.to_dense().unwrap(), dab.to_dense().unwrap());
     }
 }

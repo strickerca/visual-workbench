@@ -112,6 +112,7 @@ fn only_bound_paint_provider_commands_receive_the_larger_parent_deadline() {
             tilt_y: 0,
             rotation: 0,
             pen_flags: 0,
+            pen_mask: 1,
         },
     };
     for request in [finite_request(), wheel, pen, Command::Check { sequence: 2 }] {
@@ -358,6 +359,7 @@ fn late_pen_up_reply_cannot_infer_scoped_device_retirement() -> Result<()> {
             tilt_y: 0,
             rotation: 0,
             pen_flags: 0,
+            pen_mask: 1,
         },
     };
     let mut finite = finite::Fence::with_binding(Some(binding()));

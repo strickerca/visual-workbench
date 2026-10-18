@@ -21,7 +21,8 @@ internal fun SelectionPanel(controller: SelectionController, selectedObject: Str
             SelectionTool.entries.forEach { tool ->
                 OutlinedButton({ actions.tool(tool) }, Modifier.fillMaxWidth(), enabled = !state.busy) {
                     Text((if (state.tool == tool) "• " else "") + when (tool) {
-                        SelectionTool.Rectangle -> "Rectangle"; SelectionTool.Lasso -> "Lasso"
+                        SelectionTool.Rectangle -> "Rectangle"; SelectionTool.Ellipse -> "Ellipse"
+                        SelectionTool.Polygon -> "Polygon"; SelectionTool.Lasso -> "Lasso"
                         SelectionTool.Paint -> "Paint selection"; SelectionTool.MaskEraser -> "Erase mask"
                     })
                 }
@@ -30,6 +31,14 @@ internal fun SelectionPanel(controller: SelectionController, selectedObject: Str
             SelectionCombine.entries.forEach { mode ->
                 TextButton({ actions.combine(mode) }, enabled = !state.busy && state.tool != SelectionTool.MaskEraser) {
                     Text((if (state.combine == mode) "• " else "") + mode.name)
+                }
+            }
+            if (state.tool == SelectionTool.Polygon) {
+                Text("Tap vertices. Drag adjusts the current vertex. Finish saves one selection.")
+                Row {
+                    TextButton({ actions.finishPolygon() }, Modifier.heightIn(min = 48.dp), enabled = state.canFinishPolygon) { Text("Finish polygon") }
+                    TextButton({ actions.undoPolygonVertex() }, Modifier.heightIn(min = 48.dp), enabled = state.canUndoPolygonVertex) { Text("Undo vertex") }
+                    TextButton(actions::cancelGesture, enabled = state.draft != null) { Text("Cancel") }
                 }
             }
             if (state.tool == SelectionTool.Paint || state.tool == SelectionTool.MaskEraser) {

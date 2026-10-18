@@ -724,10 +724,12 @@ fn remote_capability(capabilities: &BTreeSet<String>, body: &Body) -> Result<()>
                         if flags & !7 != 0
                             || p.barrel != (flags & 1 != 0)
                             || p.eraser != (flags & 4 != 0)
+                            || p.native_pen_mask
+                                .is_some_and(|mask| !matches!(mask, 1 | 3 | 13 | 15))
                         {
                             return Err(NetError::Invalid("exact remote pen flags invalid"));
                         }
-                    } else if p.native_pen_flags.is_some() {
+                    } else if p.native_pen_flags.is_some() || p.native_pen_mask.is_some() {
                         return Err(NetError::Invalid("remote flags lack scope"));
                     }
                 }

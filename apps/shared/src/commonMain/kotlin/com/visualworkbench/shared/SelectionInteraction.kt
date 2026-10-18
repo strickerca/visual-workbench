@@ -23,7 +23,7 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
-public enum class SelectionTool { Rectangle, Lasso, Paint, MaskEraser }
+public enum class SelectionTool { Rectangle, Ellipse, Polygon, Lasso, Paint, MaskEraser }
 public enum class SelectionRefinement { Invert, Expand, Shrink, Feather }
 public data class SelectionDraft(public val tool: SelectionTool, public val points: List<Point>, public val radius: Double)
 public data class SelectionPreview(public val binding: SelectionBinding, public val selection: SelectionVersion,
@@ -39,10 +39,13 @@ public data class SelectionUiState(
     public val selection: SelectionSnapshot? = null,
     public val preview: SelectionPreview? = null,
     public val draft: SelectionDraft? = null,
+    public val polygonContactActive: Boolean = false,
     public val busy: Boolean = false,
     public val loading: Boolean = false,
     public val message: String? = null,
 ) {
+    public val canFinishPolygon: Boolean get() = canDraw && !polygonContactActive && draft?.tool == SelectionTool.Polygon && (draft?.points?.size ?: 0) >= 3
+    public val canUndoPolygonVertex: Boolean get() = canDraw && !polygonContactActive && draft?.tool == SelectionTool.Polygon && !draft?.points.isNullOrEmpty()
     public val canDraw: Boolean get() = active && document != null && !busy && !loading &&
         (selection?.editable != false) && (tool != SelectionTool.MaskEraser || selection != null)
     public val canRefine: Boolean get() = document != null && selection?.editable == true && !busy && !loading
@@ -77,6 +80,7 @@ public class SelectionInteraction(
     private var selectedId: String? = null
     private var camera: Camera? = null
     private var gesture: Gesture? = null
+    private var polygon: SelectionPolygon? = null
     private var owner: Job? = null
     private var reader: Job? = null
     private var operation: Job? = null
@@ -130,8 +134,8 @@ public class SelectionInteraction(
     }
 
     private fun invalidate() {
-        admission++; previewAdmission++; gesture = null
-        mutableState.value = mutableState.value.copy(document = null, selection = null, preview = null, draft = null)
+        admission++; previewAdmission++; gesture = null; polygon = null
+        mutableState.value = mutableState.value.copy(document = null, selection = null, preview = null, draft = null, polygonContactActive = false)
     }
 
     public fun active(value: Boolean) {
@@ -189,6 +193,16 @@ public class SelectionInteraction(
         val point = runCatching { core.mapPoints(capturedCamera, true, listOf(screenPoint)).singleOrNull() }.getOrNull() ?: return false
         if (!finite(point)) return false
         val current = state.value
+        val retained = gesture
+        if (current.tool == SelectionTool.Polygon && retained != null) {
+            if (retained.tool != SelectionTool.Polygon || retained.admission != admission ||
+                retained.camera != capturedCamera || retained.document != document || polygon?.begin(point) != true) {
+                cancelGesture()
+                mutableState.value = state.value.copy(message = "Polygon cancelled: its view changed or its vertex limit was reached.")
+                return false
+            }
+            showDraft(); return true
+        }
         if (current.selection == null && current.combine != SelectionCombine.Add) {
             mutableState.value = current.copy(message = "Create a selection with Add before subtracting or intersecting."); return false
         }
@@ -198,6 +212,8 @@ public class SelectionInteraction(
         gesture = Gesture(admission, capturedCamera, document, target, current.tool,
             if (current.tool == SelectionTool.MaskEraser) SelectionCombine.Subtract else current.combine,
             current.radius, current.opacity, mutableListOf(point))
+        polygon = if (current.tool == SelectionTool.Polygon) SelectionPolygon() else null
+        if (polygon != null && polygon?.begin(point) != true) { cancelGesture(); return false }
         showDraft(); return true
     }
     /** Each real event is mapped with the DOWN camera. No thinning or predicted
@@ -207,7 +223,11 @@ public class SelectionInteraction(
         if (value.admission != admission || !finite(screenPoint)) { cancelGesture(); return }
         val point = runCatching { core.mapPoints(value.camera, true, listOf(screenPoint)).singleOrNull() }.getOrNull()
         if (point == null || !finite(point)) { cancelGesture(); return }
-        if (value.tool == SelectionTool.Rectangle) {
+        if (value.tool == SelectionTool.Polygon) {
+            if (polygon?.move(point) != true) { cancelGesture(); return }
+            showDraft(); return
+        }
+        if (value.tool == SelectionTool.Rectangle || value.tool == SelectionTool.Ellipse) {
             if (value.points.size == 1) value.points += point else value.points[1] = point
         } else if (value.points.last() != point) {
             if (value.points.size == 16_384) {
@@ -218,18 +238,25 @@ public class SelectionInteraction(
         showDraft()
     }
     public fun finish(screenPoint: Point? = null): Boolean {
+        if (gesture?.tool == SelectionTool.Polygon && polygon?.contacting != true) return false
         if (screenPoint != null) append(screenPoint)
         val value = gesture ?: return false
-        gesture = null; mutableState.value = state.value.copy(draft = null)
+        if (value.tool == SelectionTool.Polygon) {
+            if (value.admission != admission || polygon?.end() != true) { cancelGesture(); return false }
+            showDraft(); return true // UP adds one vertex; only Finish polygon publishes.
+        }
+        gesture = null; mutableState.value = state.value.copy(draft = null, polygonContactActive = false)
         if (value.admission != admission) return false
         val points = value.points.toList()
         val action = when (value.tool) {
-            SelectionTool.Rectangle -> {
+            SelectionTool.Rectangle, SelectionTool.Ellipse -> {
                 val first = points.first(); val last = points.last()
                 val rectangle = Rect(min(first.x, last.x), min(first.y, last.y), kotlin.math.abs(last.x - first.x), kotlin.math.abs(last.y - first.y))
                 if (rectangle.width == 0.0 || rectangle.height == 0.0) return false
-                SelectionOperation.Rectangle(rectangle, value.combine)
+                if (value.tool == SelectionTool.Ellipse) SelectionOperation.Ellipse(rectangle, value.combine)
+                else SelectionOperation.Rectangle(rectangle, value.combine)
             }
+            SelectionTool.Polygon -> return false // Explicit finishPolygon handles persistent drafts.
             SelectionTool.Lasso -> {
                 if (points.size < 3) { mutableState.value = state.value.copy(message = "A lasso needs at least three points."); return false }
                 SelectionOperation.Lasso(points, value.combine)
@@ -238,14 +265,44 @@ public class SelectionInteraction(
         }
         return submit(value.document, value.target, action)
     }
-    public fun cancelGesture() { gesture = null; mutableState.value = state.value.copy(draft = null) }
+    public fun finishPolygon(): Boolean {
+        val value = gesture ?: return false
+        if (value.tool != SelectionTool.Polygon || value.admission != admission ||
+            value.document != state.value.document || !state.value.canDraw || selectedSnapshotPending()) {
+            cancelGesture(); return false
+        }
+        val vertices = polygon?.completed()
+        if (vertices == null) {
+            mutableState.value = state.value.copy(message = "Tap at least three vertices and lift the pen before finishing.")
+            return false
+        }
+        cancelGesture()
+        return submit(value.document, value.target, SelectionOperation.Polygon(vertices, value.combine))
+    }
+    public fun undoPolygonVertex(): Boolean {
+        if (gesture?.tool != SelectionTool.Polygon || polygon?.undo() != true) return false
+        if (polygon?.count == 0) cancelGesture() else showDraft()
+        return true
+    }
+    /** Normal Android DOWN may retire an old tool contact while preserving only
+     * this admitted idle polygon. All explicit cancellation stays unconditional. */
+    public fun canResumePolygonContact(capturedCamera: Camera): Boolean {
+        val retained = gesture ?: return false
+        return retained.tool == SelectionTool.Polygon && state.value.tool == SelectionTool.Polygon &&
+            polygon?.let { !it.contacting && it.count > 0 } == true &&
+            state.value.canDraw && !selectedSnapshotPending() && owner?.isActive == true &&
+            retained.admission == admission && retained.camera == capturedCamera &&
+            retained.document == state.value.document
+    }
+    public fun cancelGesture() { gesture = null; polygon = null; mutableState.value = state.value.copy(draft = null, polygonContactActive = false) }
     private fun showDraft() {
         val value = gesture ?: return
-        mutableState.value = state.value.copy(draft = SelectionDraft(value.tool, value.points.toList(), value.radius))
+        mutableState.value = state.value.copy(draft = SelectionDraft(value.tool, polygon?.preview() ?: value.points.toList(), value.radius), polygonContactActive = polygon?.contacting == true)
     }
     public fun refine(value: SelectionRefinement): Boolean {
         if (!state.value.canRefine) return false
         val doc = state.value.document ?: return false; val selection = state.value.selection ?: return false
+        cancelGesture()
         val radius = state.value.refinementRadius
         val action = when (value) {
             SelectionRefinement.Invert -> SelectionOperation.Invert
@@ -342,7 +399,7 @@ public class SelectionInteraction(
     /** Await on the UI dispatcher before closing/replacing the project. */
     public suspend fun detach(): Unit = withContext(NonCancellable) {
         detaching = true
-        admission++; previewAdmission++; gesture = null
+        admission++; previewAdmission++; gesture = null; polygon = null
         val jobs = listOfNotNull(operation, reader).distinct()
         owner?.cancel(); jobs.forEach { it.cancel() }
         jobs.joinAll()

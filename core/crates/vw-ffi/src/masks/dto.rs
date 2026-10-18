@@ -88,6 +88,14 @@ pub enum SelectionOperation {
         rectangle: QueryRect,
         combine: SelectionCombine,
     },
+    Ellipse {
+        rectangle: QueryRect,
+        combine: SelectionCombine,
+    },
+    Polygon {
+        vertices: Vec<Point>,
+        combine: SelectionCombine,
+    },
     Lasso {
         points: Vec<Point>,
         combine: SelectionCombine,

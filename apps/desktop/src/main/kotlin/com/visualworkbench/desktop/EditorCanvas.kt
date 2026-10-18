@@ -178,7 +178,7 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
             controller.precisionDown(Point(down.position.x.toDouble(),down.position.y.toDouble()),currentEvent.keyboardModifiers.isShiftPressed,down.type==PointerType.Touch||currentEvent.buttons.isTertiaryPressed||currentEvent.buttons.isSecondaryPressed,down.uptimeMillis,semanticModifier=currentEvent.keyboardModifiers.isAltPressed);down.consume()
             var completed=false
             try{while(true){val event=awaitPointerEvent();val change=event.changes.firstOrNull{it.id==down.id}?:break;if(!change.pressed){controller.precisionUp(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);completed=true;change.consume();break};controller.precisionMove(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);change.consume()}}
-            finally{if(completed)controller.cancelDrag()else controller.cancelInput()}
+            finally{if(completed)controller.finishPointerContact()else controller.cancelInput()}
         }}
     ){
         drawRect(Color(0xff0c1118))

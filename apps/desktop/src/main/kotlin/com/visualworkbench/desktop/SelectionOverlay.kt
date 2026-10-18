@@ -66,9 +66,15 @@ internal fun SelectionOverlay(controller: SelectionController, camera: Camera, r
                     if (draft.tool == SelectionTool.Rectangle) drawRect(color,
                         Offset(minOf(first.x, last.x).toFloat(), minOf(first.y, last.y).toFloat()),
                         Size(kotlin.math.abs(last.x - first.x).toFloat(), kotlin.math.abs(last.y - first.y).toFloat()), style = line)
+                    else if (draft.tool == SelectionTool.Ellipse) drawOval(color,
+                        Offset(minOf(first.x, last.x).toFloat(), minOf(first.y, last.y).toFloat()),
+                        Size(kotlin.math.abs(last.x - first.x).toFloat(), kotlin.math.abs(last.y - first.y).toFloat()), style = line)
                     else {
-                        val path = Path().apply { moveTo(first.x.toFloat(), first.y.toFloat()); draft.points.drop(1).forEach { lineTo(it.x.toFloat(), it.y.toFloat()) }; if (draft.tool == SelectionTool.Lasso) close() }
+                        val path = Path().apply { moveTo(first.x.toFloat(), first.y.toFloat()); draft.points.drop(1).forEach { lineTo(it.x.toFloat(), it.y.toFloat()) }; if (draft.tool == SelectionTool.Lasso || draft.tool == SelectionTool.Polygon) close() }
                         drawPath(path, color, style = line)
+                        if (draft.tool == SelectionTool.Polygon) draft.points.forEach { point ->
+                            drawCircle(color, (2.5 / camera.scale).toFloat(), Offset(point.x.toFloat(), point.y.toFloat()))
+                        }
                         if (draft.tool == SelectionTool.Paint || draft.tool == SelectionTool.MaskEraser)
                             drawCircle(color, draft.radius.toFloat(), Offset(last.x.toFloat(), last.y.toFloat()), style = line)
                     }

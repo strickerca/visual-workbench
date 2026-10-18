@@ -20,6 +20,11 @@ internal fun SelectionControls(controller: SelectionController, selectedObject: 
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             TextButton({ if (onOpen == null) open = true else onOpen() }, Modifier.heightIn(min = 48.dp)) { Text(if (state.active) "Selection · ${state.tool.name}" else "Select pixels") }
             if (state.active) TextButton({ controller.interaction.active(false) }, Modifier.heightIn(min = 48.dp)) { Text("Return to drawing") }
+            if (state.active && state.tool == SelectionTool.Polygon && state.draft != null) {
+                TextButton({ controller.interaction.finishPolygon() }, Modifier.heightIn(min = 48.dp), enabled = state.canFinishPolygon) { Text("Finish polygon") }
+                TextButton({ controller.interaction.undoPolygonVertex() }, Modifier.heightIn(min = 48.dp), enabled = state.canUndoPolygonVertex) { Text("Undo vertex") }
+                TextButton(controller.interaction::cancelGesture, Modifier.heightIn(min = 48.dp)) { Text("Cancel polygon") }
+            }
             if (state.busy) TextButton(controller::cancel, Modifier.heightIn(min = 48.dp)) { Text("Cancel selection") }
         }
     }
@@ -38,9 +43,17 @@ internal fun SelectionPanel(controller: SelectionController, selectedObject: Str
             SelectionTool.entries.forEach { tool ->
                 OutlinedButton({ actions.tool(tool) }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = !state.busy) {
                     Text((if (state.active && state.tool == tool) "• " else "") + when (tool) {
-                        SelectionTool.Rectangle -> "Rectangle"; SelectionTool.Lasso -> "Lasso"
+                        SelectionTool.Rectangle -> "Rectangle"; SelectionTool.Ellipse -> "Ellipse"
+                        SelectionTool.Polygon -> "Polygon"; SelectionTool.Lasso -> "Lasso"
                         SelectionTool.Paint -> "Paint selection"; SelectionTool.MaskEraser -> "Erase mask"
                     })
+                }
+            }
+            if (state.tool == SelectionTool.Polygon) {
+                Text("Tap vertices, then Finish polygon. Dragging adjusts only the current vertex.")
+                Row {
+                    TextButton({ actions.finishPolygon() }, Modifier.heightIn(min = 48.dp), enabled = state.canFinishPolygon) { Text("Finish polygon") }
+                    TextButton({ actions.undoPolygonVertex() }, Modifier.heightIn(min = 48.dp), enabled = state.canUndoPolygonVertex) { Text("Undo vertex") }
                 }
             }
             Row(Modifier.horizontalScroll(rememberScrollState())) {

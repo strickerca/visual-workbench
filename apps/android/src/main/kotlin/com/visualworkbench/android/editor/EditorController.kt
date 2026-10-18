@@ -573,6 +573,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     override fun navigationContact(active: Boolean) {
         if (navigationContactActive == active) return
         navigationContactActive = active
+        if (active) cancelTool()
         captureNavigationGeneration++
         instructionInteractionChanged()
     }
@@ -1025,7 +1026,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         document?.let{background!=null||documentOwner.matchingFrame(it,epoch)!=null}==true
     override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
         if(ai.state.value.open||!aiResultReady())return
-        cancelTool(); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
+        val retainPolygon = !selectionPointer && !eraserPointer && gesture == null && documentPress == null &&
+            precisionInputAllowed() && erasers.tools.route(rawSample.tool == PointerTool.Eraser) == EraserInputRoute.Selection &&
+            selections.interaction.canResumePolygonContact(camera)
+        clearToolContact(retainPolygon); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
         if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || (background == null && document?.let{documentOwner.matchingFrame(it,epoch)}==null) || documents.state.value.busy || strokes.size >= 3) {
             if (strokes.size >= 3) message = "The save queue is full. Wait for the current strokes to finish."
             return
@@ -1220,11 +1224,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         publish()
     }
 
-    override fun cancelTool() {
+    override fun cancelTool() { clearToolContact(false) }
+    private fun clearToolContact(retainPolygon: Boolean) {
         documentPress=null
         cancelPrecision()
         eraserPointer = false; erasers.interaction.cancelGesture()
-        selectionPointer = false; selections.interaction.cancelGesture()
+        selectionPointer = false; if (!retainPolygon) selections.interaction.cancelGesture()
         gesture?.let { active -> finishRemotePreview(active.link, active.previewId, true) }
         gesture?.stroke?.let { run -> run.canceled.set(true); cancelNative(run.native); run.queue.close(); run.drawing = null }
         gesture = null; transientShape = null; erased = emptySet(); transformed = emptyMap(); eraserLast = null; publish()
@@ -1462,6 +1467,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         camera = next.copy(center = Point(next.center.x + anchored.x - under.x, next.center.y + anchored.y - under.y)); publish()
     }
     override fun contextMenu(x: Double, y: Double) {
+        cancelTool()
         selected = scene?.let { EditorDrawing.hit(it, Point(x, y), 8 * density)?.item?.objectId }
         showContext = true; publish()
     }

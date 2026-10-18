@@ -469,3 +469,40 @@ fn authority_update_requires_exact_nonzero_finite_correlation() -> Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn scoped_pen_axis_presence_roundtrips_and_legacy_input_cannot_claim_it() -> Result<()> {
+    for mask in [1, 3, 13, 15] {
+        let (mut tx, mut rx) = sessions(true)?;
+        rx.input.grant(id(1)?, id(2)?, 1, 0)?;
+        let mut event = pen(Some(0), true)?;
+        if let Some(Event::Pen(p)) = &mut event.event {
+            p.native_pen_mask = Some(mask);
+        }
+        tx.enqueue(Body::InputEvent(event))?;
+        let frame = tx
+            .next_frame()?
+            .ok_or(NetError::Invalid("missing mask frame"))?;
+        let Receive::Deliver(Body::InputEvent(value)) =
+            rx.receive(decode_frame(&encode_frame(&frame)?)?, 1)?
+        else {
+            return Err(NetError::Invalid("mask not delivered"));
+        };
+        assert!(matches!(value.event, Some(Event::Pen(p)) if p.native_pen_mask == Some(mask)));
+    }
+    let (mut tx, _) = sessions(true)?;
+    for mask in [0, 2, 4, 5, 8, 9, 16, u32::MAX] {
+        let mut event = pen(Some(0), true)?;
+        if let Some(Event::Pen(p)) = &mut event.event {
+            p.native_pen_mask = Some(mask);
+        }
+        assert!(tx.enqueue(Body::InputEvent(event)).is_err());
+    }
+    let (mut legacy, _) = sessions(false)?;
+    let mut event = pen(None, false)?;
+    if let Some(Event::Pen(p)) = &mut event.event {
+        p.native_pen_mask = Some(1);
+    }
+    assert!(legacy.enqueue(Body::InputEvent(event)).is_err());
+    Ok(())
+}

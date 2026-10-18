@@ -5,6 +5,7 @@
 mod coverage;
 mod export;
 mod morphology;
+mod shape_selection;
 
 pub use export::{Cutout8, Cutout16};
 use std::{collections::BTreeMap, sync::Arc};

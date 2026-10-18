@@ -75,6 +75,12 @@ pub struct PenSample {
     pub tilt_y: i32,
     pub rotation: u32,
     pub pen_flags: u32,
+    /// Exact reported/calibrated axis presence: pressure=1, twist=2, tilt pair=12.
+    #[serde(default = "pressure_only_mask")]
+    pub pen_mask: u32,
+}
+fn pressure_only_mask() -> u32 {
+    1
 }
 impl PenSample {
     pub fn validate(&self) -> Result<()> {
@@ -83,6 +89,7 @@ impl PenSample {
             || !(-90..=90).contains(&self.tilt_x)
             || !(-90..=90).contains(&self.tilt_y)
             || self.pen_flags & !7 != 0
+            || !matches!(self.pen_mask, 1 | 3 | 13 | 15)
         {
             return Err(Error::Invalid);
         }
@@ -213,9 +220,15 @@ pub fn read_command(r: &mut impl Read) -> Result<Command> {
     if v.sequence() == 0 {
         return Err(Error::Invalid);
     }
+    if let Command::Pen { sample, .. } = &v {
+        sample.validate()?;
+    }
     Ok(v)
 }
 pub fn write_command(w: &mut impl Write, v: &Command) -> Result<()> {
+    if let Command::Pen { sample, .. } = v {
+        sample.validate()?;
+    }
     write_bounded(
         w,
         &serde_json::to_vec(v).map_err(|_| Error::Invalid)?,
@@ -335,3 +348,7 @@ mod refresh_tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "wire/pen_axes_tests.rs"]
+mod pen_axes_tests;

@@ -8,6 +8,128 @@ import kotlin.coroutines.startCoroutine
 import kotlin.test.*
 
 class SelectionInteractionTest {
+    @Test fun polygonControlsRequireAnIdleContactAndDuplicateUpKeepsItsDraft() {
+        val f = SelectionFixture()
+        try {
+            f.ui.tool(SelectionTool.Polygon)
+            for (p in listOf(Point(1.0, 1.0), Point(6.0, 1.0), Point(4.0, 5.0))) { f.ui.begin(p, f.camera); f.ui.finish() }
+            assertTrue(f.ui.state.value.canFinishPolygon); assertTrue(f.ui.state.value.canUndoPolygonVertex)
+            assertFalse(f.ui.finish(Point(99.0, 99.0)))
+            assertEquals(3, f.ui.state.value.draft?.points?.size)
+            assertTrue(f.ui.begin(Point(1.0, 5.0), f.camera))
+            assertFalse(f.ui.state.value.canFinishPolygon); assertFalse(f.ui.state.value.canUndoPolygonVertex)
+            assertFalse(f.ui.finishPolygon()); assertTrue(f.api.edits.isEmpty())
+        } finally { f.close() }
+    }
+    @Test fun sameRevisionPageChangeCannotResumeOrFinishPolygon() {
+        val f = SelectionFixture()
+        try {
+            f.page = 0u; f.bind(1u); f.ui.tool(SelectionTool.Polygon)
+            for (p in listOf(Point(1.0, 1.0), Point(6.0, 1.0), Point(4.0, 5.0))) { f.ui.begin(p, f.camera); f.ui.finish() }
+            assertTrue(f.ui.canResumePolygonContact(f.camera))
+            f.page = 1u; f.bind(1u)
+            assertFalse(f.ui.canResumePolygonContact(f.camera)); assertFalse(f.ui.finishPolygon())
+            assertNull(f.ui.state.value.draft); assertTrue(f.api.edits.isEmpty())
+        } finally { f.close() }
+    }
+
+    @Test fun ellipseUsesOneDownCameraRectangleAndOneCommit() {
+        val f = SelectionFixture()
+        try {
+            f.ui.tool(SelectionTool.Ellipse)
+            assertTrue(f.ui.begin(Point(20.0, 30.0), f.camera))
+            f.ui.append(Point(10.0, 12.0)); assertTrue(f.ui.finish())
+            assertFalse(f.ui.finish())
+            assertEquals(SelectionOperation.Ellipse(Rect(10.0, 12.0, 10.0, 18.0), SelectionCombine.Add), f.api.edits.single().operation)
+        } finally { f.close() }
+    }
+    @Test fun polygonRetainsTappedVerticesWithoutWritingUntilExplicitFinish() {
+        val f = SelectionFixture()
+        try {
+            f.ui.tool(SelectionTool.Polygon)
+            val vertices = listOf(Point(1.0, 2.0), Point(12.0, 3.0), Point(8.0, 20.0))
+            for (p in vertices) { assertTrue(f.ui.begin(p, f.camera)); assertTrue(f.ui.finish()) }
+            assertTrue(f.api.edits.isEmpty())
+            assertEquals(vertices, f.ui.state.value.draft?.points)
+            assertTrue(f.ui.finishPolygon()); assertFalse(f.ui.finishPolygon())
+            assertEquals(SelectionOperation.Polygon(vertices, SelectionCombine.Add), f.api.edits.single().operation)
+            assertNull(f.ui.state.value.draft)
+        } finally { f.close() }
+    }
+    @Test fun polygonDragAdjustsOneVertexAndUndoDoesNotCommit() {
+        val f = SelectionFixture()
+        try {
+            f.ui.tool(SelectionTool.Polygon)
+            assertTrue(f.ui.begin(Point(1.0, 1.0), f.camera))
+            repeat(50) { f.ui.append(Point(2.0 + it, 2.0)) }
+            assertTrue(f.ui.finish()); assertEquals(listOf(Point(51.0, 2.0)), f.ui.state.value.draft?.points)
+            assertFalse(f.ui.finishPolygon())
+            assertTrue(f.ui.begin(Point(10.0, 20.0), f.camera)); f.ui.finish()
+            assertTrue(f.ui.undoPolygonVertex()); assertEquals(1, f.ui.state.value.draft?.points?.size)
+            assertTrue(f.ui.undoPolygonVertex()); assertNull(f.ui.state.value.draft)
+            assertTrue(f.api.edits.isEmpty())
+        } finally { f.close() }
+    }
+    @Test fun polygonCannotFinishWhileContactIsDownAndCancelLosesAllVertices() {
+        val f = SelectionFixture()
+        try {
+            f.ui.tool(SelectionTool.Polygon)
+            for (p in listOf(Point(1.0, 1.0), Point(6.0, 1.0), Point(4.0, 5.0))) {
+                assertTrue(f.ui.begin(p, f.camera)); f.ui.finish()
+            }
+            assertTrue(f.ui.begin(Point(1.0, 5.0), f.camera))
+            assertFalse(f.ui.finishPolygon()); assertTrue(f.api.edits.isEmpty())
+            f.ui.cancelGesture(); assertFalse(f.ui.finish()); assertFalse(f.ui.finishPolygon())
+            assertNull(f.ui.state.value.draft)
+        } finally { f.close() }
+    }
+    @Test fun polygonRevisionViewportAttachmentAndToolChangesCannotPublishOldVertices() {
+        for (reason in 0..3) {
+            val f = SelectionFixture()
+            try {
+                f.ui.tool(SelectionTool.Polygon)
+                for (p in listOf(Point(1.0, 1.0), Point(6.0, 1.0), Point(4.0, 5.0))) { f.ui.begin(p, f.camera); f.ui.finish() }
+                when (reason) {
+                    0 -> f.ui.observe(f.info.copy(stateHash = "new-pending-visible-hash"), 2u)
+                    1 -> f.ui.viewport(f.camera.copy(rotation = .5))
+                    2 -> immediate { f.ui.detach() }
+                    else -> f.ui.tool(SelectionTool.Ellipse)
+                }
+                assertFalse(f.ui.finishPolygon()); assertTrue(f.api.edits.isEmpty()); assertNull(f.ui.state.value.draft)
+            } finally { f.close() }
+        }
+    }
+    @Test fun polygonExistingMaskUsesCapturedVersionAndSubtractMode() {
+        val f = SelectionFixture()
+        try {
+            f.select(); f.ui.tool(SelectionTool.Polygon); f.ui.combine(SelectionCombine.Subtract)
+            for (p in listOf(Point(1.0, 1.0), Point(6.0, 1.0), Point(4.0, 5.0))) { f.ui.begin(p, f.camera); f.ui.finish() }
+            assertTrue(f.ui.finishPolygon())
+            val edit = f.api.edits.single()
+            assertEquals(SelectionCombine.Subtract, (edit.operation as SelectionOperation.Polygon).combine)
+            assertEquals(SelectionVersion("selection", "mask", 1u), (edit.target as SelectionTarget.Existing).selection)
+        } finally { f.close() }
+    }
+    @Test fun polygonFailureRefreshesOnceAndDoesNotReuseItsPrivateDraft() {
+        val f = SelectionFixture()
+        try {
+            f.api.failure = SelectionFailure(SelectionFailureKind.Memory); f.ui.tool(SelectionTool.Polygon)
+            for (p in listOf(Point(1.0, 1.0), Point(6.0, 1.0), Point(4.0, 5.0))) { f.ui.begin(p, f.camera); f.ui.finish() }
+            assertTrue(f.ui.finishPolygon()); assertEquals(1, f.api.edits.size); assertEquals(1, f.refreshes)
+            assertFalse(f.ui.finishPolygon()); assertFalse(f.ui.state.value.busy); assertNull(f.ui.state.value.draft)
+        } finally { f.close() }
+    }
+    @Test fun polygonOwnedRequestCopiesVerticesBeforeCallerMutation() {
+        val vertices = mutableListOf(Point(1.0, 1.0), Point(8.0, 1.0), Point(4.0, 9.0))
+        val edit = SelectionEdit(SelectionBinding("p", "d", "a", 0u, "hash"), "txn", "device", 1u, 0,
+            SelectionTarget.New("o", "l"), SelectionOperation.Polygon(vertices, SelectionCombine.Add))
+        val owned = edit.ownedSelectionRequest()
+        vertices.clear()
+        assertEquals(3, (owned.operation as SelectionOperation.Polygon).vertices.size)
+        assertFailsWith<SelectionFailure> { edit.ownedSelectionRequest() }
+    }
+
+
     @Test fun sameSizedSameRevisionPageSwitchInvalidatesGestureAndPickerTicket() {
         val f=SelectionFixture();f.page=0u;f.bind(1u);f.select()
         val ticket=assertNotNull(f.ui.saveTicket(SelectionExportKind.Mask,false))

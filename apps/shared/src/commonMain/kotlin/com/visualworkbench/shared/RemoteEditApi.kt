@@ -33,7 +33,7 @@ public data class RemoteVideoConfig(public val scope:RemoteVideoScope,public val
 /** Native admission retains ticket metadata. Decoder callbacks cannot supply ACKs. */
 public data class RemoteVideoFrame(public val ticket:ULong,public val config:RemoteVideoConfig,public val frameId:ULong,public val ptsUs:Long,public val keyframe:Boolean,public val bytes:ByteArray)
 public enum class RemotePenPhase { Hover,Down,Move,Up,Leave }
-public data class RemotePenSample(public val phase:RemotePenPhase,public val hostX:Int,public val hostY:Int,public val pressure:UInt,public val tiltX:Int,public val tiltY:Int,public val rotation:UInt,public val penFlags:UInt,public val sampledLocalNanos:Long)
+public data class RemotePenSample(public val phase:RemotePenPhase,public val hostX:Int,public val hostY:Int,public val pressure:UInt,public val tiltX:Int,public val tiltY:Int,public val rotation:UInt,public val penFlags:UInt,public val sampledLocalNanos:Long,public val nativePenMask:UInt=1u)
 public data class RemoteInputAdmission(public val binding:RemoteTargetBinding,public val sequence:ULong,public val sampledLocalNanos:Long)
 public data class RemoteRenderedAcknowledgment(public val binding:RemoteTargetBinding,public val frameId:ULong,public val ticket:ULong,public val lastInputSequenceApplied:ULong)
 /** Borrowed link capability. A failed close retains its native owner and blocks

@@ -22,6 +22,8 @@ mod asset;
 mod capture;
 mod display;
 mod lens;
+mod stylus_tilt;
+pub use stylus_tilt::{TiltAxisSign, TiltCalibration, TiltError, WindowsTilt, windows_tilt};
 
 pub use affine::{Affine, Camera, Point, Rect, Size, snap_edge, snap_pixel_center};
 pub use asset::{ExifOrientation, PdfPage, SvgFit, SvgViewport};

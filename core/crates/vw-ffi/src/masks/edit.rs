@@ -28,8 +28,9 @@ pub(super) fn admit_options(options: &SelectionEdit) -> SelectionResult<()> {
     }
     match &options.operation {
         SelectionOperation::Lasso { points, .. }
-            if points.len() < 3 || points.len() > vw_mask::MAX_PATH_POINTS =>
-        {
+        | SelectionOperation::Polygon {
+            vertices: points, ..
+        } if points.len() < 3 || points.len() > vw_mask::MAX_PATH_POINTS => {
             Err(SelectionError::Limit)
         }
         SelectionOperation::Paint { points, .. }
@@ -58,9 +59,11 @@ pub(super) fn apply(
         return Err(SelectionError::Invalid);
     }
     let input_bytes = match &options.operation {
-        SelectionOperation::Lasso { points, .. } | SelectionOperation::Paint { points, .. } => {
-            points.len() as u64 * 256
-        }
+        SelectionOperation::Lasso { points, .. }
+        | SelectionOperation::Paint { points, .. }
+        | SelectionOperation::Polygon {
+            vertices: points, ..
+        } => points.len() as u64 * 256,
         _ => 0,
     };
     memory(
@@ -79,6 +82,17 @@ pub(super) fn apply(
         admit_morphology_size(size, *radius)?;
     }
 
+    if let SelectionOperation::Ellipse { rectangle: r, .. } = &options.operation {
+        Mask::admit_ellipse(
+            size,
+            vw_mask::Rect {
+                x: r.x,
+                y: r.y,
+                width: r.width,
+                height: r.height,
+            },
+        )?;
+    }
     let project = state.project()?;
     let document_id = Id::try_from(options.binding.document_id.clone())?;
     let mut kinds = Vec::new();
@@ -376,6 +390,25 @@ fn apply_math(
             )?,
             *how,
         ),
+        SelectionOperation::Ellipse {
+            rectangle: r,
+            combine: how,
+        } => combine(
+            Mask::ellipse(
+                base.size(),
+                vw_mask::Rect {
+                    x: r.x,
+                    y: r.y,
+                    width: r.width,
+                    height: r.height,
+                },
+            )?,
+            *how,
+        ),
+        SelectionOperation::Polygon {
+            vertices,
+            combine: how,
+        } => combine(Mask::polygon(base.size(), &points(vertices))?, *how),
         SelectionOperation::Lasso {
             points: p,
             combine: how,

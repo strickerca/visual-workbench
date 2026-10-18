@@ -469,7 +469,9 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     }
     fun precisionDown(raw:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long,pressure:Float=1f,semanticModifier:Boolean=false){
         if(!pointerAllowed(panButton))return
-        cancelInput()
+        val keepPolygon = !panButton && !selectionPointer && !eraserPointer && drag == null && ink == null && markerPress == null && documentPress == null &&
+            erasers.tools.route() == EraserInputRoute.Selection && selections.interaction.canResumePolygonContact(mutable.value.view.camera)
+        clearInputContact(keepPolygon)
         val state=mutable.value;val pan=panButton||(state.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
         if(pan){pointerDown(raw,extend,panButton,uptimeMs,pressure,semanticModifier);return}
         val physical=precision.inputMatrix(raw);val mapped=precision.route(listOf(raw)).single()
@@ -552,7 +554,8 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         if(s.draft!=null){val(a,b)=s.draft;val r=Rect(minOf(a.x,b.x),minOf(a.y,b.y),kotlin.math.abs(a.x-b.x),kotlin.math.abs(a.y-b.y));val shape=when(d.tool){Tool.Rectangle->Shape.Rectangle(r);Tool.Ellipse->Shape.Ellipse(r);Tool.Line->Shape.Line(listOf(a,b));Tool.Arrow->Shape.Arrow(listOf(a,b));else->null};update{it.copy(draft=null)};val provisional=d.newObject;val geometry=draftShape(d.tool,a,b);if(provisional!=null){if(geometry!=null)gestureEdit(listOf(EditCommand.Create(provisional.objectId,provisional.layer,geometry,provisional.style)),d.binding,provisional)else live.cancelLater(provisional.attachment,provisional.id)}else if(shape!=null&&r.width+r.height>0.01)create(shape,d.binding);return}
         val edits=s.preview.filter{(id,transform)->d.selected.any{it.objectId==id&&it.transform!=transform}}.map{EditCommand.SetTransform(it.key,it.value)};update{it.copy(preview=emptyMap())};gestureEdit(edits,d.binding,d.live)
     }
-    fun cancelDrag(){precisionContact=false;documentPress=null;documentPressBinding=null;cancelPrecision();markerPress=null;eraserPointer=false;erasers.interaction.cancelGesture();selectionPointer=false;selections.interaction.cancelGesture();val old=drag?.let{it.live?:it.newObject};drag=null;live.cancelLater(old?.attachment,old?.id);update{it.copy(preview=emptyMap(),draft=null)}}
+    fun cancelDrag(){clearDragContact(false)}
+    private fun clearDragContact(retainPolygon:Boolean){precisionContact=false;documentPress=null;documentPressBinding=null;cancelPrecision();markerPress=null;eraserPointer=false;erasers.interaction.cancelGesture();selectionPointer=false;if(!retainPolygon)selections.interaction.cancelGesture();val old=drag?.let{it.live?:it.newObject};drag=null;live.cancelLater(old?.attachment,old?.id);update{it.copy(preview=emptyMap(),draft=null)}}
     private fun newObjectPreview(state:EditorState,binding:RenderBinding):NewObjectPreviewLease?{
         val attachment=live.attachment()?:return null;val shape=draftTemplate(state.tool)?:return null
         val layer=state.document?.layers?.firstOrNull{it.visible&&!it.locked&&it.blend=="normal"}?:return null;val now=System.currentTimeMillis()
@@ -563,7 +566,9 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         return ObjectPreviewLease(core.newId(System.currentTimeMillis().toULong()),attached,binding.documentId,item.objectId,kind)
     }
     private fun cancelWidth(){val old=widthGesture;widthGesture=null;live.cancelLater(old?.live?.attachment,old?.live?.id);update{it.copy(previewStyles=emptyMap())}}
-    fun cancelInput(){precisionContact=false;documentPress=null;documentPressBinding=null;cancelPrecision();cancelDrag();cancelWidth();cancelInk()}
+    fun cancelInput(){clearInputContact(false)}
+    private fun clearInputContact(retainPolygon:Boolean){precisionContact=false;documentPress=null;documentPressBinding=null;cancelPrecision();clearDragContact(retainPolygon);cancelWidth();cancelInk()}
+    fun finishPointerContact(){clearDragContact(selections.interaction.canResumePolygonContact(mutable.value.view.camera))}
     private fun beginInk(first:DesktopSample,binding:RenderBinding){
         val s=mutable.value;val p=project?:return;val doc=s.document?:return;val layer=doc.layers.firstOrNull{it.visible&&!it.locked&&it.blend=="normal"}?:return
         val now=System.currentTimeMillis();val info=doc.render.revision

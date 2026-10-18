@@ -785,6 +785,9 @@ message PenEvent {
   // Exact Windows PEN_FLAG bits: BARREL1, INVERTED2, ERASER4; never force2|4.
   // Presence distinguishes an exact zero flag value from a legacy projection.
   optional uint32 native_pen_flags = 11;
+  // Scoped remote input: exact Windows PEN_MASK bits. Absent means pressure
+  // only (1), never fabricated tilt/twist. Tilt X/Y must be present together.
+  optional uint32 native_pen_mask = 12;
 }
 
 message MouseEvent {

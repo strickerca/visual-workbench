@@ -49,6 +49,8 @@ public sealed interface SelectionTarget {
 public sealed interface SelectionOperation {
     public data class Rectangle(public val rectangle: Rect, public val combine: SelectionCombine) : SelectionOperation
     public data class Lasso(public val points: List<Point>, public val combine: SelectionCombine) : SelectionOperation
+    public data class Ellipse(public val rectangle: Rect, public val combine: SelectionCombine) : SelectionOperation
+    public data class Polygon(public val vertices: List<Point>, public val combine: SelectionCombine) : SelectionOperation
     /** Subtract is a mask eraser. Only real D-space samples; no motion prediction. */
     public data class Paint(public val points: List<Point>, public val radius: Double,
         public val opacity: UByte, public val combine: SelectionCombine) : SelectionOperation
@@ -98,6 +100,10 @@ internal fun SelectionEdit.ownedSelectionRequest(): SelectionEdit {
         is SelectionOperation.Lasso -> {
             if (value.points.size !in 3..16_384) throw SelectionFailure(SelectionFailureKind.Limit)
             value.copy(points = value.points.toList())
+        }
+        is SelectionOperation.Polygon -> {
+            if (value.vertices.size !in 3..16_384) throw SelectionFailure(SelectionFailureKind.Limit)
+            value.copy(vertices = value.vertices.toList())
         }
         is SelectionOperation.Paint -> {
             if (value.points.size !in 1..16_384) throw SelectionFailure(SelectionFailureKind.Limit)

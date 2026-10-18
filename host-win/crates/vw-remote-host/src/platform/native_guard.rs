@@ -235,6 +235,7 @@ impl HoverRetirement {
             tilt_y: 0,
             rotation: 0,
             pen_flags: 0,
+            pen_mask: 1,
         })
     }
 }
@@ -299,12 +300,7 @@ impl Injector {
     }
     pub fn send(&mut self, s: Sample) -> Result<()> {
         self.hover_retirement.begin_attempt();
-        if s.pressure > 1024
-            || s.rotation > 359
-            || !(-90..=90).contains(&s.tilt_x)
-            || !(-90..=90).contains(&s.tilt_y)
-            || s.pen_flags & !7 != 0
-        {
+        if s.validate().is_err() {
             self.guard.suspend();
             return Err("Sample outside native pen bounds".into());
         }
@@ -330,7 +326,7 @@ impl Injector {
                 ..Default::default()
             },
             penFlags: s.pen_flags,
-            penMask: 15,
+            penMask: s.pen_mask,
             pressure: s.pressure,
             rotation: s.rotation,
             tiltX: s.tilt_x,
@@ -419,6 +415,7 @@ mod retirement_tests {
             tilt_y: -10,
             rotation: 90,
             pen_flags: 0,
+            pen_mask: 1,
         }
     }
 
@@ -437,6 +434,7 @@ mod retirement_tests {
                 tilt_y: 0,
                 rotation: 0,
                 pen_flags: 0,
+                pen_mask: 1,
             })
         );
         assert!(state.take_leave(false).is_none());

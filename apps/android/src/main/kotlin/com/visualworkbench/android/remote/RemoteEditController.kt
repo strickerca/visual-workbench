@@ -34,7 +34,8 @@ internal data class RemoteAccessibilityInputSnapshot(val ready:Boolean,val nativ
     val paintTarget:Boolean,val bindingDigest:String,val localViewport:IntArray?,val hostClientRect:IntArray?,val renderAgeMillis:Long)
 /** Owns every native ticket, duplicated Surface/codec worker, palette and input
  * queue until actual retirement. No callback or predicted sample invents ACK. */
-internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:CoroutineScope):RemoteConsumerOwner {
+internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:CoroutineScope,
+    private val measuredTiltCalibration:(Int)->StylusTiltCalibration?={null}):RemoteConsumerOwner {
     private val job=SupervisorJob(parent.coroutineContext[Job])
     private val scope=CoroutineScope(parent.coroutineContext.minusKey(Job)+job)
     private val decoderMutex=Mutex()
@@ -326,6 +327,10 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
                 return false
             }
         }
+        val axes=try{com.visualworkbench.android.input.StylusInput().snapshot(event)}catch(_:IllegalArgumentException){return rejectTouch()}
+        // RemoteViewport is translation plus positive uniform scale, so its
+        // actual view-to-frame directional rotation is zero (no guessed display rotation).
+        val calibration=measuredTiltCalibration(event.deviceId)
         val now=System.nanoTime();val uptime=SystemClock.uptimeMillis()
         val flags=(if(event.buttonState and MotionEvent.BUTTON_STYLUS_PRIMARY!=0)1u else 0u) or (if(tool==MotionEvent.TOOL_TYPE_ERASER)4u else 0u)
         val samples=if(phase==RemotePenPhase.Move)event.historySize+1 else 1
@@ -340,12 +345,11 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
             val pressure=if(historical)event.getHistoricalPressure(0,index)else event.pressure
             if(!pressure.isFinite()||pressure<0)return rejectTouch()
             val normalized=pressure.coerceAtMost(1f)
-            val tilt=if(historical)event.getHistoricalAxisValue(MotionEvent.AXIS_TILT,0,index)else event.getAxisValue(MotionEvent.AXIS_TILT)
-            val orientation=if(historical)event.getHistoricalAxisValue(MotionEvent.AXIS_ORIENTATION,0,index)else event.getAxisValue(MotionEvent.AXIS_ORIENTATION)
-            if(!tilt.isFinite()||!orientation.isFinite())return rejectTouch()
-            val degrees=tilt*180f/Math.PI.toFloat();val tx=(kotlin.math.sin(orientation)*degrees).roundToInt().coerceIn(-90,90);val ty=(-kotlin.math.cos(orientation)*degrees).roundToInt().coerceIn(-90,90)
+            val reported=axes.frames[if(historical)index else axes.frames.lastIndex].pointers.single()
+            val projected=try{remotePenAxes(reported.tilt?.toDouble(),reported.orientation?.toDouble(),0.0,calibration)}
+                catch(_:StylusTiltFailure){return rejectTouch()}
             val samplePhase=if(historical)RemotePenPhase.Move else phase
-            val sample=RemotePenSample(samplePhase,point.first,point.second,(normalized*1024).roundToInt().toUInt(),tx,ty,0u,flags,sampled)
+            val sample=RemotePenSample(samplePhase,point.first,point.second,(normalized*1024).roundToInt().toUInt(),projected.tiltX,projected.tiltY,0u,flags,sampled,projected.nativePenMask)
             val contact=samplePhase==RemotePenPhase.Down||samplePhase==RemotePenPhase.Move
             batch+=TouchAdmission(target.binding,sample,GhostPoint(x,y,normalized,sampled,false),contact,fence)
         }

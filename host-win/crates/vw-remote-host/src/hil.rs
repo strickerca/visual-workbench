@@ -1077,6 +1077,7 @@ fn pen(target: &Target, phase: Phase, flags: u32) -> PenSample {
         tilt_y: -9,
         rotation: 0,
         pen_flags: flags,
+        pen_mask: 1,
     }
 }
 fn injected(

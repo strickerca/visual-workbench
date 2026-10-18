@@ -112,7 +112,7 @@ internal class NativeRemoteEdit(private val handle:LiveSession,private val linkO
     }
     override suspend fun pen(binding:RemoteTargetBinding,sample:RemotePenSample):RemoteInputAdmission = native{
         val phase=when(sample.phase){RemotePenPhase.Hover->"Hover";RemotePenPhase.Down->"Down";RemotePenPhase.Move->"Move";RemotePenPhase.Up->"Up";RemotePenPhase.Leave->"Leave"}
-        val json="{\"phase\":\"$phase\",\"x\":${sample.hostX},\"y\":${sample.hostY},\"pressure\":${sample.pressure},\"tilt_x\":${sample.tiltX},\"tilt_y\":${sample.tiltY},\"rotation\":${sample.rotation},\"pen_flags\":${sample.penFlags}}"
+        val json="{\"phase\":\"$phase\",\"x\":${sample.hostX},\"y\":${sample.hostY},\"pressure\":${sample.pressure},\"tilt_x\":${sample.tiltX},\"tilt_y\":${sample.tiltY},\"rotation\":${sample.rotation},\"pen_flags\":${sample.penFlags},\"pen_mask\":${sample.nativePenMask}}"
         val result=handle.remotePen(RemoteNativeJson.binding(binding),json)
         RemoteInputAdmission(RemoteNativeJson.binding(RemoteNativeJson.read(result.bindingJson)),result.inputSequence,sample.sampledLocalNanos)
     }

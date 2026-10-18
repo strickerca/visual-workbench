@@ -142,6 +142,9 @@ private fun SelectionEdit.native(): NEdit = NEdit(binding.native(), transactionI
         is SelectionOperation.Rectangle -> NOperation.Rectangle(QueryRect(value.rectangle.x, value.rectangle.y,
             value.rectangle.width, value.rectangle.height), value.combine.native())
         is SelectionOperation.Lasso -> NOperation.Lasso(value.points.map { NPoint(it.x, it.y) }, value.combine.native())
+        is SelectionOperation.Ellipse -> NOperation.Ellipse(QueryRect(value.rectangle.x, value.rectangle.y,
+            value.rectangle.width, value.rectangle.height), value.combine.native())
+        is SelectionOperation.Polygon -> NOperation.Polygon(value.vertices.map { NPoint(it.x, it.y) }, value.combine.native())
         is SelectionOperation.Paint -> NOperation.Paint(value.points.map { NPoint(it.x, it.y) }, value.radius, value.opacity, value.combine.native())
         is SelectionOperation.Combine -> NOperation.Combine(value.other.native(), value.combine.native())
         SelectionOperation.Invert -> NOperation.Invert
