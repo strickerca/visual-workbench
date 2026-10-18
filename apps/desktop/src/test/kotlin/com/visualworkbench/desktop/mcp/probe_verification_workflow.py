@@ -58,8 +58,10 @@ with tempfile.TemporaryDirectory(prefix='vw-verification-workflow-') as scratch:
     binding = re.findall(r'^public data class WorkflowBinding\([^\n]+\)$', workflow, re.MULTILINE)
     assert len(binding) == 1
     sources['WorkflowBinding.kt'] = 'package com.visualworkbench.shared\n' + binding[0]
-    for name in ('PackagesApi.kt', 'McpInboxApi.kt', 'VerificationApi.kt'):
+    for name in ('PackagesApi.kt', 'McpInboxApi.kt'):
         sources[name] = (shared / name).read_text().split('public expect')[0]
+    sources['VerificationApi.kt'] = re.sub(r'^public expect fun verification(?:Workflows|History)\([^\n]*(?:\n    [^\n]*)?', '',
+        (shared / 'VerificationApi.kt').read_text(), flags=re.MULTILINE)
     if args.legacy_failure_budget_negative_control:
         current = 'memoryBudgetBytes: ULong = 256uL * 1024uL * 1024uL'
         assert sources['VerificationApi.kt'].count(current) == 1
@@ -70,6 +72,8 @@ with tempfile.TemporaryDirectory(prefix='vw-verification-workflow-') as scratch:
     sources['UnavailableNative.kt'] = '''package com.visualworkbench.shared
 @Suppress("UNUSED_PARAMETER")
 public fun verificationWorkflows(original:WorkbenchProject,after:WorkbenchProject,catalog:WorkbenchPackageCatalog,inbox:WorkbenchMcpInbox):WorkbenchVerification=error("JNI intentionally unavailable in focused probe")
+@Suppress("UNUSED_PARAMETER")
+public fun verificationHistory(original:WorkbenchProject):WorkbenchVerificationHistory=error("JNI intentionally unavailable in focused probe")
 '''
     host = (production / 'DesktopMcpHost.kt').read_text()
     sources['OwnerTypes.kt'] = 'package com.visualworkbench.desktop.mcp\n' + host[host.index('/** These callbacks'):host.index('/** Terminate')]
@@ -99,8 +103,16 @@ public fun verificationWorkflows(original:WorkbenchProject,after:WorkbenchProjec
     assert len(registration_names) == 13
     registration_tests = '\n'.join(line for line in registration_tests.splitlines() if not line.startswith('import org.junit.')).replace('@Test ', '')
     sources['RegistrationSelectedTests.kt'] = registration_tests + helpers
+    recovery_tests = (tests / 'McpCaptureSourceRecoveryTest.kt').read_text()
+    recovery_names = re.findall(r'@Test fun (\w+)\(', recovery_tests)
+    assert len(recovery_names) == 15
+    recovery_tests = '\n'.join(line for line in recovery_tests.splitlines() if not line.startswith('import org.junit.')).replace('@Test ', '')
+    # This Linux probe requires real symlink fixtures. Unlike JUnit's portable
+    # assumption, unsupported fixture creation must fail this focused receipt.
+    sources['RecoverySelectedTests.kt'] = recovery_tests + helpers + '\nprivate fun assumeNoException(error:Throwable):Nothing=throw AssertionError("Symlink fixture unavailable",error)\n'
     coordinator_calls = ['McpCoordinatorTest().' + name + '()\nprintln("PASS ' + name + '")' for name in coordinator_names]
     coordinator_calls += ['McpImageRegistrationTest().' + name + '()\nprintln("PASS ' + name + '")' for name in registration_names]
+    coordinator_calls += ['McpCaptureSourceRecoveryTest().' + name + '()\nprintln("PASS ' + name + '")' for name in recovery_names]
     sources['CoordinatorProbe.kt'] = 'package com.visualworkbench.desktop.mcp\nfun main(){\n' + '\n'.join(coordinator_calls) + '\n}\n'
     sources['SharedProbe.kt'] = 'package com.visualworkbench.shared\nfun main(){\n' + '\n'.join(calls) + '\n}\n'
     for name, text in sources.items():
@@ -108,12 +120,19 @@ public fun verificationWorkflows(original:WorkbenchProject,after:WorkbenchProjec
         path.write_text(text)
         files.append(str(path))
     files += [str(shared / 'VerificationInteraction.kt'), str(jvm / 'PackageOwnership.kt')]
-    files += [str(production / name) for name in ('McpJson.kt','McpVerificationTargets.kt','McpMarkerAssessments.kt','McpSemanticMarkerAlignment.kt','McpImageRegistration.kt','McpVerificationWorkflow.kt')]
+    files += [str(production / name) for name in ('McpJson.kt','McpVerificationTargets.kt','McpMarkerAssessments.kt','McpSemanticMarkerAlignment.kt','McpImageRegistration.kt','McpVerificationWorkflow.kt','McpCaptureSourceRecovery.kt')]
     files += [str(tests / 'McpVerificationWorkflowProbe.kt')]
     output = scratch / 'classes'
     command = [str(java), '-Xmx384m', '-cp', str(lib / '*'), 'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler', '-no-stdlib', '-no-reflect', '-Werror', '-jvm-target', '21', '-classpath', classpath, '-d', str(output), *files]
     print('Compiling current coordinator/workflow + exact shared API + native-owner-independent tests: ' + compilers[-1].name, flush=True)
     subprocess.run(command, check=True, timeout=55)
+    passed = 0
     for main in ('com.visualworkbench.shared.SharedProbeKt', 'com.visualworkbench.desktop.mcp.McpVerificationWorkflowProbe', 'com.visualworkbench.desktop.mcp.CoordinatorProbeKt'):
-        subprocess.run([str(java), '-Xmx128m', '-cp', os.pathsep.join((str(output), classpath)), main], check=True, timeout=30)
-print('44 focused Kotlin cases passed; temporary classes/declarations disposed. No Gradle/native/Compose/ABI validation claimed.')
+        result = subprocess.run([str(java), '-Xmx128m', '-cp', os.pathsep.join((str(output), classpath)), main],
+            check=False, timeout=30, capture_output=True, text=True)
+        print(result.stdout, end='', flush=True)
+        if result.stderr:
+            print(result.stderr, end='', flush=True)
+        result.check_returncode()
+        passed += sum(line.startswith('PASS ') for line in result.stdout.splitlines())
+print(f'{passed} focused Kotlin cases passed; temporary classes/declarations disposed. No Gradle/native/Compose/ABI validation claimed.')

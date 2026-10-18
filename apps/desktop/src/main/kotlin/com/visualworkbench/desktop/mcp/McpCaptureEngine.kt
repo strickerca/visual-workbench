@@ -95,10 +95,10 @@ internal class NativeMcpCaptureEngine private constructor(
     }
     override suspend fun <T> withVerificationSources(original:PackageInfo,after:PackageInfo,body:suspend(WorkbenchProject,WorkbenchProject)->T):T = gate.withLock {
         check(!closed)
-        val beforePath=sources[source(original)]?:throw McpRefused()
-        val afterPath=sources[source(after)]?:throw McpRefused()
+        val beforePath=sourcePath(original)
+        val afterPath=sourcePath(after)
         require(beforePath!=afterPath)
-        // These exact paths were minted by this engine's capture operation.
+        // Paths are minted captures or matched retained private capture projects.
         // Reopening leases uses the canonical project API; the operation joins
         // before either owner closes or another capture/engine shutdown proceeds.
         var before:WorkbenchProject?=null;var next:WorkbenchProject?=null
@@ -115,7 +115,7 @@ internal class NativeMcpCaptureEngine private constructor(
     }
     override suspend fun <T> withVerificationSource(after:PackageInfo,body:suspend(WorkbenchProject)->T):T = gate.withLock {
         check(!closed)
-        val path=sources[source(after)]?:throw McpRefused()
+        val path=sourcePath(after)
         val project=core.open(path.toString())
         try {
             val info=project.info()
@@ -123,6 +123,16 @@ internal class NativeMcpCaptureEngine private constructor(
                 info.hostSeq==after.binding.hostSeq&&info.stateHash==after.binding.stateHash)
             body(project)
         } finally {withContext(NonCancellable){project.close()}}
+    }
+    /** Private source recovery only. This never reconstructs an OS selector or
+     * grant. Existing native methods still verify source/capture/blob identity. */
+    private suspend fun sourcePath(expected:PackageInfo):Path {
+        sources[source(expected)]?.let{return it}
+        require(sources.size<32)
+        val excluded=sources.filterKeys{it!=source(expected)}.values.toSet()
+        val found=findRetainedMcpCaptureProject(root,expected,core,excluded)?:throw McpRefused()
+        sources[source(expected)]=found
+        return found
     }
     private suspend fun <T> hostCall(release:(T)->Unit={},body:suspend(CaptureOperation)->T):T {
         val operation=CaptureOperation();val owned=AtomicReference<T?>(null)

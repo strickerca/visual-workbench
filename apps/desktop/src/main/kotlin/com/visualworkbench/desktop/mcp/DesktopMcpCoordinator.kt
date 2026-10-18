@@ -34,6 +34,7 @@ internal data class McpDesktopState(
     val grants:List<McpCaptureGrant> = emptyList(),val activeCapture:McpCaptureActivity?=null,
     val retiring:Set<String> = emptySet(),val sendPreview:McpClaudePreview?=null,
     val verificationReceipts:Set<String> = emptySet(),
+    val verificationHistory:VerificationReviewHistoryPage?=null,
     val message:String?=null,val closed:Boolean=false,
 )
 
@@ -297,6 +298,20 @@ internal class DesktopMcpCoordinator(
     /** Installed by the existing editor owner under its lifecycle ownership. */
     fun attachVerificationOriginal(access:McpVerificationOriginalAccess) {
         synchronized(lifecycle){check(!closing);verification.originalAccess=access}
+        mutable.update{it.copy(verificationHistory=null)}
+    }
+    suspend fun loadVerificationHistory(after:String?=null):VerificationReviewHistoryPage=owned {
+        verificationGate.withLock{catalogGate.withLock{
+            verification.history(after).also{page->mutable.update{it.copy(verificationHistory=page,message=if(page.snapshots.isEmpty())"No saved reviews on this page of the open original."else"Saved reviews loaded. No capture grant was restored.")}}
+        }}
+    }
+    suspend fun openVerificationHistory(expected:VerificationReviewSnapshot):McpInboxReceipt=owned {
+        verificationGate.withLock{catalogGate.withLock{inboxGate.withLock{
+            val receipt=verification.openHistory(expected)
+            mutable.update{it.copy(inbox=it.inbox.filterNot{old->old.receiptId==receipt.receiptId}+receipt,
+                verificationReceipts=it.verificationReceipts+receipt.receiptId,message="Saved review reopened against checked immutable images. Capture still requires a fresh grant.")}
+            receipt
+        }}}
     }
     /** Called by the existing capture delivery, before compiling/exposing its
      * marked package. Retaining a route mints no connection or capture grant. */

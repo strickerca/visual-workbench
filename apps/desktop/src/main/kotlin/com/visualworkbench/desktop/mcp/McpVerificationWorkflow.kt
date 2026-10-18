@@ -18,6 +18,9 @@ internal interface McpVerificationOriginalAccess {
     /** Identity selection only; withOriginal rechecks under the editor mutex. */
     fun owns(expected:PackageInfo):Boolean
     suspend fun <T> withOriginal(expected:PackageInfo,body:suspend(WorkbenchProject)->T):T
+    /** Root lends the currently open original under its existing edit mutex.
+     * A pair is not yet known when enumerating this installation's saved rows. */
+    suspend fun <T> withCurrentVerificationOriginal(body:suspend(WorkbenchProject)->T):T = throw McpRefused()
 }
 /** Minted only by the native adapter from the existing capture owner's exact
  * target/frame/project delivery. It contains no portable or agent authority. */
@@ -72,11 +75,14 @@ internal class McpVerificationWorkflow(
     private val capture:McpCaptureEngine,private val checked:suspend(PackageInfo)->PublishedPackage,
     private val newId:()->String,
     private val verificationFactory:(WorkbenchProject,WorkbenchProject,WorkbenchPackageCatalog,WorkbenchMcpInbox)->WorkbenchVerification=::verificationWorkflows,
+    private val historyFactory:(WorkbenchProject)->WorkbenchVerificationHistory=::verificationHistory,
 ) {
-    private data class Entry(val original:PackageInfo,val after:PackageInfo,val receipt:McpInboxReceipt,val recapture:McpVerificationRecapture) {
+    private data class Entry(val original:PackageInfo,val after:PackageInfo,val receipt:McpInboxReceipt,val recapture:McpVerificationRecapture,
+        val historical:VerificationReviewSnapshot?=null) {
         val pair=VerificationPair(original.verificationKey(),after.verificationKey(),receipt.receiptId,receipt.receiptBlake3)
     }
     private val entries=linkedMapOf<String,Entry>()
+    private var loadedHistory:VerificationReviewHistoryPage?=null
     @Volatile var originalAccess:McpVerificationOriginalAccess?=null
     private suspend fun manifest(info:PackageInfo):VerificationManifest {
         checked(info)
@@ -112,6 +118,49 @@ internal class McpVerificationWorkflow(
         return VerificationManifest(info,width,height,scale,McpCaptureProfile(target,info.includesWindowTitle),markers)
     }
     suspend fun profile(original:PackageInfo):McpCaptureProfile=manifest(original).profile
+    suspend fun history(after:String?):VerificationReviewHistoryPage {
+        val access=originalAccess?:throw McpRefused()
+        val page=access.withCurrentVerificationOriginal{original->
+            val project=original.info()
+            historyFactory(original).page(after).also{value->require(value.snapshots.all{it.projectId==project.projectId&&it.version>0uL})}
+        }
+        return page.copy(snapshots=java.util.Collections.unmodifiableList(ArrayList(page.snapshots))).also{loadedHistory=it}
+    }
+    private suspend fun checkHistory(expected:VerificationReviewSnapshot) {
+        val access=originalAccess?:throw McpRefused()
+        access.withCurrentVerificationOriginal{original->
+            require(original.info().projectId==expected.projectId)
+            historyFactory(original).check(expected)
+        }
+    }
+    /** Selection must come from a real saved private row on the displayed page.
+     * Recheck that row, both checked catalog owners and both retained inbox PNGs.
+     * Imported lineage/agent content cannot create this association. */
+    suspend fun openHistory(expected:VerificationReviewSnapshot):McpInboxReceipt {
+        require(loadedHistory?.snapshots?.count{it==expected}==1)
+        checkHistory(expected)
+        val pair=expected.pair
+        val original=catalog.lookup(pair.original.packageId,pair.original.target,pair.original.manifestSha256).info
+        val after=catalog.lookup(pair.after.packageId,pair.after.target,pair.after.manifestSha256).info
+        checked(original);checked(after)
+        require(original.binding.projectId==expected.projectId&&original.markerCount==expected.markerCount&&original.target==after.target&&original.model==after.model)
+        val receipt=inbox.list().singleOrNull{it.receiptId==pair.receiptId&&it.receiptBlake3==pair.receiptBlake3&&!it.retired}?:throw McpRefused()
+        require(receipt.packageId==original.packageId&&receipt.target==original.target&&receipt.manifestSha256==original.manifestSha256&&
+            receipt.binding==original.binding&&receipt.sourceAssetId==original.sourceAssetId&&receipt.after!=null&&receipt.text==null)
+        for((info,side) in listOf(original to McpInboxSide.Before,after to McpInboxSide.After)){
+            val image=info.images.single{it.role=="clean_source"}
+            val recorded=if(side==McpInboxSide.Before)receipt.before else requireNotNull(receipt.after)
+            require(image.width==recorded.width&&image.height==recorded.height)
+            val catalogPng=catalog.readFile(info.packageId,info.target,info.manifestSha256,image.path,4u*1024u*1024u)
+            val inboxPng=inbox.readPng(receipt.receiptId,receipt.receiptBlake3,side)
+            require(catalogPng.contentEquals(inboxPng))
+        }
+        checkHistory(expected)
+        require(entries.size<32||receipt.receiptId in entries)
+        val relation=McpVerificationRecapture(McpVerificationPackage.of(original),McpVerificationPackage.of(after))
+        entries[receipt.receiptId]=Entry(original,after,receipt,relation,expected)
+        return receipt
+    }
     suspend fun remember(recapture:McpVerificationRecapture,session:String):McpVerificationReceipt {
         require(entries.size<32)
         val original=checkedIdentity(recapture.original);val after=checkedIdentity(recapture.recaptured)
@@ -141,11 +190,14 @@ internal class McpVerificationWorkflow(
         else access.withOriginal(e.original){original->capture.withVerificationSource(e.after){after->body(verificationFactory(original,after,catalog,inbox))}}
     }
     suspend fun review(receipt:McpInboxReceipt):VerificationReviewSnapshot {
-        val e=entry(receipt.receiptId,receipt.receiptBlake3);return sources(e){it.review(e.pair)}
+        val e=entry(receipt.receiptId,receipt.receiptBlake3)
+        return e.historical?.also{checkHistory(it)}?:sources(e){it.review(e.pair)}
     }
     suspend fun change(request:VerificationOwnerChange):VerificationReviewSnapshot {
         val e=entry(request.pair.receiptId,request.pair.receiptBlake3);require(e.pair==request.pair)
-        return sources(e){it.change(e.pair,request.expectedVersion,request.operationId,request.originalNumber,request.verdict,request.note)}
+        val value=sources(e){it.change(e.pair,request.expectedVersion,request.operationId,request.originalNumber,request.verdict,request.note)}
+        if(e.historical!=null)entries[e.receipt.receiptId]=e.copy(historical=value)
+        return value
     }
     private suspend fun translation(e:Entry,marker:VerificationMarker,before:VerificationManifest,after:VerificationManifest,
         assumeSrgb:Boolean,allowDepth:Boolean):Pair<String,VerificationMarkerTranslation>? {
@@ -216,5 +268,5 @@ internal class McpVerificationWorkflow(
     suspend fun checkReview(expected:VerificationReviewSnapshot){val e=entry(expected.pair.receiptId,expected.pair.receiptBlake3);require(sources(e){it.review(e.pair)}==expected)}
     fun retire(info:PackageInfo){entries.entries.removeIf{it.value.original.verificationKey()==info.verificationKey()||it.value.after.verificationKey()==info.verificationKey()}}
     fun retire(receipt:McpInboxReceipt){entries.remove(receipt.receiptId)}
-    fun close(){entries.clear();originalAccess=null}
+    fun close(){entries.clear();loadedHistory=null;originalAccess=null}
 }
