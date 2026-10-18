@@ -23,6 +23,7 @@ MAX_FILE = 2 * 1024**3
 MAX_TOTAL = 8 * 1024**3
 MAX_SOURCE_FILE = MAX_FILE
 MAX_SOURCE_TOTAL = 4 * 1024**3
+MAX_OUTPUT_ENTRIES = 32768
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 DESKTOP = "apps/desktop/build/compose/binaries/main/app/VisualWorkbenchDev/"
 DOCUMENTS = {"toolchain_record": "release-docs/TOOLCHAIN.txt",
@@ -228,12 +229,12 @@ class Directory:
         else:
             (self.path / leaf).mkdir(mode=0o700)
 
-    def remove(self, leaf: str, directory: bool = False):
+    def entries(self):
         self.check()
-        if os.name == "posix":
-            (os.rmdir if directory else os.unlink)(leaf, dir_fd=self.fd)
-        else:
-            ((self.path / leaf).rmdir if directory else (self.path / leaf).unlink)()
+        return os.scandir(self.fd if os.name == "posix" else self.path)
+
+    def metadata(self):
+        return os.fstat(self.fd) if os.name == "posix" else self.path.lstat()
 
 
 def get_dir(path: Path, stack: ExitStack, cache: dict) -> Directory:
@@ -284,12 +285,13 @@ class Inputs:
 
 
 class Output:
-    """Fresh destination is staging until COMPLETE; cleanup only owned identities."""
+    """Fresh destination is staging; failed staging is conservatively retained."""
     def __init__(self, destination: Path, stack: ExitStack, cache: dict):
         self.root, self.stack, self.cache = absolute(destination), stack, cache
         self.created = []
         self.files = {}
         self.identities = {}
+        self.marker_fd = None
         parent = get_dir(self.root.parent, stack, cache)
         parent.mkdir(self.root.name)  # Exclusive: existing files/directories are never reused.
         self.created.append((parent, self.root.name, True, identity(parent.stat(self.root.name))))
@@ -317,6 +319,13 @@ class Output:
             opened = os.fstat(stream.fileno())
             self.created.append((parent, leaf, False, identity(opened)))
             ordinary(opened, False)
+            if relative == "COMPLETE":
+                require(self.marker_fd is None, "completion_marker_duplicate")
+                # Retain the actual created object, not merely its pathname.
+                # Refusal can invalidate this marker without unlinking a
+                # replacement installed by a concurrent writer.
+                self.marker_fd = os.dup(stream.fileno())
+                self.stack.callback(os.close, self.marker_fd)
             if source is not None:
                 actual, _ = source.read(descriptor["path"], descriptor, limit, output=stream)
             else:
@@ -337,22 +346,63 @@ class Output:
         self.identities[relative] = own
         return actual
 
+    def verify_namespace(self):
+        """Bounded observed snapshot; this does not exclude concurrent writers."""
+        directories = {}
+        for parent, leaf, directory, ident in self.created:
+            if directory:
+                relative = (parent.path / leaf).relative_to(self.root).as_posix()
+                directories["" if relative == "." else relative] = ident
+        require(set(self.files) == set(self.identities), "output_namespace_records")
+        require(len(directories) + len(self.files) <= MAX_OUTPUT_ENTRIES, "output_namespace_limit")
+        seen_dirs, seen_files = set(), set()
+        pending = [("", self.directory)]
+        count = 1  # Root plus every enumerated entry, monotonically bounded.
+        while pending:
+            relative, directory = pending.pop()
+            directory.check()
+            before = directory.metadata()
+            ordinary(before, True)
+            require(identity(before) == directories[relative], "output_directory_identity_changed")
+            require(relative not in seen_dirs, "output_namespace_duplicate")
+            seen_dirs.add(relative)
+            names = set()
+            with directory.entries() as entries:
+                for entry in entries:
+                    child = name(entry.name if not relative else relative + "/" + entry.name)
+                    count += 1
+                    require(count <= MAX_OUTPUT_ENTRIES, "output_namespace_limit")
+                    require(entry.name not in names, "output_namespace_duplicate")
+                    names.add(entry.name)
+                    current = directory.stat(entry.name)  # Never follows links.
+                    if child in directories:
+                        ordinary(current, True)
+                        require(identity(current) == directories[child], "output_directory_identity_changed")
+                        pending.append((child, get_dir(directory.path / entry.name, self.stack, self.cache)))
+                    elif child in self.identities:
+                        ordinary(current, False)
+                        require(snapshot(current) == self.identities[child], "output_identity_changed")
+                        seen_files.add(child)
+                    else:
+                        raise Rejected("output_namespace_unlisted")
+            require(snapshot(directory.metadata()) == snapshot(before), "output_namespace_changed")
+            directory.check()
+        require(seen_dirs == set(directories) and seen_files == set(self.files), "output_namespace_missing")
+        if self.marker_fd is not None:
+            require(snapshot(os.fstat(self.marker_fd)) == self.identities["COMPLETE"], "completion_marker_changed")
+
     def cleanup(self):
-        # Close held Windows directory handles before deleting those directories.
-        refused = False
-        for parent, leaf, directory, ident in reversed(self.created):
+        # A POSIX unlink cannot target a retained inode. A stat followed by
+        # unlink can delete a foreign replacement, even through a pinned parent.
+        # No backend currently proves exclusion for every output entry, so
+        # retain the complete failed staging tree on every platform. Invalidate
+        # only our marker descriptor; never delete or truncate a checked path.
+        if self.marker_fd is not None:
             try:
-                current = parent.stat(leaf)
-                ordinary(current, directory)
-                require(identity(current) == ident, "cleanup_identity_changed")
-                if directory and os.name == "nt":
-                    child = self.cache.get(parent.path / leaf)
-                    if child is not None:
-                        child.close()
-                parent.remove(leaf, directory)
-            except (OSError, Rejected):
-                refused = True
-        require(not refused, "cleanup_refused_foreign_or_changed_path")
+                os.ftruncate(self.marker_fd, 0)
+                os.fsync(self.marker_fd)
+            except OSError as error:
+                raise Rejected("incomplete_marker_invalidation_failed") from error
 
 
 def blob(row: dict) -> dict:
@@ -584,13 +634,17 @@ def assemble(root: Path, manifest_name: str, expected_sha256: str, destination: 
                   "files": dict(sorted(output.files.items())), "notices": notice_rows, "package_checks": package_results,
                   "release_prerequisites": prerequisites, "release_ready": False,
                   "external_dependencies": spec.get("external_dependencies", []),
+                  "output_namespace_entry_limit": MAX_OUTPUT_ENTRIES,
+                  "output_namespace_check": "observed whole namespace before and after COMPLETE; concurrent mutation is not excluded",
                   "built": False, "signed_or_signature_verified": False, "installed_or_launched": False,
                   "device_or_physical_acceptance": False,
                   "external_package_validation": "MSI/opaque inputs receive hash binding only; root MSI admission is separate"}
         output.write("inventory.json", json_bytes(report))
         sums = "".join(f"{value['sha256']}  {key}\n" for key, value in sorted(output.files.items()))
         output.write("SHA256SUMS", sums.encode("ascii"))
+        output.verify_namespace()
         output.write("COMPLETE", (output.files["inventory.json"]["sha256"] + "  inventory.json\n").encode("ascii"))
+        output.verify_namespace()
         return report
     except BaseException:
         if output is not None:

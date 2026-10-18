@@ -127,24 +127,33 @@ desktop image is delivered.
 Bounds: 8 MiB per JSON or generated metadata file; 4,096 artifacts; 2 GiB per
 artifact; 8 GiB total artifacts; 24,000 source/evidence entries; 2 GiB per source
 file and 4 GiB aggregate source/evidence bytes; 512 nonempty notices, 4 MiB each
-and 32 MiB total; 32,768 pinned directory identities. Names are bounded to 512
+and 32 MiB total; 32,768 pinned directory identities; 32,768 total output
+namespace entries including directories and the staging root. Names are bounded to 512
 ASCII characters and 24 components by the existing path contract. Operating
 system handle/resource exhaustion is a refusal, not a partial success.
 
 ## Output and failure behavior
 
-The freshly created destination is the task's staging directory. Until
-`COMPLETE` exists with the exact `inventory.json` hash, consumers must treat it
-as incomplete. Directory creation and publication of the whole tree are not an
+The freshly created destination is the task's staging directory. A successful
+assembler result and `COMPLETE` containing the exact `inventory.json` hash are
+both required for an assembly receipt. A failed run's retained tree is
+incomplete. Directory creation and publication of the whole tree are not an
 atomic directory transaction. Each file is created exclusively; inputs are
 streamed in 1 MiB chunks. The assembler checks opened-file identity, size,
 mtime/ctime and link count around reads, then rereads original declared inputs
 and copied files after package verification. POSIX operations use pinned
 ancestor descriptors and no-follow relative opens; Windows reads use no-follow,
 read-only file leases and pinned no-delete directory handles. Windows behavior
-still needs real host validation.
+still needs real host validation. Bounded, no-follow scans check the entire
+output namespace against the recorded files and owned directory identities,
+including empty directories. Unknown files, directories and links refuse.
+Expected files must retain their recorded identity/size/time/link snapshots;
+expected directories must retain their recorded identities. Each scan checks
+directory metadata before and after enumeration and rechecks its ancestor
+chain. These scans run before `COMPLETE` is created and again afterwards,
+including the marker in the final gate.
 
-The destination contains only:
+The successful final observed namespace must match:
 
 - Listed artifacts under `artifacts/`, preserving a complete desktop layout.
 - Actual `third_party/LICENSES` and `third_party/notices/*` input bytes.
@@ -159,9 +168,29 @@ The destination contains only:
   recursively hash itself; `COMPLETE` and `SHA256SUMS` are excluded from the
   inventory's `files` map to avoid a circular digest.
 
-On refusal, cleanup removes only paths whose identities belong to this run.
-Foreign replacements, changed directory identities or foreign inserted files
-cause cleanup refusal and an incomplete directory is retained. Existing
+On refusal after destination creation, the entire staging tree is retained on
+all platforms. Cleanup performs **no pathname deletion**. POSIX cannot unlink
+by a retained inode; checking an inode and then unlinking its name can delete a
+foreign replacement. The current backends do not prove exclusion for every
+output entry, so even apparently unchanged owned files/directories remain.
+The original refusal is preserved; a retained destination cannot be reused for
+a later run.
+
+The assembler retains a descriptor to its own `COMPLETE` file. On refusal after
+marker creation it truncates and fsyncs **that object**, leaving an empty,
+invalid marker when it still occupies the output path. It never deletes or
+truncates a replacement found at the marker's pathname. If another writer moves
+the owned marker and supplies a foreign replacement, the owned descriptor is
+invalidated and the foreign path is preserved; a marker alone does not override
+the failed process result. Invalidation failure is explicitly reported as
+`incomplete_marker_invalidation_failed`.
+
+These gates establish an observed namespace snapshot, not atomic exclusion of
+concurrent writers. A mutation after a checked entry or after the last scan can
+still occur; the marker can be observed before the final gate finishes. Delivery
+consumers must use the successful process result and revalidate the complete
+namespace and hashes after writer access has stopped. The tool does not provide
+an atomic directory publication or a tamper-proof completion claim. Existing
 destinations and source files are preserved. A successful assembly receipt is
 not signature, installation, startup, editor, device, performance or physical
 acceptance. Unexpected I/O/validator errors cross the CLI as a static refusal
@@ -178,7 +207,11 @@ synthetic APK fixture builder. They exercise copied inventories/checksums,
 bounded admission, actual notice gates and native APK validator reuse, malformed
 inputs, source/output identity replacement, source mutation, no-follow paths,
 hardlinks/FIFOs, simulated reparse attributes, fresh-output preservation and
-owned cleanup. These checks do not build or package the product.
+conservative failure retention. Regressions exercise the stale-stat / foreign
+replacement cleanup race without any unlink, unlisted DLL/empty-directory/link
+injection during validation, bounded namespace enumeration, final-gate file
+replacement and retained-descriptor marker invalidation. These checks do not
+build or package the product.
 
 ## Exact root hook proposal (not applied)
 

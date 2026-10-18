@@ -1,5 +1,5 @@
 """Small synthetic, stdlib-only checks. No builds, real packages or devices."""
-from contextlib import ExitStack, redirect_stdout
+from contextlib import ExitStack, redirect_stdout, nullcontext
 import copy
 import hashlib
 import io
@@ -63,6 +63,12 @@ class Assembly(unittest.TestCase):
         with self.assertRaisesRegex((ValueError, OSError), "^" + re.escape(code) + "$"):
             (call or self.run_assembly)()
 
+    def incomplete(self):
+        self.assertTrue(self.destination.is_dir())
+        marker = self.destination / "COMPLETE"
+        if marker.exists():
+            self.assertEqual(marker.read_bytes(), b"")
+
     def before(self):
         return {p.relative_to(self.root).as_posix(): (p.read_bytes(), a.snapshot(p.stat()))
                 for p in self.root.rglob("*") if p.is_file()}
@@ -117,11 +123,11 @@ class Assembly(unittest.TestCase):
         self.refuses("input_binding")
         self.assertFalse(self.destination.exists())
 
-    def test_bad_artifact_hash_cleans_staging_and_preserves_source(self):
+    def test_bad_artifact_hash_retains_staging_and_preserves_source(self):
         self.put("built/artifact.bin", b"wrong built bytes")
         before = self.before()
         self.refuses("input_binding")
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
         self.assertEqual(self.before(), before)
 
     def test_explicit_build_binding_must_exactly_cover_artifacts(self):
@@ -173,7 +179,7 @@ class Assembly(unittest.TestCase):
         self.put("third_party/notices/extra.txt", b"synthetic full notice\n")
         self.refresh()
         self.refuses("notice_unlisted_source")
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
 
     def test_notice_manifest_requires_every_declared_notice(self):
         source = json.loads((self.root / "third_party/LICENSES").read_bytes())
@@ -183,7 +189,7 @@ class Assembly(unittest.TestCase):
         self.refresh()
         with self.assertRaises(OSError):
             self.run_assembly()
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
 
     def test_notice_hash_change_and_printable_metadata_gate(self):
         source = json.loads((self.root / "third_party/LICENSES").read_bytes())
@@ -192,7 +198,7 @@ class Assembly(unittest.TestCase):
         self.spec["notice_manifest"] = self.row("third_party/LICENSES")
         self.refresh()
         self.refuses("notice_metadata")
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
 
     def test_real_apk_validator_is_reused_and_no_acceptance_added(self):
         path = Path(a.__file__).absolute().parents[1] / "ffi-test/test_apk.py"
@@ -207,10 +213,10 @@ class Assembly(unittest.TestCase):
         self.assertEqual(checked["extracted_files"], 0)
         self.assertEqual(len(checked["libraries"]), 2)
 
-    def test_corrupt_apk_refuses_with_no_delivered_tree(self):
+    def test_corrupt_apk_refuses_with_incomplete_retained_tree(self):
         self.replace_artifact("built/test.apk", b"not an apk" * 10, "apk")
         self.refuses("missing_eocd")
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
 
     def test_msi_is_only_hash_bound_external_input(self):
         self.replace_artifact("built/test.msi", b"synthetic opaque external package", "external-package")
@@ -257,9 +263,9 @@ class Assembly(unittest.TestCase):
     def test_desktop_adapter_requires_explicit_apk_and_full_layout(self):
         self.replace_artifact(a.DESKTOP + "app/item.bin", b"synthetic desktop", "desktop-file")
         self.refuses("personal_package_requires_explicit_apk")
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
 
-    def test_fresh_destination_constructor_failure_cleans_owned_directory(self):
+    def test_fresh_destination_constructor_failure_retains_owned_directory(self):
         original = a.get_dir
         def fail(path, stack, cache):
             if path == self.destination:
@@ -268,9 +274,9 @@ class Assembly(unittest.TestCase):
         with patch.object(a, "get_dir", fail):
             with self.assertRaises(OSError):
                 self.run_assembly()
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
 
-    def test_copy_failure_cleans_only_new_tree(self):
+    def test_copy_failure_retains_new_tree_and_preserves_source(self):
         original = a.Output.write
         def fail(owner, relative, *args, **kwargs):
             value = original(owner, relative, *args, **kwargs)
@@ -281,7 +287,7 @@ class Assembly(unittest.TestCase):
         with patch.object(a.Output, "write", fail):
             with self.assertRaises(OSError):
                 self.run_assembly()
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
         self.assertEqual(self.before(), before)
 
     def test_same_bytes_replacement_after_copy_is_detected(self):
@@ -296,7 +302,7 @@ class Assembly(unittest.TestCase):
             return value
         with patch.object(a.Output, "write", swap):
             self.refuses("input_identity_changed")
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
 
     def test_same_bytes_output_replacement_refuses_and_preserves_foreign_file(self):
         original = a.Output.write
@@ -309,7 +315,7 @@ class Assembly(unittest.TestCase):
                 os.replace(replacement, path)
             return value
         with patch.object(a.Output, "write", swap):
-            self.refuses("cleanup_refused_foreign_or_changed_path")
+            self.refuses("output_identity_changed")
         self.assertEqual((self.destination / "artifacts/artifact.bin").read_bytes(), b"synthetic compiled bytes\n")
         self.assertFalse((self.destination / "COMPLETE").exists())
 
@@ -332,7 +338,7 @@ class Assembly(unittest.TestCase):
             return MutatingStream(stream) if parent.path / leaf == source_path and not write else stream
         with patch.object(a.Directory, "open", changed):
             self.refuses("input_changed")
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
 
     def test_simulated_windows_reparse_attributes_refuse(self):
         info = (self.root / "project.txt").stat()
@@ -349,7 +355,7 @@ class Assembly(unittest.TestCase):
                 os.link(parent.path / leaf, alias)
             return stream
         with patch.object(a.Directory, "open", linked):
-            self.refuses("cleanup_refused_foreign_or_changed_path")
+            self.refuses("hardlinked_input")
         self.assertEqual(alias.read_bytes(), b"")
         self.assertFalse((self.destination / "COMPLETE").exists())
 
@@ -361,13 +367,15 @@ class Assembly(unittest.TestCase):
         path.unlink()
         path.symlink_to(target)
         self.refuses("redirected_path")
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
+        self.destination = self.base / "delivery-parent-link"
         path.unlink()
         path.write_bytes(target.read_bytes())
         (self.root / "built").rename(self.root / "original-built")
         (self.root / "built").symlink_to("original-built", target_is_directory=True)
         self.refuses("redirected_path")
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
+        self.destination = self.base / "delivery-root-link"
         alias = self.base / "alias"
         alias.symlink_to(self.root, target_is_directory=True)
         self.refuses("redirected_path", lambda: a.assemble(alias, ".local/manifest.json", self.digest, self.destination))
@@ -383,19 +391,149 @@ class Assembly(unittest.TestCase):
             return value
         with patch.object(a.Output, "write", swap):
             self.refuses("redirected_path")
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
 
     @unittest.skipUnless(os.name == "posix", "POSIX hardlink/FIFO fixtures")
     def test_hardlink_and_fifo_are_refused_without_reading(self):
         path = self.root / "built/artifact.bin"
         os.link(path, self.base / "hardlink")
         self.refuses("hardlinked_input")
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
+        self.destination = self.base / "delivery-fifo"
         (self.base / "hardlink").unlink()
         path.unlink()
         os.mkfifo(path)
         self.refuses("path_type")
-        self.assertFalse(self.destination.exists())
+        self.incomplete()
+
+    @unittest.skipUnless(os.name == "posix", "POSIX stale-stat cleanup regression")
+    def test_cleanup_preserves_foreign_replacement_after_stale_stat(self):
+        with ExitStack() as stack:
+            owner = a.Output(self.destination, stack, {})
+            owner.write("artifacts/victim.dll", b"owned bytes")
+            parent, leaf = owner.parent("artifacts/victim.dll")
+            path = self.destination / "artifacts/victim.dll"
+            original_stat = a.Directory.stat
+            stale = original_stat(parent, leaf)
+            replacement = self.base / "foreign-replacement"
+            replacement.write_bytes(b"foreign bytes must survive")
+            injected = False
+            def raced_stat(directory, child):
+                nonlocal injected
+                if directory.path / child == path:
+                    if not injected:
+                        os.replace(replacement, path)  # After stat, before the old unlink.
+                        injected = True
+                    return stale
+                return original_stat(directory, child)
+            with patch.object(a.Directory, "stat", raced_stat), \
+                    patch.object(a.os, "unlink", wraps=os.unlink) as unlink, \
+                    patch.object(a.os, "rmdir", wraps=os.rmdir) as rmdir:
+                self.assertEqual(a.identity(parent.stat(leaf)), a.identity(stale))
+                owner.cleanup()
+                unlink.assert_not_called()
+                rmdir.assert_not_called()
+            self.assertTrue(injected)
+            self.assertEqual(path.read_bytes(), b"foreign bytes must survive")
+            self.incomplete()
+
+    def test_foreign_file_injected_during_validation_refuses_without_complete(self):
+        original = a.validate_packages
+        def injected(root, output, *args):
+            (output.root / "artifacts/foreign.dll").write_bytes(b"foreign file")
+            return original(root, output, *args)
+        before = self.before()
+        with patch.object(a, "validate_packages", injected):
+            self.refuses("output_namespace_unlisted")
+        self.incomplete()
+        self.assertFalse((self.destination / "COMPLETE").exists())
+        self.assertEqual((self.destination / "artifacts/foreign.dll").read_bytes(), b"foreign file")
+        self.assertEqual(self.before(), before)
+
+    def test_foreign_empty_directory_is_not_omitted_from_namespace(self):
+        original = a.validate_packages
+        def injected(root, output, *args):
+            (output.root / "foreign-directory").mkdir()
+            return original(root, output, *args)
+        with patch.object(a, "validate_packages", injected):
+            self.refuses("output_namespace_unlisted")
+        self.incomplete()
+        self.assertTrue((self.destination / "foreign-directory").is_dir())
+
+    @unittest.skipUnless(os.name == "posix", "POSIX foreign symlink namespace fixture")
+    def test_foreign_directory_symlink_is_refused_without_traversal(self):
+        original = a.validate_packages
+        target = self.base / "outside"
+        target.mkdir()
+        (target / "keep").write_bytes(b"outside content")
+        def injected(root, output, *args):
+            (output.root / "artifacts/foreign-link").symlink_to(target, target_is_directory=True)
+            return original(root, output, *args)
+        with patch.object(a, "validate_packages", injected):
+            self.refuses("output_namespace_unlisted")
+        self.incomplete()
+        self.assertTrue((self.destination / "artifacts/foreign-link").is_symlink())
+        self.assertEqual((target / "keep").read_bytes(), b"outside content")
+
+    def test_whole_namespace_entry_limit_is_enforced(self):
+        with patch.object(a, "MAX_OUTPUT_ENTRIES", 1):
+            self.refuses("output_namespace_limit")
+        self.incomplete()
+        self.assertFalse((self.destination / "COMPLETE").exists())
+
+    def test_duplicate_namespace_entries_refuse_under_fixed_enumeration_bound(self):
+        original = a.Directory.entries
+        def repeated(directory):
+            if directory.path == self.destination:
+                return nullcontext([SimpleNamespace(name="release-manifest.json")] * 2)
+            return original(directory)
+        with patch.object(a.Directory, "entries", repeated):
+            self.refuses("output_namespace_duplicate")
+        self.incomplete()
+        self.assertFalse((self.destination / "COMPLETE").exists())
+
+    def test_final_gate_includes_complete_and_invalidates_owned_marker(self):
+        original = a.Output.write
+        def injected(owner, relative, *args, **kwargs):
+            value = original(owner, relative, *args, **kwargs)
+            if relative == "COMPLETE":
+                (owner.root / "artifacts/foreign.dll").write_bytes(b"late foreign file")
+            return value
+        with patch.object(a.Output, "write", injected):
+            self.refuses("output_namespace_unlisted")
+        self.incomplete()
+        self.assertEqual((self.destination / "COMPLETE").read_bytes(), b"")
+        self.assertEqual((self.destination / "artifacts/foreign.dll").read_bytes(), b"late foreign file")
+
+    def test_final_gate_rejects_known_file_replacement(self):
+        original = a.Output.write
+        def replaced(owner, relative, *args, **kwargs):
+            value = original(owner, relative, *args, **kwargs)
+            if relative == "COMPLETE":
+                path = owner.root / "artifacts/artifact.bin"
+                replacement = self.base / "late-same-bytes"
+                replacement.write_bytes(path.read_bytes())
+                os.replace(replacement, path)
+            return value
+        with patch.object(a.Output, "write", replaced):
+            self.refuses("output_identity_changed")
+        self.incomplete()
+
+    @unittest.skipUnless(os.name == "posix", "POSIX retained marker descriptor fixture")
+    def test_marker_invalidation_targets_owned_descriptor_not_foreign_path(self):
+        original = a.Output.write
+        moved = self.base / "owned-marker-moved"
+        def replaced(owner, relative, *args, **kwargs):
+            value = original(owner, relative, *args, **kwargs)
+            if relative == "COMPLETE":
+                path = owner.root / relative
+                path.rename(moved)
+                path.write_bytes(b"foreign marker must survive")
+            return value
+        with patch.object(a.Output, "write", replaced):
+            self.refuses("output_identity_changed")
+        self.assertEqual((self.destination / "COMPLETE").read_bytes(), b"foreign marker must survive")
+        self.assertEqual(moved.read_bytes(), b"")
 
     def test_output_containment_and_missing_parent_refuse(self):
         self.destination = self.root
