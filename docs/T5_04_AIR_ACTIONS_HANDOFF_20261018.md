@@ -129,21 +129,41 @@ cancel/focus/detach/replacement, barrel-remapped click suppression, fresh idle
 Undo, and motion forwarding identity/order/result/exception. Native readiness/ACK
 is a fixture flag, not an actual native or device measurement.
 
-**Execution is pending the requested focused compiler slot.** The coordinator
-holds the heavy slot, and the grant bars compiler processes during that ownership.
-The standalone cached-tool runner needs one bounded 512 MiB Kotlin compiler and
-no Gradle/native build or installation:
+**Authorized focused execution passes all 17/17 scenarios on exact source
+`cc606a0243fe18d2468f8aabab0ceee560c2f907`.** The isolated resource check found a
+16 GiB local memory limit, about 162 MB in use, over 17 GB headroom, and no other
+compiler/build process. Cached jars/SDK are read-only; outputs used a unique
+private temporary directory. Compiler heap was capped at 512 MiB, runtime at
+256 MiB. No Gradle/native build, daemon, installation or shared build/cache writes.
+The standalone command is:
 
 ```sh
 python3 apps/android/src/test/kotlin/com/visualworkbench/android/airactions/check_remote_motion.py --tools-root /workspace/.vw-tools --receipt-dir /tmp/vw-air-remote-motion-NEW
 ```
 
-The current source/ownership audit passes **113 distinct checks**, including byte
+Executed with cached Kotlin **2.4.0**, coroutines **1.9.0**, JVM 21 and `-Werror`;
+the MotionEvent adapter also compiles against API 37. The negative control produces
+**one stale Undo**, the hooked exact timing trace **zero commands**, and fresh
+idle input **one Undo**. All contact/queued/cancel/focus/detach/replacement/barrel
+and exactly-once delegate scenarios pass. Exact command exit codes, source hashes
+and limits: `/tmp/vw-air-remote-motion-executed-r1/receipt.json`; named results:
+`host-contracts.log`; resource/collision evidence:
+`/tmp/vw-air-remote-motion-resource-check.json`. Temporary compiler artifacts were
+disposed and the post-run build-process count is zero.
+
+Current source hashes (SHA-256):
+
+- AirActionRouter.kt: `7dc09b08cbccc73ec6861a3278a3edcc5cf70834f7a5e8a6fdcda5a87d453c04`
+- AirActionRemoteMotion.kt: `6b744bbf7f80c57b28a78fe2f962a61b2ffda9a23d49cd820682a2abc2425a02`
+- AirActionRemoteMotionEvent.kt: `ad8aecb1086f55b9ee8efc9e444aea2742257cc5864aa4e2c060797e39a3da4c`
+- AirActionRemoteMotionContract.kt: `08380de852aa37d6e8b415ced4f7b1537d56e24243640222e7391370bc109932`
+
+The source/ownership audit also passes **113 distinct checks**, including byte
 identity of both real remote-input source files and exact callback-registration
-fences. Receipt: `/tmp/vw-air-remote-motion-source-final.json`. Harness Python syntax
-and whitespace checks pass. The seventeen new contract scenarios are written,
-not reported as executed. The full Compose/controller path, native ACK/input,
-Android runtime and physical S23/A09 acceptance remain unverified.
+fences. Receipt: `/tmp/vw-air-remote-motion-source-final.json`. Whitespace and
+staged secret checks pass. This was standalone host execution, not a JUnit runner
+or full Compose/EditorController compilation. Native ACK/input, actual MotionEvent
+framework execution, Android runtime and physical S23/A09 acceptance stay unverified.
 
 ## Executed evidence and remaining gates
 
