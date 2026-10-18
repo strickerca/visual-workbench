@@ -175,7 +175,11 @@ class DiagnosticReportWriterTest {
     }
 
     @Test fun cancellationAfterStreamClosedBeforeOwnerResumesCannotReplaceSuccessWithFailure() {
-        val output = OwnedOutput()
+        // Force withContext(IO) to suspend before IO can complete. Otherwise a
+        // fast stream may settle undispatched before launch returns, legitimately
+        // leaving no queued owner continuation for this race test to intercept.
+        val release = CountDownLatch(1)
+        val output = OwnedOutput(flushRelease = release)
         val preview = report()
         val dispatcher = QueuedOwnerDispatcher()
         val parent = Job()
@@ -186,8 +190,9 @@ class DiagnosticReportWriterTest {
             recorded.add(it)
         }
         try {
-            // Taking the queued owner continuation proves IO has already returned.
-            // Cancel before running it, reproducing withContext's prompt-cancellation race.
+            // launch has now suspended with IO blocked. Let the stream close,
+            // then hold its real owner continuation before cancellation.
+            release.countDown()
             val resumeOwner = dispatcher.takeTask()
             assertArrayEquals(preview.jsonText.toByteArray(Charsets.UTF_8), output.bytes.toByteArray())
             assertEquals(1, output.closes)
@@ -197,7 +202,7 @@ class DiagnosticReportWriterTest {
             resumeOwner.run()
             dispatcher.runUntilComplete(writer)
             assertEquals(listOf(DiagnosticEventCode.ExportSucceeded), recorded)
-        } finally { parent.cancel(); dispatcher.runUntilComplete(writer) }
+        } finally { release.countDown(); parent.cancel(); dispatcher.runUntilComplete(writer) }
     }
 
     @Test fun cancellationAfterSettlementDoesNotChangeOrRepeatTheRecordedOutcome() {
