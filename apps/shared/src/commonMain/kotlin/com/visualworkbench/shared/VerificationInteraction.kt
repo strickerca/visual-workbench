@@ -78,6 +78,9 @@ public fun verificationReviewOutcome(value: VerificationReviewSnapshot): Verific
 internal const val VERIFICATION_MAX_MARKERS: Int = 512
 internal const val VERIFICATION_MAX_NOTE: Int = 32 * 1024
 internal const val VERIFICATION_MAX_NOTES: Int = 128 * 1024
+internal const val VERIFICATION_HISTORY_MAX_ROWS: Int = 8
+internal const val VERIFICATION_HISTORY_MAX_NOTES: Int = VERIFICATION_HISTORY_MAX_ROWS * VERIFICATION_MAX_NOTES
+internal const val VERIFICATION_HISTORY_PREFIX: String = "vw.verification-review.v1."
 
 /** Common read-only storage with a private copy; a JVM MutableList cast cannot
  * mutate an admitted snapshot or measured translation set after validation. */
@@ -115,11 +118,12 @@ internal fun verificationNoteBytes(value: String, kind: PackageFailureKind = Pac
     return value.encodeToByteArray().size.also { if (it > VERIFICATION_MAX_NOTE) throw PackageFailure(PackageFailureKind.Limit) }
 }
 
-private fun <T> boundedVerificationCopy(values: List<T>, kind: PackageFailureKind): List<T> {
-    if (values.size > VERIFICATION_MAX_MARKERS) throw PackageFailure(kind)
+private fun <T> boundedVerificationCopy(values: List<T>, kind: PackageFailureKind,
+    maximum: Int = VERIFICATION_MAX_MARKERS): List<T> {
+    if (values.size > maximum) throw PackageFailure(kind)
     val copy = ArrayList<T>(values.size)
     for (value in values) {
-        if (copy.size == VERIFICATION_MAX_MARKERS) throw PackageFailure(kind)
+        if (copy.size == maximum) throw PackageFailure(kind)
         copy.add(value)
     }
     return copy
@@ -162,4 +166,38 @@ internal fun ownedVerificationTranslations(expected: VerificationReviewSnapshot,
         owned.any { !it.dx.isFinite() || !it.dy.isFinite() } ||
         owned.map { it.originalNumber }.sorted() != failed) throw PackageFailure(PackageFailureKind.Invalid)
     return VerificationReadOnlyList(owned.sortedBy { it.originalNumber })
+}
+
+private fun verificationHistoryCursor(value: String): Boolean =
+    value.length == VERIFICATION_HISTORY_PREFIX.length + 64 && value.startsWith(VERIFICATION_HISTORY_PREFIX) &&
+        hash(value.substring(VERIFICATION_HISTORY_PREFIX.length))
+
+internal fun validateVerificationHistoryRequest(after: String?, limit: UInt): Unit {
+    if (limit !in 1u..VERIFICATION_HISTORY_MAX_ROWS.toUInt() || after?.let { !verificationHistoryCursor(it) } == true)
+        throw PackageFailure(PackageFailureKind.Invalid)
+}
+
+/** Defends the decoded API boundary. Only native storage has the encoded row
+ * bytes and key binding needed to enforce 2 MiB and last-returned-key identity. */
+internal fun ownedVerificationHistoryPage(value: VerificationReviewHistoryPage, projectId: String,
+    after: String? = null, limit: UInt = 8u): VerificationReviewHistoryPage {
+    validateVerificationHistoryRequest(after, limit)
+    if (!verificationId(projectId)) throw PackageFailure(PackageFailureKind.Integrity)
+    val input = boundedVerificationCopy(value.snapshots, PackageFailureKind.Integrity, limit.toInt())
+    val cursor = value.nextCursor
+    if (cursor != null && (!verificationHistoryCursor(cursor) || input.isEmpty() || (after != null && cursor <= after)))
+        throw PackageFailure(PackageFailureKind.Integrity)
+    var noteBytes = 0
+    val snapshots = input.map { snapshot ->
+        val owned = ownedVerificationSnapshot(snapshot, kind = PackageFailureKind.Integrity)
+        if (owned.version == 0uL || owned.projectId != projectId) throw PackageFailure(PackageFailureKind.Integrity)
+        for (marker in owned.markers) {
+            noteBytes += verificationNoteBytes(marker.note, PackageFailureKind.Integrity)
+            if (noteBytes > VERIFICATION_HISTORY_MAX_NOTES) throw PackageFailure(PackageFailureKind.Limit)
+        }
+        owned
+    }
+    if (snapshots.map { Triple(it.pair, it.projectId, it.markerCount) }.distinct().size != snapshots.size)
+        throw PackageFailure(PackageFailureKind.Integrity)
+    return VerificationReviewHistoryPage(VerificationReadOnlyList(snapshots), cursor)
 }

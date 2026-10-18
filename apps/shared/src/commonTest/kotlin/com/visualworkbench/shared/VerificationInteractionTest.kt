@@ -23,6 +23,9 @@ class VerificationInteractionTest {
         assertEquals(kind, assertFailsWith<PackageFailure>(block = block).kind)
     }
 
+    private fun historySnapshot(number: Int = 1): VerificationReviewSnapshot = snapshot(VerificationVerdict.Pending)
+        .copy(pair = pair.copy(receiptId = pair.receiptId.dropLast(1) + number.toString(16)))
+
     @Test fun freshVersionZeroCanSaveItsFirstManualDecisionAsVersionOne(): Unit {
         val interaction = VerificationInteraction()
         val fresh = snapshot(VerificationVerdict.Pending, VerificationVerdict.Pending, version = 0uL)
@@ -170,5 +173,79 @@ class VerificationInteractionTest {
             ownedVerificationTranslations(snapshot(VerificationVerdict.Pending), emptyList())
         }
         assertTrue(ownedVerificationTranslations(snapshot(VerificationVerdict.Pass), emptyList()).isEmpty())
+    }
+
+    @Test fun privateHistoryUsesCanonicalExclusiveCursorsAndBoundedRequests(): Unit {
+        val after = VERIFICATION_HISTORY_PREFIX + "1".repeat(64)
+        val next = VERIFICATION_HISTORY_PREFIX + "2".repeat(64)
+        validateVerificationHistoryRequest(after, 1u)
+        val page = ownedVerificationHistoryPage(VerificationReviewHistoryPage(listOf(historySnapshot()), next), projectId, after, 1u)
+        assertEquals(next, page.nextCursor)
+        assertNull(ownedVerificationHistoryPage(VerificationReviewHistoryPage(emptyList(), null), projectId, next).nextCursor)
+        for (cursor in listOf("", "1".repeat(64), next.uppercase(), VERIFICATION_HISTORY_PREFIX + "g".repeat(64),
+            "vw.verification-review.v2." + "1".repeat(64), next + "0")) {
+            failure(PackageFailureKind.Invalid) { validateVerificationHistoryRequest(cursor, 8u) }
+            failure(PackageFailureKind.Integrity) {
+                ownedVerificationHistoryPage(VerificationReviewHistoryPage(listOf(historySnapshot()), cursor), projectId)
+            }
+        }
+        for (limit in listOf(0u, 9u, UInt.MAX_VALUE)) {
+            failure(PackageFailureKind.Invalid) { validateVerificationHistoryRequest(null, limit) }
+        }
+        for (cursor in listOf(after, VERIFICATION_HISTORY_PREFIX + "0".repeat(64))) {
+            failure(PackageFailureKind.Integrity) {
+                ownedVerificationHistoryPage(VerificationReviewHistoryPage(listOf(historySnapshot()), cursor), projectId, after)
+            }
+        }
+        failure(PackageFailureKind.Integrity) {
+            ownedVerificationHistoryPage(VerificationReviewHistoryPage(emptyList(), next), projectId)
+        }
+    }
+
+    @Test fun historyAdmitsSavedPendingNotesAndRefusesFreshOrForeignRecords(): Unit {
+        val saved = historySnapshot().copy(markers = listOf(VerificationMarkerReview(1u, VerificationVerdict.Pending, "owner note")))
+        assertEquals(saved, ownedVerificationHistoryPage(VerificationReviewHistoryPage(listOf(saved), null), projectId).snapshots.single())
+        for (bad in listOf(saved.copy(version = 0uL, markers = listOf(VerificationMarkerReview(1u, VerificationVerdict.Pending, ""))),
+            saved.copy(version = ULong.MAX_VALUE), saved.copy(projectId = operationId),
+            saved.copy(markers = listOf(VerificationMarkerReview(2u, VerificationVerdict.Pending, ""))))) {
+            failure(PackageFailureKind.Integrity) {
+                ownedVerificationHistoryPage(VerificationReviewHistoryPage(listOf(bad), null), projectId)
+            }
+        }
+        failure(PackageFailureKind.Integrity) {
+            ownedVerificationHistoryPage(VerificationReviewHistoryPage(listOf(saved, saved), null), projectId)
+        }
+    }
+
+    @Test fun historyOwnsBothListsAndKeepsPrivateNotesOutOfDiagnostics(): Unit {
+        val secret = "private historical owner observation"
+        val markers = mutableListOf(VerificationMarkerReview(1u, VerificationVerdict.Fail, secret))
+        val rows = mutableListOf(historySnapshot().copy(markers = markers))
+        val owned = ownedVerificationHistoryPage(VerificationReviewHistoryPage(rows, null), projectId)
+        markers[0] = VerificationMarkerReview(1u, VerificationVerdict.Pass, "changed later")
+        rows.clear()
+        assertEquals(1, owned.snapshots.size)
+        assertEquals(VerificationVerdict.Fail, owned.snapshots.single().markers.single().verdict)
+        assertEquals(secret, owned.snapshots.single().markers.single().note)
+        assertFalse(secret in owned.toString())
+        assertFalse(secret in owned.snapshots.toString())
+    }
+
+    @Test fun historyBoundsDecodedNotesWithoutClaimingToMeasureNativeEncodedRows(): Unit {
+        val maxNotes = List(4) { index -> VerificationMarkerReview((index + 1).toUInt(), VerificationVerdict.Pass, "x".repeat(32768)) }
+        val rows = (1..8).map { historySnapshot(it).copy(markerCount = 4u, markers = maxNotes) }
+        val owned = ownedVerificationHistoryPage(VerificationReviewHistoryPage(rows, null), projectId)
+        assertEquals(8, owned.snapshots.size)
+        assertEquals(1024 * 1024, owned.snapshots.sumOf { row -> row.markers.sumOf { it.note.encodeToByteArray().size } })
+        failure(PackageFailureKind.Integrity) {
+            ownedVerificationHistoryPage(VerificationReviewHistoryPage(rows + historySnapshot(9), null), projectId)
+        }
+        failure(PackageFailureKind.Integrity) {
+            ownedVerificationHistoryPage(VerificationReviewHistoryPage(rows.take(2), null), projectId, limit = 1u)
+        }
+        failure(PackageFailureKind.Limit) {
+            val tooManyNotes = historySnapshot().copy(markerCount = 5u, markers = maxNotes + VerificationMarkerReview(5u, VerificationVerdict.Pass, "x"))
+            ownedVerificationHistoryPage(VerificationReviewHistoryPage(listOf(tooManyNotes), null), projectId)
+        }
     }
 }

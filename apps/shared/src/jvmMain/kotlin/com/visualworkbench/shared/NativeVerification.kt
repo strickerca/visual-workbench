@@ -9,6 +9,7 @@ import com.visualworkbench.bindings.core.VerificationVerdict as NVerdict
 import com.visualworkbench.bindings.core.VerificationMarkerReview as NMarker
 import com.visualworkbench.bindings.core.VerificationReviewSnapshot as NSnapshot
 import com.visualworkbench.bindings.core.VerificationMarkerTranslation as NTranslation
+import com.visualworkbench.bindings.core.VerificationReviewHistoryPage as NHistoryPage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -132,6 +133,52 @@ private class NativeVerification(private val original: WorkbenchProject, private
                 try { compiled?.close() } catch (cleanup: Throwable) { error.addSuppressed(cleanup) }
                 throw error
             }
+        }
+    }
+}
+
+public actual fun verificationHistory(original: WorkbenchProject): WorkbenchVerificationHistory {
+    verificationProject(original)
+    return NativeVerificationHistory(original)
+}
+
+private suspend fun verificationHistoryProjectId(project: WorkbenchProject): String =
+    try {
+        // Project identity alone binds historical records. hostSeq, stateHash
+        // and document/source revisions deliberately do not fence a history read.
+        project.info().projectId.also { if (!verificationId(it)) throw PackageFailure(PackageFailureKind.Integrity) }
+    } catch (error: CoreFailure) {
+        throw PackageFailure(when (error.kind) {
+            CoreFailureKind.Invalid -> PackageFailureKind.Invalid
+            CoreFailureKind.Backpressure -> PackageFailureKind.Busy
+            CoreFailureKind.Closed -> PackageFailureKind.Closed
+            CoreFailureKind.Cancelled -> PackageFailureKind.Cancelled
+            CoreFailureKind.Unsupported -> PackageFailureKind.Unsupported
+            else -> PackageFailureKind.Storage
+        })
+    }
+
+private fun NHistoryPage.common(projectId: String, after: String?, limit: UInt): VerificationReviewHistoryPage {
+    if (snapshots.size > limit.toInt()) throw PackageFailure(PackageFailureKind.Integrity)
+    return ownedVerificationHistoryPage(VerificationReviewHistoryPage(snapshots.map { it.common(it.pair.common()) }, nextCursor),
+        projectId, after, limit)
+}
+
+private class NativeVerificationHistory(private val original: WorkbenchProject) : WorkbenchVerificationHistory {
+    override suspend fun page(after: String?, limit: UInt): VerificationReviewHistoryPage {
+        validateVerificationHistoryRequest(after, limit)
+        return settledVerification { cancel ->
+            val projectId = verificationHistoryProjectId(original)
+            verificationProject(original).verificationReviewHistory(after, limit, cancel).common(projectId, after, limit)
+        }
+    }
+
+    override suspend fun check(expected: VerificationReviewSnapshot): Unit {
+        val snapshot = ownedVerificationSnapshot(expected)
+        if (snapshot.version == 0uL) throw PackageFailure(PackageFailureKind.Stale)
+        return settledVerification { cancel ->
+            if (snapshot.projectId != verificationHistoryProjectId(original)) throw PackageFailure(PackageFailureKind.Stale)
+            verificationProject(original).checkVerificationHistory(snapshot.native(), cancel)
         }
     }
 }

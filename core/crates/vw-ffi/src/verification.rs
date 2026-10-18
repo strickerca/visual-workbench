@@ -8,6 +8,7 @@
 //! registration and deferred execution prerequisites.
 mod checked;
 mod dto;
+mod history;
 mod prepare;
 #[cfg(test)]
 mod tests;

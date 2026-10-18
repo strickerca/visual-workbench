@@ -35,6 +35,12 @@ pub struct VerificationReviewSnapshot {
     pub version: u64,
     pub markers: Vec<VerificationMarkerReview>,
 }
+/// Private saved review data only. It grants no source mutation or capture.
+#[derive(Clone, PartialEq, Eq, uniffi::Record)]
+pub struct VerificationReviewHistoryPage {
+    pub snapshots: Vec<VerificationReviewSnapshot>,
+    pub next_cursor: Option<String>,
+}
 /// Geometry supplied by the private owner workflow's checked alignment. This is
 /// neither an agent verdict nor proof of capture permission or image alignment.
 #[derive(Clone, Copy, PartialEq, uniffi::Record)]
