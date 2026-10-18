@@ -330,6 +330,36 @@ pub(crate) fn from_compiler(
     {
         return Err(Error::Integrity);
     }
+    if let Some(origin) = &m.extensions.verification_origin {
+        if origin.original_package_id == m.package_id
+            || origin.original_target != m.compiled_for.target
+            || !matches!(
+                origin.original_target.as_str(),
+                "claude" | "openai" | "gemini" | "generic"
+            )
+            || !bounded::hash_valid(&origin.original_manifest_sha256)
+            || !bounded::hash_valid(&origin.comparison_receipt_blake3)
+            || origin.original_marker_numbers.is_empty()
+            || origin.original_marker_numbers.len() != m.markers.len()
+        {
+            return Err(Error::Integrity);
+        }
+        // Admission caps this vector before serde allocation. Check identity and
+        // uniqueness with fixed stack storage, never a second growing inventory.
+        let mut seen = [false; 512];
+        for number in &origin.original_marker_numbers {
+            let Some(slot) = number
+                .checked_sub(1)
+                .and_then(|index| usize::try_from(index).ok())
+                .and_then(|index| seen.get_mut(index))
+            else {
+                return Err(Error::Integrity);
+            };
+            if std::mem::replace(slot, true) {
+                return Err(Error::Integrity);
+            }
+        }
+    }
     let mut inventory = BTreeSet::new();
     for f in &m.files {
         if f.path == "manifest.json"
