@@ -423,7 +423,7 @@ entrypoints exercised by their owning process tests. Strict Linux Clippy passes
 for the four affected crates. Fresh Linux and Androidarm64 libraries build;
 Android's four LOAD segments retain16KiB alignment. Final JVM tests pass816cases (shared337, Desktop346, Android133), with seven
 Windows-only skips. Android instrumentation source compiles; lint has zero errors,
-59warnings and12hints. Failures, source/artifact bindings and exact scope are in
+59warnings and 12hints. Failures, source/artifact bindings and exact scope are in
 `evidence/GIANT_CALLER_INTEGRATION_20261018.json` and its receipt excerpts. No APK signing/install, app launch, device, Windows GPU/runtime,
 performance or physical gate is inferred from these checks.
 
@@ -479,3 +479,44 @@ Air Actions and capture-picker leaves keep exclusive ownership and send minimal
 interfaces to root. Krita, PDF runtime activation, external authority and all
 physical/product gates remain deferred/open. Preserved worktrees and archives
 are untouched.
+
+## Private giant producer root batch
+
+Code 4a87aac on cloud/giant-producer-draft-20261018 composes the reviewed unchanged
+af934061 leaves and accepted 9b05bea read repair, plus new root ownership/JNI code
+that awaits Astra review. It is based on editing 707e940; the separately published
+correction 35ad8b4/a1ad07f is awaiting recheck and is not in this branch. Main stays
+reviewed 6f3e2f3. Do not promote this draft until the reviewed editing correction
+and independent composed root-source review are complete.
+
+All four publication parts now enter one payload before fallible construction.
+The same 32 MiB charge drops last in actual ProjectState; its permit retires with
+that state. A real native publication/adoption regression verifies prepared/build
+retirement, the retained project charge, exact original bytes and database reopen.
+Three additional worker tests cover constructor refusal, cancelled close and
+abandoned startup delivery. The private Android runner bridge invokes the real
+fixed JVM producer, admits same-pool ownership and copies checked typed output
+under withRootOutput into independent native storage. It withholds the build until
+actual Java close succeeds. JNI symbols/descriptors are checked; actual ART/codec/
+GPU execution remains open. Fixed producer file reads add three sentinel/capacity/
+admission regressions without changing the accepted 256 MiB phone cap.
+
+Final checks pass 547 native executions in 38 result blocks (two private child
+entrypoints ignored in the parent harness and exercised by owning tests), strict
+Linux and arm64 library Clippy, fresh libraries, one core-binding generation,
+944 JVM/unit cases and both instrumentation source sets. Seven Windows cases skip;
+the 19 Android producer cases compile only. Android app lint has zero errors,
+60 warnings and 12 hints. The lock adds only the internal Windows producer and
+FFI edge; external pins and license policy remain intact. Precise scope, source/
+artifact bindings and failed attempts are recorded in
+`evidence/GIANT_PRODUCER_ROOT_VALIDATION_20261018.json`.
+
+This is private producer/root composition, not a user giant intake/import/rebuild/
+export pass. Public owned-input and caller APIs, existing-project budget adoption,
+actual Android JNI/codec/renderer retirement and Windows dynamic runtime remain
+next work. The exact three-file pending-input continuation grant lets the image
+owner proceed after root freezes without moving root registration or controllers.
+Capture-picker 9769d218 is narrowly accepted for a separate caller batch; later
+Air Actions wiring uses 2a66b8. T5.01 semantic/recapture proposals remain held until
+their repaired 4436382 source receives a verdict. No physical/product gate, private
+capture, provider call, signing/install or old-worktree disposition changes.

@@ -1,0 +1,118 @@
+Private giant root producer phase — execution excerpts
+Code: 4a87aac91b0422a7252efce919e3de7db384b893
+Editing base: 707e940841373b076ebbe750c01319df2d992eed; separately pending correction35ad8b4 is not in this draft.
+Astra review and corrected-base composition required before main promotion. No user import/hardware acceptance.
+
+LOG vw-producer-root-native-final.log
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test giant_images::producer::android_bridge::tests::real_publication_adopts_all_four_parts_and_keeps_only_its_project_charge_until_close ... ok
+test result: ok. 271 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.29s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.26s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.22s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.10s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.73s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.70s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.22s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.99s
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.25s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.49s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+LOG vw-producer-root-clippy-linux-final2.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.96s
+
+LOG vw-producer-root-clippy-android-attempt2.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.18s
+
+LOG vw-producer-root-linux-build.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.89s
+
+LOG vw-producer-root-android-build.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 34.30s
+
+LOG vw-producer-root-apps-attempt1.log
+Application license census: 264 exact modules across 12 runtime configurations; 5 bound parent POMs
+GRADLE LICENSES: PASS (264 dependency entries)
+Android 16 KiB LOAD alignment: PASS; segments=3
+e: file:///workspace/visual-workbench/apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/giant/AndroidGiantRuntime.kt:5:35 Unresolved reference 'sharedSessionResources'.
+e: file:///workspace/visual-workbench/apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/giant/AndroidGiantRuntime.kt:30:57 Unresolved reference 'sharedSessionResources'.
+         Unresolved reference 'sharedSessionResources'.
+BUILD FAILED in 1m 20s
+
+LOG vw-producer-root-apps-attempt2.log
+Application license census: 264 exact modules across 12 runtime configurations; 5 bound parent POMs
+GRADLE LICENSES: PASS (264 dependency entries)
+Android 16 KiB LOAD alignment: PASS; segments=3
+BUILD SUCCESSFUL in 3m 41s
+
+Final XML: shared460 pass; Desktop348 pass/7 Windows-only skips; Android136 pass.
+Shared Android device-test source compiles, including19 producer cases; none executed.
+Android app lint: zero errors/60 warnings/12 hints.
+JNI descriptors:
+Compiled from "AndroidGiantRuntime.kt"
+public final class com.visualworkbench.shared.giant.AndroidGiantRuntime {
+  public static final com.visualworkbench.shared.giant.AndroidGiantRuntime INSTANCE;
+    descriptor: Lcom/visualworkbench/shared/giant/AndroidGiantRuntime;
+  private static boolean installed;
+    descriptor: Z
+  private com.visualworkbench.shared.giant.AndroidGiantRuntime();
+    descriptor: ()V
+
+  public final synchronized void install();
+    descriptor: ()V
+
+  private static final int buildPrepared(long, java.lang.String, java.lang.String, java.lang.String, int, int, int, long, long);
+    descriptor: (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIJJ)I
+
+  private static final java.lang.String[] describeOutputForNative(com.visualworkbench.shared.giant.AndroidTileBuild);
+    descriptor: (Lcom/visualworkbench/shared/giant/AndroidTileBuild;)[Ljava/lang/String;
+
+  private static final native int initializeNative();
+    descriptor: ()I
+
+  private static final native boolean cancelledNative(long);
+    descriptor: (J)Z
+
+  private static final native int consumeNative(long, com.visualworkbench.shared.giant.AndroidTileBuild);
+    descriptor: (JLcom/visualworkbench/shared/giant/AndroidTileBuild;)I
+
+  public static final boolean access$cancelledNative(long);
+    descriptor: (J)Z
+
+  public static final int access$consumeNative(long, com.visualworkbench.shared.giant.AndroidTileBuild);
+    descriptor: (JLcom/visualworkbench/shared/giant/AndroidTileBuild;)I
+
+  static {};
+    descriptor: ()V
+}
+
+arm64 JNI exports:
+00000000018d5244 T Java_com_visualworkbench_shared_giant_AndroidGiantRuntime_cancelledNative
+00000000018d5338 T Java_com_visualworkbench_shared_giant_AndroidGiantRuntime_consumeNative
+00000000018d543c T Java_com_visualworkbench_shared_giant_AndroidGiantRuntime_initializeNative
