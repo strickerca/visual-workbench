@@ -1,10 +1,13 @@
-//! Bounded BMP/TIFF conversion. The encoded original remains authoritative.
+//! Bounded BMP/TIFF conversion, flattened composites and RAW previews.
+//! The encoded original remains authoritative.
 #![forbid(unsafe_code)]
 mod admission;
 mod bmp;
 mod io;
 mod jpeg;
 mod orientation;
+pub mod psd;
+pub mod raw_preview;
 mod tiff;
 mod tiff_header;
 pub use admission::{Format, Header, Limits, Notice};
@@ -122,6 +125,50 @@ pub fn encode_to(
 /// Maximum application provenance payload, excluding the TIFF NUL terminator.
 pub const MAX_METADATA_BYTES: usize = 16 * 1024;
 
+/// Opt-in candidate BMP carrier. Application publication remains gated until its
+/// interoperability review. See `bmp_provenance` for the exact private layout.
+/// Metadata is descriptive, untrusted input, never revision authority.
+pub fn encode_bmp_with_provenance(
+    image: &DecodedImage,
+    limits: Limits,
+    metadata: &str,
+    output: &mut dyn WriteSeek,
+    cancel: &dyn Fn() -> bool,
+) -> Result<ExportReceipt> {
+    check(cancel)?;
+    validate_metadata(metadata)?;
+    encode(
+        image,
+        ExportFormat::Bmp8,
+        limits,
+        Some(metadata),
+        output,
+        cancel,
+    )
+}
+
+/// Read this application's private BMP gap carrier without decoding pixels.
+/// At offset 138: `VWBMETA\0`, LE u32 version 1, LE u32 ASCII payload length,
+/// 1..=16KiB payload, zero padding to a multiple of four payload bytes. bfOffBits
+/// points immediately after the block. ICC stays after pixels in real ICC fields.
+/// Normal bounded header/profile admission still runs. Absence returns None;
+/// a recognized malformed carrier refuses. Unknown gap bytes are not interpreted.
+/// The original's hash remains the entire file; payloads confer no authority.
+pub fn bmp_provenance(bytes: &[u8], limits: Limits) -> Result<Option<&str>> {
+    limits.input(bytes.len())?;
+    bmp::provenance(bytes, limits)
+}
+
+fn validate_metadata(metadata: &str) -> Result<()> {
+    if metadata.len() > MAX_METADATA_BYTES {
+        return Err(Error::Limit);
+    }
+    if metadata.is_empty() || !metadata.is_ascii() || metadata.as_bytes().contains(&0) {
+        return Err(Error::Invalid);
+    }
+    Ok(())
+}
+
 /// Store application provenance in TIFF's standard ASCII ImageDescription tag.
 /// The caller supplies serialized metadata for this exact source and revision.
 /// BMP has no admitted provenance carrier and is refused before writing bytes.
@@ -137,12 +184,7 @@ pub fn encode_to_with_metadata(
     if format == ExportFormat::Bmp8 {
         return Err(Error::Unsupported);
     }
-    if metadata.len() > MAX_METADATA_BYTES {
-        return Err(Error::Limit);
-    }
-    if metadata.is_empty() || !metadata.is_ascii() || metadata.as_bytes().contains(&0) {
-        return Err(Error::Invalid);
-    }
+    validate_metadata(metadata)?;
     encode(image, format, limits, Some(metadata), output, cancel)
 }
 
@@ -202,7 +244,7 @@ fn encode(
     image.validate().map_err(|_| Error::Color)?;
     let mut bounded = io::Output::new(output, limits.output_bytes, cancel)?;
     match format {
-        ExportFormat::Bmp8 => bmp::encode(image, &mut bounded)?,
+        ExportFormat::Bmp8 => bmp::encode(image, &mut bounded, metadata)?,
         ExportFormat::Tiff8 | ExportFormat::Tiff16 => tiff::encode(image, &mut bounded, metadata)?,
     }
     let bytes = bounded.finish()?;
