@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-18",
+  "reviewed_main": "bca245eda44a470906c23c464f60fdd2af618016",
+  "status": "Source incompatibility confirmed for intended unextracted APK layout. No device-observed failure or repaired loader claimed. Precise native/packaging admission gap returned; no speculative production edit.",
+  "current_state": "PDF runtime/pin asset are absent and PDF capability is gated. No actual APK or target isolated runtime was available in this worker. A present pin and uncompressed APK JNI entry alone would not satisfy the existing physical-file contract.",
+  "trace": [
+    {
+      "stage": "Build input",
+      "evidence": "apps/shared/build.gradle.kts adds androidNativeDirectory as JNI source; Android app admits arm64-v8a only. Existing common loader calls System.loadLibrary(vw_core). No PDFium stage/hash/notice task or alternate PDFium loader found.",
+      "implication": "Core loading can work directly from APK without creating any libpdfium.so physical file."
+    },
+    {
+      "stage": "APK packaging",
+      "evidence": "App and shared Gradle set jniLibs.useLegacyPackaging=false; app minSdk29,target36. APK checker requires every .so ZIP_STORED plus ARM64 ELF and16KiB LOAD/ZIP alignment.",
+      "implication": "Current delivery policy intentionally supports uncompressed, unextracted JNI loading. Merely changing extractNativeLibs/compression is not a document-leaf repair."
+    },
+    {
+      "stage": "Caller to isolated service",
+      "evidence": "AndroidDocumentJobs sends request, source/output FDs and pdfium boolean; no library path/FD or alternative installed-artifact capability crosses Binder. Manifest retains exported=false,isolatedProcess=true.",
+      "implication": "Library selection is local to trusted service code, not document input. Keep that separation."
+    },
+    {
+      "stage": "Kotlin pin acquisition",
+      "evidence": "DocumentWorkerService.pdfium reads assets/vw-document-android.sha256 via bounded readDocumentRuntimePin; parses SHA256/decimal size/libpdfium.so, then requires File(applicationInfo.nativeLibraryDir,libpdfium.so).isFile, size equality and canonical path.",
+      "implication": "For unextracted JNI installation this returns Unavailable even if APK contains the correct stored library and pin. Missing asset currently refuses still earlier."
+    },
+    {
+      "stage": "Native admission",
+      "evidence": "run_isolated_android_document_job independently checks actual isolated UID, typed request/source identity, PDF/PC classification, process limits, absolute path and exact libpdfium.so basename, then std::fs::File::open and SHA256 before parser/library construction.",
+      "implication": "Returning base.apk!/lib/arm64-v8a/libpdfium.so from Kotlin is insufficient: std::fs::File::open is not an APK-entry reader. Removing this hash check would be a bypass."
+    },
+    {
+      "stage": "Actual load",
+      "evidence": "Android document engine calls Pdfium::bind_to_library(library). Pinned pdfium-render0.9.4 implements this through libloading::Library::new and its private DynamicPdfiumBindings; no public load-an-existing-handle constructor was found.",
+      "implication": "A proposed android_dlopen_ext FD load cannot simply be dropped into owned Kotlin files or assumed compatible with this binding. Standard APK-relative dlopen is supported by bionic, but verified-entry binding/native handoff still needs implementation and target proof."
+    },
+    {
+      "stage": "Worker retirement",
+      "evidence": "One-job service retires isolated process; parent requires actual Binder death before releasing descriptors/output/source.",
+      "implication": "Any new APK FD/library ownership must last through native use and retain the existing death/cleanup guarantees."
+    }
+  ],
+  "source_supported_conclusion": {
+    "conditional_failure": "With the current unextracted packaging and no separate reviewed extraction step, the physical-file guard refuses a library present only in APK. This follows from both the documented Android packaging contract and the actual Java/Rust file operations.",
+    "not_claimed": "No installed manifest inspection, target path listing, Binder run, dlopen experiment, native runtime success, device observation or product acceptance was performed."
+  },
+  "why_no_owned_only_fix": [
+    "Owned service/jobs files cannot change package-installer extraction behavior.",
+    "An APK-relative string alone fails coordinator-owned native File::open/hash verification.",
+    "Copying to app-private cache does not establish isolated UID read/execute access, creates writable executable ownership and needs a reviewed lifecycle/SELinux policy; no such workaround is justified here.",
+    "Switching to System.loadLibrary or accepting Java-only hashing would discard the admitted source-bound native artifact check.",
+    "Changing global extraction/compression conflicts with both app/shared Gradle settings and APK artifact checker; these are coordinator-reserved and affect the currently working core library."
+  ],
+  "coordinator_handoff": {
+    "preferred_direction_for_review": "Preserve current uncompressed JNI packaging and admit an installed-APK-entry verification/load path, rather than weakening native hash/isolation or changing all JNI extraction as an incidental fix.",
+    "native_contract_needed": "Keep physical-file mode only where installer-extracted file actually exists. For APK mode accept only a service-selected installed-package archive and fixed lib/arm64-v8a/libpdfium.so entry; bound archive/entry metadata, require unique stored aligned entry and exact expected size/hash. Native must independently verify that entry, pin the underlying APK owner and load that same verified artifact, with explicit lifetime and fixed failure codes. A raw caller-supplied path or result-ready signal is not authority.",
+    "binding_route_gap": "Bionic supports APK !/ syntax and FD+offset loading, but stock pdfium-render0.9.4 exposes path-based bind_to_library and keeps DynamicPdfiumBindings private. Coordinator must choose/admit the exact native verifier and pinned-inode loading route; this source review does not assert a proc/self/fd APK path works inside the actual isolated linker namespace.",
+    "packaging_admission_needed": [
+      "Add exact hash-pinned PDFium7881 arm64 artifact and complete notices through a reviewed stage, without downloading here.",
+      "Generate pin from actual final packaged bytes, or explicitly preserve original library bytes (current keepDebugSymbols only names libvw_core.so; processing libpdfium.so may change it).",
+      "Extend final APK checks to require exactly the admitted PDFium entry and pin correspondence when PDF capability is enabled; retain ARM64/16KiB/ZIP_STORED checks.",
+      "Define current single-APK selection and explicit refusal/handling for split APK placement rather than guessing a library path."
+    ],
+    "reserved_files": [
+      "apps/android/build.gradle.kts",
+      "apps/shared/build.gradle.kts",
+      "apps/android/src/main/AndroidManifest.xml",
+      "tools/check_android_artifacts.py",
+      "core/crates/vw-ffi/src/documents/jobs.rs",
+      "native dependency/binding interfaces"
+    ],
+    "owned_files_after_admission": [
+      "apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentWorkerService.kt",
+      "dedicated document runtime locator/verifier leaf and tests"
+    ],
+    "alternative_requires_explicit_review": "Installer extraction could satisfy existing native physical-file ABI, but requires coordinated app/shared packaging and artifact-check changes plus device proof. No global compression/extraction change is proposed or performed as a leaf patch."
+  },
+  "required_validation_after_contract_admission": {
+    "deterministic": [
+      "Synthetic APK fixtures: absent/duplicate/wrong ABI/compressed/unaligned entry, malformed bounds, exact SHA/size mismatch, stale archive replacement and actual packaged pin mismatch.",
+      "Native independent verifier rejects invalid entry even if Kotlin accepts it; SVG empty-library policy and PDF/PC mode refusal stay intact.",
+      "Owned FD/library lifetime: no close before native return/process death; failed retirement retains the same owner; no app cache extraction or arbitrary document-selected path."
+    ],
+    "target": [
+      "Inspect real merged manifest and final APK native/pin bytes.",
+      "On the admitted ARM64 Android target, prove isolated UID can read/map the exact installed library with actual linker namespace/SELinux/transitive dependency policy.",
+      "Run a synthetic PDF operation with genuine pinned7881 runtime; inject wrong hash and cancellation/death; verify refusal and joined retirement.",
+      "Retain16KiB artifact/device and native AS/deadline gates; no Linux model test establishes these facts."
+    ],
+    "tests_run_this_pass": 0,
+    "reason": "No changed production implementation or meaningful pure loader contract exists until native/packaging handoff is admitted. Avoided a test that merely assumes extraction or demonstrates a temporary directory lacks a file. Coordinator owns heavy slot."
+  },
+  "primary_sources": [
+    {
+      "url": "https://developer.android.com/guide/topics/manifest/application-element#extractNativeLibs",
+      "supports": "Unextracted native libraries are loaded directly from APK; useLegacyPackaging replaces manifest compression configuration."
+    },
+    {
+      "url": "https://developer.android.com/reference/tools/gradle-api/8.13/com/android/build/api/dsl/JniLibsPackaging",
+      "supports": "useLegacyPackaging controls compressed native-library packaging; uncompressed/page-aligned default when minSdk>=23."
+    },
+    {
+      "url": "https://android.googlesource.com/platform/bionic/+/refs/heads/main/linker/linker.cpp",
+      "observed_blob": "4cf93b9badb616b892a2b063234abd72fb7c71e8",
+      "supports": "open_library_in_zipfile recognizes !/; requires stored entry/page alignment; load_library supports explicit FD and offset. Mainline source is platform-mechanism evidence, not proof of actual target firmware behavior."
+    }
+  ],
+  "local_binding_source": "pdfium-render0.9.4 registry source: src/pdfium.rs:173..189 and src/bindings/dynamic_bindings.rs:48; inspected as text only.",
+  "unchanged": {
+    "runtime_or_publication_gates": true,
+    "hash_verification": true,
+    "isolated_uid_and_process_limits": true,
+    "retirement_and_source_ownership": true,
+    "root_manifests_gradle_ffi": true,
+    "native_libraries_loaded": false,
+    "downloads_or_new_installs": false,
+    "proxy_bypass": false,
+    "license_acceptance": false,
+    "builds_run": false
+  },
+  "source_files": [
+    {
+      "path": "apps/android/build.gradle.kts",
+      "bytes": 4075,
+      "sha256": "20d03c33a7c9fcf29b46e4f4911492e306984c39030ebd7b125377f7f90bf27e"
+    },
+    {
+      "path": "apps/shared/build.gradle.kts",
+      "bytes": 11907,
+      "sha256": "83153ddd1eb700c615ec0d2815e3fbd4bd369991e29b65b8b6d94e780676920c"
+    },
+    {
+      "path": "apps/android/src/main/AndroidManifest.xml",
+      "bytes": 3171,
+      "sha256": "c3bc6840bf5adeda3c02b6761ec5709fd2484bad7655bcfa6fb0dac0d06d6e99"
+    },
+    {
+      "path": "tools/check_android_artifacts.py",
+      "bytes": 3707,
+      "sha256": "07aa6eab53071771f08da359859b6a83ad3fdb9befb1551efce3a32f37ef9831"
+    },
+    {
+      "path": "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/NativeLibrary.kt",
+      "bytes": 167,
+      "sha256": "74327f91c52e38596aeb524e371d6c8bbb06718fe85b128ef4045cb7d299f048"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/documents/AndroidDocumentJobs.kt",
+      "bytes": 10863,
+      "sha256": "95c9e76cf8596ce8c6505c476beff6f84abf8aad32a5c985c2ff4d003bd03ebc"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentWorkerService.kt",
+      "bytes": 5523,
+      "sha256": "f4e9d564a5b18be9910285777a37f79a2dd8863819d03365f561f5d04df298dd"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentRuntimePin.kt",
+      "bytes": 789,
+      "sha256": "8d57e56f494d755dc95c5208c5be21974ac01521f45acb51ebc5170f3bf0a21e"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/documents/jobs.rs",
+      "bytes": 17910,
+      "sha256": "9316f90a76669a2717e576606902bef7403fae563e7bc6d882a2f2aab18515cb"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/documents/engine.rs",
+      "bytes": 25867,
+      "sha256": "98acad30f4ebe48fd86c06f5a05b874432b30587f0781c641d24b67eba66809c"
+    }
+  ]
+}
