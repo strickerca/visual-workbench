@@ -1,4 +1,5 @@
 //! Query-only measured Paint routes. No action, profile, coordinate or ordinal authority.
+mod compatibility;
 pub(crate) mod experiment;
 pub(crate) mod production;
 use super::{runtime_hash, sha256};
@@ -155,13 +156,13 @@ impl PaintFrameWitness {
         self.canvas_rect_host
             .validate()
             .map_err(|_| Error::Invalid)?;
-        if self.observed_start_qpc_100ns == 0
-            || self.observed_end_qpc_100ns < self.observed_start_qpc_100ns
-            || !matches!(
-                self.canvas_tool_name.as_str(),
-                "Using Brush tool on Canvas" | "Using Eraser tool on Canvas"
-            )
-        {
+        if !compatibility::observation_clock_valid(
+            self.observed_start_qpc_100ns,
+            self.observed_end_qpc_100ns,
+        ) || !matches!(
+            self.canvas_tool_name.as_str(),
+            "Using Brush tool on Canvas" | "Using Eraser tool on Canvas"
+        ) {
             return Err(Error::Invalid);
         }
         Ok(())
@@ -325,21 +326,13 @@ fn intersection(rect: Rect, client: Rect) -> Option<Rect> {
     Some(value)
 }
 fn range_valid(value: &RangeFacts) -> Result<()> {
-    if ![
+    if !compatibility::numeric_range_valid([
         value.current,
         value.minimum,
         value.maximum,
         value.small_change,
         value.large_change,
-    ]
-    .iter()
-    .all(|v| v.is_finite() && v.abs() <= 1_000_000.0)
-        || value.minimum > value.maximum
-        || value.current < value.minimum
-        || value.current > value.maximum
-        || value.small_change < 0.0
-        || value.large_change < 0.0
-    {
+    ]) {
         return Err(Error::Invalid);
     }
     Ok(())

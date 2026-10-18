@@ -242,10 +242,18 @@ fn base(
 fn validate_size_numeric(current: &NumericControl, expected_range: &RangeShape) -> Result<()> {
     let range = exact(current.range.clone())?;
     let value = exact(current.value.clone())?;
+    range_valid(&range)?;
+    expected_range.validate()?;
     // Paint exposes display-only Value text on its keyboard-adjustable Size
     // slider. Writability belongs to RangeValue; this route never sets Value.
     // Keep the current text for exact revalidation after the thumb click.
-    if range_shape(&range) != *expected_range || range.read_only || value.text.is_empty() {
+    if range_shape(&range) != *expected_range
+        || range.read_only
+        || value.text.is_empty()
+        || !current.element.destination_eligible
+        || !current.element.enabled
+        || current.element.offscreen
+    {
         return Err(Error::Unavailable);
     }
     Ok(())
@@ -321,25 +329,19 @@ pub(crate) fn observe_authority(
     // Both Size actions resolve the same slider/thumb in this one authority
     // observation. Reuse only its fresh facts here, validating each admitted
     // action's own range; no cached element crosses a command or stage.
-    let mut size: Option<Destination> = None;
+    let mut size: Option<Result<Destination>> = None;
     for action in actions {
         let action = ActionSpec::from(action);
         let result = if let RouteSpec::PaintSize { numeric } = &action.route {
             if !matches!(action.action, 6 | 7) {
                 Err(Error::Unavailable)
             } else {
-                match size.as_ref() {
-                    Some(value) => validate_size_numeric(
+                match size.get_or_insert_with(|| destination(&v, &action, &proof.canvas)) {
+                    Ok(value) => validate_size_numeric(
                         value.numeric.as_ref().ok_or(Error::Invalid)?,
                         &numeric.range,
                     ),
-                    None => match destination(&v, &action, &proof.canvas) {
-                        Ok(value) => {
-                            size = Some(value);
-                            Ok(())
-                        }
-                        Err(error) => Err(error),
-                    },
+                    Err(error) => Err(error.clone()),
                 }
             }
         } else {
@@ -596,6 +598,34 @@ mod tests {
             assert_eq!(
                 validate_size_numeric(&changed, &expected),
                 Err(Error::Unavailable)
+            );
+        }
+    }
+    #[test]
+    fn paint_size_visible_thumb_cannot_override_an_ineligible_slider() {
+        for case in 0..3 {
+            let mut value = discovered_size();
+            match case {
+                0 => value.element.destination_eligible = false,
+                1 => value.element.enabled = false,
+                _ => value.element.offscreen = true,
+            }
+            assert_eq!(
+                validate_size_numeric(&value, &discovered_size_range()),
+                Err(Error::Unavailable)
+            );
+        }
+    }
+    #[test]
+    fn paint_size_rejects_invalid_current_value_even_for_a_matching_shape() {
+        for current in [f64::NAN, f64::INFINITY, -1.0, 91.0] {
+            let mut value = discovered_size();
+            if let Observed::Known { value } = &mut value.range {
+                value.current = current;
+            }
+            assert_eq!(
+                validate_size_numeric(&value, &discovered_size_range()),
+                Err(Error::Invalid)
             );
         }
     }
