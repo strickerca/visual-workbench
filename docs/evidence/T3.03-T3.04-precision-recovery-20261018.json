@@ -1,0 +1,204 @@
+{
+  "schema": 1,
+  "status": "focused module validation passed; native/app integration and physical acceptance pending",
+  "integration_base": "6e8649aaeb4ce9b964c4f8636d7f100cb91f3165",
+  "preserved_source_commit": "473395197f6437586a8b0c05fa8cd35aa6800441",
+  "manifest_verification": {
+    "entries": 19,
+    "sha256_and_bytes_matched": 19,
+    "frozen_artifacts_including_manifest": 20,
+    "gitattributes_separate": true,
+    "written_tests": 34
+  },
+  "validation_overlay": {
+    "registration": "mod precision; pub use precision::*;",
+    "test_import_repair": "vw_ffi -> vw_core (current library name)",
+    "native_actual": "preserved NativePrecision.kt",
+    "app_controller_or_ui_patches_applied": false,
+    "delivered_sources_matched_byte_for_byte": true
+  },
+  "final_host_tests": {
+    "native_preserved": 8,
+    "shared_native_backed": 17,
+    "common_placement_grid": 6,
+    "canonical_geometry": 6,
+    "desktop_render_and_hit": 5,
+    "total": 42,
+    "failed": 0,
+    "original_host_cases_recovered": 25,
+    "new_or_adapted_cases": 17
+  },
+  "android_instrumentation": {
+    "written": 9,
+    "executed": 0,
+    "reason": "No authorized runtime/device actions in this task"
+  },
+  "strict_checks": {
+    "geometry_clippy": "cargo clippy --locked -p vw-geom --test precision_recovery -- -D warnings",
+    "geometry_rustfmt": "pass",
+    "shared_main_explicit_api": true,
+    "shared_main_all_warnings_as_errors": true,
+    "common_import_guard": "pass",
+    "import_guard_fixture_tests": 4,
+    "setup_policy": "pass",
+    "npm_reviewed_packages": 20,
+    "rust_licenses_sources_bans": "pass",
+    "maven_licensed_entries": 262,
+    "plan_coverage_requirements": 189
+  },
+  "baseline_failures": [
+    {
+      "suite": "preserved shared PrecisionTest",
+      "passed": 11,
+      "failed": 1,
+      "case": "allViewportEdgesAvoidTheNibAndRemainContained",
+      "cause": "Asymmetric half-open nib exclusion rejected exactly 16 pixels of clearance at top/left viewport corners",
+      "resolution": "Symmetric inclusive clearance boundary; all 12 original shared cases now pass"
+    },
+    {
+      "suite": "preserved DesktopPrecisionTest",
+      "passed": 3,
+      "failed": 2,
+      "cause": "Skiko cache attempted read-only /home/agent/.skiko; native initializer failed",
+      "resolution": "Test-only skiko.data.path in owned temporary directory; all 5 pass"
+    },
+    {
+      "stage": "mistaken regression invocation",
+      "cause": "Source checkout selected instead of validation overlay; missing native build inputs",
+      "seconds": 13,
+      "source_compilation_started": false,
+      "resolution": "Correct validation overlay selected; strict shared run passes"
+    },
+    {
+      "stage": "initial offline Cargo policy check",
+      "cause": "Current integration workspace TIFF dependency was not cached",
+      "resolution": "Locked online policy check passed; no dependency/lockfile changes"
+    }
+  ],
+  "junit_suites": [
+    {
+      "name": "PrecisionPlacementTest[desktop]",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "PrecisionTest[desktop]",
+      "tests": "17",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.visualworkbench.desktop.DesktopPrecisionTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "delivered_sources": [
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PrecisionApi.kt",
+      "sha256": "0cff9dbede35d6a1cedcd2452cfe6c2fb7c37496fb554234367b7d11a5f5e2ff",
+      "bytes": 862
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PrecisionController.kt",
+      "sha256": "81013ccf77e0ba754f009e8fd352c6cf7bb49fc9f0fad3ff8900886c0963968a",
+      "bytes": 12664
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PrecisionGrid.kt",
+      "sha256": "e4c2e6fb06d23cda8274b35c8c4b3702139b786306455bce54c626524c7de354",
+      "bytes": 1537
+    },
+    {
+      "path": "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/PrecisionPlacementTest.kt",
+      "sha256": "3f0d1189dc85732c7cda4c3ecff0b2f0c96993aac2a1da52924274f1f657477e",
+      "bytes": 3851
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PrecisionTest.kt",
+      "sha256": "df41706373dbabcd1feb71ef7db11dfb8d61fb0a251011a18d8134b3567a9fc7",
+      "bytes": 10456
+    },
+    {
+      "path": "core/crates/vw-geom/tests/precision_recovery.rs",
+      "sha256": "9ed73b113c2a81df444c6577184316fcfef78092c7ae9020e17786d6002041eb",
+      "bytes": 5739
+    }
+  ],
+  "temporary_validation_inputs": [
+    {
+      "name": "vw-precision-strict.init.gradle",
+      "sha256": "9502d1073ddefb1954a063036585e2f9a0d10128b2ed150251e02b10ca0fa599"
+    },
+    {
+      "name": "vw-precision-skiko.init.gradle",
+      "sha256": "04289a9bc61f22b684a1c89f3fe67d8fdd9c684bda7374c431db97434fa5b989"
+    }
+  ],
+  "retained_private_log_digests": [
+    {
+      "name": "geometry-clippy.log",
+      "sha256": "50d50f1f70fda10a34f420606cbc51814c30d435acf2c3ba3c368d33797577fc"
+    },
+    {
+      "name": "geometry-regressions.log",
+      "sha256": "8ec4b0d66a15d23c3799b2db48454404ef5c9377017496c738e02b9da1ca1fa8"
+    },
+    {
+      "name": "license-gradle-threads.log",
+      "sha256": "824b448c0d2ca83e7470c250cdc0e637998121923dc8ac6639ad6866cadb63d2"
+    },
+    {
+      "name": "license-gradle.log",
+      "sha256": "92a21343669368d006cc3745c85c90e7fd668ae721d046e141204f7a4ccb7039"
+    },
+    {
+      "name": "license-rust.log",
+      "sha256": "b24effcdfc259db35c251d28ce380497d82cd0c285ab93526f06db53bd5021dd"
+    },
+    {
+      "name": "native-bindings-build.log",
+      "sha256": "bf63788af8fbaff8dcc110c155d6f49c3f4e3126be47e4e7f47bceb7bc3c6ee3"
+    },
+    {
+      "name": "precision-desktop-final.log",
+      "sha256": "90c3227950c16a742b46d3d8b721a114b25d76144076c2dccb77a83ca981076f"
+    },
+    {
+      "name": "precision-shared-regressions.log",
+      "sha256": "1509db230b8614113db92a65925b2520774486ac427fbddb21d203e73e5d7ce1"
+    },
+    {
+      "name": "r2-desktop-baseline.log",
+      "sha256": "c105069fff166fc2c4a5f6331e9b47371832fc8ba069cc5aba5749252a586a05"
+    },
+    {
+      "name": "r2-jvm-desktop-baseline.log",
+      "sha256": "f28664e56c53ff721ae3d259ae6ba01dd551381d7f892313637a90d6eedcb64f"
+    },
+    {
+      "name": "r2-native-baseline.log",
+      "sha256": "412e7a3cdcff5addec03c35d8d844ca888b9933ad52f1bacc8bbae7b6d2ab486"
+    },
+    {
+      "name": "wrong-checkout-failure.log",
+      "sha256": "f4ecb5b21e25204b92e9f721991b07dc5f466165f768a18b1847843492e0c044"
+    }
+  ],
+  "limits": [
+    "Coordinator must promote/register native FFI/JVM actuals and integrate real app callers before feature-complete claim",
+    "Nine Android cases unrun",
+    "A03/A04/A05 and physical hover/pressure/tilt/barrel/latency/owner acceptance pending",
+    "Krita deferred",
+    "Existing unrelated Linux native and test/app warnings retained; no all-workspace warning-free claim",
+    "No device/provider/paid service/credentials/security/deployment actions",
+    "Synthetic bitmap fixtures remained in memory; no verification screenshots written",
+    "No roadmap gate or requirement status changed"
+  ],
+  "heavy_build_slot": "released; all compilation/test processes completed"
+}
