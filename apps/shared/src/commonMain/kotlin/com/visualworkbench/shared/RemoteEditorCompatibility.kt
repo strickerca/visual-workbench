@@ -48,10 +48,10 @@ public fun RemoteEditorIdentity.valid():Boolean =
     (if(packageFullName==null)packageVersion==null else remotePackageVersion(packageFullName)==packageVersion)&&
     when(editor){RemoteEditorKind.Krita->executableName.equals("krita.exe",true)&&fileVersion!=null;RemoteEditorKind.Paint->executableName.equals("mspaint.exe",true)&&packageFullName!=null&&packageVersion!=null;RemoteEditorKind.Unknown->true}
 public fun RemoteToolCompatibility.validFor(current:RemoteEditorIdentity,tool:String,settings:String):Boolean {
-    if(!identity.valid()||identity!=current||toolId!=tool||settingsDigest!=settings||!toolId.boundedText(128)||!settingsDigest.digest())return false
+    if(!identity.valid()||!current.valid()||identity.editor==RemoteEditorKind.Unknown||identity!=current||toolId!=tool||settingsDigest!=settings||!toolId.boundedText(128)||!settingsDigest.digest())return false
     if(deviceModel!=null&&!deviceModel.boundedText(128))return false
     if(result==RemoteCompatibilityResult.NotTested)return method==RemoteCompatibilityMethod.NotPerformed&&evidenceSha256==null
-    if(method==RemoteCompatibilityMethod.NotPerformed||evidenceSha256?.digest()!=true)return false
+    if(method==RemoteCompatibilityMethod.NotPerformed||evidenceSha256?.digest()!=true||inputApi==RemoteEditorInputApi.Unknown)return false
     if(aspect in setOf(RemoteCompatibilityAspect.Pressure,RemoteCompatibilityAspect.Hover,RemoteCompatibilityAspect.Tilt,RemoteCompatibilityAspect.InvertedEraser,RemoteCompatibilityAspect.BarrelButton) && (inputApi!=RemoteEditorInputApi.WindowsPointerInput||method!=RemoteCompatibilityMethod.PhysicalOwnerGesture||deviceModel==null))return false
     if(aspect==RemoteCompatibilityAspect.Pressure&&identity.editor==RemoteEditorKind.Krita&&result==RemoteCompatibilityResult.Supported&&inputApi!=RemoteEditorInputApi.WindowsPointerInput)return false
     return true
@@ -82,4 +82,40 @@ public fun remoteEditorActions(editor:RemoteEditorKind):List<RemoteEditorAction>
     RemoteEditorKind.Unknown->emptyList()
     RemoteEditorKind.Krita->listOf(RemoteEditorAction.Undo,RemoteEditorAction.Redo,RemoteEditorAction.SelectFreehandBrush,RemoteEditorAction.ToggleEraserMode,RemoteEditorAction.BrushSmaller,RemoteEditorAction.BrushLarger,RemoteEditorAction.ZoomIn,RemoteEditorAction.ZoomOut,RemoteEditorAction.FitCanvas,RemoteEditorAction.ActualPixels,RemoteEditorAction.ResetRotation,RemoteEditorAction.PanLeft,RemoteEditorAction.PanRight,RemoteEditorAction.PanUp,RemoteEditorAction.PanDown)
     RemoteEditorKind.Paint->listOf(RemoteEditorAction.Undo,RemoteEditorAction.Redo,RemoteEditorAction.SelectFreehandBrush,RemoteEditorAction.SelectEraser,RemoteEditorAction.BrushSmaller,RemoteEditorAction.BrushLarger,RemoteEditorAction.ZoomIn,RemoteEditorAction.ZoomOut,RemoteEditorAction.FitCanvas,RemoteEditorAction.ActualPixels,RemoteEditorAction.PanLeft,RemoteEditorAction.PanRight,RemoteEditorAction.PanUp,RemoteEditorAction.PanDown)
+}
+
+/** Imported compatibility is historical evidence, never current-tool authority.
+ * Keep the exact observation scope and method visible, including untested rows. */
+public fun remoteEditorCompatibilitySummary(state:RemoteEditorPaletteState):List<String> {
+    val target=state.target
+    val tool=state.toolId
+    val settings=state.settingsDigest
+    val records=if(target!=null&&tool!=null&&settings!=null)
+        state.compatibility.filter{it.validFor(target.identity,tool,settings)} else emptyList()
+    return buildList {
+        if(records.isNotEmpty()) {
+            add("Observed tool: $tool · settings $settings")
+            add("These observations apply to that editor, tool and settings; current tool support is not inferred.")
+        }
+        RemoteCompatibilityAspect.entries.forEach{aspect->
+            val record=records.singleOrNull{it.aspect==aspect}
+            val result=when(record?.result){
+                null,RemoteCompatibilityResult.NotTested->"not tested"
+                RemoteCompatibilityResult.Supported->"supported"
+                RemoteCompatibilityResult.Unsupported->"unsupported"
+                RemoteCompatibilityResult.Inconclusive->"inconclusive"
+            }
+            val method=when(record?.method){
+                RemoteCompatibilityMethod.EditorObserved->" · editor observation"
+                RemoteCompatibilityMethod.PhysicalOwnerGesture->" · physical gesture"+(record.deviceModel?.let{" on $it"}?:"")
+                else->""
+            }
+            val input=if(record==null||record.result==RemoteCompatibilityResult.NotTested)"" else when(record.inputApi){
+                RemoteEditorInputApi.WindowsPointerInput->" · Windows pointer input"
+                RemoteEditorInputApi.Mouse->" · mouse input"
+                RemoteEditorInputApi.Unknown->""
+            }
+            add("${aspect.name}: $result$method$input")
+        }
+    }
 }

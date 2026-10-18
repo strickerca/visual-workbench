@@ -11,6 +11,7 @@ import com.visualworkbench.shared.*
 
 @Composable internal fun RemoteEditorPalettePanel(controller:RemoteEditorPalette) {
     val state by controller.state.collectAsState();val target=state.target
+    val unavailable=remoteEditorPaletteStateReason(state)
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(4.dp)) {
         Text("Remote destination: ${target?.identity?.editor?.name ?: "none"}",style=MaterialTheme.typography.subtitle2)
         Text("These commands use the PC editor's history and tools. Workbench undo stays separate.",style=MaterialTheme.typography.caption)
@@ -18,14 +19,18 @@ import com.visualworkbench.shared.*
             Text("File ${identity.fileVersion ?: "unknown"}"+(identity.packageVersion?.let{" · package $it"} ?: ""),style=MaterialTheme.typography.caption)
             Row(Modifier.horizontalScroll(rememberScrollState())) {
                 remoteEditorActions(identity.editor).forEach { action ->
-                    TextButton({controller.command(action)},enabled=!state.closed&&!state.busy&&remoteEditorActionEnabled(selected,action)){Text(remoteEditorActionLabel(identity.editor,action))}
+                    TextButton({controller.command(action)},enabled=unavailable==null&&!state.busy&&remoteEditorActionEnabled(selected,action)){Text(remoteEditorActionLabel(identity.editor,action))}
+                }
+            }
+            if(unavailable==null)remoteEditorActions(identity.editor).forEach{action->
+                remoteEditorActionUnavailableReason(selected,action)?.let{reason->
+                    Text("${remoteEditorActionLabel(identity.editor,action)}: $reason",style=MaterialTheme.typography.caption)
                 }
             }
             remoteEditorLimits(identity.editor).forEach{Text(remoteEditorLimitText(it),style=MaterialTheme.typography.caption)}
-            val observed=state.compatibility
-            Text(if(observed.isEmpty())"Tool pressure, hover, tilt, eraser and buttons: not tested." else observed.joinToString(" · "){"${it.aspect.name}: ${it.result.name}"},style=MaterialTheme.typography.caption)
+            remoteEditorCompatibilitySummary(state).forEach{Text(it,style=MaterialTheme.typography.caption)}
         }
-        remoteEditorPaletteReason(target)?.let{Text(it,style=MaterialTheme.typography.caption)}
+        unavailable?.let{Text(it,style=MaterialTheme.typography.caption)}
         if(state.busy)LinearProgressIndicator(Modifier.fillMaxWidth())
         state.message?.let{Text(it,style=MaterialTheme.typography.caption)}
     }
