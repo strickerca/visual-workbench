@@ -1,0 +1,45 @@
+{
+  "source_head": "fb824935a331d7d16a7e50620b5ed611dccceb4a",
+  "status": "source-only findings for module owners; fixes and regression execution pending",
+  "findings": [
+    {
+      "owner": "document lane",
+      "location": "core/crates/vw-svg/src/engine.rs:158",
+      "issue": "Tile-based reservation does not bound pattern surfaces. Pinned resvg 0.47.0 path.rs render_pattern_pixmap allocates pattern.rect multiplied by the effective transform, independently of output tile dimensions.",
+      "action": "Refuse patterns until their transformed surfaces and nested rendering are admitted, or implement conservative accounting before renderer entry. Add a bounded rejection/budget regression. This is separate from the already-reported marker expansion finding."
+    },
+    {
+      "owner": "image lane",
+      "location": "core/crates/vw-formats/src/tiff_header.rs:135",
+      "issue": "FillOrder tag 266 is admitted without checking its value. Pinned tiff 0.11.3 declares FillOrder with TODO support and its decoder does not interpret it.",
+      "action": "Reject nondefault FillOrder before decoder entry; verify with an independent 1x1 reversed-bit-order fixture. Pixel decoding was not executed in this review."
+    },
+    {
+      "owner": "image lane",
+      "location": "core/crates/vw-formats/src/tiff_header.rs:263",
+      "issue": "Legacy explicit color declarations, including TransferFunction, WhitePoint, PrimaryChromaticities and GrayResponseCurve, pass admission while only ICC is retained. Unsupported declared color can become UntaggedColor.",
+      "action": "Preserve and interpret supported declarations or return Error::Color when they cannot be honored; add small fixtures for the admitted/refused cases."
+    },
+    {
+      "owner": "image lane",
+      "location": "core/crates/vw-assets/src/scheduler.rs:87",
+      "issue": "finish checks current tile membership but ignores the request viewport generation. viewport(A), next(r), cancel_view(), viewport(A), finish(r) permits the cancelled result again, contrary to the shared ownership contract.",
+      "action": "Check generation at completion and preserve/requeue still-wanted tiles when retiring older requests, including tiles skipped by next while an older request remained active."
+    }
+  ],
+  "diagnostics": {
+    "decision": "Closed schema and frozen report are the admitted interface direction. Bounded close reports pending and must retain the actual writer/publication owner. Final Android scope cancellation and Desktop Main close predicates require integration-owned wiring.",
+    "contract": "docs/RECOVERY_INTEGRATION_CONTRACTS.md"
+  },
+  "precision": {
+    "recovery_commit": "473395197f6437586a8b0c05fa8cd35aa6800441",
+    "manifest_source_files_verified": 19,
+    "active_source_imported": false,
+    "next": "Propose a bounded precision leaf-module/test lane after current module tests; integration retains shared APIs, registration and all eight composed app targets."
+  },
+  "limits": [
+    "No product build, runtime reproducer, stress input, provider call or device action was run for these findings.",
+    "No fixes were made in worker-owned modules. Their owners must resolve the findings and run regressions before promotion.",
+    "Existing worker recovery bases were not advanced to the additional precision archive commit."
+  ]
+}
