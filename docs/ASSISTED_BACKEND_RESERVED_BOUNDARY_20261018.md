@@ -29,6 +29,14 @@ foreign copy against the existing256MiB pool, and preserve delivered-byte owners
 through actual retirement. Prefer existing trusted readers when sufficient; no
 second decoder, memory pool or unchecked caller pixels. Return root lib/module,
 dependency/license and factory/controller registration hunks promptly.
+  For JVM native acquisition, reuse root's existing internal
+  `withNativeGiantProject(project, suspend (ProjectSession) -> T): T` project
+  lifetime borrow from giant candidate79d7d7fc: it holds the actual project's
+  close mutex through joined work, including ordinary projects. Map its typed
+  Closed/Invalid failure into the selection domain. Do not copy an unpinned
+  nativeProjectHandle across suspension or create another close/lifetime gate.
+  The helper composes with the root giant candidate; its final-ABI caller test
+  remains deferred, so report that source dependency explicitly.
 Do not duplicate the mask importer, correction workflow, memory pool or encoded
 image/session owner. Parent may reuse the completed offline owner for this lane;
 do not create another worker without assignment.
