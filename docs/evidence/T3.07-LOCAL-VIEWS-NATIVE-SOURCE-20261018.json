@@ -1,0 +1,63 @@
+{
+  "base": "88cb9b374c52e8a751879797f8152771f11af6b8",
+  "recovery_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "status": "native facade source recovered, unregistered, uncompiled; no shared heavy slot granted",
+  "owned_sources": [
+    {
+      "path": "core/crates/vw-ffi/src/local_views.rs",
+      "bytes": 8009,
+      "sha256": "765477881f1f67078bacd2049ebc8744edc1c1ce9e7a28c8ba80927c16431b9d"
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/local_views.rs",
+      "bytes": 10367,
+      "sha256": "2fab0b7f6b60530c760da4b895edf87d3a16c6f03e8c312c7386b4319c7b12a0"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeLocalViews.kt",
+      "bytes": 2862,
+      "sha256": "201abe35cf567778c5024908aa69a8a3c25b5f4e15afec0022086c73e13d0837"
+    }
+  ],
+  "signatures": [
+    "ProjectSession::local_views_snapshot(&self, binding: LocalViewsBinding, memory_budget_bytes: u64, cancellation: Arc<Cancellation>) -> WorkflowResult<LocalViewsSnapshot>",
+    "ProjectSession::change_local_views(&self, binding: LocalViewsBinding, expected_revision: u64, operation_id: String, mutation: LocalViewsMutation, memory_budget_bytes: u64, cancellation: Arc<Cancellation>) -> WorkflowResult<LocalViewsSnapshot>",
+    "public fun localViewWorkflows(project: WorkbenchProject): WorkbenchLocalViews"
+  ],
+  "coordinator_registration": [
+    "mod local_views;",
+    "pub use local_views::{LocalViewsBinding, LocalViewsMutation, LocalViewsSnapshot, RegionBookmark};",
+    "regenerate bindings once with the phase batch; no dependency/lock change"
+  ],
+  "runtime_contract": [
+    "uses existing project worker and store; no second manager/service",
+    "checks project/document membership and explicit installation device namespace",
+    "minimum transient work budget 1 MiB, fixed row/bookmark bounds inherited from store",
+    "settledWorkflow retains native cancellation ownership; durable local publication is not relabeled unwritten",
+    "common API has no new expect declaration; native factory is injected into LocalViewsInteraction",
+    "bookmarks remain image-document only; no page identity introduced"
+  ],
+  "checks": {
+    "rustfmt": "passed edition 2024 skip_children on both files",
+    "kotlin_psi": "one facade file parsed without syntax errors; no generated-binding semantic compilation",
+    "native_tests": {
+      "written": 6,
+      "run": false,
+      "cases": [
+        "camera/bookmark reopen with same canonical revision",
+        "installation namespace and project/document membership",
+        "memory/cancellation/camera admission",
+        "exact ambiguous retry and closed borrowed capability",
+        "changed expected revision cannot reuse operation identity",
+        "UTF-8 name and identity refusal before publication"
+      ]
+    },
+    "full_native_or_app_build": "not run; image owns shared heavy slot",
+    "new_dependencies": "none",
+    "device_or_provider_calls": "none",
+    "images": "none created"
+  },
+  "prior_shared_evidence": "31 passing cases at 88cb9b3 are not rerun or promoted by this source-only facade recovery",
+  "root_caller_hooks": "docs/T3_07_SAVED_VIEWS_HANDOFF_20261018.md; the previously requested native sources are now present, only registration/generation and root composition remain",
+  "review": "Independent read-only review found no concrete defects; no compilation or test execution performed."
+}
