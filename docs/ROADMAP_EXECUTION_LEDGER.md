@@ -58,6 +58,26 @@ portability checks are recorded separately in
 `evidence/CLOUD_RECOVERY_ADMISSION_20261018.json` and
 `evidence/CLOUD_PORTABILITY_20261018.json`.
 
+Combined candidate `6dcdcdf` compiled the real Linux host libraries/generator,
+Android arm64 core and current shared/Android/Desktop app sources. It passed 20
+document-protocol tests, warnings-denied protocol Clippy and 53 focused JVM cases
+(22 shared, 18 Desktop, 13 Android writer), with zero failures/skips. Android lint
+completed with zero errors, 53 warnings and 12 notes. Product-core 16 KiB LOAD
+alignment passed on all four segments. License census remained 262 dependencies
+across 12 runtime configurations. See
+`evidence/CLOUD_COMBINED_VALIDATION_20261018.json` for exact commands, artifacts,
+fresh JUnit receipts and limits. Windows helper packaging, app launch and actual
+chooser/provider/device behavior were not exercised by this Linux host run.
+
+Desktop diagnostics callers and the Android cancellation-settlement repair are
+integrated. Common ordinary-format and document DTO/frame/ownership contracts
+are admitted and tested; exclusive next caller slices and root prerequisites are
+fixed in `RECOVERY_CALLER_ASSIGNMENTS_20261018.md`. Recovered document/image
+engines still need native registration, storage/facade and app adoption before
+their import/render/export workflows become usable. Precision `1d0f2fd` remains
+staged for the next integration batch; its module review does not pass app or
+physical acceptance.
+
 The additional precision R2 commit was fetched separately; existing lane bases
 remain unchanged. Proposed next lane owns only `vw-ffi/src/precision.rs`, its
 dedicated test, Android/desktop `precision/` leaf modules and their dedicated
