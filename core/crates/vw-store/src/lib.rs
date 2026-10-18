@@ -3,6 +3,7 @@
 mod archive;
 mod blobs;
 mod cache;
+mod conflict_review;
 mod database;
 mod local_views;
 mod migrations;
@@ -10,6 +11,7 @@ mod projections;
 pub use archive::*;
 pub use blobs::*;
 pub use cache::*;
+pub use conflict_review::*;
 pub use database::*;
 pub use local_views::*;
 
