@@ -152,7 +152,8 @@
     "rustfmt": "passed",
     "git_diff_check": "passed",
     "check_setup_all": "passed",
-    "check_plan_coverage": "passed: 189 requirements, 66 tasks, 26 prompts"
+    "check_plan_coverage": "passed: 189 requirements, 66 tasks, 26 prompts",
+    "gitleaks": "passed: gitleaks 8.30.1, one commit, 164623 staged source/text bytes, zero findings"
   },
   "focused_tests": {
     "vw-assets": 17,
@@ -195,9 +196,26 @@
     "Original blob transfer, giant JPEG/HEIC routing, tile/export app integration and device acceptance need separate source-bound runtime evidence."
   ],
   "next_validation": [
-    "Use tested setup and coordinator-provided updated lockfile in scheduled slot.",
+    "Coordinator batch-admits Cargo.lock using source checkpoint 755dcaff55cfd14e35d9c25ab95b69417e639fff; parent then assigns this lane a build slot after the document lane.",
     "Run focused tests and clippy with warnings denied for all three crates; run existing vw-raster display tests to preserve R164 behavior.",
     "Run license checks before compilation; cross-target-check Windows adapter when a supported target and scheduled slot are available.",
     "Coordinator integrates and validates ordinary formats/color before overlapping stream-finish admission."
-  ]
+  ],
+  "bootstrap": {
+    "commit": "a79728a254b6afffd1d34cc7078b28a2777ee30a",
+    "method": "Extracted only seven tools/cloud-setup files outside product checkout; install without Android SDK/NDK options.",
+    "install": "stopped at cargo fetch --locked: new portable crates require coordinator-owned lockfile admission",
+    "bounded_verifier": "ran once: all six pinned tool versions pass; cargo-cache-offline exits 101 because Cargo.lock needs an update; later checks not run",
+    "tool_versions": {
+      "rust": "1.99.0",
+      "node": "24.21.0",
+      "jdk": "21.0.12.1",
+      "cargo-deny": "0.20.2",
+      "cargo-ndk": "4.1.2",
+      "gitleaks": "8.30.1"
+    },
+    "android_sdk_installed_for_this_lane": false,
+    "product_build_started": false,
+    "failure_receipts_retained_outside_repository": true
+  }
 }
