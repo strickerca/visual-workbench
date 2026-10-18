@@ -61,7 +61,8 @@ public class AirActionRouter(
                     event.gesture in setOf(AirActionGesture.SingleClick, AirActionGesture.DoubleClick) }
                 if (single != null) pending.remove(single)
                 val command = bindings.command(event.gesture) ?: return true
-                if (!allowed(ticket, command) || pressed.size >= MaximumPressed) return true
+                if (!allowed(ticket, command)) return true
+                if (pressed.size >= MaximumPressed) { queueRefused(); return true }
                 pressed[key] = Press(ticket, generation, single != null, event.eventTimeMs)
             }
             AirActionKeyPhase.Up -> {

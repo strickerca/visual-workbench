@@ -35,6 +35,7 @@ internal object AirActionContract {
         "remap retires queued old mapping" to ::remapQueued,
         "disabled gesture and disabled module do not act" to ::disabled,
         "full serial dispatcher reports refusal without replay" to ::fullDispatcher,
+        "ninth simultaneous press reports one capacity refusal without replay" to ::boundedPressed,
         "pending capacity refuses explicitly without retry" to ::boundedPending,
         "clock regression and stale events fail closed" to ::badClock,
         "late timer cannot replay old input" to ::lateTimer,
@@ -191,6 +192,29 @@ internal object AirActionContract {
         val gate = f.block(); check(f.dispatcher.offer {})
         f.pair(AirActionGesture.SwipeLeft); f.flush(); check(f.refusals == 1); gate.complete(Unit)
         f.flush(); check(f.calls.isEmpty())
+    }
+    private fun boundedPressed() = Fixture().use { f ->
+        val downs = (0..8).map { stream -> f.event(AirActionGesture.SwipeLeft, AirActionKeyPhase.Down, stream = stream) }
+        downs.take(8).forEach { check(f.router.key(it)) }
+        check(f.refusals == 0 && f.calls.isEmpty())
+        f.permitted = false
+        check(f.router.key(downs.last().copy(stream = 9)))
+        f.permitted = true
+        val ninth = downs.last()
+        check(f.router.key(ninth))
+        check(f.router.key(ninth))
+        check(f.router.key(ninth.copy(repeatCount = 1)))
+        f.time++
+        downs.forEach { check(f.router.key(it.copy(phase = AirActionKeyPhase.Up, eventTimeMs = f.time))) }
+        f.flush()
+        check(f.calls.size == 8 && f.refusals == 1) { "executed=${f.calls.size} capacity_refusals=${f.refusals}" }
+        check(f.calls.all { it.second == AirActionCommand.Undo })
+        // Freeing a slot does not retry the refused physical press.
+        check(f.router.key(ninth.copy(eventTimeMs = f.time)))
+        check(f.router.key(ninth.copy(phase = AirActionKeyPhase.Up, eventTimeMs = f.time)))
+        f.flush(); check(f.calls.size == 8 && f.refusals == 1)
+        f.time++; f.pair(AirActionGesture.SwipeLeft, stream = ninth.stream); f.flush()
+        check(f.calls.size == 9 && f.refusals == 1)
     }
     private fun boundedPending() = Fixture().use { f ->
         repeat(17) { f.pair(AirActionGesture.SwipeLeft); f.time++ }
