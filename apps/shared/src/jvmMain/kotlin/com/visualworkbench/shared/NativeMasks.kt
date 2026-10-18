@@ -139,6 +139,7 @@ private fun SelectionEdit.native(): NEdit = NEdit(binding.native(), transactionI
         is SelectionTarget.New -> NTarget.New(value.objectId, value.layerId)
         is SelectionTarget.Existing -> NTarget.Existing(value.selection.native())
     }, when (val value = operation) {
+        is SelectionOperation.ImportCoverage -> NOperation.ImportCoverage(value.width, value.height, value.coverage, value.combine.native())
         is SelectionOperation.Rectangle -> NOperation.Rectangle(QueryRect(value.rectangle.x, value.rectangle.y,
             value.rectangle.width, value.rectangle.height), value.combine.native())
         is SelectionOperation.Lasso -> NOperation.Lasso(value.points.map { NPoint(it.x, it.y) }, value.combine.native())

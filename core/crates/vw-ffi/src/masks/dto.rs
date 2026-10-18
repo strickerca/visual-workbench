@@ -84,6 +84,14 @@ pub enum SelectionTarget {
 
 #[derive(Clone, Debug, uniffi::Enum)]
 pub enum SelectionOperation {
+    /// Full oriented document coverage. The normal source binding, target
+    /// version and one-transaction undo authority apply to the imported result.
+    ImportCoverage {
+        width: u32,
+        height: u32,
+        coverage: Vec<u8>,
+        combine: SelectionCombine,
+    },
     Rectangle {
         rectangle: QueryRect,
         combine: SelectionCombine,
