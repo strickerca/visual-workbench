@@ -1,0 +1,215 @@
+{
+  "created_utc": "2026-10-18T21:37:48.490641+00:00",
+  "evidence_kind": "SOURCE_ONLY; no compilation or Kotlin test execution",
+  "base": "f661eca9d2f6d6d6ebe4fc31ed2d0a5c6ec095e0",
+  "source_commit": "490ed8ba471fe13391c542fa389a7261f6d21af3",
+  "grant_commit": "30b77615fe0ce79b2b1a044a0704ae2c7d186c14",
+  "grant_sha256": "269a52236120df87be83adf5ad8fa4a46cf814350891f6388c8ac693d3205a75",
+  "branch": "task/t3.01-desktop-capture-callers-20261018",
+  "source_sha256": {
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": "ad0309764f856d4deadd78a87e72dd6573ce05ab318a308aac76f7a0257373f5",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureAdmission.kt": "8938d51888c82b74629cd2c0b85241335fa53e4047c4fd87a6669a8f3f1f5f79",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirement.kt": "0a38cd414a3dfd15d1165b9e41fa5b8260f5a6b55038c627c927d5933414a20e",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureDelivery.kt": "added7a03ac9b7b9e2670fa0722a7cce4a202cdecd245e4db72c416624228cdf",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CapturePickerController.kt": "5768043cb8371c6b0faf2154b61e0269f4375aea8a11695bfbf868e3cd4de438",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CapturePickerWindow.kt": "c41ac8eba13d5c480c3acf8abc347eb022cc8c9f77481c31f41e55736a36f12c",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureSettings.kt": "428e69493587bcff83c5e79e7d97affb65a67d7b9a9e2cb4609d8656f70a3180",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/DesktopCaptureController.kt": "8f17f245c6d2e08e7c8b19d9ca79d7a03685bcc263b0710be9d1d089b22f7667",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/PickerWorkspace.kt": "1d834052466625f92f0812d52d05a6f85affec6a8c95bb9577ccc9fd994e1a82",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureAdmissionTest.kt": "96488b08a59dd30ea9ff57531161c9abd16422d29d3323e1a61eae3dbd059e1d",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirementTest.kt": "49fe0e5321da0a1adf56c379b62bd6c4d10826254bf7acdf3fa260a33375b9ad",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureDeliveryTest.kt": "43c3e1a7199bb3af36b42fc5c4163811ab8538d3975c764428015b1db9f5327a",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt": "d1896ad1b70b3c9d1c97544a29c62fbcbfa622c28129c785e3c0fc24007ea3e3",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureRegionEditor.kt": "71bb63866ee6f69f86c2daa3fcfa5507bee17a279df603291e58d63d1090d73b",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt": "6907573c782e49a1b39c403639d6a4a827a5923cb482eda1259034f9b1b655f6"
+  },
+  "unchanged_bound_contract_sha256": {
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt": "b7b528f6931b43728ce0355c1f1eb4dd47f957eadbd773fa7e6a99ab595390c8",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt": "3df04c474af43a394f216c75d0445328ed9132cde9479d08d839bace856d0552",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeOwnership.kt": "a1b2c04a7becf90ffb3e6002b5217551c7428be444fa5a7ca7a342b006e4a62d",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeGiantImages.kt": "3d80683c5a30f0875604fe10b0bea9f3503895b9e6f43b1bc8fb5df787458c6e",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopDiagnosticsLifecycle.kt": "50c6906e678fa13745c6424f5f9e1dc4548a6b141558b0282c4a81b16cbeea9c"
+  },
+  "checks": {
+    "exclusive_source_paths": "PASS",
+    "source_matches_frozen_candidate": "PASS",
+    "whitespace_and_newlines": "PASS",
+    "git_diff_check": "PASS",
+    "lexical_delimiters_only": "PASS; not parsing, PSI or compilation",
+    "shared_public_declaration_signatures": "UNCHANGED",
+    "shared_platform_neutral_imports": "PASS",
+    "existing_editor_shell_and_rendering_suffix_sha256": "690bcb79a67784aecade338f9e13ee50b35b28b1426832695016833204bef25f",
+    "caller_hook_presence_and_retirement_order_source_assertions": "PASS; not runtime proof",
+    "independent_fixture_arithmetic_only": [
+      {
+        "density": 1.0,
+        "expected_edges": [
+          10.0,
+          10.0,
+          40.0,
+          40.0
+        ]
+      },
+      {
+        "density": 1.25,
+        "expected_edges": [
+          10.0,
+          10.0,
+          40.0,
+          40.0
+        ]
+      },
+      {
+        "density": 1.5,
+        "expected_edges": [
+          10.0,
+          10.0,
+          40.0,
+          40.0
+        ]
+      },
+      {
+        "density": 2.0,
+        "expected_edges": [
+          10.0,
+          10.0,
+          40.0,
+          40.0
+        ]
+      },
+      {
+        "density": 3.0,
+        "expected_edges": [
+          10.0,
+          10.0,
+          40.0,
+          40.0
+        ]
+      }
+    ]
+  },
+  "test_inventory": {
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureAdmissionTest.kt": {
+      "baseline_written": 3,
+      "current_written": 4,
+      "new_written": 1,
+      "names": [
+        "cancelBeforeBodyReleasesAdmissionAndNextCaptureRuns",
+        "cancelledProducerRetainsSlotAndEveryShutdownJoinsItsCleanup",
+        "bodyCleanupFailureCannotPermanentlyHoldCaptureAdmission",
+        "busyRemainsPublishedUntilCancelledCleanupActuallyFinishes"
+      ],
+      "executed": false
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirementTest.kt": {
+      "baseline_written": 0,
+      "current_written": 3,
+      "new_written": 3,
+      "names": [
+        "abortedDepartureDoesNotPermanentlyRetireCapture",
+        "eitherCaptureRefusalKeepsParentsAliveAndRetainsTheOriginalFailure",
+        "cancelledQuitStillJoinsBothSourcesBeforeClosingAnyParent"
+      ],
+      "executed": false
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureDeliveryTest.kt": {
+      "baseline_written": 0,
+      "current_written": 3,
+      "new_written": 3,
+      "names": [
+        "failedDestinationCloseRetainsTheConcreteProjectWithoutASecondClose",
+        "cancellationAfterAffirmativeDestinationCloseKeepsCancellationSemantics",
+        "nativeCloseFailureReplacesDeliveryCancellationAndIsRetained"
+      ],
+      "executed": false
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt": {
+      "baseline_written": 27,
+      "current_written": 31,
+      "new_written": 4,
+      "names": [
+        "refusedCaptureExclusionShowsEditorAndDisablesCapture",
+        "exclusionSuccessAloneEnablesPicker",
+        "cancelledStartupCannotPublishAnExclusionOutcome",
+        "fractionalLetterboxUsesTheSameOriginalPixelTransformAsRegionMapping",
+        "cancellationJoinsNativeProducerAndReleasesLateOwnerExactlyOnce",
+        "throwingCancellationSignalStillJoinsAndReleasesProducer",
+        "alreadyCancelledCallerCannotCreateAWorkspaceOrNativeOwner",
+        "deliveredOwnerBelongsToCallerAndIsNotDisposedByHandoff",
+        "pickerModalOwnsOneLeaseAndNeverReleasesAnotherDialog",
+        "rgbaDisplayConversionPreservesChannelOrderAndAlpha",
+        "emptyPrivateWorkspaceIsRemovedButCompletedOriginalIsRetained",
+        "foreignMarkerAndUnexpectedChildRefuseCleanupWithoutDeletingOriginal",
+        "retainedCaptureCountCannotGrowWithoutBoundOrAdoptOldOwners",
+        "failedModalCloseRetainsTheExactLeaseForRetry",
+        "operationGenerationRejectsCancelledAndRetiredResults",
+        "dismissalSealsAdmissionBeforeJoinAndIgnoresCallerCancellation",
+        "concurrentDismissalsDoNotReopenAdmissionBetweenCleanups",
+        "cancelledScopeCannotAdmitWorkOrStrandBusyState",
+        "cleanupFailureCanBeRetriedAfterPermanentAdmissionSeal",
+        "malformedPreviewExtentsAndPayloadAreRefusedBeforeBitmapAllocation",
+        "nonFiniteAndRotatedDisplayCamerasAreRefused",
+        "retentionChecksOwnershipBeforeWritingRecoveryOrDeletingEmptyWorkspace",
+        "symlinkedOriginalIsNeverFollowedRetainedOrDeleted",
+        "successfulWorkspaceRetirementIsIdempotent",
+        "cancellationAfterExclusionSettlementStillCannotPublishReady",
+        "encodedPreviewBufferRejectsGrowthAndInvalidRanges",
+        "unknownNativeRetirementNeverCreditsASecondNoOpDestruction",
+        "saveAndRegionRequireTheExactDisplayedSnapshot",
+        "finalDirectoryDeleteFailureCanRetryAfterTheMarkerWasRemoved",
+        "finalDeletionRetryRefusesAnUnmarkedReplacementDirectory",
+        "finalDeletionRetryCannotDeleteANewChild"
+      ],
+      "executed": false
+    },
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureRegionEditorTest.kt": {
+      "baseline_written": 6,
+      "current_written": 19,
+      "new_written": 13,
+      "names": [
+        "displayLetterboxingAndDpiNeverDoubleScaleFrameCoordinates",
+        "reversedDragRemainsExplicitForNativePixelEdgeAdmission",
+        "outsideImageOrEmptyContactsDoNotBecomeRegionRequests",
+        "sourceViewportAndSizeChangesInvalidateBothDownAndCompletedDrafts",
+        "cancelAndDetachCannotReuseACompletedRectangle",
+        "nonfiniteInputAndMappingFailureDoNotEscapeTheDisplayBoundary",
+        "invalidMoveRetiresContactRatherThanReusingOldEndpoints",
+        "invalidCameraReplacementDetachesThePreviousCompletedSelection",
+        "invalidSourceOrExtentReplacementAlsoDetachesThePreviousSelection",
+        "identicalBindingAndDuplicateFinishCannotAlterCompletedEdges",
+        "offViewportInputCannotSelectUnseenPixelsOfAZoomedSource",
+        "exactFrameBordersAndFractionalReversedEdgesStayUnrounded",
+        "cancellationFromTheMapperPropagatesAndRetiresTheContact",
+        "malformedMapperResultsRetireTheActiveContact",
+        "mappingCannotPublishAfterDetachAndRebindingTheSameSource",
+        "obsoleteFinishCannotCancelAReplacementGestureStartedInsideMapping",
+        "unchangedBindingPreservesTheActiveContact",
+        "maximumAdmittedExtentCanSelectItsExactInclusivePixelEdges",
+        "ordinaryMappingFailureDuringMoveCannotLeaveAFinishableContact"
+      ],
+      "executed": false
+    }
+  },
+  "written_test_totals": {
+    "baseline_written": 36,
+    "current_written": 60,
+    "new_written": 24
+  },
+  "executed_kotlin_tests": 0,
+  "not_run": [
+    "all compiler/build processes including Kotlin/JUnit/PSI/Gradle/cargo/rustc",
+    "new and existing Kotlin/JVM tests",
+    "generated binding/app compatibility builds",
+    "Windows WGC/UIA/hotkey/exclusion/picker runtime",
+    "physical mixed-DPI/negative-origin region mapping",
+    "actual preview/GPU presentation and stale-target lifecycle exercises",
+    "device or physical input/performance acceptance"
+  ],
+  "build_slot": "coordinator owns heavy slot; no compiler started by this lane",
+  "runtime_gates_passed": [],
+  "installations_downloads_security_or_device_actions": false,
+  "screenshots_created": false,
+  "source_bound_delivery_contract": "Actual NativeProject and frozen EditorController destination only; retain escaped non-cancellation close failure without retrying destruction",
+  "workspace_identity_limit": "Normal token-owned deletion works with null fileKey; an unmarked directory retry without an exact key remains held",
+  "windows_provider_reference": "https://raw.githubusercontent.com/openjdk/jdk17u/master/src/java.base/windows/classes/sun/nio/fs/WindowsFileAttributes.java"
+}
