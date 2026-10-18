@@ -10,6 +10,7 @@ publish = false
 test = false
 
 [dependencies]
+vw-geom = { path = "../vw-geom", version = "=0.1.0" }
 vw-model = { path = "../vw-model", version = "=0.1.0" }
 vw-proto = { path = "../vw-proto", version = "=0.1.0" }
 vw-ink = { path = "../vw-ink", version = "=0.1.0" }

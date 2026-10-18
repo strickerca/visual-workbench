@@ -3721,6 +3721,7 @@ dependencies = [
  "tiny-skia",
  "unicode-bidi",
  "unicode-script",
+ "vw-geom",
  "vw-ink",
  "vw-model",
  "vw-proto",
