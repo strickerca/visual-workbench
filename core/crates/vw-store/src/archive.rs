@@ -59,12 +59,22 @@ pub fn export_vwbz(
         .execute("VACUUM INTO ?1", [sqlite_path(&copy)?])?;
     let copy_connection = Connection::open_with_flags(&copy, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
     copy_connection.pragma_update(None, "journal_mode", "DELETE")?;
+    // Refuse injected triggers/schema changes before scrubbing the private copy:
+    // a DELETE trigger could otherwise move a removed note into an exported row.
+    crate::migrations::verify_schema(&copy_connection, 2)?;
     copy_connection.execute("UPDATE devices SET label = NULL", [])?;
     // Installation-local camera positions and bookmark names never leave this
     // installation. VACUUM below also removes their former page contents.
     copy_connection.execute(
         "DELETE FROM settings WHERE key GLOB ?1",
         [format!("{}*", crate::LOCAL_VIEW_PREFIX)],
+    )?;
+    // Reserved by the durable verification leaf before that module is wired.
+    // Strip even malformed records; no private review is parsed/exported here.
+    // On module admission this literal is lowered through its exact prefix const.
+    copy_connection.execute(
+        "DELETE FROM settings WHERE key GLOB ?1",
+        ["vw.verification-review.v1.*"],
     )?;
     copy_connection.execute("VACUUM INTO ?1", [sqlite_path(&clean)?])?;
     copy_connection

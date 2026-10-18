@@ -621,6 +621,152 @@ fn inconsistent_stored_sizes_are_rejected_before_extracting_declared_small_membe
     temporary.close().unwrap();
 }
 
+const PRIVATE_REVIEW_NOTE: &str = "SYNTHETIC_PRIVATE_REVIEW_NOTE_618B7B_OMIT_FROM_ARCHIVE";
+const PRIVATE_REVIEW_OTHER: &str = "SYNTHETIC_MALFORMED_REVIEW_NOTE_69386F_OMIT_FROM_ARCHIVE";
+
+fn private_review_fixture(root: &Path) -> (ProjectStore, AssetId) {
+    let (store, asset) = fixture(root);
+    let connection = rusqlite::Connection::open(root.join("source.vwb/project.sqlite")).unwrap();
+    for (key, value) in [
+        (
+            "vw.verification-review.v1.valid-fixture",
+            PRIVATE_REVIEW_NOTE,
+        ),
+        ("vw.verification-review.v1.", PRIVATE_REVIEW_OTHER),
+        ("synthetic.unrelated.setting", "preserve-unrelated-value"),
+    ] {
+        connection
+            .execute(
+                "INSERT INTO settings(key,value) VALUES (?1,?2)",
+                [key, value],
+            )
+            .unwrap();
+    }
+    (store, asset)
+}
+fn assert_private_source_rows(root: &Path) {
+    let connection = rusqlite::Connection::open(root.join("source.vwb/project.sqlite")).unwrap();
+    let values: Vec<String> = connection
+        .prepare(
+            "SELECT value FROM settings WHERE key GLOB 'vw.verification-review.v1.*' ORDER BY key",
+        )
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(values, [PRIVATE_REVIEW_OTHER, PRIVATE_REVIEW_NOTE]);
+    let unrelated: String = connection
+        .query_row(
+            "SELECT value FROM settings WHERE key='synthetic.unrelated.setting'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(unrelated, "preserve-unrelated-value");
+}
+
+#[test]
+fn private_review_prefix_and_deleted_note_bytes_never_leave_in_an_archive() {
+    let temporary = temporary();
+    let (mut source, asset) = private_review_fixture(temporary.path());
+    let before = source.project().state_hash().unwrap();
+    let revision = source.revision().unwrap();
+    let destination = temporary.path().join("private-filtered.vwbz");
+    export_vwbz(&mut source, &destination).unwrap();
+    let raw = fs::read(&destination).unwrap();
+    for omitted in [PRIVATE_REVIEW_NOTE, PRIVATE_REVIEW_OTHER] {
+        assert!(
+            !raw.windows(omitted.len())
+                .any(|window| window == omitted.as_bytes())
+        );
+    }
+    let restored_path = temporary.path().join("restored-private-filtered.vwb");
+    let restored = import_vwbz(&destination, &restored_path, ImportLimits::default()).unwrap();
+    let copy = rusqlite::Connection::open(restored_path.join("project.sqlite")).unwrap();
+    let count: i64 = copy
+        .query_row(
+            "SELECT COUNT(*) FROM settings WHERE key GLOB 'vw.verification-review.v1.*'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(count, 0);
+    let unrelated: String = copy
+        .query_row(
+            "SELECT value FROM settings WHERE key='synthetic.unrelated.setting'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(unrelated, "preserve-unrelated-value");
+    assert_eq!(restored.project().state_hash().unwrap(), before);
+    assert_eq!(restored.revision().unwrap(), revision);
+    assert_eq!(
+        BlobStore::new(&restored_path)
+            .unwrap()
+            .read(&asset)
+            .unwrap(),
+        ORIGINAL
+    );
+    assert_private_source_rows(temporary.path());
+    assert_eq!(source.project().state_hash().unwrap(), before);
+    drop(copy);
+    drop(restored);
+    drop(source);
+    clean_staging(temporary.path());
+    temporary.close().unwrap();
+}
+
+#[test]
+fn injected_delete_trigger_cannot_redirect_private_notes_into_exported_settings() {
+    let temporary = temporary();
+    let (mut source, _) = private_review_fixture(temporary.path());
+    let sql =
+        rusqlite::Connection::open(temporary.path().join("source.vwb/project.sqlite")).unwrap();
+    sql.execute_batch("CREATE TRIGGER synthetic_review_redirect AFTER DELETE ON settings BEGIN INSERT OR REPLACE INTO settings(key,value) VALUES ('synthetic.redirected-note',OLD.value); END;").unwrap();
+    drop(sql);
+    let destination = temporary.path().join("must-not-export-trigger.vwbz");
+    assert!(matches!(
+        export_vwbz(&mut source, &destination),
+        Err(vw_store::StoreError::Corrupt("unexpected database schema"))
+    ));
+    assert!(!destination.exists());
+    assert_private_source_rows(temporary.path());
+    let sql =
+        rusqlite::Connection::open(temporary.path().join("source.vwb/project.sqlite")).unwrap();
+    let redirected: i64 = sql
+        .query_row(
+            "SELECT COUNT(*) FROM settings WHERE key='synthetic.redirected-note'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(redirected, 0);
+    drop(sql);
+    drop(source);
+    clean_staging(temporary.path());
+    temporary.close().unwrap();
+}
+
+#[test]
+fn failed_export_after_copy_scrubbing_keeps_private_source_progress_and_publishes_nothing() {
+    let temporary = temporary();
+    let (mut source, asset) = private_review_fixture(temporary.path());
+    let blob = BlobStore::new(&temporary.path().join("source.vwb"))
+        .unwrap()
+        .path(&asset)
+        .unwrap();
+    fs::write(blob, b"damaged owned fixture blob").unwrap();
+    let destination = temporary.path().join("must-not-export-damaged.vwbz");
+    assert!(export_vwbz(&mut source, &destination).is_err());
+    assert!(!destination.exists());
+    assert_private_source_rows(temporary.path());
+    drop(source);
+    clean_staging(temporary.path());
+    temporary.close().unwrap();
+}
+
 // A tiny, deliberately permissive fixture writer is independent of zip-rs's
 // duplicate-name/type defenses, allowing those malformed inputs to reach ours.
 fn write_raw(
