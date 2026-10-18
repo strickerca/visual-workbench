@@ -74,6 +74,15 @@ impl Parser {
     }
 }
 pub(super) fn read(input: &mut impl Read, uncertain: &AtomicBool) -> Result<Vec<u8>> {
+    read_settled(input, uncertain, || {})
+}
+/// Settlement is the validated final line after actual Complete. Continue to
+/// EOF for closed-record validation and actual IO join; EOF is not the clock.
+pub(super) fn read_settled(
+    input: &mut impl Read,
+    uncertain: &AtomicBool,
+    mut settled: impl FnMut(),
+) -> Result<Vec<u8>> {
     let mut input = BufReader::with_capacity(8192, input);
     let mut parser = Parser::default();
     let mut line = Vec::new();
@@ -86,6 +95,9 @@ pub(super) fn read(input: &mut impl Read, uncertain: &AtomicBool) -> Result<Vec<
         }
         if byte[0] == b'\n' {
             parser.line(std::mem::take(&mut line), uncertain)?;
+            if parser.final_receipt.is_some() {
+                settled();
+            }
         } else {
             if line.len() >= MAX_OUTPUT {
                 return Err(Error::Limit);
@@ -187,6 +199,45 @@ mod tests {
         let mut twice = complete();
         twice.extend(complete());
         assert!(read(&mut Cursor::new(twice), &AtomicBool::new(true)).is_err());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod calibration_clock_tests {
+    use super::*;
+    use std::{cell::Cell, io::Cursor};
+    struct Endpoint<'a> {
+        bytes: Cursor<Vec<u8>>,
+        settled: &'a Cell<bool>,
+    }
+    impl Read for Endpoint<'_> {
+        fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+            if self.bytes.position() == self.bytes.get_ref().len() as u64 {
+                assert!(
+                    self.settled.get(),
+                    "clock must settle before process EOF/join"
+                );
+            }
+            self.bytes.read(output)
+        }
+    }
+    #[test]
+    fn final_complete_reply_stops_exchange_clock_before_eof() -> Result<()> {
+        let mut bytes =
+            b"{\"schema\":1,\"operation\":\"finite-retirement\",\"retirement\":\"Complete\"}\n"
+                .to_vec();
+        bytes.extend_from_slice(br#"{"schema":1,"operation":"owned-blank-editor-effect-hil","profile_authority":false,"parent_job_present":true,"held_process_and_image_namespace":true,"owned_blank_fixture_asserted":true,"input_sent":false,"target":{},"image":{},"before":{}}"#);
+        bytes.push(b'\n');
+        let settled = Cell::new(false);
+        let mut endpoint = Endpoint {
+            bytes: Cursor::new(bytes),
+            settled: &settled,
+        };
+        let uncertain = AtomicBool::new(true);
+        read_settled(&mut endpoint, &uncertain, || settled.set(true))?;
+        assert!(settled.get());
+        assert!(!uncertain.load(Ordering::Acquire));
         Ok(())
     }
 }

@@ -1,5 +1,6 @@
 //! Source-resolution CPU raster exports. No network, UI or preview fallback.
 //! Streaming PNG can use a caller-owned private scratch file.
+mod display;
 mod export;
 mod ffi;
 mod materialized_result;
@@ -9,6 +10,7 @@ mod render;
 mod source;
 mod stream;
 mod text;
+pub use display::{DisplayImage, display_rgba8};
 pub use export::{
     AlphaPolicy, ColorPolicy, ExportFormat, ExportMetadata, ExportRequest, ExportedImage, Region,
     export, preflight,

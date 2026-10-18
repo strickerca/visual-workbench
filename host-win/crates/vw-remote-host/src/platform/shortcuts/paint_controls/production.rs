@@ -1,9 +1,10 @@
 //! Selected action only. No complete-tree query, UI mutation, cached authority,
 //! default shortcut or inferred RangeValue-to-pixel mapping.
+use super::super::essential_runtime::action::{ActionSpec, RouteSpec};
 use super::*;
-use vw_remote::profile::essential::{ControlRoute, EssentialAction, PaintToolbar, RangeShape};
+use vw_remote::profile::essential::{EssentialAction, PaintToolbar, RangeShape};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub(crate) struct Proof {
     pub(crate) canvas: ElementFacts,
     pub(crate) canvas_tool: String,
@@ -38,7 +39,9 @@ struct View<'a> {
 }
 fn view<'a>(target: &'a Target, budget: &'a SourceBudget) -> Result<View<'a>> {
     let deadline = Instant::now()
-        .checked_add(budget.remaining()?.min(Duration::from_millis(180)))
+        .checked_add(budget.remaining()?.min(Duration::from_millis(
+            super::super::essential_runtime::PAINT_PRODUCTION_BUDGET_MS,
+        )))
         .ok_or(Error::Limit)?;
     // SAFETY: caller owns the retained isolated MTA worker; interfaces remain on
     // this invocation's thread and never escape in the owned Proof.
@@ -192,8 +195,12 @@ impl View<'_> {
         }
     }
 }
-fn base(v: &View<'_>, expected_watched_digest: &str, require_canvas_focus: bool) -> Result<Proof> {
-    if !vw_remote::profile::digest(expected_watched_digest) {
+fn base(
+    v: &View<'_>,
+    expected_watched_digest: Option<&str>,
+    require_canvas_focus: bool,
+) -> Result<Proof> {
+    if expected_watched_digest.is_some_and(|expected| !vw_remote::profile::digest(expected)) {
         return Err(Error::Invalid);
     }
     let q = &v.query;
@@ -218,7 +225,7 @@ fn base(v: &View<'_>, expected_watched_digest: &str, require_canvas_focus: bool)
     // Current tool remains separately proved from both actual toggles + canvas.
     // No runtime ID or transient focus becomes portable settings identity.
     let watched_settings_digest = watched_digest(&brush.style, &opacity_value.text, &colors)?;
-    if watched_settings_digest != expected_watched_digest {
+    if expected_watched_digest.is_some_and(|expected| watched_settings_digest != expected) {
         return Err(Error::Unavailable);
     }
     Ok(Proof {
@@ -232,57 +239,70 @@ fn base(v: &View<'_>, expected_watched_digest: &str, require_canvas_focus: bool)
         brush_style: brush.style,
     })
 }
-fn destination(
-    v: &View<'_>,
-    action: &EssentialAction,
-    _canvas: &ElementFacts,
-) -> Result<(ElementFacts, Option<NumericControl>)> {
+fn validate_size_numeric(current: &NumericControl, expected_range: &RangeShape) -> Result<()> {
+    let range = exact(current.range.clone())?;
+    let value = exact(current.value.clone())?;
+    // Paint exposes display-only Value text on its keyboard-adjustable Size
+    // slider. Writability belongs to RangeValue; this route never sets Value.
+    // Keep the current text for exact revalidation after the thumb click.
+    if range_shape(&range) != *expected_range || range.read_only || value.text.is_empty() {
+        return Err(Error::Unavailable);
+    }
+    Ok(())
+}
+struct Destination {
+    element: IUIAutomationElement,
+    slider: Option<IUIAutomationElement>,
+    facts: ElementFacts,
+    numeric: Option<NumericControl>,
+}
+fn destination(v: &View<'_>, action: &ActionSpec, _canvas: &ElementFacts) -> Result<Destination> {
     let q = &v.query;
-    let (destination, numeric) = match &action.route {
-        ControlRoute::PaintToolbar { control } if action.action == control.action() => {
-            (q.facts(&v.element(*control)?)?, None)
+    let (element, slider, numeric) = match &action.route {
+        RouteSpec::PaintToolbar { control } if action.action == control.action() => {
+            (v.element(*control)?, None, None)
         }
-        ControlRoute::PaintSize { numeric } if matches!(action.action, 6 | 7) => {
+        RouteSpec::PaintSize { numeric } if matches!(action.action, 6 | 7) => {
             let slider = q.unique(&v.pane, &Selector::xaml("Slider", "", Some("Size"), 50015))?;
             let current = NumericControl {
                 element: q.facts(&slider)?,
                 value: Observed::capture(q.value(&slider)),
                 range: Observed::capture(q.range(&slider)),
             };
-            let range = exact(current.range.clone())?;
-            let value = exact(current.value.clone())?;
-            if range_shape(&range) != numeric.range
-                || range.read_only
-                || value.read_only
-                || value.text.is_empty()
-            {
-                return Err(Error::Unavailable);
-            }
+            validate_size_numeric(&current, &numeric.range)?;
             let thumb = q.raw_unique(
                 &slider,
                 &Selector::xaml("Thumb", "VerticalThumb", Some(""), 50027),
             )?;
-            (q.facts(&thumb)?, Some(current))
+            (thumb, Some(slider), Some(current))
         }
         _ => return Err(Error::Unavailable),
     };
-    if !destination.destination_eligible {
+    let facts = q.facts(&element)?;
+    if !facts.destination_eligible {
         return Err(Error::Unavailable);
     }
-    Ok((destination, numeric))
+    Ok(Destination {
+        element,
+        slider,
+        facts,
+        numeric,
+    })
 }
 pub(crate) fn observe_action(
     target: &Target,
     budget: &SourceBudget,
-    action: &EssentialAction,
-    expected_watched_digest: &str,
+    action: &ActionSpec,
+    expected_watched_digest: Option<&str>,
     require_canvas_focus: bool,
 ) -> Result<Proof> {
     let v = view(target, budget)?;
     let mut proof = base(&v, expected_watched_digest, require_canvas_focus)?;
-    let (destination, numeric) = destination(&v, action, &proof.canvas)?;
-    proof.destination = destination;
-    proof.numeric = numeric;
+    let destination = destination(&v, action, &proof.canvas)?;
+    proof.destination = destination.facts;
+    proof.numeric = destination.numeric;
+    drop(destination.element);
+    drop(destination.slider);
     budget.check()?;
     drop(v);
     budget.check()?;
@@ -292,19 +312,46 @@ pub(crate) fn observe_authority(
     target: &Target,
     budget: &SourceBudget,
     actions: &[EssentialAction],
-    expected_watched_digest: &str,
+    expected_watched_digest: Option<&str>,
     require_canvas_focus: bool,
 ) -> Result<(Proof, Vec<u32>)> {
     let v = view(target, budget)?;
     let proof = base(&v, expected_watched_digest, require_canvas_focus)?;
     let mut verified = Vec::new();
+    // Both Size actions resolve the same slider/thumb in this one authority
+    // observation. Reuse only its fresh facts here, validating each admitted
+    // action's own range; no cached element crosses a command or stage.
+    let mut size: Option<Destination> = None;
     for action in actions {
-        match destination(&v, action, &proof.canvas) {
-            Ok(_) => verified.push(action.action),
+        let action = ActionSpec::from(action);
+        let result = if let RouteSpec::PaintSize { numeric } = &action.route {
+            if !matches!(action.action, 6 | 7) {
+                Err(Error::Unavailable)
+            } else {
+                match size.as_ref() {
+                    Some(value) => validate_size_numeric(
+                        value.numeric.as_ref().ok_or(Error::Invalid)?,
+                        &numeric.range,
+                    ),
+                    None => match destination(&v, &action, &proof.canvas) {
+                        Ok(value) => {
+                            size = Some(value);
+                            Ok(())
+                        }
+                        Err(error) => Err(error),
+                    },
+                }
+            }
+        } else {
+            destination(&v, &action, &proof.canvas).map(|_| ())
+        };
+        match result {
+            Ok(()) => verified.push(action.action),
             Err(Error::Unavailable) => {}
             Err(error) => return Err(error),
         }
     }
+    drop(size);
     budget.check()?;
     drop(v);
     budget.check()?;
@@ -365,43 +412,26 @@ fn same_numeric(expected: Option<&NumericControl>, current: &NumericControl) -> 
 pub(crate) fn validate_final(
     target: &Target,
     budget: &SourceBudget,
-    action: &EssentialAction,
+    action: &ActionSpec,
     expected: &Proof,
     second: bool,
 ) -> Result<()> {
     let v = view(target, budget)?;
-    let current = base(&v, &expected.watched_settings_digest, false)?;
-    let (destination, numeric) = destination(&v, action, &current.canvas)?;
-    if destination != expected.destination
-        || numeric != expected.numeric
-        || current.canvas != expected.canvas
-        || current.canvas_tool != expected.canvas_tool
-        || current.brush_selected != expected.brush_selected
-        || current.eraser_selected != expected.eraser_selected
-        || current.brush_style != expected.brush_style
-    {
+    let mut current = base(&v, Some(&expected.watched_settings_digest), false)?;
+    let destination = destination(&v, action, &current.canvas)?;
+    current.destination = destination.facts;
+    current.numeric = destination.numeric;
+    if expected != &current {
         return Err(Error::TargetChanged);
     }
-    let (element, slider) = match &action.route {
-        ControlRoute::PaintToolbar { control } => (v.element(*control)?, None),
-        ControlRoute::PaintSize { .. } => {
-            let slider = v
-                .query
-                .unique(&v.pane, &Selector::xaml("Slider", "", Some("Size"), 50015))?;
-            let numeric = NumericControl {
-                element: v.query.facts(&slider)?,
-                value: Observed::capture(v.query.value(&slider)),
-                range: Observed::capture(v.query.range(&slider)),
-            };
-            same_numeric(expected.numeric.as_ref(), &numeric)?;
-            let thumb = v.query.raw_unique(
-                &slider,
-                &Selector::xaml("Thumb", "VerticalThumb", Some(""), 50027),
-            )?;
-            (thumb, Some(slider))
-        }
-        _ => return Err(Error::Invalid),
-    };
+    // Reuse the exact rooted objects from the fresh complete proof above.
+    // Resolving them again supplied no additional freshness: final facts and
+    // actual hit/focus are still read below, after all source/settings work.
+    let element = destination.element;
+    let slider = destination.slider;
+    if let Some(numeric) = current.numeric.as_ref() {
+        same_numeric(expected.numeric.as_ref(), numeric)?;
+    }
     if v.query.facts(&element)? != expected.destination {
         return Err(Error::TargetChanged);
     }
@@ -435,28 +465,25 @@ pub(crate) fn validate_final(
             }
         }
     } else {
-        // SAFETY: exact physical point from current rooted eligible element.
-        let point = expected.destination_point()?;
-        let hit = v
-            .query
-            .call("Paint final physical destination", || unsafe {
-                v.query
-                    .automation
-                    .ElementFromPoint(windows::Win32::Foundation::POINT {
-                        x: point.0,
-                        y: point.1,
-                    })
-            })?;
-        v.query.pid(&hit)?;
-        if !v
-            .query
-            .call("Paint final same element", || unsafe {
-                v.query.automation.CompareElements(&element, &hit)
-            })?
-            .as_bool()
-        {
-            return Err(Error::Ungranted);
-        }
+        let policy = match &action.route {
+            RouteSpec::PaintToolbar {
+                control: PaintToolbar::Brush,
+            } => DestinationHit::PassiveImage(PassiveImageButton::Brush),
+            RouteSpec::PaintToolbar {
+                control: PaintToolbar::Eraser,
+            } => DestinationHit::PassiveImage(PassiveImageButton::Eraser),
+            RouteSpec::PaintSize { .. } => DestinationHit::SizeSlider(
+                slider.as_ref().ok_or(Error::Invalid)?,
+                &expected.numeric.as_ref().ok_or(Error::Invalid)?.element,
+            ),
+            _ => DestinationHit::Exact,
+        };
+        v.query.hit_destination_with_policy(
+            &element,
+            &expected.destination,
+            expected.destination_point()?,
+            policy,
+        )?;
     }
     let finished = Instant::now();
     drop(element);
@@ -498,6 +525,99 @@ mod tests {
                 },
             },
         }
+    }
+    fn discovered_size() -> NumericControl {
+        let mut value = numeric();
+        value.value = Observed::Known {
+            value: ValueFacts {
+                text: "3 pixel".into(),
+                read_only: true,
+            },
+        };
+        value.range = Observed::Known {
+            value: RangeFacts {
+                current: 2.0,
+                minimum: 0.0,
+                maximum: 90.0,
+                small_change: 1.0,
+                large_change: 10.0,
+                read_only: false,
+            },
+        };
+        value
+    }
+    fn discovered_size_range() -> RangeShape {
+        RangeShape {
+            minimum: 0.0,
+            maximum: 90.0,
+            small_change: 1.0,
+            large_change: 10.0,
+        }
+    }
+    #[test]
+    fn paint_size_accepts_observed_display_only_text_with_writable_range() -> Result<()> {
+        let value = discovered_size();
+        validate_size_numeric(&value, &discovered_size_range())?;
+        same_numeric(Some(&value), &value)
+    }
+    #[test]
+    fn paint_size_still_refuses_readonly_or_changed_range_and_unknown_or_empty_text() {
+        let original = discovered_size();
+        let expected = discovered_size_range();
+        for case in 0..5 {
+            let mut changed = original.clone();
+            match case {
+                0 => {
+                    if let Observed::Known { value } = &mut changed.range {
+                        value.read_only = true;
+                    }
+                }
+                1 => {
+                    if let Observed::Known { value } = &mut changed.range {
+                        value.maximum = 91.0;
+                    }
+                }
+                2 => {
+                    changed.range = Observed::Unknown {
+                        error: Error::Unavailable,
+                    }
+                }
+                3 => {
+                    changed.value = Observed::Unknown {
+                        error: Error::Unavailable,
+                    }
+                }
+                _ => {
+                    if let Observed::Known { value } = &mut changed.value {
+                        value.text.clear();
+                    }
+                }
+            }
+            assert_eq!(
+                validate_size_numeric(&changed, &expected),
+                Err(Error::Unavailable)
+            );
+        }
+    }
+    #[test]
+    fn paint_size_display_only_text_is_still_freshly_bound_after_thumb_click() {
+        let original = discovered_size();
+        let mut changed = original.clone();
+        if let Observed::Known { value } = &mut changed.value {
+            value.text = "4 pixel".into();
+        }
+        assert_eq!(
+            same_numeric(Some(&original), &changed),
+            Err(Error::TargetChanged)
+        );
+        let mut changed = original.clone();
+        if let Observed::Known { value } = &mut changed.value {
+            value.read_only = false;
+        }
+        assert_eq!(
+            same_numeric(Some(&original), &changed),
+            Err(Error::TargetChanged)
+        );
     }
     #[test]
     fn final_paint_numeric_relookup_checks_last_value_range_and_element() {

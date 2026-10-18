@@ -572,47 +572,63 @@ impl ProjectSession {
                 }
                 let depth = asset.bit_depth as u8;
                 let source_asset_id = doc.primary_asset_id.clone();
-                let output = export(
-                    state,
-                    ExportOptions {
-                        document_id,
-                        format: ImageFormat::Png8,
-                        marked: false,
-                        region: None,
-                        matte_rgb: None,
-                        convert_to_srgb: true,
-                        assume_untagged_srgb,
-                        allow_depth_reduction: true,
-                        memory_budget_bytes,
-                    },
-                    &cancellation,
-                )?;
-                let decode_budget = memory_budget_bytes
-                    .checked_sub(output.bytes.len() as u64)
-                    .ok_or(CoreError::Backpressure)?;
-                let image = vw_raster::decode(
-                    &output.bytes,
-                    vw_raster::DecodeLimits {
-                        max_encoded_bytes: 64 * 1024 * 1024,
-                        max_pixels: 50_000_000,
-                        max_memory_bytes: decode_budget,
-                    },
-                )?;
-                cancellation.check()?;
-                let rgba = match image.pixels {
-                    vw_raster::Pixels::Rgba8(bytes) => bytes,
-                    _ => return Err(CoreError::Raster),
+                let orientation = asset.orientation as u8;
+                let (width, height) = if orientation >= 5 {
+                    (asset.height, asset.width)
+                } else {
+                    (asset.width, asset.height)
                 };
+                let assets = Assets {
+                    blobs: &state.blobs,
+                    budget: memory_budget_bytes,
+                    cancel: &cancellation,
+                };
+                // This verifies the immutable original's complete BLAKE3 hash.
+                // Its encoded Vec and decoder temporaries are dropped before
+                // the consuming display conversion begins; there is no PNG
+                // export, crop, re-decode or source-resolution substitution.
+                let source = assets
+                    .image(&source_asset_id)
+                    .map_err(background_raster_error)?;
+                cancellation.check()?;
+                if source.width != width
+                    || source.height != height
+                    || source.orientation_applied != orientation
+                    || source.pixels.bit_depth() != depth
+                {
+                    return Err(CoreError::Raster);
+                }
+                let image = vw_raster::display_rgba8(
+                    source,
+                    memory_budget_bytes,
+                    assume_untagged_srgb,
+                    &|| cancellation.is_cancelled(),
+                )
+                .map_err(background_raster_error)?;
+                cancellation.check()?;
                 Ok(BackgroundImage {
                     width: image.width,
                     height: image.height,
-                    rgba,
+                    rgba: image.rgba,
                     source_asset_id,
-                    source_bit_depth: depth,
-                    icc_profile: image.icc.unwrap_or_default(),
+                    source_bit_depth: image.source_bit_depth,
+                    icc_profile: image.icc_profile,
                 })
             })
             .await
+    }
+}
+
+// Only the background boundary classifies budget/cancellation errors. Keep the
+// existing Raster/color-consent ABI for untagged and other raster refusals; do
+// not change global export/import error mapping or silently assume source color.
+fn background_raster_error(error: vw_raster::RasterError) -> CoreError {
+    match error {
+        vw_raster::RasterError::Memory { .. } | vw_raster::RasterError::Allocation => {
+            CoreError::Backpressure
+        }
+        vw_raster::RasterError::Cancelled => CoreError::Cancelled,
+        _ => CoreError::Raster,
     }
 }
 

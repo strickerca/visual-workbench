@@ -400,31 +400,6 @@ impl View<'_> {
             ordinal_authority: false,
         })
     }
-    fn hit_exact(&self, element: &IUIAutomationElement, destination: (i32, i32)) -> Result<()> {
-        // SAFETY: one exact physical point inside the freshly measured selected
-        // rooted element. PID is checked before any hit property or comparison.
-        unsafe {
-            let hit = self.query.call("Paint actual destination element", || {
-                self.query
-                    .automation
-                    .ElementFromPoint(windows::Win32::Foundation::POINT {
-                        x: destination.0,
-                        y: destination.1,
-                    })
-            })?;
-            self.query.pid(&hit)?;
-            if !self
-                .query
-                .call("Paint destination element identity", || {
-                    self.query.automation.CompareElements(element, &hit)
-                })?
-                .as_bool()
-            {
-                return Err(Error::Ungranted);
-            }
-        }
-        Ok(())
-    }
 }
 pub(crate) fn address(target: &Target, budget: &SourceBudget, action: Action) -> Result<Address> {
     view(target, budget)?.address(action)
@@ -556,7 +531,12 @@ pub(crate) fn inject(
         if arrow.is_some() {
             v.focused_exact(&v.element(action)?, &destination_element)?;
         } else {
-            v.hit_exact(&destination_element, current.destination)?;
+            v.query.hit_destination(
+                &destination_element,
+                &current.element,
+                current.destination,
+                action == Action::Brush,
+            )?;
         }
         let proof_finished = Instant::now();
         drop(destination_element);

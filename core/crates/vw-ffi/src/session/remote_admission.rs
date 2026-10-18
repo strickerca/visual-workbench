@@ -59,6 +59,11 @@ impl Admission {
     pub fn cover(&mut self, sequence: u64) {
         self.covered = self.covered.max(sequence);
     }
+    // Observation publication does not need a rendered ACK or a reservation.
+    // Wait only for locally queued samples/contact/finite commands to settle.
+    pub fn authority_idle(&self) -> bool {
+        !self.busy() && !self.contact && self.queued == 0
+    }
     pub fn can_reserve(&self) -> bool {
         !self.busy() && !self.contact && self.queued == 0 && self.covered >= self.last_pen
     }

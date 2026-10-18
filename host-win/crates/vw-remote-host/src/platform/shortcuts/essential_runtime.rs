@@ -1,6 +1,8 @@
 //! Actual selected-source control consumer. Catalog bytes alone cannot satisfy
 //! current tool/settings/canvas/destination proof. The caller owns finite input,
-//! process/Job/IO retirement and the unchanged parent exchange deadline.
+//! process/Job/IO retirement and the command-specific parent exchange deadline.
+pub(crate) mod action;
+pub(crate) mod calibration;
 use super::{
     absolute, catalog, center, click, clock_100ns, observer, paint_controls, runtime_hash, sha256,
 };
@@ -8,6 +10,7 @@ use crate::{
     Error, Result,
     editor_source::{SourceBudget, SourceLease},
 };
+use action::{ActionSpec, RouteSpec};
 use observer::{Budget, ElementProof, NumericProof, NumericWitness, Observer};
 use std::{
     sync::{Arc, OnceLock},
@@ -18,35 +21,48 @@ use vw_remote::{
     profile::{
         self, Authority, CanvasProof, PackagedProfile,
         catalog::Entry,
-        essential::{
-            ControlRoute, Editor, EssentialAction, EssentialProfile, NumericKey, RangeShape,
-        },
+        essential::{ControlRoute, Editor, EssentialProfile, NumericKey, RangeShape},
         live::{self, ToolSettings},
     },
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 
+pub(crate) const PAINT_PRODUCTION_BUDGET_MS: u64 = Editor::Paint.provider_budget_ms() as u64;
+
 struct Installed {
     profile: EssentialProfile,
+    context: Context,
+}
+impl std::ops::Deref for Installed {
+    type Target = Context;
+    fn deref(&self) -> &Context {
+        &self.context
+    }
+}
+struct Context {
+    editor: Editor,
+    identity: profile::ImageIdentity,
+    watched_settings_digest: Option<String>,
+    mutable_size: Option<RangeShape>,
     source: SourceLease,
     digest: String,
     cancel: Arc<vw_capture::Cancellation>,
 }
 static INSTALLED: OnceLock<Installed> = OnceLock::new();
-impl Installed {
+impl Context {
     fn budget(&self, deadline: Instant) -> Result<SourceBudget> {
         SourceBudget::until(self.cancel.clone(), deadline)
     }
     fn verify(&self, target: &Target, owner: u32, budget: &SourceBudget) -> Result<()> {
         self.source.verify(target, owner, budget)?;
-        if self.source.identity() != &self.profile.metadata.identity() {
+        if self.source.identity() != &self.identity {
             return Err(Error::TargetChanged);
         }
         budget.check()
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 struct KritaProof {
     settings: ToolSettings,
     canvas: CanvasProof,
@@ -55,7 +71,7 @@ struct KritaProof {
     watched: Vec<NumericWitness>,
     watched_digest: String,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 enum Proof {
     Krita(Box<KritaProof>),
     Paint(Box<paint_controls::production::Proof>),
@@ -148,7 +164,7 @@ fn watched_digest(
     for value in watched {
         value.validate()?;
         let shape = witness_shape(value);
-        shape.validate()?;
+        shape.validate_wheel()?;
         let mutable = mutable_size == Some(&shape);
         mutable_matches += usize::from(mutable);
         values.push(PortableNumeric {
@@ -200,7 +216,7 @@ fn permit(action: u32, settings: &ToolSettings) -> Result<()> {
     Ok(())
 }
 fn krita_base(
-    p: &Installed,
+    p: &Context,
     target: &Target,
     observer: &Observer<'_>,
     require_focus: bool,
@@ -208,8 +224,11 @@ fn krita_base(
     let settings = observer.settings()?;
     known_tool(&settings)?;
     let watched = observer.brush_numeric_witnesses()?;
-    let digest = watched_digest(&settings, &watched, size_shape(&p.profile)?.as_ref())?;
-    if digest != p.profile.watched_settings_digest {
+    let digest = watched_digest(&settings, &watched, p.mutable_size.as_ref())?;
+    if p.watched_settings_digest
+        .as_ref()
+        .is_some_and(|expected| &digest != expected)
+    {
         return Err(Error::Unavailable);
     }
     let (canvas, canvas_rect) = if require_focus {
@@ -243,20 +262,20 @@ fn krita_base(
 }
 fn krita_destination(
     observer: &Observer<'_>,
-    action: &EssentialAction,
+    action: &ActionSpec,
     proof: &mut KritaProof,
 ) -> Result<()> {
     permit(action.action, &proof.settings)?;
     let (element, numeric) = match &action.route {
-        ControlRoute::Toolbar { route } => (observer.proof(&observer.element(route)?)?, None),
-        ControlRoute::FocusedNumeric { numeric } => {
+        RouteSpec::Toolbar { route } => (observer.proof(&observer.element(route)?)?, None),
+        RouteSpec::FocusedNumeric { numeric } => {
             let (_, value) = observer.numeric(&numeric.route, &numeric.range)?;
             if value.read_only || value.value_text.is_empty() {
                 return Err(Error::Unavailable);
             }
             (value.element.clone(), Some(value))
         }
-        ControlRoute::ElementWheel { numeric } => {
+        RouteSpec::ElementWheel { numeric } => {
             let (_, value) = observer.numeric_wheel(&numeric.route, &numeric.range)?;
             if value.read_only || value.value_text.is_empty() {
                 return Err(Error::Unavailable);
@@ -270,19 +289,19 @@ fn krita_destination(
     Ok(())
 }
 fn read(
-    p: &Installed,
+    p: &Context,
     target: &Target,
     owner: u32,
-    action: &EssentialAction,
+    action: &ActionSpec,
     budget: &SourceBudget,
 ) -> Result<Proof> {
     p.verify(target, owner, budget)?;
-    let proof = match p.profile.editor {
+    let proof = match p.editor {
         Editor::Paint => Proof::Paint(Box::new(paint_controls::production::observe_action(
             target,
             budget,
             action,
-            &p.profile.watched_settings_digest,
+            p.watched_settings_digest.as_deref(),
             false,
         )?)),
         Editor::Krita => {
@@ -307,13 +326,13 @@ fn authority(
     require_focus: bool,
 ) -> Result<Authority> {
     p.verify(target, owner, budget)?;
-    let (proof, verified_actions) = match p.profile.editor {
+    let (proof, verified_actions) = match p.editor {
         Editor::Paint => {
             let (proof, actions) = paint_controls::production::observe_authority(
                 target,
                 budget,
                 &p.profile.actions,
-                &p.profile.watched_settings_digest,
+                p.watched_settings_digest.as_deref(),
                 require_focus,
             )?;
             (Proof::Paint(Box::new(proof)), actions)
@@ -325,7 +344,7 @@ fn authority(
             let mut actions = Vec::new();
             for action in &p.profile.actions {
                 let mut current = proof.clone();
-                match krita_destination(&observer, action, &mut current) {
+                match krita_destination(&observer, &ActionSpec::from(action), &mut current) {
                     Ok(()) => actions.push(action.action),
                     Err(Error::Unavailable) => {}
                     Err(error) => return Err(error),
@@ -346,7 +365,9 @@ fn authority(
         identity: p.profile.metadata.identity(),
         profile_digest: p.digest.clone(),
         verified_actions,
-        focus,
+        routes: profile::AuthorityRoutes::Essential,
+        focus: require_focus.then(|| focus.clone()),
+        selected_canvas: (!require_focus).then_some(focus),
     })
 }
 pub(super) fn install(
@@ -354,21 +375,27 @@ pub(super) fn install(
     owner: u32,
     packaged: &PackagedProfile,
 ) -> Result<Option<Authority>> {
+    let started = Instant::now();
     let cancel = Arc::new(vw_capture::Cancellation::default());
-    let budget = SourceBudget::new(
-        cancel.clone(),
-        Duration::from_millis(observer::PRODUCTION_BUDGET_MS),
-    )?;
+    // The editor is trusted only after exact package/source selection. Bound
+    // selection by the maximum, then include it in the selected editor's one
+    // absolute budget; a slow selection cannot renew Krita's 180ms deadline.
+    let budget = SourceBudget::until(cancel.clone(), deadline(Editor::Paint, started)?)?;
     let Some(selected) = catalog::select(target, owner, packaged, &budget)? else {
         return Ok(None);
     };
     let Entry::Essential { profile } = selected.entry;
-    let installed = Installed {
-        profile,
+    let context = Context {
+        editor: profile.editor,
+        identity: profile.metadata.identity(),
+        watched_settings_digest: Some(profile.watched_settings_digest.clone()),
+        mutable_size: size_shape(&profile)?,
         source: selected.source,
         digest: selected.digest,
         cancel,
     };
+    let installed = Installed { profile, context };
+    let budget = installed.budget(deadline(installed.editor, started)?)?;
     let result = match authority(&installed, target, owner, &budget, true) {
         Ok(result) => result,
         Err(Error::Unavailable | Error::Ungranted) => return Ok(None),
@@ -388,9 +415,17 @@ pub(super) fn refresh(target: &Target, owner: u32, digest: &str) -> Result<Autho
         return Err(Error::Ungranted);
     }
     let started = Instant::now();
-    // The current DTO names this a focus proof. A toolbar-owned keyboard focus
-    // is a typed refusal, never a selected-canvas descriptor mislabeled as focus.
-    authority(p, target, owner, &p.budget(deadline(started)?)?, true)
+    // A successfully completed toolbar/numeric command may leave keyboard focus
+    // on its exact destination. Retain a separately typed selected-canvas
+    // observation, never invent focused-canvas proof. Each next finite stage
+    // still performs its current destination/focus and native guard checks.
+    authority(
+        p,
+        target,
+        owner,
+        &p.budget(deadline(p.editor, started)?)?,
+        false,
+    )
 }
 
 /// Raw inputs and stage association are immutable outside this source module.
@@ -411,7 +446,7 @@ impl Stage {
 }
 pub struct Command {
     proof: Proof,
-    action: EssentialAction,
+    action: ActionSpec,
     started: Instant,
     digest: String,
     runtime: String,
@@ -498,9 +533,11 @@ fn right_click(point: (i32, i32)) -> Vec<INPUT> {
         button(MOUSEEVENTF_RIGHTUP),
     ]
 }
-fn deadline(started: Instant) -> Result<Instant> {
+fn deadline(editor: Editor, started: Instant) -> Result<Instant> {
     started
-        .checked_add(Duration::from_millis(observer::PRODUCTION_BUDGET_MS))
+        .checked_add(Duration::from_millis(u64::from(
+            editor.provider_budget_ms(),
+        )))
         .ok_or(Error::Limit)
 }
 // The final relookup must prove actual numeric value/text, range, mutability,
@@ -534,8 +571,22 @@ pub(super) fn prepare(
     if p.digest != digest || !profile::digest(runtime) {
         return Err(Error::Ungranted);
     }
-    let budget = p.budget(deadline(started)?)?;
-    let action = p.profile.action(action)?.clone();
+    let action = ActionSpec::from(p.profile.action(action)?);
+    prepare_with(p, target, owner, digest, action, runtime, started)
+}
+fn prepare_with(
+    p: &Context,
+    target: &Target,
+    owner: u32,
+    digest: &str,
+    action: ActionSpec,
+    runtime: &str,
+    started: Instant,
+) -> Result<Command> {
+    if p.digest != digest || !profile::digest(runtime) || p.watched_settings_digest.is_none() {
+        return Err(Error::Ungranted);
+    }
+    let budget = p.budget(deadline(p.editor, started)?)?;
     let proof = read(p, target, owner, &action, &budget)?;
     if proof.canvas(target, digest)?.runtime_id_hash != runtime {
         return Err(Error::Ungranted);
@@ -543,11 +594,11 @@ pub(super) fn prepare(
     let destination = proof.destination()?;
     let absolute_destination = absolute(destination)?;
     let inputs = match &action.route {
-        ControlRoute::ElementWheel { numeric } => wheel(absolute_destination, numeric.wheel_delta)?,
+        RouteSpec::ElementWheel { numeric } => wheel(absolute_destination, numeric.wheel_delta)?,
         // Right-click is an explicit measured entry route, not a claim that a
         // center left-click harmlessly focuses Qt. Exact final focus still gates
         // stage two; only admitted causal/restoration receipts enable this route.
-        ControlRoute::FocusedNumeric { .. } => right_click(absolute_destination),
+        RouteSpec::FocusedNumeric { .. } => right_click(absolute_destination),
         _ => click(absolute_destination),
     };
     budget.check()?;
@@ -569,17 +620,36 @@ pub(super) fn prepare(
     })
 }
 pub(super) fn second(target: &Target, owner: u32, command: &Command) -> Result<Option<Stage>> {
+    second_with(
+        INSTALLED.get().ok_or(Error::Unavailable)?,
+        target,
+        owner,
+        command,
+    )
+}
+fn second_with(
+    p: &Context,
+    target: &Target,
+    owner: u32,
+    command: &Command,
+) -> Result<Option<Stage>> {
     let key = match &command.action.route {
-        ControlRoute::FocusedNumeric { numeric } => numeric.key,
-        ControlRoute::PaintSize { numeric } => numeric.key,
+        RouteSpec::FocusedNumeric { numeric } => numeric.key,
+        RouteSpec::PaintSize { numeric } => numeric.key,
         _ => return Ok(None),
     };
-    let p = INSTALLED.get().ok_or(Error::Unavailable)?;
     if p.digest != command.digest {
         return Err(Error::Ungranted);
     }
-    let budget = p.budget(deadline(command.started)?)?;
-    let proof = read(p, target, owner, &command.action, &budget)?;
+    let budget = p.budget(deadline(p.editor, command.started)?)?;
+    // The stage engine reaches here only after complete first-stage retirement.
+    // Paint Size's final key-send validation freshly rechecks every numeric
+    // fact and the exact focused Slider/Thumb against this command baseline.
+    // Preparing a paired key needs no duplicate provider read before that gate.
+    let proof = match (&command.proof, p.editor, &command.action.route) {
+        (Proof::Paint(_), Editor::Paint, RouteSpec::PaintSize { .. }) => command.proof.clone(),
+        _ => read(p, target, owner, &command.action, &budget)?,
+    };
     if !command.proof.stable_eq(&proof) {
         return Err(Error::TargetChanged);
     }
@@ -598,16 +668,40 @@ pub(super) fn validate(
     command: &Command,
     stage: &Stage,
 ) -> Result<()> {
+    validate_with(
+        INSTALLED.get().ok_or(Error::Unavailable)?,
+        target,
+        owner,
+        command,
+        stage,
+    )
+}
+fn validate_with(
+    p: &Context,
+    target: &Target,
+    owner: u32,
+    command: &Command,
+    stage: &Stage,
+) -> Result<()> {
     stage_matches(command, stage)?;
-    let p = INSTALLED.get().ok_or(Error::Unavailable)?;
     if p.digest != command.digest {
         return Err(Error::Ungranted);
     }
-    let budget = p.budget(deadline(command.started)?)?;
-    let current = read(p, target, owner, &command.action, &budget)?;
-    if !command.proof.stable_eq(&current)
-        || current.destination()? != stage.destination
-        || current.canvas(target, &p.digest)?.runtime_id_hash != command.runtime
+    let budget = p.budget(deadline(p.editor, command.started)?)?;
+    // Paint's final provider validation below re-reads every proof field and
+    // compares it to this command before the exact hit/focus check. Avoid an
+    // additional complete Paint tree read immediately before that same check.
+    // This copy is only the expected baseline, never a current observation.
+    let validation_baseline = match (&command.proof, p.editor) {
+        (Proof::Paint(_), Editor::Paint) => command.proof.clone(),
+        _ => read(p, target, owner, &command.action, &budget)?,
+    };
+    if !command.proof.stable_eq(&validation_baseline)
+        || validation_baseline.destination()? != stage.destination
+        || validation_baseline
+            .canvas(target, &p.digest)?
+            .runtime_id_hash
+            != command.runtime
     {
         return Err(Error::TargetChanged);
     }
@@ -615,7 +709,7 @@ pub(super) fn validate(
     // Every potentially blocking source/package operation precedes this final
     // provider proof. After it, only bounded COM release, clock/deadline checks
     // and the common finite owner's cheap exact native destination guard run.
-    match &current {
+    match &validation_baseline {
         Proof::Paint(value) => paint_controls::production::validate_final(
             target,
             &budget,
@@ -628,17 +722,17 @@ pub(super) fn validate(
             let observer = Observer::open(target, &observer_budget)?;
             let mut value = krita_base(p, target, &observer, false)?;
             krita_destination(&observer, &command.action, &mut value)?;
-            if !Proof::Krita(Box::new(value)).stable_eq(&current) {
+            if !Proof::Krita(Box::new(value)).stable_eq(&validation_baseline) {
                 return Err(Error::TargetChanged);
             }
             let element = match &command.action.route {
-                ControlRoute::Toolbar { route } => observer.element(route)?,
-                ControlRoute::FocusedNumeric { numeric } => {
+                RouteSpec::Toolbar { route } => observer.element(route)?,
+                RouteSpec::FocusedNumeric { numeric } => {
                     let (element, last) = observer.numeric(&numeric.route, &numeric.range)?;
                     same_numeric(expected.numeric.as_ref(), &last)?;
                     element
                 }
-                ControlRoute::ElementWheel { numeric } => {
+                RouteSpec::ElementWheel { numeric } => {
                     let (element, last) = observer.numeric_wheel(&numeric.route, &numeric.range)?;
                     same_numeric(expected.numeric.as_ref(), &last)?;
                     element
@@ -837,6 +931,21 @@ mod tests {
         Ok(())
     }
     #[test]
+    fn actual_zero_step_witness_remains_valid_but_changed_range_still_refuses() -> Result<()> {
+        let mut values = witnesses();
+        values[1].small_change = 0.0;
+        values[1].large_change = 0.0;
+        let digest = watched_digest(&settings(), &values, None)?;
+        values[1].small_change = 1.0;
+        assert_ne!(digest, watched_digest(&settings(), &values, None)?);
+        values[1].small_change = -1.0;
+        assert_eq!(
+            watched_digest(&settings(), &values, None),
+            Err(Error::Unavailable)
+        );
+        Ok(())
+    }
+    #[test]
     fn without_calibrated_size_every_actual_numeric_value_remains_watched() -> Result<()> {
         let mut values = witnesses();
         let original = watched_digest(&settings(), &values, None)?;
@@ -857,12 +966,25 @@ mod tests {
     }
     #[test]
     fn one_absolute_command_budget_cannot_be_renewed_for_stage_two() -> Result<()> {
-        let cancel = Arc::new(vw_capture::Cancellation::default());
-        let started = Instant::now() - Duration::from_millis(observer::PRODUCTION_BUDGET_MS + 1);
-        assert!(matches!(
-            SourceBudget::until(cancel, deadline(started)?),
-            Err(Error::Timeout)
-        ));
+        let now = Instant::now();
+        for (editor, milliseconds) in [(Editor::Krita, 180), (Editor::Paint, 750)] {
+            let elapsed = Duration::from_millis(milliseconds + 1);
+            let started = now - elapsed;
+            let original_deadline = deadline(editor, started)?;
+            assert_eq!(
+                original_deadline,
+                started + Duration::from_millis(milliseconds)
+            );
+            assert!(matches!(
+                SourceBudget::until(
+                    Arc::new(vw_capture::Cancellation::default()),
+                    original_deadline
+                ),
+                Err(Error::Timeout)
+            ));
+        }
+        assert_eq!(PAINT_PRODUCTION_BUDGET_MS, 750);
+        assert_eq!(observer::PRODUCTION_BUDGET_MS, 180);
         Ok(())
     }
     #[test]

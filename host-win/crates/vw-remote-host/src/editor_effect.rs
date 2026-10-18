@@ -2,7 +2,7 @@
 mod krita;
 mod paint;
 mod restoration;
-mod terminal;
+pub(crate) mod terminal;
 use crate::{
     Error, Result,
     editor_probe::{Source, image},
@@ -10,7 +10,7 @@ use crate::{
 };
 use restoration::{Restoration, restore};
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 use vw_remote::{
     Target,
     profile::{ImageIdentity, live::ToolSettings},
@@ -86,15 +86,45 @@ fn run_inner(producer: &mut terminal::Producer) -> Result<()> {
     let _job = platform::confine()?;
     let _apartment = platform::EffectApartment::initialize()?;
     platform::initialize_hil_dpi()?;
+    let stdin = std::io::stdin();
+    let mut input = stdin.lock();
     let mut bytes = Vec::new();
-    std::io::stdin()
-        .lock()
+    Read::by_ref(&mut input)
         .take(16 * 1024 + 1)
-        .read_to_end(&mut bytes)?;
+        .read_until(b'\n', &mut bytes)?;
+    let calibration_frame = bytes == platform::shortcuts::essential_runtime::calibration::SETUP;
+    if calibration_frame {
+        bytes.clear();
+        Read::by_ref(&mut input)
+            .take(16 * 1024 + 1)
+            .read_until(b'\n', &mut bytes)?;
+    } else {
+        // Preserve the existing EOF-delimited JSON protocol, including pretty
+        // printed/multiline requests. Only the explicit setup token is framed.
+        let remaining = (16 * 1024 + 1usize).saturating_sub(bytes.len());
+        Read::by_ref(&mut input)
+            .take(remaining as u64)
+            .read_to_end(&mut bytes)?;
+    }
     if bytes.len() > 16 * 1024 {
         return Err(Error::Limit);
     }
     let mode: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_| Error::Invalid)?;
+    if calibration_frame
+        != (mode.get("mode").and_then(serde_json::Value::as_str)
+            == Some("--essential-calibration-experiment"))
+    {
+        return Err(Error::Invalid);
+    }
+    if matches!(
+        mode.get("mode").and_then(serde_json::Value::as_str),
+        Some("--essential-calibration-observe" | "--essential-calibration-experiment")
+    ) {
+        return platform::shortcuts::essential_runtime::calibration::run(
+            &bytes, &mut input, producer,
+        );
+    }
+
     if matches!(
         mode.get("mode").and_then(serde_json::Value::as_str),
         Some("--paint-observe" | "--paint-experiment")

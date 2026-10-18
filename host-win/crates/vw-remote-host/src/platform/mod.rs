@@ -2,11 +2,12 @@
 mod encoder;
 pub mod finite_input;
 pub mod guard;
-mod input;
+pub(crate) mod input;
 mod native_guard;
-mod shortcuts;
+pub(crate) mod shortcuts;
 pub(crate) use shortcuts::{
-    Apartment as EffectApartment, ClickMeasurement, Measurement, measure, measure_click,
+    Apartment as EffectApartment, ClickMeasurement, Measurement, measure,
+    measure_canvas_for_capture, measure_click,
 };
 pub use shortcuts::{
     PreparedBatch, prepare, prepare_batch, validate_canvas, validate_current, validate_prepared,

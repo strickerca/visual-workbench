@@ -19,6 +19,61 @@ use std::{
     time::{Duration, Instant},
 };
 use vw_remote::wire::{self, Command, Header, Packet};
+// This optional digest is adopted only from our pinned input helper's Ready
+// for the actual OpenInput target/catalog. A request cannot raise its own bound.
+#[cfg(any(windows, test))]
+fn paint_profile_digest(request: &Command, ready: &Packet) -> Option<String> {
+    use vw_remote::profile::{AuthorityRoutes, essential::Editor};
+    let (
+        Command::OpenInput {
+            target,
+            profile: Some(packaged),
+            ..
+        },
+        Header::Ready {
+            input_authority: Some(authority),
+            ..
+        },
+    ) = (request, &ready.header)
+    else {
+        return None;
+    };
+    if authority.routes != AuthorityRoutes::Essential
+        || authority.profile_digest != packaged.digest
+        || !Editor::Paint.matches_identity(&authority.identity)
+        || authority.focused_canvas().is_err()
+        || authority.canvas_for_target(target).is_err()
+    {
+        return None;
+    }
+    // The native install path already verifies the packaged JSON SHA, exact
+    // catalog policy and retained source before producing this Ready authority.
+    Some(authority.profile_digest.clone())
+}
+fn exchange_timeout(request: &Command, paint_digest: Option<&str>) -> Duration {
+    let provider_digest = match request {
+        Command::Finite {
+            action: wire::FiniteAction::Shortcut { profile_digest, .. },
+            ..
+        }
+        | Command::RefreshAuthority { profile_digest, .. } => Some(profile_digest.as_str()),
+        _ => None,
+    };
+    let milliseconds = if provider_digest.is_some() && provider_digest == paint_digest {
+        u64::from(vw_remote::profile::essential::Editor::Paint.parent_exchange_budget_ms())
+    } else if matches!(
+        request,
+        Command::Pen { .. }
+            | Command::Finite { .. }
+            | Command::Check { .. }
+            | Command::RefreshAuthority { .. }
+    ) {
+        250
+    } else {
+        6000
+    };
+    Duration::from_millis(milliseconds)
+}
 static VIDEO: AtomicBool = AtomicBool::new(false);
 static INPUT: AtomicBool = AtomicBool::new(false);
 #[derive(Clone, Copy)]
@@ -59,6 +114,67 @@ impl Cancellation {
             Ok(())
         }
     }
+}
+// A successful exchange must still be current after its consumed reply has
+// updated retirement truth. Waiting is capped without resetting the deadline.
+fn exchange_wait(deadline: Instant, now: Instant, cancel: &Cancellation) -> Result<Duration> {
+    cancel.check()?;
+    let remaining = deadline.saturating_duration_since(now);
+    if remaining.is_zero() {
+        return Err(Error::Timeout);
+    }
+    Ok(remaining.min(Duration::from_millis(5)))
+}
+fn admit_reply(
+    request: &Command,
+    packet: &Packet,
+    observe: impl FnOnce(&Packet) -> Result<()>,
+    still_current: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    if packet.header.sequence() != request.sequence() {
+        return Err(Error::Invalid);
+    }
+    let allowed = matches!(
+        (request, &packet.header),
+        (
+            Command::OpenVideo { .. } | Command::OpenInput { .. },
+            Header::Ready { .. }
+        ) | (
+            Command::Poll { .. },
+            Header::Video { .. } | Header::Idle { .. }
+        ) | (
+            Command::Pen { .. } | Command::Finite { .. },
+            Header::Injected { .. }
+        ) | (Command::RefreshAuthority { .. }, Header::Authority { .. })
+            | (
+                Command::Check { .. },
+                Header::Idle { .. } | Header::StrokeAuthority { .. }
+            )
+            | (Command::Stop { .. }, Header::Stopped { .. })
+    ) || matches!(packet.header, Header::Refused { .. });
+    if !allowed {
+        return Err(Error::Invalid);
+    }
+    if let Header::StrokeAuthority {
+        binding,
+        completed_up,
+        authority,
+        ..
+    } = &packet.header
+    {
+        if *completed_up == 0 || !packet.payload.is_empty() {
+            return Err(Error::Invalid);
+        }
+        binding.validate()?;
+        authority.validate()?;
+    }
+    // A late or cancelled Injected/Stopped packet is still actual consumed
+    // retirement evidence. Never discard it before preserving that truth.
+    observe(packet)?;
+    if let Header::Refused { error, .. } = &packet.header {
+        return Err(error.clone());
+    }
+    still_current()
 }
 pub struct LockedHelper {
     path: PathBuf,
@@ -263,6 +379,7 @@ pub struct Process {
     last: u64,
     sealed: bool,
     pen_release: Option<wire::PenReleaseWitness>,
+    paint_profile_digest: Option<String>,
 }
 impl Process {
     pub fn open(
@@ -315,6 +432,7 @@ impl Process {
                 last: 0,
                 sealed: false,
                 pen_release: None,
+                paint_profile_digest: None,
             };
             if let Some(error) = owner.resource()?.child.startup_error.clone() {
                 let retired = owner.close();
@@ -345,11 +463,12 @@ impl Process {
                     return Err(retired.err().unwrap_or(error));
                 }
             }
-            let ready = owner.exchange(request, cancel)?;
+            let ready = owner.exchange(request.clone(), cancel)?;
             if !matches!(ready.header, Header::Ready { .. }) {
                 let retired = owner.close();
                 return Err(retired.err().unwrap_or(Error::Unavailable));
             }
+            owner.paint_profile_digest = paint_profile_digest(&request, &ready);
             Ok((owner, ready))
         }
     }
@@ -377,17 +496,10 @@ impl Process {
         if sequence != self.next_sequence()? {
             return Err(Error::Invalid);
         }
-        let timeout = if matches!(
-            &request,
-            Command::Pen { .. }
-                | Command::Finite { .. }
-                | Command::Check { .. }
-                | Command::RefreshAuthority { .. }
-        ) {
-            250
-        } else {
-            6000
-        };
+        let timeout = exchange_timeout(&request, self.paint_profile_digest.as_deref());
+        // Include queue publication and bookkeeping in this one deadline. A
+        // deschedule after enqueue must not grant a reply a fresh time budget.
+        let deadline = Instant::now() + timeout;
         let finite_command = matches!(request, Command::Finite { .. });
         if let Command::Finite { input_seq, .. } = &request {
             self.resource()?.finite.begin(sequence, *input_seq)?
@@ -415,49 +527,28 @@ impl Process {
         }
         self.resource()?.last_request = sequence;
         self.last = sequence;
-        let start = Instant::now();
         loop {
-            if let Err(e) = cancel.check() {
-                return Err(self.failed(e));
-            }
-            if start.elapsed() >= Duration::from_millis(timeout) {
-                return Err(self.failed(Error::Timeout));
-            }
-            match self
-                .resource()?
-                .receive
-                .recv_timeout(Duration::from_millis(5))
-            {
+            let wait = match exchange_wait(deadline, Instant::now(), cancel) {
+                Ok(wait) => wait,
+                Err(error) => return Err(self.failed(error)),
+            };
+            match self.resource()?.receive.recv_timeout(wait) {
                 Ok(Ok(packet)) => {
-                    if packet.header.sequence() != sequence {
-                        return Err(self.failed(Error::Invalid));
-                    }
-                    let allowed = matches!(
-                        (&request, &packet.header),
-                        (
-                            Command::OpenVideo { .. } | Command::OpenInput { .. },
-                            Header::Ready { .. }
-                        ) | (
-                            Command::Poll { .. },
-                            Header::Video { .. } | Header::Idle { .. }
-                        ) | (
-                            Command::Pen { .. } | Command::Finite { .. },
-                            Header::Injected { .. }
-                        ) | (Command::RefreshAuthority { .. }, Header::Authority { .. })
-                            | (Command::Check { .. }, Header::Idle { .. })
-                            | (Command::Stop { .. }, Header::Stopped { .. })
-                    ) || matches!(packet.header, Header::Refused { .. });
-                    if !allowed {
-                        return Err(self.failed(Error::Invalid));
-                    }
-                    if let Err(error) = self.resource()?.observe(&packet) {
+                    if let Err(error) = admit_reply(
+                        &request,
+                        &packet,
+                        |packet| self.resource()?.observe(packet),
+                        || exchange_wait(deadline, Instant::now(), cancel).map(|_| ()),
+                    ) {
                         return Err(self.failed(error));
-                    }
-                    if let Header::Refused { error, .. } = &packet.header {
-                        return Err(self.failed(error.clone()));
                     }
                     if matches!(request, Command::Stop { .. }) {
                         self.close()?;
+                        // Actual close may consume time or overlap cancellation.
+                        // Preserve its settled truth but never return late success.
+                        if let Err(error) = exchange_wait(deadline, Instant::now(), cancel) {
+                            return Err(self.failed(error));
+                        }
                     }
                     return Ok(packet);
                 }
@@ -546,4 +637,143 @@ pub fn load_packaged_profile(
 /// foreign runtime unload fence; an empty retirement list alone is insufficient.
 pub fn active_owner_count() -> usize {
     usize::from(VIDEO.load(Ordering::Acquire)) + usize::from(INPUT.load(Ordering::Acquire))
+}
+
+#[cfg(test)]
+#[path = "process/exchange_tests.rs"]
+mod exchange_tests;
+
+#[cfg(test)]
+mod stroke_reply_tests {
+    use super::*;
+    #[test]
+    fn observation_reply_is_check_only_payload_free_and_never_settles_finite_input() -> Result<()> {
+        use vw_remote::{
+            Binding, Rect, Scope,
+            profile::{Authority, AuthorityRoutes, CanvasProof, ImageIdentity},
+        };
+        let binding = Binding {
+            scope: Scope {
+                connection_epoch: 1,
+                source_generation: 1,
+                geometry_revision: 1,
+                capture_session_id: "018bcfe5-6800-7000-8000-000000000001".into(),
+                target_token: "018bcfe5-6800-7000-8000-000000000002".into(),
+            },
+            input_session_id: "018bcfe5-6800-7000-8000-000000000003".into(),
+        };
+        let mut packet = Packet {
+            header: Header::StrokeAuthority {
+                sequence: 3,
+                binding: binding.clone(),
+                completed_up: 2,
+                authority: Authority {
+                    identity: ImageIdentity {
+                        executable_name: "mspaint.exe".into(),
+                        executable_blake3: "c".repeat(64),
+                        executable_bytes: 1024,
+                        file_version: None,
+                        package_full_name: None,
+                        package_version: None,
+                    },
+                    profile_digest: "a".repeat(64),
+                    verified_actions: vec![1, 3],
+                    routes: AuthorityRoutes::Essential,
+                    focus: None,
+                    selected_canvas: Some(CanvasProof {
+                        runtime_id_hash: "b".repeat(64),
+                        process_id: 7,
+                        sampled_qpc_100ns: 100,
+                        class_name: "fixture".into(),
+                        control_type: 50026,
+                        canvas_rect: Rect {
+                            x: 0,
+                            y: 0,
+                            width: 800,
+                            height: 600,
+                        },
+                        profile_digest: "a".repeat(64),
+                    }),
+                },
+            },
+            payload: Vec::new(),
+        };
+        let mut bytes = Vec::new();
+        wire::write_packet(&mut bytes, &packet)?;
+        let decoded = wire::read_packet(&mut bytes.as_slice())?;
+        assert!(matches!(
+            decoded.header,
+            Header::StrokeAuthority {
+                sequence: 3,
+                completed_up: 2,
+                ..
+            }
+        ));
+        admit_reply(
+            &Command::Check { sequence: 3 },
+            &packet,
+            |_| Ok(()),
+            || Ok(()),
+        )?;
+        let mut fence = finite::Fence::with_binding(Some(binding));
+        fence.begin(3, 2)?;
+        fence.observe(&packet.header)?;
+        assert!(fence.pending()); // read-only data is no injection/release receipt
+        for request in [
+            Command::RefreshAuthority {
+                sequence: 3,
+                profile_digest: "a".repeat(64),
+            },
+            Command::Stop { sequence: 3 },
+            Command::Poll {
+                sequence: 3,
+                force_keyframe: false,
+            },
+        ] {
+            assert!(admit_reply(&request, &packet, |_| Ok(()), || Ok(())).is_err());
+        }
+        assert!(
+            admit_reply(
+                &Command::Check { sequence: 4 },
+                &packet,
+                |_| Ok(()),
+                || Ok(())
+            )
+            .is_err()
+        );
+        assert!(
+            admit_reply(
+                &Command::Check { sequence: 3 },
+                &packet,
+                |_| Ok(()),
+                || Err(Error::Cancelled)
+            )
+            .is_err()
+        );
+        packet.payload.push(1);
+        assert!(wire::write_packet(&mut Vec::new(), &packet).is_err());
+        assert!(
+            admit_reply(
+                &Command::Check { sequence: 3 },
+                &packet,
+                |_| Ok(()),
+                || Ok(())
+            )
+            .is_err()
+        );
+        packet.payload.clear();
+        if let Header::StrokeAuthority { completed_up, .. } = &mut packet.header {
+            *completed_up = 0;
+        }
+        assert!(
+            admit_reply(
+                &Command::Check { sequence: 3 },
+                &packet,
+                |_| Ok(()),
+                || Ok(())
+            )
+            .is_err()
+        );
+        Ok(())
+    }
 }

@@ -412,7 +412,270 @@ struct Query<'a> {
     source_budget: &'a SourceBudget,
     deadline: Instant,
 }
+#[derive(Clone, Copy)]
+enum PassiveImageButton {
+    Brush,
+    Eraser,
+}
+impl PassiveImageButton {
+    fn selector(self) -> Selector<'static> {
+        match self {
+            Self::Brush => Selector::xaml("Button", "PrimaryButton", None, 50000),
+            Self::Eraser => Selector::xaml("ToggleButton", "EraserTool", Some("Eraser"), 50000),
+        }
+    }
+}
+enum DestinationHit<'a> {
+    Exact,
+    PassiveImage(PassiveImageButton),
+    SizeSlider(&'a IUIAutomationElement, &'a ElementFacts),
+}
+fn require_absent_pattern(value: &VARIANT) -> Result<()> {
+    // SAFETY: inspect the tag before its corresponding scalar union member.
+    // Missing/unsupported/coercible values cannot become a false Boolean.
+    unsafe {
+        if value.Anonymous.Anonymous.vt != windows::Win32::System::Variant::VT_BOOL {
+            return Err(Error::Unavailable);
+        }
+        if value.Anonymous.Anonymous.Anonymous.boolVal.0 != 0 {
+            return Err(Error::Ungranted);
+        }
+    }
+    Ok(())
+}
+fn passive_image_geometry(image: &ElementFacts, button: &ElementFacts, point: (i32, i32)) -> bool {
+    let contains = |rect: Rect, point: (i32, i32)| {
+        rect.validate().is_ok()
+            && i64::from(point.0) >= i64::from(rect.x)
+            && i64::from(point.1) >= i64::from(rect.y)
+            && i64::from(point.0) < i64::from(rect.x) + i64::from(rect.width)
+            && i64::from(point.1) < i64::from(rect.y) + i64::from(rect.height)
+    };
+    let (Some(image_rect), Some(button_rect), Some(image_visible), Some(button_visible)) = (
+        image.physical_rect_host,
+        button.physical_rect_host,
+        image.visible_rect_host,
+        button.visible_rect_host,
+    ) else {
+        return false;
+    };
+    image.enabled
+        && !image.offscreen
+        && image.destination_eligible
+        && button.enabled
+        && !button.offscreen
+        && button.destination_eligible
+        && contains(image_rect, point)
+        && contains(button_rect, point)
+        && contains(image_visible, point)
+        && contains(button_visible, point)
+        && i64::from(image_rect.x) >= i64::from(button_rect.x)
+        && i64::from(image_rect.y) >= i64::from(button_rect.y)
+        && i64::from(image_rect.x) + i64::from(image_rect.width)
+            <= i64::from(button_rect.x) + i64::from(button_rect.width)
+        && i64::from(image_rect.y) + i64::from(image_rect.height)
+            <= i64::from(button_rect.y) + i64::from(button_rect.height)
+}
+
+fn size_slider_hit_matches(
+    thumb: &ElementFacts,
+    slider: &ElementFacts,
+    expected_thumb: &ElementFacts,
+    expected_slider: &ElementFacts,
+    point: (i32, i32),
+    exact_relations: (bool, bool),
+) -> Result<()> {
+    // Both relations are actual CompareElements results: hit == rooted Slider,
+    // and the current Thumb's immediate raw parent == that same Slider.
+    if exact_relations != (true, true) {
+        return Err(Error::Ungranted);
+    }
+    if thumb != expected_thumb || slider != expected_slider {
+        return Err(Error::TargetChanged);
+    }
+    // The proven Thumb point, not a track point inferred from RangeValue.
+    if !passive_image_geometry(thumb, slider, point) {
+        return Err(Error::Ungranted);
+    }
+    Ok(())
+}
+
 impl Query<'_> {
+    // Preserve the legacy experiment's exact/Brush-only contract.
+    fn hit_destination(
+        &self,
+        element: &IUIAutomationElement,
+        expected: &ElementFacts,
+        point: (i32, i32),
+        brush: bool,
+    ) -> Result<()> {
+        self.hit_destination_with_policy(
+            element,
+            expected,
+            point,
+            if brush {
+                DestinationHit::PassiveImage(PassiveImageButton::Brush)
+            } else {
+                DestinationHit::Exact
+            },
+        )
+    }
+
+    /// Exact hit or one measured, route-specific relationship. Every caller is
+    /// outside held contact; there is no generic ancestor/descendant fallback.
+    fn hit_destination_with_policy(
+        &self,
+        element: &IUIAutomationElement,
+        expected: &ElementFacts,
+        point: (i32, i32),
+        policy: DestinationHit<'_>,
+    ) -> Result<()> {
+        self.pid(element)?;
+        let at_point = || {
+            // SAFETY: current rooted destination uses physical coordinates.
+            self.call("Paint final physical destination", || unsafe {
+                self.automation
+                    .ElementFromPoint(windows::Win32::Foundation::POINT {
+                        x: point.0,
+                        y: point.1,
+                    })
+            })
+        };
+        let hit = at_point()?;
+        self.pid(&hit)?;
+        // SAFETY: both queried elements have the exact selected PID.
+        let exact = self
+            .call("Paint exact destination", || unsafe {
+                self.automation.CompareElements(element, &hit)
+            })?
+            .as_bool();
+        if exact {
+            return Ok(());
+        }
+        if let DestinationHit::SizeSlider(slider, expected_slider) = &policy {
+            self.pid(slider)?;
+            self.matches(
+                element,
+                &Selector::xaml("Thumb", "VerticalThumb", Some(""), 50027),
+            )?;
+            self.matches(slider, &Selector::xaml("Slider", "", Some("Size"), 50015))?;
+            // SAFETY: both elements were checked against the exact selected PID.
+            let hit_is_slider = self
+                .call("Paint size hit exact slider", || unsafe {
+                    self.automation.CompareElements(*slider, &hit)
+                })?
+                .as_bool();
+            // SAFETY: read one immediate raw parent of the already-rooted Thumb.
+            let walker = self.call("Paint size parent walker", || unsafe {
+                self.automation.RawViewWalker()
+            })?;
+            let parent = self.call("Paint size immediate thumb parent", || unsafe {
+                walker.GetParentElement(element)
+            })?;
+            self.pid(&parent)?;
+            // SAFETY: current same-PID parent and exact rooted Slider.
+            let parent_is_slider = self
+                .call("Paint size exact owning slider", || unsafe {
+                    self.automation.CompareElements(*slider, &parent)
+                })?
+                .as_bool();
+            size_slider_hit_matches(
+                &self.facts(element)?,
+                &self.facts(slider)?,
+                expected,
+                expected_slider,
+                point,
+                (hit_is_slider, parent_is_slider),
+            )?;
+            // Recheck after all additional provider work; overlay/replacement refuses.
+            let final_hit = at_point()?;
+            self.pid(&final_hit)?;
+            // SAFETY: exact current same-PID hit witnesses, no ancestor search.
+            if !self
+                .call("Paint size final same slider hit", || unsafe {
+                    self.automation.CompareElements(&hit, &final_hit)
+                })?
+                .as_bool()
+            {
+                return Err(Error::TargetChanged);
+            }
+            return self.check();
+        }
+        let button = match policy {
+            DestinationHit::PassiveImage(button) => button,
+            _ => return Err(Error::Ungranted),
+        };
+        self.matches(element, &button.selector())?;
+        self.matches(&hit, &Selector::xaml("Image", "", None, 50006))?;
+        let image = self.facts(&hit)?;
+        // SAFETY: PID and measured Image shape were checked before these facts.
+        if self
+            .call("Paint image focusable", || unsafe {
+                hit.CurrentIsKeyboardFocusable()
+            })?
+            .as_bool()
+            || self
+                .call("Paint image focused", || unsafe {
+                    hit.CurrentHasKeyboardFocus()
+                })?
+                .as_bool()
+        {
+            return Err(Error::Ungranted);
+        }
+        for property in [
+            UIA_IsInvokePatternAvailablePropertyId,
+            UIA_IsTogglePatternAvailablePropertyId,
+            UIA_IsSelectionItemPatternAvailablePropertyId,
+        ] {
+            // SAFETY: property queries only; no pattern is acquired or invoked.
+            let available = self.call("Paint passive image pattern", || unsafe {
+                hit.GetCurrentPropertyValue(property)
+            })?;
+            require_absent_pattern(&available)?;
+        }
+        // Only one actual raw parent is permitted by the measured Brush/Eraser proof.
+        // There is no root, same-PID, sibling or arbitrary-ancestor fallback.
+        // SAFETY: query-only walker on this invocation's initialized MTA.
+        let walker = self.call("Paint image parent walker", || unsafe {
+            self.automation.RawViewWalker()
+        })?;
+        // SAFETY: the source hit has already passed selected-PID/shape checks.
+        let parent = self.call("Paint image immediate parent", || unsafe {
+            walker.GetParentElement(&hit)
+        })?;
+        self.pid(&parent)?;
+        // SAFETY: both actual live elements have the selected PID.
+        if !self
+            .call("Paint image exact button parent", || unsafe {
+                self.automation.CompareElements(element, &parent)
+            })?
+            .as_bool()
+        {
+            return Err(Error::Ungranted);
+        }
+        let current = self.facts(element)?;
+        if current != *expected {
+            return Err(Error::TargetChanged);
+        }
+        if !passive_image_geometry(&image, &current, point) {
+            return Err(Error::Ungranted);
+        }
+        // Recheck the actual hit after the additional provider work. A new
+        // overlay, changed child or replaced runtime identity refuses the batch.
+        let final_hit = at_point()?;
+        self.pid(&final_hit)?;
+        // SAFETY: two current same-PID hit witnesses, no identity substitution.
+        if !self
+            .call("Paint final same passive image", || unsafe {
+                self.automation.CompareElements(&hit, &final_hit)
+            })?
+            .as_bool()
+        {
+            return Err(Error::TargetChanged);
+        }
+        self.check()
+    }
+
     fn check(&self) -> Result<()> {
         self.source_budget.check()?;
         if Instant::now() >= self.deadline {
@@ -1098,6 +1361,216 @@ pub(crate) fn observe(target: &Target, budget: &SourceBudget) -> Result<Snapshot
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn observed_eraser_image_uses_same_passive_geometry_guard() {
+        let image = point_facts(Rect {
+            x: 457,
+            y: 222,
+            width: 28,
+            height: 28,
+        });
+        let button = point_facts(Rect {
+            x: 443,
+            y: 208,
+            width: 56,
+            height: 56,
+        });
+        assert!(passive_image_geometry(&image, &button, (471, 236)));
+        assert!(!passive_image_geometry(&image, &button, (485, 236)));
+        let mut clipped = image.clone();
+        clipped.visible_rect_host = Some(Rect {
+            x: 457,
+            y: 222,
+            width: 10,
+            height: 28,
+        });
+        assert!(!passive_image_geometry(&clipped, &button, (471, 236)));
+    }
+    fn observed_size_hit() -> (ElementFacts, ElementFacts) {
+        let mut thumb = point_facts(Rect {
+            x: 49,
+            y: 832,
+            width: 39,
+            height: 39,
+        });
+        thumb.runtime_id_hash = "b".repeat(64);
+        let slider = point_facts(Rect {
+            x: 39,
+            y: 427,
+            width: 57,
+            height: 449,
+        });
+        (thumb, slider)
+    }
+    #[test]
+    fn measured_size_slider_hit_requires_exact_owner_and_unchanged_thumb_point() -> Result<()> {
+        let (thumb, slider) = observed_size_hit();
+        size_slider_hit_matches(&thumb, &slider, &thumb, &slider, (68, 851), (true, true))?;
+        for relation in [(false, true), (true, false), (false, false)] {
+            assert_eq!(
+                size_slider_hit_matches(&thumb, &slider, &thumb, &slider, (68, 851), relation),
+                Err(Error::Ungranted)
+            );
+        }
+        // Still on the Slider track, but outside the proved Thumb.
+        assert_eq!(
+            size_slider_hit_matches(&thumb, &slider, &thumb, &slider, (68, 700), (true, true)),
+            Err(Error::Ungranted)
+        );
+        Ok(())
+    }
+    #[test]
+    fn size_hit_rejects_replaced_moved_hidden_disabled_or_clipped_facts() {
+        let (thumb, slider) = observed_size_hit();
+        for replace_thumb in [false, true] {
+            for mutation in 0..7 {
+                let mut current_thumb = thumb.clone();
+                let mut current_slider = slider.clone();
+                let bad = if replace_thumb {
+                    &mut current_thumb
+                } else {
+                    &mut current_slider
+                };
+                match mutation {
+                    0 => bad.runtime_id_hash = "c".repeat(64),
+                    1 => {
+                        bad.physical_rect_host = bad.physical_rect_host.map(|mut rect| {
+                            rect.x += 1;
+                            rect
+                        })
+                    }
+                    2 => bad.enabled = false,
+                    3 => bad.offscreen = true,
+                    4 => bad.destination_eligible = false,
+                    5 => bad.physical_rect_host = None,
+                    _ => bad.visible_rect_host = None,
+                }
+                assert_eq!(
+                    size_slider_hit_matches(
+                        &current_thumb,
+                        &current_slider,
+                        &thumb,
+                        &slider,
+                        (68, 851),
+                        (true, true)
+                    ),
+                    Err(Error::TargetChanged)
+                );
+                assert!(
+                    size_slider_hit_matches(
+                        &current_thumb,
+                        &current_slider,
+                        &current_thumb,
+                        &current_slider,
+                        (68, 851),
+                        (true, true)
+                    )
+                    .is_err()
+                        || mutation < 2
+                );
+            }
+        }
+    }
+    #[test]
+    fn passive_image_requires_actual_false_boolean_pattern_values() {
+        assert_eq!(require_absent_pattern(&VARIANT::from(false)), Ok(()));
+        assert_eq!(
+            require_absent_pattern(&VARIANT::from(true)),
+            Err(Error::Ungranted)
+        );
+        assert_eq!(
+            require_absent_pattern(&VARIANT::from(0i32)),
+            Err(Error::Unavailable)
+        );
+        assert_eq!(
+            require_absent_pattern(&VARIANT::from("false")),
+            Err(Error::Unavailable)
+        );
+        assert_eq!(
+            require_absent_pattern(&VARIANT::default()),
+            Err(Error::Unavailable)
+        );
+    }
+    fn point_facts(rect: Rect) -> ElementFacts {
+        ElementFacts {
+            runtime_id_hash: "a".repeat(64),
+            physical_rect_host: Some(rect),
+            visible_rect_host: Some(rect),
+            enabled: true,
+            offscreen: false,
+            destination_eligible: true,
+        }
+    }
+    #[test]
+    fn observed_image_is_inside_current_primary_button_at_actual_point() {
+        let image = point_facts(Rect {
+            x: 699,
+            y: 165,
+            width: 42,
+            height: 42,
+        });
+        let button = point_facts(Rect {
+            x: 686,
+            y: 156,
+            width: 66,
+            height: 60,
+        });
+        assert!(passive_image_geometry(&image, &button, (719, 186)));
+        assert!(!passive_image_geometry(&image, &button, (741, 186)));
+        assert!(!passive_image_geometry(&image, &button, (719, 207)));
+        assert!(!passive_image_geometry(&image, &button, (698, 186)));
+    }
+    #[test]
+    fn image_must_be_wholly_inside_same_button_not_merely_share_hit_point() {
+        let button = point_facts(Rect {
+            x: 686,
+            y: 156,
+            width: 66,
+            height: 60,
+        });
+        let image = point_facts(Rect {
+            x: 685,
+            y: 165,
+            width: 56,
+            height: 42,
+        });
+        assert!(!passive_image_geometry(&image, &button, (719, 186)));
+        let image = point_facts(Rect {
+            x: 699,
+            y: 165,
+            width: 54,
+            height: 42,
+        });
+        assert!(!passive_image_geometry(&image, &button, (719, 186)));
+    }
+    #[test]
+    fn hidden_disabled_or_unknown_image_and_button_geometry_refuse() {
+        let image = point_facts(Rect {
+            x: 699,
+            y: 165,
+            width: 42,
+            height: 42,
+        });
+        let button = point_facts(Rect {
+            x: 686,
+            y: 156,
+            width: 66,
+            height: 60,
+        });
+        for index in 0..5 {
+            let mut bad = image.clone();
+            match index {
+                0 => bad.enabled = false,
+                1 => bad.offscreen = true,
+                2 => bad.destination_eligible = false,
+                3 => bad.physical_rect_host = None,
+                _ => bad.visible_rect_host = None,
+            }
+            assert!(!passive_image_geometry(&bad, &button, (719, 186)));
+            assert!(!passive_image_geometry(&image, &bad, (719, 186)));
+        }
+    }
+
     #[test]
     fn primitive_raw_walk_is_bounded_and_cannot_select_an_ordinal() -> Result<()> {
         raw_child_budget(MAX_RAW_PRIMITIVE_CHILDREN - 1)?;

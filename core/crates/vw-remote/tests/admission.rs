@@ -25,6 +25,9 @@ fn nal(kind: u8, body: &[u8]) -> Vec<u8> {
     [&[0, 0, 0, 1, kind << 1, 1][..], body].concat()
 }
 fn sps(width: u32, height: u32) -> Vec<u8> {
+    cropped_sps(width, height, None)
+}
+fn cropped_sps(width: u32, height: u32, crop: Option<[u32; 4]>) -> Vec<u8> {
     fn bits(out: &mut Vec<bool>, value: u32, n: usize) {
         for b in (0..n).rev() {
             out.push(value & (1 << b) != 0)
@@ -51,7 +54,12 @@ fn sps(width: u32, height: u32) -> Vec<u8> {
     ue(&mut b, 1);
     ue(&mut b, width);
     ue(&mut b, height);
-    bits(&mut b, 0, 1);
+    bits(&mut b, u32::from(crop.is_some()), 1);
+    if let Some(offsets) = crop {
+        for offset in offsets {
+            ue(&mut b, offset);
+        }
+    }
     ue(&mut b, 0);
     ue(&mut b, 0);
     b.push(true);
@@ -149,6 +157,74 @@ fn changed_generation_and_invented_ack_are_rejected() {
 fn main_sps_dimension_and_depth_bounds_are_enforced() {
     assert_eq!(annexb::sps(&sps(800, 600), 802, 600), Err(Error::Invalid));
     assert_eq!(annexb::sps(&sps(800, 600), 800, 600), Ok(()));
+}
+#[test]
+fn captured_intel_aligned_paint_sps_remains_admitted() {
+    // Codec configuration only, from the input-free R142 control; no image data.
+    let sps = [
+        0, 0, 0, 1, 66, 1, 1, 33, 64, 0, 0, 3, 0, 144, 0, 0, 3, 0, 0, 3, 0, 150, 160, 1, 0, 32, 5,
+        233, 104, 249, 36, 109, 147, 255, 96, 40, 1, 0, 0, 3, 0, 1, 0, 0, 3, 0, 30, 97, 181, 239,
+        126, 0, 2, 220, 108, 0, 5, 184, 220, 128,
+    ];
+    assert_eq!(annexb::sps(&sps, 2048, 1512), Ok(()));
+}
+#[test]
+fn paint_conformance_crop_preserves_even_nv12_and_odd_visible_height() -> Result<()> {
+    let mut c = config();
+    c.visible_width = 2076;
+    c.visible_height = 1511;
+    c.coded_width = 2076;
+    c.coded_height = 1512;
+    c.sps = cropped_sps(2080, 1512, Some([0, 2, 0, 0]));
+    c.validate()?;
+    frame(true).validate(&c)?;
+    assert_eq!(
+        annexb::sps(&cropped_sps(2080, 1520, Some([0, 2, 0, 4])), 2076, 1512),
+        Ok(())
+    );
+    assert_eq!(
+        annexb::sps(&cropped_sps(2080, 1520, Some([0, 31, 0, 31])), 2018, 1458),
+        Ok(())
+    );
+    Ok(())
+}
+#[test]
+fn conformance_crop_rejects_changed_origin_and_excess_padding() {
+    for (crop, width, height) in [
+        ([1, 1, 0, 0], 2076, 1520),
+        ([0, 2, 1, 3], 2076, 1512),
+        ([0, 32, 0, 0], 2016, 1520),
+        ([0, 0, 0, 32], 2080, 1456),
+    ] {
+        assert!(annexb::sps(&cropped_sps(2080, 1520, Some(crop)), width, height).is_err());
+    }
+}
+#[test]
+fn conformance_crop_rejects_wrong_dimensions_and_arithmetic_edges() {
+    for (picture_width, picture_height, crop, width, height) in [
+        (2080, 1512, Some([0, 1, 0, 0]), 2076, 1512),
+        (2080, 1512, None, 2076, 1512),
+        (2076, 1512, None, 2076, 1512),
+        (8, 8, Some([0, 5, 0, 0]), 2, 8),
+        (2080, 1512, Some([0, (1 << 30) - 1, 0, 0]), 2076, 1512),
+        (2080, 1512, Some([0, u32::MAX - 1, 0, 0]), 2076, 1512),
+        (4104, 1512, Some([0, 4, 0, 0]), 4096, 1512),
+        (0, 1512, None, 0, 1512),
+        (2080, 1512, Some([0, 2, 0, 0]), 2075, 1512),
+    ] {
+        assert!(
+            annexb::sps(
+                &cropped_sps(picture_width, picture_height, crop),
+                width,
+                height
+            )
+            .is_err()
+        );
+    }
+    let valid = cropped_sps(2080, 1512, Some([0, 2, 0, 0]));
+    for length in 0..valid.len() {
+        assert!(annexb::sps(&valid[..length], 2076, 1512).is_err());
+    }
 }
 #[test]
 fn mixed_irap_and_repeated_parameter_sets_are_refused() {

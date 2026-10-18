@@ -5,7 +5,7 @@ use std::io::Write;
 use vw_remote::wire::FiniteRetirement;
 
 #[derive(Default)]
-pub(super) struct Producer {
+pub(crate) struct Producer {
     attempted: bool,
     terminal: bool,
 }
@@ -59,14 +59,14 @@ fn retire_to(owner: &mut impl RetirementPort, output: &mut impl Write) -> Result
     pending_output.and(complete_output)
 }
 impl Producer {
-    pub(super) fn arm_attempt(&mut self) -> Result<()> {
+    pub(crate) fn arm_attempt(&mut self) -> Result<()> {
         if self.terminal {
             return Err(Error::RetirementPending);
         }
         self.attempted = true;
         Ok(())
     }
-    pub(super) fn finish<S: 'static>(&mut self, owner: &mut FiniteInputOwner<S>) -> Result<()> {
+    pub(crate) fn finish<S: 'static>(&mut self, owner: &mut FiniteInputOwner<S>) -> Result<()> {
         if self.terminal {
             return Err(Error::Invalid);
         }

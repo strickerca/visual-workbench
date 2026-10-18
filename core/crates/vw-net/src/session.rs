@@ -602,6 +602,7 @@ fn remote_capability(capabilities: &BTreeSet<String>, body: &Body) -> Result<()>
                         | "command_request"
                         | "command_refused"
                         | "authority"
+                        | "stroke_authority"
                         | "retired"
                 )
                 || v.selected_destination_label.len() > 2048
@@ -610,11 +611,19 @@ fn remote_capability(capabilities: &BTreeSet<String>, body: &Body) -> Result<()>
                 || v.selected_target_json.len() > 8192
                 || v.shortcut_state_json.len() > 16384
                 || !crate::remote_reason_allowed(&v.reason)
-                || (v.action == "authority") != (v.command_input_seq > 0)
+                || matches!(v.action.as_str(), "authority" | "stroke_authority")
+                    != (v.command_input_seq > 0)
                 || if matches!(v.action.as_str(), "command_request" | "command_refused") {
                     v.request_nonce == 0 || !(1..=16).contains(&v.editor_action)
                 } else if v.action == "authority" {
                     !(1..=16).contains(&v.editor_action)
+                } else if v.action == "stroke_authority" {
+                    v.request_nonce != 0
+                        || v.editor_action != 0
+                        || v.input_session_id.is_none()
+                        || v.shortcut_state_json.is_empty()
+                        || !v.reason.is_empty()
+                        || !v.selected_target_json.is_empty()
                 } else {
                     v.request_nonce != 0 || v.editor_action != 0
                 }
@@ -734,4 +743,49 @@ fn remote_capability(capabilities: &BTreeSet<String>, body: &Body) -> Result<()>
         _ => {}
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod stroke_control_tests {
+    use super::*;
+    #[test]
+    fn stroke_authority_is_explicit_correlated_query_only_control() -> Result<()> {
+        let id = Id::from_parts(1, [1; 10])?.to_proto();
+        let v = v1::RemoteControl {
+            scope: Some(v1::RemoteScope {
+                connection_epoch: 1,
+                source_generation: 1,
+                geometry_revision: 1,
+                capture_session_id: Some(id.clone()),
+                target_token: Some(id.clone()),
+            }),
+            sequence: 1,
+            action: "stroke_authority".into(),
+            input_session_id: Some(id),
+            command_input_seq: 2,
+            shortcut_state_json: b"{}".to_vec(),
+            ..Default::default()
+        };
+        let caps = BTreeSet::from(["remote_edit_v1".into()]);
+        // Authority JSON is validated by the native session consumer; network
+        // ingress admits only this closed, bounded, negotiated envelope.
+        remote_capability(&caps, &Body::RemoteControl(v.clone()))?;
+        assert!(remote_capability(&BTreeSet::new(), &Body::RemoteControl(v.clone())).is_err());
+        for mode in 0..9 {
+            let mut bad = v.clone();
+            match mode {
+                0 => bad.command_input_seq = 0,
+                1 => bad.editor_action = 1,
+                2 => bad.request_nonce = 1,
+                3 => bad.input_session_id = None,
+                4 => bad.reason = "input_busy".into(),
+                5 => bad.shortcut_state_json.clear(),
+                6 => bad.selected_target_json = vec![1],
+                7 => bad.selected_destination_label = "other".into(),
+                _ => bad.action = "authority".into(),
+            }
+            assert!(remote_capability(&caps, &Body::RemoteControl(bad)).is_err());
+        }
+        Ok(())
+    }
 }

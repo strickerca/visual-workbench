@@ -14,7 +14,7 @@ use vw_remote::{
     },
 };
 mod catalog;
-mod essential_runtime;
+pub(crate) mod essential_runtime;
 pub(crate) mod krita_controls;
 mod observer;
 pub(crate) mod paint_controls;
@@ -116,7 +116,9 @@ pub fn install(
         identity: installed.profile.identity(),
         profile_digest: installed.digest.clone(),
         verified_actions,
-        focus,
+        routes: profile::AuthorityRoutes::Legacy,
+        focus: Some(focus),
+        selected_canvas: None,
     };
     INSTALLED.set(installed).map_err(|_| Error::Invalid)?;
     Ok(Some(authority))
@@ -436,6 +438,36 @@ pub fn measure(target: &Target, owner_pid: u32, action: u32) -> Result<Measureme
     } else {
         profile::live::route_for(action)?
     };
+    let element = observer.proof(&observer.element(&route)?)?;
+    budget.check()?;
+    unchanged(target, owner_pid)?;
+    Ok(Measurement {
+        settings,
+        element,
+        lookup_micros: budget.elapsed_micros(),
+        canvas: CanvasProof {
+            runtime_id_hash,
+            process_id: target.process_id,
+            sampled_qpc_100ns: clock_100ns()?,
+            class_name: "KisOpenGLCanvas2".into(),
+            control_type: 50026,
+            canvas_rect,
+            profile_digest: String::new(),
+        },
+    })
+}
+/// Read-only owned-editor capture witness. Toolbar focus does not invalidate
+/// canvas pixels. This grants no input. Initial grants and legacy keyboard
+/// focus guards remain strict; production finite destinations are independently
+/// revalidated before every actual stage.
+pub(crate) fn measure_canvas_for_capture(target: &Target, owner_pid: u32) -> Result<Measurement> {
+    let budget = Budget::new(std::time::Duration::from_secs(2));
+    unchanged(target, owner_pid)?;
+    let observer = Observer::open(target, &budget)?;
+    let settings = observer.settings()?;
+    let (canvas, canvas_rect) = observer.canvas()?;
+    let runtime_id_hash = runtime_hash(&canvas)?;
+    let route = profile::live::route_for(3)?;
     let element = observer.proof(&observer.element(&route)?)?;
     budget.check()?;
     unchanged(target, owner_pid)?;

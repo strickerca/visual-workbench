@@ -166,6 +166,14 @@ pub enum Header {
         binding: Binding,
         authority: Option<profile::Authority>,
     },
+    // Query-only result after an actually accepted contacted Up. It is never
+    // an injection receipt and never creates a finite command reservation.
+    StrokeAuthority {
+        sequence: u64,
+        binding: Binding,
+        completed_up: u64,
+        authority: profile::Authority,
+    },
     Idle {
         sequence: u64,
     },
@@ -188,6 +196,7 @@ impl Header {
             | Self::Video { sequence, .. }
             | Self::Injected { sequence, .. }
             | Self::Authority { sequence, .. }
+            | Self::StrokeAuthority { sequence, .. }
             | Self::Idle { sequence }
             | Self::Stopped { sequence, .. }
             | Self::Refused { sequence, .. } => *sequence,

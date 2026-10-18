@@ -121,6 +121,7 @@ pub(super) struct State {
     commands: BTreeMap<u64, PendingCommand>,
     next_command: u64,
     admission: admission::Admission,
+    stroke: commands::StrokeObservation,
     #[cfg(windows)]
     runtime: Option<host::Runtime>,
 }
@@ -300,6 +301,7 @@ impl RemoteHub {
                 commands: BTreeMap::new(),
                 next_command: 0,
                 admission: admission::Admission::default(),
+                stroke: commands::StrokeObservation::default(),
                 #[cfg(windows)]
                 runtime: None,
             }),
@@ -356,6 +358,7 @@ impl RemoteHub {
         s.peer_retiring = false;
         s.binding = None;
         s.admission = admission::Admission::default();
+        s.stroke = commands::StrokeObservation::default();
         s.authority = None;
         s.config = None;
         s.held.clear();
@@ -430,6 +433,7 @@ impl RemoteHub {
         }
         s.binding = None;
         s.admission = admission::Admission::default();
+        s.stroke = commands::StrokeObservation::default();
         s.authority = None;
         s.applied = None;
     }
@@ -440,6 +444,7 @@ impl RemoteHub {
         Ok(())
     }
     fn reset_source(s: &mut State, source_epoch: Option<u64>) {
+        s.stroke = commands::StrokeObservation::default();
         s.source_epoch = source_epoch;
         s.selected = None;
         s.retired.clear();
@@ -838,6 +843,7 @@ impl RemoteHub {
                             self.publish(&mut s, "paused", None)?;
                         }
                         "authority" => self.receive_authority(&mut s, &v)?,
+                        "stroke_authority" => self.receive_stroke_authority(&mut s, &v)?,
                         "command_request" => {
                             self.peer_command(
                                 &mut s,
@@ -884,18 +890,27 @@ impl RemoteHub {
                                     .to_string(),
                             };
                             binding.validate().map_err(failure)?;
+                            let next_authority = if v.shortcut_state_json.is_empty() {
+                                None
+                            } else {
+                                let authority: vw_remote::profile::Authority =
+                                    serde_json::from_slice(&v.shortcut_state_json)
+                                        .map_err(|_| SessionError::Invalid)?;
+                                // Selection-only observations are a post-command
+                                // state, never initial focused-canvas authority.
+                                authority.focused_canvas().map_err(failure)?;
+                                authority
+                                    .canvas_for_target(
+                                        &s.selected.as_ref().ok_or(SessionError::Invalid)?.target,
+                                    )
+                                    .map_err(failure)?;
+                                Some(authority)
+                            };
                             Self::retire_authority(&mut s);
                             s.binding = Some(binding);
                             s.input_seq = 0;
                             s.last_input = Instant::now();
-                            s.authority = if v.shortcut_state_json.is_empty() {
-                                None
-                            } else {
-                                Some(
-                                    serde_json::from_slice(&v.shortcut_state_json)
-                                        .map_err(|_| SessionError::Invalid)?,
-                                )
-                            };
+                            s.authority = next_authority;
                             self.publish(&mut s, "controlling", None)?;
                         }
                         "pause" | "revoke" | "stop" => {
@@ -1047,6 +1062,7 @@ impl RemoteHub {
                         )?;
                         self.publish(&mut s, "controlling", None)?;
                     }
+                    s.stroke.event(&v)?;
                     self.workers
                         .lock()
                         .map_err(|_| SessionError::Worker)?
@@ -1392,6 +1408,8 @@ impl LiveSession {
             .ok_or(SessionError::Closed)?
             .enqueue(Body::InputEvent(event))?;
         s.admission.admit_pen(sample.phase, sequence);
+        s.stroke.pen(sample.phase, sequence);
+        self.remote.apply_pending_stroke_authority(&mut s)?;
         s.input_seq = sequence;
         s.last_input = Instant::now();
         Ok(RemoteInputAdmitted {

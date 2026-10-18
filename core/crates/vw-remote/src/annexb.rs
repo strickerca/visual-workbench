@@ -1,5 +1,5 @@
 //! Bounded Annex B HEVC NAL admission. Does not claim decoder conformance.
-use crate::{Error, MAX_ACCESS_UNIT, MAX_CONFIG, Result};
+use crate::{Error, MAX_ACCESS_UNIT, MAX_CONFIG, MAX_SIDE, Result};
 pub struct Unit<'a> {
     pub idr: bool,
     pub vps: Option<&'a [u8]>,
@@ -149,17 +149,44 @@ pub fn sps(bytes: &[u8], width: u32, height: u32) -> Result<()> {
     if b.ue()? != 1 {
         return Err(Error::Unavailable);
     } // YUV 4:2:0
-    if b.ue()? != width || b.ue()? != height {
+    let picture_width = b.ue()?;
+    let picture_height = b.ue()?;
+    if !(2..=MAX_SIDE).contains(&width)
+        || !(2..=MAX_SIDE).contains(&height)
+        || !width.is_multiple_of(2)
+        || !height.is_multiple_of(2)
+        || !(8..=MAX_SIDE).contains(&picture_width)
+        || !(8..=MAX_SIDE).contains(&picture_height)
+        || !picture_width.is_multiple_of(8)
+        || !picture_height.is_multiple_of(8)
+    {
         return Err(Error::Invalid);
     }
-    if b.read(1)? != 0 {
+    let (right, bottom) = if b.read(1)? != 0 {
         let left = b.ue()?;
         let right = b.ue()?;
         let top = b.ue()?;
         let bottom = b.ue()?;
-        if left != 0 || right != 0 || top != 0 || bottom != 0 {
+        // Preserve the selected client's origin. Only encoder padding at the
+        // right/bottom is supported, bounded below one 64-pixel HEVC CTB.
+        if left != 0 || top != 0 || right >= 32 || bottom >= 32 {
             return Err(Error::Unavailable);
         }
+        (right, bottom)
+    } else {
+        (0, 0)
+    };
+    // H.265 7.4.3.2: Main 4:2:0 conformance offsets use two luma samples.
+    // The SPS picture includes coding-block padding; transport dimensions
+    // describe its conformance output, retaining the existing even NV12 size.
+    let output_width = right
+        .checked_mul(2)
+        .and_then(|crop| picture_width.checked_sub(crop));
+    let output_height = bottom
+        .checked_mul(2)
+        .and_then(|crop| picture_height.checked_sub(crop));
+    if output_width != Some(width) || output_height != Some(height) {
+        return Err(Error::Invalid);
     }
     if b.ue()? != 0 || b.ue()? != 0 {
         return Err(Error::Unavailable);

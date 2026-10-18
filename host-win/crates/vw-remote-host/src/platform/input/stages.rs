@@ -2,7 +2,7 @@
 //! can authorize its second producer; no fake retirement or replacement owner.
 use crate::{Error, Result};
 use vw_remote::wire::{FiniteAttempt, FiniteRetirement};
-pub(super) trait Stages {
+pub(crate) trait Stages {
     fn first(&mut self) -> FiniteAttempt;
     fn second(&mut self, first: &FiniteAttempt) -> Result<Option<FiniteAttempt>>;
 }
@@ -58,7 +58,7 @@ fn combined(first: &FiniteAttempt, second: FiniteAttempt) -> FiniteAttempt {
         retirement: second.retirement,
     }
 }
-pub(super) fn execute(port: &mut impl Stages, receipt: &mut Option<FiniteAttempt>) -> Result<()> {
+pub(crate) fn execute(port: &mut impl Stages, receipt: &mut Option<FiniteAttempt>) -> Result<()> {
     let first = port.first();
     *receipt = Some(first.clone());
     if let Err(error) = complete(&first) {

@@ -1,7 +1,8 @@
 //! Separate input helper: bounded actual samples, guarded contact refresh and
 //! finite SendInput batches. Partial batches seal; no global release claim.
 use super::{clock_100ns, confine, native_guard, unchanged};
-mod stages;
+mod post_stroke;
+pub(crate) mod stages;
 use crate::{Error, Result};
 use std::{
     io,
@@ -460,6 +461,22 @@ pub fn run() -> Result<()> {
             return Err(error);
         }
     };
+    // One read-only worker shares the already-installed exact source lifetime.
+    // Its Drop invalidates results without joining a possibly blocked provider.
+    let observer = authority
+        .as_ref()
+        .filter(|a| {
+            a.routes == vw_remote::profile::AuthorityRoutes::Essential
+                && vw_remote::profile::essential::Editor::Paint.matches_identity(&a.identity)
+        })
+        .map(|a| {
+            post_stroke::Observer::open(
+                input.target.clone(),
+                input.owner_pid,
+                a.profile_digest.clone(),
+            )
+        })
+        .transpose()?;
     wire::write_packet(
         &mut output,
         &Packet {
@@ -489,6 +506,8 @@ pub fn run() -> Result<()> {
         }
         last = sequence;
         if matches!(command, Command::Stop { .. }) {
+            // Never let observer cancellation/join delay actual held-input release.
+            drop(observer);
             let terminal = stopped_after_retirement(&mut input.finite_owner, sequence);
             #[cfg(feature = "integration-carrier-fault")]
             let release = (input.release_record.clone(), input.binding.clone());
@@ -505,14 +524,34 @@ pub fn run() -> Result<()> {
             return Ok(());
         }
         let finite_command = matches!(command, Command::Finite { .. });
+        if let Some(observer) = &observer {
+            match &command {
+                Command::Pen {
+                    input_seq, sample, ..
+                } if matches!(sample.phase, Phase::Down | Phase::Leave) => {
+                    observer.invalidate(*input_seq)
+                }
+                Command::Finite { input_seq, .. } => observer.invalidate(*input_seq),
+                _ => {}
+            }
+        }
         let result = match command {
             Command::Pen {
                 input_seq, sample, ..
-            } => input.pen(input_seq, sample).map(|qpc| Header::Injected {
-                sequence,
-                binding: input.binding.clone(),
-                input_seq,
-                accepted_qpc_100ns: qpc,
+            } => input.pen(input_seq, sample).map(|qpc| {
+                // pen() accepted this Up only from an actual contact, and has
+                // recorded release before any query can be scheduled.
+                if sample.phase == Phase::Up
+                    && let Some(observer) = &observer
+                {
+                    observer.completed_up(input_seq);
+                }
+                Header::Injected {
+                    sequence,
+                    binding: input.binding.clone(),
+                    input_seq,
+                    accepted_qpc_100ns: qpc,
+                }
             }),
             Command::Finite {
                 input_seq, action, ..
@@ -529,7 +568,19 @@ pub fn run() -> Result<()> {
                     binding: input.binding.clone(),
                     authority,
                 }),
-            Command::Check { .. } => input.validate().map(|()| Header::Idle { sequence }),
+            Command::Check { .. } => input.validate().map(|()| {
+                observer
+                    .as_ref()
+                    .and_then(post_stroke::Observer::take)
+                    .map_or(Header::Idle { sequence }, |(completed_up, authority)| {
+                        Header::StrokeAuthority {
+                            sequence,
+                            binding: input.binding.clone(),
+                            completed_up,
+                            authority,
+                        }
+                    })
+            }),
             _ => Err(Error::Invalid),
         };
         match result {

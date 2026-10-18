@@ -20,6 +20,65 @@ pub(super) struct PendingCommand {
     pub result: Option<RemoteCommandResult>,
     pub refresh_done: bool,
 }
+// Distinct from the finite command barrier. A newer admitted stroke or finite
+// action invalidates pending read-only results without refusing pen samples.
+#[derive(Default)]
+pub(super) struct StrokeObservation {
+    contact: bool,
+    completed_up: u64,
+    published_up: u64,
+    pending: Option<(u64, vw_remote::profile::Authority)>,
+}
+impl StrokeObservation {
+    pub(super) fn invalidate(&mut self) {
+        self.completed_up = 0;
+        self.pending = None;
+    }
+    pub(super) fn pen(&mut self, phase: vw_remote::wire::Phase, sequence: u64) {
+        use vw_remote::wire::Phase;
+        match phase {
+            Phase::Down => {
+                self.invalidate();
+                self.contact = true;
+            }
+            Phase::Up => {
+                if self.contact {
+                    self.completed_up = sequence;
+                }
+                self.contact = false;
+            }
+            Phase::Leave => {
+                self.invalidate();
+                self.contact = false;
+            }
+            Phase::Move | Phase::Hover => {}
+        }
+    }
+    #[cfg(windows)]
+    pub(super) fn event(&mut self, event: &pb::InputEvent) -> SessionResult<()> {
+        if let Some(pb::input_event::Event::Pen(pen)) = &event.event {
+            let phase =
+                match pb::PenPhase::try_from(pen.phase).map_err(|_| SessionError::Invalid)? {
+                    pb::PenPhase::Down => vw_remote::wire::Phase::Down,
+                    pb::PenPhase::Move => vw_remote::wire::Phase::Move,
+                    pb::PenPhase::Up => vw_remote::wire::Phase::Up,
+                    pb::PenPhase::Hover => vw_remote::wire::Phase::Hover,
+                    pb::PenPhase::Cancel => vw_remote::wire::Phase::Leave,
+                    _ => return Err(SessionError::Invalid),
+                };
+            self.pen(phase, event.input_seq);
+        } else {
+            self.invalidate();
+        }
+        Ok(())
+    }
+    fn current(&self, sequence: u64) -> bool {
+        sequence != 0
+            && sequence == self.completed_up
+            && sequence > self.published_up
+            && !self.contact
+    }
+}
 fn action_allowed<'a>(
     s: &'a State,
     binding: &Binding,
@@ -29,9 +88,11 @@ fn action_allowed<'a>(
         return Err(SessionError::Authentication);
     }
     let authority = s.authority.as_ref().ok_or(SessionError::Authentication)?;
-    if !authority.verified_actions.contains(&action)
-        || authority.profile_digest != authority.focus.profile_digest
-    {
+    let selected = s.selected.as_ref().ok_or(SessionError::Authentication)?;
+    authority
+        .canvas_for_target(&selected.target)
+        .map_err(failure)?;
+    if selected.scope != binding.scope || !authority.verified_actions.contains(&action) {
         return Err(SessionError::Authentication);
     }
     Ok(authority)
@@ -53,7 +114,7 @@ impl RemoteHub {
             kind: "shortcut".into(),
             editor_action: action,
             profile_digest: authority.profile_digest.clone(),
-            focus_runtime_hash: authority.focus.runtime_id_hash.clone(),
+            focus_runtime_hash: authority.canvas().map_err(failure)?.runtime_id_hash.clone(),
             ..Default::default()
         };
         let sequence = s
@@ -76,6 +137,7 @@ impl RemoteHub {
             .enqueue(Body::InputEvent(event))?;
         s.admission
             .reserve(sequence, action, request_nonce, digest)?;
+        s.stroke.invalidate();
         self.publish(s, "controlling", None)?;
         s.input_seq = sequence;
         s.last_input = Instant::now();
@@ -321,6 +383,119 @@ impl RemoteHub {
         pending.refresh_done = true;
         Ok(())
     }
+    fn validate_stroke_authority(
+        s: &State,
+        binding: &Binding,
+        next: &vw_remote::profile::Authority,
+    ) -> SessionResult<()> {
+        if s.binding.as_ref() != Some(binding) {
+            return Err(SessionError::Authentication);
+        }
+        let old = s.authority.as_ref().ok_or(SessionError::Authentication)?;
+        let selected = s.selected.as_ref().ok_or(SessionError::Authentication)?;
+        let canvas = next.canvas_for_target(&selected.target).map_err(failure)?;
+        let previous = old.canvas_for_target(&selected.target).map_err(failure)?;
+        if canvas.runtime_id_hash != previous.runtime_id_hash
+            || canvas.process_id != previous.process_id
+            || canvas.class_name != previous.class_name
+            || canvas.control_type != previous.control_type
+            || canvas.canvas_rect != previous.canvas_rect
+            || selected.scope != binding.scope
+            || !vw_remote::profile::essential::Editor::Paint.matches_identity(&old.identity)
+            || old.routes != vw_remote::profile::AuthorityRoutes::Essential
+            || next.profile_digest != old.profile_digest
+            || canvas.profile_digest != old.profile_digest
+            || next.identity != old.identity
+            || next.routes != old.routes
+        {
+            return Err(SessionError::Authentication);
+        }
+        Ok(())
+    }
+    pub(super) fn apply_pending_stroke_authority(&self, s: &mut State) -> SessionResult<()> {
+        if !s.admission.authority_idle() {
+            return Ok(());
+        }
+        if let Some((sequence, authority)) = s.stroke.pending.take() {
+            if !s.stroke.current(sequence) || s.authority.is_none() {
+                return Ok(());
+            }
+            let binding = s.binding.clone().ok_or(SessionError::Authentication)?;
+            Self::validate_stroke_authority(s, &binding, &authority)?;
+            s.authority = Some(authority);
+            s.stroke.published_up = sequence;
+            // No command receipt, barrier completion, grant or input ACK is made.
+            self.publish(s, "controlling", None)?;
+        }
+        Ok(())
+    }
+    pub(super) fn receive_stroke_authority(
+        &self,
+        s: &mut State,
+        v: &pb::RemoteControl,
+    ) -> SessionResult<()> {
+        if self.host
+            || v.command_input_seq == 0
+            || v.editor_action != 0
+            || v.request_nonce != 0
+            || !v.reason.is_empty()
+            || !v.selected_target_json.is_empty()
+            || !v.selected_destination_label.is_empty()
+            || v.shortcut_state_json.is_empty()
+        {
+            return Err(SessionError::Invalid);
+        }
+        let binding = Binding {
+            scope: scope_from(v.scope.clone())?,
+            input_session_id: Id::from_proto(v.input_session_id.as_ref())
+                .map_err(|_| SessionError::Invalid)?
+                .to_string(),
+        };
+        // Authenticate the envelope before disposal, but do not validate an old
+        // result against authority removed by a newer finite refresh/revocation.
+        if s.binding.as_ref() != Some(&binding) || v.command_input_seq > s.input_seq {
+            return Err(SessionError::Authentication);
+        }
+        let authority =
+            serde_json::from_slice(&v.shortcut_state_json).map_err(|_| SessionError::Invalid)?;
+        if !s.stroke.current(v.command_input_seq) || s.authority.is_none() {
+            return Ok(());
+        }
+        Self::validate_stroke_authority(s, &binding, &authority)?;
+        s.stroke.pending = Some((v.command_input_seq, authority));
+        self.apply_pending_stroke_authority(s)
+    }
+    #[cfg(windows)]
+    pub(super) fn publish_stroke_authority(
+        &self,
+        binding: &Binding,
+        sequence: u64,
+        authority: vw_remote::profile::Authority,
+    ) -> SessionResult<()> {
+        let mut s = self.state.lock().map_err(|_| SessionError::Worker)?;
+        // This is an asynchronous local observation, not a peer command. A
+        // replaced/retired binding or newer input silently owns the state now.
+        if s.binding.as_ref() != Some(binding)
+            || !s.stroke.current(sequence)
+            || s.admission.busy()
+            || s.authority.is_none()
+        {
+            return Ok(());
+        }
+        Self::current(&s)?;
+        Self::validate_stroke_authority(&s, binding, &authority)?;
+        self.send_command_control(
+            &mut s,
+            binding,
+            "stroke_authority",
+            (sequence, 0, 0),
+            &Some(authority.clone()),
+            "",
+        )?;
+        s.authority = Some(authority);
+        s.stroke.published_up = sequence;
+        self.publish(&mut s, "controlling", None)
+    }
     fn adopt_authority(
         &self,
         s: &mut State,
@@ -343,14 +518,11 @@ impl RemoteHub {
                 .as_ref()
                 .ok_or(SessionError::Authentication)?
                 .target;
+            let canvas = next.canvas_for_target(target).map_err(failure)?;
             if next.profile_digest != command.digest
-                || next.focus.profile_digest != command.digest
+                || canvas.profile_digest != command.digest
                 || next.identity != old.identity
-                || next.focus.process_id != target.process_id
-                || next.focus.sampled_qpc_100ns == 0
-                || !vw_remote::profile::digest(&next.focus.runtime_id_hash)
-                || next.verified_actions.len() > 16
-                || next.verified_actions.iter().any(|a| !(1..=16).contains(a))
+                || next.routes != old.routes
             {
                 return Err(SessionError::Authentication);
             }
@@ -511,6 +683,145 @@ impl LiveSession {
 #[cfg(test)]
 mod refresh_tests {
     use super::*;
+    fn authority(selected: bool) -> vw_remote::profile::Authority {
+        use vw_remote::profile::{Authority, AuthorityRoutes, CanvasProof, ImageIdentity};
+        let canvas = CanvasProof {
+            runtime_id_hash: "b".repeat(64),
+            process_id: 7,
+            sampled_qpc_100ns: 101,
+            class_name: "KisOpenGLCanvas2".into(),
+            control_type: 50026,
+            canvas_rect: vw_remote::Rect {
+                x: 0,
+                y: 0,
+                width: 800,
+                height: 600,
+            },
+            profile_digest: "a".repeat(64),
+        };
+        Authority {
+            identity: ImageIdentity {
+                executable_name: "krita.exe".into(),
+                executable_blake3: "c".repeat(64),
+                executable_bytes: 1024,
+                file_version: Some("5.3.4.0".into()),
+                package_full_name: None,
+                package_version: None,
+            },
+            profile_digest: "a".repeat(64),
+            verified_actions: vec![1, 2, 3, 6, 7, 8, 9],
+            routes: AuthorityRoutes::Essential,
+            focus: (!selected).then(|| canvas.clone()),
+            selected_canvas: selected.then_some(canvas),
+        }
+    }
+    fn observation_fixture() -> SessionResult<(Arc<RemoteHub>, Binding)> {
+        let hub = RemoteHub::new(false);
+        let b = binding();
+        {
+            let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+            let rect = vw_remote::Rect {
+                x: 0,
+                y: 0,
+                width: 800,
+                height: 600,
+            };
+            s.selected = Some(Selected {
+                target: Target {
+                    token: b.scope.target_token.clone(),
+                    window: 1,
+                    process_id: 7,
+                    thread_id: 8,
+                    process_created: 9,
+                    window_rect: rect,
+                    frame_rect: rect,
+                    client_rect: rect,
+                    dpi: 96,
+                    integrity: 0,
+                },
+                scope: b.scope.clone(),
+                display_label: "owned authority fixture".into(),
+            });
+            s.binding = Some(b.clone());
+            s.authority = Some(authority(false));
+            s.admission.reserve(7, 1, 5, "a".repeat(64))?;
+        }
+        Ok((hub, b))
+    }
+    #[test]
+    fn selected_canvas_refresh_keeps_next_essential_command_in_both_channel_orders()
+    -> SessionResult<()> {
+        for authority_first in [false, true] {
+            let (hub, b) = observation_fixture()?;
+            let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+            if authority_first {
+                hub.adopt_authority(&mut s, &b, (7, 1, 5), Some(authority(true)))?;
+            } else {
+                hub.command_result(&mut s, &injected(&b)?)?;
+            }
+            assert!(s.admission.busy());
+            if authority_first {
+                hub.command_result(&mut s, &injected(&b)?)?;
+            } else {
+                hub.adopt_authority(&mut s, &b, (7, 1, 5), Some(authority(true)))?;
+            }
+            assert!(!s.admission.busy());
+            assert_eq!(s.binding.as_ref(), Some(&b));
+            let next = action_allowed(&s, &b, 2)?;
+            assert!(next.focus.is_none() && next.selected_canvas.is_some());
+            assert!(s.admission.can_reserve());
+        }
+        Ok(())
+    }
+    #[test]
+    fn invalid_selected_refresh_preserves_current_authority_and_reservation() -> SessionResult<()> {
+        for mode in 0..7 {
+            let (hub, b) = observation_fixture()?;
+            let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+            let mut next = authority(true);
+            match mode {
+                0 => next.focus = next.selected_canvas.clone(),
+                1 => next.selected_canvas = None,
+                2 => next.identity.executable_blake3 = "d".repeat(64),
+                3 => {
+                    next.selected_canvas
+                        .as_mut()
+                        .ok_or(SessionError::Invalid)?
+                        .process_id = 8
+                }
+                4 => {
+                    next.selected_canvas
+                        .as_mut()
+                        .ok_or(SessionError::Invalid)?
+                        .canvas_rect
+                        .x = 1
+                }
+                5 => next.profile_digest = "d".repeat(64),
+                _ => next.routes = vw_remote::profile::AuthorityRoutes::Legacy,
+            }
+            assert!(
+                hub.adopt_authority(&mut s, &b, (7, 1, 5), Some(next))
+                    .is_err()
+            );
+            assert!(s.admission.busy());
+            assert!(s.authority.as_ref().is_some_and(|a| a.focus.is_some()));
+            assert_eq!(s.binding.as_ref(), Some(&b));
+        }
+        Ok(())
+    }
+    #[test]
+    fn focused_refresh_cannot_change_installed_route_family() -> SessionResult<()> {
+        let (hub, b) = observation_fixture()?;
+        let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+        let mut next = authority(false);
+        next.routes = vw_remote::profile::AuthorityRoutes::Legacy;
+        assert!(
+            hub.adopt_authority(&mut s, &b, (7, 1, 5), Some(next))
+                .is_err()
+        );
+        assert!(s.admission.busy());
+        Ok(())
+    }
     fn binding() -> Binding {
         Binding {
             scope: Scope {
@@ -607,6 +918,247 @@ mod refresh_tests {
         assert!(s.binding.is_none());
         assert!(!s.admission.busy());
         assert!(hub.adopt_authority(&mut s, &b, (7, 1, 5), None).is_err());
+        Ok(())
+    }
+
+    fn stroke_fixture() -> SessionResult<(Arc<RemoteHub>, Binding)> {
+        let (hub, b) = observation_fixture()?;
+        {
+            let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+            s.admission = admission::Admission::default();
+            let mut a = authority(false);
+            a.identity = vw_remote::profile::ImageIdentity {
+                executable_name: "mspaint.exe".into(),
+                executable_blake3:
+                    "b2a7f30ffa5f4864fbe63b49c64153f1d75a278f5771f14e59ffb6be4f65792f".into(),
+                executable_bytes: 4_272_128,
+                file_version: Some("11.2605.81.0".into()),
+                package_full_name: Some(vw_remote::profile::essential::PAINT_PACKAGE.into()),
+                package_version: Some("11.2605.81.0".into()),
+            };
+            a.verified_actions = vec![3, 6, 7, 8, 9];
+            s.authority = Some(a);
+            s.stroke.pen(vw_remote::wire::Phase::Down, 1);
+            s.stroke.pen(vw_remote::wire::Phase::Up, 2);
+            s.input_seq = 2;
+        }
+        Ok((hub, b))
+    }
+    fn stroke_update(s: &State, b: &Binding) -> SessionResult<pb::RemoteControl> {
+        let mut a = s.authority.clone().ok_or(SessionError::Invalid)?;
+        a.verified_actions.insert(0, 1); // actual fixture observation of Undo
+        a.selected_canvas = a.focus.take();
+        Ok(pb::RemoteControl {
+            scope: Some(scope_pb(&b.scope)?),
+            sequence: 1,
+            action: "stroke_authority".into(),
+            input_session_id: Some(native_id(&b.input_session_id)?.to_proto()),
+            command_input_seq: 2,
+            shortcut_state_json: json(&a)?.into_bytes(),
+            ..Default::default()
+        })
+    }
+    #[test]
+    fn stroke_observation_updates_availability_without_finite_receipt_or_coverage()
+    -> SessionResult<()> {
+        let (hub, b) = stroke_fixture()?;
+        let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+        s.admission.admit_pen(vw_remote::wire::Phase::Down, 1);
+        s.admission.admit_pen(vw_remote::wire::Phase::Up, 2);
+        let update = stroke_update(&s, &b)?;
+        hub.receive_stroke_authority(&mut s, &update)?;
+        assert!(action_allowed(&s, &b, 1).is_ok());
+        assert!(!s.admission.busy() && s.commands.is_empty());
+        assert!(!s.admission.can_reserve()); // observation is not a covering ACK
+        assert_eq!(s.input_seq, 2);
+        assert_eq!(s.stroke.published_up, 2);
+        let published = s.display.sequence;
+        hub.receive_stroke_authority(&mut s, &update)?;
+        assert_eq!(s.display.sequence, published); // duplicate disposed
+        Ok(())
+    }
+    #[test]
+    fn queued_hover_defers_and_queued_new_down_discards_old_stroke() -> SessionResult<()> {
+        use vw_remote::wire::Phase;
+        for phase in [Phase::Hover, Phase::Down] {
+            let (hub, b) = stroke_fixture()?;
+            let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+            let update = stroke_update(&s, &b)?;
+            assert!(s.admission.queue(1)?);
+            hub.receive_stroke_authority(&mut s, &update)?;
+            assert!(s.stroke.pending.is_some());
+            assert!(action_allowed(&s, &b, 1).is_err());
+            s.admission.check_pen(phase)?; // observer creates no input barrier
+            s.admission.admit_pen(phase, 3);
+            s.stroke.pen(phase, 3);
+            s.input_seq = 3;
+            hub.apply_pending_stroke_authority(&mut s)?;
+            assert_eq!(action_allowed(&s, &b, 1).is_ok(), phase == Phase::Hover);
+            assert!(s.stroke.pending.is_none());
+        }
+        Ok(())
+    }
+    #[test]
+    fn stale_stroke_after_finite_or_new_down_is_disposed_before_absent_authority_validation()
+    -> SessionResult<()> {
+        for finite in [false, true] {
+            let (hub, b) = stroke_fixture()?;
+            let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+            let update = stroke_update(&s, &b)?;
+            if finite {
+                s.stroke.invalidate();
+            } else {
+                s.stroke.pen(vw_remote::wire::Phase::Down, 3);
+            }
+            s.input_seq = 3;
+            s.authority = None;
+            hub.receive_stroke_authority(&mut s, &update)?;
+            assert!(s.authority.is_none() && s.stroke.pending.is_none());
+            assert_eq!(s.stroke.published_up, 0);
+        }
+        Ok(())
+    }
+    #[test]
+    fn stroke_requires_exact_binding_profile_identity_routes_and_canvas() -> SessionResult<()> {
+        for mode in 0..10 {
+            let (hub, b) = stroke_fixture()?;
+            let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+            let mut update = stroke_update(&s, &b)?;
+            let mut a: vw_remote::profile::Authority =
+                serde_json::from_slice(&update.shortcut_state_json)
+                    .map_err(|_| SessionError::Invalid)?;
+            match mode {
+                0 => {
+                    update.input_session_id =
+                        Some(native_id("018bcfe5-6800-7000-8000-000000000004")?.to_proto())
+                }
+                1 => {
+                    update
+                        .scope
+                        .as_mut()
+                        .ok_or(SessionError::Invalid)?
+                        .source_generation += 1
+                }
+                2 => a.profile_digest = "d".repeat(64),
+                3 => a.identity.executable_blake3 = "d".repeat(64),
+                4 => a.routes = vw_remote::profile::AuthorityRoutes::Legacy,
+                5 => {
+                    a.selected_canvas
+                        .as_mut()
+                        .ok_or(SessionError::Invalid)?
+                        .runtime_id_hash = "d".repeat(64)
+                }
+                6 => {
+                    a.selected_canvas
+                        .as_mut()
+                        .ok_or(SessionError::Invalid)?
+                        .canvas_rect
+                        .width -= 1
+                }
+                7 => {
+                    a.selected_canvas
+                        .as_mut()
+                        .ok_or(SessionError::Invalid)?
+                        .process_id += 1
+                }
+                8 => update.command_input_seq = 3,
+                _ => {
+                    update
+                        .scope
+                        .as_mut()
+                        .ok_or(SessionError::Invalid)?
+                        .geometry_revision += 1
+                }
+            }
+            update.shortcut_state_json = json(&a)?.into_bytes();
+            assert!(hub.receive_stroke_authority(&mut s, &update).is_err());
+            assert!(action_allowed(&s, &b, 1).is_err());
+            assert!(s.commands.is_empty() && !s.admission.busy());
+        }
+        Ok(())
+    }
+    #[test]
+    fn stroke_control_has_closed_query_shape_and_retired_disposal_only() -> SessionResult<()> {
+        let (hub, b) = stroke_fixture()?;
+        let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+        let update = stroke_update(&s, &b)?;
+        retired::control_shape(&update, false)?;
+        assert!(retired::control_shape(&update, true).is_err());
+        for mode in 0..7 {
+            let mut bad = update.clone();
+            match mode {
+                0 => bad.command_input_seq = 0,
+                1 => bad.editor_action = 1,
+                2 => bad.request_nonce = 1,
+                3 => bad.reason = "input_busy".into(),
+                4 => bad.shortcut_state_json.clear(),
+                5 => bad.selected_target_json = vec![1],
+                _ => bad.selected_destination_label = "other".into(),
+            }
+            assert!(hub.receive_stroke_authority(&mut s, &bad).is_err());
+            assert!(retired::control_shape(&bad, false).is_err());
+        }
+        RemoteHub::retire(&mut s);
+        retired::control_shape(&update, false)?; // structural disposal, no grant
+        assert!(hub.receive_stroke_authority(&mut s, &update).is_err());
+        assert!(s.binding.is_none() && s.authority.is_none() && s.commands.is_empty());
+        assert!(!s.stroke.current(2));
+        Ok(())
+    }
+    #[test]
+    fn only_completed_contact_and_latest_up_can_publish() {
+        use vw_remote::wire::Phase;
+        let mut s = StrokeObservation::default();
+        for (phase, seq) in [(Phase::Hover, 1), (Phase::Up, 2), (Phase::Move, 3)] {
+            s.pen(phase, seq);
+            assert!(!s.current(seq));
+        }
+        s.pen(Phase::Down, 4);
+        s.pen(Phase::Move, 5);
+        assert!(!s.current(5));
+        s.pen(Phase::Up, 6);
+        assert!(s.current(6));
+        s.pen(Phase::Down, 7);
+        assert!(!s.current(6));
+        s.pen(Phase::Up, 8);
+        assert!(s.current(8) && !s.current(6));
+        s.pen(Phase::Leave, 9);
+        assert!(!s.current(8));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn late_local_observation_after_focus_revoke_reconnect_or_finite_is_nonfatal_disposal()
+    -> SessionResult<()> {
+        for mode in 0..5 {
+            let (hub, b) = stroke_fixture()?;
+            let actual;
+            {
+                let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+                actual = s.authority.clone().ok_or(SessionError::Invalid)?;
+                match mode {
+                    0 => RemoteHub::retire_authority(&mut s), // same path as focus revoke
+                    1 => RemoteHub::retire(&mut s),
+                    2 => RemoteHub::reset_source(&mut s, Some(3)),
+                    3 => {
+                        s.stroke.invalidate();
+                        s.authority = None; // finite observation unavailable
+                    }
+                    _ => {
+                        let mut replacement = b.clone();
+                        replacement.input_session_id =
+                            "018bcfe5-6800-7000-8000-000000000004".into();
+                        s.binding = Some(replacement);
+                    }
+                }
+            }
+            // Fixture has no live sender: an obsolete result must be disposed
+            // before either current-carrier or absent-authority validation.
+            hub.publish_stroke_authority(&b, 2, actual)?;
+            let s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+            assert_eq!(s.stroke.published_up, 0);
+            assert!(s.stroke.pending.is_none() && s.commands.is_empty());
+        }
         Ok(())
     }
 }

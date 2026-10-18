@@ -19,6 +19,27 @@ pub enum Editor {
     Krita,
     Paint,
 }
+impl Editor {
+    /// The same exact image allowlist used by essential catalog validation.
+    /// Identity alone supplies no action authority or selected-source proof.
+    pub fn matches_identity(self, identity: &ImageIdentity) -> bool {
+        exact_identity(self, identity)
+    }
+    pub const fn provider_budget_ms(self) -> u32 {
+        match self {
+            Self::Krita => 180,
+            // One command deadline covers Size thumb focus and its key-send proof.
+            // Keep 250 ms inside the unchanged 1000 ms parent exchange.
+            Self::Paint => 750,
+        }
+    }
+    pub const fn parent_exchange_budget_ms(self) -> u32 {
+        match self {
+            Self::Krita => 250,
+            Self::Paint => 1000,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -274,8 +295,8 @@ impl EssentialProfile {
             || !digest(&self.measured_tree_digest)
             || !digest(&self.watched_settings_digest)
             || self.watched_settings_digest != self.metadata.settings_digest
-            || self.provider_budget_ms != 180
-            || self.parent_exchange_budget_ms != 250
+            || self.provider_budget_ms != self.editor.provider_budget_ms()
+            || self.parent_exchange_budget_ms != self.editor.parent_exchange_budget_ms()
             || self.actions.is_empty()
             || self.actions.len() > 10
         {
@@ -541,8 +562,8 @@ pub(crate) mod tests {
             },
             measured_tree_digest: "d".repeat(64),
             watched_settings_digest: "c".repeat(64),
-            provider_budget_ms: 180,
-            parent_exchange_budget_ms: 250,
+            provider_budget_ms: editor.provider_budget_ms(),
+            parent_exchange_budget_ms: editor.parent_exchange_budget_ms(),
             actions: vec![EssentialAction {
                 action: 3,
                 route: if paint {
@@ -612,6 +633,32 @@ pub(crate) mod tests {
                 _ => action.production_budget_receipt_digest.clear(),
             }
             assert_eq!(bad.validate(), Err(Error::Invalid));
+        }
+        Ok(())
+    }
+    #[test]
+    fn editor_budgets_require_the_exact_reviewed_pair() -> Result<()> {
+        for (editor, expected) in [(Editor::Krita, (180, 250)), (Editor::Paint, (750, 1000))] {
+            let valid = fixture(editor)?;
+            valid.validate()?;
+            assert_eq!(
+                (valid.provider_budget_ms, valid.parent_exchange_budget_ms),
+                expected
+            );
+            for (provider, parent) in [
+                (180, 250),
+                (500, 1000),
+                (180, 1000),
+                (500, 250),
+                (750, 1000),
+                (751, 1000),
+                (750, 1001),
+            ] {
+                let mut candidate = valid.clone();
+                candidate.provider_budget_ms = provider;
+                candidate.parent_exchange_budget_ms = parent;
+                assert_eq!(candidate.validate().is_ok(), (provider, parent) == expected);
+            }
         }
         Ok(())
     }

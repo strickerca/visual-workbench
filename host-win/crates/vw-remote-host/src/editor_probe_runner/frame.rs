@@ -446,7 +446,7 @@ fn retain_refusal_summary<T>(
 fn measure_witness(r: &Request, b: &SourceBudget) -> Result<Witness> {
     match r.source_policy {
         SourcePolicy::Ordinary => b
-            .call(|| platform::measure(&r.target, r.owner_pid, 3))
+            .call(|| platform::measure_canvas_for_capture(&r.target, r.owner_pid))
             .map(|value| Witness::Ordinary(Box::new(value))),
         SourcePolicy::InstalledPaint => b
             .call(|| platform::paint_controls::observe(&r.target, b)?.frame_witness())

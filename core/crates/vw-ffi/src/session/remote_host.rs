@@ -580,13 +580,14 @@ fn input_loop(
                             authority,
                         )?;
                     }
-                    check = Instant::now();
+                    // Leave the independent cheap Check clock running. A hover
+                    // stream must not starve an already-completed observation.
                 }
                 Err(mpsc::RecvTimeoutError::Disconnected) => return Err(SessionError::Closed),
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
             }
             if check.elapsed() >= Duration::from_millis(20) {
-                owner
+                let checked = owner
                     .exchange(
                         Command::Check {
                             sequence: owner.next_sequence().map_err(failure)?,
@@ -594,6 +595,18 @@ fn input_loop(
                         &cancel,
                     )
                     .map_err(failure)?;
+                if let Header::StrokeAuthority {
+                    binding: actual,
+                    completed_up,
+                    authority,
+                    ..
+                } = checked.header
+                {
+                    if actual != binding {
+                        return Err(SessionError::Authentication);
+                    }
+                    hub.publish_stroke_authority(&binding, completed_up, authority)?;
+                }
                 check = Instant::now();
             }
         }
@@ -726,6 +739,21 @@ impl RemoteHub {
         });
         Ok(())
     }
+    // Complete the already-validated, installed input owner's publication while
+    // the caller retains State. State -> Workers is the existing lock order.
+    // Acquire Workers before enqueueing Grant so there is no new fallible step
+    // after publication. The request stays pending until a real IDR is published.
+    fn publish_grant(
+        &self,
+        s: &mut State,
+        send: impl FnOnce(&mut State) -> SessionResult<()>,
+    ) -> SessionResult<()> {
+        let workers = self.workers.lock().map_err(|_| SessionError::Worker)?;
+        send(s)?;
+        self.publish(s, "controlling", None)?;
+        workers.request_keyframe();
+        Ok(())
+    }
     pub(super) fn grant(self: &Arc<Self>) -> SessionResult<()> {
         if !self.host {
             return Err(SessionError::Invalid);
@@ -781,6 +809,14 @@ impl RemoteHub {
             let _ = process.close();
             return Err(SessionError::Invalid);
         };
+        if let Some(authority) = &authority
+            && let Err(error) = authority
+                .focused_canvas()
+                .and_then(|_| authority.canvas_for_target(&selected.target))
+        {
+            let _ = process.close();
+            return Err(failure(error));
+        }
         let mut s = self.state.lock().map_err(|_| SessionError::Worker)?;
         if let Err(error) = RemoteHub::current(&s) {
             drop(s);
@@ -830,10 +866,7 @@ impl RemoteHub {
                 thread: Some(thread),
             });
         }
-        if let Err(error) = self
-            .send_control(&mut s, "grant", "")
-            .and_then(|()| self.publish(&mut s, "controlling", None))
-        {
+        if let Err(error) = self.publish_grant(&mut s, |s| self.send_control(s, "grant", "")) {
             RemoteHub::retire(&mut s);
             drop(s);
             self.cancel_workers();
@@ -858,4 +891,134 @@ pub(super) fn windows() -> SessionResult<Vec<RemoteWindow>> {
                 })
                 .collect()
         })
+}
+
+#[cfg(test)]
+mod grant_frame_tests {
+    use super::*;
+
+    fn fixture() -> SessionResult<(Arc<RemoteHub>, Arc<stream::Keyframes>)> {
+        let hub = RemoteHub::new(true);
+        let scope = Scope {
+            connection_epoch: 1,
+            capture_session_id: "018bcfe5-6800-7000-8000-000000000001".into(),
+            source_generation: 3,
+            target_token: "018bcfe5-6800-7000-8000-000000000002".into(),
+            geometry_revision: 2,
+        };
+        let rect = vw_remote::Rect {
+            x: 0,
+            y: 0,
+            width: 800,
+            height: 600,
+        };
+        {
+            let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+            s.epoch = 1;
+            s.grant_revision = 7;
+            s.selected = Some(Selected {
+                target: Target {
+                    token: scope.target_token.clone(),
+                    window: 1,
+                    process_id: 7,
+                    thread_id: 8,
+                    process_created: 9,
+                    window_rect: rect,
+                    frame_rect: rect,
+                    client_rect: rect,
+                    dpi: 96,
+                    integrity: 0,
+                },
+                scope: scope.clone(),
+                display_label: "static grant fixture".into(),
+            });
+            let binding = Binding {
+                scope,
+                input_session_id: "018bcfe5-6800-7000-8000-000000000003".into(),
+            };
+            s.applied = Some(Applied::new(binding.clone()).map_err(failure)?);
+            s.binding = Some(binding);
+            hub.publish(&mut s, "viewing", None)?;
+        }
+        let keyframes = Arc::new(stream::Keyframes::default());
+        hub.workers
+            .lock()
+            .map_err(|_| SessionError::Worker)?
+            .keyframe_fixture(keyframes.clone());
+        Ok((hub, keyframes))
+    }
+
+    #[test]
+    fn static_grant_requests_new_capture_after_the_viewing_idr() -> SessionResult<()> {
+        let (hub, keyframes) = fixture()?;
+        keyframes.request();
+        let viewing_idr = keyframes.generation();
+        assert!(!keyframes.pending(viewing_idr));
+        let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+        let binding = s.binding.clone();
+        let revision = s.grant_revision;
+        let diagnostics = hub.stream.snapshot();
+        hub.publish_grant(&mut s, |s| {
+            assert_eq!(s.display.status, "viewing");
+            assert_eq!(keyframes.generation(), viewing_idr);
+            let Body::RemoteControl(grant) = RemoteHub::control_body(s, "grant", "")? else {
+                return Err(SessionError::Invalid);
+            };
+            assert_eq!(grant.action, "grant");
+            let expected = binding.as_ref().ok_or(SessionError::Invalid)?;
+            assert_eq!(scope_from(grant.scope)?, expected.scope);
+            assert_eq!(
+                grant.input_session_id,
+                Some(native_id(&expected.input_session_id)?.to_proto())
+            );
+            Ok(())
+        })?;
+        assert_eq!(s.display.status, "controlling");
+        assert_eq!(s.binding, binding);
+        assert_eq!(s.grant_revision, revision);
+        assert_eq!(s.applied.as_ref().map(Applied::binding), binding.as_ref());
+        assert_eq!(hub.stream.snapshot(), diagnostics);
+        assert_eq!(keyframes.generation(), viewing_idr + 1);
+        // Neither Idle nor completion of an older in-flight IDR acknowledges
+        // this grant's request. The normal helper poll must capture a new IDR.
+        for _ in 0..5 {
+            assert!(keyframes.pending(viewing_idr));
+        }
+        let granted_idr = keyframes.generation();
+        assert!(!keyframes.pending(granted_idr));
+        Ok(())
+    }
+
+    #[test]
+    fn refused_grant_publication_does_not_request_capture_or_restore_input() -> SessionResult<()> {
+        let (hub, keyframes) = fixture()?;
+        let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+        let binding = s.binding.clone();
+        assert!(matches!(
+            hub.publish_grant(&mut s, |_| Err(SessionError::Backpressure)),
+            Err(SessionError::Backpressure)
+        ));
+        assert_eq!(keyframes.generation(), 0);
+        assert_eq!(s.display.status, "viewing");
+        assert_eq!(s.binding, binding);
+        RemoteHub::retire(&mut s);
+        assert!(s.binding.is_none());
+        assert!(s.applied.is_none());
+        assert_eq!(keyframes.generation(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn failed_local_grant_publication_does_not_request_capture() -> SessionResult<()> {
+        let (hub, keyframes) = fixture()?;
+        let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+        s.display.sequence = u64::MAX;
+        assert!(matches!(
+            hub.publish_grant(&mut s, |_| Ok(())),
+            Err(SessionError::Backpressure)
+        ));
+        assert_eq!(keyframes.generation(), 0);
+        assert_eq!(s.display.status, "viewing");
+        Ok(())
+    }
 }

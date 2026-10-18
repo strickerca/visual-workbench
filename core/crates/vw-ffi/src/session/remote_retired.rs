@@ -92,14 +92,23 @@ pub(super) fn control_shape(v: &pb::RemoteControl, host: bool) -> SessionResult<
     } else {
         matches!(
             v.action.as_str(),
-            "grant" | "retired" | "command_request" | "pause" | "revoke" | "stop" | "authority"
+            "grant"
+                | "retired"
+                | "command_request"
+                | "pause"
+                | "revoke"
+                | "stop"
+                | "authority"
+                | "stroke_authority"
         )
     };
     if !known
         || !v.selected_target_json.is_empty()
         || !v.selected_destination_label.is_empty()
-        || (!matches!(v.action.as_str(), "grant" | "authority")
-            && !v.shortcut_state_json.is_empty())
+        || (!matches!(
+            v.action.as_str(),
+            "grant" | "authority" | "stroke_authority"
+        ) && !v.shortcut_state_json.is_empty())
     {
         return Err(SessionError::Invalid);
     }
@@ -119,12 +128,22 @@ pub(super) fn control_shape(v: &pb::RemoteControl, host: bool) -> SessionResult<
     } else if v.request_nonce != 0 || v.editor_action != 0 {
         return Err(SessionError::Invalid);
     }
-    if (v.action == "authority") != (v.command_input_seq > 0) {
+    if matches!(v.action.as_str(), "authority" | "stroke_authority") != (v.command_input_seq > 0) {
+        return Err(SessionError::Invalid);
+    }
+    if v.action == "stroke_authority"
+        && (v.input_session_id.is_none()
+            || v.shortcut_state_json.is_empty()
+            || !v.reason.is_empty())
+    {
         return Err(SessionError::Invalid);
     }
     if !v.shortcut_state_json.is_empty() {
-        let _: vw_remote::profile::Authority =
+        let authority: vw_remote::profile::Authority =
             serde_json::from_slice(&v.shortcut_state_json).map_err(|_| SessionError::Invalid)?;
+        if v.action == "grant" {
+            authority.focused_canvas().map_err(failure)?;
+        }
     }
     Ok(())
 }

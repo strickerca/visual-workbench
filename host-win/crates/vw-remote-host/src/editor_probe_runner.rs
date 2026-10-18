@@ -51,6 +51,7 @@ struct Outcome {
     _input: Option<File>,
     _output: Option<File>,
     bytes: Result<Vec<u8>>,
+    parent_exchange: Option<ParentExchange>,
 }
 struct Owner {
     child: Child,
@@ -105,6 +106,14 @@ fn collect_released<T>(
     collect_latest(query, worker_finished, join)
 }
 #[derive(Clone, Serialize)]
+struct ParentExchange {
+    boundary: &'static str,
+    startup_excluded: bool,
+    budget_ms: u64,
+    settled_elapsed_us: u64,
+    within_budget: bool,
+}
+#[derive(Clone, Serialize)]
 struct Receipt {
     schema: u32,
     status: &'static str,
@@ -126,6 +135,8 @@ struct Receipt {
     profile_authority: bool,
     effect_harness: bool,
     input_retirement_complete: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parent_exchange: Option<ParentExchange>,
 }
 fn local(path: &Path) -> Result<()> {
     crate::process::windows::namespace(path)?;
@@ -205,13 +216,33 @@ fn invocation(mode: &str, request: &str) -> Result<Vec<u8>> {
     }
     Ok(bytes)
 }
+// Classification only chooses a measurement bound; the child still validates
+// the complete request, exact source identity and finite-input authorization.
+fn calibration_exchange_budget(bytes: &[u8]) -> Result<u64> {
+    use vw_remote::profile::essential::Editor;
+    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|_| Error::Invalid)?;
+    let request = value.get("request").ok_or(Error::Invalid)?;
+    let editor = match (
+        request.get("editor").and_then(serde_json::Value::as_str),
+        request
+            .get("source_policy")
+            .and_then(serde_json::Value::as_str),
+    ) {
+        (Some("krita"), Some("ordinary")) => Editor::Krita,
+        (Some("paint"), Some("installed_paint")) => Editor::Paint,
+        _ => return Err(Error::Invalid),
+    };
+    Ok(u64::from(editor.parent_exchange_budget_ms()))
+}
 fn io(
     pipes: Arc<Mutex<Pipes>>,
     bytes: Vec<u8>,
     _pins: Arc<Pins>,
     input_uncertain: Arc<AtomicBool>,
     effect: bool,
+    calibration_budget_ms: Option<u64>,
 ) -> Outcome {
+    let calibration = calibration_budget_ms.is_some();
     let (input, output) = {
         let mut p = pipes.lock().unwrap_or_else(|e| e.into_inner());
         (p.input.take(), p.output.take())
@@ -223,18 +254,58 @@ fn io(
             _input: input,
             _output: None,
             bytes: Err(Error::Io),
+            parent_exchange: None,
         };
     };
+    let mut parent_exchange = None;
     let result = match input {
         Some(mut input) => {
-            let written = input.write_all(&bytes).map_err(Error::from);
+            let mut written = if calibration {
+                input
+                    .write_all(crate::platform::shortcuts::essential_runtime::calibration::SETUP)
+                    .and_then(|()| input.write_all(&bytes))
+                    .map_err(Error::from)
+            } else {
+                input.write_all(&bytes).map_err(Error::from)
+            };
+            let mut exchange_started = None;
+            if calibration && written.is_ok() {
+                written = (|| -> Result<()> {
+                    input.write_all(b"\n")?;
+                    input.flush()?;
+                    let line = calibration_ready_line(&mut output)?;
+                    if line != crate::platform::shortcuts::essential_runtime::calibration::READY {
+                        // An actual no-input Complete on failed setup must still
+                        // clear uncertainty. No malformed prefix can do so.
+                        let mut fallback = std::io::Cursor::new(line).chain(&mut output);
+                        let _ = finite::read(&mut fallback, &input_uncertain);
+                        return Err(Error::Unavailable);
+                    }
+                    exchange_started = Some(Instant::now());
+                    input.write_all(
+                        crate::platform::shortcuts::essential_runtime::calibration::EXECUTE,
+                    )?;
+                    input.flush()?;
+                    Ok(())
+                })();
+            }
             // Finite request EOF is intentional: the probe's bounded stdin
             // reader cannot finish until this writer closes. Read endpoint,
             // Pins, Child, Job and permit remain retained through actual join.
             drop(input);
             written.and_then(|()| {
                 if effect {
-                    return finite::read(&mut output, &input_uncertain);
+                    return finite::read_settled(&mut output, &input_uncertain, || {
+                        if let (Some(started), Some(budget_ms)) = (exchange_started, calibration_budget_ms) {
+                            let elapsed=started.elapsed();
+                            parent_exchange=Some(ParentExchange {
+                                boundary:"resident-ready-received/request-write/Complete-and-final-reply",
+                                startup_excluded:true,budget_ms,
+                                settled_elapsed_us:elapsed.as_micros().min(u128::from(u64::MAX)) as u64,
+                                within_budget:elapsed <= Duration::from_millis(budget_ms),
+                            });
+                        }
+                    });
                 }
                 let mut bytes = Vec::new();
                 Read::by_ref(&mut output)
@@ -252,7 +323,22 @@ fn io(
         _input: None,
         _output: Some(output),
         bytes: result,
+        parent_exchange,
     }
+}
+fn calibration_ready_line(input: &mut impl Read) -> Result<Vec<u8>> {
+    let mut line = Vec::new();
+    let mut byte = [0u8; 1];
+    while input.read(&mut byte)? != 0 {
+        if line.len() >= 4096 {
+            return Err(Error::Limit);
+        }
+        line.push(byte[0]);
+        if byte[0] == b'\n' {
+            return Ok(line);
+        }
+    }
+    Err(Error::Invalid)
 }
 impl Owner {
     fn may_retire(&self) -> bool {
@@ -428,6 +514,7 @@ fn measured_effect_output(bytes: &[u8]) -> Result<serde_json::Value> {
     }
     match value.get("operation").and_then(serde_json::Value::as_str) {
         Some("owned-krita-numeric-wheel-calibration") => wheel_receipt_owner(&value)?,
+        Some("owned-essential-production-route-calibration") => calibration_receipt(&value)?,
         Some("owned-blank-editor-effect-hil")
             if value
                 .get("held_process_and_image_namespace")
@@ -466,6 +553,54 @@ fn measured_effect_output(bytes: &[u8]) -> Result<serde_json::Value> {
     }
     Ok(value)
 }
+fn calibration_receipt(value: &serde_json::Value) -> Result<()> {
+    let yes = |name| value.get(name).and_then(serde_json::Value::as_bool) == Some(true);
+    let no = |name| value.get(name).and_then(serde_json::Value::as_bool) == Some(false);
+    let source = value.get("source_proof").ok_or(Error::Invalid)?;
+    let source_yes = |name| source.get(name).and_then(serde_json::Value::as_bool) == Some(true);
+    let source_no = |name| source.get(name).and_then(serde_json::Value::as_bool) == Some(false);
+    let policy = source.get("policy").and_then(serde_json::Value::as_str);
+    let editor = match policy {
+        Some("ordinary") => vw_remote::profile::essential::Editor::Krita,
+        Some("installed_paint") => vw_remote::profile::essential::Editor::Paint,
+        _ => return Err(Error::Invalid),
+    };
+    if !yes("common_finite_owner")
+        || !yes("shared_production_preparation")
+        || !yes("shared_production_stage_engine")
+        || !yes("setup_excluded_from_parent_exchange")
+        || !no("catalog_installed")
+        || !no("semantic_role_proven")
+        || !no("restoration_proven")
+        || !no("physical_or_editor_pixel_effect_proven")
+        || !no("production_parent_exchange_proven")
+        || value
+            .get("provider_budget_ms")
+            .and_then(serde_json::Value::as_u64)
+            != Some(u64::from(editor.provider_budget_ms()))
+        || value
+            .get("input_retirement")
+            .and_then(serde_json::Value::as_str)
+            != Some("Complete")
+        || !source_yes("held_process")
+        || !source_yes("held_final_image")
+        || !source_no("namespace_lease_equivalence_claim")
+        || !source_no("input_authority")
+        || !source_no("profile_authority")
+        || !match policy {
+            Some("ordinary") => {
+                source_yes("held_ancestor_namespace") && source_no("installed_package_namespace")
+            }
+            Some("installed_paint") => {
+                source_no("held_ancestor_namespace") && source_yes("installed_package_namespace")
+            }
+            _ => false,
+        }
+    {
+        return Err(Error::Invalid);
+    }
+    Ok(())
+}
 fn receipt(owner: &Owner, digest: &str, error: Option<Error>) -> Receipt {
     Receipt {
         schema: 1,
@@ -488,6 +623,7 @@ fn receipt(owner: &Owner, digest: &str, error: Option<Error>) -> Receipt {
         profile_authority: false,
         effect_harness: false,
         input_retirement_complete: owner.may_retire(),
+        parent_exchange: None,
     }
 }
 fn pending(owner: Owner, mut receipt: Receipt, cause: Error) -> Result<()> {
@@ -523,6 +659,17 @@ fn finished(receipt: &mut Receipt, pid: u32, code: u32, outcome: Result<Option<O
             None
         }
     };
+    if let Some(value) = &outcome {
+        receipt.parent_exchange = value.parent_exchange.clone();
+        if value
+            .parent_exchange
+            .as_ref()
+            .is_some_and(|v| !v.within_budget)
+            && receipt.error.is_none()
+        {
+            receipt.error = Some(Error::Timeout);
+        }
+    }
     receipt.observation = match outcome {
         Some(v) => match v.bytes {
             Ok(bytes) => match if receipt.effect_harness {
@@ -570,6 +717,14 @@ fn finished(receipt: &mut Receipt, pid: u32, code: u32, outcome: Result<Option<O
             .and_then(|value| value.get("input_sent"))
             .and_then(serde_json::Value::as_bool);
     }
+    if receipt.observation.as_ref().is_some_and(|value| {
+        value.get("operation").and_then(serde_json::Value::as_str)
+            == Some("owned-essential-production-route-calibration")
+            && value.get("error").is_none_or(|e| !e.is_null())
+    }) && receipt.error.is_none()
+    {
+        receipt.error = Some(Error::Unavailable);
+    }
     if code != 0 && receipt.error.is_none() {
         receipt.error = Some(Error::Unavailable);
     }
@@ -615,6 +770,8 @@ fn run_for(effect: bool) -> Result<()> {
                 | "--krita-experiment"
                 | "--krita-wheel-observe"
                 | "--krita-wheel-experiment"
+                | "--essential-calibration-observe"
+                | "--essential-calibration-experiment"
         ) || args[3].len() > MAX_INVOCATION
         {
             return Err(Error::Invalid);
@@ -632,6 +789,11 @@ fn run_for(effect: bool) -> Result<()> {
         bytes
     } else {
         invocation(&args[2], &args[3])?
+    };
+    let calibration_budget_ms = if effect && args[2] == "--essential-calibration-experiment" {
+        Some(calibration_exchange_budget(&bytes)?)
+    } else {
+        None
     };
     let permit = Permit::acquire()?;
     let path = PathBuf::from(&args[0]);
@@ -667,7 +829,7 @@ fn run_for(effect: bool) -> Result<()> {
         let uncertain = owner.input_uncertain.clone();
         match thread::Builder::new()
             .name("editor-probe-io".into())
-            .spawn(move || io(p, bytes, image, uncertain, effect))
+            .spawn(move || io(p, bytes, image, uncertain, effect, calibration_budget_ms))
         {
             Ok(worker) => owner.io = Some(worker),
             Err(_) => error = Some(Error::Io),
@@ -1141,6 +1303,7 @@ mod tests {
             profile_authority: false,
             effect_harness: false,
             input_retirement_complete: true,
+            parent_exchange: None,
         };
         match collection {
             Collection::Joined { pid, code, outcome } => finished(&mut receipt, pid, code, outcome),
@@ -1203,6 +1366,135 @@ mod tests {
             }
         ));
         assert_eq!((queried.get(), joined.get()), (1, 1));
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod calibration_receipt_tests {
+    use super::*;
+    fn value(error: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({"schema":1,"operation":"owned-essential-production-route-calibration",
+            "profile_authority":false,"parent_job_present":true,"owned_blank_fixture_asserted":true,
+            "input_sent":false,"target":{},"image":{},"before":{},"error":error,
+            "common_finite_owner":true,"shared_production_preparation":true,"shared_production_stage_engine":true,
+            "setup_excluded_from_parent_exchange":true,"catalog_installed":false,"semantic_role_proven":false,
+            "restoration_proven":false,"physical_or_editor_pixel_effect_proven":false,"production_parent_exchange_proven":false,
+            "provider_budget_ms":180,"input_retirement":"Complete",
+            "source_proof":{"policy":"ordinary","held_process":true,"held_final_image":true,
+                "held_ancestor_namespace":true,"installed_package_namespace":false,"namespace_lease_equivalence_claim":false,
+                "input_authority":false,"profile_authority":false}})
+    }
+    fn receipt_fixture() -> Receipt {
+        Receipt {
+            schema: 1,
+            status: "RetirementPending",
+            probe_pid: None,
+            probe_exit_code: None,
+            probe_sha256: "a".repeat(64),
+            suspended_before_job_assignment: true,
+            exact_image_verified_before_resume: true,
+            process_and_job_retired: false,
+            io_joined: false,
+            error: None,
+            retirement_error: None,
+            io_error: None,
+            observation: None,
+            diagnostic_sha256: None,
+            diagnostic_prefix: None,
+            diagnostic_truncated: false,
+            input_sent: None,
+            profile_authority: false,
+            effect_harness: true,
+            input_retirement_complete: true,
+            parent_exchange: None,
+        }
+    }
+    #[test]
+    fn calibration_budgets_follow_the_exact_editor_source_pair() -> Result<()> {
+        for (editor, policy, provider, parent) in [
+            ("krita", "ordinary", 180, 250),
+            ("paint", "installed_paint", 750, 1000),
+        ] {
+            let invocation = serde_json::to_vec(&serde_json::json!({"request": {
+                "editor": editor, "source_policy": policy,
+            }}))
+            .map_err(|_| Error::Invalid)?;
+            assert_eq!(calibration_exchange_budget(&invocation)?, parent);
+            let mut receipt = value(serde_json::Value::Null);
+            receipt["source_proof"]["policy"] = serde_json::json!(policy);
+            receipt["source_proof"]["held_ancestor_namespace"] =
+                serde_json::json!(editor == "krita");
+            receipt["source_proof"]["installed_package_namespace"] =
+                serde_json::json!(editor == "paint");
+            receipt["provider_budget_ms"] = serde_json::json!(provider);
+            calibration_receipt(&receipt)?;
+            for wrong in [180, 250, 500, 749, 750, 751, 1000] {
+                if wrong != provider {
+                    receipt["provider_budget_ms"] = serde_json::json!(wrong);
+                    assert_eq!(calibration_receipt(&receipt), Err(Error::Invalid));
+                }
+            }
+        }
+        for request in [
+            serde_json::json!({"editor":"paint","source_policy":"ordinary"}),
+            serde_json::json!({"editor":"krita","source_policy":"installed_paint"}),
+            serde_json::json!({"editor":"unknown","source_policy":"ordinary"}),
+            serde_json::json!({}),
+        ] {
+            let bytes = serde_json::to_vec(&serde_json::json!({"request":request}))
+                .map_err(|_| Error::Invalid)?;
+            assert_eq!(calibration_exchange_budget(&bytes), Err(Error::Invalid));
+        }
+        Ok(())
+    }
+    #[test]
+    fn completed_child_failure_or_late_settlement_is_not_success() -> Result<()> {
+        for (error, within, expected) in [
+            (serde_json::json!("TargetChanged"), true, Error::Unavailable),
+            (serde_json::Value::Null, false, Error::Timeout),
+        ] {
+            let mut receipt = receipt_fixture();
+            let child = value(error);
+            let outcome = Outcome {
+                _input: None,
+                _output: None,
+                bytes: Ok(serde_json::to_vec(&child).map_err(|_| Error::Invalid)?),
+                parent_exchange: Some(ParentExchange {
+                    boundary: "test",
+                    startup_excluded: true,
+                    budget_ms: 250,
+                    settled_elapsed_us: if within { 100 } else { 250001 },
+                    within_budget: within,
+                }),
+            };
+            finished(&mut receipt, 12, 0, Ok(Some(outcome)));
+            assert_eq!(receipt.status, "Failed");
+            assert_eq!(receipt.error, Some(expected));
+            assert_eq!(receipt.observation, Some(child));
+        }
+        let mut forbidden = value(serde_json::Value::Null);
+        forbidden["production_parent_exchange_proven"] = serde_json::json!(true);
+        assert_eq!(calibration_receipt(&forbidden), Err(Error::Invalid));
+        Ok(())
+    }
+    #[test]
+    fn ready_requires_complete_exact_line_and_never_consumes_following_reply() -> Result<()> {
+        use std::io::Cursor;
+        let ready = crate::platform::shortcuts::essential_runtime::calibration::READY;
+        let mut bytes = ready.to_vec();
+        bytes.extend_from_slice(b"reply\n");
+        let mut input = Cursor::new(bytes);
+        assert_eq!(calibration_ready_line(&mut input)?, ready);
+        assert_eq!(input.position(), ready.len() as u64);
+        assert_eq!(
+            calibration_ready_line(&mut Cursor::new(&ready[..ready.len() - 1])),
+            Err(Error::Invalid)
+        );
+        assert_eq!(
+            calibration_ready_line(&mut Cursor::new(vec![b'x'; 4097])),
+            Err(Error::Limit)
+        );
         Ok(())
     }
 }
