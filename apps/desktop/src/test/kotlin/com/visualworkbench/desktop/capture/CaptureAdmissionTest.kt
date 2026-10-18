@@ -54,4 +54,16 @@ class CaptureAdmissionTest {
             assertTrue(owner.start { calls++ }); assertEquals(2, calls)
         } finally { owner.shutdown(); scope.cancel() }
     }
+    @Test fun busyRemainsPublishedUntilCancelledCleanupActuallyFinishes() = runBlocking {
+        val queue = Queued(); val scope = CoroutineScope(SupervisorJob() + queue)
+        val states = mutableListOf<Boolean>(); val owner = CaptureAdmission(scope, states::add)
+        try {
+            assertTrue(owner.start { fail("cancelled before dispatch") })
+            assertEquals(listOf(true), states)
+            owner.cancel(); assertEquals(listOf(true), states)
+            queue.drain(); assertEquals(listOf(true, false), states)
+            owner.shutdown(); assertFalse(owner.start {})
+            assertEquals(listOf(true, false), states)
+        } finally { owner.cancel(); queue.drain(); owner.shutdown(); scope.cancel() }
+    }
 }

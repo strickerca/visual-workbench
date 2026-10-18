@@ -79,7 +79,7 @@ import javax.imageio.ImageIO
                 state.message?.let { Text(it, style = MaterialTheme.typography.body2) }
                 if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = controller::save, enabled = !state.busy && !state.cleanupPending && state.preview != null && (!state.region || state.regionReady)) { Text("Save exact snapshot") }
+                    Button(onClick = { controller.save(state.preview) }, enabled = !state.busy && state.acceptsPreview(state.preview) && (!state.region || state.regionReady)) { Text("Save exact snapshot") }
                     TextButton(onClick = controller::cancelWork, enabled = state.busy) { Text("Cancel operation") }
                     TextButton(onClick = ::closePicker) { Text("Discard preview and close") }
                 }
@@ -98,10 +98,16 @@ import javax.imageio.ImageIO
 @Composable private fun CapturePreview(controller: CapturePickerController, source: PickerPreview, state: CapturePickerState) {
     var viewport by remember { mutableStateOf(IntSize.Zero) }
     var bitmap by remember(source) { mutableStateOf<PickerBitmap?>(null) }
+    val firstDraw = remember(source) { CompletableDeferred<Unit>() }
     LaunchedEffect(source) {
         try { bitmap = pickerReadBitmap(source) }
         catch (error: CancellationException) { throw error }
         catch (_: Exception) { controller.previewUnavailable(source) }
+    }
+    LaunchedEffect(source, firstDraw) {
+        firstDraw.await()
+        withFrameNanos { }
+        controller.previewPresented(source)
     }
     val camera = remember(source, viewport) {
         Camera(Point(source.sourceWidth.toDouble() / 2, source.sourceHeight.toDouble() / 2),
@@ -109,27 +115,27 @@ import javax.imageio.ImageIO
             0.0, viewport.width.toDouble().coerceAtLeast(1.0), viewport.height.toDouble().coerceAtLeast(1.0))
     }
     LaunchedEffect(source, camera) { controller.bindRegion(source, camera) }
-    Canvas(Modifier.fillMaxSize().onSizeChanged { viewport = it }.pointerInput(source, camera, state.region, state.busy) {
+    Canvas(Modifier.fillMaxSize().onSizeChanged { viewport = it }.pointerInput(source, camera, state.region, state.busy, state.previewReady) {
         try { awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
-            if (!state.region || state.busy) return@awaitEachGesture
-            controller.bindRegion(source, camera); controller.regionBegin(Point(down.position.x.toDouble(), down.position.y.toDouble()), source); down.consume()
+            if (!state.region || state.busy || !state.acceptsPreview(source)) return@awaitEachGesture
+            controller.regionBegin(Point(down.position.x.toDouble(), down.position.y.toDouble()), source, camera); down.consume()
             var valid = true
             while (true) {
                 val event = awaitPointerEvent(); val change = event.changes.firstOrNull { it.id == down.id }
-                if (change == null || event.changes.count { it.pressed } > 1) { valid = false; controller.regionCancel(source); break }
+                if (change == null || event.changes.count { it.pressed } > 1) { valid = false; controller.regionCancel(source, camera); break }
                 val point = Point(change.position.x.toDouble(), change.position.y.toDouble())
-                if (!change.pressed) { controller.regionFinish(point, source); change.consume(); break }
-                controller.regionMove(point, source); change.consume()
+                if (!change.pressed) { controller.regionFinish(point, source, camera); change.consume(); break }
+                controller.regionMove(point, source, camera); change.consume()
             }
-            if (!valid) controller.regionCancel(source)
-        } } finally { if (controller.region.contacting) controller.regionCancel(source) }
+            if (!valid) controller.regionCancel(source, camera)
+        } } finally { if (controller.region.contacting) controller.regionCancel(source, camera) }
     }) {
         val display = pickerDisplayTransform(source, camera)
         bitmap?.let { image -> withTransform({
             translate(display.left, display.top)
             scale(display.scaleX, display.scaleY, pivot = Offset.Zero)
-        }) { drawImage(image.image, filterQuality = FilterQuality.None) } }
+        }) { drawImage(image.image, filterQuality = FilterQuality.None) }; firstDraw.complete(Unit) }
         state.regionEdges?.let { edges ->
             val points = controller.core.mapPoints(camera, false, listOf(Point(edges[0], edges[1]), Point(edges[2], edges[3])))
             drawRect(Color(0xffffce70), Offset(minOf(points[0].x, points[1].x).toFloat(), minOf(points[0].y, points[1].y).toFloat()),

@@ -12,11 +12,15 @@ import java.util.concurrent.atomic.AtomicReference
 internal data class CapturePickerState(
     val open: Boolean = false, val busy: Boolean = false,
     val catalog: CapturePickerCatalog? = null, val selected: CaptureSelection? = null,
-    val preview: PickerPreview? = null, val region: Boolean = false,
+    val preview: PickerPreview? = null, val previewReady: Boolean = false, val region: Boolean = false,
     val regionOnly: Boolean = false, val message: String? = null,
     val hotkeyEnabled: Boolean = false, val regionEdges: List<Double>? = null,
-    val regionReady: Boolean = false, val cleanupPending: Boolean = false,
+    val regionReady: Boolean = false, val cleanupPending: Boolean = false, val stopping: Boolean = false,
 )
+
+/** Object identity fences a queued action even if two snapshots hash alike. */
+internal fun CapturePickerState.acceptsPreview(value: PickerPreview?): Boolean =
+    open && previewReady && preview != null && preview === value && !cleanupPending && !stopping
 
 /** UI-dispatcher owner of local snapshots only. The destination is bound before
  * capture; its callback takes project ownership at invocation, including failure.
@@ -52,37 +56,48 @@ internal class CapturePickerController(
     }
 
     val region = CaptureRegionEditor(core::mapPoints)
+    private var regionCamera: Camera? = null
     fun bindRegion(preview: PickerPreview, camera: Camera) {
         // A delayed composition of an old preview cannot rebind the next draft.
-        if (preview !== state.value.preview || state.value.cleanupPending) return
+        if (preview !== state.value.preview || state.value.cleanupPending || !operations.accepting) return
         region.bind(preview.sourceAssetId, preview.sourceWidth, preview.sourceHeight, camera)
+        regionCamera = camera
         regionChanged()
+    }
+    fun previewPresented(preview: PickerPreview) {
+        if (preview !== state.value.preview || state.value.cleanupPending || !operations.accepting) return
+        mutable.update { it.copy(previewReady = true) }
     }
     fun previewUnavailable(preview: PickerPreview) {
         if (preview !== state.value.preview) return
         regionCancel()
-        mutable.update { it.copy(preview = null, message = "The preview could not be displayed. Refresh sources and select again before saving.") }
+        mutable.update { it.copy(preview = null, previewReady = false, message = "The preview could not be displayed. Refresh sources and select again before saving.") }
     }
-    fun regionBegin(point: Point, preview: PickerPreview? = null) { if (regionAllowed(preview)) { region.begin(point); regionChanged() } }
-    fun regionMove(point: Point, preview: PickerPreview? = null) { if (regionAllowed(preview)) { region.move(point); regionChanged() } }
-    fun regionFinish(point: Point, preview: PickerPreview? = null) { if (regionAllowed(preview)) { region.finish(point); regionChanged() } }
-    fun regionCancel(preview: PickerPreview? = null) {
-        if (preview == null || preview === state.value.preview) { region.cancel(); regionChanged() }
+    fun regionBegin(point: Point, preview: PickerPreview, camera: Camera) { if (regionAllowed(preview, camera)) { region.begin(point); regionChanged() } }
+    fun regionMove(point: Point, preview: PickerPreview, camera: Camera) { if (regionAllowed(preview, camera)) { region.move(point); regionChanged() } }
+    fun regionFinish(point: Point, preview: PickerPreview, camera: Camera) { if (regionAllowed(preview, camera)) { region.finish(point); regionChanged() } }
+    fun regionCancel(preview: PickerPreview? = null, camera: Camera? = null) {
+        if ((preview == null || preview === state.value.preview) && (camera == null || camera === regionCamera)) {
+            region.cancel(); regionChanged()
+        }
     }
-    private fun regionAllowed(preview: PickerPreview?): Boolean =
-        (preview == null || preview === state.value.preview) && operations.accepting && state.value.open &&
+    private fun regionAllowed(preview: PickerPreview, camera: Camera): Boolean =
+        state.value.acceptsPreview(preview) && camera === regionCamera && operations.accepting && state.value.open &&
         !state.value.busy && !state.value.cleanupPending && state.value.region
     private fun regionChanged() { mutable.update { it.copy(regionEdges = region.edges, regionReady = region.completedEdges() != null) } }
 
     fun open(regionOnly: Boolean = false) {
         if (!operations.accepting || state.value.busy || state.value.cleanupPending || !mayOpen()) return
-        modal(true) // Seal focus admission before the window becomes observable.
+        try { modal(true) } // Seal focus admission before the window becomes observable.
+        catch (error: CancellationException) { throw error }
+        catch (error: Exception) { cleanupRefused(); return }
         if (regionOnly) regionCancel()
         mutable.update { old ->
             val monitor = old.selected is CaptureSelection.Monitor
             old.copy(open = true, regionOnly = regionOnly,
                 region = if (regionOnly) monitor else old.region,
                 preview = if (regionOnly && !monitor) null else old.preview,
+                previewReady = old.previewReady && (!regionOnly || monitor),
                 message = if (regionOnly) "Choose a monitor's Draw region action to select exact snapshot pixels." else old.message)
         }
         if (state.value.catalog == null) refresh()
@@ -120,7 +135,7 @@ internal class CapturePickerController(
             validatePickerPreview(pixels)
             requireCurrent(ticket)
             snapshot = current
-            mutable.update { it.copy(selected = source, preview = pixels, region = drawRegion,
+            mutable.update { it.copy(selected = source, preview = pixels, previewReady = false, region = drawRegion,
                 message = if (drawRegion) "Draw a rectangle on this snapshot. Save keeps these exact pixels and physical coordinates."
                 else "Lossless snapshot ready. Save creates a new capture document.") }
             ready = true
@@ -129,66 +144,73 @@ internal class CapturePickerController(
         }
     }
 
-    fun save() = launch { ticket ->
-        val current = checkNotNull(snapshot)
-        check(state.value.preview != null)
-        var chosen = current
-        var cropped: Draft? = null
-        var published = false
-        var warning: String? = null
-        try {
-            if (state.value.region) {
-                val edges = checkNotNull(region.completedEdges())
-                val crop = newDraft(current.selected, current.destination)
-                cropped = crop
-                val value = hostCall(release = { crop.frame.set(it) }) { operation ->
-                    checkNotNull(current.frame.get()).cropRegion(edges, crop.work.path.toString(), operation)
+    fun save(preview: PickerPreview?) {
+        if (state.value.busy || !state.value.acceptsPreview(preview)) return
+        launch { ticket ->
+            val current = checkNotNull(snapshot)
+            check(state.value.acceptsPreview(preview))
+            var chosen = current
+            var cropped: Draft? = null
+            var published = false
+            var warning: String? = null
+            try {
+                if (state.value.region) {
+                    val edges = checkNotNull(region.completedEdges())
+                    val crop = newDraft(current.selected, current.destination)
+                    cropped = crop
+                    val value = hostCall(release = { crop.frame.set(it) }) { operation ->
+                        checkNotNull(current.frame.get()).cropRegion(edges, crop.work.path.toString(), operation)
+                    }
+                    crop.frame.set(value)
+                    chosen = crop
                 }
-                crop.frame.set(value)
-                chosen = crop
+                requireCurrent(ticket)
+                val frame = checkNotNull(chosen.frame.get())
+                val info = frame.info(); val f = info.frame
+                val projectId = id(); val documentId = id(); val destination = projects.resolve("$projectId.vwb")
+                val project = createCaptureProject(CreateFileProject(destination.toString(), projectId, documentId, id(), device,
+                    "Screen capture", chosen.work.path.resolve("capture.png").toString(), chosen.work.path.toString(), System.currentTimeMillis()),
+                    CaptureImportDescriptor(true, f.captureSessionId, f.frameId, f.geometryRevision, "windows", info.sourceKind,
+                        f.physicalX, f.physicalY, f.width, f.height, f.dpiScale, f.timestampNs, f.capturedAtMs,
+                        f.windowHandle, info.monitorId, f.sourceAssetId))
+                pendingProject = project; published = true
+                requireCurrent(ticket)
+                if (info.semanticWindowAvailable) {
+                    val revision = project.info()
+                    val workflow = semanticWorkflows(project).beginCapture(WorkflowBinding(revision.projectId, documentId, revision.hostSeq, revision.stateHash))
+                    try {
+                        val tree = hostCall { operation -> frame.collect(operation) }
+                        requireCurrent(ticket)
+                        require(tree.sourceAssetId == workflow.describe().sourceAssetId)
+                        val plan = workflow.prepare(WorkflowMetadata(id(), device, revision.nextLamport, System.currentTimeMillis()), id(),
+                            if (tree.platform == "chromium_uia") SemanticPlatform.ChromiumUia else SemanticPlatform.Uia,
+                            tree.frameDeltaMs, tree.collectionElapsedMs, SemanticBoundsSpace.HostPhysical,
+                            tree.elements.map { e -> CapturedSemanticElement(e.localId, e.parentLocalId, e.name, e.role, e.automationId,
+                                e.resourceId, e.htmlId, Rect(e.x, e.y, e.width, e.height), e.text, e.enabled, e.focused) })
+                        try { plan.commit() } finally { plan.close() }
+                    } catch (error: CancellationException) { throw error }
+                    catch (_: Exception) { warning = "Capture saved; the selected window's semantic snapshot was unavailable or stale." }
+                    finally { workflow.close() }
+                } else warning = "Capture saved. Monitor and region captures have no selected window subtree."
+                requireCurrent(ticket)
+                // The callback owns close even if route validation or delivery throws.
+                pendingProject = null
+                deliverCaptureProject(project, { current.destination(it, destination, warning) }) { held, error ->
+                    pendingProject = held
+                    pendingProjectFailure = error
+                    cleanupRefused()
+                }
+                discardDrafts(preserve = false)
+                try { modal(false) } catch (error: Exception) { cleanupRefused(); throw error }
+                mutable.update { it.copy(open = false, message = warning) }
+            } finally {
+                withContext(NonCancellable) {
+                    closePendingProject()
+                    cropped?.takeIf { it in drafts }?.let { releaseDraft(it, preserve = !published) }
+                }
+                if (!currentCoroutineContext().isActive) mutable.update { it.copy(message =
+                    "Capture cancelled. Any published project and completed original remain saved; inspect them before retrying.") }
             }
-            requireCurrent(ticket)
-            val frame = checkNotNull(chosen.frame.get())
-            val info = frame.info(); val f = info.frame
-            val projectId = id(); val documentId = id(); val destination = projects.resolve("$projectId.vwb")
-            val project = createCaptureProject(CreateFileProject(destination.toString(), projectId, documentId, id(), device,
-                "Screen capture", chosen.work.path.resolve("capture.png").toString(), chosen.work.path.toString(), System.currentTimeMillis()),
-                CaptureImportDescriptor(true, f.captureSessionId, f.frameId, f.geometryRevision, "windows", info.sourceKind,
-                    f.physicalX, f.physicalY, f.width, f.height, f.dpiScale, f.timestampNs, f.capturedAtMs,
-                    f.windowHandle, info.monitorId, f.sourceAssetId))
-            pendingProject = project; published = true
-            requireCurrent(ticket)
-            if (info.semanticWindowAvailable) {
-                val revision = project.info()
-                val workflow = semanticWorkflows(project).beginCapture(WorkflowBinding(revision.projectId, documentId, revision.hostSeq, revision.stateHash))
-                try {
-                    val tree = hostCall { operation -> frame.collect(operation) }
-                    requireCurrent(ticket)
-                    require(tree.sourceAssetId == workflow.describe().sourceAssetId)
-                    val plan = workflow.prepare(WorkflowMetadata(id(), device, revision.nextLamport, System.currentTimeMillis()), id(),
-                        if (tree.platform == "chromium_uia") SemanticPlatform.ChromiumUia else SemanticPlatform.Uia,
-                        tree.frameDeltaMs, tree.collectionElapsedMs, SemanticBoundsSpace.HostPhysical,
-                        tree.elements.map { e -> CapturedSemanticElement(e.localId, e.parentLocalId, e.name, e.role, e.automationId,
-                            e.resourceId, e.htmlId, Rect(e.x, e.y, e.width, e.height), e.text, e.enabled, e.focused) })
-                    try { plan.commit() } finally { plan.close() }
-                } catch (error: CancellationException) { throw error }
-                catch (_: Exception) { warning = "Capture saved; the selected window's semantic snapshot was unavailable or stale." }
-                finally { workflow.close() }
-            } else warning = "Capture saved. Monitor and region captures have no selected window subtree."
-            requireCurrent(ticket)
-            // The callback owns close even if route validation or delivery throws.
-            pendingProject = null
-            current.destination(project, destination, warning)
-            discardDrafts(preserve = false)
-            try { modal(false) } catch (error: Exception) { cleanupRefused(); throw error }
-            mutable.update { it.copy(open = false, message = warning) }
-        } finally {
-            withContext(NonCancellable) {
-                closePendingProject()
-                cropped?.takeIf { it in drafts }?.let { releaseDraft(it, preserve = !published) }
-            }
-            if (!currentCoroutineContext().isActive) mutable.update { it.copy(message =
-                "Capture cancelled. Any published project and completed original remain saved; inspect them before retrying.") }
         }
     }
 
@@ -253,6 +275,7 @@ internal class CapturePickerController(
 
     suspend fun shutdown() {
         if (stopped) return
+        mutable.update { it.copy(stopping = true, previewReady = false) }
         operations.retire(permanent = true) {
             try {
                 releaseHotkey()
@@ -294,13 +317,14 @@ internal class CapturePickerController(
     }
     private suspend fun discardDrafts(preserve: Boolean) {
         closePendingProject()
+        regionCamera = null
         region.detach()
-        mutable.update { it.copy(preview = null, selected = null, regionEdges = null, regionReady = false) }
+        mutable.update { it.copy(preview = null, previewReady = false, selected = null, regionEdges = null, regionReady = false) }
         for (value in drafts.toList()) releaseDraft(value, preserve)
         mutable.update { it.copy(cleanupPending = false) }
     }
     private fun cleanupRefused() {
-        mutable.update { it.copy(cleanupPending = true, preview = null, regionReady = false,
+        mutable.update { it.copy(cleanupPending = true, preview = null, previewReady = false, regionReady = false,
             message = "Capture cleanup is pending. Keep this window open and retry closing before leaving the editor.") }
     }
     private fun launch(body: suspend (Long) -> Unit) {

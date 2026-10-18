@@ -9,6 +9,7 @@ import com.visualworkbench.desktop.capture.CapturePickerController
 import com.visualworkbench.desktop.capture.CapturePickerWindow
 import com.visualworkbench.desktop.capture.PickerModal
 import com.visualworkbench.desktop.capture.initializePickerProtection
+import com.visualworkbench.desktop.capture.withRetiredCaptureCallers
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -87,10 +88,8 @@ fun main(args: Array<String>) {
             DesktopDiagnosticsLifecycle({ diagnostics.held }, diagnostics::requestClose, { diagnostics.closeWithin() })
         }
         val pickerOwner=remember{java.util.concurrent.atomic.AtomicReference<CapturePickerController?>(null)}
-        fun pickerBlocking():Boolean=pickerOwner.get()?.state?.value?.let{it.open||it.cleanupPending}==true
+        fun pickerBlocking():Boolean=pickerOwner.get()?.state?.value?.let{it.open||it.cleanupPending||it.stopping}==true
         fun commandsAllowed(): Boolean = !pickerBlocking() && projectPicker == null && !controller.workflows.blocksInput() && diagnosticsLifecycle.allowsCommand(quitting)
-        val capture=remember{com.visualworkbench.desktop.capture.DesktopCaptureController(scope,core,captureService,location.path,device,
-            controller::captureDestination,controller::report)}
         var captureSettings by remember{mutableStateOf(false)}
         var remoteView by remember{mutableStateOf<WorkbenchRemoteEdit?>(null)}
         fun openRemoteView(){
@@ -106,9 +105,9 @@ fun main(args: Array<String>) {
         var captureFocusLease by remember { mutableStateOf<AutoCloseable?>(null) }
         fun captureDialog(value: Boolean) {
             if (value && !commandsAllowed()) return
-            if (value && !captureSettings) captureFocusLease = controller.instructionPicker()
+            if (value && !captureSettings) { controller.cancelInput(); captureFocusLease = controller.instructionPicker() }
+            if (!value) { captureFocusLease?.close(); captureFocusLease = null }
             captureSettings = value
-            if (!value) { val prior = captureFocusLease; captureFocusLease = null; prior?.close() }
         }
         DisposableEffect(controller) { onDispose { val prior = captureFocusLease; captureFocusLease = null; prior?.close() } }
         var captureProtected by remember{mutableStateOf(false)}
@@ -145,13 +144,33 @@ fun main(args: Array<String>) {
                 mcpModal.state.value.let { it.settings || it.compare != null } || captureSettings || remoteView != null ||
                 current.textAnchor != null || current.exportOpen || current.pasteOpen || controller.ai.state.value.open
         }
+        // Observe the actual coordinator for menu refresh; admission also reads
+        // it directly so a hotkey cannot use an older composition's busy state.
+        val mcpCaptureState = mcpState.owner?.state?.collectAsState()?.value
+        fun localCaptureAdmission(): Boolean {
+            val current = controller.state.value
+            val lifetime = mcp.state.value
+            val agent = lifetime.owner?.state?.value
+            return captureProtected && commandsAllowed() && !competingModal() && dialog == null &&
+                !current.busy && !diagnostics.held && !lifetime.starting && !lifetime.closed &&
+                lifetime.failureStage == null && agent?.closed != true && agent?.activeCapture == null
+        }
+        val currentCaptureAdmission by rememberUpdatedState(::localCaptureAdmission)
+        val capture=remember(scope,controller){com.visualworkbench.desktop.capture.DesktopCaptureController(scope,core,captureService,location.path,device,
+            controller::captureDestination,controller::report,mayCapture={currentCaptureAdmission()})}
+        val foregroundCaptureState by capture.state.collectAsState()
+        fun pickerAdmission(): Boolean = currentCaptureAdmission() && capture.state.value.let {
+            !it.busy && !it.cleanupPending && !it.stopping
+        }
+        val currentPickerAdmission by rememberUpdatedState(::pickerAdmission)
         val pickerModal=remember(controller){PickerModal(controller::instructionPicker)}
         val capturePicker=remember(scope,controller){CapturePickerController(scope,core,location.path,device,
             openService={com.visualworkbench.desktop.capture.openDesktopCaptureService(
                 nativeRuntime.directory.resolve("vw-capture-helper.exe"),nativeRuntime.packagedHash("vw-capture-helper.exe"))},
-            saved=controller::captureDestination,modal=pickerModal::set,
-            mayOpen={captureProtected&&commandsAllowed()&&!competingModal()&&dialog==null&&!editor.busy&&
-                !diagnostics.held&&mcp.state.value.owner?.state?.value?.activeCapture==null})}
+            saved=controller::captureDestination,modal={open ->
+                if(open)controller.cancelInput()
+                pickerModal.set(open)
+            },mayOpen={currentPickerAdmission()})}
         pickerOwner.set(capturePicker)
         val capturePickerState by capturePicker.state.collectAsState()
         fun retryPickerCleanup(){scope.launch{try{capturePicker.dismiss()}catch(error:CancellationException){throw error}
@@ -220,17 +239,16 @@ fun main(args: Array<String>) {
                 scope.launch { withContext(NonCancellable) {
                     var clean = false
                     try {
-                        val pickerRetired=try{capturePicker.shutdown();true}catch(_:Exception){false}
-                        if(pickerRetired)clean = diagnosticsLifecycle.closeParentsAfterRetirement(
+                        clean = diagnosticsLifecycle.closeParentsAfterRetirement(
                             admit = { controller.mayCloseAi() && controller.sealInstructionsForClose() },
-                            closeParents = {
+                            closeParents = { withRetiredCaptureCallers(capturePicker::shutdown,capture::shutdown) {
                                 remoteView?.let{it.seal("owner_pause");it.close()}
                                 // Retire link-owned helpers before foreign parent teardown.
                                 controller.close();assertRemoteEditRetired()
                                 try { codex.close() } finally { codexModal.close()
                                 try { mcpTasks.close() } finally { try { mcp.close() } finally {
                                 mcpModal.close()
-                                try { try { capture.shutdown() } finally { assistance.close() } } finally {
+                                try { assistance.close() } finally {
                                     try { controller.close() } finally {
                                         try { sessions.close() } finally {
                                             try { host.shutdown() } finally { host.destroy() }
@@ -240,8 +258,12 @@ fun main(args: Array<String>) {
                                 } }
                                 }
                                 appOwner.close();appAnchor.close()
-                            },
+                            } },
                         )
+                    } catch (_: Exception) {
+                        // A retained source refusal must leave every parent and
+                        // the native runtime alive for a visible Quit retry.
+                        clean = false
                     } finally {
                         if (startupSmoke) println(if (clean)
                             "VW_DESKTOP_EXIT startup_smoke=true cleanup=complete"
@@ -412,7 +434,8 @@ fun main(args: Array<String>) {
             val density=LocalDensity.current.density
             LaunchedEffect(density,state.position){try{val info=host.windowDpiInfo(window.windowHandle.toULong());dpiText="Windows ${info.windowDpi} DPI · Compose ${"%.2f".format(density)}× · PMv2 ${info.windowPerMonitorV2}"}catch(_:Exception){dpiText="Display DPI query unavailable"}}
             val firstDraw = remember { CompletableDeferred<Unit>() }
-            LaunchedEffect(Unit) {
+            LaunchedEffect(window) {
+                captureProtected=false;captureChecked=false
                 val protection=initializePickerProtection { excludeCaptureWindows(listOf(window.windowHandle.toULong())) }
                 captureProtected=protection.captureAllowed;captureChecked=protection.editorVisible
                 if(!captureProtected)controller.report("Screen capture is unavailable because this editor window could not be excluded. Editing remains available.")
@@ -447,7 +470,7 @@ fun main(args: Array<String>) {
                 Menu("Edit"){for(c in listOf(Command.Undo,Command.Redo,Command.Delete,Command.SelectAll,Command.ClearSelection,Command.Color,Command.WidthUp,Command.WidthDown,Command.NudgeLeft,Command.NudgeRight,Command.NudgeUp,Command.NudgeDown))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
                 Menu("Tools"){for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout,Command.CycleMarker,Command.Instructions))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
                 Menu("View"){for(c in listOf(Command.Fit,Command.ActualPixels,Command.ZoomIn,Command.ZoomOut,Command.Windowed,Command.Maximized,Command.Fullscreen,Command.FollowPeer,Command.MatchPeer,Command.PeerOutline))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
-                Menu("Workbench"){Item("Remote Krita / Paint…",enabled=commandsAllowed()&&editor.sync?.carrier==SessionCarrier.QuicTether,onClick={openRemoteView()});Item("Send package to Codex",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();codexModal.settings();mcpModal.dismiss()}});Item("Local agents and Compare",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();mcpModal.settings();codexModal.dismiss()}});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Capture source…",enabled=captureProtected&&commandsAllowed()&&!competingModal()&&dialog==null,onClick={capturePicker.open()});Item("Retry capture cleanup",enabled=capturePickerState.cleanupPending,onClick=::retryPickerCleanup);Item("Foreground capture settings…",enabled=captureProtected&&commandsAllowed(),onClick={captureDialog(true)})}
+                Menu("Workbench"){Item("Remote Krita / Paint…",enabled=commandsAllowed()&&editor.sync?.carrier==SessionCarrier.QuicTether,onClick={openRemoteView()});Item("Send package to Codex",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();codexModal.settings();mcpModal.dismiss()}});Item("Local agents and Compare",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();mcpModal.settings();codexModal.dismiss()}});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Capture source…",enabled=pickerAdmission()&&mcpCaptureState?.activeCapture==null&&!foregroundCaptureState.busy,onClick={capturePicker.open()});Item("Retry capture cleanup",enabled=capturePickerState.cleanupPending,onClick=::retryPickerCleanup);Item("Foreground capture settings…",enabled=captureProtected&&commandsAllowed()&&!competingModal()&&dialog==null&&!foregroundCaptureState.stopping,onClick={captureDialog(true)})}
             }
             MaterialTheme(colors=darkColors(primary=accent,secondary=Color(0xffe8bb75),background=Color(0xff101720),surface=Color(0xff18222e))){
                 Box(Modifier.fillMaxSize().drawWithContent {

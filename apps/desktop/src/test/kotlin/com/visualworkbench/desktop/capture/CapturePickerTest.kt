@@ -281,4 +281,89 @@ class CapturePickerTest {
         assertEquals(1, successes)
     }
 
+    @Test fun saveAndRegionRequireTheExactDisplayedSnapshot() {
+        val preview = PickerPreview("a", 2u, 1u, 2u, 1u, ByteArray(8))
+        val pending = CapturePickerState(open = true, preview = preview)
+        assertFalse(pending.acceptsPreview(preview))
+        val displayed = pending.copy(previewReady = true)
+        assertTrue(displayed.acceptsPreview(preview))
+        assertFalse(displayed.acceptsPreview(preview.copy()))
+        assertFalse(displayed.acceptsPreview(null))
+        for (retired in listOf(displayed.copy(open = false), displayed.copy(stopping = true),
+            displayed.copy(cleanupPending = true), displayed.copy(preview = null))) {
+            assertFalse(retired.acceptsPreview(preview))
+        }
+    }
+
+    @Test fun finalDirectoryDeleteFailureCanRetryAfterTheMarkerWasRemoved() {
+        val projects = Files.createTempDirectory("vw-picker-test").toRealPath()
+        var attempts = 0
+        val work = PickerWorkspace.create(projects) {
+            if (++attempts == 1) throw java.io.IOException("busy directory")
+            Files.delete(it)
+        }
+        try {
+            Files.write(work.path.resolve("capture.png"), byteArrayOf(7))
+            assertTrue(runCatching { work.release() }.isFailure)
+            assertTrue(Files.isDirectory(work.path)); assertFalse(Files.exists(work.path.resolve("owner-v1")))
+            val keyed = Files.readAttributes(work.path, java.nio.file.attribute.BasicFileAttributes::class.java).fileKey() != null
+            if (keyed) { work.release(); assertEquals(2, attempts) }
+            else {
+                assertTrue(runCatching { work.release() }.isFailure); assertEquals(1, attempts)
+                Files.delete(work.path) // Exact empty test fixture; the production owner refused it.
+                work.release()
+            }
+            work.release(); assertFalse(Files.exists(work.path))
+        } finally {
+            work.release(); Files.delete(projects.resolve(".picker-inbox-v1")); Files.delete(projects)
+        }
+    }
+
+    @Test fun finalDeletionRetryRefusesAnUnmarkedReplacementDirectory() {
+        val projects = Files.createTempDirectory("vw-picker-test").toRealPath()
+        var attempts = 0
+        val work = PickerWorkspace.create(projects) {
+            if (++attempts == 1) throw java.io.IOException("busy directory")
+            Files.delete(it)
+        }
+        val held = projects.resolve("held-original")
+        try {
+            assertTrue(runCatching { work.release() }.isFailure)
+            Files.move(work.path, held); Files.createDirectory(work.path)
+            assertTrue(runCatching { work.release() }.isFailure)
+            assertTrue(Files.isDirectory(work.path)); assertEquals(1, attempts)
+            Files.delete(work.path); Files.move(held, work.path)
+            val keyed = Files.readAttributes(work.path, java.nio.file.attribute.BasicFileAttributes::class.java).fileKey() != null
+            if (keyed) work.release()
+            else { assertTrue(runCatching { work.release() }.isFailure); Files.delete(work.path); work.release() }
+        } finally {
+            if (Files.exists(held)) { Files.deleteIfExists(work.path); Files.move(held, work.path) }
+            work.release(); Files.delete(projects.resolve(".picker-inbox-v1")); Files.delete(projects)
+        }
+    }
+
+    @Test fun finalDeletionRetryCannotDeleteANewChild() {
+        val projects = Files.createTempDirectory("vw-picker-test").toRealPath()
+        var attempts = 0
+        val work = PickerWorkspace.create(projects) {
+            if (++attempts == 1) throw java.io.IOException("busy directory")
+            Files.delete(it)
+        }
+        val foreign = work.path.resolve("foreign")
+        try {
+            assertTrue(runCatching { work.release() }.isFailure)
+            Files.writeString(foreign, "keep")
+            assertTrue(runCatching { work.retain() }.isFailure)
+            assertEquals("keep", Files.readString(foreign)); assertEquals(1, attempts)
+            Files.delete(foreign)
+            val keyed = Files.readAttributes(work.path, java.nio.file.attribute.BasicFileAttributes::class.java).fileKey() != null
+            if (keyed) work.retain()
+            else { assertTrue(runCatching { work.retain() }.isFailure); Files.delete(work.path); work.retain() }
+            assertFalse(Files.exists(work.path))
+        } finally {
+            Files.deleteIfExists(foreign); work.release()
+            Files.delete(projects.resolve(".picker-inbox-v1")); Files.delete(projects)
+        }
+    }
+
 }
