@@ -586,3 +586,14 @@ See GIANT_PICKED_INPUT_COMPOSED_20261018.md and its exact receipt/excerpts.
 Close is not an OS-thread join; the actual Linux probe proves eventual exit under
 bounded waits, not an instantaneous thread/RSS bound. Public intake remains
 next; all four parallel grants and device/runtime gates stay separate/open.
+
+## Diagnostics privacy guard composed after conditional review
+
+Accepted picked-input source is published on main1307a7a. Diagnostics8c90d0a is
+conditionally accepted, four files unchanged in root composition47a1bc4. Actual
+common-source compilation and all22 focused tests pass; both conditions are met.
+Closed canonical schema/privacy enforcement is complete within this narrow
+software scope, with no numeric provenance or general secret-redaction claim.
+Exact source/JUnit/log receipts are in evidence/DIAGNOSTICS_PRIVACY_COMPOSED_20261018.json.
+No native/API/binding or other caller change; hardware/export-runtime gates remain
+separate. Root lineage88946ba/8bf738a still awaits independent source review.

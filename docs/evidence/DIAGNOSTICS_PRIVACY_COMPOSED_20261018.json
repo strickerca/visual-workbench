@@ -1,0 +1,98 @@
+{
+  "date_utc": "2026-10-18",
+  "scope": "Conditional diagnostics privacy guard acceptance conditions: composed actual common-source compilation and22 focused host tests",
+  "source_commit": "47a1bc40f73bda82778eea134aa809082dd3863b",
+  "branch": "cloud/diagnostics-privacy-integration-20261018",
+  "base": "1307a7a0039ddf2952d564d4b044b76bba2796e1",
+  "accepted_leaf": "8c90d0aea2e4f2ef6a738f7f18c24a8c2973ab35",
+  "accepted_source_identity": "All four files byte-identical to conditionally accepted source; no new root implementation hunk",
+  "review": "Astra conditionally accepted exact source, requiring composed common-source type check and22focused tests. Both conditions now satisfied. Guard establishes closed schema, not measurement provenance or general secret redaction.",
+  "jvm": {
+    "DiagnosticsBundleTest": {
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "rejectedClockCannotRotateOrChangeTheFrozenPreview[desktop]",
+        "desktopCallerKeepsUnknownFrameCountsAndEchoDistinctFromDrawingLatency[desktop]",
+        "androidCallerUsesOnlyHeapAndSampleCountsAndKeepsExactExportPreview[desktop]",
+        "maximumLogStillProducesBoundedAsciiPayload[desktop]",
+        "unavailableMetricsStayUnknownRatherThanBecomingZero[desktop]",
+        "invalidMetricsAndClockOrderAreRejectedBeforeExport[desktop]",
+        "reportHasOnlyClosedSchemaStringsAndTypedMetrics[desktop]",
+        "rotationKeepsNewestEventsAndReportsDiscardedCount[desktop]",
+        "failedAuditAndRejectedPreparationLeaveSourceLogAndPriorPreviewIntact[desktop]",
+        "preparedPreviewCannotChangeWhenLaterEventsArrive[desktop]"
+      ]
+    },
+    "DiagnosticsPrivacyAuditTest": {
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "duplicateAndUnknownKeysAreRejectedAtEveryObjectLevel[desktop]",
+        "escapedKeysAlternateOrderAndNoncanonicalRepresentationsCannotAliasTheSchema[desktop]",
+        "eventCountAndRotationMetadataMustMatchTheExactBody[desktop]",
+        "negativeNonfiniteFractionalExponentAndOverflowCountersAreRejected[desktop]",
+        "syntheticIdentityCredentialAndPathStringsNeverFitKnownValuePositions[desktop]",
+        "maximumEventCountPassesAndAnExtraEventCannotHideBehindMetadata[desktop]",
+        "stringAndSchemaTypesAreClosedRatherThanCoerced[desktop]",
+        "trailingContentTruncatedStructuresAndArrayTypeChangesAreRejected[desktop]",
+        "boundedMalformedDeepAndTruncatedInputsRefuseWithoutARecursiveParser[desktop]",
+        "eventsMustBeMonotonicButEqualTimesAreValid[desktop]",
+        "rawControlsUnicodeBomAndEscapedAliasesAreRejected[desktop]",
+        "everyRealFactoryPlatformAndCodePassesWithNullOrMaximumMetrics[desktop]"
+      ]
+    }
+  },
+  "passed": 22,
+  "failed": 0,
+  "skipped": 0,
+  "checks": {
+    "actual_common_source_compile": "PASS :shared:compileKotlinDesktop, explicit API and actual common source included",
+    "actual_common_tests_compile": "PASS :shared:compileTestKotlinDesktop",
+    "common_import_guard": "HOOK-002 PASS",
+    "focused_tests": "PASS22",
+    "secret_scan": "PASS source/receipt/history before publication",
+    "bindings_native": "No public API/UniFFI/dependency/native source change; zero generation or broad native/app reruns"
+  },
+  "command": "bash apps/gradlew -p apps :shared:desktopTest --tests com.visualworkbench.shared.DiagnosticsBundleTest --tests com.visualworkbench.shared.DiagnosticsPrivacyAuditTest -x :shared:generateCoreBindings -x :shared:generateHostBindings --console=plain --no-daemon --no-parallel --max-workers=2",
+  "source_sha256": [
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DiagnosticsBundle.kt",
+      "bytes": 5392,
+      "sha256": "e77556fe6d602c6144609ff58f9f4bb4bdf5374d0e583318c2d6071414e4afd5"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DiagnosticsPrivacyAudit.kt",
+      "bytes": 4135,
+      "sha256": "cac78dd0306dc2cb2bae0829cb7475eedcf0c11f398176834ad1ca7829466aa9"
+    },
+    {
+      "path": "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/DiagnosticsBundleTest.kt",
+      "bytes": 9493,
+      "sha256": "62d7c2afd608bf9923ea503648da0ffb07d28d34859c3449bee7f82666dc1b9b"
+    },
+    {
+      "path": "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/DiagnosticsPrivacyAuditTest.kt",
+      "bytes": 9992,
+      "sha256": "4ce40c8d14cb7b6c0bd307e9371fe290067820b56bd4ae331003d090f22d52bc"
+    }
+  ],
+  "logs": [
+    {
+      "path": "vw-diagnostics-composed-tests-attempt1.log",
+      "bytes": 3758,
+      "sha256": "ce2e96287164d3212b2c23b2f66b3891c4ef8f0d84f0ba05fdc84d5f541048d0"
+    }
+  ],
+  "limits": [
+    "Canonical known v1 schema/privacy guard only; numeric metric/platform provenance is not authenticated",
+    "No arbitrary raw log/free-text redaction or generic JSON acceptance is introduced",
+    "No Android/device/export IO/owner acceptance run in this focused batch; existing platform exporters/callers/public contracts unchanged",
+    "Remaining caller/native verification work, future archive private-review filtering, full T5.01 and hardware gates remain separate"
+  ],
+  "operations": "Only typed/fake report fixtures; no external export, provider, credentials, signing/deployment, SDK/device or worktree operations. Other three caller/native-verification grants unchanged; diagnostics source only composed after conditional review."
+}
