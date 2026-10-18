@@ -485,6 +485,7 @@ async fn absolute_edit_precondition_is_atomic_but_exact_retry_survives_a_new_rev
     draw(&project).await;
     let before = project.info().await.unwrap();
     let expected = EditPrecondition {
+        page_index: None,
         host_seq: before.host_seq,
         state_hash: before.state_hash.clone(),
     };

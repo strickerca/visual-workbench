@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-18",
+  "base": "5d0e39a7ed11a293c6b905392683020ec9d515ff",
+  "frozen_validation_candidate_unchanged": "070758ac3b0537b4ea9efc0f6d21b23792d47762",
+  "source_changes": [
+    "Common document snapshots carry page identity; eraser admission, immutable stroke/delete requests and selection gesture/picker admission include it.",
+    "Both actual app page callbacks join eraser and selection retirement before selecting a new page, rebind both owners and refresh page-dependent instruction/semantic projections.",
+    "Native EditPrecondition and VectorEraseOptions carry page_index. Fresh PDF edits/erasures require it and atomically check every target layer. Exact committed edit retries remain idempotent.",
+    "Native common adapters reject a captured page that no longer matches the selected page before invoking mutation.",
+    "Both app document owners schedule admitted source-fenced fidelity inspection after runtime installation, including import/reopen. Common binding preserves validated notices across same-source edits/pages and clears them on source/attachment replacement."
+  ],
+  "new_regressions": {
+    "common": "Two eraser page regressions, selection gesture/picker page invalidation and five notice lifecycle/admission/source cases.",
+    "app_adapters": "Each actual Android/desktop EraserController tested with injected hit input, equal-size equal-revision pages and distinct object IDs; includes detach/rebind.",
+    "native": "Two-page source/storage fixture exercises cross-page and missing-page delete/vector erase refusal, unchanged revision, current-page deletion and exact retry."
+  },
+  "checks_before_publication": {"rustfmt": "passed", "diff_check": "passed", "staged_secret_scan": "required before commit"},
+  "validation": "Affected bounded Kotlin checks run after source publication; results recorded in follow-up receipt. Native/bindings/app compilation waits for the serialized build slot.",
+  "limits": ["No device, GUI, GPU, real document parser or provider acceptance.", "No binding regeneration in this source slice; next combined phase must regenerate after EditPrecondition/VectorEraseOptions changes.", "Full runtime packaging, sandbox retirement and product/hardware gates remain open."]
+}

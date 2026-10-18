@@ -32,6 +32,8 @@ public class DocumentController(private val scope: CoroutineScope, private val c
     private var viewport: Camera? = null
     private var password: String? = null
     private var epoch: Long? = null
+    private var noticesPending: Boolean = false
+    private var noticesTask: Job? = null
     public val pcRedaction: Boolean get() = jobs.pcRedaction
     /** Worker copy requests do not yet carry the revision/source identity needed
      * by CORE-006. Do not offer publication until an embedded carrier is verified. */
@@ -40,23 +42,39 @@ public class DocumentController(private val scope: CoroutineScope, private val c
         val currentEpoch = attachment()?.epoch
         val old = state.value
         if (old.descriptor == descriptor && old.page == page && epoch == currentEpoch) return
-        val sameSource = old.descriptor?.sourceAssetId == descriptor?.sourceAssetId && epoch == currentEpoch
+        val sameSource = descriptor != null && old.descriptor?.sourceAssetId == descriptor.sourceAssetId &&
+            old.descriptor.documentId == descriptor.documentId && old.descriptor.kind == descriptor.kind &&
+            old.descriptor.pages == descriptor.pages && epoch == currentEpoch
         generation++;viewportGeneration++;viewport = null;tasks.toList().forEach { it.cancel() }
-        command = null;tileTask = null;epoch = currentEpoch
+        command = null;tileTask = null;noticesTask?.cancel();noticesTask=null;epoch = currentEpoch
+        if (!sameSource) noticesPending = descriptor != null
         if (!sameSource) password = null
-        mutable.value = DocumentState(descriptor,page,regions=if(sameSource)old.regions else emptyList())
+        mutable.value = DocumentState(descriptor,page,regions=if(sameSource)old.regions else emptyList(),notices=if(sameSource)old.notices else emptyList())
+    }
+    /** App owners call after runtime installation, including import and reopen.
+     * Wait for editor admission without borrowing source bytes or a worker. */
+    public fun scheduleNotices(): Unit {
+        if (!noticesPending || noticesTask?.isActive == true || state.value.descriptor == null) return
+        val task = scope.launch(start=CoroutineStart.LAZY) {
+            while (!admitted() || state.value.busy) delay(25)
+            currentCoroutineContext().ensureActive()
+            refreshNotices()
+        }
+        noticesTask=task;tasks+=task
+        task.invokeOnCompletion { tasks.remove(task);if(noticesTask===task)noticesTask=null }
+        task.start()
     }
     private fun capture(): Pair<DocumentAttachment,EditableDescriptor> {
         val a=attachment() ?: throw DocumentFailure(DocumentFailureKind.Stale)
         val d=state.value.descriptor ?: throw DocumentFailure(DocumentFailureKind.Unavailable)
-        if(a.epoch != epoch || a.snapshot.documentId != d.documentId || !a.snapshot.render.revision.sameDocumentRevision(d.revision))
+        if(a.epoch != epoch || a.snapshot.documentId != d.documentId || a.snapshot.page?.let{it!=state.value.page}==true || !a.snapshot.render.revision.sameDocumentRevision(d.revision))
             throw DocumentFailure(DocumentFailureKind.Stale)
         return a to d
     }
     private fun current(a: DocumentAttachment,d: EditableDescriptor,ticket: Long,page: UInt): Boolean {
         val now=attachment() ?: return false
         return ticket==generation && now.project===a.project && now.epoch==a.epoch && state.value.page==page &&
-            state.value.descriptor?.sourceAssetId==d.sourceAssetId && now.snapshot.documentId==d.documentId && now.snapshot.render.revision.sameDocumentRevision(d.revision)
+            state.value.descriptor?.sourceAssetId==d.sourceAssetId && now.snapshot.documentId==d.documentId && now.snapshot.page?.let{it==page}!=false && now.snapshot.render.revision.sameDocumentRevision(d.revision)
     }
     private fun launchOwned(commandTask:Boolean=false,tile:Boolean=false,block: suspend CoroutineScope.() -> Unit): Job {
         val task=scope.launch(start=CoroutineStart.LAZY){operationGate.withLock{block()}}
@@ -90,10 +108,12 @@ public class DocumentController(private val scope: CoroutineScope, private val c
     private fun password(a:DocumentAttachment,d:EditableDescriptor):String? = password ?: (a.project as? WorkbenchDocumentsProject)?.documentPassword(d.documentId)
     public fun refreshNotices(): Unit = work { a,d,ticket,page ->
         val source=(a.project as WorkbenchDocumentsProject).documentSource(d.documentId,d.revision)
+        if(source.descriptor!=d) throw DocumentFailure(DocumentFailureKind.Verification)
         val reply=jobs.run(DocumentRequest(if(d.kind==EditableKind.Pdf)DocumentOperation.PdfInfo else DocumentOperation.SvgInfo,password(a,d)),source.bytes)
         val info=reply.metadata as? DocumentMetadata.Info ?: throw DocumentFailure(DocumentFailureKind.Verification)
         if(reply.sourceBlake3!=d.sourceAssetId || info.kind!=d.kind || info.pages!=d.pages.size.toUInt()) throw DocumentFailure(DocumentFailureKind.Verification)
-        if(current(a,d,ticket,page)) mutable.value=state.value.copy(notices=info.notices,passwordNeeded=false)
+        if(info.notices.size>64 || info.notices.any{it.length>64}) throw DocumentFailure(DocumentFailureKind.Verification)
+        if(current(a,d,ticket,page)) { noticesPending=false;mutable.value=state.value.copy(notices=info.notices.toList(),passwordNeeded=false) }
     }
     public fun password(value:String):Unit {
         if(state.value.busy || value.length>1024 || '\u0000' in value || !admitted())return
@@ -197,6 +217,6 @@ public class DocumentController(private val scope: CoroutineScope, private val c
         generation++;viewportGeneration++;viewport=null;epoch=null;password=null
         val retiring=tasks.toList();retiring.forEach{it.cancel()}
         withContext(NonCancellable){retiring.joinAll()}
-        tasks.clear();command=null;tileTask=null;mutable.value=DocumentState()
+        tasks.clear();command=null;tileTask=null;noticesTask=null;noticesPending=false;mutable.value=DocumentState()
     }
 }

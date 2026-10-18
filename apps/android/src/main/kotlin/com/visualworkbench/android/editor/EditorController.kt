@@ -70,11 +70,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         { !disposing&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
         { attached,page -> mutations.withLock {
             if(project!==attached.project||epoch!=attached.epoch||!documentRevisionMatches(attached))throw DocumentFailure(DocumentFailureKind.Stale)
-            cancelTool();documentOwnerDiscardDraw()
+            cancelTool();erasers.detach();selections.detach();documentOwnerDiscardDraw()
             val next=(attached.project as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
             val drawing=prepareEditorObjects(core,next.render.items)
             if(project!==attached.project||epoch!=attached.epoch||disposing)throw DocumentFailure(DocumentFailureKind.Stale)
-            document=next;info=next.render.revision;objects=drawing;background=null;selected=null;cameraFitted=false;fit()
+            document=next;info=next.render.revision;objects=drawing;background=null;selected=null;cameraFitted=false
+            selections.bind(attached.project,next,epoch,refreshAdmission.capture().sequence,camera)
+            erasers.bind(attached.project,next,epoch,refreshAdmission.capture().sequence,camera)
+            instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit()
         } }, { publish() },application,{canvasRetirement()})
     val documents:DocumentController get()=documentOwner.controller
     private fun documentRevisionMatches(attached:DocumentAttachment):Boolean = document?.render?.revision?.sameDocumentRevision(attached.snapshot.render.revision)==true
@@ -178,7 +181,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val current = project
         if (!disposing && current != null && document != null) refresh(current, current.info(), epoch)
     })
-    val erasers = EraserController(core, scope, selections) { receipt ->
+    val erasers = EraserController(core, scope, selections.interaction) { receipt ->
         val current = project
         if (!disposing && current != null && document != null) {
             selected?.let { id -> if (receipt != null) {

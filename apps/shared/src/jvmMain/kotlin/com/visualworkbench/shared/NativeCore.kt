@@ -85,7 +85,7 @@ private class NativeProject(val handle: ProjectSession) : WorkbenchProject, Work
         EditableSource(value.descriptor.documentCommon(),value.bytes)
     }
     override suspend fun documentPage(documentId: String,page: UInt): DocumentSnapshot = documentNativeCall {
-        checkDocumentOpen(); handle.editableDocumentPage(documentId,page,it).documentCommon()
+        checkDocumentOpen(); handle.editableDocumentPage(documentId,page,it).documentCommon().copy(page=page)
     }
     override suspend fun selectDocumentPage(documentId: String,page: UInt): DocumentSnapshot {
         val value=documentPage(documentId,page)
@@ -147,7 +147,12 @@ private class NativeProject(val handle: ProjectSession) : WorkbenchProject, Work
     }
     override suspend fun edit(options: EditOptions,commands: List<EditCommand>): ProjectInfo = call {
         if ((options.expectedHostSeq == null) != (options.expectedStateHash == null)) throw CoreFailure(CoreFailureKind.Invalid)
-        val expected = options.expectedHostSeq?.let { seq -> EditPrecondition(seq, requireNotNull(options.expectedStateHash)) }
+        val descriptor = documentDescriptor(options.documentId)
+        val page = descriptor?.let { selectedDocumentPage(options.documentId) }
+        if (options.page != null && options.page != page) throw CoreFailure(CoreFailureKind.Invalid)
+        val visible = if (page != null && options.expectedHostSeq == null) info() else null
+        val expected = options.expectedHostSeq?.let { seq -> EditPrecondition(seq, requireNotNull(options.expectedStateHash), page) }
+            ?: visible?.let { value -> EditPrecondition(value.hostSeq,value.stateHash,page) }
         handle.applyEditAt(options.native(),commands.map { it.native() },expected,options.gestureId,it).common()
     }
     override suspend fun undoRedo(options: EditOptions,redo: Boolean): ProjectInfo = call { handle.undoRedo(options.native(),redo,it).common() }

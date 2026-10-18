@@ -69,7 +69,7 @@ internal class EditorDocuments(private val scope:CoroutineScope, private val cor
         val descriptor=native?.documentDescriptor(snapshot.documentId)
         if(attachment()?.project!==project)return
         controller.bind(descriptor,native?.selectedDocumentPage(snapshot.documentId)?:0u)
-        if(descriptor!=null)try{ensureJobs()}catch(error:DocumentFailure){controller.reportFailure(error)}
+        if(descriptor!=null)try{ensureJobs();controller.scheduleNotices()}catch(error:DocumentFailure){controller.reportFailure(error)}
     }
     fun matchingFrame(snapshot:DocumentSnapshot,epoch:Long):DocumentDrawFrame<PreparedDocumentTile>? = frame?.takeIf {
         it.available&&it.binding==controller.state.value.frame?.binding&&it.binding.documentId==snapshot.documentId&&it.binding.page==controller.state.value.page&&it.binding.attachmentEpoch==epoch&&it.binding.revision.sameDocumentRevision(snapshot.render.revision)

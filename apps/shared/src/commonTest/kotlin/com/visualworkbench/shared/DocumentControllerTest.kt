@@ -15,8 +15,8 @@ class DocumentControllerTest {
         override suspend fun layoutText(text:String,font:String,size:Float):TextLayout=error("unused")
     }
     private class Project:WorkbenchProject,WorkbenchDocumentsProject {
-        val revision=ProjectInfo("project","title","device",1uL,false,false,1uL,"b".repeat(64),listOf("doc"))
-        val descriptor=EditableDescriptor("doc","a".repeat(64),EditableKind.Pdf,List(2){DocumentPage(it.toUInt(),100.0,100.0,listOf(0.0,0.0,100.0,100.0),0u,"layer-$it")},revision)
+        var revision=ProjectInfo("project","title","device",1uL,false,false,1uL,"b".repeat(64),listOf("doc"))
+        var descriptor=EditableDescriptor("doc","a".repeat(64),EditableKind.Pdf,List(2){DocumentPage(it.toUInt(),100.0,100.0,listOf(0.0,0.0,100.0,100.0),0u,"layer-$it")},revision)
         var sourceFailure:CoreFailureKind?=null
         var page=0u
         override val changes=emptyFlow<ProjectChange>()
@@ -44,9 +44,14 @@ class DocumentControllerTest {
         val entered=CompletableDeferred<Unit>()
         var release:CompletableDeferred<Unit>?=null
         var calls=0
+        var notices=listOf("foreign_object_ignored","resource_denied")
+        var sourceHash="a".repeat(64)
+        var kind=EditableKind.Pdf
         override suspend fun run(request:DocumentRequest,source:ByteArray):DocumentReply {
             calls++;entered.complete(Unit)
             release?.let{withContext(NonCancellable){it.await()}}
+            if(request.operation==DocumentOperation.PdfInfo || request.operation==DocumentOperation.SvgInfo)
+                return DocumentReply(sourceHash,"c".repeat(64),DocumentMetadata.Info(kind,if(kind==EditableKind.Pdf)2u else 1u,100.0,100.0,false,notices),byteArrayOf())
             val tile=(request.operation as DocumentOperation.Tile)
             return DocumentReply("a".repeat(64),"c".repeat(64),DocumentMetadata.Tile(tile.page,tile.tile.origin,tile.tile.scale.toFloat().toDouble(),tile.tile.width,tile.tile.height),ByteArray(tile.tile.width.toInt()*tile.tile.height.toInt()*4))
         }
@@ -56,10 +61,46 @@ class DocumentControllerTest {
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
         val project=Project();val jobs=Jobs()
         var attached:DocumentAttachment?=null
-        val controller=DocumentController(scope,Core(),jobs,{attached},{true},{a,page->attached=DocumentAttachment(a.project,project.selectDocumentPage("doc",page),a.epoch)})
+        var admitted=true
+        val controller=DocumentController(scope,Core(),jobs,{attached},{admitted},{a,page->attached=DocumentAttachment(a.project,project.selectDocumentPage("doc",page),a.epoch)})
         val camera=Camera(Point(0.0,0.0),1.0,0.0,2.0,2.0)
         suspend fun bind(epoch:Long=1){attached=DocumentAttachment(project,project.document("doc"),epoch);controller.bind(project.descriptor,project.page)}
         suspend fun close(){jobs.release?.complete(Unit);controller.close();scope.cancel()}
+    }
+    @Test fun importAndReopenRefreshSvgFidelityNoticesWithoutPasswordSubmission():Unit=runBlocking {
+        val f=Fixture();try{
+            f.project.descriptor=f.project.descriptor.copy(kind=EditableKind.Svg,pages=f.project.descriptor.pages.take(1));f.jobs.kind=EditableKind.Svg
+            f.bind();f.controller.scheduleNotices()
+            assertEquals(f.jobs.notices,f.controller.state.value.notices);assertEquals(1,f.jobs.calls)
+            f.controller.close();f.bind(2);f.controller.scheduleNotices()
+            assertEquals(f.jobs.notices,f.controller.state.value.notices);assertEquals(2,f.jobs.calls)
+        }finally{f.close()}
+    }
+    @Test fun sameSourceEditAndPageSwitchKeepValidatedFidelityNotices():Unit=runBlocking {
+        val f=Fixture();try{f.bind();f.controller.scheduleNotices();val notices=f.controller.state.value.notices
+            f.project.revision=f.project.revision.copy(hostSeq=2uL,stateHash="d".repeat(64));f.project.descriptor=f.project.descriptor.copy(revision=f.project.revision)
+            f.bind();assertEquals(notices,f.controller.state.value.notices);f.controller.scheduleNotices();assertEquals(1,f.jobs.calls)
+            f.controller.page(1u);assertEquals(notices,f.controller.state.value.notices)
+        }finally{f.close()}
+    }
+    @Test fun replacementSourceDropsWarningsAndRejectsLateOldSourceNotices():Unit=runBlocking {
+        val f=Fixture();try{f.bind();f.controller.scheduleNotices();assertNotNull(f.controller.state.value.notices.firstOrNull())
+            f.jobs.release=CompletableDeferred();f.controller.refreshNotices()
+            f.project.descriptor=f.project.descriptor.copy(sourceAssetId="d".repeat(64));f.bind()
+            assertTrue(f.controller.state.value.notices.isEmpty());f.jobs.release!!.complete(Unit);yield()
+            assertTrue(f.controller.state.value.notices.isEmpty())
+        }finally{f.close()}
+    }
+    @Test fun noticesWaitForCallerAdmissionBeforeBorrowingSource():Unit=runBlocking {
+        val f=Fixture();try{f.bind();f.admitted=false;f.controller.scheduleNotices();assertEquals(0,f.jobs.calls)
+            f.admitted=true;withTimeout(2000){while(f.controller.state.value.notices.isEmpty())delay(5)}
+            assertEquals(f.jobs.notices,f.controller.state.value.notices)
+        }finally{f.close()}
+    }
+    @Test fun aDifferentSourceCannotSupplyFidelityNotices():Unit=runBlocking {
+        val f=Fixture();try{f.bind();f.jobs.sourceHash="d".repeat(64);f.controller.scheduleNotices()
+            assertTrue(f.controller.state.value.notices.isEmpty());assertNotNull(f.controller.state.value.message)
+        }finally{f.close()}
     }
     @Test fun ordinaryViewportAdoptionCarriesAllAuthorityAndItsOwnGeneration():Unit=runBlocking {
         val f=Fixture();try{f.bind();f.controller.viewport(f.camera);val frame=assertNotNull(f.controller.state.value.frame)

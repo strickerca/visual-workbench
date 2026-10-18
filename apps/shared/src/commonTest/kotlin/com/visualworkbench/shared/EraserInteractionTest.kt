@@ -21,6 +21,21 @@ class EraserInteractionTest {
         assertEquals(1, f.refreshes); assertFalse(f.ui.state.value.busy); assertNull(f.ui.state.value.draft)
         assertEquals(f.id, f.lastChange?.replacements?.keys?.single()); f.close()
     }
+    @Test fun sameSizedSameRevisionPageSwitchCancelsOldGestureAndUsesOnlyNewPageIds() {
+        val f = EraseFixture();f.page=0u;f.bind(f.seq);f.ui.tool(EraserMode.Object)
+        assertTrue(f.ui.begin(Point(10.0,10.0),f.camera))
+        f.page=1u;val second="00000000-0000-7000-8000-000000000011"
+        f.items=listOf(f.item.copy(objectId=second,layerId="page-one"));f.port.hits=listOf(second);f.bind(f.seq)
+        assertFalse(f.ui.finish());assertTrue(f.port.deletes.isEmpty())
+        assertTrue(f.ui.begin(Point(10.0,10.0),f.camera));assertTrue(f.ui.finish())
+        assertEquals(listOf(second),f.port.deletes.single().second);assertEquals(1u,f.port.deletes.single().first.page);f.close()
+    }
+    @Test fun oldPageHitCompletionCannotDeleteAfterSameRevisionPageRebind() {
+        val f=EraseFixture();f.page=0u;f.bind(f.seq);val gate=CompletableDeferred<Unit>();f.port.hitGate=gate
+        f.ui.tool(EraserMode.Object);assertTrue(f.ui.begin(Point(10.0,10.0),f.camera));f.ui.finish()
+        f.page=1u;f.items=listOf(f.item.copy(objectId="other-page"));f.bind(f.seq);gate.complete(Unit)
+        assertTrue(f.port.deletes.isEmpty());assertFalse(f.ui.state.value.busy);f.close()
+    }
     @Test fun cancellingDownDoesNotCallEitherMutation() {
         val f = EraseFixture(); f.ui.tool(EraserMode.Stroke); f.ui.begin(Point(10.0, 10.0), f.camera)
         f.ui.append(Point(20.0, 20.0)); f.ui.cancelGesture()
@@ -139,6 +154,7 @@ private class EraseFixture {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     val camera = Camera(Point(32.0, 32.0), 2.0, 0.0, 128.0, 128.0)
     var info = ProjectInfo("project", "fixture", "device", 1u, false, false, 0u, "visible-a", listOf("document"))
+    var page: UInt? = null
     var documentId = "document"; var epoch = 1L; var seq = 1uL; var counter = 0
     val id = "00000000-0000-7000-8000-000000000010"
     val item = RenderItem(id, "layer", 1.0, "normal", Rect(0.0, 0.0, 40.0, 40.0),
@@ -156,13 +172,14 @@ private class EraseFixture {
     init { bind(seq) }
     private fun uiCancel() { ui.cancelOperation() }
     fun snapshot() = DocumentSnapshot(documentId, "fixture", 64u, 64u, 8u,
-        listOf(LayerInfo("layer", "layer", true, false, 1.0, "normal")), RenderList(info, items))
+        listOf(LayerInfo("layer", "layer", true, false, 1.0, "normal")), RenderList(info, items),page)
     fun bind(sequence: ULong) { seq = sequence; ui.bind(port, snapshot(), epoch, sequence); ui.viewport(camera) }
     fun close() { eraseImmediate { ui.detach() }; scope.cancel() }
 }
 private class ErasePort(private val f: EraseFixture) : EraserBackend {
     val strokes = mutableListOf<VectorEraseEdit>()
     val deletes = mutableListOf<Pair<EditOptions, List<String>>>()
+    var hits: List<String> = listOf(f.id)
     var hitGate: CompletableDeferred<Unit>? = null
     var eraseGate: CompletableDeferred<Unit>? = null
     var settlement: CompletableDeferred<Unit>? = null
@@ -171,7 +188,7 @@ private class ErasePort(private val f: EraseFixture) : EraserBackend {
     override suspend fun objectHits(query: EraserHitQuery): List<String> {
         try { hitGate?.await() }
         finally { if (!currentCoroutineContext().isActive) { wasCancelled = true; withContext(NonCancellable) { settlement?.await() } } }
-        return listOf(f.id)
+        return hits
     }
     override suspend fun eraseStrokes(request: VectorEraseEdit): VectorEraseReceipt {
         strokes += request; eraseGate?.await(); failure?.let { throw it }

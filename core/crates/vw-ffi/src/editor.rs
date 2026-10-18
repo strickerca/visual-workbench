@@ -261,6 +261,36 @@ fn transaction(
     }
     Ok(value)
 }
+/// A PDF is one canonical document with distinct page layers. A revision alone
+/// cannot authorize old-page targets after a local view change.
+fn admit_page_commands(
+    project: &vw_model::Project,
+    document: &Id,
+    page: u32,
+    commands: &[EditCommand],
+) -> Result<()> {
+    for command in commands {
+        let layer = match command {
+            EditCommand::Create { layer_id, .. } => Id::try_from(layer_id.clone())?,
+            EditCommand::Delete { object_id }
+            | EditCommand::Transform { object_id, .. }
+            | EditCommand::SetText { object_id, .. }
+            | EditCommand::SetStyle { object_id, .. } => {
+                let object = project
+                    .objects
+                    .get(&Id::try_from(object_id.clone())?)
+                    .ok_or(CoreError::Invalid)?;
+                if &object.document_id != document {
+                    return Err(CoreError::Invalid);
+                }
+                Id::from_proto(object.state.layer_id.as_ref())?
+            }
+        };
+        crate::documents::admit_page_layer(project, document, page, &layer)?;
+    }
+    Ok(())
+}
+
 #[uniffi::export]
 impl ProjectSession {
     pub async fn apply_edit(
@@ -302,7 +332,7 @@ impl ProjectSession {
                 let txn_id = Id::try_from(options.transaction_id.clone())?.to_proto();
                 let previous = state.previous(&txn_id)?;
                 if previous.is_none()
-                    && let Some(expected) = expected
+                    && let Some(expected) = expected.as_ref()
                 {
                     let current = state.info()?;
                     if expected.host_seq != current.host_seq
@@ -311,8 +341,16 @@ impl ProjectSession {
                         return Err(CoreError::Invalid);
                     }
                 }
-                if !project.documents.contains_key(&document) {
-                    return Err(CoreError::Invalid);
+                let definition = project.documents.get(&document).ok_or(CoreError::Invalid)?;
+                if previous.is_none() {
+                    let page = expected.as_ref().and_then(|value| value.page_index);
+                    if definition.definition.kind == pb::DocumentKind::Pdf as i32 && page.is_none()
+                    {
+                        return Err(CoreError::Invalid);
+                    }
+                    if let Some(page) = page {
+                        admit_page_commands(project, &document, page, &commands)?;
+                    }
                 }
                 let mut order_by_layer = BTreeMap::<Id, OrderKey>::new();
                 let mut ops = Vec::new();

@@ -649,6 +649,7 @@ async fn deleting_a_selection_is_whole_object_erase_and_undo_restores_it() {
             edit(31, selected.revision.next_lamport),
             vec![EditCommand::Delete { object_id: id(21) }],
             Some(EditPrecondition {
+                page_index: None,
                 host_seq: selected.revision.host_seq,
                 state_hash: selected.revision.state_hash,
             }),

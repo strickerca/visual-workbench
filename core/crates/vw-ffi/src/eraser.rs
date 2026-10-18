@@ -27,6 +27,7 @@ pub struct VectorEraseOptions {
     pub memory_budget_bytes: u64,
     pub max_output_vertices: u32,
     pub max_work_units: u64,
+    pub page_index: Option<u32>,
 }
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct VectorEraseReplacement {
@@ -142,6 +143,14 @@ fn apply(
     let document = Id::try_from(request.binding.document_id.clone())?;
     let device = DeviceId::try_from(request.metadata.device_id.clone())?;
     let project = state.project()?;
+    if project
+        .documents
+        .get(&document)
+        .is_some_and(|value| value.definition.kind == pb::DocumentKind::Pdf as i32)
+        && request.page_index.is_none()
+    {
+        return Err(WorkflowError::Invalid);
+    }
     let mut total_source_vertices = 0usize;
     for target in &request.targets {
         let id = Id::try_from(target.object_id.clone())?;
@@ -149,6 +158,11 @@ fn apply(
         let object = project.objects.get(&id).ok_or(WorkflowError::Missing)?;
         if object.document_id != document {
             return Err(WorkflowError::Invalid);
+        }
+        let layer_id = Id::from_proto(object.state.layer_id.as_ref())?;
+        if let Some(page) = request.page_index {
+            crate::documents::admit_page_layer(project, &document, page, &layer_id)
+                .map_err(|_| WorkflowError::Invalid)?;
         }
         let layer = project
             .layers

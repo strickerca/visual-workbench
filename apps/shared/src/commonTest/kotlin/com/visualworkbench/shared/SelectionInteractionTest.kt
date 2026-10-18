@@ -8,6 +8,14 @@ import kotlin.coroutines.startCoroutine
 import kotlin.test.*
 
 class SelectionInteractionTest {
+    @Test fun sameSizedSameRevisionPageSwitchInvalidatesGestureAndPickerTicket() {
+        val f=SelectionFixture();f.page=0u;f.bind(1u);f.select()
+        val ticket=assertNotNull(f.ui.saveTicket(SelectionExportKind.Mask,false))
+        f.ui.tool(SelectionTool.Rectangle);assertTrue(f.ui.begin(Point(1.0,1.0),f.camera))
+        f.page=1u;f.bind(1u)
+        assertFalse(f.ui.finish());assertFalse(f.ui.matches(ticket));assertNull(f.ui.state.value.selection)
+        assertTrue(f.api.edits.isEmpty());f.close()
+    }
     @Test fun inactiveEditorDoesNotAcquireOrReadUnusedNativeSelectionCapability() {
         val f = SelectionFixture()
         f.capabilityFailure = SelectionFailure(SelectionFailureKind.Unsupported)
@@ -148,6 +156,7 @@ private fun immediate(block: suspend () -> Unit) {
     assertTrue(finished, "Fixture unexpectedly suspended"); error?.let { throw it }
 }
 private class SelectionFixture {
+    var page: UInt? = null
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     val camera = Camera(Point(32.0, 32.0), 1.0, 0.0, 64.0, 64.0)
     var info = ProjectInfo("project", "Fixture", "device", 1u, false, false, 0u, "hash-a", listOf("document"))
@@ -162,7 +171,7 @@ private class SelectionFixture {
         bind((refreshes + 1).toULong())
     }, { value -> capabilityCalls++; capabilityRequests += value; capabilityFailure?.let { throw it }; api })
     init { bind(1u); ui.viewport(camera) }
-    fun bind(sequence: ULong) { ui.bind(project, DocumentSnapshot("document", "Fixture", 64u, 64u, 8u, emptyList(), RenderList(info, emptyList())), 1L, sequence) }
+    fun bind(sequence: ULong) { ui.bind(project, DocumentSnapshot("document", "Fixture", 64u, 64u, 8u, emptyList(), RenderList(info, emptyList()),page), 1L, sequence) }
     fun select() { api.exists = true; ui.useObject("selection") }
     fun close() { immediate { ui.detach() }; scope.cancel() }
 }

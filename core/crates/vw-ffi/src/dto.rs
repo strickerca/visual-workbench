@@ -25,6 +25,8 @@ pub struct ProjectInfo {
 pub struct EditPrecondition {
     pub host_seq: u64,
     pub state_hash: String,
+    /// PDF page selected by the caller; checked atomically against every target.
+    pub page_index: Option<u32>,
 }
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct StrokeOptions {

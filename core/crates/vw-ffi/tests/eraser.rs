@@ -48,6 +48,7 @@ async fn request(
 ) -> VectorEraseOptions {
     let info = project.info().await.unwrap();
     VectorEraseOptions {
+        page_index: None,
         binding: WorkflowBinding {
             project_id: info.project_id,
             document_id: id(2),
