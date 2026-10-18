@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "status": "focused module checks passed; two frozen Android caller defects reproduced; combined candidate build/runtime pending",
+  "candidate": "070758ac3b0537b4ea9efc0f6d21b23792d47762",
+  "reserved_files_edited": false,
+  "new_executed_tests": {
+    "shared_native_backed": 17,
+    "placement_grid": 6,
+    "android_input_methods_on_host": 5,
+    "native_precision": 8,
+    "passing_module_cases": 36
+  },
+  "caller_probes": {
+    "android_constructor_current": "compile exit 1: missing changed argument and Unit/renderMatrix type mismatch",
+    "android_constructor_corrected": "compile exit 0: changed = { ... }",
+    "hover_exit_current_sequence": "expected behavior assertion fails: 450ms hold becomes 50ms click after helper reset",
+    "hover_exit_preserve_press_clock_sequence": "passes; no queued toggle"
+  },
+  "candidate_precision_sources": [
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PrecisionApi.kt",
+      "sha256": "0cff9dbede35d6a1cedcd2452cfe6c2fb7c37496fb554234367b7d11a5f5e2ff"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PrecisionController.kt",
+      "sha256": "81013ccf77e0ba754f009e8fd352c6cf7bb49fc9f0fad3ff8900886c0963968a"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PrecisionGrid.kt",
+      "sha256": "e4c2e6fb06d23cda8274b35c8c4b3702139b786306455bce54c626524c7de354"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativePrecision.kt",
+      "sha256": "2082be9bf46e965f235a0cf8f7ef6848324e89aa12dd761635c2b2568e19ed0e"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PrecisionTest.kt",
+      "sha256": "df41706373dbabcd1feb71ef7db11dfb8d61fb0a251011a18d8134b3567a9fc7"
+    },
+    {
+      "path": "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/PrecisionPlacementTest.kt",
+      "sha256": "3f0d1189dc85732c7cda4c3ecff0b2f0c96993aac2a1da52924274f1f657477e"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/input/StylusInput.kt",
+      "sha256": "1ce7ee5cf6628ffc2a090d32d851fcac079109cee64991a9e97ba51f14e82484"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/precision/PrecisionInput.kt",
+      "sha256": "204a2bbb02ab2be0da1c9e91d101b700a5d0fefb06f18ba05e0f1c44a17e651d"
+    },
+    {
+      "path": "apps/android/src/androidTest/kotlin/com/visualworkbench/android/PrecisionInstrumentedTest.kt",
+      "sha256": "a0da95dd94c8f5ee78190334615c77f2e0221c4fc549dd22287dfea2a1de2cec"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/precision.rs",
+      "sha256": "42733305a2904dab97a43a56cd42af92dbed4ebf439728c450fdb18c20fe11af"
+    },
+    {
+      "path": "core/crates/vw-ffi/tests/precision.rs",
+      "sha256": "68db00fab3ed328d23d0d68289aa996431c321b6413eabd09e2fb097c3628db8"
+    }
+  ],
+  "compilation": {
+    "kotlin": "2.4.20; -Werror; current precision common/API/native actual slice additionally -Xexplicit-api=strict",
+    "android_api": "37.0; current StylusInput.kt + PrecisionInput.kt compile with no warnings",
+    "native_test": "Rust 1.99.0; frozen precision.rs test source; -D warnings; linked to prior compatible vw_core rlib",
+    "no_full_app_or_current_combined_native_build": true
+  },
+  "native_reuse": {
+    "artifact_sha256": "6fa9987451e923ca3584dfb6f3e7f07d326b3a9ec584ed1d778efa8c805f5569",
+    "precision_source_matches_after_rustfmt": true,
+    "not_full_070758_native_source_closure": true,
+    "description": "Frozen precision sources/tests compiled against unchanged precision-compatible baseline ABI and native math artifact; new document/image/root-native composition is deferred to coordinator"
+  },
+  "historical_evidence_reused": {
+    "checkpoint": "1d0f2fd4030272db0acb29a47a4d18d1a1fea79e",
+    "geometry_cases": 6,
+    "desktop_renderer_hit_cases": 5,
+    "geometry_source_and_test_bytes_unchanged": true,
+    "desktop_leaf_helper_test_and_canonical_functions_unchanged": true,
+    "not_rerun_in_this_pass": true
+  },
+  "android_instrumentation": {
+    "actual_suite_executed": 0,
+    "written": 9,
+    "host_input_method_bodies_recompiled_and_executed": [
+      "acceptedAndPredictedRoutingPreservesEveryNonCoordinateField",
+      "inspectionOnAndOffPreservesAllAcceptedSampleBits",
+      "physicalHoldAcrossHoverToContactDoesNotBecomeAShortClick",
+      "shortReleaseBeforeUpQueuesExactlyOneToggleAndCancellationNeverClicks",
+      "snapCalibrationCapturesLensPhysicalPixelsBeforeQueuedClose"
+    ],
+    "host_slice_is_not_instrumentation_or_device_acceptance": true
+  },
+  "failure_receipts": [
+    {
+      "name": "constructor-invalid.log",
+      "sha256": "c5cadc5f79941d9ae69d94e481ba180edbafa7c0f0009c14f80274643e05fc95"
+    },
+    {
+      "name": "constructor-corrected.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "current-shared-compile.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "current-test-compile.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "focused-jvm-tests.log",
+      "sha256": "0b7d1d09b20875fa88e6071f8defdacd33ab94f37b92b336158fee8f09c88bf6"
+    },
+    {
+      "name": "native-test-compile.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "native-tests.log",
+      "sha256": "34e92f5646af7764b0a035e21731a45063948ef1f95eb8b95cf9100ef98219b4"
+    },
+    {
+      "name": "hover-probe-compile.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "hover-probe-tests.log",
+      "sha256": "2a69ff7e4a6668da19dc8662e7b0d4ec9bbb03397e68f62b0b1d5aed3321411d"
+    }
+  ],
+  "probe_sources": [
+    {
+      "name": "constructor-invalid.kt",
+      "sha256": "8e8525281a982ef15c9e9ce2437b1f373046760066cf1ae53e3c8b99ed041040"
+    },
+    {
+      "name": "constructor-corrected.kt",
+      "sha256": "a4b11955917022a7562ae99e89b10de95c6e105b33ed550619be4c9a5377e57d"
+    },
+    {
+      "name": "PrecisionAndroidInputHostSliceTest.kt",
+      "sha256": "5e9e1c300c9402113d32c396f0565129d61060948623b9e1844b047e83cc1eeb"
+    },
+    {
+      "name": "PrecisionHoverExitCallerProbeTest.kt",
+      "sha256": "c7963946039078e9074436cf4e67f9144ac6d98b08cdb8a08ef3b4f69e0f36e9"
+    }
+  ],
+  "heavy_slot": "released; no compilation/test process remains",
+  "pending": [
+    "Coordinator fixes Android constructor at EditorController.kt:61",
+    "Coordinator preserves barrel clock across hover-to-contact at CanvasSurface.kt:224",
+    "Coordinator current complete native/binding/app validation after document repairs",
+    "Nine Android instrumentation cases and S Pen calibration/physical acceptance",
+    "A03/A04/A05 and owner gates remain pending"
+  ]
+}
