@@ -81,6 +81,25 @@ fn no_scratch(root: &Path) {
             .starts_with("vw-raster-")
     }));
 }
+fn embedded_tiff_metadata(bytes: &[u8]) -> vw_raster::ExportMetadata {
+    assert_eq!(&bytes[..4], b"II*\0");
+    let ifd = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
+    let count = u16::from_le_bytes(bytes[ifd..ifd + 2].try_into().unwrap()) as usize;
+    let at = (0..count)
+        .map(|i| ifd + 2 + i * 12)
+        .find(|&at| u16::from_le_bytes(bytes[at..at + 2].try_into().unwrap()) == 270)
+        .unwrap();
+    assert_eq!(
+        u16::from_le_bytes(bytes[at + 2..at + 4].try_into().unwrap()),
+        2
+    );
+    let len = u32::from_le_bytes(bytes[at + 4..at + 8].try_into().unwrap()) as usize;
+    assert!(len > 4 && len <= vw_formats::MAX_METADATA_BYTES + 1);
+    let offset = u32::from_le_bytes(bytes[at + 8..at + 12].try_into().unwrap()) as usize;
+    let text = &bytes[offset..offset + len];
+    assert_eq!(text.last(), Some(&0));
+    serde_json::from_slice(&text[..text.len() - 1]).unwrap()
+}
 fn binding(info: &ProjectInfo) -> WorkflowBinding {
     WorkflowBinding {
         project_id: info.project_id.clone(),
@@ -125,7 +144,8 @@ async fn ordinary_memory_bmp_intake_preserves_immutable_encoded_original_and_pro
     assert!(!format.untagged);
     let mut export = options();
     export.marked = false;
-    export.format = ImageFormat::Bmp8;
+    // BMP intake remains supported; publish through TIFF's admitted metadata carrier.
+    export.format = ImageFormat::Tiff8;
     let result = project.export_image(export, cancel()).await.unwrap();
     let decoded = vw_formats::decode(&result.bytes, vw_formats::Limits::default(), &|| false)
         .unwrap()
@@ -282,12 +302,11 @@ async fn ordinary_attachment_intake_retains_tiff_notice_depth_and_hash() {
 }
 
 #[tokio::test]
-async fn finalized_file_hash_and_preflight_depth_match_exact_clean_pixels_for_all_formats() {
+async fn finalized_tiff_bytes_contain_source_revision_and_exact_clean_pixels_at_both_depths() {
     let root = temp();
     let (image, bytes) = fixture(8);
     let project = memory_project(&root.path().join("project"), bytes).await;
     for (name, format, depth) in [
-        ("clean.bmp", ImageFormat::Bmp8, 8),
         ("clean.tiff", ImageFormat::Tiff8, 8),
         ("clean16.tiff", ImageFormat::Tiff16, 16),
     ] {
@@ -303,6 +322,29 @@ async fn finalized_file_hash_and_preflight_depth_match_exact_clean_pixels_for_al
             .await
             .unwrap();
         let output = std::fs::read(root.path().join(name)).unwrap();
+        let embedded = embedded_tiff_metadata(&output);
+        assert_eq!(
+            embedded.revision,
+            format!(
+                "r{}-{}",
+                result.revision.host_seq,
+                &result.revision.state_hash[..8]
+            )
+        );
+        assert_eq!(embedded.source_asset, image_asset(&project).await);
+        assert_eq!(
+            embedded.settings.revision.host_seq,
+            result.revision.host_seq
+        );
+        assert_eq!(
+            embedded.settings.revision.state_hash,
+            AssetId::try_from(result.revision.state_hash.clone())
+                .unwrap()
+                .bytes()
+                .to_vec()
+        );
+        assert_eq!(embedded.settings.capture_session, None);
+        assert_eq!(embedded.settings.frame_id, None);
         assert_eq!(result.encoded_bytes, output.len() as u64);
         assert_eq!(result.blake3, AssetId::hash(&output).to_string());
         let decoded = vw_formats::decode(&output, vw_formats::Limits::default(), &|| false)
@@ -326,6 +368,32 @@ async fn finalized_file_hash_and_preflight_depth_match_exact_clean_pixels_for_al
         assert_eq!(metadata.source_asset, image_asset(&project).await);
         no_scratch(root.path());
     }
+    project.close().await.unwrap();
+}
+
+#[tokio::test]
+async fn bmp_export_is_refused_instead_of_publishing_a_file_without_required_provenance() {
+    let root = temp();
+    let (_, bytes) = fixture(8);
+    let project = memory_project(&root.path().join("project"), bytes).await;
+    let mut request = options();
+    request.marked = false;
+    request.format = ImageFormat::Bmp8;
+    assert!(matches!(
+        project.export_image(request, cancel()).await,
+        Err(CoreError::Raster)
+    ));
+    assert!(matches!(
+        project
+            .export_transfer_file(
+                output(root.path(), "gated.bmp", ImageFormat::Bmp8),
+                cancel()
+            )
+            .await,
+        Err(TransferError::Unsupported)
+    ));
+    assert!(!root.path().join("gated.bmp").exists());
+    no_scratch(root.path());
     project.close().await.unwrap();
 }
 async fn image_asset(project: &ProjectSession) -> String {
@@ -540,5 +608,34 @@ mod avif_missing_codec {
             Err(CoreError::ImageCodecUnavailable)
         ));
         assert!(!path.exists());
+    }
+
+    #[tokio::test]
+    async fn admitted_avif_file_import_keeps_the_typed_missing_codec_failure() {
+        let root = temp();
+        let path = root.path().join("unavailable-avif-file");
+        let input = root.path().join("admitted-source.avif");
+        std::fs::write(&input, ordinary()).unwrap();
+        let result = create_file_image_project(
+            CreateFileImageProject {
+                path: path.to_string_lossy().into(),
+                project_id: id(1),
+                document_id: id(2),
+                layer_id: id(3),
+                device_id: device(),
+                title: "Unavailable AVIF fixture".into(),
+                source_path: input.to_string_lossy().into(),
+                work_directory: root.path().to_string_lossy().into(),
+                now_ms: TIME,
+                memory_budget_bytes: 256 * 1024 * 1024,
+                max_encoded_bytes: 64 * 1024 * 1024,
+                max_scratch_bytes: 400_000_000,
+            },
+            cancel(),
+        )
+        .await;
+        assert!(matches!(result, Err(CoreError::ImageCodecUnavailable)));
+        assert!(!path.exists());
+        no_scratch(root.path());
     }
 }

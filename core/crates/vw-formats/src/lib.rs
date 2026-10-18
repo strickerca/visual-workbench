@@ -106,11 +106,51 @@ pub struct ExportReceipt {
 /// Writes only to caller-owned private staging. Caller must fsync, hash and
 /// atomically publish after success and its exact revision check. No automatic
 /// depth, profile, alpha or size conversion occurs here. A preview whose original
-/// is unavailable cannot be exported through this boundary.
+/// is unavailable cannot be exported through this boundary. This raw codec
+/// primitive carries no application provenance; standalone application exports
+/// must use `encode_to_with_metadata`.
 pub fn encode_to(
     image: &DecodedImage,
     format: ExportFormat,
     limits: Limits,
+    output: &mut dyn WriteSeek,
+    cancel: &dyn Fn() -> bool,
+) -> Result<ExportReceipt> {
+    encode(image, format, limits, None, output, cancel)
+}
+
+/// Maximum application provenance payload, excluding the TIFF NUL terminator.
+pub const MAX_METADATA_BYTES: usize = 16 * 1024;
+
+/// Store application provenance in TIFF's standard ASCII ImageDescription tag.
+/// The caller supplies serialized metadata for this exact source and revision.
+/// BMP has no admitted provenance carrier and is refused before writing bytes.
+pub fn encode_to_with_metadata(
+    image: &DecodedImage,
+    format: ExportFormat,
+    limits: Limits,
+    metadata: &str,
+    output: &mut dyn WriteSeek,
+    cancel: &dyn Fn() -> bool,
+) -> Result<ExportReceipt> {
+    check(cancel)?;
+    if format == ExportFormat::Bmp8 {
+        return Err(Error::Unsupported);
+    }
+    if metadata.len() > MAX_METADATA_BYTES {
+        return Err(Error::Limit);
+    }
+    if metadata.is_empty() || !metadata.is_ascii() || metadata.as_bytes().contains(&0) {
+        return Err(Error::Invalid);
+    }
+    encode(image, format, limits, Some(metadata), output, cancel)
+}
+
+fn encode(
+    image: &DecodedImage,
+    format: ExportFormat,
+    limits: Limits,
+    metadata: Option<&str>,
     output: &mut dyn WriteSeek,
     cancel: &dyn Fn() -> bool,
 ) -> Result<ExportReceipt> {
@@ -163,7 +203,7 @@ pub fn encode_to(
     let mut bounded = io::Output::new(output, limits.output_bytes, cancel)?;
     match format {
         ExportFormat::Bmp8 => bmp::encode(image, &mut bounded)?,
-        ExportFormat::Tiff8 | ExportFormat::Tiff16 => tiff::encode(image, &mut bounded)?,
+        ExportFormat::Tiff8 | ExportFormat::Tiff16 => tiff::encode(image, &mut bounded, metadata)?,
     }
     let bytes = bounded.finish()?;
     check(cancel)?;
