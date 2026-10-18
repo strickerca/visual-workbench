@@ -91,4 +91,15 @@ class DiagnosticsBundleTest {
         assertTrue(report.jsonText.all { it.code in 0..127 })
         assertTrue(report.jsonText.endsWith("\n"))
     }
+
+    @Test fun rejectedClockCannotRotateOrChangeTheFrozenPreview() {
+        val log = PrivateDiagnosticLog(capacity = 1)
+        log.append(10L, DiagnosticEventCode.AppStarted)
+        val before = log.prepare(DiagnosticPlatform.Android, DiagnosticMetrics())
+        assertFailsWith<IllegalArgumentException> { log.append(9L, DiagnosticEventCode.ExportSucceeded) }
+        val after = log.prepare(DiagnosticPlatform.Android, DiagnosticMetrics())
+        assertEquals(before.jsonText, after.jsonText)
+        assertEquals(0L, after.rotatedEventCount)
+        assertFalse(after.jsonText.contains("export_succeeded"))
+    }
 }

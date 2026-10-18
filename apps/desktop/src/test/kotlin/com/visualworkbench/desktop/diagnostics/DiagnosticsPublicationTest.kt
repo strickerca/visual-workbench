@@ -5,6 +5,7 @@ import com.visualworkbench.shared.DiagnosticMetrics
 import com.visualworkbench.shared.DiagnosticPlatform
 import com.visualworkbench.shared.PrivateDiagnosticLog
 import java.nio.file.Files
+import java.nio.file.Path
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -103,6 +104,66 @@ class DiagnosticsPublicationTest {
         val writer = DiagnosticPublication(prepared(), directory.resolve("report.json"), nowNanos = {
             if (++calls == 1) 0L else 6_000_000_000L
         })
+        assertEquals(DiagnosticWriteResult.Failed, writer.write())
+        assertFalse(writer.published)
+        assertFalse(writer.cleanupPending)
+        Files.list(directory).use { assertEquals(0L, it.count()) }
+    }
+
+    @Test fun deadlineAfterWritingRetiresTheSiblingWithoutExposingPartialOutput() {
+        val directory = temporary.newFolder().toPath()
+        var sawWrittenSibling = false
+        val writer = DiagnosticPublication(prepared(), directory.resolve("report.json"), nowNanos = {
+            val hasBytes = Files.list(directory).use { paths ->
+                paths.anyMatch { it.fileName.toString().endsWith(".tmp") && Files.size(it) > 0 }
+            }
+            if (hasBytes) sawWrittenSibling = true
+            if (sawWrittenSibling) 6_000_000_000L else 0L
+        })
+        assertEquals(DiagnosticWriteResult.Failed, writer.write())
+        assertTrue(sawWrittenSibling)
+        assertFalse(writer.published)
+        assertFalse(writer.cleanupPending)
+        Files.list(directory).use { assertEquals(0L, it.count()) }
+    }
+
+    @Test fun replacedSiblingIsHeldForCleanupAndForeignBytesAreNeverDeleted() {
+        val directory = temporary.newFolder().toPath()
+        val retained = directory.resolve("retained-owned-file")
+        val foreignBytes = byteArrayOf(10, 20, 30)
+        var replaced: Path? = null
+        val writer = DiagnosticPublication(prepared(), directory.resolve("report.json"), nowNanos = {
+            if (replaced == null) {
+                val sibling = Files.list(directory).use { paths ->
+                    paths.filter { it.fileName.toString().endsWith(".tmp") && Files.size(it) > 0 }.findFirst().orElse(null)
+                }
+                if (sibling != null) {
+                    Files.move(sibling, retained)
+                    Files.write(sibling, foreignBytes, java.nio.file.StandardOpenOption.CREATE_NEW)
+                    replaced = sibling
+                }
+            }
+            0L
+        })
+        assertEquals(DiagnosticWriteResult.Failed, writer.write())
+        val foreign = checkNotNull(replaced)
+        assertTrue(writer.cleanupPending)
+        assertFalse(writer.published)
+        assertFalse(writer.cleanup())
+        assertArrayEquals(foreignBytes, Files.readAllBytes(foreign))
+        assertFalse(Files.exists(directory.resolve("report.json")))
+        // Restore the original identity explicitly; only then may its owner retire it.
+        Files.delete(foreign)
+        Files.move(retained, foreign)
+        assertTrue(writer.cleanup())
+        assertTrue(writer.cleanup())
+        assertFalse(writer.cleanupPending)
+        Files.list(directory).use { assertEquals(0L, it.count()) }
+    }
+
+    @Test fun invalidDestinationExtensionCreatesNoTemporaryOrFinalFile() {
+        val directory = temporary.newFolder().toPath()
+        val writer = DiagnosticPublication(prepared(), directory.resolve("report.txt"))
         assertEquals(DiagnosticWriteResult.Failed, writer.write())
         assertFalse(writer.published)
         assertFalse(writer.cleanupPending)

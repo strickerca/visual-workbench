@@ -6,8 +6,10 @@ import com.visualworkbench.shared.DiagnosticPlatform
 import com.visualworkbench.shared.PreparedDiagnosticsReport
 import com.visualworkbench.shared.PrivateDiagnosticLog
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -64,6 +66,41 @@ class DiagnosticReportWriterTest {
         assertEquals(1, opens)
     }
 
+    @Test fun closeFailureCannotBeReportedAsASuccessfulExport() {
+        val output = OwnedOutput(failClose = true)
+        assertThrows(IOException::class.java) { writePreparedDiagnosticsReport(report()) { output } }
+        assertEquals(1, output.flushes)
+        assertEquals(1, output.closes)
+    }
+
+    @Test fun closeFailurePreservesTheOriginalWriteFailure() {
+        val output = OwnedOutput(failWrite = true, failClose = true)
+        val failure = assertThrows(IOException::class.java) { writePreparedDiagnosticsReport(report()) { output } }
+        assertEquals("Write failed", failure.message)
+        assertEquals(1, failure.suppressed.size)
+        assertEquals("Close failed", failure.suppressed.single().message)
+        assertEquals(1, output.closes)
+    }
+
+    @Test fun cancellingAWaiterDoesNotCancelOrReleaseTheActualWriter() = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val release = CountDownLatch(1)
+        val output = OwnedOutput(flushEntered = entered, flushRelease = release)
+        val preview = report()
+        val writer = launch { withContext(Dispatchers.IO) { writePreparedDiagnosticsReport(preview) { output } } }
+        try {
+            withTimeout(5_000L) { entered.await() }
+            val waiter = launch(start = CoroutineStart.UNDISPATCHED) { awaitPreparedReportWriter(writer) }
+            waiter.cancelAndJoin()
+            assertTrue(writer.isActive)
+            assertEquals(0, output.closes)
+            release.countDown()
+            assertTrue(awaitPreparedReportWriter(writer))
+            assertArrayEquals(preview.jsonText.toByteArray(Charsets.UTF_8), output.bytes.toByteArray())
+            assertEquals(1, output.closes)
+        } finally { release.countDown(); withTimeout(5_000L) { writer.join() } }
+    }
+
     @Test fun expiredWaitRetainsOwnedStreamUntilLateSettlement() = runBlocking {
         val entered = CompletableDeferred<Unit>()
         val release = CountDownLatch(1)
@@ -103,6 +140,7 @@ class DiagnosticReportWriterTest {
     private class OwnedOutput(
         private val failWrite: Boolean = false,
         private val failFlush: Boolean = false,
+        private val failClose: Boolean = false,
         private val flushEntered: CompletableDeferred<Unit>? = null,
         private val flushRelease: CountDownLatch? = null,
     ) : OutputStream() {
@@ -123,6 +161,9 @@ class DiagnosticReportWriterTest {
             flushEntered?.complete(Unit)
             flushRelease?.await()
         }
-        override fun close() { closes += 1 }
+        override fun close() {
+            closes += 1
+            if (failClose) throw IOException("Close failed")
+        }
     }
 }
