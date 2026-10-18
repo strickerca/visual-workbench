@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Optional Samsung declarative module. The integration owner registers this
+     resource on the single Activity that delegates KeyEvents to AirActionKeys.
+     Stable key slots have app-side remaps; labels describe their defaults. -->
+<remote-actions version="1.2">
+    <action id="lens_toggle" label="@string/air_action_lens" priority="1" trigger_key="F1"><preference name="gesture" value="click" /></action>
+    <action id="fit_restore" label="@string/air_action_fit" priority="2" trigger_key="F2"><preference name="gesture" value="double_click" /></action>
+    <action id="undo" label="@string/air_action_undo" priority="3" trigger_key="F3"><preference name="gesture" value="swipe_left" /></action>
+    <action id="redo" label="@string/air_action_redo" priority="4" trigger_key="F4"><preference name="gesture" value="swipe_right" /></action>
+    <action id="previous_tool" label="@string/air_action_previous_tool" priority="5" trigger_key="F5"><preference name="gesture" value="swipe_up" /></action>
+    <action id="next_tool" label="@string/air_action_next_tool" priority="6" trigger_key="F6"><preference name="gesture" value="swipe_down" /></action>
+    <action id="lens_increase" label="@string/air_action_increase" priority="7" trigger_key="F7"><preference name="gesture" value="circle_cw" /></action>
+    <action id="lens_decrease" label="@string/air_action_decrease" priority="8" trigger_key="F8"><preference name="gesture" value="circle_ccw" /></action>
+</remote-actions>
