@@ -1,6 +1,6 @@
 {
   "source_head": "fb824935a331d7d16a7e50620b5ed611dccceb4a",
-  "status": "Document findings resolved in reviewed owner checkpoint; image owner fixes and combined app validation pending",
+  "status": "All four module findings resolved in reviewed owner checkpoints; independent review and combined app validation pending",
   "findings": [
     {
       "owner": "document lane",
@@ -18,19 +18,37 @@
       "owner": "image lane",
       "location": "core/crates/vw-formats/src/tiff_header.rs:135",
       "issue": "FillOrder tag 266 is admitted without checking its value. Pinned tiff 0.11.3 declares FillOrder with TODO support and its decoder does not interpret it.",
-      "action": "Reject nondefault FillOrder before decoder entry; verify with an independent 1x1 reversed-bit-order fixture. Pixel decoding was not executed in this review."
+      "action": "Reject nondefault FillOrder before decoder entry; verify with an independent 1x1 reversed-bit-order fixture. Pixel decoding was not executed in this review.",
+      "resolution": {
+        "owner_commit": "d406b755effd90da7a748a1fb84a1fa862f753af",
+        "source_review": "Nondefault TIFF FillOrder and unsupported explicit legacy color declarations are refused before decoder entry. Tile completion requires the current generation and retirement requeues wanted tiles without duplicates, with visible tiles ahead of prefetch.",
+        "owner_tests": "55 module tests and 5 R164 display tests passed; strict Clippy and Cargo license/source/bans passed. Dedicated regressions cover all three findings.",
+        "runtime_limits": "Platform decoding, FFI/app/blob/GPU wiring and performance acceptance remain pending. No repeated build in integration lane."
+      }
     },
     {
       "owner": "image lane",
       "location": "core/crates/vw-formats/src/tiff_header.rs:263",
       "issue": "Legacy explicit color declarations, including TransferFunction, WhitePoint, PrimaryChromaticities and GrayResponseCurve, pass admission while only ICC is retained. Unsupported declared color can become UntaggedColor.",
-      "action": "Preserve and interpret supported declarations or return Error::Color when they cannot be honored; add small fixtures for the admitted/refused cases."
+      "action": "Preserve and interpret supported declarations or return Error::Color when they cannot be honored; add small fixtures for the admitted/refused cases.",
+      "resolution": {
+        "owner_commit": "d406b755effd90da7a748a1fb84a1fa862f753af",
+        "source_review": "Nondefault TIFF FillOrder and unsupported explicit legacy color declarations are refused before decoder entry. Tile completion requires the current generation and retirement requeues wanted tiles without duplicates, with visible tiles ahead of prefetch.",
+        "owner_tests": "55 module tests and 5 R164 display tests passed; strict Clippy and Cargo license/source/bans passed. Dedicated regressions cover all three findings.",
+        "runtime_limits": "Platform decoding, FFI/app/blob/GPU wiring and performance acceptance remain pending. No repeated build in integration lane."
+      }
     },
     {
       "owner": "image lane",
       "location": "core/crates/vw-assets/src/scheduler.rs:87",
       "issue": "finish checks current tile membership but ignores the request viewport generation. viewport(A), next(r), cancel_view(), viewport(A), finish(r) permits the cancelled result again, contrary to the shared ownership contract.",
-      "action": "Check generation at completion and preserve/requeue still-wanted tiles when retiring older requests, including tiles skipped by next while an older request remained active."
+      "action": "Check generation at completion and preserve/requeue still-wanted tiles when retiring older requests, including tiles skipped by next while an older request remained active.",
+      "resolution": {
+        "owner_commit": "d406b755effd90da7a748a1fb84a1fa862f753af",
+        "source_review": "Nondefault TIFF FillOrder and unsupported explicit legacy color declarations are refused before decoder entry. Tile completion requires the current generation and retirement requeues wanted tiles without duplicates, with visible tiles ahead of prefetch.",
+        "owner_tests": "55 module tests and 5 R164 display tests passed; strict Clippy and Cargo license/source/bans passed. Dedicated regressions cover all three findings.",
+        "runtime_limits": "Platform decoding, FFI/app/blob/GPU wiring and performance acceptance remain pending. No repeated build in integration lane."
+      }
     }
   ],
   "diagnostics": {

@@ -75,5 +75,12 @@
     "Windows native chooser focus/cancel/retry and slow filesystem shutdown scenarios",
     "Android screen/controller compilation and provider export lifecycle",
     "No hardware, provider quality or physical pen gate is passed"
-  ]
+  ],
+  "planned_combined_validation": {
+    "status": "planned only; wait for parent slot handoff after precision",
+    "script_sha256": "de22e3568f6c98aa4d9d6c8b39f66054dcca4282afb610482eead8c5c43a4b68",
+    "script": "#!/usr/bin/env bash\nset -euo pipefail\ncd /workspace/visual-workbench\nsource /workspace/.vw-tools/cloud-setup/start.sh\ncargo deny --offline check licenses sources bans\nbash apps/gradlew -p apps checkDependencyLicenses --console=plain --no-daemon --no-parallel --max-workers=2\ncargo test --locked -p vw-document-protocol -- --test-threads=2\ncargo build --locked -p vw-ffi -p vw-host-ffi --features vw-ffi/bindgen --lib --bin vw-bindgen\ncargo ndk -t arm64-v8a --platform 29 -o target/android-jni build --locked -p vw-ffi\n# Focused Linux-host tests compile the actual apps. The Windows-only desktop\n# helper resource task is excluded only here; product packaging remains untested.\nbash apps/gradlew -p apps \\\n  :shared:desktopTest --tests com.visualworkbench.shared.DiagnosticsBundleTest \\\n  :desktop:test --tests com.visualworkbench.desktop.DesktopDiagnosticsLifecycleTest \\\n  --tests com.visualworkbench.desktop.diagnostics.DiagnosticsPublicationTest \\\n  :android:testDebugUnitTest --tests com.visualworkbench.android.diagnostics.DiagnosticReportWriterTest \\\n  :android:lintDebug -x :desktop:packageConnectionRuntime \\\n  --console=plain --no-daemon --no-parallel --max-workers=2\n",
+    "outer_command": "flock -n /workspace/.vw-tools/heavy-build.lock timeout --signal=TERM --kill-after=20s 40m bash /tmp/vw-combined-app-validation.sh > /tmp/vw-combined-app-validation.log 2>&1",
+    "windows_packaging_limit": "Excluding :desktop:packageConnectionRuntime is restricted to focused Linux-host unit tests. No distributable or Windows helper inventory is accepted by this run."
+  }
 }
