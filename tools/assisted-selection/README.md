@@ -374,7 +374,16 @@ only trusted root composition may inject detached `LiteRtReviewedAdmission`
 records with exact manifest/APK/license/runtime/memory evidence.
 
 Actual LiteRT 2.3.0 AAR/Android 37 API jars passed focused Kotlin compilation with
-`-Werror` and explicit API checks. The native source factory was linked through a
+`-Werror` and explicit API checks. The final host JUnit rerun passed **22 tests**:
+nine tensor/resize samples, four ownership/worker checks and nine catalog/metadata
+checks. These are host tests from the Android test leaves, not device passes.
+The final metadata reader rejects dynamic intermediate tensors, external buffer
+storage, invalid signed operator references, mutable/custom options and duplicate
+signatures/IO, matching the Python refusal policy. Its vector visits share the
+two-million-read cap. Read-only Sol review confirmed the repair at Git blobs
+`a88a6ca5736e26de1724434f0fee8204fc7c3e4d` (reader) and
+`7f493b7cd509f0d97389a0d2dc46733297348735` (tests); parent Astra review remains
+separate. The native source factory was linked through a
 temporary signature-only fixture: regenerated ABI and actual caller builds remain
 unrun. No `Environment`, `CompiledModel`, learned-model inference, Android service
 or device execution occurred. Sampled resize goldens came from installed Pillow

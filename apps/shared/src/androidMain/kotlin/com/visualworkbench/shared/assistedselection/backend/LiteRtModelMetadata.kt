@@ -10,15 +10,29 @@ import kotlinx.coroutines.ensureActive
  * already hashed local child; custom/Flex/delegate opcodes are rejected. */
 internal fun inspectFlatbuffer(spec: ModelSpec, task: CoroutineContext = EmptyCoroutineContext) {
     RandomAccessFile(spec.file,"r").use { file ->
+        if (spec.bytes !in 8..134217728L || file.length() != spec.bytes) corrupt()
         val fb=Metadata(file,spec.bytes,task)
         if (fb.i32(4) != 0x334c4654) corrupt() // TFL3, little endian.
-        val model=fb.i32(0).toLong(); if (fb.scalar(model,0,0) != 3) corrupt()
+        val model=fb.indirect(0); if (fb.scalar(model,0,0) != 3) corrupt()
         val graphs=fb.vector(model,2,1); if (graphs.size != 1) corrupt()
         val graph=fb.indirect(graphs.single())
         val tensors=fb.vector(graph,0,32768).map(fb::indirect)
+        if (tensors.isEmpty()) corrupt()
+        val buffers=fb.vector(model,4,32768).map(fb::indirect)
+        if (buffers.isEmpty()) corrupt()
+        buffers.forEach {
+            if (fb.longScalar(it,1) != 0L || fb.longScalar(it,2) != 0L) corrupt()
+            fb.byteVectorSize(it,0,134217728)
+        }
+        tensors.forEach {
+            if (fb.scalar(it,2,0) !in buffers.indices || fb.byteScalar(it,5,0) != 0 || fb.byteScalar(it,1,0) in setOf(13,14)) corrupt()
+            val shape=fb.vector(it,0,8).map(fb::i32)
+            val signature=fb.vector(it,7,8).map(fb::i32)
+            if (shape.any { dimension -> dimension !in 0..16777216 } || signature.isNotEmpty() && signature != shape) corrupt()
+        }
         fun check(specs: List<TensorSpec>, field: Int) {
             val indices=fb.vector(graph,field,8).map { fb.i32(it) }
-            if (indices.toSet() != specs.map { it.index }.toSet() || indices.size != specs.size) corrupt()
+            if (indices.distinct().size != indices.size || indices.toSet() != specs.map { it.index }.toSet() || indices.size != specs.size) corrupt()
             specs.forEach {
                 val tensor=tensors.getOrNull(it.index) ?: corrupt()
                 val type=fb.byteScalar(tensor,1,0)
@@ -27,31 +41,43 @@ internal fun inspectFlatbuffer(spec: ModelSpec, task: CoroutineContext = EmptyCo
             }
         }
         check(spec.inputs,1); check(spec.outputs,2)
-        val codes=fb.vector(model,1,256).map {
+        val codes=fb.vector(model,1,512).map {
             val table=fb.indirect(it)
-            if (fb.field(table,1) != 0L) corrupt()
-            val code=fb.scalar(table,3,0).takeIf { value -> value != 0 } ?: fb.byteScalar(table,0,0)
+            if (fb.optionalStringField(table,1).isNotEmpty()) corrupt()
+            val deprecated=fb.byteScalar(table,0,0).toByte().toInt()
+            val code=maxOf(fb.scalar(table,3,0),deprecated)
             val version=fb.scalar(table,2,1)
             if (code !in LITERT_BUILTINS || version !in 1..32) corrupt()
             code to version
         }
-        if (codes.distinct().size != codes.size || codes.sortedWith(compareBy({it.first},{it.second})) != spec.operators) corrupt()
+        if (codes.isEmpty() || codes.distinct().size != codes.size || codes.sortedWith(compareBy({it.first},{it.second})) != spec.operators) corrupt()
         val used=mutableSetOf<Int>()
-        fb.vector(graph,3,8192).forEach {
+        val operators=fb.vector(graph,3,8192)
+        if (operators.isEmpty()) corrupt()
+        operators.forEach {
             val operator=fb.indirect(it); val index=fb.scalar(operator,0,0)
             if (index !in codes.indices) corrupt()
             used+=index
+            for (field in listOf(1,2,8)) {
+                val minimum=if (field == 1) -1 else 0
+                if (fb.vector(operator,field,32768).any { at -> fb.i32(at) !in minimum until tensors.size }) corrupt()
+            }
+            if (fb.byteVectorSize(operator,5,32768) != 0 ||
+                fb.vector(operator,7,32768,1).any { at -> fb.byteAt(at) != 0 } ||
+                fb.longScalar(operator,9) != 0L || fb.longScalar(operator,10) != 0L) corrupt()
         }
         if (used != codes.indices.toSet()) corrupt()
-        val signatures=fb.vector(model,7,4).map(fb::indirect)
-        val signature=signatures.singleOrNull { fb.stringField(it,2) == spec.signature } ?: corrupt()
-        if (fb.scalar(signature,4,0) != 0) corrupt()
+        val signatures=fb.vector(model,7,2).map(fb::indirect)
+        if (signatures.size != 1) corrupt()
+        val signature=signatures.single()
+        if (spec.signature != "serving_default" || fb.stringField(signature,2) != spec.signature || fb.scalar(signature,4,0) != 0) corrupt()
         fun signatureTensors(field: Int, specs: List<TensorSpec>) {
             val bindings=fb.vector(signature,field,8).map {
                 val item=fb.indirect(it)
                 fb.stringField(item,0) to fb.scalar(item,1,0)
             }
-            if (bindings.size != specs.size || bindings.toSet() != specs.map { it.signatureName to it.index }.toSet()) corrupt()
+            if (bindings.map { it.first }.distinct().size != bindings.size || bindings.map { it.second }.distinct().size != bindings.size ||
+                bindings.size != specs.size || bindings.toSet() != specs.map { it.signatureName to it.index }.toSet()) corrupt()
         }
         signatureTensors(0,spec.inputs); signatureTensors(1,spec.outputs)
     }
@@ -59,12 +85,18 @@ internal fun inspectFlatbuffer(spec: ModelSpec, task: CoroutineContext = EmptyCo
 
 private class Metadata(private val file: RandomAccessFile, private val size: Long, private val task: CoroutineContext) {
     private var reads=0
+    private fun charge(amount: Int) {
+        if (amount < 0 || amount > 2_000_000-reads) limit()
+        if (reads == 0 || reads/128 != (reads+amount)/128) task.ensureActive()
+        reads+=amount
+    }
     private fun range(offset: Long, length: Long) {
-        if (++reads > 2_000_000) limit()
-        if (reads % 128 == 1) task.ensureActive()
+        charge(1)
         if (offset < 0 || length < 0 || offset > size-length) corrupt()
     }
     fun i32(offset: Long): Int { range(offset,4); file.seek(offset); return Integer.reverseBytes(file.readInt()) }
+    fun byteAt(offset: Long): Int { range(offset,1); file.seek(offset); return file.readUnsignedByte() }
+    private fun i64(offset: Long): Long { range(offset,8); file.seek(offset); return java.lang.Long.reverseBytes(file.readLong()) }
     private fun u16(offset: Long): Int { range(offset,2); file.seek(offset); return java.lang.Short.reverseBytes(file.readShort()).toInt() and 65535 }
     fun field(table: Long, index: Int): Long {
         range(table,4); val vtable=table-i32(table); val length=u16(vtable); val objectSize=u16(vtable+2)
@@ -76,23 +108,31 @@ private class Metadata(private val file: RandomAccessFile, private val size: Lon
         return table+offset
     }
     fun scalar(table: Long, index: Int, fallback: Int): Int = field(table,index).let { if (it == 0L) fallback else i32(it) }
-    fun byteScalar(table: Long, index: Int, fallback: Int): Int = field(table,index).let {
-        if (it == 0L) fallback else { range(it,1); file.seek(it); file.readUnsignedByte() }
-    }
+    fun byteScalar(table: Long, index: Int, fallback: Int): Int = field(table,index).let { if (it == 0L) fallback else byteAt(it) }
+    fun longScalar(table: Long, index: Int): Long = field(table,index).let { if (it == 0L) 0L else i64(it) }
     fun indirect(offset: Long): Long {
-        val relative=i32(offset); if (relative <= 0) corrupt()
+        val relative=i32(offset); if (relative < 4) corrupt()
         return (offset+relative).also { range(it,4) }
     }
-    fun vector(table: Long, index: Int, max: Int): List<Long> {
+    fun vector(table: Long, index: Int, max: Int, elementSize: Int = 4): List<Long> {
         val location=field(table,index); if (location == 0L) return emptyList()
         val base=indirect(location); val count=i32(base)
-        if (count !in 0..max) corrupt(); range(base+4,count.toLong()*4)
-        return List(count) { base+4+it*4L }
+        if (count !in 0..max || elementSize !in setOf(1,4)) corrupt()
+        charge(count); range(base+4,count.toLong()*elementSize)
+        return List(count) { base+4+it.toLong()*elementSize }
     }
-    fun stringField(table: Long, index: Int): String {
+    fun byteVectorSize(table: Long, index: Int, max: Int): Int {
+        val location=field(table,index); if (location == 0L) return 0
+        val base=indirect(location); val count=i32(base)
+        if (count !in 0..max) corrupt()
+        range(base+4,count.toLong())
+        return count
+    }
+    fun optionalStringField(table: Long, index: Int): String = if (field(table,index) == 0L) "" else stringField(table,index,4096,true)
+    fun stringField(table: Long, index: Int, max: Int = 256, allowEmpty: Boolean = false): String {
         val location=field(table,index); if (location == 0L) corrupt()
         val base=indirect(location); val count=i32(base)
-        if (count !in 1..256) corrupt(); range(base+4,count.toLong()+1)
+        if (count !in (if (allowEmpty) 0 else 1)..max) corrupt(); range(base+4,count.toLong()+1)
         file.seek(base+4); val bytes=ByteArray(count); file.readFully(bytes)
         if (file.readUnsignedByte() != 0 || bytes.any { (it.toInt() and 255) !in 32..126 }) corrupt()
         return bytes.decodeToString()
