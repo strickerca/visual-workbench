@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "task": "T3.11 dedicated offline review caller leaves",
+  "status": "source-candidate-unregistered-uncompiled-regressions-unrun",
+  "base_source_checkpoint": "7f5ff6fe8df0c43643ec617b5f774fb6f028c077",
+  "base_main": "83663107d864b21d22d2e746b9ca6eb80d47beac",
+  "branch": "feat/t3-11-offline-review",
+  "shared_seam_status": "proposed-additive-ABI-requires-coordinator-admission",
+  "owned_sources": [
+    {
+      "path": "core/crates/vw-store/src/conflict_review.rs",
+      "sha256": "652198b0a5ccf50da2d0b624501e8fa2c150139f4bd4c765246cfd76e93e3133"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/offline_review.rs",
+      "sha256": "d866084688b428bade5b71515585f7c35767995abb5f2946c4d347daedde1463"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/offline_review/dto.rs",
+      "sha256": "ca1efc0047bafd3e09f2273915ced9d3a8f53c38a46fe51b3818b62975863238"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/offline_review/tests.rs",
+      "sha256": "ddc797b0e8b98bd0ac82ebac413b1e20944dc21e9ebfaed9d2e325f633bffe2d"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/OfflineReviewApi.kt",
+      "sha256": "c7d18fc5c08133e389cf3b788ece4cae6317bd9c67292bf13674f9ed8b516919"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/OfflineReviewInteraction.kt",
+      "sha256": "b210289caef7da2904dbc886ac85fb789e086e5b85d671c76f05b8ca03f226c5"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeOfflineReview.kt",
+      "sha256": "3923afe369f8cbc99cfe978aefcccd46cd34485f5eda1da1775f2ffbc09c0a8c"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/OfflineReviewInteractionTest.kt",
+      "sha256": "0edecdb287b7346875ed03b6fe5d231ca2f2ce67c17672c0921653423f98a4d0"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/offline/OfflineReviewPanel.kt",
+      "sha256": "f0e728f457d98a4b7215f23d02ac63e5d4afa84af848e2a76a8ea957f27d8bd6"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/offline/OfflineReviewPanel.kt",
+      "sha256": "5e09fa71bf2d96496879ad294414a3424d5d678e24f96a506f616b43a4e29780"
+    },
+    {
+      "path": "docs/T3_11_OFFLINE_REVIEW_CALLER_HANDOFF_20261018.md",
+      "sha256": "ffa49fd271cda118614c029dfe009e73b7b83631aea93fb6c0bc25a66318994e"
+    }
+  ],
+  "preserved_store_tests": {
+    "path": "core/crates/vw-store/tests/conflict_review.rs",
+    "sha256": "8f002072fc13b749a26ae29e090e6a7b02f8cc896fc7e37acc1eaeb023cd03c6",
+    "written_cases": 15,
+    "byte_identical_to_base_checkpoint": true
+  },
+  "new_written_tests": {
+    "native_caller": 5,
+    "jvm_interaction": 7,
+    "executed": 0
+  },
+  "checks": {
+    "rustfmt_syntax_and_format": "pass",
+    "kotlin_psi_syntax_six_files": "pass-no-typecheck-no-product-compile",
+    "diff_whitespace": "pass",
+    "redacted_staged_secret_scan": "pass-12-explicit-files-no-leaks",
+    "read_only_source_review": "completed-ambiguous-completion-reconciliation-repaired",
+    "main_reconciliation_before_publication": "unchanged-at-83663107d864b21d22d2e746b9ca6eb80d47beac"
+  },
+  "product_compilation_started": false,
+  "heavy_build_started": false,
+  "binding_generation_started": false,
+  "policy_blocker": "existing-pdfium-render-cached-index-metadata-missing-no-lock-or-pin-change",
+  "remaining_hooks": [
+    "coordinator admits new shared/native DTO signatures",
+    "FFI lib module registration and one coherent binding generation",
+    "History::restore merges conflict_review_lamport_floor before any ordinary edit",
+    "platform controller attachment/admission/allocator/refresh/detach callbacks",
+    "app roots render callback-only panels"
+  ],
+  "remaining_validation": [
+    "focused store/native/JVM tests and Clippy after shared slot and license gate",
+    "actual app restart/reconnect/review/undo",
+    "carrier switching authentication/lifecycle/timing and scale rebase",
+    "T3.11/SYNC-003/A14/A25/G3 acceptance"
+  ],
+  "excluded": [
+    "phone AI/provider execution",
+    "live stream modules",
+    "credentials",
+    "device identity changes",
+    "device operations",
+    "paid services",
+    "published binaries",
+    "Krita"
+  ]
+}
