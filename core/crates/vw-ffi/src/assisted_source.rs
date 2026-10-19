@@ -15,13 +15,13 @@ pub struct AssistedSourcePixelsInfo {
     pub rgba_bytes: u64,
 }
 
-/// Exactly one full, oriented, sRGB RGBA8 publication. The native, ABI and
-/// foreign reservations move together and outlive the acquisition handle.
-/// The foreign owner must retire its ByteArray before closing native_lease.
+/// Exactly one full, oriented, sRGB RGBA8 publication. The foreign owner must
+/// retain publication_lease before taking pixels, then retire its ByteArray
+/// before closing that lease. No opaque handle is serialized after bulk bytes:
+/// a failed foreign lift must not strand an unread owned Arc in a RustBuffer.
 #[derive(uniffi::Record)]
 pub struct AssistedSourcePixelsDelivery {
     pub rgba: Vec<u8>,
-    pub native_lease: Arc<crate::SessionResourceCharge>,
 }
 
 // Fields drop in declaration order: retire the actual native pixel allocation
@@ -32,7 +32,10 @@ pub(super) struct OwnedPixels {
 }
 enum State {
     Ready(OwnedPixels),
-    Taken,
+    Prepared(OwnedPixels),
+    Taken {
+        _native_lease: Arc<crate::SessionResourceCharge>,
+    },
     Retiring(Arc<crate::SessionResourceCharge>),
     Closed,
 }
@@ -61,48 +64,60 @@ impl AssistedSourcePixels {
     }
     /// Fetch and retain this small opaque lease before take_pixels can allocate
     /// a foreign ByteArray. A failed bulk ABI lift then has an explicit known
-    /// retirement owner. This is the same underlying Arc returned in delivery.
+    /// retirement owner. The source also retains the charge through take_pixels
+    /// until release_source; the bulk record contains only the bytes.
     pub fn publication_lease(&self) -> SelectionResult<Arc<crate::SessionResourceCharge>> {
-        let state = self.state.lock().map_err(|_| SelectionError::Storage)?;
+        let mut state = self.state.lock().map_err(|_| SelectionError::Storage)?;
+        if matches!(*state, State::Ready(_)) {
+            let State::Ready(pixels) = std::mem::replace(&mut *state, State::Closed) else {
+                return Err(SelectionError::Invalid);
+            };
+            *state = State::Prepared(pixels);
+        }
         match &*state {
-            State::Ready(pixels) => Ok(pixels.native_lease.clone()),
-            State::Taken => Err(SelectionError::Invalid),
+            State::Prepared(pixels) => Ok(pixels.native_lease.clone()),
+            State::Ready(_) | State::Taken { .. } => Err(SelectionError::Invalid),
             State::Retiring(_) | State::Closed => Err(SelectionError::Closed),
         }
     }
     /// Move the pre-admitted native Vec once. No pixel clone or fresh pool is
-    /// created here. The returned lease protects serialization and the actual
-    /// foreign bytes, even if this source handle or project closes meanwhile.
+    /// created here. publication_lease must have been obtained first. Both that
+    /// independent lease and this source retain the reservation through lifting;
+    /// the foreign lease then protects bytes after source/project retirement.
     pub fn take_pixels(&self) -> SelectionResult<AssistedSourcePixelsDelivery> {
         let mut state = self.state.lock().map_err(|_| SelectionError::Storage)?;
-        match &*state {
-            State::Taken => return Err(SelectionError::Invalid),
+        let retained = match &*state {
+            State::Ready(_) | State::Taken { .. } => return Err(SelectionError::Invalid),
             State::Retiring(_) | State::Closed => return Err(SelectionError::Closed),
-            State::Ready(_) => {}
-        }
-        let State::Ready(pixels) = std::mem::replace(&mut *state, State::Taken) else {
+            State::Prepared(pixels) => pixels.native_lease.clone(),
+        };
+        let State::Prepared(pixels) = std::mem::replace(
+            &mut *state,
+            State::Taken {
+                _native_lease: retained,
+            },
+        ) else {
             return Err(SelectionError::Invalid);
         };
-        Ok(AssistedSourcePixelsDelivery {
-            rgba: pixels.rgba,
-            native_lease: pixels.native_lease,
-        })
+        Ok(AssistedSourcePixelsDelivery { rgba: pixels.rgba })
     }
-    /// Idempotent native-handle retirement. After take_pixels the delivery owns
-    /// the reservation independently; close cannot credit delivered bytes.
+    /// Idempotent native-handle retirement. After take_pixels the prefetched
+    /// foreign lease owns the reservation independently; this close only drops
+    /// the source's Arc and cannot credit bytes while that lease is retained.
     /// A poisoned lock returns Storage while retaining the payload and charges.
     pub fn release_source(&self) -> SelectionResult<()> {
         let mut state = self.state.lock().map_err(|_| SelectionError::Storage)?;
         let lease = match &*state {
             State::Closed => return Ok(()),
-            State::Taken => {
+            State::Taken { .. } => {
                 *state = State::Closed;
                 return Ok(());
             }
             State::Retiring(lease) => lease.clone(),
-            State::Ready(_) => {
-                let State::Ready(pixels) = std::mem::replace(&mut *state, State::Taken) else {
-                    return Err(SelectionError::Invalid);
+            State::Ready(_) | State::Prepared(_) => {
+                let pixels = match std::mem::replace(&mut *state, State::Closed) {
+                    State::Ready(pixels) | State::Prepared(pixels) => pixels,
+                    _ => return Err(SelectionError::Invalid),
                 };
                 let OwnedPixels { rgba, native_lease } = pixels;
                 // Even a failed small opaque-lease lift is recoverable through
@@ -200,9 +215,13 @@ mod tests {
     fn concurrent_handle_retirement_cannot_credit_the_independent_delivery() {
         let budget = SessionBudget::new(128).unwrap();
         let source = fixture(&budget);
+        // A bulk return without its known retirement authority must refuse.
+        assert!(matches!(source.take_pixels(), Err(SelectionError::Invalid)));
+        assert_eq!(budget.used_bytes(), 12);
         let prefetched = source.publication_lease().unwrap();
+        let retired = Arc::downgrade(&prefetched);
         let delivered = source.take_pixels().unwrap();
-        assert!(Arc::ptr_eq(&prefetched, &delivered.native_lease));
+        assert_eq!(Arc::strong_count(&prefetched), 2); // Source plus foreign owner.
         let close = source.clone();
         std::thread::spawn(move || close.release_source().unwrap())
             .join()
@@ -211,11 +230,13 @@ mod tests {
         assert_eq!(budget.used_bytes(), 12);
         assert!(matches!(source.take_pixels(), Err(SelectionError::Closed)));
         // Test foreign retirement explicitly, before returning its credit.
-        let AssistedSourcePixelsDelivery { rgba, native_lease } = delivered;
+        let AssistedSourcePixelsDelivery { rgba } = delivered;
         drop(rgba);
-        native_lease.close().unwrap();
-        native_lease.close().unwrap();
+        prefetched.close().unwrap();
+        prefetched.close().unwrap();
         assert_eq!(budget.used_bytes(), 0);
+        drop(prefetched);
+        assert!(retired.upgrade().is_none());
     }
     #[test]
     fn ready_release_can_retire_a_prefetched_but_undelivered_opaque_lease() {
@@ -234,19 +255,49 @@ mod tests {
         prefetched.close().unwrap();
     }
     #[test]
-    fn prefetched_lease_can_retire_a_failed_bulk_lift_after_take() {
+    fn failed_actual_record_lift_destroys_the_final_lease_after_known_owners_retire() {
         let budget = SessionBudget::new(128).unwrap();
         let source = fixture(&budget);
         let prefetched = source.publication_lease().unwrap();
-        let AssistedSourcePixelsDelivery { rgba, native_lease } = source.take_pixels().unwrap();
-        // Simulate bulk lift failing: no record reaches the caller. Its known
-        // prefetch still owns explicit retirement independently of both handles.
-        drop(rgba);
+        let retired = Arc::downgrade(&prefetched);
+        // Exercise the actual production Record derive, not a hand-built Vec
+        // or a destructured delivery whose explicit Arc drop hides unread handles.
+        let wire = <AssistedSourcePixelsDelivery as uniffi::Lower<crate::UniFfiTag>>::lower_into_rust_buffer(
+            source.take_pixels().unwrap(),
+        );
+        let wire_bytes = wire.len();
+        // Kotlin's FfiConverterRustBuffer finally frees this buffer even when
+        // the first ByteArray lift throws before any record reaches the caller.
+        wire.destroy();
         source.release_source().unwrap();
         assert_eq!(budget.used_bytes(), 12);
         prefetched.close().unwrap();
         assert_eq!(budget.used_bytes(), 0);
-        drop(native_lease);
+        drop(prefetched);
+        drop(source);
+        assert!(retired.upgrade().is_none(), "unread serialized Arc leaked");
+        // i32 byte count followed by four samples; no unread object handle.
+        assert_eq!(wire_bytes, 8);
+    }
+    #[test]
+    fn source_retains_taken_charge_until_a_failed_undelivered_buffer_is_freed() {
+        let budget = SessionBudget::new(128).unwrap();
+        let source = fixture(&budget);
+        let prefetched = source.publication_lease().unwrap();
+        let retired = Arc::downgrade(&prefetched);
+        let wire = <AssistedSourcePixelsDelivery as uniffi::Lower<crate::UniFfiTag>>::lower_into_rust_buffer(
+            source.take_pixels().unwrap(),
+        );
+        drop(prefetched);
+        // Even losing the foreign owner cannot drop the source's own charge
+        // while the bulk serialization is still outstanding.
+        assert_eq!(budget.used_bytes(), 12);
+        assert!(retired.upgrade().is_some());
+        wire.destroy();
+        source.release_source().unwrap();
+        assert_eq!(budget.used_bytes(), 0);
+        drop(source);
+        assert!(retired.upgrade().is_none());
     }
     #[test]
     fn failed_close_keeps_the_undelivered_owner_and_all_its_charges() {

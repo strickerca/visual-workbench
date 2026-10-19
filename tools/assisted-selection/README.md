@@ -319,8 +319,13 @@ is `f9ff4a329c9df7c230725999c62b6efe0af4e7d8`; subsequent review repairs reject
 aliased IO indices and bind provenance before conversion. These source records
 are not evidence that generated bindings were integrated.
 
-The native source lane reports three new Rust files plus 14 unrun Rust tests
-(10 integration, four unit). Root registration is:
+The native source lane contains three new Rust files and 15 native test cases
+(10 integration, five unit). The five source unit cases plus the existing
+resource-owner unit case passed in an isolated fixture using actual source state,
+production `uniffi::Record` lowering, session resource owner and budget code with
+UniFFI 0.32.2. The project/decoder entry point was excluded from that fixture;
+the 10 native integration cases and full registered crate build remain unrun.
+Root registration is:
 
 ```rust
 mod assisted_source;
@@ -332,6 +337,26 @@ assume, budget, cancellation)` returns the owned source `Arc`. Call `describe`
 and acquire `publication_lease` BEFORE `take_pixels`/`release_source`, retaining
 actual delivered-byte ownership through retirement. These names avoid adding a
 UniFFI method named `close`, which collides with generated ownership APIs.
+`AssistedSourcePixelsDelivery` now contains **only `rgba`**, with no opaque lease
+handle following the bulk allocation. `publication_lease` prepares acquisition;
+`take_pixels` refuses before preparation and retains a source-owned Arc until
+`release_source`. After taking, source release drops only that Arc, while the
+prefetched foreign lease retains the reservation until its bytes retire.
+
+The actual-record regression lowers the production record to a RustBuffer,
+simulates failure before its first field reaches the caller, frees the serialized
+buffer, retires known owners and checks `Weak` final destruction in addition to
+budget return. Running that exact regression against the original record at
+`1992d5a3afe3a5f43f3fa843b84be30b4b2e88c8` failed with
+`unread serialized Arc leaked`; the repaired source passed. This replaces the old
+test whose explicit destruction of the duplicate delivery Arc hid the ABI leak.
+The isolated fixture is not a generated Kotlin/JNA ABI or full application test.
+
+Neighbor inspection found no embedded owned handles in the image-frame or mask
+bulk records. `GiantTileDelivery` in `core/crates/vw-ffi/src/giant_images/dto.rs`
+still serializes its nested pixel record before an owned `native_lease`, exposing
+the same unread-handle failure pattern. Giant-image paths belong to another
+owner; coordinator repair/review is pending and this change does not modify them.
 
 The common/JVM factory `assistedSourcePixels(project)` depends on root's future
 `withNativeGiantProject(project, suspend (ProjectSession) -> T)` lifetime borrow

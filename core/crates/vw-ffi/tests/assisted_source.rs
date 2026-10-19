@@ -89,8 +89,8 @@ async fn acquire(
         .await
         .unwrap()
 }
-fn retire(delivery: AssistedSourcePixelsDelivery) {
-    let AssistedSourcePixelsDelivery { rgba, native_lease } = delivery;
+fn retire(delivery: AssistedSourcePixelsDelivery, native_lease: Arc<SessionResourceCharge>) {
+    let AssistedSourcePixelsDelivery { rgba } = delivery;
     drop(rgba); // Foreign adapter must do the equivalent before releaseCharge.
     native_lease.close().unwrap();
     native_lease.close().unwrap();
@@ -127,7 +127,6 @@ async fn one_publication_keeps_native_abi_and_foreign_charges_after_source_and_p
         assert_eq!(info.page, None);
         let prefetched = owner.publication_lease().unwrap();
         let delivery = owner.take_pixels().unwrap();
-        assert!(Arc::ptr_eq(&prefetched, &delivery.native_lease));
         assert!(matches!(owner.take_pixels(), Err(SelectionError::Invalid)));
         assert!(pool.used_bytes() > baseline);
         let decoded = vw_raster::decode(&original, vw_raster::DecodeLimits::default()).unwrap();
@@ -141,7 +140,7 @@ async fn one_publication_keeps_native_abi_and_foreign_charges_after_source_and_p
         drop(owner);
         assert_eq!(pool.used_bytes(), held);
         assert_eq!(delivery.rgba.len(), 64 * 64 * 4);
-        retire(delivery);
+        retire(delivery, prefetched);
         assert!(pool.used_bytes() < held);
         assert!(pool.used_bytes() <= baseline);
         let store = vw_store::ProjectStore::open(&path).unwrap();
@@ -184,6 +183,7 @@ async fn original_pixels_ignore_annotations_and_canonical_tonal_parameters() {
     let project = project(&path, bytes.clone()).await;
     let before = acquire(&project, &document(&project).await, true).await;
     let original_binding = before.describe().unwrap().binding;
+    let raw_lease = before.publication_lease().unwrap();
     let raw = before.take_pixels().unwrap();
     before.release_source().unwrap();
     let info = project.info().await.unwrap();
@@ -255,12 +255,13 @@ async fn original_pixels_ignore_annotations_and_canonical_tonal_parameters() {
     plan.dispose();
     let doc = document(&project).await;
     let after = acquire(&project, &doc, true).await;
+    let delivered_lease = after.publication_lease().unwrap();
     let delivered = after.take_pixels().unwrap();
     after.release_source().unwrap();
     assert_eq!(delivered.rgba, raw.rgba);
     assert_ne!(doc.binding, original_binding);
-    retire(delivered);
-    retire(raw);
+    retire(delivered, delivered_lease);
+    retire(raw, raw_lease);
     project.close().await.unwrap();
     assert_eq!(
         vw_store::BlobStore::new(&path)
@@ -522,6 +523,7 @@ async fn tagged_oriented_sixteen_bit_tiff_uses_the_canonical_format_decoder() {
     let doc = document(&project).await;
     assert_eq!((doc.width, doc.height, doc.source_bit_depth), (3, 2, 16));
     let owner = acquire(&project, &doc, false).await;
+    let delivery_lease = owner.publication_lease().unwrap();
     let delivery = owner.take_pixels().unwrap();
     owner.release_source().unwrap();
     let decoded = vw_formats::decode(&bytes, vw_formats::Limits::default(), &|| false)
@@ -529,7 +531,7 @@ async fn tagged_oriented_sixteen_bit_tiff_uses_the_canonical_format_decoder() {
         .image;
     let expected = vw_raster::display_rgba8(decoded, BUDGET, false, &|| false).unwrap();
     assert_eq!(delivery.rgba, expected.rgba);
-    retire(delivery);
+    retire(delivery, delivery_lease);
     project.close().await.unwrap();
 }
 
@@ -616,6 +618,7 @@ async fn capture_original_uses_the_same_page_free_exact_source_contract() {
     let doc = document(&project).await;
     let owner = acquire(&project, &doc, true).await;
     assert_eq!(owner.describe().unwrap().page, None);
+    let pixels_lease = owner.publication_lease().unwrap();
     let pixels = owner.take_pixels().unwrap();
     owner.release_source().unwrap();
     let expected = vw_raster::display_rgba8(
@@ -626,7 +629,7 @@ async fn capture_original_uses_the_same_page_free_exact_source_contract() {
     )
     .unwrap();
     assert_eq!(pixels.rgba, expected.rgba);
-    retire(pixels);
+    retire(pixels, pixels_lease);
     project.close().await.unwrap();
 }
 
