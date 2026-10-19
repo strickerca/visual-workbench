@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-19",
+  "F": {
+    "ref": "81413d81ecc26c70122b72f33914437f8a29b88e",
+    "status": "parent-supplied narrow acceptance; exact source leaves composed",
+    "files": [
+      "apps/android/src/main/kotlin/com/visualworkbench/android/editor/ExportSelection.kt",
+      "apps/android/src/test/kotlin/com/visualworkbench/android/editor/ExportProjectionTest.kt",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopTransfers.kt",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpJson.kt",
+      "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopTransferTest.kt",
+      "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpJsonTest.kt"
+    ]
+  },
+  "R": {
+    "ref": "681cf9da2bbc36aa0ac0df097b7deb531c4b4ef6",
+    "status": "returned source composed for integration; held for three known repairs/review; not accepted",
+    "files": [
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorWorkflowControls.kt",
+      "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopComposedCanvasTest.kt"
+    ],
+    "known_gaps": [
+      "wrong positional task call breaks full compilation",
+      "composed background must survive previews",
+      "saved guides need painting because native compositor does not bake them"
+    ]
+  },
+  "root_source_sha256": {
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": "53e1b8149337892186a117360bf28cdbfbf1d06bb42e75bdaaaaca68377f3650",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/ExportDialog.kt": "785629a04c34285dc73d27c8bd3c338dcc11aef3185bd02a0bcf6bcca01a67de",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/ImageFramesPanel.kt": "5f09b5f5a793a91c93e4bea4132256e091d366885086bf6eb07ed9662aa39375"
+  },
+  "validation": [
+    "F owner earlier20 focused tests and independent repaired parser checks, inherited exact source only",
+    "R owner4 policy helpers passed, full compilation unrun with known compile failure",
+    "Root UI wording/modal/source flow inspection and whitespace only; no generated ABI/Compose/app check"
+  ],
+  "main_merged": false
+}

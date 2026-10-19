@@ -93,7 +93,7 @@ fun main(args: Array<String>) {
         }
         val pickerOwner=remember{java.util.concurrent.atomic.AtomicReference<CapturePickerController?>(null)}
         fun pickerBlocking():Boolean=pickerOwner.get()?.state?.value?.let{it.open||it.cleanupPending||it.stopping}==true
-        fun commandsAllowed(): Boolean = !pickerBlocking() && projectPicker == null && !controller.workflows.blocksInput() && diagnosticsLifecycle.allowsCommand(quitting)
+        fun commandsAllowed(): Boolean = !pickerBlocking() && projectPicker == null && !controller.workflows.blocksInput() && !controller.frames.state.value.blocksInput && diagnosticsLifecycle.allowsCommand(quitting)
         var captureSettings by remember{mutableStateOf(false)}
         var remoteView by remember{mutableStateOf<WorkbenchRemoteEdit?>(null)}
         fun openRemoteView(){
@@ -157,7 +157,7 @@ fun main(args: Array<String>) {
         var dpiText by remember{mutableStateOf("Checking display scale…")}
         fun competingModal(ignorePicker: ProjectFilePickerRequest? = null): Boolean {
             val current = controller.state.value
-            return pickerBlocking() || controller.workflows.blocksInput() || (projectPicker != null && projectPicker !== ignorePicker) ||
+            return pickerBlocking() || controller.workflows.blocksInput() || controller.frames.state.value.blocksInput || (projectPicker != null && projectPicker !== ignorePicker) ||
                 documentImport!=null||nativePickerCount != 0 || codexModal.state.value.settings ||
                 mcpModal.state.value.let { it.settings || it.compare != null } || captureSettings || remoteView != null ||
                 current.textAnchor != null || current.exportOpen || current.pasteOpen || controller.ai.state.value.open
@@ -258,14 +258,22 @@ fun main(args: Array<String>) {
             if (!retireProjectPicker()) return
             closeDocumentImport(false)
             if(!controller.mayCloseAi())return
-            if (quitting || !controller.mayCloseInstructions()) return
+            if (quitting || !controller.mayCloseInstructions(allowFrameRetirementRetry=true)) return
             if (!quitting) {
                 quitting = true
                 scope.launch { withContext(NonCancellable) {
                     var clean = false
                     try {
                         clean = diagnosticsLifecycle.closeParentsAfterRetirement(
-                            admit = { controller.mayCloseAi() && controller.sealInstructionsForClose() },
+                            admit = {
+                                if (!controller.mayCloseAi() || !controller.mayCloseInstructions(allowFrameRetirementRetry=true)) false
+                                else {
+                                    val frame=controller.frames.state.value
+                                    val retry=frame.departing&&frame.retirementPending&&!frame.busy
+                                    if (!controller.sealInstructionsForClose(frameDepartureStarted=retry)) false
+                                    else { controller.frames.beginDeparture(); true }
+                                }
+                            },
                             closeParents = { withRetiredCaptureCallers(capturePicker::shutdown,capture::shutdown) {
                                 remoteView?.let{it.seal("owner_pause");it.close()}
                                 try { codex.close() } finally { codexModal.close() }
@@ -308,7 +316,7 @@ fun main(args: Array<String>) {
         }
         mcpState.owner?.let{McpCaptureIndicator(it)}
         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
-        val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,pickerBlocking()||controller.workflows.blocksInput()||codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
+        val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,pickerBlocking()||controller.workflows.blocksInput()||controller.frames.state.value.blocksInput||codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
             onPreviewKeyEvent=canvasShortcut) {
             DisposableEffect(window, controller) {
@@ -361,7 +369,7 @@ fun main(args: Array<String>) {
                                     when (command) {
                                         Command.Import -> {
                                             val selected = chosen.toAbsolutePath().normalize()
-                                            if (selected.fileName.toString().substringAfterLast('.', "").lowercase(java.util.Locale.ROOT) in setOf("pdf", "svg")) {
+                                            if (selected.fileName.toString().substringAfterLast('.', "").lowercase(java.util.Locale.ROOT) in setOf("pdf", "svg", "ai")) {
                                                 documentImportLease = controller.instructionPicker()
                                                 documentImportPicker = request
                                                 documentImport = selected to epoch
@@ -517,9 +525,9 @@ fun main(args: Array<String>) {
                 remoteView?.let{remote->com.visualworkbench.desktop.remote.RemoteEditPanel(remote){remoteView=null}}
                 CapturePickerWindow(capturePicker,controller::report)
                 if(captureSettings)com.visualworkbench.desktop.capture.CaptureSettings(capture){captureDialog(false)}
-                documentImport?.let{(path,epoch)->AlertDialog(onDismissRequest=::dismissDocumentImport,title={Text("Open PDF or SVG")},text={Column{
+                documentImport?.let{(path,epoch)->AlertDialog(onDismissRequest=::dismissDocumentImport,title={Text("Open PDF, SVG or PDF-compatible AI")},text={Column{
                     Text("The original file is preserved. Enter a password only if this PDF requires one.")
-                    if(path.fileName.toString().endsWith(".pdf",true))OutlinedTextField(documentImportPassword,{documentImportPassword=it.take(1024)},label={Text("PDF password (if required)")},visualTransformation=androidx.compose.ui.text.input.PasswordVisualTransformation())
+                    if(path.fileName.toString().substringAfterLast('.', "").lowercase(java.util.Locale.ROOT) in setOf("pdf", "ai"))OutlinedTextField(documentImportPassword,{documentImportPassword=it.take(1024)},label={Text("PDF password (if required)")},visualTransformation=androidx.compose.ui.text.input.PasswordVisualTransformation())
                 }},confirmButton={TextButton({val password=documentImportPassword.takeIf{it.isNotEmpty()};dismissDocumentImport();controller.importEditable(path,password,epoch)}){Text("Open")}},dismissButton={TextButton(::dismissDocumentImport){Text("Cancel")}})}
                 if(editor.exportOpen&&editor.document!=null&&documentState.descriptor!=null)AlertDialog(onDismissRequest=controller::dismissExport,title={Text("Document export")},text={Column(Modifier.heightIn(max=560.dp).verticalScroll(rememberScrollState())){EditableDocumentControls(controller.documents,::saveDocument)}},confirmButton={TextButton(controller::dismissExport){Text("Close")}})
                 if(editor.exportOpen&&editor.document!=null&&documentState.descriptor==null)ExportDialog(controller,editor,::save)
@@ -557,7 +565,6 @@ fun main(args: Array<String>) {
             commandButton(Command.Import,action);commandButton(Command.Undo,action,enabled=editor.document?.render?.revision?.canUndo==true);commandButton(Command.Redo,action,enabled=editor.document?.render?.revision?.canRedo==true);commandButton(Command.Export,action,enabled=editor.document!=null)
         }
         editor.originalFormatNotice?.let{Text(it,Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=8.dp),style=MaterialTheme.typography.caption)}
-        if(editor.document?.hasToneAdjustments==true)Text("Tone adjustments appear in Tone preview and marked exports. This canvas shows the original image.",Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=8.dp),style=MaterialTheme.typography.caption)
         PrecisionControls(controller.precision)
         AiResultStatus(controller)
         Row(Modifier.weight(1f)){
@@ -604,7 +611,7 @@ fun main(args: Array<String>) {
                     }
                 }
                 if(editor.document==null)Column(Modifier.align(Alignment.Center).widthIn(max=420.dp).padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(18.dp)){
-                    Text("Make the detail clear.",style=MaterialTheme.typography.h4,fontWeight=FontWeight.Medium);Text("Open an image to annotate, refine and export at its original resolution.",color=Color(0xffaebccb));Button(onClick={action(Command.Import)}){Text("Import image  ·  Ctrl+I")};TextButton(onClick={action(Command.Open)}){Text("Open a saved project")}
+                    Text("Make the detail clear.",style=MaterialTheme.typography.h4,fontWeight=FontWeight.Medium);Text("Open an image to annotate, refine and export.",color=Color(0xffaebccb));Button(onClick={action(Command.Import)}){Text("Import image  ·  Ctrl+I")};TextButton(onClick={action(Command.Open)}){Text("Open a saved project")}
                 };if(editor.busy||quitting)LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
             }
             Column(Modifier.width(390.dp).fillMaxHeight().background(Color(0xff141e29)).padding(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){

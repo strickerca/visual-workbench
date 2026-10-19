@@ -16,16 +16,19 @@ internal fun ExportDialog(controller: EditorController, state: EditorState, save
         runCatching { captureExport(state, controller.core) }.getOrNull()
     }
     val enabled = !state.busy && request != null
+    val checked = state.exportCheck?.takeIf { it.request.matches(state) }?.result
     AlertDialog(
         onDismissRequest = { if (state.busy) controller.cancelTransfer() else controller.dismissExport() },
         title = { Text("Export image") },
         text = {
             Column(Modifier.width(650.dp).heightIn(max = 620.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 request?.let {
-                    Text("${it.revision} · ${it.width} × ${it.height} px", style = MaterialTheme.typography.subtitle1)
+                    Text(it.revision, style = MaterialTheme.typography.subtitle1)
+                    Text(checked?.let { result -> "${result.width} × ${result.height} output pixels" }
+                        ?: "Check limits to confirm the output pixel dimensions.", style = MaterialTheme.typography.caption)
                 } ?: Text("Select a region that intersects the image, or choose Full image.")
                 state.originalFormatNotice?.let { Text(it, style = MaterialTheme.typography.caption) }
-                Text("Exports use the original image at document resolution. Region exports use rectangular pixel bounds.", style = MaterialTheme.typography.caption)
+                Text("Exports use the saved crop, rotation and output size. Selection and view exports cover whole output pixels.", style = MaterialTheme.typography.caption)
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     Choice("Content", if (settings.marked) "Marked" else "Clean", listOf("Marked", "Clean"), !state.busy) {
                         controller.exportSettings(settings.copy(marked = it == "Marked"))
@@ -58,7 +61,7 @@ internal fun ExportDialog(controller: EditorController, state: EditorState, save
                     Option("Allow depth reduction for the DIBV5 companion", settings.allowDibDepthReduction, !state.busy) { controller.exportSettings(settings.copy(allowDibDepthReduction = it)) }
                     Option("Treat an untagged DIBV5 companion as sRGB", settings.assumeDibSrgb, !state.busy) { controller.exportSettings(settings.copy(assumeDibSrgb = it)) }
                 }
-                state.exportCheck?.takeIf { it.request == request }?.result?.let { check ->
+                checked?.let { check ->
                     Text("Preflight: ${check.width} × ${check.height} · ${check.outputBitDepth} bit · estimated ${check.estimatedPeakBytes / (1024uL * 1024uL)} MiB${if (check.buffered) " · buffered codec" else " · strip encoder"}")
                     if (check.requiresRenderValidation) Text("Marked content is validated again when the completed file is prepared.", style = MaterialTheme.typography.caption)
                 }

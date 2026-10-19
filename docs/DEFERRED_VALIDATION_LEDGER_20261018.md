@@ -149,3 +149,27 @@ older giant roots replace root intake/producer exports. Main/capture work remain
 pushed8d44db3/48ac2a5, with49 focused tests and actual controller source compile;
 Main/Compose/OS lifecycle remains deferred. New root Desktop UI follow-through
 from R681cf9da is assigned and will retain its source contract when composed.
+
+## 2026-10-19 F/R composition and Desktop root follow-through
+
+Accepted F81413d81 is composed exactly (six source/test leaves): projection
+helpers, strict top-level receipt JSON, malformed escape refusal and byte bound
+before allocation. R681cf9da's four exact source/test leaves are composed on
+the integration branch but explicitly held for its known positional task compile
+error, composed preview visibility and saved-guide drawing repairs. Root did not
+edit those delegated paths. Main now honors frame modal/callback departure/retry
+fences, routes .ai through PDF/password intake and removes the stale tone banner.
+ExportDialog shows checked O dimensions and matches projected checks against
+current intent. Frame UI wording preserves RAW-preview limits. These root UI
+edits are source/whitespace inspected only; full Desktop compilation remains
+blocked pending R repair, then deferred to the coherent aggregate. See
+DESKTOP_ROOT_FOLLOWTHROUGH_20261019.md and exact source-binding evidence.
+
+Android398c0f is under narrow review: exported D-intent/frame/URI source paths
+returned with4 authored/unrun tests, while tonal canvas/RAW-composite/assisted
+callers remain code gaps. ANDROID_REMAINING_CALLER_HANDOFF_20261019.md returns
+those actual source paths to its existing owner using now-registered shared
+LiteRT dependencies and existing stable APIs. Parent activation remains explicit.
+E47f76bf actual cleanup-ordering repair and G08332934+b75cea58 corrected production/
+test stack remain current review inputs. No earlier incomplete giant accounting
+stack is accepted or merged; no device/model/runtime gate is inferred.

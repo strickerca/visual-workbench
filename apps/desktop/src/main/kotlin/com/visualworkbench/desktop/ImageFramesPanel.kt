@@ -59,10 +59,10 @@ internal fun ImageFramesPanel(controls: ImageFramesInteraction, activate: (Boole
     AlertDialog(onDismissRequest={if (current()) activate(false)},title={Text("Output frame")},text={
         Column(Modifier.fillMaxWidth().heightIn(min=240.dp,max=600.dp).verticalScroll(rememberScrollState()),
             verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            Text("Crop, quarter-turn rotation and output size are editable parameters. Every original source pixel remains available in the editor and Undo restores the prior frame.",
+            Text("Crop, quarter-turn rotation and output size are editable parameters. Source geometry stays unchanged and Undo restores the prior frame. An embedded preview retains its source-format and export limits.",
                 style=MaterialTheme.typography.body2)
             snapshot?.let {
-                Text("Original source: ${it.sourceWidth} × ${it.sourceHeight} · ${it.sourceBitDepth}-bit. Saved output: ${it.outputWidth} × ${it.outputHeight}.",
+                Text("Imported pixels: ${it.sourceWidth} × ${it.sourceHeight} · ${it.sourceBitDepth}-bit. Saved output: ${it.outputWidth} × ${it.outputHeight}.",
                     style=MaterialTheme.typography.caption)
             }
             if (state.loading || state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
