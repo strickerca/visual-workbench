@@ -8,7 +8,7 @@ internal enum class ExportEncoding(val label: String, val mime: String, val exte
     Png8("PNG 8-bit", "image/png", "png"), Png16("PNG 16-bit", "image/png", "png"),
     Jpeg("JPEG", "image/jpeg", "jpg"), WebpLossless("WebP lossless", "image/webp", "webp"), WebpLossy("WebP lossy", "image/webp", "webp"),
     Bmp8("BMP 8-bit", "image/bmp", "bmp"), Tiff8("TIFF 8-bit", "image/tiff", "tiff"), Tiff16("TIFF 16-bit", "image/tiff", "tiff");
-    val exportAvailable: Boolean get() = this != Bmp8
+    val exportAvailable: Boolean get() = true
     fun format(quality: Int): ImageFormat = when (this) {
         Png8 -> ImageFormat.Png8; Png16 -> ImageFormat.Png16; Jpeg -> ImageFormat.Jpeg(quality.toUByte())
         WebpLossless -> ImageFormat.WebpLossless; WebpLossy -> ImageFormat.WebpLossy(quality.toUByte())

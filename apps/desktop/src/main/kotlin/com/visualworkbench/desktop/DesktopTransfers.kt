@@ -17,7 +17,7 @@ enum class ExportEncoding(val label: String, val extension: String) {
     Png8("PNG · 8 bit", "png"), Png16("PNG · 16 bit", "png"),
     Jpeg("JPEG", "jpg"), WebpLossless("WebP · lossless", "webp"), WebpLossy("WebP · lossy", "webp"),
     Bmp8("BMP · 8 bit", "bmp"), Tiff8("TIFF · 8 bit", "tiff"), Tiff16("TIFF · 16 bit", "tiff");
-    val exportAvailable: Boolean get() = this != Bmp8
+    val exportAvailable: Boolean get() = true
     val png: Boolean get() = this == Png8 || this == Png16
 }
 enum class ExportMatte(val label: String, val rgb: UInt?) { Preserve("Preserve alpha", null), White("White matte", 0xffffffu), Black("Black matte", 0u) }
@@ -69,7 +69,6 @@ data class ImportRequest(val epoch: Long, val path: Path)
 internal fun captureExport(state: EditorState, core: WorkbenchCore): ExportRequest {
     val document = state.document ?: throw HandoffFailure("Open a document before exporting.")
     val settings = state.exportSettings
-    if (!settings.encoding.exportAvailable) throw HandoffFailure("BMP export is unavailable because its file metadata cannot yet carry the required revision and source identity.")
     val candidate = when (settings.area) {
         ExportArea.Full -> null
         ExportArea.Selection -> union(document.render.items.filter { it.objectId in state.selected }.map { it.bounds })
