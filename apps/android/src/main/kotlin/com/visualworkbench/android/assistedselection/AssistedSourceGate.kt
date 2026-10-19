@@ -1,6 +1,7 @@
 package com.visualworkbench.android.assistedselection
 
 import com.visualworkbench.shared.AssistedSelectionSource
+import com.visualworkbench.shared.AssistedSelectionPhase
 import java.util.concurrent.atomic.AtomicReference
 
 /** Worker-readable publication of one exact project reference and source. */
@@ -14,3 +15,13 @@ internal class AssistedSourceGate<P : Any> {
         current.get()?.let { it.project === project && it.source == source } == true
     fun revoke() { current.set(null) }
 }
+
+/** Retirement runs before checking idle because a stale retained owner itself
+ * blocks ordinary workflow admission. Failure leaves its caller-owned slot set. */
+internal suspend fun retireAssistedBeforeAdmission(retire: suspend () -> Unit, canAdmit: () -> Boolean): Boolean {
+    retire()
+    return canAdmit()
+}
+
+internal fun reusableAssistedOwner(current: Boolean, phase: AssistedSelectionPhase): Boolean =
+    current && phase !in setOf(AssistedSelectionPhase.Stale, AssistedSelectionPhase.Failed, AssistedSelectionPhase.Closed)

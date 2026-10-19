@@ -16,6 +16,9 @@ internal fun checkedAndroidExportReceipt(result: FileExportResult, intent: Expor
     if (result.encodedBytes !in 1uL..(512uL * 1024uL * 1024uL) ||
         !result.blake3.matches(Regex("[0-9a-f]{64}"))) throw RasterTransferFailure("The native export receipt has invalid encoded identity.")
     val fields = try {
+        // UTF-8 never uses fewer bytes than UTF-16 code units for well-formed
+        // text. Reject oversized input before the encoder allocates its buffer.
+        if (result.metadataJson.length > 65_536) throw IllegalArgumentException("Oversized receipt")
         val bytes = Charsets.UTF_8.newEncoder().onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT).encode(CharBuffer.wrap(result.metadataJson))
         if (bytes.remaining() > 65_536) throw IllegalArgumentException("Oversized receipt")
@@ -87,7 +90,9 @@ private class ReceiptJson(private val source: String) {
                     'n' -> out.append('\n'); 'r' -> out.append('\r'); 't' -> out.append('\t')
                     'u' -> {
                         require(at + 4 <= source.length)
-                        val code = source.substring(at, at + 4).toIntOrNull(16) ?: error("Invalid Unicode escape")
+                        val digits = source.substring(at, at + 4)
+                        require(digits.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' })
+                        val code = digits.toInt(16)
                         out.append(code.toChar()); at += 4
                     }
                     else -> error("Invalid escape")

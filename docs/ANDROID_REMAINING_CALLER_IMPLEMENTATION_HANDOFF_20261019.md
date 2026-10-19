@@ -15,6 +15,10 @@ The other checkout's uncommitted work was preserved. Krita remains deferred.
   through `ProjectRepository.exportImage/sharePng` and `RasterTransfers.export/sharePng`.
   AndroidExportReceipt checks the exact immutable export intent/revision and O
   dimensions. Existing provider fixtures assert zero writer opens on refusal.
+  Follow-up AND5–6 guards receipt character count before strict UTF-8 encoding
+  and accepts only four ASCII hex digits per JSON Unicode escape. The Android
+  export receipt is the only local custom receipt parser; DocumentWire bounds
+  metadata before encoding, and document replies use bounded library JSON.
 - `ef45ffe`, `faa4e58`: Android ordinary tone display uses `editingBackground`
   with project identity, page, epoch, full revision, source and size checks;
   unadopted bitmaps are recycled. Ordered changes revoke stale composition before
@@ -24,6 +28,8 @@ The other checkout's uncommitted work was preserved. Krita remains deferred.
   GiantAndroidCanvas binds immutable Source/Composed mode and the source-specific
   color choice to one existing viewport owner. Draw admission stays atomic on the
   graphics thread. Native levels above 2 remain an explicit composed-tile limit.
+  AND7 carries a reload obligation after hiding stale composed pixels on an
+  ordered change, including undo of the last saved tone.
 - `8f94190`, `8e75eaa`, `4399716`: the document picker exposes PDF-compatible AI
   to the PDF/password importer, whose native intake requires a PDF signature.
   The bounded 64 MiB ordinary provider staging now calls native PSD/PSB
@@ -34,6 +40,8 @@ The other checkout's uncommitted work was preserved. Krita remains deferred.
   correction. Its worker-readable source gate uses project reference identity
   and is revoked on ordered change, page, epoch, departure and backgrounding.
   Pen prompts are committed on pen-up, so cancellation drops an interrupted tap.
+  AND8 retires a stale or failed assisted owner before fresh idle admission,
+  outside the mutation mutex; a failed close keeps the exact owner for retry.
 
 The production assisted catalog is empty under app-private `noBackupFilesDir`
 and pins are null. The constructor permits a reviewed catalog/pins pair; only
@@ -47,10 +55,11 @@ additional format staging seam used under the remaining-caller directive.
 
 ## Checks and limits
 
-`git diff --check` and staged-byte secret-pattern checks passed. Earlier focused
-source-order checks for AND1–4 passed. Newly authored Android unit and device
-tests cover baked draw classification, composed giant mode, provider refusal and
-source-reference fencing; they have **not run**. No aggregate Gradle/ABI/lint,
+`git diff --check`, staged-byte secret-pattern checks, and six focused source-order
+checks for the receipt guard, reload, retirement and giant cleanup passed. Newly authored Android unit and device
+tests cover baked draw classification, composed giant mode, provider refusal,
+source-reference fencing, last-tone reload, stale assisted retirement and export
+receipt limits/escapes; they have **not run**. No aggregate Gradle/ABI/lint,
 native rerun, app installation, model inference, provider/device runtime or
 physical S23 stylus/Bluetooth/A09 check was run without the shared build slot.
 Compilation is not claimed from source checks. Real user-visible Android results

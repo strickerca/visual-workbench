@@ -1,6 +1,7 @@
 package com.visualworkbench.android.assistedselection
 
 import com.visualworkbench.shared.*
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -21,5 +22,28 @@ class AssistedSourceGateTest {
             assertFalse(gate.matches(first,stale))
         gate.revoke();assertNull(gate.sourceFor(first))
         gate.publish(reopened,source);assertNull(gate.sourceFor(first))
+    }
+
+    @Test fun staleOwnerRetiresBeforeFreshIdleAdmissionAndFailedCloseKeepsOwner() = runBlocking {
+        assertFalse(reusableAssistedOwner(false,AssistedSelectionPhase.Ready))
+        assertFalse(reusableAssistedOwner(true,AssistedSelectionPhase.Stale))
+        assertFalse(reusableAssistedOwner(true,AssistedSelectionPhase.Failed))
+        assertTrue(reusableAssistedOwner(true,AssistedSelectionPhase.Ready))
+        val stale=Any()
+        var retained: Any?=stale
+        val order=mutableListOf<String>()
+        val closeFailure=IllegalStateException("retirement pending")
+        val first=runCatching {
+            retireAssistedBeforeAdmission({ order+="close";throw closeFailure },
+                { order+="idle";retained==null })
+        }
+        assertSame(closeFailure,first.exceptionOrNull())
+        assertSame(stale,retained)
+        assertEquals(listOf("close"),order)
+        order.clear()
+        val admitted=retireAssistedBeforeAdmission({order+="close";retained=null},
+            {order+="idle";retained==null})
+        assertTrue(admitted)
+        assertEquals(listOf("close","idle"),order)
     }
 }

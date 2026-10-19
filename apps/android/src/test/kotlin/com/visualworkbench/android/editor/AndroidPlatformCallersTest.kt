@@ -66,6 +66,14 @@ class AndroidPlatformCallersTest {
         assertTrue(runCatching { checkedAndroidExportReceipt(receipt.copy(metadataJson = receipt.metadataJson.replace("\"output_width\":160", "\"output_width\":159")), intent) }.exceptionOrNull() is WorkflowFailure)
         assertTrue(runCatching { checkedAndroidExportReceipt(receipt.copy(metadataJson = receipt.metadataJson.dropLast(1) + ",\"revision\":\"revision\"}"), intent) }.exceptionOrNull() is RasterTransferFailure)
         assertTrue(runCatching { checkedAndroidExportReceipt(receipt.copy(metadataJson = receipt.metadataJson + " {}"), intent) }.exceptionOrNull() is RasterTransferFailure)
+        val legalEscapedRevision = receipt.metadataJson.replace("\"revision\"", "\"re" + '\\' + "u0076ision\"")
+        checkedAndroidExportReceipt(receipt.copy(metadataJson = legalEscapedRevision), intent)
+        val signedRevision = receipt.metadataJson.replace("\"revision\"", "\"re" + '\\' + "u+076ision\"")
+        val signedWidth = receipt.metadataJson.replace("\"output_width\":160", "\"output_" + '\\' + "u+077idth\":160")
+        val tooManyUtf8Bytes = receipt.metadataJson.dropLast(1) + ",\"extension\":\"${"é".repeat(40_000)}\"}"
+        for (malformed in listOf(signedRevision, signedWidth, receipt.metadataJson + "\uD800",
+            tooManyUtf8Bytes, " ".repeat(2 * 1024 * 1024)))
+            assertTrue(runCatching { checkedAndroidExportReceipt(receipt.copy(metadataJson = malformed), intent) }.exceptionOrNull() is RasterTransferFailure)
     }
 
     @Test fun giantOwnersCloseInReverseOrderAfterSuccessfulDelivery() = runBlocking {
@@ -89,7 +97,7 @@ class AndroidPlatformCallersTest {
         }
         job.join()
         assertTrue(job.isCancelled)
-        assertEquals(listOf("prepare", "describe", "build", "publish", "project-close", "built-close", "prepared-close", "picked-close"), order)
+        assertEquals(listOf("prepare", "describe", "build", "publish", "built-close", "prepared-close", "picked-close", "project-close"), order)
     }
 
     @Test fun cancellationDuringEverySuspendingCloseNeverDeliversThePublishedProject() = runBlocking {
