@@ -90,11 +90,25 @@ ten explicit-sRGB RGBA8 PNGs are decoded one at a time under a 1 Mi-pixel
 canvas bound. The helper is a single Job process and never launches a nested
 capture child. A successful result verifies deletion of all ten private PNGs.
 
+Independent Astra source review of the first pushed candidate `59b69c5`
+identified three blockers. The follow-up source repair adds refusal-only
+decoding of the actual two white/stable baseline frames before Dot, changed
+post-Dot pixels before Undo, baseline-equal pixels before Redo, and exact
+post-Dot redo pixels before final Undo. The final joined evaluator remains
+separate. A shared authorization/termination mutex closes the race between a
+parent timeout kill and a newly sent grant. After a fresh actual process/Job
+receipt and IO join, private PNG disposal now runs even if canvas/input remains
+unresolved; the source, Job, exclusive permit and recovery fence remain held.
+The repair also accounts ten decoded RGBA frames plus serial PNG/decode scratch
+against an explicit 256 MiB parent ceiling, and full-frame child scratch
+against the existing 768 MiB Job limit. The native decoder uses checked
+allocation. These are source repairs, not a Windows compile/runtime pass.
+
 ## Proposed deferred validation rows for the root ledger
 
 | Candidate / phase | Exact command or journey | Prerequisites | Expected outcome | Status |
 |---|---|---|---|---|
-| P native source | `cargo test --locked --offline --target x86_64-pc-windows-msvc -p vw-remote-host --lib editor_probe_runner::compatibility:: -- --test-threads=1` and `cargo test --locked --offline --target x86_64-pc-windows-msvc -p vw-remote-host --lib editor_probe_runner::frame::tests::joined_drawing_decoder_refuses_rgba_without_explicit_srgb -- --exact` | Root binary registration, Windows linker/runtime and allocated heavy slot | Fixed phase, source-held terminal, joined-owner uncertainty, source-change, bounded capture refusal and private disposal tests pass | Authored, unrun |
+| P native source | `cargo test --locked --offline --target x86_64-pc-windows-msvc -p vw-remote-host --lib editor_probe_runner::compatibility:: -- --test-threads=1` and `cargo test --locked --offline --target x86_64-pc-windows-msvc -p vw-remote-host --lib editor_probe_runner::frame::tests:: -- --test-threads=1` | Root binary registration, Windows linker/runtime and allocated heavy slot | Fixed phase, source-held terminal, authorization/kill ordering, pre-input pixel refusal, joined-owner uncertainty, source-change, bounded capture refusal, aggregate admission and private disposal tests pass | Authored, unrun |
 | P Windows package/ABI | `cargo check --locked --offline --target x86_64-pc-windows-msvc -p vw-remote-host --all-targets -j2` followed by the root's exact helper hash/package verification | Root packaged binary/catalog and heavy slot | Dedicated helper and native library compile/link; exact executable pin/hash resolves | Deferred |
 | P selected blank Paint drawing | Open a fresh blank white installed Paint canvas, select Brush, move OS pointer outside canvas, confirm the root-owned experiment once; observe two baseline, paired Dot/Undo/Redo/final Undo WGC captures, then inspect owner cleanup/status | Licensed installed Paint, authorized Windows editor session, packaged exact helpers, root confirmation and actual OS capture/input authority | Only stable exact pixel restoration/redo and complete Job/IO/input retirement produce Drawing/Supported/EditorObserved/Mouse; ten private captures removed; prior history/pen/physical remain unproven | Deferred; no GUI/input/capture performed |
 | P refusal/recovery | With an owned disposable blank canvas, deliberately cancel before each authorization, change source/focus between phases, induce capture/color failure and partial/held input in a controlled harness; retry retirement/cleanup | Same authorized Windows target and controlled fault harness | No later authorization or false positive; actual owner/source/Job/lease retained until safe retirement; post-dot unknown canvas blocks a new experiment | Deferred; hardware/GUI gate |

@@ -9,6 +9,41 @@ use std::{
 use vw_remote::wire::FiniteRetirement;
 use windows_sys::Win32::System::Pipes::PeekNamedPipe;
 
+/// Serializes the root's authorization byte with any parent-side cancellation
+/// kill. Once closed, no callback can grant a later action.
+pub(crate) struct AuthorizationGate(Mutex<bool>);
+impl AuthorizationGate {
+    pub(crate) fn new() -> Self {
+        Self(Mutex::new(false))
+    }
+    pub(crate) fn authorize(
+        &self,
+        uncertain: &AtomicBool,
+        callback: impl FnOnce() -> Result<()>,
+    ) -> Result<()> {
+        let closed = self.0.lock().unwrap_or_else(|error| error.into_inner());
+        if *closed {
+            return Err(Error::Cancelled);
+        }
+        uncertain.store(true, Ordering::Release);
+        callback()
+    }
+    pub(crate) fn close_if_safe(
+        &self,
+        uncertain: &AtomicBool,
+        unresolved: &AtomicBool,
+        kill: impl FnOnce(),
+    ) -> bool {
+        let mut closed = self.0.lock().unwrap_or_else(|error| error.into_inner());
+        if *closed || uncertain.load(Ordering::Acquire) || unresolved.load(Ordering::Acquire) {
+            return false;
+        }
+        *closed = true;
+        kill();
+        true
+    }
+}
+
 pub(super) const MAX_LINE: usize = 16 * 1024;
 pub(super) const MAX_TRANSCRIPT: usize = 256 * 1024;
 pub(super) const GRANT: u8 = b'G';
@@ -198,6 +233,186 @@ fn output_empty(output: &File) -> Result<()> {
     }
     Ok(())
 }
+pub(super) fn blank_white(first: &[u8], second: &[u8]) -> Result<()> {
+    if first != second
+        || first.is_empty()
+        || !first.len().is_multiple_of(4)
+        || first
+            .chunks_exact(4)
+            .any(|pixel| pixel != [255, 255, 255, 255])
+    {
+        Err(Error::Unavailable)
+    } else {
+        Ok(())
+    }
+}
+pub(super) fn admitted_dot_delta(
+    before: &[u8],
+    after: &[u8],
+    width: u32,
+    dot: [i64; 2],
+) -> Result<()> {
+    let width = usize::try_from(width).map_err(|_| Error::Limit)?;
+    if width == 0 || before.len() != after.len() || before.len() % 4 != 0 {
+        return Err(Error::Invalid);
+    }
+    let mut center_hit = false;
+    for (index, (previous, current)) in before
+        .chunks_exact(4)
+        .zip(after.chunks_exact(4))
+        .enumerate()
+    {
+        if previous == current {
+            continue;
+        }
+        let x = i64::try_from(index % width).map_err(|_| Error::Limit)?;
+        let y = i64::try_from(index / width).map_err(|_| Error::Limit)?;
+        let dx = (x - dot[0]).abs();
+        let dy = (y - dot[1]).abs();
+        if dx > 64 || dy > 64 {
+            return Err(Error::Unavailable);
+        }
+        center_hit |= dx <= 1 && dy <= 1;
+    }
+    if center_hit {
+        Ok(())
+    } else {
+        Err(Error::Unavailable)
+    }
+}
+/// A refusal-only guard while the child waits at Ready. The same files are
+/// independently decoded again after process/Job/IO retirement for proof.
+fn preflight_pixels(
+    step: Step,
+    transcript: &Transcript,
+    pixels: &mut Vec<Vec<u8>>,
+    expected: &Request,
+    capture_target: &vw_capture::WindowTarget,
+    source: &SourceLease,
+    cancel: &Cancellation,
+    current: &Current,
+) -> Result<()> {
+    let baseline = transcript.samples.first().ok_or(Error::Invalid)?;
+    let canvas = baseline.witness.canvas_rect_host;
+    let parked = baseline.pointer_before;
+    if !helper::outside(parked, canvas) {
+        return Err(Error::Unavailable);
+    }
+    for index in pixels.len()..step.samples_before() {
+        cancel.check()?;
+        current()?;
+        source.verify_observation(&expected.target, expected.owner_pid)?;
+        let sample = &transcript.samples[index];
+        let timestamp = sample.frame.source_identity.monotonic_timestamp_ns;
+        if sample.witness.canvas_rect_host != canvas
+            || sample.before_witness.canvas_rect_host != canvas
+            || sample.witness.canvas_runtime_id_hash != baseline.witness.canvas_runtime_id_hash
+            || sample.before_witness.canvas_runtime_id_hash
+                != baseline.witness.canvas_runtime_id_hash
+            || sample.witness.settings_digest != expected.settings_digest
+            || sample.before_witness.settings_digest != expected.settings_digest
+            || sample.witness.canvas_tool_name != "Using Brush tool on Canvas"
+            || sample.pointer_before != parked
+            || sample.pointer_after != parked
+            || !sample.os_cursor_capture_disabled
+            || sample
+                .before_witness
+                .observed_end_qpc_100ns
+                .checked_mul(100)
+                .is_none_or(|v| v > timestamp)
+            || sample
+                .witness
+                .observed_start_qpc_100ns
+                .checked_mul(100)
+                .is_none_or(|v| v < timestamp)
+        {
+            return Err(Error::TargetChanged);
+        }
+        let path = expected.sample_directory(index)?.join("capture-canvas.png");
+        let pin = Pin::open(&path, false)?;
+        pixels.push(frame::joined_canvas_rgba(
+            &pin,
+            &sample.frame,
+            capture_target,
+            canvas,
+            expected.owner_pid,
+            &expected.capture_session_id,
+            capture_target.observed_ns / 100,
+            evidence::MAX_PIXELS,
+        )?);
+        source.verify_observation(&expected.target, expected.owner_pid)?;
+        cancel.check()?;
+        current()?;
+    }
+    let pair = step.samples_before() - 2;
+    if pixels[pair] != pixels[pair + 1] {
+        return Err(Error::Unavailable);
+    }
+    match step {
+        Step::CanvasDot => {
+            blank_white(&pixels[0], &pixels[1])?;
+        }
+        Step::Undo => {
+            if pixels[2] == pixels[0] {
+                return Err(Error::Unavailable);
+            }
+            let dot = &transcript.clicks.first().ok_or(Error::Invalid)?.report;
+            let cx = i64::from(dot.destination[0]) - i64::from(canvas.x);
+            let cy = i64::from(dot.destination[1]) - i64::from(canvas.y);
+            if cx < 64
+                || cy < 64
+                || cx + 64 >= i64::from(canvas.width)
+                || cy + 64 >= i64::from(canvas.height)
+            {
+                return Err(Error::Unavailable);
+            }
+            admitted_dot_delta(&pixels[0], &pixels[2], canvas.width, [cx, cy])?;
+        }
+        Step::Redo => {
+            if pixels[4] != pixels[0] {
+                return Err(Error::Unavailable);
+            }
+        }
+        Step::FinalUndo => {
+            if pixels[6] != pixels[2] {
+                return Err(Error::Unavailable);
+            }
+        }
+    }
+    if pair > 0 {
+        let receipt = &transcript.clicks[(pair / 2) - 1].report;
+        let first = transcript.samples[pair]
+            .frame
+            .source_identity
+            .monotonic_timestamp_ns
+            / 100;
+        let second = transcript.samples[pair + 1]
+            .frame
+            .source_identity
+            .monotonic_timestamp_ns
+            / 100;
+        if first.saturating_sub(receipt.accepted_qpc_100ns.ok_or(Error::Invalid)?) < 1_000_000
+            || second.saturating_sub(first) < 1_000_000
+        {
+            return Err(Error::Unavailable);
+        }
+    } else {
+        let first = transcript.samples[0]
+            .frame
+            .source_identity
+            .monotonic_timestamp_ns
+            / 100;
+        let second = transcript.samples[1]
+            .frame
+            .source_identity
+            .monotonic_timestamp_ns
+            / 100;
+        if second.saturating_sub(first) < 1_000_000 {
+            return Err(Error::Unavailable);
+        }
+    }
+    Ok(())
+}
 
 /// The IO worker holds both pipe ends and pins while this state machine runs.
 /// Every Ready is phase-checked; uncertainty precedes the root guard callback.
@@ -211,6 +426,9 @@ pub(super) fn exchange(
     authorize: &PaintDrawingAuthorize,
     cancel: &Cancellation,
     canvas_unresolved: &AtomicBool,
+    gate: &AuthorizationGate,
+    capture_target: &vw_capture::WindowTarget,
+    source: &SourceLease,
 ) -> Result<Vec<u8>> {
     if request.len() > MAX_LINE {
         return Err(Error::Limit);
@@ -222,6 +440,7 @@ pub(super) fn exchange(
         samples: Vec::with_capacity(10),
         clicks: Vec::with_capacity(4),
     };
+    let mut phase_pixels = Vec::with_capacity(8);
     for step in Step::ORDER {
         while result.samples.len() < step.samples_before() {
             current()?;
@@ -271,9 +490,18 @@ pub(super) fn exchange(
         {
             return Err(Error::TargetChanged);
         }
+        preflight_pixels(
+            step,
+            &result,
+            &mut phase_pixels,
+            expected,
+            capture_target,
+            source,
+            cancel,
+            current,
+        )?;
         output_empty(&output)?;
         // No other code may clear this before the exact source-held terminal.
-        uncertain.store(true, Ordering::Release);
         let mut sent = false;
         let mut grant = || -> Result<()> {
             if sent {
@@ -287,7 +515,7 @@ pub(super) fn exchange(
             sent = true;
             Ok(())
         };
-        let permission = authorize(step.authorize(), &mut grant);
+        let permission = gate.authorize(uncertain, || authorize(step.authorize(), &mut grant));
         if !sent {
             input.write_all(&[DENY])?;
             input.flush()?;

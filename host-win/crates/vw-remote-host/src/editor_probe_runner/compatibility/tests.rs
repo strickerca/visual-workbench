@@ -25,6 +25,31 @@ fn fixed_phase_order_has_no_arbitrary_input_or_sample_expansion() {
     );
 }
 #[test]
+fn preauthorization_pixels_refuse_nonblank_or_noncausal_phases() {
+    let blank = vec![255u8; 130 * 130 * 4];
+    assert_eq!(ipc::blank_white(&blank, &blank), Ok(()));
+    let mut nonwhite = blank.clone();
+    nonwhite[0] = 200;
+    assert_eq!(
+        ipc::blank_white(&nonwhite, &nonwhite),
+        Err(Error::Unavailable)
+    );
+    assert_eq!(ipc::blank_white(&blank, &nonwhite), Err(Error::Unavailable));
+    let mut dot = blank.clone();
+    let center = (65 * 130 + 65) * 4;
+    dot[center] = 0;
+    assert_eq!(ipc::admitted_dot_delta(&blank, &dot, 130, [65, 65]), Ok(()));
+    assert_eq!(
+        ipc::admitted_dot_delta(&blank, &blank, 130, [65, 65]),
+        Err(Error::Unavailable)
+    );
+    dot[0] = 0;
+    assert_eq!(
+        ipc::admitted_dot_delta(&blank, &dot, 130, [65, 65]),
+        Err(Error::Unavailable)
+    );
+}
+#[test]
 fn bounded_lines_refuse_truncation_and_extra_capacity() {
     assert_eq!(ipc::line(Cursor::new(b"sample")), Err(Error::Io));
     assert_eq!(
@@ -89,6 +114,44 @@ fn joined_owner_refuses_collection_while_input_is_uncertain() {
     ));
 }
 #[test]
+fn authorization_and_cancel_kill_are_serialized() {
+    use std::sync::{Barrier, mpsc};
+    let gate = Arc::new(ipc::AuthorizationGate::new());
+    let uncertain = Arc::new(AtomicBool::new(false));
+    let unresolved = Arc::new(AtomicBool::new(false));
+    let entered = Arc::new(Barrier::new(2));
+    let release = Arc::new(Barrier::new(2));
+    let worker = {
+        let gate = gate.clone();
+        let uncertain = uncertain.clone();
+        let entered = entered.clone();
+        let release = release.clone();
+        std::thread::spawn(move || {
+            gate.authorize(&uncertain, || {
+                entered.wait();
+                release.wait();
+                Ok(())
+            })
+        })
+    };
+    entered.wait();
+    let (tx, rx) = mpsc::channel();
+    let cancel = {
+        let gate = gate.clone();
+        let uncertain = uncertain.clone();
+        let unresolved = unresolved.clone();
+        std::thread::spawn(move || tx.send(gate.close_if_safe(&uncertain, &unresolved, || {})))
+    };
+    release.wait();
+    assert_eq!(worker.join().unwrap(), Ok(()));
+    assert_eq!(rx.recv().unwrap(), false);
+    cancel.join().unwrap().unwrap();
+    assert!(uncertain.load(Ordering::Acquire));
+    uncertain.store(false, Ordering::Release);
+    assert!(gate.close_if_safe(&uncertain, &unresolved, || {}));
+    assert_eq!(gate.authorize(&uncertain, || Ok(())), Err(Error::Cancelled));
+}
+#[test]
 fn private_disposal_retains_extra_file_failure_then_retries() -> Result<()> {
     static NEXT: AtomicUsize = AtomicUsize::new(1);
     let ordinal = NEXT.fetch_add(1, AtomicOrdering::Relaxed) as u32;
@@ -104,6 +167,26 @@ fn private_disposal_retains_extra_file_failure_then_retries() -> Result<()> {
     assert!(lease.root.exists());
     fs::remove_file(&unexpected)?;
     assert_eq!(lease.dispose()?, 0);
+    assert!(!lease.root.exists());
+    Ok(())
+}
+#[test]
+fn private_capture_cleanup_does_not_require_canvas_recovery_or_live_source() -> Result<()> {
+    static NEXT: AtomicUsize = AtomicUsize::new(1000);
+    let ordinal = NEXT.fetch_add(1, AtomicOrdering::Relaxed) as u32;
+    let marker = id(std::process::id().wrapping_add(ordinal));
+    let sample = id(std::process::id().wrapping_add(ordinal).wrapping_add(1));
+    let mut lease = PrivateTempLease::create(&marker, &sample, std::process::id())?;
+    fs::write(
+        lease
+            .root
+            .join(format!("{sample}-00"))
+            .join("capture-canvas.png"),
+        b"private",
+    )?;
+    let canvas_unresolved = AtomicBool::new(true);
+    assert!(canvas_unresolved.load(Ordering::Acquire));
+    assert_eq!(lease.dispose()?, 1);
     assert!(!lease.root.exists());
     Ok(())
 }

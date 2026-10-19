@@ -68,6 +68,7 @@ struct Owner {
     pins: Arc<Pins>,
     pipes: Arc<Mutex<Pipes>>,
     io: Option<JoinHandle<Outcome>>,
+    parked_outcome: Option<Outcome>,
     _permit: Permit,
     input_uncertain: Arc<AtomicBool>,
     // A programmatic observation retains the actual parent source through any
@@ -75,6 +76,7 @@ struct Owner {
     _source: Option<Arc<crate::editor_source::SourceLease>>,
     private_temp: Option<compatibility::PrivateTempLease>,
     canvas_unresolved: Arc<AtomicBool>,
+    drawing_gate: Option<Arc<compatibility::AuthorizationGate>>,
 }
 struct PendingOwner {
     owner: Owner,
@@ -361,6 +363,12 @@ impl Owner {
         !self.input_uncertain.load(Ordering::Acquire)
     }
     fn kill_if_released(&self) {
+        if let Some(gate) = &self.drawing_gate {
+            gate.close_if_safe(&self.input_uncertain, &self.canvas_unresolved, || {
+                let _ = self.child.kill_tree();
+            });
+            return;
+        }
         if self.may_retire() && !self.canvas_unresolved.load(Ordering::Acquire) {
             let _ = self.child.kill_tree();
         }
@@ -374,17 +382,38 @@ impl Owner {
     fn collect(&mut self) -> Collection<Outcome> {
         let child = &self.child;
         let worker = &mut self.io;
+        let parked = &mut self.parked_outcome;
         collect_released(
             &self.input_uncertain,
             || child.retired_receipt(),
             worker.as_ref().is_none_or(JoinHandle::is_finished),
             || {
-                worker
-                    .take()
-                    .map(|v| v.join().map_err(|_| Error::Io))
-                    .transpose()
+                if let Some(outcome) = parked.take() {
+                    Ok(Some(outcome))
+                } else {
+                    worker
+                        .take()
+                        .map(|v| v.join().map_err(|_| Error::Io))
+                        .transpose()
+                }
             },
         )
+    }
+    /// Retire private files only after a fresh actual Job receipt and finished
+    /// IO join. Unknown canvas/input state continues to retain source and permit.
+    fn cleanup_private_if_quiescent(&mut self) -> Result<bool> {
+        self.child.retired_receipt()?;
+        if self.io.as_ref().is_some_and(|worker| !worker.is_finished()) {
+            return Ok(false);
+        }
+        if let Some(worker) = self.io.take() {
+            self.parked_outcome = Some(worker.join().map_err(|_| Error::Io)?);
+        }
+        if let Some(temp) = self.private_temp.as_mut() {
+            temp.dispose()?;
+            self.private_temp = None;
+        }
+        Ok(true)
     }
     fn reap(&self, duration: Duration) -> Result<bool> {
         let started = Instant::now();
@@ -839,11 +868,13 @@ fn run_for(effect: bool) -> Result<()> {
         pins,
         pipes,
         io: None,
+        parked_outcome: None,
         _permit: permit,
         input_uncertain,
         _source: None,
         private_temp: None,
         canvas_unresolved: Arc::new(AtomicBool::new(false)),
+        drawing_gate: None,
     };
     let mut error = owner.child.startup_error.clone();
     if error.is_none() {
@@ -918,6 +949,7 @@ pub fn wait_retained() {
                 .canvas_unresolved
                 .load(Ordering::Acquire)
             {
+                let _ = owners[index].owner.cleanup_private_if_quiescent();
                 index += 1;
                 continue;
             }
@@ -927,6 +959,7 @@ pub fn wait_retained() {
                 Collection::Pending(cause) => {
                     owners[index].receipt.retirement_error = Some(cause);
                     owners[index].owner.kill_if_released();
+                    let _ = owners[index].owner.cleanup_private_if_quiescent();
                     index += 1;
                 }
                 Collection::Joined { pid, code, outcome } => {
