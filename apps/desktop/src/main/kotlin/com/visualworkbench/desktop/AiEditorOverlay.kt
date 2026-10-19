@@ -16,7 +16,7 @@ internal fun AiEditorOverlay(editor: EditorController) {
     DialogWindow(onCloseRequest = editor::hideAi, title = "AI image edit",
         state = rememberDialogState(width = 1120.dp, height = 800.dp)) {
         MaterialTheme {
-            AiWorkspace(editor.ai, editor.aiService, editor.core, { keys = true }, editor::hideAi)
+            AiWorkspace(editor.ai, editor.aiService, editor.core, { _ -> keys = true }, editor::hideAi)
             if (keys) AiKeyDialog(editor.aiService, { keys = false })
         }
     }

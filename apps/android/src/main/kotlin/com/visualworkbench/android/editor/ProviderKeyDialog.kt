@@ -32,8 +32,9 @@ import kotlinx.coroutines.launch
 /** Root wires this explicit settings action after Application trust bootstrap.
  * Never reads the saved value into the field. Input is not remembered/saved. */
 @Composable
-internal fun ProviderKeyDialog(store: AndroidProviderKeyStore, lifecycle: Lifecycle, onDismiss: () -> Unit) {
-    var provider by remember { mutableStateOf(AiProviderKind.OpenAiImageEdits) }
+internal fun ProviderKeyDialog(store: AndroidProviderKeyStore, lifecycle: Lifecycle,
+    selectedProvider: AiProviderKind, onDismiss: () -> Unit) {
+    var provider by remember(selectedProvider) { mutableStateOf(selectedProvider) }
     val selectedStore = remember(store, provider) { store.forProvider(provider) }
     var field by remember { mutableStateOf<EditText?>(null) }
     var message by remember { mutableStateOf("Checking protected storage…") }
