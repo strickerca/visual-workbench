@@ -31,6 +31,7 @@ import com.visualworkbench.shared.*
                     modifier=Modifier.fillMaxWidth()){Text("Read current Paint controls")}
             }
             RemoteCompatibilityImportButton(controller)
+            RemoteDrawingCheckPanel(controller)
             remoteEditorCompatibilitySummary(state).forEach{Text(it,style=MaterialTheme.typography.caption)}
         }
         unavailable?.let{Text(it,style=MaterialTheme.typography.caption)}

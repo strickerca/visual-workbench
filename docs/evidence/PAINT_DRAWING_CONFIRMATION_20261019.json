@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "date_utc": "2026-10-19T03:28:16.017664+00:00",
+  "kind": "Paint drawing confirmation lifecycle and capture-policy source",
+  "composition_base": "a7bedd860da91bce5daa53847d26f7dd2d5b528d",
+  "source_sha256": {
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteDrawingCheck.kt": "27bb3207a9f7d96508fce1814d1026d97fc317d02bbcc1623e9b5d916fd96816",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditorPalette.kt": "aca03cf92626ae638c417366365d53b34c0dafe28c289d7fe8bb2bd9d0f4c661",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/RemoteDrawingCheckCases.kt": "35c33125ca9b8352cb3c0c550610e25b1a2584c0c35cb1e477e06e28c9fdddea",
+    "apps/shared/src/commonTest/paint/run_compatibility_probe.py": "df2fc4362969f5f6c7a6258569ba9fd09965fb1fce07aee990ad1502e3aea622",
+    "apps/shared/src/commonTest/paint/run_probe.py": "be2fb72209f77834bf0442070349621a197e778a84d036a65f0c736deb4541d5",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/remote/RemoteDrawingCheckPanel.kt": "f110731364c7f39bf2c2f2cfa39e5bc86d3ea90174095c456d5d0c0d4a12b68d",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/remote/RemoteEditorPalettePanel.kt": "191bf0e17c083adea1f91718ea6994d3635808d48c6f9c76d55229594046fe40",
+    "core/crates/vw-capture/src/windows/wgc.rs": "ea9edd693f3b63f68893b69744eafa03acfc6488320de431f4ea48ff516bded3"
+  },
+  "executed": [
+    {
+      "command": "python3 apps/shared/src/commonTest/paint/run_compatibility_probe.py",
+      "result": "PASS",
+      "drawing_lifecycle_cases": 13,
+      "existing_import_synthetic_groups": 16,
+      "existing_desktop_file_guard_cases": 5,
+      "compiler": "cached embedded Kotlin 2.4.0; explicit API strict; warnings denied; real common production leaves and JVM parser/owner, synthetic dispatcher/opaque preparation; Desktop file guard source slices"
+    },
+    {
+      "command": "python3 apps/shared/src/commonTest/paint/run_probe.py",
+      "result": "PASS",
+      "existing_palette_synthetic_cases": 16,
+      "compiler": "cached embedded Kotlin 2.4.0; explicit API strict; warnings denied; actual production leaves, no generated bindings or Compose"
+    }
+  ],
+  "logs_sha256": {
+    "vw-paint-drawing-flow-20261019-final3.log": "b2b375eade719d7339acb009f2afaf52f64514ed50b187152d80c85913f9d68e",
+    "vw-paint-palette-20261019-drawing.log": "0e927721251e0a8d5c8f0e7fc21ea1efe785f8b67dadfa31531dcdfcba8e745d"
+  },
+  "earlier_failure_receipts_retained": [
+    "/tmp/vw-paint-drawing-flow-compile-20261019.log",
+    "/tmp/vw-paint-drawing-flow-20261019-final.log"
+  ],
+  "corrections": "Qualified outer lifecycle cancellation after an unqualified cancel selected the coroutine receiver. Explicit fixture dispatcher type corrected anonymous property API error. Recovery now seals the same input session across missing observations/geometry refresh.",
+  "implemented_source": [
+    "Query-only preparation, explicit owner confirmation, shared command/import admission, retained native preparation handoff, single-flight cleanup retry and close joins",
+    "Canvas recovery fences same input session; new native input session required; physical pen remains NotTested",
+    "Desktop confirmation/progress/cancel/retry UI, hidden unless actual adapter advertises native capability",
+    "Actual WGC cursor-disabled getter after setter; early RAII installed before fallible session configuration"
+  ],
+  "not_implemented_or_unrun": [
+    "Concrete NativeRemoteEdit drawing capability/foreign owner, queued-input reservation and generated ABI await real P producer integration; no app positive drawing record enabled",
+    "Desktop Compose/full apps/native Windows compile and actual WGC/getter/input/process/Job/device runtime unrun",
+    "No real captures, GUI input, physical pen, hardware/product gate, provider/deployment/credential operation"
+  ],
+  "counts_are_separate_scopes_not_final_tree_acceptance": true
+}

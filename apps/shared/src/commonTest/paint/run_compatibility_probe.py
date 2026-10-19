@@ -24,7 +24,7 @@ def main():
     shared = ROOT / "apps/shared/src"
     common = shared / "commonMain/kotlin/com/visualworkbench/shared"
     jvm = shared / "jvmMain/kotlin/com/visualworkbench/shared"
-    sources = [common / (name + ".kt") for name in ["RemoteEditApi", "RemoteEditorCompatibility", "RemoteEditorPalette", "RemoteEditorProfileEvidence", "RemoteCompatibilityImport"]]
+    sources = [common / (name + ".kt") for name in ["RemoteEditApi", "RemoteEditorCompatibility", "RemoteEditorPalette", "RemoteEditorProfileEvidence", "RemoteCompatibilityImport", "RemoteDrawingCheck"]]
     sources += [jvm / "RemoteNativeJson.kt", jvm / "NativeRemoteCompatibility.kt"]
     with tempfile.TemporaryDirectory(prefix="vw-compatibility-probe-") as temp:
         temp = Path(temp)
@@ -34,8 +34,10 @@ def main():
         subprocess.run(compile + ["-Xexplicit-api=strict", "-classpath", cp] + list(map(str, sources)), check=True, timeout=45)
         runtime = str(out) + os.pathsep + cp
         subprocess.run(compile + ["-Xfriend-paths=" + str(out), "-classpath", runtime,
-            str(shared / "jvmTest/kotlin/com/visualworkbench/shared/RemoteCompatibilityImportCases.kt")], check=True, timeout=45)
+            str(shared / "jvmTest/kotlin/com/visualworkbench/shared/RemoteCompatibilityImportCases.kt"),
+            str(shared / "jvmTest/kotlin/com/visualworkbench/shared/RemoteDrawingCheckCases.kt")], check=True, timeout=45)
         subprocess.run([java, "-Xmx128m", "-cp", runtime, "com.visualworkbench.shared.RemoteCompatibilityImportCasesKt"], check=True, timeout=20)
+        subprocess.run([java, "-Xmx128m", "-cp", runtime, "com.visualworkbench.shared.RemoteDrawingCheckCasesKt"], check=True, timeout=30)
         desktop = ROOT / "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/remote/RemoteCompatibilityImport.kt"
         text = desktop.read_text()
         start, end = text.index("internal fun sameImportTarget("), text.index("private suspend fun chooseCompatibilityReceipt(")

@@ -31,6 +31,23 @@ public class RemoteEditorPalette(
     private val admission=Mutex()
     private val mutable=MutableStateFlow(RemoteEditorPaletteState())
     public val state:StateFlow<RemoteEditorPaletteState> = mutable.asStateFlow()
+    private val drawingCheck=RemoteDrawingCheck(dispatcher,scope,admission,adopt={result->
+        result.validFor(result.target)&&compatibility(result.toolId,result.settingsDigest,result.records)
+    },busy={value->mutable.update{it.copy(busy=value)}},seal={binding->
+        mutable.update{old->if(old.target==null||sameInputSession(old.target.binding,binding))
+            old.copy(sealedBinding=binding,message="Check the Paint canvas before granting a new input session.")else old}
+    })
+    public val drawingCheckState:StateFlow<RemoteDrawingCheckState> = drawingCheck.state
+    public val drawingCheckAvailable:Boolean get()=(dispatcher as? RemoteDrawingCheckCapability)?.drawingCheckSupported==true
+    public fun prepareDrawingCheck():Boolean {
+        val snapshot=mutable.value
+        val target=snapshot.target?:return false
+        if(snapshot.closed||snapshot.busy||snapshot.sealedBinding?.let{sameInputSession(it,target.binding)}==true)return false
+        return drawingCheck.prepare()
+    }
+    public fun confirmDrawingCheck():Boolean = drawingCheck.confirm()
+    public fun cancelDrawingCheck():Unit = drawingCheck.cancel()
+    public suspend fun retryDrawingCheckCleanup():Unit = drawingCheck.retryCleanup()
     init {
         scope.launch {
             dispatcher.target.collect { next ->
@@ -173,6 +190,7 @@ public class RemoteEditorPalette(
     public suspend fun close():Unit = withContext(NonCancellable) {
         mutable.update{it.copy(closed=true,target=null,message=null,toolId=null,settingsDigest=null,compatibility=emptyList())}
         owner.cancelAndJoin()
+        drawingCheck.close()
     }
 }
 
