@@ -136,6 +136,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     internal var giantMode by mutableStateOf(false); private set
     internal var giantIssue by mutableStateOf<String?>(null); private set
     private val giantDraw = java.util.concurrent.atomic.AtomicReference<GiantVisibleFrame<Bitmap>?>(null)
+    private val giantExpectedContent = java.util.concurrent.atomic.AtomicReference<GiantTileContent?>(null)
     private fun expectedGiantContent(doc: DocumentSnapshot): GiantTileContent =
         if (doc.hasToneAdjustments) GiantTileContent.Composed else GiantTileContent.Source
     private fun approvedAssumption(doc: DocumentSnapshot): Boolean {
@@ -170,7 +171,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     private fun giantInputReady(doc:DocumentSnapshot):Boolean = giantRenderReady&&giantFrame(doc)!=null
     internal fun giantFrameCurrent(frame:GiantVisibleFrame<Bitmap>):Boolean =
-        giantDraw.get() === frame && document?.let { frame.content == expectedGiantContent(it) && giantFrame(it) === frame } == true
+        giantDraw.get() === frame && giantExpectedContent.get() == frame.content
     private fun giantFrame(doc:DocumentSnapshot):GiantVisibleFrame<Bitmap>? {
         if(!giantMode)return null
         val view=giantOwner.current?:return null
@@ -178,9 +179,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         return runCatching{view.matchingFrame(WorkflowBinding(revision.projectId,doc.documentId,revision.hostSeq,revision.stateHash),epoch,
             giantViewport(core,camera,precision.frame()),expectedGiantContent(doc))}.getOrNull()
     }
-    private suspend fun detachGiant() {giantOwner.detach();giantMode=false;giantIssue=null;giantDraw.set(null)}
+    private suspend fun detachGiant() {giantExpectedContent.set(null);giantDraw.set(null);giantOwner.detach();giantMode=false;giantIssue=null}
     private suspend fun loadGiantBackground(current:WorkbenchProject,doc:DocumentSnapshot) {
-        giantMode=true;background=null;composedBackground=null;giantDraw.set(null);giantRenderReady=false;giantOwner.invalidate()
+        giantExpectedContent.set(expectedGiantContent(doc));giantDraw.set(null)
+        giantMode=true;background=null;composedBackground=null;giantRenderReady=false;giantOwner.invalidate()
         val revision = doc.render.revision
         val format = originalFormat?.takeIf { it.binding == WorkflowBinding(revision.projectId,doc.documentId,
             revision.hostSeq,revision.stateHash) }
