@@ -10,6 +10,10 @@ pub use avif_images::*;
 mod format_images;
 pub use format_images::OriginalFormatInfo;
 mod ai_edit;
+mod assisted_source;
+pub use assisted_source::{
+    AssistedSourcePixels, AssistedSourcePixelsDelivery, AssistedSourcePixelsInfo,
+};
 mod camera;
 mod documents;
 pub use documents::*;

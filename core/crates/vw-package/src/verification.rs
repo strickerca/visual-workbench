@@ -201,6 +201,7 @@ pub fn compile_verification_failure_package(
         || m.source.asset_hash != a.source.asset_hash
         || m.source.width != a.source.width
         || m.source.height != a.source.height
+        || m.extensions.image_output != a.extensions.image_output
         || m.source.document_kind != a.source.document_kind
         || m.source.units != a.source.units
         || m.extensions.host_seq < a.extensions.host_seq

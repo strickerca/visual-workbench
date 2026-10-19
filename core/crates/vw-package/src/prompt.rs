@@ -15,20 +15,39 @@ pub(crate) fn build(
 ) -> Result<Vec<u8>> {
     let mut out = String::new();
     push(&mut out, "# Visual instruction package\n\n")?;
-    push(
-        &mut out,
-        &format!(
-            "Source revision {} (full hash {}). Compiled image {} × {} pixels; source document {} × {} px.\nCoordinate convention: {}. Uniform scale: {} compiled pixels per D pixel. Padding is only on the bottom/right and never shifts coordinates.\n",
-            manifest.source.revision,
-            manifest.extensions.state_hash,
-            manifest.extensions.overview_mapping.width,
-            manifest.extensions.overview_mapping.height,
-            manifest.source.width,
-            manifest.source.height,
-            manifest.compiled_for.coordinate_convention,
-            manifest.compiled_for.scale
-        ),
-    )?;
+    if let Some(output) = manifest.extensions.image_output {
+        let frame = bounded::json(&output, 4096)?;
+        push(
+            &mut out,
+            &format!(
+                "Source revision {} (full hash {}). Compiled image {} × {} pixels; immutable source document D {} × {} px.\nCoordinate convention: {}. Uniform scale: {} compiled pixels per O pixel after the canonical D-to-O frame. Padding is only on the bottom/right and never shifts coordinates.\nCanonical D-to-O frame (JSON data): {}. Document points, boxes and captured element references remain in D; compiled points, boxes and context rectangles use O followed by target scaling. This mapping does not establish capture or comparison alignment.\n",
+                manifest.source.revision,
+                manifest.extensions.state_hash,
+                manifest.extensions.overview_mapping.width,
+                manifest.extensions.overview_mapping.height,
+                manifest.source.width,
+                manifest.source.height,
+                manifest.compiled_for.coordinate_convention,
+                manifest.compiled_for.scale,
+                std::str::from_utf8(&frame).map_err(|_| Error::Encoding)?,
+            ),
+        )?;
+    } else {
+        push(
+            &mut out,
+            &format!(
+                "Source revision {} (full hash {}). Compiled image {} × {} pixels; source document {} × {} px.\nCoordinate convention: {}. Uniform scale: {} compiled pixels per D pixel. Padding is only on the bottom/right and never shifts coordinates.\n",
+                manifest.source.revision,
+                manifest.extensions.state_hash,
+                manifest.extensions.overview_mapping.width,
+                manifest.extensions.overview_mapping.height,
+                manifest.source.width,
+                manifest.source.height,
+                manifest.compiled_for.coordinate_convention,
+                manifest.compiled_for.scale
+            ),
+        )?;
+    }
     push(
         &mut out,
         &format!(
@@ -115,7 +134,12 @@ pub(crate) fn build(
             push(
                 &mut out,
                 &format!(
-                    "Crop D rectangle: {:?}; content {} × {}, image {} × {} pixels; box in crop pixels [x,y,w,h]: {:?}.\n",
+                    "Crop {} rectangle: {:?}; content {} × {}, image {} × {} pixels; box in crop pixels [x,y,w,h]: {:?}.\n",
+                    if manifest.extensions.image_output.is_some() {
+                        "O"
+                    } else {
+                        "D"
+                    },
                     crop.mapping.source_rectangle,
                     crop.mapping.content_width,
                     crop.mapping.content_height,

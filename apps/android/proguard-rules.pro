@@ -2,6 +2,7 @@
 -keep class com.visualworkbench.shared.AndroidProviderRuntime { *; }
 -keep class com.visualworkbench.shared.AndroidProviderKeyStore {
     public byte[] loadForNative(long);
+    public byte[] loadForNative(int,long);
     public void clearForNative(byte[]);
     public boolean isProductionForNative(android.app.Application);
 }

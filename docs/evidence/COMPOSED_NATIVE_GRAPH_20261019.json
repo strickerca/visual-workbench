@@ -1,0 +1,52 @@
+{
+  "source_admissions": [
+    {
+      "lane": "A",
+      "accepted_source": "d337c63920a0d48ad5ec0215789ef39dc2916609",
+      "paths": 42,
+      "all_source_blobs_match": true
+    },
+    {
+      "lane": "E",
+      "accepted_source": "54b42f204608d5fd5ac68ef63b068e52a3b41536",
+      "paths": 18,
+      "all_source_blobs_match": true
+    },
+    {
+      "lane": "F",
+      "accepted_source": "c03e489a5c7f95175c84c9d9b13eb158018b2474",
+      "paths": 18,
+      "all_source_blobs_match": true
+    },
+    {
+      "lane": "V",
+      "accepted_source": "24543f28f3bf23228d4fdc9d9d9dfb5e7248ee8d",
+      "paths": 25,
+      "all_source_blobs_match": true
+    },
+    {
+      "lane": "O",
+      "accepted_source": "2d633a8785d35848dbfa12c45c09d860ce8e13d7",
+      "paths": 8,
+      "all_source_blobs_match": true
+    }
+  ],
+  "root_hooks": [
+    "assisted_source module/exports",
+    "O prompt D/O labels and failure-frame preservation",
+    "V original/after/history output-frame refusal",
+    "provider-scoped JNI R8 overload retention"
+  ],
+  "check": {
+    "command": "cargo check --locked --offline -p vw-ffi --lib -j2",
+    "result": "pass with one Linux-only dead_code warning in ProviderAdapter; strict Clippy not claimed",
+    "log_sha256": "7ab572ebd3e573a3ab1fa988ec18b597f113f16c8d7ab2231d341677ebbf22f8",
+    "seconds": 16.5
+  },
+  "limits": [
+    "No generated ABI or shared/app/platform/device execution",
+    "Current GiantTileDelivery unread-Arc defect remains explicitly granted to E",
+    "Actual D/O verification alignment and both-app export-region/O-receipt callers remain implementation work",
+    "Converted/admitted model artifacts, LiteRT packaging/notices and actual factory/UI delivery remain open"
+  ]
+}
