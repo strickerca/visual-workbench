@@ -177,6 +177,23 @@ fn accepted_result_uses_existing_resolver_and_full_d_transform() -> TestResult {
     let region = tile();
     let info = BorrowedSource::new(&source)?.info().clone();
     let assets = Assets(result_image);
+    let mut denied = options();
+    denied.assume_untagged_srgb = false;
+    assert!(matches!(
+        compose_document_region(
+            &source.crop(region)?,
+            &info,
+            &project,
+            &document,
+            &assets,
+            denied,
+            region,
+            &|| false,
+        ),
+        Err(RasterError::Unsupported(
+            "untagged result color; explicitly assume sRGB"
+        ))
+    ));
     let actual = compose_document_region(
         &source.crop(region)?,
         &info,
@@ -194,6 +211,41 @@ fn accepted_result_uses_existing_resolver_and_full_d_transform() -> TestResult {
         &expected.pixels,
         "accepted result at D origin",
     )?;
+    Ok(())
+}
+
+#[test]
+fn tagged_profile_validation_waits_for_region_memory_admission() -> TestResult {
+    let (source, mut project, document) = fixture()?;
+    let mut info = BorrowedSource::new(&source)?.info().clone();
+    let profile = standard_srgb_profile()?;
+    info.icc = Some(profile.clone());
+    project
+        .assets
+        .get_mut(&source.source_asset)
+        .ok_or("asset")?
+        .icc_profile = profile;
+    let mut tight = options();
+    tight.memory_budget_bytes = 1;
+    assert!(matches!(
+        region_composition_estimate(&info, &project, &document, tight, tile()),
+        Err(RasterError::Memory { .. })
+    ));
+    let malformed = vec![0; 132];
+    info.icc = Some(malformed.clone());
+    project
+        .assets
+        .get_mut(&source.source_asset)
+        .ok_or("asset")?
+        .icc_profile = malformed;
+    assert!(matches!(
+        region_composition_estimate(&info, &project, &document, tight, tile()),
+        Err(RasterError::Memory { .. })
+    ));
+    assert!(matches!(
+        region_composition_estimate(&info, &project, &document, options(), tile()),
+        Err(RasterError::Color)
+    ));
     Ok(())
 }
 

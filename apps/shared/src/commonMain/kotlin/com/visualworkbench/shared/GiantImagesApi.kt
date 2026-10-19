@@ -32,11 +32,13 @@ public interface GiantImage {
     public suspend fun close(): Unit
 }
 /** Optional committed D-space composition. Callers select this mode explicitly
- * and suppress their ordinary canonical annotation pass for these pixels. The
- * reservation and retirement contract is identical to [GiantImage.tile]. */
+ * and suppress their ordinary canonical annotation pass for these pixels. Pass
+ * assumeUntaggedSrgb=true only after the owner approves interpreting the
+ * untagged original as sRGB; false retains the renderer's color refusal.
+ * The reservation and retirement contract is identical to [GiantImage.tile]. */
 public interface GiantEditingImage {
     public suspend fun editingTile(address: GiantTileAddress,
-        foreign: SessionResourceCharge): GiantTilePixels
+        foreign: SessionResourceCharge, assumeUntaggedSrgb: Boolean): GiantTilePixels
 }
 public enum class GiantImageFailureKind { Invalid, Limit, Memory, Stale, Missing, Unsupported, Closed, Cancelled, Backpressure, Storage }
 public class GiantImageFailure(public val kind: GiantImageFailureKind,

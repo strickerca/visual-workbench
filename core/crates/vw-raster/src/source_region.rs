@@ -6,7 +6,6 @@ use vw_model::{Id, Project};
 use vw_proto::v1;
 
 fn binding(info: &SourceInfo, project: &Project, document: &Id) -> Result<(), RasterError> {
-    info.validate()?;
     let definition = &project
         .documents
         .get(document)
@@ -51,15 +50,22 @@ pub fn region_composition_estimate(
     region.validate(info.width, info.height)?;
     let pixels = u64::from(region.width) * u64::from(region.height);
     let geometry = crate::stream::geometry_reserve(project, document, options.include_guides)?;
-    let profile = crate::export::icc_workspace(info.icc.as_ref())?;
-    let estimated = pixels
+    // Reject a tiny budget before inspecting ICC structures or invoking the
+    // semantic profile parser. Once this floor fits, icc_workspace calculates
+    // the additional profile allowance without allocating parser state.
+    let fixed = pixels
         .checked_mul(64)
         .and_then(|n| n.checked_add(32 * 1024 * 1024))
         .and_then(|n| n.checked_add(geometry))
-        .and_then(|n| n.checked_add(profile))
+        .ok_or(RasterError::Allocation)?;
+    crate::source::check_memory(fixed, options.memory_budget_bytes)?;
+    let profile = crate::export::icc_workspace(info.icc.as_ref())?;
+    let estimated = fixed
+        .checked_add(profile)
         .and_then(|n| n.checked_add(info.icc.as_ref().map_or(0, |v| v.capacity() as u64)))
         .ok_or(RasterError::Allocation)?;
     crate::source::check_memory(estimated, options.memory_budget_bytes)?;
+    info.validate()?;
     project.validate()?;
     Ok(estimated)
 }
