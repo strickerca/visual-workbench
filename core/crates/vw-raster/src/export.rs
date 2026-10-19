@@ -397,7 +397,8 @@ pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage,
     export_with_output(source, r, None)
 }
 
-pub(crate) fn export_with_output(
+/// Encode already-composed O pixels with their checked immutable D-to-O provenance.
+pub fn export_with_output(
     source: &DecodedImage,
     r: &ExportRequest,
     output: Option<crate::ImageOutputMetadata>,

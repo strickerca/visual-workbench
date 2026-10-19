@@ -11,10 +11,10 @@ mod render;
 mod source;
 mod stream;
 mod text;
-pub use display::{DisplayImage, display_rgba8};
+pub use display::{DisplayImage, display_preview_rgba8, display_rgba8};
 pub use export::{
     AlphaPolicy, ColorPolicy, ExportFormat, ExportMetadata, ExportRequest, ExportedImage,
-    PreparedRaster, Region, export, preflight, prepare_export_pixels,
+    PreparedRaster, Region, export, export_with_output, preflight, prepare_export_pixels,
     prepare_export_pixels_with_output,
 };
 pub use ffi::webp_encoder_version;

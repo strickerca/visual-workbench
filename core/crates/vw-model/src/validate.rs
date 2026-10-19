@@ -268,8 +268,25 @@ pub fn validate_asset(value: &v1::AddAsset) -> Result<(), ModelError> {
     one_of(
         &value.format,
         &[
-            "png", "jpeg", "jpg", "webp", "avif", "heic", "heif", "tiff", "bmp", "gif", "pdf",
-            "svg", "mp4", "mov",
+            "png",
+            "jpeg",
+            "jpg",
+            "webp",
+            "avif",
+            "heic",
+            "heif",
+            "tiff",
+            "bmp",
+            "gif",
+            "pdf",
+            "svg",
+            "mp4",
+            "mov",
+            "psd",
+            "psb",
+            "dng",
+            "cr2",
+            "raw-preview",
         ],
     )?;
     one_of(&value.source, &["camera", "import", "capture", "ai_result"])?;
@@ -285,14 +302,28 @@ pub fn validate_asset(value: &v1::AddAsset) -> Result<(), ModelError> {
         return Err(ModelError::Invalid("ICC profile size"));
     }
     text(&value.color_space, 256)?;
+    let mut flattened = false;
+    let mut raw_preview = false;
+    let mut first_tiff_page = false;
     if let Some(metadata) = json(&value.metadata_json, true)? {
         let entries = metadata
             .as_object()
             .ok_or(ModelError::Invalid("metadata object"))?;
         for (key, value) in entries {
             if key == "first_tiff_page_only" {
-                if !value.is_boolean() {
-                    return Err(ModelError::Invalid("TIFF first-page notice"));
+                first_tiff_page = value
+                    .as_bool()
+                    .ok_or(ModelError::Invalid("TIFF first-page notice"))?;
+                continue;
+            }
+            if key == "flattened_composite" || key == "raw_preview" {
+                let notice = value
+                    .as_bool()
+                    .ok_or(ModelError::Invalid("original format notice"))?;
+                if key == "flattened_composite" {
+                    flattened = notice;
+                } else {
+                    raw_preview = notice;
                 }
                 continue;
             }
@@ -310,6 +341,14 @@ pub fn validate_asset(value: &v1::AddAsset) -> Result<(), ModelError> {
                 65_536,
             )?;
         }
+    }
+    if flattened != matches!(value.format.as_str(), "psd" | "psb")
+        || raw_preview != matches!(value.format.as_str(), "dng" | "cr2" | "raw-preview")
+        || (flattened && !matches!(value.bit_depth, 8 | 16))
+        || (raw_preview && value.bit_depth != 8)
+        || (first_tiff_page && value.format != "tiff")
+    {
+        return Err(ModelError::Invalid("original format notice binding"));
     }
     Ok(())
 }

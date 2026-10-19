@@ -6,8 +6,9 @@ use vw_model::AssetId;
 const MAX_DISPLAY_PIXELS: u64 = 50_000_000;
 const FIXED_WORKSPACE_BYTES: u64 = 32 * 1024 * 1024;
 
-/// An oriented, sRGB, 8-bit display derivative of an immutable original.
-/// `source_bit_depth` and `source_asset` describe the original, not the derivative.
+/// An oriented, sRGB, 8-bit display derivative of its admitted immutable input.
+/// `source_asset` retains the container identity; `source_bit_depth` describes
+/// decoded input samples. A RAW preview does not establish sensor bit depth.
 #[derive(Debug)]
 pub struct DisplayImage {
     pub width: u32,
@@ -28,15 +29,53 @@ pub struct DisplayImage {
 /// returned Vec / serialized RGBA8 copy. It is not a measured process-RSS limit
 /// and does not account for a caller's retained source clones or UI bitmap.
 pub fn display_rgba8(
-    mut image: DecodedImage,
+    image: DecodedImage,
     memory_budget_bytes: u64,
     assume_untagged_srgb: bool,
     cancelled: &dyn Fn() -> bool,
 ) -> Result<DisplayImage, RasterError> {
+    display_pixels(
+        image,
+        memory_budget_bytes,
+        assume_untagged_srgb,
+        cancelled,
+        false,
+    )
+}
+
+/// Display an explicitly unavailable-original preview with the same admitted
+/// color conversion. Its depth describes preview samples, not RAW sensor data.
+/// No original flag is changed and DisplayImage grants no export/source authority.
+pub fn display_preview_rgba8(
+    image: DecodedImage,
+    memory_budget_bytes: u64,
+    assume_untagged_srgb: bool,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<DisplayImage, RasterError> {
+    display_pixels(
+        image,
+        memory_budget_bytes,
+        assume_untagged_srgb,
+        cancelled,
+        true,
+    )
+}
+
+fn display_pixels(
+    mut image: DecodedImage,
+    memory_budget_bytes: u64,
+    assume_untagged_srgb: bool,
+    cancelled: &dyn Fn() -> bool,
+    preview: bool,
+) -> Result<DisplayImage, RasterError> {
     source::check_cancel(cancelled)?;
     export::image_shape(&image)?;
-    if !image.original_available {
-        return Err(RasterError::OriginalRequired);
+    if image.original_available == preview {
+        return Err(if preview {
+            RasterError::Invalid("display preview requires an unavailable original")
+        } else {
+            RasterError::OriginalRequired
+        });
     }
     if !(1..=8).contains(&image.orientation_applied) {
         return Err(RasterError::Invalid("orientation"));
