@@ -40,4 +40,12 @@ class DesktopComposedCanvasTest {
         assertEquals(listOf("canonical"),items.map{it.objectId})
         assertEquals(emptyList<RenderItem>(),canvasItems(doc,true,emptyMap()))
     }
+
+    @Test fun peerReplacementCannotOverlayTheBakedCanonicalPose(){
+        val doc=document();val binding=doc.binding(3L)
+        val state=EditorState(document=doc,projectEpoch=3L,composedBackground=binding,
+            peerFrame=PeerFrame(binding,1L,PeerPreviews(1uL,emptyList(),listOf(item("canonical")))))
+        assertFalse(composedCanvasCurrent(state,binding))
+        assertEquals(listOf("canonical"),canvasItems(doc,false,mapOf("canonical" to item("canonical"))).map{it.objectId})
+    }
 }

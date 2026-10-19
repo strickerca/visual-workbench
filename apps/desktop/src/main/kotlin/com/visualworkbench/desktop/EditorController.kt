@@ -299,7 +299,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
         val token=rotation.begin(handle.pivot,point)?:return false
         rotationGesture=token;rotationPhysical=physical;rotationDisplay.set(handle.copy(point=point));return true
     }
-    private fun bindWorkflows(reconcileRotation:Boolean=true){if(reconcileRotation)rotation.reconciled();workflowAttachment()?.let{a->workflows.bind(a);frames.bind(a.project,a.document,a.epoch,a.changeSequence)}}
+    private fun bindWorkflows(reconcileRotation:Boolean=true){if(reconcileRotation)rotation.reconciled();workflowAttachment()?.let{a->workflows.bind(a);frames.bind(a.project,a.document,a.epoch,a.sequence)}}
     private suspend fun enterWorkflows(){workflowAttachment()?.let{workflows.enter(it)}}
     private suspend fun adoptWorkflowDocument(a:EditorWorkflowAttachment,target:DocumentSnapshot){
         if(project!==a.project||generation!=a.epoch||mutable.value.document?.binding(generation)!=a.document.binding(a.epoch)||closing)
@@ -506,6 +506,10 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         fun current()=!closing&&project===p&&generation==epoch&&refreshTicket==ticket&&
             mutable.value.document?.binding(epoch)==renderBinding&&mutable.value.documentPage==(doc.page?:0u)
         if(!current())return
+        if(doc.hasToneAdjustments&&!assumed&&mutable.value.originalFormatInfo?.takeIf{it.binding==workflowBinding}?.untagged==true){
+            update{it.copy(needsColorConsent=true,backgroundIssue="Tone display requires explicit sRGB consent for this untagged original. The original remains unchanged.",backgroundFailureKind=null)}
+            return
+        }
         update{it.copy(backgroundIssue=null,backgroundFailureKind=null)}
         try{
             val composed=doc.hasToneAdjustments
@@ -891,7 +895,16 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         requireCurrent(request)
         val p=project?:throw HandoffFailure("Open a project before exporting.")
         if(!request.matches(p.info())){refresh();throw HandoffFailure("The core revision changed. Review it before exporting.")}
-        val projected=projectExport(request,p)
+        val projected=try{projectExport(request,p)}catch(error:WorkflowFailure){
+            throw HandoffFailure(when(error.kind){
+                WorkflowFailureKind.Stale,WorkflowFailureKind.Missing,WorkflowFailureKind.Detached,WorkflowFailureKind.Closed ->
+                    "The saved output frame or original changed. Reopen the project and prepare this export again."
+                WorkflowFailureKind.Invalid -> "The saved output frame or selected source rectangle is invalid. Review the frame and export area."
+                WorkflowFailureKind.Limit,WorkflowFailureKind.Memory,WorkflowFailureKind.Backpressure ->
+                    "Output-frame projection exceeds its work or memory allowance. Choose a smaller region or retry when work settles."
+                else -> "The saved output frame could not be verified for export. The original is unchanged."
+            })
+        }
         requireCurrent(request)
         requireCurrent(projected)
         if(!projected.matches(p.info()))throw HandoffFailure("The project changed while resolving its saved output frame.")
