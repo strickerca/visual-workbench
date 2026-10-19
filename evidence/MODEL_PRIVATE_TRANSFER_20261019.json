@@ -1,0 +1,32 @@
+{
+  "status": "Library authorization succeeded; archive bytes blocked by environment HTTPS proxy",
+  "error": "CONNECT tunnel 403 Forbidden for signed oaiusercontent download hosts",
+  "direct_workspace_path_available": false,
+  "expected_archives": [
+    {
+      "name": "01-model-artifacts.tar",
+      "bytes": 47052800,
+      "sha256": "9e9a9b9707f327351d42c72886392fdbea4aab45ffbe78c30586e13e6e0073a9"
+    },
+    {
+      "name": "02-parity-notices-logs.tar",
+      "bytes": 14960640,
+      "sha256": "d0b940831603150371721b73413b0fde218897bc4b45a78b85bd5fa16626f006"
+    },
+    {
+      "name": "03-pinned-checkpoint.tar",
+      "bytes": 40734720,
+      "sha256": "03872b6e73724d6f500cbed26362a177377605a024577e9f8aa3ea321336a6f8"
+    }
+  ],
+  "actual_received_bytes": 0,
+  "archive_hashes_verified": false,
+  "extraction_attempted": false,
+  "expected_transfer_index_sha256": "b65883589eeec3f3e9e07c7b4a43a58dd2683b5a8781b013409fc989d51ea089",
+  "expected_transfer_files": 149,
+  "conversion_repeated": false,
+  "production_model_admission": "closed",
+  "private_failure_receipt": "/workspace/assisted-model-transfer-20261019/transfer-failure.json",
+  "retained_zero_byte_partials": 3,
+  "signed_urls_tokens_or_private_library_ids_committed": false
+}

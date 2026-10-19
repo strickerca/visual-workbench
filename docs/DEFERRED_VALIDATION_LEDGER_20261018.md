@@ -307,3 +307,54 @@ root reran its31 offline tests successfully; the actual private models/goldens/
 logs/wheels were not transferred or rerun. Root Paint source still needs
 independent source review and the native/ABI/runtime checks above. V7698bc4 and
 Androiddf7edbe remain review-held candidates, so no acceptance is inferred.
+
+
+## 2026-10-19 PRT1 and positive producer continuation
+
+PRT1 repair1b9d68e: actual close-body foreign-boundary harness passes8 cases:
+repeat close, parent destroy, successor, borrower cleanup, captured pause failure,
+consumer/owner-job joins, concurrent callers and retryable consumer failure.
+The old ad6787c body fails the exact first three regressions; its blocking old
+mutex-join fixture was deliberately omitted from that negative run. All actual
+Kotlin coroutine joins now occur outside closeMutex; native calls and retired
+publication remain guarded. Whole adapter/NativeSessions/JNI/Windows tests remain
+unrun. REMOTE_EDIT_CLOSE_PRT1_20261019.json retains source/log hashes.
+
+Source context repair741bed9 captures local/source epochs, grant revision and
+selected scope, checks both retirement flags and bound source epoch, and rechecks
+before opening source and launching query. Three exact predicate methods reject
+15 mutations at substituted hub/helper boundaries using actual cached remote
+types. Removing only local epoch makes the expected reactivation regression
+fail. No native SourceLease/Job/IO/FFI execution is inferred.
+
+Positive drawing numeric evaluator:9 exact Rust tests pass. It requires actual
+joined native parked Dot/Undo/Redo/Undo projections, ten stable blank/changed/restored/redo/final-restored
+canvas samples, matching source/canvas/settings, ordered QPC and bounded dot
+support. The real combined producer is not yet wired; no positive record is
+admitted in the current app. The precise existing-P grant is
+PAINT_POSITIVE_PRODUCER_GRANT_20261019.md. Its dedicated helper, parent IPC,
+actual file/source/input/process/Job/IO/disposal and cancellation cases must be
+implemented and reviewed, then root adds native/shared/UI/exclusive-input hooks.
+Physical gestures and all real Windows/owner/pen gates remain separate and open.
+
+V2ec0b15 (reserved output-layer exclusion + framed-after regression and corrected
+96-case probe) is review-held. Android a2c299a AND5/6/8 is closed at source scope;
+AND7 first-composition undo/reload remains held. Root has not composed either
+complete candidate or claimed their authored/unrun native/app tests pass.
+
+E private Library prepare_materialize authorization succeeded for all3 archives,
+with no direct workspace_path. Signed GETs fail in this environment's HTTPS
+proxy at CONNECT403 before payload bytes; all3 retained partials are0 bytes.
+No archive/index/149-file hash or graph validation/extraction was performed here.
+No repeated conversion or public binary upload. MODEL_PRIVATE_TRANSFER_20261019
+records expected archive hashes and the exact blocker without signed URLs,
+tokens or private Library IDs. Production model admission remains closed.
+
+The evaluator's final nine-case revision additionally rejects cursor capture,
+inside/moved pointers, incomplete parked four-event clicks, unjoined redo/final
+Undo, unrestored final pixels and transient changes that Redo cannot reproduce.
+All10 samples use the same outside pointer position, strict QPC ordering and
+100ms post-input/stable-pair separation. This is numeric proof only; P must
+supply the actual guarded parked actions, cursor-policy readback, native WGC
+samples and joined producer construction. The earlier seven-case logs remain
+preserved separately and are not counted as extra tests.

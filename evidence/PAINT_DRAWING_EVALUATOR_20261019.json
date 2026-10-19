@@ -1,0 +1,40 @@
+{
+  "status": "positive drawing numeric evaluator implemented; native producer dispatch/normal integration still required",
+  "checks": 9,
+  "proof": "stable opaque blank -> parked native mouse Dot -> stable change -> Undo restores -> Redo reproduces exact change -> final Undo restores; cursor disabled and same outside pointer throughout",
+  "typed_proof": "Drawing/Supported/EditorObserved/Mouse only; other aspects remain NotTested",
+  "bounds": {
+    "max_canvas_pixels": 1048576,
+    "fixed_captures": 10,
+    "max_radius_pixels": 64,
+    "min_post_input_settle_100ns": 1000000,
+    "min_stable_pair_gap_100ns": 1000000,
+    "events_per_parked_click": 4
+  },
+  "module_registration": "not enabled until actual P producer supplies joined native construction sites",
+  "producer_dispatch": {
+    "existing_task": "01a15145-22a1-76b1-ba3e-d2bbe0326006",
+    "grant": "docs/PAINT_POSITIVE_PRODUCER_GRANT_20261019.md",
+    "root_outgoing_dispatch_available": false
+  },
+  "limits": [
+    "Synthetic fixtures prove numeric admissibility only",
+    "Actual helper/Job/IO/finite-input/capture/source/temp owner not yet implemented for this combined producer",
+    "No GUI/input/capture or physical-owner action performed",
+    "Canvas pixels restored does not prove undo/redo history restoration",
+    "Root retains normal native/shared trigger, UI and exclusive input gate"
+  ],
+  "source_sha256": {
+    "host-win/crates/vw-remote-host/src/editor_probe_runner/compatibility/evidence.rs": "4da67c6f0a78ea25a67277510a49dc1511a5f3fb4b9f70895dcc33c65d6e3b70",
+    "tools/tests/check_paint_drawing_evidence.py": "86f486d148a11af41a2ddf672407e04fba0a13dbc24f0ea68cd12f32384ab8a4",
+    "docs/PAINT_POSITIVE_PRODUCER_GRANT_20261019.md": "dfea2433f5c546c6235739407f29c431678b43977d2884e99e6d91a86f79e437"
+  },
+  "log": {
+    "path": "/tmp/vw-paint-drawing-evidence-20261019-final.log",
+    "sha256": "16fff0e32f982c28cd42e6b576da4cf8a7b5021a2302bb48cdf088b36e76ee1b"
+  },
+  "superseded_logs_preserved": [
+    "/tmp/vw-paint-drawing-evidence-20261019.log",
+    "/tmp/vw-paint-drawing-evidence-20261019-redo.log"
+  ]
+}
