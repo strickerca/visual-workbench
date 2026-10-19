@@ -11,6 +11,9 @@ use vw_stream::{MemoryCharge, MemoryKind, SessionBudget};
 // the buffer as fields are appended. The pinned Rust Vec growth is at most
 // twice the final written length, including a partially filled edge tile.
 const TILE_WIRE_OVERHEAD: u64 = 2 * (4 + 64) + (1 + 4 + 4) + 6 * 4 + 4;
+// Covers the PreparedGiantTile and SessionResourceCharge Arc allocations,
+// their headers, and the three MemoryCharge entries retained beside pixels.
+const RETAINED_OWNER_BYTES: usize = 512;
 
 fn abi_copy_bound(pixels: &GiantTilePixels) -> GiantImageResult<u64> {
     (pixels.rgba.len() as u64)
@@ -70,7 +73,7 @@ impl PreparedGiantTile {
             .asset_id
             .capacity()
             .checked_add(pixels.manifest_hash.capacity())
-            .and_then(|sum| sum.checked_add(512))
+            .and_then(|sum| sum.checked_add(RETAINED_OWNER_BYTES))
             .ok_or(GiantImageError::Limit)?;
         if !canonical_hash(&pixels.asset_id)
             || !canonical_hash(&pixels.manifest_hash)
@@ -88,6 +91,17 @@ impl PreparedGiantTile {
         {
             return Err(GiantImageError::Invalid);
         }
+        // Outgoing already covers the actual RGBA Vec capacity. The foreign
+        // reservation is separate. Keep two additional charges: one for the
+        // serialized RustBuffer growth and one for identities/owner storage.
+        let resident_bytes =
+            u64::try_from(metadata_capacity).map_err(|_| GiantImageError::Limit)?;
+        let resident = budget
+            .reserve(MemoryKind::Transfer, resident_bytes)
+            .map_err(|_| GiantImageError::Memory {
+                estimated: budget.used_bytes().saturating_add(resident_bytes),
+                budget: budget.limit_bytes(),
+            })?;
         let bytes = abi_copy_bound(pixels)?;
         let abi = budget
             .reserve(MemoryKind::CodecWorkspace, bytes)
@@ -98,7 +112,7 @@ impl PreparedGiantTile {
         Ok(Arc::new(Self {
             state: Mutex::new(State::Ready(OwnedPixels {
                 pixels: incoming.pixels,
-                lease: SessionResourceCharge::from_charges(vec![incoming.outgoing, abi]),
+                lease: SessionResourceCharge::from_charges(vec![incoming.outgoing, resident, abi]),
             })),
         }))
     }
@@ -370,7 +384,10 @@ mod tests {
             let pixels = edge_pixels(width, height);
             let rgba_bytes = pixels.rgba.len() as u64;
             let abi_bytes = abi_copy_bound(&pixels).unwrap();
-            let budget = SessionBudget::new(rgba_bytes + abi_bytes).unwrap();
+            let resident_bytes = (pixels.asset_id.capacity()
+                + pixels.manifest_hash.capacity()
+                + RETAINED_OWNER_BYTES) as u64;
+            let budget = SessionBudget::new(rgba_bytes + resident_bytes + abi_bytes).unwrap();
             let outgoing = budget.reserve(MemoryKind::Transfer, rgba_bytes).unwrap();
             let source =
                 PreparedGiantTile::admit_in_pool(pixels, outgoing, budget.clone()).unwrap();
@@ -385,9 +402,9 @@ mod tests {
                 actual_capacity <= abi_bytes,
                 "{width}x{height} grew beyond its ABI charge"
             );
-            assert_eq!(budget.used_bytes(), rgba_bytes + abi_bytes);
+            assert_eq!(budget.used_bytes(), rgba_bytes + resident_bytes + abi_bytes);
             source.release_source().unwrap();
-            assert_eq!(budget.used_bytes(), rgba_bytes + abi_bytes);
+            assert_eq!(budget.used_bytes(), rgba_bytes + resident_bytes + abi_bytes);
             wire.destroy();
             prefetched.close().unwrap();
             drop(prefetched);
@@ -399,7 +416,8 @@ mod tests {
                 // the actual RustBuffer while the original RGBA stayed owned.
                 let old_abi = rgba_bytes + 16 * 1024;
                 assert!(old_abi < actual_capacity);
-                let tight_budget = SessionBudget::new(rgba_bytes + actual_capacity - 1).unwrap();
+                let tight_budget =
+                    SessionBudget::new(rgba_bytes + resident_bytes + actual_capacity - 1).unwrap();
                 let outgoing = tight_budget
                     .reserve(MemoryKind::Transfer, rgba_bytes)
                     .unwrap();
@@ -414,5 +432,68 @@ mod tests {
                 assert_eq!(tight_budget.used_bytes(), 0);
             }
         }
+    }
+
+    #[test]
+    fn tiny_tile_with_large_retained_hash_buffers_needs_its_own_charge() {
+        fn large_hash_buffers() -> GiantTilePixels {
+            let mut pixels = edge_pixels(1, 1);
+            pixels.asset_id = String::with_capacity(4096);
+            pixels.asset_id.push_str(&"a".repeat(64));
+            pixels.manifest_hash = String::with_capacity(4096);
+            pixels.manifest_hash.push_str(&"b".repeat(64));
+            pixels
+        }
+        let pixels = large_hash_buffers();
+        let resident_bytes = (pixels.asset_id.capacity()
+            + pixels.manifest_hash.capacity()
+            + RETAINED_OWNER_BYTES) as u64;
+        let abi_bytes = abi_copy_bound(&pixels).unwrap();
+        assert!(resident_bytes >= 8192 + RETAINED_OWNER_BYTES as u64);
+        assert_eq!(abi_bytes, 354);
+        // This budget admits the same tiny tile with compact 64-byte hashes.
+        // It also admitted the inflated hashes under the old ABI-only charge.
+        let compact_budget =
+            SessionBudget::new(4 + abi_bytes + 128 + RETAINED_OWNER_BYTES as u64).unwrap();
+        let outgoing = compact_budget.reserve(MemoryKind::Transfer, 4).unwrap();
+        assert!(matches!(
+            PreparedGiantTile::admit_in_pool(pixels, outgoing, compact_budget.clone()),
+            Err(GiantImageError::Memory { .. })
+        ));
+        assert_eq!(compact_budget.used_bytes(), 0);
+        let outgoing = compact_budget.reserve(MemoryKind::Transfer, 4).unwrap();
+        let compact =
+            PreparedGiantTile::admit_in_pool(edge_pixels(1, 1), outgoing, compact_budget.clone())
+                .unwrap();
+        compact.release_source().unwrap();
+        assert_eq!(compact_budget.used_bytes(), 0);
+
+        let budget = SessionBudget::new(4 + resident_bytes + abi_bytes).unwrap();
+        let outgoing = budget.reserve(MemoryKind::Transfer, 4).unwrap();
+        let source =
+            PreparedGiantTile::admit_in_pool(large_hash_buffers(), outgoing, budget.clone())
+                .unwrap();
+        let prefetched = source.publication_lease().unwrap();
+        let weak = Arc::downgrade(&prefetched);
+        let wire = <GiantTilePixels as uniffi::Lower<crate::UniFfiTag>>::lower_into_rust_buffer(
+            source.take_pixels().unwrap(),
+        );
+        assert!(wire.capacity() as u64 <= abi_bytes);
+        assert_eq!(budget.used_bytes(), 4 + resident_bytes + abi_bytes);
+        source.release_source().unwrap();
+        wire.destroy();
+        prefetched.close().unwrap();
+        drop(prefetched);
+        drop(source);
+        retired(weak, &budget);
+    }
+
+    #[test]
+    fn fixed_owner_allowance_covers_all_retained_structs_and_charge_entries() {
+        let structural_bytes = std::mem::size_of::<PreparedGiantTile>()
+            + std::mem::size_of::<SessionResourceCharge>()
+            + 3 * std::mem::size_of::<MemoryCharge>()
+            + 4 * std::mem::size_of::<usize>(); // Two Arc headers.
+        assert!(structural_bytes <= RETAINED_OWNER_BYTES);
     }
 }
