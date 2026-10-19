@@ -184,6 +184,8 @@ internal fun completeExport(request: ExportRequest, result: FileExportResult): C
     if (!request.matches(result.revision) ||
         !Regex("[0-9a-f]{64}").matches(result.blake3) || result.encodedBytes == 0uL)
         throw HandoffFailure("The export receipt does not match the captured revision.")
+    if (result.metadataJson.length > 65536)
+        throw HandoffFailure("The export receipt exceeds its limit.")
     val fields = try {
         val buffer = Charsets.UTF_8.newEncoder().onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT).encode(CharBuffer.wrap(result.metadataJson))

@@ -179,11 +179,28 @@ class DesktopTransferTest {
             framed.dropLast(1) + ",\"output_width\":2}",
             framed + " false", framed.replace("\"output_width\":2", "\"output_width\":\"2\""),
             framed.replace("\"output_width\":2", "\"output_width\":2.5"),
+            framed.replace("\"output_width\":2", "\"output_\\u+077idth\":2"),
+            framed.dropLast(1) + ",\"note\":\"\\u-077\"}",
             framed.replace(SOURCE, "c".repeat(64)),
             framed.replace(projected.revision, "r8-changed"),
         )) assertThrows(HandoffFailure::class.java) { completeExport(projected, result.copy(metadataJson = bad)) }
         assertThrows(HandoffFailure::class.java) { completeExport(projected, result.copy(revision = transferInfo(8u))) }
         Unit
+    }
+    @Test fun receiptRefusesOverlargeTextBeforeEncodingAndOverlargeUtf8AfterEncoding() {
+        val request = captureExport(transferState(), TransferCore(TransferProject()))
+        val base = metadata(request)
+        assertEquals(request.width, completeExport(request, receipt(request).copy(metadataJson = base.padEnd(65536, ' '))).width)
+        val oversizedWithInvalidSurrogate = base.padEnd(65537, ' ') + '\uD800'
+        val early = assertThrows(HandoffFailure::class.java) {
+            completeExport(request, receipt(request).copy(metadataJson = oversizedWithInvalidSurrogate))
+        }
+        assertTrue(early.message.orEmpty().contains("exceeds its limit"))
+        val oversizedUtf8 = base.dropLast(1) + ",\"note\":\"${"é".repeat(32768)}\"}"
+        val encoded = assertThrows(HandoffFailure::class.java) {
+            completeExport(request, receipt(request).copy(metadataJson = oversizedUtf8))
+        }
+        assertTrue(encoded.message.orEmpty().contains("exceeds its limit"))
     }
     @Test fun fileDragProvidesOnlyTheOneImmutableFileFlavor() {
         val file = Path.of("C:/synthetic/export.png")

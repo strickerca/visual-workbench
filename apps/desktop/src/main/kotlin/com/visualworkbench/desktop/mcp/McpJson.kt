@@ -72,7 +72,21 @@ internal object McpJson {
                     when(val escape=text[at++]) {
                         '"','\\','/' -> out.append(escape)
                         'b' -> out.append('\b'); 'f' -> out.append('\u000c'); 'n' -> out.append('\n'); 'r' -> out.append('\r'); 't' -> out.append('\t')
-                        'u' -> {require(at+4<=text.length);out.append(text.substring(at,at+4).toInt(16).toChar());at+=4}
+                        'u' -> {
+                            require(at+4<=text.length)
+                            var code = 0
+                            repeat(4) {
+                                val digit = when (val hex = text[at++]) {
+                                    in '0'..'9' -> hex - '0'
+                                    in 'a'..'f' -> hex - 'a' + 10
+                                    in 'A'..'F' -> hex - 'A' + 10
+                                    else -> -1
+                                }
+                                require(digit >= 0) { "JSON Unicode escape requires four ASCII hex digits" }
+                                code = (code shl 4) or digit
+                            }
+                            out.append(code.toChar())
+                        }
                         else -> error("Invalid MCP JSON escape")
                     }
                 }
