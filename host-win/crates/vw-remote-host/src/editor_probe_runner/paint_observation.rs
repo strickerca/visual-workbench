@@ -161,6 +161,7 @@ impl PaintObservationHelper {
             input_uncertain: Arc::new(AtomicBool::new(false)),
             _source: Some(source.clone()),
             private_temp: None,
+            private_disposed_files: 0,
             canvas_unresolved: Arc::new(AtomicBool::new(false)),
             drawing_gate: None,
         };

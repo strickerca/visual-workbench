@@ -15,8 +15,10 @@ use crate::{
     },
 };
 pub use compatibility::{
-    CompletedPaintDrawingObservation, Current, PaintDrawingAuthorize, PaintDrawingInputStep,
-    PaintDrawingPaths, PaintDrawingPreparation, prepare_paint_drawing, run_paint_drawing_helper,
+    CompletedPaintDrawingObservation, Current, PaintDrawingAuthorize, PaintDrawingCanvasState,
+    PaintDrawingInputStep, PaintDrawingPaths, PaintDrawingPreparation,
+    PaintDrawingRetirementHandle, PaintDrawingRetirementStatus, prepare_paint_drawing,
+    run_paint_drawing_helper,
 };
 pub use paint_observation::{
     PaintControlsObservation, PaintObservationHelper, retry_paint_observation_retirements,
@@ -75,6 +77,7 @@ struct Owner {
     // failed child/Job/IO retirement, using this same existing failure owner.
     _source: Option<Arc<crate::editor_source::SourceLease>>,
     private_temp: Option<compatibility::PrivateTempLease>,
+    private_disposed_files: u32,
     canvas_unresolved: Arc<AtomicBool>,
     drawing_gate: Option<Arc<compatibility::AuthorizationGate>>,
 }
@@ -423,6 +426,7 @@ impl Owner {
         let worker = &mut self.io;
         let parked = &mut self.parked_outcome;
         let private_temp = &mut self.private_temp;
+        let disposed = &mut self.private_disposed_files;
         cleanup_private_after_join(
             || child.retired_receipt(),
             finished,
@@ -434,7 +438,7 @@ impl Owner {
             },
             || {
                 if let Some(temp) = private_temp.as_mut() {
-                    temp.dispose()?;
+                    *disposed = temp.dispose()?;
                     *private_temp = None;
                 }
                 Ok(())
@@ -899,6 +903,7 @@ fn run_for(effect: bool) -> Result<()> {
         input_uncertain,
         _source: None,
         private_temp: None,
+        private_disposed_files: 0,
         canvas_unresolved: Arc::new(AtomicBool::new(false)),
         drawing_gate: None,
     };

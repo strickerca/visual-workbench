@@ -50,6 +50,237 @@ pub struct PaintDrawingPreparation {
     cancel: Arc<Cancellation>,
     current: Current,
     authorize: PaintDrawingAuthorize,
+    retirement: Arc<PaintDrawingRunRetirement>,
+}
+/// A source-owned run state. Resource cleanup never promotes an unresolved
+/// document to Restored; only the joined pixel evaluator can do that.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PaintDrawingCanvasState {
+    Unchanged,
+    Restored,
+    RecoveryNeeded,
+    Unknown,
+}
+#[derive(Clone, Debug)]
+pub struct PaintDrawingRetirementStatus {
+    pub canvas: PaintDrawingCanvasState,
+    pub process_and_job_retired: bool,
+    pub io_joined: bool,
+    pub private_files_disposed: u32,
+    pub owner_retained: bool,
+    pub run_error: Option<Error>,
+}
+#[derive(Clone)]
+pub struct PaintDrawingRetirementHandle(Arc<PaintDrawingRunRetirement>);
+struct PaintDrawingRunRetirement {
+    state: Mutex<PaintDrawingRunState>,
+}
+#[derive(Default)]
+struct PaintDrawingRunState {
+    active: bool,
+    sealed: bool,
+    owner: Option<Owner>,
+    private_temp: Option<PrivateTempLease>,
+    restored_proven: bool,
+    process_and_job_retired: bool,
+    io_joined: bool,
+    private_files_disposed: u32,
+    run_error: Option<Error>,
+}
+impl PaintDrawingRunState {
+    fn canvas(&self) -> PaintDrawingCanvasState {
+        let unresolved = self
+            .owner
+            .as_ref()
+            .is_some_and(|owner| owner.canvas_unresolved.load(Ordering::Acquire));
+        let uncertain = self
+            .owner
+            .as_ref()
+            .is_some_and(|owner| owner.input_uncertain.load(Ordering::Acquire));
+        canvas_from_owned_facts(
+            self.restored_proven,
+            unresolved,
+            uncertain,
+            self.active,
+            self.owner.is_some(),
+        )
+    }
+    fn unresolved_owner(&self) -> bool {
+        self.owner.as_ref().is_some_and(|owner| {
+            owner.canvas_unresolved.load(Ordering::Acquire)
+                || owner.input_uncertain.load(Ordering::Acquire)
+        })
+    }
+    fn status(&self) -> PaintDrawingRetirementStatus {
+        PaintDrawingRetirementStatus {
+            canvas: self.canvas(),
+            process_and_job_retired: self.process_and_job_retired,
+            io_joined: self.io_joined,
+            private_files_disposed: self.private_files_disposed,
+            owner_retained: self.active || self.owner.is_some() || self.private_temp.is_some(),
+            run_error: self.run_error.clone(),
+        }
+    }
+}
+fn canvas_from_owned_facts(
+    restored: bool,
+    unresolved: bool,
+    uncertain: bool,
+    active: bool,
+    held_owner: bool,
+) -> PaintDrawingCanvasState {
+    if unresolved {
+        PaintDrawingCanvasState::RecoveryNeeded
+    } else if uncertain {
+        PaintDrawingCanvasState::Unknown
+    } else if restored {
+        PaintDrawingCanvasState::Restored
+    } else if active || held_owner {
+        PaintDrawingCanvasState::Unknown
+    } else {
+        PaintDrawingCanvasState::Unchanged
+    }
+}
+impl PaintDrawingRunRetirement {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            state: Mutex::new(PaintDrawingRunState::default()),
+        })
+    }
+    fn lock(&self) -> std::sync::MutexGuard<'_, PaintDrawingRunState> {
+        self.state.lock().unwrap_or_else(|error| error.into_inner())
+    }
+    fn retain_owner(&self, owner: Owner, error: Error) {
+        let mut state = self.lock();
+        state.private_files_disposed = owner
+            .private_temp
+            .as_ref()
+            .map_or(owner.private_disposed_files, |temp| temp.removed);
+        state.owner = Some(owner);
+        state.run_error = Some(error);
+    }
+    fn retain_private(&self, temp: PrivateTempLease) {
+        let mut state = self.lock();
+        state.private_files_disposed = temp.removed;
+        state.private_temp = Some(temp);
+    }
+}
+impl Drop for PaintDrawingRunRetirement {
+    fn drop(&mut self) {
+        let state = self
+            .state
+            .get_mut()
+            .unwrap_or_else(|error| error.into_inner());
+        if let Some(owner) = state.owner.take() {
+            let mut receipt = receipt(&owner, "", state.run_error.clone());
+            receipt.retirement_error = Some(Error::RetirementPending);
+            RETAINED
+                .get_or_init(|| Mutex::new(Vec::new()))
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .push(PendingOwner {
+                    owner,
+                    receipt,
+                    quiet: true,
+                });
+        }
+        if let Some(temp) = state.private_temp.take() {
+            retain_private(temp);
+        }
+    }
+}
+struct Running(Arc<PaintDrawingRunRetirement>);
+impl Running {
+    fn begin(retirement: Arc<PaintDrawingRunRetirement>) -> Result<Self> {
+        {
+            let mut state = retirement.lock();
+            if state.sealed || state.active {
+                return Err(Error::Cancelled);
+            }
+            state.active = true;
+        }
+        Ok(Self(retirement))
+    }
+}
+impl Drop for Running {
+    fn drop(&mut self) {
+        self.0.lock().active = false;
+    }
+}
+impl PaintDrawingRetirementHandle {
+    /// A snapshot of actual retained ownership. A live or uncertain owner is
+    /// Unknown/RecoveryNeeded until joined proof, regardless of file cleanup.
+    pub fn status(&self) -> PaintDrawingRetirementStatus {
+        self.0.lock().status()
+    }
+    /// Retry the exact run's Job/IO/private cleanup. An uncertain input or
+    /// canvas keeps its source, permit and child owner even after files retire.
+    pub fn retire(&self) -> Result<PaintDrawingRetirementStatus> {
+        let mut state = self.0.lock();
+        state.sealed = true;
+        if state.active {
+            return Err(Error::RetirementPending);
+        }
+        if state.owner.is_some() {
+            let (cleanup, process_retired, io_joined, disposed) = {
+                let owner = state.owner.as_mut().ok_or(Error::Invalid)?;
+                let cleanup = cleanup_after_sealed_shutdown(
+                    owner,
+                    Owner::kill_if_released,
+                    Owner::cleanup_private_if_quiescent,
+                );
+                let process_retired = owner.child.retired_receipt().is_ok();
+                let io_joined = process_retired && owner.io.is_none();
+                let disposed = owner
+                    .private_temp
+                    .as_ref()
+                    .map_or(owner.private_disposed_files, |v| v.removed);
+                (cleanup, process_retired, io_joined, disposed)
+            };
+            state.process_and_job_retired |= process_retired;
+            state.io_joined |= io_joined;
+            state.private_files_disposed = disposed;
+            if !cleanup? {
+                return Err(Error::RetirementPending);
+            }
+            if state.unresolved_owner() {
+                return Err(Error::RetirementPending);
+            }
+            match state.owner.as_mut().ok_or(Error::Invalid)?.collect() {
+                Collection::Pending(error) => return Err(error),
+                Collection::Joined { .. } => {
+                    state.owner = None;
+                }
+            }
+        }
+        if state.private_temp.is_some() {
+            let (disposal, disposed) = {
+                let temp = state.private_temp.as_mut().ok_or(Error::Invalid)?;
+                (temp.dispose(), temp.removed)
+            };
+            state.private_files_disposed = disposed;
+            disposal?;
+            state.private_temp = None;
+        }
+        Ok(state.status())
+    }
+}
+/// Closing the grant/attempting safe pre-input shutdown must precede the fresh
+/// Job/IO query. Unsafe input or canvas state keeps the child and its owner.
+fn cleanup_after_sealed_shutdown<T>(
+    owner: &mut T,
+    shutdown: impl FnOnce(&T),
+    cleanup: impl FnOnce(&mut T) -> Result<bool>,
+) -> Result<bool> {
+    shutdown(owner);
+    cleanup(owner)
+}
+impl PaintDrawingPreparation {
+    /// Obtain this before consuming the one-shot preparation. The native
+    /// session must keep it through failed-run cleanup and recovery handling.
+    pub fn retirement_handle(&self) -> PaintDrawingRetirementHandle {
+        PaintDrawingRetirementHandle(self.retirement.clone())
+    }
 }
 pub struct CompletedPaintDrawingObservation {
     target: Target,
@@ -171,7 +402,16 @@ pub(super) fn retry_private_disposal() -> usize {
     leases.len()
 }
 impl PrivateTempLease {
+    #[cfg(test)]
     fn create(marker_id: &str, sample_id: &str, owner_pid: u32) -> Result<Self> {
+        Self::create_for_run(marker_id, sample_id, owner_pid, None)
+    }
+    fn create_for_run(
+        marker_id: &str,
+        sample_id: &str,
+        owner_pid: u32,
+        retirement: Option<&PaintDrawingRunRetirement>,
+    ) -> Result<Self> {
         vw_remote::id(marker_id)?;
         vw_remote::id(sample_id)?;
         let temp = frame::os_temp_root(&std::env::temp_dir())?;
@@ -202,7 +442,12 @@ impl PrivateTempLease {
         };
         if let Err(error) = lease.populate(marker_id, owner_pid) {
             if lease.dispose().is_err() {
-                retain_private(lease);
+                if let Some(retirement) = retirement {
+                    retirement.retain_private(lease);
+                    retirement.lock().run_error = Some(error.clone());
+                } else {
+                    retain_private(lease);
+                }
             }
             return Err(error);
         }
@@ -345,6 +590,7 @@ pub fn prepare_paint_drawing(
         cancel,
         current,
         authorize,
+        retirement: PaintDrawingRunRetirement::new(),
         _observation: observation,
     })
 }
@@ -533,6 +779,21 @@ impl PaintDrawingPreparation {
     /// Consuming this object is the only execution entry. The root confirmation
     /// owner has already acquired its exclusive input/idle barrier.
     pub fn run_confirmed(self) -> Result<CompletedPaintDrawingObservation> {
+        let retirement = self.retirement.clone();
+        let _running = Running::begin(retirement.clone())?;
+        let result = self.run_confirmed_inner(&retirement);
+        if let Err(error) = &result {
+            let mut state = retirement.lock();
+            if state.run_error.is_none() {
+                state.run_error = Some(error.clone());
+            }
+        }
+        result
+    }
+    fn run_confirmed_inner(
+        self,
+        retirement: &Arc<PaintDrawingRunRetirement>,
+    ) -> Result<CompletedPaintDrawingObservation> {
         self.cancel.check()?;
         (self.current)()?;
         self.source
@@ -570,14 +831,18 @@ impl PaintDrawingPreparation {
         if bytes.len() > ipc::MAX_LINE {
             return Err(Error::Limit);
         }
-        let temp =
-            PrivateTempLease::create(&self.marker_id, &request.sample_id, request.owner_pid)?;
+        let temp = PrivateTempLease::create_for_run(
+            &self.marker_id,
+            &request.sample_id,
+            request.owner_pid,
+            Some(retirement.as_ref()),
+        )?;
         if let Err(error) = self.cancel.check().and_then(|()| (self.current)()) {
-            return fail_prelaunch(temp, error);
+            return fail_prelaunch(retirement, temp, error);
         }
         let mut child = match Child::launch(&self.drawing_path, &self.drawing_pins, &self.cancel) {
             Ok(child) => child,
-            Err(error) => return fail_prelaunch(temp, error),
+            Err(error) => return fail_prelaunch(retirement, temp, error),
         };
         let startup = child.startup_error.clone();
         let pipes = Arc::new(Mutex::new(Pipes {
@@ -596,6 +861,7 @@ impl PaintDrawingPreparation {
             input_uncertain: Arc::new(AtomicBool::new(false)),
             _source: Some(self.source),
             private_temp: Some(temp),
+            private_disposed_files: 0,
             canvas_unresolved: Arc::new(AtomicBool::new(false)),
             drawing_gate: Some(gate.clone()),
         };
@@ -651,16 +917,16 @@ impl PaintDrawingPreparation {
             });
         match thread {
             Ok(worker) => owner.io = Some(worker),
-            Err(_) => return retain(owner, Error::Io),
+            Err(_) => return retain(retirement, owner, Error::Io),
         }
         if let Some(error) = startup {
-            return retain(owner, error);
+            return retain(retirement, owner, error);
         }
         let started = Instant::now();
         while started.elapsed() < Duration::from_secs(90) {
             if let Err(error) = self.cancel.check().and_then(|()| (self.current)()) {
                 owner.kill_if_released();
-                return retain(owner, error);
+                return retain(retirement, owner, error);
             }
             if owner.retired().unwrap_or(false) {
                 break;
@@ -669,10 +935,10 @@ impl PaintDrawingPreparation {
         }
         if !owner.retired().unwrap_or(false) {
             owner.kill_if_released();
-            return retain(owner, Error::Timeout);
+            return retain(retirement, owner, Error::Timeout);
         }
         let Collection::Joined { pid, code, outcome } = owner.collect() else {
-            return retain(owner, Error::RetirementPending);
+            return retain(retirement, owner, Error::RetirementPending);
         };
         let transcript = match outcome
             .and_then(|v| v.ok_or(Error::Io))
@@ -681,10 +947,10 @@ impl PaintDrawingPreparation {
                 serde_json::from_slice::<ipc::Transcript>(&raw).map_err(|_| Error::Invalid)
             }) {
             Ok(v) => v,
-            Err(error) => return retain(owner, error),
+            Err(error) => return retain(retirement, owner, error),
         };
         if let Err(error) = (self.current)() {
-            return retain(owner, error);
+            return retain(retirement, owner, error);
         }
         let evidence = match evaluate(
             &owner,
@@ -697,11 +963,12 @@ impl PaintDrawingPreparation {
             code,
         ) {
             Ok(v) => v,
-            Err(error) => return retain(owner, error),
+            Err(error) => return retain(retirement, owner, error),
         };
         owner.canvas_unresolved.store(false, Ordering::Release);
+        retirement.lock().restored_proven = true;
         if let Err(error) = (self.current)() {
-            return retain(owner, error);
+            return retain(retirement, owner, error);
         }
         let disposal = match owner.private_temp.as_mut() {
             Some(temp) => temp.dispose(),
@@ -709,9 +976,15 @@ impl PaintDrawingPreparation {
         };
         let disposed = match disposal {
             Ok(v) => v,
-            Err(error) => return retain(owner, error),
+            Err(error) => return retain(retirement, owner, error),
         };
         owner.private_temp = None;
+        {
+            let mut state = retirement.lock();
+            state.process_and_job_retired = true;
+            state.io_joined = true;
+            state.private_files_disposed = disposed;
+        }
         if disposed != 10 {
             return Err(Error::Invalid);
         }
@@ -725,26 +998,22 @@ impl PaintDrawingPreparation {
         })
     }
 }
-fn retain(owner: Owner, error: Error) -> Result<CompletedPaintDrawingObservation> {
-    let mut receipt = receipt(&owner, "", Some(error));
-    receipt.retirement_error = Some(Error::RetirementPending);
-    RETAINED
-        .get_or_init(|| Mutex::new(Vec::new()))
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .push(PendingOwner {
-            owner,
-            receipt,
-            quiet: true,
-        });
+fn retain(
+    retirement: &PaintDrawingRunRetirement,
+    owner: Owner,
+    error: Error,
+) -> Result<CompletedPaintDrawingObservation> {
+    retirement.retain_owner(owner, error);
     Err(Error::RetirementPending)
 }
 fn fail_prelaunch(
+    retirement: &PaintDrawingRunRetirement,
     mut temp: PrivateTempLease,
     error: Error,
 ) -> Result<CompletedPaintDrawingObservation> {
     if temp.dispose().is_err() {
-        retain_private(temp);
+        retirement.retain_private(temp);
+        retirement.lock().run_error = Some(error);
         return Err(Error::RetirementPending);
     }
     Err(error)
