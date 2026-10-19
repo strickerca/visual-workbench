@@ -233,6 +233,11 @@ class FlatbufferTests(unittest.TestCase):
             with self.subTest(kwargs=kwargs), self.assertRaises(verify.VerificationError):
                 verify.inspect_tflite(synthetic_metadata(**kwargs), "encoder")
 
+    def test_official_sum_builtin_does_not_admit_a_custom_operator(self):
+        self.assertEqual(verify.inspect_tflite(synthetic_metadata(code=74), "encoder")["operators"][0]["name"], "SUM")
+        with self.assertRaises(verify.VerificationError):
+            verify.inspect_tflite(synthetic_metadata(code=74, custom="vendor_sum"), "encoder")
+
     def test_truncated_and_unbounded_offsets_vectors_refuse(self):
         raw = synthetic_metadata()
         for cut in (0, 7, 20, len(raw) - 1):

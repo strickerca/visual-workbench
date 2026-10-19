@@ -1,16 +1,16 @@
-# Offline MobileSAM conversion candidate
+# Offline MobileSAM host artifact candidate
 
 These tools prepare and inspect a **pending admission** local MobileSAM `vit_t`
-encoder/decoder pair for standalone Android LiteRT 2.3.0. They do not install,
-download, enable a backend, grant license/runtime admission, or run inference as
-part of verification. `model-runtime-candidate.json` has an empty
+encoder/decoder pair for standalone Android LiteRT 2.3.0. They do not enable a
+backend or grant license/runtime admission. `model-runtime-candidate.json` has an empty
 `production_admissions` array and no converted artifact hashes. Never use the
 upstream `.pt` digest as `AssistedSelectionPins.modelArtifactSha256`.
 
-Only synthetic Python metadata/layout tests have been run in this lane. Actual
-conversion, reference comparison, CPU/GPU execution, working-set admission and
-device journeys remain OPEN. The fixed graph is an implementation candidate;
-conversion/operator compatibility has not been demonstrated.
+The 2026-10-19 cloud host run downloaded exact public pins, converted both graphs,
+and compared upstream PyTorch and LiteRT 2.2.0 host CPU outputs. Its private
+artifact manifest and logs are at `/workspace/assisted-model-delivery-20261019`.
+Android 2.3.0 CPU/GPU, working-set and device admission remain OPEN. The detached
+delivery manifest records exact hashes and transfer paths; no model binary is in Git.
 
 ## Inputs and toolchain
 
@@ -19,8 +19,8 @@ the candidate catalog. The upstream source commit is
 `f706ad9c4eb7f219c00d9050e46328518ffb65d2`. The checkpoint is 40,728,226 bytes with
 SHA-256 `6dbb90523a35330fedd7f1d3dfc66f995213d81b29a5ca8108dbcdd4e37d6c2f`.
 Source file pins were hashed from the exact official raw files, including
-`LICENSE`; no checkpoint was downloaded or deserialized in this implementation
-lane. Extra local Python files are never imported. The top-level convenience
+`LICENSE`; the cloud run downloaded and safely deserialized the matching
+checkpoint with `weights_only=True`. Extra local Python files are never imported. The top-level convenience
 `mobile_sam/__init__.py` is replaced by an empty namespace; only the hash-checked
 model/build source bytes are compiled by a restricted in-memory loader.
 
@@ -38,9 +38,11 @@ The converter requires Linux x86_64, Python 3.11 and these **exact installed ver
 | timm | 0.9.16 |
 | numpy | 2.1.3 |
 
-These primary host pins are candidates, not a complete admitted/reproducible
-toolchain lock. All transitive wheels, native dependencies and their notices
-still need review. The official `litert-torch` 0.9.4 wheel is 807,293 bytes,
+`host-wheel-lock.json` and `host-wheel-requirements.txt` now bind the exact 71
+installed distributions, their wheel hashes, 258 native files, and 114 bundled
+notice files. Seven wheels have no bundled notice file and still need source/
+license review; the lock does not grant product admission. The official
+`litert-torch` 0.9.4 wheel is 807,293 bytes,
 SHA-256 `e338b9ddd71ed5fa6002525a386e22f0cec441da6deb5f9a45e73c97d91b6353`.
 Its host dependency is `ai-edge-litert >=2.2.0,<2.3.0`; this differs from the
 separately pinned Android runtime 2.3.0. No package installation is performed by
@@ -54,14 +56,14 @@ Official CPU indices publish the exact CPython 3.11 manylinux_2_28_x86_64 wheels
 | torch-2.12.0+cpu-cp311-cp311-manylinux_2_28_x86_64.whl | 192183537 | d85bdbc271bf22ef1931375a81b0366ab11081509728c58df730cf194a090818 |
 | torchvision-0.27.0+cpu-cp311-cp311-manylinux_2_28_x86_64.whl | 1748192 | 376d04dcb7b75069a2b9a1af2c30ff4ac40113309907a54d0b0b26f4ad2ba075 |
 
-Only their PEP 658 metadata was downloaded and matched to the official index
+The preliminary PEP 658 metadata matched the official index
 metadata hashes (31,354 bytes SHA-256
 `4dea4f71028daacd7f5b67b9992c243a2cefabbadb8566316a8c2e5af0c86228` and
 5,480 bytes SHA-256
 `cf683281d0addcc624cbe151a0391359864f030638a52840d44063ea4a675fa0`). The CPU
 torch metadata declares BSD-3-Clause and no CUDA/NVIDIA dependencies; torchvision
-metadata declares BSD. The large wheel bytes were not downloaded or independently
-hashed; index pins and HEAD lengths are not full wheel/license admission. Full
+metadata declares BSD. The actual CPU wheel bytes were then downloaded and
+independently hashed to the pinned SHA-256 values above. Full
 wheel/native/transitive notice review remains OPEN. Installed flavor/version and
 dependency metadata are checked before imports, then actual `torch.version.cuda`
 and `torch.version.hip` must both be `None` before any model construction.
@@ -85,7 +87,9 @@ python3.11 tools/assisted-selection/convert_mobile_sam.py \
 ```
 
 Run in a private, network-isolated environment with reviewed installed packages.
-The script additionally denies Python socket connections/name lookup and sets
+The cloud run used an inherited seccomp network-syscall denial and bounded CPU,
+address-space, output-file and wall-time settings. The script additionally denies
+Python socket connections/name lookup and sets
 Hugging Face offline/telemetry flags during imports/conversion; these controls
 are not a sandbox for arbitrary native dependency code. No user image is needed.
 `--help` and importing the scripts do not import torch/LiteRT or construct a model.
@@ -145,8 +149,11 @@ attention. The wrapper intersects `point_valid == 1` with slot index below
 to negative infinity in both sparse-token self-attention branches and every
 image-to-token cross-attention block. Inactive queries cannot influence valid
 queries/images through these paths. Layer norms/MLPs act per token. This explains
-the intended equivalence; real upstream-versus-wrapper parity for point counts,
-negative points, box-only and combined prompts remains required and unrun.
+the intended equivalence. The cloud run executed upstream-versus-wrapper parity
+for positive/negative points, boxes, mixed prompts, maximum capacity and
+all-padding/token-count cases, then host LiteRT CPU parity against those outputs.
+The all-padding cases exercise masking; Android UI admission still refuses an
+empty user prompt.
 
 Preprocessing schema `sam-rgb-resize-longest1024-v1` means: acquire full oriented
 original D pixels through the trusted source owner, resolve explicit color/alpha
@@ -260,10 +267,10 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
   -s tools/assisted-selection/tests -v
 ```
 
-Current tool-only result: **30 synthetic tests passing**. Official source pins
-matched all ten model/build/license files, 88,068 bytes total. No torch,
-LiteRT, model constructor, conversion or learned-model inference was imported/run
-by these checks. Python syntax and owned-file whitespace checks also passed.
+Current tool-only result: **31 synthetic tests passing**. Official source pins
+matched all ten model/build/license files, 88,068 bytes total. The synthetic
+suite itself does not import torch or LiteRT; separate cloud parity and
+conversion commands do. Python syntax and owned-file whitespace checks passed.
 
 Fixtures are synthetic FlatBuffer metadata and byte files, not runnable model or
 runtime artifacts. AST checks establish the intended boundaries/mask call sites;
@@ -295,10 +302,7 @@ Primary sources inspected for this implementation:
 - [Official FlatBuffer schema](https://raw.githubusercontent.com/tensorflow/tensorflow/v2.20.0/tensorflow/compiler/mlir/lite/schema/schema.fbs), SHA-256 `20685cadade475c2a5cccf29339ecd2bf27755da50dc3d2c092f1ee2e21ff7d3`.
 - [Android LiteRT documentation](https://ai.google.dev/edge/litert/android).
 
-Remaining gates: execute this conversion under parent resource allocation;
-resolve any unsupported lowering without enabling custom/Flex/vendor shortcuts;
-compare real upstream and fixed-wrapper outputs across the full prompt contract;
-inspect and admit exact resulting artifacts/toolchain/notice inventories; establish
+Remaining gates: review the exact resulting artifacts/toolchain/notice inventories; establish
 a conservative total execution working set inside the existing pool; run actual
 CPU and optional GPU sessions with joined cancellation/retirement; validate source,
 orientation, prompt inverse mapping, correction/import/undo and S23 quality/latency.
@@ -373,8 +377,8 @@ Root must register Android standalone `litert` and `litert-gpu` 2.3.0 with the
 same transitive `litert-api` pin, retain all native/transitive notices, build the
 actual APK, obtain the detached closed catalog/memory/source review described
 above, and wire the actual caller's thread-safe project/currentness/page/epoch
-providers. The Python tool tests are synthetic only; native integration, actual
-conversion/reference inference, device CPU/GPU/cancellation/retirement and
+providers. The Python tool tests are synthetic only; native integration, Android
+device CPU/GPU/cancellation/retirement and
 correction/undo journeys remain separate unrun gates. Parent Astra review follows
 the coherent source candidate; no product gate or production admission is closed.
 

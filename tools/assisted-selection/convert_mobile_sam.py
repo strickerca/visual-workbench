@@ -308,6 +308,7 @@ def convert(source_root, checkpoint, output):
         else:
             raise verify.VerificationError("output already exists")
         verify_versions(catalog)
+        print("offline conversion: verified source, checkpoint and host pins", flush=True)
         verify.require(not any(name == "mobile_sam" or name.startswith("mobile_sam.") for name in sys.modules), "MobileSAM already imported")
         staging_name = "." + output.name + ".staging-" + uuid.uuid4().hex
         os.mkdir(staging_name, mode=0o700, dir_fd=parent)
@@ -335,6 +336,7 @@ def convert(source_root, checkpoint, output):
                 sam.train(True)
                 sam.eval()
                 encoder, decoder = build_wrappers(torch, sam)
+                print("offline conversion: pinned trained model loaded on CPU", flush=True)
                 samples = {
                     "encoder": {"image": torch.zeros((1, 3, 1024, 1024), dtype=torch.float32)},
                     "prompt_decoder": {
@@ -350,14 +352,22 @@ def convert(source_root, checkpoint, output):
                     for role, module in (("encoder", encoder), ("prompt_decoder", decoder)):
                         # No AOT/vendor target, Flex fallback, cloud call,
                         # quantizer or interpreter invocation is requested.
+                        print("offline conversion: converting " + role, flush=True)
                         with torch.no_grad():
                             edge = converter.convert(module, sample_kwargs=samples[role], strict_export=True, enable_x64=False, runtime_constant_folding=False)
                         data = edge.model_content()
                         verify.require(type(data) is bytes and len(data) <= verify.MAX_ARTIFACT, "converter output size/type")
-                        inspected = verify.inspect_tflite(data, role)
+                        try:
+                            inspected = verify.inspect_tflite(data, role)
+                        except verify.VerificationError:
+                            # Retain a private failed graph for bounded inspection;
+                            # it is never published as an admitted artifact.
+                            _write_at(staging, "rejected-" + role + ".tflite", data)
+                            raise
                         name = role + ".tflite"
                         _write_at(staging, name, data)
                         artifacts.append({"role": role, "path": name, "bytes": len(data), "sha256": verify.sha256(data), **inspected})
+                        print("offline conversion: verified " + role + " bytes=" + str(len(data)), flush=True)
                         del edge, data
                     manifest = {"schema": "vw-assisted-model-v1", "status": "pending-admission", "model": "MobileSAM-vit_t", "source_commit": catalog["model"]["source_commit"], "checkpoint": {key: pin[key] for key in ("bytes", "sha256")}, "graph_contract": verify.GRAPH_CONTRACT, "artifacts": artifacts, "preprocessing": verify.PREPROCESSING, "postprocessing": verify.POSTPROCESSING, "converter": {"packages": catalog["converter"]["packages"], "files": provenance}}
                     raw = verify.canonical_bytes(manifest)
