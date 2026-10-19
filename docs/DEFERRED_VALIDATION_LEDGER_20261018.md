@@ -49,3 +49,35 @@ Workers append proposed rows in their OWN handoff, not this file. Each must name
 the exact candidate/command/prerequisite/expected outcome and distinguish executed,
 deferred, failed, unavailable and physical acceptance. Never convert absence of a
 runtime/model/key into a completed feature. Root updates row scope at integration.
+
+## 2026-10-19 root export/lifetime batch
+
+Parent reports narrow Astra source acceptance of134b421: AP1/RP1 closed,
+111 accepted source leaves match, all three O hooks present. Existing executed
+18 archive/8 raster/Linux compile evidence remains exact to that tree. No
+physical, ABI, app/export or D/O verification completion follows.
+
+Root adds a native revision-bound D→O export-geometry query and shared API,
+using canonical integer frame projection with explicit empty-intersection
+refusal. Three focused geometry methods and Linux vw-ffi library check pass;
+the saved-frame/stale/cancel native workflow case and giant identity unit case
+are authored/unrun. New bindings/whole JVM module and actual callers remain
+pending. EXPORT_AND_PLATFORM_CALLER_GRANTS_20261019.md sends precise independent
+F helper, R Desktop, existing Main/capture and existing Android owner work
+through the parent; no root ownership overlap is intended.
+
+Ordinary NativeProject.close retains its first shutdown/destroy error before
+the closed early return, without blindly retrying native destruction. Actual
+production close body/fields/error mapping/release dispatcher and generic giant
+owner compile unchanged in seven focused boundary cases; old134b421 source
+fails four cases as expected. Foreign handle/drain are substituted, so whole
+NativeProject class/new ABI/real JNI/app lifecycle remain unrun. Pre-shutdown
+child drain and joined giant owner retain their distinct retry contracts.
+NATIVE_PROJECT_CLOSE_RESULT_20261019.md and evidence bind these limits.
+
+Parent delivered E giant delivery repair b2c874695f6ef79f8f88c62bc367e78dbdfcf026
+for narrow review; not composed while review is pending. G remains the active
+region owner. Converted model artifacts/catalog admission and genuine Paint
+observations remain implementation/delivery gaps. Existing failed receipts,
+owners and old worktrees are preserved; Krita and expensive aggregate checks
+remain deferred.

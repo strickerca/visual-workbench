@@ -125,6 +125,45 @@ impl ImageOutputFrame {
         }
         Rect::new(lo[0], lo[1], hi[0] - lo[0], hi[1] - lo[1])
     }
+    /// Intersect an integral D region with the crop and cover its projected O
+    /// edges with whole output pixels. Integer ratios avoid adding a spurious
+    /// pixel when a mathematically integral edge has floating-point error.
+    pub fn source_region(self, region: [u32; 4]) -> Result<[u32; 4], GeometryError> {
+        let [x, y, w, h] = region;
+        let right = x.checked_add(w).ok_or(GeometryError::OutOfBounds)?;
+        let bottom = y.checked_add(h).ok_or(GeometryError::OutOfBounds)?;
+        if w == 0 || h == 0 || right > self.source[0] || bottom > self.source[1] {
+            return Err(GeometryError::OutOfBounds);
+        }
+        let [cx, cy, cw, ch] = self.crop;
+        let left = x.max(cx);
+        let top = y.max(cy);
+        let right = right.min(cx + cw);
+        let bottom = bottom.min(cy + ch);
+        if left >= right || top >= bottom {
+            return Err(GeometryError::EmptyExtent);
+        }
+        let [u0, v0, u1, v1] = [left - cx, top - cy, right - cx, bottom - cy];
+        let [x0, y0, x1, y1] = match self.rotation {
+            QuarterTurn::Zero => [u0, v0, u1, v1],
+            QuarterTurn::Clockwise90 => [ch - v1, u0, ch - v0, u1],
+            QuarterTurn::Half => [cw - u1, ch - v1, cw - u0, ch - v0],
+            QuarterTurn::Clockwise270 => [v0, cw - u1, v1, cw - u0],
+        };
+        let [rw, rh] = self.rotated_size();
+        // Every operand is at most IMAGE_OUTPUT_MAX_SIDE, so products and
+        // the ceiling adjustment fit in u64 and quotients fit in u32.
+        let floor =
+            |n: u32, out: u32, size: u32| (u64::from(n) * u64::from(out) / u64::from(size)) as u32;
+        let ceil = |n: u32, out: u32, size: u32| {
+            (u64::from(n) * u64::from(out)).div_ceil(u64::from(size)) as u32
+        };
+        let ox = floor(x0, self.output[0], rw);
+        let oy = floor(y0, self.output[1], rh);
+        let ow = ceil(x1, self.output[0], rw) - ox;
+        let oh = ceil(y1, self.output[1], rh) - oy;
+        Ok([ox, oy, ow, oh])
+    }
     /// True when the complete supplied D rectangle lies inside the crop.
     /// Package compilation uses this to refuse silently omitted instructions.
     pub fn contains(self, rect: Rect) -> bool {

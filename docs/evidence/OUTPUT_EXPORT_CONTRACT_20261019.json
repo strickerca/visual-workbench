@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-19",
+  "status": "root contract implemented; platform callers still being delegated",
+  "base": "134b421ba5e5732c6cbdb90b1cb73ee831f56793",
+  "source_sha256": {
+    "core/crates/vw-geom/src/image_output.rs": "194e993a3b157c4d4b2505599cd7b1045dea9f30898f151319c5ed586289d6bd",
+    "core/crates/vw-geom/tests/image_output_regions.rs": "4d0546667f0c41ec9f9cf6eab090d492cc467ed009ba003054f7afd3abcb0aef",
+    "core/crates/vw-ffi/src/image_frames/export_geometry.rs": "1fcdb653abd70e13cb61bd783d9e5feadc77c51892e13015153e53823203ee64",
+    "core/crates/vw-ffi/src/image_frames/dto.rs": "72892c07c3a132dd48dae918d6e3b2262d99f89c293bd9681401052932acbc94",
+    "core/crates/vw-ffi/src/image_frames.rs": "77347bf481a254e6c1cc43ab083e34403d54f8c0e303178df434e3eec28f6d82",
+    "core/crates/vw-ffi/src/lib.rs": "5944d3cf179c8afc803e8a330189ecb73b99ffd0b7f6021187c9b39e5ac28fdc",
+    "core/crates/vw-ffi/tests/image_frames.rs": "2427255802f322dec5e16ff8e2bb374039c22c586824991b4640f6a5f211e94f",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/ImageOutputExportApi.kt": "8a359cfb5891acab0e8dbe0e01bab4e6b5efa17eaeeaf967a69493325e36b8d8",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeImageOutputExport.kt": "bf5f9d12603a2690f83d667fcbd060c48dd1e7ebb45cb1ae9bd9b1eaa83d849a"
+  },
+  "executed": [
+    {
+      "command": "cargo test --locked --offline -p vw-geom --test image_output_regions -j2",
+      "result": "3 passed; 0 failed",
+      "receipt": "execution tool transcript; no separate raw log retained"
+    },
+    {
+      "command": "cargo check --locked --offline -p vw-ffi --lib -j2",
+      "result": "pass; one existing Linux ProviderAdapter dead_code warning; strict Clippy not passed",
+      "log": "/tmp/vw-output-export-contract-check-20261019.log",
+      "sha256": "edbbea6c7094bc29c6cb46be88d1efefc7e8c79fe77619f99af9d433816f35bc"
+    }
+  ],
+  "unrun": [
+    "Native workflow integration case (saved frame, full/regional dimensions, stale binding, empty crop and cancellation)",
+    "Native unframed giant geometry unit case",
+    "New common/JVM whole-module compilation and regenerated bindings",
+    "Both actual app callers, source format/picker and capture/Main hooks",
+    "Real JNI, packaging, devices and physical gates"
+  ],
+  "ownership": "EXPORT_AND_PLATFORM_CALLER_GRANTS_20261019.md"
+}

@@ -102,6 +102,87 @@ async fn snapshot(project: &Arc<ProjectSession>) -> ImageFramesSnapshot {
         .await
         .unwrap()
 }
+
+#[tokio::test]
+async fn export_geometry_reads_saved_frame_without_panel_and_refuses_stale_binding() {
+    let _serial = TESTS.lock().await;
+    let dir = temp();
+    let project = create_fixture(&dir.path().join("output-export-geometry.vw"), 8).await;
+    let before = snapshot(&project).await;
+    let full = project
+        .image_output_export_geometry(before.binding.clone(), None, BUDGET, cancel())
+        .await
+        .unwrap();
+    assert_eq!([full.encoded_width, full.encoded_height], [64, 64]);
+    assert!(full.region.is_none());
+    apply(&project, 80, set()).await;
+    assert!(matches!(
+        project
+            .image_output_export_geometry(before.binding, None, BUDGET, cancel())
+            .await,
+        Err(WorkflowError::Stale)
+    ));
+    let binding = snapshot(&project).await.binding;
+    let full = project
+        .image_output_export_geometry(binding.clone(), None, BUDGET, cancel())
+        .await
+        .unwrap();
+    assert_eq!(
+        [
+            full.output_width,
+            full.output_height,
+            full.encoded_width,
+            full.encoded_height
+        ],
+        [12, 16, 12, 16]
+    );
+    assert!(full.region.is_none());
+    let mapped = project
+        .image_output_export_geometry(
+            binding.clone(),
+            Some(SelectionRegion {
+                x: 8,
+                y: 6,
+                width: 8,
+                height: 6,
+            }),
+            BUDGET,
+            cancel(),
+        )
+        .await
+        .unwrap();
+    let region = mapped.region.unwrap();
+    assert_eq!(
+        [region.x, region.y, region.width, region.height],
+        [9, 0, 3, 4]
+    );
+    assert_eq!([mapped.encoded_width, mapped.encoded_height], [3, 4]);
+    assert!(
+        project
+            .image_output_export_geometry(
+                binding.clone(),
+                Some(SelectionRegion {
+                    x: 0,
+                    y: 0,
+                    width: 2,
+                    height: 2,
+                }),
+                BUDGET,
+                cancel()
+            )
+            .await
+            .is_err()
+    );
+    let token = cancel();
+    token.cancel();
+    assert!(matches!(
+        project
+            .image_output_export_geometry(binding, None, BUDGET, token)
+            .await,
+        Err(WorkflowError::Cancelled)
+    ));
+    project.close_session().await.unwrap();
+}
 async fn prepare(
     project: &Arc<ProjectSession>,
     n: u8,

@@ -55,7 +55,7 @@ pub use object_rotation::rotate_object_transforms;
 mod image_frames;
 pub use image_frames::{
     ImageEditingBackground, ImageEditingPreview, ImageFrameCommand, ImageFrameEntry,
-    ImageFramePreview, ImageFrameSettings, ImageFramesSnapshot,
+    ImageFramePreview, ImageFrameSettings, ImageFramesSnapshot, ImageOutputExportGeometry,
 };
 mod tone_controls;
 pub use tone_controls::{

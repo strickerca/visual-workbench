@@ -1,5 +1,20 @@
 use super::*;
 
+/// Revision-bound conversion of a source D export intent into encoder O pixels.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct ImageOutputExportGeometry {
+    pub binding: WorkflowBinding,
+    pub source_asset_id: String,
+    pub source_width: u32,
+    pub source_height: u32,
+    pub output_width: u32,
+    pub output_height: u32,
+    /// None preserves full-output export semantics, including frame crops.
+    pub region: Option<crate::SelectionRegion>,
+    pub encoded_width: u32,
+    pub encoded_height: u32,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
 pub struct ImageFrameSettings {
     pub crop_x: u32,

@@ -1,6 +1,7 @@
 //! Nondestructive output frames over existing canonical operations.
 //! D remains the immutable source grid; O is the explicit export grid.
 mod dto;
+mod export_geometry;
 mod pixels;
 mod plan;
 mod snapshot;
