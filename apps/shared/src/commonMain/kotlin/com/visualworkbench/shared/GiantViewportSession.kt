@@ -20,11 +20,14 @@ public interface GiantRenderBackend<T : Any> {
     public fun release(image: T)
 }
 public data class GiantRenderedTile<T : Any>(public val pixels: GiantTileDescriptor, public val image: T)
+/** Immutable content choice for one viewport owner and every frame it publishes. */
+public enum class GiantTileContent { Source, Composed }
 public data class GiantTileDescriptor(public val address: GiantTileAddress, public val x: UInt, public val y: UInt,
     public val documentWidth: UInt, public val documentHeight: UInt, public val width: UInt, public val height: UInt)
 public data class GiantVisibleFrame<T : Any>(public val binding: WorkflowBinding, public val attachmentEpoch: Long,
     public val generation: ULong, public val view: GiantViewport,
-    public val assetId: String, public val manifestHash: String, public val tiles: List<GiantRenderedTile<T>>)
+    public val assetId: String, public val manifestHash: String, public val tiles: List<GiantRenderedTile<T>>,
+    public val content: GiantTileContent = GiantTileContent.Source)
 public data class GiantViewStatus(public val generation: ULong = 0uL, public val ready: Boolean = false,
     public val busy: Boolean = false, public val retainedBytes: Long = 0L, public val message: String? = null)
 
@@ -43,8 +46,11 @@ public class GiantViewportSession<T : Any>(
     private val isCurrent: (WorkflowBinding, Long) -> Boolean,
     private val resources: SessionResources,
     private val maxRetainedBytes: Long = 192L * 1024L * 1024L,
+    private val content: GiantTileContent = GiantTileContent.Source,
+    private val assumeUntaggedSrgb: Boolean = false,
 ) {
     private data class Request(val generation: ULong, val view: GiantViewport)
+    private class ComposedLevelLimit : Exception()
     private val supervisor: CompletableJob = SupervisorJob(parent.coroutineContext[Job])
     private val scope: CoroutineScope = CoroutineScope(parent.coroutineContext + supervisor)
     private val operationGate: Mutex = Mutex()
@@ -72,10 +78,15 @@ public class GiantViewportSession<T : Any>(
                 for (request in requests) {
                     try { operationGate.withLock { load(request) } }
                     catch (cancel: CancellationException) { throw cancel }
-                    catch (_: Exception) {
+                    catch (error: Exception) {
                         operationGate.withLock { retire() }
                         if (request.generation == generation) mutable.value = mutable.value.copy(
-                            busy = false, ready = false, message = "Derived tiles are unavailable or exceed the admitted viewport budget. Rebuild the cache from the preserved original.")
+                            busy = false, ready = false, message = when {
+                                error is ComposedLevelLimit -> "Composed giant-image tiles support native levels 0–2. Zoom in to continue editing."
+                                content == GiantTileContent.Composed && error is GiantImageFailure &&
+                                    error.kind == GiantImageFailureKind.Unsupported -> "Committed giant-image composition is unavailable for this source."
+                                else -> "Derived tiles are unavailable or exceed the admitted viewport budget. Rebuild the cache from the preserved original."
+                            })
                     }
                 }
             } catch (cancel: CancellationException) { throw cancel }
@@ -141,9 +152,15 @@ public class GiantViewportSession<T : Any>(
     }
     private fun mutableStateForBytes(): GiantViewStatus = mutable.value.copy(retainedBytes = bytes)
     private suspend fun load(request: Request): Unit {
+        // A composed owner cannot silently fall back to source pixels. Resolve
+        // the optional capability before any tile reservation or upload.
+        val editing = if (content == GiantTileContent.Composed)
+            image as? GiantEditingImage ?: throw GiantImageFailure(GiantImageFailureKind.Unsupported)
+        else null
         val plan = image.viewport(request.view)
         if (!current(request)) return
         require(plan.level <= 20u)
+        if (editing != null && plan.level > 2u) throw ComposedLevelLimit()
         val pair = plan.assetId to plan.manifestHash
         require(listOf(plan.assetId, plan.manifestHash).all { value -> value.length == 64 && value.all { it in '0'..'9' || it in 'a'..'f' } })
         if (identity == null) identity = pair else require(identity == pair)
@@ -169,7 +186,8 @@ public class GiantViewportSession<T : Any>(
             try {
                 currentCoroutineContext().ensureActive()
                 if (!current(request)) return false
-                val pixels = image.tile(key, charge)
+                val pixels = if (editing == null) image.tile(key, charge)
+                    else editing.editingTile(key, charge, assumeUntaggedSrgb)
                 require(pixels.assetId == pair.first && pixels.manifestHash == pair.second && pixels.address == key)
                 require(pixels.width in 1u..256u && pixels.height in 1u..256u)
                 require(pixels.rgba.size.toLong() == pixels.width.toLong() * pixels.height.toLong() * 4L)
@@ -204,7 +222,7 @@ public class GiantViewportSession<T : Any>(
         for (key in plan.visible) { currentCoroutineContext().ensureActive(); if (!current(request) || !read(key)) return }
         if (!current(request)) return
         backend.present(GiantVisibleFrame(binding, attachmentEpoch, request.generation, request.view, pair.first, pair.second,
-            plan.visible.map { checkNotNull(retained[it]?.tile) }))
+            plan.visible.map { checkNotNull(retained[it]?.tile) }, content))
         mutable.value = mutable.value.copy(ready = true, busy = false, message = null)
         for (key in plan.prefetch) { currentCoroutineContext().ensureActive(); if (!current(request) || !read(key)) break }
     }
