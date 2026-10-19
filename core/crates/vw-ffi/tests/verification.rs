@@ -177,6 +177,42 @@ async fn durable_manual_cas_checks_real_pair_and_compiles_only_failed_markers_ag
         receipt_id: receipt.receipt_id,
         receipt_blake3: receipt.receipt_blake3,
     };
+    let coordinates = catalog
+        .verification_coordinate_pair(pair.clone(), cancel())
+        .await
+        .unwrap();
+    assert_eq!(coordinates.pair, pair);
+    assert_eq!(coordinates.original.key, key(&original_package));
+    assert_eq!(coordinates.after.key, key(&after_package));
+    assert_eq!(coordinates.original.binding, original_package.binding);
+    assert_eq!(coordinates.after.binding, after_package.binding);
+    assert_eq!(
+        coordinates.original.source_asset_id,
+        original_package.source_asset_id
+    );
+    assert_eq!(
+        coordinates.after.source_asset_id,
+        after_package.source_asset_id
+    );
+    for image in [&coordinates.original, &coordinates.after] {
+        assert_eq!((image.source_width, image.source_height), (64, 64));
+        assert_eq!((image.output_width, image.output_height), (64, 64));
+        assert_eq!((image.image_width, image.image_height), (64, 64));
+        assert_eq!((image.content_width, image.content_height), (64, 64));
+        assert_eq!(image.content_bounds, [0.0, 0.0, 64.0, 64.0]);
+        assert_eq!(image.crop_document, [0.0, 0.0, 64.0, 64.0]);
+        assert_eq!(image.document_to_image, [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]);
+        assert_eq!(image.image_to_document, image.document_to_image);
+        assert!(!image.has_output_frame);
+    }
+    let mut wrong = pair.clone();
+    wrong.after.manifest_sha256 = "00".repeat(32);
+    assert!(
+        catalog
+            .verification_coordinate_pair(wrong, cancel())
+            .await
+            .is_err()
+    );
     let pending = original
         .verification_review(
             after.clone(),

@@ -10,6 +10,8 @@ import com.visualworkbench.bindings.core.VerificationMarkerReview as NMarker
 import com.visualworkbench.bindings.core.VerificationReviewSnapshot as NSnapshot
 import com.visualworkbench.bindings.core.VerificationMarkerTranslation as NTranslation
 import com.visualworkbench.bindings.core.VerificationReviewHistoryPage as NHistoryPage
+import com.visualworkbench.bindings.core.VerificationImageCoordinates as NCoordinates
+import com.visualworkbench.bindings.core.VerificationCoordinatePair as NCoordinatePair
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,6 +53,29 @@ private fun VerificationPackageKey.native(): NKey = NKey(packageId, target, mani
 private fun NKey.common(): VerificationPackageKey = VerificationPackageKey(packageId, target, manifestSha256)
 private fun VerificationPair.native(): NPair = NPair(original.native(), after.native(), receiptId, receiptBlake3)
 private fun NPair.common(): VerificationPair = VerificationPair(original.common(), after.common(), receiptId, receiptBlake3)
+private fun NCoordinates.common(): VerificationImageCoordinates = VerificationImageCoordinates(key.common(),
+    WorkflowBinding(binding.projectId, binding.documentId, binding.hostSeq, binding.stateHash), sourceAssetId,
+    sourceWidth, sourceHeight, outputWidth, outputHeight, imageWidth, imageHeight, contentWidth, contentHeight,
+    contentBounds, cropDocument, documentToImage, imageToDocument, hasOutputFrame)
+private fun NCoordinatePair.common(expected: VerificationPair): VerificationCoordinatePair {
+    if (pair.common() != expected) throw PackageFailure(PackageFailureKind.Integrity)
+    val result = VerificationCoordinatePair(expected, original.common(), after.common())
+    if (result.original.key != expected.original || result.after.key != expected.after ||
+        listOf(result.original, result.after).any { image ->
+            image.sourceWidth == 0u || image.sourceHeight == 0u || image.outputWidth == 0u || image.outputHeight == 0u ||
+                image.imageWidth == 0u || image.imageHeight == 0u || image.contentWidth == 0u || image.contentHeight == 0u ||
+                image.contentWidth > image.imageWidth || image.contentHeight > image.imageHeight ||
+                image.cropDocument.size != 4 || image.contentBounds.size != 4 ||
+                image.documentToImage.size != 6 || image.imageToDocument.size != 6 ||
+                (image.cropDocument + image.contentBounds + image.documentToImage + image.imageToDocument).any { !it.isFinite() }
+        }) throw PackageFailure(PackageFailureKind.Integrity)
+    return result
+}
+public actual suspend fun verificationCoordinates(catalog: WorkbenchPackageCatalog,
+    pair: VerificationPair): VerificationCoordinatePair {
+    validateVerificationPair(pair)
+    return settledVerification { cancel -> nativePackageCatalog(catalog).verificationCoordinatePair(pair.native(), cancel).common(pair) }
+}
 private fun VerificationVerdict.native(): NVerdict = when (this) {
     VerificationVerdict.Pending -> NVerdict.PENDING
     VerificationVerdict.Pass -> NVerdict.PASS

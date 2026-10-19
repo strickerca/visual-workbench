@@ -1,5 +1,32 @@
 # T5.01 verification integration handoff
 
+## Checked image coordinates (2026-10-19 V leaf)
+
+After composing root's `vw_package::verification_image_geometry` at
+`6fd99bf7f7523071f0f955603461c42af387312c`, retain this branch's new
+`verification/geometry.rs`, DTOs and shared `VerificationApi.kt` /
+`NativeVerification.kt` leaves. Regenerate the root-owned UniFFI bindings for
+`PackageCatalog.verification_coordinate_pair(pair, cancellation)` and its
+`VerificationCoordinatePair` / `VerificationImageCoordinates` records. The
+shared `verificationCoordinates(catalog, pair)` adapter calls that exact method;
+there is no Desktop call yet. The native method reopens both exact checked
+catalog packages, checks target profiles, projects their canonical geometry,
+includes binding and source-asset identities, and rechecks the catalog. It
+returns continuous `content_bounds` separately from rounded-up `content_size`
+so a fractional edge pixel is not treated as fully supported registration
+content. It grants no capture, receipt, alignment or review authority.
+
+The native and Desktop frame refusals in `verification/checked.rs` and
+`McpVerificationWorkflow.kt` remain. Positive framed verification still needs
+paired-pixel normalization/registration in the Desktop comparison owner and
+native failure-crop/source checks before either refusal can be removed. The
+existing non-framed path is unchanged. The new ordinary-package integration
+assertions and fractional-edge unit case are source-authored but **unrun**:
+the parent holds the shared heavy build slot. Exact deferred checks after root
+composition: `cargo test --locked --offline -p vw-ffi verification -j2` and
+`cargo test --locked --offline -p vw-package verification_geometry:: -j2`.
+No OS recapture, target registration or A30 evidence is claimed.
+
 Base `47f2b82da1799a8481af7e92998f5ea56dc9c087`; branch
 `cloud/t5-01-history-20261018`; grant
 `docs/ROADMAP_ROOT_HOOK_GRANTS_20261018.md`, V extension. Before editing, compared

@@ -14,6 +14,40 @@ pub struct VerificationPair {
     pub receipt_id: String,
     pub receipt_blake3: String,
 }
+/// Checked package image geometry in physical retained-PNG pixels. The affine
+/// coefficients are in a,b,c,d,e,f order, with x'=a*x+c*y+e and y'=b*x+d*y+f.
+/// Content dimensions exclude minimum 64px PNG padding but can round up a
+/// fractional edge. This does not prove that the images are registered or
+/// that either capture source is current.
+#[derive(Clone, PartialEq, uniffi::Record)]
+pub struct VerificationImageCoordinates {
+    pub key: VerificationPackageKey,
+    pub binding: crate::WorkflowBinding,
+    pub source_asset_id: String,
+    pub source_width: u32,
+    pub source_height: u32,
+    pub output_width: u32,
+    pub output_height: u32,
+    pub image_width: u32,
+    pub image_height: u32,
+    pub content_width: u32,
+    pub content_height: u32,
+    /// Continuous mapped crop edges [left, top, width, height]. The rounded-up
+    /// content dimensions can contain fractional padding at the far edges.
+    pub content_bounds: Vec<f64>,
+    pub crop_document: Vec<f64>,
+    pub document_to_image: Vec<f64>,
+    pub image_to_document: Vec<f64>,
+    pub has_output_frame: bool,
+}
+/// Geometry and exact package identities only. Receipt, source, alignment and
+/// owner permissions remain separately checked by the verification workflow.
+#[derive(Clone, PartialEq, uniffi::Record)]
+pub struct VerificationCoordinatePair {
+    pub pair: VerificationPair,
+    pub original: VerificationImageCoordinates,
+    pub after: VerificationImageCoordinates,
+}
 #[derive(Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum VerificationVerdict {
     Pending,
