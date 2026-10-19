@@ -2,6 +2,7 @@
 package com.visualworkbench.desktop
 
 import com.visualworkbench.shared.*
+import kotlinx.coroutines.*
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -66,5 +67,34 @@ class DesktopGiantChoiceTest {
         assertTrue(giantChoiceMatches(frame,choice,3L,viewport))
         assertEquals(listOf("guide","transient"),canvasItems(doc,true,mapOf("transient" to transient)).map{it.objectId})
         assertEquals(listOf("canonical","result","guide"),canvasItems(doc,false,emptyMap()).map{it.objectId})
+    }
+
+    @Test fun retryRechecksFailedFormatReceiptAtTheSameRevisionBeforeLoading()=runBlocking {
+        val doc=document(true)
+        var reads=0
+        var metadata:OriginalFormatInfo?=null
+        val choices=mutableListOf<GiantDisplayChoice?>()
+        val read:suspend ()->OriginalFormatInfo={if(++reads==1)error("transient metadata failure") else format(false)}
+        val refresh:suspend ()->Unit={metadata=try{read()}catch(_:Exception){null}}
+        val load:suspend ()->Unit={choices+=giantDisplayChoice(doc,metadata,null)}
+        refresh()
+        assertNull(giantDisplayChoice(doc,metadata,null))
+        retryWithFreshOriginalFormat(refresh,load)
+        assertEquals(2,reads)
+        assertEquals(binding,choices.single()?.binding)
+        assertEquals(GiantTileContent.Composed,choices.single()?.content)
+    }
+
+    @Test fun canceledFormatRefreshCannotOpenTheReplacementOwner()=runBlocking {
+        val release=CompletableDeferred<Unit>()
+        var loads=0
+        val retry=launch(start=CoroutineStart.UNDISPATCHED){
+            retryWithFreshOriginalFormat({withContext(NonCancellable){release.await()}},{loads++})
+        }
+        retry.cancel()
+        release.complete(Unit)
+        retry.join()
+        assertTrue(retry.isCancelled)
+        assertEquals(0,loads)
     }
 }

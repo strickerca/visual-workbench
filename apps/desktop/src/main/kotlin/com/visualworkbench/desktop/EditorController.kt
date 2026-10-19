@@ -58,6 +58,11 @@ internal fun <T:Any> giantChoiceMatches(frame:GiantVisibleFrame<T>,choice:GiantD
     frame.assetId==choice.sourceAssetId&&frame.matches(choice.binding,epoch,viewport)
 internal fun giantChoiceRequiresRetirement(prior:GiantDisplayChoice?,next:GiantDisplayChoice?,forceReplace:Boolean=false):Boolean =
     forceReplace||prior!=next||next==null
+internal suspend fun retryWithFreshOriginalFormat(refresh:suspend ()->Unit,load:suspend ()->Unit){
+    refresh()
+    currentCoroutineContext().ensureActive()
+    load()
+}
 private data class Drag(val start:Point,val initial:ViewState,val selected:List<RenderItem>,val bounds:Rect?,val resize:Boolean,val pan:Boolean,val binding:RenderBinding,val live:ObjectPreviewLease?=null,val newObject:NewObjectPreviewLease?=null,val tool:Tool=Tool.Select)
 private data class WidthGesture(val binding:RenderBinding,val items:List<RenderItem>,val live:ObjectPreviewLease?)
 private data class CachedExport(val workspace:TransferWorkspace,val receipt:CompletedExport)
@@ -611,7 +616,9 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
                 else "Image display could not finish. The project remains open; retry the image display.",backgroundFailureKind=null)}
         }
     }
-    fun retryBackground():Job?=task(generation){loadBackground(forceGiantReplace=true)}
+    fun retryBackground():Job?=task(generation){
+        retryWithFreshOriginalFormat(::refreshOriginalFormatNotice){loadBackground(forceGiantReplace=true)}
+    }
     fun assumeSrgb(){task(generation){
         val doc=mutable.value.document
         if(doc!=null&&giantDisplayRequired(doc)){
