@@ -19,6 +19,8 @@ import com.visualworkbench.android.offline.OfflineReviewPanel
         LocalViewsPanel(owner.views,{owner.activate(EditorWorkflowPanel.SavedViews,it)},owner::saveView,owner::restoreView)
         LayersPanel(owner.controls,editor::workflowId,setOfNotNull(editor.selected),{owner.activate(EditorWorkflowPanel.Layers,it)})
         ToneControlsPanel(owner.tones,{owner.activate(EditorWorkflowPanel.Tones,it)})
+        if(editor.frameControlsAvailable) ImageFramesPanel(editor.imageFrames,editor::framePanel)
+        else OutlinedButton({},Modifier.heightIn(min=48.dp),enabled=false){Text("Output frame unavailable for this source")}
         OutlinedButton({owner.activate(EditorWorkflowPanel.OfflineReview,true)},Modifier.heightIn(min=48.dp),enabled=editor.document!=null){Text("Offline conflicts")}
     }
     if(editor.selected!=null)RotationSnapControl(editor.rotationSnap15,!editor.busy,editor::rotationSnap)
