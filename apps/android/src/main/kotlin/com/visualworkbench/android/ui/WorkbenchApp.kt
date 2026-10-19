@@ -34,6 +34,7 @@ import com.visualworkbench.shared.EditableKind
 import com.visualworkbench.shared.DocumentExport
 import com.visualworkbench.android.precision.PrecisionControls
 import com.visualworkbench.android.precision.PrecisionHandles
+import com.visualworkbench.android.assistedselection.AssistedSelectionPanel
 import com.visualworkbench.android.instructions.InstructionsScreen
 import com.visualworkbench.android.instructions.InstructionFocusModal
 import com.visualworkbench.shared.SelectionSaveTicket
@@ -111,7 +112,7 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { editor.receiveImage(it) } }
     if (showImageSource) AlertDialog(onDismissRequest = { showImageSource = false; largeJpegSrgb = false },
         title = { Text("Open image file") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Choose regular import for PNG, JPEG, WebP, HEIF, AVIF, BMP or TIFF within the current decoder limits.")
+            Text("Regular import also accepts PSD/PSB flattened composites and DNG/CR2 embedded previews. RAW sensor pixels and PSD layers remain only in the unchanged original.")
             Text("Large JPEG uses original-resolution tiles. The selected file must actually be JPEG; its original is saved unchanged.")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(largeJpegSrgb, { largeJpegSrgb = it })
@@ -127,7 +128,8 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
         }, dismissButton = {
             TextButton(onClick = {
                 showImageSource = false; largeJpegSrgb = false
-                try { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/heic", "image/heif", "image/avif", "image/bmp", "image/tiff")) }
+                try { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/heic", "image/heif", "image/avif", "image/bmp", "image/tiff",
+                    "image/vnd.adobe.photoshop", "application/vnd.adobe.photoshop", "image/x-adobe-dng", "image/x-canon-cr2", "application/octet-stream")) }
                 catch (_: Exception) { editor.transferMessage("An image document picker is unavailable.") }
             }) { Text("Regular image") }
         })
@@ -164,7 +166,8 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
         catch (_: Exception) { editor.shareLaunchFailed(uri) }
     }
     BackHandler(editor.screen != WorkbenchScreen.Projects) {
-        if(editor.ai.state.value.open)editor.hideAi()
+        if(editor.assistedPanelOpen)editor.dismissAssistedPanel()
+        else if(editor.ai.state.value.open)editor.hideAi()
         else if (editor.textDraft != null) editor.dismissText()
         else if (editor.showBrush) editor.brushDialog(false)
         else if (editor.screen == WorkbenchScreen.Settings) editor.returnFromSettings()
@@ -270,8 +273,8 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
     var projectActionsOpen by remember(editor.document?.documentId) { mutableStateOf(false) }
     var pixelSelectionOpen by remember(editor.document?.documentId) { mutableStateOf(false) }
     val airModalOwner = remember(editor) { Any() }
-    DisposableEffect(editor, projectActionsOpen, pixelSelectionOpen) {
-        editor.airModal(airModalOwner, projectActionsOpen || pixelSelectionOpen)
+    DisposableEffect(editor, projectActionsOpen, pixelSelectionOpen, editor.assistedPanelOpen) {
+        editor.airModal(airModalOwner, projectActionsOpen || pixelSelectionOpen || editor.assistedPanelOpen)
         onDispose { editor.airModal(airModalOwner, false) }
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -298,6 +301,8 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                             }
                             DropdownMenuItem(onClick = { projectActionsOpen = false; editor.editInstruction() }) { Text("Instructions") }
                             DropdownMenuItem(onClick = { projectActionsOpen = false; pixelSelectionOpen = true }, enabled = !editor.busy && editor.document != null && documentState.descriptor==null) { Text("Pixel selection") }
+                            DropdownMenuItem(onClick = { projectActionsOpen = false; editor.openAssistedSelection() },
+                                enabled = !editor.busy && editor.document != null && documentState.descriptor==null) { Text("Assisted selection") }
                             DropdownMenuItem(onClick = { projectActionsOpen = false; onExport() }, enabled = !editor.busy && editor.pending == 0 && editor.document != null) { Text("Export") }
                         }
                     }
@@ -307,7 +312,9 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                         Text(if (editor.pending > 0) "Saving ${editor.pending} edit${if (editor.pending == 1) "" else "s"}…" else editor.exportReady?.takeIf { it.matches(editor.info, editor.document) }
                             ?.let { "EXPORT READY · revision ${it.hostSeq} · ${it.width} × ${it.height} px" } ?: editor.connectionLabel(),
                             style = MaterialTheme.typography.caption, color = MaterialTheme.colors.secondary)
-                        editor.document?.let { Text(if(documentState.descriptor==null)"${it.width} × ${it.height} px · ${it.bitDepth}-bit original" else "${it.width} × ${it.height} document units", style = MaterialTheme.typography.caption) }
+                        editor.document?.let { Text(if(documentState.descriptor!=null)"${it.width} × ${it.height} document units"
+                            else if(editor.rawPreview)"${it.width} × ${it.height} px · ${it.bitDepth}-bit embedded RAW preview"
+                            else "${it.width} × ${it.height} px · ${it.bitDepth}-bit original", style = MaterialTheme.typography.caption) }
                     }
                 }
             }
@@ -363,7 +370,7 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                 color = MaterialTheme.colors.onSurface, modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp).background(MaterialTheme.colors.surface, RoundedCornerShape(8.dp)).padding(8.dp))
         }
         val eraserControlsVisible = eraserState.busy || (eraserState.active && !selectionState.active)
-        val selectionControlsVisible = selectionState.active || selectionState.busy
+        val selectionControlsVisible = (selectionState.active || selectionState.busy) && editor.assistedActions == null
         val inactiveEraseMessage = eraserState.message?.takeIf { !eraserControlsVisible }
         if (eraserControlsVisible || selectionControlsVisible || inactiveEraseMessage != null) {
             Column(Modifier.fillMaxWidth().heightIn(max = contextHeight).verticalScroll(rememberScrollState())) {
@@ -385,6 +392,10 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
     }
     if (pixelSelectionOpen && editor.blockingMessage == null) SelectionPanel(editor.selections, editor.selected,
         { ticket -> pixelSelectionOpen = false; onSelectionSave(ticket) }, { pixelSelectionOpen = false })
+    if(editor.assistedPanelOpen)editor.assistedActions?.let { actions -> AssistedSelectionPanel(actions,
+        editor.assistedPrompt,editor.assistedSubmittedPrompt,editor::proposeAssisted,
+        editor.assistedNegative,editor::assistedPromptPolarity,
+        editor::clearAssistedPrompts,editor.assistedTarget(),editor::assistedManualSelection,editor::dismissAssistedPanel) }
     editor.blockingMessage?.let { reason ->
         AlertDialog(onDismissRequest = { editor.navigate(WorkbenchScreen.Projects) }, title = { Text("Original preserved") },
             text = {

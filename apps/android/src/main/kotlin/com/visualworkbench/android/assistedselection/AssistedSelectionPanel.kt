@@ -19,16 +19,18 @@ import com.visualworkbench.shared.*
  * project, model, mutation dispatcher or manual selection controller. */
 @Composable
 internal fun AssistedSelectionPanel(actions: AssistedSelectionInteraction,
-    prompt: AssistedSelectionPrompt, negative: Boolean, onNegative: (Boolean) -> Unit,
+    prompt: AssistedSelectionPrompt, submittedPrompt: AssistedSelectionPrompt?, onPropose: () -> Unit,
+    negative: Boolean, onNegative: (Boolean) -> Unit,
     onClearPrompts: () -> Unit, target: SelectionTarget?, onManualSelection: (String?) -> Unit,
     onDismiss: () -> Unit) {
     val state by actions.state.collectAsState()
     var combine by remember(actions) { mutableStateOf(SelectionCombine.Add) }
-    val proposal = state.proposal
+    val proposal = state.proposal.takeIf { prompt == submittedPrompt }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Assisted selection") }, text = {
         Column(Modifier.heightIn(max = 600.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Use pen taps to include or exclude pixels, review the proposed coverage, then Accept to save one selection edit.")
+            if(state.canPrompt)Text("Close this panel to tap the canvas with the pen, then reopen Assisted selection to propose from those taps.")
             state.issue?.let { Text(it) }
             if (state.canPrompt) {
                 Row {
@@ -37,7 +39,7 @@ internal fun AssistedSelectionPanel(actions: AssistedSelectionInteraction,
                 }
                 Text("${prompt.positive.size} include · ${prompt.negative.size} exclude · at most 64 real taps")
                 TextButton(onClearPrompts) { Text("Clear pen prompts") }
-                OutlinedButton({ actions.prompt(prompt) }, enabled = prompt.positive.isNotEmpty() || prompt.box != null) {
+                OutlinedButton(onPropose, enabled = prompt.positive.isNotEmpty() || prompt.box != null) {
                     Text("Propose from current prompts")
                 }
             }

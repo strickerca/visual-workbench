@@ -17,7 +17,11 @@ import com.visualworkbench.android.diagnostics.DiagnosticsController
 import com.visualworkbench.android.input.*
 import com.visualworkbench.android.precision.*
 import com.visualworkbench.android.airactions.*
+import com.visualworkbench.android.assistedselection.AssistedSourceGate
+import com.visualworkbench.android.assistedselection.appendAssistedPenPrompt
 import com.visualworkbench.android.ui.ProjectCard
+import com.visualworkbench.shared.assistedselection.backend.LiteRtReviewedCatalog
+import com.visualworkbench.shared.assistedselection.backend.liteRtAssistedSelectionBackend
 import com.visualworkbench.shared.*
 import com.visualworkbench.android.session.PairingController
 import com.visualworkbench.android.session.RefreshAdmission
@@ -30,6 +34,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.io.File
 import kotlin.math.*
 
 internal enum class WorkbenchScreen { Projects, Canvas, Settings, Diagnostics, Pairing, Instructions }
@@ -58,8 +63,22 @@ internal fun projectReceiveFailureMessage(kind: SessionFailureKind): String = wh
 internal class EditorController @JvmOverloads constructor(application: Application, val core: WorkbenchCore = workbenchCore(),
     captureStatusFactory: (ProjectLink) -> WorkbenchAgentCaptureStatus = ::agentCaptureStatus,
     private val captureArrivalQuery: suspend (WorkbenchProject, ULong) -> ReceivedCapture? = { p, after -> p.receivedCapture(after) },
-    sessionFactory: suspend (android.content.Context, String) -> WorkbenchSessions = ::createAndroidSessions) : AndroidViewModel(application), CanvasGestureSink {
+    sessionFactory: suspend (android.content.Context, String) -> WorkbenchSessions = ::createAndroidSessions,
+    private val assistedCatalog: LiteRtReviewedCatalog = LiteRtReviewedCatalog.empty(File(application.noBackupFilesDir,"assisted-selection")),
+    private val assistedPins: AssistedSelectionPins? = null) : AndroidViewModel(application), CanvasGestureSink {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val assistedSource=AssistedSourceGate<WorkbenchProject>()
+    internal var assistedActions by mutableStateOf<AssistedSelectionInteraction?>(null); private set
+    internal var assistedPanelOpen by mutableStateOf(false); private set
+    internal var assistedPrompt by mutableStateOf(AssistedSelectionPrompt()); private set
+    internal var assistedSubmittedPrompt by mutableStateOf<AssistedSelectionPrompt?>(null); private set
+    internal var assistedNegative by mutableStateOf(false); private set
+    private var assistedCollecting=false
+    private data class AssistedTap(val project:WorkbenchProject,val source:AssistedSelectionSource,
+        val camera:Camera,val down:PenSample,val negative:Boolean)
+    private var assistedTap:AssistedTap?=null
+    private var assistedNewObjectId:String?=null
+    private var assistedOpening=false
     private val airEpoch = AtomicLong()
     private var airInitialized = false
     private val airViewRestore = AirActionViewRestore()
@@ -188,8 +207,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     private val documentOwner:EditorDocuments=EditorDocuments(scope,core,
         { val p=project;val snapshot=document;if(p!=null&&snapshot!=null&&!disposing)DocumentAttachment(p,snapshot,epoch)else null },
-        { !disposing&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
-        { attached,page -> mutations.withLock {
+        { !disposing&&assistedActions==null&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
+        { attached,page -> closeAssisted();mutations.withLock {
             if(project!==attached.project||epoch!=attached.epoch||!documentRevisionMatches(attached))throw DocumentFailure(DocumentFailureKind.Stale)
             refreshAdmission.invalidate();documentRefresh.invalidate()
             cancelTool();imageFrames.detach();workflows.detach();rotation.detach();detachGiant();erasers.detach();selections.detach();documentOwnerDiscardDraw()
@@ -279,6 +298,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         private set(value) {
             if (documentState !== value) interruptAirInput(clearView = documentState?.documentId != value?.documentId ||
                 documentState?.width != value?.width || documentState?.height != value?.height)
+            if(documentState?.documentId!=value?.documentId || documentState?.page!=value?.page ||
+                documentState?.render?.revision!=value?.render?.revision)invalidateAssisted()
             documentState = value
         }
     var selected by mutableStateOf<String?>(null); private set
@@ -308,7 +329,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var checkedExportIntent: ExportCallerIntent? = null
     private var pickerTicket: ExportTicket? = null
     private var project: WorkbenchProject? = null
-        set(value) { if (field !== value) interruptAirInput(clearView = true, clearBarrel = true); field = value }
+        set(value) { if (field !== value) {interruptAirInput(clearView = true, clearBarrel = true);invalidateAssisted()}; field = value }
     private var transferJob: Job? = null
     private var incomingJob: Job? = null
     private var incomingProducer: Job? = null
@@ -316,7 +337,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var shareLease: MediaHandoff.Lease? = null
     private var disposing = false
     private var epoch = 0L
-        set(value) { if (field != value) interruptAirInput(clearView = true, clearBarrel = true); field = value }
+        set(value) { if (field != value) {interruptAirInput(clearView = true, clearBarrel = true);invalidateAssisted()}; field = value }
     private var sceneRevision = 0L
     private var background: Bitmap? = null
     private var objects = emptyList<DrawObject>()
@@ -345,6 +366,84 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             } }
             refresh(current, current.info(), epoch)
         }
+    }
+    private fun assistedCurrent(projectOwner: WorkbenchProject, source: AssistedSelectionSource): Boolean {
+        val doc=document ?: return false
+        val revision=doc.render.revision
+        return !disposing && project === projectOwner && epoch == source.attachmentEpoch &&
+            doc.page == source.page && source.document.width == doc.width && source.document.height == doc.height &&
+            source.document.sourceBitDepth == doc.bitDepth &&
+            source.binding.projectId == revision.projectId && source.binding.documentId == doc.documentId &&
+            source.binding.hostSeq == revision.hostSeq && source.binding.stateHash == revision.stateHash &&
+            assistedSource.matches(projectOwner,source)
+    }
+    private fun invalidateAssisted() { assistedSource.revoke();assistedCollecting=false;assistedTap=null;assistedActions?.invalidate() }
+    private suspend fun closeAssisted() {
+        invalidateAssisted();assistedPanelOpen=false
+        val owner=assistedActions ?: return
+        owner.close() // Keep this exact owner if native/runtime retirement fails.
+        if(assistedActions===owner)assistedActions=null
+        assistedPrompt=AssistedSelectionPrompt();assistedSubmittedPrompt=null;assistedNewObjectId=null
+    }
+    internal fun openAssistedSelection() {
+        val owner=project ?: return
+        val snapshot=document ?: return
+        assistedActions?.let { actions -> if(assistedCurrent(owner,actions.source)){
+            assistedCollecting=false;assistedPanelOpen=true;return
+        } }
+        if(assistedOpening)return
+        if(disposing||!workflowIdle()||documents.state.value.descriptor!=null||blockingMessage!=null||
+            originalFormat?.rawPreview==true){message="Assisted selection requires an available raster image preview.";return}
+        val capturedEpoch=epoch
+        assistedOpening=true
+        cancelTool();selections.interaction.active(true)
+        scope.launch {
+            try {
+                closeAssisted()
+                val expected=snapshot.render.revision
+                val selected=withTimeoutOrNull(5_000) { selections.state.first { state ->
+                    state.document?.let { value -> value.binding.projectId==expected.projectId &&
+                        value.binding.documentId==snapshot.documentId && value.binding.hostSeq==expected.hostSeq &&
+                        value.binding.stateHash==expected.stateHash } == true }.document }
+                if(selected==null){message="The selection source is still unavailable. Try again or use manual selection.";return@launch}
+                val source=AssistedSelectionSource(selected,snapshot.page,capturedEpoch)
+                if(disposing||project!==owner||epoch!=capturedEpoch||document?.render?.revision!=expected||document?.page!=snapshot.page)return@launch
+                assistedSource.publish(owner,source)
+                val backend=assistedPins?.let { liteRtAssistedSelectionBackend(getApplication(),assistedCatalog,owner,
+                    {assistedSource.sourceFor(owner)},approvedAssumption(snapshot)) }
+                val actions=AssistedSelectionInteraction(scope,source,owner.selections(),mutations,
+                    metadata={val info=owner.info();WorkflowMetadata(newId(),repository.deviceId,
+                        repository.instructionLamport(info.nextLamport),System.currentTimeMillis())},
+                    isCurrent={candidate->assistedCurrent(owner,candidate)},
+                    afterMutation={receipt->
+                        if(project===owner&&epoch==capturedEpoch&&!disposing){refresh(owner,owner.info(),capturedEpoch)
+                            receipt?.let{selections.interaction.useObject(it.snapshot.selection.objectId)}}
+                    },pins=assistedPins,backend=backend)
+                if(!assistedCurrent(owner,source)){actions.close();return@launch}
+                assistedActions=actions;assistedPrompt=AssistedSelectionPrompt();assistedSubmittedPrompt=null;assistedNegative=false
+                assistedNewObjectId=newId();assistedPanelOpen=true
+            } catch(cancel:CancellationException){throw cancel}
+            catch(error:Exception){assistedSource.revoke();report(error)}
+            finally{assistedOpening=false}
+        }
+    }
+    internal fun assistedPromptPolarity(negative:Boolean){assistedNegative=negative}
+    internal fun clearAssistedPrompts(){assistedPrompt=AssistedSelectionPrompt();assistedSubmittedPrompt=null}
+    internal fun proposeAssisted(){val prompt=assistedPrompt
+        if(assistedActions?.prompt(prompt)==true)assistedSubmittedPrompt=prompt
+    }
+    internal fun dismissAssistedPanel(){assistedPanelOpen=false;assistedCollecting=assistedActions?.state?.value?.canPrompt==true
+        if(!assistedCollecting)scope.launch { try{closeAssisted()}catch(error:Exception){report(error)} }
+    }
+    internal fun assistedManualSelection(objectId:String?){dismissAssistedPanel();assistedCollecting=false
+        if(objectId==null)selections.interaction.newSelection() else selections.interaction.useObject(objectId)
+        scope.launch { try{closeAssisted()}catch(error:Exception){report(error)} }
+    }
+    internal fun assistedTarget():SelectionTarget? {
+        val selected=selections.state.value.selection?.takeIf { it.binding==assistedActions?.source?.binding }
+        if(selected!=null&&selected.editable)return SelectionTarget.Existing(selected.selection)
+        val layer=runCatching{selectedLayer()}.getOrNull()?:return null
+        return SelectionTarget.New(assistedNewObjectId ?: return null,layer.id)
     }
     private val strokes = LinkedHashSet<StrokeRun>()
     private var previewJob: Job? = null
@@ -435,7 +534,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         return if(current!=null&&doc!=null&&!disposing)EditorWorkflowAttachment(current,doc,epoch,refreshAdmission.capture().sequence,repository.deviceId)else null
     }
     private fun workflowIdle():Boolean = frameIdle() && !imageFrames.state.value.blocksInput
-    private fun frameIdle():Boolean = !disposing&&!busy&&pending==0&&operationCount==0&&screen==WorkbenchScreen.Canvas&&
+    private fun frameIdle():Boolean = !disposing&&assistedActions==null&&!busy&&pending==0&&operationCount==0&&screen==WorkbenchScreen.Canvas&&
         !navigationContactActive&&!rotation.state.value.active&&!rotationUnavailable()&&gesture==null&&strokes.isEmpty()&&documentPress==null&&!selectionPointer&&!eraserPointer&&
         sliderGesture==null&&selectedStyleDraft==null&&!showBrush&&!showContext&&textDraft==null&&blockingMessage==null&&
         !ai.state.value.open&&!ai.needsDecision()&&!instructionEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&
@@ -463,6 +562,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         documents.state.value.descriptor == null && originalFormat != null && originalFormat?.rawPreview != true
     internal val toneControlsAvailable: Boolean get() = document != null && documents.state.value.descriptor == null &&
         originalFormat != null && originalFormat?.rawPreview != true
+    internal val rawPreview: Boolean get() = originalFormat?.rawPreview == true
     internal fun framePanel(active: Boolean) {
         if (active && !imageFrames.state.value.blocksInput && (!frameControlsAvailable || !workflowIdle())) {
             message = if (originalFormat?.rawPreview == true) "RAW sensor originals are not editable through the embedded preview."
@@ -957,6 +1057,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             scope.launch {
                 var instructionSeal = false
                 try {
+                    closeAssisted()
                     val closed = mutations.withLock {
                         if (!instructionEditor.sealIfClean()) {
                             message = "Save or discard the instruction draft before closing this project."
@@ -980,6 +1081,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     fun returnFromSettings() { captureNavigationGeneration++; screen = if (project == null) WorkbenchScreen.Projects else WorkbenchScreen.Canvas }
     fun onBackground() {
         interruptAirInput()
+        invalidateAssisted();scope.launch { try{closeAssisted()}catch(error:Exception){report(error)} }
         remoteCapability?.seal("background")
         captureNavigationGeneration++
         ai.background();instructionInteractionChanged()
@@ -1085,6 +1187,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             var instructionSeal = false
             var completion: ProjectOpenCompletion<WorkbenchProject>? = null
             try {
+                closeAssisted()
                 val opened=mutations.withLock {
                     if(disposing)return@withLock false
                     if (!instructionEditor.sealIfClean()) {
@@ -1235,7 +1338,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private suspend fun closeCurrent() {
         interruptAirInput(clearView = true, clearBarrel = true)
         withContext(NonCancellable) {
-        imageFrames.detach();workflows.detach();rotation.detach()
+        closeAssisted();imageFrames.detach();workflows.detach();rotation.detach()
         documentOwner.detach()
         if(!precisionClosed)precision.reset()
         scene=null;composedBackground=null
@@ -1287,6 +1390,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         refreshAdmission.observe(change.sequence)) {
                         captureArrivals.changed(current, token)
                         giantOwner.observe(change.project)
+                        invalidateAssisted()
                         if(composedBackground!=null && document?.render?.revision?.let { old ->
                             old.projectId==change.project.projectId && (old.hostSeq!=change.project.hostSeq || old.stateHash!=change.project.stateHash) }==true){
                             composedBackground=null;background=null
@@ -1705,6 +1809,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         precision.down(raw)
         val physical=precision.inputMatrix()
         val sample=precision.routePen(listOf(rawSample)).single()
+        if(assistedCollecting && rawSample.tool==PointerTool.Pen){
+            val actions=assistedActions
+            val source=actions?.source
+            if(actions!=null && source!=null && actions.state.value.canPrompt && assistedCurrent(current,source)){
+                assistedTap=AssistedTap(current,source,camera,sample,assistedNegative)
+            } else {assistedCollecting=false;message="The assisted source changed. Reopen assisted selection before drawing."}
+            return
+        }
         val documentMode=documents.state.value
         if(documentMode.textTool||documentMode.regionTool){
             val point=toDocument(sample,camera)
@@ -1779,6 +1891,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
 
     override fun extendTool(samples: List<PenSample>) {
         samples.lastOrNull()?.let{precision.move(Point(it.x,it.y))}
+        if(assistedTap!=null)return
         val mapped=precision.routePen(samples)
         rotationGesture?.let{token->
             if(precision.inputMatrix()!=rotationPhysical){rotationGesture=null;rotation.cancel();publish();return}
@@ -1851,6 +1964,16 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     override fun finishTool(samples: List<PenSample>) {
         try{
             val mapped=precision.routePen(samples)
+            assistedTap?.let{tap->
+                assistedTap=null
+                if(camera==tap.camera&&assistedCurrent(tap.project,tap.source)){
+                    val point=toDocument(mapped.lastOrNull()?:tap.down,tap.camera)
+                    val next=appendAssistedPenPrompt(assistedPrompt,point,tap.negative,tap.source)
+                    if(next!=null){assistedPrompt=next;assistedSubmittedPrompt=null}
+                    else message="This prompt is outside the source or exceeds 64 taps."
+                }
+                return
+            }
             rotationGesture?.let{token->
                 rotationGesture=null
                 if(precision.inputMatrix()!=rotationPhysical){rotation.cancel();publish();return}
@@ -1908,7 +2031,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     override fun cancelTool() { interruptAirInput(); rotationGesture=null;rotation.cancel();clearToolContact(false) }
     private fun clearToolContact(retainPolygon: Boolean) {
         if(rotationGesture!=null){rotationGesture=null;rotation.cancel()}
-        documentPress=null
+        documentPress=null;assistedTap=null
         cancelPrecision()
         eraserPointer = false; erasers.interaction.cancelGesture()
         selectionPointer = false; if (!retainPolygon) selections.interaction.cancelGesture()
@@ -2406,6 +2529,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         imageFrames.beginDeparture();workflows.beginDeparture();rotation.cancel()
         giantOwner.invalidate()
         disposing = true
+        invalidateAssisted()
         remoteCapability?.let{it.seal("background");retireRemoteEditLater(it)}
         captureOwner.close()
         importReadiness.close()
@@ -2423,7 +2547,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 // can miss a project returned while the ViewModel is clearing.
                 try {
                     incomingJob?.join()
-                    try { connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin(); mutations.withLock { closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision() } }
+                    try { connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin(); closeAssisted();mutations.withLock { closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision() } }
                     finally {
                         try { pairing.close() }
                         finally {
@@ -2433,7 +2557,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     }
                 } catch (error: Exception) {
                     report(error)
-                    DocumentRetirementRegistry.retain(this@EditorController){mutations.withLock{closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision()}}
+                    DocumentRetirementRegistry.retain(this@EditorController){closeAssisted();mutations.withLock{closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision()}}
                 } finally { scope.cancel() }
             }
         }
