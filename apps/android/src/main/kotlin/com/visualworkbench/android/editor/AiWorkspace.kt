@@ -19,7 +19,7 @@ import com.visualworkbench.shared.*
  * actions have separate buttons; Send captures this exact displayed review. */
 @Composable
 internal fun AiWorkspace(controller: AiEditorController<AiBitmap>, service: AiServiceController,
-    core: WorkbenchCore, onKeys: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    core: WorkbenchCore, onKeys: (AiProviderKind) -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val state by controller.state.collectAsState()
     val settings by service.state.collectAsState()
     Surface(modifier.fillMaxSize(), elevation = 12.dp) {
@@ -46,7 +46,7 @@ internal fun AiWorkspace(controller: AiEditorController<AiBitmap>, service: AiSe
 
 @Composable
 private fun AiControls(controller: AiEditorController<AiBitmap>, service: AiServiceController,
-    state: AiEditorState<AiBitmap>, settings: AiServiceState, onKeys: () -> Unit, modifier: Modifier) {
+    state: AiEditorState<AiBitmap>, settings: AiServiceState, onKeys: (AiProviderKind) -> Unit, modifier: Modifier) {
     var showSettings by remember { mutableStateOf(false) }
     var instruction by remember { mutableStateOf("") }
     var textTokens by remember { mutableStateOf("") }
@@ -223,7 +223,7 @@ private fun AiCandidateGrid(controller: AiEditorController<AiBitmap>, state: AiE
 @Composable private fun AiCheck(label: String, value: Boolean, change: (Boolean) -> Unit, enabled: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(value, change, enabled = enabled); Text(label, style = MaterialTheme.typography.body2) }
 }
-@Composable private fun AiSettings(service: AiServiceController, state: AiServiceState, onKeys: () -> Unit, idle: Boolean) {
+@Composable private fun AiSettings(service: AiServiceController, state: AiServiceState, onKeys: (AiProviderKind) -> Unit, idle: Boolean) {
     val enabled=idle&&!state.busy
     val configuration = state.configuration
     var json by remember(configuration?.fingerprint) { mutableStateOf(configuration?.json.orEmpty()) }
@@ -239,10 +239,9 @@ private fun AiCandidateGrid(controller: AiEditorController<AiBitmap>, state: AiE
         TextButton({ amount?.let { service.configureDailyBudget(configuration.fingerprint, it) } }, enabled = enabled && amount != null) { Text("Save daily budget") }
         OutlinedTextField(json, { json = it.take(65_536) }, Modifier.fillMaxWidth(), label = { Text("Versioned provider configuration JSON") }, enabled = enabled)
         TextButton({ service.configure(json, configuration.fingerprint) }, enabled = enabled) { Text("Validate & save configuration") }
-        if (configuration.providerKind == AiProviderKind.OpenAiImageEdits)
-            TextButton(onKeys, enabled = enabled) { Text("Protected API key settings") }
-        else Text("Provider-specific protected key settings are unavailable for this configuration.",
-            style = MaterialTheme.typography.caption)
+        TextButton({ onKeys(configuration.providerKind) }, enabled = enabled) {
+            Text("${aiProviderLabel(configuration.providerKind)} protected API key settings")
+        }
     }
     state.readiness?.let { Text("Recorded today ${aiMoney(it.spentTodayMicrousd)} of ${aiMoney(it.dailySoftBudgetMicrousd)} soft budget.\nProvider ${if (it.providerReady && it.configured) "ready" else "unavailable"}; TLS trust ${if (it.trustReady) "ready" else "unavailable"}; configuration ${if (it.configurationCurrent) "current" else "expired"}.", style = MaterialTheme.typography.caption) }
     state.failure?.let { Text(aiFailureText(it), color = MaterialTheme.colors.error) }

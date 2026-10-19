@@ -13,6 +13,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.LifecycleOwner
 import com.visualworkbench.shared.AndroidProviderKeyStore
+import com.visualworkbench.shared.AiProviderKind
 
 private fun lifecycleOwner(context: Context): LifecycleOwner? {
     var value = context
@@ -31,15 +32,19 @@ internal fun AiEditorOverlay(editor: EditorController) {
     if (!state.open) return
     val lifecycle = lifecycleOwner(LocalContext.current)?.lifecycle
     var keys by remember { mutableStateOf<AndroidProviderKeyStore?>(null) }
+    var keyProvider by remember { mutableStateOf<AiProviderKind?>(null) }
     var keyFailure by remember { mutableStateOf(false) }
     Dialog(onDismissRequest = editor::hideAi, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxSize()) {
             val captureStatus by editor.agentCapture.state.collectAsState()
             AgentCaptureIndicator(captureStatus)
             ReceivedCaptureBanner(editor)
-        AiWorkspace(editor.ai, editor.aiService, editor.core, {
+        AiWorkspace(editor.ai, editor.aiService, editor.core, { selected ->
             try {
-                if (lifecycle == null) keyFailure = true else keys = editor.aiKeyStore()
+                if (lifecycle == null) keyFailure = true else {
+                    keyProvider = selected
+                    keys = editor.aiKeyStore()
+                }
             } catch (_: Exception) { keyFailure = true }
         }, editor::hideAi, Modifier.weight(1f))
         }
@@ -48,8 +53,9 @@ internal fun AiEditorOverlay(editor: EditorController) {
             text = { Text("Reopen the app and try API key settings again. No key was saved or removed.") },
             confirmButton = { TextButton({ keyFailure = false }) { Text("Close") } })
         val store = keys
-        if (store != null && lifecycle != null) ProviderKeyDialog(store, lifecycle) {
-            keys = null; editor.aiService.activate()
+        val selected = keyProvider
+        if (store != null && lifecycle != null && selected != null) ProviderKeyDialog(store, lifecycle, selected) {
+            keys = null; keyProvider = null; editor.aiService.activate()
         }
     }
 }
