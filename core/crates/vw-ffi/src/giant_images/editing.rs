@@ -175,6 +175,7 @@ impl ImageState {
     fn editing_tile(
         &mut self,
         requested: GiantTileAddress,
+        assume_untagged_srgb: bool,
         snapshot: &Snapshot,
         cancel: &Cancellation,
         budget: &SessionBudget,
@@ -207,7 +208,7 @@ impl ImageState {
         let options = RenderOptions {
             memory_budget_bytes: budget.limit_bytes(),
             include_guides: false,
-            assume_untagged_srgb: false,
+            assume_untagged_srgb,
         };
         let working = vw_raster::region_composition_estimate(
             &full,
@@ -302,6 +303,7 @@ impl GiantImage {
     pub(crate) async fn read_editing_tile(
         &self,
         address: GiantTileAddress,
+        assume_untagged_srgb: bool,
         cancellation: Arc<Cancellation>,
     ) -> Result<Arc<super::super::PreparedGiantTile>> {
         self.check(cancellation.clone()).await?;
@@ -355,10 +357,13 @@ impl GiantImage {
                 Ok((|| {
                     live(&local_closed, &cancel)?;
                     source.verify_owned(&closed, &local_closed, &cancel, &budget)?;
-                    let tile = state
-                        .as_mut()
-                        .ok_or(Error::Closed)?
-                        .editing_tile(address, &snapshot, &cancel, &budget)?;
+                    let tile = state.as_mut().ok_or(Error::Closed)?.editing_tile(
+                        address,
+                        assume_untagged_srgb,
+                        &snapshot,
+                        &cancel,
+                        &budget,
+                    )?;
                     source.verify_owned(&closed, &local_closed, &cancel, &budget)?;
                     live(&local_closed, &cancel)?;
                     Ok::<_, Error>(tile)
