@@ -67,9 +67,12 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
     var documentKind by remember{mutableStateOf(EditableKind.Pdf)}
     var documentPassword by remember{mutableStateOf("")}
     var documentCopy by remember{mutableStateOf<DocumentExport?>(null)}
+    var showImageSource by remember { mutableStateOf(false) }
+    var largeJpegSrgb by rememberSaveable { mutableStateOf(false) }
+    var largeJpegPickerOpen by rememberSaveable { mutableStateOf(false) }
     val airModalOwner = remember(editor) { Any() }
     val airModalActive = showExport || selectionPicker != null || pickerTicketId != null || cameraSaveToken != null ||
-        cameraDiscardToken != null || documentUri != null || documentCopy != null
+        cameraDiscardToken != null || documentUri != null || documentCopy != null || showImageSource || largeJpegPickerOpen
     DisposableEffect(editor, airModalActive) {
         editor.airModal(airModalOwner, airModalActive)
         onDispose { editor.airModal(airModalOwner, false) }
@@ -99,7 +102,34 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
         }},confirmButton={TextButton({val uri=documentUri;val password=documentPassword.takeIf{it.isNotEmpty()};val kind=documentKind;dismissDocumentImport();if(uri!=null)editor.importDocument(uri,kind,if(kind==EditableKind.Pdf)password else null)}){Text("Open")}},dismissButton={TextButton(::dismissDocumentImport){Text("Cancel")}})
     }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { editor.receiveImage(it) } }
+    val largeJpegPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val admitted = largeJpegPickerOpen && largeJpegSrgb
+        largeJpegPickerOpen = false; largeJpegSrgb = false
+        if (uri != null && admitted) editor.receiveGiantImage(uri, assumeUntaggedSrgb = true)
+    }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { editor.receiveImage(it) } }
+    if (showImageSource) AlertDialog(onDismissRequest = { showImageSource = false; largeJpegSrgb = false },
+        title = { Text("Open image file") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Choose regular import for PNG, JPEG, WebP, HEIF, AVIF, BMP or TIFF within the current decoder limits.")
+            Text("Large JPEG uses original-resolution tiles. The selected file must actually be JPEG; its original is saved unchanged.")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(largeJpegSrgb, { largeJpegSrgb = it })
+                Text("For a large JPEG without a color profile, treat colors as sRGB for tiled display.")
+            }
+        } }, confirmButton = {
+            TextButton(onClick = {
+                showImageSource = false
+                largeJpegPickerOpen = true
+                try { largeJpegPicker.launch(arrayOf("image/jpeg")) }
+                catch (_: Exception) { largeJpegPickerOpen = false; largeJpegSrgb = false; editor.transferMessage("A large-JPEG document picker is unavailable.") }
+            }, enabled = largeJpegSrgb) { Text("Large JPEG") }
+        }, dismissButton = {
+            TextButton(onClick = {
+                showImageSource = false; largeJpegSrgb = false
+                try { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/heic", "image/heif", "image/avif", "image/bmp", "image/tiff")) }
+                catch (_: Exception) { editor.transferMessage("An image document picker is unavailable.") }
+            }) { Text("Regular image") }
+        })
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         try {
             val uri = result.data?.data
@@ -154,7 +184,7 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
                     { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     { editor.newCanvas() }, { editor.open(it) },
                     { editor.navigate(WorkbenchScreen.Settings) }, { editor.navigate(WorkbenchScreen.Diagnostics) }, { editor.navigate(WorkbenchScreen.Pairing) },
-                    { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/heic", "image/heif", "image/avif", "image/bmp", "image/tiff")) }, onCamera,
+                    { showImageSource = true }, onCamera,
                     editor.cameraCaptures, editor::retryCamera, { cameraDiscardToken = it }, { token ->
                         if (cameraSaveToken != null) editor.transferMessage("Finish or cancel the pending original-file destination first.")
                         else {
