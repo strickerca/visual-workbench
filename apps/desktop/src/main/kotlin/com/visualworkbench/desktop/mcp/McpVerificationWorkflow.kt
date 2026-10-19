@@ -54,7 +54,7 @@ private fun verificationPng(value:McpInboxPixels):String {
 }
 private data class VerificationMarker(val number:UInt,val bounds:Rect,val point:Point,val refs:List<SemanticReference>)
 private data class VerificationManifest(val info:PackageInfo,val width:UInt,val height:UInt,val scale:Double,
-    val profile:McpCaptureProfile,val markers:List<VerificationMarker>)
+    val outputFrame:Boolean,val profile:McpCaptureProfile,val markers:List<VerificationMarker>)
 
 /** Integer pixel enclosure, retaining the last covered pixel at fractional
  * marker edges. A large marker shows an explicit top-left <=512px region. */
@@ -76,6 +76,7 @@ internal class McpVerificationWorkflow(
     private val newId:()->String,
     private val verificationFactory:(WorkbenchProject,WorkbenchProject,WorkbenchPackageCatalog,WorkbenchMcpInbox)->WorkbenchVerification=::verificationWorkflows,
     private val historyFactory:(WorkbenchProject)->WorkbenchVerificationHistory=::verificationHistory,
+    private val coordinateFactory:suspend(WorkbenchPackageCatalog,VerificationPair)->VerificationCoordinatePair=::verificationCoordinates,
 ) {
     private data class Entry(val original:PackageInfo,val after:PackageInfo,val receipt:McpInboxReceipt,val recapture:McpVerificationRecapture,
         val historical:VerificationReviewSnapshot?=null) {
@@ -89,14 +90,10 @@ internal class McpVerificationWorkflow(
         val bytes=catalog.readFile(info.packageId,info.target,info.manifestSha256,"manifest.json",4u*1024u*1024u)
         val parts=checkedJsonArrayParts(bytes,"markers",512)
         val root=parts.header
-        // Marker boxes are D-space. Until one checked D-to-O mapping is shared
-        // with the package compiler, an output frame cannot be compared with
-        // the retained O-space PNG, even when its dimensions happen to match.
-        val extensions=root["extensions"] as? Map<*,*>
-        require(extensions?.get("image_output")==null)
+        val outputFrame=(root["extensions"] as? Map<*,*>)?.get("image_output")!=null
         fun objectAt(value:Any?):Map<*,*> = value as? Map<*,*> ?: throw McpRefused()
         fun number(value:Any?):Double = (value as? BigDecimal)?.toDouble()?.takeIf{it.isFinite()}?:throw McpRefused()
-        fun rect(value:Any?):Rect {val a=value as? List<*>?:throw McpRefused();require(a.size==4);val v=a.map(::number);require(v[0]>=0&&v[1]>=0&&v[2]>0&&v[3]>0);return Rect(v[0],v[1],v[2],v[3])}
+        fun rect(value:Any?):Rect {val a=value as? List<*>?:throw McpRefused();require(a.size==4);val v=a.map(::number);require(v[0]>=0&&v[1]>=0&&v[2]>0&&v[3]>0&&(v[0]+v[2]).isFinite()&&(v[1]+v[3]).isFinite());return Rect(v[0],v[1],v[2],v[3])}
         require(root["package_id"]==info.packageId)
         val source=objectAt(root["source"]);val compiled=objectAt(root["compiled_for"])
         require(source["project_id"]==info.binding.projectId&&source["document_id"]==info.binding.documentId&&source["asset_hash"]==info.sourceAssetId&&compiled["target"]==info.target)
@@ -120,7 +117,7 @@ internal class McpVerificationWorkflow(
             require(refs.size<=64);VerificationMarker(n,bounds,Point(number(p[0]),number(p[1])),refs)
         }
         require(markers.size.toUInt()==info.markerCount&&markers.map{it.number}==(1..markers.size).map{it.toUInt()})
-        return VerificationManifest(info,width,height,scale,McpCaptureProfile(target,info.includesWindowTitle),markers)
+        return VerificationManifest(info,width,height,scale,outputFrame,McpCaptureProfile(target,info.includesWindowTitle),markers)
     }
     suspend fun profile(original:PackageInfo):McpCaptureProfile=manifest(original).profile
     suspend fun history(after:String?):VerificationReviewHistoryPage {
@@ -166,7 +163,9 @@ internal class McpVerificationWorkflow(
         checkHistory(expected)
         require(entries.size<32||receipt.receiptId in entries)
         val relation=McpVerificationRecapture(McpVerificationPackage.of(original),McpVerificationPackage.of(after))
-        entries[receipt.receiptId]=Entry(original,after,receipt,relation,expected)
+        val entry=Entry(original,after,receipt,relation,expected)
+        coordinates(entry,manifest(original),manifest(after))
+        entries[receipt.receiptId]=entry
         return receipt
     }
     suspend fun remember(recapture:McpVerificationRecapture,session:String):McpVerificationReceipt {
@@ -192,6 +191,39 @@ internal class McpVerificationWorkflow(
         return e
     }
     fun has(receipt:McpInboxReceipt):Boolean=entries[receipt.receiptId]?.receipt==receipt
+    private suspend fun coordinates(e:Entry,before:VerificationManifest,after:VerificationManifest):VerificationCoordinatePair {
+        val value=coordinateFactory(catalog,e.pair)
+        require(value.pair==e.pair)
+        for((manifest,geometry,recorded) in listOf(
+            Triple(before,value.original,e.receipt.before),Triple(after,value.after,requireNotNull(e.receipt.after)))) {
+            val clean=manifest.info.images.single{it.role=="clean_source"}
+            require(geometry.key==manifest.info.verificationKey()&&geometry.binding==manifest.info.binding&&
+                geometry.sourceAssetId==manifest.info.sourceAssetId&&geometry.sourceWidth==manifest.width&&
+                geometry.sourceHeight==manifest.height&&geometry.hasOutputFrame==manifest.outputFrame&&
+                geometry.imageWidth==clean.width&&geometry.imageHeight==clean.height&&
+                geometry.imageWidth==recorded.width&&geometry.imageHeight==recorded.height)
+        }
+        return value
+    }
+    private suspend fun normalized(e:Entry,side:McpInboxSide,geometry:VerificationImageCoordinates,
+        region:Rect,width:Int,height:Int,assumeSrgb:Boolean,allowDepth:Boolean):McpInboxPixels? {
+        val job=currentCoroutineContext()
+        val pixels=normalizedVerificationPixels(e.receipt.receiptId,e.receipt.receiptBlake3,side,geometry,region,width,height,
+            {tile->inbox.pixels(e.receipt.receiptId,e.receipt.receiptBlake3,side,tile,assumeSrgb,allowDepth)},
+            {!job.isActive})
+        job.ensureActive()
+        return pixels
+    }
+    private suspend fun framedPair(e:Entry,marker:VerificationMarker,dx:Double,dy:Double,
+        geometry:VerificationCoordinatePair,assumeSrgb:Boolean,allowDepth:Boolean):Pair<McpInboxPixels,McpInboxPixels>? {
+        val r=marker.bounds;val shifted=r.copy(x=r.x+dx,y=r.y+dy)
+        if(!verificationInsideCrop(r,geometry.original)||!verificationInsideCrop(shifted,geometry.after))return null
+        val crop=Rect(r.x,r.y,minOf(r.width,512.0),minOf(r.height,512.0))
+        val w=ceil(crop.width).toInt();val h=ceil(crop.height).toInt()
+        val first=normalized(e,McpInboxSide.Before,geometry.original,crop,w,h,assumeSrgb,allowDepth)?:return null
+        val second=normalized(e,McpInboxSide.After,geometry.after,crop.copy(x=crop.x+dx,y=crop.y+dy),w,h,assumeSrgb,allowDepth)?:return null
+        return first to second
+    }
     private suspend fun <T> sources(e:Entry,body:suspend(WorkbenchVerification)->T):T {
         val access=originalAccess
         return if(access==null||!access.owns(e.original))capture.withVerificationSources(e.original,e.after){original,after->body(verificationFactory(original,after,catalog,inbox))}
@@ -208,17 +240,20 @@ internal class McpVerificationWorkflow(
         return value
     }
     private suspend fun translation(e:Entry,marker:VerificationMarker,before:VerificationManifest,after:VerificationManifest,
+        coordinates:VerificationCoordinatePair,
         assumeSrgb:Boolean,allowDepth:Boolean):Pair<String,VerificationMarkerTranslation>? {
-        // Paired lossless tiles share one physical pixel scale. A semantic
-        // translation cannot make differently scaled crops equivalent.
-        if(before.scale!=after.scale)return null
+        val framed=coordinates.original.hasOutputFrame||coordinates.after.hasOutputFrame
+        if(!framed&&before.scale!=after.scale)return null
         fun measured(dx:Double,dy:Double):VerificationMarkerTranslation? {
             val x=round(dx);val y=round(dy)
             // Native pixel instructions snap source deltas to integer edges.
-            // Admit only an identical source delta and paired package pixel
-            // phase, rather than displaying a shift the compiler would round.
+            // The ordinary scalar path additionally requires paired package
+            // pixel phase. Framed packages are reprojected on a common D grid.
             if(!dx.isFinite()||!dy.isFinite()||abs(dx-x)>1e-7||abs(dy-y)>1e-7||
-                abs(x*before.scale-round(x*before.scale))>1e-7||abs(y*before.scale-round(y*before.scale))>1e-7)return null
+                (!framed&&(abs(x*before.scale-round(x*before.scale))>1e-7||
+                    abs(y*before.scale-round(y*before.scale))>1e-7)))return null
+            if(framed&&(!verificationInsideCrop(marker.bounds,coordinates.original)||
+                !verificationInsideCrop(marker.bounds.copy(x=marker.bounds.x+x,y=marker.bounds.y+y),coordinates.after)))return null
             return VerificationMarkerTranslation(marker.number,x,y)
         }
         val a=McpAlignmentSnapshot.fromCheckedPackage(e.original,catalog.readFile(e.original.packageId,e.original.target,e.original.manifestSha256,"semantic.json",4u*1024u*1024u))
@@ -228,7 +263,21 @@ internal class McpVerificationWorkflow(
             val offsets=aligned.map{it.afterBounds.x-it.beforeBounds.x to it.afterBounds.y-it.beforeBounds.y}.distinct()
             if(offsets.size==1){val(dx,dy)=offsets.single();return measured(dx,dy)?.let{"semantic" to it}}
         }
-        if(before.scale!=after.scale||before.markers.size>64)return null
+        if(before.markers.size>64)return null
+        if(framed){
+            val tile=verificationRegistrationRegion(coordinates.original,coordinates.after,marker.bounds)?:return null
+            val width=tile.width.toInt();val height=tile.height.toInt()
+            val p=normalized(e,McpInboxSide.Before,coordinates.original,tile,width,height,assumeSrgb,allowDepth)?:return null
+            val q=normalized(e,McpInboxSide.After,coordinates.after,tile,width,height,assumeSrgb,allowDepth)?:return null
+            val changes=verificationChangeRegions(before.markers.map{it.bounds},tile)
+            val job=currentCoroutineContext()
+            val registered=registerMcpImages(p,q,changes,changes,isCancelled={!job.isActive})
+            job.ensureActive()
+            return if(registered is McpImageRegistrationResult.Aligned)
+                measured(registered.dx.toDouble(),registered.dy.toDouble())?.let{"registration" to it}else null
+        }
+        // Legacy equal-scale path retains its exact physical-pixel search.
+        if(before.scale!=after.scale)return null
         val clean=e.receipt.before;val next=e.receipt.after?:return null
         val width=minOf(clean.width,next.width,512u);val height=minOf(clean.height,next.height,512u)
         if(width<96u||height<96u)return null
@@ -251,10 +300,16 @@ internal class McpVerificationWorkflow(
         assumeSrgb:Boolean=false,allowDepth:Boolean=false):McpMarkerComparison {
         val e=entry(receiptId,receiptHash);require(e.pair.original==original)
         val before=manifest(e.original);val after=manifest(e.after);val marker=before.markers.single{it.number==number}
-        val aligned=translation(e,marker,before,after,assumeSrgb,allowDepth)?:return McpMarkerComparison(e.pair,number,null,null,null)
+        val geometry=coordinates(e,before,after)
+        val aligned=translation(e,marker,before,after,geometry,assumeSrgb,allowDepth)?:return McpMarkerComparison(e.pair,number,null,null,null)
         val(dx,dy)=aligned.second.let{it.dx to it.dy}
         val r=marker.bounds
         if(r.x+dx<0||r.y+dy<0||r.x+dx+r.width>after.width.toDouble()||r.y+dy+r.height>after.height.toDouble())return McpMarkerComparison(e.pair,number,null,null,null)
+        if(geometry.original.hasOutputFrame||geometry.after.hasOutputFrame){
+            val pixels=framedPair(e,marker,dx,dy,geometry,assumeSrgb,allowDepth)
+            return if(pixels!=null)McpMarkerComparison(e.pair,number,aligned.first,pixels.first,pixels.second)
+                else McpMarkerComparison(e.pair,number,null,null,null)
+        }
         val clean=e.receipt.before;val next=requireNotNull(e.receipt.after)
         val first=verificationCropRegion(r,before.scale,clean.width,clean.height)?:return McpMarkerComparison(e.pair,number,null,null,null)
         val second=verificationCropRegion(r.copy(x=r.x+dx,y=r.y+dy),after.scale,next.width,next.height)?:return McpMarkerComparison(e.pair,number,null,null,null)
@@ -267,9 +322,14 @@ internal class McpVerificationWorkflow(
         val e=entry(expected.pair.receiptId,expected.pair.receiptBlake3);require(e.pair==expected.pair)
         require(expected.markers.none{it.verdict==VerificationVerdict.Pending})
         val before=manifest(e.original);val after=manifest(e.after)
+        val geometry=coordinates(e,before,after)
         val translations=expected.markers.filter{it.verdict==VerificationVerdict.Fail}.map{review->
             currentCoroutineContext().ensureActive()
-            translation(e,before.markers.single{it.number==review.originalNumber},before,after,assumeSrgb,allowDepth)?.second?:throw McpRefused()
+            val marker=before.markers.single{it.number==review.originalNumber}
+            val measured=translation(e,marker,before,after,geometry,assumeSrgb,allowDepth)?.second?:throw McpRefused()
+            if((geometry.original.hasOutputFrame||geometry.after.hasOutputFrame)&&
+                framedPair(e,marker,measured.dx,measured.dy,geometry,assumeSrgb,allowDepth)==null)throw McpRefused()
+            measured
         }
         return sources(e){it.compileFailures(expected,translations,packageId,createdAtMs)}
     }
