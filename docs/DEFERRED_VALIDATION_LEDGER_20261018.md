@@ -197,3 +197,23 @@ actual artifact delivery grant. Exact source/hook/log hashes and current limits
 are in evidence/GIANT_DELIVERY_REGION_COMPOSED_20261019.json. R's composed source
 remains explicitly held for its three known defects; no main merge, broad build,
 device/performance/physical gate or worktree disposal occurs in this batch.
+
+## 2026-10-19 Android AND4 ownership resolution
+
+Android398c0f remains held for four reported source findings: hidden active frame
+owner on format refresh failure; cancelled published giant project returned;
+missing URI quarantine retirement; provider destination publication before actual
+native receipt/current intent validation. ANDROID_AND4_TRANSFER_BOUNDARY_20261019.md
+extends its existing owner to ProjectRepository/RasterTransfers and the actual
+instrumented provider fixture, freezing a mandatory suspend receipt validator
+inside staged transfer before provider.open(wt) or any share lease publication.
+It preserves original caller/mutex context, failed destination/scratch cleanup
+and URI lease ownership. Android owner must implement and prove zero writer opens
+for a mismatching native revision. Root is not concurrently editing those leaves.
+
+R e212c275 repair is published/in narrow review; existing R source composition
+is still held, and wireframe geometry-move preview is an explicit limitation,
+not a painted-pixel move implementation. Parent activated E's real conversion,
+G's actual viewport mode and Android's remaining caller grants. Their expensive
+slot/device/aggregate limits remain unchanged. Root next prepares the canonical
+checked-package coordinate helper without editing P/V-owned active leaves.
