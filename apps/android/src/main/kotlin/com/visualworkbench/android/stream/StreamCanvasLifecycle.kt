@@ -39,20 +39,25 @@ internal class StreamCanvasLifecycle<T : Any>(
     private var closing = false
     private var closed = false
     private var presentationUnknown = false
+    private var receiverRetired = false
 
     val displayedFrame: CaptureStreamFrame? get() = shown?.frame
     val losslessDisplayed: Boolean get() = shownLossless
     val sealed: Boolean get() = presentationUnknown || closing
+    val receiverClosed: Boolean get() = receiverRetired
     fun pause() { live = false }
+    /** Stop native receiver operations; retain shown pixels, draft and exact Save
+     * plan until the root joins explicit platform/child retirement. */
+    fun retireReceiver() { receiverRetired = true; live = false }
     fun activate() {
-        check(!sealed && stillAttached() && stream.signal().connectionEpoch == epoch)
+        check(!receiverRetired && !sealed && stillAttached() && stream.signal().connectionEpoch == epoch)
         if (annotation.state.value.frozen == null) live = true
     }
     /** Synchronous: accepted physical DOWN seals admission before waiting for a
      * previously entered draw's actual receipt. Hover/navigation never call it. */
     fun stopLiveDraws() { live = false }
 
-    private fun attached() = !closing && stillAttached() && stream.signal().connectionEpoch == epoch
+    private fun attached() = !receiverRetired && !closing && stillAttached() && stream.signal().connectionEpoch == epoch
     private suspend fun release(owner: CaptureStreamPixels) { owner.close(); native.remove(owner) }
     private suspend fun release(owner: StreamOwnedPixels<T>) { owner.close(); images.remove(owner) }
     private suspend fun replace(image: StreamOwnedPixels<T>, lossless: Boolean) {
@@ -161,12 +166,13 @@ internal class StreamCanvasLifecycle<T : Any>(
 
     suspend fun save(allowDegraded: Boolean = false): WorkflowReceipt = gate.withLock {
         check(!closing)
+        check(!receiverRetired || annotation.state.value.saveRetry || annotation.state.value.saved != null)
         // The Android caller seals/settles its child edits before this call.
         annotation.save(allowDegraded)
     }
 
     suspend fun resume(): Unit = gate.withLock {
-        check(!closing && !presentationUnknown)
+        check(!receiverRetired && !closing && !presentationUnknown)
         check(!annotation.state.value.saving && !annotation.state.value.saveRetry)
         retireChild() // Includes actual child draw/input retirement, outside root mutation mutex.
         annotation.resumeAfterEditorDisposed()

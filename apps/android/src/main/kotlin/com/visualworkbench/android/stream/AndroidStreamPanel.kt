@@ -35,7 +35,8 @@ internal fun AndroidStreamPanel(session: AndroidStreamSession, onClose: () -> Un
     }
     Column(modifier) {
         val frozen = state.frozen != null
-        val mode = if (frozen) "FROZEN" else if (signal.stage == CaptureStreamStage.Live) "LIVE" else "WAITING"
+        val mode = if (frozen) "FROZEN" else if (signal.stage == CaptureStreamStage.Live) "LIVE"
+            else if (signal.stage == CaptureStreamStage.Closed) "CLOSED" else "WAITING"
         Text("$mode · ${signal.sourceName ?: "Computer capture"}", Modifier.padding(horizontal = 12.dp))
         if (!signal.sourceAvailable) Text(if (frozen) "Source unavailable · frozen frame retained" else "Source unavailable",
             Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.caption)
@@ -53,14 +54,15 @@ internal fun AndroidStreamPanel(session: AndroidStreamSession, onClose: () -> Un
             if (issue != null && session.displayRetryAllowed) TextButton(session::retryDisplay) { Text("Retry display") }
             if (frozen) {
                 if (state.draft == null && !state.editorFailed)
-                    TextButton(session::openFrozenEditor, enabled = !state.preparing) { Text("Retry frozen frame") }
+                    TextButton(session::openFrozenEditor, enabled = !state.preparing && signal.stage != CaptureStreamStage.Closed) { Text("Retry frozen frame") }
                 TextButton({ session.save() }, enabled = state.draft != null && !state.saving && !state.editorFailed &&
-                    state.saved == null && (state.lossless || state.saveRetry)) {
+                    state.saved == null && (state.lossless || state.saveRetry) && (signal.stage != CaptureStreamStage.Closed || state.saveRetry)) {
                     Text(if (state.saveRetry) "Retry same Save" else "Save capture")
                 }
                 if (!state.lossless && !state.saveRetry && state.saved == null && signal.stage == CaptureStreamStage.FrozenDegraded)
                     TextButton({ confirmDegraded = true }, enabled = state.draft != null && !state.saving && !state.editorFailed) { Text("Save degraded…") }
-                TextButton({ if (state.saved == null) confirmDiscard = true else session.resume() }, enabled = !state.saving && !state.saveRetry) {
+                TextButton({ if (state.saved == null) confirmDiscard = true else session.resume() },
+                    enabled = !state.saving && !state.saveRetry && signal.stage != CaptureStreamStage.Closed) {
                     Text(if (state.saved == null) "Discard draft…" else "Resume live")
                 }
             } else Text("Touch with the pen to freeze the displayed frame", Modifier.padding(12.dp), style = MaterialTheme.typography.caption)

@@ -9,7 +9,7 @@ Krita remains deferred. This is module implementation, not completed T3.02/A07.
 
 ## Exclusive files and behavior
 
-New Android `stream/**` contains six production leaves:
+New Android `stream/**` contains seven production leaves:
 
 - `StreamCanvasLifecycle`: serializes platform draw/post/native receipt with
   accepted pen freeze. Pending never-shown work receives false; unknown posting
@@ -25,6 +25,14 @@ New Android `stream/**` contains six production leaves:
 - `StreamInputFence`: uses the existing CanvasGestureRouter/StylusInput. Only
   root-admitted real pen DOWN freezes; hover/palm/finger do not. Interrupted input
   is dropped, first-gesture buffering is bounded and replay batches stay <=512.
+  The held first identity survives subsequent physical contacts (including reused
+  pointer IDs) until consumed; ignored contacts cannot send orphan MOVE/UP to the
+  newly attached editor. Lifecycle/viewport interruption explicitly discards it.
+- `StreamSignalObservation`: maps only upstream native SessionFailure.Closed to
+  terminal UI state using the last signal identity; no closed-handle query occurs.
+  Explicit Closed stops collection. Cancellation, other native failures and
+  downstream callback exceptions retain their original meaning. Native reads/new
+  input stop; shown/frozen pixels and Save-retry owners await explicit retirement.
 - `AndroidStreamSession`: owns joined signal/render/freeze/child/save/resume work;
   verified lossless pixels replace only the latest child's background. Existing
   camera, provisional objects and gesture state survive adoption. Live fit camera
@@ -77,11 +85,12 @@ Run `python3 apps/android/src/test/kotlin/com/visualworkbench/android/stream/che
 The offline probe compiles the non-Compose modules against Android SDK signatures,
 actual common stream/draft/state APIs and the existing input code; unrelated
 expect factories and the editor renderer boundary are substituted. It runs the
-18 focused lifecycle/input contract cases. Logs and source hashes stay in its
+original 18 lifecycle/input cases plus 13 router/signal/closed-lifecycle boundary
+regressions (31 total). Logs and source hashes stay in its
 printed `/tmp/vw-android-stream-probe-*` evidence directory. This is not a JNI/app
-build. Final passing evidence is `/tmp/vw-android-stream-probe-aemzcrmg`;
-source manifest SHA-256 `fe1e42b6f94bac7c4275960b720ffd59c9db3660a22ef9f56f88707285ca5ca5`,
-run log SHA-256 `772098b9ecc7546c2601027556d764c850b896fd14415539a3b754c884e6e9bc`.
+build. Final passing evidence is `/tmp/vw-android-stream-probe-jbbtw1ac`;
+source manifest SHA-256 `91013490a4d0d13467f4a502b53b3d5d085fe2ef21522074104c2a6625920327`,
+run log SHA-256 `7043ccdbd7c1ddb2591c9d6b48f91e1c2b91d950f8cc3a604990192ff09c7e8b`.
 Compiled platform/test source hashes match current files. Exclusive staged paths,
 secret-pattern scan, root patch applicability and `git diff --check` pass. Four real Bitmap
 instrumentation cases are authored but unrun. Compose/JNI/app/device/provider

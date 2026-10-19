@@ -57,7 +57,9 @@ fun sessionResources():SessionResources=error("no JNI in offline probe")
 main = output / "ProbeMain.kt"
 main.write_text('''package com.visualworkbench.android.stream
 fun main(){println("lifecycle cases: ${runStreamLifecycleContract()}")
-println("input cases: ${runStreamInputContract()}")}
+println("input cases: ${runStreamInputContract()}")
+println("router/signal boundary cases: ${runStreamBoundaryRepairContract()}")
+println("closed lifecycle cases: ${runStreamClosedLifecycleContract()}")}
 ''')
 sources += [boundary, factory, main]
 platform = repo / "apps/android/src/main/kotlin/com/visualworkbench/android"
@@ -65,6 +67,7 @@ sources += sorted((platform / "stream").glob("*.kt"))
 sources = [path for path in sources if path.name != "AndroidStreamPanel.kt"]
 sources += [platform / "input/CanvasGestureRouter.kt", platform / "input/StylusInput.kt"]
 sources += [Path(__file__).with_name("StreamLifecycleContract.kt"), Path(__file__).with_name("StreamInputContract.kt")]
+sources += [Path(__file__).with_name("StreamBoundaryContract.kt")]
 snapshots = []
 manifest = []
 for index, source in enumerate(sources):

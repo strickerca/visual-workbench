@@ -3,6 +3,7 @@ package com.visualworkbench.android.stream
 import com.visualworkbench.shared.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 
 /** Also callable by the bounded offline compiler probe without Android/JNI. */
 internal fun runStreamLifecycleContract(): Int = runBlocking {
@@ -99,6 +100,43 @@ internal fun runStreamLifecycleContract(): Int = runBlocking {
     }
 }
 
+internal fun runStreamClosedLifecycleContract(): Int = runBlocking {
+    withTimeout(10_000) {
+        run {
+            val f = StreamFixture(); f.owner.drawLive(); f.owner.freeze()
+            val initial = f.receiver.signal()
+            observeStreamSignals(initial, flow { throw SessionFailure(SessionFailureKind.Closed) }) {
+                if (it.stage == CaptureStreamStage.Closed) f.owner.retireReceiver()
+            }
+            f.receiver.signalClosed = true; val reads = f.receiver.signalReads
+            val posts = f.posts
+            f.owner.drawLive(); f.owner.refreshOriginal(); f.owner.drawFrozen()
+            check(runCatching { f.owner.activate() }.isFailure && runCatching { f.owner.freeze() }.isFailure)
+            check(runCatching { f.owner.resume() }.isFailure && runCatching { f.owner.save() }.isFailure)
+            check(f.owner.receiverClosed && f.receiver.signalReads == reads && f.posts == posts + 1)
+            check(f.owner.displayedFrame == f.frame && f.factory.images.none { it.closed })
+            f.owner.close(); check(f.factory.images.all { it.closed } && f.receiver.closes == 1)
+        }
+        run {
+            val f = StreamFixture(); f.owner.drawLive()
+            val initial = f.receiver.signal(); f.receiver.nextFrame = f.frame.copy(frameId = 2uL)
+            val entered = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
+            f.factory.copyHook = { entered.complete(Unit); release.await() }
+            val draw = async { runCatching { f.owner.drawLive() } }; entered.await()
+            observeStreamSignals(initial, flow { throw SessionFailure(SessionFailureKind.Closed) }) {
+                if (it.stage == CaptureStreamStage.Closed) f.owner.retireReceiver()
+            }
+            f.receiver.signalClosed = true; release.complete(Unit)
+            val failure = draw.await().exceptionOrNull()
+            check(failure is SessionFailure && failure.kind == SessionFailureKind.Closed)
+            check(f.receiver.tickets.last().choices == listOf(false) && f.owner.displayedFrame == f.frame)
+            check(f.factory.images.first().closed.not() && f.factory.images.last().closed)
+            f.owner.close(); check(f.factory.images.all { it.closed })
+        }
+        2
+    }
+}
+
 private class StreamFixture {
     val frame = CaptureStreamFrame("capture", 1uL, 1uL, 8u, 8u, 0, 0, 1.0, 1u, 20, 1000, "windows")
     val order = mutableListOf<String>()
@@ -154,9 +192,14 @@ private class Receiver(val frame: CaptureStreamFrame, private val order: Mutable
     var nextFrame = frame; var shown: CaptureStreamFrame? = null
     var stage = CaptureStreamStage.Live; var contacts = 0; var closes = 0; var resumes = 0
     var originalReady = false; var originalFrame = frame
+    var signalClosed = false; var signalReads = 0
     val tickets = mutableListOf<Ticket>(); val backgrounds = mutableListOf<Pixels>()
     override val signals = emptyFlow<CaptureStreamSignal>()
-    override fun signal() = CaptureStreamSignal(1uL, 1uL, 1uL, nextFrame.frameId, stage, 8u, 8u, 256uL, null)
+    override fun signal(): CaptureStreamSignal {
+        signalReads++
+        if (signalClosed) throw SessionFailure(SessionFailureKind.Closed)
+        return CaptureStreamSignal(1uL, 1uL, 1uL, nextFrame.frameId, stage, 8u, 8u, 256uL, null)
+    }
     override suspend fun beginDraw() = Ticket(nextFrame, order) { shown = it }.also { tickets += it }
     override suspend fun frozenBackground(): CaptureFrozenBackground? =
         if (originalReady) Pixels(originalFrame, true).also { backgrounds += it } else null

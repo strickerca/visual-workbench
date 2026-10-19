@@ -16,6 +16,8 @@ internal class StreamInputFence(
     }
     private var child: CanvasGestureSink? = null
     private var contact: Contact? = null
+    private var heldFirst = false
+    private var activeContact = false
     private var opening = false
     private var blocked = false
 
@@ -23,6 +25,8 @@ internal class StreamInputFence(
         check(child == null)
         child = sink; opening = false
         val pending = contact; contact = null
+        heldFirst = false
+        activeContact = !blocked && pending != null && !pending.finished
         if (!blocked && pending != null) {
             sink.beginTool(pending.down, pending.capabilities)
             val chunks = pending.samples.chunked(512)
@@ -32,35 +36,47 @@ internal class StreamInputFence(
             } else chunks.forEach(sink::extendTool)
         }
     }
-    fun detach() { cancelTool(); child = null; opening = false; blocked = false }
-    fun block(value: Boolean) { if (value) cancelTool(); blocked = value }
+    /** Lifecycle interruption also drops a completed but not-yet-consumed stroke. */
+    fun interrupt() { contact = null; activeContact = false; child?.cancelTool() }
+    fun detach() { interrupt(); child = null; opening = false; heldFirst = false; blocked = false }
+    fun block(value: Boolean) { if (value) interrupt(); blocked = value }
     override fun beginTool(sample: PenSample, capabilities: StylusCapabilities) {
+        activeContact = false
         if (blocked) return
-        child?.let { it.beginTool(sample, capabilities); return }
+        child?.let { activeContact = true; it.beginTool(sample, capabilities); return }
+        // A subsequent physical stroke can arrive while the editor factory is
+        // suspended. It must neither replace nor append to the first one, even
+        // when Android reuses the pointer ID. Cancellation leaves a tombstone.
+        if (heldFirst) return
         if (sample.tool != PointerTool.Pen || !admitDown(sample, capabilities)) return
+        heldFirst = true; activeContact = true
         contact = Contact(sample, capabilities)
         if (!opening) { opening = true; freeze() }
     }
     private fun append(samples: List<PenSample>): Boolean {
-        val pending = contact ?: return false
+        val pending = contact?.takeIf { activeContact && !it.finished } ?: return false
         if (samples.size > 4096 - pending.samples.size || samples.any {
                 it.pointerId != pending.down.pointerId || it.tool != PointerTool.Pen || it.timeMs < pending.down.timeMs }) {
-            contact = null; return false
+            contact = null; activeContact = false; return false
         }
         pending.samples += samples
         return true
     }
     override fun extendTool(samples: List<PenSample>) {
         if (blocked) return
-        child?.let { it.extendTool(samples); return }
+        child?.let { if (activeContact) it.extendTool(samples); return }
         append(samples)
     }
     override fun finishTool(samples: List<PenSample>) {
         if (blocked) return
-        child?.let { it.finishTool(samples); return }
+        child?.let { if (activeContact) { activeContact = false; it.finishTool(samples) }; return }
         if (append(samples)) contact?.finished = true
+        activeContact = false
     }
-    override fun cancelTool() { contact = null; child?.cancelTool() }
+    override fun cancelTool() {
+        if (activeContact) contact = null
+        activeContact = false; child?.cancelTool()
+    }
     override fun navigationContact(active: Boolean) { if (!blocked) child?.navigationContact(active) }
     override fun pan(dx: Double, dy: Double) { if (!blocked) child?.pan(dx, dy) }
     override fun pinch(previousX: Double, previousY: Double, nextX: Double, nextY: Double, scale: Double, radians: Double) {

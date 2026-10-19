@@ -50,6 +50,7 @@ internal class AndroidStreamSession private constructor(
     private var actor: Job? = null
     private var operation: Job? = null
     private var closing = false
+    private var receiverRetired = false
     private var foreground = true
     private val mutableSignal = MutableStateFlow(annotation.stream.signal())
     val signal: StateFlow<CaptureStreamSignal> = mutableSignal.asStateFlow()
@@ -70,17 +71,23 @@ internal class AndroidStreamSession private constructor(
         private set
     private lateinit var lifecycle: StreamCanvasLifecycle<Bitmap>
     private val input = StreamInputFence({ sample, capabilities ->
-        foreground && !closing && stillAttached() && ::lifecycle.isInitialized &&
+        foreground && !closing && !receiverRetired && stillAttached() && ::lifecycle.isInitialized &&
             lifecycle.displayedFrame != null && !lifecycle.sealed && admitPenDown(sample, capabilities)
     }, { lifecycle.stopLiveDraws(); openFrozenEditor() })
 
     private fun request() { if (!closing) requests.trySend(Unit) }
+    private fun receiverEnded() {
+        receiverRetired = true; lifecycle.retireReceiver()
+        input.block(true); canvas.cancelInput()
+        mutableIssue.value = "Capture stream closed. The displayed frame and draft remain retained until this view closes."
+    }
     private fun start() {
         actor = scope.launch {
             for (ignored in requests) {
                 try {
                     if (!foreground || closing || !stillAttached()) continue
-                    if (child == null) lifecycle.drawLive()
+                    if (receiverRetired) { if (child != null) lifecycle.drawFrozen() }
+                    else if (child == null) lifecycle.drawLive()
                     else { try { lifecycle.refreshOriginal() } finally { lifecycle.drawFrozen() } }
                     mutableLossless.value = lifecycle.losslessDisplayed
                 } catch (cancel: CancellationException) { throw cancel }
@@ -93,7 +100,10 @@ internal class AndroidStreamSession private constructor(
             }
         }
         observer = scope.launch {
-            annotation.stream.signals.collect { value -> mutableSignal.value = value; request() }
+            observeStreamSignals(mutableSignal.value, annotation.stream.signals) { value ->
+                if (value.stage == CaptureStreamStage.Closed) receiverEnded()
+                mutableSignal.value = value; request()
+            }
         }
         request()
     }
@@ -101,6 +111,7 @@ internal class AndroidStreamSession private constructor(
     fun activate() {
         if (closing || !stillAttached()) return
         foreground = true
+        if (receiverRetired) { input.block(true); request(); return }
         try {
             lifecycle.activate()
             val state = annotation.state.value
@@ -118,7 +129,7 @@ internal class AndroidStreamSession private constructor(
     /** Retry is for this exact frozen frame; native firstContact is idempotently
      * retained by CaptureAnnotationSession, never replaced by a new source. */
     fun openFrozenEditor() {
-        if (closing || operation?.isActive == true || child != null) return
+        if (closing || receiverRetired || operation?.isActive == true || child != null) return
         lifecycle.stopLiveDraws()
         operation = scope.launch {
             var borrowed = false
@@ -132,7 +143,7 @@ internal class AndroidStreamSession private constructor(
                 // delivery can lose it. Close joins this admitted factory.
                 withContext(NonCancellable) { child = openEditor(project, draft, viewport) }
                 currentCoroutineContext().ensureActive()
-                check(stillAttached() && !closing)
+                check(stillAttached() && !closing && !receiverRetired)
                 val editor = checkNotNull(child)
                 editor.viewport(canvas.width, canvas.height, canvas.resources.displayMetrics.density)
                 canvas.scene = checkNotNull(editor.scenes.value).also {
@@ -149,7 +160,7 @@ internal class AndroidStreamSession private constructor(
                         mutableIssue.value = "The draft display changed unexpectedly. Discard this frozen draft or close the stream." }
                 }
                 input.attach(editor.gestures)
-                if (foreground) input.block(false)
+                if (foreground && !receiverRetired) input.block(false)
                 mutableIssue.value = null; request()
             } catch (cancel: CancellationException) {
                 if (borrowed) annotation.editorFailed()
@@ -157,7 +168,7 @@ internal class AndroidStreamSession private constructor(
             } catch (_: Exception) {
                 if (borrowed) annotation.editorFailed()
                 input.block(true)
-                if (!borrowed && annotation.state.value.frozen == null && !lifecycle.sealed && foreground && stillAttached()) {
+                if (!borrowed && !receiverRetired && annotation.state.value.frozen == null && !lifecycle.sealed && foreground && stillAttached()) {
                     // No accepted freeze occurred (for example source changed
                     // before contact). Drop that gesture and wait for a fresh
                     // positively posted frame, rather than stranding live view.
@@ -183,6 +194,9 @@ internal class AndroidStreamSession private constructor(
 
     fun save(confirmedDegraded: Boolean = false) {
         if (closing || operation?.isActive == true || child == null) return
+        if (receiverRetired && !annotation.state.value.saveRetry) {
+            mutableIssue.value = "The capture stream closed. New Save preparation is unavailable; close this view."; return
+        }
         input.block(true)
         operation = scope.launch {
             try {
@@ -196,6 +210,9 @@ internal class AndroidStreamSession private constructor(
     }
     fun resume() {
         if (closing || operation?.isActive == true) return
+        if (receiverRetired) {
+            mutableIssue.value = "The capture stream closed. Close this view before opening another stream."; return
+        }
         if (annotation.state.value.saveRetry) {
             mutableIssue.value = "Retry the same Save before discarding or resuming this draft."; return
         }
@@ -210,8 +227,11 @@ internal class AndroidStreamSession private constructor(
         }
     }
     fun retryDisplay() { request() }
-    val displayRetryAllowed: Boolean get() = ::lifecycle.isInitialized && !lifecycle.sealed && !closing
-    suspend fun requestComputerRegion() { annotation.requestComputerRegion() }
+    val displayRetryAllowed: Boolean get() = ::lifecycle.isInitialized && !receiverRetired && !lifecycle.sealed && !closing
+    suspend fun requestComputerRegion() {
+        if (receiverRetired) throw SessionFailure(SessionFailureKind.Closed)
+        annotation.requestComputerRegion()
+    }
 
     suspend fun close(): Unit = withContext(NonCancellable + Dispatchers.Main.immediate) {
         closing = true; background()
@@ -242,6 +262,7 @@ internal class AndroidStreamSession private constructor(
                     owner.surfaceCharge = resources.reserveForeign(STREAM_ANDROID_SURFACE_BYTES)
                     owner.canvas = AndroidStreamCanvas(context, owner.input, { owner.surfaceCharge != null }, owner::request,
                         { width, height, density ->
+                            owner.input.interrupt()
                             try { owner.child?.viewport(width, height, density) }
                             catch (_: Exception) { annotation.editorFailed(); owner.input.block(true)
                                 owner.mutableIssue.value = "The draft viewport could not update. Discard the frozen draft or close the stream." }
