@@ -10,27 +10,38 @@ pub struct RemoteCompatibilityObservation {
 #[cfg(windows)]
 struct Owned {
     hub: std::sync::Weak<RemoteHub>,
+    context: ObservationContext,
+    source: Arc<vw_remote_host::editor_source::SourceLease>,
+    cancel: Arc<vw_remote_host::process::Cancellation>,
+    observation: vw_remote_host::editor_probe_runner::PaintControlsObservation,
+    receipt: Vec<u8>,
+}
+#[cfg(windows)]
+struct ObservationContext {
+    local_epoch: u64,
+    source_epoch: Option<u64>,
+    grant_revision: u64,
     binding: Binding,
     target: Target,
     identity: vw_remote::profile::ImageIdentity,
     profile_digest: String,
-    source: Arc<vw_remote_host::editor_source::SourceLease>,
-    cancel: Arc<vw_remote_host::process::Cancellation>,
     helper: Arc<vw_remote_host::editor_probe_runner::PaintObservationHelper>,
-    observation: vw_remote_host::editor_probe_runner::PaintControlsObservation,
-    receipt: Vec<u8>,
 }
 
 #[cfg(windows)]
-impl Owned {
-    fn current(&self) -> SessionResult<()> {
-        self.cancel.check().map_err(failure)?;
-        let hub = self.hub.upgrade().ok_or(SessionError::Closed)?;
+impl ObservationContext {
+    fn current(&self, hub: &RemoteHub) -> SessionResult<()> {
         let s = hub.state.lock().map_err(|_| SessionError::Worker)?;
         RemoteHub::current(&s)?;
         if s.host_retiring
+            || s.peer_retiring
+            || s.epoch != self.local_epoch
+            || s.source_epoch != self.source_epoch
+            || s.source_epoch != Some(self.binding.scope.connection_epoch)
+            || s.grant_revision != self.grant_revision
             || s.binding.as_ref() != Some(&self.binding)
             || s.selected.as_ref().map(|v| &v.target) != Some(&self.target)
+            || s.selected.as_ref().map(|v| &v.scope) != Some(&self.binding.scope)
             || s.authority.as_ref().is_none_or(|a| {
                 a.identity != self.identity || a.profile_digest != self.profile_digest
             })
@@ -43,9 +54,17 @@ impl Owned {
         }
         Ok(())
     }
+}
+#[cfg(windows)]
+impl Owned {
+    fn current(&self) -> SessionResult<()> {
+        self.cancel.check().map_err(failure)?;
+        let hub = self.hub.upgrade().ok_or(SessionError::Closed)?;
+        self.context.current(&hub)
+    }
     fn verify_source(&self) -> SessionResult<()> {
         self.source
-            .verify_observation(&self.target, std::process::id())
+            .verify_observation(&self.context.target, std::process::id())
             .map_err(failure)
     }
 }
@@ -110,8 +129,9 @@ impl RemoteCompatibilityObservation {
             owned.current()?;
             owned.verify_source()?;
             let actual = owned
+                .context
                 .helper
-                .observe(&owned.target, owned.source.clone(), &owned.cancel)
+                .observe(&owned.context.target, owned.source.clone(), &owned.cancel)
                 .map_err(failure)?;
             owned.verify_source()?;
             owned.current()?;
@@ -183,10 +203,10 @@ impl LiveSession {
             }
             let binding: Binding =
                 serde_json::from_str(&binding_json).map_err(|_| SessionError::Invalid)?;
-            let (target, identity, profile_digest, helper) = {
+            let context = {
                 let s = self.remote.state.lock().map_err(|_| SessionError::Worker)?;
                 RemoteHub::current(&s)?;
-                if s.host_retiring || s.binding.as_ref() != Some(&binding) {
+                if s.host_retiring || s.peer_retiring || s.binding.as_ref() != Some(&binding) {
                     return Err(SessionError::Closed);
                 }
                 let authority = s
@@ -196,19 +216,25 @@ impl LiveSession {
                 if authority.identity.executable_name != "mspaint.exe" {
                     return Err(SessionError::RemoteUnavailable);
                 }
-                (
-                    s.selected
+                ObservationContext {
+                    local_epoch: s.epoch,
+                    source_epoch: s.source_epoch,
+                    grant_revision: s.grant_revision,
+                    binding,
+                    target: s
+                        .selected
                         .as_ref()
                         .ok_or(SessionError::Closed)?
                         .target
                         .clone(),
-                    authority.identity.clone(),
-                    authority.profile_digest.clone(),
-                    s.runtime
+                    identity: authority.identity.clone(),
+                    profile_digest: authority.profile_digest.clone(),
+                    helper: s
+                        .runtime
                         .as_ref()
                         .and_then(|r| r.observation.clone())
                         .ok_or(SessionError::RemoteUnavailable)?,
-                )
+                }
             };
             let cancel = Arc::new(vw_remote_host::process::Cancellation::default());
             {
@@ -223,33 +249,32 @@ impl LiveSession {
                 }
                 registered.push(Arc::downgrade(&cancel));
             }
+            context.current(&self.remote)?;
             let source = Arc::new(
                 vw_remote_host::editor_source::SourceLease::open_paint_observation(
-                    &target,
+                    &context.target,
                     std::process::id(),
-                    &identity,
+                    &context.identity,
                 )
                 .map_err(failure)?,
             );
             cancel.check().map_err(failure)?;
-            let observation = helper
-                .observe(&target, source.clone(), &cancel)
+            context.current(&self.remote)?;
+            let observation = context
+                .helper
+                .observe(&context.target, source.clone(), &cancel)
                 .map_err(failure)?;
             let receipt = receipt(
-                &identity,
-                &profile_digest,
+                &context.identity,
+                &context.profile_digest,
                 &observation.tool_id,
                 &observation.settings_digest,
             )?;
             let owned = Owned {
                 hub: Arc::downgrade(&self.remote),
-                binding,
-                target,
-                identity,
-                profile_digest,
+                context,
                 source,
                 cancel,
-                helper,
                 observation,
                 receipt,
             };

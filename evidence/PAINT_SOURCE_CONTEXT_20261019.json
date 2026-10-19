@@ -1,0 +1,36 @@
+{
+  "status": "actual source-scope predicate repaired; isolated boundary tests passed",
+  "changes": [
+    "Capture local epoch, source epoch and grant revision from actual hub",
+    "Require exact local/source/grant stamp, selected scope, target, binding, image/profile and helper identity",
+    "Require source epoch equals bound source connection epoch",
+    "Reject host/peer retirement",
+    "Recheck context before source open and again before helper query"
+  ],
+  "checks": {
+    "test_methods": 3,
+    "rejected_mutations": 15,
+    "negative_control": "Removing only local-epoch predicate admits reactivated local epoch with unchanged source/binding; expected failure observed"
+  },
+  "real_types": "cached vw-remote Binding/Scope/Target/ImageIdentity/Authority/CanvasProof",
+  "substitutions": "hub/state/locked-helper boundary; exact production ObservationContext and RemoteHub::current bodies compiled",
+  "limits": [
+    "Not complete native RemoteHub/FFI module compilation",
+    "No source lease/process/Job/IO/JNI/Windows execution",
+    "No new ABI generation or physical acceptance"
+  ],
+  "source_sha256": {
+    "core/crates/vw-ffi/src/session/remote_compatibility.rs": "b6b87f663ae78a3ce3dd1a35f11fe280dcc6d1330ae65c9c7fce711e0b50047c",
+    "tools/tests/check_paint_source_scope.py": "6de9f424b82bd31dc0efdf8af90d10ab498399cf544329d3ad9095c80464d7c5"
+  },
+  "logs": {
+    "/tmp/vw-paint-source-scope-20261019.log": {
+      "sha256": "ee6776647ea775835681c208b3a6e26fb54cdb709ee685bf75a1925f421b72b9",
+      "bytes": 426
+    },
+    "/tmp/vw-paint-source-scope-negative-20261019.log": {
+      "sha256": "b717f568ecd466297e216f89ed022bf733c2138f539ad8543fe81ff85bf22c4c",
+      "bytes": 765
+    }
+  }
+}
