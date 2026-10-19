@@ -1,0 +1,187 @@
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt
+@@ -3,6 +3,7 @@
+ package com.visualworkbench.android.editor
+
+ import android.app.Application
++import com.visualworkbench.android.stream.AndroidStreamSession
+ import android.graphics.Bitmap
+ import android.graphics.Path
+ import android.net.Uri
+@@ -69,6 +70,29 @@
+     private val assistedCatalog: LiteRtReviewedCatalog = LiteRtReviewedCatalog.empty(File(application.noBackupFilesDir,"assisted-selection")),
+     private val assistedPins: AssistedSelectionPins? = null) : AndroidViewModel(application), CanvasGestureSink {
+     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
++    internal var captureStreamOwner by mutableStateOf<AndroidStreamSession?>(null); private set
++    // Root's single acquisition job sets this before receiver allocation and
++    // clears it after installation/retirement, including cancellation cleanup.
++    internal var captureStreamOpening by mutableStateOf(false)
++    internal suspend fun installCaptureStream(owner: AndroidStreamSession, expectedProject: WorkbenchProject,
++        expectedLink: ProjectLink, expectedEpoch: Long, expectedLinkEpoch: Long, expectedDocument: String) {
++        check(captureStreamOwner == null)
++        captureStreamOwner = owner // Own before any stale-result cleanup suspension.
++        if(disposing || project !== expectedProject || link !== expectedLink || epoch != expectedEpoch ||
++            linkEpoch != expectedLinkEpoch || document?.documentId != expectedDocument) {
++            closeCaptureStream(); throw WorkflowFailure(WorkflowFailureKind.Stale)
++        }
++    }
++    private suspend fun closeCaptureStream() {
++        // Root must cancel/join its single acquisition job before reaching here.
++        check(!captureStreamOpening)
++        val owner = captureStreamOwner ?: return
++        owner.close()
++        if(captureStreamOwner === owner) captureStreamOwner = null
++    }
++    internal fun closeCaptureStreamPanel() {
++        scope.launch { try { closeCaptureStream() } catch(error:Exception) { report(error) } }
++    }
+     private val assistedSource=AssistedSourceGate<WorkbenchProject>()
+     internal var assistedActions by mutableStateOf<AssistedSelectionInteraction?>(null); private set
+     internal var assistedPanelOpen by mutableStateOf(false); private set
+@@ -166,7 +190,7 @@
+         diskCacheBytes=2uL*1024uL*1024uL*1024uL,ramCacheBytes=64uL*1024uL*1024uL,
+         failedCreationOwner={ (it as? GiantAndroidCreationFailure)?.owner })
+     internal fun giantSurfaceReady():Boolean = !giantMode || giantOwner.current?.surfaceReserved == true
+-    internal fun canCreateCanvas(hook:suspend()->Unit):Boolean = canvasOwners.canCreate(hook)&&giantSurfaceReady()
++    internal fun canCreateCanvas(hook:suspend()->Unit):Boolean = captureStreamOwner==null&&!captureStreamOpening&&canvasOwners.canCreate(hook)&&giantSurfaceReady()
+     internal fun canvasRendererRetired(hook:suspend()->Unit){canvasOwners.confirmed(hook)}
+     internal fun canvasRendererRetiring(){giantRenderReady=false}
+     internal fun giantRenderCompleted(frame:GiantVisibleFrame<Bitmap>,hook:suspend()->Unit){
+@@ -212,8 +236,8 @@
+     }
+     private val documentOwner:EditorDocuments=EditorDocuments(scope,core,
+         { val p=project;val snapshot=document;if(p!=null&&snapshot!=null&&!disposing)DocumentAttachment(p,snapshot,epoch)else null },
+-        { !disposing&&assistedActions==null&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
+-        { attached,page -> closeAssisted();mutations.withLock {
++        { !disposing&&captureStreamOwner==null&&!captureStreamOpening&&assistedActions==null&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
++        { attached,page -> closeCaptureStream();closeAssisted();mutations.withLock {
+             if(project!==attached.project||epoch!=attached.epoch||!documentRevisionMatches(attached))throw DocumentFailure(DocumentFailureKind.Stale)
+             refreshAdmission.invalidate();documentRefresh.invalidate()
+             cancelTool();imageFrames.detach();workflows.detach();rotation.detach();detachGiant();erasers.detach();selections.detach();documentOwnerDiscardDraw()
+@@ -546,7 +570,7 @@
+         return if(current!=null&&doc!=null&&!disposing)EditorWorkflowAttachment(current,doc,epoch,refreshAdmission.capture().sequence,repository.deviceId)else null
+     }
+     private fun workflowIdle():Boolean = frameIdle() && !imageFrames.state.value.blocksInput
+-    private fun frameIdle():Boolean = !disposing&&assistedActions==null&&!busy&&pending==0&&operationCount==0&&screen==WorkbenchScreen.Canvas&&
++    private fun frameIdle():Boolean = !disposing&&captureStreamOwner==null&&!captureStreamOpening&&assistedActions==null&&!busy&&pending==0&&operationCount==0&&screen==WorkbenchScreen.Canvas&&
+         !navigationContactActive&&!rotation.state.value.active&&!rotationUnavailable()&&gesture==null&&strokes.isEmpty()&&documentPress==null&&!selectionPointer&&!eraserPointer&&
+         sliderGesture==null&&selectedStyleDraft==null&&!showBrush&&!showContext&&textDraft==null&&blockingMessage==null&&
+         !ai.state.value.open&&!ai.needsDecision()&&!instructionEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&
+@@ -1069,7 +1093,7 @@
+             scope.launch {
+                 var instructionSeal = false
+                 try {
+-                    closeAssisted()
++                    closeCaptureStream();closeAssisted()
+                     val closed = mutations.withLock {
+                         if (!instructionEditor.sealIfClean()) {
+                             message = "Save or discard the instruction draft before closing this project."
+@@ -1092,6 +1116,7 @@
+     }
+     fun returnFromSettings() { captureNavigationGeneration++; screen = if (project == null) WorkbenchScreen.Projects else WorkbenchScreen.Canvas }
+     fun onBackground() {
++        captureStreamOwner?.background()
+         interruptAirInput()
+         invalidateAssisted();scope.launch { try{closeAssisted()}catch(error:Exception){report(error)} }
+         remoteCapability?.seal("background")
+@@ -1199,7 +1224,7 @@
+             var instructionSeal = false
+             var completion: ProjectOpenCompletion<WorkbenchProject>? = null
+             try {
+-                closeAssisted()
++                closeCaptureStream();closeAssisted()
+                 val opened=mutations.withLock {
+                     if(disposing)return@withLock false
+                     if (!instructionEditor.sealIfClean()) {
+@@ -1348,6 +1373,7 @@
+         nextWork.start()
+     }
+     private suspend fun closeCurrent() {
++        check(captureStreamOwner==null&&!captureStreamOpening)
+         interruptAirInput(clearView = true, clearBarrel = true)
+         withContext(NonCancellable) {
+         closeAssisted();imageFrames.detach();workflows.detach();rotation.detach()
+@@ -1433,6 +1459,7 @@
+         busy = true
+         connectionJob = scope.launch {
+             try {
++                closeCaptureStream()
+                 mutations.withLock {
+                     if (disposing || project !== current || token != epoch) return@withLock
+                     detachLink()
+@@ -1526,6 +1553,7 @@
+     private fun clearPeerObjects() { peerAdmission++; peerObjects = emptyList() }
+
+     private suspend fun detachLink() {
++        check(captureStreamOwner==null&&!captureStreamOpening)
+         interruptAirInput()
+         withContext(NonCancellable) {
+         agentCapture.detach()
+@@ -1542,9 +1570,9 @@
+     }
+     fun disconnect() {
+         if (busy) return
+-        cancelTool(); scope.launch { try { detachLink(); publish() } catch (error: Exception) { report(error) } }
+-    }
+-    fun revoke(peer: String) { pairing.revoke(peer) { cancelTool(); detachLink(); publish() } }
++        cancelTool(); scope.launch { try { closeCaptureStream();detachLink(); publish() } catch (error: Exception) { report(error) } }
++    }
++    fun revoke(peer: String) { pairing.revoke(peer) { cancelTool(); closeCaptureStream();detachLink(); publish() } }
+     fun matchPeer() { if(workflows.blocksInput()||imageFrames.state.value.blocksInput)return;followPeer = false; matchPeerCamera(); publish() }
+     fun followPeer(enabled: Boolean) { if(workflows.blocksInput()||imageFrames.state.value.blocksInput)return;followPeer = enabled; if (enabled) matchPeerCamera(); publish() }
+     private fun matchPeerCamera() {
+@@ -2565,7 +2593,7 @@
+                 // can miss a project returned while the ViewModel is clearing.
+                 try {
+                     incomingJob?.join()
+-                    try { connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin(); closeAssisted();mutations.withLock { closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision() } }
++                    try { connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin(); closeCaptureStream();closeAssisted();mutations.withLock { closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision() } }
+                     finally {
+                         try { pairing.close() }
+                         finally {
+@@ -2575,7 +2603,7 @@
+                     }
+                 } catch (error: Exception) {
+                     report(error)
+-                    DocumentRetirementRegistry.retain(this@EditorController){closeAssisted();mutations.withLock{closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision()}}
++                    DocumentRetirementRegistry.retain(this@EditorController){closeCaptureStream();closeAssisted();mutations.withLock{closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision()}}
+                 } finally { scope.cancel() }
+             }
+         }
+--- a/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
++++ b/apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt
+@@ -4,6 +4,7 @@
+ import androidx.activity.compose.rememberLauncherForActivityResult
+ import androidx.activity.result.contract.ActivityResultContracts
+ import androidx.activity.result.PickVisualMediaRequest
++import com.visualworkbench.android.stream.AndroidStreamPanel
+ import android.app.Activity
+ import android.content.Intent
+ import androidx.compose.foundation.background
+@@ -165,8 +166,14 @@
+         try { context.startActivity(Intent.createChooser(MediaIntents.sharePng(uri), "Share PNG")) }
+         catch (_: Exception) { editor.shareLaunchFailed(uri) }
+     }
++    val captureStreamModal = remember(editor) { Any() }
++    DisposableEffect(editor, editor.captureStreamOwner, editor.captureStreamOpening) {
++        editor.airModal(captureStreamModal, editor.captureStreamOwner!=null || editor.captureStreamOpening)
++        onDispose { editor.airModal(captureStreamModal, false) }
++    }
+     BackHandler(editor.screen != WorkbenchScreen.Projects) {
+-        if(editor.assistedPanelOpen)editor.dismissAssistedPanel()
++        if(editor.captureStreamOwner!=null)editor.captureStreamOwner?.requestClose()
++        else if(editor.assistedPanelOpen)editor.dismissAssistedPanel()
+         else if(editor.ai.state.value.open)editor.hideAi()
+         else if (editor.textDraft != null) editor.dismissText()
+         else if (editor.showBrush) editor.brushDialog(false)
+@@ -200,7 +207,9 @@
+                         editor.cancelTool();editor.instructionModal(InstructionFocusModal.DocumentImport,true)
+                         try{documentPicker.launch(arrayOf("application/pdf","image/svg+xml","application/postscript","application/illustrator","application/octet-stream"))}catch(_:Exception){editor.instructionModal(InstructionFocusModal.DocumentImport,false);editor.transferMessage("A document picker is unavailable.")}
+                     })
+-                WorkbenchScreen.Canvas -> EditorScreen(editor, { exportDialog(true) }, ::saveSelection,::saveDocument)
++                WorkbenchScreen.Canvas -> editor.captureStreamOwner?.let { stream ->
++                    AndroidStreamPanel(stream, editor::closeCaptureStreamPanel, Modifier.fillMaxSize())
++                } ?: EditorScreen(editor, { exportDialog(true) }, ::saveSelection,::saveDocument)
+                 WorkbenchScreen.Settings -> Column {
+                     TextButton(onClick = { context.startActivity(Intent(context, com.visualworkbench.android.capture.CaptureEntryActivity::class.java)) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Screen capture and accessibility") }
+                     TextButton(onClick = { showAirSettings = !showAirSettings }, modifier = Modifier.heightIn(min = 48.dp)) {
