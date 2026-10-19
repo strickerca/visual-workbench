@@ -42,6 +42,22 @@ internal fun composedSelectionGuideIds(document:DocumentSnapshot,controls:Docume
         }
     }.toSet()
 }
+internal data class GiantDisplayChoice(val binding:WorkflowBinding,val sourceAssetId:String,
+    val content:GiantTileContent,val assumeUntaggedSrgb:Boolean)
+internal fun expectedGiantContent(document:DocumentSnapshot):GiantTileContent =
+    if(document.hasToneAdjustments)GiantTileContent.Composed else GiantTileContent.Source
+internal fun giantDisplayChoice(document:DocumentSnapshot,info:OriginalFormatInfo?,approvedSourceId:String?):GiantDisplayChoice? {
+    val revision=document.render.revision
+    val binding=WorkflowBinding(revision.projectId,document.documentId,revision.hostSeq,revision.stateHash)
+    if(info==null||info.binding!=binding||info.sourceAssetId.length!=64)return null
+    if(info.untagged&&approvedSourceId!=info.sourceAssetId)return null
+    return GiantDisplayChoice(binding,info.sourceAssetId,expectedGiantContent(document),info.untagged)
+}
+internal fun <T:Any> giantChoiceMatches(frame:GiantVisibleFrame<T>,choice:GiantDisplayChoice,
+    epoch:Long,viewport:GiantViewport):Boolean = frame.content==choice.content&&
+    frame.assetId==choice.sourceAssetId&&frame.matches(choice.binding,epoch,viewport)
+internal fun giantChoiceRequiresRetirement(prior:GiantDisplayChoice?,next:GiantDisplayChoice?,forceReplace:Boolean=false):Boolean =
+    forceReplace||prior!=next||next==null
 private data class Drag(val start:Point,val initial:ViewState,val selected:List<RenderItem>,val bounds:Rect?,val resize:Boolean,val pan:Boolean,val binding:RenderBinding,val live:ObjectPreviewLease?=null,val newObject:NewObjectPreviewLease?=null,val tool:Tool=Tool.Select)
 private data class WidthGesture(val binding:RenderBinding,val items:List<RenderItem>,val live:ObjectPreviewLease?)
 private data class CachedExport(val workspace:TransferWorkspace,val receipt:CompletedExport)
@@ -60,14 +76,18 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     private var documentPressRegion=false
     private var documentPressBinding:DocumentFrameBinding?=null
     private var giantMode=false
+    private var giantChoice:GiantDisplayChoice?=null
+    private var approvedGiantSourceId:String?=null
     private var updatingGiant=false
     private val giantDraw=java.util.concurrent.atomic.AtomicReference<GiantVisibleFrame<GiantBitmap>?>(null)
     private val giantOwner=GiantAttachmentOwner<GiantDesktopView>(
         attachment={val p=project;val doc=mutable.value.document;if(p!=null&&doc!=null&&!closing)DocumentAttachment(p,doc,generation)else null},
         create={image,resources,binding,epoch,current->
-            GiantDesktopView.create(scope,image,resources,binding,epoch,current,::cancelInput){value->
-                update{it.copy(giantReady=value.ready,giantIssue=value.message)}
-            }
+            val choice=checkNotNull(giantChoice).also{check(it.binding==binding)}
+            GiantDesktopView.create(scope,image,resources,binding,epoch,
+                {value,attached->current(value,attached)&&giantChoice==choice},::cancelInput,
+                {value->if(giantChoice==choice)update{it.copy(giantReady=value.ready,giantIssue=value.message)}},
+                choice.content,choice.assumeUntaggedSrgb)
         },closeView={it.close()},changed={giantDraw.set(null);update{it.copy(giantReady=false,giantOwnerVersion=it.giantOwnerVersion+1L)}},
         diskCacheBytes=4uL*1024uL*1024uL*1024uL,ramCacheBytes=128uL*1024uL*1024uL,
         failedCreationOwner={ (it as? GiantDesktopCreationFailure)?.owner })
@@ -75,30 +95,67 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     internal fun giantFrameCurrent(frame:GiantVisibleFrame<GiantBitmap>,drawState:EditorState?=null):Boolean {
         val state=mutable.value;val document=state.document?:return false
         val revision=document.render.revision
-        return giantDraw.get()===frame&&state.giantActive&&
+        val choice=giantChoice?:return false
+        val viewport=state.giantViewport?:return false
+        return giantDraw.get()===frame&&state.giantActive&&choice.content==expectedGiantContent(document)&&
+            giantDisplayChoice(document,state.originalFormatInfo,approvedGiantSourceId)==choice&&
             (drawState==null||(drawState.document===document&&drawState.view.camera==state.view.camera&&drawState.precision==state.precision))&&
-            state.giantViewport?.let{frame.matches(WorkflowBinding(revision.projectId,document.documentId,revision.hostSeq,revision.stateHash),generation,it)}==true
+            choice.binding==WorkflowBinding(revision.projectId,document.documentId,revision.hostSeq,revision.stateHash)&&
+            giantChoiceMatches(frame,choice,generation,viewport)&&
+            giantOwner.current?.matchingFrame(choice.binding,generation,viewport)===frame
     }
     private fun giantInputReady():Boolean=giantDraw.get()?.let{giantFrameCurrent(it)}==true
-    private suspend fun detachGiant(){giantOwner.detach();giantMode=false;giantDraw.set(null)}
-    private suspend fun loadGiantBackground(p:WorkbenchProject,doc:DocumentSnapshot){
-        giantMode=true;giantOwner.invalidate();giantDraw.set(null)
-        update{it.copy(background=null,giantActive=true,giantReady=false,giantIssue=null)}
-        if(!colorAssumed){update{it.copy(needsColorConsent=true,backgroundIssue="Tiled display requires an explicit sRGB assumption for this untagged source. The original remains unchanged.")};return}
-        update{it.copy(needsColorConsent=false,backgroundIssue=null)}
-        try{giantOwner.bind(DocumentAttachment(p,doc,generation))?.update(core,mutable.value.view.camera,mutable.value.precision)}
+    private fun composedInputReady(state:EditorState):Boolean =
+        state.composedBackground==state.document?.binding(generation)||
+            giantDraw.get()?.let{it.content==GiantTileContent.Composed&&giantFrameCurrent(it)}==true
+    private suspend fun detachGiant(){giantMode=false;giantChoice=null;giantDraw.set(null);giantOwner.detach()}
+    private suspend fun loadGiantBackground(p:WorkbenchProject,doc:DocumentSnapshot,forceReplace:Boolean){
+        val epoch=generation;val ticket=refreshTicket
+        val info=mutable.value.originalFormatInfo
+        val choice=giantDisplayChoice(doc,info,approvedGiantSourceId)
+        val unapproved=info?.untagged==true&&choice==null
+        giantMode=true;giantDraw.set(null)
+        if(giantChoiceRequiresRetirement(giantChoice,choice,forceReplace)){
+            giantChoice=null;giantOwner.invalidate()
+            try{giantOwner.detach()}catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){update{it.copy(giantActive=true,giantReady=false,giantIssue="The previous tiled renderer could not retire. Its resources remain reserved; reopen after recovery.")};return}
+        }
+        fun current()=!closing&&project===p&&generation==epoch&&refreshTicket==ticket&&mutable.value.document===doc
+        if(!current())return
+        update{it.copy(background=null,composedBackground=null,composedGuideIds=emptySet(),giantActive=true,
+            giantReady=false,giantIssue=null,needsColorConsent=unapproved,
+            backgroundIssue=when{unapproved->"Tiled display requires explicit sRGB consent for this untagged source. The original remains unchanged."
+                choice==null->"The giant source identity could not be verified. Reopen or retry display.";else->null})}
+        if(choice==null)return
+        try{
+            val guides=if(choice.content==GiantTileContent.Composed&&doc.render.items.any{it.shape is Shape.Polygon})
+                composedSelectionGuideIds(doc,documentControlWorkflows(p).snapshot(doc.documentId),choice.binding) else emptySet()
+            if(!current())return
+            giantChoice=choice
+            update{it.copy(composedGuideIds=guides)}
+            giantOwner.bind(DocumentAttachment(p,doc,epoch))?.update(core,mutable.value.view.camera,mutable.value.precision)
+        }
         catch(cancel:CancellationException){throw cancel}
-        catch(_:Exception){update{it.copy(giantIssue="The original is preserved. Its verified tiled display is unavailable. Retry display or reopen the project.")}}
+        catch(error:Exception){if(current())update{it.copy(giantIssue=if(error is GiantImageFailure&&
+            error.kind==GiantImageFailureKind.Unsupported&&choice.content==GiantTileContent.Composed)
+            "Committed giant-image composition is unavailable for this source. The original and saved edits are preserved."
+            else "The original is preserved. Its verified tiled display is unavailable. Retry display or reopen the project.")}}
     }
     private fun syncGiant(){
         if(!giantMode){giantDraw.set(null);return}
+        val state=mutable.value;val doc=state.document?:run{giantDraw.set(null);return}
+        val choice=giantChoice
+        if(choice==null||giantDisplayChoice(doc,state.originalFormatInfo,approvedGiantSourceId)!=choice){giantDraw.set(null);return}
         val view=giantOwner.current?:run{giantDraw.set(null);return}
         if(!updatingGiant){updatingGiant=true;try{view.update(core,mutable.value.view.camera,mutable.value.precision)}
             catch(_:Exception){giantDraw.set(null);mutable.value=mutable.value.copy(giantReady=false,giantIssue="This tiled viewport exceeds its display allowance. Reduce the window or retry display.");return}
             finally{updatingGiant=false}}
-        val state=mutable.value;val doc=state.document?:run{giantDraw.set(null);return}
+        val present=mutable.value
+        val presentDoc=present.document
+        if(presentDoc!==doc||giantChoice!=choice||giantDisplayChoice(doc,present.originalFormatInfo,approvedGiantSourceId)!=choice){giantDraw.set(null);return}
         val revision=doc.render.revision
-        giantDraw.set(state.giantViewport?.let{view.matchingFrame(WorkflowBinding(revision.projectId,doc.documentId,revision.hostSeq,revision.stateHash),generation,it)})
+        giantDraw.set(present.giantViewport?.let{viewport->if(choice.binding==WorkflowBinding(revision.projectId,doc.documentId,revision.hostSeq,revision.stateHash))
+            view.matchingFrame(choice.binding,generation,viewport)?.takeIf{giantChoiceMatches(it,choice,generation,viewport)} else null})
     }
     private val documentOwner:EditorDocuments=EditorDocuments(scope,core,
         { val p=project;val snapshot=mutable.value.document;if(p!=null&&snapshot!=null&&!closing)DocumentAttachment(p,snapshot,generation)else null },
@@ -108,7 +165,6 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
             refreshTicket++;documentRefresh.invalidate()
             cancelInput();frames.beginDeparture();frames.detach();workflows.detach();rotation.detach();detachGiant();erasers.detach();selections.detach();documentOwnerDiscardDraw()
             val next=(attached.project as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
-            validateDrawing(next)
             if(closing||project!==attached.project||generation!=attached.epoch)throw DocumentFailure(DocumentFailureKind.Stale)
             update{it.copy(document=next,documentPage=page,background=null,canvasReady=false,selected=emptySet())}
             selections.bind(attached.project,next,generation,changeSequence,mutable.value.view.camera)
@@ -163,6 +219,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     internal fun aiResultReady(): Boolean {
         val state=mutable.value
         if(state.background!=null&&state.document?.binding(generation)==state.composedBackground)return true
+        if(giantDraw.get()?.takeIf{it.content==GiantTileContent.Composed&&giantFrameCurrent(it)}!=null)return true
         return state.document?.render?.items?.none{it.shape is Shape.Result} != false || aiResultFrame()!=null
     }
     fun openAi() {
@@ -315,7 +372,6 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     private suspend fun adoptWorkflowDocument(a:EditorWorkflowAttachment,target:DocumentSnapshot){
         if(project!==a.project||generation!=a.epoch||mutable.value.document?.binding(generation)!=a.document.binding(a.epoch)||closing)
             throw WorkflowFailure(WorkflowFailureKind.Stale)
-        validateDrawing(target)
         cancelInput();update{it.copy(view=it.view.copy(followPeer=false))}
         var metadataRetired=false
         withDocumentObserversRetired(
@@ -335,7 +391,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
             if(actual.projectId!=expected.projectId||actual.hostSeq!=expected.hostSeq||actual.stateHash!=expected.stateHash||target.documentId !in actual.documentIds){
                 refresh();throw WorkflowFailure(WorkflowFailureKind.Stale)
             }
-            generation++;refreshTicket++;documentRefresh.invalidate();colorAssumed=false;aiRetiring=false
+            generation++;refreshTicket++;documentRefresh.invalidate();colorAssumed=false;approvedGiantSourceId=null;aiRetiring=false
             if(!precisionClosed)precision.reset()
             update{EditorState(document=target,path=it.path,view=it.view.copy(peer=null,followPeer=false),projectEpoch=generation,
                 canvasFocused=it.canvasFocused,sync=it.sync,sessionRole=it.sessionRole,routeWarnings=it.routeWarnings,shareViewport=it.shareViewport,
@@ -476,7 +532,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     }
     private fun transfer(epoch:Long,block:suspend()->Unit):Job?{if(transferJob?.isActive==true){report("A transfer is already running. Finish or cancel it first.");return null};val job=task(epoch,block=block);transferJob=job;return job}
     private suspend fun discardExport(){preparedDrag?.second?.close();preparedDrag=null;val prior=cachedExport;cachedExport=null;update{it.copy(exportReceipt=null,exportCheck=null,dragPrepared=false)};prior?.workspace?.close()}
-    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();frames.beginDeparture();frames.detach();workflows.detach();rotation.detach();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.detach();if(!precisionClosed)precision.reset();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();documentOwner.bind(value,snapshot);fit();bindWorkflows();enterWorkflows();refreshOriginalFormatNotice();loadBackground();refreshRole(value,generation)
+    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);cancelInput();live.close();changes?.cancelAndJoin();discardExport();frames.beginDeparture();frames.detach();workflows.detach();rotation.detach();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.detach();if(!precisionClosed)precision.reset();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;approvedGiantSourceId=null;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();documentOwner.bind(value,snapshot);fit();bindWorkflows();enterWorkflows();refreshOriginalFormatNotice();loadBackground();refreshRole(value,generation)
         changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){giantOwner.observe(event.project);workflows.observe(event.project,event.sequence);frames.observe(event.sequence);erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash)&&mutable.value.composedBackground!=null)update{it.copy(background=null,canvasReady=false)};if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()else bindWorkflows(false)}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
         }finally{withContext(NonCancellable){
             try { if(!adopted)value.close() }
@@ -506,10 +562,10 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
             if(current())update{it.copy(originalFormatNotice="Original-image page information could not be checked. Reopen the project to retry.",originalFormatInfo=null,originalFormatUnavailable=true)}
         }
     }
-    private suspend fun loadBackground(){
+    private suspend fun loadBackground(forceGiantReplace:Boolean=false){
         val p=project?:return;val doc=mutable.value.document?:return;val epoch=generation;val assumed=colorAssumed;val ticket=refreshTicket
         if(documents.state.value.descriptor!=null){detachGiant();update{it.copy(background=null,composedBackground=null,composedGuideIds=emptySet(),needsColorConsent=false,backgroundIssue=null,backgroundFailureKind=null)};return}
-        if(giantDisplayRequired(doc)){loadGiantBackground(p,doc);return}
+        if(giantDisplayRequired(doc)){loadGiantBackground(p,doc,forceGiantReplace);return}
         if(giantMode||giantOwner.retaining)detachGiant()
         val renderBinding=doc.binding(epoch)
         val revision=doc.render.revision
@@ -555,10 +611,18 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
                 else "Image display could not finish. The project remains open; retry the image display.",backgroundFailureKind=null)}
         }
     }
-    fun retryBackground():Job?=task(generation){loadBackground()}
-    fun assumeSrgb(){task(generation){colorAssumed=true;loadBackground()}}
-    private fun validateDrawing(snapshot:DocumentSnapshot){if(snapshot.hasToneAdjustments&&giantDisplayRequired(snapshot))
-        throw UnsupportedOperationException("This giant original has saved tone adjustments that the tiled viewport cannot compose yet. The original and saved edits are preserved.")}
+    fun retryBackground():Job?=task(generation){loadBackground(forceGiantReplace=true)}
+    fun assumeSrgb(){task(generation){
+        val doc=mutable.value.document
+        if(doc!=null&&giantDisplayRequired(doc)){
+            val revision=doc.render.revision
+            val binding=WorkflowBinding(revision.projectId,doc.documentId,revision.hostSeq,revision.stateHash)
+            val info=mutable.value.originalFormatInfo?.takeIf{it.binding==binding&&it.untagged}
+            if(info==null){report("This untagged source could not be verified. Retry display before approving its colors.");return@task}
+            approvedGiantSourceId=info.sourceAssetId
+        }else colorAssumed=true
+        loadBackground()
+    }}
     fun importEditable(path:Path,password:String?,epoch:Long=generation):Job? = transfer(epoch){
         val suffix=path.fileName.toString().substringAfterLast('.',"").lowercase(java.util.Locale.ROOT)
         val kind=when(suffix){"pdf","ai"->EditableKind.Pdf;"svg"->EditableKind.Svg;else->throw DocumentFailure(DocumentFailureKind.Invalid)}
@@ -665,8 +729,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
             SnapshotDecision.Duplicate->{selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);bindWorkflows();return}
             SnapshotDecision.Conflict->{cancelDrag();update{it.copy(canvasReady=false,renderIssue="The same revision returned different content. Reopen the project before editing.")};return}
             SnapshotDecision.Newer->{
-                val issue=try{validateDrawing(snapshot);null}catch(error:UnsupportedOperationException){error.message}
-                cancelDrag();cancelWidth();update{it.copy(document=snapshot,selected=it.selected.intersect(snapshot.render.items.filterNot{item->item.locked}.map{item->item.objectId}.toSet()),preview=emptyMap(),previewStyles=emptyMap(),draft=null,peerFrame=null,exportReceipt=null,exportCheck=null,canvasReady=false,renderIssue=issue)}
+                cancelDrag();cancelWidth();update{it.copy(document=snapshot,selected=it.selected.intersect(snapshot.render.items.filterNot{item->item.locked}.map{item->item.objectId}.toSet()),preview=emptyMap(),previewStyles=emptyMap(),draft=null,peerFrame=null,exportReceipt=null,exportCheck=null,canvasReady=false,renderIssue=null)}
             }
         }
         selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)
@@ -714,7 +777,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     private fun pointerAllowed(panButton:Boolean):Boolean {
         val s=mutable.value
         return !closing&&!rotationUnavailable()&&!workflows.blocksInput()&&!frames.state.value.blocksInput&&!ai.state.value.open&&(panButton||s.tool==Tool.Pan||aiResultReady())&&!s.busy&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&s.document!=null&&(s.background!=null||s.documentFrame!=null||giantInputReady())&&s.backgroundIssue==null&&
-            (!s.document.hasToneAdjustments||s.composedBackground==s.document.binding(generation))&&
+            (!s.document.hasToneAdjustments||composedInputReady(s))&&
             (s.canvasReady||panButton||s.tool==Tool.Pan)&&s.renderIssue==null&&s.textAnchor==null&&!s.exportOpen&&!s.pasteOpen&&instructionAdmission.allows(false,false,false)
     }
     fun precisionDown(raw:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long,pressure:Float=1f,semanticModifier:Boolean=false){
@@ -758,7 +821,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         }finally{precisionContact=false;precision.end()}
     }
     fun precisionHover(raw:Point?){if(!closing)precision.hover(raw)}
-    fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false,physical:Transform?=null,raw:Point=viewPoint){if(rotationUnavailable()||workflows.blocksInput()||frames.state.value.blocksInput||ai.state.value.open||(!panButton&&mutable.value.tool!=Tool.Pan&&!aiResultReady()))return;val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||(s.background==null&&s.documentFrame==null&&!giantInputReady())||s.backgroundIssue!=null||(s.document.hasToneAdjustments&&s.composedBackground!=s.document.binding(generation))||documents.state.value.busy||(!s.canvasReady&&!panButton&&s.tool!=Tool.Pan)||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||(s.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
+    fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false,physical:Transform?=null,raw:Point=viewPoint){if(rotationUnavailable()||workflows.blocksInput()||frames.state.value.blocksInput||ai.state.value.open||(!panButton&&mutable.value.tool!=Tool.Pan&&!aiResultReady()))return;val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||(s.background==null&&s.documentFrame==null&&!giantInputReady())||s.backgroundIssue!=null||(s.document.hasToneAdjustments&&!composedInputReady(s))||documents.state.value.busy||(!s.canvasReady&&!panButton&&s.tool!=Tool.Pan)||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||(s.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
         if(!pan&&s.tool==Tool.Select&&erasers.tools.route()==EraserInputRoute.Editor&&startRotation(s,point,raw,physical?:core.cameraMatrix(s.view.camera)))return
         if(!pan)when(erasers.tools.route()){
             EraserInputRoute.Selection->{selectionPointer=selections.interaction.begin(viewPoint,s.view.camera);return}
