@@ -37,6 +37,20 @@ internal data class GeometryFrame<T>(val binding:RenderBinding,val document:Docu
     fun current(state:EditorState):GeometryFrame<T>? = takeIf{geometryMatches(binding,state)&&document===state.document&&page==state.documentPage}
 }
 internal data class OverlayFrame(val binding:RenderBinding,val source:List<RenderItem>,val entries:Map<String,CanvasGeometry>)
+/** A composed D bitmap owns canonical paint. A transient replacement of an
+ * existing object must first retire that bitmap, or the old pose stays baked in. */
+internal fun composedCanvasCurrent(state:EditorState,binding:RenderBinding):Boolean =
+    state.composedBackground==binding&&state.preview.isEmpty()&&state.previewStyles.isEmpty()&&
+        state.peerFrame?.takeIf{it.binding==binding}?.previews?.items?.none{peer->
+            state.document?.render?.items?.any{it.objectId==peer.objectId}==true
+        }!=false
+
+internal fun canvasItems(document:DocumentSnapshot,composed:Boolean,replacements:Map<String,RenderItem>):List<RenderItem>{
+    val originalIds=document.render.items.mapTo(hashSetOf()){it.objectId}
+    val canonical=if(composed)emptyList() else document.render.items.filterNot{it.shape is Shape.Adjustment}
+    return canonical.map{replacements[it.objectId]?:it}+
+        replacements.values.filter{it.objectId !in originalIds&&it.shape !is Shape.Adjustment}
+}
 internal fun overlayItems(state:EditorState):List<RenderItem>{
     val document=state.document?:return emptyList();val binding=document.binding(state.projectEpoch)
     val items=linkedMapOf<String,RenderItem>()
@@ -95,7 +109,7 @@ internal fun prepareGeometry(item:RenderItem,markerText:TextLayout?=null,checkCa
             markerText?.let{layout->val glyphs=layout.glyphs.flatMap{it.outline}.path(checkCancelled).apply{translate(Offset((shape.point.x-layout.width/2).toFloat(),(shape.point.y+radius*1.15*.35).toFloat()))};passes+=PaintPass(glyphs,PaintKind.StrokeFill)}
         }
         is Shape.Result->Unit
-        Shape.Adjustment->error("Composite objects require the core composite display path")
+        Shape.Adjustment->Unit // Canonical tone metadata is already in the composed D background.
     }
     return CanvasGeometry(passes)
 }
@@ -185,18 +199,19 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
         drawRect(Color(0xff0c1118))
         val current=latest
         val frame=prepared?.current(current)?:return@Canvas
-        val background=current.background
+        val composed=current.composedBackground?.takeIf{composedCanvasCurrent(current,frame.binding)}
+        val background=current.background.takeIf{current.composedBackground==null||composed!=null}
         val giant=latestGiant
         if(current.giantActive&&(giant==null||!controller.giantFrameCurrent(giant,current)))return@Canvas
-        if(background==null&&current.documentFrame==null&&giant==null)return@Canvas
+        if(background==null&&current.documentFrame==null&&giant==null&&current.composedBackground==null)return@Canvas
         if(current.documentFrame!=null&&documentReader?.binding!=current.documentFrame.binding)return@Canvas
         val doc=frame.document
+        if(doc.hasToneAdjustments&&composed==null&&current.preview.isEmpty()&&current.previewStyles.isEmpty())return@Canvas
         val aiFrame=controller.aiResultFrame()
         if(!controller.aiResultReady())return@Canvas
         val currentOverlay=overlay?.takeIf{it.binding==frame.binding&&it.source===latestOverlay}
         val replacements=currentOverlay?.source?.associateBy{it.objectId}.orEmpty()
-        val originalIds=doc.render.items.mapTo(hashSetOf()){it.objectId}
-        val displayed=doc.render.items.map{replacements[it.objectId]?:it}+replacements.values.filter{it.objectId !in originalIds}
+        val displayed=canvasItems(doc,composed!=null,replacements)
         var documentTiles:List<PreparedDocumentTile>?=null
         fun document(camera:Transform,scale:Double,smooth:Boolean){
         withTransform({transform(camera.matrix())}){

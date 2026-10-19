@@ -16,6 +16,7 @@ import com.visualworkbench.desktop.offline.OfflineReviewPanel
     LocalViewsPanel(owner.views,{owner.activate(EditorWorkflowPanel.SavedViews,it)},owner::saveView,owner::restoreView,Modifier.fillMaxWidth())
     LayersPanel(owner.controls,controller::workflowId,editor.selected,{owner.activate(EditorWorkflowPanel.Layers,it)},Modifier.fillMaxWidth())
     ToneControlsPanel(owner.tones,{owner.activate(EditorWorkflowPanel.Tones,it)})
+    ImageFramesPanel(controller.frames,controller::activateFrames,Modifier.fillMaxWidth())
     OutlinedButton({owner.activate(EditorWorkflowPanel.OfflineReview,true)},Modifier.fillMaxWidth().heightIn(min=48.dp),enabled=editor.document!=null){Text("Offline conflicts")}
     if(panel==EditorWorkflowPanel.OfflineReview)AlertDialog(
         onDismissRequest={owner.activate(EditorWorkflowPanel.OfflineReview,false)},
