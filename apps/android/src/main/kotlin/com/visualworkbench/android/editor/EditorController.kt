@@ -150,11 +150,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     private val documentOwner:EditorDocuments=EditorDocuments(scope,core,
         { val p=project;val snapshot=document;if(p!=null&&snapshot!=null&&!disposing)DocumentAttachment(p,snapshot,epoch)else null },
-        { !disposing&&!workflows.blocksInput()&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
+        { !disposing&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
         { attached,page -> mutations.withLock {
             if(project!==attached.project||epoch!=attached.epoch||!documentRevisionMatches(attached))throw DocumentFailure(DocumentFailureKind.Stale)
             refreshAdmission.invalidate();documentRefresh.invalidate()
-            cancelTool();workflows.detach();rotation.detach();detachGiant();erasers.detach();selections.detach();documentOwnerDiscardDraw()
+            cancelTool();imageFrames.detach();workflows.detach();rotation.detach();detachGiant();erasers.detach();selections.detach();documentOwnerDiscardDraw()
             val next=(attached.project as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
             val drawing=prepareEditorObjects(core,next.render.items)
             if(project!==attached.project||epoch!=attached.epoch||disposing)throw DocumentFailure(DocumentFailureKind.Stale)
@@ -233,6 +233,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         private set(value) { if (blockingMessageState != value) interruptAirInput(); blockingMessageState = value }
     var needsColorConsent by mutableStateOf(false); private set
     var originalFormatNotice by mutableStateOf<String?>(null); private set
+    private var originalFormat by mutableStateOf<OriginalFormatInfo?>(null)
     var info by mutableStateOf<ProjectInfo?>(null); private set
     private var documentState by mutableStateOf<DocumentSnapshot?>(null)
     var document: DocumentSnapshot?
@@ -266,6 +267,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     var exportPreflight by mutableStateOf<FilePreflight?>(null); private set
     var cameraCaptures by mutableStateOf<List<CameraCapture>>(emptyList()); private set
     private var checkedExport: ExportOptions? = null
+    private var checkedExportIntent: ExportCallerIntent? = null
     private var pickerTicket: ExportTicket? = null
     private var project: WorkbenchProject? = null
         set(value) { if (field !== value) interruptAirInput(clearView = true, clearBarrel = true); field = value }
@@ -369,7 +371,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private fun aiFrame()=aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),camera,aiPoses())}
     private fun aiResultReady()=document?.render?.items?.none{it.shape is Shape.Result}!=false||aiFrame()!=null
     fun openAi(){
-        if(workflows.blocksInput())return
+        if(workflows.blocksInput()||imageFrames.state.value.blocksInput)return
         if(documents.state.value.descriptor!=null){message="AI image edits require a raster image document.";return}
         if(disposing||busy||pending!=0||document==null||textDraft!=null||showBrush||showContext||blockingMessage!=null)return
         if(instructionEditor.hasUnsaved()){message="Save or discard the instruction draft before opening AI review.";return}
@@ -392,7 +394,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val current=project;val doc=document
         return if(current!=null&&doc!=null&&!disposing)EditorWorkflowAttachment(current,doc,epoch,refreshAdmission.capture().sequence,repository.deviceId)else null
     }
-    private fun workflowIdle():Boolean = !disposing&&!busy&&pending==0&&operationCount==0&&screen==WorkbenchScreen.Canvas&&
+    private fun workflowIdle():Boolean = frameIdle() && !imageFrames.state.value.blocksInput
+    private fun frameIdle():Boolean = !disposing&&!busy&&pending==0&&operationCount==0&&screen==WorkbenchScreen.Canvas&&
         !navigationContactActive&&!rotation.state.value.active&&!rotationUnavailable()&&gesture==null&&strokes.isEmpty()&&documentPress==null&&!selectionPointer&&!eraserPointer&&
         sliderGesture==null&&selectedStyleDraft==null&&!showBrush&&!showContext&&textDraft==null&&blockingMessage==null&&
         !ai.state.value.open&&!ai.needsDecision()&&!instructionEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&
@@ -409,13 +412,30 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         committed={a,receipt->if(project===a.project&&epoch==a.epoch&&!disposing){repository.observeLamport(receipt.revision.nextLamport);refresh(a.project,receipt.revision,a.epoch)}},
         adoptDocument=::adoptWorkflowDocument,report={message=it},
         localViews=::localViewWorkflows,documentControls=::documentControlWorkflows,reviews=::offlineReviews,toneControls=::toneControlWorkflows)
+    internal val imageFrames = ImageFramesInteraction(scope, mutations, ::newId,
+        { current -> val next = current.info(); WorkflowMetadata(newId(), repository.deviceId,
+            repository.instructionLamport(next.nextLamport), System.currentTimeMillis()) },
+        { frameIdle() && !workflows.blocksInput() },
+        { receipt -> val current = project; if (current != null && !disposing && receipt.revision.projectId == info?.projectId) {
+            repository.observeLamport(receipt.revision.nextLamport); refresh(current, receipt.revision, epoch)
+        } }, ::imageFrameWorkflows)
+    internal val frameControlsAvailable: Boolean get() = document?.let { !giantDisplayRequired(it) } == true &&
+        documents.state.value.descriptor == null && originalFormat != null && originalFormat?.rawPreview != true
+    internal fun framePanel(active: Boolean) {
+        if (active && !imageFrames.state.value.active && (!frameControlsAvailable || !workflowIdle())) {
+            message = if (originalFormat?.rawPreview == true) "RAW sensor originals are not editable through the embedded preview."
+                else "Finish the current edit or dialog before opening the output frame."
+            return
+        }
+        if (!imageFrames.active(active)) message = "Apply or discard private frame values before closing."
+    }
     private var rotationGesture:ObjectRotationGesture?=null
     private var rotationDisplay:ObjectRotationHandle?=null
     private var rotationPhysical:Transform?=null
     internal var rotationSnap15 by mutableStateOf(false); private set
-    internal fun rotationSnap(value:Boolean){if(!disposing&&!workflows.blocksInput())rotationSnap15=value}
+    internal fun rotationSnap(value:Boolean){if(!disposing&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput)rotationSnap15=value}
     private fun rotationUnavailable():Boolean=rotation.state.value.busy||rotation.state.value.failure==ObjectRotationFailure.Unconfirmed
-    private fun rotationAdmission():Boolean = !disposing&&!busy&&pending==0&&operationCount==0&&!workflows.blocksInput()&&
+    private fun rotationAdmission():Boolean = !disposing&&!busy&&pending==0&&operationCount==0&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&
         !instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!ai.state.value.open&&
         instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)
     internal val rotation=ObjectRotationInteraction(scope,mutations,::newId,::objectRotationTransforms,
@@ -434,7 +454,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         })
     private fun rotationHandle():ObjectRotationHandle? {
         val doc=document?:return null
-        if(tool!=EditorTool.Select||workflows.blocksInput()||blockingMessage!=null)return null
+        if(tool!=EditorTool.Select||workflows.blocksInput()||imageFrames.state.value.blocksInput||blockingMessage!=null)return null
         val base=objectRotationHandle(doc,setOfNotNull(selected),camera,28.0*density)?:return null
         return rotationDisplay?:base
     }
@@ -444,7 +464,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val token=rotation.begin(handle.pivot,point)?:return false
         rotationGesture=token;rotationDisplay=handle.copy(point=point);rotationPhysical=physical;publish();return true
     }
-    private fun bindWorkflows(){rotation.reconciled();info?.let{repository.observeLamport(it.nextLamport)};workflowAttachment()?.let(workflows::bind)}
+    private fun bindWorkflows(){rotation.reconciled();info?.let{repository.observeLamport(it.nextLamport)};workflowAttachment()?.let(workflows::bind)
+        val current=project;val doc=document
+        if(current!=null&&doc!=null&&!disposing)imageFrames.bind(current,doc,epoch,refreshAdmission.capture().sequence)
+    }
     private suspend fun enterWorkflows(){workflowAttachment()?.let{workflows.enter(it)}}
     private suspend fun adoptWorkflowDocument(a:EditorWorkflowAttachment,target:DocumentSnapshot){
         if(project!==a.project||epoch!=a.epoch||document?.documentId!=a.document.documentId||document?.page!=a.document.page||document?.render?.revision?.sameDocumentRevision(a.document.render.revision)!=true||disposing)
@@ -471,7 +494,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             }},
         ) {
             refreshMutex.withLock {
-                rotation.detach();semanticEditor.detach();instructionEditor.detach();instructionFocus.detach()
+                imageFrames.detach();rotation.detach();semanticEditor.detach();instructionEditor.detach();instructionFocus.detach()
                 metadataRetired=true
                 erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.detach()
                 if(disposing||project!==a.project||epoch!=a.epoch)throw WorkflowFailure(WorkflowFailureKind.Stale)
@@ -484,7 +507,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 document=target;info=target.render.revision;objects=drawing;background=null;scene=null;selected=null
                 transientShape=null;transformed=emptyMap();erased=emptySet();hoverPoint=null;selectedStyleDraft=null
                 pendingPreviews.clear();pendingTransforms.clear();pendingErases.clear()
-                blockingMessage=null;needsColorConsent=false;originalFormatNotice=null;cameraFitted=false;lastViewport=null
+                blockingMessage=null;needsColorConsent=false;originalFormatNotice=null;originalFormat=null;cameraFitted=false;lastViewport=null
                 instructionEditor.resume();semanticEditor.resumeAfterReplacement();metadataRetired=false
                 selections.bind(a.project,target,epoch,refreshAdmission.capture().sequence,camera)
                 erasers.bind(a.project,target,epoch,refreshAdmission.capture().sequence,camera)
@@ -780,11 +803,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             }
         }
     }
-    fun configureExport(value: ExportSelection) { if (!value.encoding.exportAvailable) { message = "BMP export is unavailable until its file metadata can carry the revision and source identity."; return }; if (exportSelection != value) { exportSelection = value; exportPreflight = null; checkedExport = null } }
-    private fun invalidateExport() { exportReady = null; exportPreflight = null; checkedExport = null }
+    fun configureExport(value: ExportSelection) { if (!value.encoding.exportAvailable) { message = "This format is unavailable for an identity-preserving export."; return }; if (exportSelection != value) { exportSelection = value; invalidateExport() } }
+    private fun invalidateExport() { exportReady = null; exportPreflight = null; checkedExport = null; checkedExportIntent = null }
     private fun invalidateViewCheck() {
         if (!applyingAirView) airViewRestore.clear()
-        if (exportSelection.viewOnly) { exportPreflight = null; checkedExport = null }
+        if (exportSelection.viewOnly) invalidateExport()
     }
     suspend fun cleanupTransfer(action: suspend () -> Unit) { cleanupHandoff(action) { message = "Temporary image cleanup could not finish. Retained files have not been deleted; you can retry or discard camera captures from Projects." } }
     private suspend fun refreshCaptures() {
@@ -876,7 +899,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         } else { previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null }
     }
     fun navigate(next: WorkbenchScreen) {
-        if(workflows.blocksInput()){message="Close the current controls or finish their operation first.";return}
+        if(workflows.blocksInput()||imageFrames.state.value.blocksInput){message="Close the current controls or finish their operation first.";return}
         captureNavigationGeneration++ // Explicit navigation invalidates any staged arrival before suspension.
         if(next==WorkbenchScreen.Projects&&!mayCloseAi())return
         if (next == WorkbenchScreen.Projects && instructionEditor.hasUnsaved()) {
@@ -947,8 +970,15 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
     fun importImage(uri: Uri) = openRequest(transfer = true) { repository.importImage(uri) { transferLabel = it } }
+    /** The large-JPEG picker supplies a transient URI grant. The native URI
+     * reader admits it before provider open; no Java-side original is spooled. */
+    fun receiveGiantImage(uri: Uri, assumeUntaggedSrgb: Boolean) {
+        if (!assumeUntaggedSrgb) { message = "Confirm the large-JPEG color assumption before choosing an original."; return }
+        receivePickedImage(uri, {}, true)
+    }
     /** Copy transient picker/share grants while this process owns them; no persistent grant is needed. */
-    fun receiveImage(uri: Uri, cleanup: suspend (ImportOutcome) -> Unit = {}) {
+    fun receiveImage(uri: Uri, cleanup: suspend (ImportOutcome) -> Unit = {}) = receivePickedImage(uri, cleanup, null)
+    private fun receivePickedImage(uri: Uri, cleanup: suspend (ImportOutcome) -> Unit, giantSrgb: Boolean?) {
         if (disposing || incomingJob?.isActive == true) {
             message = "Finish the current image import before opening another image."
             scope.launch { cleanupTransfer { cleanup(ImportOutcome.Retained) }; refreshCaptures() }
@@ -961,8 +991,20 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             try {
                 require(uri.scheme == "content") { "Choose an image from a content provider." }
                 if (importReadiness.awaitReady() && !disposing) {
-                    importer = openRequest(transfer = true) {
-                        val handle = repository.importImage(uri) { transferLabel = it }
+                    importer = openRequest(knownSrgb = giantSrgb == true, transfer = true) {
+                        val handle = if (giantSrgb == null) repository.importImage(uri) { transferLabel = it }
+                        else {
+                            val now = System.currentTimeMillis()
+                            val id = core.newId(now.toULong())
+                            val picked = openAndroidGiantOriginal(getApplication(), GiantUriOptions(
+                                uri.toString(), getApplication<Application>().cacheDir.absolutePath,
+                                2uL * 1024uL * 1024uL * 1024uL, 4uL * 1024uL * 1024uL * 1024uL, giantSrgb))
+                            publishAndroidGiantPicked(picked,
+                                GiantCacheBuildOptions(2uL * 1024uL * 1024uL * 1024uL, 120_000uL, giantSrgb),
+                                { GiantProjectOptions(repository.checkedPath(id), id,
+                                    core.newId(now.toULong()), core.newId(now.toULong()), repository.deviceId,
+                                    "Large JPEG", now, 2uL * 1024uL * 1024uL * 1024uL) }) { transferLabel = it }
+                        }
                         imported = true
                         handle
                     }
@@ -986,7 +1028,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     fun open(id: String) = openRequest { repository.open(id) }
     private fun openRequest(knownSrgb: Boolean = false, transfer: Boolean = false, receivingProject: Boolean = false,
         onOpened: ((WorkbenchProject, Long) -> Unit)? = null, load: suspend () -> WorkbenchProject): Job? {
-        if(workflows.blocksInput()||!workflows.mayLeave())return null
+        if(workflows.blocksInput()||!workflows.mayLeave()||imageFrames.state.value.blocksInput)return null
         if(!mayCloseAi())return null
         if (instructionEditor.hasUnsaved()) {
             message = "Save or discard the instruction draft before opening another project."; screen = WorkbenchScreen.Instructions; return null
@@ -1057,11 +1099,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         captureNavigationGeneration++
         instructionInteractionChanged()
     }
-    private fun receivedCaptureIdle(ownInstructions: Boolean = false, ownSemantics: Boolean = false): Boolean = !disposing && !navigationContactActive && pending == 0 && gesture == null && strokes.isEmpty() &&
+    private fun receivedCaptureIdle(ownInstructions: Boolean = false, ownSemantics: Boolean = false): Boolean = !disposing && !imageFrames.state.value.blocksInput && !navigationContactActive && pending == 0 && gesture == null && strokes.isEmpty() &&
         !ai.state.value.open && !instructionEditor.hasUnsaved() && (ownInstructions || !instructionEditor.state.value.busy) && (ownSemantics || !semanticEditor.state.value.busy) &&
         !selections.state.value.active && !erasers.state.value.active &&
         instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null)
-    internal fun canOpenReceivedCapture(): Boolean = !workflows.blocksInput()&&!busy && captureOpenWork == null && receivedCaptureIdle()
+    internal fun canOpenReceivedCapture(): Boolean = !workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&!busy && captureOpenWork == null && receivedCaptureIdle()
     internal fun autoOpenReceivedCapture(value: ReceivedCapture): Boolean =
         screen == WorkbenchScreen.Canvas && failedCaptureOpen != value.createdHostSeq && canOpenReceivedCapture()
 
@@ -1098,14 +1140,15 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                             val checked = current.info()
                             if (!stillOwned() || !receivedCaptureIdle(ownInstructions = true) || checked.hostSeq != next.render.revision.hostSeq ||
                                 checked.stateHash != next.render.revision.stateHash) return@capture
-                            workflows.detach();rotation.detach();semanticEditor.detach(); instructionEditor.detach(); detachGiant(); selections.detach(); erasers.detach(); retireAi()
+                            imageFrames.detach();workflows.detach();rotation.detach();semanticEditor.detach(); instructionEditor.detach(); detachGiant(); selections.detach(); erasers.detach(); retireAi()
                             // Modal entry may run while the owners above settle.
                             if (!stillOwned() || !receivedCaptureIdle(ownInstructions = true, ownSemantics = true)) return@capture
                             cancelTool(); invalidateExport(); clearPeerObjects(); aiRetiring = false
                             refreshAdmission.invalidate();documentRefresh.invalidate()
                             document = next; info = next.render.revision; objects = drawing; selected = null
                             background = staged; staged = null; blockingMessage = null; needsColorConsent = false; colorAssumed = false
-                            screen = WorkbenchScreen.Canvas; cameraFitted = false; fit();bindWorkflows();enterWorkflows()
+                            originalFormat = null; originalFormatNotice = null
+                            screen = WorkbenchScreen.Canvas; cameraFitted = false; fit();bindWorkflows();enterWorkflows();refreshOriginalFormatNotice()
                             captureArrivals.acknowledge(value); failedCaptureOpen = null
                             message = "Received lossless capture. Its exact original is saved in this project."
                             publish()
@@ -1137,12 +1180,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private suspend fun closeCurrent() {
         interruptAirInput(clearView = true, clearBarrel = true)
         withContext(NonCancellable) {
-        workflows.detach();rotation.detach()
+        imageFrames.detach();workflows.detach();rotation.detach()
         documentOwner.detach()
         if(!precisionClosed)precision.reset()
         scene=null
         exportReady = null
-        exportPreflight = null; checkedExport = null
+        invalidateExport()
         detachGiant()
         erasers.detach(); selections.detach()
         instructionFocus.detach()
@@ -1162,7 +1205,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             finally {
                 document = null; info = null
                 background = null; objects = emptyList(); selected = null; transientShape = null
-                transformed = emptyMap(); erased = emptySet(); scene = null; blockingMessage = null; needsColorConsent = false; originalFormatNotice = null
+                transformed = emptyMap(); erased = emptySet(); scene = null; blockingMessage = null; needsColorConsent = false; originalFormatNotice = null; originalFormat = null
             }
         }
         // Published render snapshots may still reference the old bitmap. Allow
@@ -1189,6 +1232,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         refreshAdmission.observe(change.sequence)) {
                         captureArrivals.changed(current, token)
                         giantOwner.observe(change.project)
+                        imageFrames.observe(change.sequence)
                         workflows.observe(change.project,change.sequence)
                         erasers.observe(change); selections.observe(change)
                         clearPeerObjects(); publish()
@@ -1325,8 +1369,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         cancelTool(); scope.launch { try { detachLink(); publish() } catch (error: Exception) { report(error) } }
     }
     fun revoke(peer: String) { pairing.revoke(peer) { cancelTool(); detachLink(); publish() } }
-    fun matchPeer() { if(workflows.blocksInput())return;followPeer = false; matchPeerCamera(); publish() }
-    fun followPeer(enabled: Boolean) { if(workflows.blocksInput())return;followPeer = enabled; if (enabled) matchPeerCamera(); publish() }
+    fun matchPeer() { if(workflows.blocksInput()||imageFrames.state.value.blocksInput)return;followPeer = false; matchPeerCamera(); publish() }
+    fun followPeer(enabled: Boolean) { if(workflows.blocksInput()||imageFrames.state.value.blocksInput)return;followPeer = enabled; if (enabled) matchPeerCamera(); publish() }
     private fun matchPeerCamera() {
         val view = connection?.peerViewport?.takeIf { it.documentId == document?.documentId && it.corners.size == 4 } ?: return
         val first = view.corners[0]; val next = view.corners[1]
@@ -1354,7 +1398,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
 
     private suspend fun refreshOriginalFormatNotice() {
-        if(documents.state.value.descriptor!=null){originalFormatNotice=null;return}
+        if(documents.state.value.descriptor!=null){originalFormatNotice=null;originalFormat=null;return}
         val owner = project ?: return
         val formats = owner as? WorkbenchOriginalFormats ?: return
         val snapshot = document ?: return
@@ -1365,12 +1409,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         fun current(): Boolean = !disposing && project === owner && epoch == token && refreshAdmission.accepts(ticket) &&
             document?.let { it.documentId == binding.documentId && originalFormatRevisionMatches(it.render.revision, binding) } == true
         if (!current()) return
-        originalFormatNotice = null
+        originalFormatNotice = null; originalFormat = null
         try {
             val receipt = formats.originalFormatInfo(binding)
             currentCoroutineContext().ensureActive()
             validateOriginalFormatInfo(receipt, binding)
-            if (current()) originalFormatNotice = originalFormatNotice(receipt)
+            if (current()) { originalFormat = receipt; originalFormatNotice = originalFormatNotice(receipt) }
         } catch (cancel: CancellationException) { throw cancel }
         catch (_: Exception) {
             currentCoroutineContext().ensureActive()
@@ -1423,7 +1467,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     fun assumeSrgb() {
         if (busy || !needsColorConsent) return
-        colorAssumed = true; busy = true; exportPreflight = null; checkedExport = null
+        colorAssumed = true; busy = true; invalidateExport()
         scope.launch { try { loadBackground() } catch (error: Exception) { report(error) } finally { busy = false } }
     }
 
@@ -1523,13 +1567,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                                    val revision: ProjectInfo? = null, val newObjectId: String? = null,
                                    val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false,val physical:Transform=Transform())
 
-    internal fun precisionInputAllowed():Boolean = !disposing&&!rotationUnavailable()&&!workflows.blocksInput()&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
+    internal fun precisionInputAllowed():Boolean = !disposing&&!rotationUnavailable()&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
         !instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&
         !ai.state.value.open&&aiResultReady()&&blockingMessage==null&&textDraft==null&&!showBrush&&!showContext&&instructionAdmission.allows(false,false,false,false)&&
         document?.let{background!=null||documentOwner.matchingFrame(it,epoch)!=null||giantInputReady(it)}==true
     override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
         interruptAirInput()
-        if(rotationUnavailable()||workflows.blocksInput()||ai.state.value.open||!aiResultReady())return
+        if(rotationUnavailable()||workflows.blocksInput()||imageFrames.state.value.blocksInput||ai.state.value.open||!aiResultReady())return
         val retainPolygon = !selectionPointer && !eraserPointer && gesture == null && documentPress == null &&
             precisionInputAllowed() && erasers.tools.route(rawSample.tool == PointerTool.Eraser) == EraserInputRoute.Selection &&
             selections.interaction.canResumePolygonContact(camera)
@@ -1866,7 +1910,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                      createdAtMs: Long = System.currentTimeMillis()) {
         val current = project ?: return
         if (commands.isEmpty()) return
-        if(rotationUnavailable()||workflows.blocksInput()){finishRemotePreview(previewLink,gestureId,true);message="Finish or close the current controls before editing.";return}
+        if(rotationUnavailable()||workflows.blocksInput()||imageFrames.state.value.blocksInput){finishRemotePreview(previewLink,gestureId,true);message="Finish or close the current controls before editing.";return}
         if (operationCount >= 32) { finishRemotePreview(previewLink, gestureId, true); message = "The edit queue is full. Try the edit again after saving finishes."; return }
         val token = epoch
         val options = editOptions(commands.sumOf { when (it) { is EditCommand.SetText -> 3; is EditCommand.SetStyle -> 2; else -> 1 } })
@@ -1914,7 +1958,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         refreshOriginalFormatNotice()
         instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
         if (exportReady?.matches(info, document) != true) exportReady = null
-        if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq) { exportPreflight = null; checkedExport = null }
+        if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq) {
+            exportPreflight = null; checkedExport = null; checkedExportIntent = null
+        }
         if (objects.none { it.item.objectId == selected }) selected = null
         publish()
         }
@@ -1959,7 +2005,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     override fun undo() = undoRedo(false)
     override fun redo() = undoRedo(true)
     private fun undoRedo(redo: Boolean) {
-        if (busy) return
+        if (busy || workflows.blocksInput() || imageFrames.state.value.blocksInput) return
         cancelTool()
         if (pending != 0) { message = "Wait for the current edit to finish before undo or redo."; return }
         val current = project ?: return
@@ -2050,18 +2096,38 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             allowDepthReduction = selection.allowDepthReduction, assumeUntaggedSrgb = colorAssumed)
     }
     fun prepareExport() {
-        if (busy || pending != 0) return
+        if (busy || pending != 0 || imageFrames.state.value.blocksInput || workflows.blocksInput()) return
         val current = project ?: return
         val doc = document ?: return
-        val options = try { exportOptions(doc, exportSelection) } catch (error: Exception) { report(error); return }
-        busy = true; cancelTool(); exportPreflight = null; checkedExport = null
+        val selection = exportSelection
+        val view = camera
+        val source = try { exportOptions(doc, selection) } catch (error: Exception) { report(error); return }
+        val revision = doc.render.revision
+        val binding = WorkflowBinding(revision.projectId, doc.documentId, revision.hostSeq, revision.stateHash)
+        val token = epoch
+        busy = true; cancelTool(); invalidateExport()
         val job = scope.launch {
             try {
                 transferLabel = "Checking image dimensions, color and export limits…"
-                val result = mutations.withLock { repository.preflight(current, options) }
-                if (result.revision.stateHash == info?.stateHash && result.revision.hostSeq == info?.hostSeq) { exportPreflight = result; checkedExport = options }
-                else message = "The project changed during the check. Check the export again."
+                val checked = mutations.withLock {
+                    if (project !== current || epoch != token || document !== doc || exportSelection != selection ||
+                        (selection.viewOnly && camera != view) || info?.stateHash != binding.stateHash || info?.hostSeq != binding.hostSeq)
+                        throw WorkflowFailure(WorkflowFailureKind.Stale)
+                    val (projected, geometry) = projectExportOptions(current, binding, source)
+                    val intent = ExportCallerIntent(current, token, doc.page, view, selection, binding, source, projected, geometry)
+                    if (!intent.matches(project, epoch, document, info, camera, exportSelection))
+                        throw WorkflowFailure(WorkflowFailureKind.Stale)
+                    val result = repository.preflight(current, projected)
+                    if (result.width != geometry.encodedWidth || result.height != geometry.encodedHeight ||
+                        result.revision.projectId != binding.projectId || result.revision.hostSeq != binding.hostSeq ||
+                        result.revision.stateHash != binding.stateHash) throw WorkflowFailure(WorkflowFailureKind.Stale)
+                    intent to result
+                }
+                if (checked.first.matches(project, epoch, document, info, camera, exportSelection)) {
+                    checkedExportIntent = checked.first; checkedExport = checked.first.options; exportPreflight = checked.second
+                } else message = "The project changed during the check. Check the export again."
             } catch (cancel: CancellationException) { throw cancel }
+            catch (error: WorkflowFailure) { message = "The project or output frame changed. Check this export again." }
             catch (error: Exception) { report(error) }
             finally { busy = false; transferLabel = null; transferJob = null }
         }
@@ -2071,8 +2137,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (pickerTicket != null) { message = "Finish or cancel the pending file destination before starting another export."; return null }
         val current = info ?: return null
         val options = checkedExport ?: return null
+        val intent = checkedExportIntent ?: return null
         val checked = exportPreflight ?: return null
-        if (busy || pending != 0 || checked.revision.stateHash != current.stateHash || checked.revision.hostSeq != current.hostSeq) return null
+        if (busy || pending != 0 || imageFrames.state.value.blocksInput || workflows.blocksInput() ||
+            checked.revision.stateHash != current.stateHash || checked.revision.hostSeq != current.hostSeq ||
+            !intent.matches(project, epoch, document, info, camera, exportSelection) || options != intent.options ||
+            checked.width != intent.geometry.encodedWidth || checked.height != intent.geometry.encodedHeight) return null
         return ExportTicket(newId(), current.projectId, options.documentId, current.hostSeq, current.stateHash, options, exportSelection.encoding).also { pickerTicket = it }
     }
     fun cancelExportTicket(id: String?) { if (pickerTicket?.id == id) pickerTicket = null }
@@ -2080,8 +2150,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val ticket = pickerTicket?.takeIf { it.id == ticketId }
         cancelExportTicket(ticketId)
         if (uri.scheme != "content") { message = "The export destination must be a document provider."; return }
-        if (disposing || busy || pending != 0 || project == null || document == null || checkedExport == null ||
-            ticket?.matches(info, document, checkedExport) != true) {
+        if (disposing || busy || pending != 0 || imageFrames.state.value.blocksInput || workflows.blocksInput() ||
+            project == null || document == null || checkedExport == null ||
+            ticket?.matches(info, document, checkedExport) != true ||
+            checkedExportIntent?.matches(project, epoch, document, info, camera, exportSelection) != true) {
             message = "The project or export settings changed while choosing a destination. Check the export again."
             scope.launch { try { repository.discardDestination(uri) } catch (error: Exception) { report(error) } }
             return
@@ -2090,15 +2162,17 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     fun sharePng() = exportImage(null, sharing = true)
     private fun exportImage(uri: Uri?, sharing: Boolean) {
-        if (busy || pending != 0) return
+        if (busy || pending != 0 || imageFrames.state.value.blocksInput || workflows.blocksInput()) return
         val current = project ?: return
         val doc = document ?: return
+        val intent = checkedExportIntent ?: run { message = "Check the export settings before saving or sharing."; return }
         val options = checkedExport ?: run { message = "Check the export settings before saving or sharing."; return }
         if (sharing && options.format != ImageFormat.Png8 && options.format != ImageFormat.Png16) {
             message = "Choose PNG 8-bit or PNG 16-bit to share an image."; return
         }
-        if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq || options.documentId != doc.documentId) {
-            exportPreflight = null; checkedExport = null; message = "The project changed. Check the export again."; return
+        if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq ||
+            options != intent.options || !intent.matches(current, epoch, doc, info, camera, exportSelection)) {
+            invalidateExport(); message = "The project or output frame changed. Check the export again."; return
         }
         if (doc.bitDepth > 8u && options.format == ImageFormat.Png8 && !options.allowDepthReduction) {
             message = "Choose PNG 16-bit or explicitly allow reduction to 8-bit."; return
@@ -2106,25 +2180,43 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         exportReady = null
         busy = true; cancelTool()
         val job = scope.launch {
+            var pendingShare: MediaHandoff.Lease? = null
             try {
                 val result = mutations.withLock {
+                    if (!intent.matches(project, epoch, document, info, camera, exportSelection))
+                        throw WorkflowFailure(WorkflowFailureKind.Stale)
                     if (sharing) {
                         val shared = repository.sharePng(current, options) { transferLabel = it }
-                        shareLease = shared.first; shareUri = shared.first.uri
+                        pendingShare = shared.first
                         shared.second
                     } else repository.exportImage(checkNotNull(uri), current, options) { transferLabel = it }
                 }
+                if (!intent.matches(project, epoch, document, info, camera, exportSelection) ||
+                    result.revision.projectId != intent.binding.projectId ||
+                    result.revision.hostSeq != intent.binding.hostSeq || result.revision.stateHash != intent.binding.stateHash)
+                    throw WorkflowFailure(WorkflowFailureKind.Stale)
                 exportReady = ExportReady(result.revision.projectId, doc.documentId, result.revision.stateHash,
-                    result.revision.hostSeq, options.region?.width?.toUInt() ?: doc.width,
-                    options.region?.height?.toUInt() ?: doc.height, result.blake3)
+                    result.revision.hostSeq, intent.geometry.encodedWidth, intent.geometry.encodedHeight, result.blake3)
+                if (sharing) {
+                    shareLease = pendingShare
+                    shareUri = pendingShare?.uri
+                    pendingShare = null
+                }
                 message = "${exportSelection.encoding.label} exported at revision ${result.revision.hostSeq}. The original image is unchanged."
             } catch (cancel: CancellationException) {
                 message = "Export canceled. The original and saved edits are unchanged."
                 throw cancel
+            } catch (error: WorkflowFailure) {
+                message = "The project or output frame changed. Check the export again."
             } catch (error: CoreFailure) {
                 message = rasterFailure(error, importing = false)
             } catch (error: Exception) { report(error) }
-            finally { busy = false; transferLabel = null; transferJob = null }
+            finally {
+                withContext(NonCancellable) {
+                    pendingShare?.let { cleanupTransfer { MediaHandoff(getApplication()).remove(it, camera = false) } }
+                }
+                busy = false; transferLabel = null; transferJob = null
+            }
         }
         transferJob = job.takeIf { it.isActive }
     }
@@ -2164,6 +2256,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 else -> "The image transfer could not finish safely. The original and edits are intact."
             }
             is ImageTooLarge, is RasterTransferFailure -> error.message
+            is GiantImageFailure -> when (error.kind) {
+                GiantImageFailureKind.Limit, GiantImageFailureKind.Memory, GiantImageFailureKind.Backpressure ->
+                    "This large JPEG exceeds the available tile, memory or scratch-storage allowance. Its source was not reduced."
+                GiantImageFailureKind.Unsupported -> "This device's tiled producer supports JPEG originals only. Choose regular import for a supported smaller image."
+                GiantImageFailureKind.Storage -> "The large JPEG could not be saved safely. Check free space and try again."
+                GiantImageFailureKind.Cancelled -> "Large-JPEG import was canceled."
+                else -> "The large JPEG could not be verified or opened. Existing projects are unchanged."
+            }
             is CoreFailure -> when (error.kind) {
                 CoreFailureKind.Backpressure -> "The core is at its resource limit. The unfinished action was canceled; saved work is intact."
                 CoreFailureKind.Storage -> "The edit could not be saved. Check available storage and try again."
@@ -2177,7 +2277,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     override fun onCleared() {
         interruptAirInput(clearView = true, clearBarrel = true); resetAirRemoteMotion(); airActionRouter.close(); airDispatcher.close()
-        workflows.beginDeparture();rotation.cancel()
+        imageFrames.beginDeparture();workflows.beginDeparture();rotation.cancel()
         giantOwner.invalidate()
         disposing = true
         remoteCapability?.let{it.seal("background");retireRemoteEditLater(it)}
@@ -2197,7 +2297,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 // can miss a project returned while the ViewModel is clearing.
                 try {
                     incomingJob?.join()
-                    try { connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin(); mutations.withLock { closeCurrent();workflows.close();rotation.close();documentOwner.close();closePrecision() } }
+                    try { connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin(); mutations.withLock { closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision() } }
                     finally {
                         try { pairing.close() }
                         finally {
@@ -2207,7 +2307,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     }
                 } catch (error: Exception) {
                     report(error)
-                    DocumentRetirementRegistry.retain(this@EditorController){mutations.withLock{closeCurrent();workflows.close();rotation.close();documentOwner.close();closePrecision()}}
+                    DocumentRetirementRegistry.retain(this@EditorController){mutations.withLock{closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision()}}
                 } finally { scope.cancel() }
             }
         }
