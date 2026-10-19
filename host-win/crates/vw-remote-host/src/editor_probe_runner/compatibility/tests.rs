@@ -242,6 +242,122 @@ fn unresolved_canvas_private_cleanup_requires_job_and_io_join() -> Result<()> {
     drop(source_fence);
     Ok(())
 }
+#[test]
+fn failed_run_canvas_state_cannot_be_promoted_by_cleanup() {
+    assert_eq!(
+        canvas_from_owned_facts(false, true, false, false, true),
+        PaintDrawingCanvasState::RecoveryNeeded
+    );
+    assert_eq!(
+        canvas_from_owned_facts(true, true, false, false, true),
+        PaintDrawingCanvasState::RecoveryNeeded
+    );
+    assert_eq!(
+        canvas_from_owned_facts(false, false, true, false, true),
+        PaintDrawingCanvasState::Unknown
+    );
+    assert_eq!(
+        canvas_from_owned_facts(false, false, false, false, true),
+        PaintDrawingCanvasState::Unknown
+    );
+    assert_eq!(
+        canvas_from_owned_facts(true, false, false, false, true),
+        PaintDrawingCanvasState::Restored
+    );
+    assert_eq!(
+        canvas_from_owned_facts(false, false, false, false, false),
+        PaintDrawingCanvasState::Unchanged
+    );
+}
+#[test]
+fn retirement_during_running_attempt_keeps_unknown_and_seals_future_start() -> Result<()> {
+    let retirement = PaintDrawingRunRetirement::new();
+    let handle = PaintDrawingRetirementHandle(retirement.clone());
+    let running = Running::begin(retirement.clone())?;
+    assert!(matches!(handle.retire(), Err(Error::RetirementPending)));
+    assert_eq!(handle.status().canvas, PaintDrawingCanvasState::Unknown);
+    drop(running);
+    let done = handle.retire()?;
+    assert_eq!(done.canvas, PaintDrawingCanvasState::Unchanged);
+    assert!(matches!(Running::begin(retirement), Err(Error::Cancelled)));
+    Ok(())
+}
+#[test]
+fn preinput_retirement_closes_grants_and_shuts_down_before_cleanup() -> Result<()> {
+    use std::cell::Cell;
+    struct FailedRun {
+        gate: ipc::AuthorizationGate,
+        uncertain: AtomicBool,
+        unresolved: AtomicBool,
+        killed: Cell<bool>,
+        cleaned: Cell<bool>,
+    }
+    for (uncertain, unresolved, expect_kill) in [
+        (false, false, true),
+        (true, false, false),
+        (false, true, false),
+    ] {
+        let mut run = FailedRun {
+            gate: ipc::AuthorizationGate::new(),
+            uncertain: AtomicBool::new(uncertain),
+            unresolved: AtomicBool::new(unresolved),
+            killed: Cell::new(false),
+            cleaned: Cell::new(false),
+        };
+        assert!(cleanup_after_sealed_shutdown(
+            &mut run,
+            |run| {
+                run.gate
+                    .close_if_safe(&run.uncertain, &run.unresolved, || run.killed.set(true));
+            },
+            |run| {
+                assert_eq!(run.killed.get(), expect_kill);
+                assert_eq!(
+                    run.gate.authorize(&run.uncertain, || Ok(())),
+                    Err(Error::Cancelled)
+                );
+                run.cleaned.set(true);
+                Ok(true)
+            }
+        )?);
+        assert!(run.cleaned.get());
+        assert_eq!(run.killed.get(), expect_kill);
+    }
+    Ok(())
+}
+#[test]
+fn per_run_private_retirement_retries_same_lease_and_seals_late_execution() -> Result<()> {
+    static NEXT: AtomicUsize = AtomicUsize::new(2000);
+    let ordinal = NEXT.fetch_add(1, AtomicOrdering::Relaxed) as u32;
+    let marker = id(std::process::id().wrapping_add(ordinal));
+    let sample = id(std::process::id().wrapping_add(ordinal).wrapping_add(1));
+    let mut lease = PrivateTempLease::create(&marker, &sample, std::process::id())?;
+    let root = lease.root.clone();
+    let png = root.join(format!("{sample}-00")).join("capture-canvas.png");
+    let extra = root.join(format!("{sample}-00")).join("unexpected.txt");
+    fs::write(&png, b"private")?;
+    fs::write(&extra, b"refuse premature cleanup")?;
+    assert_eq!(lease.dispose(), Err(Error::Io));
+    assert!(!png.exists());
+    let retention = PaintDrawingRunRetirement::new();
+    retention.retain_private(lease);
+    let handle = PaintDrawingRetirementHandle(retention.clone());
+    assert_eq!(handle.status().private_files_disposed, 1);
+    assert!(matches!(handle.retire(), Err(Error::Io)));
+    let pending = handle.status();
+    assert!(pending.owner_retained);
+    assert_eq!(pending.canvas, PaintDrawingCanvasState::Unchanged);
+    assert_eq!(pending.private_files_disposed, 1);
+    assert!(root.exists());
+    fs::remove_file(extra)?;
+    let done = handle.retire()?;
+    assert!(!done.owner_retained);
+    assert_eq!(done.canvas, PaintDrawingCanvasState::Unchanged);
+    assert_eq!(done.private_files_disposed, 1);
+    assert!(!root.exists());
+    assert!(matches!(Running::begin(retention), Err(Error::Cancelled)));
+    Ok(())
+}
 fn sample_request() -> Request {
     Request {
         schema: 1,
