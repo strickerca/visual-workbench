@@ -67,14 +67,26 @@ internal class RasterTransfers(context: Context, private val handoffFactory: (Co
         var handle: WorkbenchProject? = null
         try {
             stage("Copying the original image…")
-            val title = withContext(Dispatchers.IO) {
+            val (title,kind) = withContext(Dispatchers.IO) {
                 work.create()
+                val title=provider.title(uri)
+                val mime=provider.perform { context.contentResolver.getType(uri) }
+                val kind=ordinaryImportKindForFile(title,mime)
+                require(kind !in setOf(OrdinaryImportKind.Unsupported,OrdinaryImportKind.PdfCompatibleAi)) {
+                    if(kind==OrdinaryImportKind.PdfCompatibleAi) "Open PDF-compatible AI through the document picker."
+                    else "This image file type is unsupported."
+                }
                 val original = work.file("original.bin")
                 copyOriginal(uri, original)
-                provider.title(uri)
+                title to kind
             }
-            stage("Reading the full-resolution original…")
-            handle = streaming.createFile(options(work.file("original.bin").absolutePath, work.root.absolutePath, title))
+            stage(when(kind){
+                OrdinaryImportKind.RawPreview -> "Reading the bounded embedded RAW preview…"
+                OrdinaryImportKind.FlattenedComposite -> "Reading the flattened embedded composite…"
+                else -> "Reading the full-resolution original…"
+            })
+            handle = createOrdinaryImageProject(kind,streaming,
+                options(work.file("original.bin").absolutePath, work.root.absolutePath, title))
             // Cleanup may suspend. Keep ownership until it finishes and caller
             // cancellation is checked, then return without another suspension.
             withContext(NonCancellable + Dispatchers.IO) { work.close() }

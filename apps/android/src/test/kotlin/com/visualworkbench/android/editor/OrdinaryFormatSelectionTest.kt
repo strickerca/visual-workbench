@@ -18,13 +18,23 @@ class OrdinaryFormatSelectionTest {
     }
     @Test fun compositesPreviewsAndAiRequestTheirExplicitImportRoute() {
         for (suffix in listOf("psd", "psb", ".PSD", "PSB")) assertEquals(OrdinaryImportKind.FlattenedComposite, ordinaryImportKind(suffix))
-        for (suffix in listOf("dng", "cr2", "nef", "arw", ".DNG", "CR2", "NEF", "ARW")) assertEquals(OrdinaryImportKind.RawPreview, ordinaryImportKind(suffix))
+        for (suffix in listOf("dng", "cr2", ".DNG", "CR2")) assertEquals(OrdinaryImportKind.RawPreview, ordinaryImportKind(suffix))
+        for (suffix in listOf("nef", "arw", "NEF", "ARW")) assertEquals(OrdinaryImportKind.Unsupported, ordinaryImportKind(suffix))
         for (suffix in listOf("ai", ".AI")) assertEquals(OrdinaryImportKind.PdfCompatibleAi, ordinaryImportKind(suffix))
     }
     @Test fun suffixSelectionDoesNotGuessFromNamesBytesOrUnadmittedRawVariants() {
         for (suffix in listOf("", ".", "..psd", "image.psd", "photo.dng", "dng ", " psb", "raw", "raf", "orf", "rw2", "raw-preview", "image/x-adobe-dng", "II*", "8BPS", "pdf", "svg", "mp4")) {
             assertEquals(OrdinaryImportKind.Unsupported, ordinaryImportKind(suffix))
         }
+    }
+    @Test fun providerNameAndExactMimeSelectOnlyAdmittedRoutes() {
+        assertEquals(OrdinaryImportKind.FlattenedComposite,ordinaryImportKindForFile("portrait.PSD","application/octet-stream"))
+        assertEquals(OrdinaryImportKind.RawPreview,ordinaryImportKindForFile("photo.CR2","application/octet-stream"))
+        assertEquals(OrdinaryImportKind.Image,ordinaryImportKindForFile("Imported image","image/jpeg"))
+        assertEquals(OrdinaryImportKind.RawPreview,ordinaryImportKindForFile("Imported image","image/x-adobe-dng"))
+        assertEquals(OrdinaryImportKind.Unsupported,ordinaryImportKindForFile("photo.NEF","application/octet-stream"))
+        assertEquals(OrdinaryImportKind.PdfCompatibleAi,ordinaryImportKindForFile("drawing.ai","application/pdf"))
+        assertEquals(OrdinaryImportKind.Unsupported,ordinaryImportKindForFile("Imported image","application/octet-stream"))
     }
     @Test fun ordinaryAndCompositeRoutesPreserveTheOwnedStagingRequest() = runBlocking {
         val request = CreateFileProject("project", "project-id", "document-id", "layer-id", "device-id", "fixture", "source", "work", 0L)
