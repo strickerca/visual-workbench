@@ -9,20 +9,36 @@ class GiantViewportSessionTest {
     private fun view(x: Double) = GiantViewport(x,0.0,x+256.0,256.0,1.0,0.0,0.0,1.0)
     private class Source : GiantImage {
         val reads = mutableListOf<GiantTileAddress>()
+        var viewportCalls = 0
         var identity = "a".repeat(64)
         var onRead: suspend () -> Unit = {}
         var closed = false
         var many = false
+        var level: UByte = 0u
         var documentOffset: UInt = 0u
         override suspend fun viewport(view: GiantViewport): GiantViewportPlan {
-            val keys = if(many)(0u..2u).map{GiantTileAddress(0u,it,0u)} else listOf(GiantTileAddress(0u,view.left.toUInt(),0u))
-            return GiantViewportPlan(identity,"b".repeat(64),0u,keys,emptyList())
+            viewportCalls++
+            val keys = if(many)(0u..2u).map{GiantTileAddress(level,it,0u)} else listOf(GiantTileAddress(level,view.left.toUInt(),0u))
+            return GiantViewportPlan(identity,"b".repeat(64),level,keys,emptyList())
         }
         override suspend fun tile(address: GiantTileAddress, foreign: SessionResourceCharge): GiantTilePixels {
             reads += address; onRead()
-            return GiantTilePixels(identity,"b".repeat(64),address,address.x*256u+documentOffset,0u,256u,256u,256u,256u,ByteArray(256*256*4){if(it%4==3)255.toByte() else 0})
+            return pixels(address)
         }
+        fun pixels(address: GiantTileAddress) = GiantTilePixels(identity,"b".repeat(64),address,
+            address.x*256u+documentOffset,0u,256u,256u,256u,256u,
+            ByteArray(256*256*4){if(it%4==3)255.toByte() else 0})
         override suspend fun close(){closed=true}
+    }
+    private class EditingSource(val source: Source = Source()) : GiantImage by source, GiantEditingImage {
+        val edits = mutableListOf<Pair<GiantTileAddress, Boolean>>()
+        var onEdit: suspend () -> Unit = {}
+        override suspend fun editingTile(address: GiantTileAddress, foreign: SessionResourceCharge,
+            assumeUntaggedSrgb: Boolean): GiantTilePixels {
+            edits += address to assumeUntaggedSrgb
+            onEdit()
+            return source.pixels(address)
+        }
     }
     private class Renderer : GiantRenderBackend<Int> {
         val events = mutableListOf<String>(); var next=0; var frame:GiantVisibleFrame<Int>?=null
@@ -50,8 +66,10 @@ class GiantViewportSessionTest {
     }
     private fun session(parent: CoroutineScope, image: GiantImage, backend: GiantRenderBackend<Int>,
         bound: WorkflowBinding, epoch: Long, current: (WorkflowBinding, Long) -> Boolean,
-        max: Long = 192L * 1024L * 1024L, resources: Resources = Resources()): GiantViewportSession<Int> =
-        GiantViewportSession(parent, image, backend, bound, epoch, current, resources, max)
+        max: Long = 192L * 1024L * 1024L, resources: Resources = Resources(),
+        content: GiantTileContent = GiantTileContent.Source,
+        assumeUntaggedSrgb: Boolean = false): GiantViewportSession<Int> =
+        GiantViewportSession(parent, image, backend, bound, epoch, current, resources, max, content, assumeUntaggedSrgb)
     private suspend fun until(test:()->Boolean){withTimeout(3000){while(!test())yield()}}
     @Test fun evictionCreditsOnlyAfterActualRendererRetirement()=runBlocking {
         val source=Source();val backend=Renderer();val session=session(this,source,backend,binding,1L,{_,_->true},GiantViewportSession.TILE_CHARGE)
@@ -223,6 +241,118 @@ class GiantViewportSessionTest {
         try {session.request(view(0.0));until{session.state.value.ready}
             assertEquals(1,source.reads.size);assertTrue(publications<=2)
         }finally{closing=true;session.close()}
+    }
+
+    @Test fun immutableContentModeDispatchesOnlyTheSelectedTileReaderAndForwardsColorConsent()=runBlocking {
+        for (consent in listOf(false, true)) {
+            val image=EditingSource();val backend=Renderer()
+            val owner=session(this,image,backend,binding,1L,{_,_->true},
+                content=GiantTileContent.Composed,assumeUntaggedSrgb=consent)
+            try {
+                owner.request(view(0.0));until{owner.state.value.ready}
+                assertEquals(listOf(GiantTileAddress(0u,0u,0u) to consent),image.edits)
+                assertTrue(image.source.reads.isEmpty())
+                assertEquals(GiantTileContent.Composed,backend.frame?.content)
+            } finally {owner.close()}
+        }
+        val image=EditingSource();val backend=Renderer()
+        val sourceOwner=session(this,image,backend,binding,1L,{_,_->true})
+        try {
+            sourceOwner.request(view(0.0));until{sourceOwner.state.value.ready}
+            assertEquals(1,image.source.reads.size);assertTrue(image.edits.isEmpty())
+            assertEquals(GiantTileContent.Source,backend.frame?.content)
+        } finally {sourceOwner.close()}
+    }
+
+    @Test fun missingCompositionCapabilityAndUnsupportedLevelRefuseBeforeTileAdmission()=runBlocking {
+        val plain=Source();val backend=Renderer();val resources=Resources()
+        val owner=session(this,plain,backend,binding,1L,{_,_->true},resources=resources,
+            content=GiantTileContent.Composed)
+        try {
+            owner.request(view(0.0));until{owner.state.value.message!=null}
+            assertTrue(owner.state.value.message.orEmpty().contains("composition is unavailable"))
+            assertEquals(0,plain.viewportCalls);assertTrue(plain.reads.isEmpty())
+            assertEquals(0,backend.next);assertNull(backend.frame);assertEquals(0uL,resources.used)
+        } finally {owner.close()}
+        val image=EditingSource(Source().apply{level=3u});val second=Renderer()
+        val limited=session(this,image,second,binding,1L,{_,_->true},content=GiantTileContent.Composed)
+        try {
+            limited.request(view(0.0));until{limited.state.value.message!=null}
+            assertTrue(limited.state.value.message.orEmpty().contains("levels 0–2"))
+            assertEquals(1,image.source.viewportCalls);assertTrue(image.edits.isEmpty())
+            assertEquals(0,second.next);assertNull(second.frame)
+            assertEquals(0L,limited.state.value.retainedBytes)
+        } finally {limited.close()}
+    }
+
+    @Test fun staleCommittedRevisionDuringComposedReadCannotPublishOrUpload()=runBlocking {
+        val image=EditingSource();val backend=Renderer();val entered=CompletableDeferred<Unit>();val leave=CompletableDeferred<Unit>()
+        var liveBinding=binding
+        image.onEdit={entered.complete(Unit);withContext(NonCancellable){leave.await()}}
+        val owner=session(this,image,backend,binding,1L,{expected,_->expected==liveBinding},
+            content=GiantTileContent.Composed)
+        try {
+            owner.request(view(0.0));withTimeout(3000){entered.await()}
+            liveBinding=binding.copy(stateHash="d".repeat(64))
+            leave.complete(Unit);until{!owner.state.value.busy}
+            assertEquals(0,backend.next);assertNull(backend.frame)
+            assertEquals(0L,owner.state.value.retainedBytes)
+        } finally {leave.complete(Unit);owner.close()}
+    }
+
+    @Test fun composedReadCancellationJoinsAndRetiresItsChargedReservation()=runBlocking {
+        val image=EditingSource();val backend=Renderer();val resources=Resources()
+        val entered=CompletableDeferred<Unit>();val leave=CompletableDeferred<Unit>()
+        image.onEdit={entered.complete(Unit);withContext(NonCancellable){leave.await()}}
+        val owner=session(this,image,backend,binding,1L,{_,_->true},resources=resources,
+            content=GiantTileContent.Composed)
+        owner.request(view(0.0));withTimeout(3000){entered.await()}
+        val closing=launch(start=CoroutineStart.UNDISPATCHED){owner.close()}
+        try {
+            assertFalse(closing.isCompleted)
+            assertEquals(GiantViewportSession.TILE_CHARGE,owner.state.value.retainedBytes)
+        } finally {leave.complete(Unit);closing.join()}
+        assertTrue(image.source.closed);assertNull(backend.frame);assertEquals(0,backend.next)
+        assertEquals(0uL,resources.used);assertEquals(0L,owner.state.value.retainedBytes)
+    }
+
+    @Test fun composedImageChargeWaitsForRendererRetirementAcknowledgment()=runBlocking {
+        val image=EditingSource();val backend=Renderer();val resources=Resources()
+        val owner=session(this,image,backend,binding,1L,{_,_->true},
+            max=GiantViewportSession.TILE_CHARGE,resources=resources,content=GiantTileContent.Composed)
+        val entered=CompletableDeferred<Unit>();val leave=CompletableDeferred<Unit>()
+        try {
+            owner.request(view(0.0));until{owner.state.value.ready}
+            backend.onRetire={entered.complete(Unit);leave.await()}
+            owner.request(view(1.0));withTimeout(3000){entered.await()}
+            assertEquals(GiantViewportSession.TILE_CHARGE.toULong(),resources.used)
+            assertFalse(backend.events.any{it=="release:1"})
+            leave.complete(Unit);until{owner.state.value.ready}
+            assertEquals(listOf(0u,1u),image.edits.map{it.first.x})
+            assertTrue(backend.events.indexOf("retire:end")<backend.events.indexOf("release:1"))
+        } finally {leave.complete(Unit);owner.close()}
+        assertEquals(0uL,resources.used)
+    }
+
+    @Test fun sourceToComposedReplacementRetiresTheOldOwnerBeforeTheNewFrame()=runBlocking {
+        val resources=Resources();val oldImage=EditingSource();val oldBackend=Renderer()
+        val old=session(this,oldImage,oldBackend,binding,1L,{_,_->true},resources=resources)
+        old.request(view(0.0));until{old.state.value.ready}
+        assertEquals(GiantTileContent.Source,oldBackend.frame?.content)
+        old.close()
+        assertTrue(oldImage.source.closed)
+        assertTrue(oldBackend.events.indexOf("retire:end")<oldBackend.events.indexOf("release:1"))
+        assertEquals(0uL,resources.used)
+        val nextImage=EditingSource();val nextBackend=Renderer()
+        val next=session(this,nextImage,nextBackend,binding.copy(hostSeq=2uL),2L,{_,_->true},
+            resources=resources,content=GiantTileContent.Composed)
+        try {
+            next.request(view(0.0));until{next.state.value.ready}
+            assertEquals(GiantTileContent.Composed,nextBackend.frame?.content)
+            assertTrue(nextImage.source.reads.isEmpty());assertEquals(1,nextImage.edits.size)
+            assertEquals(GiantViewportSession.TILE_CHARGE.toULong(),resources.used)
+        } finally {next.close()}
+        assertEquals(0uL,resources.used)
     }
 
 }
