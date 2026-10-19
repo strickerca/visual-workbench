@@ -110,7 +110,7 @@ fn sha(bytes: &[u8]) -> String {
 }
 /// Only the actual OS TEMP root may have one conventional terminal separator.
 /// No general path canonicalization or component/dot/redirect normalization.
-fn os_temp_root(path: &Path) -> Result<PathBuf> {
+pub(super) fn os_temp_root(path: &Path) -> Result<PathBuf> {
     let text = path.to_str().ok_or(Error::Invalid)?;
     if text.ends_with("\\\\") {
         return Err(Error::Invalid);
@@ -142,7 +142,7 @@ fn within(path: &Path, root: &Path) -> bool {
                     .is_some_and(|v| v.starts_with('\\'))
         })
 }
-fn temp_path(path: &Path, temp: &Path, workspace: &Path, nonce: &str) -> Result<()> {
+pub(super) fn temp_path(path: &Path, temp: &Path, workspace: &Path, nonce: &str) -> Result<()> {
     crate::process::windows::namespace(path)?;
     vw_remote::id(nonce)?;
     if !same_path(path.parent().ok_or(Error::Invalid)?, temp)
@@ -754,6 +754,41 @@ fn canvas_frame_valid(
     }
     Ok(())
 }
+/// The drawing producer calls this only after its own Child/Job receipt and IO
+/// join. It validates the original WGC target and reads exact pinned canvas PNG
+/// bytes, then decodes one RGBA frame at a time under the numeric pixel bound.
+pub(super) fn joined_canvas_rgba(
+    pin: &Pin,
+    frame: &vw_capture::CanvasFrameReceipt,
+    expected: &vw_capture::WindowTarget,
+    canvas: Rect,
+    owner: u32,
+    session: &str,
+    before_qpc_100ns: u64,
+    max_pixels: u64,
+) -> Result<Vec<u8>> {
+    canvas_frame_valid(frame, expected, canvas, owner, session, before_qpc_100ns)?;
+    if max_pixels > 1024 * 1024 || u64::from(frame.width) * u64::from(frame.height) > max_pixels {
+        return Err(Error::Limit);
+    }
+    pin.verify()?;
+    let mut file = pin.file().try_clone()?;
+    if file.metadata()?.len() != frame.png_bytes || frame.png_bytes > metrics::MAX_PNG as u64 {
+        return Err(Error::Limit);
+    }
+    let mut encoded = Vec::new();
+    Read::by_ref(&mut file)
+        .take(metrics::MAX_PNG as u64 + 1)
+        .read_to_end(&mut encoded)?;
+    if encoded.len() as u64 != frame.png_bytes
+        || blake3::hash(&encoded).to_hex().to_string() != frame.source_asset_id
+    {
+        return Err(Error::TargetChanged);
+    }
+    let rgba = metrics::decode(&encoded, frame.width, frame.height)?;
+    pin.verify()?;
+    Ok(rgba)
+}
 enum Sample {
     FullClient(vw_capture::FrameReceipt),
     Canvas(vw_capture::CanvasFrameReceipt),
@@ -1162,6 +1197,22 @@ pub(super) fn wait_retained() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn joined_drawing_decoder_refuses_rgba_without_explicit_srgb() -> Result<()> {
+        let mut bytes = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut bytes, 1, 1);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().map_err(|_| Error::Invalid)?;
+            writer
+                .write_image_data(&[255, 255, 255, 255])
+                .map_err(|_| Error::Invalid)?;
+        }
+        assert_eq!(metrics::decode(&bytes, 1, 1), Err(Error::Invalid));
+        assert_eq!(metrics::decode(&bytes, 2, 1), Err(Error::Invalid));
+        Ok(())
+    }
     #[test]
     fn one_os_temp_separator_preserves_drive_root_and_exact_spelling() -> Result<()> {
         assert_eq!(os_temp_root(Path::new(r"C:\Temp\"))?, Path::new(r"C:\Temp"));

@@ -468,6 +468,43 @@ pub(crate) fn inject(
     budget: &SourceBudget,
     step: Step<'_>,
 ) -> Result<BatchReceipt> {
+    inject_impl(input_owner, target, owner, budget, step, None)
+}
+
+/// The dedicated one-process drawing helper supplies this point from its own
+/// GetCursorPos immediately before the experiment. No IPC/caller coordinate is
+/// accepted. Ordinary three-event experiment clicks still use `inject`.
+pub(crate) fn inject_parked(
+    input_owner: &mut super::super::super::finite_input::FiniteInputOwner<SourceLease>,
+    target: &Target,
+    owner: u32,
+    budget: &SourceBudget,
+    step: Step<'_>,
+    observed_outside: (i32, i32),
+) -> Result<BatchReceipt> {
+    if !matches!(step.action, Action::CanvasDot | Action::Undo | Action::Redo)
+        || step.arrow.is_some()
+    {
+        return Err(Error::Invalid);
+    }
+    inject_impl(
+        input_owner,
+        target,
+        owner,
+        budget,
+        step,
+        Some(observed_outside),
+    )
+}
+
+fn inject_impl(
+    input_owner: &mut super::super::super::finite_input::FiniteInputOwner<SourceLease>,
+    target: &Target,
+    owner: u32,
+    budget: &SourceBudget,
+    step: Step<'_>,
+    observed_outside: Option<(i32, i32)>,
+) -> Result<BatchReceipt> {
     let Step {
         action,
         expected,
@@ -483,10 +520,28 @@ pub(crate) fn inject(
     } else {
         None
     };
+    let parked_absolute = observed_outside.map(super::super::absolute).transpose()?;
+    if observed_outside == Some(current.destination) {
+        return Err(Error::Invalid);
+    }
     let batch = if let Some(positive) = arrow {
         keys(action, positive)
     } else {
-        super::super::click(normalized.ok_or(Error::Invalid)?)
+        let mut events = super::super::click(normalized.ok_or(Error::Invalid)?);
+        if let Some((dx, dy)) = parked_absolute {
+            events.push(INPUT {
+                r#type: INPUT_MOUSE,
+                Anonymous: INPUT_0 {
+                    mi: MOUSEINPUT {
+                        dx,
+                        dy,
+                        dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
+                        ..Default::default()
+                    },
+                },
+            });
+        }
+        events
     };
     // The shared owner refuses any provider closure while a known down remains.
     // It retains the actual SourceLease and owns all accepted down/up accounting.
@@ -549,6 +604,16 @@ pub(crate) fn inject(
         if let Some(expected) = normalized {
             same_absolute(expected, super::super::absolute(current.destination)?)?;
         }
+        if let (Some(outside), Some(expected)) = (observed_outside, parked_absolute) {
+            same_absolute(expected, super::super::absolute(outside)?)?;
+            let mut actual = windows::Win32::Foundation::POINT::default();
+            // SAFETY: read-only actual OS pointer immediately before finite send.
+            unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut actual) }
+                .map_err(|_| Error::TargetChanged)?;
+            if (actual.x, actual.y) != outside {
+                return Err(Error::TargetChanged);
+            }
+        }
         budget.check()
         // The shared owner now performs the final cheap exact native destination
         // and foreground guard, with no provider call afterward or while held.
@@ -563,6 +628,8 @@ pub(crate) fn inject(
         action,
         kind: if arrow.is_some() {
             "focused_thumb_arrow_pair"
+        } else if observed_outside.is_some() {
+            "rooted_parked_balanced_click"
         } else {
             "rooted_balanced_click"
         },

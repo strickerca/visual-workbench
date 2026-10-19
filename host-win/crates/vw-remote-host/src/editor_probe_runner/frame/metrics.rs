@@ -41,7 +41,7 @@ fn dimensions(width: u32, height: u32) -> Result<usize> {
     }
     usize::try_from(pixels.checked_mul(4).ok_or(Error::Limit)?).map_err(|_| Error::Limit)
 }
-fn decode(bytes: &[u8], width: u32, height: u32) -> Result<Vec<u8>> {
+pub(super) fn decode(bytes: &[u8], width: u32, height: u32) -> Result<Vec<u8>> {
     let size = dimensions(width, height)?;
     if bytes.is_empty() || bytes.len() > MAX_PNG {
         return Err(Error::Limit);
