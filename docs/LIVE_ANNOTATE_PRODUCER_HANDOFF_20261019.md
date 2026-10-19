@@ -70,7 +70,13 @@ creation and source-close behavior. The producer makes none of those decisions.
 `stream_wire` has closed Open/Poll/Original/Stop commands and
 Ready/Tiles/Original/Idle/Refused/Stopped replies. It limits headers to 16 KiB,
 payloads to 64 MiB, and retains charges for parsed headers, queued commands and
-payloads. JSON DTO workspace is reserved before parsing. Protobuf tiles receive
+payloads. A no-allocation lexical census caps JSON at 512 tokens and 16 levels;
+the corresponding up-to-2.25-MiB workspace reservation precedes Serde parsing
+and stays with the DTO. This closes the demonstrated 16,030-byte malformed
+header that allocated 278,646 bytes under only 32,414 bytes of admission. The
+new regression refuses that header without calling the allocating parser and
+also checks that a normally shaped header cannot enter parsing one byte below
+its calculated workspace charge. Protobuf tiles receive
 a bounded wire preflight and an endpoint-pool parser/DTO reservation before
 `FrameTiles::decode`; this uses the current `vw-proto` API. `validate_reply`
 takes the same `SessionBudget` and checks sequence, epoch, generation, source geometry,

@@ -10,6 +10,17 @@ use vw_stream::{BudgetedBytes, Cancellation, MemoryCharge, MemoryKind, SessionBu
 
 pub const MAX_HEADER_BYTES: usize = 16 * 1024;
 pub const MAX_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
+const MAX_JSON_TOKENS: usize = 512;
+const MAX_JSON_DEPTH: usize = 16;
+// Internally tagged Serde enums can temporarily materialize JSON Content
+// nodes before the variant is known. Bound that graph before deserialization:
+// at most 512 tokens, 16 levels, and 16 KiB of source text. Four KiB per token
+// covers map/vector growth and per-node metadata; four copies of the complete
+// source cover decoded strings and the final typed DTO. The extra 64 KiB covers
+// fixed parser/DTO state. The maximum charge is under 2.25 MiB.
+const JSON_NODE_WORK_BYTES: u64 = 4096;
+const JSON_TEXT_WORK_COPIES: u64 = 4;
+const JSON_FIXED_WORK_BYTES: u64 = 64 * 1024;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
@@ -214,10 +225,73 @@ fn write_header<W: Write, T: Serialize>(
         .and_then(|()| output.write_all(&owned.bytes()[..size]))
         .map_err(|_| Error::Platform)
 }
-fn read_header<R: Read, T: for<'de> Deserialize<'de>>(
+// Allocation-free lexical census. Serde still validates the full JSON grammar;
+// this gate refuses inputs that could make its tagged-enum buffering large.
+fn json_workspace(bytes: &[u8]) -> Result<u64> {
+    let mut tokens = 0usize;
+    let mut depth = 0usize;
+    let mut quoted = false;
+    let mut escaped = false;
+    let mut atom = false;
+    for &byte in bytes {
+        if quoted {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                quoted = false;
+            }
+            continue;
+        }
+        match byte {
+            b'"' => {
+                quoted = true;
+                atom = false;
+                tokens += 1;
+            }
+            b'{' | b'[' => {
+                depth += 1;
+                if depth > MAX_JSON_DEPTH {
+                    return Err(Error::Limit);
+                }
+                atom = false;
+                tokens += 1;
+            }
+            b'}' | b']' => {
+                depth = depth.checked_sub(1).ok_or(Error::Invalid)?;
+                atom = false;
+                tokens += 1;
+            }
+            b':' | b',' => {
+                atom = false;
+                tokens += 1;
+            }
+            b' ' | b'\t' | b'\r' | b'\n' => atom = false,
+            _ => {
+                if !atom {
+                    tokens += 1;
+                    atom = true;
+                }
+            }
+        }
+        if tokens > MAX_JSON_TOKENS {
+            return Err(Error::Limit);
+        }
+    }
+    if quoted || depth != 0 || tokens == 0 {
+        return Err(Error::Invalid);
+    }
+    Ok(JSON_FIXED_WORK_BYTES
+        + JSON_NODE_WORK_BYTES * tokens as u64
+        + JSON_TEXT_WORK_COPIES * bytes.len() as u64)
+}
+
+fn read_header_with<R: Read, T>(
     input: &mut R,
     budget: &SessionBudget,
     cancel: &Cancellation,
+    parse: impl FnOnce(&[u8]) -> Result<T>,
 ) -> Result<(T, MemoryCharge)> {
     cancel.check().map_err(stream_error)?;
     let mut len = [0u8; 4];
@@ -232,14 +306,23 @@ fn read_header<R: Read, T: for<'de> Deserialize<'de>>(
         .read_exact(owned.bytes_mut())
         .map_err(|_| Error::Platform)?;
     cancel.check().map_err(stream_error)?;
-    // JSON can allocate owned strings while decoding. Reserve its maximum
-    // retained DTO before serde sees the bounded input, then hand the charge
-    // to the command/packet owner rather than crediting it after parse.
+    let workspace = json_workspace(owned.bytes())?;
+    // Keep the whole graph charge with the command/packet through its lifetime.
+    // No Serde call runs until this specific lexical bound is admitted.
     let dto_charge = budget
-        .reserve(MemoryKind::Transfer, MAX_HEADER_BYTES as u64)
+        .reserve(MemoryKind::Transfer, workspace)
         .map_err(stream_error)?;
-    let parsed = serde_json::from_slice(owned.bytes()).map_err(|_| Error::Invalid)?;
+    let parsed = parse(owned.bytes())?;
     Ok((parsed, dto_charge))
+}
+fn read_header<R: Read, T: for<'de> Deserialize<'de>>(
+    input: &mut R,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<(T, MemoryCharge)> {
+    read_header_with(input, budget, cancel, |bytes| {
+        serde_json::from_slice(bytes).map_err(|_| Error::Invalid)
+    })
 }
 pub fn write_command<W: Write>(
     output: &mut W,
@@ -311,4 +394,63 @@ pub fn read_packet<R: Read>(
         payload,
         _header_charge: header_charge,
     })
+}
+
+#[cfg(test)]
+mod allocation_tests {
+    use super::*;
+    use std::{cell::Cell, io::Cursor};
+
+    #[test]
+    fn hostile_near_maximum_header_never_enters_allocating_deserializer() {
+        let mut json = b"{\"command\":\"poll\"".to_vec();
+        while json.len() + b",\"x\":0".len() < 16_029 {
+            json.extend_from_slice(b",\"x\":0");
+        }
+        json.resize(16_029, b' ');
+        json.push(b'}');
+        assert_eq!(json.len(), 16_030);
+        let mut wire = (json.len() as u32).to_le_bytes().to_vec();
+        wire.extend_from_slice(&json);
+        // The former 16 KiB DTO reservation let this class of header enter
+        // Serde with only 32,414 bytes admitted. It can buffer many Content
+        // nodes before rejecting the duplicate/unknown fields.
+        let budget = SessionBudget::new(32_414).expect("budget");
+        let called = Cell::new(false);
+        let result: Result<((), MemoryCharge)> = read_header_with(
+            &mut Cursor::new(wire),
+            &budget,
+            &Cancellation::default(),
+            |_| {
+                called.set(true);
+                Ok(())
+            },
+        );
+        assert!(matches!(result, Err(Error::Limit)));
+        assert!(!called.get());
+        assert_eq!(budget.used_bytes(), 0);
+    }
+
+    #[test]
+    fn admitted_shape_reserves_its_calculated_workspace_before_parse() {
+        let json = br#"{"command":"stop","sequence":1,"connection_epoch":2,"source_generation":3}"#;
+        let workspace = json_workspace(json).expect("shape");
+        assert!(workspace > MAX_HEADER_BYTES as u64);
+        let mut wire = (json.len() as u32).to_le_bytes().to_vec();
+        wire.extend_from_slice(json);
+        let budget = SessionBudget::new(json.len() as u64 + workspace - 1).expect("budget");
+        let called = Cell::new(false);
+        let result: Result<((), MemoryCharge)> = read_header_with(
+            &mut Cursor::new(wire),
+            &budget,
+            &Cancellation::default(),
+            |_| {
+                called.set(true);
+                Ok(())
+            },
+        );
+        assert!(matches!(result, Err(Error::Limit)));
+        assert!(!called.get());
+        assert_eq!(budget.used_bytes(), 0);
+    }
 }
