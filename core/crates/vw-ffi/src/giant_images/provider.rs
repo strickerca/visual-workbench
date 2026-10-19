@@ -17,6 +17,9 @@ use vw_assets::{AssetError, BudgetCache, CacheLease, Manifest, TileKey, Viewport
 use vw_store::DiskCache;
 use vw_stream::{MemoryCharge, MemoryKind, SessionBudget};
 
+#[path = "editing.rs"]
+mod editing;
+
 fn asset_error(error: AssetError) -> Error {
     match error {
         AssetError::Busy | AssetError::Poisoned => Error::Backpressure,

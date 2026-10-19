@@ -8,6 +8,68 @@ use vw_assets::{
 use vw_store::DiskCache;
 use vw_stream::{MemoryCharge, MemoryKind, SessionBudget};
 
+/// Copy a verified level-0 tile into one preadmitted D-space region buffer.
+/// Reject inconsistent metadata before it can shift an edge or leave a gap.
+pub(super) fn copy_original_tile(
+    region: vw_raster::Region,
+    part: &super::GiantTilePixels,
+    assembled: &mut [u8],
+    cancel: &Cancellation,
+) -> Result<()> {
+    region
+        .validate(u32::MAX, u32::MAX)
+        .map_err(|_| Error::Invalid)?;
+    let length = u64::from(region.width) * u64::from(region.height) * 4;
+    if assembled.len() as u64 != length
+        || part.address.level != 0
+        || part.width == 0
+        || part.height == 0
+        || part.width > 256
+        || part.height > 256
+        || part.document_width != part.width
+        || part.document_height != part.height
+        || part.document_x != part.address.x.checked_mul(256).ok_or(Error::Limit)?
+        || part.document_y != part.address.y.checked_mul(256).ok_or(Error::Limit)?
+        || part.rgba.len() as u64 != u64::from(part.width) * u64::from(part.height) * 4
+    {
+        return Err(Error::Invalid);
+    }
+    let x0 = region.x.max(part.document_x);
+    let y0 = region.y.max(part.document_y);
+    let x1 = (region.x + region.width).min(
+        part.document_x
+            .checked_add(part.width)
+            .ok_or(Error::Invalid)?,
+    );
+    let y1 = (region.y + region.height).min(
+        part.document_y
+            .checked_add(part.height)
+            .ok_or(Error::Invalid)?,
+    );
+    if x0 >= x1 || y0 >= y1 {
+        return Err(Error::Invalid);
+    }
+    for y in y0..y1 {
+        cancel.check().map_err(Error::from)?;
+        let source = ((u64::from(y - part.document_y) * u64::from(part.width)
+            + u64::from(x0 - part.document_x))
+            * 4) as usize;
+        let target = ((u64::from(y - region.y) * u64::from(region.width)
+            + u64::from(x0 - region.x))
+            * 4) as usize;
+        let row = (x1 - x0) as usize * 4;
+        assembled
+            .get_mut(target..target + row)
+            .ok_or(Error::Invalid)?
+            .copy_from_slice(part.rgba.get(source..source + row).ok_or(Error::Invalid)?);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+#[path = "tiles_region_tests.rs"]
+mod region_tests;
+
 // The successfully validated <=100k-entry map has bounded keys (128 bytes)
 // and computed 70-byte filenames. Keep its resident envelope separately from
 // transient JSON/index work: holding the entire 128 MiB peak forever would
