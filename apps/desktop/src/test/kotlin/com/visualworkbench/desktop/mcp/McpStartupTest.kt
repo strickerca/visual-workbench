@@ -114,6 +114,20 @@ class McpStartupTest {
             yield();release.complete(Unit);assertTrue(withTimeout(5000){closing.await()});try{lifetime.close();fail("missing cleanup failure")}catch(_:McpRefused){}
         }finally{release.complete(Unit);start.cancelAndJoin();try{lifetime.close()}catch(_:McpRefused){}}
     }
+    @Test fun failedServiceCloseRetainsExactOwnerAndSealsRestartUntilRetrySettles()=runBlocking {
+        val closes=AtomicInteger();var mayClose=false
+        val cycles=McpServiceCycles{object:McpOwnedService{
+            override suspend fun close(){closes.incrementAndGet();if(!mayClose)throw McpRefused()}
+        }}
+        cycles.start()
+        try{cycles.stop();fail("Uncertain close was accepted")}catch(_:McpRefused){}
+        assertEquals(1,closes.get())
+        try{cycles.start();fail("Restart admitted while old owner remains")}catch(_:IllegalStateException){}
+        mayClose=true;cycles.stop()
+        assertEquals(2,closes.get())
+        try{cycles.start();fail("Restart admitted after failed cycle")}catch(_:IllegalStateException){}
+        cycles.close();assertEquals(2,closes.get())
+    }
     @Test fun expiredAndFutureOwnerMarkersRetireWithoutStartingService(){
         assumeTrue("Requires Windows owner handles and file-sharing semantics",System.getProperty("os.name").startsWith("Windows",ignoreCase=true))
         val directory=Files.createTempDirectory("vw-mcp-marker-age-").toRealPath()

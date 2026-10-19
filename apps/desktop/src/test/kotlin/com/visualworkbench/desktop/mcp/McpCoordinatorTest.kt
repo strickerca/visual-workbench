@@ -62,7 +62,7 @@ class McpCoordinatorTest {
         override suspend fun close(){closed++}
     }
     private inner class Capture:McpCaptureEngine {
-        var calls=0;var closed=0;var enter:CompletableDeferred<Unit>?=null
+        var calls=0;var closed=0;var closeFailure:Throwable?=null;var enter:CompletableDeferred<Unit>?=null
         var waitForever=false
         var result=info()
         var beforeReturn:suspend()->Unit={}
@@ -71,7 +71,20 @@ class McpCoordinatorTest {
         var cleanupEntered:CompletableDeferred<Unit>?=null;var cleanupFinish:CompletableDeferred<Unit>?=null
         override suspend fun select()=selected
         override suspend fun compile(selector:String,checkGrant:suspend()->Unit):WorkbenchCompiledPackage {checkGrant();calls++;enter?.complete(Unit);try{if(waitForever)awaitCancellation();beforeReturn();return Compiled(result).also{returned=it}}finally{cleanupFinish?.let{withContext(NonCancellable){cleanupEntered?.complete(Unit);it.await()}}}}
-        override suspend fun close(){closed++}
+        override suspend fun close(){closed++;closeFailure?.let{throw it}}
+    }
+    @Test fun failedCaptureRetirementKeepsCoordinatorOwnerUntilExactRetrySettles()=runBlocking {
+        val catalog=Catalog();val inbox=Inbox();val connection=Connection();val capture=Capture()
+        val owner=DesktopMcpCoordinator(catalog,inbox,connection,capture,newId={receiptId()})
+        val failure=IllegalStateException("Capture project retirement uncertain")
+        capture.closeFailure=failure
+        try {owner.close();fail("Failed retirement was reported as closed")} catch(error:IllegalStateException){assertSame(failure,error)}
+        assertFalse(owner.state.value.closed)
+        assertEquals(1,capture.closed);assertEquals(1,catalog.closed);assertEquals(1,inbox.closed);assertEquals(1,connection.closed)
+        capture.closeFailure=null
+        owner.close()
+        assertTrue(owner.state.value.closed)
+        assertEquals(2,capture.closed);assertEquals(1,catalog.closed);assertEquals(1,inbox.closed);assertEquals(1,connection.closed)
     }
     @Test fun decoderRefusesAmbiguousOversizeAndNoncanonicalBase64(){
         assertThrows(IllegalArgumentException::class.java){decodeMcpReturn("x","eA==","")}

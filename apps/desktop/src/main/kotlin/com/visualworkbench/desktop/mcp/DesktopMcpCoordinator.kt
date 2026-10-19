@@ -51,7 +51,11 @@ internal class DesktopMcpCoordinator(
     private val lifecycle=Any()
     private var closing=false
     private val active=LinkedHashMap<Job,String?>()
-    private val stopped=CompletableDeferred<Unit>()
+    private var closeAttempt:CompletableDeferred<Unit>?=null
+    private var closeSucceeded=false
+    private var closePrepared=false
+    private var connectionClosed=false;private var captureClosed=false
+    private var inboxClosed=false;private var catalogClosed=false
     private val catalogGate=Mutex();private val inboxGate=Mutex();private val captureGate=Mutex()
     private val verificationTargets=McpVerificationTargets()
     private val verificationGate=Mutex()
@@ -399,17 +403,36 @@ internal class DesktopMcpCoordinator(
         mutable.update{it.copy(inbox=it.inbox.filterNot{old->old.receiptId==receipt.receiptId},verificationReceipts=it.verificationReceipts-receipt.receiptId,message=if(retired.filesRemoved)"Return removed." else "Return retired; exact bytes remain pending supported cleanup.")}
     }
     suspend fun close() {
-        val launch=synchronized(lifecycle){if(closing)false else{closing=true;true}}
-        if(launch) closeScope.launch {
-            var failure:Throwable?=null
-            suspend fun settle(body:suspend()->Unit){try{body()}catch(error:Throwable){if(failure==null)failure=error}}
-            val jobs=synchronized(lifecycle){grants.clear();grantAdmissions.clear();publishGrants();active.keys.toList()+controls.values.toList()+listOfNotNull(batchControl)};jobs.forEach{it.cancel()};jobs.joinAll()
-            verificationTargets.close();verification.close()
-            settle{connection.close()};settle{captureEngine.close()};settle{inbox.close()};settle{catalog.close()}
-            scope.cancel();mutable.update{it.copy(agents=emptyList(),grants=emptyList(),activeCapture=null,closed=true)}
-            val error=failure;if(error==null)stopped.complete(Unit)else stopped.completeExceptionally(error)
+        val (attempt,launch)=synchronized(lifecycle){
+            closing=true
+            val pending=closeAttempt?.takeUnless{it.isCompleted}
+            if(pending!=null)pending to false
+            else if(closeSucceeded)requireNotNull(closeAttempt) to false
+            else CompletableDeferred<Unit>().also{closeAttempt=it} to true
         }
-        withContext(NonCancellable){stopped.await()}
+        if(launch)closeScope.launch {
+            try {
+                if(!closePrepared){
+                    val jobs=synchronized(lifecycle){grants.clear();grantAdmissions.clear();publishGrants();active.keys.toList()+controls.values.toList()+listOfNotNull(batchControl)}
+                    jobs.forEach{it.cancel()};jobs.joinAll()
+                    verificationTargets.close();verification.close();scope.cancel()
+                    closePrepared=true
+                }
+                var failure:Throwable?=null
+                suspend fun settle(done:Boolean,close:suspend()->Unit,mark:()->Unit){
+                    if(!done)try{close();mark()}catch(error:Throwable){val prior=failure;if(prior==null)failure=error else if(prior!==error)prior.addSuppressed(error)}
+                }
+                settle(connectionClosed,{connection.close()},{connectionClosed=true})
+                settle(captureClosed,{captureEngine.close()},{captureClosed=true})
+                settle(inboxClosed,{inbox.close()},{inboxClosed=true})
+                settle(catalogClosed,{catalog.close()},{catalogClosed=true})
+                failure?.let{throw it}
+                mutable.update{it.copy(agents=emptyList(),grants=emptyList(),activeCapture=null,closed=true)}
+                synchronized(lifecycle){closeSucceeded=true}
+                attempt.complete(Unit)
+            }catch(error:Throwable){attempt.completeExceptionally(error)}
+        }
+        withContext(NonCancellable){attempt.await()}
     }
     companion object{private val closeScope=CoroutineScope(SupervisorJob()+Dispatchers.Default)}
 }
