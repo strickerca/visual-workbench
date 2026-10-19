@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JPanel
 
 internal data class DesktopStreamViewState(val signal:CaptureStreamSignal,
@@ -34,7 +35,8 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
     private val failedBackgrounds=mutableListOf<CaptureFrozenBackground>()
     private val pending=AtomicReference<StreamCanvasSlot?>(null)
     private val adoptionGate=Mutex()
-    private var adoptionJob:Job?=null
+    private val closeGate=Mutex()
+    @Volatile private var adoptionJob:Job?=null
     @Volatile private var admitting=true
     @Volatile private var closed=false
     private var closeFailure:Throwable?=null
@@ -74,6 +76,8 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
         var raster:StreamRaster?=null
         var slot:StreamCanvasSlot?=null
         var offered=false
+        val rasterHandoff=AtomicReference<StreamRaster?>(null)
+        val offerHandoff=AtomicBoolean(false)
         var problem:Throwable?=null
         try {
             val frame=draw.frame
@@ -81,19 +85,23 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
             if(admitting&&current.connectionEpoch==initial.connectionEpoch&&current.sourceGeneration==frame.sourceGeneration&&
                 current.stage==CaptureStreamStage.Live&&current.sourceAvailable){
                 val surface=withContext(ui){painter.surfaceBytes()}
-                raster=withContext(Dispatchers.Default){readStreamRaster(draw,resources,surface,::quarantineRaster)}
+                raster=withContext(Dispatchers.Default){
+                    readStreamRaster(draw,resources,surface,::quarantineRaster).also(rasterHandoff::set)
+                }
                 currentCoroutineContext().ensureActive()
                 val after=stream.signal()
                 if(admitting&&after.connectionEpoch==initial.connectionEpoch&&after.sourceGeneration==frame.sourceGeneration&&
                     after.stage==CaptureStreamStage.Live&&after.sourceAvailable&&withContext(ui){attached()}){
                     val candidate=StreamCanvasSlot(frame,checkNotNull(raster),StreamDrawPermit())
                     slot=candidate;pending.set(candidate)
-                    offered=withContext(ui){painter.offer(candidate)}
+                    offered=withContext(ui){painter.offer(candidate).also(offerHandoff::set)}
                     if(offered)candidate.permit?.awaitDecision()
                 }
             }
         }catch(error:Throwable){problem=error}
         withContext(NonCancellable){
+            raster=raster?:rasterHandoff.get()
+            offered=offered||offerHandoff.get()
             val candidate=slot
             val receipt=if(candidate!=null){candidate.permit?.refuse();candidate.permit?.awaitDecision()}else false
             var acknowledged=false
@@ -102,8 +110,10 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
             try{draw.close()}catch(error:Throwable){synchronized(failedDraws){failedDraws+=draw};if(problem==null)problem=error else problem.addSuppressed(error)}
             try{
                 if(candidate!=null){
-                    if(offered&&acknowledged)mutable.value=mutable.value.copy(displayed=candidate.frame,lossless=false)
-                    withContext(ui){if(offered&&acknowledged)painter.commit(candidate) else painter.rollback(candidate,offered)}
+                    if(acknowledged){
+                        withContext(ui){painter.commit(candidate)}
+                        mutable.value=mutable.value.copy(displayed=candidate.frame,lossless=false)
+                    }else withContext(ui){painter.rollback(candidate,offered)}
                 }else raster?.close()
             }catch(error:Throwable){
                 if(candidate==null)raster?.let(::quarantineRaster)
@@ -126,7 +136,6 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
     }
     /** Invoke only for an accepted physical DOWN, after rejecting palms/tools. */
     suspend fun stopForContact(viewPoint:Point):DesktopStreamContact? {
-        if(mutable.value.displayed==null||mutable.value.sealed)return null
         val frame=stopLiveDraws()?:return null
         val sourcePoint=mapPointer(viewPoint)?:return null
         return DesktopStreamContact(frame,sourcePoint)
@@ -139,12 +148,14 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
     internal suspend fun adoptLossless(refreshOriginal:suspend ()->Unit,
         snapshot:()->CaptureAnnotationState):Boolean=adoptionGate.withLock {
         currentCoroutineContext().ensureActive()
-        check(!closed&&!admitting&&withContext(ui){attached()})
         adoptionJob=currentCoroutineContext()[Job]
         var raster:StreamRaster?=null
+        val rasterHandoff=AtomicReference<StreamRaster?>(null)
         var slot:StreamCanvasSlot?=null
         var offered=false
         try {
+            if(closed||mutable.value.sealed)return@withLock false
+            check(!admitting&&withContext(ui){attached()})
             refreshOriginal()
             val owned=snapshot()
             val draft=owned.draft?:return@withLock false
@@ -154,41 +165,53 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
             try {
                 require(losslessBackgroundMatches(owned,background,initial.connectionEpoch,stream.signal()))
                 val surface=withContext(ui){painter.surfaceBytes()}
-                raster=withContext(Dispatchers.Default){readStreamRaster(background,resources,surface,::quarantineRaster)}
+                raster=withContext(Dispatchers.Default){
+                    readStreamRaster(background,resources,surface,::quarantineRaster).also(rasterHandoff::set)
+                }
             }finally{
                 withContext(NonCancellable){try{background.close()}catch(error:Throwable){
                     synchronized(failedBackgrounds){failedBackgrounds+=background};throw error
                 }}
             }
             currentCoroutineContext().ensureActive()
-            if(closed||stream.signal().connectionEpoch!=initial.connectionEpoch||snapshot().draft!=draft)return@withLock false
+            if(!withContext(ui){adoptionValid(draft,snapshot)})return@withLock false
             val candidate=StreamCanvasSlot(draft.frame,checkNotNull(raster),losslessPaint=CompletableDeferred())
             slot=candidate
             offered=withContext(ui){painter.offer(candidate)}
             if(!offered)return@withLock false
             checkNotNull(candidate.losslessPaint).await()
             currentCoroutineContext().ensureActive()
-            slot=null;raster=null
-            withContext(NonCancellable+ui){painter.commit(candidate)}
+            val committed=withContext(NonCancellable+ui){
+                if(adoptionValid(draft,snapshot)){painter.commit(candidate);true}else false
+            }
+            if(!committed)return@withLock false
+            slot=null;raster=null;rasterHandoff.set(null)
             mutable.value=mutable.value.copy(displayed=draft.frame,lossless=true)
             true
         }catch(cancel:CancellationException){throw cancel}
         catch(error:Throwable){seal("The lossless background could not be adopted. The provisional preview remains owned.");throw error}
         finally{
             try{withContext(NonCancellable){
+                raster=raster?:rasterHandoff.get()
                 slot?.let{candidate->try{withContext(ui){painter.rollback(candidate,offered)}}catch(error:Throwable){seal("The lossless canvas could not retire its provisional bitmap.");throw error}}
                 if(slot==null)raster?.let{try{it.close()}catch(error:Throwable){quarantineRaster(it);seal("The lossless bitmap could not retire.");throw error}}
             }}finally{adoptionJob=null}
         }
     }
 
+    private fun adoptionValid(draft:CaptureDraftInfo,snapshot:()->CaptureAnnotationState):Boolean {
+        if(closed||mutable.value.sealed||stream.signal().connectionEpoch!=initial.connectionEpoch||!attached())return false
+        val state=snapshot()
+        return state.draft==draft&&state.lossless&&state.frozen?.draftId==draft.draftId
+    }
+
     /** Does not close stream: CaptureAnnotationSession/root owns that lease. */
     suspend fun close(){
-        closeFailure?.let{throw it}
-        if(closed)return
         val caller=currentCoroutineContext()[Job]
-        closed=true;admitting=false;pending.get()?.permit?.refuse()
-        withContext(NonCancellable){
+        withContext(NonCancellable){closeGate.withLock {
+            closeFailure?.let{throw it}
+            if(closed)return@withLock
+            closed=true;admitting=false;pending.get()?.permit?.refuse()
             var failure:Throwable?=null
             try{worker.cancelAndJoin()}catch(error:Throwable){failure=error}
             try{collector.cancelAndJoin()}catch(error:Throwable){if(failure==null)failure=error else failure.addSuppressed(error)}
@@ -202,6 +225,6 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
             closeFailure=failure
             mutable.value=mutable.value.copy(sealed=true,failure=if(failure==null)null else "Capture canvas retirement is incomplete; keep the paired project open.")
             failure?.let{throw it}
-        }
+        }}
     }
 }

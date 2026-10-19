@@ -12,8 +12,11 @@ import java.awt.image.DataBufferInt
 internal const val STREAM_ROW_REPLY_MAX = 256 * 1024
 internal const val STREAM_FRAME_RGBA_MAX = 32 * 1024 * 1024
 internal const val STREAM_SURFACE_RGBA_MAX = 64 * 1024 * 1024
+// AWT's destination plus a possible accelerated/staging copy are retained
+// while the admitted raster can be redrawn. Account three physical surfaces.
+internal const val STREAM_PLATFORM_SURFACE_COPIES = 3L
 
-internal data class StreamRasterSize(val width:Int,val height:Int,val rowBytes:Int,val bytes:Int,val chargeBytes:ULong)
+internal data class StreamRasterSize(val width:Int,val height:Int,val rowBytes:Int,val bytes:Int)
 
 /** Four copies cover the incoming row DTO, assembled RGBA, Java raster and a
  * possible platform drawing copy. Reject before foreign reads or allocation. */
@@ -25,8 +28,7 @@ internal fun streamRasterSize(frame:CaptureStreamFrame):StreamRasterSize {
     require(bytes in 4..STREAM_FRAME_RGBA_MAX.toLong())
     val rowBytes=width*4L
     require(rowBytes<=STREAM_ROW_REPLY_MAX)
-    return StreamRasterSize(width.toInt(),height.toInt(),rowBytes.toInt(),bytes.toInt(),
-        (bytes*4L+STREAM_ROW_REPLY_MAX+16L*1024L).toULong())
+    return StreamRasterSize(width.toInt(),height.toInt(),rowBytes.toInt(),bytes.toInt())
 }
 
 internal fun losslessBackgroundMatches(state:CaptureAnnotationState,background:CaptureFrozenBackground,
@@ -39,7 +41,8 @@ internal fun losslessBackgroundMatches(state:CaptureAnnotationState,background:C
 internal fun streamRasterCharge(size:StreamRasterSize,platformSurfaceBytes:Long):ULong {
     val surface=if(platformSurfaceBytes==0L)size.bytes.toLong() else platformSurfaceBytes
     require(surface in 4..STREAM_SURFACE_RGBA_MAX.toLong())
-    return (size.bytes.toLong()*3L+maxOf(size.bytes.toLong(),surface)+STREAM_ROW_REPLY_MAX+16L*1024L).toULong()
+    return (size.bytes.toLong()*3L+surface*STREAM_PLATFORM_SURFACE_COPIES+
+        STREAM_ROW_REPLY_MAX+16L*1024L).toULong()
 }
 
 /** A failed charge release stays owned; a second call reports the same failure. */

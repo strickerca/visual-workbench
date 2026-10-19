@@ -4,6 +4,11 @@ import com.visualworkbench.shared.*
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
+import java.awt.BufferCapabilities
+import java.awt.Graphics
+import java.awt.ImageCapabilities
+import java.awt.image.BufferedImage
+import java.awt.image.BufferStrategy
 
 class DesktopStreamPixelsTest {
     private val frame=CaptureStreamFrame("capture",7u,2u,2u,2u,14,29,1.25,3u,900L,1000L,"windows")
@@ -26,13 +31,45 @@ class DesktopStreamPixelsTest {
         val pixels=Pixels(frame,byteArrayOf(1,2,3,-1,4,5,6,-1,7,8,9,-1,10,11,12,-1))
         val raster=readStreamRaster(pixels,resources){error("Unexpected failed close")}
         assertEquals(listOf(0u to 2u),pixels.rows)
-        assertEquals(streamRasterSize(frame).chargeBytes,resources.requested)
+        assertEquals(streamRasterCharge(streamRasterSize(frame),16L),resources.requested)
         assertTrue(streamRasterCharge(streamRasterSize(frame),64L)>checkNotNull(resources.requested))
         assertEquals(0xff010203.toInt(),raster.image?.getRGB(0,0))
         assertEquals(0xff0a0b0c.toInt(),raster.image?.getRGB(1,1))
         assertEquals(2,raster.image?.width)
         raster.close();raster.close()
         assertEquals(1,resources.charge.closes)
+    }
+
+    @Test fun hidpiAdmissionCountsPhysicalPixelsAndRetainedDestinationCopies() {
+        assertEquals(4L*100L*50L*4L,physicalCanvasBytes(100,50,2.0,2.0))
+        assertEquals(4L*151L*76L,physicalCanvasBytes(100,50,1.501,1.501))
+        val size=streamRasterSize(frame)
+        val physical=physicalCanvasBytes(100,50,2.0,2.0)
+        assertEquals((size.bytes.toLong()*3L+physical*STREAM_PLATFORM_SURFACE_COPIES+
+            STREAM_ROW_REPLY_MAX+16L*1024L).toULong(),streamRasterCharge(size,physical))
+        assertThrows(IllegalArgumentException::class.java){physicalCanvasBytes(8192,8192,3.0,3.0)}
+    }
+
+    @Test fun bufferSubmissionReceiptsOnlyAfterVisibleShowAndTreatsShowFailureAsUnknown()=runBlocking {
+        val events=mutableListOf<String>()
+        fun strategy(fail:Boolean)=object:BufferStrategy() {
+            override fun getCapabilities()=BufferCapabilities(ImageCapabilities(false),ImageCapabilities(false),null)
+            override fun getDrawGraphics():Graphics=BufferedImage(2,2,BufferedImage.TYPE_INT_ARGB).createGraphics()
+            override fun contentsLost()=false
+            override fun contentsRestored()=false
+            override fun show(){events+="show";if(fail)error("platform show failed")}
+        }
+        val shown=StreamDrawPermit()
+        assertTrue(shown.paint{submitStreamBuffer(strategy(false),{events+="draw"},{events+="sync"})})
+        assertEquals(listOf("draw","show","sync"),events)
+        assertEquals(true,shown.awaitDecision())
+        events.clear()
+        val unknown=StreamDrawPermit()
+        assertThrows(IllegalStateException::class.java){
+            unknown.paint{submitStreamBuffer(strategy(true),{events+="draw"},{events+="sync"})}
+        }
+        assertEquals(listOf("draw","show"),events)
+        assertNull(unknown.awaitDecision())
     }
 
     @Test fun boundsAndMalformedRowFailBeforeOrWithinChargedOwnership()=runBlocking {
