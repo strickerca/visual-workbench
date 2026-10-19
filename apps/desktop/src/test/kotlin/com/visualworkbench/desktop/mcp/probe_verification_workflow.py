@@ -95,7 +95,7 @@ public fun verificationHistory(original:WorkbenchProject):WorkbenchVerificationH
     selected_tests = original_coordinator_tests[:original_coordinator_tests.index('    @Test fun decoder')]
     selected_tests += original_coordinator_tests[original_coordinator_tests.index('    private suspend fun <T> drawCapture'):]
     coordinator_names = re.findall(r'@Test fun (\w+)\(', selected_tests)
-    assert len(coordinator_names) == 6
+    assert len(coordinator_names) == 7
     selected_tests = '\n'.join(line for line in selected_tests.splitlines() if not line.startswith('import org.junit.')).replace('@Test ', '')
     sources['CoordinatorSelectedTests.kt'] = selected_tests + helpers
     registration_tests = (tests / 'McpImageRegistrationTest.kt').read_text()
@@ -105,14 +105,34 @@ public fun verificationHistory(original:WorkbenchProject):WorkbenchVerificationH
     sources['RegistrationSelectedTests.kt'] = registration_tests + helpers
     recovery_tests = (tests / 'McpCaptureSourceRecoveryTest.kt').read_text()
     recovery_names = re.findall(r'@Test fun (\w+)\(', recovery_tests)
-    assert len(recovery_names) == 15
+    assert len(recovery_names) == 18
     recovery_tests = '\n'.join(line for line in recovery_tests.splitlines() if not line.startswith('import org.junit.')).replace('@Test ', '')
     # This Linux probe requires real symlink fixtures. Unlike JUnit's portable
     # assumption, unsupported fixture creation must fail this focused receipt.
     sources['RecoverySelectedTests.kt'] = recovery_tests + helpers + '\nprivate fun assumeNoException(error:Throwable):Nothing=throw AssertionError("Symlink fixture unavailable",error)\n'
-    coordinator_calls = ['McpCoordinatorTest().' + name + '()\nprintln("PASS ' + name + '")' for name in coordinator_names]
+    startup_tests = (tests / 'McpStartupTest.kt').read_text()
+    startup_tests = startup_tests[startup_tests.index('    @Test fun lateStartupResult'):startup_tests.index('    @Test fun expiredAndFutureOwner')]
+    startup_names = re.findall(r'@Test fun (\w+)\(', startup_tests)
+    assert len(startup_names) == 6
+    sources['StartupSelectedTests.kt'] = ('package com.visualworkbench.desktop.mcp\nimport kotlinx.coroutines.*\n'
+        'import java.util.concurrent.atomic.AtomicInteger\nclass McpStartupTest {\n' + startup_tests.replace('@Test ', '') + '\n}\n' + helpers)
+    sources['McpLifetimeDependencies.kt'] = '''package com.visualworkbench.desktop.mcp
+import com.visualworkbench.shared.WorkbenchCore
+import java.nio.file.Path
+internal class McpRuntime
+internal class DesktopMcpBundle(val runtime:McpRuntime=McpRuntime()):AutoCloseable {
+    override fun close(){}
+    companion object {fun prepare(parent:Path)=DesktopMcpBundle()}
+}
+internal object DesktopMcpService {
+    suspend fun open(runtime:McpRuntime,privateParent:Path,captureHelper:Path,captureSha256:String,
+        core:WorkbenchCore,deviceId:String):DesktopMcpCoordinator=error("Native startup unavailable in source probe")
+}
+'''
+    coordinator_calls = ['println("RUN ' + name + '")\nMcpCoordinatorTest().' + name + '()\nprintln("PASS ' + name + '")' for name in coordinator_names]
     coordinator_calls += ['McpImageRegistrationTest().' + name + '()\nprintln("PASS ' + name + '")' for name in registration_names]
     coordinator_calls += ['McpCaptureSourceRecoveryTest().' + name + '()\nprintln("PASS ' + name + '")' for name in recovery_names]
+    coordinator_calls += ['McpStartupTest().' + name + '()\nprintln("PASS ' + name + '")' for name in startup_names]
     sources['CoordinatorProbe.kt'] = 'package com.visualworkbench.desktop.mcp\nfun main(){\n' + '\n'.join(coordinator_calls) + '\n}\n'
     sources['SharedProbe.kt'] = 'package com.visualworkbench.shared\nfun main(){\n' + '\n'.join(calls) + '\n}\n'
     for name, text in sources.items():
@@ -120,7 +140,7 @@ public fun verificationHistory(original:WorkbenchProject):WorkbenchVerificationH
         path.write_text(text)
         files.append(str(path))
     files += [str(shared / 'VerificationInteraction.kt'), str(jvm / 'PackageOwnership.kt')]
-    files += [str(production / name) for name in ('McpJson.kt','McpVerificationTargets.kt','McpMarkerAssessments.kt','McpSemanticMarkerAlignment.kt','McpImageRegistration.kt','McpVerificationWorkflow.kt','McpCaptureSourceRecovery.kt')]
+    files += [str(production / name) for name in ('McpJson.kt','McpVerificationTargets.kt','McpMarkerAssessments.kt','McpSemanticMarkerAlignment.kt','McpImageRegistration.kt','McpVerificationWorkflow.kt','McpCaptureSourceRecovery.kt','DesktopMcpLifetime.kt')]
     files += [str(tests / 'McpVerificationWorkflowProbe.kt')]
     output = scratch / 'classes'
     command = [str(java), '-Xmx384m', '-cp', str(lib / '*'), 'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler', '-no-stdlib', '-no-reflect', '-Werror', '-jvm-target', '21', '-classpath', classpath, '-d', str(output), *files]

@@ -10,9 +10,10 @@ internal object McpVerificationWorkflowProbe {
     private val original=PackageInfo(id(1),"generic",null,WorkflowBinding(id(10),id(11),7uL,"a".repeat(64)),"b".repeat(64),"c".repeat(64),"2026-10-18",128uL,1u,
         listOf(PackageImageInfo("clean","clean_source","images/clean.png",256u,256u,64uL)),true,false)
     private val after=original.copy(packageId=id(2),binding=WorkflowBinding(id(20),id(21),8uL,"d".repeat(64)),sourceAssetId="e".repeat(64),manifestSha256="f".repeat(64),markerCount=0u)
-    private fun manifest(info:PackageInfo,semantic:Boolean):ByteArray {
+    private fun manifest(info:PackageInfo,semantic:Boolean,outputFrame:Boolean=false):ByteArray {
         val marker=if(info.markerCount==0u)"" else """{"number":1,"bbox_document":[10,10,30,30],"point_document":[15,15],"element_refs":[${reference(id(30),0,0,semantic)}]}"""
-        return """{"package_id":"${info.packageId}","source":{"project_id":"${info.binding.projectId}","document_id":"${info.binding.documentId}","asset_hash":"${info.sourceAssetId}","width":256,"height":256},"compiled_for":{"target":"generic","max_long_edge":2048,"scale":1},"markers":[$marker]}""".toByteArray()
+        val frame=if(outputFrame)""""image_output":{"version":1,"source_width":256,"source_height":256,"crop":{"x":0,"y":0,"width":256,"height":256},"clockwise_degrees":90,"output_width":256,"output_height":256,"resampling":"PremultipliedBilinearSourceSamplesV1"}"""" else ""
+        return """{"package_id":"${info.packageId}","source":{"project_id":"${info.binding.projectId}","document_id":"${info.binding.documentId}","asset_hash":"${info.sourceAssetId}","width":256,"height":256},"compiled_for":{"target":"generic","max_long_edge":2048,"scale":1},"markers":[$marker],"extensions":{$frame}}""".toByteArray()
     }
     private fun reference(snapshot:String,dx:Int,dy:Int,stable:Boolean)="""{"platform":"uia","eid":"$snapshot/one","name":"button","role":"button","automation_id":${if(stable)"\"stable\""else"null"},"resource_id":null,"html_id":null,"bounds_document":[${12+dx},${12+dy},24,24]}"""
     private fun semantic(info:PackageInfo,enabled:Boolean):ByteArray {
@@ -21,6 +22,7 @@ internal object McpVerificationWorkflowProbe {
         return """{"schema_version":1,"text_is_untrusted":true,"project_id":"${info.binding.projectId}","document_id":"${info.binding.documentId}","snapshot_id":${if(enabled)"\"$snapshot\""else"null"},"platform":"uia","elements":[${if(enabled)e else""}]}""".toByteArray()
     }
     private class Catalog(var semantics:Boolean=true):WorkbenchPackageCatalog {
+        var originalOutputFrame=false;var afterOutputFrame=false
         val saved=linkedMapOf(original.packageId to PublishedPackage(original,"/synthetic/original"),after.packageId to PublishedPackage(after,"/synthetic/after"))
         val reads=mutableListOf<Pair<String,String>>()
         override suspend fun publish(packageValue:WorkbenchCompiledPackage):PublishedPackage=error("unused")
@@ -28,7 +30,7 @@ internal object McpVerificationWorkflowProbe {
         override suspend fun lookup(packageId:String,target:String,manifestSha256:String)=requireNotNull(saved[packageId]).also{require(it.info.target==target&&it.info.manifestSha256==manifestSha256)}
         override suspend fun readFile(packageId:String,target:String,manifestSha256:String,name:String,maxBytes:UInt):ByteArray {
             val info=lookup(packageId,target,manifestSha256).info;reads+=packageId to name
-            return when(name){"manifest.json"->manifest(info,semantics);"semantic.json"->semantic(info,semantics);"images/clean.png"->byteArrayOf(1,2,3,4);else->error("unexpected path")}.also{require(it.size.toUInt()<=maxBytes)}
+            return when(name){"manifest.json"->manifest(info,semantics,if(info==original)originalOutputFrame else afterOutputFrame);"semantic.json"->semantic(info,semantics);"images/clean.png"->byteArrayOf(1,2,3,4);else->error("unexpected path")}.also{require(it.size.toUInt()<=maxBytes)}
         }
         override suspend fun pendingRetirement():PackageRetirement?=null
         override suspend fun retire(packageId:String,target:String,manifestSha256:String):PackageRetirement=error("unused")
@@ -121,6 +123,26 @@ internal object McpVerificationWorkflowProbe {
         refused{restarted.openHistory(saved)}
         println("PASS exact exclusive history cursor advances and old page cannot select")
         restarted.close()
+        suspend fun frameRefusal(before:Boolean,next:Boolean,label:String){
+            catalog.originalOutputFrame=before;catalog.afterOutputFrame=next
+            val workflow=McpVerificationWorkflow(catalog,inbox,capture,{catalog.lookup(it.packageId,it.target,it.manifestSha256)},{id(304)},{_,_,_,_->backend},{history})
+            workflow.originalAccess=object:McpVerificationOriginalAccess {
+                override fun owns(expected:PackageInfo)=true
+                override suspend fun<T> withOriginal(expected:PackageInfo,body:suspend(WorkbenchProject)->T):T=throw PackageFailure(PackageFailureKind.Stale)
+                override suspend fun<T> withCurrentVerificationOriginal(body:suspend(WorkbenchProject)->T):T=body(project)
+            }
+            check(workflow.history(null).snapshots==listOf(saved))
+            val prior=checks
+            refused{workflow.openHistory(saved)}
+            refused{workflow.review(receipt)}
+            check(checks==prior+1&&capture.borrows==0)
+            println("PASS history refuses $label before entry registration")
+            workflow.close()
+        }
+        frameRefusal(true,false,"original-only output frame")
+        frameRefusal(false,true,"after-only output frame")
+        frameRefusal(true,true,"equal-size quarter-turn output frames")
+        catalog.originalOutputFrame=false;catalog.afterOutputFrame=false
     }
     private class Capture: McpCaptureEngine {
         var borrows=0
@@ -203,6 +225,6 @@ internal object McpVerificationWorkflowProbe {
         check(backend.compileCalls==2);println("PASS uniform equal-size images do not invent alignment or compile failures")
         workflow.retire(after);refused{workflow.review(receipt)};println("PASS after retirement invalidates pair")
         historyCases()
-        println("24 synthetic workflow-routing cases passed; native, app, OS and device gates remain unrun.")
+        println("27 synthetic workflow-routing cases passed; native, app, OS and device gates remain unrun.")
     }
 }
