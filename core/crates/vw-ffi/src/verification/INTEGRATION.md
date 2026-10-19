@@ -1,6 +1,6 @@
 # T5.01 verification integration handoff
 
-## Checked image coordinates (2026-10-19 V leaf)
+## Framed verification (2026-10-19 V leaf)
 
 After composing root's `vw_package::verification_image_geometry` at
 `6fd99bf7f7523071f0f955603461c42af387312c`, retain this branch's new
@@ -9,23 +9,37 @@ After composing root's `vw_package::verification_image_geometry` at
 `PackageCatalog.verification_coordinate_pair(pair, cancellation)` and its
 `VerificationCoordinatePair` / `VerificationImageCoordinates` records. The
 shared `verificationCoordinates(catalog, pair)` adapter calls that exact method;
-there is no Desktop call yet. The native method reopens both exact checked
+Desktop comparison now calls it. The native method reopens both exact checked
 catalog packages, checks target profiles, projects their canonical geometry,
 includes binding and source-asset identities, and rechecks the catalog. It
 returns continuous `content_bounds` separately from rounded-up `content_size`
 so a fractional edge pixel is not treated as fully supported registration
 content. It grants no capture, receipt, alignment or review authority.
 
-The native and Desktop frame refusals in `verification/checked.rs` and
-`McpVerificationWorkflow.kt` remain. Positive framed verification still needs
-paired-pixel normalization/registration in the Desktop comparison owner and
-native failure-crop/source checks before either refusal can be removed. The
-existing non-framed path is unchanged. The new ordinary-package integration
-assertions and fractional-edge unit case are source-authored but **unrun**:
-the parent holds the shared heavy build slot. Exact deferred checks after root
-composition: `cargo test --locked --offline -p vw-ffi verification -j2` and
-`cargo test --locked --offline -p vw-package verification_geometry:: -j2`.
-No OS recapture, target registration or A30 evidence is claimed.
+`McpNormalizedVerification.kt` maps retained inbox tiles through those exact
+matrices onto a common D-space grid. Every sampled physical pixel must have
+its full square inside continuous content, and each tile/receipt/canvas identity
+is checked. Reads are limited to 16 tiles per side and 512² output samples;
+unsupported support or ambiguous registration stays unresolved. Semantic IDs
+can supply an integer D shift; the existing bounded image registrar also runs
+on normalized D tiles. Framed per-marker crops use that same grid, including
+original-only, after-only and equal-size quarter turns. Failure compilation
+rechecks paired pixel availability; native `prepare.rs` checks whole original
+and translated failed-marker regions against saved crops before host work.
+Native pair/source currentness uses checked geometry rather than the temporary
+frame refusal. The ordinary scalar path is retained for unframed packages.
+
+Cheap isolated Kotlin compilation and execution passed five normalized-pixel
+regression methods plus the complete synthetic workflow routing probe (including
+framed semantic comparison/failure routing, rotated after-frame image
+registration, partial-crop refusal and historical source mismatch). Rustfmt
+and whitespace checks passed. Native FFI/package
+tests, generated-binding compilation, full Desktop/ABI and real capture/device
+acceptance are **unrun**: the parent holds the shared heavy slot. Exact deferred
+checks after root composition: `cargo test --locked --offline -p vw-ffi verification -j2`,
+`cargo test --locked --offline -p vw-package verification_geometry:: -j2`, and
+the focused Desktop verification tests. No OS recapture, actual target
+registration or A30 pass is claimed.
 
 Base `47f2b82da1799a8481af7e92998f5ea56dc9c087`; branch
 `cloud/t5-01-history-20261018`; grant
@@ -87,16 +101,6 @@ BLOB/TEXT keys and 40,000 unrelated rows: empty history costs 46 VM steps on
 SQLite 3.53.1 (40 on system 3.46.1), while the old predicate costs 200,015.
 The 65-row limit sentinel remains bounded at 1,196/1,190 steps. Native store
 tests remain unrun pending the shared heavy slot.
-
-Until root composes the positive O package and an actual D-to-O comparison,
-`verification/checked.rs` refuses a checked pair if either manifest has a
-non-null `extensions.image_output`, and refuses the current source likewise
-(`PackageError::Unsupported`). Its bounded manifest-field probe builds before
-and after the O type lands. Desktop historical open checks both manifests before
-entry registration; original-only, after-only and equal-size 90-degree cases
-refuse, while ordinary saved history still opens after a current revision change.
-Root must retain these refusal gates when composing O, then replace them with
-one canonical D/O projection before enabling transformed verification.
 
 ## Registration
 

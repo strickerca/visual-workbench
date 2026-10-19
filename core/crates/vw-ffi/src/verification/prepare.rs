@@ -140,6 +140,65 @@ pub(super) fn translations(
     }
     Ok(out)
 }
+fn admit_failure_region(
+    image: vw_package::VerificationImageGeometry,
+    bounds: [f64; 4],
+) -> PackageResult<()> {
+    let region = vw_geom::Rect::new(bounds[0], bounds[1], bounds[2], bounds[3])
+        .map_err(|_| PackageError::Invalid)?;
+    image.document_region(region)?;
+    Ok(())
+}
+/// A saved crop must contain the entire original failed marker and its
+/// translated after marker. This runs before any isolated host/compiler work;
+/// the normal compiler still validates every instruction and output image.
+fn admit_failure_crops(checked: &CheckedPair, request: &CompileRequest) -> PackageResult<()> {
+    let original = vw_package::verification_image_geometry(&checked.original)?;
+    let after = vw_package::verification_image_geometry(&checked.after)?;
+    for authored in &request.authoring.markers {
+        let marker = checked
+            .original
+            .manifest()
+            .markers
+            .get(authored.original_number as usize - 1)
+            .ok_or(PackageError::Invalid)?;
+        let translation = request
+            .translations
+            .get(&authored.original_number)
+            .ok_or(PackageError::Invalid)?;
+        let moved = translated(
+            marker,
+            translation,
+            checked.after.manifest().source.width,
+            checked.after.manifest().source.height,
+        )?;
+        admit_failure_region(original, marker.bbox_document)?;
+        admit_failure_region(after, moved.bounds)?;
+    }
+    Ok(())
+}
+#[cfg(test)]
+mod frame_tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+    #[test]
+    fn failure_region_requires_the_entire_saved_crop_even_with_padded_image_pixels() {
+        let image = vw_package::VerificationImageGeometry {
+            source_size: [100, 80],
+            output_size: [30, 40],
+            image_size: [64, 64],
+            content_size: [30, 40],
+            crop_document: vw_geom::Rect::new(10.0, 20.0, 30.0, 40.0).unwrap(),
+            document_to_image: vw_geom::Affine::IDENTITY,
+            image_to_document: vw_geom::Affine::IDENTITY,
+            has_output_frame: true,
+        };
+        assert!(admit_failure_region(image, [12.0, 25.0, 10.0, 12.0]).is_ok());
+        assert!(admit_failure_region(image, [9.0, 25.0, 10.0, 12.0]).is_err());
+        assert!(admit_failure_region(image, [35.0, 25.0, 10.0, 12.0]).is_err());
+        assert!(admit_failure_region(image, [12.0, 25.0, 0.0, 12.0]).is_err());
+    }
+}
 fn role(value: &str) -> PackageResult<Role> {
     match value {
         "none" => Ok(Role::None),
@@ -228,6 +287,7 @@ pub(super) fn compile(
 ) -> PackageResult<vw_package::Package> {
     stop.check()?;
     source_current(state, &checked.after)?;
+    admit_failure_crops(checked, &request)?;
     if state.replica.is_some() || !checked.after.manifest().markers.is_empty() {
         return Err(PackageError::Stale);
     }

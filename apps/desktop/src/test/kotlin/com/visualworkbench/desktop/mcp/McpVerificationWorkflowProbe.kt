@@ -12,7 +12,7 @@ internal object McpVerificationWorkflowProbe {
     private val after=original.copy(packageId=id(2),binding=WorkflowBinding(id(20),id(21),8uL,"d".repeat(64)),sourceAssetId="e".repeat(64),manifestSha256="f".repeat(64),markerCount=0u)
     private fun manifest(info:PackageInfo,semantic:Boolean,outputFrame:Boolean=false):ByteArray {
         val marker=if(info.markerCount==0u)"" else """{"number":1,"bbox_document":[10,10,30,30],"point_document":[15,15],"element_refs":[${reference(id(30),0,0,semantic)}]}"""
-        val frame=if(outputFrame)""""image_output":{"version":1,"source_width":256,"source_height":256,"crop":{"x":0,"y":0,"width":256,"height":256},"clockwise_degrees":90,"output_width":256,"output_height":256,"resampling":"PremultipliedBilinearSourceSamplesV1"}"""" else ""
+        val frame=if(outputFrame)""" "image_output":{"version":1,"source_width":256,"source_height":256,"crop":{"x":0,"y":0,"width":256,"height":256},"clockwise_degrees":90,"output_width":256,"output_height":256,"resampling":"PremultipliedBilinearSourceSamplesV1"} """.trim() else ""
         return """{"package_id":"${info.packageId}","source":{"project_id":"${info.binding.projectId}","document_id":"${info.binding.documentId}","asset_hash":"${info.sourceAssetId}","width":256,"height":256},"compiled_for":{"target":"generic","max_long_edge":2048,"scale":1},"markers":[$marker],"extensions":{$frame}}""".toByteArray()
     }
     private fun reference(snapshot:String,dx:Int,dy:Int,stable:Boolean)="""{"platform":"uia","eid":"$snapshot/one","name":"button","role":"button","automation_id":${if(stable)"\"stable\""else"null"},"resource_id":null,"html_id":null,"bounds_document":[${12+dx},${12+dy},24,24]}"""
@@ -23,6 +23,8 @@ internal object McpVerificationWorkflowProbe {
     }
     private class Catalog(var semantics:Boolean=true):WorkbenchPackageCatalog {
         var originalOutputFrame=false;var afterOutputFrame=false
+        var badSourceCoordinates=false
+        var narrowAfterCrop=false
         val saved=linkedMapOf(original.packageId to PublishedPackage(original,"/synthetic/original"),after.packageId to PublishedPackage(after,"/synthetic/after"))
         val reads=mutableListOf<Pair<String,String>>()
         override suspend fun publish(packageValue:WorkbenchCompiledPackage):PublishedPackage=error("unused")
@@ -35,12 +37,25 @@ internal object McpVerificationWorkflowProbe {
         override suspend fun pendingRetirement():PackageRetirement?=null
         override suspend fun retire(packageId:String,target:String,manifestSha256:String):PackageRetirement=error("unused")
         override suspend fun close(){}
+        fun coordinates(pair:VerificationPair):VerificationCoordinatePair {
+            fun image(info:PackageInfo,framed:Boolean):VerificationImageCoordinates {
+                val forward=if(framed)listOf(0.0,1.0,-1.0,0.0,256.0,0.0)else listOf(1.0,0.0,0.0,1.0,0.0,0.0)
+                val inverse=if(framed)listOf(0.0,-1.0,1.0,0.0,0.0,256.0)else forward
+                val crop=if(info==after&&narrowAfterCrop)listOf(0.0,0.0,20.0,20.0)else listOf(0.0,0.0,256.0,256.0)
+                return VerificationImageCoordinates(info.verificationKey(),info.binding,
+                    if(badSourceCoordinates&&info==after)"0".repeat(64)else info.sourceAssetId,
+                    256u,256u,256u,256u,256u,256u,256u,256u,
+                    listOf(0.0,0.0,256.0,256.0),crop,forward,inverse,framed)
+            }
+            return VerificationCoordinatePair(pair,image(original,originalOutputFrame),image(after,afterOutputFrame))
+        }
     }
     private class Inbox:WorkbenchMcpInbox {
         var submission:McpInboxSubmission?=null
         var receipt:McpInboxReceipt?=null
         val regions=mutableListOf<Pair<McpInboxSide,McpInboxRegion>>()
         var savedPng=byteArrayOf(1,2,3,4)
+        var patterned=false;var afterTurn=false
         override suspend fun submit(catalog:WorkbenchPackageCatalog,submission:McpInboxSubmission):McpInboxReceipt {
             this.submission=submission;val info=catalog.lookup(submission.packageId,submission.target,submission.manifestSha256).info
             val image=McpInboxImage(256u,256u,8u,64uL,"a".repeat(64),null,1u)
@@ -53,7 +68,18 @@ internal object McpVerificationWorkflowProbe {
         }
         override suspend fun pixels(receiptId:String,receiptBlake3:String,side:McpInboxSide,region:McpInboxRegion,assumeUntaggedSrgb:Boolean,allowDepthReduction:Boolean):McpInboxPixels {
             require(this.receipt?.receiptId==receiptId&&this.receipt?.receiptBlake3==receiptBlake3);regions+=side to region
-            return McpInboxPixels(receiptId,receiptBlake3,side,region,256u,256u,ByteArray(region.width.toInt()*region.height.toInt()*4))
+            val bytes=ByteArray(region.width.toInt()*region.height.toInt()*4)
+            if(patterned)for(y in 0 until region.height.toInt())for(x in 0 until region.width.toInt()){
+                val px=region.x.toInt()+x;val py=region.y.toInt()+y
+                val dx=if(side==McpInboxSide.After&&afterTurn)py else px
+                val dy=if(side==McpInboxSide.After&&afterTurn)255-px else py
+                val sx=dx-if(side==McpInboxSide.After)7 else 0
+                val sy=dy-if(side==McpInboxSide.After)3 else 0
+                val value=if(sx in 0..255&&sy in 0..255)((sx*73+sy*151) xor (sx*sy*19)) and 0xffffff else 0
+                val at=(y*region.width.toInt()+x)*4
+                bytes[at]=value.toByte();bytes[at+1]=(value ushr 8).toByte();bytes[at+2]=(value ushr 16).toByte();bytes[at+3]=255.toByte()
+            }
+            return McpInboxPixels(receiptId,receiptBlake3,side,region,256u,256u,bytes)
         }
         override suspend fun retire(receiptId:String,receiptBlake3:String):McpInboxRetirement=error("unused")
         override suspend fun close(){}
@@ -61,7 +87,7 @@ internal object McpVerificationWorkflowProbe {
     private suspend fun historyCases() {
         val catalog=Catalog();val inbox=Inbox();val capture=Capture();val backend=Backend()
         val relation=McpVerificationRecapture(McpVerificationPackage.of(original),McpVerificationPackage.of(after))
-        val first=McpVerificationWorkflow(catalog,inbox,capture,{catalog.lookup(it.packageId,it.target,it.manifestSha256)},{id(300)},{_,_,_,_->backend})
+        val first=McpVerificationWorkflow(catalog,inbox,capture,{catalog.lookup(it.packageId,it.target,it.manifestSha256)},{id(300)},{_,_,_,_->backend},coordinateFactory={_,pair->catalog.coordinates(pair)})
         first.remember(relation,"a".repeat(32))
         val receipt=requireNotNull(inbox.receipt)
         val saved=VerificationReviewSnapshot(VerificationPair(original.verificationKey(),after.verificationKey(),receipt.receiptId,receipt.receiptBlake3),
@@ -85,7 +111,7 @@ internal object McpVerificationWorkflowProbe {
             if(method.name=="info")ProjectInfo(projectId,"synthetic",id(90),1uL,false,false,99uL,"8".repeat(64),listOf(original.binding.documentId))
             else error("Unexpected historical source call ${method.name}")
         } as WorkbenchProject
-        val restarted=McpVerificationWorkflow(catalog,inbox,capture,{catalog.lookup(it.packageId,it.target,it.manifestSha256)},{id(301)},{_,_,_,_->backend},{history})
+        val restarted=McpVerificationWorkflow(catalog,inbox,capture,{catalog.lookup(it.packageId,it.target,it.manifestSha256)},{id(301)},{_,_,_,_->backend},{history},{_,pair->catalog.coordinates(pair)})
         refused{restarted.history(null)};println("PASS history requires a currently borrowed original owner")
         restarted.originalAccess=object:McpVerificationOriginalAccess {
             override fun owns(expected:PackageInfo)=true
@@ -123,25 +149,37 @@ internal object McpVerificationWorkflowProbe {
         refused{restarted.openHistory(saved)}
         println("PASS exact exclusive history cursor advances and old page cannot select")
         restarted.close()
-        suspend fun frameRefusal(before:Boolean,next:Boolean,label:String){
+        suspend fun frameComparison(before:Boolean,next:Boolean,label:String){
             catalog.originalOutputFrame=before;catalog.afterOutputFrame=next
-            val workflow=McpVerificationWorkflow(catalog,inbox,capture,{catalog.lookup(it.packageId,it.target,it.manifestSha256)},{id(304)},{_,_,_,_->backend},{history})
+            val workflow=McpVerificationWorkflow(catalog,inbox,capture,{catalog.lookup(it.packageId,it.target,it.manifestSha256)},{id(304)},{_,_,_,_->backend},{history},{_,pair->catalog.coordinates(pair)})
             workflow.originalAccess=object:McpVerificationOriginalAccess {
                 override fun owns(expected:PackageInfo)=true
                 override suspend fun<T> withOriginal(expected:PackageInfo,body:suspend(WorkbenchProject)->T):T=throw PackageFailure(PackageFailureKind.Stale)
                 override suspend fun<T> withCurrentVerificationOriginal(body:suspend(WorkbenchProject)->T):T=body(project)
             }
             check(workflow.history(null).snapshots==listOf(saved))
-            val prior=checks
-            refused{workflow.openHistory(saved)}
-            refused{workflow.review(receipt)}
-            check(checks==prior+1&&capture.borrows==0)
-            println("PASS history refuses $label before entry registration")
+            check(workflow.openHistory(saved)==receipt)
+            val comparison=workflow.comparison(original.verificationKey(),receipt.receiptId,receipt.receiptBlake3,1u)
+            check(comparison.method=="semantic"&&comparison.before?.region==McpInboxRegion(0u,0u,30u,30u)&&
+                comparison.after?.region==McpInboxRegion(0u,0u,30u,30u))
+            check(workflow.review(receipt)==saved&&capture.borrows==0)
+            println("PASS $label uses checked coordinates and aligned D-grid crops")
             workflow.close()
         }
-        frameRefusal(true,false,"original-only output frame")
-        frameRefusal(false,true,"after-only output frame")
-        frameRefusal(true,true,"equal-size quarter-turn output frames")
+        frameComparison(true,false,"original-only output frame")
+        frameComparison(false,true,"after-only output frame")
+        frameComparison(true,true,"equal-size quarter-turn output frames")
+        catalog.badSourceCoordinates=true
+        val mismatch=McpVerificationWorkflow(catalog,inbox,capture,{catalog.lookup(it.packageId,it.target,it.manifestSha256)},{id(305)},{_,_,_,_->backend},{history},{_,pair->catalog.coordinates(pair)})
+        mismatch.originalAccess=object:McpVerificationOriginalAccess {
+            override fun owns(expected:PackageInfo)=true
+            override suspend fun<T> withOriginal(expected:PackageInfo,body:suspend(WorkbenchProject)->T):T=throw PackageFailure(PackageFailureKind.Stale)
+            override suspend fun<T> withCurrentVerificationOriginal(body:suspend(WorkbenchProject)->T):T=body(project)
+        }
+        check(mismatch.history(null).snapshots==listOf(saved))
+        refused{mismatch.openHistory(saved)}
+        println("PASS historical frame pair refuses a mismatched checked after source")
+        mismatch.close();catalog.badSourceCoordinates=false
         catalog.originalOutputFrame=false;catalog.afterOutputFrame=false
     }
     private class Capture: McpCaptureEngine {
@@ -183,7 +221,7 @@ internal object McpVerificationWorkflowProbe {
         check(verificationCropRegion(Rect(31.5,1.0,1.0,1.0),1.0,32u,32u)==null)
         println("PASS fractional edges include the final covered pixel and explicit tile bounds")
         val catalog=Catalog();val inbox=Inbox();val capture=Capture();val backend=Backend()
-        val workflow=McpVerificationWorkflow(catalog,inbox,capture,{catalog.lookup(it.packageId,it.target,it.manifestSha256)},{id(100)},{_,_,_,_->backend})
+        val workflow=McpVerificationWorkflow(catalog,inbox,capture,{catalog.lookup(it.packageId,it.target,it.manifestSha256)},{id(100)},{_,_,_,_->backend},coordinateFactory={_,pair->catalog.coordinates(pair)})
         val relation=McpVerificationRecapture(McpVerificationPackage.of(original),McpVerificationPackage.of(after))
         val result=workflow.remember(relation,"a".repeat(32));val receipt=requireNotNull(inbox.receipt)
         check(result.original==original.verificationKey()&&result.after==after.verificationKey()&&result.receiptId==id(100))
@@ -223,8 +261,28 @@ internal object McpVerificationWorkflowProbe {
         check(unresolved.method==null&&unresolved.before==null&&unresolved.after==null)
         refused{workflow.compile(review.copy(markers=listOf(VerificationMarkerReview(1u,VerificationVerdict.Fail,""))),id(200),0,false,false)}
         check(backend.compileCalls==2);println("PASS uniform equal-size images do not invent alignment or compile failures")
+        catalog.semantics=true;catalog.originalOutputFrame=true;catalog.afterOutputFrame=true
+        val framed=workflow.comparison(original.verificationKey(),receipt.receiptId,receipt.receiptBlake3,1u)
+        check(framed.method=="semantic"&&framed.before?.region==McpInboxRegion(0u,0u,30u,30u)&&
+            framed.after?.region==McpInboxRegion(0u,0u,30u,30u))
+        requireNotNull(workflow.compile(failed,id(202),0,false,false)).close()
+        check(backend.compileCalls==3&&backend.translations==listOf(VerificationMarkerTranslation(1u,7.0,3.0)))
+        println("PASS framed semantic pair compares normalized pixels and routes a measured failure")
+        catalog.semantics=false;catalog.originalOutputFrame=false;catalog.afterOutputFrame=true
+        inbox.patterned=true;inbox.afterTurn=true
+        val registered=workflow.comparison(original.verificationKey(),receipt.receiptId,receipt.receiptBlake3,1u)
+        check(registered.method=="registration"&&registered.before!=null&&registered.after!=null)
+        println("PASS rotated after frame registers a unique measured D translation without semantic IDs")
+        inbox.patterned=false;inbox.afterTurn=false;catalog.semantics=true;catalog.originalOutputFrame=true;catalog.afterOutputFrame=true
+        catalog.narrowAfterCrop=true
+        val cropped=workflow.comparison(original.verificationKey(),receipt.receiptId,receipt.receiptBlake3,1u)
+        check(cropped.method==null&&cropped.before==null&&cropped.after==null)
+        refused{workflow.compile(failed,id(203),0,false,false)}
+        check(backend.compileCalls==3)
+        println("PASS partial after crop refuses comparison and failure compilation")
+        catalog.narrowAfterCrop=false;catalog.originalOutputFrame=false;catalog.afterOutputFrame=false
         workflow.retire(after);refused{workflow.review(receipt)};println("PASS after retirement invalidates pair")
         historyCases()
-        println("27 synthetic workflow-routing cases passed; native, app, OS and device gates remain unrun.")
+        println("Synthetic workflow-routing cases passed; native, app, OS and device gates remain unrun.")
     }
 }
