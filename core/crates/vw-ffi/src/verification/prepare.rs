@@ -331,6 +331,7 @@ pub(super) fn compile(
         .iter()
         .find(|(_, layer)| {
             layer.definition.document_id == Some(document.to_proto())
+                && layer.definition.kind != vw_model::IMAGE_OUTPUT_LAYER_KIND
                 && layer.visible
                 && !layer.locked
                 && layer.opacity > 0.0

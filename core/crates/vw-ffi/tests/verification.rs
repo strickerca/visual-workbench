@@ -5,6 +5,7 @@ use std::sync::Arc;
 use support::*;
 use vw_core::*;
 const BUDGET: u64 = 256 * 1024 * 1024;
+static TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 fn key(info: &PackageInfo) -> VerificationPackageKey {
     VerificationPackageKey {
@@ -94,10 +95,231 @@ async fn publish(
     compiled.dispose();
     published.info
 }
+async fn manifest_json(catalog: &Arc<PackageCatalog>, info: &PackageInfo) -> serde_json::Value {
+    let bytes = catalog
+        .read_file(
+            info.package_id.clone(),
+            info.target.clone(),
+            info.manifest_sha256.clone(),
+            "manifest.json".into(),
+            4 * 1024 * 1024,
+            cancel(),
+        )
+        .await
+        .unwrap();
+    serde_json::from_slice(&bytes).unwrap()
+}
+
+/// The reserved frame layer sorts before the ordinary art layer. Failure
+/// authoring must select the latter so the single-object output invariant
+/// survives compilation of a framed recapture.
+async fn frame_after(project: &Arc<ProjectSession>) {
+    let snapshot = project
+        .image_frames_snapshot(id(12), BUDGET, cancel())
+        .await
+        .unwrap();
+    let info = project.info().await.unwrap();
+    let plan = project
+        .clone()
+        .prepare_image_frame(
+            snapshot.binding,
+            WorkflowMetadata {
+                transaction_id: id(70),
+                device_id: info.device_id,
+                first_lamport: info.next_lamport,
+                created_at_ms: TIME + 70,
+            },
+            ImageFrameCommand::Set {
+                layer_id: id(4),
+                object_id: id(5),
+                settings: ImageFrameSettings {
+                    crop_x: 4,
+                    crop_y: 5,
+                    crop_width: 40,
+                    crop_height: 40,
+                    clockwise_degrees: 90,
+                    output_width: 40,
+                    output_height: 40,
+                },
+                enabled: true,
+            },
+            BUDGET,
+            cancel(),
+        )
+        .await
+        .unwrap();
+    plan.commit(cancel()).await.unwrap();
+    plan.dispose();
+}
+
+#[tokio::test]
+async fn framed_after_failure_uses_art_layer_and_preserves_output_frame() {
+    let _serial = TESTS.lock().await;
+    let root = tempfile::tempdir().unwrap();
+    let original = create_image_project(create(&root.path().join("original")), cancel())
+        .await
+        .unwrap();
+    marked(
+        &original,
+        20,
+        "framed follow-up",
+        InstructionRole::Preserve,
+        Some(QueryRect {
+            x: 6.0,
+            y: 7.0,
+            width: 12.0,
+            height: 10.0,
+        }),
+    )
+    .await;
+    let mut after_options = create(&root.path().join("after"));
+    after_options.project_id = id(11);
+    after_options.document_id = id(12);
+    after_options.layer_id = id(13);
+    let after = create_image_project(after_options, cancel()).await.unwrap();
+    frame_after(&after).await;
+    assert!(id(4) < id(13));
+    assert_eq!(
+        after
+            .image_frames_snapshot(id(12), BUDGET, cancel())
+            .await
+            .unwrap()
+            .frame
+            .unwrap()
+            .layer_id,
+        id(4)
+    );
+    let catalog = open_package_catalog(root.path().to_string_lossy().into(), cancel())
+        .await
+        .unwrap();
+    let before_info = publish(&original, &catalog, 40, 2).await;
+    let after_info = publish(&after, &catalog, 41, 12).await;
+    let after_png = catalog
+        .read_file(
+            after_info.package_id.clone(),
+            after_info.target.clone(),
+            after_info.manifest_sha256.clone(),
+            after_info
+                .images
+                .iter()
+                .find(|image| image.role == "clean_source")
+                .unwrap()
+                .path
+                .clone(),
+            4 * 1024 * 1024,
+            cancel(),
+        )
+        .await
+        .unwrap();
+    let inbox = open_mcp_result_inbox(root.path().to_string_lossy().into(), cancel())
+        .await
+        .unwrap();
+    let receipt = inbox
+        .submit(
+            catalog.clone(),
+            McpInboxSubmission {
+                receipt_id: id(50),
+                package_id: before_info.package_id.clone(),
+                target: before_info.target.clone(),
+                manifest_sha256: before_info.manifest_sha256.clone(),
+                connection: "ab".repeat(16),
+                created_at_ms: TIME + 50,
+                text: None,
+                png: Some(after_png),
+                note: String::new(),
+            },
+            cancel(),
+        )
+        .await
+        .unwrap();
+    let pair = VerificationPair {
+        original: key(&before_info),
+        after: key(&after_info),
+        receipt_id: receipt.receipt_id,
+        receipt_blake3: receipt.receipt_blake3,
+    };
+    let geometry = catalog
+        .verification_coordinate_pair(pair.clone(), cancel())
+        .await
+        .unwrap();
+    assert!(!geometry.original.has_output_frame && geometry.after.has_output_frame);
+    assert_eq!(geometry.after.crop_document, [4.0, 5.0, 40.0, 40.0]);
+    assert_eq!(
+        original
+            .verification_review(
+                after.clone(),
+                catalog.clone(),
+                inbox.clone(),
+                pair.clone(),
+                cancel(),
+            )
+            .await
+            .unwrap()
+            .version,
+        0
+    );
+    let review = original
+        .change_verification_review(
+            after.clone(),
+            catalog.clone(),
+            inbox.clone(),
+            pair.clone(),
+            0,
+            id(60),
+            1,
+            VerificationVerdict::Fail,
+            String::new(),
+            cancel(),
+        )
+        .await
+        .unwrap();
+    let failures = original
+        .compile_verification_failures(
+            after.clone(),
+            catalog.clone(),
+            inbox.clone(),
+            pair,
+            review,
+            vec![VerificationMarkerTranslation {
+                original_number: 1,
+                dx: 3.0,
+                dy: 4.0,
+            }],
+            id(90),
+            TIME + 90,
+            BUDGET,
+            cancel(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    let published = catalog.publish(failures.clone(), cancel()).await.unwrap();
+    assert_eq!(published.info.marker_count, 1);
+    let after_manifest = manifest_json(&catalog, &after_info).await;
+    let followup_manifest = manifest_json(&catalog, &published.info).await;
+    assert_eq!(
+        followup_manifest["extensions"]["image_output"],
+        after_manifest["extensions"]["image_output"]
+    );
+    assert_eq!(
+        followup_manifest["markers"][0]["bbox_document"],
+        serde_json::json!([9.0, 11.0, 12.0, 10.0])
+    );
+    assert_eq!(
+        followup_manifest["extensions"]["verification_origin"]["original_marker_numbers"],
+        serde_json::json!([1])
+    );
+    failures.dispose();
+    inbox.shutdown().await.unwrap();
+    catalog.shutdown().await.unwrap();
+    after.close().await.unwrap();
+    original.close().await.unwrap();
+}
 
 #[tokio::test]
 async fn durable_manual_cas_checks_real_pair_and_compiles_only_failed_markers_against_full_after_source()
  {
+    let _serial = TESTS.lock().await;
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("original");
     let mut original = create_image_project(create(&path), cancel()).await.unwrap();
