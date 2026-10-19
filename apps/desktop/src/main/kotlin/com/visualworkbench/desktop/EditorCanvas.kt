@@ -33,23 +33,37 @@ import kotlinx.coroutines.withContext
 internal enum class PaintKind { ObjectFill, StrokeFill, Outline }
 internal data class PaintPass(val path:Path,val kind:PaintKind,val documentPath:Path?=null)
 internal data class CanvasGeometry(val passes:List<PaintPass>)
-internal data class GeometryFrame<T>(val binding:RenderBinding,val document:DocumentSnapshot,val entries:Map<String,T>,val page:UInt=0u) {
-    fun current(state:EditorState):GeometryFrame<T>? = takeIf{geometryMatches(binding,state)&&document===state.document&&page==state.documentPage}
+internal data class GeometryFrame<T>(val binding:RenderBinding,val document:DocumentSnapshot,val entries:Map<String,T>,val page:UInt=0u,
+    val guideIds:Set<String> = emptySet()) {
+    fun current(state:EditorState):GeometryFrame<T>? = takeIf{geometryMatches(binding,state)&&document===state.document&&page==state.documentPage&&guideIds==state.composedGuideIds}
 }
 internal data class OverlayFrame(val binding:RenderBinding,val source:List<RenderItem>,val entries:Map<String,CanvasGeometry>)
-/** A composed D bitmap owns canonical paint. A transient replacement of an
- * existing object must first retire that bitmap, or the old pose stays baked in. */
+/** The composed bitmap owns canonical paint. Transient replacements of its
+ * objects are indicated by outlines, never painted over their baked poses. */
 internal fun composedCanvasCurrent(state:EditorState,binding:RenderBinding):Boolean =
-    state.composedBackground==binding&&state.preview.isEmpty()&&state.previewStyles.isEmpty()&&
-        state.peerFrame?.takeIf{it.binding==binding}?.previews?.items?.none{peer->
-            state.document?.render?.items?.any{it.objectId==peer.objectId}==true
-        }!=false
+    state.background!=null&&state.composedBackground==binding&&state.document?.binding(state.projectEpoch)==binding
 
-internal fun canvasItems(document:DocumentSnapshot,composed:Boolean,replacements:Map<String,RenderItem>):List<RenderItem>{
+internal fun canvasItems(document:DocumentSnapshot,composed:Boolean,replacements:Map<String,RenderItem>,
+    selectionGuideIds:Set<String> = emptySet()):List<RenderItem>{
     val originalIds=document.render.items.mapTo(hashSetOf()){it.objectId}
-    val canonical=if(composed)emptyList() else document.render.items.filterNot{it.shape is Shape.Adjustment}
+    val canonical=document.render.items.filterNot{it.shape is Shape.Adjustment}.filter{
+        !composed||it.shape is Shape.Guide||it.objectId in selectionGuideIds
+    }
     return canonical.map{replacements[it.objectId]?:it}+
         replacements.values.filter{it.objectId !in originalIds&&it.shape !is Shape.Adjustment}
+}
+/** Baked canonical objects remain one paint in the bitmap. Their proposed
+ * local or peer geometry is a wireframe until the native revision is composed. */
+internal fun transientCanonicalOutlines(state:EditorState,replacements:Map<String,RenderItem>):List<Rect>{
+    val doc=state.document?:return emptyList()
+    val binding=doc.binding(state.projectEpoch)
+    val peerIds=state.peerFrame?.takeIf{it.binding==binding}?.previews?.items?.map{it.objectId}.orEmpty()
+    val ids=state.preview.keys+state.previewStyles.keys+peerIds
+    return doc.render.items.filter{it.objectId in ids&&it.shape !is Shape.Adjustment&&
+        it.shape !is Shape.Guide&&it.objectId !in state.composedGuideIds}.map{item->
+        val replacement=replacements[item.objectId]?:item
+        previewBounds(replacement,state.preview[item.objectId])
+    }
 }
 internal fun overlayItems(state:EditorState):List<RenderItem>{
     val document=state.document?:return emptyList();val binding=document.binding(state.projectEpoch)
@@ -83,7 +97,7 @@ private fun Rect.compose():androidx.compose.ui.geometry.Rect = androidx.compose.
 
 /** Ordered passes mirror vw-raster: marker circle and box each composite their
  * own fill/outline, while an ink stroke is one compound NONZERO fill. */
-internal fun prepareGeometry(item:RenderItem,markerText:TextLayout?=null,checkCancelled:()->Unit={}):CanvasGeometry {
+internal fun prepareGeometry(item:RenderItem,markerText:TextLayout?=null,selectionGuide:Boolean=false,checkCancelled:()->Unit={}):CanvasGeometry {
     val passes=mutableListOf<PaintPass>()
     fun stroke(path:Path){if(item.style.width>0.0)passes+=PaintPass(path,PaintKind.Outline,if(item.style.screenConstantWidth)path.transformed(item.transform)else null)}
     fun outlined(path:Path){if(item.style.fill!=null)passes+=PaintPass(path,PaintKind.ObjectFill);stroke(path)}
@@ -98,10 +112,14 @@ internal fun prepareGeometry(item:RenderItem,markerText:TextLayout?=null,checkCa
                 passes+=PaintPass(polyline(listOf(end,Point(end.x-ux*size-uy*size*.45,end.y-uy*size+ux*size*.45),Point(end.x-ux*size+uy*size*.45,end.y-uy*size-ux*size*.45)),true),PaintKind.StrokeFill)
             }
         }
-        is Shape.Polygon->outlined(polyline(shape.points,true,checkCancelled))
+        is Shape.Polygon->if(selectionGuide){val path=polyline(shape.points,true,checkCancelled)
+            passes+=PaintPass(path,PaintKind.Outline,if(item.style.screenConstantWidth)path.transformed(item.transform)else null)
+        }else outlined(polyline(shape.points,true,checkCancelled))
         is Shape.Rectangle->outlined(Path().apply{addRect(shape.rectangle.compose())})
         is Shape.Ellipse->outlined(Path().apply{addOval(shape.rectangle.compose())})
-        is Shape.Guide->stroke(Path().apply{addRect(shape.rectangle.compose())})
+        is Shape.Guide->{val path=Path().apply{addRect(shape.rectangle.compose())}
+            passes+=PaintPass(path,PaintKind.Outline,if(item.style.screenConstantWidth)path.transformed(item.transform)else null)
+        }
         is Shape.Marker->{
             val radius=maxOf(12.0,item.style.width*4.0)
             outlined(Path().apply{addOval(androidx.compose.ui.geometry.Rect((shape.point.x-radius).toFloat(),(shape.point.y-radius).toFloat(),(shape.point.x+radius).toFloat(),(shape.point.y+radius).toFloat()))})
@@ -145,20 +163,20 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
     val binding=state.document?.binding(state.projectEpoch)
     val requestedOverlay=remember(binding,state.documentPage,state.peerFrame,state.previewStyles,state.wetStroke){overlayItems(state)}
     val latestOverlay by rememberUpdatedState(requestedOverlay)
-    LaunchedEffect(binding,requestedOverlay){
+    LaunchedEffect(binding,requestedOverlay,state.composedGuideIds){
         overlay=null
         val requested=binding?:return@LaunchedEffect
         try{
             val geometry=withContext(Dispatchers.Default){val context=currentCoroutineContext();requestedOverlay.associate{item->
                 context.ensureActive();val marker=item.shape as? Shape.Marker
                 val text=marker?.let{controller.core.layoutText(it.number.toString(),"Inter",(maxOf(12.0,item.style.width*4)*1.15).toFloat())}
-                item.objectId to prepareGeometry(item,text){context.ensureActive()}
+                item.objectId to prepareGeometry(item,text,item.objectId in state.composedGuideIds){context.ensureActive()}
             }}
             if(geometryMatches(requested,latest)&&latestOverlay===requestedOverlay)overlay=OverlayFrame(requested,requestedOverlay,geometry)
         }catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
         catch(_:Exception){controller.report("An intermediate preview could not be drawn. Saved edits remain available.")}
     }
-    LaunchedEffect(binding,state.document,state.documentPage){
+    LaunchedEffect(binding,state.document,state.documentPage,state.composedGuideIds){
         prepared=null
         val document=state.document?:return@LaunchedEffect
         val requested=checkNotNull(binding)
@@ -170,10 +188,10 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
                     context.ensureActive()
                     val marker=item.shape as? Shape.Marker
                     val text=marker?.let{controller.core.layoutText(it.number.toString(),"Inter",(maxOf(12.0,item.style.width*4)*1.15).toFloat())}
-                    item.objectId to prepareGeometry(item,text){context.ensureActive()}
+                    item.objectId to prepareGeometry(item,text,item.objectId in state.composedGuideIds){context.ensureActive()}
                 }
             }
-            val frame=GeometryFrame(requested,document,geometry,state.documentPage)
+            val frame=GeometryFrame(requested,document,geometry,state.documentPage,state.composedGuideIds)
             if(frame.current(latest)!=null){prepared=frame;if(controller.aiResultReady())controller.canvasPrepared(requested)}
         }catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
         catch(_:Exception){prepared=null;controller.canvasFailed(requested,"Canvas geometry could not be prepared. Reopen the project before editing; saved data is intact.")}
@@ -206,12 +224,14 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
         if(background==null&&current.documentFrame==null&&giant==null&&current.composedBackground==null)return@Canvas
         if(current.documentFrame!=null&&documentReader?.binding!=current.documentFrame.binding)return@Canvas
         val doc=frame.document
-        if(doc.hasToneAdjustments&&composed==null&&current.preview.isEmpty()&&current.previewStyles.isEmpty())return@Canvas
+        if((doc.hasToneAdjustments||current.composedBackground!=null)&&composed==null)return@Canvas
         val aiFrame=controller.aiResultFrame()
         if(!controller.aiResultReady())return@Canvas
         val currentOverlay=overlay?.takeIf{it.binding==frame.binding&&it.source===latestOverlay}
         val replacements=currentOverlay?.source?.associateBy{it.objectId}.orEmpty()
-        val displayed=canvasItems(doc,composed!=null,replacements)
+        val displayed=canvasItems(doc,composed!=null,replacements,current.composedGuideIds).filterNot{
+            composed!=null&&it.shape is Shape.Result&&aiFrame?.images?.containsKey(it.objectId)!=true
+        }
         var documentTiles:List<PreparedDocumentTile>?=null
         fun document(camera:Transform,scale:Double,smooth:Boolean){
         withTransform({transform(camera.matrix())}){
@@ -232,12 +252,21 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
                     }
                     val paint=Paint().apply{alpha=first.layerOpacity.toFloat();blendMode=if(first.layerBlend=="multiply")BlendMode.Multiply else BlendMode.SrcOver}
                     drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f,0f,doc.width.toFloat(),doc.height.toFloat()),paint)
-                    try{for(item in items)drawGeometry(item,checkNotNull(currentOverlay?.entries?.get(item.objectId)?:frame.entries[item.objectId]),current.preview[item.objectId],scale)}finally{drawContext.canvas.restore()}
+                    try{for(item in items){
+                        val guide=if(item.shape is Shape.Guide||(composed!=null&&item.objectId in current.composedGuideIds))
+                            item.copy(style=item.style.copy(width=maxOf(1.0,item.style.width),fill=null)) else item
+                        drawGeometry(guide,checkNotNull(currentOverlay?.entries?.get(item.objectId)?:frame.entries[item.objectId]),current.preview[item.objectId],scale)
+                    }}finally{drawContext.canvas.restore()}
                 }
             }
             }finally{drawContext.canvas.restore()}
             val selected=doc.render.items.filter{it.objectId in current.selected}
             union(selected.map{previewBounds(it,current.preview[it.objectId])})?.let{bounds->val width=(1.0/scale).toFloat();drawRect(Color(0xff81e0c8),Offset(bounds.x.toFloat(),bounds.y.toFloat()),Size(bounds.width.toFloat(),bounds.height.toFloat()),style=Stroke(width));val side=(8.0/scale).toFloat();drawRect(Color(0xff81e0c8),Offset((bounds.x+bounds.width).toFloat()-side/2,(bounds.y+bounds.height).toFloat()-side/2),Size(side,side))}
+            if(composed!=null)for(bounds in transientCanonicalOutlines(current,replacements)){
+                drawRect(Color(0xffefba71),Offset(bounds.x.toFloat(),bounds.y.toFloat()),
+                    Size(bounds.width.toFloat(),bounds.height.toFloat()),style=Stroke((1.5/scale).toFloat(),
+                        pathEffect=PathEffect.dashPathEffect(floatArrayOf((6.0/scale).toFloat(),(4.0/scale).toFloat()))))
+            }
             controller.rotationHandle(current)?.let{handle->
                 drawLine(Color(0xff81e0c8),Offset(handle.pivot.x.toFloat(),handle.pivot.y.toFloat()),Offset(handle.point.x.toFloat(),handle.point.y.toFloat()),(1.0/scale).toFloat())
                 drawCircle(Color(0xff81e0c8),(6.0/scale).toFloat(),Offset(handle.point.x.toFloat(),handle.point.y.toFloat()),style=Stroke((1.5/scale).toFloat()))

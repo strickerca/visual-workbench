@@ -25,10 +25,22 @@ data class EditorState(val document:DocumentSnapshot?=null,val background:ImageB
     val wetStroke:RenderItem?=null,val shareViewport:Boolean=false,val sessionRole:ProjectSessionRole?=null,
     val backgroundIssue:String?=null,val backgroundFailureKind:CoreFailureKind?=null,val originalFormatNotice:String?=null,
     val originalFormatInfo:OriginalFormatInfo?=null,val originalFormatUnavailable:Boolean=false,
-    val composedBackground:RenderBinding?=null,
+    val composedBackground:RenderBinding?=null,val composedGuideIds:Set<String> = emptySet(),
     val documentFrame:DocumentDrawFrame<AutoCloseable>?=null,val documentPage:UInt=0u,val precision:PrecisionFrame=PrecisionFrame(),
     val giantOwnerVersion:Long=0L,val giantActive:Boolean=false,val giantReady:Boolean=false,val giantIssue:String?=null,val giantViewport:GiantViewport?=null) {
     val exportReady:Boolean get()=exportReceipt?.request?.matches(this)==true
+}
+internal fun composedSelectionGuideIds(document:DocumentSnapshot,controls:DocumentControlSnapshot,
+    binding:WorkflowBinding):Set<String>{
+    if(controls.binding!=binding)throw WorkflowFailure(WorkflowFailureKind.Stale)
+    val kinds=controls.objects.associate{it.objectId to it.kind}
+    return document.render.items.filter{it.shape is Shape.Polygon}.mapNotNull{item->
+        when(kinds[item.objectId]){
+            "polygon"->null
+            "vector selection"->item.objectId
+            else->throw WorkflowFailure(WorkflowFailureKind.Stale)
+        }
+    }.toSet()
 }
 private data class Drag(val start:Point,val initial:ViewState,val selected:List<RenderItem>,val bounds:Rect?,val resize:Boolean,val pan:Boolean,val binding:RenderBinding,val live:ObjectPreviewLease?=null,val newObject:NewObjectPreviewLease?=null,val tool:Tool=Tool.Select)
 private data class WidthGesture(val binding:RenderBinding,val items:List<RenderItem>,val live:ObjectPreviewLease?)
@@ -150,8 +162,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     internal fun aiResultFrame(): AiResultFrame<AiBitmap>? = aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),mutable.value.view.camera,aiPoses())}
     internal fun aiResultReady(): Boolean {
         val state=mutable.value
-        if(state.background!=null&&state.document?.binding(generation)==state.composedBackground&&
-            state.preview.isEmpty()&&state.previewStyles.isEmpty())return true
+        if(state.background!=null&&state.document?.binding(generation)==state.composedBackground)return true
         return state.document?.render?.items?.none{it.shape is Shape.Result} != false || aiResultFrame()!=null
     }
     fun openAi() {
@@ -463,7 +474,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
             } finally { queued-- }
         }
     }
-    private fun transfer(epoch:Long,block:suspend()->Unit):Job?{if(transferJob?.isActive==true){report("A transfer is already running. Finish or cancel it first.");return null};val job=task(epoch,block);transferJob=job;return job}
+    private fun transfer(epoch:Long,block:suspend()->Unit):Job?{if(transferJob?.isActive==true){report("A transfer is already running. Finish or cancel it first.");return null};val job=task(epoch,block=block);transferJob=job;return job}
     private suspend fun discardExport(){preparedDrag?.second?.close();preparedDrag=null;val prior=cachedExport;cachedExport=null;update{it.copy(exportReceipt=null,exportCheck=null,dragPrepared=false)};prior?.workspace?.close()}
     private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();frames.beginDeparture();frames.detach();workflows.detach();rotation.detach();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.detach();if(!precisionClosed)precision.reset();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();documentOwner.bind(value,snapshot);fit();bindWorkflows();enterWorkflows();refreshOriginalFormatNotice();loadBackground();refreshRole(value,generation)
         changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){giantOwner.observe(event.project);workflows.observe(event.project,event.sequence);frames.observe(event.sequence);erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash)&&mutable.value.composedBackground!=null)update{it.copy(background=null,canvasReady=false)};if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()else bindWorkflows(false)}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
@@ -497,7 +508,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     }
     private suspend fun loadBackground(){
         val p=project?:return;val doc=mutable.value.document?:return;val epoch=generation;val assumed=colorAssumed;val ticket=refreshTicket
-        if(documents.state.value.descriptor!=null){detachGiant();update{it.copy(background=null,composedBackground=null,needsColorConsent=false,backgroundIssue=null,backgroundFailureKind=null)};return}
+        if(documents.state.value.descriptor!=null){detachGiant();update{it.copy(background=null,composedBackground=null,composedGuideIds=emptySet(),needsColorConsent=false,backgroundIssue=null,backgroundFailureKind=null)};return}
         if(giantDisplayRequired(doc)){loadGiantBackground(p,doc);return}
         if(giantMode||giantOwner.retaining)detachGiant()
         val renderBinding=doc.binding(epoch)
@@ -513,6 +524,9 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         update{it.copy(backgroundIssue=null,backgroundFailureKind=null)}
         try{
             val composed=doc.hasToneAdjustments
+            val guideIds=if(composed&&doc.render.items.any{it.shape is Shape.Polygon}){
+                composedSelectionGuideIds(doc,documentControlWorkflows(p).snapshot(doc.documentId),workflowBinding)
+            }else emptySet()
             val pixels=if(composed){
                 val value=imageFrameWorkflows(p).editingBackground(workflowBinding,assumed)
                 if(value.binding!=workflowBinding||value.width!=doc.width||value.height!=doc.height||
@@ -527,7 +541,8 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
             currentCoroutineContext().ensureActive()
             val image=withContext(Dispatchers.Default){bitmap(pixels)}
             currentCoroutineContext().ensureActive()
-            if(current())update{it.copy(background=image,composedBackground=renderBinding.takeIf{composed},needsColorConsent=false,backgroundIssue=null,backgroundFailureKind=null)}
+            if(current())update{it.copy(background=image,composedBackground=renderBinding.takeIf{composed},
+                composedGuideIds=guideIds,needsColorConsent=false,backgroundIssue=null,backgroundFailureKind=null)}
         }catch(cancel:CancellationException){throw cancel}
         catch(error:CoreFailure){
             currentCoroutineContext().ensureActive()
