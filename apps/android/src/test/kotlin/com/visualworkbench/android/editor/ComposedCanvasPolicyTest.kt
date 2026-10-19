@@ -31,4 +31,15 @@ class ComposedCanvasPolicyTest {
         assertEquals(listOf("new"),renderProvisional.map { it.objectId })
         assertEquals(setOf("art","result"),baked) // Original pixels remain until commit.
     }
+
+    @Test fun orderedChangeStillReloadsPixelsWhenUndoRemovesTheLastTone() {
+        val obligation=ComposedReloadObligation()
+        assertFalse(obligation.needsReload(false))
+        obligation.revokeComposedPixels() // Observe hides the stale bitmap before the new document arrives.
+        assertTrue(obligation.pending)
+        assertTrue(obligation.needsReload(false)) // The refreshed document has no tone.
+        obligation.settle()
+        assertFalse(obligation.needsReload(false))
+        assertTrue(obligation.needsReload(true))
+    }
 }

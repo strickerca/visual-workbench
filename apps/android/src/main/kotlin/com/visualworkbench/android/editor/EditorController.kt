@@ -19,6 +19,8 @@ import com.visualworkbench.android.precision.*
 import com.visualworkbench.android.airactions.*
 import com.visualworkbench.android.assistedselection.AssistedSourceGate
 import com.visualworkbench.android.assistedselection.appendAssistedPenPrompt
+import com.visualworkbench.android.assistedselection.retireAssistedBeforeAdmission
+import com.visualworkbench.android.assistedselection.reusableAssistedOwner
 import com.visualworkbench.android.ui.ProjectCard
 import com.visualworkbench.shared.assistedselection.backend.LiteRtReviewedCatalog
 import com.visualworkbench.shared.assistedselection.backend.liteRtAssistedSelectionBackend
@@ -121,6 +123,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private data class ComposedBackgroundOwner(val project: WorkbenchProject, val epoch: Long,
         val documentId: String, val page: UInt?, val binding: WorkflowBinding)
     private var composedBackground: ComposedBackgroundOwner? = null
+    private val composedReload = ComposedReloadObligation()
     private fun composedCurrent(doc: DocumentSnapshot): Boolean {
         val revision = doc.render.revision
         val owner = composedBackground ?: return false
@@ -300,6 +303,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         private set(value) {
             if (documentState !== value) interruptAirInput(clearView = documentState?.documentId != value?.documentId ||
                 documentState?.width != value?.width || documentState?.height != value?.height)
+            if (documentState?.documentId != value?.documentId || documentState?.page != value?.page)
+                composedReload.settle()
             if(documentState?.documentId!=value?.documentId || documentState?.page!=value?.page ||
                 documentState?.render?.revision!=value?.render?.revision)invalidateAssisted()
             documentState = value
@@ -331,7 +336,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var checkedExportIntent: ExportCallerIntent? = null
     private var pickerTicket: ExportTicket? = null
     private var project: WorkbenchProject? = null
-        set(value) { if (field !== value) {interruptAirInput(clearView = true, clearBarrel = true);invalidateAssisted()}; field = value }
+        set(value) { if (field !== value) {interruptAirInput(clearView = true, clearBarrel = true);invalidateAssisted();composedReload.settle()}; field = value }
     private var transferJob: Job? = null
     private var incomingJob: Job? = null
     private var incomingProducer: Job? = null
@@ -390,18 +395,23 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     internal fun openAssistedSelection() {
         val owner=project ?: return
         val snapshot=document ?: return
-        assistedActions?.let { actions -> if(assistedCurrent(owner,actions.source)){
+        if(assistedOpening)return
+        assistedActions?.let { actions -> if(reusableAssistedOwner(assistedCurrent(owner,actions.source),actions.state.value.phase)){
             assistedCollecting=false;assistedPanelOpen=true;return
         } }
-        if(assistedOpening)return
-        if(disposing||!workflowIdle()||documents.state.value.descriptor!=null||blockingMessage!=null||
+        if(disposing||(assistedActions==null&&!workflowIdle())||documents.state.value.descriptor!=null||blockingMessage!=null||
             originalFormat?.rawPreview==true){message="Assisted selection requires an available raster image preview.";return}
         val capturedEpoch=epoch
         assistedOpening=true
-        cancelTool();selections.interaction.active(true)
         scope.launch {
             try {
-                closeAssisted()
+                if(!retireAssistedBeforeAdmission(::closeAssisted, ::workflowIdle) ||
+                    project!==owner || epoch!=capturedEpoch || document?.render?.revision!=snapshot.render.revision ||
+                    document?.page!=snapshot.page || documents.state.value.descriptor!=null ||
+                    originalFormat?.rawPreview==true){
+                    message="Assisted selection requires an available raster image preview.";return@launch
+                }
+                cancelTool();selections.interaction.active(true)
                 val expected=snapshot.render.revision
                 val selected=withTimeoutOrNull(5_000) { selections.state.first { state ->
                     state.document?.let { value -> value.binding.projectId==expected.projectId &&
@@ -1395,6 +1405,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         invalidateAssisted()
                         if(composedBackground!=null && document?.render?.revision?.let { old ->
                             old.projectId==change.project.projectId && (old.hostSeq!=change.project.hostSeq || old.stateHash!=change.project.stateHash) }==true){
+                            composedReload.revokeComposedPixels()
                             composedBackground=null;background=null
                         }
                         imageFrames.observe(change.sequence)
@@ -2189,8 +2200,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         // The document and its own revision are one native snapshot. Host sequence
         // alone cannot order optimistic edits sharing the same accepted base.
         if (document?.render?.revision != next.render.revision) clearPeerObjects()
-        val priorComposition=composedBackground!=null
+        val priorComposition=composedBackground!=null || composedReload.pending
         if(document?.render?.revision!=next.render.revision && (priorComposition || next.hasToneAdjustments)){
+            if(priorComposition)composedReload.revokeComposedPixels()
             background=null;composedBackground=null
         }
         info = next.render.revision
@@ -2200,7 +2212,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         bindWorkflows()
         if(priorComposition || next.hasToneAdjustments)publish()
         refreshOriginalFormatNotice()
-        if(giantMode||giantDisplayRequired(next)||next.hasToneAdjustments||priorComposition)loadBackground()
+        if(giantMode||giantDisplayRequired(next)||composedReload.needsReload(next.hasToneAdjustments)){
+            loadBackground()
+            if(document===next && refreshAdmission.accepts(ticket))composedReload.settle()
+        }
         instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
         if (exportReady?.matches(info, document) != true) exportReady = null
         if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq) {
