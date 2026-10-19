@@ -5,6 +5,21 @@ public data class VerificationPackageKey(public val packageId: String, public va
     public val manifestSha256: String)
 public data class VerificationPair(public val original: VerificationPackageKey, public val after: VerificationPackageKey,
     public val receiptId: String, public val receiptBlake3: String)
+/** Read-only canonical D-to-retained-PNG coordinates from two exact checked
+ * packages. Bounds are continuous edges; contentWidth/Height are rounded-up
+ * storage extents and may include a fractional padding edge. */
+public data class VerificationImageCoordinates(public val key: VerificationPackageKey, public val binding: WorkflowBinding,
+    public val sourceAssetId: String, public val sourceWidth: UInt, public val sourceHeight: UInt,
+    public val outputWidth: UInt, public val outputHeight: UInt, public val imageWidth: UInt, public val imageHeight: UInt,
+    public val contentWidth: UInt, public val contentHeight: UInt, public val contentBounds: List<Double>,
+    public val cropDocument: List<Double>, public val documentToImage: List<Double>, public val imageToDocument: List<Double>,
+    public val hasOutputFrame: Boolean)
+public data class VerificationCoordinatePair(public val pair: VerificationPair,
+    public val original: VerificationImageCoordinates, public val after: VerificationImageCoordinates)
+/** Package metadata only; it grants no capture, receipt, alignment, review or
+ * mutation authority. The comparison owner rechecks those separately. */
+public expect suspend fun verificationCoordinates(catalog: WorkbenchPackageCatalog,
+    pair: VerificationPair): VerificationCoordinatePair
 public enum class VerificationVerdict { Pending, Pass, Fail }
 
 /** Installation-local owner input. Notes must not enter logs or portable output. */
