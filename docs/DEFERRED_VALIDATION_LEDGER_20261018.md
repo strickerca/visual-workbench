@@ -122,3 +122,30 @@ refuse without an explicit approved untagged-sRGB authority, and the public
 raster region API parses ICC before memory admission. The G owner is repairing
 both and updating the portable patches. Full G acceptance remains held; root
 will preserve actual user color consent when composing the corrected request.
+
+## 2026-10-19 standalone Android dependency delivery
+
+Root registers strict LiteRT API/JNI/GPU2.3.0 in shared/androidMain, where the
+accepted backend source actually lives. Exact3 AAR/POM pairs and3 arm64 native
+children match pinned identities. Identical full upstream LICENSE/aggregate
+notice files are retained once with hashes. The unused Play AI delivery module
+and its services chain are explicitly excluded; its Play Core terms are not
+added to the allowlist. A conservative36-class closure from the backend's five
+actual imports has no deployment/Play references; APK/D8/R8/native linking remains
+unrun. Real shared/scoped Android runtime lock resolution and complete Maven
+license census (264 identities/12 runtime configurations) pass, as does the
+third-party notice hash gate. No bindings or app/native build was invoked.
+AndroidX Lifecycle2.10/SavedState1.4/Guava33.5 and associated changes are retained
+in the actual locks; final coherent app checks remain necessary. Full native
+component/license scope, real model artifacts, reference parity, working-set
+admission and CPU/GPU/device journeys remain open. The production catalog stays
+empty. See ASSISTED_RUNTIME_REGISTRATION_20261019.md and exact JSON evidence.
+
+ASSISTED_MODEL_DELIVERY_HANDOFF_20261019.md hands the next actual conversion,
+reference-parity and artifact-delivery job to E after its giant repair, through
+parent activation/single-heavy-slot allocation. Current E/G/F/R review repairs
+are retained as pending until the parent supplies their narrow acceptance; no
+older giant roots replace root intake/producer exports. Main/capture work remains
+pushed8d44db3/48ac2a5, with49 focused tests and actual controller source compile;
+Main/Compose/OS lifecycle remains deferred. New root Desktop UI follow-through
+from R681cf9da is assigned and will retain its source contract when composed.

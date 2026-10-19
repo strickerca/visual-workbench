@@ -1,0 +1,188 @@
+{
+  "date": "2026-10-19",
+  "status": "standalone source dependency/notice registration; production model/runtime catalog remains unadmitted",
+  "source_sha256": {
+    "apps/shared/build.gradle.kts": "2a42a6b5b5283bed7a3f643fe6245467c636c9299bbf20cd1a484ed737b5e917",
+    "apps/shared/gradle.lockfile": "aaf719241ec86b0532e1dda7c218c7d269b124a609bc266c9c65d60fc765732d",
+    "apps/android/gradle.lockfile": "6b7eb9652ee0feb72f1ec16a042172491692188fe6fa6936ce5747b53f0d9a00",
+    "third_party/LICENSES": "c50654ea4ed2b1a2e20d93b0d11729ea29cbbf5e802feb9bf0c4c2d373bc5c34",
+    "third_party/notices/LiteRT-2.3.0-LICENSE.txt": "71c6915d04265772a0339bed47276942c678b45cc01534210ebe6984fd1aec65",
+    "third_party/notices/LiteRT-2.3.0-THIRD_PARTY_NOTICE.txt": "db6e1ff4b16c11eb01c45f135928527a50a05282739054686793ec70f442f119",
+    "docs/THIRD_PARTY_NOTICES.md": "9991100c179ddc81038da0ee63646c232d42538d98dd54f0938c7aa876480a62"
+  },
+  "artifact_audit": [
+    {
+      "coordinate": "com.google.ai.edge.litert:litert-api:2.3.0",
+      "aar": {
+        "bytes": 945619,
+        "sha256": "20f630e9ed0b4f0564da616fd3d6406f3013cacad7d492cbe2963330f519256b",
+        "url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert-api/2.3.0/litert-api-2.3.0.aar"
+      },
+      "pom": {
+        "bytes": 1660,
+        "sha256": "ace008f44c8ce4715c0e0b3f506dd0aee0bfada54c09c10c1e6bf714857b639a",
+        "url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert-api/2.3.0/litert-api-2.3.0.pom"
+      },
+      "notice_entries": [
+        "LICENSE",
+        "THIRD_PARTY_NOTICE.txt"
+      ],
+      "notice_hashes": {
+        "LICENSE": {
+          "bytes": 13575,
+          "sha256": "71c6915d04265772a0339bed47276942c678b45cc01534210ebe6984fd1aec65"
+        },
+        "THIRD_PARTY_NOTICE.txt": {
+          "bytes": 1960672,
+          "sha256": "db6e1ff4b16c11eb01c45f135928527a50a05282739054686793ec70f442f119"
+        }
+      },
+      "arm64_native": {
+        "jni/arm64-v8a/liblitert_jni.so": {
+          "bytes": 529296,
+          "sha256": "b4bc082f740076f09d566b2deaa8a1af6b1ec1252d20c3688acb8405d69871dc"
+        }
+      }
+    },
+    {
+      "coordinate": "com.google.ai.edge.litert:litert:2.3.0",
+      "aar": {
+        "bytes": 7640140,
+        "sha256": "9508c6e9142646f0f2bc1fe68b3925fb470ee7ddd29114540339a04a8ab189dc",
+        "url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert/2.3.0/litert-2.3.0.aar"
+      },
+      "pom": {
+        "bytes": 1167,
+        "sha256": "912be63ad7aa3df18ed8c53deeb8c2e44ed407976d08253089e93c185963d774",
+        "url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert/2.3.0/litert-2.3.0.pom"
+      },
+      "notice_entries": [
+        "LICENSE",
+        "THIRD_PARTY_NOTICE.txt"
+      ],
+      "notice_hashes": {
+        "LICENSE": {
+          "bytes": 13575,
+          "sha256": "71c6915d04265772a0339bed47276942c678b45cc01534210ebe6984fd1aec65"
+        },
+        "THIRD_PARTY_NOTICE.txt": {
+          "bytes": 1960672,
+          "sha256": "db6e1ff4b16c11eb01c45f135928527a50a05282739054686793ec70f442f119"
+        }
+      },
+      "arm64_native": {
+        "jni/arm64-v8a/libLiteRt.so": {
+          "bytes": 5629696,
+          "sha256": "e5b7e3413a8b428b1a1b669f368cf613058868bc7b63e10d0b9c2e6ba55c97d8"
+        }
+      }
+    },
+    {
+      "coordinate": "com.google.ai.edge.litert:litert-gpu:2.3.0",
+      "aar": {
+        "bytes": 4695499,
+        "sha256": "173a4c3813601f7e9542f4e6a49e237775e2f9ce1e0948f35407098bffb1824f",
+        "url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert-gpu/2.3.0/litert-gpu-2.3.0.aar"
+      },
+      "pom": {
+        "bytes": 1174,
+        "sha256": "2996e64770ee2d43f8fd82f5ecda32eba8299d2507d19206c3136b0779512a54",
+        "url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert-gpu/2.3.0/litert-gpu-2.3.0.pom"
+      },
+      "notice_entries": [
+        "LICENSE",
+        "THIRD_PARTY_NOTICE.txt"
+      ],
+      "notice_hashes": {
+        "LICENSE": {
+          "bytes": 13575,
+          "sha256": "71c6915d04265772a0339bed47276942c678b45cc01534210ebe6984fd1aec65"
+        },
+        "THIRD_PARTY_NOTICE.txt": {
+          "bytes": 1960672,
+          "sha256": "db6e1ff4b16c11eb01c45f135928527a50a05282739054686793ec70f442f119"
+        }
+      },
+      "arm64_native": {
+        "jni/arm64-v8a/libLiteRtClGlAccelerator.so": {
+          "bytes": 3253032,
+          "sha256": "c200369269a3994b646a8d0ac56ff29127c6ce742abcfd345a7d478eab3b6c6d"
+        }
+      }
+    }
+  ],
+  "conservative_classfile_closure": {
+    "seeds": [
+      "com/google/ai/edge/litert/Environment",
+      "com/google/ai/edge/litert/CompiledModel",
+      "com/google/ai/edge/litert/Accelerator",
+      "com/google/ai/edge/litert/TensorBuffer",
+      "com/google/ai/edge/litert/TensorType"
+    ],
+    "classes": [
+      "com/google/ai/edge/litert/Accelerator",
+      "com/google/ai/edge/litert/Accelerator$Companion",
+      "com/google/ai/edge/litert/CompiledModel",
+      "com/google/ai/edge/litert/CompiledModel$Companion",
+      "com/google/ai/edge/litert/CompiledModel$CpuOptions",
+      "com/google/ai/edge/litert/CompiledModel$CpuOptions$Key",
+      "com/google/ai/edge/litert/CompiledModel$GpuOptions",
+      "com/google/ai/edge/litert/CompiledModel$GpuOptions$Backend",
+      "com/google/ai/edge/litert/CompiledModel$GpuOptions$BufferStorageType",
+      "com/google/ai/edge/litert/CompiledModel$GpuOptions$Key",
+      "com/google/ai/edge/litert/CompiledModel$GpuOptions$Precision",
+      "com/google/ai/edge/litert/CompiledModel$GpuOptions$Priority",
+      "com/google/ai/edge/litert/CompiledModel$Options",
+      "com/google/ai/edge/litert/CompiledModel$Options$Companion",
+      "com/google/ai/edge/litert/CompiledModel$QualcommOptions",
+      "com/google/ai/edge/litert/CompiledModel$QualcommOptions$HtpPerformanceMode",
+      "com/google/ai/edge/litert/CompiledModel$QualcommOptions$Key",
+      "com/google/ai/edge/litert/CompiledModel$QualcommOptions$LogLevel",
+      "com/google/ai/edge/litert/CompiledModel$QualcommOptions$OptimizationLevel",
+      "com/google/ai/edge/litert/CompiledModel$QualcommOptions$Profiling",
+      "com/google/ai/edge/litert/Environment",
+      "com/google/ai/edge/litert/Environment$Companion",
+      "com/google/ai/edge/litert/Environment$Option",
+      "com/google/ai/edge/litert/JniHandle",
+      "com/google/ai/edge/litert/LiteRtException",
+      "com/google/ai/edge/litert/NpuAcceleratorProvider",
+      "com/google/ai/edge/litert/Status",
+      "com/google/ai/edge/litert/Status$Companion",
+      "com/google/ai/edge/litert/TensorBuffer",
+      "com/google/ai/edge/litert/TensorBuffer$Companion",
+      "com/google/ai/edge/litert/TensorBufferRequirements",
+      "com/google/ai/edge/litert/TensorBufferType",
+      "com/google/ai/edge/litert/TensorBufferType$Companion",
+      "com/google/ai/edge/litert/TensorType",
+      "com/google/ai/edge/litert/TensorType$ElementType",
+      "com/google/ai/edge/litert/TensorType$Layout"
+    ],
+    "direct_play_refs": [],
+    "method": "Conservative presence of each known class name in classfile bytes; not method reachability or dynamic/reflection execution"
+  },
+  "actual_maven_census": {
+    "sha256": "7d4dcda59fb23fa36df62dfc124b2d9a62d817212d2ffb7a93d8a2a09adfb6e5",
+    "dependencies": 264,
+    "configurations": 12,
+    "no_play_delivery_or_services": true,
+    "litert_coordinates": [
+      "com.google.ai.edge.litert:litert-api:2.3.0",
+      "com.google.ai.edge.litert:litert-gpu:2.3.0",
+      "com.google.ai.edge.litert:litert:2.3.0"
+    ]
+  },
+  "log_hashes": {
+    "/tmp/vw-litert-lock-resolution-20261019.log": "024dfc13d86e44fa07ba1bffa503af5d1f31d83889ef02c4f4fbf2fbfd3baa28",
+    "/tmp/vw-litert-lock-debug-20261019.log": "843d59cf969f2a6c135adda425b365ce00fddd8c1528ecef6bdabe4ba8ca5a8a",
+    "/tmp/vw-litert-lock-release-20261019.log": "b9444338a963fc105f3d32cce13831b4e8e7f5fb683fa6cef7cb138a6717e1c1",
+    "/tmp/vw-litert-license-census-20261019.log": "1102f9d94f60acd176a93ceaa81bfcdea49d82cbeb36d8d23306f2c7981e4a06",
+    "/tmp/vw-litert-notice-manifest-20261019.log": "807722a6a4048de0643675de61c3a82a0b9eb152275bd4d6d37d9a7f389dce36"
+  },
+  "limits": [
+    "Maven POM license census and full notice hashes pass; individual native component/license scope remains pending",
+    "Static API closure/consumer-rule evidence only; actual D8/R8/APK/native class linking is unrun",
+    "Updated AndroidX/Guava runtime graph awaits final app compile/tests/lint/package",
+    "Model conversion/reference parity/artifact delivery/memory/runtime admission and Android inference unrun",
+    "No source catalog entry, model hash, review identity or production admission invented"
+  ]
+}

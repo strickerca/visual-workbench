@@ -172,6 +172,14 @@ kotlin {
                 implementation(project(":bindings-core"))
                 implementation("net.java.dev.jna:jna:5.19.1@aar")
                 implementation("org.rustls:rustls-platform-verifier:0.2.0")
+                // Standalone local-model backend. Keep API/JNI/optional GPU on
+                // the exact pinned version; no Play AI-pack delivery.
+                for (artifact in listOf("litert-api", "litert", "litert-gpu")) {
+                    implementation("com.google.ai.edge.litert:$artifact:2.3.0") {
+                        version { strictly("2.3.0") }
+                        exclude(group = "com.google.android.play", module = "ai-delivery")
+                    }
+                }
             }
         }
         val desktopMain by getting {

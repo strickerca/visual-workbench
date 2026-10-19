@@ -180,6 +180,20 @@
       "license": "MIT",
       "source_url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-win-x64.zip",
       "sha256": "ed34dd8e3f0a78dbaf00d0444ce8e285b015b765379c2e17880455f70370f8e9"
+    },
+    {
+      "path": "notices/LiteRT-2.3.0-LICENSE.txt",
+      "license": "Apache-2.0",
+      "source_url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert/2.3.0/litert-2.3.0.aar#LICENSE",
+      "sha256": "71c6915d04265772a0339bed47276942c678b45cc01534210ebe6984fd1aec65",
+      "notice_scope": "Primary upstream artifact declaration; verbatim aggregate notices retained. Individual native/APK component scope remains pending, not an admission of all listed source/build dependencies."
+    },
+    {
+      "path": "notices/LiteRT-2.3.0-THIRD_PARTY_NOTICE.txt",
+      "license": "Apache-2.0",
+      "source_url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert/2.3.0/litert-2.3.0.aar#THIRD_PARTY_NOTICE.txt",
+      "sha256": "db6e1ff4b16c11eb01c45f135928527a50a05282739054686793ec70f442f119",
+      "notice_scope": "Primary upstream artifact declaration; verbatim aggregate notices retained. Individual native/APK component scope remains pending, not an admission of all listed source/build dependencies."
     }
   ]
 }

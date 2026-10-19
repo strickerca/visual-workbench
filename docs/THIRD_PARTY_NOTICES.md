@@ -19,6 +19,17 @@ the desktop JAR packages the same files as resources.
 These additional native notices complement embedded artifact notices. Full
 release attribution and final distributable inspection remain Phase 5 work.
 
+The Android assisted-selection source backend pins standalone LiteRT API/JNI/GPU
+artifacts at2.3.0. Their exact AARs contain identical LICENSE and
+THIRD_PARTY_NOTICE.txt files, retained once as LiteRT-2.3.0-* with hashes in
+third_party/LICENSES. The complete aggregate notice includes upstream source,
+build-tool and runtime terms; retaining it does not establish that every named
+component is shipped or admit every native component under the primary Maven
+Apache-2.0 declaration. Final native/APK component scope and the detached
+model/runtime/memory admission remain open. The local model API graph excludes
+the unused Play AI-pack delivery module and its Play Core terms; no license
+allowlist exception or missing-class warning suppression was added.
+
 Phase 2 adds zstd-sys 2.1.0 / bundled Zstandard 1.5.7 under BSD-3-Clause.
 The Rust wrapper, generated-bindings and native Zstandard notices are retained
 separately and hashed in the manifest. Their source is the registry archive
