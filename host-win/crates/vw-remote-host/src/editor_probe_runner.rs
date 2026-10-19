@@ -123,6 +123,22 @@ fn collect_released<T>(
     }
     collect_latest(query, worker_finished, join)
 }
+/// Private images may retire independently of an unresolved canvas/input
+/// fence, but never before the actual process/Job receipt and IO join.
+fn cleanup_private_after_join(
+    query: impl FnOnce() -> Result<(u32, u32)>,
+    worker_finished: bool,
+    join: impl FnOnce() -> Result<()>,
+    dispose: impl FnOnce() -> Result<()>,
+) -> Result<bool> {
+    query()?;
+    if !worker_finished {
+        return Ok(false);
+    }
+    join()?;
+    dispose()?;
+    Ok(true)
+}
 #[derive(Clone, Serialize)]
 struct ParentExchange {
     boundary: &'static str,
@@ -402,18 +418,28 @@ impl Owner {
     /// Retire private files only after a fresh actual Job receipt and finished
     /// IO join. Unknown canvas/input state continues to retain source and permit.
     fn cleanup_private_if_quiescent(&mut self) -> Result<bool> {
-        self.child.retired_receipt()?;
-        if self.io.as_ref().is_some_and(|worker| !worker.is_finished()) {
-            return Ok(false);
-        }
-        if let Some(worker) = self.io.take() {
-            self.parked_outcome = Some(worker.join().map_err(|_| Error::Io)?);
-        }
-        if let Some(temp) = self.private_temp.as_mut() {
-            temp.dispose()?;
-            self.private_temp = None;
-        }
-        Ok(true)
+        let child = &self.child;
+        let finished = self.io.as_ref().is_none_or(JoinHandle::is_finished);
+        let worker = &mut self.io;
+        let parked = &mut self.parked_outcome;
+        let private_temp = &mut self.private_temp;
+        cleanup_private_after_join(
+            || child.retired_receipt(),
+            finished,
+            || {
+                if let Some(handle) = worker.take() {
+                    *parked = Some(handle.join().map_err(|_| Error::Io)?);
+                }
+                Ok(())
+            },
+            || {
+                if let Some(temp) = private_temp.as_mut() {
+                    temp.dispose()?;
+                    *private_temp = None;
+                }
+                Ok(())
+            },
+        )
     }
     fn reap(&self, duration: Duration) -> Result<bool> {
         let started = Instant::now();

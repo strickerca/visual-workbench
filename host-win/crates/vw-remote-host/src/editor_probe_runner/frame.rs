@@ -794,7 +794,7 @@ pub(super) fn joined_canvas_rgba(
 pub(super) fn drawing_capacity(canvas_pixels: u64, full_frame_pixels: u64) -> Result<()> {
     const MIB: u64 = 1024 * 1024;
     if canvas_pixels == 0
-        || canvas_pixels > 1 * MIB
+        || canvas_pixels > MIB
         || full_frame_pixels == 0
         || full_frame_pixels > 4 * MIB
     {
