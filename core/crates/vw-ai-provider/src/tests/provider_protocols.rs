@@ -142,6 +142,17 @@ impl WireReply {
             body: serde_json::to_vec(&body)?,
         })
     }
+    fn raw_ready(cost: Option<&str>) -> Self {
+        let cost = cost.map_or_else(String::new, |value| format!(",\"cost\":{value}"));
+        Self {
+            status: 200,
+            mime: "application/json",
+            body: format!(
+                "{{\"id\":\"fixture-task\",\"status\":\"Ready\",\"result\":{{\"sample\":\"https://delivery.eu1.bfl.ai/fixture.png?signature=fixture\"}}{cost}}}"
+            )
+            .into_bytes(),
+        }
+    }
 }
 struct ScriptServer {
     target: String,
@@ -212,9 +223,6 @@ impl Drop for ScriptServer {
 fn submission() -> serde_json::Value {
     serde_json::json!({"id":"fixture-task","polling_url":"https://api.us1.bfl.ai/v1/get_result?id=fixture-task","cost":5})
 }
-fn ready() -> serde_json::Value {
-    serde_json::json!({"id":"fixture-task","status":"Ready","result":{"sample":"https://delivery.eu1.bfl.ai/fixture.png?signature=fixture"},"cost":0.25})
-}
 #[test]
 fn flux_real_async_wire_has_one_post_bound_poll_and_no_delivery_credential() -> TestResult {
     let _guard = workers()?;
@@ -224,7 +232,7 @@ fn flux_real_async_wire_has_one_post_bound_poll_and_no_delivery_credential() -> 
     let image = fixtures::png(crop.model_width, crop.model_height)?;
     let server = ScriptServer::start(vec![
         WireReply::json(submission())?,
-        WireReply::json(ready())?,
+        WireReply::raw_ready(Some("0.25")),
         WireReply {
             status: 200,
             mime: "image/png",
@@ -302,21 +310,59 @@ fn flux_real_async_wire_has_one_post_bound_poll_and_no_delivery_credential() -> 
     Ok(())
 }
 #[test]
-fn flux_missing_or_inexact_cost_keeps_the_single_attempt_unresolved() -> TestResult {
+fn flux_raw_cost_settlement_preserves_exact_decimal_and_unresolved_attempts() -> TestResult {
     let _guard = workers()?;
-    for (index, cost) in [serde_json::Value::Null, serde_json::json!(0.00001)]
-        .into_iter()
-        .enumerate()
-    {
+    let cases = [
+        (None, Settlement::UsageMissing, EntryState::Attempted),
+        (
+            Some("null"),
+            Settlement::UsageMissing,
+            EntryState::Attempted,
+        ),
+        (
+            Some("0.00001"),
+            Settlement::LedgerUnavailable,
+            EntryState::Attempted,
+        ),
+        (
+            Some("1e-400"),
+            Settlement::LedgerUnavailable,
+            EntryState::Attempted,
+        ),
+        (
+            Some("0.00010000000000000000000001"),
+            Settlement::LedgerUnavailable,
+            EntryState::Attempted,
+        ),
+        (
+            Some("18446744073709551616"),
+            Settlement::LedgerUnavailable,
+            EntryState::Attempted,
+        ),
+        (
+            Some("922337203685478"),
+            Settlement::LedgerUnavailable,
+            EntryState::Attempted,
+        ),
+        (
+            Some("0.25"),
+            Settlement::UsagePriced { microusd: 2_500 },
+            EntryState::Settled,
+        ),
+        (
+            Some("1e-4"),
+            Settlement::UsagePriced { microusd: 1 },
+            EntryState::Settled,
+        ),
+    ];
+    for (index, (cost, settlement, state)) in cases.into_iter().enumerate() {
         let root = temp()?;
         let prepared = prepared_for(ApiKeyProtocol::Flux, 95 + index as u8, 1024 * 1024)?;
         let crop = prepared.review().crop();
         let image = fixtures::png(crop.model_width, crop.model_height)?;
-        let mut response = ready();
-        response["cost"] = cost;
         let server = ScriptServer::start(vec![
             WireReply::json(submission())?,
-            WireReply::json(response)?,
+            WireReply::raw_ready(cost),
             WireReply {
                 status: 200,
                 mime: "image/png",
@@ -337,20 +383,21 @@ fn flux_missing_or_inexact_cost_keeps_the_single_attempt_unresolved() -> TestRes
             &NeverCancel,
         )?;
         assert_eq!(result.response.image_png(), image);
+        assert_eq!(result.settlement, settlement, "cost={cost:?}");
         assert_eq!(
-            result.settlement,
-            if index == 0 {
-                Settlement::UsageMissing
-            } else {
-                Settlement::LedgerUnavailable
-            }
+            result
+                .response
+                .flux_cost_receipt()
+                .map(|receipt| receipt.credits_decimal()),
+            cost.filter(|value| *value != "null")
         );
         assert_eq!(
             ledger
                 .entry(prepared.review().request_id())?
                 .ok_or("entry")?
                 .state,
-            EntryState::Attempted
+            state,
+            "cost={cost:?}"
         );
         assert_eq!(server.finish()?.len(), 3);
     }
@@ -398,7 +445,7 @@ fn gemini_inline_wire_uses_its_key_header_and_real_usage_schema() -> TestResult 
 fn flux_bad_task_status_and_untrusted_delivery_never_download_or_retry() -> TestResult {
     let _guard = workers()?;
     for (index,reply) in [
-        serde_json::json!({"id":"wrong-task","status":"Ready","result":null}),
+        serde_json::json!({"id":"wrong-task","status":"Ready","result":{"sample":"https://delivery.eu1.bfl.ai/fixture.png"},"cost":0.25}),
         serde_json::json!({"id":"fixture-task","status":"Content Moderated","result":null}),
         serde_json::json!({"id":"fixture-task","status":"Ready","result":{"sample":"https://evil.invalid/result.png"}}),
     ].into_iter().enumerate() {

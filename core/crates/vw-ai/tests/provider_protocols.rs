@@ -294,8 +294,7 @@ fn exact_flux_credit_receipt_settles_the_original_attempt_only() -> TestResult {
         BudgetPolicy::default(),
     )?;
     let _permit = ledger.begin_attempt(prepared.review())?;
-    let credits: serde_json::Number = serde_json::from_str("0.25")?;
-    let receipt = FluxCostReceipt::from_provider("fixture-task", &credits).ok_or("receipt")?;
+    let receipt = FluxCostReceipt::from_provider("fixture-task", "0.25").ok_or("receipt")?;
     assert_eq!(receipt.microusd(), Some(2_500));
     assert_eq!(
         ledger.settle_flux(
@@ -328,4 +327,35 @@ fn exact_flux_credit_receipt_settles_the_original_attempt_only() -> TestResult {
             .is_err()
     );
     Ok(())
+}
+
+#[test]
+fn flux_receipt_decimal_requires_exact_micro_usd_and_bounded_value() {
+    for (decimal, expected) in [
+        ("0.25", Some(2_500)),
+        ("1e-4", Some(1)),
+        ("1e-400", None),
+        ("0.00010000000000000000000001", None),
+        ("18446744073709551616", None),
+        ("922337203685478", Some(9_223_372_036_854_780_000)),
+    ] {
+        let receipt = FluxCostReceipt::from_provider("fixture-task", decimal);
+        assert_eq!(
+            receipt.and_then(|value| value.microusd()),
+            expected,
+            "{decimal}"
+        );
+    }
+    for invalid in [
+        "-1",
+        "+1",
+        "01",
+        "1.",
+        "1e",
+        "1e+",
+        "0.2 trailing",
+        "\"0.2\"",
+    ] {
+        assert!(FluxCostReceipt::from_provider("fixture-task", invalid).is_none());
+    }
 }
