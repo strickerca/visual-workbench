@@ -159,6 +159,8 @@ impl PaintObservationHelper {
             _permit: permit,
             input_uncertain: Arc::new(AtomicBool::new(false)),
             _source: Some(source.clone()),
+            private_temp: None,
+            canvas_unresolved: Arc::new(AtomicBool::new(false)),
         };
         let mut error = owner.child.startup_error.clone();
         if error.is_none() {
@@ -225,8 +227,9 @@ impl PaintObservationHelper {
 /// Retry the existing strong failure owners without emitting private probe
 /// observations into application stdout. A failed join/query remains owned.
 pub fn retry_paint_observation_retirements() -> Result<usize> {
+    let private_pending = super::compatibility::retry_private_disposal();
     let Some(registry) = RETAINED.get() else {
-        return Ok(usize::from(ACTIVE.load(Ordering::Acquire)));
+        return Ok(private_pending + usize::from(ACTIVE.load(Ordering::Acquire)));
     };
     let mut owners = registry.lock().map_err(|_| Error::Io)?;
     let mut at = 0;
@@ -235,8 +238,18 @@ pub fn retry_paint_observation_retirements() -> Result<usize> {
             at += 1;
             continue;
         }
+        if owners[at].owner.canvas_unresolved.load(Ordering::Acquire) {
+            at += 1;
+            continue;
+        }
         match owners[at].owner.collect() {
             Collection::Joined { .. } => {
+                if let Some(temp) = owners[at].owner.private_temp.as_mut() {
+                    if temp.dispose().is_err() {
+                        at += 1;
+                        continue;
+                    }
+                }
                 owners.remove(at);
             }
             Collection::Pending(_) => {
@@ -245,7 +258,9 @@ pub fn retry_paint_observation_retirements() -> Result<usize> {
             }
         }
     }
-    Ok(owners.iter().filter(|v| v.quiet).count() + usize::from(ACTIVE.load(Ordering::Acquire)))
+    Ok(private_pending
+        + owners.iter().filter(|v| v.quiet).count()
+        + usize::from(ACTIVE.load(Ordering::Acquire)))
 }
 
 #[cfg(test)]

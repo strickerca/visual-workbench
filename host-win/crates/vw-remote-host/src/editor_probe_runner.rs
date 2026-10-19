@@ -1,5 +1,7 @@
 //! Root-owned, input-free probe runner. Reuses actual suspended helper launch.
 //! An unsuccessful retirement keeps every owner until joined or outer Job kill.
+#[path = "editor_probe_runner/compatibility.rs"]
+mod compatibility;
 #[path = "editor_probe_runner/finite.rs"]
 mod finite;
 #[path = "editor_probe_runner/frame.rs"]
@@ -11,6 +13,10 @@ use crate::{
         Cancellation,
         windows::{Child, Pins},
     },
+};
+pub use compatibility::{
+    CompletedPaintDrawingObservation, Current, PaintDrawingAuthorize, PaintDrawingInputStep,
+    PaintDrawingPaths, PaintDrawingPreparation, prepare_paint_drawing, run_paint_drawing_helper,
 };
 pub use paint_observation::{
     PaintControlsObservation, PaintObservationHelper, retry_paint_observation_retirements,
@@ -67,6 +73,8 @@ struct Owner {
     // A programmatic observation retains the actual parent source through any
     // failed child/Job/IO retirement, using this same existing failure owner.
     _source: Option<Arc<crate::editor_source::SourceLease>>,
+    private_temp: Option<compatibility::PrivateTempLease>,
+    canvas_unresolved: Arc<AtomicBool>,
 }
 struct PendingOwner {
     owner: Owner,
@@ -353,7 +361,7 @@ impl Owner {
         !self.input_uncertain.load(Ordering::Acquire)
     }
     fn kill_if_released(&self) {
-        if self.may_retire() {
+        if self.may_retire() && !self.canvas_unresolved.load(Ordering::Acquire) {
             let _ = self.child.kill_tree();
         }
     }
@@ -834,6 +842,8 @@ fn run_for(effect: bool) -> Result<()> {
         _permit: permit,
         input_uncertain,
         _source: None,
+        private_temp: None,
+        canvas_unresolved: Arc::new(AtomicBool::new(false)),
     };
     let mut error = owner.child.startup_error.clone();
     if error.is_none() {
@@ -903,6 +913,14 @@ pub fn wait_retained() {
         let mut owners = registry.lock().unwrap_or_else(|e| e.into_inner());
         let mut index = 0;
         while index < owners.len() {
+            if owners[index]
+                .owner
+                .canvas_unresolved
+                .load(Ordering::Acquire)
+            {
+                index += 1;
+                continue;
+            }
             // No earlier predicate is release authority. Query once more
             // inside collection and remove only after an actual completed join.
             match owners[index].owner.collect() {
@@ -913,6 +931,14 @@ pub fn wait_retained() {
                 }
                 Collection::Joined { pid, code, outcome } => {
                     let retained = &mut owners[index];
+                    if let Some(temp) = retained.owner.private_temp.as_mut() {
+                        if let Err(error) = temp.dispose() {
+                            retained.receipt.retirement_error = Some(error);
+                            index += 1;
+                            continue;
+                        }
+                        retained.owner.private_temp = None;
+                    }
                     retained.receipt.input_retirement_complete = retained.owner.may_retire();
                     if !retained.quiet {
                         finished(&mut retained.receipt, pid, code, outcome);
