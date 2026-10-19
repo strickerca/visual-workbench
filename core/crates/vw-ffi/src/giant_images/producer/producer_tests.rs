@@ -726,7 +726,7 @@ fn public_publication_adopts_full_budgeted_session_and_reopens_accepted_destinat
             .await
             .unwrap();
         let delivery = image
-            .tile(
+            .prepare_tile(
                 super::super::GiantTileAddress {
                     level: 0,
                     x: 0,
@@ -736,9 +736,11 @@ fn public_publication_adopts_full_budgeted_session_and_reopens_accepted_destinat
             )
             .await
             .unwrap();
-        assert_eq!(delivery.pixels.rgba, [21, 42, 84, 255]);
-        let lease = delivery.native_lease;
-        drop(delivery.pixels);
+        let lease = delivery.publication_lease().unwrap();
+        let pixels = delivery.take_pixels().unwrap();
+        assert_eq!(pixels.rgba, [21, 42, 84, 255]);
+        drop(pixels);
+        delivery.release_source().unwrap();
         lease.close().unwrap();
         image.close().await.unwrap();
         cap.close().await.unwrap();

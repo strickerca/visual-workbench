@@ -3637,6 +3637,7 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "thiserror",
+ "vw-geom",
  "vw-instructions",
  "vw-model",
  "vw-ops",
