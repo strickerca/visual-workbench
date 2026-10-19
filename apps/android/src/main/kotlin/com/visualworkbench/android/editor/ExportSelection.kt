@@ -34,6 +34,52 @@ internal data class ExportTicket(val id: String, val projectId: String, val docu
             doc?.documentId == documentId && checked == options
 }
 
+/** Interpret the retained source options in D, then use the revision-bound native O projection. */
+internal suspend fun projectExportOptions(project: WorkbenchProject, binding: WorkflowBinding,
+    sourceOptions: ExportOptions,
+): Pair<ExportOptions, ImageOutputExportGeometry> =
+    projectExportOptions(project, binding, sourceOptions, ::imageOutputExportGeometry)
+
+internal suspend fun projectExportOptions(project: WorkbenchProject, binding: WorkflowBinding,
+    sourceOptions: ExportOptions,
+    geometryQuery: suspend (WorkbenchProject, WorkflowBinding, SelectionRegion?, ULong) -> ImageOutputExportGeometry,
+): Pair<ExportOptions, ImageOutputExportGeometry> {
+    require(sourceOptions.documentId == binding.documentId) { "Export document changed." }
+    val source = sourceOptions.region?.let { rect ->
+        fun coordinate(value: Double): UInt {
+            require(value.isFinite() && value >= 0.0 && value <= UInt.MAX_VALUE.toDouble() && value % 1.0 == 0.0) {
+                "Export region requires nonnegative integer source coordinates."
+            }
+            return value.toUInt()
+        }
+        SelectionRegion(coordinate(rect.x), coordinate(rect.y), coordinate(rect.width), coordinate(rect.height))
+            .also { require(it.width > 0u && it.height > 0u) { "Export region is empty." } }
+    }
+    val geometry = geometryQuery(project, binding, source, sourceOptions.memoryBudgetBytes)
+    require(geometry.binding == binding && geometry.sourceWidth > 0u && geometry.sourceHeight > 0u &&
+        geometry.outputWidth > 0u && geometry.outputHeight > 0u &&
+        geometry.encodedWidth > 0u && geometry.encodedHeight > 0u &&
+        (source == null) == (geometry.region == null)) { "Export frame changed or returned invalid dimensions." }
+    if (source != null) require(source.x.toULong() + source.width.toULong() <= geometry.sourceWidth.toULong() &&
+        source.y.toULong() + source.height.toULong() <= geometry.sourceHeight.toULong()) {
+        "Export region exceeds its source document."
+    }
+    val output = geometry.region
+    if (output == null) {
+        require(geometry.encodedWidth == geometry.outputWidth && geometry.encodedHeight == geometry.outputHeight) {
+            "Full export frame returned inconsistent dimensions."
+        }
+    } else require(output.width > 0u && output.height > 0u &&
+        output.x.toULong() + output.width.toULong() <= geometry.outputWidth.toULong() &&
+        output.y.toULong() + output.height.toULong() <= geometry.outputHeight.toULong() &&
+        geometry.encodedWidth == output.width && geometry.encodedHeight == output.height) {
+        "Export frame returned an invalid output rectangle."
+    }
+    return sourceOptions.copy(region = output?.let {
+        Rect(it.x.toDouble(), it.y.toDouble(), it.width.toDouble(), it.height.toDouble())
+    }) to geometry
+}
+
 internal fun viewExportRegion(points: List<Point>, width: UInt, height: UInt): Rect {
     require(points.size == 4 && points.all { it.x.isFinite() && it.y.isFinite() })
     val left = floor(points.minOf { it.x }).coerceIn(0.0, width.toDouble())

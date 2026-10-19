@@ -1,10 +1,14 @@
 package com.visualworkbench.desktop
 
 import com.visualworkbench.shared.*
+import com.visualworkbench.desktop.mcp.McpJson
 import kotlinx.coroutines.*
 import java.io.IOException
+import java.math.BigDecimal
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
+import java.nio.CharBuffer
+import java.nio.charset.CodingErrorAction
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.UUID
@@ -46,8 +50,12 @@ data class ExportRequest(
     val hostSeq: ULong, val stateHash: String, val settings: ExportSettings,
     val region: Rect?, val width: UInt, val height: UInt,
     val selection: Set<String>, val camera: Camera?,
+    /** Source D intent survives projection and retries; region/width/height become O. */
+    val sourceRegion: Rect? = region, val sourceWidth: UInt = width, val sourceHeight: UInt = height,
+    val projectedGeometry: ImageOutputExportGeometry? = null,
 ) {
     val revision: String get() = "r$hostSeq-${stateHash.take(8)}"
+    val binding: WorkflowBinding get() = WorkflowBinding(projectId, documentId, hostSeq, stateHash)
     fun options(): ExportOptions = ExportOptions(documentId, settings.format(), settings.marked, region,
         settings.matte.rgb, settings.convertToSrgb, settings.assumeUntaggedSrgb, settings.allowDepthReduction)
     fun matches(state: EditorState): Boolean {
@@ -55,6 +63,8 @@ data class ExportRequest(
         val info = document.render.revision
         return epoch == state.projectEpoch && projectId == info.projectId && documentId == document.documentId &&
             hostSeq == info.hostSeq && stateHash == info.stateHash && settings == state.exportSettings &&
+            sourceWidth == document.width && sourceHeight == document.height &&
+            (projectedGeometry == null || projectedGeometry.binding == binding) &&
             (settings.area != ExportArea.Selection || selection == state.selected) &&
             (settings.area != ExportArea.View || camera == state.view.camera)
     }
@@ -87,7 +97,50 @@ internal fun captureExport(state: EditorState, core: WorkbenchCore): ExportReque
     return ExportRequest(state.projectEpoch, info.projectId, document.documentId, info.hostSeq, info.stateHash,
         settings, region, region?.width?.toUInt() ?: document.width, region?.height?.toUInt() ?: document.height,
         if (settings.area == ExportArea.Selection) state.selected.toSet() else emptySet(),
-        state.view.camera.takeIf { settings.area == ExportArea.View })
+        state.view.camera.takeIf { settings.area == ExportArea.View },
+        region, document.width, document.height)
+}
+
+/** Resolve the saved frame under the captured revision; never feed a projected O region back as D. */
+internal suspend fun projectExport(request: ExportRequest, project: WorkbenchProject): ExportRequest =
+    projectExport(request, project, ::imageOutputExportGeometry)
+
+internal suspend fun projectExport(request: ExportRequest, project: WorkbenchProject,
+    geometryQuery: suspend (WorkbenchProject, WorkflowBinding, SelectionRegion?, ULong) -> ImageOutputExportGeometry,
+): ExportRequest {
+    val source = request.sourceRegion?.let { rect ->
+        fun coordinate(value: Double): UInt {
+            if (!value.isFinite() || value < 0.0 || value > UInt.MAX_VALUE.toDouble() || value % 1.0 != 0.0)
+                throw HandoffFailure("The captured export region is not an integer source rectangle.")
+            return value.toUInt()
+        }
+        SelectionRegion(coordinate(rect.x), coordinate(rect.y), coordinate(rect.width), coordinate(rect.height))
+            .also { if (it.width == 0u || it.height == 0u) throw HandoffFailure("The captured export region is empty.") }
+    }
+    if (request.sourceWidth == 0u || request.sourceHeight == 0u ||
+        (source != null && (source.x.toULong() + source.width.toULong() > request.sourceWidth.toULong() ||
+            source.y.toULong() + source.height.toULong() > request.sourceHeight.toULong())))
+        throw HandoffFailure("The captured export region exceeds its source document.")
+    val geometry = geometryQuery(project, request.binding, source, request.options().memoryBudgetBytes)
+    if (geometry.binding != request.binding || geometry.sourceWidth != request.sourceWidth ||
+        geometry.sourceHeight != request.sourceHeight || !Regex("[0-9a-f]{64}").matches(geometry.sourceAssetId) ||
+        geometry.outputWidth == 0u || geometry.outputHeight == 0u ||
+        geometry.encodedWidth == 0u || geometry.encodedHeight == 0u ||
+        (source == null) != (geometry.region == null) ||
+        (request.projectedGeometry != null && request.projectedGeometry != geometry))
+        throw HandoffFailure("The export frame changed after capture. Prepare it again.")
+    val output = geometry.region
+    if (output == null) {
+        if (geometry.encodedWidth != geometry.outputWidth || geometry.encodedHeight != geometry.outputHeight)
+            throw HandoffFailure("The export frame returned inconsistent dimensions.")
+    } else if (output.width == 0u || output.height == 0u ||
+        output.x.toULong() + output.width.toULong() > geometry.outputWidth.toULong() ||
+        output.y.toULong() + output.height.toULong() > geometry.outputHeight.toULong() ||
+        geometry.encodedWidth != output.width || geometry.encodedHeight != output.height) {
+        throw HandoffFailure("The export frame returned an invalid output rectangle.")
+    }
+    return request.copy(region = output?.let { Rect(it.x.toDouble(), it.y.toDouble(), it.width.toDouble(), it.height.toDouble()) },
+        width = geometry.encodedWidth, height = geometry.encodedHeight, projectedGeometry = geometry)
 }
 internal fun clippedExportRect(rect: Rect, width: UInt, height: UInt): Rect {
     if (listOf(rect.x, rect.y, rect.width, rect.height, rect.x + rect.width, rect.y + rect.height).any { !it.isFinite() } || rect.width <= 0 || rect.height <= 0)
@@ -125,20 +178,40 @@ internal fun transferMessage(error: Exception): String = when (error) {
     else -> "The handoff could not finish. The original and existing destination were preserved."
 }
 
-/** These fields come from bounded canonical core JSON, not arbitrary app text.
- * No new JSON dependency or parsing of embedded PNG bytes is needed here; the
- * host independently verifies the complete PNG and its embedded receipt. */
+/** Read only top-level receipt fields. A framed receipt can also contain nested
+ * image_output dimensions, which must not be mistaken for encoded dimensions. */
 internal fun completeExport(request: ExportRequest, result: FileExportResult): CompletedExport {
-    if (!request.matches(result.revision) || result.metadataJson.length > 65536 ||
+    if (!request.matches(result.revision) ||
         !Regex("[0-9a-f]{64}").matches(result.blake3) || result.encodedBytes == 0uL)
         throw HandoffFailure("The export receipt does not match the captured revision.")
-    fun string(key: String): String = Regex("\"$key\"\\s*:\\s*\"([^\"]*)\"").findAll(result.metadataJson)
-        .toList().singleOrNull()?.groupValues?.get(1) ?: throw HandoffFailure("The export receipt is incomplete.")
-    fun number(key: String): UInt = Regex("\"$key\"\\s*:\\s*([0-9]+)(?=\\s*[,}])").findAll(result.metadataJson)
-        .toList().singleOrNull()?.groupValues?.get(1)?.toUIntOrNull() ?: throw HandoffFailure("The export dimensions are missing.")
+    val fields = try {
+        val buffer = Charsets.UTF_8.newEncoder().onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT).encode(CharBuffer.wrap(result.metadataJson))
+        if (buffer.remaining() > 65536) throw HandoffFailure("The export receipt exceeds its limit.")
+        McpJson.decode(ByteArray(buffer.remaining()).also { buffer.get(it) })
+    } catch (error: IllegalArgumentException) {
+        throw HandoffFailure("The export receipt is malformed.")
+    } catch (error: IllegalStateException) {
+        throw HandoffFailure("The export receipt is malformed.")
+    } catch (error: java.nio.charset.CharacterCodingException) {
+        throw HandoffFailure("The export receipt is malformed.")
+    }
+    fun string(key: String): String = fields[key] as? String
+        ?: throw HandoffFailure("The export receipt is incomplete.")
+    fun number(key: String): UInt {
+        val value = fields[key] as? BigDecimal ?: throw HandoffFailure("The export dimensions are missing.")
+        if (value.scale() != 0) throw HandoffFailure("The export dimensions are not integers.")
+        val integer = try { value.longValueExact() } catch (_: ArithmeticException) {
+            throw HandoffFailure("The export dimensions are out of range.")
+        }
+        if (integer !in 1..UInt.MAX_VALUE.toLong()) throw HandoffFailure("The export dimensions are out of range.")
+        return integer.toUInt()
+    }
     val revision = string("revision"); val source = string("source_asset")
     val width = number("output_width"); val height = number("output_height")
-    if (revision != request.revision || !Regex("[0-9a-f]{64}").matches(source) || width != request.width || height != request.height)
+    if (revision != request.revision || !Regex("[0-9a-f]{64}").matches(source) ||
+        request.projectedGeometry?.sourceAssetId?.let { it != source } == true ||
+        width != request.width || height != request.height)
         throw HandoffFailure("The completed export has different source/revision or dimensions. Prepare it again.")
     return CompletedExport(request, result.encodedBytes, result.blake3, source, revision, width, height)
 }
