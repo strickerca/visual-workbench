@@ -15,6 +15,75 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.util.concurrent.Executors
 
 class DesktopTransferTest {
+    @Test fun bmpChooserCapturesItsActualCodecWithoutGrantingConversionOrPngTransfers() {
+        assertTrue(ExportEncoding.entries.all { it.exportAvailable })
+        val state = transferState().copy(document = transferDocument().copy(bitDepth = 16u),
+            exportSettings = ExportSettings(encoding = ExportEncoding.Bmp8))
+        val request = captureExport(state, TransferCore(TransferProject()))
+        val options = request.options()
+        assertEquals(ImageFormat.Bmp8, options.format)
+        assertFalse(request.settings.encoding.png)
+        assertTrue(options.marked); assertNull(options.region); assertNull(options.matteRgb)
+        assertFalse(options.allowDepthReduction); assertFalse(options.convertToSrgb); assertFalse(options.assumeUntaggedSrgb)
+        assertEquals(256uL * 1024uL * 1024uL, options.memoryBudgetBytes)
+        assertEquals(8u, request.width); assertEquals(6u, request.height)
+        assertEquals(16u, state.document!!.bitDepth)
+    }
+    @Test fun bmpSelectionRetainsExactRegionMatteConsentAndCapturedSettings() {
+        val settings = ExportSettings(encoding = ExportEncoding.Bmp8, area = ExportArea.Selection, marked = false,
+            matte = ExportMatte.Black, convertToSrgb = true, assumeUntaggedSrgb = true, allowDepthReduction = true,
+            allowDibDepthReduction = true, assumeDibSrgb = true)
+        val state = transferState().copy(exportSettings = settings, selected = setOf("object"))
+        val request = captureExport(state, TransferCore(TransferProject()))
+        val options = request.options()
+        assertSame(settings, request.settings)
+        assertEquals(ImageFormat.Bmp8, options.format); assertEquals("document", options.documentId)
+        assertEquals(Rect(1.0, 2.0, 4.0, 3.0), options.region)
+        assertEquals(4u, request.width); assertEquals(3u, request.height)
+        assertEquals(0u, options.matteRgb); assertFalse(options.marked)
+        assertTrue(options.convertToSrgb); assertTrue(options.assumeUntaggedSrgb); assertTrue(options.allowDepthReduction)
+        assertEquals(setOf("object"), request.selection); assertNull(request.camera)
+        assertTrue(request.matches(state))
+    }
+    @Test fun bmpReadinessStillRequiresTheExactRevisionPoliciesSelectionAndView() {
+        val state = transferState().copy(exportSettings = ExportSettings(encoding = ExportEncoding.Bmp8, area = ExportArea.Selection),
+            selected = setOf("object"))
+        val request = captureExport(state, TransferCore(TransferProject()))
+        val ready = state.copy(exportReceipt = completeExport(request, receipt(request)))
+        assertTrue(ready.exportReady)
+        for (stale in listOf(ready.copy(projectEpoch = 2), ready.copy(document = null),
+            ready.copy(document = transferDocument(8u)), ready.copy(document = transferDocument().copy(documentId = "another")),
+            ready.copy(document = transferDocument().let { it.copy(render = it.render.copy(revision = it.render.revision.copy(projectId = "another"))) }),
+            ready.copy(selected = emptySet()),
+            ready.copy(exportSettings = state.exportSettings.copy(encoding = ExportEncoding.Png8)),
+            ready.copy(exportSettings = state.exportSettings.copy(marked = false)),
+            ready.copy(exportSettings = state.exportSettings.copy(matte = ExportMatte.White)),
+            ready.copy(exportSettings = state.exportSettings.copy(convertToSrgb = true)),
+            ready.copy(exportSettings = state.exportSettings.copy(assumeUntaggedSrgb = true)),
+            ready.copy(exportSettings = state.exportSettings.copy(allowDepthReduction = true)),
+            ready.copy(exportSettings = state.exportSettings.copy(area = ExportArea.Full)))) assertFalse(stale.exportReady)
+        val viewed = state.copy(exportSettings = state.exportSettings.copy(area = ExportArea.View))
+        val viewRequest = captureExport(viewed, TransferCore(TransferProject()))
+        val viewReady = viewed.copy(exportReceipt = completeExport(viewRequest, receipt(viewRequest)))
+        assertTrue(viewReady.exportReady)
+        assertFalse(viewReady.copy(view = viewReady.view.copy(camera = viewReady.view.camera.copy(rotation = .2))).exportReady)
+    }
+    @Test fun bmpReceiptAndPublicationRetainRevisionChecksAndNoClobber() = temporary { root ->
+        val state = transferState().copy(exportSettings = ExportSettings(encoding = ExportEncoding.Bmp8))
+        val request = captureExport(state, TransferCore(TransferProject()))
+        assertThrows(HandoffFailure::class.java) { completeExport(request, receipt(request).copy(revision = transferInfo(8u))) }
+        val completed = completeExport(request, receipt(request))
+        val source = root.resolve("prepared.bmp"); Files.write(source, DATA)
+        val destination = root.resolve("saved.bmp")
+        publishExport(source, destination, completed.bytes) { request.matches(state) }
+        assertArrayEquals(DATA, Files.readAllBytes(destination))
+        try { publishExport(source, destination, completed.bytes) { true }; fail("replaced an existing BMP destination") }
+        catch (_: FileAlreadyExistsException) { }
+        val stale = root.resolve("stale.bmp")
+        try { publishExport(source, stale, completed.bytes) { request.matches(state.copy(projectEpoch = 2)) }; fail("published stale BMP request") }
+        catch (_: HandoffFailure) { }
+        assertFalse(Files.exists(stale)); assertArrayEquals(DATA, Files.readAllBytes(source))
+    }
     @Test fun readinessBindsProjectAttachmentRevisionSettingsAndRegion() {
         val state = transferState()
         val full = captureExport(state, TransferCore(TransferProject()))

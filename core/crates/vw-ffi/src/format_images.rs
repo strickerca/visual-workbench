@@ -108,6 +108,44 @@ fn false_notice(value: &bool) -> bool {
     !*value
 }
 
+/// Read revision-covered notices without treating a legacy TIFF's absent field
+/// as an explicit claim that its complete page set is displayed.
+fn stored_import_notices(format: &str, metadata: &str) -> Result<ImportNotices, WorkflowError> {
+    if metadata.len() > 4096 {
+        return Err(WorkflowError::Limit);
+    }
+    let notices = if format == "tiff" {
+        serde_json::from_str::<ImportNotices>(metadata)
+            .ok()
+            .and_then(|mut notices| {
+                // The typed parse retains duplicate-field/type rejection. The
+                // bounded object read distinguishes absence from explicit false.
+                let value: serde_json::Value = serde_json::from_str(metadata).ok()?;
+                let missing = !value.as_object()?.contains_key("first_tiff_page_only");
+                if missing {
+                    notices.first_tiff_page_only = true;
+                }
+                Some(notices)
+            })
+            .unwrap_or(ImportNotices {
+                first_tiff_page_only: true,
+                ..Default::default()
+            })
+    } else if matches!(format, "psd" | "psb" | "dng" | "cr2" | "raw-preview") {
+        serde_json::from_str(metadata).map_err(|_| WorkflowError::Invalid)?
+    } else {
+        // Ordinary legacy image metadata did not carry these additive notices.
+        ImportNotices::default()
+    };
+    if notices.flattened_composite != matches!(format, "psd" | "psb")
+        || notices.raw_preview != matches!(format, "dng" | "cr2" | "raw-preview")
+        || (notices.first_tiff_page_only && format != "tiff")
+    {
+        return Err(WorkflowError::Invalid);
+    }
+    Ok(notices)
+}
+
 pub(crate) fn asset_is_raw_preview(asset: &vw_proto::v1::AddAsset) -> Result<bool, RasterError> {
     if !matches!(asset.format.as_str(), "dng" | "cr2" | "raw-preview") {
         return Ok(false);
@@ -503,31 +541,8 @@ impl ProjectSession {
                     {
                         return Err(WorkflowError::Invalid);
                     }
-                    if asset.metadata_json.len() > 4096 {
-                        return Err(WorkflowError::Limit);
-                    }
-                    let notices: ImportNotices = if asset.format == "tiff" {
-                        // Old projects may lack the additive field. Report conservative
-                        // visibility rather than silently promising a complete TIFF.
-                        serde_json::from_str(&asset.metadata_json).unwrap_or(ImportNotices {
-                            first_tiff_page_only: asset.format == "tiff",
-                            ..Default::default()
-                        })
-                    } else if matches!(
-                        asset.format.as_str(),
-                        "psd" | "psb" | "dng" | "cr2" | "raw-preview"
-                    ) {
-                        serde_json::from_str(&asset.metadata_json)
-                            .map_err(|_| WorkflowError::Invalid)?
-                    } else {
-                        ImportNotices::default()
-                    };
-                    if notices.flattened_composite != matches!(asset.format.as_str(), "psd" | "psb")
-                        || notices.raw_preview
-                            != matches!(asset.format.as_str(), "dng" | "cr2" | "raw-preview")
-                        || (notices.first_tiff_page_only && asset.format != "tiff")
-                        || (notices.raw_preview && asset.bit_depth != 8)
-                    {
+                    let notices = stored_import_notices(&asset.format, &asset.metadata_json)?;
+                    if notices.raw_preview && asset.bit_depth != 8 {
                         return Err(WorkflowError::Invalid);
                     }
                     cancellation.check()?;
@@ -658,4 +673,5 @@ mod tests {
         assert_eq!(embedded.settings.frame_id, Some(u64::MAX));
     }
     include!("format_adapter_tests.rs");
+    include!("format_notice_tests.rs");
 }
