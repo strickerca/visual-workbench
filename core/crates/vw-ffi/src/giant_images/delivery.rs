@@ -61,6 +61,14 @@ impl PreparedGiantTile {
             pixels: GiantTilePixels,
             outgoing: MemoryCharge,
         }
+        // ABI admission can fail after the resident charge succeeds. Keep the
+        // hashes and both charges in one owner so field drop order frees pixel
+        // allocations before returning either reservation on that path.
+        struct WithResident {
+            pixels: GiantTilePixels,
+            outgoing: MemoryCharge,
+            resident: MemoryCharge,
+        }
         let incoming = Incoming { pixels, outgoing };
         let pixels = &incoming.pixels;
         let canonical_hash = |value: &str| {
@@ -94,6 +102,7 @@ impl PreparedGiantTile {
         // Outgoing already covers the actual RGBA Vec capacity. The foreign
         // reservation is separate. Keep two additional charges: one for the
         // serialized RustBuffer growth and one for identities/owner storage.
+        let bytes = abi_copy_bound(pixels)?;
         let resident_bytes =
             u64::try_from(metadata_capacity).map_err(|_| GiantImageError::Limit)?;
         let resident = budget
@@ -102,17 +111,26 @@ impl PreparedGiantTile {
                 estimated: budget.used_bytes().saturating_add(resident_bytes),
                 budget: budget.limit_bytes(),
             })?;
-        let bytes = abi_copy_bound(pixels)?;
+        let with_resident = WithResident {
+            pixels: incoming.pixels,
+            outgoing: incoming.outgoing,
+            resident,
+        };
         let abi = budget
             .reserve(MemoryKind::CodecWorkspace, bytes)
             .map_err(|_| GiantImageError::Memory {
                 estimated: budget.used_bytes().saturating_add(bytes),
                 budget: budget.limit_bytes(),
             })?;
+        let WithResident {
+            pixels,
+            outgoing,
+            resident,
+        } = with_resident;
         Ok(Arc::new(Self {
             state: Mutex::new(State::Ready(OwnedPixels {
-                pixels: incoming.pixels,
-                lease: SessionResourceCharge::from_charges(vec![incoming.outgoing, resident, abi]),
+                pixels,
+                lease: SessionResourceCharge::from_charges(vec![outgoing, resident, abi]),
             })),
         }))
     }
@@ -193,7 +211,53 @@ impl PreparedGiantTile {
 #[allow(clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
-    use std::sync::Weak;
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::sync::{
+        OnceLock, Weak,
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+    };
+
+    // SAFETY: This test allocator delegates every allocation operation to
+    // System. Its deallocation observer performs only atomic and budget reads.
+    struct ObservedAllocator;
+    #[global_allocator]
+    static OBSERVED_ALLOCATOR: ObservedAllocator = ObservedAllocator;
+    static OBSERVED_BUDGET: OnceLock<SessionBudget> = OnceLock::new();
+    static HASH_A_PTR: AtomicUsize = AtomicUsize::new(0);
+    static HASH_B_PTR: AtomicUsize = AtomicUsize::new(0);
+    static RGBA_PTR: AtomicUsize = AtomicUsize::new(0);
+    static HASH_A_CHARGE_AT_FREE: AtomicU64 = AtomicU64::new(0);
+    static HASH_B_CHARGE_AT_FREE: AtomicU64 = AtomicU64::new(0);
+    static RGBA_CHARGE_AT_FREE: AtomicU64 = AtomicU64::new(0);
+
+    unsafe impl GlobalAlloc for ObservedAllocator {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            // SAFETY: Forward the unchanged valid allocation layout to System.
+            unsafe { System.alloc(layout) }
+        }
+
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            let address = ptr as usize;
+            let observed = [
+                (&HASH_A_PTR, &HASH_A_CHARGE_AT_FREE),
+                (&HASH_B_PTR, &HASH_B_CHARGE_AT_FREE),
+                (&RGBA_PTR, &RGBA_CHARGE_AT_FREE),
+            ];
+            for (target, receipt) in observed {
+                if target
+                    .compare_exchange(address, 0, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
+                {
+                    if let Some(budget) = OBSERVED_BUDGET.get() {
+                        receipt.store(budget.used_bytes(), Ordering::SeqCst);
+                    }
+                }
+            }
+            // SAFETY: The pointer and layout are the exact pair supplied by
+            // the allocator client; this wrapper has not changed either.
+            unsafe { System.dealloc(ptr, layout) }
+        }
+    }
 
     fn fixture(budget: &SessionBudget) -> Arc<PreparedGiantTile> {
         let outgoing = budget.reserve(MemoryKind::Transfer, 4).unwrap();
@@ -486,6 +550,80 @@ mod tests {
         drop(prefetched);
         drop(source);
         retired(weak, &budget);
+    }
+
+    #[test]
+    fn abi_admission_failure_keeps_quota_until_actual_pixel_deallocation() {
+        fn hashes(asset_capacity: usize, manifest_capacity: usize) -> GiantTilePixels {
+            let mut pixels = edge_pixels(1, 1);
+            pixels.asset_id = String::with_capacity(asset_capacity);
+            pixels.asset_id.push_str(&"a".repeat(64));
+            pixels.manifest_hash = String::with_capacity(manifest_capacity);
+            pixels.manifest_hash.push_str(&"b".repeat(64));
+            pixels
+        }
+        fn observe(pixels: &GiantTilePixels) {
+            HASH_A_CHARGE_AT_FREE.store(0, Ordering::SeqCst);
+            HASH_B_CHARGE_AT_FREE.store(0, Ordering::SeqCst);
+            RGBA_CHARGE_AT_FREE.store(0, Ordering::SeqCst);
+            HASH_A_PTR.store(pixels.asset_id.as_ptr() as usize, Ordering::SeqCst);
+            HASH_B_PTR.store(pixels.manifest_hash.as_ptr() as usize, Ordering::SeqCst);
+            RGBA_PTR.store(pixels.rgba.as_ptr() as usize, Ordering::SeqCst);
+        }
+        fn assert_observed(expected: u64) {
+            assert_eq!(HASH_A_CHARGE_AT_FREE.load(Ordering::SeqCst), expected);
+            assert_eq!(HASH_B_CHARGE_AT_FREE.load(Ordering::SeqCst), expected);
+            assert_eq!(RGBA_CHARGE_AT_FREE.load(Ordering::SeqCst), expected);
+        }
+        let pixels = hashes(4096, 4096);
+        let resident_bytes = (pixels.asset_id.capacity()
+            + pixels.manifest_hash.capacity()
+            + RETAINED_OWNER_BYTES) as u64;
+        let abi_bytes = abi_copy_bound(&pixels).unwrap();
+        let budget = SessionBudget::new(4 + resident_bytes + abi_bytes - 1).unwrap();
+        OBSERVED_BUDGET.set(budget.clone()).unwrap();
+        observe(&pixels);
+        let outgoing = budget.reserve(MemoryKind::Transfer, 4).unwrap();
+        assert!(matches!(
+            PreparedGiantTile::admit_in_pool(pixels, outgoing, budget.clone()),
+            Err(GiantImageError::Memory { .. })
+        ));
+        assert_observed(4 + resident_bytes);
+        assert_eq!(budget.used_bytes(), 0);
+
+        // Validation and resident-admission failures still release pixels
+        // before returning the one outgoing charge they could have acquired.
+        let mut invalid = hashes(4096, 4096);
+        invalid.asset_id.push('a');
+        observe(&invalid);
+        let outgoing = budget.reserve(MemoryKind::Transfer, 4).unwrap();
+        assert!(matches!(
+            PreparedGiantTile::admit_in_pool(invalid, outgoing, budget.clone()),
+            Err(GiantImageError::Invalid)
+        ));
+        assert_observed(4);
+        assert_eq!(budget.used_bytes(), 0);
+
+        let resident_refused = hashes(8192, 4096);
+        observe(&resident_refused);
+        let outgoing = budget.reserve(MemoryKind::Transfer, 4).unwrap();
+        assert!(matches!(
+            PreparedGiantTile::admit_in_pool(resident_refused, outgoing, budget.clone()),
+            Err(GiantImageError::Memory { .. })
+        ));
+        assert_observed(4);
+        assert_eq!(budget.used_bytes(), 0);
+
+        // The successful Ready path drops its pixels before explicit release
+        // credits the outgoing, resident and ABI charges together.
+        let compact = edge_pixels(1, 1);
+        observe(&compact);
+        let outgoing = budget.reserve(MemoryKind::Transfer, 4).unwrap();
+        let source = PreparedGiantTile::admit_in_pool(compact, outgoing, budget.clone()).unwrap();
+        let charged = budget.used_bytes();
+        source.release_source().unwrap();
+        assert_observed(charged);
+        assert_eq!(budget.used_bytes(), 0);
     }
 
     #[test]
