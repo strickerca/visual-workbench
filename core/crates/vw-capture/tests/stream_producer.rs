@@ -43,6 +43,7 @@ struct Synthetic {
     prepared: bool,
     reads: usize,
     discards: usize,
+    cancel_during_read: bool,
 }
 impl Synthetic {
     fn new() -> Self {
@@ -51,6 +52,7 @@ impl Synthetic {
             prepared: false,
             reads: 0,
             discards: 0,
+            cancel_during_read: false,
         }
     }
 }
@@ -63,9 +65,17 @@ impl StreamSource for Synthetic {
             captured_at_ms: 1_700_000_000_000,
         }))
     }
-    fn read_into(&mut self, destination: &mut [u8], _: &Cancellation) -> vw_capture::Result<()> {
+    fn read_into(
+        &mut self,
+        destination: &mut [u8],
+        cancel: &Cancellation,
+    ) -> vw_capture::Result<()> {
         assert!(self.prepared);
         self.reads += 1;
+        if self.cancel_during_read {
+            cancel.cancel();
+            return Err(Error::Cancelled);
+        }
         for p in destination.as_chunks_mut::<4>().0 {
             p.copy_from_slice(&[42, 84, 126, 255]);
         }
@@ -175,4 +185,24 @@ fn original_requires_exact_frame_geometry_and_timestamp_after_eviction() {
     ));
     actor.cancel();
     assert!(matches!(actor.original(&current), Err(Error::Cancelled)));
+}
+
+#[test]
+fn late_readback_cancellation_drops_the_unpublished_ring_reservation() {
+    let request = request();
+    let budget = SessionBudget::new(request.endpoint_bytes).expect("budget");
+    let mut actor = StreamProducer::open(request, budget.clone()).expect("producer");
+    let mut source = Synthetic::new();
+    source.cancel_during_read = true;
+    assert!(matches!(
+        actor.poll(&mut source, 1, None, false, 100),
+        Err(Error::Cancelled)
+    ));
+    assert_eq!(source.reads, 1);
+    assert_eq!(source.discards, 1);
+    assert_eq!(actor.retained_frames(), 0);
+    assert_eq!(actor.retained_bytes(), 0);
+    assert_eq!(budget.used_bytes(), 64 * 1024);
+    drop(actor);
+    assert_eq!(budget.used_bytes(), 0);
 }
