@@ -90,6 +90,11 @@ internal object RemoteDrawingCheckCases {
             check(!f.flow.prepare()&&!f.admission.tryLock());f.flow.retryCleanup()
             check(f.prepared.closes==2&&f.prepared.runs==1&&f.adopted==1&&!f.flow.state.value.cleanupPending);f.unlocked()
         }
+        case("runtime capability withdrawal before cleanup retry cannot admit buffered result") {f->
+            f.prepared.failures=1;check(f.flow.prepare());check(f.flow.confirm())
+            settled{f.flow.state.value.cleanupPending};f.supported=false;f.flow.retryCleanup()
+            check(f.prepared.closes==2&&f.prepared.runs==1&&f.adopted==0&&!f.flow.state.value.cleanupPending);f.unlocked()
+        }
         case("cancelled run reports native canvas recovery separately from safe retirement") {f->
             f.prepared.runGate=CompletableDeferred();f.prepared.canvas=RemoteDrawingCanvasState.RecoveryNeeded
             check(f.flow.prepare());check(f.flow.confirm());check(f.prepared.runs==1)

@@ -56,3 +56,25 @@ Desktop/Android compile/tests/lint; final runtime/notices/package inventories.
 Actual model conversion is implementation work with separate artifact review.
 Authorized physical/hardware/provider/quality/acceptance runs require their real
 evidence; those requirements do not become completed through the aggregate build.
+
+
+Root6efc8b8 is now independently source-accepted by the parent. Its additional
+6 palette-owner checks and36 extracted WGC control-flow cases are separate from
+root's earlier probes; no Windows/Compose/ABI/runtime pass follows. New native
+adapter preparation after that tip is unreviewed: NativeRemoteEdit now owns
+prepared drawing consumers through confirmation/late allocation/run/cleanup,
+with12 actual-owner-boundary cases and14 common lifecycle cases passing. The
+complete actual adapter compile was attempted against older cached jars and
+blocked on the pre-existing missing remoteConfigureObservationHelper binding.
+No generated-method stub or small-slice ABI regeneration was used. See
+PAINT_DRAWING_NATIVE_ADAPTER_HANDOFF_20261019.md and
+ evidence/PAINT_NATIVE_DRAWING_OWNER_20261019.json. The actual foreign factory,
+sequenced input barrier and P per-run failed-owner observation remain code work.
+
+Parent dispatched E model/host-wheel license closure and F scrcpy prerequisite.
+F1f2496cc is available for safe preparation composition; actual Windows DLL
+configuration/aggregate notices and device/tunnel execution remain blocked.
+Pab477729 is available for source/hook composition; its Windows/native tests are
+authored unrun. Root has read both handbacks; no independent Astra acceptance
+receipt for P is present in its branch, so that worker claim is not counted as
+verified root evidence. Parent retains review/disposition.

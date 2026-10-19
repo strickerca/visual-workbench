@@ -33,7 +33,8 @@ public fun retireRemoteEditLater(remote:WorkbenchRemoteEdit) {
 private val retirementScope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
 internal class NativeRemoteEdit(private val handle:LiveSession,private val linkOwner:Any,
     private val compatibilityObservations:NativeCompatibilityObservationAccess?=null,
-):WorkbenchRemoteEdit,RemoteCompatibilityImportCapability {
+    private val drawingPreparations:NativeDrawingPreparationAccess?=null,
+):WorkbenchRemoteEdit,RemoteCompatibilityImportCapability,RemoteDrawingCheckCapability {
     private val closing=AtomicBoolean(false)
     private val retired=AtomicBoolean(false)
     private val frameCollector=AtomicBoolean(false)
@@ -187,6 +188,14 @@ internal class NativeRemoteEdit(private val handle:LiveSession,private val linkO
             val after=handle.remoteDisplay().common().target
             if(after?.binding!=expected.binding||after.identity!=expected.identity)null else admitted
         }
+    }
+    override val drawingCheckSupported:Boolean get()=drawingPreparations!=null&&!closing.get()
+    override suspend fun prepareDrawingCheck(expected:RemoteTargetState):RemotePreparedDrawingCheck = native {
+        val access=drawingPreparations?:throw SessionFailure(SessionFailureKind.RemoteUnavailable)
+        fun current():Boolean = !closing.get()&&mutableTarget.value?.let {
+            it.binding==expected.binding&&it.identity==expected.identity&&it.grantActive
+        }==true
+        prepareNativeDrawing(expected,access,ownerScope,consumers,::current,::open)
     }
     override suspend fun close(){releaseNative{
         var leadAttempt=false

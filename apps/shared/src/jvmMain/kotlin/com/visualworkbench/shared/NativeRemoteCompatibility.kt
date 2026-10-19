@@ -74,6 +74,21 @@ internal class NativeOwnedCompatibilityReceipt(
 }
 
 internal object NativeRemoteCompatibility {
+    /** Only the actual joined drawing owner supplies this projection. Require
+     * its exact bytes/records and the closed mouse-only seven-aspect result. */
+    fun admitDrawing(expected:RemoteTargetState,owned:NativeOwnedCompatibilityReceipt):RemoteCompatibilityAdmission {
+        val value=decode(expected,owned.receipt)
+        require(expected.grantActive&&owned.target.grantActive&&owned.target.binding==expected.binding&&owned.target.identity==expected.identity&&
+            owned.toolId==value.toolId&&owned.settingsDigest==value.settingsDigest&&owned.records==value.records)
+        require(value.toolId=="paint.brush"&&value.records.size==RemoteCompatibilityAspect.entries.size&&value.records.all {row->
+            if(row.aspect==RemoteCompatibilityAspect.Drawing)
+                row.result==RemoteCompatibilityResult.Supported&&row.method==RemoteCompatibilityMethod.EditorObserved&&
+                    row.inputApi==RemoteEditorInputApi.Mouse&&row.evidenceSha256!=null&&row.deviceModel==null
+            else row.result==RemoteCompatibilityResult.NotTested&&row.method==RemoteCompatibilityMethod.NotPerformed&&
+                row.inputApi==RemoteEditorInputApi.Unknown&&row.evidenceSha256==null&&row.deviceModel==null
+        })
+        return value
+    }
     suspend fun admitCurrent(
         expected:RemoteTargetState,bytes:ByteArray,
         current:()->RemoteTargetState?,access:NativeCompatibilityObservationAccess,

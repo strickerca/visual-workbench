@@ -358,3 +358,30 @@ All10 samples use the same outside pointer position, strict QPC ordering and
 supply the actual guarded parked actions, cursor-policy readback, native WGC
 samples and joined producer construction. The earlier seven-case logs remain
 preserved separately and are not counted as extra tests.
+
+
+## 2026-10-19 accepted callers and native drawing preparation
+
+V2ec0b15 including00f1f26 and Androidb1a6f94 AND1–8 are now source-accepted and
+composed on root through6efc8b8. The earlier held rows remain historical. Parent
+also accepts6efc8b8 with6 additional palette-owner checks and36 extracted WGC
+control-flow cases. These do not pass native Windows, Compose, fresh ABI/apps,
+Android authored tests, actual Paint or any physical/product gate.
+
+New adapter preparation after6efc8b8 has12 focused native-owner cases plus14
+common flow cases,16 existing importer groups and5 file guards passing in the
+current phase probe. Actual foreign/session boundaries are synthetic; production
+owner/registry/preparation/decoder code is used. New source still needs review.
+The complete NativeRemoteEdit compile attempted against old cached jars failed
+on missing pre-existing remoteConfigureObservationHelper; retain
+/tmp/vw-native-drawing-owner-20261019-adapter.log. Fresh ABI generation waits for
+one coherent native tree; no binding stub or broad build substitutes for it.
+
+The actual normal foreign factory, source/currentness authorization, sequenced
+peer/host input exclusion, specific P failed-run retirement observation and
+helper registration/packaging remain integration work. Pab477729 has source
+handback and authored native tests, not an executed Windows pass. F1f2496cc
+prepares pinned scrcpy bytes without running binaries; actual DLL configured
+license/aggregate notices, owner-adb selection, lossless source/UI capture,
+scrcpy-loop refusal and device journeys remain open. E model/host notices remain
+parent-dispatched; Library CONNECT403 artifacts and all old worktrees persist.

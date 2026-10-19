@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "date_utc": "2026-10-19T03:47:13.789606+00:00",
+  "kind": "native drawing adapter preparation ownership",
+  "base": "6efc8b8cba9daa4e4ff598e6419c4db41deb6a8b",
+  "source_sha256": {
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteDrawingCheck.kt": "8c5ad2d93f7f89635380393f256b514f922946db83674198892de9128641fa29",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/RemoteDrawingCheckCases.kt": "e7a416d21d51ded34b9b6ef42d66e4d2f1e8d5e1804a86c121986d507a85ae5d",
+    "apps/shared/src/commonTest/paint/run_compatibility_probe.py": "ee345b25020363a902efd639b1dcbec62d7c1b89040ae189edee54c3a0f3aee3",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeRemoteCompatibility.kt": "277f7796db4e05aa986d3bd092aa8f7e1e9e73fe4fb60f7cb14d43505e339add",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeRemoteDrawingOwner.kt": "a8f50206d52542ff1f3beb312af208eaeaf8525d1ca0bbb06f65616f47ed2e04",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeRemoteEdit.kt": "f928debd513f4f002d2e9698ae79eb69ae9030a6167d95068c8c3cbb9d606487",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/NativeDrawingOwnerCases.kt": "f915b6be03ad0a74eca6932ec72a43dec46aacfeda7ca05dc3fa884d1b41d9ab"
+  },
+  "passed": {
+    "command": "python3 apps/shared/src/commonTest/paint/run_compatibility_probe.py",
+    "native_owner_cases": 12,
+    "common_flow_cases": 14,
+    "existing_importer_groups": 16,
+    "existing_desktop_file_guards": 5,
+    "scope": "actual production preparation/consumer registry/owner/decoder/common source; synthetic foreign/session boundaries; exact common SessionFailure declarations sliced from SessionApi; no fake generated API",
+    "compiler": "cached embedded Kotlin 2.4.0; explicit API strict; warnings denied",
+    "log_sha256": "db6cf9e0f923d87149428fd63c070cfd681b6f1a6f47b9e41434f8d190b68f7b"
+  },
+  "whole_adapter_attempt": {
+    "command": "python3 apps/shared/src/commonTest/paint/run_compatibility_probe.py --check-adapter",
+    "result": "BLOCKED by older cached binding jar",
+    "diagnostic": "NativeRemoteEdit.kt: unresolved reference remoteConfigureObservationHelper",
+    "introduced_by_this_change": false,
+    "binding_regeneration": "deferred to coherent native batch; no substituted generated method",
+    "log_sha256": "f84117dc39d4d9a2672b93109f3b4e451f7ff8c079fdf40349a9045e75c0764b"
+  },
+  "earlier_failure_retained": "/tmp/vw-native-drawing-owner-20261019-first.log: unnecessary fixture lateinit warning failed warnings-denied compile; corrected to val",
+  "implementation": [
+    "session registry registration before foreign allocation; escaped preparation owned through confirmation",
+    "late allocation and running task joined before parent destruction; cancellation signal finishes before foreign destruction",
+    "one-shot mouse-only seven-aspect receipt checks; same-owner retirement retry and concurrent close single flight",
+    "capability withdrawal prevents later buffered result admission"
+  ],
+  "open": [
+    "normal factory actual foreign access remains absent until P native/source/input owner integration",
+    "real sequenced peer/host exclusion and P per-run failed-owner hook; helper pin/Cargo/package registration and new ABI",
+    "full NativeRemoteEdit/apps/Compose/native Windows tests and all actual Paint/capture/input/device/physical journeys"
+  ],
+  "review": "new adapter/common capability-withdrawal changes unreviewed; earlier6efc8b8 accepted separately by parent",
+  "no_gui_capture_input_or_device_execution": true
+}

@@ -144,6 +144,7 @@ internal class RemoteDrawingCheck(
             val result=op.result.value
             op.result.value=null
             val adopted=if(!closed.value&&!op.cancelled.value&&!recovery&&result!=null&&
+                (dispatcher as? RemoteDrawingCheckCapability)?.drawingCheckSupported==true&&
                 same(op.expected,dispatcher.target.value)&&result.validFor(op.expected))
                     try{adopt(result)}catch(_:Exception){false}else false
             mutable.value=when {
