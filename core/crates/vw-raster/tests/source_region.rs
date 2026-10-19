@@ -179,11 +179,48 @@ fn accepted_result_uses_existing_resolver_and_full_d_transform() -> TestResult {
     let assets = Assets(result_image);
     let mut denied = options();
     denied.assume_untagged_srgb = false;
+    // Both objects have the same order key; id(4) renders first. Isolate each
+    // refusal so an annotation cannot satisfy the result assertion.
+    let mut annotation_only = project.clone();
+    let removed_result = annotation_only
+        .objects
+        .remove(&id(21)?)
+        .ok_or("result fixture")?;
+    assert!(matches!(
+        removed_result.state.shape,
+        Some(Shape::ResultId(_))
+    ));
+    annotation_only.validate()?;
     assert!(matches!(
         compose_document_region(
             &source.crop(region)?,
             &info,
-            &project,
+            &annotation_only,
+            &document,
+            &assets,
+            denied,
+            region,
+            &|| false,
+        ),
+        Err(RasterError::Unsupported(
+            "untagged annotation color; explicitly assume sRGB"
+        ))
+    ));
+    let mut result_only = project.clone();
+    let removed_annotation = result_only
+        .objects
+        .remove(&id(4)?)
+        .ok_or("annotation fixture")?;
+    assert!(matches!(
+        removed_annotation.state.shape,
+        Some(Shape::Rect(_))
+    ));
+    result_only.validate()?;
+    assert!(matches!(
+        compose_document_region(
+            &source.crop(region)?,
+            &info,
+            &result_only,
             &document,
             &assets,
             denied,
