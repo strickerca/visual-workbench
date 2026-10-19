@@ -64,7 +64,9 @@ pub(super) fn decode(bytes: &[u8], width: u32, height: u32) -> Result<Vec<u8>> {
     {
         return Err(Error::Invalid);
     }
-    let mut pixels = vec![0; size];
+    let mut pixels = Vec::new();
+    pixels.try_reserve_exact(size).map_err(|_| Error::Limit)?;
+    pixels.resize(size, 0);
     let output = reader.next_frame(&mut pixels).map_err(|_| Error::Invalid)?;
     if output.width != width
         || output.height != height

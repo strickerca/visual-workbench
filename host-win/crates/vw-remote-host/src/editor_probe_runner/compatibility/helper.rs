@@ -351,6 +351,12 @@ fn run_inner() -> Result<()> {
         &budget,
     )?;
     let (_, baseline) = witness(&source, &r, &cancel)?;
+    let fixed = vw_capture::windows::fixed_target(r.target.window, r.owner_pid)
+        .map_err(|_| Error::TargetChanged)?;
+    frame::drawing_capacity(
+        u64::from(baseline.canvas_rect_host.width) * u64::from(baseline.canvas_rect_host.height),
+        u64::from(fixed.frame.width) * u64::from(fixed.frame.height),
+    )?;
     let parked = pointer()?;
     if !outside(parked, baseline.canvas_rect_host) {
         return Err(Error::Unavailable);

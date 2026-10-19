@@ -18,6 +18,7 @@ mod helper;
 mod ipc;
 #[cfg(test)]
 mod tests;
+pub(super) use ipc::AuthorizationGate;
 
 pub type PaintDrawingAuthorize =
     Arc<dyn Fn(PaintDrawingInputStep, &mut dyn FnMut() -> Result<()>) -> Result<()> + Send + Sync>;
@@ -564,6 +565,7 @@ impl PaintDrawingPreparation {
         if frame_pixels > 4 * 1024 * 1024 {
             return Err(Error::Limit);
         }
+        frame::drawing_capacity(evidence::MAX_PIXELS, frame_pixels)?;
         let bytes = serde_json::to_vec(&request).map_err(|_| Error::Invalid)?;
         if bytes.len() > ipc::MAX_LINE {
             return Err(Error::Limit);
@@ -582,16 +584,20 @@ impl PaintDrawingPreparation {
             input: child.stdin.take(),
             output: child.stdout.take(),
         }));
+        let gate = Arc::new(AuthorizationGate::new());
+        let preview_source = self.source.clone();
         let mut owner = Owner {
             child,
             pins: self.drawing_pins,
             pipes: pipes.clone(),
             io: None,
+            parked_outcome: None,
             _permit: permit,
             input_uncertain: Arc::new(AtomicBool::new(false)),
             _source: Some(self.source),
             private_temp: Some(temp),
             canvas_unresolved: Arc::new(AtomicBool::new(false)),
+            drawing_gate: Some(gate.clone()),
         };
         let uncertain = owner.input_uncertain.clone();
         let canvas_unresolved = owner.canvas_unresolved.clone();
@@ -599,6 +605,7 @@ impl PaintDrawingPreparation {
         let authorize = self.authorize.clone();
         let cancel = self.cancel.clone();
         let expected = request.clone();
+        let preview_target = expected_capture.clone();
         let pins = owner.pins.clone();
         let thread = thread::Builder::new()
             .name("paint-drawing-io".into())
@@ -627,6 +634,9 @@ impl PaintDrawingPreparation {
                             &authorize,
                             &cancel,
                             &canvas_unresolved,
+                            &gate,
+                            &preview_target,
+                            &preview_source,
                         )
                     }),
                     None => Err(Error::Io),

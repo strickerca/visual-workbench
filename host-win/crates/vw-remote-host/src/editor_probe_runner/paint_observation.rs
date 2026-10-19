@@ -156,11 +156,13 @@ impl PaintObservationHelper {
             pins: self.pins.clone(),
             pipes,
             io: None,
+            parked_outcome: None,
             _permit: permit,
             input_uncertain: Arc::new(AtomicBool::new(false)),
             _source: Some(source.clone()),
             private_temp: None,
             canvas_unresolved: Arc::new(AtomicBool::new(false)),
+            drawing_gate: None,
         };
         let mut error = owner.child.startup_error.clone();
         if error.is_none() {
@@ -239,6 +241,7 @@ pub fn retry_paint_observation_retirements() -> Result<usize> {
             continue;
         }
         if owners[at].owner.canvas_unresolved.load(Ordering::Acquire) {
+            let _ = owners[at].owner.cleanup_private_if_quiescent();
             at += 1;
             continue;
         }
@@ -254,6 +257,7 @@ pub fn retry_paint_observation_retirements() -> Result<usize> {
             }
             Collection::Pending(_) => {
                 owners[at].owner.kill_if_released();
+                let _ = owners[at].owner.cleanup_private_if_quiescent();
                 at += 1;
             }
         }

@@ -789,6 +789,35 @@ pub(super) fn joined_canvas_rgba(
     pin.verify()?;
     Ok(rgba)
 }
+/// Admit the fixed ten-frame producer's aggregate parent working set before
+/// capture. Encoded bytes and decoder scratch are serial; decoded frames persist.
+pub(super) fn drawing_capacity(canvas_pixels: u64, full_frame_pixels: u64) -> Result<()> {
+    const MIB: u64 = 1024 * 1024;
+    if canvas_pixels == 0
+        || canvas_pixels > 1 * MIB
+        || full_frame_pixels == 0
+        || full_frame_pixels > 4 * MIB
+    {
+        return Err(Error::Limit);
+    }
+    let rgba_total = canvas_pixels
+        .checked_mul(4)
+        .and_then(|v| v.checked_mul(10))
+        .ok_or(Error::Limit)?;
+    let parent_peak = rgba_total
+        .checked_add(metrics::MAX_PNG as u64)
+        .and_then(|v| v.checked_add(128 * MIB))
+        .ok_or(Error::Limit)?;
+    let child_peak = full_frame_pixels
+        .checked_mul(12)
+        .and_then(|v| v.checked_add(128 * MIB))
+        .and_then(|v| v.checked_add(metrics::MAX_PNG as u64))
+        .ok_or(Error::Limit)?;
+    if parent_peak > 256 * MIB || child_peak > 768 * MIB {
+        return Err(Error::Limit);
+    }
+    Ok(())
+}
 enum Sample {
     FullClient(vw_capture::FrameReceipt),
     Canvas(vw_capture::CanvasFrameReceipt),
@@ -1212,6 +1241,15 @@ mod tests {
         assert_eq!(metrics::decode(&bytes, 1, 1), Err(Error::Invalid));
         assert_eq!(metrics::decode(&bytes, 2, 1), Err(Error::Invalid));
         Ok(())
+    }
+    #[test]
+    fn drawing_aggregate_admission_counts_ten_rgba_and_serial_scratch() {
+        assert_eq!(drawing_capacity(1024 * 1024, 4 * 1024 * 1024), Ok(()));
+        assert_eq!(
+            drawing_capacity(1024 * 1024 + 1, 4 * 1024 * 1024),
+            Err(Error::Limit)
+        );
+        assert_eq!(drawing_capacity(1, 4 * 1024 * 1024 + 1), Err(Error::Limit));
     }
     #[test]
     fn one_os_temp_separator_preserves_drive_root_and_exact_spelling() -> Result<()> {
