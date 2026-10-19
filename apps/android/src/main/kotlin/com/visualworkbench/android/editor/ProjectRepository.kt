@@ -132,11 +132,13 @@ internal class ProjectRepository(context: Context, val core: WorkbenchCore) {
         return core.create(CreateProject(checkedPath(project), project, core.newId(now.toULong()), core.newId(now.toULong()), deviceId, title, bytes, now))
     }
 
-    suspend fun exportImage(uri: Uri, project: WorkbenchProject, options: ExportOptions, stage: (String) -> Unit): FileExportResult =
-        rasterTransfers.export(uri, project as? WorkbenchStreamingProject ?: throw CoreFailure(CoreFailureKind.Unsupported), options, stage)
+    suspend fun exportImage(uri: Uri, project: WorkbenchProject, options: ExportOptions,
+        validateReceipt: suspend (FileExportResult) -> Unit, stage: (String) -> Unit): FileExportResult =
+        rasterTransfers.export(uri, project as? WorkbenchStreamingProject ?: throw CoreFailure(CoreFailureKind.Unsupported), options, validateReceipt, stage)
 
-    suspend fun sharePng(project: WorkbenchProject, options: ExportOptions, stage: (String) -> Unit): Pair<MediaHandoff.Lease, FileExportResult> =
-        rasterTransfers.sharePng(project as? WorkbenchStreamingProject ?: throw CoreFailure(CoreFailureKind.Unsupported), options, stage)
+    suspend fun sharePng(project: WorkbenchProject, options: ExportOptions,
+        validateReceipt: suspend (FileExportResult) -> Unit, stage: (String) -> Unit): Pair<MediaHandoff.Lease, FileExportResult> =
+        rasterTransfers.sharePng(project as? WorkbenchStreamingProject ?: throw CoreFailure(CoreFailureKind.Unsupported), options, validateReceipt, stage)
 
     suspend fun preflight(project: WorkbenchProject, options: ExportOptions): FilePreflight =
         rasterTransfers.preflight(project as? WorkbenchFileTransfers ?: throw CoreFailure(CoreFailureKind.Unsupported), options)

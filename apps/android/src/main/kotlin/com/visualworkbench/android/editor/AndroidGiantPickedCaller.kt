@@ -10,6 +10,7 @@ import com.visualworkbench.shared.WorkbenchProject
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 /** The native URI admission already owns the reader. These are its real
@@ -20,11 +21,18 @@ internal suspend fun publishAndroidGiantPicked(
     destination: (GiantOriginalInfo) -> GiantProjectOptions,
     progress: (String) -> Unit,
 ): WorkbenchProject {
+    val caller = currentCoroutineContext()
     var prepared: GiantPreparedOriginal? = null
     var built: GiantBuiltImage? = null
     var project: WorkbenchProject? = null
-    var delivered = false
     var failure: Throwable? = null
+    var cleanup: Throwable? = null
+    var projectClosed = false
+    suspend fun settle(close: suspend () -> Unit) {
+        try { close() } catch (error: Throwable) {
+            if (cleanup == null) cleanup = error else if (cleanup !== error) cleanup?.addSuppressed(error)
+        }
+    }
     try {
         progress("Inspecting the complete original…")
         prepared = picked.prepare()
@@ -38,29 +46,28 @@ internal suspend fun publishAndroidGiantPicked(
         currentCoroutineContext().ensureActive()
         progress("Saving the verified original and tiles…")
         project = built.publish(destination(info))
-        currentCoroutineContext().ensureActive()
-        delivered = true
-        return checkNotNull(project)
+        caller.ensureActive()
     } catch (error: Throwable) {
         failure = error
-        throw error
     } finally {
         withContext(NonCancellable) {
-            var cleanup: Throwable? = null
-            suspend fun settle(close: suspend () -> Unit) {
-                try { close() } catch (error: Throwable) {
-                    if (cleanup == null) cleanup = error else if (cleanup !== error) cleanup?.addSuppressed(error)
-                }
-            }
-            if (!delivered) settle { project?.let { it.close() } }
             settle { built?.let { it.close() } }
             settle { prepared?.let { it.close() } }
             settle { picked.close() }
-            if (cleanup != null) {
-                if (failure != null) failure?.takeIf { it !== cleanup }?.addSuppressed(checkNotNull(cleanup))
-                else if (delivered) runCatching { progress("The original was saved; temporary reader retirement needs a retry.") }
-                else throw checkNotNull(cleanup)
+            if (failure != null || !caller.isActive) {
+                settle { project?.let { it.close() } }
+                projectClosed = true
             }
         }
     }
+    failure?.let { error -> cleanup?.takeIf { it !== error }?.let(error::addSuppressed); throw error }
+    if (cleanup != null) runCatching { progress("The original was saved; temporary reader retirement needs a retry.") }
+    try { caller.ensureActive() } catch (cancel: Throwable) {
+        // Cancellation may arrive while owners settle or just after that
+        // settlement. Never return an undelivered project in either window.
+        if (!projectClosed) withContext(NonCancellable) { settle { project?.let { it.close() } } }
+        cleanup?.takeIf { it !== cancel }?.let(cancel::addSuppressed)
+        throw cancel
+    }
+    return checkNotNull(project)
 }

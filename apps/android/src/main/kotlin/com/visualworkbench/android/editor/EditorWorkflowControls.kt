@@ -10,16 +10,21 @@ import androidx.compose.ui.unit.dp
 import com.visualworkbench.shared.*
 import com.visualworkbench.android.offline.OfflineReviewPanel
 
+/** A failed or still-loading format query cannot hide the owner that guards edits. */
+internal fun showFrameControls(available: Boolean, state: ImageFramesState): Boolean =
+    available || state.blocksInput
+
 @Composable internal fun EditorWorkflowControls(editor:EditorController){
     val owner=editor.workflows
     val panel by owner.panel.collectAsState()
     val review by owner.review.state.collectAsState()
+    val frame by editor.imageFrames.state.collectAsState()
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
         DocumentNavigatorPanel(owner.navigator,{owner.activate(EditorWorkflowPanel.Documents,it)},owner::choose,owner::cancelSwitch)
         LocalViewsPanel(owner.views,{owner.activate(EditorWorkflowPanel.SavedViews,it)},owner::saveView,owner::restoreView)
         LayersPanel(owner.controls,editor::workflowId,setOfNotNull(editor.selected),{owner.activate(EditorWorkflowPanel.Layers,it)})
         ToneControlsPanel(owner.tones,{owner.activate(EditorWorkflowPanel.Tones,it)})
-        if(editor.frameControlsAvailable) ImageFramesPanel(editor.imageFrames,editor::framePanel)
+        if(showFrameControls(editor.frameControlsAvailable,frame)) ImageFramesPanel(editor.imageFrames,editor::framePanel)
         else OutlinedButton({},Modifier.heightIn(min=48.dp),enabled=false){Text("Output frame unavailable for this source")}
         OutlinedButton({owner.activate(EditorWorkflowPanel.OfflineReview,true)},Modifier.heightIn(min=48.dp),enabled=editor.document!=null){Text("Offline conflicts")}
     }
