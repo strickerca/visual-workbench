@@ -27,6 +27,7 @@ internal object NativeDrawingOwnerCases {
         return NativeOwnedCompatibilityReceipt(target,value.toolId,value.settingsDigest,bytes,value.records)
     }
     private class Prepared(override var target:RemoteTargetState):NativeDrawingPreparation {
+        override var readyForConfirmation=true
         var runs=0;var closes=0;var cancellations=0;var failures=0;var destroyed=false
         var runGate:CompletableDeferred<Unit>?=null
         var closeGate:CompletableDeferred<Unit>?=null
@@ -88,6 +89,13 @@ internal object NativeDrawingOwnerCases {
         case("session close retires preparation still waiting for confirmation") {f->
             f.adapter.prepareDrawingCheck(f.expected);f.adapter.closeSession()
             check(f.prepared.runs==0&&f.prepared.destroyed&&f.adapter.parentDestroyed.get())
+        }
+        case("actual failed-preparation owner is adopted before readiness is inspected") {f->
+            f.prepared.readyForConfirmation=false
+            val owned=f.adapter.prepareDrawingCheck(f.expected)
+            check(!owned.readyForConfirmation&&f.adapter.owners().single()===owned)
+            check(runCatching{owned.runConfirmed()}.isFailure&&f.prepared.runs==0)
+            owned.close();check(f.prepared.destroyed&&f.adapter.owners().isEmpty())
         }
         case("late foreign allocation remains registered until cancelled preparation retires") {f->
             f.prepareGate=CompletableDeferred()

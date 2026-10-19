@@ -143,7 +143,7 @@ private class NativeLink(private val handle: LiveSession, private val owner: Ses
     private val remoteOwner=RemoteOwnerPublication<NativeRemoteEdit>(closed){it.isRetired()}
     private val retired=AtomicBoolean(false)
     override fun remoteEditHandle():WorkbenchRemoteEdit =
-        remoteOwner.acquire(owner::checkOpen){NativeRemoteEdit(handle,this,NativeCompatibilityRuntimeAccess(handle))}
+        remoteOwner.acquire(owner::checkOpen){NativeRemoteEdit(handle,this,NativeCompatibilityRuntimeAccess(handle),NativeDrawingRuntimeAccess(handle))}
     override fun focusHandle(): LiveSession {
         owner.checkOpen()
         if (closed.get()) throw SessionFailure(SessionFailureKind.Closed)

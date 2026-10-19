@@ -96,7 +96,8 @@ pub fn unchanged(target: &Target, owner_pid: u32) -> Result<()> {
     }
     Ok(())
 }
-/// Called only for the owner's local PC Grant action. Windows may refuse focus;
+/// Called only for local PC owner actions: Grant or preparation, confirmation
+/// and retirement of the explicitly requested drawing check. Windows may refuse focus;
 /// that is pending focus, and never permission to arm or inject in the background.
 pub fn focus_for_owner_grant(target: &Target, owner_pid: u32) -> Result<()> {
     unchanged(target, owner_pid)?;

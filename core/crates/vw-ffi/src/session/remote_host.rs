@@ -21,6 +21,8 @@ pub(super) struct Runtime {
     profile: Option<vw_remote::profile::PackagedProfile>,
     pub(super) observation:
         Option<Arc<vw_remote_host::editor_probe_runner::PaintObservationHelper>>,
+    pub(super) observation_files: Option<(String, String)>,
+    pub(super) drawing: Option<Arc<super::drawing::Files>>,
 }
 pub(super) struct Worker {
     cancel: Arc<Cancellation>,
@@ -123,10 +125,14 @@ impl Drop for Starting {
         }
     }
 }
-struct Pending {
+struct InputPending {
     binding: Binding,
     event: pb::InputEvent,
     arrived: Instant,
+}
+enum Pending {
+    Input(InputPending),
+    Drawing(Arc<drawing_gate::Gate>),
 }
 #[derive(Default)]
 pub(super) struct Workers {
@@ -183,15 +189,28 @@ impl Workers {
         self.input_send
             .as_ref()
             .ok_or(SessionError::Authentication)?
-            .try_send(Pending {
+            .try_send(Pending::Input(InputPending {
                 binding,
                 event,
                 arrived: Instant::now(),
-            })
+            }))
             .map_err(|e| match e {
                 mpsc::TrySendError::Full(_) => SessionError::Backpressure,
                 mpsc::TrySendError::Disconnected(_) => SessionError::Worker,
             })
+    }
+    pub(super) fn park_drawing(&self, gate: Arc<drawing_gate::Gate>) -> SessionResult<()> {
+        self.input_send
+            .as_ref()
+            .ok_or(SessionError::Closed)?
+            .try_send(Pending::Drawing(gate))
+            .map_err(|_| SessionError::Backpressure)
+    }
+    pub(super) fn drawing_input_cancel(&self) -> SessionResult<Arc<Cancellation>> {
+        self.input
+            .as_ref()
+            .map(|w| w.cancel.clone())
+            .ok_or(SessionError::Closed)
     }
 }
 fn worker_error(hub: &RemoteHub, scope: &Scope, reason: &str) {
@@ -465,13 +484,90 @@ fn input_loop(
     binding: Binding,
     receive: mpsc::Receiver<Pending>,
     cancel: Arc<Cancellation>,
+    runtime: Runtime,
 ) -> SessionResult<()> {
     let result = (|| {
         let mut check = Instant::now();
         loop {
             cancel.check().map_err(failure)?;
             match receive.recv_timeout(Duration::from_millis(5)) {
-                Ok(p) => {
+                Ok(Pending::Drawing(gate)) => {
+                    if gate.binding != binding {
+                        return Err(SessionError::Authentication);
+                    }
+                    drawing_current(&hub, &gate)?;
+                    // This is the same actual serial input worker. Prior accepted
+                    // samples are covered by the peer's rendered ACK; Stop/Job/IO
+                    // retirement additionally proves no old helper can inject.
+                    owner.close().map_err(failure)?;
+                    let witness = owner
+                        .pen_release_witness()
+                        .ok_or(SessionError::RemoteRetirementPending)?;
+                    if witness.binding != binding || witness.held_before_release {
+                        return Err(SessionError::Authentication);
+                    }
+                    drawing_current(&hub, &gate)?;
+                    gate.parked.store(true, Ordering::Release);
+                    while !gate.release.load(Ordering::Acquire) {
+                        cancel.check().map_err(failure)?;
+                        drawing_current(&hub, &gate)?;
+                        thread::sleep(Duration::from_millis(5));
+                    }
+                    cancel.check().map_err(failure)?;
+                    drawing_current(&hub, &gate)?;
+                    let (mut resumed, ready) = Process::open(
+                        runtime.input.clone(),
+                        Command::OpenInput {
+                            sequence: 1,
+                            target: target.clone(),
+                            binding: binding.clone(),
+                            owner_pid: std::process::id(),
+                            profile: runtime.profile.clone(),
+                        },
+                        &cancel,
+                    )
+                    .map_err(failure)?;
+                    let Header::Ready {
+                        input_authority: Some(authority),
+                        ..
+                    } = ready.header
+                    else {
+                        let _ = resumed.close();
+                        return Err(SessionError::Invalid);
+                    };
+                    authority.canvas_for_target(&target).map_err(failure)?;
+                    let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+                    let current = s.drawing.as_ref().is_some_and(|g| Arc::ptr_eq(g, &gate))
+                        && s.binding.as_ref() == Some(&binding)
+                        && !gate.cancelled.load(Ordering::Acquire);
+                    if !current
+                        || s.authority.as_ref().is_none_or(|a| {
+                            a.identity != authority.identity
+                                || a.profile_digest != authority.profile_digest
+                        })
+                    {
+                        drop(s);
+                        let _ = resumed.close();
+                        return Err(SessionError::Closed);
+                    }
+                    hub.drawing_control(
+                        &mut s,
+                        &binding,
+                        "drawing_release",
+                        gate.nonce,
+                        0,
+                        Some(&authority),
+                        "",
+                    )?;
+                    s.authority = Some(authority);
+                    s.admission.release_drawing(gate.nonce)?;
+                    s.drawing = None;
+                    hub.publish(&mut s, "controlling", None)?;
+                    owner = resumed;
+                    gate.resumed.store(true, Ordering::Release);
+                    check = Instant::now();
+                }
+                Ok(Pending::Input(p)) => {
                     if p.binding != binding || p.arrived.elapsed() >= Duration::from_millis(50) {
                         hub.injected_command(&binding, &p.event, &Err(vw_remote::Error::Invalid))?;
                         return Err(SessionError::Invalid);
@@ -628,6 +724,18 @@ fn input_loop(
     }
     result
 }
+fn drawing_current(hub: &RemoteHub, gate: &Arc<drawing_gate::Gate>) -> SessionResult<()> {
+    let s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+    RemoteHub::current(&s)?;
+    if gate.cancelled.load(Ordering::Acquire)
+        || s.binding.as_ref() != Some(&gate.binding)
+        || s.drawing.as_ref().is_none_or(|g| !Arc::ptr_eq(g, gate))
+        || s.admission.drawing != Some(gate.nonce)
+    {
+        return Err(SessionError::Closed);
+    }
+    Ok(())
+}
 impl RemoteHub {
     pub(super) fn configure_runtime(
         self: &Arc<Self>,
@@ -635,6 +743,15 @@ impl RemoteHub {
     ) -> SessionResult<()> {
         if !self.host {
             return Err(SessionError::Invalid);
+        }
+        if self
+            .state
+            .lock()
+            .map_err(|_| SessionError::Worker)?
+            .drawing
+            .is_some()
+        {
+            return Err(SessionError::Backpressure);
         }
         let video = LockedHelper::open(
             Path::new(&files.video_path),
@@ -662,6 +779,8 @@ impl RemoteHub {
             input,
             profile,
             observation: None,
+            observation_files: None,
+            drawing: None,
         });
         Ok(())
     }
@@ -766,6 +885,9 @@ impl RemoteHub {
             return Err(SessionError::Invalid);
         }
         let _operation = self.operations.lock().map_err(|_| SessionError::Worker)?;
+        if super::drawing::busy(self)? {
+            return Err(SessionError::RemoteRetirementPending);
+        }
         let (selected, runtime, revision) = {
             let mut s = self.state.lock().map_err(|_| SessionError::Worker)?;
             RemoteHub::current(&s)?;
@@ -796,6 +918,7 @@ impl RemoteHub {
         };
         let cancel = Arc::new(Cancellation::default());
         let _starting = Starting::new(self.clone(), cancel.clone())?;
+        let resume_runtime = runtime.clone();
         let (mut process, ready) = Process::open(
             runtime.input,
             Command::OpenInput {
@@ -856,7 +979,7 @@ impl RemoteHub {
         let target = selected.target;
         let thread = match thread::Builder::new()
             .name("vw-remote-input-owner".into())
-            .spawn(move || input_loop(hub, process, target, binding, receive, c))
+            .spawn(move || input_loop(hub, process, target, binding, receive, c, resume_runtime))
         {
             Ok(v) => v,
             Err(_) => {

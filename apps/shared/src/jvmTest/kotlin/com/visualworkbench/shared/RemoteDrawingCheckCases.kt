@@ -13,11 +13,13 @@ internal object RemoteDrawingCheckCases {
         return RemoteTargetState(binding,identity,emptySet(),null,true,null)
     }
     private class Prepared(override var target:RemoteTargetState):RemotePreparedDrawingCheck {
+        override var readyForConfirmation=true
         var runs=0;var closes=0;var failures=0
         var runGate:CompletableDeferred<Unit>?=null
         var closeGate:CompletableDeferred<Unit>?=null
         val closeEntered=CompletableDeferred<Unit>()
         var canvas:RemoteDrawingCanvasState?=null
+        override val canvasRecoveryNeeded:Boolean get()=canvas in setOf(RemoteDrawingCanvasState.RecoveryNeeded,RemoteDrawingCanvasState.Unknown)
         var resultTarget:RemoteTargetState?=null
         override suspend fun runConfirmed():RemoteCompatibilityAdmission {
             runs++;runGate?.await()
@@ -74,6 +76,12 @@ internal object RemoteDrawingCheckCases {
             check(f.flow.prepare());f.flow.cancel();settled{f.prepared.closes==1}
             check(f.prepared.runs==0&&f.adopted==0);f.unlocked()
         }
+        case("failed preparation is retained through cleanup and never offers confirmation") {f->
+            f.prepared.readyForConfirmation=false;f.prepared.failures=1
+            check(f.flow.prepare());settled{f.flow.state.value.cleanupPending}
+            check(!f.flow.confirm()&&f.prepared.runs==0&&f.prepared.closes==1&&!f.admission.tryLock())
+            f.flow.retryCleanup();check(f.prepared.closes==2&&f.adopted==0);f.unlocked()
+        }
         case("source replacement retires prepared owner without confirmation") {f->
             check(f.flow.prepare());f.source.value=f.expected.copy(binding=f.expected.binding.copy(geometryRevision=2u))
             settled{f.prepared.closes==1};check(!f.flow.confirm()&&f.prepared.runs==0&&f.adopted==0);f.unlocked()
@@ -94,6 +102,12 @@ internal object RemoteDrawingCheckCases {
             f.prepared.failures=1;check(f.flow.prepare());check(f.flow.confirm())
             settled{f.flow.state.value.cleanupPending};f.supported=false;f.flow.retryCleanup()
             check(f.prepared.closes==2&&f.prepared.runs==1&&f.adopted==0&&!f.flow.state.value.cleanupPending);f.unlocked()
+        }
+        case("pending cleanup exposes owned recovery state while retaining the permit") {f->
+            f.prepared.canvas=RemoteDrawingCanvasState.RecoveryNeeded;f.prepared.failures=1
+            check(f.flow.prepare());check(f.flow.confirm());settled{f.flow.state.value.cleanupPending}
+            check(f.flow.state.value.canvasRecoveryNeeded&&f.adopted==0&&!f.admission.tryLock())
+            f.flow.retryCleanup();check(f.flow.state.value.canvasRecoveryNeeded&&!f.flow.prepare());f.unlocked()
         }
         case("cancelled run reports native canvas recovery separately from safe retirement") {f->
             f.prepared.runGate=CompletableDeferred();f.prepared.canvas=RemoteDrawingCanvasState.RecoveryNeeded

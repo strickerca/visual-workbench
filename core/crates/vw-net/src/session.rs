@@ -588,6 +588,28 @@ fn remote_capability(capabilities: &BTreeSet<String>, body: &Body) -> Result<()>
     match body {
         Body::RemoteControl(v) => {
             remote_scope(&v.scope)?;
+            if matches!(
+                v.action.as_str(),
+                "drawing_reserve" | "drawing_reserved" | "drawing_refused" | "drawing_release"
+            ) {
+                if !capabilities.contains("paint_drawing_check_v1")
+                    || v.sequence == 0
+                    || v.request_nonce == 0
+                    || v.editor_action != 0
+                    || !v.selected_target_json.is_empty()
+                    || !v.selected_destination_label.is_empty()
+                    || v.shortcut_state_json.len() > 16384
+                    || (v.action != "drawing_reserved" && v.command_input_seq != 0)
+                    || (v.action != "drawing_release" && !v.shortcut_state_json.is_empty())
+                    || (v.action == "drawing_release" && v.shortcut_state_json.is_empty())
+                    || (v.action == "drawing_refused" && v.reason != "input_busy")
+                    || (v.action != "drawing_refused" && !v.reason.is_empty())
+                {
+                    return Err(NetError::Invalid("drawing reservation control"));
+                }
+                Id::from_proto(v.input_session_id.as_ref())?;
+                return Ok(());
+            }
             if v.sequence == 0
                 || !matches!(
                     v.action.as_str(),
@@ -747,6 +769,85 @@ fn remote_capability(capabilities: &BTreeSet<String>, body: &Body) -> Result<()>
     Ok(())
 }
 
+#[cfg(test)]
+mod drawing_control_tests {
+    use super::*;
+    fn control(action: &str) -> Result<v1::RemoteControl> {
+        let id = Id::from_parts(1, [1; 10])?.to_proto();
+        Ok(v1::RemoteControl {
+            scope: Some(v1::RemoteScope {
+                connection_epoch: 1,
+                capture_session_id: Some(id.clone()),
+                source_generation: 1,
+                target_token: Some(id.clone()),
+                geometry_revision: 1,
+            }),
+            sequence: 1,
+            action: action.into(),
+            input_session_id: Some(id),
+            request_nonce: 8,
+            reason: if action == "drawing_refused" {
+                "input_busy".into()
+            } else {
+                String::new()
+            },
+            shortcut_state_json: if action == "drawing_release" {
+                b"{}".to_vec()
+            } else {
+                Vec::new()
+            },
+            ..Default::default()
+        })
+    }
+    #[test]
+    fn drawing_controls_require_optional_negotiation_and_never_look_like_injected_status()
+    -> Result<()> {
+        let old = BTreeSet::from(["remote_edit_v1".into()]);
+        let current = BTreeSet::from(["remote_edit_v1".into(), "paint_drawing_check_v1".into()]);
+        for action in [
+            "drawing_reserve",
+            "drawing_reserved",
+            "drawing_refused",
+            "drawing_release",
+        ] {
+            let value = control(action)?;
+            assert!(remote_capability(&old, &Body::RemoteControl(value.clone())).is_err());
+            remote_capability(&current, &Body::RemoteControl(value.clone()))?;
+            for field in 0..7 {
+                let mut bad = value.clone();
+                match field {
+                    0 => bad.request_nonce = 0,
+                    1 => bad.input_session_id = None,
+                    2 => bad.editor_action = 1,
+                    3 => bad.selected_target_json = b"{}".to_vec(),
+                    4 => bad.selected_destination_label = "window".into(),
+                    5 => bad.shortcut_state_json = vec![0; 16385],
+                    _ => bad.reason = "partial_input".into(),
+                };
+                assert!(remote_capability(&current, &Body::RemoteControl(bad)).is_err());
+            }
+        }
+        Ok(())
+    }
+    #[test]
+    fn only_reserved_response_carries_actual_prior_input_sequence() -> Result<()> {
+        let caps = BTreeSet::from(["remote_edit_v1".into(), "paint_drawing_check_v1".into()]);
+        for action in [
+            "drawing_reserve",
+            "drawing_reserved",
+            "drawing_refused",
+            "drawing_release",
+        ] {
+            let mut value = control(action)?;
+            value.command_input_seq = 9;
+            assert_eq!(
+                remote_capability(&caps, &Body::RemoteControl(value)).is_ok(),
+                action == "drawing_reserved"
+            );
+        }
+        Ok(())
+    }
+}
 #[cfg(test)]
 mod stroke_control_tests {
     use super::*;

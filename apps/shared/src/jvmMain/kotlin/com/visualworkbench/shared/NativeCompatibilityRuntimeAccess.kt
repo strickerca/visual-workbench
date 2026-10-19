@@ -22,7 +22,8 @@ internal class NativeCompatibilityRuntimeAccess(private val handle:LiveSession):
         // Keep acquisition and disposal in the same uncancellable bracket, so
         // dispatcher delivery can never abandon an already-created foreign owner.
         return try { withJoinedCompatibilityObservation(
-            create={handle.remoteObserveCompatibility(RemoteNativeJson.binding(expected.binding))},
+            create={if(receiptSha256==null)handle.remoteObserveCompatibility(RemoteNativeJson.binding(expected.binding))
+                else handle.remoteObserveCompatibilityReceipt(RemoteNativeJson.binding(expected.binding),receiptSha256)},
             release={owned->try { owned.releaseSource() } finally { owned.destroy() }},
         ) { owned ->
             val bytes=owned.receiptBytes()

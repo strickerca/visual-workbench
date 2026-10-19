@@ -64,4 +64,8 @@ impl Applied {
     pub fn binding(&self) -> &Binding {
         &self.binding
     }
+    /// Actual last accepted injection only; CONTROL reservations never advance it.
+    pub fn last_sequence(&self) -> u64 {
+        self.last_seq
+    }
 }

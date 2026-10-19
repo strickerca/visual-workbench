@@ -84,6 +84,18 @@ pub(super) fn may_precede_start(s: &State, scope: &Scope) -> SessionResult<bool>
     Ok(scope.source_generation > floor)
 }
 pub(super) fn control_shape(v: &pb::RemoteControl, host: bool) -> SessionResult<()> {
+    if drawing_gate::ACTIONS.contains(&v.action.as_str()) {
+        let correct = if host {
+            matches!(v.action.as_str(), "drawing_reserved" | "drawing_refused")
+        } else {
+            matches!(v.action.as_str(), "drawing_reserve" | "drawing_release")
+        };
+        return if correct {
+            drawing_gate::shape(v)
+        } else {
+            Err(SessionError::Invalid)
+        };
+    }
     let known = if host {
         matches!(
             v.action.as_str(),

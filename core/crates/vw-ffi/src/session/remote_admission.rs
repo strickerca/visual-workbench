@@ -18,10 +18,11 @@ pub(super) struct Admission {
     last_pen: u64,
     covered: u64,
     pub command: Option<Reservation>,
+    pub drawing: Option<u64>,
 }
 impl Admission {
     pub fn busy(&self) -> bool {
-        self.command.is_some()
+        self.command.is_some() || self.drawing.is_some()
     }
     pub fn queue(&mut self, samples: u32) -> SessionResult<bool> {
         if samples == 0 || samples > 8 {
@@ -66,6 +67,23 @@ impl Admission {
     }
     pub fn can_reserve(&self) -> bool {
         !self.busy() && !self.contact && self.queued == 0 && self.covered >= self.last_pen
+    }
+    pub fn reserve_drawing(&mut self, nonce: u64) -> SessionResult<()> {
+        if nonce == 0 {
+            return Err(SessionError::Invalid);
+        }
+        if !self.can_reserve() {
+            return Err(SessionError::Backpressure);
+        }
+        self.drawing = Some(nonce);
+        Ok(())
+    }
+    pub fn release_drawing(&mut self, nonce: u64) -> SessionResult<()> {
+        if self.drawing != Some(nonce) {
+            return Err(SessionError::Authentication);
+        }
+        self.drawing = None;
+        Ok(())
     }
     pub fn reserve(
         &mut self,
@@ -119,6 +137,39 @@ mod tests {
     use super::*;
     fn reserve(a: &mut Admission) -> SessionResult<()> {
         a.reserve(3, 1, 0, "a".repeat(64))
+    }
+    #[test]
+    fn drawing_reservation_needs_idle_covered_pen_and_blocks_all_enqueues() -> SessionResult<()> {
+        let mut a = Admission::default();
+        a.queue(1)?;
+        assert!(a.reserve_drawing(7).is_err());
+        a.admit_pen(Phase::Down, 1);
+        a.cover(1);
+        assert!(a.reserve_drawing(7).is_err());
+        a.admit_pen(Phase::Up, 2);
+        assert!(a.reserve_drawing(7).is_err());
+        a.cover(2);
+        a.reserve_drawing(7)?;
+        assert!(a.busy());
+        assert!(!a.queue(1)?);
+        assert!(reserve(&mut a).is_err());
+        assert!(a.release_drawing(8).is_err());
+        assert!(a.busy());
+        a.release_drawing(7)?;
+        assert!(a.can_reserve());
+        Ok(())
+    }
+    #[test]
+    fn drawing_control_does_not_manufacture_input_sequence_or_cover() -> SessionResult<()> {
+        let mut a = Admission::default();
+        a.admit_pen(Phase::Hover, 9);
+        a.cover(9);
+        a.reserve_drawing(4)?;
+        a.release_drawing(4)?;
+        assert_eq!(a.last_pen, 9);
+        assert_eq!(a.covered, 9);
+        assert!(a.command.is_none());
+        Ok(())
     }
     #[test]
     fn queued_down_prevents_command_before_async_pen() -> SessionResult<()> {

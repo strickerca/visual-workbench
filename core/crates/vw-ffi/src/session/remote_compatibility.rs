@@ -15,22 +15,24 @@ struct Owned {
     cancel: Arc<vw_remote_host::process::Cancellation>,
     observation: vw_remote_host::editor_probe_runner::PaintControlsObservation,
     receipt: Vec<u8>,
+    _evidence: Option<Arc<super::drawing::Evidence>>,
 }
 #[cfg(windows)]
-struct ObservationContext {
-    local_epoch: u64,
-    source_epoch: Option<u64>,
-    grant_revision: u64,
-    binding: Binding,
-    target: Target,
-    identity: vw_remote::profile::ImageIdentity,
-    profile_digest: String,
-    helper: Arc<vw_remote_host::editor_probe_runner::PaintObservationHelper>,
+#[derive(Clone)]
+pub(super) struct ObservationContext {
+    pub(super) local_epoch: u64,
+    pub(super) source_epoch: Option<u64>,
+    pub(super) grant_revision: u64,
+    pub(super) binding: Binding,
+    pub(super) target: Target,
+    pub(super) identity: vw_remote::profile::ImageIdentity,
+    pub(super) profile_digest: String,
+    pub(super) helper: Arc<vw_remote_host::editor_probe_runner::PaintObservationHelper>,
 }
 
 #[cfg(windows)]
 impl ObservationContext {
-    fn current(&self, hub: &RemoteHub) -> SessionResult<()> {
+    pub(super) fn current(&self, hub: &RemoteHub) -> SessionResult<()> {
         let s = hub.state.lock().map_err(|_| SessionError::Worker)?;
         RemoteHub::current(&s)?;
         if s.host_retiring
@@ -72,7 +74,7 @@ impl Owned {
 // Every result is deliberately NotTested. A read-only controls witness says
 // which tool/settings were observed; it proves no drawing or physical gesture.
 #[cfg(any(windows, test))]
-fn receipt(
+pub(super) fn receipt(
     identity: &vw_remote::profile::ImageIdentity,
     profile: &str,
     tool: &str,
@@ -180,15 +182,62 @@ impl LiveSession {
             if s.closed {
                 return Err(SessionError::Closed);
             }
-            s.runtime
-                .as_mut()
-                .ok_or(SessionError::RemoteUnavailable)?
-                .observation = Some(helper);
+            if s.drawing.is_some() {
+                return Err(SessionError::Backpressure);
+            }
+            let runtime = s.runtime.as_mut().ok_or(SessionError::RemoteUnavailable)?;
+            runtime.observation = Some(helper);
+            runtime.observation_files = Some((path, sha256));
+            runtime.drawing = None;
             Ok(())
         }
         #[cfg(not(windows))]
         {
             let _ = (path, sha256);
+            Err(SessionError::RemoteUnavailable)
+        }
+    }
+    /// A file hash only selects already-owned evidence. It cannot create it.
+    pub fn remote_observe_compatibility_receipt(
+        &self,
+        binding_json: String,
+        receipt_sha256: String,
+    ) -> SessionResult<Arc<RemoteCompatibilityObservation>> {
+        #[cfg(windows)]
+        {
+            if !vw_remote::profile::digest(&receipt_sha256) {
+                return Err(SessionError::Invalid);
+            }
+            let observation = self.remote_observe_compatibility(binding_json)?;
+            let cached = {
+                let s = self.remote.state.lock().map_err(|_| SessionError::Worker)?;
+                s.drawing_evidence.clone()
+            };
+            if let Some(cached) = cached {
+                use sha2::{Digest, Sha256};
+                let sha = format!("{:x}", Sha256::digest(&cached.receipt));
+                if sha == receipt_sha256 && cached.context.current(&self.remote).is_ok() {
+                    let mut guard = observation.owned.lock().map_err(|_| SessionError::Worker)?;
+                    let owned = guard.as_mut().ok_or(SessionError::Closed)?;
+                    owned.current()?;
+                    if owned.observation.tool_id == cached.completed.tool_id()
+                        && owned.observation.settings_digest == cached.completed.settings_digest()
+                    {
+                        cached
+                            .source
+                            .verify_observation(&owned.context.target, std::process::id())
+                            .map_err(failure)?;
+                        owned.source = cached.source.clone();
+                        owned.receipt = cached.receipt.clone();
+                        owned._evidence = Some(cached);
+                    }
+                }
+            }
+            Ok(observation)
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = (binding_json, receipt_sha256);
             Err(SessionError::RemoteUnavailable)
         }
     }
@@ -206,6 +255,9 @@ impl LiveSession {
             let context = {
                 let s = self.remote.state.lock().map_err(|_| SessionError::Worker)?;
                 RemoteHub::current(&s)?;
+                if s.drawing.is_some() {
+                    return Err(SessionError::Backpressure);
+                }
                 if s.host_retiring || s.peer_retiring || s.binding.as_ref() != Some(&binding) {
                     return Err(SessionError::Closed);
                 }
@@ -277,6 +329,7 @@ impl LiveSession {
                 cancel,
                 observation,
                 receipt,
+                _evidence: None,
             };
             owned.verify_source()?;
             owned.current()?;

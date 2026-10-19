@@ -5,6 +5,7 @@ import kotlinx.coroutines.*
 /** Implemented by the actual foreign producer access. No receipt import or UI
  * implementation supplies this access to the normal NativeRemoteEdit factory. */
 internal interface NativeDrawingPreparationAccess {
+    val available:Boolean get()=true
     suspend fun prepare(expected:RemoteTargetState):NativeDrawingPreparation
 }
 
@@ -14,6 +15,8 @@ internal interface NativeDrawingPreparationAccess {
  * canvas state before foreign destruction and retains failed cleanup for retry. */
 internal interface NativeDrawingPreparation {
     val target:RemoteTargetState
+    val readyForConfirmation:Boolean get()=true
+    val canvasRecoveryNeeded:Boolean get()=false
     fun cancel()
     suspend fun runConfirmed():NativeOwnedCompatibilityReceipt?
     suspend fun retire():RemoteDrawingCanvasState
@@ -66,6 +69,10 @@ internal class NativeRemoteDrawingOwner(
     private var cancellation:CompletableDeferred<Unit>?=null
     private var closeAttempt:CompletableDeferred<RemoteDrawingCanvasState>?=null
     private var retired:RemoteDrawingCanvasState?=null
+    override val readyForConfirmation:Boolean get()=synchronized(lock){
+        !closing&&!invalidated&&prepared?.readyForConfirmation==true&&current()
+    }
+    override val canvasRecoveryNeeded:Boolean get()=synchronized(lock){prepared?.canvasRecoveryNeeded==true}
 
     private fun usable(){
         if(invalidated||closing||retired!=null||!job.isActive||!current())
@@ -98,6 +105,7 @@ internal class NativeRemoteDrawingOwner(
             usable()
             check(preparing?.isCompleted==true&&running==null)
             val owned=prepared?:throw SessionFailure(SessionFailureKind.Closed)
+            if(!owned.readyForConfirmation)throw SessionFailure(SessionFailureKind.Closed)
             scope.async(start=CoroutineStart.LAZY) {
                 currentCoroutineContext().ensureActive()
                 synchronized(lock){usable()}

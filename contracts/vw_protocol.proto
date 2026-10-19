@@ -865,14 +865,14 @@ message RemoteScope {
 message RemoteControl {
   RemoteScope scope = 1;
   uint64 sequence = 2;
-  string action = 3; // start|stop|request_control|grant|pause|revoke|background|keyframe
+  string action = 3; // start|stop|request_control|grant|pause|revoke|background|keyframe; drawing_* requires paint_drawing_check_v1
   bytes selected_target_json = 4; // host-issued native identity, <=8KiB
   Uuid input_session_id = 5;
   string reason = 6; // bounded closed status code, never captured free text
   bytes shortcut_state_json = 7; // optional native admitted profile/focus evidence
-  uint64 request_nonce = 8; // command_request only; no input sequence authority
-  uint32 editor_action = 9; // command_request only; finite admitted ordinal+1
-  uint64 command_input_seq = 11; // authority only; exact settled finite input, never a new input grant
+  uint64 request_nonce = 8; // command requests or drawing reservation; no input sequence authority
+  uint32 editor_action = 9; // finite admitted ordinal+1; zero for drawing_* controls
+  uint64 command_input_seq = 11; // authority/stroke_authority: actual settled input; drawing_reserved: covered prior input; never an injection or grant
   string selected_destination_label = 10; // start only; display metadata <=2KiB, never input/profile authority
 }
 message RemoteVideoConfig {

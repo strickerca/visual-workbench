@@ -13,6 +13,8 @@ internal interface RemoteDrawingCheckCapability {
 }
 internal interface RemotePreparedDrawingCheck {
     val target:RemoteTargetState
+    val readyForConfirmation:Boolean get()=true
+    val canvasRecoveryNeeded:Boolean get()=false
     /** One-shot native producer, reached only after this owner's confirmation.
      * Native rechecks its source/tool and actual queued-input exclusion. Any
      * admitted receipt must also remain in the native session's evidence owner. */
@@ -100,6 +102,11 @@ internal class RemoteDrawingCheck(
                 ensureActive()
                 val prepared=op.prepared.value?:error("Missing prepared drawing owner")
                 if(op.cancelled.value||!same(expected,dispatcher.target.value)||!same(expected,prepared.target))return@launch
+                if(!prepared.readyForConfirmation){
+                    mutable.value=RemoteDrawingCheckState(RemoteDrawingCheckPhase.Complete,expected.identity,
+                        "The drawing check could not be prepared. Finish the stroke and check Paint before retrying.")
+                    return@launch
+                }
                 mutable.value=RemoteDrawingCheckState(RemoteDrawingCheckPhase.AwaitingConfirmation,expected.identity)
                 if(!op.decision.await())return@launch
                 ensureActive()
@@ -163,9 +170,12 @@ internal class RemoteDrawingCheck(
             if(op.permitReleased.compareAndSet(false,true))admission.unlock()
             flight.complete(Unit)
         }catch(error:Throwable){
+            val recovery=op.prepared.value?.canvasRecoveryNeeded==true
+            if(recovery){recoveryBinding.value=op.expected.binding;seal(op.expected.binding)}
             mutable.value=RemoteDrawingCheckState(if(closed.value)RemoteDrawingCheckPhase.Closed
                 else RemoteDrawingCheckPhase.CleanupPending,op.expected.identity,
-                "Drawing check cleanup is pending. Keep this session open and retry cleanup.",true)
+                if(recovery)"Drawing check cleanup is pending. The Paint canvas may need manual recovery; keep this session open and retry cleanup."
+                else "Drawing check cleanup is pending. Keep this session open and retry cleanup.",true,recovery)
             flight.completeExceptionally(error)
             throw error
         }finally{op.retirement.compareAndSet(flight,null)}

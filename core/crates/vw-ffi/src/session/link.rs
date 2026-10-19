@@ -32,8 +32,8 @@ pub use agent_capture::AgentCaptureDisplay;
 mod remote_edit;
 pub use remote_edit::{
     RemoteAcknowledgment, RemoteCommandResult, RemoteCompatibilityObservation, RemoteDisplay,
-    RemoteFrame, RemoteInputAdmitted, RemoteRuntimeFiles, RemoteWindow,
-    remote_helpers_retirement_count,
+    RemoteDrawingCanvas, RemoteDrawingPreparation, RemoteFrame, RemoteInputAdmitted,
+    RemoteRuntimeFiles, RemoteWindow, remote_helpers_retirement_count,
 };
 
 pub(super) const MAX_TRANSFER: u64 = 64 * 1024 * 1024;
@@ -416,6 +416,7 @@ pub(super) fn hello(device: DeviceId) -> LocalHello {
             vw_model::IMAGE_OUTPUT_CAPABILITY.into(),
             agent_capture::CAPABILITY.into(),
             vw_remote::CAPABILITY.into(),
+            remote_edit::DRAWING_CAPABILITY.into(),
         ]),
     }
 }
@@ -977,6 +978,10 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         .session()
         .capabilities()
         .contains(vw_remote::CAPABILITY);
+    let negotiated_drawing = connection
+        .session()
+        .capabilities()
+        .contains(remote_edit::DRAWING_CAPABILITY);
     let (sender, mut receive) = connection.into_duplex()?;
     let _closing = Closing(sender.clone());
     let start = Instant::now();
@@ -986,6 +991,7 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         sender.clone(),
         start,
     )?;
+    remote.enable_drawing_capability(active_epoch.value, negotiated_drawing)?;
     let mut interval = tokio::time::interval(Duration::from_nanos(8_333_334));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut outbound = BTreeMap::<String, Outbound>::new();

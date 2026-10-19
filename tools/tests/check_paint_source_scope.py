@@ -15,7 +15,7 @@ options=args.parse_args()
 root=Path(__file__).resolve().parents[2]
 native=(root/'core/crates/vw-ffi/src/session/remote_compatibility.rs').read_text()
 scope=native[native.index('struct ObservationContext {'):native.index('#[cfg(windows)]\nimpl Owned')]
-scope=scope.replace('#[cfg(windows)]\n','').replace('vw_remote_host::editor_probe_runner::PaintObservationHelper','ProbeHelper')
+scope=scope.replace('#[cfg(windows)]\n','').replace('vw_remote_host::editor_probe_runner::PaintObservationHelper','ProbeHelper').replace('pub(super) ', '')
 if options.negative_control:
     old='\n            || s.epoch != self.local_epoch'
     assert old in scope

@@ -18,6 +18,11 @@ mod admission;
 mod commands;
 #[path = "remote_compatibility.rs"]
 mod compatibility;
+#[path = "remote_drawing.rs"]
+mod drawing;
+pub(super) const DRAWING_CAPABILITY: &str = drawing_gate::CAPABILITY;
+#[path = "remote_drawing_gate.rs"]
+mod drawing_gate;
 #[cfg(windows)]
 #[path = "remote_host.rs"]
 mod host;
@@ -30,6 +35,7 @@ mod stream;
 use commands::PendingCommand;
 pub use commands::RemoteCommandResult;
 pub use compatibility::RemoteCompatibilityObservation;
+pub use drawing::{RemoteDrawingCanvas, RemoteDrawingPreparation};
 
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct RemoteRuntimeFiles {
@@ -125,6 +131,10 @@ pub(super) struct State {
     next_command: u64,
     admission: admission::Admission,
     stroke: commands::StrokeObservation,
+    drawing_enabled: bool,
+    drawing: Option<Arc<drawing_gate::Gate>>,
+    #[cfg(windows)]
+    drawing_evidence: Option<Arc<drawing::Evidence>>,
     #[cfg(windows)]
     runtime: Option<host::Runtime>,
 }
@@ -305,6 +315,10 @@ impl RemoteHub {
                 next_command: 0,
                 admission: admission::Admission::default(),
                 stroke: commands::StrokeObservation::default(),
+                drawing_enabled: false,
+                drawing: None,
+                #[cfg(windows)]
+                drawing_evidence: None,
                 #[cfg(windows)]
                 runtime: None,
             }),
@@ -333,7 +347,7 @@ impl RemoteHub {
             reason: reason.map(str::to_owned),
             encoder_description: s.config.as_ref().map(|v| v.encoder.name.clone()),
             destination_label: s.selected.as_ref().map(|v| v.display_label.clone()),
-            command_busy: s.admission.busy(),
+            command_busy: s.admission.busy() || s.drawing.is_some(),
         };
         self.signal.send_replace(s.display.clone());
         Ok(())
@@ -353,6 +367,7 @@ impl RemoteHub {
         s.epoch = epoch;
         Self::reset_source(&mut s, self.host.then_some(epoch));
         s.enabled = negotiated;
+        s.drawing_enabled = false;
         s.sender = Some(sender);
         s.started = started;
         s.sent_control = 0;
@@ -410,6 +425,13 @@ impl RemoteHub {
     // valid decoder ticket. Its actual callback may drain as video only; input
     // acknowledgment still requires the exact current input-session binding.
     fn retire_authority(s: &mut State) {
+        #[cfg(windows)]
+        {
+            s.drawing_evidence = None;
+        }
+        if let Some(gate) = s.drawing.take() {
+            gate.cancelled.store(true, Ordering::Release);
+        }
         if let Some(sender) = &s.sender {
             sender.revoke_input()
         }
@@ -812,6 +834,9 @@ impl RemoteHub {
                         return Err(SessionError::Invalid);
                     }
                     match v.action.as_str() {
+                        "drawing_reserved" | "drawing_refused" => {
+                            self.receive_drawing(&mut s, &v)?
+                        }
                         "command_refused" => self.command_refused(&mut s, &v)?,
                         "request_control" => self.publish(&mut s, "pending_grant", None)?,
                         "keyframe" => {
@@ -838,6 +863,9 @@ impl RemoteHub {
                     }
                 } else {
                     match v.action.as_str() {
+                        "drawing_reserve" | "drawing_release" => {
+                            self.receive_drawing(&mut s, &v)?
+                        }
                         "retired" => {
                             if s.selected.as_ref().is_none_or(|v| v.scope != scope) {
                                 return Err(SessionError::Invalid);
@@ -1426,7 +1454,8 @@ impl LiveSession {
 pub fn remote_helpers_retirement_count() -> SessionResult<u32> {
     #[cfg(windows)]
     {
-        u32::try_from(host::retirement_count()?).map_err(|_| SessionError::Backpressure)
+        u32::try_from(host::retirement_count()? + drawing::retirement_count()?)
+            .map_err(|_| SessionError::Backpressure)
     }
     #[cfg(not(windows))]
     {

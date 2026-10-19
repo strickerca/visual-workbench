@@ -612,6 +612,9 @@ impl LiveSession {
         let mut s = self.remote.state.lock().map_err(|_| SessionError::Worker)?;
         RemoteHub::current(&s)?;
         action_allowed(&s, &binding, action)?;
+        if s.admission.busy() || s.drawing.is_some() {
+            return Err(SessionError::Backpressure);
+        }
         if s.commands.len() >= 4 {
             return Err(SessionError::Backpressure);
         }

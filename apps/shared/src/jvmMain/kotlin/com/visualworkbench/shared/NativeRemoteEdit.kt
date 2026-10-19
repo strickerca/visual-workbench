@@ -14,11 +14,13 @@ internal interface NativeRemoteAccess { fun remoteEditHandle():WorkbenchRemoteEd
 public fun remoteEdit(link:ProjectLink):WorkbenchRemoteEdit = (link as? NativeRemoteAccess)?.remoteEditHandle() ?: throw SessionFailure(SessionFailureKind.Invalid)
 /** Called by the pinned desktop runtime only; peer/project/UI paths cannot
  * supply a helper or profile inventory. Existing locked inventory is retained. */
-public fun configureRemoteEditRuntime(remote:WorkbenchRemoteEdit,videoPath:String,videoSha256:String,inputPath:String,inputSha256:String,profilePath:String?=null,profileSha256:String?=null,observationPath:String?=null,observationSha256:String?=null) {
+public fun configureRemoteEditRuntime(remote:WorkbenchRemoteEdit,videoPath:String,videoSha256:String,inputPath:String,inputSha256:String,profilePath:String?=null,profileSha256:String?=null,observationPath:String?=null,observationSha256:String?=null,drawingPath:String?=null,drawingSha256:String?=null) {
     val native=remote as? NativeRemoteEdit ?: throw SessionFailure(SessionFailureKind.Invalid)
     require((observationPath==null)==(observationSha256==null))
+    require((drawingPath==null)==(drawingSha256==null)&&(drawingPath==null||observationPath!=null))
     native.configure(RemoteRuntimeFiles(videoPath,videoSha256,inputPath,inputSha256,profilePath,profileSha256))
     if(observationPath!=null&&observationSha256!=null)native.configureObservation(observationPath,observationSha256)
+    if(drawingPath!=null&&drawingSha256!=null)native.configureDrawing(drawingPath,drawingSha256)
 }
 private val remoteOwners=ConcurrentHashMap.newKeySet<NativeRemoteEdit>()
 public fun remoteEditOwnerCount():Int = remoteOwners.size
@@ -78,6 +80,7 @@ internal class NativeRemoteEdit(private val handle:LiveSession,private val linkO
     private suspend fun <T> native(block:suspend()->T):T = withContext(Dispatchers.Default){try{open();block()}catch(error:SessionException){throw sessionFailure(error)}}
     internal fun configure(files:RemoteRuntimeFiles){open();try{handle.remoteConfigureRuntime(files)}catch(error:SessionException){throw sessionFailure(error)}}
     internal fun configureObservation(path:String,sha256:String){open();try{handle.remoteConfigureObservationHelper(path,sha256)}catch(error:SessionException){throw sessionFailure(error)}}
+    internal fun configureDrawing(path:String,sha256:String){open();try{handle.remoteConfigureDrawingHelper(path,sha256)}catch(error:SessionException){throw sessionFailure(error)}}
     override fun invalidateConsumers(){consumers.invalidate()}
     override fun seal(reason:String){
         invalidateConsumers()
@@ -189,7 +192,7 @@ internal class NativeRemoteEdit(private val handle:LiveSession,private val linkO
             if(after?.binding!=expected.binding||after.identity!=expected.identity)null else admitted
         }
     }
-    override val drawingCheckSupported:Boolean get()=drawingPreparations!=null&&!closing.get()
+    override val drawingCheckSupported:Boolean get()=!closing.get()&&drawingPreparations?.available==true
     override suspend fun prepareDrawingCheck(expected:RemoteTargetState):RemotePreparedDrawingCheck = native {
         val access=drawingPreparations?:throw SessionFailure(SessionFailureKind.RemoteUnavailable)
         fun current():Boolean = !closing.get()&&mutableTarget.value?.let {
