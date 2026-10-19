@@ -12,14 +12,16 @@ pub const MAX_HEADER_BYTES: usize = 16 * 1024;
 pub const MAX_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
 const MAX_JSON_TOKENS: usize = 512;
 const MAX_JSON_DEPTH: usize = 16;
+const MAX_JSON_STRING_BYTES: usize = 1024;
 // Internally tagged Serde enums can temporarily materialize JSON Content
 // nodes before the variant is known. Bound that graph before deserialization:
-// at most 512 tokens, 16 levels, and 16 KiB of source text. Four KiB per token
-// covers map/vector growth and per-node metadata; four copies of the complete
-// source cover decoded strings and the final typed DTO. The extra 64 KiB covers
-// fixed parser/DTO state. The maximum charge is under 2.25 MiB.
+// at most 512 tokens, 16 levels, 1024 source bytes per string and 16 KiB total.
+// Four KiB per token covers map/vector growth and node metadata. Eight copies
+// of the text cover simultaneous decoded-string growth, typed values and Serde's
+// rejection-message formatting, including reallocation peaks. The extra 64 KiB
+// covers fixed parser/DTO state. The maximum charge is under 2.25 MiB.
 const JSON_NODE_WORK_BYTES: u64 = 4096;
-const JSON_TEXT_WORK_COPIES: u64 = 4;
+const JSON_TEXT_WORK_COPIES: u64 = 8;
 const JSON_FIXED_WORK_BYTES: u64 = 64 * 1024;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -233,20 +235,33 @@ fn json_workspace(bytes: &[u8]) -> Result<u64> {
     let mut quoted = false;
     let mut escaped = false;
     let mut atom = false;
+    let mut string_bytes = 0usize;
     for &byte in bytes {
         if quoted {
+            if byte < 0x20 || byte == 0x7f {
+                // No platform source identifier needs raw control/DEL bytes.
+                // Refuse them before Serde formats a potentially long error.
+                return Err(Error::Invalid);
+            }
+            if byte == b'"' && !escaped {
+                quoted = false;
+                continue;
+            }
+            string_bytes += 1;
+            if string_bytes > MAX_JSON_STRING_BYTES {
+                return Err(Error::Limit);
+            }
             if escaped {
                 escaped = false;
             } else if byte == b'\\' {
                 escaped = true;
-            } else if byte == b'"' {
-                quoted = false;
             }
             continue;
         }
         match byte {
             b'"' => {
                 quoted = true;
+                string_bytes = 0;
                 atom = false;
                 tokens += 1;
             }
@@ -452,5 +467,30 @@ mod allocation_tests {
         assert!(matches!(result, Err(Error::Limit)));
         assert!(!called.get());
         assert_eq!(budget.used_bytes(), 0);
+    }
+
+    #[test]
+    fn long_or_control_bearing_header_string_is_refused_before_deserialization() {
+        for value in [vec![b'x'; 8_533], vec![0x7f; 8_533]] {
+            let mut json = b"{\"reply\":\"ready\",\"request_hash\":\"\\\\".to_vec();
+            json.extend_from_slice(&value);
+            json.extend_from_slice(b"\"}");
+            let mut wire = (json.len() as u32).to_le_bytes().to_vec();
+            wire.extend_from_slice(&json);
+            let budget = SessionBudget::new(112_297).expect("budget");
+            let called = Cell::new(false);
+            let result: Result<((), MemoryCharge)> = read_header_with(
+                &mut Cursor::new(wire),
+                &budget,
+                &Cancellation::default(),
+                |_| {
+                    called.set(true);
+                    Ok(())
+                },
+            );
+            assert!(matches!(result, Err(Error::Invalid | Error::Limit)));
+            assert!(!called.get());
+            assert_eq!(budget.used_bytes(), 0);
+        }
     }
 }
