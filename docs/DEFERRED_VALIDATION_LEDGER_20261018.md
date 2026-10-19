@@ -409,3 +409,16 @@ foreign factory; fresh coherent bindings and full native/apps/Windows/runtime
 checks. Model/checkpoint lineage/native notices/Android runtime admission and
 scrcpy DLL configuration/aggregate notices remain unresolved. Root LICENSES,
 production catalog/null pins and blocked private model transfer remain intact.
+
+
+Latest parent disposition: exact Pab477729 is independently accepted with14
+focused checks. Root still owes real exclusive peer/host admission, scoped
+session/source/grant/cancellation authorization, native result revalidation
+before publication and retained recovery ownership blocking another probe.
+Completed getters have no currentness. Native/Windows/Paint gates remain open.
+F1f2496cc tooling acceptance is held on four P2s returned to existing F: bound
+DLL configuration parsing before conversion; repair notice tag-object404 URLs;
+validate every intermediate redirect; bound inventory reads. Its composed
+source remains an inactive held candidate and no runtime admission was added.
+Root must compose the repair before treating preparation as accepted or merging
+that held source to main. Earlier6-case results remain narrow fixture evidence.

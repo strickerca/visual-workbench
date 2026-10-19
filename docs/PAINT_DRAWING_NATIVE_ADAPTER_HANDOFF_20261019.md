@@ -89,3 +89,17 @@ Desktop runtime inventory entry. The33 synthetic runtime/catalog and33 package
 report cases pass; no helper executable was built, launched or assigned a hash
 without an actual packaged artifact. The real foreign/input integration above
 remains required before the normal factory advertises the capability.
+
+
+Parent now independently accepts exact Pab477729 with14 focused checks. This
+supersedes the earlier unverified worker-review claim. Those checks do not
+validate root's foreign integration or actual Windows/GUI/native behavior.
+Root must acquire real exclusive peer/host input admission; its fixed callback
+must recheck actual session/source epoch, grant, scoped reservation and the
+shared cancellation token before sending authorization. On native return, root
+must revalidate the retained native source and actual session/grant/cancellation
+before cache or UI publication; completed getters alone have no currentness.
+Retain actual unresolved canvas/history/source/Job/permit ownership and block
+another probe. Only Drawing/Supported/EditorObserved/Mouse may be produced;
+all six other aspects stay NotTested. None of these native hooks is supplied by
+the Kotlin lifetime owner, cached UI target or helper filename registration.
