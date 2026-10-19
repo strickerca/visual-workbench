@@ -1,5 +1,27 @@
 # Visual Workbench implementation guidance
 
+Current cloud continuation (2026-10-19): the current parent delegation and its
+explicit lane grant define the active deliverable. This continuation supersedes
+the older pause/scope instructions below for this delegated cloud work. Retain
+those dated entries as history; do not restart a completed old task/audit because
+a reused thread or checkout still mentions it. See
+`docs/ACTIVE_CLOUD_LANES_20261019.md` for current source ownership and handoffs.
+Current user instructions remain authoritative if that coordination map is stale.
+
+Before claiming progress after a resumed/reassigned turn, establish actual cwd,
+branch/HEAD, dirty owned paths and the current requested deliverable. Preserve
+useful old work/receipts and unrelated dirty files; do not reset or silently
+replace them. An unrelated old-task commit is preserved work, not evidence that
+the current assigned implementation or model conversion was performed. If the
+active task/checkout differs from the parent delegation, report the mismatch
+and continue the current authorized task in a suitable isolated checkout.
+
+The parent controls cloud lane activation and the single heavy slot. Root does
+not silently reassign E/Android or dispatch another executor. This cloud scope
+excludes live provider calls, credentials/signing/deployment, GUI input/capture,
+device/security/driver changes. Keep expensive aggregate/device validation
+deferred as requested, and never treat slot reservation as execution evidence.
+
 The active repository is this directory. Use `docs/BUILD_SPECIFICATION.md`,
 `docs/REQUIREMENTS.json` and `docs/IMPLEMENTATION_PLAN.md` as the v2 product sources.
 Root specification/requirements copies are preserved v1 references. Read the

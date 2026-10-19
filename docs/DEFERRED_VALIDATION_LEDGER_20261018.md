@@ -258,3 +258,17 @@ was an unsupported execution inference; it is corrected to reservation only.
 No conversion/model artifact exists in root evidence. Parent is resolving E's
 unrelated old-main T3.07 return e8ff4bf; that source is preserved remotely and
 not composed here. Root's new package geometry cases remain authored/unrun.
+
+## 2026-10-19 cloud assignment routing check
+
+Root did not reassign E/Android, spawn agents, send cloud task messages or run
+conversion. Its expected integration worktree was clean at6fd99bf. Inspection
+found one applicable project AGENTS.md with historic pause/scope notes and an
+explicit current-user precedence clause; no project/workspace .agents/.codex
+task files or assignment sender/rewriter in inspected tools/grants. Root cannot
+inspect other cloud workers' private message routing, so no root cause is proven.
+AGENTS now clarifies current continuation/task routing, with exact active lane
+contracts in ACTIVE_CLOUD_LANES_20261019.md. Useful old E e8ff4bf/T5.04 audit work
+is preserved separately; actual model conversion and AND1–4 repairs remain
+unconfirmed/unresolved until source/artifact evidence arrives. No redundant old
+audit, heavy build or device work was launched by root during this check.
