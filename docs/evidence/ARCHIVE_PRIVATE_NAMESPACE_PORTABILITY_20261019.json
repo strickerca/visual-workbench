@@ -1,0 +1,25 @@
+{
+  "status": "actual source SQL byte-prefix predicates passed in two runtimes",
+  "source_sha256": "ecbdc727c34560f693b4eada129ab1b243ead0302803c8c7c132be8cc39bb0c1",
+  "python_sqlite": {
+    "version": "3.53.1",
+    "individual_namespace_cases": 8,
+    "bulk_private_rows_scrubbed": 8,
+    "unrelated_rows_preserved": 2,
+    "legacy_glob_matches_blob_prefix": true,
+    "like_doesnt_match_blobs": false
+  },
+  "system_sqlite": {
+    "version": "3.46.1",
+    "individual_namespace_cases": 8,
+    "bulk_private_rows_scrubbed": 8,
+    "unrelated_rows_preserved": 2,
+    "legacy_glob_matches_blob_prefix": false,
+    "like_doesnt_match_blobs": true
+  },
+  "limits": [
+    "SQL fixtures only, no Cargo/native archive workflow executed",
+    "Production bundled-SQLite leak was not demonstrated",
+    "Actual export/import/BLOB/VACUUM regressions authored; final native run deferred"
+  ]
+}

@@ -66,14 +66,22 @@ pub fn export_vwbz(
     // Installation-local camera positions and bookmark names never leave this
     // installation. VACUUM below also removes their former page contents.
     copy_connection.execute(
-        "DELETE FROM settings WHERE key GLOB ?1",
-        [format!("{}*", crate::LOCAL_VIEW_PREFIX)],
+        "DELETE FROM settings WHERE substr(CAST(key AS BLOB),1,?1)=CAST(?2 AS BLOB)",
+        rusqlite::params![
+            crate::LOCAL_VIEW_PREFIX.len() as i64,
+            crate::LOCAL_VIEW_PREFIX
+        ],
     )?;
     // Strip even malformed private reviews before the final VACUUM. The source
-    // database and its manual owner progress remain unchanged.
+    // database and its manual owner progress remain unchanged. Byte-prefix
+    // comparison covers malformed TEXT/BLOB keys independently of SQLite's
+    // LIKE_DOESNT_MATCH_BLOBS build option, including NUL/invalid UTF-8 suffixes.
     copy_connection.execute(
-        "DELETE FROM settings WHERE key GLOB ?1",
-        [format!("{}*", crate::VERIFICATION_REVIEW_PREFIX)],
+        "DELETE FROM settings WHERE substr(CAST(key AS BLOB),1,?1)=CAST(?2 AS BLOB)",
+        rusqlite::params![
+            crate::VERIFICATION_REVIEW_PREFIX.len() as i64,
+            crate::VERIFICATION_REVIEW_PREFIX
+        ],
     )?;
     copy_connection.execute("VACUUM INTO ?1", [sqlite_path(&clean)?])?;
     copy_connection
@@ -197,8 +205,8 @@ pub fn import_vwbz(
     // Normal exports omit this namespace; retain the incoming archive untouched
     // and refuse before publishing a project containing imported review claims.
     let private_reviews: bool = restored.connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM settings WHERE key GLOB ?1)",
-        [format!("{}*", crate::VERIFICATION_REVIEW_PREFIX)],
+        "SELECT EXISTS(SELECT 1 FROM settings WHERE substr(CAST(key AS BLOB),1,?1)=CAST(?2 AS BLOB))",
+        rusqlite::params![crate::VERIFICATION_REVIEW_PREFIX.len() as i64, crate::VERIFICATION_REVIEW_PREFIX],
         |row| row.get(0),
     )?;
     if private_reviews {

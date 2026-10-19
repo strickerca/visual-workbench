@@ -837,6 +837,124 @@ fn imported_archive_cannot_mint_installation_local_owner_verdicts() {
     temporary.close().unwrap();
 }
 
+fn malformed_private_keys(prefix: &str) -> Vec<rusqlite::types::Value> {
+    use rusqlite::types::Value;
+    vec![
+        Value::Text(format!("{prefix}synthetic-text")),
+        Value::Text(format!("{prefix}\0synthetic-nul")),
+        Value::Blob(prefix.as_bytes().to_vec()),
+        Value::Blob([prefix.as_bytes(), b"\xff\0\x80synthetic-blob"].concat()),
+    ]
+}
+
+fn setting_bytes(path: &Path) -> Vec<(Vec<u8>, Vec<u8>)> {
+    let connection = rusqlite::Connection::open(path.join("project.sqlite")).unwrap();
+    let rows = connection
+        .prepare("SELECT CAST(key AS BLOB), CAST(value AS BLOB) FROM settings ORDER BY key")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    rows
+}
+
+#[test]
+fn archive_scrubs_text_blob_and_malformed_private_namespace_bytes_only_in_its_copy() {
+    let temporary = temporary();
+    let (mut source, _) = fixture(temporary.path());
+    let source_path = temporary.path().join("source.vwb");
+    let sql = rusqlite::Connection::open(source_path.join("project.sqlite")).unwrap();
+    let note = "SYNTHETIC_PRIVATE_BLOB_OR_TEXT_NOTE_92841";
+    for prefix in [
+        vw_store::VERIFICATION_REVIEW_PREFIX,
+        vw_store::LOCAL_VIEW_PREFIX,
+    ] {
+        for key in malformed_private_keys(prefix) {
+            sql.execute(
+                "INSERT INTO settings(key,value) VALUES (?1,?2)",
+                rusqlite::params![key, note.as_bytes()],
+            )
+            .unwrap();
+        }
+    }
+    // Adjacent, unrelated byte namespaces must survive exact prefix removal.
+    let keep = b"vw.verification-review.v1-neighbor\xff";
+    sql.execute(
+        "INSERT INTO settings(key,value) VALUES (?1,'preserve-neighbor')",
+        [keep.as_slice()],
+    )
+    .unwrap();
+    drop(sql);
+    let before = setting_bytes(&source_path);
+    let revision = source.revision().unwrap();
+    let archive = temporary.path().join("byte-private-scrubbed.vwbz");
+    export_vwbz(&mut source, &archive).unwrap();
+    assert!(
+        !fs::read(&archive)
+            .unwrap()
+            .windows(note.len())
+            .any(|v| v == note.as_bytes())
+    );
+    assert_eq!(setting_bytes(&source_path), before);
+    let restored_path = temporary.path().join("byte-private-restored.vwb");
+    let restored = import_vwbz(&archive, &restored_path, ImportLimits::default()).unwrap();
+    let rows = setting_bytes(&restored_path);
+    assert!(rows.iter().all(|(key, _)| {
+        !key.starts_with(vw_store::VERIFICATION_REVIEW_PREFIX.as_bytes())
+            && !key.starts_with(vw_store::LOCAL_VIEW_PREFIX.as_bytes())
+    }));
+    assert!(
+        rows.iter()
+            .any(|(key, value)| key == keep && value == b"preserve-neighbor")
+    );
+    assert_eq!(restored.revision().unwrap(), revision);
+    drop(restored);
+    drop(source);
+    clean_staging(temporary.path());
+    temporary.close().unwrap();
+}
+
+#[test]
+fn imported_private_text_blob_and_invalid_utf8_keys_refuse_without_touching_archive() {
+    for key in malformed_private_keys(vw_store::VERIFICATION_REVIEW_PREFIX) {
+        let temporary = temporary();
+        let (mut source, _) = fixture(temporary.path());
+        let normal = temporary.path().join("normal-before-private-row.vwbz");
+        export_vwbz(&mut source, &normal).unwrap();
+        let mut members = entries(&normal);
+        let database = temporary.path().join("incoming-private.sqlite");
+        let member = members
+            .iter_mut()
+            .find(|(name, _)| name == "project.sqlite")
+            .unwrap();
+        fs::write(&database, &member.1).unwrap();
+        let sql = rusqlite::Connection::open(&database).unwrap();
+        sql.execute(
+            "INSERT INTO settings(key,value) VALUES (?1,'synthetic-private-claim')",
+            [key],
+        )
+        .unwrap();
+        drop(sql);
+        member.1 = fs::read(&database).unwrap();
+        let incoming = temporary.path().join("malformed-private-input.vwbz");
+        write_raw(&incoming, &members, None, None);
+        let original = fs::read(&incoming).unwrap();
+        let destination = temporary.path().join("must-not-publish-private.vwb");
+        assert!(matches!(
+            import_vwbz(&incoming, &destination, ImportLimits::default()),
+            Err(vw_store::StoreError::Invalid(
+                "installation-local verification review"
+            ))
+        ));
+        assert!(!destination.exists());
+        assert_eq!(fs::read(&incoming).unwrap(), original);
+        drop(source);
+        clean_staging(temporary.path());
+        temporary.close().unwrap();
+    }
+}
+
 // A tiny, deliberately permissive fixture writer is independent of zip-rs's
 // duplicate-name/type defenses, allowing those malformed inputs to reach ours.
 fn write_raw(
