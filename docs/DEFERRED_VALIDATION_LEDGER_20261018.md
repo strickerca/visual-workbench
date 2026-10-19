@@ -299,3 +299,11 @@ Rust artifact selection used incompatible serde instances (fixed by matching
 Cargo fingerprints), and runtime inventory's old six-file lease assertion
 expected13 instead of14 (updated for the pinned seventh file, then33/33 pass).
 Temporary compiler products were disposed; no private screenshots were created.
+
+Disposition after root source commit ad6787c: accepted Desktop ea8ba87 +02aa0e5
+composed cleanly as7a405f8 +f08a3a5; no controller/ABI tests were inferred from
+cherry-pick success. E e28987e offline delivery tooling composed as61c0ec8 and
+root reran its31 offline tests successfully; the actual private models/goldens/
+logs/wheels were not transferred or rerun. Root Paint source still needs
+independent source review and the native/ABI/runtime checks above. V7698bc4 and
+Androiddf7edbe remain review-held candidates, so no acceptance is inferred.
