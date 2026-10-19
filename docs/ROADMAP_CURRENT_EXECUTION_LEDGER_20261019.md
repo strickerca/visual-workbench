@@ -1,114 +1,67 @@
 # Current phased execution ledger
 
-This is the concise current view; ROADMAP_EXECUTION_LEDGER.md and the append-only
-DEFERRED_VALIDATION_LEDGER_20261018.md retain earlier source/test/failure history.
-Main remains6d505416. Active work is on cloud/roadmap-source-integration-20261018;
-accepted source composition does not pass phase, hardware or product gates.
-The796 recovered candidates/manifests remain preserved source evidence, not
-automatically accepted active implementation. No old worktree was cleaned.
+## Reconciled current disposition — 2026-10-19
 
-| Phase | Implemented/composed source | Remaining implementation/delivery | Validation/gate state |
-|---|---|---|---|
-| 0–2 foundations | Main checkpoint, native/shared ownership, ordinary editor/transport, source-bound archives/offline recovery and existing partial Paint/stream foundations | Recovered work is promoted only through explicit reviewed leaves; no blanket stale overlay | Earlier evidence stays exact to its source/artifact. Physical/user gates remain open; cloud compilation never passes them |
-| 3 capture and image editing | Actual capture Main/access/origin callbacks; canonical frame/D-tones; accepted F original formats/export projections; native giant input/URI and complete E47f76bf charged tile delivery; G08332934+b75cea58 lossless region composition and root/JVM registration; accepted Desktop02aa0e5 caller/Retry as7a405f8+f08a3a5; accepted Android b1a6f94 AND1–8 stack composed througha7bedd8 | E e28987e tools are composed as61c0ec8 with actual host conversion/parity reported and private artifacts retained by E; transfer, license/runtime/catalog/memory admissions remain. Recovered stream-finish source still requires deliberate reconciliation, preserving newer charged owners | Earlier combined Linux library check atf60eca3 passed with one known provider warning. G13 regressions/new ABI/apps/platform journeys unrun. Parent Android policy/source-order substitutes pass within their narrow scope; authored controller/app/device tests unrun. Wireframe move preview is current behavior; painted-pixel move is absent |
-| 4 remote Paint | Genuine query-only native source/helper owner/factory/importer; accepted PRT1 repeated-close fix1b9d68e and source/grant/scope lifetime741bed9; numeric evaluator with9 isolated tests; root shared confirmation/retained cleanup/session-recovery fence and conditional Desktop dialog source | Pab477729 source is composed as107b829..2da57ee. Root native prepared-owner/decoder/capability source is implemented ase215cf2; dedicated helper registration/eight-file packaging source is added. Actual native/Kotlin factory, P scoped failed-owner observation, peer/host reservation, helper retirement/resume and final native publication checks are now implemented in the concrete integration candidate. Fresh bindings, full gateway/Compose/apps and Windows/runtime verification remain open; no actual positive observation was executed. Physical owner-gesture producer remains code work | Earlier root13 lifecycle cases/palette16 cases remain source-bound. Current native-owner12/common-flow14/importer16/file5 cases and runtime/catalog33/package-report33 cases pass at their own leaf scope. Actual WGC cursor-disabled readback and early RAII are authored; Windows compile/runtime, Compose/native/apps and genuine effect/physical acceptance unrun. No new GUI/input/capture/device use. Krita deferred |
-| 5 verification/providers/operations | A provider/settings/cost source composed without live calls; V private review/history/source retention and Main attachment; canonical coordinates and accepted paired-pixel/failure-crop/output-layer stack through2ec0b15 composed as3fdc728..29b8647; standalone LiteRT graph/notices and passing Maven census | Root reran96 focused V Kotlin cases on the composed source; parent4 isolated Rust checks remain separate. Positive Paint native integration, optional Android tunnel and stream-finish reconciliation remain. E6394880 license census and F1f2496cc scrcpy preparation are composed as110d4ec/737215c; root license/model/runtime admissions remain closed | Provider quality/live calls, Android model execution/admission, generated ABI, whole apps/lint/package/native policy and OS/runtime/deployment/physical journeys stay separate. No credential/signing/security/device changes |
+Source inspected: `e57b941da52ed2663fc181b5a040877af2548820`, against approved
+v2 IMPLEMENTATION_PLAN/BUILD_SPECIFICATION/REQUIREMENTS and the parent's latest
+review dispositions. This section supersedes the historical pending-code and
+review statements below. Main remains `6d505416963fb42009921bd3fb8639994e73752a`;
+integration remains on `cloud/roadmap-source-integration-20261018`. Source,
+compilation, runtime and owner/hardware acceptance are distinct. Krita is
+deferred. No phase/product gate is passed. No heavy Workbench run was started
+while the parent's FarmTC/Claude workload is active.
 
-Active nonoverlapping lanes remain parent-managed:
+| Phase/tasks | Actual source/behavior now | Remaining code/delivery versus verification |
+|---|---|---|
+| 0–2 | Main checkpoint and subsequent reviewed ownership, editor, transport, capture, archive/offline, provider/package/MCP source | Exact earlier evidence retained; G0–G2, real apps/providers and physical acceptance open. Recovered archives are candidates, not accepted implementation |
+| **T3.02 live annotate** | `vw-stream` has charged ring/tiles/codecs/pacer, authenticated consent, presentation tickets and freeze state machine; protocol has frame/freeze messages | **Real code gap:** no production caller of PresentedFrames/FreezeMachine outside native tests, no app live-annotate canvas/controller. Persistent capture producer, authenticated dispatch, displayed-frame freeze, provisional draft/lossless swap, durable one-document save, resume and both-device status need integration. Recovered 289-case census is written/unrun. 15fps/ring/swap/resume/A07 hardware evidence remains separate |
+| T3.01, T3.03–05 | Actual capture picker/Main callbacks, physical geometry, precision/loupe/lens, selection/polygon and tilt source | Fresh whole apps/ABI/goldens and real capture/DPI/pen/precision journeys unrun here; no new missing leaf algorithm established by this inventory |
+| T3.06 assisted selection | Android LiteRT backend, encode-once/source/manual-correction callers; E actual host conversion/parity and license census composed | Transfer blocked here by proxy CONNECT403 before bytes. Weight/checkpoint terms, TinyViT lineage, native aggregate and Android memory/catalog admission unresolved; empty production catalog/null pins remain. Host2.2 parity does not prove Android2.3/JNI/APK/accelerator/100ms/memory acceptance |
+| T3.07 controls | Layer/group/lock/rotation/bookmark/navigation plus newer crop/quarter-turn/resize/tone/composed-background callers composed on both platforms | Old claim that crop/resize/tonal code is wholly missing is superseded. Transient local/peer movement is explicitly wireframe; painted-pixel preview absent, but approved T3.07 does not separately require it. Fresh apps/controller/undo/sync/export/>=20-doc journeys remain |
+| T3.08 giant | Charged delivery/prefetch/source owners, lossless L0/composed regions and actual viewport/Desktop/Android callers | Final G13 authored regressions/ABI/apps/platform/GPU/RSS/performance/A10 unrun; root one public-publication case is narrower. Unsupported reduction levels remain explicit refusals |
+| T3.09 documents | Isolated document protocol/worker, PDFium, deny-all resvg/export, actual qpdf PC redaction with independent post-write verification, explicit raster path and callers | Licensed PDFium/qpdf/LPAC runtime admission and actual malformed/password/isolation/fidelity/removed-text/A12 journeys remain. PC redaction source is not merely a future placeholder |
+| T3.10 / T5.08 | F immutable D→O export/formats/color, PSD/PSB/PDF-compatible AI/RAW-preview source and callers composed | Actual OS decoder/color/export workflows unrun. **INSTR-005 dated next-release/drop decision missing**; do not invent owner approval or a handwriting implementation requirement |
+| T3.11–12 | Rebase/conflict review/counter floors/joined navigation plus phone AI/provider callers exist | Scale rebase, <=2s carrier switch/zero duplicates, phone-only W1 and A14/A25 unverified; no new missing algorithm established here. G3 open while T3.02/model admission also incomplete |
+| T4 active Paint subset | Parent's final Astra review **accepts bounded integration `e57b941`**, including `a87eb4d` and P composition `9103cf5`: actual factory/Main ownership, peer reservation, input-helper retire/resume, failed-owner retention and final native checks | Fresh bindings/actual native access/Main/Compose/JNI/apps and Windows/Paint runtime remain. Positive producer evidence is mouse-only; uncertainty never becomes restored. Physical-gesture compatibility producer remains distinct missing code; query-only reads are NotTested. No genuine positive observation executed here |
+| T4 deferred | Existing sources preserved | Current parent defers Krita. Approved plan explicitly defers text refinement, virtual driver/display, Adobe/plugins, broader editors/palettes and full G4; do not silently complete or reactivate them |
+| T5.01–02 | Accepted V paired-pixel/alignment/failure/output-layer/history stack and root attachments; A adapters/settings/cost/candidate grid source | Root96 focused Kotlin and parent4 isolated Rust checks remain separate. Actual recapture/MCP/apps/A30 and provider availability/quality open; no live calls |
+| **T5.03 tunnel** | Repaired F exact `55505c6`, composed `32befbd`, **independently accepted by parent**: four findings closed,11 tests plus independent boundaries/fresh official archive pass | **Real code gap:** owner-adb/session/scrcpy process, paired screencap/uiautomator capture and owned-mirror loop protection absent from app/core/host. DLL configured-license/native aggregate/replaceability/notices admission still closed; no root manifest admission or runtime/device result |
+| T5.04–05 | Air Actions declarative/onboarding/dedup/dispatch and private diagnostics preview/export/scanner leaves composed | Fresh apps/lint/ABI and actual Bluetooth/destination/lifecycle journeys remain; do not restart old no-change audits |
+| T5.06 | Personal runtime packaging and bounded release assembler/checksums/notices/source association exist | Root reviewed MSI/build hook and final producer-toolchain/runtime/notices/uninstall-guide content need closure; assembler accepts already-built MSI only as hash-bound input. Signing/driver/plugin authority and installation/uninstall/reproducibility/A20 remain separate |
+| T5.07 | No release-wide acceptance run | Final artifacts/untested matrix, A01–A30/performance/thermal/recovery and owner G5 remain open |
 
-- E e28987e host conversion and parity are now evidenced:19 tensor comparisons,
-  max absolute error6.77e-05,31 offline tooling tests. Private Library transfer is authorized, but signed downloads are blocked by
-  this environment HTTPS proxy CONNECT403 before any bytes; directory/hash/
-  extraction validation remains unperformed. No conversion was repeated. Production catalog remains empty. Root reran31 offline tooling tests successfully; no model conversion/inference was repeated here.
-- G viewport bridge e72f2f1 is accepted/composed. R corrected02aa0e5 is accepted/composed as7a405f8+f08a3a5
-  with14 parent-reported isolated cases; whole-controller/runtime checks remain.
-- Android b1a6f94 AND7 is accepted after the full caller repair stack. Root
-  composed398c0f/3f90c9c throughb1a6f94 as83c4f42..a7bedd8; skipped only the old
-  shared merge already present. Parent's4 policy scenarios/5 source-order
-  assertions are bounded substitutes. Authored Android/full-app/ABI/device
-  checks stay unrun; source acceptance does not pass those gates.
-- V2ec0b15 is accepted/composed including its00f1f26 reserved output-layer fix.
-  Root's96 focused workflow cases pass; parent's4 isolated Rust cases remain
-  separately scoped. No native/runtime or generated-ABI pass is claimed.
-- Root supplies query-only Paint normal ownership/factory and packaging source,
-  contracts/registrations/manifests/locks/Main integration and source disposition.
-  PRT1 repeated-close/successor fix1b9d68e and lifetime stamp741bed9 are accepted.
-  Parent independently reports10 close cases/old negative controls and4 lifetime
-  tests/21 refused variations/9 matching source hashes. Root's earlier8 close
-  cases/3 scope methods are separate evidence, not additional unique coverage.
-  P is now active under PAINT_POSITIVE_PRODUCER_GRANT_20261019.md. Root's shared
-  confirmation lifecycle and conditional Desktop UI are authored/tested at leaf
-  scope; real native adapter/exclusive input wiring and physical evidence remain.
-  See evidence/PAINT_DRAWING_CONFIRMATION_20261019.json. No per-small-commit ABI
-  regeneration or broad native/app build was run for this batch.
+**Ready independent code:** existing G persistent live-annotate producer and
+existing F Android tunnel owner/capture/loop module. Exact exclusive paths,
+contracts, root registration dependencies and bounded tests are in
+[REMAINING_CODE_GRANTS_20261019.md](REMAINING_CODE_GRANTS_20261019.md).
+Parent controls dispatch; root did not spawn/contact another executor. Root
+next owns T3.02 common/native/session/draft/save contracts and recovered consumer
+integration. Final bounded Paint source review is accepted. Publish shared draw/
+draft ownership APIs before parent extends existing Android/R platform lanes.
 
-Recent review dispositions: F81413d81 accepted and composed; complete E47f76bf
-accepted/composed, retaining root URI intake/producer exports; G production
-08332934 accepted and test-only b75cea58 composed with13 unrun regressions;
-R e212c275 accepted/composed after its three earlier findings; G viewport e72f2f1
-is now accepted/composed with25 parent-reported focused cases. Android b1a6f94
-AND1–8 and V2ec0b15 are now source-accepted/composed. The R/V/root test
-counts describe their own scope and are not summed into a final-tree pass.
+Current exact Paint evidence is
+`evidence/PAINT_CONCRETE_NATIVE_INTEGRATION_20261019.json`: Linux vw-ffi check,
+9 actual admission and80 net cases,5 package geometry and1 giant publication
+case pass at their scope; Kotlin16 lifecycle/13 owner/16 import groups/5 guards
+use substituted foreign/session boundaries. Actual native-access/Main/Compose/
+fresh generated API were not compiled. MSVC check stopped at missing lib.exe
+before new Windows code compiled. Parent's independent acceptance reports
+16 common/13 owner/16 importer/5 guards/19 Rust boundary cases and24 source
+hashes; retain that separate scope, do not sum repeated checks into final-tree
+acceptance. No runtime experiment/heavy build was run for this reconciliation.
 
-The next aggregate validation is one coherent source tree: format/import/license
-policy; strict native checks/tests; one core/host binding generation; shared and
-Desktop/Android compile/tests/lint; final runtime/notices/package inventories.
-Actual model conversion is implementation work with separate artifact review.
-Authorized physical/hardware/provider/quality/acceptance runs require their real
-evidence; those requirements do not become completed through the aggregate build.
+After ready code composition/review and release of the heavy slot: one coherent
+policy/format/affected native/strict-Clippy batch (max2 workers); one phase-wide
+core/host binding generation; actual shared/Desktop/Android tests/compilation,
+instrumentation compile/lint; then authorized Windows build.ps1/runtime/package
+inventories. Toolchain task owns setup. Actual model/tunnel/editor/device/
+physical/performance/owner journeys require their own admission and evidence.
+No per-small-commit regeneration, paid Actions, credentials/signing/deployment,
+driver/security/device changes or worktree cleanup is implied.
 
-
-Root6efc8b8 is now independently source-accepted by the parent. Its additional
-6 palette-owner checks and36 extracted WGC control-flow cases are separate from
-root's earlier probes; no Windows/Compose/ABI/runtime pass follows. New native
-adapter preparation after that tip is unreviewed: NativeRemoteEdit now owns
-prepared drawing consumers through confirmation/late allocation/run/cleanup,
-with12 actual-owner-boundary cases and14 common lifecycle cases passing. The
-complete actual adapter compile was attempted against older cached jars and
-blocked on the pre-existing missing remoteConfigureObservationHelper binding.
-No generated-method stub or small-slice ABI regeneration was used. See
-PAINT_DRAWING_NATIVE_ADAPTER_HANDOFF_20261019.md and
- evidence/PAINT_NATIVE_DRAWING_OWNER_20261019.json. The actual foreign factory,
-sequenced input barrier and P per-run failed-owner observation remain code work.
-
-Parent dispatched E model/host-wheel license closure and F scrcpy prerequisite.
-F1f2496cc is available for safe preparation composition; actual Windows DLL
-configuration/aggregate notices and device/tunnel execution remain blocked.
-Pab477729 is available for source/hook composition; its Windows/native tests are
-authored unrun. Root has read both handbacks; no independent Astra acceptance
-receipt for P is present in its branch, so that worker claim is not counted as
-verified root evidence. Parent retains review/disposition.
-
-
-Pab477729, F1f2496cc and E6394880 source handbacks are now composed unchanged
-as107b829..2da57ee,737215c and110d4ec. Root verified all11 P,13 F and125 E
-changed paths against their exact worker Git objects. Root registered the exact
-vw-paint-drawing-helper binary and eighth runtime file; Cargo offline metadata
-finds it once with no implicit paint_drawing target. The33 synthetic Kotlin
-runtime/catalog tests and33 Python package-report tests pass; the earlier
-seven-file fixture count failure is retained. F6 synthetic preparation and E6
-synthetic audit/refusal tests pass here; no archive, graph, wheel or DLL work was
-repeated. See evidence/PAINT_HELPER_AND_RUNTIME_COMPOSITION_20261019.json.
-
-The P per-run failed-owner/accessor requirement remains in
-PAINT_DRAWING_NATIVE_ADAPTER_HANDOFF_20261019.md. No generic global retirement
-count supplies a canvas result. Root still needs the actual sequenced peer/host
-exclusion and native foreign factory before enabling the action. E's checkpoint/
-derived-weight terms, TinyViT lineage, native build notice mapping and Android
-LiteRT2.3 aggregate remain unresolved. F actual Windows DLL configured license/
-aggregate notices remain unresolved; its proposed root manifest is not applied.
-Production catalog/null pins, blocked Library transfer and physical gates stay
-unchanged. No old worktree was cleaned.
-
-
-Latest parent disposition: exact Pab477729 is independently accepted with14
-focused checks. Root still owes real exclusive peer/host admission, scoped
-session/source/grant/cancellation authorization, native result revalidation
-before publication and retained recovery ownership blocking another probe.
-Completed getters have no currentness. Native/Windows/Paint gates remain open.
-F1f2496cc tooling acceptance is held on four P2s returned to existing F: bound
-DLL configuration parsing before conversion; repair notice tag-object404 URLs;
-validate every intermediate redirect; bound inventory reads. Its composed
-source remains an inactive held candidate and no runtime admission was added.
-Root must compose the repair before treating preparation as accepted or merging
-that held source to main. Earlier6-case results remain narrow fixture evidence.
+Earlier wording remains preserved in Git at e57b941 and the historical
+ROADMAP_EXECUTION_LEDGER/DEFERRED_VALIDATION_LEDGER; use this reconciled current
+view for dispatch. The796 recovered candidates/manifests at exact recovery
+commit0d91b70558a995fa7654021de7465b1d3f615e3d remain outside active code. No old
+worktree was cleaned; useful source, archives, failure receipts and unrun tests
+are preserved pending individual disposition.

@@ -6,6 +6,20 @@ AGENTS checkpoint pauses and old-main checkouts do not replace them.
 Parent controls dispatch. Root has not reassigned E or Android, spawned another
 worker, sent an outgoing cloud task message or run model conversion.
 
+**Latest disposition (supersedes historical rows below):** parent independently
+accepts bounded Paint integration e57b941, including a87eb4d/9103cf5, with actual
+factory/Main owner, peer reservation, helper retire/resume, retained failed
+owner and final native checks. Windows/fresh bindings/Compose/JNI/actual Paint
+journeys remain pending; mouse-only evidence never becomes physical pen proof.
+Repaired F55505c6 preparation is independently accepted, actual tunnel DLL/
+license/runtime admission still closed. Current remaining-code reconciliation
+is ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md. Exact parent-dispatch grants
+for existing G live-annotate producer and F tunnel session/capture/loop source
+are REMAINING_CODE_GRANTS_20261019.md; root has not activated them. Root next
+owns T3.02 contract/session/draft/save and app-root integration. No heavy local
+Workbench run while the parent's FarmTC/Claude workload is active. Krita stays
+deferred; no old worktree was cleaned.
+
 | Lane | Current objective | Exact task contract / disposition |
 |---|---|---|
 | E backend/model | Actual pinned model/toolchain/reference-parity/artifact delivery | ASSISTED_MODEL_DELIVERY_HANDOFF_20261019.md. Giant repair47f76bf is accepted/composed. e28987e is composed as61c0ec8 and publishes actual host conversion/parity/tooling evidence; root31 offline tool tests pass; private Library archives are now available, but root signed downloads fail HTTPS proxy CONNECT403 before bytes; no conversion repeated. Android/license/runtime/memory admission remains closed. Unrelated old-main T3.07 e8ff4bf is preserved separately, not composed or model evidence |
