@@ -233,8 +233,8 @@ crop admission and conjugated before→after mapping for independently measured
 D translations are implemented without new pixel/source owners or package schema
 changes. This is descriptive geometry, not actual alignment. V's framed refusal
 and P/V active files stay unchanged. Five new unit methods and actual encoded
-image-output integration assertions are authored/unrun while conversion owns
-the single allocated heavy slot. Rustfmt parse/format and whitespace pass. See
+image-output integration assertions are authored/unrun under the implementation-first/model slot reservation;
+actual conversion execution is unconfirmed. Rustfmt parse/format and whitespace pass. See
 VERIFICATION_PACKAGE_GEOMETRY_20261019.md and exact JSON source bindings.
 
 ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md supplies the current concise phased
@@ -242,3 +242,19 @@ view without deleting earlier receipts/dispositions. E model delivery, G viewpor
 bridge/callers, Android source repairs/remaining routes, P genuine observations
 and V actual D/O comparison remain active independent jobs. Neither new metadata
 APIs nor previous partial source checkpoints are represented as completed gates.
+
+## 2026-10-19 G viewport acceptance and E assignment correction
+
+G e72f2f1 is now composed exactly across its four source/test files after parent
+Astra acceptance with25 focused cases. The bridge does not complete platform
+controller/canvas adoption; GIANT_PLATFORM_CALLER_EXTENSION_20261019.md returns
+those exact calls and mode/consent/draw fences to existing R/Android owners. Older
+G13 native/raster/capability cases, full ABI/app/device retirement remain unrun.
+
+Correction: root never reassigned E, contacted another executor or ran conversion.
+It published the explicit actual-model grant, which the parent activated with a
+heavy slot. Earlier wording that conversion was performing/occupying that slot
+was an unsupported execution inference; it is corrected to reservation only.
+No conversion/model artifact exists in root evidence. Parent is resolving E's
+unrelated old-main T3.07 return e8ff4bf; that source is preserved remotely and
+not composed here. Root's new package geometry cases remain authored/unrun.

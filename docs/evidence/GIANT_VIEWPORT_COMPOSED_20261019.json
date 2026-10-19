@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-19",
+  "source_ref": "e72f2f1cfb27672eee797a2d172184505c0f3750",
+  "status": "parent/Astra scoped acceptance composed exactly",
+  "files": {
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/GiantCanvasHost.kt": "9814fb6ed3bdaad377967bd819e9f958970f3fac56192b3e72e45722beeee11d",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/GiantComposedViewportBoundaryTest.kt": "59043da868d054bcb1146d8d94f9d1f0fddd89ccf3ef454f19dc7f25ad8851e2",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantViewportSession.kt": "1c2cfcad6767c08475ca0191eec14624f0518ffda29d1b8bf0dc6c357cd9698c",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantViewportSessionTest.kt": "e042834c32631717b987ea93608f7fb8c31621809b1af76e646d1f913884d472"
+  },
+  "inherited_evidence": "25 parent-reported focused cases; not rerun by root",
+  "remaining_implementation": [
+    "R actual composed giant controller/canvas selection and revision/mode replacement",
+    "Android construction/mode fence and once-only canonical draw classification"
+  ],
+  "limits": [
+    "Older G8 raster/4 native/1 Kotlin methods remain separately unrun",
+    "Generated ABI, real renderer retirement, platform/device/performance gates remain deferred"
+  ],
+  "E_assignment_correction": "Root did not reassign E, contact another executor or run model conversion. Model slot was parent allocated/reserved; actual conversion execution/artifacts unconfirmed. Unrelated e8ff4bf not composed."
+}

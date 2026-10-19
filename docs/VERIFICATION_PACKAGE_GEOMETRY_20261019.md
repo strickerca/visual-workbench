@@ -45,7 +45,8 @@ translation across different output grids; minimum padding/equal-size turns;
 bad extent/scale/source binding and partial-crop refusal. The actual compiled-PNG
 image_output integration loop also checks this helper against its independent
 marker pixel goldens. These new cases and whole package compilation are UNRUN:
-the parent-allocated heavy slot is performing real model conversion. Rustfmt
+the parent reserved the heavy slot for assigned model conversion; actual
+conversion execution/artifacts have not been confirmed. Rustfmt
 parse/format and whitespace checks passed; no synthetic fixture is reported as
 real registration. Deferred command once the parent slot is free:
 

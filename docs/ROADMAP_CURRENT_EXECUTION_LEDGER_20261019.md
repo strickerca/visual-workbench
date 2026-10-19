@@ -27,13 +27,15 @@ Active nonoverlapping lanes remain parent-managed:
   exclusive; root's new package helper does not change those source refusals.
 - Root contracts/registrations/manifests/locks/Main/dialog integration, source
   composition and acceptance ledger. New native geometry tests are authored/unrun
-  while conversion occupies the heavy slot. No per-small-commit binding rebuild.
+  under the implementation-first policy/model slot reservation; conversion
+  execution is unconfirmed. No per-small-commit binding rebuild.
 
 Recent review dispositions: F81413d81 accepted and composed; complete E47f76bf
 accepted/composed, retaining root URI intake/producer exports; G production
 08332934 accepted and test-only b75cea58 composed with13 unrun regressions;
 R e212c275 accepted/composed after its three earlier findings; G viewport e72f2f1
-and Android398c0f source are separate pending returns/reviews. The R/V/root test
+is now accepted/composed with25 parent-reported focused cases. Android398c0f
+source remains held for repair. The R/V/root test
 counts describe their own scope and are not summed into a final-tree pass.
 
 The next aggregate validation is one coherent source tree: format/import/license
