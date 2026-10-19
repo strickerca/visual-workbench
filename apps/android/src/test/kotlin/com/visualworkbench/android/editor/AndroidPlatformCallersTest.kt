@@ -28,6 +28,13 @@ class AndroidPlatformCallersTest {
     private val document = DocumentSnapshot("document", "Canvas", 80u, 40u, 8u, emptyList(), RenderList(info, emptyList()))
     private val camera = Camera(Point(40.0, 20.0), 1.0, 0.0, 80.0, 40.0)
 
+    @Test fun formatRefreshCannotHideAnActiveOrRetainedFrameOwner() {
+        assertTrue(showFrameControls(false, ImageFramesState(active = true, dirty = true)))
+        assertTrue(showFrameControls(false, ImageFramesState(active = true, loading = true)))
+        assertTrue(showFrameControls(false, ImageFramesState(retry = WorkflowPlanInfo("retry", binding, 1u, 1uL))))
+        assertFalse(showFrameControls(false, ImageFramesState()))
+    }
+
     @Test fun capturedSourceIntentRejectsReplayedOutputAndChangedPickerState() {
         val project = CallerProject()
         val selection = ExportSelection(viewOnly = true)
@@ -43,6 +50,22 @@ class AndroidPlatformCallersTest {
         assertFalse(intent.matches(project, 3L, document, info, camera, selection.copy(marked = false)))
         assertFalse(ExportCallerIntent(project, 3L, null, camera, selection, binding, source, source, geometry)
             .matches(project, 3L, document, info, camera, selection))
+    }
+
+    @Test fun exportReceiptUsesStrictTopLevelRevisionSourceAndEncodedDimensions() {
+        val project = CallerProject()
+        val source = ExportOptions("document")
+        val geometry = ImageOutputExportGeometry(binding, "a".repeat(64), 80u, 40u, 160u, 80u,
+            null, 160u, 80u)
+        val intent = ExportCallerIntent(project, 3L, null, camera, ExportSelection(), binding, source, source, geometry)
+        val receipt = FileExportResult(1024uL, "b".repeat(64),
+            """{"image_output":{"output_width":3,"output_height":5},"revision":"revision","source_asset":"${"a".repeat(64)}","output_width":160,"output_height":80}""",
+            info, 4096uL)
+        checkedAndroidExportReceipt(receipt, intent)
+        assertTrue(runCatching { checkedAndroidExportReceipt(receipt.copy(revision = info.copy(hostSeq = 8uL)), intent) }.exceptionOrNull() is WorkflowFailure)
+        assertTrue(runCatching { checkedAndroidExportReceipt(receipt.copy(metadataJson = receipt.metadataJson.replace("\"output_width\":160", "\"output_width\":159")), intent) }.exceptionOrNull() is WorkflowFailure)
+        assertTrue(runCatching { checkedAndroidExportReceipt(receipt.copy(metadataJson = receipt.metadataJson.dropLast(1) + ",\"revision\":\"revision\"}"), intent) }.exceptionOrNull() is RasterTransferFailure)
+        assertTrue(runCatching { checkedAndroidExportReceipt(receipt.copy(metadataJson = receipt.metadataJson + " {}"), intent) }.exceptionOrNull() is RasterTransferFailure)
     }
 
     @Test fun giantOwnersCloseInReverseOrderAfterSuccessfulDelivery() = runBlocking {
@@ -69,6 +92,29 @@ class AndroidPlatformCallersTest {
         assertEquals(listOf("prepare", "describe", "build", "publish", "project-close", "built-close", "prepared-close", "picked-close"), order)
     }
 
+    @Test fun cancellationDuringEverySuspendingCloseNeverDeliversThePublishedProject() = runBlocking {
+        for (closing in listOf("built-close", "prepared-close", "picked-close")) {
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val order = mutableListOf<String>()
+            var delivered = false
+            val project = CallerProject { order += "project-close" }
+            val job = launch {
+                publishAndroidGiantPicked(picked(order, project, stallAt = closing, entered = entered, release = release),
+                    GiantCacheBuildOptions(1uL, 1uL, true),
+                    { GiantProjectOptions("/private/destination", "project", "document", "layer", "device", "Large JPEG", 1L, 1uL) }, {})
+                delivered = true
+            }
+            entered.await()
+            job.cancel()
+            release.complete(Unit)
+            job.join()
+            assertFalse("$closing returned a canceled project", delivered)
+            assertEquals(1, order.count { it == "project-close" })
+            assertEquals(listOf("built-close", "prepared-close", "picked-close", "project-close"), order.takeLast(4))
+        }
+    }
+
     @Test fun nonJpegOriginalNeverReachesTileBuildOrPublication() = runBlocking {
         val order = mutableListOf<String>()
         try {
@@ -80,7 +126,12 @@ class AndroidPlatformCallersTest {
     }
 
     private fun picked(order: MutableList<String>, project: WorkbenchProject,
-        format: String = "jpeg", cancelAfterPublish: Boolean = false): GiantPickedOriginal = object : GiantPickedOriginal {
+        format: String = "jpeg", cancelAfterPublish: Boolean = false, stallAt: String? = null,
+        entered: CompletableDeferred<Unit>? = null, release: CompletableDeferred<Unit>? = null): GiantPickedOriginal = object : GiantPickedOriginal {
+        suspend fun closing(name: String) {
+            order += name
+            if (stallAt == name) { entered?.complete(Unit); release?.await() }
+        }
         override suspend fun prepare(): GiantPreparedOriginal {
             order += "prepare"
             return object : GiantPreparedOriginal {
@@ -97,12 +148,12 @@ class AndroidPlatformCallersTest {
                             return project
                         }
                         override suspend fun rebuild(project: WorkbenchProject, binding: WorkflowBinding) = error("unused")
-                        override suspend fun close() { order += "built-close" }
+                        override suspend fun close() { closing("built-close") }
                     }
                 }
-                override suspend fun close() { order += "prepared-close" }
+                override suspend fun close() { closing("prepared-close") }
             }
         }
-        override suspend fun close() { order += "picked-close" }
+        override suspend fun close() { closing("picked-close") }
     }
 }

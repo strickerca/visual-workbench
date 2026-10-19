@@ -25,6 +25,7 @@ import org.junit.runner.RunWith
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(AndroidJUnit4::class)
 class RasterTransfersInstrumentedTest {
@@ -41,6 +42,7 @@ class RasterTransfersInstrumentedTest {
         private var outputOverride: ParcelFileDescriptor? = null
         private val pipeEnds = mutableListOf<ParcelFileDescriptor>()
         val opened = CompletableDeferred<ParcelFileDescriptor>()
+        val outputWriterOpens = AtomicInteger()
         fun stallInput() { val pipe = ParcelFileDescriptor.createPipe(); pipeEnds.addAll(pipe); inputOverride = pipe[0] }
         fun stallOutput() { val pipe = ParcelFileDescriptor.createPipe(); pipeEnds.addAll(pipe); outputOverride = pipe[1] }
         val context = object : ContextWrapper(actual) {
@@ -61,6 +63,7 @@ class RasterTransfersInstrumentedTest {
                 override fun update(uri:Uri,values:ContentValues?,selection:String?,selectionArgs:Array<out String>?)=0
                 override fun delete(uri:Uri,selection:String?,selectionArgs:Array<out String>?):Int = if(uri==output&&destination.delete())1 else 0
                 override fun openFile(uri:Uri,mode:String):ParcelFileDescriptor {
+                    if (uri == output && 'w' in mode) outputWriterOpens.incrementAndGet()
                     val injected = if (uri == input) inputOverride else outputOverride
                     val descriptor = if (injected != null) ParcelFileDescriptor.dup(injected.fileDescriptor)
                         else ParcelFileDescriptor.open(if(uri==input)source else destination,ParcelFileDescriptor.parseMode(mode))
@@ -82,12 +85,92 @@ class RasterTransfersInstrumentedTest {
             val project=transfers.importImage(fixture.input,streaming,{source,work,title->CreateFileProject(File(fixture.root,"project").absolutePath,id,core.newId(now.toULong()),core.newId(now.toULong()),core.newDeviceId(),title,source,work,now)}) { stages += it }
             try {
                 fixture.assertNoWorkspaces();val info=project.info();fixture.destination.createNewFile()
-                val result=transfers.export(fixture.output,project as WorkbenchStreamingProject,ExportOptions(info.documentIds.single(),marked=false)) { stages += it }
+                val result=transfers.export(fixture.output,project as WorkbenchStreamingProject,ExportOptions(info.documentIds.single(),marked=false),
+                    { receipt -> assertEquals(info.projectId,receipt.revision.projectId) }) { stages += it }
                 assertEquals(result.encodedBytes,fixture.destination.length().toULong());assertArrayEquals(original,fixture.source.readBytes())
                 val pixels=BitmapFactory.decodeFile(fixture.destination.absolutePath)
                 try { assertEquals(63,pixels.width);assertEquals(49,pixels.height);assertEquals(0xff456789.toInt(),pixels.getPixel(30,20)) } finally { pixels.recycle() }
                 assertTrue(stages.any{it.contains("Rendering")});assertTrue(stages.any{it.contains("Saving")});fixture.assertNoWorkspaces()
             } finally { withContext(NonCancellable){project.close()} }
+        }
+    }
+
+    @Test fun staleNativeReceiptIsRejectedBeforeOpeningProviderWriter() = runBlocking {
+        for (variant in 0..2) Fixture().use { fixture ->
+            fixture.destination.createNewFile()
+            val original = fixture.source.readBytes()
+            val expected = ProjectInfo("expected", "synthetic", "device", 1uL, false, false, 4uL, "state", listOf("document"))
+            val stale = when (variant) {
+                0 -> expected.copy(projectId = "other")
+                1 -> expected.copy(hostSeq = 5uL)
+                else -> expected.copy(stateHash = "changed")
+            }
+            val exporter = object : WorkbenchStreamingProject {
+                override suspend fun exportFile(options: FileExportOptions): FileExportResult {
+                    File(options.outputPath).writeBytes(original)
+                    return FileExportResult(original.size.toULong(), "a".repeat(64), "{}", stale, 4096uL)
+                }
+            }
+            val failure = runCatching { RasterTransfers(fixture.context).export(fixture.output, exporter,
+                ExportOptions("document"), { receipt ->
+                    if (receipt.revision.projectId != expected.projectId || receipt.revision.hostSeq != expected.hostSeq ||
+                        receipt.revision.stateHash != expected.stateHash) throw IllegalStateException("stale receipt")
+                }) { } }.exceptionOrNull()
+            assertTrue(failure is IllegalStateException)
+            assertEquals(0, fixture.outputWriterOpens.get())
+            assertFalse(fixture.destination.exists())
+            fixture.assertNoWorkspaces(); assertArrayEquals(original, fixture.source.readBytes())
+        }
+    }
+
+    @Test fun receiptCallbackRunsBeforeWriterAndCanCancelWithoutPublishing() = runBlocking {
+        for (cancel in listOf(false, true)) Fixture().use { fixture ->
+            fixture.destination.createNewFile()
+            val original = fixture.source.readBytes()
+            val revision = ProjectInfo("expected", "synthetic", "device", 1uL, false, false, 4uL, "state", listOf("document"))
+            val exporter = object : WorkbenchStreamingProject {
+                override suspend fun exportFile(options: FileExportOptions): FileExportResult {
+                    File(options.outputPath).writeBytes(original)
+                    return FileExportResult(original.size.toULong(), "a".repeat(64), "{}", revision, 4096uL)
+                }
+            }
+            val result = runCatching { RasterTransfers(fixture.context).export(fixture.output, exporter,
+                ExportOptions("document"), { receipt ->
+                    assertEquals(0, fixture.outputWriterOpens.get())
+                    assertEquals(revision, receipt.revision)
+                    if (cancel) throw CancellationException("synthetic callback cancellation")
+                }) { } }
+            if (cancel) {
+                assertTrue(result.exceptionOrNull() is CancellationException)
+                assertEquals(0, fixture.outputWriterOpens.get()); assertFalse(fixture.destination.exists())
+            } else {
+                assertTrue(result.isSuccess)
+                assertEquals(1, fixture.outputWriterOpens.get()); assertArrayEquals(original, fixture.destination.readBytes())
+            }
+            fixture.assertNoWorkspaces()
+        }
+    }
+
+    @Test fun refusedShareReceiptNeverCreatesLease() = runBlocking {
+        Fixture().use { fixture ->
+            val original = fixture.source.readBytes()
+            var leases = 0
+            val exporter = object : WorkbenchStreamingProject {
+                override suspend fun exportFile(options: FileExportOptions): FileExportResult {
+                    File(options.outputPath).writeBytes(original)
+                    return FileExportResult(original.size.toULong(), "a".repeat(64), "{}",
+                        ProjectInfo("other", "synthetic", "device", 1uL, false, false, 4uL, "state", listOf("document")), 4096uL)
+                }
+            }
+            val transfers = RasterTransfers(fixture.context) { context -> MediaHandoff(context) { _, file ->
+                leases++; Uri.parse("content://synthetic.handoff/${file.name}")
+            } }
+            val failure = runCatching { transfers.sharePng(exporter, ExportOptions("document"),
+                { receipt -> if (receipt.revision.projectId != "expected") throw IllegalStateException("stale receipt") }) { } }.exceptionOrNull()
+            assertTrue(failure is IllegalStateException)
+            assertEquals(0, leases)
+            assertEquals(0, fixture.outputWriterOpens.get())
+            fixture.assertNoWorkspaces()
         }
     }
     @Test fun cancelledExportRemovesOnlyItsNewDestinationAndWorkspace() = runBlocking {
@@ -101,7 +184,8 @@ class RasterTransfersInstrumentedTest {
                     try { awaitCancellation() } finally { File(options.outputPath).delete() }
                 }
             }
-            val job=launch { RasterTransfers(fixture.context).export(fixture.output,exporter,ExportOptions("fixture")){ } }
+            val job=launch { RasterTransfers(fixture.context).export(fixture.output,exporter,ExportOptions("fixture"),
+                { _ -> fail("Cancelled exporter returned a receipt") }){ } }
             withTimeout(10_000){ready.await()};job.cancelAndJoin()
             assertFalse(fixture.destination.exists());assertTrue(fixture.source.exists());fixture.assertNoWorkspaces()
         }
@@ -151,7 +235,8 @@ class RasterTransfersInstrumentedTest {
                 override suspend fun exportFile(options: FileExportOptions): FileExportResult = error("Must reject destination before native export")
             }
             val transfers = RasterTransfers(fixture.context)
-            assertTrue(runCatching { transfers.export(Uri.fromFile(fixture.source), exporter, ExportOptions("fixture")) { } }.exceptionOrNull() is IllegalArgumentException)
+            assertTrue(runCatching { transfers.export(Uri.fromFile(fixture.source), exporter, ExportOptions("fixture"),
+                { _ -> fail("Filesystem destination reached validation") }) { } }.exceptionOrNull() is IllegalArgumentException)
             assertTrue(runCatching { transfers.discardDestination(Uri.fromFile(fixture.source)) }.exceptionOrNull() is IllegalArgumentException)
             assertArrayEquals(original, fixture.source.readBytes()); fixture.assertNoWorkspaces()
         }
@@ -174,7 +259,8 @@ class RasterTransfersInstrumentedTest {
                 job.cancel()
                 Uri.parse("content://synthetic.handoff/${file.parentFile?.name}/${file.name}")
             } }
-            job = launch(start = CoroutineStart.LAZY) { transfers.sharePng(exporter, ExportOptions("document")) { } }
+            job = launch(start = CoroutineStart.LAZY) { transfers.sharePng(exporter, ExportOptions("document"),
+                { receipt -> assertTrue(receipt.encodedBytes > 0uL) }) { } }
             job.start(); withTimeout(10_000) { job.join() }
             assertTrue(leaseCreated); assertTrue(job.isCancelled)
             fixture.assertNoWorkspaces(); assertArrayEquals(original, fixture.source.readBytes())
@@ -193,7 +279,8 @@ class RasterTransfersInstrumentedTest {
                         ProjectInfo("fixture", "synthetic", "device", 1uL, false, false, 0uL, "state", listOf("document")), 4096uL)
                 }
             }
-            val (lease, receipt) = RasterTransfers(fixture.context) { handoff }.sharePng(exporter, ExportOptions("document")) { }
+            val (lease, receipt) = RasterTransfers(fixture.context) { handoff }.sharePng(exporter, ExportOptions("document"),
+                { result -> assertTrue(result.encodedBytes > 0uL) }) { }
             try {
                 fixture.assertNoWorkspaces(); assertEquals(receipt.encodedBytes, lease.file.length().toULong())
                 assertArrayEquals(original, lease.file.readBytes()); assertArrayEquals(original, fixture.source.readBytes())
@@ -225,7 +312,8 @@ class RasterTransfersInstrumentedTest {
                         ProjectInfo("fixture", "synthetic", "device", 1uL, false, false, 0uL, "state", listOf("document")), 4096uL)
                 }
             }
-            val job = launch { RasterTransfers(f.context).export(f.output, exporter, ExportOptions("document")) {} }
+            val job = launch { RasterTransfers(f.context).export(f.output, exporter, ExportOptions("document"),
+                { result -> assertEquals("fixture",result.revision.projectId) }) {} }
             val opened = withTimeout(5_000) { f.opened.await() }
             delay(100) // Fill the pipe while its reader deliberately remains open and idle.
             withTimeout(5_000) { job.cancelAndJoin() }

@@ -422,7 +422,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     internal val frameControlsAvailable: Boolean get() = document?.let { !giantDisplayRequired(it) } == true &&
         documents.state.value.descriptor == null && originalFormat != null && originalFormat?.rawPreview != true
     internal fun framePanel(active: Boolean) {
-        if (active && !imageFrames.state.value.active && (!frameControlsAvailable || !workflowIdle())) {
+        if (active && !imageFrames.state.value.blocksInput && (!frameControlsAvailable || !workflowIdle())) {
             message = if (originalFormat?.rawPreview == true) "RAW sensor originals are not editable through the embedded preview."
                 else "Finish the current edit or dialog before opening the output frame."
             return
@@ -994,6 +994,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     importer = openRequest(knownSrgb = giantSrgb == true, transfer = true) {
                         val handle = if (giantSrgb == null) repository.importImage(uri) { transferLabel = it }
                         else {
+                            // A failed native URI-reader close can retain either
+                            // of two input permits before a picked owner exists.
+                            // Retry those exact readers once before new admission.
+                            retryAndroidGiantUriRetirement()
                             val now = System.currentTimeMillis()
                             val id = core.newId(now.toULong())
                             val picked = openAndroidGiantOriginal(getApplication(), GiantUriOptions(
@@ -1048,7 +1052,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     instructionSeal = true
                     closeCurrent()
                     val next=load()
-                    if(disposing){next.close();false}else{project=next;aiRetiring=false;true}
+                    try { currentCoroutineContext().ensureActive() }
+                    catch (error: Throwable) {
+                        withContext(NonCancellable) { try { next.close() } catch (retirement: Throwable) {
+                            if (retirement !== error) error.addSuppressed(retirement)
+                        } }
+                        throw error
+                    }
+                    if(disposing){withContext(NonCancellable){next.close()};false}else{project=next;aiRetiring=false;true}
                 }
                 if(!opened)return@launch
                 val current = checkNotNull(project)
@@ -2181,15 +2192,21 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         busy = true; cancelTool()
         val job = scope.launch {
             var pendingShare: MediaHandoff.Lease? = null
+            val validateReceipt: suspend (FileExportResult) -> Unit = { result ->
+                if (!intent.matches(project, epoch, document, info, camera, exportSelection) ||
+                    checkedExportIntent !== intent || checkedExport != options)
+                    throw WorkflowFailure(WorkflowFailureKind.Stale)
+                checkedAndroidExportReceipt(result, intent)
+            }
             try {
                 val result = mutations.withLock {
                     if (!intent.matches(project, epoch, document, info, camera, exportSelection))
                         throw WorkflowFailure(WorkflowFailureKind.Stale)
                     if (sharing) {
-                        val shared = repository.sharePng(current, options) { transferLabel = it }
+                        val shared = repository.sharePng(current, options, validateReceipt) { transferLabel = it }
                         pendingShare = shared.first
                         shared.second
-                    } else repository.exportImage(checkNotNull(uri), current, options) { transferLabel = it }
+                    } else repository.exportImage(checkNotNull(uri), current, options, validateReceipt) { transferLabel = it }
                 }
                 if (!intent.matches(project, epoch, document, info, camera, exportSelection) ||
                     result.revision.projectId != intent.binding.projectId ||

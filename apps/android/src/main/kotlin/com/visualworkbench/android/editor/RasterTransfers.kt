@@ -90,7 +90,8 @@ internal class RasterTransfers(context: Context, private val handoffFactory: (Co
         }
     }
 
-    suspend fun export(uri: Uri, project: WorkbenchStreamingProject, options: ExportOptions, stage: (String) -> Unit): FileExportResult {
+    suspend fun export(uri: Uri, project: WorkbenchStreamingProject, options: ExportOptions,
+        validateReceipt: suspend (FileExportResult) -> Unit, stage: (String) -> Unit): FileExportResult {
         require(uri.scheme == "content") { "The export destination must be a document provider." }
         val work = Workspace(context.cacheDir)
         var published = false
@@ -100,6 +101,7 @@ internal class RasterTransfers(context: Context, private val handoffFactory: (Co
             val output = work.file(outputName(options.format))
             val request = FileExportOptions(options, output.absolutePath, work.root.absolutePath)
             val result = if (project is WorkbenchFileTransfers) project.exportTransfer(request) else project.exportFile(request)
+            validateReceipt(result)
             stage("Saving the exported image…")
             withContext(Dispatchers.IO) {
                 require(output.isFile && output.length().toULong() == result.encodedBytes) { "The completed export did not match its native receipt" }
@@ -193,7 +195,8 @@ internal class RasterTransfers(context: Context, private val handoffFactory: (Co
         } finally { if (!complete) discardDestination(uri) }
     }
 
-    suspend fun sharePng(project: WorkbenchStreamingProject, options: ExportOptions, stage: (String) -> Unit): Pair<MediaHandoff.Lease, FileExportResult> {
+    suspend fun sharePng(project: WorkbenchStreamingProject, options: ExportOptions,
+        validateReceipt: suspend (FileExportResult) -> Unit, stage: (String) -> Unit): Pair<MediaHandoff.Lease, FileExportResult> {
         require(options.format == ImageFormat.Png8 || options.format == ImageFormat.Png16)
         val work = Workspace(context.cacheDir)
         val handoff = handoffFactory(context)
@@ -205,6 +208,7 @@ internal class RasterTransfers(context: Context, private val handoffFactory: (Co
             val output = work.file("output.png")
             val request = FileExportOptions(options, output.absolutePath, work.root.absolutePath)
             val result = if (project is WorkbenchFileTransfers) project.exportTransfer(request) else project.exportFile(request)
+            validateReceipt(result)
             withContext(Dispatchers.IO) {
                 require(output.isFile && output.length().toULong() == result.encodedBytes)
                 lease = handoff.create(camera = false)
