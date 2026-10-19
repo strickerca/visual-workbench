@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-18",
+  "status": "Reserved source checkpoint; uncompiled pending image SessionBudget/provider hook, registration and combined binding phase. No platform/helper/giant workflow acceptance.",
+  "base": "32b60a5a0c9db925039d359d9b4f73704e51833b",
+  "branch": "cloud/giant-stream-integration-20261018",
+  "main_unchanged": "83663107d864b21d22d2e746b9ca6eb80d47beac",
+  "behavior": [
+    "Required shared global Foreign reservation precedes tile calls; local192MiB accounting cannot admit new work independently.",
+    "Distinct image-release and reservation-release phases retain failed owners and avoid double destruction. Backend creation failure also requires actual retirement before credit.",
+    "Private native delivery charge and additional ABI copy survive generated reply decoding via an opaque lease; pre-admitted foreign charge remains through renderer retirement. Root will consume the image owner exact delivery result hook.",
+    "Native adapter joins cancellation, checks live foreign reservation and retains unadopted native-image close failures.",
+    "Common planning includes precision footprint/highest physical scale; actual draw fence repeats full revision, attachment and exact view."
+  ],
+  "written_tests": {
+    "viewport_owner_total": 16,
+    "geometry": 3,
+    "native_foreign_object": 1,
+    "executed_at_this_checkpoint": 0
+  },
+  "cheap_checks": {
+    "common_platform_import_guard": "pass",
+    "rustfmt_direct_reserved_files": "pass",
+    "whitespace": "pass",
+    "staged_secret_scan": "performed before publication"
+  },
+  "sources": [
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImagesApi.kt",
+      "sha256": "07eacea34d19332bbaec31facc96f69250c36037fd6031d5bca7f471e154cf27"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantViewportSession.kt",
+      "sha256": "ec301c4d0780786ae1c1eb4182ac06cc8f63e05a7dccffc2a0dfa5521d0aaa22"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantViewGeometry.kt",
+      "sha256": "1fd216c0894bfbf9fced12573bbb2fd0b89b2331a7f990f7368cad52210f5a6b"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionResourcesApi.kt",
+      "sha256": "ded5b6811373b4b3f19b79bb9eaccb2b1cac8004e8fa8f42e120038f2a10c1b2"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeGiantImages.kt",
+      "sha256": "80c7b473c2e7e77d4fbcfc9deefab93174fd03697cd329ed16b2c5c42e7f400c"
+    },
+    {
+      "path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt",
+      "sha256": "88b2951bbf4021b923923e8384dc28ff47f1cbcfbf8f3be7ce0961f5584e563f"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session_resources.rs",
+      "sha256": "6567e81f79fa6285d9e799c23dd527f52f98c452cab7f6918e59bd2e53e128c1"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images.rs",
+      "sha256": "954749cb172c87c6ee7b151d8a36ce7217d4eddf60ba22c667c188911ec804f2"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/dto.rs",
+      "sha256": "391c42b227b9f8bf3bb6c86eba015f716825810c6d249184a295048720439ce6"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/lib.rs",
+      "sha256": "51cf76d255537c845979b4bc12f1894144d06bc8e1786be4b6c89ebad50f8a39"
+    },
+    {
+      "path": "docs/GIANT_RENDERER_PARALLEL_HANDOFF_20261018.md",
+      "sha256": "92cda3b5026c73b20c8b38709ca1582b406c3c20f0838a23132149eacbed1a4a"
+    }
+  ],
+  "parallel_handoff": "docs/GIANT_RENDERER_PARALLEL_HANDOFF_20261018.md",
+  "limits": [
+    "Native provider/private delivery exact hook and SessionBudget are still owned by image and not yet integrated. Generated GiantImage/open/tile/delivery/pool methods are not available in the existing binding artifacts; these callers are source-only until the combined phase.",
+    "Root ran no heavy build while image held the slot. New JVM/native regressions are written only. No platform helpers, actual controller/draw wiring or global resource runtime behavior was tested here.",
+    "Android/Desktop renderer-only lanes are proposed with exclusive new-file ownership; root retains existing framework/controller/shared/FFI files.",
+    "Main/frozen refs remain unchanged by this source checkpoint. PDF stays gated; Windows MSVC/ring/lib.exe blocker, mixed peers, device/physical/runtime gates remain open.",
+    "No images/screenshots, device/provider calls, software install, signing, credentials or security changes."
+  ]
+}

@@ -41,6 +41,7 @@ internal class DesktopMcpCoordinator(
     private val active=LinkedHashMap<Job,String?>()
     private val stopped=CompletableDeferred<Unit>()
     private val catalogGate=Mutex();private val inboxGate=Mutex();private val captureGate=Mutex()
+    private val verificationTargets=McpVerificationTargets()
     private val grantGate=Mutex()
     private val controls=LinkedHashMap<String,Deferred<Unit>>()
     private var batchControl:Deferred<Unit>?=null
@@ -80,10 +81,19 @@ internal class DesktopMcpCoordinator(
     }
     /** A cancelled publish may already be durable. Refresh recovers by exact ID. */
     suspend fun publish(value:WorkbenchCompiledPackage):PublishedPackage=owned { publishInside(value) }
-    private suspend fun publishInside(value:WorkbenchCompiledPackage,beforeExpose:suspend()->Unit={}):PublishedPackage = catalogGate.withLock {
+    private suspend fun publishInside(value:WorkbenchCompiledPackage,verificationEligible:Boolean=true,beforePublish:suspend()->Unit={},beforeExpose:suspend()->Unit={}):PublishedPackage = catalogGate.withLock {
         require(key(value.info.packageId,value.info.target) !in mutable.value.retiring)
+        // Original retirement uses this same gate. Recheck after acquiring it,
+        // before the durable publication, as acquiring a busy gate can suspend.
+        beforePublish()
         val saved=catalog.publish(value)
-        mutable.update{state->state.copy(packages=(state.packages.filterNot{it.info.packageId==saved.info.packageId&&it.info.target==saved.info.target}+saved),sendPreview=null)}
+        // Verification routing is optional. Its bounded session registry cannot
+        // turn an already durable ordinary publication into a failed result.
+        val verificationAvailable=verificationEligible && try {
+            verificationTargets.rememberPackage(saved.info)
+        } catch(_:IllegalArgumentException) { false } catch(_:IllegalStateException) { false }
+        mutable.update{state->state.copy(packages=(state.packages.filterNot{it.info.packageId==saved.info.packageId&&it.info.target==saved.info.target}+saved),sendPreview=null,
+            message=if(verificationAvailable)state.message else "Package saved. Its original capture target is unavailable for verification.")}
         beforeExpose();connection.publish(Path.of(saved.directory),saved.info.manifestSha256)
         saved
     }
@@ -97,7 +107,7 @@ internal class DesktopMcpCoordinator(
     }
     suspend fun retirePackage(selected:PublishedPackage)=owned {
         val itemKey=key(selected.info.packageId,selected.info.target)
-        catalogGate.withLock{mutable.update{it.copy(retiring=it.retiring+itemKey,sendPreview=null)}}
+        catalogGate.withLock{verificationTargets.retire(selected.info);mutable.update{it.copy(retiring=it.retiring+itemKey,sendPreview=null)}}
         // Do not hold catalogGate while draining callbacks: an unrelated capture
         // callback may be publishing, and must settle before this receipt.
         connection.unpublish(selected.info.packageId,selected.info.target,selected.info.manifestSha256)
@@ -210,15 +220,57 @@ internal class DesktopMcpCoordinator(
     }
     fun indicatorDrawn(id:String) { synchronized(lifecycle){indicator?.takeIf{it.first==id}?.second?.complete(Unit)} }
     override suspend fun capture(session:String,selector:String):McpCaptureReceipt=owned(session) {
-        captureGate.withLock {
-            checkGrant(session,selector)
+        captureInside(session,selector)
+    }
+    /** Session-private route association only. Resolve the exact current
+     * original under the same gate used by retirement before ticket admission,
+     * and again with completion. This grants no capture or alignment authority. */
+    suspend fun recaptureOriginal(session:String,original:PackageInfo):McpVerificationRecapture=owned(session) {
+        val ticket=catalogGate.withLock {
+            verificationTargets.begin(checkedVerificationPackage(original).info)
+        }
+        try {
+            checkGrant(session,ticket.selector);verificationTargets.checkCurrent(ticket)
+            val receipt=captureInside(session,ticket.selector){verificationTargets.checkCurrent(ticket)}
+            catalogGate.withLock {
+                require(key(receipt.packageId,receipt.target) !in mutable.value.retiring)
+                val matches=catalog.list().filter{it.info.packageId==receipt.packageId && it.info.target==receipt.target}
+                require(matches.size==1)
+                val found=matches.single()
+                val after=catalog.lookup(found.info.packageId,found.info.target,found.info.manifestSha256)
+                // Native lookup verifies the actual catalog/manifest binding;
+                // immutable caller metadata or a routing ticket cannot replace it.
+                checkedVerificationPackage(original)
+                checkGrant(session,ticket.selector)
+                verificationTargets.complete(ticket,after.info)
+            }
+        } finally {verificationTargets.abandon(ticket)}
+    }
+    /** Caller holds catalogGate, so retiring admission cannot race these checks. */
+    private suspend fun checkedVerificationPackage(expected:PackageInfo):PublishedPackage {
+        require(key(expected.packageId,expected.target) !in mutable.value.retiring)
+        val exact=catalog.lookup(expected.packageId,expected.target,expected.manifestSha256)
+        require(McpVerificationPackage.of(exact.info)==McpVerificationPackage.of(expected))
+        return exact
+    }
+    private suspend fun captureInside(session:String,selector:String,checkOriginal:()->Unit={}):McpCaptureReceipt {
+        suspend fun checkCapture(){checkGrant(session,selector);checkOriginal()}
+        return captureGate.withLock {
+            checkCapture()
             val id=UUID.randomUUID().toString();val drawn=CompletableDeferred<Unit>()
             synchronized(lifecycle){indicator=id to drawn}
             mutable.update{it.copy(activeCapture=McpCaptureActivity(id,session,selector))}
             try {
-                withTimeout(2_000){drawn.await()};checkGrant(session,selector)
-                val compiled=captureEngine.compile(selector){checkGrant(session,selector)}
-                try { checkGrant(session,selector);val published=publishInside(compiled){checkGrant(session,selector)};checkGrant(session,selector)
+                withTimeout(2_000){drawn.await()};checkCapture()
+                val compiled=captureEngine.compile(selector){checkCapture()}
+                try {
+                    checkCapture()
+                    val verificationEligible=try {
+                        verificationTargets.rememberCapture(compiled.info,selector);true
+                    } catch(_:IllegalArgumentException) { false } catch(_:IllegalStateException) { false }
+                    // An unregistered/conflicting capture must never inherit an
+                    // older origin merely because its canonical bytes coincide.
+                    val published=publishInside(compiled,verificationEligible,beforePublish={checkCapture()}){checkCapture()};checkCapture()
                     McpCaptureReceipt(published.info.packageId,published.info.target,true,true)
                 } finally {withContext(NonCancellable){compiled.close()}}
             } finally {
@@ -257,6 +309,7 @@ internal class DesktopMcpCoordinator(
             var failure:Throwable?=null
             suspend fun settle(body:suspend()->Unit){try{body()}catch(error:Throwable){if(failure==null)failure=error}}
             val jobs=synchronized(lifecycle){grants.clear();grantAdmissions.clear();publishGrants();active.keys.toList()+controls.values.toList()+listOfNotNull(batchControl)};jobs.forEach{it.cancel()};jobs.joinAll()
+            verificationTargets.close()
             settle{connection.close()};settle{captureEngine.close()};settle{inbox.close()};settle{catalog.close()}
             scope.cancel();mutable.update{it.copy(agents=emptyList(),grants=emptyList(),activeCapture=null,closed=true)}
             val error=failure;if(error==null)stopped.complete(Unit)else stopped.completeExceptionally(error)

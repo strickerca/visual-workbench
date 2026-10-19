@@ -663,3 +663,131 @@ fn post_publication_reserve_decline_reclaims_cache_or_reports_low_space() -> Tes
     }
     Ok(())
 }
+
+#[test]
+fn bounded_cache_read_refuses_before_file_access_and_preserves_integrity_checks() -> TestResult {
+    let temp = fixture();
+    let mut cache = DiskCache::with_query(temp.path(), 1024, SimulatedSpace::plenty())?;
+    cache.put("bounded", b"12345678")?;
+    assert_eq!(cache.get_bounded("missing", 0)?, None);
+    assert_eq!(cache.get_bounded("bounded", 8)?, Some(b"12345678".to_vec()));
+    let path = fs::read_dir(temp.path().join("cache/vw-store-v1"))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| path.extension().is_some_and(|value| value == "cache"))
+        .ok_or("missing fixture cache payload")?;
+    // A denied bound must not even open the payload. An admitted read still
+    // detects the absent/corrupt actual bytes instead of trusting the index.
+    fs::remove_file(&path)?;
+    assert!(matches!(
+        cache.get_bounded("bounded", 7),
+        Err(StoreError::Invalid("cache read limit"))
+    ));
+    assert!(cache.get_bounded("bounded", 8).is_err());
+    fs::write(path, b"87654321")?;
+    assert!(matches!(
+        cache.get_bounded("bounded", 8),
+        Err(StoreError::Corrupt(_))
+    ));
+    Ok(())
+}
+
+#[test]
+fn streaming_read_persists_lru_with_fixed_capacity_and_preserves_originals() -> TestResult {
+    let owned = fixture();
+    let originals = BlobStore::new(owned.path())?;
+    let original = originals.put(b"read-only original")?;
+    let original_path = originals.path(&original)?;
+    let original_permissions = fs::metadata(&original_path)?.permissions();
+    let mut read_only = original_permissions.clone();
+    read_only.set_readonly(true);
+    fs::set_permissions(&original_path, read_only)?;
+    let query = SimulatedSpace::plenty();
+    let unknown = owned.path().join("cache/vw-store-v1/foreign.cache");
+    {
+        let mut cache = DiskCache::with_query(owned.path(), 12, query.clone())?;
+        fs::write(&unknown, b"another owner")?;
+        cache.put("a", b"aaaa")?;
+        cache.put("b", b"bbbb")?;
+        cache.put("c", b"cccc")?;
+        let value = cache
+            .get_bounded_streaming("a", 4)?
+            .ok_or("missing fixture")?;
+        assert_eq!(value, b"aaaa");
+        assert!(value.capacity() <= 5);
+        assert!(matches!(
+            DiskCache::with_query(owned.path(), 12, query.clone()),
+            Err(StoreError::Busy)
+        ));
+    }
+    {
+        let mut cache = DiskCache::with_query(owned.path(), 12, query)?;
+        cache.put("d", b"dddddddd")?;
+        assert!(cache.contains("a"));
+        assert!(cache.contains("d"));
+        assert!(!cache.contains("b"));
+        assert!(!cache.contains("c"));
+    }
+    assert_eq!(originals.read(&original)?, b"read-only original");
+    assert_eq!(fs::read(unknown)?, b"another owner");
+    fs::set_permissions(original_path, original_permissions)?;
+    Ok(())
+}
+
+#[test]
+fn streaming_missing_oversize_and_corrupt_reads_do_not_publish_lru() -> TestResult {
+    let owned = fixture();
+    let mut cache = DiskCache::with_query(owned.path(), 32, SimulatedSpace::plenty())?;
+    cache.put("tile", b"abcdef")?;
+    let directory = owned.path().join("cache/vw-store-v1");
+    let index = directory.join("index.json");
+    let before = fs::read(&index)?;
+    assert_eq!(cache.get_bounded_streaming("missing", 6)?, None);
+    assert!(matches!(
+        cache.get_bounded_streaming("tile", 5),
+        Err(StoreError::Invalid("cache read limit"))
+    ));
+    assert_eq!(fs::read(&index)?, before);
+    let payload = fs::read_dir(&directory)?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "cache")
+        })
+        .ok_or("missing managed fixture")?;
+    fs::write(&payload, b"ABCDEF")?;
+    assert!(matches!(
+        cache.get_bounded_streaming("tile", 6),
+        Err(StoreError::Corrupt("cache content"))
+    ));
+    assert_eq!(fs::read(index)?, before);
+    assert_eq!(fs::read(payload)?, b"ABCDEF");
+    Ok(())
+}
+
+#[test]
+fn streaming_failed_index_publication_preserves_payload_and_previous_index() -> TestResult {
+    let owned = fixture();
+    let query = SimulatedSpace::plenty();
+    let mut cache = DiskCache::with_query(owned.path(), 32, query.clone())?;
+    cache.put("tile", b"abcdef")?;
+    let directory = owned.path().join("cache/vw-store-v1");
+    let index = directory.join("index.json");
+    let previous = directory.join("owned-index-backup");
+    let before = fs::read(&index)?;
+    fs::rename(&index, &previous)?;
+    fs::create_dir(&index)?;
+    assert!(cache.get_bounded_streaming("tile", 6).is_err());
+    assert!(index.is_dir());
+    assert_eq!(fs::read(&previous)?, before);
+    fs::remove_dir(&index)?;
+    fs::rename(&previous, &index)?;
+    drop(cache);
+    let mut reopened = DiskCache::with_query(owned.path(), 32, query)?;
+    assert_eq!(
+        reopened.get_bounded_streaming("tile", 6)?,
+        Some(b"abcdef".to_vec())
+    );
+    Ok(())
+}

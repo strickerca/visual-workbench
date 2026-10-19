@@ -1,0 +1,75 @@
+{
+  "date_utc": "2026-10-18",
+  "scope": "Independent root archive privacy prerequisite for future durable verification; no pending worker module activation",
+  "source_commit": "58508058555b51f0c5e8f73d597fd4b861729b0f",
+  "branch": "cloud/verification-archive-privacy-20261018",
+  "base_and_main": "074b6c603f68f19e137b7d5c0ee0a60f88c8e855",
+  "review_status": "New root archive source/tests await independent review before main promotion",
+  "changes": [
+    "Verify the owned private SQLite copy matches existing bounded schema v2 before any scrub; injected DELETE triggers cannot redirect private note bytes into other exported settings",
+    "Delete all keys matching the admitted exact vw.verification-review.v1.* namespace on the private copy, including malformed records, before final VACUUM",
+    "Source notes/settings, canonical state/revision and originals remain unchanged; unrelated settings preserved. No new review store/API is registered"
+  ],
+  "native": {
+    "archives": 15,
+    "local_views": 11,
+    "total_passed": 26,
+    "failed": 0,
+    "ignored": 0,
+    "new_privacy_tests": 3,
+    "new_cases": [
+      "actual export/import omits prefix rows and note bytes after VACUUM, preserving source notes/unrelated settings/state/revision/blob",
+      "injected DELETE trigger refuses export before it can redirect a private note, with no destination or source mutation",
+      "blob failure after copy scrub preserves private source progress, publishes nothing and cleans owned staging"
+    ]
+  },
+  "checks": {
+    "strict_store_clippy": "PASS all targets, warnings denied",
+    "rustfmt_whitespace": "PASS",
+    "source_secret_scan": "PASS",
+    "dependency_policy": "Cargo/lock unchanged from accepted main; prior policy receipt retained",
+    "bindings": "No public API/UniFFI changes, zero generation",
+    "worker_source": "All four pending verification leaves and both platform caller candidates fetched only, not composed/edited"
+  },
+  "commands": [
+    "cargo test --locked -p vw-store --test archives -j2 -- --test-threads=2",
+    "cargo test --locked -p vw-store --test local_views -j2 -- --test-threads=2",
+    "cargo clippy --locked -p vw-store --all-targets -j2 -- -D warnings"
+  ],
+  "source_sha256": [
+    {
+      "path": "core/crates/vw-store/src/archive.rs",
+      "bytes": 22601,
+      "sha256": "95932a5aa6d640587e51c5de8f4b65bc0ee49230e977924a9a652b334820f253"
+    },
+    {
+      "path": "core/crates/vw-store/tests/archives.rs",
+      "bytes": 30167,
+      "sha256": "db78f82530af41656ee11410e61f9459c72d14bece7be15547032146b5e57469"
+    }
+  ],
+  "logs": [
+    {
+      "path": "vw-review-archive-tests-attempt1.log",
+      "bytes": 1828,
+      "sha256": "66abfd87bb4f93279cef5f0c64499dfd0984cc4f903a26e8e44cf6d9810a173a"
+    },
+    {
+      "path": "vw-review-archive-local-views-attempt1.log",
+      "bytes": 1322,
+      "sha256": "860685fec701a94e3372c148fb7ce7dde79970aec9e5ab9fc3797e21cbabe6f4"
+    },
+    {
+      "path": "vw-review-archive-clippy-attempt1.log",
+      "bytes": 744,
+      "sha256": "bd15f3b60ee59cffe6c6ea9ec8df48ab2af9f66b84f9ae2eeb2bd60a692c04df"
+    }
+  ],
+  "next": [
+    "Astra review of this prerequisite, pending native verification8912cc39 and lineage8bf738ad",
+    "After admission replace exact literal through registered VERIFICATION_REVIEW_PREFIX constant and compose one public VerificationOrigin, root helpers/modules and combined native tests",
+    "Wait for both complete platform caller source verdicts and run one coherent caller/native/bindings validation batch"
+  ],
+  "limits": "This removes the known private review namespace from normal portable export and rejects schema redirection; not a general secret-redaction/provenance guarantee. No store/FFI/UI/manual-verdict or full T5.01 activation, image alignment or hardware acceptance.",
+  "operations": "Synthetic local SQLite/archive fixtures only, no private captures/screenshots, provider/credential/signing/deployment/device/SDK/worktree operations. Source/review candidates remain preserved."
+}

@@ -1,0 +1,82 @@
+G1 focused validation — exact source 0dca21f54ad740d4529dac57e74c7b4f39edceb8
+Astra conditional source acceptance unchanged; no physical/cross-JNI execution claim.
+
+LOG vw-g1-apps-attempt1.log
+Application license census: 264 exact modules across 12 runtime configurations; 5 bound parent POMs
+GRADLE LICENSES: PASS (264 dependency entries)
+Android 16 KiB LOAD alignment: PASS; segments=3
+BUILD SUCCESSFUL in 2m 54s
+
+LOG vw-g1-build-android-attempt1.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.72s
+
+LOG vw-g1-build-linux-attempt1.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 29.74s
+
+LOG vw-g1-clippy-android-attempt1.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.11s
+
+LOG vw-g1-clippy-linux-attempt1.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.26s
+
+LOG vw-g1-native-focused-attempt1.log
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 28.39s
+test giant_images::producer::android_bridge::tests::closing_native_input_after_uncertain_foreign_exit_preserves_marker_until_retry ... ok
+test giant_images::producer::android_bridge::tests::foreign_source_pins_are_bounded_and_confirmation_is_exact ... ok
+test giant_images::producer::android_bridge::tests::real_publication_adopts_all_four_parts_and_keeps_only_its_project_charge_until_close ... ok
+test giant_images::producer::android_bridge::tests::typed_copy_refusals_independent_output_and_failed_android_retirement_preserve_owners ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.06s
+
+JVM: 464 shared +349 Desktop +136 Android =949 passes; seven Windows-only skips.
+Android producer:20 instrumentation cases compile only; none executed.
+Lint: zero errors, 60 warnings, 12 hints.
+JNI descriptors:
+Compiled from "AndroidGiantRuntime.kt"
+public final class com.visualworkbench.shared.giant.AndroidGiantRuntime {
+  public static final com.visualworkbench.shared.giant.AndroidGiantRuntime INSTANCE;
+    descriptor: Lcom/visualworkbench/shared/giant/AndroidGiantRuntime;
+  private static boolean installed;
+    descriptor: Z
+  private com.visualworkbench.shared.giant.AndroidGiantRuntime();
+    descriptor: ()V
+
+  public final synchronized void install();
+    descriptor: ()V
+
+  private static final int buildPrepared(long, java.lang.String, java.lang.String, java.lang.String, int, int, int, long, long);
+    descriptor: (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIJJ)I
+
+  public final void ownerRetired$visual_workbench_apps_shared(long);
+    descriptor: (J)V
+
+  private static final java.lang.String[] describeOutputForNative(com.visualworkbench.shared.giant.AndroidTileBuild);
+    descriptor: (Lcom/visualworkbench/shared/giant/AndroidTileBuild;)[Ljava/lang/String;
+
+  private static final native int initializeNative();
+    descriptor: ()I
+
+  private static final native int retiredNative(long);
+    descriptor: (J)I
+
+  private static final native boolean cancelledNative(long);
+    descriptor: (J)Z
+
+  private static final native int consumeNative(long, com.visualworkbench.shared.giant.AndroidTileBuild);
+    descriptor: (JLcom/visualworkbench/shared/giant/AndroidTileBuild;)I
+
+  public static final boolean access$cancelledNative(long);
+    descriptor: (J)Z
+
+  public static final int access$consumeNative(long, com.visualworkbench.shared.giant.AndroidTileBuild);
+    descriptor: (JLcom/visualworkbench/shared/giant/AndroidTileBuild;)I
+
+  static {};
+    descriptor: ()V
+}
+
+Arm64 exports:
+0000000001b8afdc T Java_com_visualworkbench_shared_giant_AndroidGiantRuntime_cancelledNative
+0000000001b8b0d0 T Java_com_visualworkbench_shared_giant_AndroidGiantRuntime_consumeNative
+0000000001b8b1d4 T Java_com_visualworkbench_shared_giant_AndroidGiantRuntime_initializeNative
+0000000001b8b2b4 T Java_com_visualworkbench_shared_giant_AndroidGiantRuntime_retiredNative
+

@@ -38,6 +38,12 @@ pub struct ProjectStore {
 }
 
 impl ProjectStore {
+    /// Canonical root selected when this locked project was opened. This is a
+    /// read-only capability hint, not permission to bypass blob/cache APIs.
+    pub fn root_path(&self) -> &Path {
+        &self.root
+    }
+
     /// Bootstrap a new mirror in an absent, caller-owned staging directory.
     /// Authentication comes from the pinned carrier, never a project field.
     /// The caller must verify/install all required originals before publishing

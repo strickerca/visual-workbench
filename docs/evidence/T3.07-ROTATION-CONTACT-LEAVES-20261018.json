@@ -1,0 +1,82 @@
+{
+  "base": "ff9d335e60cb821ab7bb36921d5ec70738ec2c6e",
+  "recovery_commit": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "status": "rotation contact and snap-toggle leaves; canonical solver, handle geometry/painting and root integration pending owning paths",
+  "owned_sources": [
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/ObjectRotationContact.kt",
+      "bytes": 3653,
+      "sha256": "bd154f2cf5ac82deb0af1b473344cc291d1f477a2b1eaa780c6746e79684433e"
+    },
+    {
+      "path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/ObjectRotationContactTest.kt",
+      "bytes": 4350,
+      "sha256": "981e3b34dae7304130f3d78668b9785eedc35deb44c6f64165a2984ceb446874"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/RotationSnapControl.kt",
+      "bytes": 1005,
+      "sha256": "28295776a48b6ada6adc58c55b3ba675f275055159c4f6c82d192722a280011d"
+    }
+  ],
+  "recovery_sources": [
+    "recovery/source-candidates/ink-core/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/ObjectRotation.kt",
+    "recovery/source-candidates/ink-core/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/ObjectRotationTest.kt"
+  ],
+  "changes": [
+    "recover contact/frame/target model only; no new affine solver or native expect/registration",
+    "injected solver is mandatory and receives immutable pen-down originals on every real sample",
+    "frame uses full visible binding, attachment epoch, camera and existing document page",
+    "nonfinite sample/result rejection seals the contact",
+    "finish emits one SetTransform command list at most once through existing editor commit owner",
+    "Android snap-toggle component receives root-owned preference; no lifecycle or engine ownership"
+  ],
+  "checks": {
+    "focused_shared_tests": {
+      "passed": 7,
+      "failed": 0,
+      "result": "JUnit version 4.13.2\n.......\nTime: 0.044\n\nOK (7 tests)",
+      "scope": "injected test solver; contact ordering/ownership/refusal only, no actual rotation math or visual golden"
+    },
+    "strict_explicit_api": "passed with warnings denied under saved Kotlin 2.4.0 compiler and test-only unused CoreApi factory actuals",
+    "heap_caps_mib": {
+      "compiler": 384,
+      "runner": 128
+    },
+    "snap_toggle_kotlin_psi": "one file parsed without syntax errors; no Compose semantic compilation",
+    "common_import_guard": "passed",
+    "whitespace": "staged diff check passed",
+    "privacy": "staged gitleaks passed unchanged rules; no leaks found",
+    "native_solver_compile_tests": "not run or modified; geometry owner retains implementation",
+    "full_native_compose_device": "not run; image retains shared heavy slot",
+    "dependencies": "none changed"
+  },
+  "review": "read-only review found no remaining concrete defects after layer-local inspection repair and rotation contact inspection; reviewer ran no builds/tests",
+  "root_hooks": "docs/T3_07_EDITING_LEAVES_HANDOFF_20261018.md; create frame, use injected canonical solver, real preview/up samples/current snap, cancel stale contacts and submit final list as one existing transaction",
+  "protected_paths": "existing APIs/protocol/schema, both controllers, Main/WorkbenchApp, build/locks, geometry/precision/rendering/document/image/stream/viewport paths untouched",
+  "tonal": "existing native parameter/export support left unchanged; interactive adjustment display remains with renderer owner",
+  "images": "none created",
+  "gates": "no requirement/gate or physical acceptance promoted; Krita deferred",
+  "logs": [
+    {
+      "path": "/tmp/vw-t307-controls-tests/rotation-strict-compile.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/vw-t307-controls-tests/rotation-compile.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/vw-t307-controls-tests/rotation-tests.log",
+      "bytes": 56,
+      "sha256": "8e8f1efabc7209961c1610b3b4992bd707d0dbce7267732d6ab19d0f0ac9296f"
+    },
+    {
+      "path": "/tmp/vw-t307-controls-tests/rotation-syntax.log",
+      "bytes": 32,
+      "sha256": "a7288137fb7ea91509e7008cd07e2f2a3c34c3d73efa9387cf9af09d8e94fe46"
+    }
+  ]
+}

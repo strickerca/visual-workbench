@@ -320,7 +320,7 @@ impl ProjectStore {
         )?;
         let mut rows = query.query([])?;
         while let Some(row) = rows.next()? {
-            if row.get::<_, usize>(1)? != PREFIX.len() + 36 {
+            if row.get::<_, i64>(1)? != PREFIX.len() as i64 + 36 {
                 return Err(StoreError::Corrupt("review key"));
             }
             let key: String = row.get(0)?;

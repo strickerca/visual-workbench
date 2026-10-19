@@ -171,6 +171,9 @@ fn render_list_for_page(
             a.state.order_key.cmp(&b.state.order_key).then(aid.cmp(bid))
         });
         for (id, object) in objects {
+            if crate::tone_controls::is_editing_metadata(project, &document, id) {
+                continue;
+            }
             let shape = draw_shape(&object.state, project)?;
             let (local, contours) = local_bounds(&object.state, project, page, &shape)?;
             let a = object.state.transform.as_ref().ok_or(CoreError::Invalid)?;
@@ -559,6 +562,9 @@ impl ProjectSession {
                     width,
                     height,
                     bit_depth: asset.bit_depth,
+                    has_tone_adjustments: project.objects.keys().any(|object| {
+                        crate::tone_controls::is_editing_metadata(project, &id, object)
+                    }),
                     layers,
                     render: render_list(state, id.as_str(), None)?,
                 };

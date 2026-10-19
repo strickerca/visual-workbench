@@ -1,6 +1,10 @@
 //! Shared UniFFI boundary. Storage and input run on distinct bounded core-owned workers.
 mod os_images;
 pub use os_images::*;
+mod session_resources;
+pub use session_resources::*;
+mod giant_images;
+pub use giant_images::*;
 mod avif_images;
 pub use avif_images::*;
 mod format_images;
@@ -32,7 +36,23 @@ mod queries;
 mod semantics;
 mod streaming_ffi;
 pub use capture_import::*;
+mod local_views;
 mod worker;
+pub use local_views::{LocalViewsBinding, LocalViewsMutation, LocalViewsSnapshot, RegionBookmark};
+mod document_controls;
+pub use document_controls::{
+    DocumentControlCommand, DocumentControlRow, DocumentControlSnapshot, DocumentControlTargets,
+    GroupControlRow, LayerControlRow, LayerControlUpdate, ObjectControlRow,
+};
+mod object_rotation;
+pub use object_rotation::rotate_object_transforms;
+mod tone_controls;
+pub use tone_controls::{
+    ImageToneSettings, ToneControlCommand, ToneControlEntry, ToneControlPreview,
+    ToneControlSnapshot,
+};
+mod offline_review;
+pub use offline_review::*;
 mod workflow;
 pub use streaming_ffi::*;
 pub mod session;

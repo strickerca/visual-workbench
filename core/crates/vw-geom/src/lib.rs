@@ -22,6 +22,8 @@ mod asset;
 mod capture;
 mod display;
 mod lens;
+mod object_rotation;
+pub use object_rotation::object_rotation;
 mod stylus_tilt;
 pub use stylus_tilt::{TiltAxisSign, TiltCalibration, TiltError, WindowsTilt, windows_tilt};
 

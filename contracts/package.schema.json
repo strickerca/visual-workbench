@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:visual-workbench:schema:vip-manifest:1",
   "title": "Visual Instruction Package manifest (draft vip-1)",
-  "description": "manifest.json at the root of a package folder or .vipz archive. Draft; finalized in task T2.08. Coordinates: bbox_compiled uses the convention named in compiled_for.coordinate_convention; bbox_document is always [x, y, w, h] in document space (BUILD_SPECIFICATION §4.2). Element names and semantic text are untrusted data and appear in prompt.md only as quoted code spans.",
+  "description": "manifest.json at the root of a package folder or .vipz archive. Draft; finalized in task T2.08. Coordinates: bbox_compiled uses the convention named in compiled_for.coordinate_convention; bbox_document is always [x, y, w, h] in document space (BUILD_SPECIFICATION \u00a74.2). Element names and semantic text are untrusted data and appear in prompt.md only as quoted code spans.",
   "type": "object",
   "required": [
     "schema_version",
@@ -413,7 +413,20 @@
     },
     "extensions": {
       "type": "object",
-      "description": "Forward-compatible extension point; consumers ignore unknown keys here."
+      "description": "Forward-compatible extension point; consumers ignore unknown keys here.",
+      "properties": {
+        "verification_origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/verificationOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional descriptive failure-package lineage; no capture permission, review verdict or alignment proof. Native admission additionally checks target, self-reference and marker count."
+        }
+      }
     }
   },
   "$defs": {
@@ -428,6 +441,54 @@
       },
       "minItems": 4,
       "maxItems": 4
+    },
+    "verificationOrigin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "original_package_id",
+        "original_target",
+        "original_manifest_sha256",
+        "comparison_receipt_id",
+        "comparison_receipt_blake3",
+        "original_marker_numbers"
+      ],
+      "properties": {
+        "original_package_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "original_target": {
+          "enum": [
+            "claude",
+            "openai",
+            "gemini",
+            "generic"
+          ]
+        },
+        "original_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "comparison_receipt_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "comparison_receipt_blake3": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "original_marker_numbers": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 512
+          },
+          "minItems": 1,
+          "maxItems": 512,
+          "uniqueItems": true,
+          "description": "Entry n maps current contiguous marker n+1 to this original marker number."
+        }
+      }
     }
   }
 }

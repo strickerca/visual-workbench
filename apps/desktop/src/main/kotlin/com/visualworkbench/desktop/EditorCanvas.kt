@@ -121,7 +121,8 @@ internal fun DrawScope.drawGeometry(item:RenderItem,geometry:CanvasGeometry,prev
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier=Modifier){
+internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier=Modifier,giantFrame:GiantVisibleFrame<GiantBitmap>?=null){
+    val latestGiant by rememberUpdatedState(giantFrame)
     val latest by rememberUpdatedState(state)
     val aiResultState by controller.aiResults.state.collectAsState()
     val focus=remember{FocusRequester()}
@@ -177,7 +178,7 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
             val down=awaitFirstDown(requireUnconsumed=false);focus.requestFocus()
             controller.precisionDown(Point(down.position.x.toDouble(),down.position.y.toDouble()),currentEvent.keyboardModifiers.isShiftPressed,down.type==PointerType.Touch||currentEvent.buttons.isTertiaryPressed||currentEvent.buttons.isSecondaryPressed,down.uptimeMillis,semanticModifier=currentEvent.keyboardModifiers.isAltPressed);down.consume()
             var completed=false
-            try{while(true){val event=awaitPointerEvent();val change=event.changes.firstOrNull{it.id==down.id}?:break;if(!change.pressed){controller.precisionUp(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);completed=true;change.consume();break};controller.precisionMove(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis);change.consume()}}
+            try{while(true){val event=awaitPointerEvent();val change=event.changes.firstOrNull{it.id==down.id}?:break;if(!change.pressed){controller.precisionUp(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis,snapRotation15=event.keyboardModifiers.isShiftPressed);completed=true;change.consume();break};controller.precisionMove(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis,snapRotation15=event.keyboardModifiers.isShiftPressed);change.consume()}}
             finally{if(completed)controller.finishPointerContact()else controller.cancelInput()}
         }}
     ){
@@ -185,7 +186,9 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
         val current=latest
         val frame=prepared?.current(current)?:return@Canvas
         val background=current.background
-        if(background==null&&current.documentFrame==null)return@Canvas
+        val giant=latestGiant
+        if(current.giantActive&&(giant==null||!controller.giantFrameCurrent(giant,current)))return@Canvas
+        if(background==null&&current.documentFrame==null&&giant==null)return@Canvas
         if(current.documentFrame!=null&&documentReader?.binding!=current.documentFrame.binding)return@Canvas
         val doc=frame.document
         val aiFrame=controller.aiResultFrame()
@@ -202,6 +205,7 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
             // white presentation page stays outside this composited stack.
             drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f,0f,doc.width.toFloat(),doc.height.toFloat()),Paint())
             try {
+            giant?.let{drawGiantTiles(it)}
             if(background!=null)drawImage(background,filterQuality=if(smooth)FilterQuality.Low else FilterQuality.None)
             documentTiles?.let{tiles->current.documentFrame?.binding?.let{binding->drawDocumentTiles(tiles,binding)}}
             clipRect(0f,0f,doc.width.toFloat(),doc.height.toFloat()){
@@ -219,6 +223,10 @@ fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier
             }finally{drawContext.canvas.restore()}
             val selected=doc.render.items.filter{it.objectId in current.selected}
             union(selected.map{previewBounds(it,current.preview[it.objectId])})?.let{bounds->val width=(1.0/scale).toFloat();drawRect(Color(0xff81e0c8),Offset(bounds.x.toFloat(),bounds.y.toFloat()),Size(bounds.width.toFloat(),bounds.height.toFloat()),style=Stroke(width));val side=(8.0/scale).toFloat();drawRect(Color(0xff81e0c8),Offset((bounds.x+bounds.width).toFloat()-side/2,(bounds.y+bounds.height).toFloat()-side/2),Size(side,side))}
+            controller.rotationHandle(current)?.let{handle->
+                drawLine(Color(0xff81e0c8),Offset(handle.pivot.x.toFloat(),handle.pivot.y.toFloat()),Offset(handle.point.x.toFloat(),handle.point.y.toFloat()),(1.0/scale).toFloat())
+                drawCircle(Color(0xff81e0c8),(6.0/scale).toFloat(),Offset(handle.point.x.toFloat(),handle.point.y.toFloat()),style=Stroke((1.5/scale).toFloat()))
+            }
             current.draft?.let{(a,b)->drawRect(color(current.color),Offset(minOf(a.x,b.x).toFloat(),minOf(a.y,b.y).toFloat()),Size(kotlin.math.abs(a.x-b.x).toFloat(),kotlin.math.abs(a.y-b.y).toFloat()),style=Stroke((1.0/scale).toFloat()))}
             if(current.view.showPeerOutline){current.peerViewport?.takeIf{it.documentId==doc.documentId}?.let{peer->drawPath(polyline(peer.corners,true),Color(0xffecbb72),style=Stroke((1.0/scale).toFloat(),pathEffect=PathEffect.dashPathEffect(floatArrayOf((6/scale).toFloat(),(4/scale).toFloat()))))}}
         }

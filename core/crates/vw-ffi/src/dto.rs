@@ -321,6 +321,9 @@ pub struct DocumentSnapshot {
     pub bit_depth: u32,
     pub layers: Vec<LayerInfo>,
     pub render: RenderList,
+    /// The ordinary editing canvas shows the original; bounded tone preview
+    /// and marked export evaluate these recognized canonical parameters.
+    pub has_tone_adjustments: bool,
 }
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct BackgroundImage {

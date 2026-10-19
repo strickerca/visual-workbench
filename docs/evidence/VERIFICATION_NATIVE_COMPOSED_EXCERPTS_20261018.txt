@@ -1,0 +1,39 @@
+Native verification composition — 1a3e8e2f32713b4af6f8a4538f35c1c450911ecb
+Inputs8912cc39 and88946ba admitted; new root composition requires review.
+No FFI/UI/manual agent setter, actual alignment or device/owner acceptance claim.
+
+LOG vw-verification-native-tests-attempt1.log
+error[E0277]: the trait bound `usize: ToSql` is not satisfied
+
+LOG vw-verification-native-tests-final.log
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.08s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.35s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.92s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test imported_archive_cannot_mint_installation_local_owner_verdicts ... ok
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 5.40s
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.23s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.46s
+test archive_export_requires_private_prefix_removal_without_mutating_source ... ok
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+LOG vw-verification-native-clippy-attempt1.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.92s
+
+Final:154 reported passes/19 result blocks, zero failures, two private parent entrypoints ignored/exercised by owner wrappers.
+Includes8store+6package leaf cases,7lineage,16archive,11local-view cases.
+Strict all-target store/package Clippy passes; fixture i64 correction recorded.
+Existing three worker production/package-test files unchanged; one store-test type lowering.
+No dependency/binding/platform/device/provider/secret/old-worktree action.

@@ -25,6 +25,7 @@ import com.visualworkbench.shared.*
 import com.visualworkbench.desktop.mcp.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.debounce
+import java.awt.EventQueue
 import java.awt.FileDialog
 import java.awt.GraphicsEnvironment
 import java.nio.file.Path
@@ -72,6 +73,7 @@ fun main(args: Array<String>) {
         var quitting by remember { mutableStateOf(false) }
         var startupMs by remember { mutableStateOf<Long?>(null) }
         var nativePickerCount by remember { mutableStateOf(0) }
+        var projectPicker by remember { mutableStateOf<ProjectFilePickerRequest?>(null) }
         val diagnosticLog = remember { PrivateDiagnosticLog().apply { append(0L, DiagnosticEventCode.AppStarted) } }
         fun diagnosticEvent(code: DiagnosticEventCode) {
             diagnosticLog.append((System.nanoTime() - started) / 1_000_000, code)
@@ -80,7 +82,7 @@ fun main(args: Array<String>) {
         val diagnosticsLifecycle = remember(diagnostics) {
             DesktopDiagnosticsLifecycle({ diagnostics.held }, diagnostics::requestClose, { diagnostics.closeWithin() })
         }
-        fun commandsAllowed(): Boolean = diagnosticsLifecycle.allowsCommand(quitting)
+        fun commandsAllowed(): Boolean = projectPicker == null && !controller.workflows.blocksInput() && diagnosticsLifecycle.allowsCommand(quitting)
         val capture=remember{com.visualworkbench.desktop.capture.DesktopCaptureController(scope,core,captureService,location.path,device,
             controller::captureDestination,controller::report)}
         var captureSettings by remember{mutableStateOf(false)}
@@ -125,14 +127,15 @@ fun main(args: Array<String>) {
         var documentImport by remember{mutableStateOf<Pair<Path,Long>?>(null)}
         var documentImportPassword by remember{mutableStateOf("")}
         var documentImportLease by remember{mutableStateOf<AutoCloseable?>(null)}
-        fun dismissDocumentImport(){documentImport=null;documentImportPassword="";documentImportLease?.close();documentImportLease=null}
-        DisposableEffect(controller){onDispose{documentImportLease?.close();documentImportLease=null}}
+        var documentImportPicker by remember { mutableStateOf<ProjectFilePickerRequest?>(null) }
+        DisposableEffect(controller){onDispose{documentImportLease?.close();documentImportLease=null;documentImportPicker=null}}
         var connectionDraft by remember { mutableStateOf(ConnectionDraft()) }
         var pickerReturnsToConnection by remember { mutableStateOf(false) }
         var dpiText by remember{mutableStateOf("Checking display scale…")}
-        fun competingModal(): Boolean {
+        fun competingModal(ignorePicker: ProjectFilePickerRequest? = null): Boolean {
             val current = controller.state.value
-            return documentImport!=null||nativePickerCount != 0 || codexModal.state.value.settings ||
+            return controller.workflows.blocksInput() || (projectPicker != null && projectPicker !== ignorePicker) ||
+                documentImport!=null||nativePickerCount != 0 || codexModal.state.value.settings ||
                 mcpModal.state.value.let { it.settings || it.compare != null } || captureSettings || remoteView != null ||
                 current.textAnchor != null || current.exportOpen || current.pasteOpen || controller.ai.state.value.open
         }
@@ -159,8 +162,40 @@ fun main(args: Array<String>) {
         LaunchedEffect(diagnostics.held, dialog, quitting) {
             if (!quitting && dialog == Command.Diagnostics && !diagnostics.held) instructionDialog(null)
         }
+        fun restoreProjectPickerRoute(request: ProjectFilePickerRequest) {
+            if (request.retired && request.returnEligible && request.returnToConnection &&
+                request.route === diagnosticsLifecycle.route() && !quitting && dialog == null &&
+                (request.owner as? java.awt.Window)?.isDisplayable == true && !competingModal()) {
+                instructionDialog(Command.Pairing)
+            }
+        }
+        fun closeDocumentImport(restoreConnection: Boolean) {
+            val pending = documentImportPicker
+            val epoch = documentImport?.second
+            documentImportPicker = null
+            documentImport = null
+            documentImportPassword = ""
+            documentImportLease?.close()
+            documentImportLease = null
+            if (restoreConnection && pending != null && epoch == controller.state.value.projectEpoch) {
+                restoreProjectPickerRoute(pending)
+            }
+        }
+        fun dismissDocumentImport() { closeDocumentImport(true) }
+        fun retireProjectPicker(): Boolean {
+            val pending = projectPicker ?: return true
+            return try {
+                pending.close()
+                if (pending.retired && projectPicker === pending) projectPicker = null
+                pending.retired
+            } catch (_: Exception) {
+                controller.report("File picker cleanup is pending. Close it before retrying.")
+                false
+            }
+        }
         fun quit() {
-            dismissDocumentImport()
+            if (!retireProjectPicker()) return
+            closeDocumentImport(false)
             if(!controller.mayCloseAi())return
             if (quitting || !controller.mayCloseInstructions()) return
             if (!quitting) {
@@ -214,21 +249,82 @@ fun main(args: Array<String>) {
         }
         mcpState.owner?.let{McpCaptureIndicator(it)}
         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
+        val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,controller.workflows.blocksInput()||codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
-            onPreviewKeyEvent={event->shortcutForFocus(event,editor.canvasFocused,codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}) {
-            fun file(command:Command){
-                if (!commandsAllowed()||documentImport!=null) return
-                nativePickerCount++
-                try { controller.instructionPicker().use { val epoch=controller.state.value.projectEpoch;val chooser=FileDialog(window,command.label,FileDialog.LOAD)
-                try{chooser.directory=(if(command==Command.Import)documents else location.path).toString();if(command==Command.Open)chooser.file="project.sqlite";chooser.isVisible=true
-                    val filename=chooser.file?:return;val chosen=Path.of(chooser.directory,filename)
-                    when(command){Command.Import->{
-                        val selected=chosen.toAbsolutePath().normalize()
-                        if(selected.fileName.toString().substringAfterLast('.',"").lowercase(java.util.Locale.ROOT) in setOf("pdf","svg")){
-                            documentImportLease=controller.instructionPicker();documentImport=selected to epoch
-                        }else controller.importFile(ImportRequest(epoch,selected))
-                    };Command.Open->{val projectDirectory=projectDirectoryFromPicker(chosen);if(projectDirectory==null)controller.report("Choose project.sqlite inside the saved project folder. The current project is unchanged.")else controller.open(projectDirectory,epoch)};else->Unit}
-                }finally{chooser.dispose()}} } finally { nativePickerCount-- }
+            onPreviewKeyEvent=canvasShortcut) {
+            DisposableEffect(window, controller) {
+                onDispose {
+                    if (projectPicker?.owner === window) retireProjectPicker()
+                }
+            }
+            fun file(command: Command, returnToConnection: Boolean) {
+                if (!commandsAllowed() || competingModal()) {
+                    if (dialog == command) instructionDialog(null)
+                    return
+                }
+                val epoch = controller.state.value.projectEpoch
+                val lease = try { controller.instructionPicker() }
+                catch (_: Exception) {
+                    instructionDialog(null)
+                    controller.report("The file picker could not open. Review the current project before retrying.")
+                    return
+                }
+                instructionDialog(null)
+                val request = ProjectFilePickerRequest(window, diagnosticsLifecycle.route(), epoch, returnToConnection, lease)
+                projectPicker = request
+                fun current(): Boolean = projectPicker === request && !quitting && window.isDisplayable &&
+                    diagnosticsLifecycle.route() === request.route && dialog == null &&
+                    diagnosticsLifecycle.allowsCommand(quitting) && !competingModal(request) &&
+                    controller.state.value.projectEpoch == request.epoch
+                fun complete() {
+                    try { request.close() }
+                    catch (_: Exception) { controller.report("File picker cleanup is pending. Close it before retrying.") }
+                    if (request.retired && projectPicker === request) {
+                        projectPicker = null
+                        restoreProjectPickerRoute(request)
+                    }
+                }
+                try {
+                    // Leave the Compose dispatcher before entering AWT's modal loop.
+                    EventQueue.invokeLater {
+                        try {
+                            request.choose(
+                                isCurrent = ::current,
+                                create = { FileDialog(window, command.label, FileDialog.LOAD) },
+                                show = { chooser ->
+                                    chooser.directory = (if (command == Command.Import) documents else location.path).toString()
+                                    if (command == Command.Open) chooser.file = "project.sqlite"
+                                    chooser.isVisible = true
+                                    chooser.file?.let { Path.of(chooser.directory, it) }
+                                },
+                                dispose = FileDialog::dispose,
+                                accept = { chosen ->
+                                    when (command) {
+                                        Command.Import -> {
+                                            val selected = chosen.toAbsolutePath().normalize()
+                                            if (selected.fileName.toString().substringAfterLast('.', "").lowercase(java.util.Locale.ROOT) in setOf("pdf", "svg")) {
+                                                documentImportLease = controller.instructionPicker()
+                                                documentImportPicker = request
+                                                documentImport = selected to epoch
+                                            } else controller.importFile(ImportRequest(epoch, selected))
+                                        }
+                                        Command.Open -> {
+                                            val directory = projectDirectoryFromPicker(chosen)
+                                            if (directory == null) controller.report("Choose project.sqlite inside the saved project folder. The current project is unchanged.")
+                                            else controller.open(directory, epoch)
+                                        }
+                                        else -> Unit
+                                    }
+                                },
+                            )
+                        } catch (_: Exception) {
+                            controller.report("The file picker could not complete. Review the current project before retrying.")
+                        } finally { complete() }
+                    }
+                } catch (_: Exception) {
+                    controller.report("The file picker could not open. Review the current project before retrying.")
+                    complete()
+                }
             }
             fun save(request:ExportRequest){
                 if (!commandsAllowed()) return
@@ -281,9 +377,9 @@ fun main(args: Array<String>) {
                 }finally{try{chooser.dispose()}finally{chooserLease.close()}}
             }
             fun action(command:Command){
-                if(documentImport!=null&&command!=Command.Quit)return
+                if ((projectPicker != null || documentImport != null) && command != Command.Quit) return
                 if (!diagnosticsLifecycle.allowsCommand(quitting,command==Command.Diagnostics,command==Command.Quit)) return
-                if(command in listOf(Command.Import,Command.Open))file(command)else dispatch(command,false,controller,{mode(it)},{instructionDialog(it)},{quit()})
+                dispatch(command,false,controller,{mode(it)},{instructionDialog(it)},{quit()})
             }
             LaunchedEffect(editor.textAnchor != null, editor.exportOpen, editor.pasteOpen) { controller.instructionFocus.interactionChanged() }
             LaunchedEffect(dialog) {
@@ -291,12 +387,7 @@ fun main(args: Array<String>) {
                 if (pending in listOf(Command.Import, Command.Open)) {
                     val returnToConnection = pickerReturnsToConnection
                     pickerReturnsToConnection = false
-                    instructionDialog(null)
-                    try { file(checkNotNull(pending)) }
-                    finally {
-                        val next = dialogAfterProjectPicker(returnToConnection, dialog, quitting)
-                        if (next != dialog) instructionDialog(next)
-                    }
+                    file(checkNotNull(pending), returnToConnection)
                 }
             }
             DisposableEffect(window,controller){val drop=DesktopDropTarget(window.contentPane,controller);val focus=object:java.awt.event.WindowAdapter(){override fun windowDeactivated(event:java.awt.event.WindowEvent){controller.cancelInput()}};window.addWindowListener(focus);onDispose{diagnostics.requestClose();window.removeWindowListener(focus);controller.cancelInput();drop.close()}}
@@ -344,7 +435,7 @@ fun main(args: Array<String>) {
                 Box(Modifier.fillMaxSize().drawWithContent {
                     drawContent()
                     if (startupSmoke) firstDraw.complete(Unit)
-                }) { EditorShell(controller,editor,dpiText,quitting,::action,::saveSelection,::saveDocument) }
+                }) { EditorShell(controller,editor,dpiText,quitting,::action,::saveSelection,::saveDocument,canvasShortcut) }
                 if(codexPanels.settings){
                     val catalogOwner=mcpState.owner
                     val published=if(catalogOwner!=null){val catalog by catalogOwner.state.collectAsState();catalog.packages}else emptyList()
@@ -393,7 +484,7 @@ fun main(args: Array<String>) {
         }
     }
 }
-@Composable private fun EditorShell(controller:EditorController,editor:EditorState,dpiText:String,quitting:Boolean,action:(Command)->Unit,saveSelection:(SelectionSaveTicket)->Unit,saveDocument:(DocumentExport)->Unit){
+@Composable private fun EditorShell(controller:EditorController,editor:EditorState,dpiText:String,quitting:Boolean,action:(Command)->Unit,saveSelection:(SelectionSaveTicket)->Unit,saveDocument:(DocumentExport)->Unit,onShortcut:(KeyEvent)->Boolean){
     val documentState by controller.documents.state.collectAsState()
     val eraserState by controller.erasers.state.collectAsState()
     val selectionState by controller.selections.state.collectAsState()
@@ -405,6 +496,7 @@ fun main(args: Array<String>) {
             commandButton(Command.Import,action);commandButton(Command.Undo,action,enabled=editor.document?.render?.revision?.canUndo==true);commandButton(Command.Redo,action,enabled=editor.document?.render?.revision?.canRedo==true);commandButton(Command.Export,action,enabled=editor.document!=null)
         }
         editor.originalFormatNotice?.let{Text(it,Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=8.dp),style=MaterialTheme.typography.caption)}
+        if(editor.document?.hasToneAdjustments==true)Text("Tone adjustments appear in Tone preview and marked exports. This canvas shows the original image.",Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=8.dp),style=MaterialTheme.typography.caption)
         PrecisionControls(controller.precision)
         AiResultStatus(controller)
         Row(Modifier.weight(1f)){
@@ -412,16 +504,36 @@ fun main(args: Array<String>) {
                 Text("TOOLS",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc));for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout))commandButton(c,action,Modifier.fillMaxWidth(),selected=c.name==editor.tool.name&&!eraserState.active&&!selectionState.active)
                 EraserPanel(controller.erasers,controller::chooseEraser,controller::stopErasing,Modifier.fillMaxWidth())
                 SelectionPanel(controller.selections,editor.selected.singleOrNull(),saveSelection,Modifier.fillMaxWidth())
+                EditorWorkflowControls(controller,editor)
                 Spacer(Modifier.height(18.dp));Text("LAYERS & OBJECTS",style=MaterialTheme.typography.overline,color=Color(0xff9cabbc))
                 editor.document?.layers?.forEach{layer->Text(layer.name,Modifier.padding(top=8.dp),fontWeight=FontWeight.Medium);editor.document?.render?.items?.filter{it.layerId==layer.id}?.forEach{item->Text(item.shape.javaClass.simpleName,Modifier.fillMaxWidth().clickable(enabled=!item.locked){controller.select(item.objectId)}.background(if(item.objectId in editor.selected)Color(0xff294a49)else Color.Transparent).padding(8.dp),style=MaterialTheme.typography.body2)}}
             }
             Box(Modifier.weight(1f).fillMaxHeight()){
-                EditorCanvas(controller,editor)
-                PrecisionHandles(controller.precision)
-                if(editor.canvasReady&&(editor.background!=null||editor.documentFrame!=null))EraserOverlay(controller.erasers,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
-                if(editor.canvasReady&&(editor.background!=null||editor.documentFrame!=null))SelectionOverlay(controller.selections,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
-                if(editor.document!=null&&(editor.renderIssue!=null||!editor.canvasReady||(editor.background==null&&editor.documentFrame==null))){
-                    val status=editor.backgroundIssue?.takeIf{editor.background==null}?:editor.renderIssue?:if(!editor.canvasReady)"Preparing this revision…"else if(editor.busy)"Loading the original image…"else"The original image is not currently displayed. Retry image display or review the project status."
+                if(editor.giantActive){
+                    controller.giantView?.takeIf{it.surfaceReserved}?.let{view->
+                        GiantEditorCanvas(view,onShortcut){frame->Box(Modifier.fillMaxSize()){
+                            EditorCanvas(controller,editor,giantFrame=frame)
+                            PrecisionHandles(controller.precision)
+                            if(frame==null||!editor.canvasReady||editor.renderIssue!=null){
+                                Column(Modifier.align(Alignment.Center).widthIn(max=440.dp).padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+                                    Text(editor.renderIssue?:editor.giantIssue?:"Preparing verified tiles…",color=Color(0xffaebccb))
+                                    TextButton(onClick={controller.retryBackground()},enabled=!editor.busy&&!quitting){Text("Retry image display")}
+                                }
+                            }
+                            if(editor.canvasReady&&frame?.let{controller.giantFrameCurrent(it,editor)}==true){
+                                EraserOverlay(controller.erasers,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
+                                SelectionOverlay(controller.selections,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
+                            }
+                        }}
+                    }
+                }else{
+                    EditorCanvas(controller,editor)
+                    PrecisionHandles(controller.precision)
+                    if(editor.canvasReady&&(editor.background!=null||editor.documentFrame!=null))EraserOverlay(controller.erasers,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
+                    if(editor.canvasReady&&(editor.background!=null||editor.documentFrame!=null))SelectionOverlay(controller.selections,editor.view.camera,editor.document?.render?.revision,editor.document?.documentId)
+                }
+                if(editor.document!=null&&(editor.renderIssue!=null||!editor.canvasReady||(editor.background==null&&editor.documentFrame==null&&(!editor.giantActive||!editor.giantReady)))){
+                    val status=editor.backgroundIssue?.takeIf{editor.background==null}?:editor.renderIssue?:editor.giantIssue?:if(editor.giantActive)"Preparing verified tiles…"else if(!editor.canvasReady)"Preparing this revision…"else if(editor.busy)"Loading the original image…"else"The original image is not currently displayed. Retry image display or review the project status."
                     Column(Modifier.align(Alignment.Center).widthIn(max=440.dp).padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
                         Text(status,color=Color(0xffaebccb))
                         if(editor.background==null){

@@ -5,13 +5,17 @@ mod blobs;
 mod cache;
 mod conflict_review;
 mod database;
+mod local_views;
 mod migrations;
 mod projections;
+mod verification_review;
 pub use archive::*;
 pub use blobs::*;
 pub use cache::*;
 pub use conflict_review::*;
 pub use database::*;
+pub use local_views::*;
+pub use verification_review::*;
 
 /// Storage errors expose categories without captured text or private paths.
 #[derive(Debug, thiserror::Error)]

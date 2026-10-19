@@ -1,0 +1,38 @@
+Diagnostics privacy composed validation — 47a1bc40f73bda82778eea134aa809082dd3863b
+Exact conditionally accepted8c90d0a source unchanged across four files.
+No numeric provenance proof or general secret redaction claim.
+
+HOOK-002 commonMain platform imports: PASS
+> Task :shared:compileKotlinDesktop
+> Task :shared:compileDesktopMainJava NO-SOURCE
+> Task :shared:compileTestKotlinDesktop
+> Task :shared:compileDesktopTestJava NO-SOURCE
+BUILD SUCCESSFUL in 1m 12s
+
+JUnit XML:
+DiagnosticsBundleTest: 10pass, zero failures/errors/skips.
+  rejectedClockCannotRotateOrChangeTheFrozenPreview[desktop]
+  desktopCallerKeepsUnknownFrameCountsAndEchoDistinctFromDrawingLatency[desktop]
+  androidCallerUsesOnlyHeapAndSampleCountsAndKeepsExactExportPreview[desktop]
+  maximumLogStillProducesBoundedAsciiPayload[desktop]
+  unavailableMetricsStayUnknownRatherThanBecomingZero[desktop]
+  invalidMetricsAndClockOrderAreRejectedBeforeExport[desktop]
+  reportHasOnlyClosedSchemaStringsAndTypedMetrics[desktop]
+  rotationKeepsNewestEventsAndReportsDiscardedCount[desktop]
+  failedAuditAndRejectedPreparationLeaveSourceLogAndPriorPreviewIntact[desktop]
+  preparedPreviewCannotChangeWhenLaterEventsArrive[desktop]
+DiagnosticsPrivacyAuditTest: 12pass, zero failures/errors/skips.
+  duplicateAndUnknownKeysAreRejectedAtEveryObjectLevel[desktop]
+  escapedKeysAlternateOrderAndNoncanonicalRepresentationsCannotAliasTheSchema[desktop]
+  eventCountAndRotationMetadataMustMatchTheExactBody[desktop]
+  negativeNonfiniteFractionalExponentAndOverflowCountersAreRejected[desktop]
+  syntheticIdentityCredentialAndPathStringsNeverFitKnownValuePositions[desktop]
+  maximumEventCountPassesAndAnExtraEventCannotHideBehindMetadata[desktop]
+  stringAndSchemaTypesAreClosedRatherThanCoerced[desktop]
+  trailingContentTruncatedStructuresAndArrayTypeChangesAreRejected[desktop]
+  boundedMalformedDeepAndTruncatedInputsRefuseWithoutARecursiveParser[desktop]
+  eventsMustBeMonotonicButEqualTimesAreValid[desktop]
+  rawControlsUnicodeBomAndEscapedAliasesAreRejected[desktop]
+  everyRealFactoryPlatformAndCodePassesWithNullOrMaximumMetrics[desktop]
+
+No public contract/native/binding change or broad-suite rerun. No device/provider/export IO.

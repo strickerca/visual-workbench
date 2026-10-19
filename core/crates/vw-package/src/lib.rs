@@ -13,11 +13,13 @@ mod image_receipt;
 mod manifest;
 mod pixels;
 mod prompt;
+mod verification;
 mod verify;
 
 pub use compiler::{CompileInput, compile};
 pub use config::*;
 pub use manifest::*;
+pub use verification::*;
 pub use verify::Package;
 pub use vw_instructions::UNTRUSTED_TEXT_NOTICE;
 pub use vw_semantics::{Cancellation, NeverCancel};

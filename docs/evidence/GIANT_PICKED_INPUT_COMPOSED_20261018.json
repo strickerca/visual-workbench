@@ -1,0 +1,91 @@
+{
+  "date_utc": "2026-10-18",
+  "scope": "Reviewed private PI1 picked-input composition with accepted legacy/G1 producer source; no public intake registration",
+  "source_commit": "04a913e3e36d4b6e18bf4b8b3d5a286e3ecf8b7a",
+  "branch": "cloud/giant-picked-input-integration-20261018",
+  "base": "30b77615fe0ce79b2b1a044a0704ae2c7d186c14",
+  "accepted_leaf": "ba338adc3d6ccd4e4291bcfbff99c03ab7e455e4",
+  "source_composition": {
+    "input_leaf": "d9fd8a5 composed2fa124b",
+    "PI1_repair": "ba338ad composed04318db",
+    "root_hunk": "mod picked plus exact pub(crate) re-exports and scoped unused-import allowance only; no other root behavior changes",
+    "accepted_source_identity": "All three leaf files byte-identical to accepted ba338ad"
+  },
+  "review": "Astra narrowly accepted ba338ad for private picked admission; root applies the exact parent/owner module/export hunk and validates combined source. No instantaneous OS-thread-join or peak-memory claim.",
+  "native": {
+    "parent_passed": 54,
+    "failed": 0,
+    "ignored_in_parent": 1,
+    "picked_cases_in_parent": 17,
+    "G1_bridge_cases_in_parent": 4,
+    "other_legacy_cache_publish_producer_cases": 33,
+    "quarantine_child": "One ignored parent entrypoint invoked by bounded owning wrapper; wrapper checks exact name and one executed/passed case. Child tests same4MiB retained and third-input refusal.",
+    "test_threads": 1,
+    "actual_worker_probe": "Accepted Linux case exercises eight completed futures retained alive/unpolled, requires eventual zero actual vw-core-open tasks within bounded waits. Does not assert close is an OS-thread join."
+  },
+  "checks": {
+    "strict_linux": "PASS vw-ffi all targets, warnings denied",
+    "strict_android": "PASS arm64 vw-ffi lib and dependencies, warnings denied",
+    "rustfmt_whitespace": "PASS",
+    "source_secret_scan": "PASS",
+    "dependency_policy": "Cargo/lock unchanged from accepted main; prior policy receipt retained",
+    "bindings_apps": "No public UniFFI changes, zero generation or app reruns; actual public caller/native packaging validation belongs to next coherent caller batch"
+  },
+  "commands": [
+    "cargo test --locked -p vw-ffi --lib giant_images::producer -j2 -- --test-threads=1",
+    "cargo clippy --locked -p vw-ffi --all-targets -j2 -- -D warnings",
+    "cargo ndk -t arm64-v8a clippy --locked -p vw-ffi --lib -j2 -- -D warnings"
+  ],
+  "implementation": [
+    "reserve_picked_input uses the same existing two-input permit and4MiB envelope, before root opens File/TempDir; attach immediately owns File/directory/admission",
+    "Preparation transfers the same admission into PreparedSource without double reservation; explicit close/abandonment settle actual input cleanup or quarantine",
+    "Shared control retires sole startup sender independently of reply polling. Startup admission survives running job completion; consumed prepared owner is independent of picked close/drop",
+    "G1 exact source pin and private publication regression run on the refactored input in this combined batch"
+  ],
+  "source_sha256": [
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/input.rs",
+      "bytes": 11700,
+      "sha256": "1ab31baf0347e3951ef91e4e544d64b2bd7b3b874722589e04825e4662bd1b34"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/picked.rs",
+      "bytes": 13802,
+      "sha256": "7c1671864c0a529be42693ec2da0e6aeca6c75e9fb1d33a359025712d8024965"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/picked_tests.rs",
+      "bytes": 24898,
+      "sha256": "3e9f3098f8f28a5cecbe4dfcbd86b077f3f796b62f261785462c4ab66da486f6"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer.rs",
+      "bytes": 16060,
+      "sha256": "fb6a16aaa35b31ce3fa49838cf557d4d42aed1fad2e89ab9fbe990539659a9f4"
+    }
+  ],
+  "logs": [
+    {
+      "path": "vw-picked-composed-clippy-android-attempt1.log",
+      "bytes": 280,
+      "sha256": "fae4afa4afe2508c322b798a009aaf3c34357f3f1bce1777d721e4382255e48f"
+    },
+    {
+      "path": "vw-picked-composed-clippy-linux-attempt1.log",
+      "bytes": 233,
+      "sha256": "7f0c049faec11c15651211d81bc8e1cde26766089a145b489450b1bd9c9f0812"
+    },
+    {
+      "path": "vw-picked-composed-native-attempt1.log",
+      "bytes": 6772,
+      "sha256": "ced0f26e58a301f2b02865db37d7f4d3907554d189580487decef0342e7ae84b"
+    }
+  ],
+  "remaining": [
+    "Public pre-open intake DTOs/FFI/shared adapters and user import/rebuild flow",
+    "One coherent native/binding/platform caller batch after accepted lane source",
+    "Actual Android JNI/codec/GPU retirement, Windows pinned runtime, strict peak RSS/thread and physical/product gates"
+  ],
+  "other_lanes": "Four Android/capture/native-verification/diagnostics grants untouched. Lineage88946ba/8bf738a remains separate pending review. Diagnostics8c90d0a fetched only pending Astra and focused22 tests.",
+  "operations": "No live provider/credentials/signing/deployment/device/SDK/worktree action. Tests use synthetic owners; deliberate quarantine exists only in isolated process with fixture file explicitly removed, no fake budget reset."
+}

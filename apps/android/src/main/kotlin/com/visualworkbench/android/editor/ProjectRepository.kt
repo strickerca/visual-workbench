@@ -18,6 +18,20 @@ import kotlin.coroutines.coroutineContext
 internal class ImageTooLarge : Exception("Images over 50 megapixels aren't supported yet")
 internal data class LocalProject(val path: String, val info: ProjectInfo?, val modifiedMs: Long)
 
+/** Merge a native durable floor into the existing pre-reserved counter range.
+ * Observing a revision consumes no new counters and performs no pen-path I/O. */
+internal fun observeOperationCounter(next:AtomicLong,reservedUntil:Long,minimum:ULong){
+    require(minimum in 1uL..Long.MAX_VALUE.toULong())
+    val floor=minimum.toLong()
+    check(floor<reservedUntil){"Reopen the app to reserve another operation counter range"}
+    while(true){
+        val observed=next.get()
+        check(observed>0){"Operation counters are not initialized"}
+        if(observed>=floor)return
+        if(next.compareAndSet(observed,floor))return
+    }
+}
+
 /** App-private project paths and install-random device identity, never hardware IDs. */
 internal class ProjectRepository(context: Context, val core: WorkbenchCore) {
     private val context = context.applicationContext
@@ -47,6 +61,8 @@ internal class ProjectRepository(context: Context, val core: WorkbenchCore) {
         check(first > 0 && first <= reservedUntil - count) { "Reopen the app to reserve another operation counter range" }
         return first.toULong()
     }
+
+    fun observeLamport(minimum:ULong){observeOperationCounter(next,reservedUntil,minimum)}
 
     /** Reserve the largest admitted instruction transaction without reusing a
      * counter when a remote/optimistic revision advanced the local minimum. */

@@ -1,0 +1,248 @@
+{
+  "date_utc": "2026-10-18",
+  "scope": "Bounded giant-image/provider/renderer integration and preserved desktop picker repair; candidate only",
+  "base_main": "83663107d864b21d22d2e746b9ca6eb80d47beac",
+  "code_commit": "7447fc6db037433d121f459f452706ebfd21b3bc",
+  "branch": "cloud/giant-stream-integration-20261018",
+  "leaf_sources": {
+    "native": "573ddafbf705c17874358eb6c72e0b6b5ebfd248",
+    "desktop_renderer": "382a36f3dadb3acd9a6583cc789f61811821bca9",
+    "android_renderer": "f79ef013065b422e41ff9bec4bae8c4f72201d39",
+    "desktop_picker": "a6454c19438f029c21c2eb63bbf0a595111c3f6f"
+  },
+  "native": {
+    "suites": 35,
+    "passed": 491,
+    "failed": 0,
+    "ignored": 2
+  },
+  "jvm": {
+    "shared": {
+      "tests": 337,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 337,
+      "focus": [
+        {
+          "name": "GiantAttachmentOwnerTest[desktop]",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "GiantViewGeometryTest[desktop]",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "GiantViewportSessionTest[desktop]",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "desktop": {
+      "tests": 353,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 7,
+      "passed": 346,
+      "focus": [
+        {
+          "name": "com.visualworkbench.desktop.GiantCanvasBoundaryTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.visualworkbench.desktop.GiantNativeBoundaryTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.visualworkbench.desktop.ProjectFilePickerRequestTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "android": {
+      "tests": 133,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 133,
+      "focus": [
+        {
+          "name": "com.visualworkbench.android.editor.GiantAndroidBoundaryTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.visualworkbench.android.editor.CanvasRetirementOwnerTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    }
+  },
+  "checks": {
+    "strict_clippy": "PASS: vw-ffi/vw-stream/vw-assets/vw-store all targets on Linux",
+    "cargo_deny": "PASS licenses/bans/sources; existing duplicates remain warnings",
+    "gradle_licenses": "PASS 264 exact modules/12 runtime configurations/5 parent POMs",
+    "linux_libraries_and_generator": "PASS",
+    "android_arm64_library": "PASS",
+    "android_load_alignment": "PASS four LOAD segments at 0x4000",
+    "android_instrumentation": "SOURCE COMPILED ONLY; new eleven cases NOT RUN",
+    "android_lint": "PASS zero errors/59 warnings/12 hints; no execution/device claim",
+    "common_import_guard": "PASS",
+    "rustfmt": "PASS",
+    "whitespace": "PASS",
+    "secret_scan": "PASS staged source/docs and complete candidate history; six exact source SHA256 pairs independently verified and narrowly allowlisted"
+  },
+  "production_refusals": [
+    "No approved giant producer is admitted. Missing cache returns Missing; unapproved inventory returns Unsupported.",
+    "No completed giant import/rebuild/export/BLOB-transfer or 15fps stream workflow is claimed.",
+    "Phone JPEG region producer and pinned Windows producer remain implementation prerequisites."
+  ],
+  "acceptance_unpassed": [
+    "Actual GPU/framework lifetime and memory peaks",
+    "Android instrumentation/device/app launch",
+    "Windows build/packaging/runtime and picker interaction",
+    "Original-size giant image import/display/export/rebuild",
+    "Frame-stream cadence/lossless freeze/actual presentation acknowledgment",
+    "Target-device/physical/owner gates",
+    "PDFium runtime, isolated worker and PDF activation"
+  ],
+  "corrected_failures": [
+    "First registration: qualified UniFFI receiver and two nested worker error types.",
+    "Strict lint: range pattern in source header parser.",
+    "Generated Kotlin: native close/release renamed to distinguish AutoCloseable disposal.",
+    "Unsigned renderer constants use literal values.",
+    "Coroutine exception wrappers: test checks original cause, retained owner and one cleanup attempt.",
+    "New actual generated-adapter regression exposed desktop512MiB process pool passed to256MiB canonical workspace API; cap canonical estimate while reserving in same pool."
+  ],
+  "logs": {
+    "vw-giant-native-attempt1.log": "8c186cd053e8426de1c85059adefbdecb2ebf75d0105d8c757ea135c103e4910",
+    "vw-giant-native-attempt2.log": "03b96e5f63df2398be5adcd5cf2cf5b5b86048fbf5fac249bb870e89a14f229d",
+    "vw-giant-native-phase.log": "de9e48a621b878a41ebe3e3ab60d3da7885778f79b66ccb05a36086ae555dc94",
+    "vw-giant-native-attempt3.log": "c2bf9e913d4e83530af588476fee5c90f14b516619a3538f7620f8215e3f0eb8",
+    "vw-giant-clippy.log": "1429c2b052d7e8965134c8d3de31f7db3909d7a50b43b6572cbdf535a56f690d",
+    "vw-giant-clippy-attempt2.log": "bf8134ac80493cf0ba472a67776c8cafde636c55189a4929d113d0c4ffcbaf66",
+    "vw-giant-linux-build.log": "21a6fbf7f2346ccf1f272b144c757906f474fae0628fc01cc4c044d772263e2a",
+    "vw-giant-android-build.log": "a387ea2679dfcf4e33ad4780aac58e417296fdf65ca9acb2b23ffbbecf884906",
+    "vw-giant-apps-attempt1.log": "7f5f575ebfa401034bb51b36dede2d007980b95e3c70b2b27e6e734775907af5",
+    "vw-giant-apps-attempt2.log": "d82dee7fe93653eae6309feb3e8bc644671bec4e06f0d65f922109df7d2f198b",
+    "vw-giant-apps-attempt3.log": "03e267375f2410343d58dce2274682a0ce1d6420f077a081c7f624ca9c7ca258",
+    "vw-giant-apps-attempt4.log": "58824a906d7f66dfed9d5b890760d77259495b3dd2a2090d55ea43131360db3e",
+    "vw-giant-abi-debug.log": "e8df76bad808b2376cedb7502de65628aaaba1795ce3070e0ba4b749051ae5c3",
+    "vw-giant-native-abi-trace.log": "05537eb0b06d7bb88e853fdd11d93091539d6bc9707b098bacfd1f800370c038",
+    "vw-giant-native-final.log": "f7fe99eccfaed2b46754c9dbd3c687f9124537e1d1fcece40bebf6d7a4ea6bb9",
+    "vw-giant-clippy-final.log": "c7afcd67651322e1b35ef0d1ef23830349348f21e2bf7f9eb0d876816841b2d0",
+    "vw-giant-linux-final.log": "82e7d9c32086ff8ca2e3a5d18fe20fa4a0b0ad60bdc004757346ddfcf942faa7",
+    "vw-giant-android-final.log": "d76e21948ba0af761e2523b58f23ab50aae3cf977640313ce9b010f8106f565c",
+    "vw-giant-apps-final.log": "093bf2d29dba4aca741245e45495e54fa876a223532609b40f5fdcf9d56bf8e7",
+    "vw-giant-policy.log": "85bc96ef28c43ae1b2e906fb66ebb4da482c5bde34046d6402b3ec1c49780e56"
+  },
+  "source_sha256": {
+    "apps/android/src/androidTest/kotlin/com/visualworkbench/android/editor/GiantAndroidCanvasInstrumentedTest.kt": "0669ee4c9ac1625a35f9c8eacfeaa04e824f4e9491491b77668a1d00cbedd2eb",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasRetirementOwner.kt": "f2440279306761b501fb8a17f6701dfa22925181003fa103aef83ac62e24fa33",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt": "5631d475dee5db0aed5c7d7127fb63358786f52664f39d7cfa066766533d66e2",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt": "e9726a30173ac3491b3d0007547d3718ae027af2950d8bf65740b114ff912861",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDrawing.kt": "701445423643daa479e04c3c6fee1ba4a02fee922f995eb4082c3ecbd6788244",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/GiantAndroidBitmap.kt": "145d4ffe9ce123752a841a5e966d3bf98d97b0486e5e569d12d5a6930a190cf5",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/GiantAndroidCanvas.kt": "7a94192703d562370dd6e4027c56ecac152edd8fc2abec8578bf93c81d4248eb",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt": "1a83353cbc691dfe9e31093007939505604fd2e6c31b5a87beba013110c95d86",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/editor/CanvasRetirementOwnerTest.kt": "57212a5850436f769f828ef2e9bb9496b0e964d79f565265bf11208e62f9b924",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/editor/GiantAndroidBoundaryTest.kt": "670f65d5ba8fe7d633abfb7b12a2fcf75fa8f22b9300f0d7c0a4183626f60787",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt": "a35c02fbd89c179530902d58058eda9ece97a0084066bd82b1671cccbfc18eb4",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt": "808c36cfd639029be4475798ccd19e95ac463c04d02f8c4bd113b0fb042f9940",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/GiantCanvasHost.kt": "570ffd926299b63661dffa626aece2d7660216d2549a27a7acf041d65720f411",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": "7e4eb44a3b03665105b944aabd58be53492ef2551db15cdda68d52dcb2f3343c",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/ProjectFilePickerRequest.kt": "1fab2dd3c46ed7e769d13055fe300e722b9301ea9b1ee8347890629f771f24d0",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/GiantCanvasBoundaryTest.kt": "52637c9eef83ac76115a012cb994952074f8abcdd47d7ed8379f54188b6139dc",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/GiantNativeBoundaryTest.kt": "600cbef9f53429bffd9a6e78b2e9c479bb7a17dc8649151ce2bd27ea4ec0c721",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/ProjectFilePickerRequestTest.kt": "a606a49a4a0472bfd57f293f8673b9a7b0b52fac1994281e0e8c406bc3a23c9c",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantAttachmentOwner.kt": "f800a41ecd314fff97096db3b04564b8b58f33d492b0f71aacdb9b4a17d1f78f",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImagesApi.kt": "07eacea34d19332bbaec31facc96f69250c36037fd6031d5bca7f471e154cf27",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantViewGeometry.kt": "1fd216c0894bfbf9fced12573bbb2fd0b89b2331a7f990f7368cad52210f5a6b",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantViewportSession.kt": "1f3cef1224ea74fbfddb60c38ba70ba76eee005e29e3df245fc4d14e571195bb",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionResourcesApi.kt": "ded5b6811373b4b3f19b79bb9eaccb2b1cac8004e8fa8f42e120038f2a10c1b2",
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/GiantAttachmentOwnerTest.kt": "345be12996ee74eb66fa62715983b85a0403720a28d0771f256649ff535bcb3f",
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/GiantViewGeometryTest.kt": "7232436af32da367488974101a723566a0f10ad352cf38228d0c7aae76f2f3f6",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt": "c3acfdc7efe0678710b5c7d9624705f646d154a67103fb8be7875c94afe08e78",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeGiantImages.kt": "3d80683c5a30f0875604fe10b0bea9f3503895b9e6f43b1bc8fb5df787458c6e",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantViewportSessionTest.kt": "a745ae264cd08e1a83d889f8b7861374816fb562df581f474040686d5f15c662",
+    "core/crates/vw-assets/GIANT_PROVIDER_ACCOUNTING_HANDOFF_20261018.md": "04a38d3bbace9b0d3cef74ab7cb2a1824337397a10c417ce37d49188814fcd1b",
+    "core/crates/vw-assets/VIEWPORT_STREAM_HOOKS_20261018.md": "80cf148d1c0f0656281d6f5b0b10d06af280bf6e8454e454c76b76cce5cba4ae",
+    "core/crates/vw-assets/giant-provider-accounting-20261018.json": "c5c2bd1fabbf6c31c04bd22fa9f99f87647792ad6898d849595a9191e15b1dbe",
+    "core/crates/vw-assets/viewport-stream-recovery-20261018.json": "745cc164617e35e37d78f223ae025f7273071e6102d2850500a372b7e0b99d95",
+    "core/crates/vw-ffi/Cargo.toml": "a80494fc57611e45c116bd40ff8b29895f846b339187b2058423009cd96cd0bb",
+    "core/crates/vw-ffi/src/giant_images.rs": "6a1cbb032726ede413bc2279ece9e823e7e510bdd72ca2bb993e23824b4e7c2f",
+    "core/crates/vw-ffi/src/giant_images/dto.rs": "391c42b227b9f8bf3bb6c86eba015f716825810c6d249184a295048720439ce6",
+    "core/crates/vw-ffi/src/giant_images/producer.rs": "1cc597a2ec3a568a0ac0f81a8e0c76e02fa4f5e091dfd946ff778e544290e6ad",
+    "core/crates/vw-ffi/src/giant_images/provider.rs": "800708d42d816976eb2943dad7b557d07bd135c874bff5328f4c2cf5273c64af",
+    "core/crates/vw-ffi/src/giant_images/source.rs": "bd944bc90631ec3dbf00c5f77028bfc1570a34e4270e2d1021de8410dc72bb7a",
+    "core/crates/vw-ffi/src/giant_images/tests.rs": "68e0b2071eb35374abaabb9fb184fe7837d42fc86aa828e4efaf61e7684ce6f7",
+    "core/crates/vw-ffi/src/giant_images/tiles.rs": "9562c5f5851383725059c5126a1de685792031f974f8f332dac7c54dba089512",
+    "core/crates/vw-ffi/src/lib.rs": "51cf76d255537c845979b4bc12f1894144d06bc8e1786be4b6c89ebad50f8a39",
+    "core/crates/vw-ffi/src/session_resources.rs": "6567e81f79fa6285d9e799c23dd527f52f98c452cab7f6918e59bd2e53e128c1",
+    "core/crates/vw-ffi/uniffi.toml": "62f6fd8f81fec026d9effd25b3b0086327e5c64b7a6a4fe2acb3b410240270ec",
+    "core/crates/vw-store/src/cache.rs": "743499114e492c0b55d96c0bf3ce41bbe5a664b2c4128fdfe23bd7e2c36c51ea",
+    "core/crates/vw-store/src/database.rs": "b3c25b5b94b2137d16b9809e195f9af1fbdbef6b0f31ad7368395ebbe3678f4c",
+    "core/crates/vw-store/tests/blobs_cache.rs": "c68a7ac34766fc9d8c553c1902057bdde299a9027d8c076d7dd57dcb9bbb1695",
+    "core/crates/vw-stream/Cargo.toml": "25b91e8088184c3d71cfc15ee0ac3cdb491b45ec2bf71808b504144803cbc271",
+    "core/crates/vw-stream/src/budget.rs": "84970a0e897bfd032d7d48d7baba1637cf11ce476bd975747165e4e81e4ddc27",
+    "core/crates/vw-stream/src/consent.rs": "0ea281e7390a0f8d27418d90a957804a99d5080b4e953e75e2e33372e0cb52cc",
+    "core/crates/vw-stream/src/frame.rs": "98d7753bc9ec9ab6c1b3df57ffec9ea6b43aaf8829758396ee19cef97a100682",
+    "core/crates/vw-stream/src/freeze.rs": "a77224c4ad15b9b94a91b1e17a78e06a5165bdf06beb3862d7c38c8ff4713523",
+    "core/crates/vw-stream/src/lib.rs": "bea8157cba6857a5ea640074f3458b653cc2b49b057cf3a92c79ea6190268d36",
+    "core/crates/vw-stream/src/lossless.rs": "1af2b845fa013fc6bca697787d92d7e3ec671f428a3c8c0178ffa617a7647359",
+    "core/crates/vw-stream/src/pacer.rs": "71618e9a761e6ba762181f75a987ebca04519e64d81cd76ba25bf78aa6e021dd",
+    "core/crates/vw-stream/src/ring.rs": "d8eeed99f5b6bdaa56a51c12d64268a4182295e067208fce205d33d0df7f9c23",
+    "core/crates/vw-stream/src/tiles.rs": "7ea970c4f4943fd65f64c366f37b42d89ee118e8354967906960b8f5ed1ff13b",
+    "core/crates/vw-stream/tests/common/mod.rs": "b4c82b0a301486a253284c9313d659905c0ae6fee65a88094a99e1072c69e198",
+    "core/crates/vw-stream/tests/consent.rs": "185d43b2aede225df54e4dfa15194f96ad72a3a3c1f2a35877a600194f4d8396",
+    "core/crates/vw-stream/tests/freeze.rs": "2b63c74c96592f52216a25fdf89c2048ff118f8e08e92ae68ffe04398588027d",
+    "core/crates/vw-stream/tests/lossless.rs": "78a86e327e7abed9fa22b537041a04e8ea2000b63e64f001b0d2c1170f99217b",
+    "core/crates/vw-stream/tests/ring.rs": "8582518cfc866283f3e2e2e6857c45071de01b3babdf5ea890d82859c1167b2f",
+    "core/crates/vw-stream/tests/session_budget.rs": "48bb142a5d4551b121fe5246b12882bb5a2d90302a799599a83d96ca717895ed",
+    "core/crates/vw-stream/tests/tiles.rs": "28ddf4606f58fd6b1267aba5c1ce33b5b23a13d7447925da8a4a5eb8d876aa53",
+    "core/crates/vw-stream/tests/workflow_freshness.rs": "4a5d03d56cbff6493bbea15f374df591a57c330313f7f1cbe2dd54843b7785a8"
+  },
+  "artifacts": {
+    "target/debug/libvw_core.so": {
+      "bytes": 240883400,
+      "sha256": "550dd8690796328bddef14d314dd9a6c5cc6c9b875edb4795fab7361471aae1d"
+    },
+    "target/debug/libvw_host.so": {
+      "bytes": 86142192,
+      "sha256": "31b97c39ab5556ddcfb876be6c801d0fa4db8afb70627b3e2d799b7166fa4470"
+    },
+    "target/android-jni/arm64-v8a/libvw_core.so": {
+      "bytes": 227220808,
+      "sha256": "bd8420694384cf2038a6c07188114372a9a23d00c3fcab0193055c3d695ed61d"
+    },
+    "apps/shared/build/generated/uniffi/core/com/visualworkbench/bindings/core/vw_core.kt": {
+      "bytes": 1067443,
+      "sha256": "5de70ed251716b9e2de9c5111aea5b03803ea7b8c1b0ee954feae721f07f4ade"
+    }
+  },
+  "disposition": "Integration branch published for review; main unchanged; prior worktrees/backups preserved",
+  "temporary_fixture_disposal": "Owned Java source and synthetic PNG inspected as bounded PNG header/chunks then removed; test-owned directories cleaned in fixture finalizers. No screenshot or signing artifact created."
+}

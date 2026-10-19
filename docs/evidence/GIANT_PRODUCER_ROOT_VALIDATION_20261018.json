@@ -1,0 +1,508 @@
+{
+  "date_utc": "2026-10-18",
+  "scope": "Private giant producer/native adoption/JNI output bridge; no public intake or user import activation",
+  "code_commit": "4a87aac91b0422a7252efce919e3de7db384b893",
+  "branch": "cloud/giant-producer-draft-20261018",
+  "editing_base": "707e940841373b076ebbe750c01319df2d992eed",
+  "review_boundary": {
+    "producer_leaf": "af934061e0b19fb3a128cd40a803dd91cff58d30, narrowly accepted; composed2ca1f33",
+    "streaming_read_leaf": "9b05bea600f60c6a3df6e52831b5de9b2e98e849, narrowly accepted; composedfc9eace",
+    "root_changes": "New root ownership/JNI/cache read implementation requires independent Astra review. Compile/test success is not independent acceptance.",
+    "editing_correction": "35ad8b46493f5240119b2927e1e90d7a7e68379d /a1ad07f is separately published for recheck and is not in this draft. Main promotion also requires composition of the reviewed correction; base707e940 had two confirmed P2 findings."
+  },
+  "native": {
+    "packages": [
+      "vw-ffi",
+      "vw-store",
+      "vw-assets",
+      "vw-assets-win"
+    ],
+    "passed": 547,
+    "failed": 0,
+    "ignored": 2,
+    "result_blocks": 38,
+    "note": "Includes actual private child test execution reports; two entrypoints are ignored in their parent harness and invoked by owning process-death tests. Scope differs from earlier editing/geometry and giant/stream batches."
+  },
+  "jvm": {
+    "shared": {
+      "tests": 460,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 460,
+      "skipped_cases": []
+    },
+    "desktop": {
+      "tests": 355,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 7,
+      "passed": 348,
+      "skipped_cases": [
+        "com.visualworkbench.desktop.mcp.McpStartupTest.expiredAndFutureOwnerMarkersRetireWithoutStartingService",
+        "com.visualworkbench.desktop.mcp.McpStartupTest.markerDeletionBindsValidatedHandleAndMalformedDataSurvives",
+        "com.visualworkbench.desktop.mcp.McpStartupTest.realWindowsOwnerLockPreventsDuplicateAndReleasesExactly",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realLongWindowsPinsStillRefuseWritesAndReplacement",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.boundedDosParserRefusesOtherNamespacesAndNoncanonicalForms",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.longNativeGuardPathsAreExplicitWithoutChangingTheShortAnchorNamespace",
+        "com.visualworkbench.desktop.NativeRuntimeAnchorTest.realWindowsAnchorHandleIsCanonicalAndOrdinaryPinsRemainExactAndExclusive"
+      ]
+    },
+    "android": {
+      "tests": 136,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 136,
+      "skipped_cases": []
+    }
+  },
+  "jvm_total_passed": 944,
+  "jvm_total_skipped": 7,
+  "root_regressions": [
+    "Three real project-worker cases: constructor refusal preserves final directory/writer integrity; cancelled close retains charge until actual state destruction; abandoned startup result retains ownership until it settles.",
+    "Synthetic typed-output core case: source/hash/marker/inventory/codec/pressure/cancel/deadline refusals, independent native files after foreign directory deletion, and native build refusal while simulated failed Android close keeps its80MiB charge. This is not actual Android/JNI execution.",
+    "Real native publication through BlobStore and all four PublishedProject parts into the actual root facade; prepared/build owners retire, project32MiB remains until close, original bytes and final database survive. Synthetic runner witness only.",
+    "Three producer verifier reader cases: growth consumes exactly one sentinel with fixed Vec capacity, truncation refuses, success retains exact encoded charge, memory/cancel refuses before IO."
+  ],
+  "checks": {
+    "native_strict_linux": "PASS four affected packages/all targets, warnings denied",
+    "native_strict_android": "PASS arm64 vw-ffi library and dependencies, warnings denied; no device run",
+    "fresh_linux_core_host_generator": "PASS",
+    "fresh_android_arm64_library": "PASS",
+    "bindings": "One phase core generation; host unchanged/up-to-date; retries reuse unchanged outputs",
+    "android_alignment": "PASS four16KiB LOAD segments",
+    "android_main_and_apps": "Actual source compilation PASS",
+    "android_shared_instrumentation": "compileAndroidDeviceTest PASS, including19 AndroidJpegPyramid cases; NOT RUN",
+    "android_app_instrumentation": "compileDebugAndroidTestKotlin PASS; NOT RUN",
+    "android_app_lint": {
+      "errors": 0,
+      "warnings": 60,
+      "hints": 12
+    },
+    "private_jni_descriptors": "Five actual compiled JVM descriptors match native call/declaration signatures; three expected JNI exports in fresh arm64 ELF. No ART callback execution claim.",
+    "rustfmt": "PASS workspace",
+    "common_imports": "HOOK-002 PASS",
+    "cargo_policy": "licenses/bans/sources PASS; existing duplicate warnings",
+    "graph": "Lock adds only vw-assets-win internal package and FFI edge; external pins unchanged",
+    "gradle_licenses": "264 exact modules/12 runtime configurations/5 bound parent POMs PASS",
+    "staged_secret_scan": "PASS; final evidence/history scanned before publication"
+  },
+  "corrected_failures": [
+    "Android JNI first check used u8 for the installed jni0.22.4 Boolean alias; switched to bool. Deprecated atomic/array APIs replaced with installed safe APIs.",
+    "Android strict lint reached an existing provider adapter let-and-return expression; an equivalent direct return removes that warning without credential/provider behavior changes. No credential read/call was performed.",
+    "First app attempt imported the generated factory name as common API; fixed runtime to use existing sessionResources() wrapper.",
+    "Producer verification now fills fixed payload storage and reads one stack sentinel rather than relying on read_to_end capacity behavior; three regressions pass."
+  ],
+  "commands": [
+    "cargo test --locked -p vw-ffi -p vw-store -p vw-assets -p vw-assets-win --lib --tests -j2 -- --test-threads=2",
+    "cargo clippy --locked -p vw-ffi -p vw-store -p vw-assets -p vw-assets-win --all-targets -j2 -- -D warnings",
+    "cargo ndk -t arm64-v8a clippy --locked -p vw-ffi --lib -j2 -- -D warnings",
+    "cargo build --locked -p vw-ffi -p vw-host-ffi --features vw-ffi/bindgen -j2",
+    "cargo ndk -t arm64-v8a -o target/android-jni build --locked -p vw-ffi -j2",
+    "bash apps/gradlew -p apps checkDependencyLicenses :shared:desktopTest :shared:compileAndroidDeviceTest :desktop:test :android:testDebugUnitTest :android:compileDebugAndroidTestKotlin :android:lintDebug -x :desktop:packageConnectionRuntime --console=plain --no-daemon --no-parallel --max-workers=2"
+  ],
+  "implementation": [
+    "StoreInput owns store/blobs/permit/charge before history/replica/worker setup; ProjectState drops the same charge last. Session permit now retires with actual state too. No destination deletion is added.",
+    "Android native invokes one fixed/pinned private JVM class from the retained input worker. Exact typed AndroidTileBuild, one-shot same-thread nested consumption, bounded cancellation probes and same process pool are required. Output is copied/verified in an independent native owner under withRootOutput; private ApprovedBuild is not returned until Java joined close succeeds.",
+    "Root JNI names are kept for shrinking; no release shrink/runtime test is claimed. Public raw-result directory/manifest/approval factories are absent.",
+    "Publication and actual ordinary root facade adoption are tested; public picker/intake, registered close/build/publish adapters and actual controller flow are still next work."
+  ],
+  "acceptance_unpassed": [
+    "Astra review of new root source and editing correction recheck/composition before main promotion",
+    "Public owned-input intake and app import/rebuild/export workflow",
+    "Actual Android codec/encoder outputs, JNI callbacks, close failure/quarantine and renderer/GPU lifetime",
+    "Opened-project/rebuild budget and ownership composition through future public callers",
+    "Maximum inventory, RSS/driver peaks, cancellation latency and performance",
+    "Pinned Windows helper/runtime/Job execution and packaging",
+    "Physical S23/owner/product gates; PDF runtime activation; Krita remains deferred"
+  ],
+  "source_sha256": [
+    {
+      "path": "Cargo.lock",
+      "bytes": 104720,
+      "sha256": "805f2cd1abd3df3152829d5ce7d7ed4e936d96f6120ec0f6d4010c806245e3c0"
+    },
+    {
+      "path": "apps/android/proguard-rules.pro",
+      "bytes": 774,
+      "sha256": "b6b95101cf7cc2c09f54e447e48856c9e4845e2f2f1332463621f6a82db3b999"
+    },
+    {
+      "path": "apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/giant/AndroidJpegPyramidTest.kt",
+      "bytes": 24452,
+      "sha256": "e15a20a43fa91ff670b14d6fa22d40ed638ebc6b7fd260b68f86064bd76f6b97"
+    },
+    {
+      "path": "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/NativeLibrary.kt",
+      "bytes": 231,
+      "sha256": "718379652da3859b833e6a634b79013fed75f34a016fd87be186760e325e4245"
+    },
+    {
+      "path": "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/giant/AndroidGiantRuntime.kt",
+      "bytes": 3692,
+      "sha256": "e9aef443aa7da478121625f994932ddfb2d905a205126fbc7e4ec602ff01c302"
+    },
+    {
+      "path": "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/giant/AndroidJpegPyramid.kt",
+      "bytes": 35986,
+      "sha256": "397b297cb785d82ef23cf54e12c6ee9fd5f4c5a15783dbdec0b651a26f2de95e"
+    },
+    {
+      "path": "core/crates/vw-ai-platform/src/android.rs",
+      "bytes": 8669,
+      "sha256": "45c5d5bc172189b4d5fbe7c078f239bf073abaa2dc4e10e59b76bead01ba5a96"
+    },
+    {
+      "path": "core/crates/vw-assets/GIANT_APPROVED_PRODUCER_HANDOFF_20261018.md",
+      "bytes": 12595,
+      "sha256": "aec83cd40f0623f355f3f51f2cdb08aef2165e4d07c521e715e631ea787e1ed9"
+    },
+    {
+      "path": "core/crates/vw-assets/PHONE_STREAMING_READ_IMPLEMENTATION_20261018.md",
+      "bytes": 7290,
+      "sha256": "6100bac470d43aa88c555902bd86820d1d106aa90faef16405f01d128c738b46"
+    },
+    {
+      "path": "core/crates/vw-assets/giant-approved-producer-20261018.json",
+      "bytes": 20132,
+      "sha256": "01d504b57ff53dce27b41051886c2f6eb7b0d24c20eb8b25e8f9a6eebaa9abee"
+    },
+    {
+      "path": "core/crates/vw-assets/phone-streaming-read-implementation-20261018.json",
+      "bytes": 5620,
+      "sha256": "02b559ddb91e58c4c2584d50a15857a50cfda0e9c569a0df7508d1e01678c64e"
+    },
+    {
+      "path": "core/crates/vw-ffi/Cargo.toml",
+      "bytes": 3531,
+      "sha256": "6c1bb3cb6b6a893210c151e6e9742c1c98e7dec584ca5066b54cad7f4d8c1449"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images.rs",
+      "bytes": 5913,
+      "sha256": "1f74e5082479e388e6745ef162decd0458d1ebc03fa48fa7685107ed2db10787"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer.rs",
+      "bytes": 15845,
+      "sha256": "52287b02dc0ca0ea63d4f981df73f084810889764bd6d6be2eea6ec5d0d19972"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/android_bridge.rs",
+      "bytes": 11330,
+      "sha256": "f9d764b04cb435e5d0e54f234e9196da1e5176f8037af1fc0c2452bb90282e00"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/android_bridge/jni.rs",
+      "bytes": 13568,
+      "sha256": "be94784a17212578add3cfa14d5be36343fa2b33e5a6781e6eabb2f61a50f2c4"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/android_bridge/tests.rs",
+      "bytes": 10226,
+      "sha256": "ce56c5a62a37ac86df1f838e6805b544d536becc527350c8f749e9beaf1c7be6"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/cache.rs",
+      "bytes": 12957,
+      "sha256": "a34a60c52adae757201b431a06a90acb30b6d65bb7cabba2af0e6c93864a2dc3"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/cache_read_tests.rs",
+      "bytes": 1697,
+      "sha256": "02d4b0e07e524328f365468428515405ce3922ddabb65abcbbf64bd77e51fa35"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/cleanup.rs",
+      "bytes": 2486,
+      "sha256": "416ad151e033162d279a693a14b490b2823e8e6d99cc13cdf08c8dcecb026ed5"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/input.rs",
+      "bytes": 8375,
+      "sha256": "8d9665425a0efd589df443f0e6542443a19d89d3ef6e0b420477dc2a4f916013"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/producer_tests.rs",
+      "bytes": 35228,
+      "sha256": "bc9f82328ec9167d336da9bbf6ece261e75435044f6a857cb0239456cec9c07b"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/publish.rs",
+      "bytes": 22307,
+      "sha256": "00c119273fe8e789fcbee7a0e658139598d5bc7f510f69cd3a1364e1bd55c7d5"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/producer/windows.rs",
+      "bytes": 5570,
+      "sha256": "1a6dfd89c32bc484bc44e4e643ccd9d92227f2e552723ac04606c68fc040c581"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/provider.rs",
+      "bytes": 15155,
+      "sha256": "14345a2589d4e39a7618bbd20faf5d72073879899daa75c1fa5d50add289dc85"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/source.rs",
+      "bytes": 19185,
+      "sha256": "df007d412ef90545319664a775d5b58f7ce6f2eafc3b4bb22a3004ac0d365706"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/tiles.rs",
+      "bytes": 7399,
+      "sha256": "4d183a255831fb91d1d0e1debff1b21b2ad1f5b6c3e4fc942966736881d0cab4"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/project.rs",
+      "bytes": 20566,
+      "sha256": "eb85948a8094288bd9db6bd240b706e17d6b73f37bcb31318e0b6b8ba405799a"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/project_budget_tests.rs",
+      "bytes": 4062,
+      "sha256": "4e3baf4d41ba9f0ee5ce62943363d3417316ecd5ad4f5011a168707e4fed13fa"
+    },
+    {
+      "path": "core/crates/vw-store/src/cache.rs",
+      "bytes": 31072,
+      "sha256": "aad84f2207dcdffdfccbef4f1df05a4e3c9d2440aef1d7a719fc4354719b47b4"
+    },
+    {
+      "path": "core/crates/vw-store/tests/blobs_cache.rs",
+      "bytes": 29020,
+      "sha256": "5765881a20b0e3c807905586ceea2c33e992cd327c233eb6dc44e4b54a2400b1"
+    },
+    {
+      "path": "docs/GIANT_ROOT_PRODUCER_DRAFT_20261018.md",
+      "bytes": 1972,
+      "sha256": "1c5167954d8aad398befd7ce7e5a768d2a23aa887d2749a4048b56e5ccc69dc3"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/Cargo.toml",
+      "bytes": 1010,
+      "sha256": "faa133522c082fbbd00e81e26facf45141ff6463972bfa3b49623bc13f38ceae"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/SOURCE_HANDOFF_20261018.md",
+      "bytes": 4407,
+      "sha256": "b960dcffe79abdf58b95cecfb5d90deb8d38c22ac3557cfd58e8a95938090285"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/runtime-pins.json",
+      "bytes": 3611,
+      "sha256": "d1cd7a05d0799fb4c8f6ac0f2f3fa648e71bcf3aa6b2ca2a29902dedbf7e6949"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/src/admission.rs",
+      "bytes": 5277,
+      "sha256": "478a96c9a10acddf862bb7dcf5cdc51ae34356d968fb1b7864bb555e55f0ff3b"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/src/bin/helper.rs",
+      "bytes": 688,
+      "sha256": "fac12d9e061bdc522c1bacbfb07b6a5a54e98d4efe717a5dbd71129d7c712b24"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/src/budget.rs",
+      "bytes": 4909,
+      "sha256": "5f6c99cf323945f4f2f885dfb3c4f5dbf41112c31d66146e80bad8fb3c2940bd"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/src/lib.rs",
+      "bytes": 3572,
+      "sha256": "ec70716b261456ee484ec117b2eb982ba0e9ce759e9e8db52bf505056557332e"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/src/native.rs",
+      "bytes": 9683,
+      "sha256": "8304555d5bc3690be3efb54d520f810a052498c11a02111c0dda5200e1f4e33f"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/src/ownership.rs",
+      "bytes": 4971,
+      "sha256": "db2db6b500a761857575aa837c78e8d142ea976fe7dd7dd6971c40cf7daf6ff5"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/src/process.rs",
+      "bytes": 15178,
+      "sha256": "65a087731141087dfd6b33f5b3c2fe32c0e826096f01accf6983c14dda7547b4"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/src/worker.rs",
+      "bytes": 22307,
+      "sha256": "d6c9da0f52d5638835c963a04cc4ead7b1c6432165f39691edb2ff60027576f4"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/tests/admission.rs",
+      "bytes": 3319,
+      "sha256": "637805d327de1c0a538efc57f2a4bf6cb494404025348b8e6788432db7ca265c"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/tests/cancellation.rs",
+      "bytes": 1507,
+      "sha256": "87e686baa120a1c030dc14e54dd8135e769c44824705a74510bd1a24336bc7c7"
+    },
+    {
+      "path": "host-win/crates/vw-assets-win/tests/windows_worker.rs",
+      "bytes": 6804,
+      "sha256": "2c857579c4e806e06a6efacaffdf95b9a54eb2cc05a2d1e7eabfebc22a5b9f71"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "target/debug/libvw_core.so",
+      "bytes": 247445752,
+      "sha256": "7ef1507bda35151b214a576867031cd35e537d0d537cff3bfae975c0b733850b"
+    },
+    {
+      "path": "target/debug/libvw_host.so",
+      "bytes": 86144024,
+      "sha256": "ea933ac88b21e64f99a761802104fb23284b01c5c7778b615bfc8ea8d9cc2d7d"
+    },
+    {
+      "path": "target/debug/vw-bindgen",
+      "bytes": 65737848,
+      "sha256": "61a2a9b8ee85685408ca8ce5428c98fe12bb6371de96da18d4179ea2433204d6"
+    },
+    {
+      "path": "target/android-jni/arm64-v8a/libvw_core.so",
+      "bytes": 235920040,
+      "sha256": "15033b233b68bf5d264f324b5d9f5a606880989426e3de3e2140cde964860cc2"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/core/com/visualworkbench/bindings/core/vw_core.kt",
+      "bytes": 1183328,
+      "sha256": "72f0b0266f8b74beeb8e7f1e615ea1728824ad4e4e856a609a0d3936f7ed9b7b"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/host/com/visualworkbench/bindings/host/vw_host.kt",
+      "bytes": 274624,
+      "sha256": "a26d23de6b9219bd449e0274890469a3199c1406f637fffbf25751f637cc5e5f"
+    },
+    {
+      "path": "apps/shared/build/classes/kotlin/android/main/com/visualworkbench/shared/giant/AndroidGiantRuntime.class",
+      "bytes": 4984,
+      "sha256": "26c0734209099281151873bb32806b43458b3e0c4d619d43381263a698232f16"
+    }
+  ],
+  "logs": [
+    {
+      "path": "vw-producer-root-android-build.log",
+      "bytes": 1712,
+      "sha256": "cbe14dbc3b5c098ac288ee2ee48f102d7af843df84fdde7283cadcb9976686d1"
+    },
+    {
+      "path": "vw-producer-root-apps-attempt1.log",
+      "bytes": 8315,
+      "sha256": "c4352ab15802cb63d84a72077c807d53061823e355868eba328805dd94976c6a"
+    },
+    {
+      "path": "vw-producer-root-apps-attempt2.log",
+      "bytes": 12596,
+      "sha256": "6387b57a947526d1300b69c119cbff949348a53d2e9e530e7bda54b383e47d31"
+    },
+    {
+      "path": "vw-producer-root-budget-tests.log",
+      "bytes": 682,
+      "sha256": "f169d5aabd24a8a766925c760a14aeeda5e1d564d20e80a9be422415531bfb50"
+    },
+    {
+      "path": "vw-producer-root-check-android-attempt1.log",
+      "bytes": 11696,
+      "sha256": "cfcb4bae620b6b515d916ff20fa4dc80ae90dcd333029b911a4d11d9320270c1"
+    },
+    {
+      "path": "vw-producer-root-check-android-attempt2.log",
+      "bytes": 196,
+      "sha256": "dd3078060fa77d1f8a9e17295249f2ac5412c805fc32e7442ea23c954d455741"
+    },
+    {
+      "path": "vw-producer-root-check-linux-attempt1.log",
+      "bytes": 1791,
+      "sha256": "077a3ccd053b14bb589e77b1393b80fc988a82263bdfb2a39211a772aa2d81b4"
+    },
+    {
+      "path": "vw-producer-root-clippy-android-attempt1.log",
+      "bytes": 3166,
+      "sha256": "3b8fefb940c23ad6a31803b62a42ba841983de85e881bf91ad4c96a20abb9eb0"
+    },
+    {
+      "path": "vw-producer-root-clippy-android-attempt2.log",
+      "bytes": 790,
+      "sha256": "62b77628615ad39bd80ba3d57d59dd3321494fc2e440c92b93b5d27a83cb50e9"
+    },
+    {
+      "path": "vw-producer-root-clippy-linux-attempt1.log",
+      "bytes": 1655,
+      "sha256": "424ed2b30b5c4a741d666a593731090384ca655ed75edb425edd08e39b4a0ef1"
+    },
+    {
+      "path": "vw-producer-root-clippy-linux-final.log",
+      "bytes": 149,
+      "sha256": "9c7e6f78cce533981bebfc730318461498f3e5a7b30e9cc00b506b570fe514eb"
+    },
+    {
+      "path": "vw-producer-root-clippy-linux-final2.log",
+      "bytes": 149,
+      "sha256": "d4bd0038fb5fe03ee7d936d110a4e5bce6b78b12363d7015bd091d7ab9ea0525"
+    },
+    {
+      "path": "vw-producer-root-copy-tests-attempt1.log",
+      "bytes": 410,
+      "sha256": "4d2c9bb44d19047b744762189c66b4566e989dfbfc1caaf831fa52525d8ddbd7"
+    },
+    {
+      "path": "vw-producer-root-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vw-producer-root-jni-descriptors.log",
+      "bytes": 1525,
+      "sha256": "ba56355365c1986a924c65075f6aace99d7bea7c65c03910cf454b836bc1f038"
+    },
+    {
+      "path": "vw-producer-root-jni-symbols.log",
+      "bytes": 278,
+      "sha256": "bcee60d2b18876634c8cc371aebabb54b88890e775c73bcadff268702f86633d"
+    },
+    {
+      "path": "vw-producer-root-linux-build.log",
+      "bytes": 395,
+      "sha256": "e3addfcb13d78b376aa7c76e2dcc0136f6aa6ba19e93eba5cae221f9ba4f9ab9"
+    },
+    {
+      "path": "vw-producer-root-metadata.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vw-producer-root-native-attempt1.log",
+      "bytes": 59656,
+      "sha256": "2c3dbb384fb0298ff151081bae4fa2a7254f0e96f11af36913177211e66bd844"
+    },
+    {
+      "path": "vw-producer-root-native-final.log",
+      "bytes": 59923,
+      "sha256": "c26ddf00b87acb6bffcda8253ecc28bd5e2a0da19d31275b3c24d066ccdac776"
+    },
+    {
+      "path": "vw-producer-root-policy.log",
+      "bytes": 94075,
+      "sha256": "9d1963ffc643fda6d6d9e998454fc59ca89de30348d7b2087ec515311d41fb2f"
+    },
+    {
+      "path": "vw-producer-root-producer-tests-final.log",
+      "bytes": 4152,
+      "sha256": "57c60a4fae798a598be302cd96a60609b557423d975224ff430990078cbc47d6"
+    },
+    {
+      "path": "vw-producer-root-shared-tasks.log",
+      "bytes": 10385,
+      "sha256": "68575312749eceba5429ec2e1573ee32e5128545500b2374834891118d24272f"
+    }
+  ],
+  "temporary_data": "Only synthetic test images/projects. Known app test directories absent at closure; Rust test-owned temp owners perform cleanup. Intentional quarantine failure receipts are preserved. No screenshots, private captures, signing/device/provider actions or worktree deletion.",
+  "next_lane": "GIANT_PICKED_INPUT_NEXT_LANE_ADMISSION_20261018.md grants three exact native source files for same-permit/same-charge pending input transfer; root retains public APIs/registration/controllers. Parent assigns owner and build slot."
+}

@@ -131,6 +131,8 @@ pub struct Redaction {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Extensions {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verification_origin: Option<crate::VerificationOrigin>,
     pub compiler: String,
     pub state_hash: String,
     pub host_seq: u64,

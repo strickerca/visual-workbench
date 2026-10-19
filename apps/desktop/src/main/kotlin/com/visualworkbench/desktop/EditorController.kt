@@ -24,7 +24,8 @@ data class EditorState(val document:DocumentSnapshot?=null,val background:ImageB
     val routeWarnings:List<TetherRouteWarning> = emptyList(),val previewStyles:Map<String,ObjectStyle> = emptyMap(),
     val wetStroke:RenderItem?=null,val shareViewport:Boolean=false,val sessionRole:ProjectSessionRole?=null,
     val backgroundIssue:String?=null,val backgroundFailureKind:CoreFailureKind?=null,val originalFormatNotice:String?=null,
-    val documentFrame:DocumentDrawFrame<AutoCloseable>?=null,val documentPage:UInt=0u,val precision:PrecisionFrame=PrecisionFrame()) {
+    val documentFrame:DocumentDrawFrame<AutoCloseable>?=null,val documentPage:UInt=0u,val precision:PrecisionFrame=PrecisionFrame(),
+    val giantOwnerVersion:Long=0L,val giantActive:Boolean=false,val giantReady:Boolean=false,val giantIssue:String?=null,val giantViewport:GiantViewport?=null) {
     val exportReady:Boolean get()=exportReceipt?.request?.matches(this)==true
 }
 private data class Drag(val start:Point,val initial:ViewState,val selected:List<RenderItem>,val bounds:Rect?,val resize:Boolean,val pan:Boolean,val binding:RenderBinding,val live:ObjectPreviewLease?=null,val newObject:NewObjectPreviewLease?=null,val tool:Tool=Tool.Select)
@@ -44,20 +45,61 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     private var documentPress:Pair<Point,Point>?=null
     private var documentPressRegion=false
     private var documentPressBinding:DocumentFrameBinding?=null
+    private var giantMode=false
+    private var updatingGiant=false
+    private val giantDraw=java.util.concurrent.atomic.AtomicReference<GiantVisibleFrame<GiantBitmap>?>(null)
+    private val giantOwner=GiantAttachmentOwner<GiantDesktopView>(
+        attachment={val p=project;val doc=mutable.value.document;if(p!=null&&doc!=null&&!closing)DocumentAttachment(p,doc,generation)else null},
+        create={image,resources,binding,epoch,current->
+            GiantDesktopView.create(scope,image,resources,binding,epoch,current,::cancelInput){value->
+                update{it.copy(giantReady=value.ready,giantIssue=value.message)}
+            }
+        },closeView={it.close()},changed={giantDraw.set(null);update{it.copy(giantReady=false,giantOwnerVersion=it.giantOwnerVersion+1L)}},
+        diskCacheBytes=4uL*1024uL*1024uL*1024uL,ramCacheBytes=128uL*1024uL*1024uL,
+        failedCreationOwner={ (it as? GiantDesktopCreationFailure)?.owner })
+    internal val giantView:GiantDesktopView? get()=giantOwner.current
+    internal fun giantFrameCurrent(frame:GiantVisibleFrame<GiantBitmap>,drawState:EditorState?=null):Boolean {
+        val state=mutable.value;val document=state.document?:return false
+        val revision=document.render.revision
+        return giantDraw.get()===frame&&state.giantActive&&
+            (drawState==null||(drawState.document===document&&drawState.view.camera==state.view.camera&&drawState.precision==state.precision))&&
+            state.giantViewport?.let{frame.matches(WorkflowBinding(revision.projectId,document.documentId,revision.hostSeq,revision.stateHash),generation,it)}==true
+    }
+    private fun giantInputReady():Boolean=giantDraw.get()?.let{giantFrameCurrent(it)}==true
+    private suspend fun detachGiant(){giantOwner.detach();giantMode=false;giantDraw.set(null)}
+    private suspend fun loadGiantBackground(p:WorkbenchProject,doc:DocumentSnapshot){
+        giantMode=true;giantOwner.invalidate();giantDraw.set(null)
+        update{it.copy(background=null,giantActive=true,giantReady=false,giantIssue=null)}
+        if(!colorAssumed){update{it.copy(needsColorConsent=true,backgroundIssue="Tiled display requires an explicit sRGB assumption for this untagged source. The original remains unchanged.")};return}
+        update{it.copy(needsColorConsent=false,backgroundIssue=null)}
+        try{giantOwner.bind(DocumentAttachment(p,doc,generation))?.update(core,mutable.value.view.camera,mutable.value.precision)}
+        catch(cancel:CancellationException){throw cancel}
+        catch(_:Exception){update{it.copy(giantIssue="The original is preserved. Its verified tiled display is unavailable. Retry display or reopen the project.")}}
+    }
+    private fun syncGiant(){
+        if(!giantMode){giantDraw.set(null);return}
+        val view=giantOwner.current?:run{giantDraw.set(null);return}
+        if(!updatingGiant){updatingGiant=true;try{view.update(core,mutable.value.view.camera,mutable.value.precision)}
+            catch(_:Exception){giantDraw.set(null);mutable.value=mutable.value.copy(giantReady=false,giantIssue="This tiled viewport exceeds its display allowance. Reduce the window or retry display.");return}
+            finally{updatingGiant=false}}
+        val state=mutable.value;val doc=state.document?:run{giantDraw.set(null);return}
+        val revision=doc.render.revision
+        giantDraw.set(state.giantViewport?.let{view.matchingFrame(WorkflowBinding(revision.projectId,doc.documentId,revision.hostSeq,revision.stateHash),generation,it)})
+    }
     private val documentOwner:EditorDocuments=EditorDocuments(scope,core,
         { val p=project;val snapshot=mutable.value.document;if(p!=null&&snapshot!=null&&!closing)DocumentAttachment(p,snapshot,generation)else null },
-        { val s=mutable.value;!closing&&!s.busy&&queued==0&&!s.exportOpen&&!s.pasteOpen&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(s.textAnchor!=null,s.exportOpen,s.pasteOpen)&&drag==null&&ink==null&&markerPress==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
+        { val s=mutable.value;!closing&&!workflows.blocksInput()&&!s.busy&&queued==0&&!s.exportOpen&&!s.pasteOpen&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(s.textAnchor!=null,s.exportOpen,s.pasteOpen)&&drag==null&&ink==null&&markerPress==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
         { attached,page -> edits.withLock {
             if(project!==attached.project||generation!=attached.epoch||mutable.value.document?.render?.revision?.sameDocumentRevision(attached.snapshot.render.revision)!=true)throw DocumentFailure(DocumentFailureKind.Stale)
             refreshTicket++;documentRefresh.invalidate()
-            cancelInput();erasers.detach();selections.detach();documentOwnerDiscardDraw()
+            cancelInput();workflows.detach();rotation.detach();detachGiant();erasers.detach();selections.detach();documentOwnerDiscardDraw()
             val next=(attached.project as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
             validateDrawing(next)
             if(closing||project!==attached.project||generation!=attached.epoch)throw DocumentFailure(DocumentFailureKind.Stale)
             update{it.copy(document=next,documentPage=page,background=null,canvasReady=false,selected=emptySet())}
             selections.bind(attached.project,next,generation,changeSequence,mutable.value.view.camera)
             erasers.bind(attached.project,next,generation,changeSequence,mutable.value.view.camera)
-            instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit()
+            instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();bindWorkflows();enterWorkflows()
         } },{update{it.copy(documentFrame=it.document?.let{snapshot->documentOwnerFrame(snapshot)})}},location.path)
     val documents:DocumentController get()=documentOwner.controller
     internal fun documentReader(expected:DocumentDrawFrame<AutoCloseable>?):DocumentDrawLease<com.visualworkbench.desktop.documents.PreparedDocumentTile>? = documentOwner.frame?.takeIf{it===expected}?.acquire()
@@ -106,6 +148,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     internal fun aiResultFrame(): AiResultFrame<AiBitmap>? = aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),mutable.value.view.camera,aiPoses())}
     internal fun aiResultReady(): Boolean = mutable.value.document?.render?.items?.none{it.shape is Shape.Result} != false || aiResultFrame()!=null
     fun openAi() {
+        if(workflows.blocksInput())return
         if(documents.state.value.descriptor!=null){report("AI image edits require a raster image document.");return}
         val current=mutable.value
         if(closing||current.busy||current.document==null||current.textAnchor!=null||current.exportOpen||current.pasteOpen)return
@@ -153,10 +196,12 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     fun instructionPicker(): AutoCloseable = instructionAdmission.picker()
     fun editInstruction() { cancelInput(); mutable.value.selected.firstOrNull()?.let(instructionEditor::focusObject) ?: instructionEditor.focusGlobal() }
     fun mayCloseInstructions(): Boolean {
+        if(!workflows.mayLeave())return false
         if (!instructionEditor.hasUnsaved()) return true
         report("Save or discard the instruction draft before closing or replacing this project."); return false
     }
     fun sealInstructionsForClose(): Boolean {
+        if(!workflows.mayLeave())return false
         if (instructionEditor.sealIfClean()) return true
         report("Save or discard the instruction draft before closing or replacing this project."); return false
     }
@@ -173,14 +218,108 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
             refresh()
         }
     }
+    private fun workflowAttachment():EditorWorkflowAttachment? {
+        val p=project;val doc=mutable.value.document
+        return if(p!=null&&doc!=null&&!closing)EditorWorkflowAttachment(p,doc,generation,changeSequence,deviceId)else null
+    }
+    private fun workflowIdle():Boolean {
+        val s=mutable.value
+        return !closing&&!s.busy&&queued==0&&!s.exportOpen&&!s.pasteOpen&&s.textAnchor==null&&
+            !ai.state.value.open&&!ai.needsDecision()&&!instructionEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&
+            !semanticEditor.state.value.busy&&instructionAdmission.allows(false,false,false)&&
+            drag==null&&ink==null&&inkWork==null&&widthGesture==null&&markerPress==null&&documentPress==null&&
+            !selectionPointer&&!eraserPointer&&!rotation.state.value.active&&!rotationUnavailable()&&!selections.state.value.busy&&!erasers.state.value.busy&&
+            !documents.state.value.busy&&transferJob?.isActive!=true&&sessionWork?.isActive!=true
+    }
+    private fun drawingLayer(doc:DocumentSnapshot?):LayerInfo? {
+        val layer=doc?.let{documentControlDrawingLayer(it,workflows.controls.state.value.drawingLayerId)}
+        if(layer==null)report("Choose a visible unlocked annotation layer before drawing.")
+        return layer
+    }
+    internal fun workflowId():String=core.newId(System.currentTimeMillis().toULong())
+    internal val workflows=EditorWorkflows(scope,edits,::workflowAttachment,::workflowIdle,{cancelInput();update{it.copy(view=it.view.copy(followPeer=false))}},
+        metadata={p->val info=p.info();val now=System.currentTimeMillis();WorkflowMetadata(core.newId(now.toULong()),deviceId,info.nextLamport,now)},
+        newId=::workflowId,camera={mutable.value.view.camera},
+        applyCamera={value->update{it.copy(view=it.view.copy(camera=value,followPeer=false))}},
+        updated={a,_->if(project===a.project&&generation==a.epoch&&!closing)refresh()},
+        committed={a,_->if(project===a.project&&generation==a.epoch&&!closing)refresh()},
+        adoptDocument=::adoptWorkflowDocument,report=::report,
+        localViews=::localViewWorkflows,documentControls=::documentControlWorkflows,reviews=::offlineReviews,toneControls=::toneControlWorkflows)
+    private var rotationGesture:ObjectRotationGesture?=null
+    private var rotationPhysical:Transform?=null
+    private val rotationDisplay=java.util.concurrent.atomic.AtomicReference<ObjectRotationHandle?>(null)
+    private var rotationPreviewIds:Set<String> = emptySet()
+    internal val rotation=ObjectRotationInteraction(scope,edits,::workflowId,::objectRotationTransforms,
+        current={val p=project;val s=mutable.value;if(p!=null&&s.document!=null&&!closing)ObjectRotationAttachment(p,s.document,generation,s.view.camera,s.selected)else null},
+        mayMutate={val s=mutable.value;!closing&&!s.busy&&queued==0&&!workflows.blocksInput()&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!ai.state.value.open&&instructionAdmission.allows(s.textAnchor!=null,s.exportOpen,s.pasteOpen)},
+        commit={request->
+            val doc=mutable.value.document
+            if(project!==request.project||doc==null||doc.objectRotationFrame(generation,mutable.value.view.camera)!=request.frame)false
+            else {val accepted=performEdit(request.commands,doc.binding(generation),request.gestureId);if(accepted)refresh();accepted}
+        })
+    internal fun rotationHandle(state:EditorState):ObjectRotationHandle? {
+        if(state.tool!=Tool.Select||workflows.blocksInput()||state.renderIssue!=null)return null
+        val base=state.document?.let{objectRotationHandle(it,state.selected,state.view.camera)}?:return null
+        if(state.document!==mutable.value.document||state.view.camera!=mutable.value.view.camera)return null
+        return rotationDisplay.get()?:base
+    }
+    private fun rotationUnavailable():Boolean=rotation.state.value.busy||rotation.state.value.failure==ObjectRotationFailure.Unconfirmed||(rotationPreviewIds.isNotEmpty()&&!rotation.state.value.active&&!rotation.state.value.busy)
+    private fun startRotation(state:EditorState,point:Point,raw:Point,physical:Transform):Boolean {
+        val handle=rotationHandle(state)?:return false
+        if(!handle.hit(physical,raw,12.0))return false
+        val token=rotation.begin(handle.pivot,point)?:return false
+        rotationGesture=token;rotationPhysical=physical;rotationDisplay.set(handle.copy(point=point));return true
+    }
+    private fun bindWorkflows(reconcileRotation:Boolean=true){if(reconcileRotation)rotation.reconciled();workflowAttachment()?.let(workflows::bind)}
+    private suspend fun enterWorkflows(){workflowAttachment()?.let{workflows.enter(it)}}
+    private suspend fun adoptWorkflowDocument(a:EditorWorkflowAttachment,target:DocumentSnapshot){
+        if(project!==a.project||generation!=a.epoch||mutable.value.document?.binding(generation)!=a.document.binding(a.epoch)||closing)
+            throw WorkflowFailure(WorkflowFailureKind.Stale)
+        validateDrawing(target)
+        cancelInput();update{it.copy(view=it.view.copy(followPeer=false))}
+        var metadataRetired=false
+        withDocumentObserversRetired(
+            retire={live.documentChanging()},
+            restore={if(!closing&&project===a.project){
+                try {
+                    if(metadataRetired){instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()}
+                } finally {live.documentChanged();live.attachment()?.link?.let{instructionFocus.attach(it)}}
+            }},
+        ) {
+            viewportJob?.cancelAndJoin();viewportJob=null;sessionWork?.cancelAndJoin();sessionWork=null
+            discardExport();rotation.detach();semanticEditor.detach();instructionEditor.detach();instructionFocus.detach()
+            metadataRetired=true
+            erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.detach()
+            if(closing||project!==a.project||generation!=a.epoch)throw WorkflowFailure(WorkflowFailureKind.Stale)
+            val actual=a.project.info();val expected=target.render.revision
+            if(actual.projectId!=expected.projectId||actual.hostSeq!=expected.hostSeq||actual.stateHash!=expected.stateHash||target.documentId !in actual.documentIds){
+                refresh();throw WorkflowFailure(WorkflowFailureKind.Stale)
+            }
+            generation++;refreshTicket++;documentRefresh.invalidate();colorAssumed=false;aiRetiring=false
+            if(!precisionClosed)precision.reset()
+            update{EditorState(document=target,path=it.path,view=it.view.copy(peer=null,followPeer=false),projectEpoch=generation,
+                canvasFocused=it.canvasFocused,sync=it.sync,sessionRole=it.sessionRole,routeWarnings=it.routeWarnings,shareViewport=it.shareViewport,
+                exportSettings=ExportSettings(encoding=if(target.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))}
+            instructionEditor.resume();semanticEditor.resumeAfterReplacement();metadataRetired=false
+            selections.bind(a.project,target,generation,changeSequence,mutable.value.view.camera)
+            erasers.bind(a.project,target,generation,changeSequence,mutable.value.view.camera)
+            instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();documentOwner.bind(a.project,target)
+            live.attachment()?.link?.let{instructionFocus.attach(it)}
+            fit();bindWorkflows();refreshOriginalFormatNotice();loadBackground();refreshRole(a.project,generation)
+        }
+    }
     fun chooseEraser(value:EraserChoice){cancelInput();erasers.tools.choose(value,mutable.value.selected.singleOrNull());update{it.copy(textAnchor=null)}}
     fun stopErasing(){cancelInput();erasers.tools.drawing()}
     private fun update(f:(EditorState)->EditorState){val before=mutable.value;var next=f(before);
+        if(rotationGesture!=null&&(next.document!==before.document||next.selected!=before.selected||next.view.camera!=before.view.camera)){rotationGesture=null;rotation.cancel()}
         if(!closing&&!synchronizingPrecision&&next.view.camera.viewportWidth>1&&next.view.camera.viewportHeight>1&&precision.baseCamera()!=next.view.camera){
             synchronizingPrecision=true
             try{if(panningView)cancelPrecision()else cancelInput();precision.synchronize(next.view.camera);next=next.copy(precision=precision.frame(),preview=emptyMap(),previewStyles=emptyMap(),draft=null,wetStroke=mutable.value.wetStroke)}finally{synchronizingPrecision=false}
         }
-if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.close();preparedDrag=null;next=next.copy(dragPrepared=false)};if(next.exportCheck?.request?.matches(next)==false)next=next.copy(exportCheck=null);mutable.value=next;if(next.document!==before.document)ai.changed();if(next.document!==before.document||next.view.camera!=before.view.camera||next.preview!=before.preview||next.peerFrame!=before.peerFrame)aiResults.request();selections.viewport(next.view.camera);erasers.viewport(next.view.camera);documents.viewport(next.view.camera);if(next.shareViewport&&(next.view.camera!=before.view.camera||!before.shareViewport))scheduleViewport()}
+if(giantMode&&next.document!==before.document)giantOwner.invalidate()
+        if(rotation.state.value.preview.isNotEmpty())next=next.copy(preview=next.preview+rotation.state.value.preview)
+        next=next.copy(giantActive=giantMode,giantViewport=if(giantMode)runCatching{giantViewport(core,next.view.camera,next.precision)}.getOrNull()else null)
+if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.close();preparedDrag=null;next=next.copy(dragPrepared=false)};if(next.exportCheck?.request?.matches(next)==false)next=next.copy(exportCheck=null);mutable.value=next;if(next.document!==before.document)ai.changed();if(next.document!==before.document||next.view.camera!=before.view.camera||next.preview!=before.preview||next.peerFrame!=before.peerFrame)aiResults.request();selections.viewport(next.view.camera);erasers.viewport(next.view.camera);documents.viewport(next.view.camera);workflows.remember(next.view.camera);syncGiant();if(next.shareViewport&&(next.view.camera!=before.view.camera||!before.shareViewport))scheduleViewport()}
     internal suspend fun compileForMcp(choice:com.visualworkbench.desktop.mcp.McpCompileChoice):WorkbenchCompiledPackage = edits.withLock {
         val view=mutable.value;val document=view.document?:throw PackageFailure(PackageFailureKind.Invalid)
         if(closing||view.busy||ai.state.value.open||semanticEditor.state.value.busy||instructionEditor.state.value.busy||drag!=null||ink!=null||inkWork!=null||widthGesture!=null||instructionEditor.hasUnsaved())throw PackageFailure(PackageFailureKind.Busy)
@@ -242,6 +381,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     fun report(message:String){update{it.copy(message=message)}}
     private fun task(epoch: Long? = null, block: suspend () -> Unit): Job? {
         if (closing) return null
+        if(workflows.blocksInput()||rotationUnavailable()){report("Close the current workflow panel or finish its operation first.");return null}
         if (queued >= 32) { report("The edit queue is full. Wait for current work to finish."); return null }
         queued++
         return scope.launch {
@@ -274,8 +414,8 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     }
     private fun transfer(epoch:Long,block:suspend()->Unit):Job?{if(transferJob?.isActive==true){report("A transfer is already running. Finish or cancel it first.");return null};val job=task(epoch,block);transferJob=job;return job}
     private suspend fun discardExport(){preparedDrag?.second?.close();preparedDrag=null;val prior=cachedExport;cachedExport=null;update{it.copy(exportReceipt=null,exportCheck=null,dragPrepared=false)};prior?.workspace?.close()}
-    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();documentOwner.detach();if(!precisionClosed)precision.reset();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();documentOwner.bind(value,snapshot);fit();refreshOriginalFormatNotice();loadBackground();refreshRole(value,generation)
-        changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
+    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);validateDrawing(snapshot);cancelInput();live.close();changes?.cancelAndJoin();discardExport();workflows.detach();rotation.detach();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.detach();if(!precisionClosed)precision.reset();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();documentOwner.bind(value,snapshot);fit();bindWorkflows();enterWorkflows();refreshOriginalFormatNotice();loadBackground();refreshRole(value,generation)
+        changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){giantOwner.observe(event.project);workflows.observe(event.project,event.sequence);erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()else bindWorkflows(false)}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
         }finally{withContext(NonCancellable){
             try { if(!adopted)value.close() }
             finally { if(instructionSeal&&!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
@@ -306,7 +446,9 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     }
     private suspend fun loadBackground(){
         val p=project?:return;val doc=mutable.value.document?:return;val epoch=generation;val assumed=colorAssumed
-        if(documents.state.value.descriptor!=null){update{it.copy(background=null,needsColorConsent=false,backgroundIssue=null,backgroundFailureKind=null)};return}
+        if(documents.state.value.descriptor!=null){detachGiant();update{it.copy(background=null,needsColorConsent=false,backgroundIssue=null,backgroundFailureKind=null)};return}
+        if(giantDisplayRequired(doc)){loadGiantBackground(p,doc);return}
+        if(giantMode||giantOwner.retaining)detachGiant()
         fun current()=!closing&&project===p&&generation==epoch&&mutable.value.document?.documentId==doc.documentId
         if(!current())return
         update{it.copy(backgroundIssue=null,backgroundFailureKind=null)}
@@ -393,13 +535,13 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
     fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one image or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension !in setOf("png","jpg","jpeg","webp","heic","heif","avif","bmp","tif","tiff","mp4")){report("This drop supports PNG, JPEG, WebP, BMP, TIFF, admitted HEIC/AVIF originals and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
     fun open(path:Path,epoch:Long=generation){task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
-    suspend fun close(){closing=true;transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();documentOwner.close();closePrecision();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
+    suspend fun close(){closing=true;workflows.beginDeparture();giantOwner.invalidate();transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();workflows.close();rotation.close();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.close();closePrecision();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
     fun closeProject(){if(!mayCloseAi())return;if(!mayCloseInstructions())return;cancelInput();sessionWork?.cancel();task(generation){
         // The pre-enqueue check can become stale while another owner holds
         // edits. task has now set busy under that same mutex, fencing Send.
         if(!mayCloseAi())return@task
         if(!sealInstructionsForClose())return@task
-        try { live.close();changes?.cancelAndJoin();changes=null;discardExport();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();documentOwner.detach();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
+        try { live.close();changes?.cancelAndJoin();changes=null;discardExport();workflows.detach();rotation.detach();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.detach();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)} }
         finally { if(!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
     }}
     private suspend fun refresh(){
@@ -416,7 +558,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         if(currentInfo.hostSeq!=snapshot.render.revision.hostSeq||currentInfo.stateHash!=snapshot.render.revision.stateHash)return
         when(snapshotDecision(mutable.value.document,snapshot,allowVisibleChange=true)){
             SnapshotDecision.Stale->return
-            SnapshotDecision.Duplicate->{selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);return}
+            SnapshotDecision.Duplicate->{selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);bindWorkflows();return}
             SnapshotDecision.Conflict->{cancelDrag();update{it.copy(canvasReady=false,renderIssue="The same revision returned different content. Reopen the project before editing.")};return}
             SnapshotDecision.Newer->{
                 val issue=try{validateDrawing(snapshot);null}catch(error:UnsupportedOperationException){error.message}
@@ -426,6 +568,8 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)
         instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh()
         documentOwner.bind(p,snapshot)
+        bindWorkflows()
+        if(giantMode||giantDisplayRequired(snapshot))loadBackground()
         refreshOriginalFormatNotice()
         refreshRole(p,epoch)
     }
@@ -465,7 +609,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     fun clearSelection(){instructionFocus.localSelection(null);cancelInput();update{it.copy(selected=emptySet(),preview=emptyMap(),draft=null,textAnchor=null)}}
     private fun pointerAllowed(panButton:Boolean):Boolean {
         val s=mutable.value
-        return !closing&&!ai.state.value.open&&(panButton||s.tool==Tool.Pan||aiResultReady())&&!s.busy&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&s.document!=null&&(s.background!=null||s.documentFrame!=null)&&(s.canvasReady||panButton||s.tool==Tool.Pan)&&s.renderIssue==null&&s.textAnchor==null&&!s.exportOpen&&!s.pasteOpen&&instructionAdmission.allows(false,false,false)
+        return !closing&&!rotationUnavailable()&&!workflows.blocksInput()&&!ai.state.value.open&&(panButton||s.tool==Tool.Pan||aiResultReady())&&!s.busy&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&s.document!=null&&(s.background!=null||s.documentFrame!=null||giantInputReady())&&(s.canvasReady||panButton||s.tool==Tool.Pan)&&s.renderIssue==null&&s.textAnchor==null&&!s.exportOpen&&!s.pasteOpen&&instructionAdmission.allows(false,false,false)
     }
     fun precisionDown(raw:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long,pressure:Float=1f,semanticModifier:Boolean=false){
         if(!pointerAllowed(panButton))return
@@ -481,18 +625,20 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
             documentPress=point to point;documentPressRegion=documentMode.regionTool
             documentPressBinding=documentMode.descriptor?.let{DocumentFrameBinding(it.sourceAssetId,it.documentId,documentMode.page,it.revision,generation,0)}
         }else pointerDown(mapped,extend,false,uptimeMs,pressure,semanticModifier,physical,raw)
-        if(documentPress!=null||eraserPointer||selectionPointer||ink!=null||drag!=null||markerPress!=null||mutable.value.textAnchor!=null){precision.down(raw);precisionContact=true}
+        if(rotationGesture!=null||documentPress!=null||eraserPointer||selectionPointer||ink!=null||drag!=null||markerPress!=null||mutable.value.textAnchor!=null){precision.down(raw);precisionContact=true}
     }
-    fun precisionMove(raw:Point,uptimeMs:Long,pressure:Float=1f){
+    fun precisionMove(raw:Point,uptimeMs:Long,pressure:Float=1f,snapRotation15:Boolean=false){
         if(precisionContact)precision.move(raw)
         val mapped=if(precisionContact)precision.route(listOf(raw)).single()else raw
+        rotationGesture?.let{token->if(precision.inputMatrix()!=rotationPhysical){rotationGesture=null;rotation.cancel();return};val point=core.mapPoints(token.frame.camera,true,listOf(mapped)).single();rotationDisplay.get()?.let{rotationDisplay.set(it.copy(point=point))};rotation.move(token,point,snapRotation15);return}
         val press=documentPress
         if(press!=null){documentPress=press.first to core.mapPoints(mutable.value.view.camera,true,listOf(mapped)).single();return}
         pointerMove(mapped,uptimeMs,pressure)
     }
-    fun precisionUp(raw:Point,uptimeMs:Long,pressure:Float=1f){
+    fun precisionUp(raw:Point,uptimeMs:Long,pressure:Float=1f,snapRotation15:Boolean=false){
         try{
             val mapped=if(precisionContact)precision.route(listOf(raw)).single()else raw
+            rotationGesture?.let{token->rotationGesture=null;if(precision.inputMatrix()!=rotationPhysical){rotation.cancel();return};val point=core.mapPoints(token.frame.camera,true,listOf(mapped)).single();rotationDisplay.get()?.let{rotationDisplay.set(it.copy(point=point))};rotation.finish(token,point,snapRotation15);return}
             val press=documentPress
             if(press!=null){
                 documentPress=null;val binding=documentPressBinding;documentPressBinding=null
@@ -506,7 +652,8 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         }finally{precisionContact=false;precision.end()}
     }
     fun precisionHover(raw:Point?){if(!closing)precision.hover(raw)}
-    fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false,physical:Transform?=null,raw:Point=viewPoint){if(ai.state.value.open||(!panButton&&mutable.value.tool!=Tool.Pan&&!aiResultReady()))return;val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||(s.background==null&&s.documentFrame==null)||documents.state.value.busy||(!s.canvasReady&&!panButton&&s.tool!=Tool.Pan)||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||(s.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
+    fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false,physical:Transform?=null,raw:Point=viewPoint){if(rotationUnavailable()||workflows.blocksInput()||ai.state.value.open||(!panButton&&mutable.value.tool!=Tool.Pan&&!aiResultReady()))return;val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||(s.background==null&&s.documentFrame==null&&!giantInputReady())||documents.state.value.busy||(!s.canvasReady&&!panButton&&s.tool!=Tool.Pan)||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||(s.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
+        if(!pan&&s.tool==Tool.Select&&erasers.tools.route()==EraserInputRoute.Editor&&startRotation(s,point,raw,physical?:core.cameraMatrix(s.view.camera)))return
         if(!pan)when(erasers.tools.route()){
             EraserInputRoute.Selection->{selectionPointer=selections.interaction.begin(viewPoint,s.view.camera);return}
             EraserInputRoute.Eraser->{eraserPointer=erasers.interaction.begin(viewPoint,s.view.camera,physicalScale=physical?.let{kotlin.math.hypot(it.a,it.b)}?:s.view.camera.scale);return}
@@ -558,7 +705,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     private fun clearDragContact(retainPolygon:Boolean){precisionContact=false;documentPress=null;documentPressBinding=null;cancelPrecision();markerPress=null;eraserPointer=false;erasers.interaction.cancelGesture();selectionPointer=false;if(!retainPolygon)selections.interaction.cancelGesture();val old=drag?.let{it.live?:it.newObject};drag=null;live.cancelLater(old?.attachment,old?.id);update{it.copy(preview=emptyMap(),draft=null)}}
     private fun newObjectPreview(state:EditorState,binding:RenderBinding):NewObjectPreviewLease?{
         val attachment=live.attachment()?:return null;val shape=draftTemplate(state.tool)?:return null
-        val layer=state.document?.layers?.firstOrNull{it.visible&&!it.locked&&it.blend=="normal"}?:return null;val now=System.currentTimeMillis()
+        val layer=drawingLayer(state.document)?:return null;val now=System.currentTimeMillis()
         return NewObjectPreviewLease(core.newId(now.toULong()),attachment,core.newId(now.toULong()),binding.documentId,layer.id,now,shape,ObjectStyle(state.color,state.width))
     }
     private fun previewFor(items:List<RenderItem>,binding:RenderBinding,kind:PreviewKind):ObjectPreviewLease?{
@@ -566,11 +713,11 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         return ObjectPreviewLease(core.newId(System.currentTimeMillis().toULong()),attached,binding.documentId,item.objectId,kind)
     }
     private fun cancelWidth(){val old=widthGesture;widthGesture=null;live.cancelLater(old?.live?.attachment,old?.live?.id);update{it.copy(previewStyles=emptyMap())}}
-    fun cancelInput(){clearInputContact(false)}
-    private fun clearInputContact(retainPolygon:Boolean){precisionContact=false;documentPress=null;documentPressBinding=null;cancelPrecision();clearDragContact(retainPolygon);cancelWidth();cancelInk()}
+    fun cancelInput(){rotationGesture=null;rotation.cancel();clearInputContact(false)}
+    private fun clearInputContact(retainPolygon:Boolean){if(rotationGesture!=null){rotationGesture=null;rotation.cancel()};precisionContact=false;documentPress=null;documentPressBinding=null;cancelPrecision();clearDragContact(retainPolygon);cancelWidth();cancelInk()}
     fun finishPointerContact(){clearDragContact(selections.interaction.canResumePolygonContact(mutable.value.view.camera))}
     private fun beginInk(first:DesktopSample,binding:RenderBinding){
-        val s=mutable.value;val p=project?:return;val doc=s.document?:return;val layer=doc.layers.firstOrNull{it.visible&&!it.locked&&it.blend=="normal"}?:return
+        val s=mutable.value;val p=project?:return;val doc=s.document?:return;val layer=drawingLayer(doc)?:return
         val now=System.currentTimeMillis();val info=doc.render.revision
         val options=StrokeOptions(core.newId(now.toULong()),core.newId(now.toULong()),core.newId(now.toULong()),binding.documentId,layer.id,info.deviceId,info.nextLamport,now,"pen",s.width,s.color)
         val run=DesktopInkRun(options,binding,s.view.camera,layer,live.attachment(),first);ink=run
@@ -583,7 +730,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     }
     private fun finishInk(){val current=ink;ink=null;current?.finish()}
     private fun cancelInk(){val current=inkWork?.first?:ink;ink=null;try{current?.cancel()}catch(error:CoreFailure){report("Core ${error.kind.name.lowercase()} while cancelling ink.")};if(current?.committed!=true){wetCommitted=null;update{it.copy(wetStroke=null)}}}
-    internal fun create(shape:Shape,binding:RenderBinding?=mutable.value.document?.binding(generation),afterSuccess:()->Unit={}){val s=mutable.value;if(s.renderIssue!=null)return;val layer=s.document?.layers?.firstOrNull{it.visible&&!it.locked&&it.blend=="normal"}?:return;edit(listOf(EditCommand.Create(core.newId(System.currentTimeMillis().toULong()),layer.id,shape,ObjectStyle(s.color,s.width))),binding,afterSuccess)}
+    internal fun create(shape:Shape,binding:RenderBinding?=mutable.value.document?.binding(generation),afterSuccess:()->Unit={}){val s=mutable.value;if(s.renderIssue!=null)return;val layer=drawingLayer(s.document)?:return;edit(listOf(EditCommand.Create(core.newId(System.currentTimeMillis().toULong()),layer.id,shape,ObjectStyle(s.color,s.width))),binding,afterSuccess)}
     fun acceptText(text:String){val anchor=mutable.value.textAnchor?:return;if(text.isNotBlank()&&!mutable.value.busy&&queued==0)create(Shape.Text(anchor,text,"Inter",18.0),afterSuccess={update{it.copy(textAnchor=null)}})}
     fun delete(){
         val state = mutable.value
@@ -614,8 +761,8 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     }
     fun commitWidth(){width(mutable.value.width,true)}
     fun cycleMarker(){val ids=mutable.value.document?.render?.items?.filter{it.shape is Shape.Marker}?.sortedBy{(it.shape as Shape.Marker).number}?.map{it.objectId}.orEmpty();if(ids.isEmpty()){report("No markers in this document.");return};val current=ids.indexOf(mutable.value.selected.firstOrNull());select(ids[(current+1)%ids.size])}
-    fun follow(){if(mutable.value.view.peer==null){report("Peer view is unavailable until an authenticated session is connected.");return};update{it.copy(view=it.view.copy(followPeer=!it.view.followPeer))}}
-    fun matchPeer(){if(mutable.value.view.peer==null)report("No authenticated peer viewport is available.")else update{it.copy(view=it.view.matchPeer())}}
+    fun follow(){if(workflows.blocksInput())return;if(mutable.value.view.peer==null){report("Peer view is unavailable until an authenticated session is connected.");return};update{it.copy(view=it.view.copy(followPeer=!it.view.followPeer))}}
+    fun matchPeer(){if(workflows.blocksInput())return;if(mutable.value.view.peer==null)report("No authenticated peer viewport is available.")else update{it.copy(view=it.view.matchPeer())}}
     fun outline(){update{it.copy(view=it.view.copy(showPeerOutline=!it.view.showPeerOutline))}}
     private fun sessionStatus(value:SessionStatus?){update{s->
         val peer=value?.peerViewport?.takeIf{it.documentId==s.document?.documentId}
@@ -670,6 +817,16 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     fun prepareDragExport(request:ExportRequest){transfer(request.epoch){if(!request.settings.encoding.png)throw HandoffFailure("File drag requires PNG. Choose PNG 8 or 16 bit.");val cached=prepareExport(request);requireCurrent(request);val lease=handoff.stage(cached.workspace.output,cached.receipt);var adopted=false;try{requireCurrent(request);preparedDrag?.second?.close();preparedDrag=cached.receipt to lease;adopted=true;update{it.copy(dragPrepared=true,exportOpen=false,message="PNG drag prepared. Drag the button to the destination; nothing is sent automatically.")}}finally{if(!adopted)lease.close()}}}
     internal fun takePreparedDrag():DesktopDragFile?{val offer=preparedDrag?:return null;if(!offer.first.request.matches(mutable.value)){offer.second.close();preparedDrag=null;update{it.copy(dragPrepared=false)};return null};preparedDrag=null;update{it.copy(dragPrepared=false)};return offer.second}
     fun cancelTransfer(){transferJob?.cancel();report("Cancelling transfer; waiting for native work to release its files.")}
+    init {
+        scope.launch { rotation.state.collect{value->
+            if(!value.active&&!value.busy){rotationDisplay.set(null);rotationPhysical=null}
+            val previous=rotationPreviewIds;rotationPreviewIds=value.preview.keys.toSet()
+            update{it.copy(preview=(it.preview-previous)+value.preview)}
+            if(value.failure==ObjectRotationFailure.Unconfirmed&&!closing)scope.launch{edits.withLock{
+                try{refresh()}catch(_:Exception){report("Refresh or reopen the project before rotating again. Any accepted edit remains in history.")}
+            }}
+        }}
+    }
 }
 private fun <T> Set<T>.toggle(value:T):Set<T> = if(value in this)this-value else this+value
 private fun backgroundFailureMessage(kind:CoreFailureKind):String=when(kind){
@@ -688,4 +845,6 @@ private fun bitmap(value:BackgroundImage):ImageBitmap {
     val width=value.width.toInt();val height=value.height.toInt();val image=BufferedImage(width,height,BufferedImage.TYPE_INT_ARGB);val row=IntArray(width)
     for(y in 0 until height){for(x in 0 until width){val i=(y*width+x)*4;row[x]=((value.rgba[i+3].toInt() and 255) shl 24) or ((value.rgba[i].toInt() and 255) shl 16) or ((value.rgba[i+1].toInt() and 255) shl 8) or (value.rgba[i+2].toInt() and 255)};image.setRGB(0,y,width,1,row,0,width)}
     val bytes=ByteArrayOutputStream().use{check(ImageIO.write(image,"png",it));it.toByteArray()};return Image.makeFromEncoded(bytes).toComposeImageBitmap()
+
+
 }

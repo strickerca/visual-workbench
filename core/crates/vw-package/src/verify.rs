@@ -30,6 +30,18 @@ impl Package {
     pub fn manifest_sha256(&self) -> &str {
         &self.manifest_sha256
     }
+    /// Move the checked encoded owners into the private failure-package builder;
+    /// retaining borrowed original/after packages remains that caller's duty.
+    pub(crate) fn into_verification_parts(self) -> (Manifest, BTreeMap<String, Vec<u8>>) {
+        (self.manifest, self.files)
+    }
+    pub(crate) fn verification_allocation_bytes(&self) -> Result<u64> {
+        self.files.values().try_fold(0_u64, |retained, bytes| {
+            retained
+                .checked_add(bytes.capacity() as u64)
+                .ok_or(Error::Limit("package allocation"))
+        })
+    }
     /// Input file names are data, never filesystem paths. Admission happens
     /// before deserialization or codec work; duplicate names fail explicitly.
     pub fn from_files(
@@ -330,6 +342,7 @@ pub(crate) fn from_compiler(
     {
         return Err(Error::Integrity);
     }
+    crate::validate_verification_origin(&m)?;
     let mut inventory = BTreeSet::new();
     for f in &m.files {
         if f.path == "manifest.json"

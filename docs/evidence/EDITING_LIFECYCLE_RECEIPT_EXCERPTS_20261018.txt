@@ -1,0 +1,20 @@
+Editing lifecycle correction execution excerpts
+Code: 35ad8b46493f5240119b2927e1e90d7a7e68379d
+Base rejected candidate: 707e940841373b076ebbe750c01319df2d992eed
+Astra recheck required before promotion.
+
+LOG vw-editing-lifecycle-attempt1.log
+Android 16 KiB LOAD alignment: PASS; segments=4
+DesktopCoherenceTest > unconfirmedRotationStaysBlockedAfterRejectedRefreshUntilAnAdmittedSnapshotWithoutReplay FAILED
+356 tests completed, 1 failed, 7 skipped
+> Task :desktop:test FAILED
+BUILD FAILED in 1m 55s
+
+LOG vw-editing-lifecycle-final.log
+Android 16 KiB LOAD alignment: PASS; segments=4
+BUILD SUCCESSFUL in 2m 13s
+
+Final JUnit XML: shared464 pass; Desktop349 pass/7 Windows skips; Android136 pass.
+Four DocumentObserverRetirement cases and the actual-controller rejected-refresh case pass.
+Android instrumentation sources compiled only; lint zero errors/60 warnings/12 hints.
+Native libraries and generated bindings match prior evidence byte-for-byte; no regeneration or native rerun.

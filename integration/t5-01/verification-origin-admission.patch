@@ -1,0 +1,72 @@
+--- a/core/crates/vw-package/src/manifest.rs
++++ b/core/crates/vw-package/src/manifest.rs
+@@ -131,6 +131,8 @@
+ #[derive(Debug, Serialize, Deserialize)]
+ #[serde(deny_unknown_fields)]
+ pub struct Extensions {
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub verification_origin: Option<VerificationOrigin>,
+     pub compiler: String,
+     pub state_hash: String,
+     pub host_seq: u64,
+@@ -160,3 +162,16 @@
+     pub language: String,
+     pub updated_at_ms: i64,
+ }
++
++/// Public lineage only. Never contains private capture selectors/OS targets.
++/// Entry n maps follow-up marker n+1 to its original package marker number.
++#[derive(Debug, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct VerificationOrigin {
++    pub original_package_id: Id,
++    pub original_target: String,
++    pub original_manifest_sha256: String,
++    pub comparison_receipt_id: Id,
++    pub comparison_receipt_blake3: String,
++    pub original_marker_numbers: Vec<u32>,
++}
+--- a/core/crates/vw-package/src/compiler.rs
++++ b/core/crates/vw-package/src/compiler.rs
+@@ -494,6 +494,7 @@
+             Vec::new()
+         },
+         extensions: Extensions {
++            verification_origin: None,
+             compiler: "vw-package-1-area-integer".into(),
+             state_hash: instructions.source().state_hash.to_string(),
+             host_seq: input.revision.host_seq,
+--- a/core/crates/vw-package/src/admission.rs
++++ b/core/crates/vw-package/src/admission.rs
+@@ -94,7 +94,7 @@
+     }
+     fn array_limit(&self, key: &[u8]) -> usize {
+         match key {
+-            b"markers" | b"crops" => self.markers,
++            b"markers" | b"crops" | b"original_marker_numbers" => self.markers,
+             b"images" => self.markers + 2,
+             b"files" => self.markers + 4,
+             b"constraints" | b"redactions" => 64,
+--- a/core/crates/vw-package/src/verify.rs
++++ b/core/crates/vw-package/src/verify.rs
+@@ -330,6 +330,20 @@
+     {
+         return Err(Error::Integrity);
+     }
++    if let Some(origin) = &m.extensions.verification_origin {
++        let numbers: BTreeSet<_> = origin.original_marker_numbers.iter().copied().collect();
++        if origin.original_package_id == m.package_id
++            || !matches!(origin.original_target.as_str(), "claude" | "openai" | "gemini" | "generic")
++            || !bounded::hash_valid(&origin.original_manifest_sha256)
++            || !bounded::hash_valid(&origin.comparison_receipt_blake3)
++            || numbers.is_empty()
++            || numbers.len() != origin.original_marker_numbers.len()
++            || numbers.len() != m.markers.len()
++            || numbers.iter().any(|n| !(1..=512).contains(n))
++        {
++            return Err(Error::Integrity);
++        }
++    }
+     let mut inventory = BTreeSet::new();
+     for f in &m.files {
+         if f.path == "manifest.json"

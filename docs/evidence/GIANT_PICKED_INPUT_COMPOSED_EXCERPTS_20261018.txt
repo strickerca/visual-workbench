@@ -1,0 +1,39 @@
+Private picked-input composition — 04a913e3e36d4b6e18bf4b8b3d5a286e3ecf8b7a
+Accepted ba338ad source unchanged; exact root module/export hunk only.
+No OS-thread join, instantaneous thread cap, measured RSS or public intake claim.
+
+LOG vw-picked-composed-clippy-android-attempt1.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.04s
+
+LOG vw-picked-composed-clippy-linux-attempt1.log
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.70s
+
+LOG vw-picked-composed-native-attempt1.log
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 24.33s
+test giant_images::producer::android_bridge::tests::closing_native_input_after_uncertain_foreign_exit_preserves_marker_until_retry ... ok
+test giant_images::producer::android_bridge::tests::foreign_source_pins_are_bounded_and_confirmation_is_exact ... ok
+test giant_images::producer::android_bridge::tests::real_publication_adopts_all_four_parts_and_keeps_only_its_project_charge_until_close ... ok
+test giant_images::producer::android_bridge::tests::typed_copy_refusals_independent_output_and_failed_android_retirement_preserve_owners ... ok
+test giant_images::producer::picked::tests::abandoned_completed_reply_retires_the_undelivered_source_without_a_worker ... ok
+test giant_images::producer::picked::tests::abandoned_queued_body_is_skipped_and_retains_admission_until_actual_drop ... ok
+test giant_images::producer::picked::tests::abandoned_running_reply_cancels_actual_work_and_close_joins_cleanup ... ok
+test giant_images::producer::picked::tests::cancelled_before_start_consumes_one_attempt_and_never_runs_the_body ... ok
+test giant_images::producer::picked::tests::cleanup_failure_retains_the_real_admission_in_an_isolated_process ... ok
+test giant_images::producer::picked::tests::close_joins_blocked_preparation_and_keeps_the_same_charge_until_release ... ok
+test giant_images::producer::picked::tests::close_ready_input_cleans_before_return_and_forbids_preparation ... ok
+test giant_images::producer::picked::tests::close_retires_completed_source_while_reply_future_is_alive_and_unpolled ... ok
+test giant_images::producer::picked::tests::completed_unpolled_replies_do_not_retain_actual_startup_workers ... ok
+test giant_images::producer::picked::tests::dropping_an_unprepared_picker_retires_its_actual_input ... ok
+test giant_images::producer::picked::tests::failed_attach_retires_file_directory_permit_and_charge ... ok
+test giant_images::producer::picked::tests::failed_prepared_worker_constructor_retires_its_actual_state ... ok
+test giant_images::producer::picked::tests::memory_and_slot_refusals_never_invoke_the_opening_hook ... ok
+test giant_images::producer::picked::tests::prepared_close_keeps_admission_with_an_actual_retained_source ... ok
+test giant_images::producer::picked::tests::quarantine_probe ... ignored, Executed by the bounded quarantine wrapper; do not leak this process-global permit into unrelated tests
+test giant_images::producer::picked::tests::startup_saturation_retires_the_input_without_starting_its_body ... ok
+test giant_images::producer::picked::tests::storage_operation_failure_does_not_invent_a_cleanup_failure ... ok
+test giant_images::producer::picked::tests::two_selected_inputs_prepare_without_a_second_permit_or_charge ... ok
+test result: ok. 54 passed; 0 failed; 1 ignored; 0 measured; 236 filtered out; finished in 0.19s
+
+54 parent passes plus bounded invoked quarantine child; one child entrypoint ignored in parent.
+17 picked tests +4 G1 bridge tests +33 legacy producer/cache/publication cases pass.
+Strict Linux all-target and Android library Clippy pass. No public ABI/bindings/app change.

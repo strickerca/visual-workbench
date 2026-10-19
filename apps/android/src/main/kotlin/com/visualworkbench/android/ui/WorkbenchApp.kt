@@ -253,6 +253,7 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
             }
         }
         PrecisionControls(editor.precision)
+        EditorWorkflowControls(editor)
         if(documentState.descriptor!=null)Column(Modifier.fillMaxWidth().heightIn(max=220.dp).verticalScroll(rememberScrollState())){EditableDocumentControls(editor.documents,onDocumentSave)}
         AiResultStatus(editor)
         if (editor.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -264,9 +265,15 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
             AndroidView(factory = { context -> CanvasSurface(context, editor) }, update = { it.updatePreferences() }, modifier = Modifier.fillMaxSize().clipToBounds())
-            editor.scene?.takeIf { (it.background != null||it.documentFrame!=null) && editor.blockingMessage == null }?.let { scene -> EraserOverlay(editor.erasers, scene.camera, scene.document.render.revision, scene.document.documentId) }
-            editor.scene?.takeIf { (it.background != null||it.documentFrame!=null) && editor.blockingMessage == null }?.let { scene -> SelectionOverlay(editor.selections, scene.camera, scene.document.render.revision, scene.document.documentId) }
+            editor.scene?.takeIf { (it.background != null||it.documentFrame!=null||it.giantFrame!=null) && editor.blockingMessage == null }?.let { scene -> EraserOverlay(editor.erasers, scene.camera, scene.document.render.revision, scene.document.documentId) }
+            editor.scene?.takeIf { (it.background != null||it.documentFrame!=null||it.giantFrame!=null) && editor.blockingMessage == null }?.let { scene -> SelectionOverlay(editor.selections, scene.camera, scene.document.render.revision, scene.document.documentId) }
             PrecisionHandles(editor.precision)
+            if(editor.giantMode&&editor.scene?.giantFrame==null&&editor.blockingMessage==null){
+                Column(Modifier.align(Alignment.Center).padding(24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                    Text(editor.giantIssue?:"Preparing original-image tiles…")
+                    if(editor.giantIssue!=null)TextButton(editor::retryGiantDisplay,Modifier.heightIn(min=48.dp),enabled=!editor.busy){Text("Retry image display")}
+                }
+            }
             val availableHeight = maxHeight
             val railHeight = minOf(availableHeight * .78f, 560.dp).coerceAtLeast(80.dp)
             val travel = (availableHeight - railHeight - 16.dp).coerceAtLeast(0.dp)
@@ -312,6 +319,7 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
             }
         }
         editor.originalFormatNotice?.let { Text(it, Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.caption) }
+        if(editor.document?.hasToneAdjustments==true)Text("Tone adjustments appear in Tone preview and marked exports. This canvas shows the original image.",Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=8.dp),style=MaterialTheme.typography.caption)
         QuickControls(editor.displayedBrush(), editor::brush, { editor.brushDialog(true) },
             editor.info?.canUndo == true && editor.pending == 0, editor.info?.canRedo == true && editor.pending == 0, editor::undo, editor::redo)
     }

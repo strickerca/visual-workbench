@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-18",
+  "status": "Interface/source handoff; no giant-image/import/stream workflow acceptance or app wiring claimed.",
+  "branch": "cloud/giant-stream-integration-20261018",
+  "base_reviewed_and_normally_promoted_main": "83663107d864b21d22d2e746b9ca6eb80d47beac",
+  "source_leaf": "ca773eda954cb4fdadd1f48091b90bed56d31c06",
+  "integrated_leaf": "f6bc5ce",
+  "contracts": [
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImagesApi.kt",
+      "sha256": "9c733efc91e886c27644033e17a326c21b74dd04ac7c7fc8793ea766231874cc"
+    },
+    {
+      "path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionResourcesApi.kt",
+      "sha256": "a24315a2684c75f6ba5610804fbc808870f086e13976e75eafcebc9a04d56d7f"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/dto.rs",
+      "sha256": "b4059f1ae1f71fcddcd8db608d637d58b1fe1e47dd1aeb677adf5068d5c29c20"
+    },
+    {
+      "path": "docs/GIANT_STREAM_OWNER_HANDOFF_20261018.md",
+      "sha256": "99d6965e2dc0e33cc082ed4d2a162b7ae684d396f18af61e1dc60d80e326637f"
+    },
+    {
+      "path": "core/crates/vw-store/src/cache.rs",
+      "sha256": "743499114e492c0b55d96c0bf3ce41bbe5a664b2c4128fdfe23bd7e2c36c51ea"
+    },
+    {
+      "path": "core/crates/vw-store/src/database.rs",
+      "sha256": "b3c25b5b94b2137d16b9809e195f9af1fbdbef6b0f31ad7368395ebbe3678f4c"
+    }
+  ],
+  "checks": {
+    "locked_offline_graph": "pass; adds only vw-stream plus vw-ffi path edges to vw-assets/vw-stream, no third-party version change",
+    "rustfmt": "pass",
+    "common_import_guard": "pass",
+    "dependency_licenses_bans_sources": "pass",
+    "native_contract_compile": "cargo check --locked --offline -p vw-ffi --lib -j2 passed; no binding generation",
+    "store_regression": "bounded_cache_read_refuses_before_file_access_and_preserves_integrity_checks:1pass,26filtered; demonstrates rejection before missing payload access and retained hash checking",
+    "leaf_tests": "51 written/unrun; no native/JVM count promoted from compilation",
+    "shared_contract_compilation": "pending combined phase; only common import guard run at this checkpoint",
+    "native_compile_warning": "One recovered vw-stream ring.rs AtomicU64.fetch_update deprecation. Strict Clippy is pending; delegated stream owner replaces it with try_update during accounting work."
+  },
+  "logs": [
+    {
+      "name": "vw-giant-contract-store.log",
+      "bytes": 1241,
+      "sha256": "b7bbee2c5dd84be193e3f74441ef36e558cafce57e272b80dd9175475d21c264",
+      "tail": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.64s",
+        "     Running tests/blobs_cache.rs (target/debug/deps/blobs_cache-755fa30b2020ca83)",
+        "",
+        "running 1 test",
+        "test bounded_cache_read_refuses_before_file_access_and_preserves_integrity_checks ... ok",
+        "",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s",
+        ""
+      ]
+    },
+    {
+      "name": "vw-giant-contract-check.log",
+      "bytes": 2932,
+      "sha256": "4560cce48f02603b5b3ea755b7c96c560c00a734557e56302e515d0d1430fbea",
+      "tail": [
+        "33 -             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {",
+        "33 +             .try_update(Ordering::AcqRel, Ordering::Acquire, |used| {",
+        "   |",
+        "",
+        "warning: `vw-stream` (lib) generated 1 warning (run `cargo fix --lib -p vw-stream` to apply 1 suggestion)",
+        "    Checking vw-assets v0.1.0 (/workspace/visual-workbench/core/crates/vw-assets)",
+        "    Checking vw-ffi v0.1.0 (/workspace/visual-workbench/core/crates/vw-ffi)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.36s"
+      ]
+    },
+    {
+      "name": "vw-giant-contract-final-policy.log",
+      "bytes": 91343,
+      "sha256": "406de0f91e5fca310b45e7812396c0a75c7da21f42b62c87b96010687b23b7a2",
+      "tail": [
+        "      \u2502       \u251c\u2500\u2500 vw-pair-cli v0.1.0 (*)",
+        "      \u2502       \u2514\u2500\u2500 vw-transport-bench v0.1.0 (*)",
+        "      \u251c\u2500\u2500 yoke-derive v0.8.4 (*)",
+        "      \u251c\u2500\u2500 zerofrom-derive v0.1.8 (*)",
+        "      \u2514\u2500\u2500 zerovec-derive v0.11.6",
+        "          \u2514\u2500\u2500 zerovec v0.11.8 (*)",
+        "",
+        "bans ok, licenses ok, sources ok"
+      ]
+    }
+  ],
+  "delegation": {
+    "handoff": "docs/GIANT_STREAM_OWNER_HANDOFF_20261018.md",
+    "image_lane_a": "New giant_images/provider.rs,source.rs,tiles.rs,producer.rs,tests.rs only; factory uses root DTOs/Worker/full-binding/closed gate and supplied SessionBudget. Root retains registration and store/common/app changes.",
+    "image_lane_b": "Pure vw-stream src/*.rs and tests/*.rs: SessionBudget RAII and actual budgeted ring/codec/frame/freeze/lossless/transfer ownership. Root retains Cargo/lock and all shared/native FFI adapter contracts.",
+    "heavy_slot": "Released by root after contract compile/test. Once parent forwards, image owner may take the single slot for policy then focused stream/assets tests, max2workers. Root works reserved source without heavy builds until explicit release."
+  },
+  "limits": [
+    "Provider factory and actual platform producer/import/rebuild are not implemented or registered at this source checkpoint. Missing/unsupported producers must refuse; arbitrary external tile directories are not approval.",
+    "Recovered viewport local192MiB accounting is not a session-wide pool. Root must compose SessionResources foreign charges backed by the same native pool and retain them through actual renderer retirement before any production caller wiring.",
+    "T3.05 Windows target check remains blocked by ring selecting hostGNUcc and missinglib.exe; mixed-version peers, measured calibration, Android instrumentation and physical gates remain unestablished.",
+    "PDF stays gated; exact artifacts acquisition403 and physical-file/unextracted-JNI loader conflict remain separate batches. No binaries installed/loaded, credentials, signing, device/provider actions or screenshots.",
+    "Frozen070758ac ref and recovery archives/worktrees retained."
+  ]
+}

@@ -20,6 +20,8 @@ import com.visualworkbench.android.input.PointerTool
 import com.visualworkbench.android.input.StylusInput
 import com.visualworkbench.android.documents.PreparedDocumentTile
 import com.visualworkbench.android.precision.*
+import com.visualworkbench.shared.GiantVisibleFrame
+import android.graphics.Bitmap
 import com.visualworkbench.shared.DocumentDrawLease
 import kotlinx.coroutines.CompletableDeferred
 
@@ -33,6 +35,8 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         var drawn = 0L
         var frontDrawn = 0L
         var documentReader:DocumentDrawLease<PreparedDocumentTile>?=null
+        var giantDrawn:GiantVisibleFrame<Bitmap>?=null
+        var giantFrontDrawn:GiantVisibleFrame<Bitmap>?=null
     }
     private data class Frame(val session: RenderSession, val dry: Boolean, val inputMs: Long)
     private val lock = Any()
@@ -41,6 +45,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private val buttons=PrecisionButtons(controller.precision,controller::precisionInputAllowed)
     private val router = CanvasGestureRouter(controller, ViewConfiguration.get(context).scaledTouchSlop.toDouble())
     private var predictor = MotionEventPredictor.newInstance(this)
+    private val retirementHook:suspend()->Unit = {retireForProject()}
     private var renderer: CanvasFrontBufferedRenderer<Frame>? = null
     private var session: RenderSession? = null
     private var retiring = false
@@ -72,11 +77,12 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow(); attached = true
-        controller.attachCanvas(::publish,::retireForProject)
+        controller.attachCanvas(::publish,retirementHook,::ensureRenderer)
         ensureRenderer()
     }
     override fun onDetachedFromWindow() {
-        attached = false; cancelInput(); controller.detachCanvas(); retireRenderer()
+        attached = false; cancelInput(); controller.detachCanvas(retirementHook)
+        retireRenderer().invokeOnCompletion{error->if(error==null)main.post{if(!attached)controller.canvasRendererRetired(retirementHook)}}
         super.onDetachedFromWindow()
     }
 
@@ -89,6 +95,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
 
     private fun publish(scene: CanvasScene) {
         latest = scene
+        if(session==null)ensureRenderer()
         val target = session ?: return
         if(target.latest?.documentFrame!==scene.documentFrame){retireRenderer();return}
         synchronized(lock) { if (!target.closed) target.latest = scene }
@@ -108,14 +115,14 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     }
 
     private fun ensureRenderer() {
-        if (!attached || !holder.surface.isValid || width <= 0 || height <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0 || renderer != null || retiring) return
+        if (!attached || !controller.canCreateCanvas(retirementHook) || !holder.surface.isValid || width <= 0 || height <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0 || latest == null || renderer != null || retiring) return
         val currentSession = RenderSession().also { it.latest = latest;it.documentReader=latest?.documentFrame?.acquire() }
         session = currentSession
         renderer = CanvasFrontBufferedRenderer(this, object : CanvasFrontBufferedRenderer.Callback<Frame> {
             override fun onDrawFrontBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, param: Frame) {
                 val snapshot = synchronized(lock) {
                     currentSession.frontQueued = false
-                    if (currentSession.closed || param.session !== currentSession) null else currentSession.latest?.also { currentSession.frontDrawn = it.revision }
+                    if (currentSession.closed || param.session !== currentSession) null else currentSession.latest?.also { currentSession.frontDrawn = it.revision;currentSession.giantFrontDrawn=it.giantFrame }
                 } ?: return
                 drawOwned(canvas,snapshot,currentSession)
                 if (param.inputMs > 0) main.post { if (!currentSession.closed) controller.drawCallback(param.inputMs) }
@@ -123,7 +130,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
             override fun onDrawMultiBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, params: Collection<Frame>) {
                 val snapshot = synchronized(lock) {
                     currentSession.dryQueued = false
-                    if (currentSession.closed) null else currentSession.latest?.also { currentSession.drawn = it.revision }
+                    if (currentSession.closed) null else currentSession.latest?.also { currentSession.drawn = it.revision;currentSession.giantDrawn=it.giantFrame }
                 }
                 if (snapshot == null) canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
                 else drawOwned(canvas,snapshot,currentSession)
@@ -132,7 +139,8 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                                                             transaction: SurfaceControlCompat.Transaction) {
                 synchronized(lock) {
                     // A stale wet callback cannot cover a newer saved dry frame.
-                    if (currentSession.closed || currentSession.frontDrawn <= currentSession.drawn)
+                    if (currentSession.closed || currentSession.frontDrawn <= currentSession.drawn ||
+                        currentSession.giantFrontDrawn?.let{!controller.giantFrameCurrent(it)}==true)
                         transaction.setVisibility(frontBufferedLayerSurfaceControl, false)
                 }
                 main.post { redrawNewer(currentSession) }
@@ -142,11 +150,15 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                                                             transaction: SurfaceControlCompat.Transaction) {
                 synchronized(lock) {
                     currentSession.frontDrawn = minOf(currentSession.frontDrawn, currentSession.drawn)
-                    if (currentSession.closed) {
+                    if (currentSession.closed || currentSession.giantDrawn?.let{!controller.giantFrameCurrent(it)}==true) {
                         transaction.setVisibility(frontBufferedLayerSurfaceControl, false)
                         transaction.setVisibility(multiBufferedLayerSurfaceControl, false)
                     }
                 }
+                currentSession.giantDrawn?.let{frame->main.post{
+                    if(!currentSession.closed&&currentSession===session&&controller.giantFrameCurrent(frame))
+                        controller.giantRenderCompleted(frame,retirementHook)
+                }}
                 // renderMultiBufferedLayer hides the front at this transaction.
                 // Reissue any newer wet scene afterward so a dry commit cannot
                 // make a following stroke disappear until its next input event.
@@ -169,12 +181,23 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private fun wet(scene: CanvasScene) = scene.provisional.isNotEmpty() || scene.transformed.isNotEmpty() || scene.hidden.isNotEmpty() || scene.documentDraft!=null
 
     private fun drawOwned(canvas:Canvas,snapshot:CanvasScene,target:RenderSession) {
+        if(snapshot.giantMode){
+            synchronized(lock){
+                val frame=snapshot.giantFrame
+                if(target.closed||target!==session||target.latest!==snapshot||frame==null||!controller.giantFrameCurrent(frame)){
+                    canvas.drawColor(Color.TRANSPARENT,PorterDuff.Mode.CLEAR);return
+                }
+                PrecisionDrawing.draw(canvas,snapshot)
+            }
+            return
+        }
         val reader=target.documentReader
         if(snapshot.documentFrame==null)PrecisionDrawing.draw(canvas,snapshot)
         else reader?.read{tiles->PrecisionDrawing.draw(canvas,snapshot.copy(documentTiles=tiles))}
     }
     private suspend fun retireForProject(){latest=null;retireRenderer().await()}
     private fun retireRenderer():CompletableDeferred<Unit> {
+        controller.canvasRendererRetiring()
         val target=session
         synchronized(lock) { target?.closed = true }
         session=null

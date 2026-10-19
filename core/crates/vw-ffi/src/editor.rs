@@ -35,6 +35,11 @@ impl History {
         for txn in store.pending()? {
             result.pending(&txn)?;
         }
+        // Durable review drafts reserve operation counters before submission.
+        // Reopen and authenticated checkpoint restore must not reuse those IDs.
+        result.next_lamport = result
+            .next_lamport
+            .max(store.conflict_review_lamport_floor()?);
         Ok(result)
     }
     pub fn accept(&mut self, txn: &pb::Transaction, receipt: &Acceptance) -> Result<()> {
