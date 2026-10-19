@@ -133,9 +133,9 @@ internal class GiantDesktopRetirement(private val stop: () -> Unit,
 
 internal fun <T : Any> giantFrameCurrent(frame: GiantVisibleFrame<T>?, owned: GiantVisibleFrame<T>?,
     binding: WorkflowBinding, epoch: Long, viewport: GiantViewport?, status: GiantViewStatus,
-    admitted: Boolean, current: Boolean): GiantVisibleFrame<T>? = frame?.takeIf {
+    admitted: Boolean, current: Boolean, content: GiantTileContent = GiantTileContent.Source): GiantVisibleFrame<T>? = frame?.takeIf {
     admitted && current && viewport != null && it === owned && status.ready &&
-        it.generation == status.generation && it.matches(binding, epoch, viewport)
+        it.content == content && it.generation == status.generation && it.matches(binding, epoch, viewport)
 }
 
 internal class GiantRasterOwner(val native: Image) {
@@ -295,7 +295,7 @@ private class GiantCanvasHost(private val cancelInput: () -> Unit,
 internal class GiantDesktopView private constructor(private val image: GiantImage,
     private val resources: SessionResources, private val binding: WorkflowBinding, private val epoch: Long,
     private val isCurrent: (WorkflowBinding, Long) -> Boolean, private val cancelInput: () -> Unit,
-    private val changed: (GiantViewStatus) -> Unit) {
+    private val changed: (GiantViewStatus) -> Unit, private val content: GiantTileContent) {
     private var surface: SessionResourceCharge? = null
     private var host: GiantCanvasHost? = null
     private var session: GiantViewportSession<GiantBitmap>? = null
@@ -330,14 +330,26 @@ internal class GiantDesktopView private constructor(private val image: GiantImag
     }
 
     companion object {
+        // Preserve the existing trailing-lambda caller while offering an
+        // explicit immutable content selection for its replacement owner.
         suspend fun create(scope: CoroutineScope, image: GiantImage, resources: SessionResources,
             binding: WorkflowBinding, epoch: Long, isCurrent: (WorkflowBinding, Long) -> Boolean,
-            cancelInput: () -> Unit, changed: (GiantViewStatus) -> Unit): GiantDesktopView {
-            val owner = GiantDesktopView(image, resources, binding, epoch, isCurrent, cancelInput, changed)
+            cancelInput: () -> Unit, changed: (GiantViewStatus) -> Unit): GiantDesktopView =
+            create(scope, image, resources, binding, epoch, isCurrent, cancelInput, changed,
+                GiantTileContent.Source, false)
+
+        suspend fun create(scope: CoroutineScope, image: GiantImage, resources: SessionResources,
+            binding: WorkflowBinding, epoch: Long, isCurrent: (WorkflowBinding, Long) -> Boolean,
+            cancelInput: () -> Unit, changed: (GiantViewStatus) -> Unit,
+            content: GiantTileContent,
+            assumeUntaggedSrgb: Boolean = false): GiantDesktopView {
+            val owner = GiantDesktopView(image, resources, binding, epoch, isCurrent, cancelInput, changed, content)
             try {
                 // Store ownership inside NonCancellable before returning across
                 // dispatchers, including a pre-cancelled creator/parent scope.
                 withContext(NonCancellable + Dispatchers.Main.immediate) {
+                    if (content == GiantTileContent.Composed && image !is GiantEditingImage)
+                        throw GiantImageFailure(GiantImageFailureKind.Unsupported)
                     owner.surface = resources.reserveForeign(GIANT_DESKTOP_SURFACE_BYTES)
                     scope.coroutineContext.ensureActive()
                     check(isCurrent(binding, epoch))
@@ -346,7 +358,8 @@ internal class GiantDesktopView private constructor(private val image: GiantImag
                         { changed(owner.status) })
                     owner.host = backend
                     val uiScope = CoroutineScope(scope.coroutineContext + Dispatchers.Main.immediate)
-                    val active = GiantViewportSession(uiScope, image, backend, binding, epoch, isCurrent, resources)
+                    val active = GiantViewportSession(uiScope, image, backend, binding, epoch, isCurrent, resources,
+                        content = content, assumeUntaggedSrgb = assumeUntaggedSrgb)
                     owner.session = active
                     owner.observation = uiScope.launch(start = CoroutineStart.UNDISPATCHED) {
                         active.state.collect { value -> backend.statusChanged(value); changed(owner.status) }
@@ -385,7 +398,7 @@ internal class GiantDesktopView private constructor(private val image: GiantImag
         val owned = host?.frame
         return giantFrameCurrent(owned, owned, binding, epoch, viewport, session?.state?.value ?: GiantViewStatus(),
             surfaceReserved && !refused && host?.surfaceAdmitted == true && host?.failed() == false && this.viewport == viewport,
-            this.binding == binding && this.epoch == epoch && isCurrent(binding, epoch))
+            this.binding == binding && this.epoch == epoch && isCurrent(binding, epoch), content)
     }
     internal fun container(): JPanel = checkNotNull(host).container
     internal fun content(handler: (KeyEvent) -> Boolean, value: @Composable (GiantVisibleFrame<GiantBitmap>?) -> Unit) {
