@@ -196,7 +196,7 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
         }catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
         catch(_:Exception){prepared=null;controller.canvasFailed(requested,"Canvas geometry could not be prepared. Reopen the project before editing; saved data is intact.")}
     }
-    LaunchedEffect(prepared,aiResultState.frame,state.view.camera,state.preview,state.peerFrame,state.composedBackground,state.background){
+    LaunchedEffect(prepared,aiResultState.frame,state.view.camera,state.preview,state.peerFrame,state.composedBackground,state.background,giantFrame){
         prepared?.current(latest)?.takeIf{controller.aiResultReady()}?.let{controller.canvasPrepared(it.binding)}
     }
     val documentReader=remember(state.documentFrame){controller.documentReader(state.documentFrame)}
@@ -224,13 +224,15 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
         if(background==null&&current.documentFrame==null&&giant==null&&current.composedBackground==null)return@Canvas
         if(current.documentFrame!=null&&documentReader?.binding!=current.documentFrame.binding)return@Canvas
         val doc=frame.document
-        if((doc.hasToneAdjustments||current.composedBackground!=null)&&composed==null)return@Canvas
+        if(giant!=null&&giant.content!=expectedGiantContent(doc))return@Canvas
+        val composedPixels=composed!=null||giant?.content==GiantTileContent.Composed
+        if((doc.hasToneAdjustments||current.composedBackground!=null)&&!composedPixels)return@Canvas
         val aiFrame=controller.aiResultFrame()
         if(!controller.aiResultReady())return@Canvas
         val currentOverlay=overlay?.takeIf{it.binding==frame.binding&&it.source===latestOverlay}
         val replacements=currentOverlay?.source?.associateBy{it.objectId}.orEmpty()
-        val displayed=canvasItems(doc,composed!=null,replacements,current.composedGuideIds).filterNot{
-            composed!=null&&it.shape is Shape.Result&&aiFrame?.images?.containsKey(it.objectId)!=true
+        val displayed=canvasItems(doc,composedPixels,replacements,current.composedGuideIds).filterNot{
+            composedPixels&&it.shape is Shape.Result&&aiFrame?.images?.containsKey(it.objectId)!=true
         }
         var documentTiles:List<PreparedDocumentTile>?=null
         fun document(camera:Transform,scale:Double,smooth:Boolean){
@@ -253,7 +255,7 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
                     val paint=Paint().apply{alpha=first.layerOpacity.toFloat();blendMode=if(first.layerBlend=="multiply")BlendMode.Multiply else BlendMode.SrcOver}
                     drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f,0f,doc.width.toFloat(),doc.height.toFloat()),paint)
                     try{for(item in items){
-                        val guide=if(item.shape is Shape.Guide||(composed!=null&&item.objectId in current.composedGuideIds))
+                        val guide=if(item.shape is Shape.Guide||(composedPixels&&item.objectId in current.composedGuideIds))
                             item.copy(style=item.style.copy(width=maxOf(1.0,item.style.width),fill=null)) else item
                         drawGeometry(guide,checkNotNull(currentOverlay?.entries?.get(item.objectId)?:frame.entries[item.objectId]),current.preview[item.objectId],scale)
                     }}finally{drawContext.canvas.restore()}
@@ -262,7 +264,7 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
             }finally{drawContext.canvas.restore()}
             val selected=doc.render.items.filter{it.objectId in current.selected}
             union(selected.map{previewBounds(it,current.preview[it.objectId])})?.let{bounds->val width=(1.0/scale).toFloat();drawRect(Color(0xff81e0c8),Offset(bounds.x.toFloat(),bounds.y.toFloat()),Size(bounds.width.toFloat(),bounds.height.toFloat()),style=Stroke(width));val side=(8.0/scale).toFloat();drawRect(Color(0xff81e0c8),Offset((bounds.x+bounds.width).toFloat()-side/2,(bounds.y+bounds.height).toFloat()-side/2),Size(side,side))}
-            if(composed!=null)for(bounds in transientCanonicalOutlines(current,replacements)){
+            if(composedPixels)for(bounds in transientCanonicalOutlines(current,replacements)){
                 drawRect(Color(0xffefba71),Offset(bounds.x.toFloat(),bounds.y.toFloat()),
                     Size(bounds.width.toFloat(),bounds.height.toFloat()),style=Stroke((1.5/scale).toFloat(),
                         pathEffect=PathEffect.dashPathEffect(floatArrayOf((6.0/scale).toFloat(),(4.0/scale).toFloat()))))
