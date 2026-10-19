@@ -1,4 +1,26 @@
 use super::*;
+
+#[test]
+fn raw_cost_is_only_the_unambiguous_top_level_json_number() {
+    for (json, expected) in [
+        (
+            r#"{"result":{"cost":0.5},"note":"comma, and } quote \" stay data","cost":0.25}"#,
+            Some("0.25"),
+        ),
+        (r#"{"cost":1e-400}"#, Some("1e-400")),
+        (
+            r#"{"cost":0.00010000000000000000000001}"#,
+            Some("0.00010000000000000000000001"),
+        ),
+        (r#"{"cost":null}"#, Some("null")),
+        (r#"{"result":{"cost":0.5}}"#, None),
+        (r#"{"cost":0.25,"cost":0.5}"#, None),
+        (r#"{"cost":0.25,"c\u006fst":0.5}"#, None),
+    ] {
+        assert_eq!(raw_cost_decimal(json.as_bytes()), expected, "{json}");
+    }
+}
+
 #[test]
 fn bfl_urls_require_https_scoped_hosts_and_exact_task_binding() -> Result<()> {
     polling_url(

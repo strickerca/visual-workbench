@@ -79,11 +79,103 @@ struct PollResult {
     id: String,
     status: String,
     result: Option<Sample>,
-    cost: Option<serde_json::Value>,
 }
 #[derive(Deserialize)]
 struct Sample {
     sample: String,
+}
+
+fn skip_json_space(bytes: &[u8], index: &mut usize) {
+    while bytes
+        .get(*index)
+        .is_some_and(|b| matches!(b, b' ' | b'\n' | b'\r' | b'\t'))
+    {
+        *index += 1;
+    }
+}
+
+fn json_string_end(bytes: &[u8], index: &mut usize) -> Option<bool> {
+    if bytes.get(*index) != Some(&b'"') {
+        return None;
+    }
+    *index += 1;
+    let mut escaped = false;
+    while let Some(&byte) = bytes.get(*index) {
+        *index += 1;
+        match byte {
+            b'"' => return Some(escaped),
+            b'\\' => {
+                escaped = true;
+                *index = index.checked_add(1)?;
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn json_value_end(bytes: &[u8], index: &mut usize) -> Option<()> {
+    let mut depth = 0_u8;
+    while let Some(&byte) = bytes.get(*index) {
+        match byte {
+            b'"' => {
+                json_string_end(bytes, index)?;
+                continue;
+            }
+            b'{' | b'[' => depth = depth.checked_add(1)?,
+            b'}' | b']' if depth == 0 => return Some(()),
+            b'}' | b']' => depth -= 1,
+            b',' if depth == 0 => return Some(()),
+            _ => {}
+        }
+        *index += 1;
+    }
+    None
+}
+
+/// Serde validates the bounded whole response first. This scanner then reads
+/// only the original top-level cost token, before JSON number/f64 conversion.
+/// Ambiguous escaped or duplicate keys cannot authorize a settlement.
+fn raw_cost_decimal(bytes: &[u8]) -> Option<&str> {
+    let mut index = 0;
+    skip_json_space(bytes, &mut index);
+    if bytes.get(index) != Some(&b'{') {
+        return None;
+    }
+    index += 1;
+    let mut cost = None;
+    loop {
+        skip_json_space(bytes, &mut index);
+        if bytes.get(index) == Some(&b'}') {
+            index += 1;
+            skip_json_space(bytes, &mut index);
+            return (index == bytes.len()).then_some(cost).flatten();
+        }
+        let start = index;
+        if json_string_end(bytes, &mut index)? {
+            return None;
+        }
+        let is_cost = bytes.get(start + 1..index - 1) == Some(b"cost".as_slice());
+        skip_json_space(bytes, &mut index);
+        if bytes.get(index) != Some(&b':') {
+            return None;
+        }
+        index += 1;
+        skip_json_space(bytes, &mut index);
+        let start = index;
+        json_value_end(bytes, &mut index)?;
+        if is_cost {
+            if cost.is_some() {
+                return None;
+            }
+            cost = Some(std::str::from_utf8(bytes.get(start..index)?.trim_ascii()).ok()?);
+        }
+        match bytes.get(index) {
+            Some(b',') => index += 1,
+            Some(b'}') => {}
+            _ => return None,
+        }
+    }
 }
 
 fn valid_id(id: &str) -> bool {
@@ -207,18 +299,15 @@ pub(crate) async fn send(
         .await?;
         let response: PollResult =
             serde_json::from_slice(bytes.as_slice()).map_err(|_| Error::Representation)?;
-        drop(bytes);
         if response.id != submission.id {
             return Err(Error::Representation);
         }
         match response.status.as_str() {
             "Pending" | "Reasoning" | "Generating" if response.result.is_none() => continue,
             "Ready" => {
-                let cost_receipt = response
-                    .cost
-                    .as_ref()
-                    .and_then(serde_json::Value::as_number)
+                let cost_receipt = raw_cost_decimal(bytes.as_slice())
                     .and_then(|credits| FluxCostReceipt::from_provider(&submission.id, credits));
+                drop(bytes);
                 let sample = response.result.ok_or(Error::Representation)?;
                 let sample = transport_url(sample_url(&sample.sample)?, target)?;
                 drop(key);

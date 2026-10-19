@@ -793,21 +793,23 @@ pub struct FluxCostReceipt {
     credits_decimal: String,
 }
 impl FluxCostReceipt {
-    pub fn from_provider(task_id: &str, credits: &serde_json::Number) -> Option<Self> {
-        let decimal = credits.to_string();
+    /// Accept the original JSON number lexeme from the provider response. A
+    /// serde_json::Number has already rounded fractional values through f64.
+    pub fn from_provider(task_id: &str, decimal: &str) -> Option<Self> {
         if task_id.is_empty()
             || task_id.len() > 128
             || !task_id
                 .bytes()
                 .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
+            || decimal.is_empty()
             || decimal.len() > 64
-            || decimal.starts_with('-')
+            || !json_nonnegative_number(decimal.as_bytes())
         {
             return None;
         }
         Some(Self {
             task_id: task_id.into(),
-            credits_decimal: decimal,
+            credits_decimal: decimal.into(),
         })
     }
     pub fn task_id(&self) -> &str {
@@ -850,6 +852,43 @@ impl FluxCostReceipt {
         };
         u64::try_from(actual).ok()
     }
+}
+
+fn json_nonnegative_number(bytes: &[u8]) -> bool {
+    let mut index = 0;
+    if bytes.first() == Some(&b'0') {
+        index += 1;
+    } else if bytes.first().is_some_and(|b| (b'1'..=b'9').contains(b)) {
+        while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+            index += 1;
+        }
+    } else {
+        return false;
+    }
+    if bytes.get(index) == Some(&b'.') {
+        index += 1;
+        let start = index;
+        while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+            index += 1;
+        }
+        if index == start {
+            return false;
+        }
+    }
+    if matches!(bytes.get(index), Some(b'e' | b'E')) {
+        index += 1;
+        if matches!(bytes.get(index), Some(b'+' | b'-')) {
+            index += 1;
+        }
+        let start = index;
+        while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+            index += 1;
+        }
+        if index == start {
+            return false;
+        }
+    }
+    index == bytes.len()
 }
 pub struct ProviderResponse {
     request_id: String,
