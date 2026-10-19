@@ -36,7 +36,7 @@
     "Thin native URI facade requires final ABI; app picker and device journey remain open"
   ],
   "native_source_sha256": {
-    "core/crates/vw-ffi/src/giant_images/producer/uri_android.rs": "754dc38d4921375189fa71a7f23df4ce6da08d59085af4ca99f398099d689fe7",
+    "core/crates/vw-ffi/src/giant_images/producer/uri_android.rs": "daacc6c26586204b2431a672c212a41ae548643cfe77b7ba91df6c66b03e8e92",
     "core/crates/vw-ffi/src/giant_images/producer/uri_staging.rs": "5437e7d9ed61672702a88a61ce2f5074170abdead3aa12e972a6e40cac755806",
     "core/crates/vw-ffi/src/giant_images/producer/uri_staging/tests.rs": "4f8101b6985b164cd3e1da156f962d646edbc80e37578ab209198f270d5871a9",
     "core/crates/vw-ffi/src/giant_images/intake.rs": "193b124f7069310037fef6c1a96d027f183db9be2ac1686e513f3f76e630600a"

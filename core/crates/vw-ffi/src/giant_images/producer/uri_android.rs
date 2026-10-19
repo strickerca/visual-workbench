@@ -62,7 +62,7 @@ impl AndroidReader {
             .vm
             .attach_current_thread_for_scope(|env| {
                 let result = env
-                    .call_method(&self.owner, name, jni_sig!(() -> void), &[])
+                    .call_method(&self.owner, name, jni_sig!("()V"), &[])
                     .map(|_| ())
                     .map_err(|_| Error::Storage);
                 env.exception_clear();
