@@ -138,7 +138,8 @@ private class NativeConfirmation(private val handle: NConfirmation, private val 
     override suspend fun decline() { close() }
     override suspend fun close() { releaseNative { closeMutex.withLock { if (closed.compareAndSet(false, true)) try { handle.decline() } catch (error: SessionException) { if (error !is SessionException.Closed) throw sessionFailure(error) } finally { handle.destroy(); owner.remove(this@NativeConfirmation) } } } }
 }
-private class NativeLink(private val handle: LiveSession, private val owner: SessionOwner) : ProjectLink, OwnedSession, NativeFocusAccess, NativeRemoteAccess {
+private class NativeLink(private val handle: LiveSession, private val owner: SessionOwner) : ProjectLink, OwnedSession, NativeFocusAccess, NativeRemoteAccess, NativeCaptureAccess {
+    override val captureChildren = CaptureChildren()
     private val closed = AtomicBoolean(false)
     private val remoteOwner=RemoteOwnerPublication<NativeRemoteEdit>(closed){it.isRetired()}
     private val retired=AtomicBoolean(false)
@@ -173,6 +174,7 @@ private class NativeLink(private val handle: LiveSession, private val owner: Ses
         // No publication monitor is held across actual decoder/helper retirement.
         // Pending close retains this child, captured foreign owner and parent.
         activeRemote?.close()
+        captureChildren.close()
         try { handle.closeSession() } catch(error:SessionException) { throw sessionFailure(error) }
         handle.destroy();retired.set(true);owner.remove(this@NativeLink)
     } } } }

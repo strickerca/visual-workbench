@@ -1,0 +1,70 @@
+{
+  "schema": "vw.f-tunnel-isolated-compile.v1",
+  "source_revision": "7533f7c0b6934fd01aae281f4261508d48d9aa13",
+  "source_files": [
+    {
+      "path": "host-win/crates/vw-remote-host/src/android_tunnel.rs",
+      "bytes": 946,
+      "sha256": "b88151e07ed50bf942cc3243067df0fcb5e5bc30f6a76bd7237f699ed57616a4"
+    },
+    {
+      "path": "host-win/crates/vw-remote-host/src/android_tunnel/capture.rs",
+      "bytes": 8174,
+      "sha256": "dc2d17e56f7e9b8403e410ab347f69839b39b77de14112d97b950d4900984ac4"
+    },
+    {
+      "path": "host-win/crates/vw-remote-host/src/android_tunnel/device.rs",
+      "bytes": 3798,
+      "sha256": "5776045004ab8f1b4fe3e017ea9d463fd1cde7f153dfc192f9a445fbd95addbb"
+    },
+    {
+      "path": "host-win/crates/vw-remote-host/src/android_tunnel/mirror.rs",
+      "bytes": 1979,
+      "sha256": "82737987b45c74cdd7eb81c0264f61fdc8ab28f919b58ad3972c80820d12db60"
+    },
+    {
+      "path": "host-win/crates/vw-remote-host/src/android_tunnel/session.rs",
+      "bytes": 19438,
+      "sha256": "0db063c0dc31d223c27c0b8b06b0626e2f61535ff4cfa0388cf5ca78feaba1e1"
+    },
+    {
+      "path": "host-win/crates/vw-remote-host/src/android_tunnel/tests.rs",
+      "bytes": 17581,
+      "sha256": "f308b842cd17e3696d47b1f0d8c844e5623b0170ac3f74de1d14dc1f9ef34368"
+    },
+    {
+      "path": "host-win/crates/vw-remote-host/src/android_tunnel/windows.rs",
+      "bytes": 29028,
+      "sha256": "cf84cc974ef596827d330d733101a04457af303fa1e732da01d069bf77c4de4e"
+    }
+  ],
+  "exact_unmodified_source_compile": "failed E0063: roxmltree::ParsingOptions.entity_resolver missing",
+  "parser_pin": "roxmltree = =0.21.1, default features",
+  "manifest_sha256": "ee512d839ab07aaea92ac0d35c5d0d51ae9f99a9a2884a386b30dccb6f0d03bb",
+  "lock_sha256": "a899152c89cd187e5d37f89f2de0a3a4e2a9fdc4771edd79c840b24a6a54f4b4",
+  "temporary_repair": {
+    "patch": "docs/evidence/F_TUNNEL_PROPOSED_COMPILE_REPAIR_20261019.patch",
+    "sha256": "86bf59ff909e062e857114e50718d245dad1f7d0a0fa6234bc0bc6054e02e270",
+    "change": "add entity_resolver: None only",
+    "synthetic_tests_passed": 4,
+    "linux_dead_code_warnings": 3
+  },
+  "scope": "Exact seven F module sources in an isolated thin crate, not the full host crate or Windows path; no fake native/platform implementation",
+  "held_code_gap": "Windows scrcpy launch is always --no-control; no enabling route found",
+  "logs": [
+    {
+      "path": "/tmp/vw-tunnel-current-isolated-compile-tests-20261019.log",
+      "bytes": 555,
+      "sha256": "5bbca1bd62a4df1a3fb2978818b48b76b87554685120921d0b722359ebab2f99"
+    },
+    {
+      "path": "/tmp/vw-tunnel-current-isolated-repaired-tests-20261019.log",
+      "bytes": 2062,
+      "sha256": "c5f6b8ff65d33c1ba7ff462195fcd689005cc15eeb87fd9b54df8da1e3620e25"
+    }
+  ],
+  "active_f_source_composed": false,
+  "runtime_or_license_admission": false,
+  "windows_compile": false,
+  "dll_or_adb_or_scrcpy_or_device_or_gui_execution": false
+}

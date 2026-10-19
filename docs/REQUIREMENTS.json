@@ -1257,9 +1257,11 @@
       "scenarios": [
         "A07"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -1281,9 +1283,11 @@
       "scenarios": [
         "A07"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
     },
@@ -1305,8 +1309,10 @@
       "scenarios": [
         "A07"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -1434,8 +1440,10 @@
         "A07",
         "A08"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "updated: the HEVC remote-edit view is STREAM-002 (phase 4)"
@@ -4433,9 +4441,10 @@
         "A07"
       ],
       "evidence": [
-        "docs/evidence/T0.07.md"
+        "docs/evidence/T0.07.md",
+        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
-      "impl_status": "not_started",
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new (D9)"
@@ -4518,9 +4527,11 @@
       "scenarios": [
         "A07"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new: lossless ring buffer"
     },
@@ -5186,9 +5197,10 @@
         "A07"
       ],
       "evidence": [
-        "docs/evidence/T0.07.md"
+        "docs/evidence/T0.07.md",
+        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
-      "impl_status": "not_started",
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new"
@@ -5397,9 +5409,11 @@
       "scenarios": [
         "A07"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     }

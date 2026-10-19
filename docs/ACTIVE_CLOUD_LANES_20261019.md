@@ -9,16 +9,32 @@ worker, sent an outgoing cloud task message or run model conversion.
 **Latest disposition (supersedes historical rows below):** parent independently
 accepts bounded Paint integration e57b941, including a87eb4d/9103cf5, with actual
 factory/Main owner, peer reservation, helper retire/resume, retained failed
-owner and final native checks. Windows/fresh bindings/Compose/JNI/actual Paint
+owner and final native checks. Windows/Compose/JNI/actual Paint
 journeys remain pending; mouse-only evidence never becomes physical pen proof.
 Repaired F55505c6 preparation is independently accepted, actual tunnel DLL/
 license/runtime admission still closed. Current remaining-code reconciliation
 is ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md. Exact parent-dispatch grants
 for existing G live-annotate producer and F tunnel session/capture/loop source
-are REMAINING_CODE_GRANTS_20261019.md; root has not activated them. Root next
-owns T3.02 contract/session/draft/save and app-root integration. No heavy local
+are REMAINING_CODE_GRANTS_20261019.md; parent has dispatched them. Root owns
+T3.02 contract/session/draft/save and app-root integration. No heavy local
 Workbench run while the parent's FarmTC/Claude workload is active. Krita stays
 deferred; no old worktree was cleaned.
+
+**Root T3.02 candidate update:** native/session/draft/atomic Save and actual
+common/JVM ownership are implemented; fresh Linux core bindings and whole shared
+JVM compilation pass. The detailed API and source-versus-app/runtime limits are
+in T3_STREAM_ROOT_CONTRACT_20261019.md. Root still owns controllers/app roots,
+contracts and registrations. Parent may extend existing R/Android lanes to their
+new stream modules after this candidate API is published.
+
+Parent dispatched the existing G/F grants. G90d02999 repairs its reviewed JSON
+workspace undercharging; parent closure is pending, so composition remains held. Parent narrowly accepts
+F7533f7c source repairs; root's exact pinned isolated compile finds the missing
+roxmltree entity_resolver field, with a proposed one-line repair and4 patched
+synthetic cases in evidence/F_TUNNEL_ISOLATED_COMPILATION_20261019.json. No F leaf
+is composed here. ANDROID_TUNNEL_CONTROL_GRANT_20261019.md is ready for the
+parent to dispatch the remaining explicit-control implementation; not dispatched
+by root. Neither module has runtime/license/device admission.
 
 | Lane | Current objective | Exact task contract / disposition |
 |---|---|---|

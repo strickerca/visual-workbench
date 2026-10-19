@@ -1,0 +1,1360 @@
+{
+  "schema": "vw.t3-native-shared-candidate.v1",
+  "status": "PASS WITH GAPS",
+  "date_utc": "2026-10-19",
+  "pre_source_revision": "6ae93d495fdfffd511f1e882facb80aaa0ab2dd4",
+  "source_manifest": {
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureAnnotationSession.kt": {
+      "bytes": 11389,
+      "sha256": "4a9a89df014490d3f6cca44c407b98d65da79f9a7e3ce8c47473273e985d5919"
+    },
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureDraftApi.kt": {
+      "bytes": 2244,
+      "sha256": "53936162c0c35071722053f470378923ceadd9a9f0daac1903cc6e115a4347ae"
+    },
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureDraftExtensions.kt": {
+      "bytes": 241,
+      "sha256": "9b6feb2874859cc04d97f5eaa54427cb2688aad1d06ac2f8158fc5e9977d2801"
+    },
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureStreamApi.kt": {
+      "bytes": 5893,
+      "sha256": "38a9d05897d31de37b25371aa9b2c5aee189660cdfb0767bb72badc2b4e1d1dd"
+    },
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureStreamExtensions.kt": {
+      "bytes": 626,
+      "sha256": "921e215667d5d57e7bbd9e1a423a5ad5ab22da26958b42770088be4e8f4b527a"
+    },
+    "apps/shared/src/commonTest/stream/run_stream_probe.py": {
+      "bytes": 3773,
+      "sha256": "5a41904a11a1fbd75460e229152e6b97f82cbcc3c592a782f8cf27b9bf3ba8fb"
+    },
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/CaptureChildren.kt": {
+      "bytes": 2877,
+      "sha256": "01f9ae517813b475a8b0bb9bbc5ba93dbff50d29cc2ebbdbe3b8eb93c0322e5d"
+    },
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/CaptureStreamOwnership.kt": {
+      "bytes": 4051,
+      "sha256": "d450ed246041dbae9e616f2ef7676e6fe367d4d8356488fba794c4a3f56c498b"
+    },
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCaptureDraft.kt": {
+      "bytes": 6493,
+      "sha256": "dab67072aeafb3a07d8768513e582bdbc0d292657c84bff9a8d47bcaa11d9394"
+    },
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCaptureStream.kt": {
+      "bytes": 11312,
+      "sha256": "2a909e557e5027d2d71adf3e575e10579fe2fd4f17632c2d6a3d17bd635a015c"
+    },
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeSessions.kt": {
+      "bytes": 18353,
+      "sha256": "2bd37e3f2ae1ac5d72dd094a3a807e5689ac40ad0553a254d34617d94a3de13b"
+    },
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt": {
+      "bytes": 10160,
+      "sha256": "77dfed840ac54bee2ed6a3dcfa6293d9fecad383dadee88a74c2bec2322eb4c9"
+    },
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureChildrenTest.kt": {
+      "bytes": 4065,
+      "sha256": "6657743fa863f45db074dad52833e84721598232b7be07838e70c92088138d80"
+    },
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt": {
+      "bytes": 4121,
+      "sha256": "b185e247c545b6dad2329f6f46b1d73d329f4b396f1945d848badc0f0bfca834"
+    },
+    "contracts/package.schema.json": {
+      "bytes": 18851,
+      "sha256": "465bcacb35c2c6943f798875e2efa6aadbdb651a70a3274ce37fa6c4bf78880b"
+    },
+    "contracts/vw_protocol.proto": {
+      "bytes": 33742,
+      "sha256": "11f47a62e2311ad7f0182ba0b497e108255940d7470543a7f5a373aea1557fcf"
+    },
+    "core/crates/vw-ffi/src/ai_edit/pixels.rs": {
+      "bytes": 8453,
+      "sha256": "6e036f53b8982daa7c07ddb6aedda54a1533c832b31c91c79101600a9b228e7f"
+    },
+    "core/crates/vw-ffi/src/capture_import.rs": {
+      "bytes": 6533,
+      "sha256": "3580b6b57a0fe12237d5ff77e1df163ec87ad804032b8a98ce48fd0afcd26af7"
+    },
+    "core/crates/vw-ffi/src/capture_provenance.rs": {
+      "bytes": 1165,
+      "sha256": "49ccf0f000bdfcf1bc70bb156abfcff6dedce43ec13f13664096246df9cfb1f7"
+    },
+    "core/crates/vw-ffi/src/dto.rs": {
+      "bytes": 7764,
+      "sha256": "f59cc8d43aceb47fb7fc9e218bd480d4d01d31002b6fbbc6dc529a611483ef86"
+    },
+    "core/crates/vw-ffi/src/editor.rs": {
+      "bytes": 28299,
+      "sha256": "f32101c6e544ad3928ab09a1d7290c48e045a228b532fed4e75a24e099688e1a"
+    },
+    "core/crates/vw-ffi/src/format_images.rs": {
+      "bytes": 25476,
+      "sha256": "9a4556b583367f745eab1cf70cd9bafeec9218e6fd2553c0c4f07fcfa8d74093"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/android_bridge/tests.rs": {
+      "bytes": 15514,
+      "sha256": "3b3f0e948953ee5674b3769c58551d9554c8375ee349dfb178c4ebe1d8580645"
+    },
+    "core/crates/vw-ffi/src/giant_images/producer/producer_tests.rs": {
+      "bytes": 40864,
+      "sha256": "d80730d9eeaaebedebcce8e3a7dff24af22bf3bce98aefc385266eecdccb4cff"
+    },
+    "core/crates/vw-ffi/src/giant_images/tests.rs": {
+      "bytes": 30480,
+      "sha256": "7b37b24d61cc0cba71a1d3f4d91f4cfd634adde23b0bebd4244c6f96ca4581e3"
+    },
+    "core/crates/vw-ffi/src/image_frames/pixels.rs": {
+      "bytes": 30648,
+      "sha256": "4e5f06795ced6cc2a3a8381407f39514a5328d7d30adc2168c2c2a362f9fd30f"
+    },
+    "core/crates/vw-ffi/src/lib.rs": {
+      "bytes": 5104,
+      "sha256": "06e4a39beb5afa6488b4605c2c622951bb207df2103d05947f1d99176c738af1"
+    },
+    "core/crates/vw-ffi/src/masks/export.rs": {
+      "bytes": 13589,
+      "sha256": "2914efde91406c6d526324c9563409f590446ac794df0734ea4f3b92beb923d1"
+    },
+    "core/crates/vw-ffi/src/packages/inbox/pixels.rs": {
+      "bytes": 5617,
+      "sha256": "5b7f0f509c66cc7e8206673f86a340db3f102b55828d9fdd766ab27140e639f9"
+    },
+    "core/crates/vw-ffi/src/packages/inbox/tests.rs": {
+      "bytes": 17221,
+      "sha256": "23cd65d91edab05a6971d3336d2b97fd00f61c90d5b4bce1356b9e2e9415404d"
+    },
+    "core/crates/vw-ffi/src/project.rs": {
+      "bytes": 21414,
+      "sha256": "f217edeeebebe2512b4c4565d1fef4beeaca1131152760e9c2ea880499049446"
+    },
+    "core/crates/vw-ffi/src/project_budget_tests.rs": {
+      "bytes": 4120,
+      "sha256": "ec32849c798c633068e9657de1ce38cc555221a3b789212918088f977d070ba2"
+    },
+    "core/crates/vw-ffi/src/queries.rs": {
+      "bytes": 34988,
+      "sha256": "e2b502d0b3c2c8f16c352ad1d041f0a759d7b29d29928d1629c5fa9038dce98f"
+    },
+    "core/crates/vw-ffi/src/queries_output_tests.rs": {
+      "bytes": 18827,
+      "sha256": "c7863b1bf2ff9cfd989446d2124d8730f391de820db8baa87f9d4bb04b75277f"
+    },
+    "core/crates/vw-ffi/src/session.rs": {
+      "bytes": 4284,
+      "sha256": "bb804b1d97fc49c1c57f4c97dce48acfd799e9a4a2836b52f7a86bd1c9f4e1fe"
+    },
+    "core/crates/vw-ffi/src/session/link.rs": {
+      "bytes": 74516,
+      "sha256": "f43def89bced1038001fa999db3bddfd400aab3e4795c03c3e0475cfe5834db7"
+    },
+    "core/crates/vw-ffi/src/session/stream.rs": {
+      "bytes": 1057,
+      "sha256": "36d321394c0d3dddbe1da9a766e44ebc48dc92139750fe3ec7bb33398e8c77c1"
+    },
+    "core/crates/vw-ffi/src/session/stream/api.rs": {
+      "bytes": 16559,
+      "sha256": "0c950c5069e6724bf43f01783e24828b10691ec76337e929126e8c4ed3b96a2e"
+    },
+    "core/crates/vw-ffi/src/session/stream/decoder.rs": {
+      "bytes": 8327,
+      "sha256": "ed7fbd560914406e85e473541fda2dafc70f8cb34acedcac8b9b2ce45f8c6b73"
+    },
+    "core/crates/vw-ffi/src/session/stream/decoder_tests.rs": {
+      "bytes": 3546,
+      "sha256": "a23977c71f8180ba66533ae165333a803b7dd7a781e0a4d281eab7d65ccf8536"
+    },
+    "core/crates/vw-ffi/src/session/stream/draft.rs": {
+      "bytes": 12068,
+      "sha256": "c5829a82c34b4ad3f4f1a1f62ec44a49f56ab9c0150a4bcdb3026b17e2c62340"
+    },
+    "core/crates/vw-ffi/src/session/stream/draft/calls.rs": {
+      "bytes": 1674,
+      "sha256": "637e659ca3a115da54fc5b8bddbc45cfead1e1c76ec04bc0e4da2b3ad3b8abc8"
+    },
+    "core/crates/vw-ffi/src/session/stream/draft/pixels.rs": {
+      "bytes": 4729,
+      "sha256": "c4af7158d66aea4277c39ec519d0c59d7f1f9f1007d192f3770bdeef2f2ecd92"
+    },
+    "core/crates/vw-ffi/src/session/stream/draft/save.rs": {
+      "bytes": 21700,
+      "sha256": "662914870f92d350155b5125707ed8cd3efacb03e83c5516c0d0562cad062f6c"
+    },
+    "core/crates/vw-ffi/src/session/stream/draft/tests.rs": {
+      "bytes": 30537,
+      "sha256": "b427bb294ffdd79b113c8b08f8535a8fba9a84c516f8edc7e0b4837f3517aada"
+    },
+    "core/crates/vw-ffi/src/session/stream/driver.rs": {
+      "bytes": 32393,
+      "sha256": "8478b91b33a2779902004d2f8d6f2e082148c4028b04b40584500c2e99a63244"
+    },
+    "core/crates/vw-ffi/src/session/stream/driver_tests.rs": {
+      "bytes": 13654,
+      "sha256": "4675cc4e3fa36b1d11ca434b32f86b26b1b7aa126df84c8e7667898e47173e57"
+    },
+    "core/crates/vw-ffi/src/session/stream/hub.rs": {
+      "bytes": 10074,
+      "sha256": "e757decbafbfe6a102233cb0550eee23bc1a75cf5a2a5621ce46b77aa278fb1a"
+    },
+    "core/crates/vw-ffi/src/session/stream/incoming.rs": {
+      "bytes": 7239,
+      "sha256": "96d0bb84cfe0a14717dd3a207d9179421dcee3be23a11b8f6dbeb30db080020f"
+    },
+    "core/crates/vw-ffi/src/session/stream/incoming_tests.rs": {
+      "bytes": 6026,
+      "sha256": "1e0c99e90e4b0a8160556b19782d4af404d6fcc1b75beb0a612a567b2eee1edd"
+    },
+    "core/crates/vw-ffi/src/session/stream/lossless.rs": {
+      "bytes": 13741,
+      "sha256": "34c315ee2c05f90ec167b2f08400bc25d12bf7ce5a5eb3b4a8b5d6a4bc5a8117"
+    },
+    "core/crates/vw-ffi/src/session/stream/lossless_tests.rs": {
+      "bytes": 7134,
+      "sha256": "da9a9cb2045f087e40ca5c71b2a9a49598765f6c94f47629533e60caacc1ccca"
+    },
+    "core/crates/vw-ffi/src/session/stream/memory.rs": {
+      "bytes": 4343,
+      "sha256": "5b0887acdcf968928454d8367c9b93d368c5e61f7aee2b9c520e654a8146d929"
+    },
+    "core/crates/vw-ffi/src/session/stream/order.rs": {
+      "bytes": 12346,
+      "sha256": "d1e0ec27723574547d3dbb01bd3e48f3266cf2bf32b0ff604629d11ae2d185dd"
+    },
+    "core/crates/vw-ffi/src/session/stream/order_tests.rs": {
+      "bytes": 12147,
+      "sha256": "f9c11c04f679e47729e02f6573d76bf99b76f6eb51a742da5384d97a269d393a"
+    },
+    "core/crates/vw-ffi/src/session/stream/outgoing.rs": {
+      "bytes": 6305,
+      "sha256": "342342eefb14854510ee8abcf07fa9f5d9894560aac0fb3ce165065aa4c48ad5"
+    },
+    "core/crates/vw-ffi/src/session/stream/outgoing_tests.rs": {
+      "bytes": 5022,
+      "sha256": "affcf2054454139e19ad2c5a29a2c6c2aae28ef75b9452b7a467835d10246b0c"
+    },
+    "core/crates/vw-ffi/src/session/stream/presentation.rs": {
+      "bytes": 5544,
+      "sha256": "d330053a9cdcaa988f80b33d45fa75212c57e89087b023524825428d45f76e88"
+    },
+    "core/crates/vw-ffi/src/session/stream/publication.rs": {
+      "bytes": 17909,
+      "sha256": "23f3dbb2f613ab0b0ecd654e5bf0eaac5e99e6b439aad11d9b3ea5bb77bb1481"
+    },
+    "core/crates/vw-ffi/src/session/stream/publication_api.rs": {
+      "bytes": 8712,
+      "sha256": "bebdb36c73dde24fe4a21ce8ae6c44662d2e1032d4e4e9ea1af834e67f03d9cb"
+    },
+    "core/crates/vw-ffi/src/session/stream/publication_tests.rs": {
+      "bytes": 14892,
+      "sha256": "238f78da7cd6fcea8a524612d6b84d98670f0bfaf58d88dd9b3dc930e2dad3fb"
+    },
+    "core/crates/vw-ffi/src/session/stream/publish_order.rs": {
+      "bytes": 10882,
+      "sha256": "ed3ed9c7a9d929689cee070803beef4e7a735fa39d940d2022bd179f3a27283e"
+    },
+    "core/crates/vw-ffi/src/session/stream/publish_order_tests.rs": {
+      "bytes": 6781,
+      "sha256": "bfb7fb4fed45a55114ea52a12186ece9c4e16da2f4fcdafbffe514104ea984da"
+    },
+    "core/crates/vw-ffi/src/session/stream/publish_worker.rs": {
+      "bytes": 5472,
+      "sha256": "19cb72182ea5c50071a459f97c6c5822c9cc25bdc3db771e6a931c14454ac8cd"
+    },
+    "core/crates/vw-ffi/src/session/stream/publish_worker_tests.rs": {
+      "bytes": 3177,
+      "sha256": "85c5357486cf6a33c7f5b69bc7093889f809d267677be3bc5fee25b52d76114f"
+    },
+    "core/crates/vw-ffi/src/session/stream/receiver.rs": {
+      "bytes": 10531,
+      "sha256": "bd20face44828223d790d577a8f6edaca12921ab0f67b6a8c93a6f93af0ac9ee"
+    },
+    "core/crates/vw-ffi/src/session/stream/receiver_tests.rs": {
+      "bytes": 9256,
+      "sha256": "de09b32bae5b10d876a30671268370158ea5e23b2563042263e06caca1ed75db"
+    },
+    "core/crates/vw-ffi/src/session/stream/region.rs": {
+      "bytes": 11839,
+      "sha256": "699930cadbfcc5c4ce0152350edba9da505fd868663e6767e0d83d7354f5194b"
+    },
+    "core/crates/vw-ffi/src/session/stream/transfer.rs": {
+      "bytes": 4505,
+      "sha256": "6cad6adbed961fe7a167d46325cada4158c632be040f3d71892665ecf8be772a"
+    },
+    "core/crates/vw-ffi/src/session/stream/verified.rs": {
+      "bytes": 3193,
+      "sha256": "c3a7c6f32cc6bdd858359703fbf083dd60ae36ad98f0b4a802e4803c290adc96"
+    },
+    "core/crates/vw-ffi/src/session/stream/verified_tests.rs": {
+      "bytes": 4070,
+      "sha256": "57ff71447d7e453974cd92d9c8a04af18b7ff418449c5aa1343ffd0389e5a69e"
+    },
+    "core/crates/vw-ffi/src/session/stream/wire.rs": {
+      "bytes": 9999,
+      "sha256": "db26386702eb629c1f4f3cc68170d88f81d6cfa9f906e47a93a809177bbfd975"
+    },
+    "core/crates/vw-ffi/src/streaming_ffi.rs": {
+      "bytes": 77416,
+      "sha256": "cd5dcf6539ca326e42cc44ad30f711d9ba407ae5908c115035050da222d3dafc"
+    },
+    "core/crates/vw-ffi/tests/assisted_source.rs": {
+      "bytes": 23699,
+      "sha256": "513f0d02318d180a45765962a55fc4e9d8bb711accaa7588198db86d942fc265"
+    },
+    "core/crates/vw-ffi/tests/background.rs": {
+      "bytes": 13257,
+      "sha256": "40335aa7e5f9f6f1ef74a55d8b464af66f0a8b92fe8065d563a79a983f243086"
+    },
+    "core/crates/vw-ffi/tests/capture_delivery.rs": {
+      "bytes": 24188,
+      "sha256": "ab4d36b920d6f53e191e2869a45f59411291462ec08d7e6ae87e4176b9b1ddee"
+    },
+    "core/crates/vw-ffi/tests/image_frames.rs": {
+      "bytes": 31259,
+      "sha256": "341ff4fc4ef1bc08e37a9aab341c158c7970a4e4870393736fde0a668e988689"
+    },
+    "core/crates/vw-ffi/tests/masks.rs": {
+      "bytes": 22992,
+      "sha256": "8ce3e11e7008373190e719ebb46c3028ea53bd469d1b82332c06b69a53276993"
+    },
+    "core/crates/vw-ffi/tests/semantic_ui.rs": {
+      "bytes": 18861,
+      "sha256": "7ca813c5682e45e5214aa9bfa91601fff331ecfd6469dde69faa3c4888c28909"
+    },
+    "core/crates/vw-ffi/tests/streaming_ffi.rs": {
+      "bytes": 15960,
+      "sha256": "16fe824b29266125450623f0f5b029f00ca22e47d48b9183dcae2ca6ea130fad"
+    },
+    "core/crates/vw-ffi/tests/support/mod.rs": {
+      "bytes": 3215,
+      "sha256": "8e1de5950aedf3f1ad462a77ab003018e6c31fd656cb8877f16195f61d58ce95"
+    },
+    "core/crates/vw-ffi/tests/tone_controls.rs": {
+      "bytes": 21346,
+      "sha256": "568549b60ac99a5b51a2a8f1200f04e122c3790ede66020d7c11a76c259cbf2c"
+    },
+    "core/crates/vw-ffi/tests/workflows.rs": {
+      "bytes": 24425,
+      "sha256": "2e58fd7d83d36986aa1c0617d0fadd948d36e4ed4ad515aab516c6920ceee183"
+    },
+    "core/crates/vw-model/src/validate.rs": {
+      "bytes": 25043,
+      "sha256": "a50d5f16fed8722e06bb055bc4125a9d2090fbeb9e2803c1a44a51a77deefefc"
+    },
+    "core/crates/vw-model/tests/model_contract.rs": {
+      "bytes": 28504,
+      "sha256": "07f9c770b5a264ee9476f3760ad9b3e77ff76830ac865719c0c8517e313b5ab3"
+    },
+    "core/crates/vw-net/src/capture_retention_tests.rs": {
+      "bytes": 5555,
+      "sha256": "22181088ee207ef5c09ca87cc077d2bb6a1f2fd468d4343864c5370a912d75ba"
+    },
+    "core/crates/vw-net/src/connection.rs": {
+      "bytes": 11458,
+      "sha256": "7d0f6e7a046143cfd6e74dc4c8af1f52282a27ab296126c5a2450ba7b6028438"
+    },
+    "core/crates/vw-net/src/frame.rs": {
+      "bytes": 4082,
+      "sha256": "043b03740db34fc97ca8dffe1b0868e4e8a0f280ac8fe84a814625ef938c3a5f"
+    },
+    "core/crates/vw-net/src/session.rs": {
+      "bytes": 38124,
+      "sha256": "a19b2b53625621e7d063439d1698ba32c15edbbffecf6cd9e98237c8561cdd75"
+    },
+    "core/crates/vw-package/src/compiler.rs": {
+      "bytes": 24487,
+      "sha256": "e09e1b9730d89432178116f7ed39a391b9ed173a30178d1dc1c772ac6a02235f"
+    },
+    "core/crates/vw-package/src/image_receipt.rs": {
+      "bytes": 4742,
+      "sha256": "194f7297d4cdad01a3c636b1dc25dd423b3073bd5c26b24ef577c974298805bd"
+    },
+    "core/crates/vw-package/src/manifest.rs": {
+      "bytes": 6625,
+      "sha256": "adc3f87e8e09838ae7b116f8e4f13617e437ae7f3d2688af3089d7427b96bac9"
+    },
+    "core/crates/vw-package/src/verify.rs": {
+      "bytes": 18920,
+      "sha256": "054fbc9630c918ca802cb082a4fa008324845a4f50ae95e5299a217f225d0642"
+    },
+    "core/crates/vw-package/tests/common/mod.rs": {
+      "bytes": 6912,
+      "sha256": "1529a347938b879ec5b2d14b85e6683c43079caf5fad313b33090dce717fad72"
+    },
+    "core/crates/vw-package/tests/image_output.rs": {
+      "bytes": 28251,
+      "sha256": "f1ab2713eded709194221675f9acaba10ba87dd94ed135ebb685654b91dac567"
+    },
+    "core/crates/vw-proto/build.rs": {
+      "bytes": 1118,
+      "sha256": "15e4c68f5f8d06a3024c39955ecc01810a576a5a9c048e5360df2232c8d46e4a"
+    },
+    "core/crates/vw-proto/src/capture_admission.rs": {
+      "bytes": 7102,
+      "sha256": "ec58529be02d3b4cfc7fa37433c99fa1bdf9f457586e3e6e861efd743f49a9b6"
+    },
+    "core/crates/vw-proto/src/lib.rs": {
+      "bytes": 555,
+      "sha256": "227897efc86cf6d9ad27fe8e92cb07e94c67e1d606b9be64199f61ea3f3a92c9"
+    },
+    "core/crates/vw-raster/src/export.rs": {
+      "bytes": 19918,
+      "sha256": "0891821b2902d2daa9c688dd6e2d5d92515edc49c4ea63692dbc7d0a74f125f5"
+    },
+    "core/crates/vw-raster/src/stream.rs": {
+      "bytes": 22263,
+      "sha256": "96691c3fa83c7463acf1afd3bffbb5e50680fc1fa04fbc35f59b88e55253ef4d"
+    },
+    "core/crates/vw-raster/tests/ordinary_format_preparation.rs": {
+      "bytes": 6279,
+      "sha256": "2df1450de08f9aceb6049d62af9b80b610e3c2c2c3ebc625d88e4b8809580506"
+    },
+    "core/crates/vw-raster/tests/support/mod.rs": {
+      "bytes": 8618,
+      "sha256": "b5aeb00e811c09a40ca133a9e611e5d8e262e1711b2483acf5987a52f0c14b2c"
+    },
+    "core/crates/vw-semantics/tests/common/mod.rs": {
+      "bytes": 4660,
+      "sha256": "91d7729b066899da7977c159f162e65314b0aad1766145dd559bc146c626d9b0"
+    },
+    "core/crates/vw-store/tests/database.rs": {
+      "bytes": 27835,
+      "sha256": "3986f9f46e1f995298d808c35dc4f544eb9ba4e41a185f7698f1dac0a18fc7f9"
+    },
+    "core/crates/vw-stream/src/budget.rs": {
+      "bytes": 6013,
+      "sha256": "9d079794e8b12e94a64f7a1effd782dafb8bc38c8305b1e3147bed6e02cc5bd9"
+    },
+    "core/crates/vw-stream/src/tiles.rs": {
+      "bytes": 24897,
+      "sha256": "c6ae9f00723aa334573b3c8de7193097b3d496c1277ec47a5e79d77952c9b573"
+    },
+    "core/crates/vw-stream/tests/process_budget.rs": {
+      "bytes": 1923,
+      "sha256": "1e83cc2b4161190b20e2aa00a5a2501708a3beb4f5b98bd4bc515ee2e65fe8c2"
+    },
+    "core/crates/vw-stream/tests/tiles.rs": {
+      "bytes": 7836,
+      "sha256": "bfcce6532b6a5be1cf175934ba30bcffa5667f76742740fa414d1d67522f41fb"
+    }
+  },
+  "recovery": {
+    "revision": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+    "root": "recovery/source-candidates/transport/t3-stream-finish/",
+    "promoted_candidates": [
+      {
+        "active_path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureAnnotationSession.kt",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureAnnotationSession.kt",
+        "candidate_sha256": "7e8a699fc75a6e1f620fb7038f487201111e5cb1f0f1affe68769e84209ef4a2",
+        "active_sha256": "4a9a89df014490d3f6cca44c407b98d65da79f9a7e3ce8c47473273e985d5919",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureDraftApi.kt",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureDraftApi.kt",
+        "candidate_sha256": "6c455cc11930fbdcebf5dab90a18c9ad21ec3397acd83f74a9942f43bd146788",
+        "active_sha256": "53936162c0c35071722053f470378923ceadd9a9f0daac1903cc6e115a4347ae",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureStreamApi.kt",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureStreamApi.kt",
+        "candidate_sha256": "d6286baca81d7651484923f320e188ce7025de2a0c8fddfd68cf5941fe41d21d",
+        "active_sha256": "38a9d05897d31de37b25371aa9b2c5aee189660cdfb0767bb72badc2b4e1d1dd",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/CaptureStreamOwnership.kt",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/CaptureStreamOwnership.kt",
+        "candidate_sha256": "bc13f108b5b900274f7031167a033db068b8565c439f735774d4e7d032f0b361",
+        "active_sha256": "d450ed246041dbae9e616f2ef7676e6fe367d4d8356488fba794c4a3f56c498b",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCaptureDraft.kt",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCaptureDraft.kt",
+        "candidate_sha256": "e2c6a3c4059e5ae9cc5fa967c359897fa81b6cd86eab5af9d812efa81cdf0858",
+        "active_sha256": "dab67072aeafb3a07d8768513e582bdbc0d292657c84bff9a8d47bcaa11d9394",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCaptureStream.kt",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCaptureStream.kt",
+        "candidate_sha256": "5959f691b0b353df42c54b4e765e1d4019ae918bfe211277de95c5c376df1e46",
+        "active_sha256": "2a909e557e5027d2d71adf3e575e10579fe2fd4f17632c2d6a3d17bd635a015c",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt",
+        "candidate_sha256": "77dfed840ac54bee2ed6a3dcfa6293d9fecad383dadee88a74c2bec2322eb4c9",
+        "active_sha256": "77dfed840ac54bee2ed6a3dcfa6293d9fecad383dadee88a74c2bec2322eb4c9",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureStreamOwnershipTest.kt",
+        "candidate_sha256": "b185e247c545b6dad2329f6f46b1d73d329f4b396f1945d848badc0f0bfca834",
+        "active_sha256": "b185e247c545b6dad2329f6f46b1d73d329f4b396f1945d848badc0f0bfca834",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "contracts/vw_protocol.proto",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/contracts/vw_protocol.proto",
+        "candidate_sha256": "9054a42876c599fd536e2739ee88ece81ed28a04499b109d02780fda1c279b7a",
+        "active_sha256": "11f47a62e2311ad7f0182ba0b497e108255940d7470543a7f5a373aea1557fcf",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/ai_edit/pixels.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/ai_edit/pixels.rs",
+        "candidate_sha256": "3e2110c3d76416d55e16588f1177725b1655e39d1381f807ff582461c3bd18ea",
+        "active_sha256": "6e036f53b8982daa7c07ddb6aedda54a1533c832b31c91c79101600a9b228e7f",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/capture_import.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/capture_import.rs",
+        "candidate_sha256": "c8d2e0808533a5a50f12579bf8af6b02b8e43bcaa9513ac0a960881eac158d35",
+        "active_sha256": "3580b6b57a0fe12237d5ff77e1df163ec87ad804032b8a98ce48fd0afcd26af7",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/capture_provenance.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/capture_provenance.rs",
+        "candidate_sha256": "dcfe2c4df36a74fe39df363cecf0d8d953d14a0ccee8a8d836eeaac57ad34fe4",
+        "active_sha256": "49ccf0f000bdfcf1bc70bb156abfcff6dedce43ec13f13664096246df9cfb1f7",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/dto.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/dto.rs",
+        "candidate_sha256": "1e4fc775b4f01d6400574bdff9dbfc0e505067bbc293f6499f0c4f6501ca3aad",
+        "active_sha256": "f59cc8d43aceb47fb7fc9e218bd480d4d01d31002b6fbbc6dc529a611483ef86",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/editor.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/editor.rs",
+        "candidate_sha256": "e608fcf1a108bba0a74fa76b0f6da14578256c86a2a53e14183145e425db9109",
+        "active_sha256": "f32101c6e544ad3928ab09a1d7290c48e045a228b532fed4e75a24e099688e1a",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/lib.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/lib.rs",
+        "candidate_sha256": "90233bea7b2638043853f76be631e1d826c3732c9fea8083306669cddfb72fa9",
+        "active_sha256": "06e4a39beb5afa6488b4605c2c622951bb207df2103d05947f1d99176c738af1",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/masks/export.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/masks/export.rs",
+        "candidate_sha256": "a6bec3eaceffbcd20ee34fd7b8472df95b15e12075a13a2959eb7f10070e67d6",
+        "active_sha256": "2914efde91406c6d526324c9563409f590446ac794df0734ea4f3b92beb923d1",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/packages/inbox/pixels.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/packages/inbox/pixels.rs",
+        "candidate_sha256": "4dcf46d469aef86c488ad6c56bd552f826badea7dd5dc83bdb231856f4721b8d",
+        "active_sha256": "5b7f0f509c66cc7e8206673f86a340db3f102b55828d9fdd766ab27140e639f9",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/packages/inbox/tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/packages/inbox/tests.rs",
+        "candidate_sha256": "6628a087b8735ad9be0be0db845f9378b4d23ebf659671a3767729bf59920dfc",
+        "active_sha256": "23cd65d91edab05a6971d3336d2b97fd00f61c90d5b4bce1356b9e2e9415404d",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/project.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/project.rs",
+        "candidate_sha256": "53c87cbd15055c0c90d2973a9e926dea2e80ee018dd69ac3cb65e579e3f9e597",
+        "active_sha256": "f217edeeebebe2512b4c4565d1fef4beeaca1131152760e9c2ea880499049446",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/queries.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/queries.rs",
+        "candidate_sha256": "e9bfb7bb3e8ce51e73b67ca22599948ec8f7cca075b1720f040f247cea2a6299",
+        "active_sha256": "e2b502d0b3c2c8f16c352ad1d041f0a759d7b29d29928d1629c5fa9038dce98f",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/session.rs",
+        "candidate_sha256": "8645e37c252223d1c6ee9624f2a9fd311dcaa3c6e25f7b096b6adbcafb03b6e0",
+        "active_sha256": "bb804b1d97fc49c1c57f4c97dce48acfd799e9a4a2836b52f7a86bd1c9f4e1fe",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/link.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/session/link.rs",
+        "candidate_sha256": "fe177e2b30af901e3b608f7f5a59eba6377388cd16293e41fb534f1bfe335593",
+        "active_sha256": "f43def89bced1038001fa999db3bddfd400aab3e4795c03c3e0475cfe5834db7",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream.rs",
+        "candidate_sha256": "39dc3782fc638836047efbe5741d27cdd35fa2f203f5b3a748ddb8ecdcbfe80a",
+        "active_sha256": "36d321394c0d3dddbe1da9a766e44ebc48dc92139750fe3ec7bb33398e8c77c1",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/api.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/api.rs",
+        "candidate_sha256": "1a05a7562275d89f9e8e4007f47636e96e2a6bc61806efd8b53daeccaf711717",
+        "active_sha256": "0c950c5069e6724bf43f01783e24828b10691ec76337e929126e8c4ed3b96a2e",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/decoder.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/decoder.rs",
+        "candidate_sha256": "9275c25fb9e359712422e87040d0e29751fea01a45bfce7e49e55662a18a3983",
+        "active_sha256": "ed7fbd560914406e85e473541fda2dafc70f8cb34acedcac8b9b2ce45f8c6b73",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/decoder_tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/decoder_tests.rs",
+        "candidate_sha256": "61314a1ef6e3de8b43c9357ffc37d0f60996d7318dded2a66c1e39277afac6fa",
+        "active_sha256": "a23977c71f8180ba66533ae165333a803b7dd7a781e0a4d281eab7d65ccf8536",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/draft.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/draft.rs",
+        "candidate_sha256": "9604af1657471519f1c415f6ddda5b40a010f8659b49bcb528efbd1e0ae98a5c",
+        "active_sha256": "c5829a82c34b4ad3f4f1a1f62ec44a49f56ab9c0150a4bcdb3026b17e2c62340",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/draft/calls.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/draft/calls.rs",
+        "candidate_sha256": "802eb26321aaa18ecafd99d870dfe8f182858c1823760712b605533bf48d694d",
+        "active_sha256": "637e659ca3a115da54fc5b8bddbc45cfead1e1c76ec04bc0e4da2b3ad3b8abc8",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/draft/pixels.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/draft/pixels.rs",
+        "candidate_sha256": "7fd5ec2d905a009dc58b647138ae5956330cacaf7e42e7b50f64be0d3396b03c",
+        "active_sha256": "c4af7158d66aea4277c39ec519d0c59d7f1f9f1007d192f3770bdeef2f2ecd92",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/draft/save.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/draft/save.rs",
+        "candidate_sha256": "75a35205702f0322d9dceccbfb72d500744f2761855d8a2d328aa3043dd65b69",
+        "active_sha256": "662914870f92d350155b5125707ed8cd3efacb03e83c5516c0d0562cad062f6c",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/draft/tests.rs",
+        "candidate_sha256": "7c5ce4dc5fa7a046b42f227aeb38202d2dab675f5e94516bbd7a40b9425a79e4",
+        "active_sha256": "b427bb294ffdd79b113c8b08f8535a8fba9a84c516f8edc7e0b4837f3517aada",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/driver.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/driver.rs",
+        "candidate_sha256": "c667ae2c18cb4eadeb2e10f9c18f1b2d55d1547ad9c9413b8755689706976b16",
+        "active_sha256": "8478b91b33a2779902004d2f8d6f2e082148c4028b04b40584500c2e99a63244",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/driver_tests.rs",
+        "candidate_sha256": "28332f4ef04813ac30d2a76142fe474200d1a57128ade0401dd761733b705d3a",
+        "active_sha256": "4675cc4e3fa36b1d11ca434b32f86b26b1b7aa126df84c8e7667898e47173e57",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/hub.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/hub.rs",
+        "candidate_sha256": "d0ea4f48256038e814fc7f96b158f0c4c9b519145d38ea179c045a4c86e55314",
+        "active_sha256": "e757decbafbfe6a102233cb0550eee23bc1a75cf5a2a5621ce46b77aa278fb1a",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/incoming.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/incoming.rs",
+        "candidate_sha256": "4c5d924d9e3fbd7be18dc105d21e771a6b4d2ab89eba49e344f4b384e1bf83ea",
+        "active_sha256": "96d0bb84cfe0a14717dd3a207d9179421dcee3be23a11b8f6dbeb30db080020f",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/incoming_tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/incoming_tests.rs",
+        "candidate_sha256": "433982ae811be719f4d693bb21754ab726643317658143019eb96b3966b140cd",
+        "active_sha256": "1e0c99e90e4b0a8160556b19782d4af404d6fcc1b75beb0a612a567b2eee1edd",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/lossless.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/lossless.rs",
+        "candidate_sha256": "880771f1058eaf476361ec3488afde51dbbf8090c9ac3251c3d46d52f332063c",
+        "active_sha256": "34c315ee2c05f90ec167b2f08400bc25d12bf7ce5a5eb3b4a8b5d6a4bc5a8117",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/lossless_tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/lossless_tests.rs",
+        "candidate_sha256": "a827fdea63fed6bcbe9cee9fb9b86a283bb891b3a7961b29ba7c146d6ed18b92",
+        "active_sha256": "da9a9cb2045f087e40ca5c71b2a9a49598765f6c94f47629533e60caacc1ccca",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/memory.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/memory.rs",
+        "candidate_sha256": "ea7f414ccf7dea4cfd3775d0cfd5724b762693293b9e295d96668cb44f8879b4",
+        "active_sha256": "5b0887acdcf968928454d8367c9b93d368c5e61f7aee2b9c520e654a8146d929",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/order.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/order.rs",
+        "candidate_sha256": "ed67b51d0d5ca38db951947d53efa2a511afb850c6315f41d748eb9b3bd5702f",
+        "active_sha256": "d1e0ec27723574547d3dbb01bd3e48f3266cf2bf32b0ff604629d11ae2d185dd",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/order_tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/order_tests.rs",
+        "candidate_sha256": "c07661e14e77f9045e3da7cfdcf229c55367a17e5b4771b1f03385cbb01495db",
+        "active_sha256": "f9c11c04f679e47729e02f6573d76bf99b76f6eb51a742da5384d97a269d393a",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/outgoing.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/outgoing.rs",
+        "candidate_sha256": "4903ffad8f6baa8f8c8253d539a9dcc2810ab786fe99b69d172a59660be849e3",
+        "active_sha256": "342342eefb14854510ee8abcf07fa9f5d9894560aac0fb3ce165065aa4c48ad5",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/outgoing_tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/outgoing_tests.rs",
+        "candidate_sha256": "4994d399ec5f2c7e8ba2c1a206f6f2da46eb5946a8f7060391d9d06075840003",
+        "active_sha256": "affcf2054454139e19ad2c5a29a2c6c2aae28ef75b9452b7a467835d10246b0c",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/presentation.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/presentation.rs",
+        "candidate_sha256": "ff8c48b4201ef934a4a8e4f31e48a46e8c3461e8e5c5ad1659770203b286a560",
+        "active_sha256": "d330053a9cdcaa988f80b33d45fa75212c57e89087b023524825428d45f76e88",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/publication.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/publication.rs",
+        "candidate_sha256": "994ec730de42e6abb2944a4a2ea17e94db24165fb03a82cb4a1cae67a7c6f5b8",
+        "active_sha256": "23f3dbb2f613ab0b0ecd654e5bf0eaac5e99e6b439aad11d9b3ea5bb77bb1481",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/publication_api.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/publication_api.rs",
+        "candidate_sha256": "8307e06302fdd2e89f97a28f432a6d04bddc225589353d657931db74ef05d4b6",
+        "active_sha256": "bebdb36c73dde24fe4a21ce8ae6c44662d2e1032d4e4e9ea1af834e67f03d9cb",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/publication_tests.rs",
+        "candidate_sha256": "06b8f0a60f750af9379f7aa6dea5fd10bab191e9eb5782ab3eb21b5db46496a2",
+        "active_sha256": "238f78da7cd6fcea8a524612d6b84d98670f0bfaf58d88dd9b3dc930e2dad3fb",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/publish_order.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/publish_order.rs",
+        "candidate_sha256": "83ede0c7b7617de8cb666a0a0bc5f62e73997372bfa64d328547d3f220e8f071",
+        "active_sha256": "ed3ed9c7a9d929689cee070803beef4e7a735fa39d940d2022bd179f3a27283e",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/publish_order_tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/publish_order_tests.rs",
+        "candidate_sha256": "018e32dd4e301d4b9dc310e3db2692262f58756ae520010e29a0c1cee4716f46",
+        "active_sha256": "bfb7fb4fed45a55114ea52a12186ece9c4e16da2f4fcdafbffe514104ea984da",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/publish_worker.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/publish_worker.rs",
+        "candidate_sha256": "3a7ce7f74fe5d1e18d832b322d40f3bc1884c61f1d12f729cf566a95d5a9085c",
+        "active_sha256": "19cb72182ea5c50071a459f97c6c5822c9cc25bdc3db771e6a931c14454ac8cd",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/publish_worker_tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/publish_worker_tests.rs",
+        "candidate_sha256": "f5e94756fceedb55aff4a4866a8d7566444d324c38d439cda96345d371764198",
+        "active_sha256": "85c5357486cf6a33c7f5b69bc7093889f809d267677be3bc5fee25b52d76114f",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/receiver.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/receiver.rs",
+        "candidate_sha256": "d15c33f025dd6a5f03ae92f1657f3c1473b3855b2261c24a98d09d9fb7db8c1a",
+        "active_sha256": "bd20face44828223d790d577a8f6edaca12921ab0f67b6a8c93a6f93af0ac9ee",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/receiver_tests.rs",
+        "candidate_sha256": "e2e57af878846fc03bff4ed43d339fbbd41bd434a1a07304da47a6bf48f2dc5b",
+        "active_sha256": "de09b32bae5b10d876a30671268370158ea5e23b2563042263e06caca1ed75db",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/region.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/region.rs",
+        "candidate_sha256": "d3442a09965620bade8f92f5a25f0c190afc3610fcce638756af5fa8a1c7414a",
+        "active_sha256": "699930cadbfcc5c4ce0152350edba9da505fd868663e6767e0d83d7354f5194b",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/transfer.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/transfer.rs",
+        "candidate_sha256": "1f28fcc4f39ca9368bd56b91f15479b35da14fe25fccdd7ab2eba376d6a2d8d7",
+        "active_sha256": "6cad6adbed961fe7a167d46325cada4158c632be040f3d71892665ecf8be772a",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/verified.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/verified.rs",
+        "candidate_sha256": "ec2b42cdd107be4d14c4a4817ab1e85fa23a497f2e1532ca7e41f4eb5eac9a85",
+        "active_sha256": "c3a7c6f32cc6bdd858359703fbf083dd60ae36ad98f0b4a802e4803c290adc96",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/verified_tests.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/verified_tests.rs",
+        "candidate_sha256": "2cc8c9ab15b5287c36eb44323693103b289f7267747b9d17dd2ec0270a87c67a",
+        "active_sha256": "57ff71447d7e453974cd92d9c8a04af18b7ff418449c5aa1343ffd0389e5a69e",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/session/stream/wire.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-ffi/src/session/stream/wire.rs",
+        "candidate_sha256": "ca001f5f930118809bd5f51c633557673c90ee2f747d4e8e0598b0a0c7e5b5df",
+        "active_sha256": "db26386702eb629c1f4f3cc68170d88f81d6cfa9f906e47a93a809177bbfd975",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/src/streaming_ffi.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/src/streaming_ffi.rs",
+        "candidate_sha256": "b1a142fe9139294adfef05d9f3f5469175a24e0a0b533338e01ad6783fec8a0a",
+        "active_sha256": "cd5dcf6539ca326e42cc44ad30f711d9ba407ae5908c115035050da222d3dafc",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/tests/capture_delivery.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/tests/capture_delivery.rs",
+        "candidate_sha256": "f309662de49206fb9cb36dc4521e3fbf0de5bd8673b72f18f86dbdf62c5429af",
+        "active_sha256": "ab4d36b920d6f53e191e2869a45f59411291462ec08d7e6ae87e4176b9b1ddee",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/tests/masks.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/tests/masks.rs",
+        "candidate_sha256": "83237255342a3d6f38e32489964146b982c67fa4303a68be8c49362b72f7e6ea",
+        "active_sha256": "8ce3e11e7008373190e719ebb46c3028ea53bd469d1b82332c06b69a53276993",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/tests/semantic_ui.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/tests/semantic_ui.rs",
+        "candidate_sha256": "8c6f50d1e6eec35f4f69d84765f8e4ac68b466fa29d56756595df893f54e8b75",
+        "active_sha256": "7ca813c5682e45e5214aa9bfa91601fff331ecfd6469dde69faa3c4888c28909",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/tests/streaming_ffi.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/tests/streaming_ffi.rs",
+        "candidate_sha256": "218b9590f796da58bead4e6a6c3c7e6f122946a1f597b85a1f0d10c4f3b93d91",
+        "active_sha256": "16fe824b29266125450623f0f5b029f00ca22e47d48b9183dcae2ca6ea130fad",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/tests/support/mod.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/tests/support/mod.rs",
+        "candidate_sha256": "399d7cf1c9079bfa4702932f8e141e0f48e77a92b3d55604828b89e9ff31c0cc",
+        "active_sha256": "8e1de5950aedf3f1ad462a77ab003018e6c31fd656cb8877f16195f61d58ce95",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-ffi/tests/workflows.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-ffi/tests/workflows.rs",
+        "candidate_sha256": "bca064cb60195cfb926d141ad50ae138db03ca9bd0ee08484992543336e5814b",
+        "active_sha256": "2e58fd7d83d36986aa1c0617d0fadd948d36e4ed4ad515aab516c6920ceee183",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-model/src/validate.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-model/src/validate.rs",
+        "candidate_sha256": "def6d32578dec3c68e02f6468e2442eb976619312874811ebfa1e63536725109",
+        "active_sha256": "a50d5f16fed8722e06bb055bc4125a9d2090fbeb9e2803c1a44a51a77deefefc",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-model/tests/model_contract.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-model/tests/model_contract.rs",
+        "candidate_sha256": "a365fecd6f49f37f73d5ffd4a6beedab209f71acf6a26dba129a7a6e6918315d",
+        "active_sha256": "07f9c770b5a264ee9476f3760ad9b3e77ff76830ac865719c0c8517e313b5ab3",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-net/src/frame.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-net/src/frame.rs",
+        "candidate_sha256": "043b03740db34fc97ca8dffe1b0868e4e8a0f280ac8fe84a814625ef938c3a5f",
+        "active_sha256": "043b03740db34fc97ca8dffe1b0868e4e8a0f280ac8fe84a814625ef938c3a5f",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-net/src/session.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-net/src/session.rs",
+        "candidate_sha256": "ae1f968d2f215c8ae95ca6aa36e8391d04b26cb596ea10e9fa7b0b3835151166",
+        "active_sha256": "a19b2b53625621e7d063439d1698ba32c15edbbffecf6cd9e98237c8561cdd75",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-package/src/compiler.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-package/src/compiler.rs",
+        "candidate_sha256": "412dfbc14a64823e28d9ac6fe6b87e52d16a4403ce097ee944e0b2ecb7363166",
+        "active_sha256": "e09e1b9730d89432178116f7ed39a391b9ed173a30178d1dc1c772ac6a02235f",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-package/src/image_receipt.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-package/src/image_receipt.rs",
+        "candidate_sha256": "07ae9e4874583e96254dbc7c28a9e03637900b53a4e50c35da9b0ea0a34d962a",
+        "active_sha256": "194f7297d4cdad01a3c636b1dc25dd423b3073bd5c26b24ef577c974298805bd",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-package/src/manifest.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-package/src/manifest.rs",
+        "candidate_sha256": "3a6761292c44d0c42775a0bffa266f35ad2bb90f58daa71dc7dd81e8d628d497",
+        "active_sha256": "adc3f87e8e09838ae7b116f8e4f13617e437ae7f3d2688af3089d7427b96bac9",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-package/src/verify.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-package/src/verify.rs",
+        "candidate_sha256": "333f45d39758d9055c2d6f1cb3be58aaf80c426b8fc02f2b1b1d846421a02c89",
+        "active_sha256": "054fbc9630c918ca802cb082a4fa008324845a4f50ae95e5299a217f225d0642",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-package/tests/common/mod.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-package/tests/common/mod.rs",
+        "candidate_sha256": "1f8e2e7a4ada811fe2576f0559514c030156a502a365c6d2d47978327b029b8d",
+        "active_sha256": "1529a347938b879ec5b2d14b85e6683c43079caf5fad313b33090dce717fad72",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-proto/build.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-proto/build.rs",
+        "candidate_sha256": "742b1daa7ab06375e7bdf2159a295d40f1c0a71c35796bf17e59b8fc3519059c",
+        "active_sha256": "15e4c68f5f8d06a3024c39955ecc01810a576a5a9c048e5360df2232c8d46e4a",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-proto/src/capture_admission.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-proto/src/capture_admission.rs",
+        "candidate_sha256": "a9fa16121d4cadecf8cd2e92d62b4b1ff29a949c24b56eb8f24f428e33536224",
+        "active_sha256": "ec58529be02d3b4cfc7fa37433c99fa1bdf9f457586e3e6e861efd743f49a9b6",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-proto/src/lib.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-proto/src/lib.rs",
+        "candidate_sha256": "19946360c5af38deddc1623a57d4d37214bff6964c25b3e03a120f27a885983d",
+        "active_sha256": "227897efc86cf6d9ad27fe8e92cb07e94c67e1d606b9be64199f61ea3f3a92c9",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-raster/src/export.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-raster/src/export.rs",
+        "candidate_sha256": "6c6988f13a408da5095293198a6c2d8e6dbf0e3f8c164aaa61fc59468709ad52",
+        "active_sha256": "0891821b2902d2daa9c688dd6e2d5d92515edc49c4ea63692dbc7d0a74f125f5",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-raster/src/stream.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-raster/src/stream.rs",
+        "candidate_sha256": "b58e1fbb6e28b6a846d7330c1978939d2b5f811abd31f1baf48474c0085d5318",
+        "active_sha256": "96691c3fa83c7463acf1afd3bffbb5e50680fc1fa04fbc35f59b88e55253ef4d",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-raster/tests/ordinary_format_preparation.rs",
+        "candidate_sha256": "cfb5f1b98858735df65f7fc6b2d25f074a3df4c9e14b13d184df661f3052ff5e",
+        "active_sha256": "2df1450de08f9aceb6049d62af9b80b610e3c2c2c3ebc625d88e4b8809580506",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-raster/tests/support/mod.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-raster/tests/support/mod.rs",
+        "candidate_sha256": "ce7b273e597f11df09df1e6247ef6455bbf4d658e0f1f300bff9d787155442dc",
+        "active_sha256": "b5aeb00e811c09a40ca133a9e611e5d8e262e1711b2483acf5987a52f0c14b2c",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-semantics/tests/common/mod.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-semantics/tests/common/mod.rs",
+        "candidate_sha256": "d30edb4982cf81081cdd261aeaa9ffe7bcaed57f339a2cb1e77cfdc0a701ac11",
+        "active_sha256": "91d7729b066899da7977c159f162e65314b0aad1766145dd559bc146c626d9b0",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-store/tests/database.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/after/core/crates/vw-store/tests/database.rs",
+        "candidate_sha256": "fe7e7061c5a90b95ab196a78fbeb2c3a9a491f14dc72966521d6809bde74109b",
+        "active_sha256": "3986f9f46e1f995298d808c35dc4f544eb9ba4e41a185f7698f1dac0a18fc7f9",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-stream/src/tiles.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-stream/src/tiles.rs",
+        "candidate_sha256": "13c7b42ecff30a248bc9c60598bc665a5410ab63767bb4dd761f04caeff5049b",
+        "active_sha256": "c6ae9f00723aa334573b3c8de7193097b3d496c1277ec47a5e79d77952c9b573",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      },
+      {
+        "active_path": "core/crates/vw-stream/tests/tiles.rs",
+        "candidate_path": "recovery/source-candidates/transport/t3-stream-finish/new/core/crates/vw-stream/tests/tiles.rs",
+        "candidate_sha256": "cc8e370f8d88a6d676b395c87f98846f865fb4e19ecfedfb8e29719ec04ed203",
+        "active_sha256": "bfcce6532b6a5be1cf175934ba30bcffa5667f76742740fa414d1d67522f41fb",
+        "disposition": "selectively promoted and reconciled; current active hash governs"
+      }
+    ],
+    "other_candidates": "preserved outside active code; not accepted functionality",
+    "stale_existing_file_overlay": false
+  },
+  "checks": [
+    {
+      "kind": "native_stream_tests",
+      "command": "cargo test --locked --offline -p vw-ffi --lib session::stream -j2 -- --test-threads=2",
+      "result": "PASS",
+      "cases": 84,
+      "log": {
+        "path": "/tmp/vw-t3-stream-native-tests-20261019-final2.log",
+        "bytes": 10643,
+        "sha256": "43fbbca8b540878078615a59b2b244db8c460ec1dab9b93bdb60813b92d1b0b5"
+      }
+    },
+    {
+      "kind": "package_tests",
+      "command": "cargo test --locked --offline -p vw-package --lib --tests -j2 -- --test-threads=2",
+      "result": "PASS",
+      "cases": 54,
+      "log": {
+        "path": "/tmp/vw-t3-stream-package-tests-20261019-final2.log",
+        "bytes": 6277,
+        "sha256": "b2cc24384456c8d6df973463a6c549e7b8b9cbb59ff2f2de9183cd8571a4762d"
+      }
+    },
+    {
+      "kind": "net_budget_tiles",
+      "command": "cargo test --locked --offline -p vw-net --lib -p vw-stream --test process_budget --test tiles -j2 -- --test-threads=2",
+      "result": "PASS",
+      "cases": {
+        "net": 87,
+        "process_budget": 3,
+        "tiles": 10
+      },
+      "log": {
+        "path": "/tmp/vw-t3-stream-net-budget-tiles-tests-20261019-final3.log",
+        "bytes": 9928,
+        "sha256": "4a36493ae2c1ce01e59d4fc6b2869bb9d1fa5f2975966a5a46684cc695c89b23"
+      }
+    },
+    {
+      "kind": "net_stream_strict_clippy",
+      "command": "cargo clippy --locked --offline -p vw-net -p vw-stream --lib --no-deps -j2 -- -D warnings",
+      "result": "PASS",
+      "cases": null,
+      "log": {
+        "path": "/tmp/vw-t3-stream-net-clippy-20261019-final.log",
+        "bytes": 624,
+        "sha256": "6a47437ed5e541640a944359083d760538b6dcfce2a8e39c18417f5adaf433a8"
+      }
+    },
+    {
+      "kind": "core_library_build",
+      "command": "cargo build --locked --offline -p vw-ffi --lib -j2",
+      "result": "PASS; existing ProviderAdapter dead-code warning",
+      "cases": null,
+      "log": {
+        "path": "/tmp/vw-t3-stream-core-library-build-20261019.log",
+        "bytes": 2145,
+        "sha256": "332c4a73cda7e5b10ca661d1ddd090b8bb3fee5b906f2ec22e861afce55d7cd4"
+      }
+    },
+    {
+      "kind": "actual_shared_compile",
+      "command": "bash apps/gradlew -p apps :shared:compileKotlinDesktop --offline --no-daemon --max-workers=2",
+      "result": "PASS; fresh actual core binding generation",
+      "cases": null,
+      "log": {
+        "path": "/tmp/vw-t3-stream-shared-compile-20261019-initial.log",
+        "bytes": 4668,
+        "sha256": "59bb58dfa7b810f79057fb1c859feb95a50b95d6d20462b41a4d2a815aa03fec"
+      }
+    },
+    {
+      "kind": "actual_shared_tests",
+      "command": "bash apps/gradlew -p apps :shared:desktopTest --tests '*CaptureAnnotationSessionTest' --tests '*CaptureStreamOwnershipTest' --tests '*CaptureChildrenTest' --offline --no-daemon --max-workers=2",
+      "result": "PASS",
+      "cases": 20,
+      "log": {
+        "path": "/tmp/vw-t3-stream-shared-tests-20261019-final.log",
+        "bytes": 2644,
+        "sha256": "a739033f97c111c6134e37b385486c4c90a27c2f716a0d80718eb8fc85ef7c23"
+      }
+    },
+    {
+      "kind": "scoped_rustfmt",
+      "command": "rustfmt --edition 2024 --check --config skip_children=true <92 changed core Rust files>",
+      "result": "PASS",
+      "cases": null,
+      "log": {
+        "path": "/tmp/vw-t3-stream-scoped-rustfmt-20261019.log",
+        "bytes": 22,
+        "sha256": "6266aa8bff1f874414b85380646e589ea80216ba37e751b18847c90760a0fb35"
+      }
+    },
+    {
+      "kind": "plan_coverage",
+      "command": "python3 tools/check_plan_coverage.py",
+      "result": "PASS;189 requirements,66 tasks,26 prompts",
+      "cases": null,
+      "log": {
+        "path": "/tmp/vw-t3-stream-plan-coverage-20261019-final.log",
+        "bytes": 81,
+        "sha256": "fcbc69d46813eae6c60e78895ad3caded49b4384ddd85340a6df04c25ad768b3"
+      }
+    },
+    {
+      "kind": "ffi_strict_clippy",
+      "command": "cargo clippy --locked --offline -p vw-ffi --lib --no-deps -j2 -- -D warnings",
+      "result": "FAIL; five unchanged baseline diagnostics",
+      "cases": null,
+      "log": {
+        "path": "/tmp/vw-t3-stream-clippy-20261019-final.log",
+        "bytes": 4609,
+        "sha256": "fb425297c6413a282801b794417cbc929308b3c1622503cd86f139c559742910"
+      }
+    },
+    {
+      "kind": "workspace_rustfmt",
+      "command": "cargo fmt --all -- --check",
+      "result": "BLOCKED; existing missing editor_probe_runner/helper.rs module",
+      "cases": null,
+      "log": {
+        "path": "/tmp/vw-t3-stream-rustfmt-20261019.log",
+        "bytes": 161,
+        "sha256": "92b7199320218c38ef5090710384f4338a09d44af4b9e7cf01f6af4e4fb54c54"
+      }
+    }
+  ],
+  "actual_shared_test_results": [
+    {
+      "class": "com.visualworkbench.shared.CaptureAnnotationSessionTest",
+      "tests": 9,
+      "skipped": 0,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "class": "com.visualworkbench.shared.CaptureChildrenTest",
+      "tests": 6,
+      "skipped": 0,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "class": "com.visualworkbench.shared.CaptureStreamOwnershipTest",
+      "tests": 5,
+      "skipped": 0,
+      "failures": 0,
+      "errors": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "target/debug/libvw_core.so",
+      "bytes": 230742168,
+      "sha256": "bdbee62dfab52718eff622a3f3ac26293f0b0ab3629988ca6957a1526c58f3df",
+      "provenance": "fresh current Linux core library/bindings"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/core/com/visualworkbench/bindings/core/vw_core.kt",
+      "bytes": 1498518,
+      "sha256": "352be71ec373dad539e909883e6dc4864919c0570028572ea45ee48bd9e907c4",
+      "provenance": "fresh current Linux core library/bindings"
+    },
+    {
+      "path": "apps/shared/build/generated/uniffi/host/com/visualworkbench/bindings/host/vw_host.kt",
+      "bytes": 322003,
+      "sha256": "79f1ab7a5a7d758b49279e5a303878965f9d9ff8fffac6b4581aaba9eecc7e3a",
+      "provenance": "unchanged earlier host binding, not regenerated this phase"
+    }
+  ],
+  "unchanged_diagnostic_sources": [
+    {
+      "path": "core/crates/vw-ffi/src/ai_edit/owner.rs",
+      "sha256": "67169ed09a92b108e52ab21dc4a3bd1109ae827d49abef3aed8c47fe2c042210",
+      "same_as_pre_source_revision": true
+    },
+    {
+      "path": "core/crates/vw-ffi/src/giant_images/editing.rs",
+      "sha256": "c017873724329f6c93d0c4be532854c316757527c4b028ed751603e7371ce58b",
+      "same_as_pre_source_revision": true
+    },
+    {
+      "path": "core/crates/vw-ffi/src/verification/prepare.rs",
+      "sha256": "404728d4ad1c83b13c63daa32c5b81ef4c543eb3d416ae002eb78587fc607cae",
+      "same_as_pre_source_revision": true
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session/remote_drawing_gate.rs",
+      "sha256": "c10b6bcf73bbf35f7b0d70779582ff38860e51f4a9cb7aa4d4c3c48539d398ca",
+      "same_as_pre_source_revision": true
+    },
+    {
+      "path": "core/crates/vw-raster/src/source_region.rs",
+      "sha256": "3632c7b5433486ae7e4511a95eea01885e6c810b3d1d8ba1dbcb4a3001474628",
+      "same_as_pre_source_revision": true
+    },
+    {
+      "path": "host-win/crates/vw-remote-host/src/editor_probe_runner.rs",
+      "sha256": "0e869e8bf2a1fab07cbe2e4e6daf5b9572c941ceceb17ae8fd532a81c8e6811d",
+      "same_as_pre_source_revision": true
+    }
+  ],
+  "preserved_failure_logs": [
+    {
+      "path": "/tmp/vw-t3-stream-native-check-20261019-fourth.log",
+      "bytes": 4398,
+      "sha256": "656d841ae797467c307bd10eb18787440c89662834185ee4dbe46a1d0f8ec1ae"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-native-check-20261019-initial.log",
+      "bytes": 917,
+      "sha256": "a1fab71465f0c6fa75ea5ebe8650b74610865d7e143e5f0b4287ca9dafd1fd70"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-native-check-20261019-second.log",
+      "bytes": 1531,
+      "sha256": "0c00a48c3a5c1ab943e259266ef51b7db7580f8417b8ccbdfa8558f0f04abdbb"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-native-check-20261019-third.log",
+      "bytes": 17101,
+      "sha256": "b6e5ba693788397ff67a173fd81be8c660eab81065cee2d18a22fa480bcf1b8e"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-native-tests-20261019-final.log",
+      "bytes": 2331,
+      "sha256": "faa5895fdfaa662b21999a5fab793ee485b094c5b326320195d6b411374c7120"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-native-tests-20261019-fourth.log",
+      "bytes": 10402,
+      "sha256": "1b914f13ee37fb293ce151457b81c5d59a0a56c79d2fe82568d05140415d2390"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-native-tests-20261019-initial.log",
+      "bytes": 11281,
+      "sha256": "9499cfb37f809a39721b3fee90bea8bdb54a173d4b068a1ae228e24b5e70fe85"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-native-tests-20261019-second.log",
+      "bytes": 1960,
+      "sha256": "a91067c3a4488798c13013a1f2fe88efb780535eff9743e115da3deb39a47283"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-native-tests-20261019-third.log",
+      "bytes": 17257,
+      "sha256": "d379d4dd07b067cd6c38644ef1f4cb76bb3676d5e5b0507baba97cd079516428"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-package-tests-20261019-final.log",
+      "bytes": 6813,
+      "sha256": "1b42e6fc69867bbb9076f8a99fac7a8bf79e6a9c446a8da26cb3bf35c8c95e13"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-net-budget-tiles-tests-20261019-final.log",
+      "bytes": 10231,
+      "sha256": "b0c8d982c9689afe888915dfa1d06d25653762e07edd5460ac936fcadb44b2e7"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-net-budget-tiles-tests-20261019-final2.log",
+      "bytes": 525,
+      "sha256": "208ddabe6f91919aa7202aee3e5cf2335b0bc16a8e52d366f9513f85078e8a84"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-shared-tests-20261019-initial.log",
+      "bytes": 3438,
+      "sha256": "3204b40e5b99c756cfd15603e77f171ba1fe98a18259a58ef153fc1609a2bf55"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-clippy-20261019-initial.log",
+      "bytes": 1882,
+      "sha256": "9d7d4295b336e35801ca19ad838190c7921b555b2904d595fe7c69308721afb0"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-clippy-20261019-nodeps.log",
+      "bytes": 14140,
+      "sha256": "37a95eeb9d18455ba0da99b2e68ad9a788de21a5535acafda6b3e57fe17bbfbd"
+    },
+    {
+      "path": "/tmp/vw-t3-stream-clippy-20261019-second.log",
+      "bytes": 2207,
+      "sha256": "2bb9620eb0a8a28326b92bd9ae898f0d7509768c97a9363da88729d7cd8b159a"
+    }
+  ],
+  "implemented_scope": [
+    "authenticated actual LiveSession CONTROL/MEDIA/scoped BLOB bridge and bilateral capability",
+    "process-parented actual allocation and outgoing carrier settlement ownership",
+    "presentation-receipted exact-frame freeze, lossless verify and separate source-loss state/name",
+    "temporary annotation draft with sealed source/target CAS, ordinary atomic Save, same-plan durable retry and cancellation/lifetime guards",
+    "optional persisted stream-save proof in package/image/normal export with old canonical bytes preserved when absent",
+    "actual JVM child owners/native facades with fresh binding typecheck and common annotation flow"
+  ],
+  "remaining_code": [
+    "G producer reviewed repair composition; actual clock stamp/module/bin/Cargo/ToolHelp/runtime/host FFI registration",
+    "Desktop/Android stream canvases, both EditorControllers and Main/WorkbenchApp normal flow integration",
+    "actual platform lossless pixel adoption preserving provisional stroke/camera and both-device LIVE/source or FROZEN/age",
+    "F exact pinned parser compile repair, Windows standalone Pins harness and explicit owner-control grant; leaf not composed"
+  ],
+  "runtime_or_product_gates": {
+    "windows_build": false,
+    "desktop_or_android_app_compile": false,
+    "actual_jni_stream_journey": false,
+    "gui_capture_or_input": false,
+    "adb_scrcpy_dll_or_device_execution": false,
+    "live_provider_calls": false,
+    "hardware_performance_or_owner_acceptance": false,
+    "phase_or_product_gate_passed": false,
+    "runtime_license_admission_changed": false,
+    "main_merged": false,
+    "old_worktrees_cleaned": false
+  },
+  "held_workers": {
+    "G": "latest90d02999f0f2d6c70c9d82359468e811c784de05 JSON workspace repair fetched for reading; awaiting parent review, not composed",
+    "F": "7533f7c0b6934fd01aae281f4261508d48d9aa13 narrowly source-accepted; pinned original compile E0063, only patched-copy4tests; not composed"
+  },
+  "test_scope": "Counts are separate named scopes. The earlier isolated Kotlin probe repeats the same20 cases and is not additive; software fixtures do not prove app/JNI/Windows/device/rendered performance.",
+  "execution": "Cloud Linux; shared exclusive heavy-build lock; bounded commands; at most two build/test workers. No local Windows heavy build, provider/device/input/runtime execution or tooling/security/identity changes."
+}
