@@ -217,3 +217,28 @@ not a painted-pixel move implementation. Parent activated E's real conversion,
 G's actual viewport mode and Android's remaining caller grants. Their expensive
 slot/device/aggregate limits remain unchanged. Root next prepares the canonical
 checked-package coordinate helper without editing P/V-owned active leaves.
+
+## 2026-10-19 accepted R repair and checked-package projection
+
+R e212c275 accepted after its three findings; all three changed source/test
+leaves are composed byte-identically. Parent reports nine independent actual
+helper cases and corrected compiler probe passing. Root follows its existing
+Main callback/guard source. Current move preview is wireframe-only; painted-pixel
+move preview remains absent. No whole Desktop/ABI/Compose/Windows/device pass.
+
+Root's vw-package verification_geometry helper now derives D→O→actual clean-image
+and inverse matrices from checked package/canonical frame/rational overview
+metadata, distinguishing original/output/content/padded image sizes. Whole-ROI
+crop admission and conjugated before→after mapping for independently measured
+D translations are implemented without new pixel/source owners or package schema
+changes. This is descriptive geometry, not actual alignment. V's framed refusal
+and P/V active files stay unchanged. Five new unit methods and actual encoded
+image-output integration assertions are authored/unrun while conversion owns
+the single allocated heavy slot. Rustfmt parse/format and whitespace pass. See
+VERIFICATION_PACKAGE_GEOMETRY_20261019.md and exact JSON source bindings.
+
+ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md supplies the current concise phased
+view without deleting earlier receipts/dispositions. E model delivery, G viewport
+bridge/callers, Android source repairs/remaining routes, P genuine observations
+and V actual D/O comparison remain active independent jobs. Neither new metadata
+APIs nor previous partial source checkpoints are represented as completed gates.

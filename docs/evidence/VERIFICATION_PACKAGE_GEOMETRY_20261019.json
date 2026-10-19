@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-19",
+  "R": {
+    "ref": "e212c2753c9ca83c81b775cdf4e161065fcab9df",
+    "status": "parent-supplied narrow source acceptance; exact three-file composition",
+    "byte_identical_paths": [
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt",
+      "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopComposedCanvasTest.kt"
+    ],
+    "inherited_evidence": [
+      "nine independent production-helper cases",
+      "corrected source compiler probe"
+    ],
+    "limitation": "wireframe-only transient preview; painted-pixel move preview not implemented"
+  },
+  "root_package_geometry": {
+    "source_sha256": {
+      "core/crates/vw-package/src/lib.rs": "7784c37dc235e21ebc872a6d50fd4f948d51805aff5e9e33a780d93727d9a869",
+      "core/crates/vw-package/src/verification_geometry.rs": "2738988767d8925034e5e7d40cf94bae8a1edb05be6f1322a51afdb4ed58f57c",
+      "core/crates/vw-package/tests/image_output.rs": "97f7d330358dc6ed6888eafdbe432508cb24ed1acdb613bab34a70d99c49514d"
+    },
+    "executed": [
+      "Rustfmt parse/format",
+      "git diff whitespace check"
+    ],
+    "authored_unrun": [
+      "five new native unit methods",
+      "new canonical geometry assertions in existing actual compiled-PNG image_output integration loop"
+    ],
+    "limits": [
+      "No whole package compile/test; conversion owns allocated heavy slot",
+      "No genuine D/O comparison, registration or source/capture authority from geometry",
+      "V framed refusal remains unchanged; generated ABI and apps remain unrun"
+    ]
+  }
+}

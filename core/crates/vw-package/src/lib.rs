@@ -14,12 +14,14 @@ mod manifest;
 mod pixels;
 mod prompt;
 mod verification;
+mod verification_geometry;
 mod verify;
 
 pub use compiler::{CompileInput, compile};
 pub use config::*;
 pub use manifest::*;
 pub use verification::*;
+pub use verification_geometry::*;
 pub use verify::Package;
 pub use vw_instructions::UNTRUSTED_TEXT_NOTICE;
 pub use vw_semantics::{Cancellation, NeverCancel};

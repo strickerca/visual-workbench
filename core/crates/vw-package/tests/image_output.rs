@@ -181,6 +181,12 @@ fn identity_crop_all_quarter_turns_and_independent_resize_round_trip_in_one_fram
         let repeated = compiled(&f, options()?)?;
         assert_eq!(files(&package), files(&repeated));
         let manifest = package.manifest();
+        let coordinates = vw_package::verification_image_geometry(&package)?;
+        let projected_point = coordinates
+            .document_to_image
+            .map(vw_geom::Point::new(6.5, 5.5)?)?;
+        near(&[projected_point.x(), projected_point.y()], &point);
+        assert_eq!(coordinates.output_size, extent);
         assert_eq!(manifest.extensions.compiler, "vw-package-1-image-output-v1");
         let frame = manifest.extensions.image_output.ok_or("output metadata")?;
         assert_eq!(frame.frame()?.output_size(), extent);
