@@ -13,10 +13,21 @@ deferred. No phase/product gate is passed. No local Windows Workbench run was
 started while the parent's FarmTC/Claude workload is active. Bounded cloud Linux
 checks use the shared heavy lock and at most two workers.
 
+Root adapter increment aftere32c046: current Android private-child editor
+methods, retained lossless background over preview refresh, disjoint4,096-op
+Save counters and Desktop beforeRetire seam are authored. Actual shared Android,
+Android app and Desktop production/test compilation pass; Android6 counter and
+Desktop3 synthetic lifecycle cases pass. Desktop tests exclude Windows runtime
+inventory packaging. These are actual source compiler checks, not new normal
+stream entry points or fresh ARM64/Windows/JNI/runtime evidence. See
+T3_STREAM_PLATFORM_ROOT_ADAPTERS_20261019.md. Parent now accepts G edf28830 including
+its JSON failure-path allocation review; source composition/clock/foreign
+adapter and actual shared capacity admission still remain code dependencies.
+
 | Phase/tasks | Actual source/behavior now | Remaining code/delivery versus verification |
 |---|---|---|
 | 0–2 | Main checkpoint and subsequent reviewed ownership, editor, transport, capture, archive/offline, provider/package/MCP source | Exact earlier evidence retained; G0–G2, real apps/providers and physical acceptance open. Recovered archives are candidates, not accepted implementation |
-| **T3.02 live annotate** | Root candidate implements actual authenticated LiveSession dispatch, bounded codec/BLOB/queued ownership, presentation-based freeze, lossless verification, temporary annotation draft, atomic one-document Save/retry, provenance, source status and native/common/JVM child owners. Fresh Linux core bindings and whole shared JVM compilation pass; native84, net87, process-budget3, tiles10, package54 and actual shared20 cases pass | **Remaining code:** compose reviewed persistent G producer plus clock/host registration, actual Desktop/Android canvases and controllers, Main/WorkbenchApp/EditorControllers, real lossless background adoption preserving provisional input and both-device LIVE/source or FROZEN/age. G90d02999 JSON workspace repair awaits parent closure. Real apps/Windows/15fps/ring/swap/resume/A07 and owner gates remain separate. Earlier recovered289 census is not a final-tree pass |
+| **T3.02 live annotate** | Root candidate implements actual authenticated LiveSession dispatch, bounded codec/BLOB/queued ownership, presentation-based freeze, lossless verification, temporary annotation draft, atomic one-document Save/retry, provenance, source status and native/common/JVM child owners. Fresh Linux core bindings and whole shared JVM compilation pass; native84, net87, process-budget3, tiles10, package54 and actual shared20 cases pass | **Remaining code:** compose reviewed persistent G producer plus clock/host registration, actual Desktop/Android canvases and controllers, Main/WorkbenchApp/EditorControllers, real lossless background adoption preserving provisional input and both-device LIVE/source or FROZEN/age. Parent accepts G edf28830 full JSON accounting repair; root composition pending. Real apps/Windows/15fps/ring/swap/resume/A07 and owner gates remain separate. Earlier recovered289 census is not a final-tree pass |
 | T3.01, T3.03–05 | Actual capture picker/Main callbacks, physical geometry, precision/loupe/lens, selection/polygon and tilt source | Fresh whole apps/ABI/goldens and real capture/DPI/pen/precision journeys unrun here; no new missing leaf algorithm established by this inventory |
 | T3.06 assisted selection | Android LiteRT backend, encode-once/source/manual-correction callers; E actual host conversion/parity and license census composed | Transfer blocked here by proxy CONNECT403 before bytes. Weight/checkpoint terms, TinyViT lineage, native aggregate and Android memory/catalog admission unresolved; empty production catalog/null pins remain. Host2.2 parity does not prove Android2.3/JNI/APK/accelerator/100ms/memory acceptance |
 | T3.07 controls | Layer/group/lock/rotation/bookmark/navigation plus newer crop/quarter-turn/resize/tone/composed-background callers composed on both platforms | Old claim that crop/resize/tonal code is wholly missing is superseded. Transient local/peer movement is explicitly wireframe; painted-pixel preview absent, but approved T3.07 does not separately require it. Fresh apps/controller/undo/sync/export/>=20-doc journeys remain |
@@ -32,8 +43,8 @@ checks use the shared heavy lock and at most two workers.
 | T5.06 | Personal runtime packaging and bounded release assembler/checksums/notices/source association exist | Root reviewed MSI/build hook and final producer-toolchain/runtime/notices/uninstall-guide content need closure; assembler accepts already-built MSI only as hash-bound input. Signing/driver/plugin authority and installation/uninstall/reproducibility/A20 remain separate |
 | T5.07 | No release-wide acceptance run | Final artifacts/untested matrix, A01–A30/performance/thermal/recovery and owner G5 remain open |
 
-**Existing independent lanes:** G persistent live-annotate producer is held for
-its JSON accounting repair90d02999 parent closure; F Android tunnel owner/capture/loop module
+**Existing independent lanes:** G persistent live-annotate producer is accepted as
+edf28830 after parent JSON allocation review; F Android tunnel owner/capture/loop module
 needs the exact pinned parser compile repair and separately granted control.
 Exact exclusive paths,
 contracts, root registration dependencies and bounded tests are in

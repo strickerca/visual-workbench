@@ -30,6 +30,7 @@ internal class DesktopLiveLink(
     private val previews: (PeerFrame?) -> Unit,
     private val warning: (String) -> Unit,
     private val beforeClose: suspend () -> Unit = {},
+    private val beforeRetire: suspend () -> Unit = {},
 ) {
     private var nextEpoch = 0L
     private var current: LiveAttachment? = null
@@ -145,6 +146,10 @@ internal class DesktopLiveLink(
     suspend fun close() = withContext(NonCancellable) {
         val prior = current
         prior?.retiring=true
+        // Child capture/render work must actually retire before its borrowed
+        // link can be destroyed. Failure keeps this exact attachment sealed for
+        // retry. Focus cleanup below retains its existing release-on-failure.
+        beforeRetire()
         try { beforeClose() } finally {
         previews(null)
         status(null)

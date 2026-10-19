@@ -1,0 +1,160 @@
+{
+  "schema": "vw.t3-root-app-adapters.v1",
+  "status": "PASS WITH GAPS",
+  "date_utc": "2026-10-19",
+  "base_revision": "e32c046e5670645a93920ffcd1c62291782b50a1",
+  "source_manifest": [
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/AiEditorController.kt",
+      "bytes": 36611,
+      "sha256": "41d7c52d8226d3ab1622df80d9e208a33b060d11635b971ae204184d7f41fb72"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt",
+      "bytes": 180685,
+      "sha256": "8c7d19ebcce73413984be5dd8ad4e29de50cab4f480f1982a1ebf64f9fc26c7b"
+    },
+    {
+      "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/ProjectRepository.kt",
+      "bytes": 8890,
+      "sha256": "d9cdac6a0d7822e08b8c1fc435097e32efc1fb3d17278a5818ce22e047e26810"
+    },
+    {
+      "path": "apps/android/src/test/kotlin/com/visualworkbench/android/editor/ProjectCounterFloorTest.kt",
+      "bytes": 2762,
+      "sha256": "176cc1a50c5afdfe1bdf10f6ab86dd4dcb2039582a3150e5be20d1f12b911469"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/AiEditorController.kt",
+      "bytes": 36604,
+      "sha256": "fae14b285a79af1742cc6b6c60f51023bf2c09efad9480e70ff38abfb68348ce"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopLiveLink.kt",
+      "bytes": 11748,
+      "sha256": "d78b6941e476aca6a2d212b321ff686d206ef71a38f7d422b94dfac3f28f3d54"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopInstructionFocusTest.kt",
+      "bytes": 3658,
+      "sha256": "cafdf273a1d9d9928de5cdae9193edb59525256969466fa72a04b36babd1f373"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/remote/RemoteCompatibilityImportTest.kt",
+      "bytes": 245,
+      "sha256": "918333f3ceda5409ff5bfcf06d0fbc447a62f687046c3df953207370c09d98d9"
+    }
+  ],
+  "implemented": [
+    "Android private annotation child install/idle/settle/original/disposal methods in current EditorController; guarded workflow/AI/export/navigation subset",
+    "lossless original retained over normal and in-flight preview background refresh without camera/input cancellation",
+    "complete4096-op Save counter CAS reservations sharing current durable allocator",
+    "Desktop borrowed-link beforeRetire suspension with retained sealed failure and unchanged beforeClose input/focus release behavior",
+    "two existing AI proof cross-module smart casts corrected with nullable reads; existing Desktop test imports aligned to configured JUnit"
+  ],
+  "checks": [
+    {
+      "command": "bash apps/gradlew -p apps :android:compileDebugKotlin --offline --no-daemon --max-workers=2",
+      "result": "PASS; actual shared Android and app production compilation; no runtime",
+      "log": {
+        "path": "/tmp/vw-stream-root-android-compile-20261019-final.log",
+        "bytes": 7058,
+        "sha256": "64ffabc35e79da0abf93140e5c9b38179c722ed670b024edf61e02504d2d7a81"
+      }
+    },
+    {
+      "command": "bash apps/gradlew -p apps :desktop:compileKotlin :android:testDebugUnitTest --tests '*ProjectCounterFloorTest' --offline --no-daemon --max-workers=2",
+      "result": "Android actual production and unit-test compilation/test tasks PASS6; overall command FAILED on old Desktop AI smartcast, repaired subsequently",
+      "log": {
+        "path": "/tmp/vw-stream-root-app-tests-20261019-initial.log",
+        "bytes": 7087,
+        "sha256": "ad083214e8a7a418dab6af017ece7f712d5dbe0df07bd3ea99e07e634b301f24"
+      }
+    },
+    {
+      "command": "bash apps/gradlew -p apps :desktop:test --tests '*DesktopInstructionFocusTest' -x :desktop:packageConnectionRuntime --offline --no-daemon --max-workers=2",
+      "result": "PASS; actual Desktop production and entire test source compile,3 focused synthetic lifecycle cases",
+      "log": {
+        "path": "/tmp/vw-stream-root-desktop-tests-20261019-final.log",
+        "bytes": 4488,
+        "sha256": "094b86da82c44c341d6c013aa18a03f2e8ce0c45cf69cc3927a319db4607dd82"
+      },
+      "excluded": "Windows prebuilt DLL/helper inventory packaging only; no packaged runtime proof or app execution"
+    }
+  ],
+  "test_results": [
+    {
+      "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.editor.ProjectCounterFloorTest.xml",
+      "class": "com.visualworkbench.android.editor.ProjectCounterFloorTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopInstructionFocusTest.xml",
+      "class": "com.visualworkbench.desktop.DesktopInstructionFocusTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "compiled_artifacts": [
+    {
+      "path": "apps/android/build/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes/com/visualworkbench/android/editor/EditorController.class",
+      "bytes": 344000,
+      "sha256": "2fd74159287b379a85245e0c957995c9894aaba19763502ef036421554b8be93"
+    },
+    {
+      "path": "apps/desktop/build/classes/kotlin/main/com/visualworkbench/desktop/EditorController.class",
+      "bytes": 263303,
+      "sha256": "4989b68ec06f663fbd72df4efdb0b7d319ff52e025a2635a5e876d36a1c62033"
+    },
+    {
+      "path": "apps/desktop/build/classes/kotlin/main/com/visualworkbench/desktop/DesktopLiveLink.class",
+      "bytes": 17184,
+      "sha256": "f2deb431bc479cf9ac7b21d18a7efa75bad0d7577d6844cb25c96f111b2ae516"
+    }
+  ],
+  "preserved_failures": [
+    {
+      "path": "/tmp/vw-stream-root-android-compile-20261019-initial.log",
+      "bytes": 11217,
+      "sha256": "52ce7071c1cea977eb04d300658bcbd015f8a4606a767eaab909cde0b87553ce"
+    },
+    {
+      "path": "/tmp/vw-stream-root-android-compile-20261019-resolve.log",
+      "bytes": 5267,
+      "sha256": "3dcb9a6aad58b041adb4a83d15aafe1669c2cf324a91964dcbf64c7116cac61c"
+    },
+    {
+      "path": "/tmp/vw-stream-root-desktop-tests-20261019-initial.log",
+      "bytes": 2048,
+      "sha256": "ee7f2a65293f7608fa88651ecfd08c8b07f77d0bec5d04e83c3e7a34141b1fb8"
+    },
+    {
+      "path": "/tmp/vw-stream-root-desktop-tests-20261019-second.log",
+      "bytes": 8633,
+      "sha256": "45766bc3cee54bc160fd64193d9428360b9b7205bfd1a4b9c6ffedd968869363"
+    }
+  ],
+  "pending_code": [
+    "Main/WorkbenchApp and controller normal stream entry/attachment/close wiring after R/Android reviewed modules; no parent receiver or producer hook is wired yet",
+    "G edf2883041f4346c2bf91463ac543e9657584c06 now parent-accepted after full JSON allocation review; not composed in this adapter commit",
+    "root G registration/clock/current fields10-12/helper runtime inventory and actual foreign adapter",
+    "shared capacity admission across actual host parsing/foreign packets and authenticated publisher; G currently owns a separate pool, not an implemented combined allowance"
+  ],
+  "pending_validation": [
+    "private Android child/bitmap/input/runtime journeys and authored worker module tests",
+    "fresh source-bound ARM64 and Windows binaries/JNI journeys; existing Android alignment check is not fresh core ABI proof",
+    "Windows runtime inventory/packaging, GUI/WGC/input/adb/scrcpy/provider/device/performance/physical/owner gates",
+    "full repository strict Clippy/format issues from prior native evidence remain open"
+  ],
+  "no_source_overlay": true,
+  "no_g_or_f_leaf_composition": true,
+  "no_binding_regeneration_this_adapter_slice": true,
+  "no_live_provider_gui_input_device_or_native_runtime_execution": true,
+  "main_merged": false,
+  "old_worktrees_cleaned": false
+}

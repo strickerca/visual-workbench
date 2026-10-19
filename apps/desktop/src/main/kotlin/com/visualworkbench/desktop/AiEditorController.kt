@@ -560,7 +560,7 @@ internal class AiEditorController<T>(
             proof.outsideSha256Before.length != 64 || proof.outsideSha256Before != proof.outsideSha256After ||
             !proof.deltaE2000Mean.isFinite() || !proof.deltaE2000Max.isFinite() || !proof.ssimInsideMask.isFinite() ||
             (candidate.partial && (proof.changedUnaccepted != 0uL || proof.unacceptedSha256Before == null ||
-                proof.unacceptedSha256Before.length != 64 || proof.unacceptedSha256Before != proof.unacceptedSha256After))) throw AiFailure(AiFailureKind.Proof)
+                proof.unacceptedSha256Before?.length != 64 || proof.unacceptedSha256Before != proof.unacceptedSha256After))) throw AiFailure(AiFailureKind.Proof)
     }
 
     suspend fun detach() {

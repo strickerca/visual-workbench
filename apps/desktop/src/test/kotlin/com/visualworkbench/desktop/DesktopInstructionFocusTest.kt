@@ -33,6 +33,20 @@ class DesktopInstructionFocusTest {
             assertTrue(link.closed); assertNull(live.attachment())
         } finally { armed = false; live.close(); scope.cancel() }
     }
+    @Test fun failedChildRetirementSealsAndRetainsTheLinkUntilActualRetrySettles() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val link = FakeLink(); var armed = false; var focusCloses = 0; var childCloses = 0
+        val live = DesktopLiveLink(scope, { null }, {}, {}, {}, { if(armed)focusCloses++ }, {
+            if(armed && ++childCloses == 1) error("synthetic child retirement pending")
+        })
+        try {
+            live.install(link) {}; armed = true
+            assertTrue(runCatching { live.close() }.isFailure)
+            assertFalse(link.closed); assertNull(live.attachment()); assertEquals(0,focusCloses)
+            live.close()
+            assertTrue(link.closed); assertEquals(2,childCloses); assertEquals(1,focusCloses)
+        } finally { armed = false; live.close(); scope.cancel() }
+    }
     private class FakeLink : ProjectLink {
         var closed = false
         override val endpoints = emptyList<SessionEndpoint>()

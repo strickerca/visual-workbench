@@ -36,6 +36,16 @@ is composed here. ANDROID_TUNNEL_CONTROL_GRANT_20261019.md is ready for the
 parent to dispatch the remaining explicit-control implementation; not dispatched
 by root. Neither module has runtime/license/device admission.
 
+Root adapter increment aftere32c046: Android private-child editor methods and
+lossless refresh retention plus full4,096-op Save counter reservation are ready;
+Desktop beforeRetire seam retains failed child cleanup without changing focus
+release semantics. Actual Android app/shared and Desktop production/test source
+compilation pass, with Android6 counter/Desktop3 focused lifecycle cases. The
+Desktop unit run excludes Windows runtime inventory packaging. Root's exact
+remaining composition/shared capacity decisions and child method signatures are
+T3_STREAM_PLATFORM_ROOT_ADAPTERS_20261019.md; normal app stream entry points are
+not yet wired. Parent now accepts G edf28830 complete allocation repair; root composition follows.
+
 | Lane | Current objective | Exact task contract / disposition |
 |---|---|---|
 | E backend/model | Actual pinned model/toolchain/reference-parity/artifact delivery | ASSISTED_MODEL_DELIVERY_HANDOFF_20261019.md. Giant repair47f76bf is accepted/composed. e28987e is composed as61c0ec8 and publishes actual host conversion/parity/tooling evidence; root31 offline tool tests pass; private Library archives are now available, but root signed downloads fail HTTPS proxy CONNECT403 before bytes; no conversion repeated. Android/license/runtime/memory admission remains closed. Unrelated old-main T3.07 e8ff4bf is preserved separately, not composed or model evidence |

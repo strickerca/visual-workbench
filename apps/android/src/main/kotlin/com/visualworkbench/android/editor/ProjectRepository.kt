@@ -32,6 +32,18 @@ internal fun observeOperationCounter(next:AtomicLong,reservedUntil:Long,minimum:
     }
 }
 
+/** One CAS owns the complete range; a remote floor or concurrent reservation
+ * can only advance it. Failure consumes no counter and never wraps. */
+internal fun reserveOperationCounters(next: AtomicLong, reservedUntil: Long, minimum: ULong, count: Int): ULong {
+    require(count in 1..4096 && minimum <= Long.MAX_VALUE.toULong())
+    while (true) {
+        val observed = next.get()
+        val first = maxOf(observed, minimum.toLong())
+        check(first > 0 && reservedUntil >= count && first <= reservedUntil - count) { "Reopen the app to reserve another operation counter range" }
+        if (next.compareAndSet(observed, first + count)) return first.toULong()
+    }
+}
+
 /** App-private project paths and install-random device identity, never hardware IDs. */
 internal class ProjectRepository(context: Context, val core: WorkbenchCore) {
     private val context = context.applicationContext
@@ -68,12 +80,14 @@ internal class ProjectRepository(context: Context, val core: WorkbenchCore) {
      * counter when a remote/optimistic revision advanced the local minimum. */
     fun instructionLamport(minimum: ULong, count: Int = 1024): ULong {
         require(count in 1..1024 && minimum <= Long.MAX_VALUE.toULong())
-        while (true) {
-            val observed = next.get()
-            val first = maxOf(observed, minimum.toLong())
-            check(first > 0 && first <= reservedUntil - count) { "Reopen the app to reserve another operation counter range" }
-            if (next.compareAndSet(observed, first + count)) return first.toULong()
-        }
+        return reserveOperationCounters(next, reservedUntil, minimum, count)
+    }
+
+    /** A native stream Save admits at most 4,096 operations. Reserve its entire
+     * disjoint range before preparing the immutable same-transaction retry. */
+    fun streamLamport(minimum: ULong): ULong {
+        require(minimum in 1uL..Long.MAX_VALUE.toULong())
+        return reserveOperationCounters(next, reservedUntil, minimum, 4096)
     }
 
     suspend fun list(): List<LocalProject> = withContext(Dispatchers.IO) {

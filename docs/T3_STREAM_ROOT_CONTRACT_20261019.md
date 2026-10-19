@@ -145,6 +145,20 @@ Clippy also reports unchanged raster source_region diagnostics. New stream
 diagnostics were repaired or narrowly documented where the bounded actor uses
 an intentional value enum/native parameter list. No policy gate was waived.
 
+## Subsequent actual app compiler and root adapter closure
+
+Root's next adapter slice provides the Android private-child methods needed by
+its stream owner, lossless retention over ordinary/in-flight preview refresh,
+full4,096-op Save counter reservation, and a Desktop link child-retirement seam.
+See T3_STREAM_PLATFORM_ROOT_ADAPTERS_20261019.md and
+[evidence/T3_ROOT_APP_ADAPTERS_20261019.json](evidence/T3_ROOT_APP_ADAPTERS_20261019.json).
+Actual Android shared/app and Desktop production/test sources now compile
+against this API. Six Android counter and3 Desktop lifecycle cases pass.
+Desktop focused tests exclude Windows runtime inventory packaging. No new
+native binding generation occurred; this uses the actual e32c046 core API.
+Normal app entry points and reviewed worker composition remain CODE work;
+fresh ARM64/Windows binaries and actual JNI journeys remain unverified.
+
 ## F compile feedback (not active composition or runtime admission)
 
 Parent supplied current F `7533f7c0b6934fd01aae281f4261508d48d9aa13` for cheap

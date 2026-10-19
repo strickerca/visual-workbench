@@ -28,4 +28,32 @@ class ProjectCounterFloorTest {
             assertEquals(10L,next.get())
         }
     }
+    @Test fun captureSaveReservesTheWholeRangeAndOrdinaryEditsCannotReuseItsTail(){
+        val next=AtomicLong(1)
+        val saved=reserveOperationCounters(next,1_000_001,100uL,4096)
+        assertEquals(100uL,saved)
+        assertEquals(4196L,next.getAndAdd(3))
+        assertEquals(4199uL,reserveOperationCounters(next,1_000_001,1uL,1024))
+    }
+    @Test fun concurrentCaptureRangesNeverOverlap(){
+        val next=AtomicLong(1);val executor=Executors.newFixedThreadPool(2)
+        try{
+            val futures=(1..16).map{executor.submit<ULong>{reserveOperationCounters(next,1_000_001,1uL,4096)}}
+            val starts=futures.map{it.get()}.sorted()
+            assertEquals(16,starts.distinct().size)
+            starts.zipWithNext().forEach{(a,b)->assertTrue(b>=a+4096uL)}
+            assertEquals(1L+16*4096,next.get())
+        }finally{executor.shutdownNow()}
+    }
+    @Test fun exhaustedCaptureRangeRefusesAtomicallyAtTheDurableBoundary(){
+        val next=AtomicLong(10)
+        for((floor,count) in listOf(10uL to 4096,ULong.MAX_VALUE to 1,10uL to 4097)){
+            assertTrue(runCatching{reserveOperationCounters(next,4105,floor,count)}.isFailure)
+            assertEquals(10L,next.get())
+        }
+        assertEquals(10uL,reserveOperationCounters(next,4106,10uL,4096))
+        assertEquals(4106L,next.get())
+        assertTrue(runCatching{reserveOperationCounters(next,4106,1uL,1)}.isFailure)
+        assertEquals(4106L,next.get())
+    }
 }
