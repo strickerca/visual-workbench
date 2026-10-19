@@ -13,13 +13,14 @@ internal fun bakedCanonicalIds(document: DocumentSnapshot, composedPixelsCurrent
 /** Static baked IDs do not turn every frame into a transient front-buffer draw. */
 internal fun transientHiddenIds(hidden: Set<String>, baked: Set<String>): Set<String> = hidden - baked
 
-/** Ordered changes must hide stale composed pixels immediately, but the next
- * refresh still owes a background load if that change removes the final tone. */
+/** Clearing an ordinary background for composition or an ordered change still
+ * owes a current bitmap, even if the change removes the final saved tone. */
 internal class ComposedReloadObligation {
     var pending: Boolean = false
         private set
 
-    fun revokeComposedPixels() { pending = true }
+    fun arm() { pending = true }
     fun needsReload(nextHasToneAdjustments: Boolean): Boolean = pending || nextHasToneAdjustments
+    /** Only a current adopted bitmap (or a different document/project) settles this. */
     fun settle() { pending = false }
 }

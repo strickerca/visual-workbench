@@ -1403,9 +1403,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         captureArrivals.changed(current, token)
                         giantOwner.observe(change.project)
                         invalidateAssisted()
-                        if(composedBackground!=null && document?.render?.revision?.let { old ->
+                        if((composedBackground!=null || document?.hasToneAdjustments==true) && document?.render?.revision?.let { old ->
                             old.projectId==change.project.projectId && (old.hostSeq!=change.project.hostSeq || old.stateHash!=change.project.stateHash) }==true){
-                            composedReload.revokeComposedPixels()
+                            composedReload.arm()
                             composedBackground=null;background=null
                         }
                         imageFrames.observe(change.sequence)
@@ -1613,6 +1613,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val composed = doc.hasToneAdjustments
         val format = originalFormat?.takeIf { it.binding == binding }
         if(composed){
+            composedReload.arm() // An ordered undo can arrive before the first composed bitmap is adopted.
             background=null;composedBackground=null
             if(format==null || format.rawPreview){
                 needsColorConsent=false
@@ -1666,6 +1667,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 composedBackground = if(composed) ComposedBackgroundOwner(current,token,doc.documentId,doc.page,binding) else null
                 blockingMessage = null; needsColorConsent = false
                 adopted=true
+                composedReload.settle()
             } finally { if(!adopted) bitmap.recycle() }
         } catch (cancel: CancellationException) { throw cancel }
         catch (error: CoreFailure) {
@@ -2200,9 +2202,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         // The document and its own revision are one native snapshot. Host sequence
         // alone cannot order optimistic edits sharing the same accepted base.
         if (document?.render?.revision != next.render.revision) clearPeerObjects()
-        val priorComposition=composedBackground!=null || composedReload.pending
+        val priorComposition=composedBackground!=null || composedReload.pending || document?.hasToneAdjustments==true
         if(document?.render?.revision!=next.render.revision && (priorComposition || next.hasToneAdjustments)){
-            if(priorComposition)composedReload.revokeComposedPixels()
+            if(priorComposition)composedReload.arm()
             background=null;composedBackground=null
         }
         info = next.render.revision
@@ -2214,7 +2216,6 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         refreshOriginalFormatNotice()
         if(giantMode||giantDisplayRequired(next)||composedReload.needsReload(next.hasToneAdjustments)){
             loadBackground()
-            if(document===next && refreshAdmission.accepts(ticket))composedReload.settle()
         }
         instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
         if (exportReady?.matches(info, document) != true) exportReady = null
