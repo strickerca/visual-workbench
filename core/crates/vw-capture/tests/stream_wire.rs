@@ -62,6 +62,15 @@ fn bounded_pipe_rejects_oversize_truncation_and_unknown_command() {
         stream_wire::read_command(&mut Cursor::new(bytes), &budget, &cancel),
         Err(Error::Invalid)
     ));
+    let parse_budget = SessionBudget::new(MAX_HEADER_BYTES as u64).expect("parse budget");
+    let mut invalid = 4u32.to_le_bytes().to_vec();
+    invalid.extend_from_slice(b"null");
+    // The DTO workspace must be admitted before serde parses even invalid JSON.
+    assert!(matches!(
+        stream_wire::read_command(&mut Cursor::new(invalid), &parse_budget, &cancel),
+        Err(Error::Limit)
+    ));
+    assert_eq!(0, parse_budget.used_bytes());
 }
 #[test]
 fn epoch_source_sequence_and_payload_are_not_self_issued_grants() {
@@ -92,7 +101,12 @@ fn epoch_source_sequence_and_payload_are_not_self_issued_grants() {
     stream_wire::write_packet(&mut reply, &good, &[], &budget, &cancel).expect("write reply");
     let packet =
         stream_wire::read_packet(&mut Cursor::new(reply), &budget, &cancel).expect("read reply");
-    validate_reply(&request, &command, &packet).expect("exact reply");
+    validate_reply(&request, &command, &packet, &budget).expect("exact reply");
+    let unrelated = SessionBudget::new(request.endpoint_bytes).expect("unrelated pool");
+    assert!(matches!(
+        validate_reply(&request, &command, &packet, &unrelated),
+        Err(Error::Invalid)
+    ));
     drop(packet);
     for wrong in [
         Header::Idle {
@@ -129,7 +143,7 @@ fn epoch_source_sequence_and_payload_are_not_self_issued_grants() {
         let packet =
             stream_wire::read_packet(&mut Cursor::new(bytes), &budget, &cancel).expect("read");
         assert!(matches!(
-            validate_reply(&request, &command, &packet),
+            validate_reply(&request, &command, &packet, &budget),
             Err(Error::Invalid)
         ));
     }

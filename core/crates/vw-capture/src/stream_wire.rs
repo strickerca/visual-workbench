@@ -184,6 +184,11 @@ pub struct Packet {
     pub payload: BudgetedBytes,
     _header_charge: MemoryCharge,
 }
+impl Packet {
+    pub fn belongs_to(&self, budget: &SessionBudget) -> bool {
+        self.payload.charge().belongs_to(budget) && self._header_charge.belongs_to(budget)
+    }
+}
 pub struct ReceivedCommand {
     pub command: Command,
     _charge: MemoryCharge,
@@ -213,7 +218,7 @@ fn read_header<R: Read, T: for<'de> Deserialize<'de>>(
     input: &mut R,
     budget: &SessionBudget,
     cancel: &Cancellation,
-) -> Result<T> {
+) -> Result<(T, MemoryCharge)> {
     cancel.check().map_err(stream_error)?;
     let mut len = [0u8; 4];
     input.read_exact(&mut len).map_err(|_| Error::Platform)?;
@@ -227,7 +232,14 @@ fn read_header<R: Read, T: for<'de> Deserialize<'de>>(
         .read_exact(owned.bytes_mut())
         .map_err(|_| Error::Platform)?;
     cancel.check().map_err(stream_error)?;
-    serde_json::from_slice(owned.bytes()).map_err(|_| Error::Invalid)
+    // JSON can allocate owned strings while decoding. Reserve its maximum
+    // retained DTO before serde sees the bounded input, then hand the charge
+    // to the command/packet owner rather than crediting it after parse.
+    let dto_charge = budget
+        .reserve(MemoryKind::Transfer, MAX_HEADER_BYTES as u64)
+        .map_err(stream_error)?;
+    let parsed = serde_json::from_slice(owned.bytes()).map_err(|_| Error::Invalid)?;
+    Ok((parsed, dto_charge))
 }
 pub fn write_command<W: Write>(
     output: &mut W,
@@ -258,10 +270,7 @@ pub fn read_command<R: Read>(
     budget: &SessionBudget,
     cancel: &Cancellation,
 ) -> Result<ReceivedCommand> {
-    let command = read_header(input, budget, cancel)?;
-    let charge = budget
-        .reserve(MemoryKind::Transfer, MAX_HEADER_BYTES as u64)
-        .map_err(stream_error)?;
+    let (command, charge) = read_header(input, budget, cancel)?;
     Ok(ReceivedCommand {
         command,
         _charge: charge,
@@ -289,10 +298,7 @@ pub fn read_packet<R: Read>(
     budget: &SessionBudget,
     cancel: &Cancellation,
 ) -> Result<Packet> {
-    let header: Header = read_header(input, budget, cancel)?;
-    let header_charge = budget
-        .reserve(MemoryKind::Transfer, MAX_HEADER_BYTES as u64)
-        .map_err(stream_error)?;
+    let (header, header_charge): (Header, MemoryCharge) = read_header(input, budget, cancel)?;
     let len = header.payload_len()?;
     let mut payload =
         BudgetedBytes::allocate(budget, MemoryKind::Transfer, len, cancel).map_err(stream_error)?;

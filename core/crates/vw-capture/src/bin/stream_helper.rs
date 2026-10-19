@@ -22,13 +22,17 @@ fn main() {
 }
 fn run() -> Result<()> {
     let started = Instant::now();
-    let deadline = Arc::new(AtomicU64::new(10_000));
+    // No active operation exists while a healthy helper waits for a command.
+    let deadline = Arc::new(AtomicU64::new(u64::MAX));
     let watchdog = deadline.clone();
     std::thread::Builder::new()
         .name("vw-stream-watchdog".into())
         .spawn(move || {
             loop {
-                if started.elapsed().as_millis() > u128::from(watchdog.load(Ordering::Acquire)) {
+                if operation_expired(
+                    started.elapsed().as_millis(),
+                    watchdog.load(Ordering::Acquire),
+                ) {
                     std::process::exit(2);
                 }
                 std::thread::sleep(Duration::from_millis(5));
@@ -46,6 +50,12 @@ fn run() -> Result<()> {
     let Command::Open { request } = &first.command else {
         return Err(Error::Invalid);
     };
+    deadline.store(
+        now_ms_any(started)?
+            .checked_add(10_000)
+            .ok_or(Error::Limit)?,
+        Ordering::Release,
+    );
     if let Err(error) = request.validate() {
         stream_wire::write_packet(
             &mut output,
@@ -161,11 +171,12 @@ fn run() -> Result<()> {
         )?;
         let mut sequence = 0u64;
         loop {
+            deadline.store(u64::MAX, Ordering::Release);
+            let received = stream_wire::read_command(&mut input, &budget, &wire_cancel)?;
             deadline.store(
                 now_ms(started)?.checked_add(10_000).ok_or(Error::Limit)?,
                 Ordering::Release,
             );
-            let received = stream_wire::read_command(&mut input, &budget, &wire_cancel)?;
             let command = &received.command;
             let next = command
                 .sequence()
@@ -304,7 +315,23 @@ fn run() -> Result<()> {
         }
     }
 }
+fn operation_expired(elapsed_ms: u128, deadline_ms: u64) -> bool {
+    deadline_ms != u64::MAX && elapsed_ms > u128::from(deadline_ms)
+}
+fn now_ms_any(started: Instant) -> Result<u64> {
+    u64::try_from(started.elapsed().as_millis()).map_err(|_| Error::Limit)
+}
 #[cfg(windows)]
 fn now_ms(started: Instant) -> Result<u64> {
-    u64::try_from(started.elapsed().as_millis()).map_err(|_| Error::Limit)
+    now_ms_any(started)
+}
+#[cfg(test)]
+mod tests {
+    use super::operation_expired;
+    #[test]
+    fn idle_wait_has_no_watchdog_deadline_but_active_work_does() {
+        assert!(!operation_expired(86_400_000, u64::MAX));
+        assert!(!operation_expired(5_000, 5_000));
+        assert!(operation_expired(5_001, 5_000));
+    }
 }

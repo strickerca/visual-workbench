@@ -1,6 +1,5 @@
 //! One pinned helper and one bounded in-flight exchange. Windows owns a
 //! suspended, kill-on-close Job before the helper's first instruction runs.
-#[cfg(windows)]
 use crate::stream::stream_error;
 use crate::{
     Error, FrameIdentity, Result,
@@ -8,12 +7,19 @@ use crate::{
     stream_wire::{Command, Header, Packet},
 };
 use vw_proto::Message;
+use vw_stream::{Cancellation, EncodedTiles, MemoryKind, SessionBudget};
 
 /// Wire values can confirm exact correlation, never create a capture grant.
 /// The root facade separately checks authenticated CONTROL/MEDIA/BLOB owners.
-pub fn validate_reply(request: &StreamRequest, command: &Command, packet: &Packet) -> Result<()> {
+pub fn validate_reply(
+    request: &StreamRequest,
+    command: &Command,
+    packet: &Packet,
+    budget: &SessionBudget,
+) -> Result<()> {
     let sequence = command.sequence().ok_or(Error::Invalid)?;
-    if sequence == 0
+    if !packet.belongs_to(budget)
+        || sequence == 0
         || packet.header.sequence() != Some(sequence)
         || command.binding() != Some((request.connection_epoch, request.source_generation))
         || packet.header.binding() != (request.connection_epoch, request.source_generation)
@@ -56,10 +62,19 @@ pub fn validate_reply(request: &StreamRequest, command: &Command, packet: &Packe
             {
                 return Err(Error::Invalid);
             }
-            vw_proto::capture_admission::frame_tiles(packet.payload.bytes())
-                .map_err(|_| Error::Limit)?;
+            let cancel = Cancellation::default();
+            let _parse_workspace = budget
+                .reserve(
+                    MemoryKind::CodecWorkspace,
+                    (vw_stream::MAX_TILE_BYTES + 64 * 1024) as u64,
+                )
+                .map_err(stream_error)?;
+            let decoded_owner = EncodedTiles::reserve(budget, &cancel).map_err(stream_error)?;
+            preflight_frame_tiles(packet.payload.bytes())?;
             let tiles = vw_proto::v1::FrameTiles::decode(packet.payload.bytes())
                 .map_err(|_| Error::Invalid)?;
+            let tiles = decoded_owner.adopt(tiles, &cancel).map_err(stream_error)?;
+            let tiles = tiles.packet();
             let expected = request.stream_geometry(*timestamp_ns)?;
             let actual = vw_stream::StreamGeometry::new(
                 tiles.geometry.as_ref().ok_or(Error::Invalid)?,
@@ -129,6 +144,169 @@ fn same_identity(a: &FrameIdentity, b: &FrameIdentity) -> bool {
         && a.platform == b.platform
         && a.window_handle == b.window_handle
         && a.monitor_id == b.monitor_id
+}
+
+#[derive(Clone, Copy)]
+enum ProtoKind {
+    Frame,
+    Uuid,
+    Geometry,
+    Tile,
+    Rect,
+}
+#[derive(Default)]
+struct ProtoCounts {
+    fields: usize,
+    tiles: usize,
+    tile_bytes: usize,
+}
+fn varint(bytes: &[u8], cursor: &mut usize) -> Result<u64> {
+    let mut value = 0u64;
+    for shift in (0..=63).step_by(7) {
+        let byte = *bytes.get(*cursor).ok_or(Error::Invalid)?;
+        *cursor += 1;
+        if shift == 63 && byte > 1 {
+            return Err(Error::Invalid);
+        }
+        value |= u64::from(byte & 0x7f) << shift;
+        if byte & 0x80 == 0 {
+            return Ok(value);
+        }
+    }
+    Err(Error::Invalid)
+}
+fn scan_proto(bytes: &[u8], kind: ProtoKind, counts: &mut ProtoCounts) -> Result<()> {
+    let mut cursor = 0usize;
+    let mut seen = 0u16;
+    while cursor < bytes.len() {
+        counts.fields = counts.fields.checked_add(1).ok_or(Error::Limit)?;
+        // One fully populated tile contributes eight wire fields (the outer
+        // repeated field, three tile fields and four rectangle fields). Leave
+        // room for all 128 tiles plus frame/geometry metadata.
+        if counts.fields > 1200 {
+            return Err(Error::Limit);
+        }
+        let key = varint(bytes, &mut cursor)?;
+        let field = key >> 3;
+        let wire = (key & 7) as u8;
+        let (expected, max_len, nested, repeat) = match (kind, field) {
+            (ProtoKind::Frame, 1) => (2, 32, Some(ProtoKind::Uuid), false),
+            (ProtoKind::Frame, 2 | 4 | 5 | 6 | 8 | 9) => (0, 0, None, false),
+            (ProtoKind::Frame, 3) => (2, 512, Some(ProtoKind::Geometry), false),
+            (ProtoKind::Frame, 7) => (
+                2,
+                vw_stream::MAX_TILE_BYTES + 128,
+                Some(ProtoKind::Tile),
+                true,
+            ),
+            (ProtoKind::Uuid, 1) => (2, 16, None, false),
+            (ProtoKind::Geometry, 1) => (2, 16, None, false),
+            (ProtoKind::Geometry, 2 | 6 | 7) => (0, 0, None, false),
+            (ProtoKind::Geometry, 3) => (2, 128, None, false),
+            (ProtoKind::Geometry, 4) => (2, 64, Some(ProtoKind::Rect), false),
+            (ProtoKind::Geometry, 5) => (1, 0, None, false),
+            (ProtoKind::Tile, 1) => (2, 64, Some(ProtoKind::Rect), false),
+            (ProtoKind::Tile, 2) => (2, 16, None, false),
+            (ProtoKind::Tile, 3) => (2, vw_stream::MAX_TILE_BYTES, None, false),
+            (ProtoKind::Rect, 1..=4) => (0, 0, None, false),
+            _ => return Err(Error::Invalid),
+        };
+        if wire != expected {
+            return Err(Error::Invalid);
+        }
+        if !repeat {
+            let bit = 1u16
+                .checked_shl(u32::try_from(field).map_err(|_| Error::Invalid)?)
+                .ok_or(Error::Invalid)?;
+            if seen & bit != 0 {
+                return Err(Error::Invalid);
+            }
+            seen |= bit;
+        }
+        match wire {
+            0 => {
+                varint(bytes, &mut cursor)?;
+            }
+            1 => {
+                cursor = cursor
+                    .checked_add(8)
+                    .filter(|end| *end <= bytes.len())
+                    .ok_or(Error::Invalid)?;
+            }
+            2 => {
+                let len = usize::try_from(varint(bytes, &mut cursor)?).map_err(|_| Error::Limit)?;
+                if len > max_len {
+                    return Err(Error::Limit);
+                }
+                let end = cursor
+                    .checked_add(len)
+                    .filter(|end| *end <= bytes.len())
+                    .ok_or(Error::Invalid)?;
+                if matches!(kind, ProtoKind::Frame) && field == 7 {
+                    counts.tiles += 1;
+                    if counts.tiles > vw_stream::MAX_TILES {
+                        return Err(Error::Limit);
+                    }
+                }
+                if matches!(kind, ProtoKind::Tile) && field == 3 {
+                    counts.tile_bytes = counts.tile_bytes.checked_add(len).ok_or(Error::Limit)?;
+                    if counts.tile_bytes > vw_stream::MAX_TILE_BYTES {
+                        return Err(Error::Limit);
+                    }
+                }
+                if matches!(kind, ProtoKind::Uuid) && field == 1 && len != 16 {
+                    return Err(Error::Invalid);
+                }
+                if let Some(child) = nested {
+                    scan_proto(&bytes[cursor..end], child, counts)?;
+                }
+                cursor = end;
+            }
+            _ => return Err(Error::Invalid),
+        }
+    }
+    Ok(())
+}
+fn preflight_frame_tiles(bytes: &[u8]) -> Result<()> {
+    if bytes.is_empty() || bytes.len() > vw_stream::MAX_TILE_BYTES + 64 * 1024 {
+        return Err(Error::Limit);
+    }
+    scan_proto(bytes, ProtoKind::Frame, &mut ProtoCounts::default())
+}
+#[cfg(test)]
+mod preflight_tests {
+    use super::*;
+    #[test]
+    fn repeated_or_inflated_protobuf_fields_refuse_before_decode() {
+        assert!(matches!(
+            preflight_frame_tiles(&[0x10, 1, 0x10, 2]),
+            Err(Error::Invalid)
+        ));
+        let mut too_many_tiles = Vec::new();
+        for _ in 0..=vw_stream::MAX_TILES {
+            too_many_tiles.extend_from_slice(&[0x3a, 0]);
+        }
+        assert!(matches!(
+            preflight_frame_tiles(&too_many_tiles),
+            Err(Error::Limit)
+        ));
+        assert!(matches!(
+            preflight_frame_tiles(&[0x1a, 2, 0x40, 1]),
+            Err(Error::Invalid)
+        ));
+    }
+    #[test]
+    fn full_tile_grid_does_not_trip_the_wire_field_ceiling() {
+        let tile = [
+            0x0a, 8, 0x08, 1, 0x10, 1, 0x18, 1, 0x20, 1, 0x12, 4, b'j', b'p', b'e', b'g', 0x1a, 0,
+        ];
+        let mut frame = vec![0x10, 1]; // frame ID plus 128 fully populated tiles
+        for _ in 0..vw_stream::MAX_TILES {
+            frame.extend_from_slice(&[0x3a, tile.len() as u8]);
+            frame.extend_from_slice(&tile);
+        }
+        assert!(preflight_frame_tiles(&frame).is_ok());
+    }
 }
 
 #[cfg(windows)]
@@ -450,6 +628,11 @@ mod owned {
         closing: bool,
     }
     impl StreamProcess {
+        /// Clone of the exact endpoint pool that owns inbound pipe buffers.
+        /// Downstream decode/display/transport copies must reserve from it.
+        pub fn budget(&self) -> SessionBudget {
+            self.budget.clone()
+        }
         pub fn open(
             helper: Arc<PinnedStreamHelper>,
             request: StreamRequest,
@@ -649,7 +832,9 @@ mod owned {
                 5_000
             };
             let packet = self.exchange_inner(command.clone(), cancel, timeout)?;
-            if let Err(error) = super::validate_reply(&self.request, &command, &packet) {
+            if let Err(error) =
+                super::validate_reply(&self.request, &command, &packet, &self.budget)
+            {
                 let _ = self.close();
                 return Err(error);
             }
@@ -723,11 +908,13 @@ mod owned {
             AssignProcessToJobObject(job.0.raw(), GetCurrentProcess())
                 .map_err(|_| Error::Platform)?;
         }
-        Ok(job)
+        Ok(job.0)
     }
 }
 #[cfg(windows)]
-pub use owned::{PinnedStreamHelper, StreamProcess, retry_unresolved_retirement};
+pub use owned::{
+    PinnedStreamHelper, StreamProcess, confine_stream_helper, retry_unresolved_retirement,
+};
 
 #[cfg(not(windows))]
 pub struct PinnedStreamHelper;

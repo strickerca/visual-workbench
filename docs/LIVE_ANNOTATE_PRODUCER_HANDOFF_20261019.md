@@ -70,11 +70,16 @@ creation and source-close behavior. The producer makes none of those decisions.
 `stream_wire` has closed Open/Poll/Original/Stop commands and
 Ready/Tiles/Original/Idle/Refused/Stopped replies. It limits headers to 16 KiB,
 payloads to 64 MiB, and retains charges for parsed headers, queued commands and
-payloads. `validate_reply` checks sequence, epoch, generation, source geometry,
+payloads. JSON DTO workspace is reserved before parsing. Protobuf tiles receive
+a bounded wire preflight and an endpoint-pool parser/DTO reservation before
+`FrameTiles::decode`; this uses the current `vw-proto` API. `validate_reply`
+takes the same `SessionBudget` and checks sequence, epoch, generation, source geometry,
 tile protobuf admission/format, and exact original identity/hash; these values
 remain correlation data, not authorization. The host and helper each enforce
 their local endpoint budget; root must bind both ends to the authenticated
-session's agreed limit and reserve downstream display/transport copies.
+session's agreed limit and reserve downstream display/transport copies. The host
+gets its exact pool from `StreamProcess::budget()`; `Packet::belongs_to` can
+confirm its charged inbound owner before adoption.
 
 On Windows, `StreamProcess::open` retains no-follow executable and ancestor
 handles plus trusted hash, spawns suspended without a shell, assigns the child
@@ -85,13 +90,20 @@ actual process exit and IO join. An unresolved close keeps the process/slot/
 helper in a retryable registry; `retry_unresolved_retirement()` attempts a new
 bounded join. The helper has a separate self-owned memory/process cap and
 watchdog. No real process or WGC capture was launched for this handoff.
+The helper watchdog is disarmed while waiting for a command, and armed only for
+Open/command processing and pipe publication; idle time is never charged to the
+next command. WGC creates D3D on the adapter of the selected output using the
+existing monitor-adapter selection helper, rather than a default GPU.
 
 ## Focused evidence and open validation
 
 `stream_producer.rs` exercises consent/source/ring refusal, keyframe repair,
 numbered frames, exact original retrieval, eviction and cancellation with a
 synthetic source. `stream_wire.rs` exercises bounded/truncated/unknown headers,
-sequence/epoch/generation mismatch and payload refusal using memory pipes.
+pre-parse DTO admission, wrong-pool refusal, sequence/epoch/generation mismatch
+and payload refusal using memory pipes. The local protobuf preflight cases
+refuse duplicate/inflated fields and admit a fully populated 128-tile wire
+grid, so the parser ceiling does not reject the valid tile-count maximum.
 `rustfmt --edition 2024` parses and formats the seven new Rust leaves; staged
 diff and secret scan are the only additional local checks. The tests have been
 written but not compiled or run; no Windows Job/WGC, native codec, app, device,

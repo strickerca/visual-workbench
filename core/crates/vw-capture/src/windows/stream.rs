@@ -15,7 +15,6 @@ use ::windows::{
     Win32::{
         Foundation::*,
         Graphics::{
-            Direct3D::*,
             Direct3D11::*,
             Dxgi::{Common::*, *},
             Gdi::*,
@@ -101,23 +100,11 @@ impl WgcStream {
         let request_charge = budget
             .reserve(MemoryKind::Foreign, 16 * 1024)
             .map_err(stream_error)?;
-        let (mut device, mut context) = (None, None);
-        // SAFETY: initialized COM output slots; the helper owns this D3D device.
-        unsafe {
-            api(D3D11CreateDevice(
-                None,
-                D3D_DRIVER_TYPE_HARDWARE,
-                HMODULE::default(),
-                D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-                Some(&[D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0]),
-                D3D11_SDK_VERSION,
-                Some(&mut device),
-                None,
-                Some(&mut context),
-            ))?;
-        }
-        let device = device.ok_or(Error::Platform)?;
-        let context = context.ok_or(Error::Platform)?;
+        // Bind D3D to the adapter of the actually selected source output.
+        // A default GPU may be on another adapter and cannot prove SDR/source
+        // identity for this monitor or window.
+        let monitor = selected_monitor(&request)?;
+        let (device, context) = super::picker_capture::device_for_monitor(monitor)?;
         let dxgi: IDXGIDevice = api(device.cast())?;
         require_sdr(&dxgi, &request)?;
         let factory: IGraphicsCaptureItemInterop = api(::windows::core::factory::<
@@ -346,23 +333,7 @@ fn check_source(request: &StreamRequest) -> Result<()> {
     }
 }
 fn require_sdr(device: &IDXGIDevice, request: &StreamRequest) -> Result<()> {
-    let monitor = match &request.source {
-        PickerSource::Window { target } => {
-            // SAFETY: the selected HWND is revalidated before this query.
-            unsafe {
-                MonitorFromWindow(
-                    HWND(target.window as usize as *mut _),
-                    MONITOR_DEFAULTTONULL,
-                )
-            }
-        }
-        PickerSource::Monitor { target } | PickerSource::Region { target, .. } => {
-            HMONITOR(target.monitor as usize as *mut _)
-        }
-    };
-    if monitor.0.is_null() {
-        return Err(Error::Unavailable);
-    }
+    let monitor = selected_monitor(request)?;
     // SAFETY: adapter/output interfaces are owned COM values, not raw display pointers.
     unsafe {
         let adapter = api(device.GetAdapter())?;
@@ -384,4 +355,24 @@ fn require_sdr(device: &IDXGIDevice, request: &StreamRequest) -> Result<()> {
         }
     }
     Err(Error::Unavailable)
+}
+fn selected_monitor(request: &StreamRequest) -> Result<HMONITOR> {
+    let monitor = match &request.source {
+        PickerSource::Window { target } => {
+            // SAFETY: the selected HWND is revalidated before this query.
+            unsafe {
+                MonitorFromWindow(
+                    HWND(target.window as usize as *mut _),
+                    MONITOR_DEFAULTTONULL,
+                )
+            }
+        }
+        PickerSource::Monitor { target } | PickerSource::Region { target, .. } => {
+            HMONITOR(target.monitor as usize as *mut _)
+        }
+    };
+    if monitor.0.is_null() {
+        return Err(Error::Unavailable);
+    }
+    Ok(monitor)
 }
