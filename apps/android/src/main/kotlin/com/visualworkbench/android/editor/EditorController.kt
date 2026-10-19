@@ -348,19 +348,25 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private val streamDisposalGate = Mutex()
     private var streamDisposalComplete = false
     private var streamBorrow: WorkbenchProject? = null
-    private data class StreamOriginal(val documentId: String, val bitmap: Bitmap)
-    private var streamOriginal: StreamOriginal? = null
+    private var streamDocumentId: String? = null
+    private var streamInitialCamera: Camera? = null
+    private var streamEditsSealed = false
+    private val streamSceneState = kotlinx.coroutines.flow.MutableStateFlow<CanvasScene?>(null)
+    internal val streamScenes: kotlinx.coroutines.flow.StateFlow<CanvasScene?> = streamSceneState
+    private fun streamBackgroundReady(): Boolean = streamDraftOnly && streamBorrow != null && streamBorrow === project &&
+        document?.documentId == streamDocumentId && !disposing
 
-    /** The draft owner retains this private project; the child has no pairing,
-     * capture service, import/export or provider admission of its own. */
-    internal suspend fun installStreamDraft(value: WorkbenchProject) {
+    /** Borrow only the private native draft. The stream surface owns all pixels
+     * and supplies its exact camera; this child never closes that project. */
+    internal suspend fun installStreamDraft(value: WorkbenchProject, documentId: String, initialCamera: Camera) {
         check(streamDraftOnly && streamBorrow == null)
-        streamBorrow = value
+        streamBorrow = value; streamDocumentId = documentId; streamInitialCamera = initialCamera
         streamInitialization.await()
         val work = openRequest(knownSrgb = true, streamInstall = true) { value } ?: error("The annotation editor is not ready")
         work.join()
         currentCoroutineContext().ensureActive()
-        check(project === value && document != null && background != null && !disposing) { "The annotation draft could not display" }
+        check(project === value && document?.documentId == documentId && background == null &&
+            streamScenes.value?.camera == initialCamera && !disposing) { "The annotation draft could not display" }
     }
     internal fun streamEditsIdle(): Boolean = streamDraftOnly && !disposing && !busy && pending == 0 &&
         operationCount == 0 && gesture == null && strokes.isEmpty() && sliderGesture == null &&
@@ -369,22 +375,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         !selections.state.value.busy && !erasers.state.value.busy
     internal suspend fun settleStreamEdits() {
         check(streamDraftOnly)
+        streamEditsSealed = true
+        // The surface has already canceled contact and stopped new input.
+        // Accepted queue work keeps its normal transaction and settlement path.
+        while (pending != 0 || operationCount != 0 || strokes.isNotEmpty() || previewJob?.isActive == true || previewHandle != null) {
+            currentCoroutineContext().ensureActive(); delay(4)
+        }
         mutations.withLock { check(streamEditsIdle()) { "Finish the annotation contact before saving" } }
-    }
-    internal fun installStreamOriginal(bitmap: Bitmap, documentId: String) {
-        var adopted = false
-        try {
-            val doc = checkNotNull(document)
-            check(streamDraftOnly && !disposing && doc.documentId == documentId && streamOriginal == null)
-            require(bitmap.width.toUInt() == doc.width && bitmap.height.toUInt() == doc.height)
-            streamOriginal = StreamOriginal(documentId, bitmap)
-            background = bitmap
-            blockingMessage = null; needsColorConsent = false
-            adopted = true
-            // Existing render snapshots may still hold the preview. Keep the
-            // normal reachability retirement policy; never recycle under draw.
-            publish()
-        } finally { if (!adopted) bitmap.recycle() }
     }
     internal suspend fun disposeStreamEditor(): Unit = withContext(NonCancellable) { streamDisposalGate.withLock {
         check(streamDraftOnly)
@@ -403,9 +400,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         closeAssisted()
         mutations.withLock { closeCurrent(); imageFrames.close(); workflows.close(); rotation.close(); documentOwner.close(); closePrecision() }
         pairing.close()
-        streamBorrow?.close(); streamBorrow = null
         scope.cancel(); scope.coroutineContext[Job]?.join()
-        streamOriginal?.bitmap?.recycle(); streamOriginal = null
+        streamSceneState.value = null; streamBorrow = null; streamDocumentId = null; streamInitialCamera = null
         streamDisposalComplete = true
     } }
     private var epoch = 0L
@@ -685,11 +681,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val token=rotation.begin(handle.pivot,point)?:return false
         rotationGesture=token;rotationDisplay=handle.copy(point=point);rotationPhysical=physical;publish();return true
     }
-    private fun bindWorkflows(){rotation.reconciled();info?.let{repository.observeLamport(it.nextLamport)};workflowAttachment()?.let(workflows::bind)
+    private fun bindWorkflows(){rotation.reconciled();info?.let{repository.observeLamport(it.nextLamport)}
+        if(streamDraftOnly)return
+        workflowAttachment()?.let(workflows::bind)
         val current=project;val doc=document
         if(current!=null&&doc!=null&&!disposing)imageFrames.bind(current,doc,epoch,refreshAdmission.capture().sequence)
     }
-    private suspend fun enterWorkflows(){workflowAttachment()?.let{workflows.enter(it)}}
+    private suspend fun enterWorkflows(){if(!streamDraftOnly)workflowAttachment()?.let{workflows.enter(it)}}
     private suspend fun adoptWorkflowDocument(a:EditorWorkflowAttachment,target:DocumentSnapshot){
         if(project!==a.project||epoch!=a.epoch||document?.documentId!=a.document.documentId||document?.page!=a.document.page||document?.render?.revision?.sameDocumentRevision(a.document.render.revision)!=true||disposing)
             throw WorkflowFailure(WorkflowFailureKind.Stale)
@@ -1285,12 +1283,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     val next=load()
                     try { currentCoroutineContext().ensureActive() }
                     catch (error: Throwable) {
-                        withContext(NonCancellable) { try { next.close() } catch (retirement: Throwable) {
+                        withContext(NonCancellable) { try { if(!streamDraftOnly || next !== streamBorrow)next.close() } catch (retirement: Throwable) {
                             if (retirement !== error) error.addSuppressed(retirement)
                         } }
                         throw error
                     }
-                    if(disposing){withContext(NonCancellable){next.close()};false}else{project=next;aiRetiring=false;true}
+                    if(disposing){withContext(NonCancellable){if(!streamDraftOnly || next !== streamBorrow)next.close()};false}else{project=next;aiRetiring=false;true}
                 }
                 if(!opened)return@launch
                 val current = checkNotNull(project)
@@ -1305,7 +1303,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
                 observeProject(current, token)
                 colorAssumed = knownSrgb; colorAssumedSourceAsset=null; screen = WorkbenchScreen.Canvas; cameraFitted = false
-                fit(); bindWorkflows();enterWorkflows();refreshOriginalFormatNotice()
+                if(streamDraftOnly){
+                    check(snapshot.documentId == streamDocumentId)
+                    camera=checkNotNull(streamInitialCamera);cameraFitted=true;unsnappedRotation=camera.rotation;publish()
+                }else fit()
+                bindWorkflows();enterWorkflows();if(!streamDraftOnly)refreshOriginalFormatNotice()
                 if(knownSrgb)colorAssumedSourceAsset=originalFormat?.sourceAssetId
                 loadBackground()
                 if (onOpened != null) completion = ProjectOpenCompletion(current, token)
@@ -1445,7 +1447,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         finally {
             previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
             val previous = project; project = null
-            try { previous?.close() }
+            try { if(!streamDraftOnly || previous !== streamBorrow)previous?.close() }
             finally {
                 document = null; info = null
                 background = null; composedBackground = null; colorAssumed=false; colorAssumedSourceAsset=null; objects = emptyList(); selected = null; transientShape = null
@@ -1674,8 +1676,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private suspend fun loadBackground() {
         val current = project ?: return
         val doc = document ?: return
-        streamOriginal?.takeIf { streamDraftOnly && it.documentId == doc.documentId }?.let {
-            background = it.bitmap; blockingMessage = null; needsColorConsent = false; publish(); return
+        if(streamDraftOnly){
+            background=null;composedBackground=null;blockingMessage=null;needsColorConsent=false;publish();return
         }
         val token = epoch
         val ticket = refreshAdmission.capture()
@@ -1740,11 +1742,6 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             try {
                 currentCoroutineContext().ensureActive()
                 if(!stillCurrent())return
-                // A verified original can arrive while this preview decode is
-                // suspended. Never regress its pixels during a later refresh.
-                streamOriginal?.takeIf { streamDraftOnly && it.documentId == doc.documentId }?.let {
-                    background = it.bitmap; blockingMessage = null; needsColorConsent = false; publish(); return
-                }
                 background = bitmap
                 composedBackground = if(composed) ComposedBackgroundOwner(current,token,doc.documentId,doc.page,binding) else null
                 blockingMessage = null; needsColorConsent = false
@@ -1809,7 +1806,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
         if(giantMode&&(scene?.camera!=camera||scene?.document!==document||scene?.precision!=precision.frame())){giantDraw.set(null);giantRenderReady=false}
         ai.changed()
-        val doc = document ?: return
+        val doc = document ?: run { streamSceneState.value=null; return }
         project?.let { selections.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera); erasers.bind(it, doc, epoch, refreshAdmission.capture().sequence, camera) }
         if (camera.viewportWidth <= 1 || camera.viewportHeight <= 1) return
         if(precision.baseCamera()!=camera){
@@ -1845,6 +1842,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
             aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame,rotationHandle=rotationHandle())
         scene = next
+        if(streamDraftOnly)streamSceneState.value=renderScene(next).also{check(it.background==null)}
         canvasSink?.invoke(renderScene(next))
         workflows.remember(camera)
         documents.viewport(camera)
@@ -1882,12 +1880,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                                    val revision: ProjectInfo? = null, val newObjectId: String? = null,
                                    val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false,val physical:Transform=Transform())
 
-    internal fun precisionInputAllowed():Boolean = !disposing&&!rotationUnavailable()&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
+    internal fun precisionInputAllowed():Boolean = !streamEditsSealed&&!disposing&&!rotationUnavailable()&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
         !instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&
         !ai.state.value.open&&aiResultReady()&&blockingMessage==null&&textDraft==null&&!showBrush&&!showContext&&instructionAdmission.allows(false,false,false,false)&&
         document?.let{(!it.hasToneAdjustments || composedCurrent(it) || (giantMode && giantInputReady(it))) &&
-            (background!=null||documentOwner.matchingFrame(it,epoch)!=null||giantInputReady(it))}==true
+            (background!=null||streamBackgroundReady()||documentOwner.matchingFrame(it,epoch)!=null||giantInputReady(it))}==true
     override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
+        if(streamEditsSealed)return
         if (streamDraftOnly && rawSample.tool == PointerTool.Eraser && erasers.state.value.mode != EraserMode.Object) return
         interruptAirInput()
         if(rotationUnavailable()||workflows.blocksInput()||imageFrames.state.value.blocksInput||ai.state.value.open||!aiResultReady())return
@@ -1895,7 +1894,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             precisionInputAllowed() && erasers.tools.route(rawSample.tool == PointerTool.Eraser) == EraserInputRoute.Selection &&
             selections.interaction.canResumePolygonContact(camera)
         clearToolContact(retainPolygon); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
-        if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || (background == null && document?.let{documentOwner.matchingFrame(it,epoch)}==null && document?.let{giantInputReady(it)}!=true) || documents.state.value.busy || strokes.size >= 3) {
+        if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || (background == null && !streamBackgroundReady() && document?.let{documentOwner.matchingFrame(it,epoch)}==null && document?.let{giantInputReady(it)}!=true) || documents.state.value.busy || strokes.size >= 3) {
             if (strokes.size >= 3) message = "The save queue is full. Wait for the current strokes to finish."
             return
         }
@@ -2246,6 +2245,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                      createdAtMs: Long = System.currentTimeMillis()) {
         val current = project ?: return
         if (commands.isEmpty()) return
+        if(streamEditsSealed){finishRemotePreview(previewLink,gestureId,true);return}
         if(rotationUnavailable()||workflows.blocksInput()||imageFrames.state.value.blocksInput){finishRemotePreview(previewLink,gestureId,true);message="Finish or close the current controls before editing.";return}
         if (operationCount >= 32) { finishRemotePreview(previewLink, gestureId, true); message = "The edit queue is full. Try the edit again after saving finishes."; return }
         val token = epoch
@@ -2349,6 +2349,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     override fun undo() = undoRedo(false)
     override fun redo() = undoRedo(true)
     private fun undoRedo(redo: Boolean) {
+        if(streamEditsSealed)return
         if (busy || workflows.blocksInput() || imageFrames.state.value.blocksInput) return
         cancelTool()
         if (pending != 0) { message = "Wait for the current edit to finish before undo or redo."; return }

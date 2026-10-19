@@ -34,6 +34,23 @@ foreign/lifetime/shared-capacity facade and normal app wiring remain CODE work;
 no Windows or runtime/product gate follows. R b94fa553 is fetched but not
 composed pending parent review. See evidence/T3.02_PRODUCER_REGISTRATION_20261019.md.
 
+Latest borrowed Android adapter: after reading085cca7f, root replaces the
+still-unwired774c048 bitmap-owning child with exact-camera/null-background scene
+publication and a retained temporary project borrow. Child cleanup never closes
+that project; the native draft owns it. Accepted edit queues settle after new
+input/mutation admission seals. Actual Android production/test compilation and
+10 counter/canvas retirement cases pass; these fixtures do not run the private
+editor. See evidence/T3_ANDROID_BORROWED_ADAPTER_20261019.json. Android085cca7f,
+R b94fa553 and corrected F2adb2fe are fetched, review pending and not composed.
+F's earlier7533 parser finding is historical and repaired in the new candidate;
+current root confirmation/foreign/admission/capture caller code remains open.
+
+Current R review: b94fa553 is explicitly held for six source defects covering
+final-blit receipt, canceled raster ownership, ACK/contact race, concurrent close,
+sealed-epoch lossless adoption and HiDPI budget/lifetime. Its nine isolated cases
+do not establish those boundaries. Existing R owns the coherent repair; root has
+not composed the held canvas or counted it as a consumer pass.
+
 | Phase/tasks | Actual source/behavior now | Remaining code/delivery versus verification |
 |---|---|---|
 | 0–2 | Main checkpoint and subsequent reviewed ownership, editor, transport, capture, archive/offline, provider/package/MCP source | Exact earlier evidence retained; G0–G2, real apps/providers and physical acceptance open. Recovered archives are candidates, not accepted implementation |

@@ -1,0 +1,86 @@
+{
+  "schema": "vw.t3-android-borrowed-adapter.v1",
+  "status": "PASS WITH GAPS",
+  "date_utc": "2026-10-19",
+  "base_revision": "c0a13e5e0d9bf3476a2b720700a7022aafc5918e",
+  "source": {
+    "path": "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt",
+    "bytes": 181258,
+    "sha256": "595182eab59149f2d6840b98bdc83904fc84d27f3d4208bdcbf47503408819e3"
+  },
+  "artifact": {
+    "path": "apps/android/build/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes/com/visualworkbench/android/editor/EditorController.class",
+    "bytes": 345129,
+    "sha256": "f61eaa7d2ac5c54ca6120010bc8f23dd8ea3f38ce37a9987f4147cef9f0dac3b"
+  },
+  "contract_read": "085cca7f60cfbb211d0f4223be2b63f3c6b140f3; fetched for interface inspection only, not composed",
+  "implemented": [
+    "private native project borrow is retained before suspension; all child open/cancel/close paths skip project.close for that exact borrow",
+    "exact stream camera installed without fit margin or device-local workflow camera restore",
+    "ordinary/giant/Result background paths skipped; actual streamScenes StateFlow has null background and retains ordinary camera/provisional annotations",
+    "new contact and ordinary edit/undo admission seal before accepted edit/stroke/preview settlement",
+    "child disposal joins editor/canvas/native-child/scope retirement; native annotation owner still owns draft.project.close"
+  ],
+  "superseded": "774c048 duplicate bitmap-owning private child helper; that still-unwired approach remains preserved in its commit/evidence and is deliberately replaced by module-owned pixel/borrowed-project contract",
+  "checks": [
+    {
+      "command": "bash apps/gradlew -p apps :android:testDebugUnitTest --tests '*ProjectCounterFloorTest' --tests '*CanvasRetirementOwnerTest' --offline --no-daemon --max-workers=2",
+      "result": "PASS; actual entire Android production/test source compilation,10 focused existing/concurrent counter and canvas retirement cases",
+      "log": {
+        "path": "/tmp/vw-stream-root-android-borrowed-adapter-20261019-final.log",
+        "bytes": 5047,
+        "sha256": "f43b709dee8073bf77d3f879ab58c54a47296157963bb949f321a3ae2ff2246f"
+      }
+    },
+    {
+      "command": "javap -p -c <actual compiled EditorController.class>; assert borrowed-project null guard",
+      "result": "PASS; final compiled class contains current guard, not the earlier in-flight snapshot",
+      "log": {
+        "path": "/tmp/vw-stream-root-android-borrowed-bytecode-20261019-final.log",
+        "bytes": 1528,
+        "sha256": "a815496356e07bc6afce8ca848bcc347c365e7f092f47504734e93c1f831fe3a"
+      }
+    }
+  ],
+  "test_results": [
+    {
+      "class": "com.visualworkbench.android.editor.ProjectCounterFloorTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "com.visualworkbench.android.editor.CanvasRetirementOwnerTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "initial_check": {
+    "log": {
+      "path": "/tmp/vw-stream-root-android-borrowed-adapter-20261019-initial.log",
+      "bytes": 5036,
+      "sha256": "0fc3164a4e0953e6d9a93e7e99f69d791d40491370ce9b367f7b8936ee80f817"
+    },
+    "result": "PASS before last null-guard source edit; bytecode inspection found that last edit was outside its source snapshot, so actual Gradle compilation was repeated and final bytecode checked"
+  },
+  "scope": "The10 fixture cases do not instantiate or execute the private Android editor. Actual private-child scene/input/lossless/Save/disposal runtime still requires module composition and platform validation.",
+  "other_workers": {
+    "R": "b94fa553143f7c398d60173c33e526ff150c3cd7 explicitly HELD by parent on six source defects: final-blit receipt, canceled raster ownership, contact/frame race, concurrent close, sealed-epoch lossless adoption, HiDPI budget/lifetime; R repair assigned; not composed",
+    "Android": "085cca7f60cfbb211d0f4223be2b63f3c6b140f3 fetched, bounded review pending, not composed",
+    "F": "2adb2fe22d7419209a641719adcd5ce96cbfaf47 fetched; current correct control source, parent review pending, not composed; wrong old formats9926a56 preserved separately"
+  },
+  "pending_code": [
+    "actual AndroidStreamDraftEditor adapter and controller acquisition/modal/input/project/link retirement gates plus WorkbenchApp entry/mount after module review",
+    "actual Desktop entry/controller/draft/view integration after R review",
+    "actual publisher/producer foreign shared-budget/lifetime facade and normal selected-source producer caller",
+    "root tunnel confirmation/native/shared/manifest/admission/capture-loop callers after F review"
+  ],
+  "no_new_binding_generation": true,
+  "no_native_jni_gui_input_device_provider_runtime_execution": true,
+  "no_windows_or_performance_or_hardware_or_owner_gate_pass": true,
+  "main_merged": false,
+  "old_worktrees_cleaned": false
+}

@@ -57,6 +57,23 @@ handback remains pending. F was redirected again from unrelated old formats
 9926a56 to current TUNNEL-005 control; preserve its dirty source and do not
 compose the wrong-task formats overlay as tunnel completion.
 
+Latest borrowed Android adapter: after reading085cca7f, root replaces the
+still-unwired774c048 bitmap-owning child with exact-camera/null-background scene
+publication and a retained temporary project borrow. Child cleanup never closes
+that project; the native draft owns it. Accepted edit queues settle after new
+input/mutation admission seals. Actual Android production/test compilation and
+10 counter/canvas retirement cases pass; these fixtures do not run the private
+editor. See evidence/T3_ANDROID_BORROWED_ADAPTER_20261019.json. Android085cca7f,
+R b94fa553 and corrected F2adb2fe are fetched, review pending and not composed.
+F's earlier7533 parser finding is historical and repaired in the new candidate;
+current root confirmation/foreign/admission/capture caller code remains open.
+
+Current R review: b94fa553 is explicitly held for six source defects covering
+final-blit receipt, canceled raster ownership, ACK/contact race, concurrent close,
+sealed-epoch lossless adoption and HiDPI budget/lifetime. Its nine isolated cases
+do not establish those boundaries. Existing R owns the coherent repair; root has
+not composed the held canvas or counted it as a consumer pass.
+
 | Lane | Current objective | Exact task contract / disposition |
 |---|---|---|
 | E backend/model | Actual pinned model/toolchain/reference-parity/artifact delivery | ASSISTED_MODEL_DELIVERY_HANDOFF_20261019.md. Giant repair47f76bf is accepted/composed. e28987e is composed as61c0ec8 and publishes actual host conversion/parity/tooling evidence; root31 offline tool tests pass; private Library archives are now available, but root signed downloads fail HTTPS proxy CONNECT403 before bytes; no conversion repeated. Android/license/runtime/memory admission remains closed. Unrelated old-main T3.07 e8ff4bf is preserved separately, not composed or model evidence |
