@@ -96,13 +96,16 @@ decoding of the actual two white/stable baseline frames before Dot, changed
 post-Dot pixels before Undo, baseline-equal pixels before Redo, and exact
 post-Dot redo pixels before final Undo. The final joined evaluator remains
 separate. A shared authorization/termination mutex closes the race between a
-parent timeout kill and a newly sent grant. After a fresh actual process/Job
+parent timeout kill and a newly sent grant. A timeout closes later grants even
+when uncertain input or an unresolved canvas makes killing unsafe. After a fresh actual process/Job
 receipt and IO join, private PNG disposal now runs even if canvas/input remains
 unresolved; the source, Job, exclusive permit and recovery fence remain held.
 The repair also accounts ten decoded RGBA frames plus serial PNG/decode scratch
 against an explicit 256 MiB parent ceiling, and full-frame child scratch
 against the existing 768 MiB Job limit. The native decoder uses checked
-allocation. These are source repairs, not a Windows compile/runtime pass.
+allocation. The production cleanup decision has a regression test for failed
+Job receipt, unfinished IO, and post-join deletion with an unresolved canvas.
+These are source repairs, not a Windows compile/runtime pass.
 
 ## Proposed deferred validation rows for the root ledger
 

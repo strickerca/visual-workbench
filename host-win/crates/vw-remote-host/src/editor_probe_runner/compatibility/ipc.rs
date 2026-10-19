@@ -35,10 +35,12 @@ impl AuthorizationGate {
         kill: impl FnOnce(),
     ) -> bool {
         let mut closed = self.0.lock().unwrap_or_else(|error| error.into_inner());
-        if *closed || uncertain.load(Ordering::Acquire) || unresolved.load(Ordering::Acquire) {
+        // A timeout always closes future authorizations, even when an already
+        // attempted input or unresolved canvas makes process kill unsafe.
+        *closed = true;
+        if uncertain.load(Ordering::Acquire) || unresolved.load(Ordering::Acquire) {
             return false;
         }
-        *closed = true;
         kill();
         true
     }

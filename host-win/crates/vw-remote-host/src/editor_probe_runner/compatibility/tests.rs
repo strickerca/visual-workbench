@@ -144,12 +144,19 @@ fn authorization_and_cancel_kill_are_serialized() {
     };
     release.wait();
     assert_eq!(worker.join().unwrap(), Ok(()));
-    assert_eq!(rx.recv().unwrap(), false);
+    assert!(!rx.recv().unwrap());
     cancel.join().unwrap().unwrap();
     assert!(uncertain.load(Ordering::Acquire));
     uncertain.store(false, Ordering::Release);
     assert!(gate.close_if_safe(&uncertain, &unresolved, || {}));
     assert_eq!(gate.authorize(&uncertain, || Ok(())), Err(Error::Cancelled));
+    let unresolved_gate = ipc::AuthorizationGate::new();
+    unresolved.store(true, Ordering::Release);
+    assert!(!unresolved_gate.close_if_safe(&uncertain, &unresolved, || panic!("unsafe kill")));
+    assert_eq!(
+        unresolved_gate.authorize(&uncertain, || Ok(())),
+        Err(Error::Cancelled)
+    );
 }
 #[test]
 fn private_disposal_retains_extra_file_failure_then_retries() -> Result<()> {
@@ -171,7 +178,7 @@ fn private_disposal_retains_extra_file_failure_then_retries() -> Result<()> {
     Ok(())
 }
 #[test]
-fn private_capture_cleanup_does_not_require_canvas_recovery_or_live_source() -> Result<()> {
+fn unresolved_canvas_private_cleanup_requires_job_and_io_join() -> Result<()> {
     static NEXT: AtomicUsize = AtomicUsize::new(1000);
     let ordinal = NEXT.fetch_add(1, AtomicOrdering::Relaxed) as u32;
     let marker = id(std::process::id().wrapping_add(ordinal));
@@ -185,9 +192,54 @@ fn private_capture_cleanup_does_not_require_canvas_recovery_or_live_source() -> 
         b"private",
     )?;
     let canvas_unresolved = AtomicBool::new(true);
-    assert!(canvas_unresolved.load(Ordering::Acquire));
-    assert_eq!(lease.dispose()?, 1);
+    let held_source = Arc::new(());
+    let source_fence = held_source.clone();
+    let mut joined = 0;
+    assert_eq!(
+        cleanup_private_after_join(
+            || Err(Error::RetirementPending),
+            true,
+            || {
+                joined += 1;
+                Ok(())
+            },
+            || lease.dispose().map(|_| ()),
+        ),
+        Err(Error::RetirementPending)
+    );
+    assert_eq!(joined, 0);
+    assert!(lease.root.exists());
+    assert_eq!(
+        cleanup_private_after_join(
+            || Ok((41, 0)),
+            false,
+            || {
+                joined += 1;
+                Ok(())
+            },
+            || lease.dispose().map(|_| ()),
+        ),
+        Ok(false)
+    );
+    assert_eq!(joined, 0);
+    assert!(lease.root.exists());
+    assert_eq!(
+        cleanup_private_after_join(
+            || Ok((41, 0)),
+            true,
+            || {
+                joined += 1;
+                Ok(())
+            },
+            || lease.dispose().map(|_| ()),
+        ),
+        Ok(true)
+    );
+    assert_eq!(joined, 1);
     assert!(!lease.root.exists());
+    assert!(canvas_unresolved.load(Ordering::Acquire));
+    assert_eq!(Arc::strong_count(&held_source), 2);
+    drop(source_fence);
     Ok(())
 }
 fn sample_request() -> Request {
