@@ -40,6 +40,7 @@ internal class NativeRemoteEdit(private val handle:LiveSession,private val linkO
     private val retirementScheduled=AtomicBoolean(false)
     private val consumers=RemoteConsumerRegistry()
     private val closeMutex=Mutex()
+    private var closeAttempt:CompletableDeferred<Unit>?=null
     private val compatibilityBorrows=NativeCompatibilityBorrowOwner()
     private val job=SupervisorJob()
     private val ownerScope=CoroutineScope(job+Dispatchers.Default)
@@ -188,22 +189,50 @@ internal class NativeRemoteEdit(private val handle:LiveSession,private val linkO
         }
     }
     override suspend fun close(){releaseNative{
-        closing.set(true)
-        consumers.invalidate()
-        // Signal the hub's actual helper cancellation registry before waiting
-        // for receipt borrowers. The handle and parent stay owned through join.
-        val observationPauseFailure=try{handle.remotePause("owner_pause");null}
-            catch(error:SessionException){if(error is SessionException.Closed)null else sessionFailure(error)}
-        compatibilityBorrows.closeAndJoin()
-        observationPauseFailure?.let{throw it}
-        closeMutex.withLock{
-        if(retired.get())return@withLock
-        val ownedConsumers=consumers.fence();consumers.invalidate()
-        try{handle.remotePause("owner_pause")}catch(error:SessionException){if(error !is SessionException.Closed)throw sessionFailure(error)}
-        for(consumer in ownedConsumers){if(!consumer.retire())throw SessionFailure(SessionFailureKind.RemoteRetirementPending);consumers.retired(consumer)}
-        try{handle.remoteClose()}catch(error:SessionException){throw sessionFailure(error)}
-        job.cancelAndJoin();retired.set(true);remoteOwners.remove(this@NativeRemoteEdit)
-    }}}
+        var leadAttempt=false
+        var observationPauseFailure:SessionFailure?=null
+        val attempt=closeMutex.withLock {
+            // Parent destruction and successor publication can follow retirement.
+            // A repeated close must return before any shared-handle operation.
+            if(retired.get())return@releaseNative
+            closeAttempt?.let{return@withLock it}
+            closing.set(true)
+            consumers.invalidate()
+            observationPauseFailure=try{handle.remotePause("owner_pause");null}
+                catch(error:SessionException){if(error is SessionException.Closed)null else sessionFailure(error)}
+            leadAttempt=true
+            CompletableDeferred<Unit>().also{closeAttempt=it}
+        }
+        if(!leadAttempt){attempt.await();return@releaseNative}
+        try {
+            // Every borrower, consumer and owner-job join runs outside mutex.
+            // Concurrent close callers await this same retained attempt.
+            compatibilityBorrows.closeAndJoin()
+            observationPauseFailure?.let{throw it}
+            val ownedConsumers=consumers.fence();consumers.invalidate()
+            for(consumer in ownedConsumers){
+                if(!consumer.retire())throw SessionFailure(SessionFailureKind.RemoteRetirementPending)
+                consumers.retired(consumer)
+            }
+            closeMutex.withLock {
+                if(!retired.get()){
+                    try{handle.remotePause("owner_pause")}catch(error:SessionException){if(error !is SessionException.Closed)throw sessionFailure(error)}
+                    try{handle.remoteClose()}catch(error:SessionException){throw sessionFailure(error)}
+                }
+            }
+            job.cancelAndJoin()
+            closeMutex.withLock {
+                retired.set(true);remoteOwners.remove(this@NativeRemoteEdit)
+                closeAttempt=null;attempt.complete(Unit)
+            }
+        } catch(error:Throwable) {
+            closeMutex.withLock {
+                if(closeAttempt===attempt)closeAttempt=null
+                attempt.completeExceptionally(error)
+            }
+            throw error
+        }
+    }}
 }
 private fun com.visualworkbench.bindings.core.RemoteDisplay.common():RemoteEditState {
     val scope=scopeJson?.let{RemoteNativeJson.scope(RemoteNativeJson.read(it))}

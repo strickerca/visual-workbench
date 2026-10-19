@@ -56,3 +56,11 @@ Reproduce with `apps/shared/src/commonTest/paint/run_compatibility_probe.py`,
 `tools/tests/check_paint_runtime.py`, and Python unittest discovery of
 `tools/desktop-test/test_reports.py`. See the central deferred ledger and
 `evidence/PAINT_RUNTIME_OBSERVATION_20261019.json` for exact remaining checks.
+
+PRT1 follow-up: remote close now checks retired state before every initial
+foreign pause and shares one retained retirement attempt among concurrent
+callers. Borrower, consumer and owner-job joins run outside closeMutex; guarded
+native close completes before retirement/successor publication. Eight actual
+close-body boundary cases pass. The old ad6787c body fails the repeated-close,
+parent-destroyed and successor cases. This does not compile the whole adapter
+or execute JNI/Windows. See REMOTE_EDIT_CLOSE_PRT1_20261019.json.

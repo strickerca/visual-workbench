@@ -1,0 +1,56 @@
+{
+  "status": "PRT1 source repair with actual close-body boundary regression; full adapter/JNI/Windows unrun",
+  "base_review": "ad6787c",
+  "repair": [
+    "Retired check precedes foreign pause under closeMutex",
+    "Single retained CompletableDeferred attempt serializes concurrent close callers",
+    "Pause failures retained until receipt borrowers join",
+    "Borrower/consumer/owner-job joins outside closeMutex",
+    "Final native pause/close guarded; retirement published only after joined cleanup",
+    "Failed attempts preserve owner/consumer and permit retry"
+  ],
+  "positive_cases": 8,
+  "negative_control": {
+    "source": "ad6787c",
+    "passed": 4,
+    "failed_expected": 3,
+    "failures": [
+      "repeated close performs further pause",
+      "retired child touches destroyed parent handle",
+      "retired child pauses successor on same hub"
+    ],
+    "known_blocking_old_mutex_join_scenario": "intentionally omitted from old-source run"
+  },
+  "production_leaves": "actual close body, borrow owner, consumer registry, publication fence, releaseNative and sessionFailure mapping",
+  "substitutions": [
+    "foreign handle operations and parent destruction boundary",
+    "owner setup fields and injected borrower/consumer/job fixture work"
+  ],
+  "compiler": "cached Kotlin2.4.20, warnings denied, JVM21",
+  "limits": [
+    "Not whole NativeRemoteEdit/NativeSessions compilation",
+    "Cached predecessor jars supply unchanged public API/error classes",
+    "No regenerated ABI, JNI, Windows helper or real successor runtime"
+  ],
+  "source_sha256": {
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeRemoteEdit.kt": "10b69646c55684f5b578a1c4f725a2cb9e5054f9e274c1360e4f984cc7358494",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeRemoteCompatibility.kt": "37616e37fdfc680c01d6e47ad8aca3ef9e5cdaf2c3b6ea2714efb7ef7cceb8ab",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/RemoteConsumerOwnership.kt": "2146127008b4f664d58d105f7ff56878c26622b4b1aae46833097484b2b5b2fb",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/RemoteOwnerPublication.kt": "c48ecbe4eaee6960ab56f4eaf2d9b7b2632ebffa003f799fde244270bdae7ee9",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeOwnership.kt": "a1b2c04a7becf90ffb3e6002b5217551c7428be444fa5a7ca7a342b006e4a62d",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeSessions.kt": "c9a96be4b5805265418457673104ac27a35abae66c317a7ff07ea82e3f143afe",
+    "tools/tests/check_remote_edit_close.py": "c57aa6f8e4427d7a0f986fca833400f4fc9e73407ccb97a1c1e94b63e99e184e"
+  },
+  "logs": {
+    "/tmp/vw-remote-close-20261019-final.log": {
+      "sha256": "2d45abde8686c5e131313f4a9ca589dee6cff413db839e79b3a92b27305c32f5",
+      "bytes": 623
+    },
+    "/tmp/vw-remote-close-20261019-negative-final.log": {
+      "sha256": "f52c5b0dea6b735dabb25adbe55bdd665efc8923d0cb162ad19397ffcde9df85",
+      "bytes": 2355
+    }
+  },
+  "temporary_compiler_products_disposed": true,
+  "hardware_input_capture_provider_actions": false
+}
