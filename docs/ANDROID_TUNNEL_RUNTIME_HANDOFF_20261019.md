@@ -49,8 +49,9 @@ The output directory must be new, absolute and outside Git. Preparation creates
 an owned staging directory, verifies it, then creates the destination without
 replacing any existing file. An interrupted or altered destination fails
 `verify`. The download has a 16 MiB byte ceiling, a 30-second socket timeout
-and a 180-second transfer budget. It follows HTTPS redirects only to GitHub's
-release-asset host. It never extracts the bundled adb or wrapper scripts.
+and a 180-second transfer budget. It validates the scheme and approved host at
+**every** HTTPS redirect, before following that hop. It never extracts the
+bundled adb or wrapper scripts.
 
 ```text
 python3 tools/android-tunnel/scrcpy_runtime.py download --destination /tmp/new-scrcpy-v4.1
@@ -64,8 +65,10 @@ array with `name`, `bytes`, `sha256`, `role`, and `architecture`, a sorted
 `excluded` array with hash and disposition, and an explicit pending license
 state. The checked-in inventory pins the exact observed file hashes so
 `verify` can rehash a prepared directory even after the temporary ZIP has
-been deleted. Supplying `--archive` additionally rechecks the full source ZIP.
-The tool does not execute downloaded code.
+been deleted. `verify` reads at most 16 KiB of inventory JSON and requires the
+exact canonical bytes, including no trailing padding. Supplying `--archive`
+additionally rechecks the full source ZIP. The tool does not execute downloaded
+code.
 
 Synthetic ZIP tests cover valid preparation, absence of delivered adb,
 changed archive/prepared bytes, missing or unexpected files, traversal,
@@ -87,6 +90,10 @@ Public tagged-source license texts and a byte-hash/source table are under
 [`third_party/notices/scrcpy`](../third_party/notices/scrcpy/SOURCES.json):
 scrcpy Apache-2.0; FFmpeg's LGPL-2.1 text plus its license/external-library
 summary; libusb LGPL-2.1; SDL's zlib text; and dav1d's BSD-2-Clause text.
+The three FFmpeg/dav1d notice URLs use peeled Git commits
+`38b88335f99e76ed89ff3c93f877fdefce736c13` and
+`b546257f770768b2c88258c533da38b91a06f737`, respectively, so they
+resolve to the exact tagged source files rather than annotated tag objects.
 [FFmpeg's tagged license summary](https://github.com/FFmpeg/FFmpeg/blob/n8.1.2/LICENSE.md)
 explicitly says optional GPL or external-library options can change the
 aggregate terms. The published ZIP contains scrcpy's `LICENSE.txt`, but no
@@ -100,8 +107,12 @@ diagnostic must rehash these same DLLs and query `avcodec_license()`,
 `avformat_license()`, `avutil_license()`, `swresample_license()` and their
 `*_configuration()` strings. GPL/nonfree/unknown responses must refuse. The
 authored `tools/android-tunnel/dll_license_probe.py` is an explicit future
-Windows-only diagnostic and **was not run**. libusb has no equivalent FFmpeg
-license query; its actual DLL build provenance, PE imports/dependencies,
+Windows-only diagnostic and **was not run**. Its pure offline checks require
+the exact FFmpeg 8.1.2 LGPL-2.1 claim and the tagged v4.1 Win64 shared recipe;
+unknown or empty configurations refuse. It keeps C pointers unconverted and
+reads no more than 128 license or 8,192 configuration bytes before refusal.
+libusb has no equivalent FFmpeg license query; its actual DLL build provenance,
+PE imports/dependencies,
 aggregate obligations, dynamic replaceability and required notices still need
 review. The same actual-byte/notice check applies to SDL and statically
 incorporated dav1d/zlib components. A source recipe, file name or SHA alone

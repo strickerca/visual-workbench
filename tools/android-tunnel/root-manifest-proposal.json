@@ -116,14 +116,14 @@
       "path": "notices/scrcpy/ffmpeg-8.1.2-LGPL-2.1.txt",
       "bytes": 26517,
       "sha256": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30",
-      "source_url": "https://github.com/FFmpeg/FFmpeg/blob/1c2c67c0b9f7f66ab32c19dcf7f227bcd290aa4c/COPYING.LGPLv2.1",
+      "source_url": "https://github.com/FFmpeg/FFmpeg/blob/38b88335f99e76ed89ff3c93f877fdefce736c13/COPYING.LGPLv2.1",
       "source_terms": "LGPL-2.1-or-later source terms"
     },
     {
       "path": "notices/scrcpy/ffmpeg-8.1.2-LICENSE.md",
       "bytes": 4346,
       "sha256": "2e1d16c72fd74e12063776371da757322f8b77589386532f4fd8634bde7de1af",
-      "source_url": "https://github.com/FFmpeg/FFmpeg/blob/1c2c67c0b9f7f66ab32c19dcf7f227bcd290aa4c/LICENSE.md",
+      "source_url": "https://github.com/FFmpeg/FFmpeg/blob/38b88335f99e76ed89ff3c93f877fdefce736c13/LICENSE.md",
       "source_terms": "FFmpeg source license summary and external component obligations"
     },
     {
@@ -144,7 +144,7 @@
       "path": "notices/scrcpy/dav1d-1.5.3-COPYING.txt",
       "bytes": 1317,
       "sha256": "dd92c3c2247c5651606fc23a5e2d6a1ebc5ace9a3e49cbde0e12f05ad1cb1ee5",
-      "source_url": "https://github.com/videolan/dav1d/blob/0664c109d1b85503bc32bf89920f951cacf5702e/COPYING",
+      "source_url": "https://github.com/videolan/dav1d/blob/b546257f770768b2c88258c533da38b91a06f737/COPYING",
       "source_terms": "BSD-2-Clause source terms"
     }
   ]
