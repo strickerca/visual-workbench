@@ -98,6 +98,7 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
         fun dismissDocumentImport(){documentUri=null;documentPassword="";editor.instructionModal(InstructionFocusModal.DocumentImport,false)}
         AlertDialog(onDismissRequest=::dismissDocumentImport,title={Text("Open document")},text={Column{
             Row{RadioButton(documentKind==EditableKind.Pdf,{documentKind=EditableKind.Pdf});Text("PDF");RadioButton(documentKind==EditableKind.Svg,{documentKind=EditableKind.Svg});Text("SVG")}
+            Text("PDF-compatible Illustrator (.ai) files use PDF admission. Files without a compatible PDF stream are refused; no flattened substitute is created.")
             if(documentKind==EditableKind.Pdf)OutlinedTextField(documentPassword,{documentPassword=it.take(1024)},label={Text("PDF password (if required)")},visualTransformation=androidx.compose.ui.text.input.PasswordVisualTransformation())
         }},confirmButton={TextButton({val uri=documentUri;val password=documentPassword.takeIf{it.isNotEmpty()};val kind=documentKind;dismissDocumentImport();if(uri!=null)editor.importDocument(uri,kind,if(kind==EditableKind.Pdf)password else null)}){Text("Open")}},dismissButton={TextButton(::dismissDocumentImport){Text("Cancel")}})
     }
@@ -194,7 +195,7 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
                         }
                     },onDocument={
                         editor.cancelTool();editor.instructionModal(InstructionFocusModal.DocumentImport,true)
-                        try{documentPicker.launch(arrayOf("application/pdf","image/svg+xml"))}catch(_:Exception){editor.instructionModal(InstructionFocusModal.DocumentImport,false);editor.transferMessage("A document picker is unavailable.")}
+                        try{documentPicker.launch(arrayOf("application/pdf","image/svg+xml","application/postscript","application/illustrator","application/octet-stream"))}catch(_:Exception){editor.instructionModal(InstructionFocusModal.DocumentImport,false);editor.transferMessage("A document picker is unavailable.")}
                     })
                 WorkbenchScreen.Canvas -> EditorScreen(editor, { exportDialog(true) }, ::saveSelection,::saveDocument)
                 WorkbenchScreen.Settings -> Column {
