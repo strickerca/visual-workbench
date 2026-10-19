@@ -9,6 +9,7 @@ import tempfile
 import unittest
 import warnings
 import zipfile
+from urllib.request import Request
 
 
 SPEC = importlib.util.spec_from_file_location("scrcpy_runtime", Path(__file__).with_name("scrcpy_runtime.py"))
@@ -78,10 +79,35 @@ class ScrcpyRuntimeTest(unittest.TestCase):
             data = path.read_bytes()
             self.assertEqual(row["bytes"], len(data))
             self.assertEqual(row["sha256"], hashlib.sha256(data).hexdigest())
+            if row["component"] == "FFmpeg 8.1.2":
+                self.assertIn("/38b88335f99e76ed89ff3c93f877fdefce736c13/", row["source_url"])
+            if row["component"] == "dav1d 1.5.3":
+                self.assertIn("/b546257f770768b2c88258c533da38b91a06f737/", row["source_url"])
         proposal = json.loads((runtime.ROOT / "tools" / "android-tunnel" /
                                "root-manifest-proposal.json").read_text(encoding="utf-8"))
         self.assertEqual({"scrcpy/" + row["name"]: row["sha256"] for row in pinned["files"]},
                          {row["path"]: row["sha256"] for row in proposal["binary_and_resource_entries"]})
+        self.assertEqual({"notices/scrcpy/" + row["path"]: row["source_url"] for row in sources["files"]},
+                         {row["path"]: row["source_url"] for row in proposal["source_notice_entries"]})
+
+    def test_each_redirect_hop_requires_https_and_an_approved_host(self):
+        handler = runtime._ReleaseRedirects()
+        initial = Request(runtime.PIN.url)
+        approved = "https://release-assets.githubusercontent.com/asset?token=synthetic"
+        self.assertEqual(approved, handler.redirect_request(initial, None, 302, "Found", {}, approved).full_url)
+        for rejected in (
+            "http://release-assets.githubusercontent.com/asset",
+            "https://unapproved.example/step",
+            "https://github.com.evil.example/step",
+            "https://github.com:444/step",
+            "https://user@github.com/step",
+        ):
+            with self.subTest(redirect=rejected), self.assertRaises(runtime.Refusal):
+                handler.redirect_request(initial, None, 302, "Found", {}, rejected)
+        # A later GitHub final URL cannot redeem an unsafe intermediate hop.
+        with self.assertRaises(runtime.Refusal):
+            handler.redirect_request(Request("http://unapproved.example/step"), None, 302,
+                                     "Found", {}, runtime.PIN.url)
 
     def test_verified_archive_censuses_all_bytes_and_never_delivers_adb(self):
         with tempfile.TemporaryDirectory() as location:
@@ -158,6 +184,23 @@ class ScrcpyRuntimeTest(unittest.TestCase):
             with self.assertRaises(runtime.Refusal):
                 runtime.verify(target, archive, pin)
             self.assertEqual("do not delete", (target / "unexpected.txt").read_text())
+
+    def test_inventory_is_byte_bounded_and_canonical_even_when_json_object_matches(self):
+        with tempfile.TemporaryDirectory() as location:
+            root = Path(location)
+            archive, pin = bundle(root)
+            target = root / "prepared"
+            runtime.prepare(archive, target, pin)
+            inventory = target / "inventory.json"
+            original = inventory.read_bytes()
+            inventory.write_bytes(original + b" " * (8 * 1024 * 1024))
+            with self.assertRaisesRegex(runtime.Refusal, "16 KiB byte limit"):
+                runtime.verify(target, archive, pin)
+            inventory.write_bytes(original + b" ")
+            with self.assertRaisesRegex(runtime.Refusal, "differs"):
+                runtime.verify(target, archive, pin)
+            inventory.write_bytes(original)
+            self.assertEqual(pin.archive_sha256, runtime.verify(target, archive, pin)["archive"]["sha256"])
 
 
 if __name__ == "__main__":

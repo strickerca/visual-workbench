@@ -19,13 +19,14 @@ import struct
 import tempfile
 import time
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = "vw.scrcpy-prepared.v1"
 MAX_ARCHIVE = 16 * 1024 * 1024
+MAX_INVENTORY = 16 * 1024
 MAX_MEMBERS = 24
 PREFIX = "scrcpy-win64-v4.1/"
 RETAIN = frozenset({
@@ -88,6 +89,24 @@ def _sha_file(path: Path, limit: int) -> tuple[int, str]:
                 raise Refusal("File exceeds its pinned size limit")
             digest.update(chunk)
     return size, digest.hexdigest()
+
+
+def _bounded_json(path: Path) -> tuple[bytes, dict]:
+    try:
+        with path.open("rb") as source:
+            raw = source.read(MAX_INVENTORY + 1)
+        if len(raw) > MAX_INVENTORY:
+            raise Refusal("Inventory exceeds its 16 KiB byte limit")
+        parsed = json.loads(raw.decode("utf-8", errors="strict"))
+        if not isinstance(parsed, dict):
+            raise Refusal("Inventory must be a JSON object")
+        return raw, parsed
+    except (UnicodeError, json.JSONDecodeError, OSError) as error:
+        raise Refusal("Inventory is missing or malformed") from error
+
+
+def _canonical_inventory(inventory: dict) -> bytes:
+    return (json.dumps(inventory, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
 def _outside_repository(path: Path, *, must_exist: bool) -> Path:
@@ -239,10 +258,9 @@ def inspect_archive(archive: Path, pin: Pin = PIN, output: Path | None = None) -
 
 
 def _pinned_inventory() -> dict:
-    try:
-        inventory = json.loads(Path(__file__).with_name("pinned-runtime-inventory.json").read_text(encoding="utf-8"))
-    except (ValueError, OSError) as error:
-        raise Refusal("Reviewed release inventory is missing or invalid") from error
+    raw, inventory = _bounded_json(Path(__file__).with_name("pinned-runtime-inventory.json"))
+    if raw != _canonical_inventory(inventory):
+        raise Refusal("Reviewed release inventory is not canonical")
     if inventory.get("schema") != SCHEMA or inventory.get("version") != PIN.version or \
        inventory.get("archive") != {"url": PIN.url, "bytes": PIN.archive_bytes, "sha256": PIN.archive_sha256} or \
        inventory.get("server_sha256") != PIN.server_sha256:
@@ -274,11 +292,8 @@ def verify(prepared: Path, archive: Path | None = None, pin: Pin = PIN) -> dict:
     actual = {p.name for p in prepared.iterdir()}
     if actual != wanted or any(not p.is_file() or p.is_symlink() for p in prepared.iterdir()):
         raise Refusal("Prepared runtime is incomplete or contains unexpected entries")
-    try:
-        inventory = json.loads((prepared / "inventory.json").read_text(encoding="utf-8"))
-    except (ValueError, OSError) as error:
-        raise Refusal("Prepared inventory is missing or invalid") from error
-    if inventory != expected:
+    raw, inventory = _bounded_json(prepared / "inventory.json")
+    if raw != _canonical_inventory(expected) or inventory != expected:
         raise Refusal("Prepared inventory differs from the pinned archive")
     for record in expected["files"]:
         path = prepared / record["name"]
@@ -294,7 +309,7 @@ def prepare(archive: Path, destination: Path, pin: Pin = PIN) -> dict:
     stage = Path(tempfile.mkdtemp(prefix=".vw-scrcpy-prepare-", dir=destination.parent))
     try:
         inventory = inspect_archive(archive, pin, stage)
-        (stage / "inventory.json").write_text(json.dumps(inventory, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        (stage / "inventory.json").write_bytes(_canonical_inventory(inventory))
         verify(stage, archive, pin)
         # CREATE_NEW owns the destination. Exclusive file copies never replace
         # an entry that another process may have placed there in the meantime.
@@ -308,15 +323,32 @@ def prepare(archive: Path, destination: Path, pin: Pin = PIN) -> dict:
             shutil.rmtree(stage)
 
 
+def _approved_release_url(url: str) -> None:
+    parsed = urlparse(url)
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise Refusal("Release redirect has an invalid port") from error
+    if parsed.scheme != "https" or parsed.hostname not in {"github.com", "release-assets.githubusercontent.com"} or \
+       parsed.username is not None or parsed.password is not None or port not in (None, 443) or parsed.fragment:
+        raise Refusal("Release redirect used HTTP or an unapproved host")
+
+
+class _ReleaseRedirects(HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, new_url):
+        _approved_release_url(request.full_url)
+        _approved_release_url(new_url)
+        return super().redirect_request(request, response, code, message, headers, new_url)
+
+
 def download(destination: Path, pin: Pin = PIN) -> dict:
     destination = _destination(destination)
     with tempfile.TemporaryDirectory(prefix=".vw-scrcpy-download-", dir=destination.parent) as scratch:
         archive = Path(scratch) / "scrcpy-win64-v4.1.zip"
+        _approved_release_url(pin.url)
         request = Request(pin.url, headers={"User-Agent": "visual-workbench-scrcpy-audit/1"})
-        with urlopen(request, timeout=30) as response, archive.open("xb") as sink:
-            final = urlparse(response.geturl())
-            if final.scheme != "https" or final.hostname not in {"github.com", "release-assets.githubusercontent.com"}:
-                raise Refusal("Official release redirected to an unknown host")
+        with build_opener(_ReleaseRedirects()).open(request, timeout=30) as response, archive.open("xb") as sink:
+            _approved_release_url(response.geturl())
             total = 0
             deadline = time.monotonic() + 180
             while True:
