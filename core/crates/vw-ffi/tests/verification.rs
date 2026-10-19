@@ -193,7 +193,7 @@ async fn framed_after_failure_uses_art_layer_and_preserves_output_frame() {
         .await
         .unwrap();
     let before_info = publish(&original, &catalog, 40, 2).await;
-    let after_info = publish(&after, &catalog, 41, 12).await;
+    let after_info = publish(&after, &catalog, 81, 12).await;
     let after_png = catalog
         .read_file(
             after_info.package_id.clone(),
