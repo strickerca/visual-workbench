@@ -178,7 +178,7 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
         }catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
         catch(_:Exception){prepared=null;controller.canvasFailed(requested,"Canvas geometry could not be prepared. Reopen the project before editing; saved data is intact.")}
     }
-    LaunchedEffect(prepared,aiResultState.frame,state.view.camera,state.preview,state.peerFrame){
+    LaunchedEffect(prepared,aiResultState.frame,state.view.camera,state.preview,state.peerFrame,state.composedBackground,state.background){
         prepared?.current(latest)?.takeIf{controller.aiResultReady()}?.let{controller.canvasPrepared(it.binding)}
     }
     val documentReader=remember(state.documentFrame){controller.documentReader(state.documentFrame)}
