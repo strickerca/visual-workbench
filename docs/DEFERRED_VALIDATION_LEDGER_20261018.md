@@ -385,3 +385,27 @@ prepares pinned scrcpy bytes without running binaries; actual DLL configured
 license/aggregate notices, owner-adb selection, lossless source/UI capture,
 scrcpy-loop refusal and device journeys remain open. E model/host notices remain
 parent-dispatched; Library CONNECT403 artifacts and all old worktrees persist.
+
+
+### P/E/F source composition and helper packaging update
+
+Pab477729 ->107b829..2da57ee, F1f2496cc ->737215c and E6394880 ->110d4ec
+are source-composed under the parent direction. All worker-owned changed files
+match their exact Git objects. Their native/runtime/legal admission claims are
+not broadened by composition. P branch evidence does not include an independent
+Astra receipt; the owner claim is not counted as a verified root review.
+
+Dedicated vw-paint-drawing-helper Cargo registration and eight-file Desktop
+runtime/build/report inventories are authored. Offline Cargo metadata passes;
+33 synthetic runtime/catalog JUnit cases and33 report cases pass. Initial old
+seven-file lease-count assertion failed and is retained at
+/tmp/vw-eight-file-runtime-20261019.log; corrected final log passes. F6 synthetic
+archive cases and E6 synthetic audit/refusal cases pass. No archive download,
+DLL load, private-wheel/model census, device or actual helper run was repeated.
+
+Still required: actual per-run P failed-owner retirement observation, sequenced
+peer/host input exclusion, scoped native source authorization and concrete
+foreign factory; fresh coherent bindings and full native/apps/Windows/runtime
+checks. Model/checkpoint lineage/native notices/Android runtime admission and
+scrcpy DLL configuration/aggregate notices remain unresolved. Root LICENSES,
+production catalog/null pins and blocked private model transfer remain intact.

@@ -72,3 +72,7 @@ path = "src/bin/editor_effect_runner.rs"
 [[bin]]
 name = "vw-editor-frame-runner"
 path = "src/bin/editor_frame_runner.rs"
+
+[[bin]]
+name = "vw-paint-drawing-helper"
+path = "src/bin/paint_drawing.rs"

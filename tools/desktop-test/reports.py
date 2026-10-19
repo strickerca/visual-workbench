@@ -23,7 +23,7 @@ MAX_TOTAL = 4 * 1024**3
 MAX_FILE = 1024**3
 MAX_JSON = 8 * 1024**2
 NATIVES = ("vw-capture-helper.exe", "vw-connection-helper.exe", "vw-hevc-helper.exe",
-           "vw-input-helper.exe", "vw-editor-probe.exe", "vw_core.dll", "vw_host.dll")
+           "vw-input-helper.exe", "vw-editor-probe.exe", "vw-paint-drawing-helper.exe", "vw_core.dll", "vw_host.dll")
 INPUTS = (*NATIVES, "vw-bindgen.exe")
 BEGIN = ".local/desktop-test-build-start.json"
 BUILT = ".local/desktop-test-build.json"

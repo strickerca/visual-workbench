@@ -50,7 +50,7 @@ compose.desktop {
 val runtimeRepository = rootProject.projectDir.parentFile
 val runtimeNativeDirectory = providers.gradleProperty("vwNativeDir").map { file(it) }.orElse(runtimeRepository.resolve("target/debug"))
 val packageConnectionRuntime = tasks.register("packageConnectionRuntime") {
-    val nativeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-hevc-helper.exe", "vw-input-helper.exe", "vw-editor-probe.exe")
+    val nativeNames = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-hevc-helper.exe", "vw-input-helper.exe", "vw-editor-probe.exe", "vw-paint-drawing-helper.exe")
     inputs.files(nativeNames.map { name -> runtimeNativeDirectory.map { it.resolve(name) } })
     val output = layout.buildDirectory.dir("generated/connectionRuntimeResources")
     outputs.dir(output)
@@ -68,7 +68,7 @@ val packageConnectionRuntime = tasks.register("packageConnectionRuntime") {
         directory.resolve("win32-x86-64").mkdirs()
         runtimeNativeDirectory.get().resolve("vw-connection-helper.exe").copyTo(directory.resolve("win32-x86-64/vw-connection-helper.exe"), overwrite = true)
         runtimeNativeDirectory.get().resolve("vw-capture-helper.exe").copyTo(directory.resolve("win32-x86-64/vw-capture-helper.exe"), overwrite = true)
-        for(name in listOf("vw-hevc-helper.exe","vw-input-helper.exe", "vw-editor-probe.exe"))runtimeNativeDirectory.get().resolve(name).copyTo(directory.resolve("win32-x86-64/$name"),overwrite=true)
+        for(name in listOf("vw-hevc-helper.exe","vw-input-helper.exe", "vw-editor-probe.exe", "vw-paint-drawing-helper.exe"))runtimeNativeDirectory.get().resolve(name).copyTo(directory.resolve("win32-x86-64/$name"),overwrite=true)
         directory.resolve("vw-native-runtime.sha256").writeText(records.joinToString("\n", postfix = "\n"), Charsets.US_ASCII)
     }
 }

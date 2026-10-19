@@ -38,12 +38,14 @@ aspects, mouse-only Drawing/Supported/EditorObserved with evidence, and six
 NotTested/NotPerformed/Unknown aspects without evidence or device claims.
 Receipt import supplies none of the foreign/source/input ownership.
 
-## Pab477729 handback inspected, not composed
+## Pab477729 handback inspected and composed
 
-Root fetched `ab477729ecf1e30bab210c59422fd5013ad9b91d` from
-`task/paint-positive-producer-20261019` read-only. Parent retains its source
-review/disposition. P's public preparation and completed getters can supply the
-successful branch; root will keep completed evidence in the actual native
+Root inspected `ab477729ecf1e30bab210c59422fd5013ad9b91d` from
+`task/paint-positive-producer-20261019` and composed it as107b829..2da57ee under
+the parent integration direction.
+Its branch contains no independent review receipt, so root does not count the
+worker review claim as independently verified evidence. P's public preparation
+and completed getters can supply the successful branch; root will keep completed evidence in the actual native
 session/source owner before disposing transient preparation resources.
 
 One required failure hook remains to reconcile before concrete FFI wiring:
@@ -81,3 +83,9 @@ NativeRemoteEdit source against cached older shared/binding jars. It fails on
 the pre-existing `remoteConfigureObservationHelper` absent from the cached core
 binding jar. The failure is retained; no generated API stub, binding regeneration
 or broad build was used. The next coherent native/ABI batch must resolve it.
+
+Root now registers the exact `vw-paint-drawing-helper` Cargo target and its eighth
+Desktop runtime inventory entry. The33 synthetic runtime/catalog and33 package
+report cases pass; no helper executable was built, launched or assigned a hash
+without an actual packaged artifact. The real foreign/input integration above
+remains required before the normal factory advertises the capability.

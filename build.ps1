@@ -124,7 +124,7 @@ function Assert-NativeReuseReceipt {
         $admitted.source_count -ne $proof.source_count -or $admitted.source_closure_count -ne $proof.source_closure_count -or
         $admitted.source_map.sha256 -cne $proof.source_map.sha256 -or
         $admitted.source_closure.sha256 -cne $proof.source_closure.sha256) { throw 'Actual source inventory and admission joins required' }
-    $names = @('target/debug/vw_core.dll', 'target/debug/vw_host.dll', 'target/debug/vw-capture-helper.exe', 'target/debug/vw-connection-helper.exe', 'target/debug/vw-hevc-helper.exe', 'target/debug/vw-input-helper.exe', 'target/debug/vw-editor-probe.exe', 'target/android-jni/arm64-v8a/libvw_core.so', 'target/debug/vw-bindgen.exe', 'target/debug/vw-mcp-host.exe', 'target/debug/vw-mcp-package.exe', 'target/debug/vw-codex-host.exe')
+    $names = @('target/debug/vw_core.dll', 'target/debug/vw_host.dll', 'target/debug/vw-capture-helper.exe', 'target/debug/vw-connection-helper.exe', 'target/debug/vw-hevc-helper.exe', 'target/debug/vw-input-helper.exe', 'target/debug/vw-editor-probe.exe', 'target/debug/vw-paint-drawing-helper.exe', 'target/android-jni/arm64-v8a/libvw_core.so', 'target/debug/vw-bindgen.exe', 'target/debug/vw-mcp-host.exe', 'target/debug/vw-mcp-package.exe', 'target/debug/vw-codex-host.exe')
     if ($proof.files.Count -ne $names.Count -or @($names | Where-Object { -not $proof.files.ContainsKey($_) }).Count -ne 0) { throw 'Exact native/binding-tool/MCP-server reuse set required' }
     foreach ($name in $names) { $row = $proof.files[$name]; [void](Pin-ReusedFile $name $row.sha256 $row.bytes) }
 }

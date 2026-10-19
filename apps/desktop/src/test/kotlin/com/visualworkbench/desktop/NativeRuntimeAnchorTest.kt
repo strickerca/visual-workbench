@@ -231,7 +231,7 @@ class NativeRuntimeAnchorTest {
         }
     }
     private fun resources(opened: (String) -> Unit = {}): NativeResources {
-        val names = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-hevc-helper.exe", "vw-input-helper.exe", "vw-editor-probe.exe")
+        val names = listOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-hevc-helper.exe", "vw-input-helper.exe", "vw-editor-probe.exe", "vw-paint-drawing-helper.exe")
         val bytes = names.associate { "win32-x86-64/$it" to "Synthetic unexecuted bytes".toByteArray() }.toMutableMap()
         bytes["vw-native-runtime.sha256"] = names.joinToString("\n", postfix = "\n") { name ->
             val data = bytes.getValue("win32-x86-64/$name")

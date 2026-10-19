@@ -108,7 +108,7 @@ class DesktopRemoteCatalogTest {
         return Resources(mutableMapOf(DesktopRemoteCatalog.RESOURCE to payload,DesktopRemoteCatalog.MANIFEST to "${hash(payload)} ${payload.size} ${DesktopRemoteCatalog.RESOURCE}\n".toByteArray(Charsets.US_ASCII)))
     }
     private fun nativeResources():Resources {
-        val names=listOf("vw_core.dll","vw_host.dll","vw-connection-helper.exe","vw-capture-helper.exe","vw-hevc-helper.exe","vw-input-helper.exe","vw-editor-probe.exe")
+        val names=listOf("vw_core.dll","vw_host.dll","vw-connection-helper.exe","vw-capture-helper.exe","vw-hevc-helper.exe","vw-input-helper.exe","vw-editor-probe.exe", "vw-paint-drawing-helper.exe")
         val data=names.associate{"win32-x86-64/$it" to "MZsynthetic".toByteArray()}.toMutableMap()
         data["vw-native-runtime.sha256"]=names.sorted().joinToString("\n",postfix="\n"){val b=data.getValue("win32-x86-64/$it");"${hash(b)} ${b.size} $it"}.toByteArray(Charsets.US_ASCII)
         return Resources(data)

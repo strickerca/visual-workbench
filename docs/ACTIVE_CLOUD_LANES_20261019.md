@@ -42,3 +42,16 @@ Prepared independent parent-dispatch grants: E exact model/host-wheel license an
 NOTICE closure; F pinned scrcpy/runtime/native-DLL provenance preparation. See
 `INDEPENDENT_RUNTIME_GRANTS_20261019.md`. Neither is dispatched by root. Both
 preserve root manifests/contracts and exclude device/credential/runtime execution.
+
+
+Current composition after6efc8b8: native prepared-owner/decoder/capability source
+is implemented ase215cf2 (new source unreviewed), with12 native-owner and14
+common-flow cases. Pab477729 is composed as107b829..2da57ee; E6394880 as110d4ec;
+F1f2496cc as737215c. Their existing owner grants remain authoritative; root did
+not dispatch another worker. Eight-file helper/runtime registration is authored
+and has33 runtime/catalog +33 report tests, while E/F6 synthetic cases each pass.
+The exact P per-run failed-owner hook still needs its existing owner; actual
+foreign/input integration and all native/device/license admissions remain open.
+See PAINT_DRAWING_NATIVE_ADAPTER_HANDOFF_20261019.md. Parent independently
+accepted the previous6efc8b8 batch with6 palette-owner/36 extracted WGC cases;
+that acceptance excludes the new adapter and packaging changes.
