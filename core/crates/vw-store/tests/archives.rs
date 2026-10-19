@@ -837,14 +837,100 @@ fn imported_archive_cannot_mint_installation_local_owner_verdicts() {
     temporary.close().unwrap();
 }
 
-fn malformed_private_keys(prefix: &str) -> Vec<rusqlite::types::Value> {
+fn encoded_text(text: &str, encoding: &str) -> Vec<u8> {
+    match encoding {
+        "UTF-8" => text.as_bytes().to_vec(),
+        "UTF-16le" => text.encode_utf16().flat_map(u16::to_le_bytes).collect(),
+        "UTF-16be" => text.encode_utf16().flat_map(u16::to_be_bytes).collect(),
+        _ => panic!("unknown synthetic encoding"),
+    }
+}
+
+/// Rebuild the actual canonical fixture schema/data under another SQLite text
+/// encoding. ATTACH/backup cannot convert database encodings; copy typed values
+/// into a fresh same-schema database before reopening the ordinary store.
+fn reencode_fixture(path: &Path, encoding: &str) {
+    let database = path.join("project.sqlite");
+    let encoded = path.parent().unwrap().join("encoded-fixture.sqlite");
+    let source = rusqlite::Connection::open(&database).unwrap();
+    let destination = rusqlite::Connection::open(&encoded).unwrap();
+    destination
+        .pragma_update(None, "encoding", encoding)
+        .unwrap();
+    let tables: Vec<(String, String)> = source
+        .prepare("SELECT name,sql FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+        .unwrap().query_map([], |r| Ok((r.get(0)?, r.get(1)?))).unwrap()
+        .collect::<Result<_, _>>().unwrap();
+    for (name, schema) in tables {
+        destination.execute_batch(&schema).unwrap();
+        let quoted = format!("\"{}\"", name.replace('"', "\"\""));
+        let mut statement = source.prepare(&format!("SELECT * FROM {quoted}")).unwrap();
+        let columns = statement.column_count();
+        let placeholders = (1..=columns)
+            .map(|i| format!("?{i}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let mut rows = statement.query([]).unwrap();
+        while let Some(row) = rows.next().unwrap() {
+            let values = (0..columns)
+                .map(|i| row.get::<_, rusqlite::types::Value>(i).unwrap())
+                .collect::<Vec<_>>();
+            destination
+                .execute(
+                    &format!("INSERT INTO {quoted} VALUES ({placeholders})"),
+                    rusqlite::params_from_iter(values),
+                )
+                .unwrap();
+        }
+    }
+    let indexes: Vec<String> = source
+        .prepare(
+            "SELECT sql FROM sqlite_schema WHERE type='index' AND sql IS NOT NULL ORDER BY name",
+        )
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    for schema in indexes {
+        destination.execute_batch(&schema).unwrap();
+    }
+    for name in ["user_version", "application_id"] {
+        let value: i64 = source.pragma_query_value(None, name, |r| r.get(0)).unwrap();
+        destination.pragma_update(None, name, value).unwrap();
+    }
+    let actual: String = destination
+        .pragma_query_value(None, "encoding", |r| r.get(0))
+        .unwrap();
+    assert_eq!(actual, encoding);
+    drop(destination);
+    drop(source);
+    fs::rename(
+        &database,
+        path.parent().unwrap().join("prior-encoding-fixture.sqlite"),
+    )
+    .unwrap();
+    fs::rename(encoded, database).unwrap();
+}
+
+fn malformed_private_keys(prefix: &str, encoding: &str) -> Vec<rusqlite::types::Value> {
     use rusqlite::types::Value;
-    vec![
+    let mut values = vec![
         Value::Text(format!("{prefix}synthetic-text")),
         Value::Text(format!("{prefix}\0synthetic-nul")),
         Value::Blob(prefix.as_bytes().to_vec()),
         Value::Blob([prefix.as_bytes(), b"\xff\0\x80synthetic-blob"].concat()),
-    ]
+    ];
+    if encoding != "UTF-8" {
+        values.push(Value::Blob(
+            [
+                encoded_text(prefix, encoding),
+                b"\xff\0synthetic-native-blob".to_vec(),
+            ]
+            .concat(),
+        ));
+    }
+    values
 }
 
 fn setting_bytes(path: &Path) -> Vec<(Vec<u8>, Vec<u8>)> {
@@ -861,97 +947,125 @@ fn setting_bytes(path: &Path) -> Vec<(Vec<u8>, Vec<u8>)> {
 
 #[test]
 fn archive_scrubs_text_blob_and_malformed_private_namespace_bytes_only_in_its_copy() {
-    let temporary = temporary();
-    let (mut source, _) = fixture(temporary.path());
-    let source_path = temporary.path().join("source.vwb");
-    let sql = rusqlite::Connection::open(source_path.join("project.sqlite")).unwrap();
-    let note = "SYNTHETIC_PRIVATE_BLOB_OR_TEXT_NOTE_92841";
-    for prefix in [
-        vw_store::VERIFICATION_REVIEW_PREFIX,
-        vw_store::LOCAL_VIEW_PREFIX,
-    ] {
-        for key in malformed_private_keys(prefix) {
-            sql.execute(
-                "INSERT INTO settings(key,value) VALUES (?1,?2)",
-                rusqlite::params![key, note.as_bytes()],
-            )
-            .unwrap();
+    for encoding in ["UTF-8", "UTF-16le", "UTF-16be"] {
+        let temporary = temporary();
+        let (source, _) = fixture(temporary.path());
+        let source_path = temporary.path().join("source.vwb");
+        drop(source);
+        reencode_fixture(&source_path, encoding);
+        let mut source = ProjectStore::open(&source_path).unwrap();
+        let sql = rusqlite::Connection::open(source_path.join("project.sqlite")).unwrap();
+        let note = "SYNTHETIC_PRIVATE_BLOB_OR_TEXT_NOTE_92841";
+        for prefix in [
+            vw_store::VERIFICATION_REVIEW_PREFIX,
+            vw_store::LOCAL_VIEW_PREFIX,
+        ] {
+            for (index, key) in malformed_private_keys(prefix, encoding)
+                .into_iter()
+                .enumerate()
+            {
+                let value = if index % 2 == 0 {
+                    rusqlite::types::Value::Text(note.into())
+                } else {
+                    rusqlite::types::Value::Blob(note.as_bytes().to_vec())
+                };
+                sql.execute(
+                    "INSERT INTO settings(key,value) VALUES (?1,?2)",
+                    rusqlite::params![key, value],
+                )
+                .unwrap();
+            }
         }
+        // Adjacent, unrelated byte namespaces must survive exact prefix removal.
+        let keep = b"vw.verification-review.v1-neighbor\xff";
+        sql.execute(
+            "INSERT INTO settings(key,value) VALUES (?1,'preserve-neighbor')",
+            [keep.as_slice()],
+        )
+        .unwrap();
+        drop(sql);
+        let before = setting_bytes(&source_path);
+        let revision = source.revision().unwrap();
+        let archive = temporary.path().join("byte-private-scrubbed.vwbz");
+        export_vwbz(&mut source, &archive).unwrap();
+        let archive_bytes = fs::read(&archive).unwrap();
+        for kind in ["UTF-8", "UTF-16le", "UTF-16be"] {
+            let note_bytes = encoded_text(note, kind);
+            assert!(
+                !archive_bytes
+                    .windows(note_bytes.len())
+                    .any(|v| v == note_bytes)
+            );
+        }
+        assert_eq!(setting_bytes(&source_path), before);
+        let restored_path = temporary.path().join("byte-private-restored.vwb");
+        let restored = import_vwbz(&archive, &restored_path, ImportLimits::default()).unwrap();
+        let rows = setting_bytes(&restored_path);
+        assert!(rows.iter().all(|(key, _)| {
+            !key.starts_with(vw_store::VERIFICATION_REVIEW_PREFIX.as_bytes())
+                && !key.starts_with(vw_store::LOCAL_VIEW_PREFIX.as_bytes())
+                && !key.starts_with(&encoded_text(
+                    vw_store::VERIFICATION_REVIEW_PREFIX,
+                    encoding,
+                ))
+                && !key.starts_with(&encoded_text(vw_store::LOCAL_VIEW_PREFIX, encoding))
+        }));
+        assert!(rows.iter().any(
+            |(key, value)| key == keep && value == &encoded_text("preserve-neighbor", encoding)
+        ));
+        assert_eq!(restored.revision().unwrap(), revision);
+        drop(restored);
+        drop(source);
+        clean_staging(temporary.path());
+        temporary.close().unwrap();
     }
-    // Adjacent, unrelated byte namespaces must survive exact prefix removal.
-    let keep = b"vw.verification-review.v1-neighbor\xff";
-    sql.execute(
-        "INSERT INTO settings(key,value) VALUES (?1,'preserve-neighbor')",
-        [keep.as_slice()],
-    )
-    .unwrap();
-    drop(sql);
-    let before = setting_bytes(&source_path);
-    let revision = source.revision().unwrap();
-    let archive = temporary.path().join("byte-private-scrubbed.vwbz");
-    export_vwbz(&mut source, &archive).unwrap();
-    assert!(
-        !fs::read(&archive)
-            .unwrap()
-            .windows(note.len())
-            .any(|v| v == note.as_bytes())
-    );
-    assert_eq!(setting_bytes(&source_path), before);
-    let restored_path = temporary.path().join("byte-private-restored.vwb");
-    let restored = import_vwbz(&archive, &restored_path, ImportLimits::default()).unwrap();
-    let rows = setting_bytes(&restored_path);
-    assert!(rows.iter().all(|(key, _)| {
-        !key.starts_with(vw_store::VERIFICATION_REVIEW_PREFIX.as_bytes())
-            && !key.starts_with(vw_store::LOCAL_VIEW_PREFIX.as_bytes())
-    }));
-    assert!(
-        rows.iter()
-            .any(|(key, value)| key == keep && value == b"preserve-neighbor")
-    );
-    assert_eq!(restored.revision().unwrap(), revision);
-    drop(restored);
-    drop(source);
-    clean_staging(temporary.path());
-    temporary.close().unwrap();
 }
 
 #[test]
 fn imported_private_text_blob_and_invalid_utf8_keys_refuse_without_touching_archive() {
-    for key in malformed_private_keys(vw_store::VERIFICATION_REVIEW_PREFIX) {
-        let temporary = temporary();
-        let (mut source, _) = fixture(temporary.path());
-        let normal = temporary.path().join("normal-before-private-row.vwbz");
-        export_vwbz(&mut source, &normal).unwrap();
-        let mut members = entries(&normal);
-        let database = temporary.path().join("incoming-private.sqlite");
-        let member = members
-            .iter_mut()
-            .find(|(name, _)| name == "project.sqlite")
+    for encoding in ["UTF-8", "UTF-16le", "UTF-16be"] {
+        for key in malformed_private_keys(vw_store::VERIFICATION_REVIEW_PREFIX, encoding) {
+            let temporary = temporary();
+            let (mut source, _) = fixture(temporary.path());
+            let normal = temporary.path().join("normal-before-private-row.vwbz");
+            export_vwbz(&mut source, &normal).unwrap();
+            let mut members = entries(&normal);
+            let database = temporary.path().join("incoming-private.sqlite");
+            let member = members
+                .iter_mut()
+                .find(|(name, _)| name == "project.sqlite")
+                .unwrap();
+            fs::write(&database, &member.1).unwrap();
+            let sql = rusqlite::Connection::open(&database).unwrap();
+            sql.execute(
+                "INSERT INTO settings(key,value) VALUES (?1,'synthetic-private-claim')",
+                [key],
+            )
             .unwrap();
-        fs::write(&database, &member.1).unwrap();
-        let sql = rusqlite::Connection::open(&database).unwrap();
-        sql.execute(
-            "INSERT INTO settings(key,value) VALUES (?1,'synthetic-private-claim')",
-            [key],
-        )
-        .unwrap();
-        drop(sql);
-        member.1 = fs::read(&database).unwrap();
-        let incoming = temporary.path().join("malformed-private-input.vwbz");
-        write_raw(&incoming, &members, None, None);
-        let original = fs::read(&incoming).unwrap();
-        let destination = temporary.path().join("must-not-publish-private.vwb");
-        assert!(matches!(
-            import_vwbz(&incoming, &destination, ImportLimits::default()),
-            Err(vw_store::StoreError::Invalid(
-                "installation-local verification review"
-            ))
-        ));
-        assert!(!destination.exists());
-        assert_eq!(fs::read(&incoming).unwrap(), original);
-        drop(source);
-        clean_staging(temporary.path());
-        temporary.close().unwrap();
+            drop(sql);
+            // Public export can originate in UTF-8; the incoming malicious database
+            // is independently encoded before normal import validates its schema.
+            let private_root = temporary.path().join("private-encoded");
+            fs::create_dir(&private_root).unwrap();
+            fs::rename(&database, private_root.join("project.sqlite")).unwrap();
+            reencode_fixture(&private_root, encoding);
+            member.1 = fs::read(private_root.join("project.sqlite")).unwrap();
+            let incoming = temporary.path().join("malformed-private-input.vwbz");
+            write_raw(&incoming, &members, None, None);
+            let original = fs::read(&incoming).unwrap();
+            let destination = temporary.path().join("must-not-publish-private.vwb");
+            assert!(matches!(
+                import_vwbz(&incoming, &destination, ImportLimits::default()),
+                Err(vw_store::StoreError::Invalid(
+                    "installation-local verification review"
+                ))
+            ));
+            assert!(!destination.exists());
+            assert_eq!(fs::read(&incoming).unwrap(), original);
+            drop(source);
+            clean_staging(temporary.path());
+            temporary.close().unwrap();
+        }
     }
 }
 

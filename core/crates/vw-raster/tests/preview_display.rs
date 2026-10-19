@@ -26,7 +26,7 @@ fn preview_display_uses_canonical_color_without_granting_original_authority() ->
             Err(RasterError::OriginalRequired)
         ));
         assert!(matches!(
-            preflight(&preview, &request(ExportFormat::Png8)),
+            export(&preview, &request(ExportFormat::Png8)),
             Err(RasterError::OriginalRequired)
         ));
         assert_eq!(preview, before);

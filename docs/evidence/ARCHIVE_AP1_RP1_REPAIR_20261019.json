@@ -1,0 +1,110 @@
+{
+  "status": "AP1/RP1 repair source and focused native checks passed; narrow re-review pending",
+  "positive": {
+    "store_archive_tests": 18,
+    "raster_display_tests": 5,
+    "preview_display_tests": 2,
+    "zero_alpha_output_tests": 1,
+    "setup": "ids/third-party/workspace pass"
+  },
+  "database_encodings": [
+    "UTF-8",
+    "UTF-16le",
+    "UTF-16be"
+  ],
+  "native_cases": "Real ProjectStore export/VACUUM/import with text/raw-UTF8-BLOB/native-encoded-BLOB keys; source/unrelated/input archive preservation",
+  "negative_control": {
+    "source": "0d8558b archive.rs only",
+    "result": "new actual archive regression failed on retained private note bytes; current source restored"
+  },
+  "source_sha256": {
+    "core/crates/vw-store/src/archive.rs": "b87ece5b0049b434832cc2c2fe44f33cac8f9a4530d3bb6d1b1fbd0dba915228",
+    "core/crates/vw-store/tests/archives.rs": "2b397bf580c96d1ea97f713ba52b88d5192b1bf678fcd9334b953ea9b1998b62",
+    "core/crates/vw-raster/tests/preview_display.rs": "452b80ea7a0f5c22e887e4d62e1994e1b413233ac0d694e6fde16eafe4e6306b",
+    "tools/tests/check_archive_private_namespaces.py": "b634511d1930eb9697c57dc9ba2d9f8119cf1e4556b94acc2b9c3816d387829e"
+  },
+  "logs": {
+    "vw-ap1-setup-20261019.log": {
+      "path": "/tmp/vw-ap1-setup-20261019.log",
+      "sha256": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197"
+    },
+    "vw-ap1-archives-20261019.log": {
+      "path": "/tmp/vw-ap1-archives-20261019.log",
+      "sha256": "2c4792c5b9a27e146efb9f65373d226709998cb4f7517ae950befc6b2f1d104b"
+    },
+    "vw-rp1-display-20261019.log": {
+      "path": "/tmp/vw-rp1-display-20261019.log",
+      "sha256": "a0460878f0be6ddefbd633c3dc34ba8468d87f6630a2c257c69ceb11aa0029dd"
+    },
+    "vw-ap1-prior-source-negative-20261019.log": {
+      "path": "/tmp/vw-ap1-prior-source-negative-20261019.log",
+      "sha256": "68bcc6f99e7de02d576810d97f57868501e598b5a72507b6abe1e962211be52d"
+    }
+  },
+  "sql_fixture_receipt": {
+    "status": "actual source SQL text/raw-BLOB predicates passed in both runtimes and all three database encodings",
+    "source_sha256": "b87ece5b0049b434832cc2c2fe44f33cac8f9a4530d3bb6d1b1fbd0dba915228",
+    "python_sqlite": {
+      "version": "3.53.1",
+      "encodings": {
+        "UTF-8": {
+          "individual_namespace_cases": 8,
+          "bulk_private_rows_scrubbed": 8,
+          "unrelated_rows_preserved": 2,
+          "legacy_glob_matches_blob_prefix": true,
+          "like_doesnt_match_blobs": false
+        },
+        "UTF-16le": {
+          "individual_namespace_cases": 10,
+          "bulk_private_rows_scrubbed": 10,
+          "unrelated_rows_preserved": 2,
+          "legacy_glob_matches_blob_prefix": false,
+          "like_doesnt_match_blobs": false
+        },
+        "UTF-16be": {
+          "individual_namespace_cases": 10,
+          "bulk_private_rows_scrubbed": 10,
+          "unrelated_rows_preserved": 2,
+          "legacy_glob_matches_blob_prefix": false,
+          "like_doesnt_match_blobs": false
+        }
+      }
+    },
+    "system_sqlite": {
+      "version": "3.46.1",
+      "encodings": {
+        "UTF-8": {
+          "individual_namespace_cases": 8,
+          "bulk_private_rows_scrubbed": 8,
+          "unrelated_rows_preserved": 2,
+          "legacy_glob_matches_blob_prefix": false,
+          "like_doesnt_match_blobs": true
+        },
+        "UTF-16le": {
+          "individual_namespace_cases": 10,
+          "bulk_private_rows_scrubbed": 10,
+          "unrelated_rows_preserved": 2,
+          "legacy_glob_matches_blob_prefix": false,
+          "like_doesnt_match_blobs": true
+        },
+        "UTF-16be": {
+          "individual_namespace_cases": 10,
+          "bulk_private_rows_scrubbed": 10,
+          "unrelated_rows_preserved": 2,
+          "legacy_glob_matches_blob_prefix": false,
+          "like_doesnt_match_blobs": true
+        }
+      }
+    },
+    "limits": [
+      "SQL fixtures only, no Cargo/native archive workflow executed",
+      "Production bundled-SQLite leak was not demonstrated",
+      "Actual export/import/BLOB/VACUUM regressions authored; final native run deferred"
+    ]
+  },
+  "limits": [
+    "No final ABI/shared/app/package/device journey",
+    "No additional concrete production leak claimed beyond the reproduced UTF-16 archive regression",
+    "Old failed candidate/receipts preserved"
+  ]
+}

@@ -77,20 +77,31 @@ def literal(value):
 
 
 def bound(statement, prefix):
-    return statement.replace("?1", str(len(prefix.encode()))).replace("?2", literal(prefix))
+    return (statement.replace("?1", str(len(prefix))).replace("?2", literal(prefix))
+            .replace("?3", str(len(prefix.encode()))).replace("?4", "X'" + prefix.encode().hex() + "'"))
 
 
-def keys(prefix):
+def encoding_bytes(text, encoding):
+    return text.encode({"UTF-8": "utf-8", "UTF-16le": "utf-16-le", "UTF-16be": "utf-16-be"}[encoding])
+
+
+def keys(prefix, encoding):
     raw = prefix.encode()
+    values = [(True, encoding_bytes(prefix + "synthetic-text", encoding)),
+              (True, encoding_bytes(prefix + "\0synthetic-nul", encoding)),
+              (False, raw), (False, raw + b"\xff\0\x80synthetic-blob")]
+    if encoding != "UTF-8":
+        values.append((False, encoding_bytes(prefix, encoding) + b"\xff\0synthetic-native-blob"))
     return [("CAST(X'" + value.hex() + "' AS TEXT)" if text else "X'" + value.hex() + "'")
-            for text, value in [(True, raw + b"synthetic-text"), (True, raw + b"\0synthetic-nul"),
-                                (False, raw), (False, raw + b"\xff\0\x80synthetic-blob")]]
+            for text, value in values]
 
 
-def probe(factory):
+def probe(factory, encoding):
     db = factory()
     try:
+        db.query("PRAGMA encoding=" + literal(encoding))
         db.query("CREATE TABLE settings(key TEXT PRIMARY KEY,value BLOB)")
+        assert db.query("PRAGMA encoding")[0][0] == encoding
         flags = sorted(row[0] for row in db.query("PRAGMA compile_options"))
         db.query("INSERT INTO settings VALUES (X'" + prefixes[0].encode().hex() + "','private')")
         prior_blob_match = int(db.query("SELECT EXISTS(SELECT 1 FROM settings WHERE key GLOB "
@@ -98,24 +109,24 @@ def probe(factory):
         db.query("DELETE FROM settings")
         import_cases = 0
         for prefix in prefixes:
-            for key in keys(prefix):
+            for key in keys(prefix, encoding):
                 db.query("INSERT INTO settings VALUES (" + key + ",'private')")
                 assert int(db.query(bound(exists, prefix))[0][0]) == 1
                 db.query(bound(delete, prefix))
                 assert int(db.query("SELECT COUNT(*) FROM settings")[0][0]) == 0
                 import_cases += 1
-        keep = [b"synthetic.unrelated", prefixes[0][:-1].encode() + b"-neighbor\xff"]
-        for key in keep:
-            db.query("INSERT INTO settings VALUES (X'" + key.hex() + "','keep')")
+        keep = [encoding_bytes("synthetic.unrelated", encoding), prefixes[0][:-1].encode() + b"-neighbor\xff"]
+        db.query("INSERT INTO settings VALUES ('synthetic.unrelated','keep')")
+        db.query("INSERT INTO settings VALUES (X'" + keep[1].hex() + "','keep')")
         for prefix in prefixes:
-            for key in keys(prefix):
+            for key in keys(prefix, encoding):
                 db.query("INSERT INTO settings VALUES (" + key + ",'private')")
         for prefix in prefixes:
             db.query(bound(delete, prefix))
             assert int(db.query(bound(exists, prefix))[0][0]) == 0
         remaining = sorted(row[0] for row in db.query("SELECT hex(CAST(key AS BLOB)) FROM settings"))
         assert remaining == sorted(value.hex().upper() for value in keep)
-        return {"individual_namespace_cases": import_cases, "bulk_private_rows_scrubbed": 8,
+        return {"individual_namespace_cases": import_cases, "bulk_private_rows_scrubbed": sum(len(keys(p, encoding)) for p in prefixes),
                 "unrelated_rows_preserved": 2, "legacy_glob_matches_blob_prefix": bool(prior_blob_match),
                 "like_doesnt_match_blobs": "LIKE_DOESNT_MATCH_BLOBS" in flags}
     finally:
@@ -123,10 +134,12 @@ def probe(factory):
 
 
 print(json.dumps({
-    "status": "actual source SQL byte-prefix predicates passed in two runtimes",
+    "status": "actual source SQL text/raw-BLOB predicates passed in both runtimes and all three database encodings",
     "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
-    "python_sqlite": {"version": sqlite3.sqlite_version, **probe(PythonDb)},
-    "system_sqlite": {"version": library.sqlite3_libversion().decode(), **probe(SystemDb)},
+    "python_sqlite": {"version": sqlite3.sqlite_version,
+        "encodings": {encoding: probe(PythonDb, encoding) for encoding in ["UTF-8", "UTF-16le", "UTF-16be"]}},
+    "system_sqlite": {"version": library.sqlite3_libversion().decode(),
+        "encodings": {encoding: probe(SystemDb, encoding) for encoding in ["UTF-8", "UTF-16le", "UTF-16be"]}},
     "limits": ["SQL fixtures only, no Cargo/native archive workflow executed",
                "Production bundled-SQLite leak was not demonstrated",
                "Actual export/import/BLOB/VACUUM regressions authored; final native run deferred"]

@@ -66,21 +66,26 @@ pub fn export_vwbz(
     // Installation-local camera positions and bookmark names never leave this
     // installation. VACUUM below also removes their former page contents.
     copy_connection.execute(
-        "DELETE FROM settings WHERE substr(CAST(key AS BLOB),1,?1)=CAST(?2 AS BLOB)",
+        "DELETE FROM settings WHERE substr(CAST(key AS TEXT),1,?1)=?2 COLLATE BINARY OR (typeof(key)='blob' AND substr(key,1,?3)=?4)",
         rusqlite::params![
+            crate::LOCAL_VIEW_PREFIX.chars().count() as i64,
+            crate::LOCAL_VIEW_PREFIX,
             crate::LOCAL_VIEW_PREFIX.len() as i64,
-            crate::LOCAL_VIEW_PREFIX
+            crate::LOCAL_VIEW_PREFIX.as_bytes()
         ],
     )?;
     // Strip even malformed private reviews before the final VACUUM. The source
-    // database and its manual owner progress remain unchanged. Byte-prefix
-    // comparison covers malformed TEXT/BLOB keys independently of SQLite's
-    // LIKE_DOESNT_MATCH_BLOBS build option, including NUL/invalid UTF-8 suffixes.
+    // database and its manual owner progress remain unchanged. Text comparison
+    // uses SQLite's logical characters across UTF-8/UTF-16 database encodings.
+    // The separate BLOB prefix is bound as actual bytes, never CAST from TEXT;
+    // it also catches malformed raw UTF-8 keys on a UTF-16 database.
     copy_connection.execute(
-        "DELETE FROM settings WHERE substr(CAST(key AS BLOB),1,?1)=CAST(?2 AS BLOB)",
+        "DELETE FROM settings WHERE substr(CAST(key AS TEXT),1,?1)=?2 COLLATE BINARY OR (typeof(key)='blob' AND substr(key,1,?3)=?4)",
         rusqlite::params![
+            crate::VERIFICATION_REVIEW_PREFIX.chars().count() as i64,
+            crate::VERIFICATION_REVIEW_PREFIX,
             crate::VERIFICATION_REVIEW_PREFIX.len() as i64,
-            crate::VERIFICATION_REVIEW_PREFIX
+            crate::VERIFICATION_REVIEW_PREFIX.as_bytes()
         ],
     )?;
     copy_connection.execute("VACUUM INTO ?1", [sqlite_path(&clean)?])?;
@@ -205,8 +210,8 @@ pub fn import_vwbz(
     // Normal exports omit this namespace; retain the incoming archive untouched
     // and refuse before publishing a project containing imported review claims.
     let private_reviews: bool = restored.connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM settings WHERE substr(CAST(key AS BLOB),1,?1)=CAST(?2 AS BLOB))",
-        rusqlite::params![crate::VERIFICATION_REVIEW_PREFIX.len() as i64, crate::VERIFICATION_REVIEW_PREFIX],
+        "SELECT EXISTS(SELECT 1 FROM settings WHERE substr(CAST(key AS TEXT),1,?1)=?2 COLLATE BINARY OR (typeof(key)='blob' AND substr(key,1,?3)=?4))",
+        rusqlite::params![crate::VERIFICATION_REVIEW_PREFIX.chars().count() as i64, crate::VERIFICATION_REVIEW_PREFIX, crate::VERIFICATION_REVIEW_PREFIX.len() as i64, crate::VERIFICATION_REVIEW_PREFIX.as_bytes()],
         |row| row.get(0),
     )?;
     if private_reviews {
