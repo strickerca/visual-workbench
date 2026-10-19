@@ -119,6 +119,72 @@ class DesktopTransferTest {
         assertTrue(transferMessage(TransferFailure(TransferFailureKind.Depth)).contains("16 bit"))
         assertTrue(transferMessage(TransferFailure(TransferFailureKind.PixelLimit)).contains("50 MP"))
     }
+    @Test fun capturedFullSelectionAndViewProjectOnceIntoAsymmetricOutput() = runBlocking {
+        val project = TransferProject()
+        val core = TransferCore(project)
+        val cases = listOf(
+            transferState() to null,
+            transferState().copy(exportSettings = ExportSettings(area = ExportArea.Selection), selected = setOf("object"))
+                to SelectionRegion(1u, 2u, 4u, 3u),
+            transferState().copy(exportSettings = ExportSettings(area = ExportArea.View))
+                to SelectionRegion(0u, 0u, 8u, 6u),
+        )
+        cases.forEach { (state, expectedD) ->
+            val captured = captureExport(state, core)
+            val output = when (state.exportSettings.area) {
+                ExportArea.Full -> null
+                ExportArea.Selection -> SelectionRegion(1u, 1u, 2u, 4u)
+                ExportArea.View -> SelectionRegion(0u, 0u, 4u, 6u)
+            }
+            var calls = 0
+            val query: suspend (WorkbenchProject, WorkflowBinding, SelectionRegion?, ULong) -> ImageOutputExportGeometry =
+                { queriedProject, binding, source, budget ->
+                    assertSame(project, queriedProject); assertEquals(captured.binding, binding)
+                    assertEquals(expectedD, source); assertEquals(256uL * 1024uL * 1024uL, budget)
+                    calls++
+                    ImageOutputExportGeometry(binding, SOURCE, 8u, 6u, 4u, 6u, output,
+                        output?.width ?: 4u, output?.height ?: 6u)
+                }
+            val projected = projectExport(captured, project, query)
+            assertEquals(captured.sourceRegion, projected.sourceRegion)
+            assertEquals(8u, projected.sourceWidth); assertEquals(6u, projected.sourceHeight)
+            assertEquals(output?.width ?: 4u, projected.width)
+            assertEquals(output?.height ?: 6u, projected.height)
+            assertEquals(output?.let { Rect(it.x.toDouble(), it.y.toDouble(), it.width.toDouble(), it.height.toDouble()) },
+                projected.options().region)
+            assertTrue(projected.matches(state))
+            assertEquals(projected, projectExport(projected, project, query))
+            assertEquals(2, calls)
+            if (state.exportSettings.area == ExportArea.Selection)
+                assertFalse(projected.matches(state.copy(selected = emptySet())))
+            if (state.exportSettings.area == ExportArea.View)
+                assertFalse(projected.matches(state.copy(view = state.view.copy(camera = state.view.camera.copy(scale = 2.0)))))
+        }
+    }
+    @Test fun framedReceiptUsesOnlyTopLevelEncodedDimensionsAndRejectsMalformedFields() = runBlocking {
+        val state = transferState().copy(exportSettings = ExportSettings(area = ExportArea.Selection), selected = setOf("object"))
+        val project = TransferProject()
+        val captured = captureExport(state, TransferCore(project))
+        val output = SelectionRegion(1u, 1u, 2u, 4u)
+        val projected = projectExport(captured, project) { _, binding, source, _ ->
+            assertEquals(SelectionRegion(1u, 2u, 4u, 3u), source)
+            ImageOutputExportGeometry(binding, SOURCE, 8u, 6u, 4u, 6u, output, 2u, 4u)
+        }
+        val framed = metadata(projected).dropLast(1) + ",\"image_output\":{\"output_width\":4,\"output_height\":6}}"
+        val result = receipt(projected).copy(metadataJson = framed)
+        val completed = completeExport(projected, result)
+        assertEquals(2u, completed.width); assertEquals(4u, completed.height)
+        assertTrue(state.copy(exportReceipt = completed).exportReady)
+        for (bad in listOf(
+            framed.dropLast(1) + ",\"output_width\":2}",
+            framed + " false", framed.replace("\"output_width\":2", "\"output_width\":\"2\""),
+            framed.replace("\"output_width\":2", "\"output_width\":2.5"),
+            framed.replace(SOURCE, "c".repeat(64)),
+            framed.replace(projected.revision, "r8-changed"),
+        )) assertThrows(HandoffFailure::class.java) { completeExport(projected, result.copy(metadataJson = bad)) }
+        assertThrows(HandoffFailure::class.java) { completeExport(projected, result.copy(revision = transferInfo(8u))) }
+        Unit
+    }
     @Test fun fileDragProvidesOnlyTheOneImmutableFileFlavor() {
         val file = Path.of("C:/synthetic/export.png")
         val transferable = PngFileTransferable(file)
