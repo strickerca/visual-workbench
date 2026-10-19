@@ -125,6 +125,107 @@
             "degraded": {
               "type": "boolean",
               "description": "true when the freeze fell back to the compressed frame"
+            },
+            "stream_save": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "draft_id",
+                "transaction_id",
+                "target_project_id",
+                "target_host_seq",
+                "target_state_hash",
+                "connection_epoch",
+                "source_generation",
+                "saved_asset_id",
+                "original_asset_id"
+              ],
+              "properties": {
+                "draft_id": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "array",
+                      "minItems": 16,
+                      "maxItems": 16,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    }
+                  }
+                },
+                "transaction_id": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "array",
+                      "minItems": 16,
+                      "maxItems": 16,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    }
+                  }
+                },
+                "target_project_id": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "array",
+                      "minItems": 16,
+                      "maxItems": 16,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    }
+                  }
+                },
+                "target_host_seq": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "target_state_hash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "connection_epoch": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "not": {
+                    "multipleOf": 2
+                  }
+                },
+                "source_generation": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "saved_asset_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "original_asset_id": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{64})?$"
+                }
+              }
             }
           }
         }

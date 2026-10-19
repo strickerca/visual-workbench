@@ -43,6 +43,8 @@ pub fn fixture() -> std::result::Result<HostSequencer, Box<dyn std::error::Error
                     lossless: true,
                     degraded: false,
                     captured_at_ms: 1000,
+
+                    stream_save: None,
                 }),
                 ..Default::default()
             },

@@ -14,6 +14,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     config.boxed(".vw.v1.Envelope.body.gesture_replay");
     config.type_attribute(".", "#[derive(::serde::Serialize, ::serde::Deserialize)]");
     config.message_attribute(".", "#[serde(deny_unknown_fields)]");
+    config.field_attribute(
+        ".vw.v1.CaptureInfo.stream_save",
+        "#[serde(default, skip_serializing_if = \"Option::is_none\")]",
+    );
     config.compile_protos(&[schema], &[contracts])?;
     Ok(())
 }

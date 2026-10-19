@@ -35,6 +35,7 @@ fn output(f: &mut Fixture, crop: [f64; 4], transform: v1::Affine, enabled: bool)
                 order_key: "V".into(),
                 transform: Some(transform),
                 style: Some(v1::Style {
+                    stroke: Some(v1::Color { rgba: 0x000000ff }),
                     width: 1.0,
                     ..Default::default()
                 }),
@@ -661,7 +662,10 @@ fn replace_clean_receipt(
         writer.write_image_data(&pixels)?;
         writer.finish()?;
     }
-    let hash = format!("{:x}", Sha256::digest(&encoded));
+    let hash = Sha256::digest(&encoded)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
     let mut input = files(package);
     input
         .iter_mut()

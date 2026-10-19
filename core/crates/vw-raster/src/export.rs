@@ -56,6 +56,8 @@ pub struct ExportRequest {
     /// Optional capture identity accompanies the document revision.
     pub capture_session: Option<vw_model::Id>,
     pub frame_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capture_provenance: Option<v1::CaptureInfo>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportMetadata {
@@ -80,6 +82,25 @@ pub struct ExportMetadata {
 pub struct ExportedImage {
     pub bytes: Vec<u8>,
     pub metadata: ExportMetadata,
+}
+
+pub(crate) fn validate_capture_export(r: &ExportRequest, asset: &str) -> Result<(), RasterError> {
+    if let Some(capture) = &r.capture_provenance {
+        vw_model::validate_capture(capture)
+            .map_err(|_| RasterError::Invalid("capture provenance"))?;
+        let session = vw_model::Id::from_proto(capture.capture_session_id.as_ref())
+            .map_err(|_| RasterError::Invalid("capture session"))?;
+        if r.capture_session.as_ref() != Some(&session)
+            || r.frame_id != Some(capture.frame_id)
+            || capture
+                .stream_save
+                .as_ref()
+                .is_some_and(|save| save.saved_asset_id != asset)
+        {
+            return Err(RasterError::Invalid("capture export binding"));
+        }
+    }
+    Ok(())
 }
 
 /// Nonallocating admission for retained ICC bytes, transient profile copies and
@@ -214,6 +235,7 @@ pub fn prepare_export_pixels(
         return Err(RasterError::Cancelled);
     }
     image_shape(source)?;
+    validate_capture_export(r, source.source_asset.as_str())?;
     if !source.original_available {
         return Err(RasterError::OriginalRequired);
     }
@@ -394,6 +416,7 @@ pub fn prepare_export_pixels_with_output(
 
 /// Export a full-resolution buffer. Call `render_document` first for marked output.
 pub fn export(source: &DecodedImage, r: &ExportRequest) -> Result<ExportedImage, RasterError> {
+    validate_capture_export(r, source.source_asset.as_str())?;
     export_with_output(source, r, None)
 }
 

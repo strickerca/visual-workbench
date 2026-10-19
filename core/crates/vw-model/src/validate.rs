@@ -32,7 +32,16 @@ impl Project {
             text(&definition.title, 4096)?;
             self.asset_ref(&definition.primary_asset_id, true)?;
             match (&definition.capture, kind) {
-                (Some(capture), v1::DocumentKind::Capture) => validate_capture(capture)?,
+                (Some(capture), v1::DocumentKind::Capture) => {
+                    validate_capture(capture)?;
+                    if capture
+                        .stream_save
+                        .as_ref()
+                        .is_some_and(|s| s.saved_asset_id != definition.primary_asset_id)
+                    {
+                        return Err(ModelError::Invalid("stream Save document asset"));
+                    }
+                }
                 (None, v1::DocumentKind::Capture) => {
                     return Err(ModelError::Missing("capture info"));
                 }
@@ -361,6 +370,26 @@ pub fn validate_capture(value: &v1::CaptureInfo) -> Result<(), ModelError> {
     text(&value.window_title, 4096)?;
     if value.lossless && value.degraded {
         return Err(ModelError::Invalid("capture quality flags"));
+    }
+    if let Some(save) = &value.stream_save {
+        Id::from_proto(save.draft_id.as_ref())?;
+        Id::from_proto(save.transaction_id.as_ref())?;
+        Id::from_proto(save.target_project_id.as_ref())?;
+        AssetId::try_from(save.target_state_hash.clone())?;
+        AssetId::try_from(save.saved_asset_id.clone())?;
+        if save.connection_epoch & 1 == 0
+            || save.source_generation == 0
+            || value.lossless == value.degraded
+        {
+            return Err(ModelError::Invalid("stream Save quality/epoch"));
+        }
+        if value.lossless {
+            if save.original_asset_id != save.saved_asset_id {
+                return Err(ModelError::Invalid("stream original hash"));
+            }
+        } else if !save.original_asset_id.is_empty() {
+            return Err(ModelError::Invalid("degraded original claim"));
+        }
     }
     let geometry = value
         .geometry

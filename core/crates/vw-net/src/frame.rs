@@ -42,7 +42,8 @@ pub fn channel_for(body: &Body) -> v1::Channel {
         | Body::BlobAck(_)
         | Body::TileRequest(_)
         | Body::Tile(_)
-        | Body::LosslessFrame(_) => v1::Channel::Blob,
+        | Body::LosslessFrame(_)
+        | Body::StreamBlob(_) => v1::Channel::Blob,
         Body::FrameTiles(_) | Body::VideoFrame(_) => v1::Channel::Media,
         Body::InputEvent(_) | Body::InputStatus(_) => v1::Channel::Input,
         _ => v1::Channel::Control,
@@ -99,6 +100,10 @@ pub fn decode_frame(bytes: &[u8]) -> Result<Frame> {
     let (channel, len) = read_header(header)?;
     if bytes.len() != HEADER_BYTES + len {
         return Err(NetError::Invalid("frame length"));
+    }
+    if channel == v1::Channel::Media {
+        vw_proto::capture_admission::media_envelope(&bytes[HEADER_BYTES..])
+            .map_err(NetError::Invalid)?;
     }
     let envelope = v1::Envelope::decode(&bytes[HEADER_BYTES..])
         .map_err(|_| NetError::Invalid("protobuf decode"))?;

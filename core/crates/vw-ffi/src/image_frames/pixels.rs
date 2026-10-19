@@ -783,6 +783,12 @@ fn export_request(
             .map(|v| Id::from_proto(v.capture_session_id.as_ref()))
             .transpose()?,
         frame_id: definition.capture.as_ref().map(|v| v.frame_id),
+
+        capture_provenance: definition
+            .capture
+            .as_ref()
+            .filter(|capture| capture.stream_save.is_some())
+            .cloned(),
     })
 }
 pub(crate) fn legacy_export(
@@ -854,12 +860,20 @@ pub(crate) fn legacy_export(
         if encoded.bytes.len() as u64 > MAX_ENCODED {
             return Err(WorkflowError::Limit);
         }
+        let revision = state.info()?;
+        let capture_provenance_json = crate::capture_provenance::export_receipt(
+            &encoded.metadata,
+            &value.document_id,
+            &revision,
+        )
+        .map_err(|_| WorkflowError::Invalid)?;
         Ok(ExportResult {
+            capture_provenance_json,
             blake3: AssetId::hash(&encoded.bytes).to_string(),
             bytes: encoded.bytes,
             metadata_json: serde_json::to_string(&encoded.metadata)
                 .map_err(|_| WorkflowError::Invalid)?,
-            revision: state.info()?,
+            revision,
         })
     })()
     .map_err(core_error)

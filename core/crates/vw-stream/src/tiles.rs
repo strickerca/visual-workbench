@@ -21,6 +21,16 @@ pub struct EncodedTiles {
     charge: MemoryCharge,
 }
 impl EncodedTiles {
+    /// Attach the producer's actual UTC capture clock before serialization.
+    /// Connection generation/delivery authority remains zero for host admission.
+    /// A timestamp is metadata and supplies no capture or input permission.
+    pub fn with_captured_at_ms(mut self, captured_at_ms: i64) -> Result<Self> {
+        if !(1..=253_402_300_799_999).contains(&captured_at_ms) {
+            return Err(StreamError::Invalid);
+        }
+        self.packet.captured_at_ms = captured_at_ms;
+        Ok(self)
+    }
     pub fn packet(&self) -> &v1::FrameTiles {
         &self.packet
     }
@@ -332,6 +342,9 @@ fn encode_tiles_inner(
         });
     }
     Ok(v1::FrameTiles {
+        delivery_sequence: 0,
+        source_generation: 0,
+        captured_at_ms: 0,
         capture_session_id: Some(id.session.to_proto()),
         frame_id: id.frame_id,
         geometry: Some(id.geometry.wire().clone()),

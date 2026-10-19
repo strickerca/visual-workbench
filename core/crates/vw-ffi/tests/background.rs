@@ -117,6 +117,8 @@ fn jpeg_original() -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
             memory_budget_bytes: 512 * 1024 * 1024,
             capture_session: None,
             frame_id: None,
+
+            capture_provenance: None,
         },
     )?
     .bytes)

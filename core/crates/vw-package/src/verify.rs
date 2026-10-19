@@ -346,6 +346,22 @@ pub(crate) fn from_compiler(
         {
             return Err(Error::Integrity);
         }
+        if let Some(save) = &c.stream_save {
+            Id::from_proto(save.draft_id.as_ref()).map_err(|_| Error::Integrity)?;
+            Id::from_proto(save.transaction_id.as_ref()).map_err(|_| Error::Integrity)?;
+            Id::from_proto(save.target_project_id.as_ref()).map_err(|_| Error::Integrity)?;
+            vw_model::AssetId::try_from(save.target_state_hash.clone())
+                .map_err(|_| Error::Integrity)?;
+            if save.saved_asset_id != m.source.asset_hash
+                || save.connection_epoch & 1 == 0
+                || save.source_generation == 0
+                || c.lossless == c.degraded
+                || (c.lossless && save.original_asset_id != save.saved_asset_id)
+                || (c.degraded && !save.original_asset_id.is_empty())
+            {
+                return Err(Error::Integrity);
+            }
+        }
         text(&c.app_name, 4096)?;
         if let Some(title) = &c.window_title {
             text(title, 4096)?;

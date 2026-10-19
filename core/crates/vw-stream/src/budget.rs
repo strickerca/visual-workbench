@@ -23,6 +23,7 @@ pub enum MemoryKind {
 struct Pool {
     used: AtomicU64,
     limit: u64,
+    parent: Option<SessionBudget>,
 }
 
 /// All clones share one hard admission pool. The active endpoint supplies this
@@ -37,6 +38,19 @@ impl SessionBudget {
         Ok(Self(Arc::new(Pool {
             used: AtomicU64::new(0),
             limit: limit_bytes,
+            parent: None,
+        })))
+    }
+    /// Independent endpoint identity with allocations also charged to a shared
+    /// process pool. Retained pixels keep both charges after endpoint shutdown.
+    pub fn child(&self, limit_bytes: u64) -> Result<Self> {
+        if limit_bytes == 0 || limit_bytes > self.limit_bytes() {
+            return Err(StreamError::Limit);
+        }
+        Ok(Self(Arc::new(Pool {
+            used: AtomicU64::new(0),
+            limit: limit_bytes,
+            parent: Some(self.clone()),
         })))
     }
     /// Reserve before allocating or asking a platform codec/readback to allocate.
@@ -48,10 +62,21 @@ impl SessionBudget {
                 used.checked_add(bytes).filter(|next| *next <= self.0.limit)
             })
             .map_err(|_| StreamError::Limit)?;
+        let parent = match &self.0.parent {
+            Some(parent) => match parent.reserve(kind, bytes) {
+                Ok(charge) => Some(Box::new(charge)),
+                Err(error) => {
+                    self.0.used.fetch_sub(bytes, Ordering::AcqRel);
+                    return Err(error);
+                }
+            },
+            None => None,
+        };
         Ok(MemoryCharge {
             budget: self.clone(),
             bytes,
             kind,
+            _parent: parent,
         })
     }
     pub fn used_bytes(&self) -> u64 {
@@ -73,6 +98,7 @@ pub struct MemoryCharge {
     budget: SessionBudget,
     bytes: u64,
     kind: MemoryKind,
+    _parent: Option<Box<MemoryCharge>>,
 }
 impl MemoryCharge {
     pub fn bytes(&self) -> u64 {
@@ -148,10 +174,20 @@ impl BudgetedBytes {
             charge: self.charge.reclassify(MemoryKind::Transfer),
         }
     }
-    pub(crate) fn from_parts(bytes: Vec<u8>, charge: MemoryCharge) -> Result<Self> {
+    /// Adopt an allocation whose capacity was reserved before its producer ran.
+    /// A mismatched capacity fails while retaining the charge through Vec drop.
+    pub fn from_parts(bytes: Vec<u8>, charge: MemoryCharge) -> Result<Self> {
         if bytes.capacity() as u64 > charge.bytes() {
+            drop(bytes);
+            drop(charge);
             return Err(StreamError::Limit);
         }
         Ok(Self { bytes, charge })
+    }
+}
+
+impl AsRef<[u8]> for BudgetedBytes {
+    fn as_ref(&self) -> &[u8] {
+        self.bytes()
     }
 }

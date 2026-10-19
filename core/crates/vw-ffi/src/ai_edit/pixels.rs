@@ -154,6 +154,8 @@ impl ProjectSession {
                             memory_budget_bytes: memory_budget_bytes - bytes.len() as u64,
                             capture_session: None,
                             frame_id: None,
+
+                            capture_provenance: None,
                         },
                     )?;
                     drop(decoded);

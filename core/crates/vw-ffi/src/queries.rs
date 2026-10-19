@@ -872,6 +872,12 @@ pub(crate) fn export(
             .map(|c| Id::from_proto(c.capture_session_id.as_ref()))
             .transpose()?,
         frame_id: definition.capture.as_ref().map(|c| c.frame_id),
+
+        capture_provenance: definition
+            .capture
+            .as_ref()
+            .filter(|capture| capture.stream_save.is_some())
+            .cloned(),
     };
     let result = if crate::format_images::external(request.format) {
         // The external adapter reserves retained input itself.
@@ -885,11 +891,18 @@ pub(crate) fn export(
     if result.bytes.len() > 64 * 1024 * 1024 {
         return Err(CoreError::Backpressure);
     }
+    let revision = state.info()?;
+    let capture_provenance_json = crate::capture_provenance::export_receipt(
+        &result.metadata,
+        &options.document_id,
+        &revision,
+    )?;
     Ok(ExportResult {
+        capture_provenance_json,
         blake3: AssetId::hash(&result.bytes).to_string(),
         bytes: result.bytes,
         metadata_json: serde_json::to_string(&result.metadata).map_err(|_| CoreError::Invalid)?,
-        revision: state.info()?,
+        revision,
     })
 }
 #[uniffi::export]

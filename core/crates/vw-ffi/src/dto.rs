@@ -119,6 +119,7 @@ pub struct ExportOptions {
 }
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct ExportResult {
+    pub capture_provenance_json: Option<String>,
     pub bytes: Vec<u8>,
     pub blake3: String,
     pub metadata_json: String,

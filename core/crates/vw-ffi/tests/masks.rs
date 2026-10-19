@@ -558,6 +558,8 @@ async fn cutout_preserves_sixteen_bit_hidden_rgb_and_multiplies_alpha_once() {
             memory_budget_bytes: MEMORY,
             capture_session: None,
             frame_id: None,
+
+            capture_provenance: None,
         },
     )
     .unwrap()

@@ -37,6 +37,7 @@ mod semantic_ui;
 pub use semantic_ui::*;
 mod capture_delivery;
 mod capture_import;
+mod capture_provenance;
 pub use capture_delivery::*;
 mod queries;
 mod semantics;

@@ -479,6 +479,8 @@ fn capture_project() -> Project {
                     lossless: true,
                     degraded: false,
                     captured_at_ms: TIME,
+
+                    stream_save: None,
                 }),
             },
             pages: vec![],

@@ -482,6 +482,8 @@ fn rich_document_projections_preserve_full_capture_identity_and_model_types() {
         lossless: true,
         degraded: false,
         captured_at_ms: 100,
+
+        stream_save: None,
     };
     value.documents.insert(
         id(3),

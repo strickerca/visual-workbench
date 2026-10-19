@@ -595,6 +595,8 @@ mod tests {
             memory_budget_bytes: 256 * MIB,
             capture_session: None,
             frame_id: None,
+
+            capture_provenance: None,
         }
     }
     #[test]

@@ -57,6 +57,14 @@ pub(crate) fn verify(
     if let Some(output) = manifest.extensions.image_output {
         receipt["image_output"] = serde_json::to_value(output).map_err(|_| Error::Integrity)?;
     }
+    if let Some(capture) = manifest
+        .source
+        .capture
+        .as_ref()
+        .filter(|c| c.stream_save.is_some())
+    {
+        receipt["capture"] = serde_json::to_value(capture).map_err(|_| Error::Integrity)?;
+    }
     let expected = bounded::json(&receipt, 8192)?;
     let mut at = 8_usize;
     let mut receipt = false;

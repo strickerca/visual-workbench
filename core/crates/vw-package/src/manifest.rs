@@ -41,6 +41,8 @@ pub struct Source {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Capture {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stream_save: Option<vw_proto::v1::StreamSaveProvenance>,
     pub platform: String,
     pub session_id: Id,
     pub frame_id: u64,

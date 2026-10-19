@@ -186,6 +186,7 @@ pub(super) fn write(
                         .ok_or(SelectionError::Limit)?,
                     capture_session,
                     frame_id,
+                    capture_provenance: None,
                 },
             )?;
             (result.bytes, depth)

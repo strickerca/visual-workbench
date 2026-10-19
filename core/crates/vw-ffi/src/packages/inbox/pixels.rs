@@ -147,6 +147,8 @@ pub(super) fn display(
             memory_budget_bytes: MAX_MEMORY - 32 * 1024 * 1024,
             capture_session: None,
             frame_id: None,
+
+            capture_provenance: None,
         },
     )
     .map_err(raster)?;

@@ -64,6 +64,7 @@ fn plan(
 ) -> Result<StreamPlan, RasterError> {
     let info = source.info();
     crate::checked_samples(info.width, info.height)?;
+    crate::export::validate_capture_export(r, info.source_asset.as_str())?;
     if r.revision.state_hash.len() != 32 || r.capture_session.is_some() != r.frame_id.is_some() {
         return Err(RasterError::Invalid("revision/capture identity"));
     }

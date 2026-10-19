@@ -538,6 +538,8 @@ async fn sixteen_bit_original_remains_exact_and_same_length_blob_corruption_is_d
             memory_budget_bytes: BUDGET,
             capture_session: None,
             frame_id: None,
+
+            capture_provenance: None,
         },
     )
     .unwrap()

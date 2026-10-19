@@ -9,3 +9,6 @@ pub mod v1 {
 }
 
 pub use prost::Message;
+
+/// Bounded wire preflight before repeated MEDIA allocation.
+pub mod capture_admission;

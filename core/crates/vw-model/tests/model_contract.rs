@@ -216,6 +216,8 @@ fn capture() -> pb::CaptureInfo {
         lossless: true,
         degraded: false,
         captured_at_ms: 1_700_000_000_001,
+
+        stream_save: None,
     }
 }
 

@@ -10,6 +10,8 @@ mod pairing;
 mod preview;
 mod replication;
 mod runtime;
+mod stream;
+pub use stream::*;
 mod trust;
 pub use bootstrap::*;
 pub use discovery::*;

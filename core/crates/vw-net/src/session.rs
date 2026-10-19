@@ -9,6 +9,7 @@ use vw_proto::v1::{self, envelope::Body};
 const MAX_QUEUE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_KEYS: usize = 256;
 const IDLE_INPUT_MS: u64 = 600_000;
+pub(crate) type RetainedFrame = (Frame, Option<Box<dyn Send + Sync>>);
 
 #[derive(Debug, Clone)]
 pub struct LocalHello {
@@ -169,6 +170,7 @@ pub struct Session {
     queues: [VecDeque<Frame>; 7],
     queued_bytes: [usize; 7],
     latest: BTreeMap<(i32, String), Frame>,
+    retained: BTreeMap<(i32, u64), Box<dyn Send + Sync>>,
     watermarks: crate::replay::ReplayWindow,
     media_started: BTreeSet<String>,
     media_received: BTreeMap<String, u64>,
@@ -244,7 +246,7 @@ impl Session {
             ack.capabilities.iter().cloned().collect(),
         ))
     }
-    fn new(
+    pub(super) fn new(
         local: DeviceId,
         peer: DeviceId,
         connection: Id,
@@ -263,6 +265,7 @@ impl Session {
             queues: std::array::from_fn(|_| VecDeque::new()),
             queued_bytes: [0; 7],
             latest: BTreeMap::new(),
+            retained: BTreeMap::new(),
             watermarks: crate::replay::ReplayWindow::new(4096),
             media_started: BTreeSet::new(),
             media_received: BTreeMap::new(),
@@ -283,6 +286,7 @@ impl Session {
         self.queues.iter_mut().for_each(VecDeque::clear);
         self.queued_bytes = [0; 7];
         self.latest.clear();
+        self.retained.clear();
         self.watermarks.clear();
         self.media_started.clear();
         self.media_received.clear();
@@ -311,10 +315,36 @@ impl Session {
         }
         Ok(())
     }
+    pub(crate) fn enqueue_retained(
+        &mut self,
+        body: Body,
+        retained: Box<dyn Send + Sync>,
+    ) -> Result<()> {
+        let channel = channel_for(&body) as usize;
+        let prior = self.next[channel];
+        self.enqueue(body)?;
+        if self.next[channel] != prior {
+            self.retained
+                .insert((channel as i32, self.next[channel]), retained);
+        }
+        Ok(())
+    }
+    pub(crate) fn next_retained_frame_where(
+        &mut self,
+        allowed: impl Fn(v1::Channel) -> bool,
+    ) -> Result<Option<RetainedFrame>> {
+        Ok(self.next_frame_where(allowed)?.map(|frame| {
+            let retained = self
+                .retained
+                .remove(&(frame.channel as i32, frame.envelope.seq));
+            (frame, retained)
+        }))
+    }
     pub fn enqueue(&mut self, body: Body) -> Result<()> {
         if !self.active {
             return Err(NetError::Invalid("disconnected session"));
         }
+        validate_capture_delivery(&body, &self.capabilities)?;
         remote_capability(&self.capabilities, &body)?;
         let channel = channel_for(&body);
         let index = channel as usize;
@@ -384,7 +414,11 @@ impl Session {
                 let (_, keyframe, gap) =
                     media.as_ref().ok_or(NetError::Invalid("media routing"))?;
                 if !keyframe && (prior > 0 || *gap || !self.media_started.contains(&map_key.1)) {
-                    self.latest.remove(&map_key);
+                    if let Some(old) = self.latest.remove(&map_key) {
+                        let key = (old.channel as i32, old.envelope.seq);
+                        drop(old);
+                        self.retained.remove(&key);
+                    }
                     self.queued_bytes[index] -= prior;
                     self.media_started.remove(&map_key.1);
                     return Err(NetError::KeyframeRequired);
@@ -406,7 +440,11 @@ impl Session {
                 self.media_started.insert(map_key.1.clone());
             }
             self.queued_bytes[index] = self.queued_bytes[index] - prior + size;
-            self.latest.insert(map_key, frame);
+            if let Some(old) = self.latest.insert(map_key, frame) {
+                let key = (old.channel as i32, old.envelope.seq);
+                drop(old);
+                self.retained.remove(&key);
+            }
         } else {
             if self.queues[index].len() >= 1024 || self.queued_bytes[index] + size > MAX_QUEUE_BYTES
             {
@@ -478,6 +516,7 @@ impl Session {
             return Ok(Receive::Discard);
         }
         let body = frame.envelope.body.ok_or(NetError::Invalid("body"))?;
+        validate_capture_delivery(&body, &self.capabilities)?;
         remote_capability(&self.capabilities, &body)?;
         let index = frame.channel as usize;
         if matches!(frame.channel, v1::Channel::Ephemeral | v1::Channel::Media) {
@@ -541,12 +580,44 @@ fn blob_priority(frame: &Frame) -> u32 {
         Some(Body::BlobRequest(v)) => v.priority,
         Some(Body::TileRequest(v)) => v.priority,
         Some(Body::BlobAck(_)) => 0,
+        Some(Body::StreamBlob(value)) => match &value.body {
+            Some(v1::stream_blob::Body::Request(request)) => request.priority,
+            Some(v1::stream_blob::Body::Ack(_) | v1::stream_blob::Body::Cancel(_)) => 0,
+            _ => u32::MAX,
+        },
         _ => u32::MAX,
+    }
+}
+fn validate_capture_delivery(body: &Body, capabilities: &BTreeSet<String>) -> Result<()> {
+    match body {
+        Body::FrameTiles(value)
+            if (value.delivery_sequence != 0) != capabilities.contains("capture_stream_v1") =>
+        {
+            Err(NetError::Invalid("capture delivery capability"))
+        }
+        Body::RegionCaptureControl(_) | Body::StreamBlob(_)
+            if !capabilities.contains("capture_stream_v1") =>
+        {
+            Err(NetError::Invalid("capture stream capability"))
+        }
+        Body::StreamControl(_) | Body::FreezeRequest(_) | Body::LosslessFrame(_)
+            if !capabilities.contains("capture_stream_v1") =>
+        {
+            Err(NetError::Invalid("capture stream capability"))
+        }
+        _ => Ok(()),
     }
 }
 pub(crate) fn media_info(body: &Body) -> Result<(u64, bool)> {
     let value = match body {
-        Body::FrameTiles(v) => (v.frame_id, v.keyframe),
+        Body::FrameTiles(v) => (
+            if v.delivery_sequence == 0 {
+                v.frame_id
+            } else {
+                v.delivery_sequence
+            },
+            v.keyframe,
+        ),
         Body::VideoFrame(v) => (v.frame_id, v.keyframe),
         _ => return Err(NetError::Invalid("media body")),
     };
@@ -892,3 +963,7 @@ mod stroke_control_tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "capture_retention_tests.rs"]
+mod capture_retention_tests;

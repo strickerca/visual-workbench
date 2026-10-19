@@ -70,6 +70,8 @@ pub fn request(format: ExportFormat) -> ExportRequest {
         memory_budget_bytes: 1024 * 1024 * 1024,
         capture_session: None,
         frame_id: None,
+
+        capture_provenance: None,
     }
 }
 pub fn asset(image: &DecodedImage) -> v1::AddAsset {

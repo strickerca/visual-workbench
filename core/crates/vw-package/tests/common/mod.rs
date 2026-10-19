@@ -211,6 +211,8 @@ pub fn capture(f: &mut Fixture) -> TestResult {
         lossless: true,
         degraded: false,
         captured_at_ms: 100,
+
+        stream_save: None,
     });
     f.host = HostSequencer::new(project, device())?;
     Ok(())

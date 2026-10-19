@@ -21,6 +21,8 @@ fn input(path: &Path, budget: &SessionBudget, bytes: u64) -> StoreInput {
         blobs: BlobStore::new(path).unwrap(),
         permit: SessionPermit::acquire().unwrap(),
         charge: Some(budget.reserve(MemoryKind::CodecWorkspace, bytes).unwrap()),
+        sealed: None,
+        temporary: None,
     }
 }
 fn adopt(input: StoreInput) -> Result<Arc<ProjectSession>> {
@@ -29,6 +31,7 @@ fn adopt(input: StoreInput) -> Result<Arc<ProjectSession>> {
         blobs,
         permit,
         charge,
+        ..
     } = input;
     ProjectSession::from_store_budgeted(store, blobs, permit, charge.unwrap())
 }

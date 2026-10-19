@@ -170,6 +170,7 @@ pub struct FileExportOptions {
 }
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct FileExportResult {
+    pub capture_provenance_json: Option<String>,
     pub encoded_bytes: u64,
     pub blake3: String,
     pub metadata_json: String,
@@ -1447,6 +1448,11 @@ fn export_file(
         scratch.close()?;
         report
     };
+    let capture_provenance_json = crate::capture_provenance::export_receipt(
+        &report.metadata,
+        &options.export.document_id,
+        &revision,
+    )?;
     let metadata_json = serde_json::to_string(&report.metadata).map_err(|_| CoreError::Invalid)?;
     let mut response_bytes = crate::payload::info_bytes(&revision)?;
     crate::payload::accumulate(
@@ -1456,6 +1462,12 @@ fn export_file(
             .checked_mul(4)
             .ok_or(CoreError::Backpressure)?,
     )?;
+    if let Some(proof) = &capture_provenance_json {
+        crate::payload::accumulate(
+            &mut response_bytes,
+            proof.len().checked_mul(4).ok_or(CoreError::Backpressure)?,
+        )?;
+    }
     hash_final_file(
         output.as_file_mut(),
         report.encoded_bytes,
@@ -1471,6 +1483,7 @@ fn export_file(
         .map_err(|_| CoreError::Storage)?;
     sync_directory(&work)?;
     Ok(FileExportResult {
+        capture_provenance_json,
         encoded_bytes: report.encoded_bytes,
         blake3: hash.finalize().to_hex().to_string(),
         metadata_json,
@@ -1534,6 +1547,12 @@ fn request(
             .map(|c| Id::from_proto(c.capture_session_id.as_ref()))
             .transpose()?,
         frame_id: document.capture.as_ref().map(|c| c.frame_id),
+
+        capture_provenance: document
+            .capture
+            .as_ref()
+            .filter(|capture| capture.stream_save.is_some())
+            .cloned(),
     })
 }
 fn with_source<R>(
@@ -1905,6 +1924,8 @@ mod tests {
             memory_budget_bytes: MEMORY_LIMIT,
             capture_session: None,
             frame_id: None,
+
+            capture_provenance: None,
         };
         (vw_raster::export(&source, &request).unwrap().bytes, pixels)
     }

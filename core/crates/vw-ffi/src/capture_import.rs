@@ -87,6 +87,8 @@ impl ValidatedCapture {
             lossless: true,
             degraded: false,
             captured_at_ms: value.captured_at_ms,
+
+            stream_save: None,
         };
         vw_model::validate_capture(&capture)?;
         Ok(Self {

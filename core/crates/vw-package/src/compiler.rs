@@ -68,6 +68,8 @@ fn srgb(
             memory_budget_bytes: budget,
             capture_session: None,
             frame_id: None,
+
+            capture_provenance: None,
         },
     )?;
     let remaining = options.limits.working(
@@ -107,6 +109,7 @@ struct ImageContext<'a> {
     binding: &'a vw_instructions::SourceBinding,
     asset: &'a str,
     limits: Limits,
+    capture: Option<&'a Capture>,
     output: Option<vw_raster::ImageOutputMetadata>,
 }
 fn image_file(
@@ -122,11 +125,15 @@ fn image_file(
         binding,
         asset,
         limits,
+        capture,
         output,
     } = context;
     let mut receipt = serde_json::json!({"schema":1,"project_id":binding.project_id,"document_id":binding.document_id,"host_seq":binding.host_seq,"state_hash":binding.state_hash,"source_asset":asset,"mapping":map});
     if let Some(output) = output {
         receipt["image_output"] = serde_json::to_value(output).map_err(|_| Error::Encoding)?;
+    }
+    if let Some(capture) = capture.filter(|c| c.stream_save.is_some()) {
+        receipt["capture"] = serde_json::to_value(capture).map_err(|_| Error::Encoding)?;
     }
     let metadata = bounded::json(&receipt, 8192)?;
     let bytes = pixels::encode(
@@ -281,6 +288,7 @@ pub fn compile(
                 return Err(Error::Stale);
             }
             Ok(Capture {
+                stream_save: c.stream_save.clone(),
                 platform: c.platform.clone(),
                 session_id: Id::from_proto(c.capture_session_id.as_ref())?,
                 frame_id: c.frame_id,
@@ -406,6 +414,7 @@ pub fn compile(
         binding: instructions.source(),
         asset: asset.as_str(),
         limits: options.limits,
+        capture: capture.as_ref(),
         output: image_output,
     };
     {

@@ -526,6 +526,8 @@ async fn actual_existing_authenticated_link_delivers_a_new_original_without_proj
             memory_budget_bytes: BUDGET,
             capture_session: None,
             frame_id: None,
+
+            capture_provenance: None,
         },
     )
     .unwrap()

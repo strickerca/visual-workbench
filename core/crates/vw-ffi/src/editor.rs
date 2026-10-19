@@ -122,6 +122,13 @@ impl ProjectState {
         device: &DeviceId,
         time: i64,
     ) -> Result<ProjectInfo> {
+        if self
+            .draft_edit_sealed
+            .as_ref()
+            .is_some_and(|sealed| sealed.load(std::sync::atomic::Ordering::Acquire))
+        {
+            return Err(CoreError::Backpressure);
+        }
         if &self.store()?.local_device()? != device {
             return Err(CoreError::Invalid);
         }

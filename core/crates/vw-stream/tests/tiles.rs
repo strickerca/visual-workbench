@@ -5,6 +5,28 @@ use vw_stream::*;
 const WORK: u64 = 128 * 1024 * 1024;
 
 #[test]
+fn capture_clock_is_attached_without_changing_frame_identity_or_charge() {
+    let budget = SessionBudget::new(WORK).unwrap();
+    let geometry = identity(1, 16, 9).geometry;
+    let mut ring = FrameRing::default_budgeted_for(id(1), geometry, budget.clone()).unwrap();
+    let original = frame(&mut ring, 1, 16, 9, [16, 32, 64, 255]);
+    let encoded =
+        encode_tiles_budgeted(&original, None, true, 85, &budget, &Cancellation::default())
+            .unwrap();
+    let used = budget.used_bytes();
+    let stamped = encoded.with_captured_at_ms(1_700_000_000_001).unwrap();
+    assert_eq!(stamped.packet().frame_id, original.identity().frame_id);
+    assert_eq!(stamped.packet().captured_at_ms, 1_700_000_000_001);
+    assert_eq!(stamped.packet().source_generation, 0);
+    assert_eq!(stamped.packet().delivery_sequence, 0);
+    assert_eq!(budget.used_bytes(), used);
+    assert!(matches!(
+        stamped.with_captured_at_ms(0),
+        Err(StreamError::Invalid)
+    ));
+}
+
+#[test]
 fn tiled_keyframe_and_dirty_delta_preserve_every_unchanged_pixel() {
     let mut r = ring(600, 520);
     let first = frame(&mut r, 1, 600, 520, [16, 32, 64, 255]);

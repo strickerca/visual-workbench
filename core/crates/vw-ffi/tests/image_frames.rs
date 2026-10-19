@@ -86,6 +86,8 @@ fn original(depth: u8) -> Vec<u8> {
             memory_budget_bytes: BUDGET,
             capture_session: None,
             frame_id: None,
+
+            capture_provenance: None,
         },
     )
     .unwrap()

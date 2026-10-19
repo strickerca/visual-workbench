@@ -108,6 +108,8 @@ pub(crate) struct ProjectState {
     // Last: store/model/history/replica/remote allocations must actually retire
     // before the giant publication's admission is returned to the shared pool.
     _memory_charge: Option<vw_stream::MemoryCharge>,
+    pub(crate) draft_edit_sealed: Option<Arc<AtomicBool>>,
+    _temporary_root: Option<tempfile::TempDir>,
 }
 impl ProjectState {
     pub fn store(&self) -> Result<&ProjectStore> {
@@ -174,6 +176,8 @@ struct StoreInput {
     blobs: BlobStore,
     permit: SessionPermit,
     charge: Option<vw_stream::MemoryCharge>,
+    sealed: Option<Arc<AtomicBool>>,
+    temporary: Option<tempfile::TempDir>,
 }
 impl ProjectSession {
     pub(crate) fn from_store(
@@ -186,6 +190,8 @@ impl ProjectSession {
             blobs,
             permit,
             charge: None,
+            sealed: None,
+            temporary: None,
         })
     }
     pub(crate) fn from_store_budgeted(
@@ -200,6 +206,8 @@ impl ProjectSession {
             blobs,
             permit,
             charge: Some(charge),
+            sealed: None,
+            temporary: None,
         };
         if input.charge.as_ref().is_none_or(|charge| {
             charge.bytes() != 32 * 1024 * 1024
@@ -208,6 +216,23 @@ impl ProjectSession {
             return Err(CoreError::Invalid);
         }
         Self::from_store_owned(input)
+    }
+    pub(crate) fn from_temporary_store(
+        store: ProjectStore,
+        blobs: BlobStore,
+        permit: SessionPermit,
+        temporary: tempfile::TempDir,
+        sealed: Arc<AtomicBool>,
+        charge: vw_stream::MemoryCharge,
+    ) -> Result<Arc<Self>> {
+        Self::from_store_owned(StoreInput {
+            store,
+            blobs,
+            permit,
+            charge: Some(charge),
+            sealed: Some(sealed),
+            temporary: Some(temporary),
+        })
     }
     fn from_store_owned(input: StoreInput) -> Result<Arc<Self>> {
         let store = &input.store;
@@ -240,6 +265,8 @@ impl ProjectSession {
                 changed: changed.clone(),
                 _permit: Some(input.permit),
                 _memory_charge: input.charge,
+                draft_edit_sealed: input.sealed,
+                _temporary_root: input.temporary,
             },
             16,
         )?;

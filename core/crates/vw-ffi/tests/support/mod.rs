@@ -39,6 +39,8 @@ pub fn source() -> Vec<u8> {
             memory_budget_bytes: 256 * 1024 * 1024,
             capture_session: None,
             frame_id: None,
+
+            capture_provenance: None,
         },
     )
     .unwrap()

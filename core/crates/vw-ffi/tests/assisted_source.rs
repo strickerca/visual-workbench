@@ -56,6 +56,8 @@ fn fixture(depth: u8, tagged: bool) -> (DecodedImage, Vec<u8>) {
             memory_budget_bytes: BUDGET,
             capture_session: None,
             frame_id: None,
+
+            capture_provenance: None,
         },
     )
     .unwrap()

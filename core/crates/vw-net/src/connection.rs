@@ -198,6 +198,19 @@ impl ConnectionSender {
         self.state.ready.notify_one();
         Ok(())
     }
+    /// Reservation follows this payload through replacement and actual IO.
+    pub fn enqueue_retained(&self, body: Body, retained: Box<dyn Send + Sync>) -> Result<()> {
+        if self.state.closed.load(Ordering::Acquire) {
+            return Err(NetError::Carrier);
+        }
+        self.state
+            .session
+            .lock()
+            .map_err(|_| NetError::Carrier)?
+            .enqueue_retained(body, retained)?;
+        self.state.ready.notify_one();
+        Ok(())
+    }
     pub fn close(&self) {
         close_duplex(&self.writer, &self.state);
     }
@@ -269,7 +282,7 @@ async fn drive_writes(writer: CarrierSender, state: Arc<DuplexState>) {
         }
         let notified = state.ready.notified();
         let frame = match state.session.lock() {
-            Ok(mut session) => session.next_frame_where(|channel| {
+            Ok(mut session) => session.next_retained_frame_where(|channel| {
                 if writer.independent_channels() {
                     !busy.contains(&(channel as i32))
                 } else {
@@ -279,11 +292,16 @@ async fn drive_writes(writer: CarrierSender, state: Arc<DuplexState>) {
             Err(_) => Err(NetError::Carrier),
         };
         match frame {
-            Ok(Some(frame)) => {
+            Ok(Some((frame, retained))) => {
                 let channel = frame.channel as i32;
                 busy.insert(channel);
                 let lane = writer.clone();
-                writes.spawn(async move { (channel, lane.send(&frame).await) });
+                writes.spawn(async move {
+                    let result = lane.send(&frame).await;
+                    drop(frame);
+                    drop(retained);
+                    (channel, result)
+                });
                 continue;
             }
             Err(_) => {

@@ -153,12 +153,14 @@ pub struct LiveSession {
     local: DeviceId,
     focus: Arc<focus::FocusHub>,
     agent_capture: Arc<agent_capture::CaptureStatusHub>,
+    stream_hub: Arc<super::stream::Hub>,
     remote: Arc<remote_edit::RemoteHub>,
 }
 impl Drop for LiveSession {
     fn drop(&mut self) {
         self.focus.stop();
         self.agent_capture.stop();
+        self.stream_hub.stop();
         self.remote.stop();
         self.runtime.stop();
     }
@@ -381,6 +383,92 @@ impl LiveSession {
                 mpsc::error::TrySendError::Closed(_) => SessionError::Closed,
             })
     }
+    /// Explicit local display admission. It grants no remote input or OS source
+    /// selection, and is available only on a negotiated capture_stream_v1 epoch.
+    pub async fn create_capture_draft(
+        &self,
+        stream: Arc<super::stream::CaptureStream>,
+        options: super::stream::CaptureDraftOptions,
+        cancellation: Arc<crate::Cancellation>,
+    ) -> crate::workflow::WorkflowResult<Arc<super::stream::CaptureDraft>> {
+        let entered_epoch = self.epoch.load(Ordering::Acquire);
+        use crate::workflow::WorkflowError;
+        if self.closed.load(Ordering::Acquire) {
+            return Err(WorkflowError::Closed);
+        }
+        let endpoint = self
+            .stream_hub
+            .endpoint(entered_epoch)
+            .map_err(|_| WorkflowError::Closed)?;
+        if !Arc::ptr_eq(&endpoint, &stream.lease.endpoint) {
+            return Err(WorkflowError::Stale);
+        }
+        let project = self.project.upgrade().ok_or(WorkflowError::Closed)?;
+        super::stream::draft::create(project, stream, options, cancellation).await
+    }
+    pub fn capture_region_signal(&self) -> SessionResult<super::stream::CaptureRegionSignal> {
+        let entered_epoch = self.epoch.load(Ordering::Acquire);
+        if self.closed.load(Ordering::Acquire) {
+            return Err(SessionError::Closed);
+        }
+        let endpoint = self.stream_hub.endpoint(entered_epoch)?;
+        let value = endpoint.region.borrow().clone();
+        Ok(value)
+    }
+    pub async fn request_capture_region(&self, request_id: String) -> SessionResult<()> {
+        let entered_epoch = self.epoch.load(Ordering::Acquire);
+        if self.closed.load(Ordering::Acquire) {
+            return Err(SessionError::Closed);
+        }
+        let endpoint = self.stream_hub.endpoint(entered_epoch)?;
+        let id = Id::try_from(request_id).map_err(|_| SessionError::Invalid)?;
+        let (reply, receive) = tokio::sync::oneshot::channel();
+        endpoint.send(super::stream::hub::Command::RegionRequest { id, reply })?;
+        receive.await.map_err(|_| SessionError::Closed)?
+    }
+    pub async fn resolve_capture_region(
+        &self,
+        request_id: String,
+        connection_epoch: u64,
+        approve: bool,
+    ) -> SessionResult<()> {
+        let entered_epoch = self.epoch.load(Ordering::Acquire);
+        if self.closed.load(Ordering::Acquire) || entered_epoch != connection_epoch {
+            return Err(SessionError::Closed);
+        }
+        let endpoint = self.stream_hub.endpoint(entered_epoch)?;
+        let id = Id::try_from(request_id).map_err(|_| SessionError::Invalid)?;
+        let (reply, receive) = tokio::sync::oneshot::channel();
+        endpoint.send(super::stream::hub::Command::RegionResolve { id, approve, reply })?;
+        receive.await.map_err(|_| SessionError::Closed)?
+    }
+    pub async fn open_capture_stream(
+        &self,
+        memory_budget_bytes: u64,
+    ) -> SessionResult<Arc<super::stream::CaptureStream>> {
+        let entered_epoch = self.epoch.load(Ordering::Acquire);
+        if self.closed.load(Ordering::Acquire) {
+            return Err(SessionError::Closed);
+        }
+        self.stream_hub
+            .open(entered_epoch, memory_budget_bytes)
+            .await
+    }
+    /// Explicit local source approval; remote requests cannot invoke this.
+    /// The caller retains the actual platform producer until it has stopped.
+    pub async fn open_capture_publisher(
+        &self,
+        source: super::stream::CapturePublishSource,
+        memory_budget_bytes: u64,
+    ) -> SessionResult<Arc<super::stream::CapturePublisher>> {
+        let entered_epoch = self.epoch.load(Ordering::Acquire);
+        if self.closed.load(Ordering::Acquire) {
+            return Err(SessionError::Closed);
+        }
+        self.stream_hub
+            .publish(entered_epoch, source, memory_budget_bytes)
+            .await
+    }
     pub async fn close(&self) -> SessionResult<()> {
         self.closed.store(true, Ordering::Release);
         self.focus.stop();
@@ -388,7 +476,9 @@ impl LiveSession {
         // Seal and retire real producers before carrier/runtime close completes.
         // Typed pending keeps this foreign owner retryable and its leases held.
         self.remote.close()?;
-        self.runtime.close().await
+        let stream = self.stream_hub.close().await;
+        let network = self.runtime.close().await;
+        stream.and(network)
     }
 }
 fn command_error(error: mpsc::error::TrySendError<super::preview::Command>) -> SessionError {
@@ -413,6 +503,7 @@ pub(super) fn hello(device: DeviceId) -> LocalHello {
             "original_upload_v1".into(),
             "new_shape_preview_v1".into(),
             "marker_focus_v1".into(),
+            "capture_stream_v1".into(),
             vw_model::IMAGE_OUTPUT_CAPABILITY.into(),
             agent_capture::CAPABILITY.into(),
             vw_remote::CAPABILITY.into(),
@@ -559,6 +650,8 @@ impl SessionService {
                 let incoming_epoch = epoch.clone();
                 let focus = focus::FocusHub::new(initial.project.clone());
                 let incoming_focus = focus.clone();
+                let stream_hub = super::stream::Hub::new();
+                let incoming_stream_hub = stream_hub.clone();
                 let agent_capture = agent_capture::CaptureStatusHub::new(host);
                 let incoming_capture = agent_capture.clone();
                 let remote = remote_edit::RemoteHub::new(host);
@@ -580,6 +673,7 @@ impl SessionService {
                         epoch: incoming_epoch,
                         previews: incoming_previews,
                         focus: incoming_focus,
+                        stream_hub: incoming_stream_hub,
                         agent_capture: incoming_capture,
                         remote: incoming_remote,
                     })
@@ -597,6 +691,7 @@ impl SessionService {
                     local: local_identity,
                     focus,
                     agent_capture,
+                    stream_hub,
                     remote,
                 }))
             })
@@ -718,6 +813,7 @@ struct Driver {
     previews: Arc<Mutex<super::preview::Previews>>,
     focus: Arc<focus::FocusHub>,
     agent_capture: Arc<agent_capture::CaptureStatusHub>,
+    stream_hub: Arc<super::stream::Hub>,
     remote: Arc<remote_edit::RemoteHub>,
 }
 async fn drive(mut driver: Driver) {
@@ -740,6 +836,7 @@ async fn drive(mut driver: Driver) {
             previews,
             focus,
             agent_capture,
+            stream_hub,
             remote,
             ..
         } = &mut driver;
@@ -782,6 +879,7 @@ async fn drive(mut driver: Driver) {
                         incoming: &mut incoming,
                         previews,
                         focus,
+                        stream_hub,
                         agent_capture,
                         remote,
                     },
@@ -936,6 +1034,7 @@ struct Connected<'a> {
     incoming: &'a mut Option<Incoming>,
     previews: &'a Arc<Mutex<super::preview::Previews>>,
     focus: &'a Arc<focus::FocusHub>,
+    stream_hub: &'a Arc<super::stream::Hub>,
     agent_capture: &'a Arc<agent_capture::CaptureStatusHub>,
     remote: &'a Arc<remote_edit::RemoteHub>,
 }
@@ -963,8 +1062,13 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         previews,
         focus,
         agent_capture,
+        stream_hub,
         remote,
     } = context;
+    let stream_supported = connection
+        .session()
+        .capabilities()
+        .contains("capture_stream_v1");
     let active_epoch = ConnectionEpoch::enter(epoch.clone())?;
     let _focus_epoch = focus.activate(active_epoch.value)?;
     let _capture_epoch = agent_capture.activate(
@@ -984,6 +1088,13 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         .contains(remote_edit::DRAWING_CAPABILITY);
     let (sender, mut receive) = connection.into_duplex()?;
     let _closing = Closing(sender.clone());
+    let mut stream = if stream_supported {
+        let (endpoint, commands) = stream_hub.activate(active_epoch.value)?;
+        Some(super::stream::Bridge::new(endpoint, commands))
+    } else {
+        None
+    };
+    let outcome = async {
     let start = Instant::now();
     let _remote_epoch = remote.activate(
         active_epoch.value,
@@ -1018,7 +1129,7 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         waiting = true;
     }
     loop {
-        if project.check_open().is_err() {
+        if project.check_open().is_err() || stream.as_ref().is_some_and(super::stream::Bridge::is_stopped) {
             return Ok(());
         }
         tokio::select! {
@@ -1072,6 +1183,12 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
                     },
                     Body::ViewportOutline(view)=>{if view.corners.len()!=4||view.corners.iter().any(|p|!p.x.is_finite()||!p.y.is_finite()){return Err(SessionError::Invalid);}let id=Id::from_proto(view.document_id.as_ref()).map_err(|_|SessionError::Invalid)?;publish(status,|s|s.peer_viewport=Some(PeerViewport{document_id:id.to_string(),corners:view.corners.into_iter().map(|p|crate::Point{x:p.x,y:p.y}).collect()}));},
                     Body::MarkerFocus(value)=>focus.receive(value,active_epoch.value)?,
+                    Body::StreamControl(value)=>stream.as_mut().ok_or(SessionError::Invalid)?.control(value)?,
+                    Body::FrameTiles(value)=>stream.as_mut().ok_or(SessionError::Invalid)?.media(value)?,
+                    Body::LosslessFrame(value)=>stream.as_mut().ok_or(SessionError::Invalid)?.lossless_offer(value,project)?,
+                    Body::RegionCaptureControl(value)=>stream.as_mut().ok_or(SessionError::Invalid)?.region_control(value,start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64)?,
+                    Body::StreamBlob(value)=>stream.as_mut().ok_or(SessionError::Invalid)?.stream_blob(value)?,
+                    Body::FreezeRequest(value)=>stream.as_mut().ok_or(SessionError::Invalid)?.freeze_request(value,start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64)?,
                     Body::AgentCaptureStatus(value)=>agent_capture.receive(value,active_epoch.value)?,
                     body @ (Body::RemoteControl(_)|Body::RemoteVideoConfig(_))=>remote.receive(body,active_epoch.value)?,
                     Body::VideoFrame(value) if value.remote_scope.is_some()=>remote.receive(Body::VideoFrame(value),active_epoch.value)?,
@@ -1093,6 +1210,9 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
                 super::preview::CommandKind::NewObject(value)=>{let local=sync::state(project).await?.local;let gesture=Id::try_from(value.gesture_id.clone()).map_err(|_|SessionError::Invalid)?;if !sync::gesture_closed(project,local.clone(),gesture).await?{previews.lock().map_err(|_|SessionError::Worker)?.record_new_object(value,&local)?;}},
                 super::preview::CommandKind::Finish{gesture,cancel}=>{let closes=previews.lock().map_err(|_|SessionError::Worker)?.finish(gesture.clone(),cancel)?;if host&&cancel{sync::cancel_gesture(project,sync::state(project).await?.local,gesture).await?;}for close in closes{sender.enqueue(close)?;}},
             }},
+            event=async { match stream.as_mut() { Some(value)=>value.next().await, None=>std::future::pending().await } }=>{
+                if let Some(value)=stream.as_mut(){value.handle(event,start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64)?;}
+            },
             _=project.network_changed.notified()=>{},
             _=interval.tick()=>{},
         }
@@ -1101,6 +1221,7 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         }
         echo.tick(&sender)?;
         focus.flush(&sender)?;
+        if let Some(value)=stream.as_mut(){value.tick(&sender,start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64)?;}
         agent_capture.flush(&sender)?;
         remote.flush()?;
         fill(&sender, &mut outbound)?;
@@ -1228,6 +1349,12 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
             };
         });
     }
+    }.await;
+    let cleanup = match stream.as_mut() {
+        Some(value) => value.shutdown().await,
+        None => Ok(()),
+    };
+    outcome.and(cleanup)
 }
 async fn receive_preview(
     project: &ProjectSession,

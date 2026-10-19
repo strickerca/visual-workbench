@@ -410,6 +410,8 @@ async fn depth_and_alpha_reductions_require_explicit_export_choices() {
             memory_budget_bytes: 256 * 1024 * 1024,
             capture_session: None,
             frame_id: None,
+
+            capture_provenance: None,
         },
     )
     .unwrap()

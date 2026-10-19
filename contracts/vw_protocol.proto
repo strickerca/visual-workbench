@@ -77,6 +77,8 @@ message Envelope {
     VideoFrame video_frame = 52;
     FreezeRequest freeze_request = 53;
     LosslessFrame lossless_frame = 54;
+    RegionCaptureControl region_capture_control = 55; // CONTROL: capture_stream_v1
+    StreamBlob stream_blob = 56; // BLOB: transient capture-only transfer scope
     // Minor-5 capture_stream_v1 tags 55/56 remain reserved for its separate candidate.
     RemoteControl remote_control = 57; // CONTROL: minor6 remote_edit_v1
     RemoteVideoConfig remote_video_config = 58; // CONTROL: exact native codec/config scope
@@ -322,6 +324,22 @@ message CaptureInfo {
   bool lossless = 7;
   bool degraded = 8;        // freeze fell back to the compressed frame (BUILD_SPECIFICATION §4.18)
   int64 captured_at_ms = 9;
+  StreamSaveProvenance stream_save = 10; // optional native stream Save receipt, capture_stream_v1
+}
+
+// Persisted with the new capture document by the same annotation transaction.
+// The final output/package carries its own full current revision in addition
+// to this immutable before-Save target CAS and producer/frame provenance.
+message StreamSaveProvenance {
+  Uuid draft_id = 1;
+  Uuid transaction_id = 2;
+  Uuid target_project_id = 3;
+  uint64 target_host_seq = 4;
+  string target_state_hash = 5;
+  uint64 connection_epoch = 6;
+  uint64 source_generation = 7;
+  string saved_asset_id = 8;
+  string original_asset_id = 9; // empty for explicitly degraded decoded preview
 }
 
 message UpdateDocument {
@@ -698,7 +716,7 @@ message CaptureGeometry {
 
 message StreamControl {
   Uuid capture_session_id = 1;
-  string action = 2;  // start | stop | pause
+  string action = 2;  // start | stop | pause | resume | keyframe | source_closed
   string source_kind = 3;
   uint64 window_handle = 4;
   string monitor_id = 5;
@@ -706,6 +724,11 @@ message StreamControl {
   uint32 max_height = 7;
   uint32 target_fps = 8;
   string mode = 9;  // frame_tiles | video_hevc
+  CaptureGeometry source_geometry = 10; // owner-approved physical source
+  string interaction = 11; // live_annotate | remote_edit; no input grant implied
+  uint64 source_generation = 12; // producer-monotonic CONTROL openings within this connection
+  string platform = 13; // windows | android, immutable for this source generation
+  string source_name = 14; // bounded owner-selected display label; never authority
 }
 
 message TileImage {
@@ -724,6 +747,9 @@ message FrameTiles {
   repeated TileImage tiles = 7;
   int64 timestamp_ns = 8;
   uint64 last_input_seq_applied = 9;  // drives ghost-ink fading (§4.11); 0 when no remote input
+  uint64 delivery_sequence = 10; // capture_stream_v1: transmission order, NOT captured frame identity
+  uint64 source_generation = 11; // exact currently approved CONTROL opening
+  int64 captured_at_ms = 12; // original capture UTC time; never receipt/import time
 }
 
 message VideoFrame {
@@ -745,7 +771,11 @@ message VideoFrame {
   uint64 captured_qpc_100ns = 16; // actual compositor capture time, never receipt time
 }
 
-message FreezeRequest { Uuid capture_session_id = 1; uint64 frame_id = 2; }
+message FreezeRequest {
+  Uuid capture_session_id = 1; uint64 frame_id = 2;
+  Uuid request_id = 3; uint32 geometry_revision = 4; // exact connection-local draft
+  uint64 source_generation = 5; // cannot revive a prior owner-approved source
+}
 
 message LosslessFrame {
   Uuid capture_session_id = 1;
@@ -755,6 +785,73 @@ message LosslessFrame {
   string format = 5;   // png | qoi
   bytes data = 6;      // or empty with asset_id set for blob transfer
   string asset_id = 7;
+  CaptureTransferKey transfer = 8; // required by capture_stream_v1 when available
+  uint64 total_size = 9; // admitted before scoped BLOB receiver creation
+  Uuid request_id = 10; // binds unavailable replies too
+  int64 captured_at_ms = 11; // available response must exactly match the frozen frame
+}
+
+// capture_stream_v1 is an independently negotiated capability. Its connection
+// epoch is always the authenticated Envelope connection_id, never a supplied
+// integer. No message below grants remote input or authorizes an OS capture.
+// Only explicit local source approval can create a producer/region offer.
+message CaptureTransferKey {
+  Uuid capture_session_id = 1;
+  uint64 frame_id = 2;
+  uint32 geometry_revision = 3;
+  Uuid request_id = 4;
+  Uuid transfer_id = 5;
+  uint64 generation = 6; // producer-monotonic for this authenticated connection
+}
+
+// Separate from ordinary project Blob messages. Capture bytes remain transient
+// and cannot enter immutable project inventory until explicit durable Save.
+message StreamBlob {
+  CaptureTransferKey key = 1;
+  oneof body {
+    BlobRequest request = 2;
+    BlobChunk chunk = 3;
+    BlobAck ack = 4;
+    StreamTransferCancel cancel = 5;
+  }
+}
+message StreamTransferCancel {}
+
+// CONTROL metadata only; image bytes use FrameTiles MEDIA or scoped StreamBlob.
+message RegionCaptureControl {
+  Uuid request_id = 1;
+  uint64 sequence = 2;
+  oneof body {
+    RegionCaptureRequest request = 3;
+    RegionCaptureOffer offer = 4;
+    RegionCaptureChoice choose = 5;
+    RegionCaptureEnd end = 6;
+    RegionCaptureResult result = 7;
+  }
+}
+message RegionCaptureRequest {} // prompt only, never a source selector
+message RegionCaptureOffer {
+  Uuid offer_id = 1;
+  Uuid capture_session_id = 2;
+  uint64 frame_id = 3;
+  CaptureGeometry geometry = 4;
+  uint32 width = 5;
+  uint32 height = 6;
+  uint32 expires_after_ms = 7; // <=30s; receiver uses its own monotonic clock
+}
+message RegionCaptureChoice {
+  Uuid offer_id = 1;
+  Uuid capture_session_id = 2;
+  uint64 frame_id = 3;
+  CaptureGeometry geometry = 4;
+  RectI rectangle = 5; // integer F edges on that exact approved frame
+}
+message RegionCaptureEnd {
+  string reason = 1; // declined | cancelled | expired | unavailable | invalid | picker_opened
+}
+message RegionCaptureResult {
+  Uuid offer_id = 1;
+  LosslessFrame original = 2; // exact same approved frame, cropped geometry
 }
 
 // ---------------------------------------------------------------------------

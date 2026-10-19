@@ -35,6 +35,8 @@ fn request(format: ExportFormat) -> ExportRequest {
         memory_budget_bytes: BUDGET,
         capture_session: None,
         frame_id: None,
+
+        capture_provenance: None,
     }
 }
 pub(crate) fn original(format: ExportFormat) -> Vec<u8> {
