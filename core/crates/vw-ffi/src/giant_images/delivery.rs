@@ -5,6 +5,20 @@ use crate::SessionResourceCharge;
 use std::sync::{Arc, Mutex};
 use vw_stream::{MemoryCharge, MemoryKind, SessionBudget};
 
+// UniFFI 0.32.2 writes two 64-byte strings (4-byte length each), a tile
+// address (1 + 4 + 4), six u32 fields, and the RGBA count (4): 173 bytes
+// besides RGBA. Lower::lower_into_rust_buffer starts with Vec::new and grows
+// the buffer as fields are appended. The pinned Rust Vec growth is at most
+// twice the final written length, including a partially filled edge tile.
+const TILE_WIRE_OVERHEAD: u64 = 2 * (4 + 64) + (1 + 4 + 4) + 6 * 4 + 4;
+
+fn abi_copy_bound(pixels: &GiantTilePixels) -> GiantImageResult<u64> {
+    (pixels.rgba.len() as u64)
+        .checked_add(TILE_WIRE_OVERHEAD)
+        .and_then(|wire_bytes| wire_bytes.checked_mul(2))
+        .ok_or(GiantImageError::Limit)
+}
+
 // Dropping an undelivered owner destroys its pixels before releasing charges.
 struct OwnedPixels {
     pixels: GiantTilePixels,
@@ -74,9 +88,7 @@ impl PreparedGiantTile {
         {
             return Err(GiantImageError::Invalid);
         }
-        let bytes = (pixels.rgba.capacity() as u64)
-            .checked_add(16 * 1024)
-            .ok_or(GiantImageError::Limit)?;
+        let bytes = abi_copy_bound(pixels)?;
         let abi = budget
             .reserve(MemoryKind::CodecWorkspace, bytes)
             .map_err(|_| GiantImageError::Memory {
@@ -323,5 +335,84 @@ mod tests {
             Err(GiantImageError::Invalid)
         ));
         assert_eq!(budget.used_bytes(), 0);
+    }
+
+    fn edge_pixels(width: u32, height: u32) -> GiantTilePixels {
+        GiantTilePixels {
+            asset_id: "a".repeat(64),
+            manifest_hash: "b".repeat(64),
+            address: super::super::GiantTileAddress {
+                level: 0,
+                x: 0,
+                y: 0,
+            },
+            document_x: 0,
+            document_y: 0,
+            document_width: width,
+            document_height: height,
+            width,
+            height,
+            rgba: vec![21; (width * height * 4) as usize],
+        }
+    }
+
+    #[test]
+    fn actual_edge_record_lowering_fits_its_charge_and_tight_budget_refuses() {
+        for (width, height) in [
+            (1, 1),
+            (1, 256),
+            (128, 128),
+            (192, 192),
+            (200, 200),
+            (255, 255),
+            (256, 256),
+        ] {
+            let pixels = edge_pixels(width, height);
+            let rgba_bytes = pixels.rgba.len() as u64;
+            let abi_bytes = abi_copy_bound(&pixels).unwrap();
+            let budget = SessionBudget::new(rgba_bytes + abi_bytes).unwrap();
+            let outgoing = budget.reserve(MemoryKind::Transfer, rgba_bytes).unwrap();
+            let source =
+                PreparedGiantTile::admit_in_pool(pixels, outgoing, budget.clone()).unwrap();
+            let prefetched = source.publication_lease().unwrap();
+            let weak = Arc::downgrade(&prefetched);
+            let wire = <GiantTilePixels as uniffi::Lower<crate::UniFfiTag>>::lower_into_rust_buffer(
+                source.take_pixels().unwrap(),
+            );
+            let actual_capacity = wire.capacity() as u64;
+            assert_eq!(wire.len() as u64, rgba_bytes + TILE_WIRE_OVERHEAD);
+            assert!(
+                actual_capacity <= abi_bytes,
+                "{width}x{height} grew beyond its ABI charge"
+            );
+            assert_eq!(budget.used_bytes(), rgba_bytes + abi_bytes);
+            source.release_source().unwrap();
+            assert_eq!(budget.used_bytes(), rgba_bytes + abi_bytes);
+            wire.destroy();
+            prefetched.close().unwrap();
+            drop(prefetched);
+            drop(source);
+            retired(weak, &budget);
+
+            if width == 200 || width == 255 {
+                // The old charge admitted this budget but could not pay for
+                // the actual RustBuffer while the original RGBA stayed owned.
+                let old_abi = rgba_bytes + 16 * 1024;
+                assert!(old_abi < actual_capacity);
+                let tight_budget = SessionBudget::new(rgba_bytes + actual_capacity - 1).unwrap();
+                let outgoing = tight_budget
+                    .reserve(MemoryKind::Transfer, rgba_bytes)
+                    .unwrap();
+                assert!(matches!(
+                    PreparedGiantTile::admit_in_pool(
+                        edge_pixels(width, height),
+                        outgoing,
+                        tight_budget.clone()
+                    ),
+                    Err(GiantImageError::Memory { .. })
+                ));
+                assert_eq!(tight_budget.used_bytes(), 0);
+            }
+        }
     }
 }
