@@ -85,7 +85,7 @@ class McpCaptureSourceRecoveryTest {
             val candidate = fixture.project(1)
             val project = Project({ info() })
             val core = Core { project }
-            assertEquals(candidate, findRetainedMcpCaptureProject(fixture.root, expected, core))
+            assertEquals(candidate, findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()))
             assertEquals(listOf(candidate), core.opened)
             assertEquals(1, project.closes); assertTrue(project.closeFinished)
         }
@@ -102,7 +102,7 @@ class McpCaptureSourceRecoveryTest {
                 if (index > 0) assertTrue(projects[index - 1].closeFinished)
                 projects[index]
             }
-            assertEquals(candidates.last(), findRetainedMcpCaptureProject(fixture.root, expected, core))
+            assertEquals(candidates.last(), findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()))
             assertEquals(candidates, core.opened)
             assertTrue(projects.all { it.closes == 1 && it.closeFinished })
         }
@@ -113,7 +113,7 @@ class McpCaptureSourceRecoveryTest {
             val known = fixture.project(1); val unknown = fixture.project(2)
             val project = Project({ info().copy(hostSeq = 999uL) })
             val core = Core { path -> assertEquals(unknown, path); project }
-            assertNull(findRetainedMcpCaptureProject(fixture.root, expected, core, setOf(known)))
+            assertNull(findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement(), setOf(known)))
             assertEquals(listOf(unknown), core.opened)
             assertTrue(project.closeFinished)
         }
@@ -123,9 +123,9 @@ class McpCaptureSourceRecoveryTest {
         Fixture().use { fixture ->
             val core = Core { error("No complete project exists") }
             fixture.project(1, complete = false)
-            assertNull(findRetainedMcpCaptureProject(fixture.root, expected, core))
+            assertNull(findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()))
             val missing = fixture.parent.resolve("missing").resolve("mcp-captures-v1")
-            assertNull(findRetainedMcpCaptureProject(missing, expected, core))
+            assertNull(findRetainedMcpCaptureProject(missing, expected, core, McpCaptureProjectRetirement()))
             assertTrue(core.opened.isEmpty())
         }
     }
@@ -137,7 +137,7 @@ class McpCaptureSourceRecoveryTest {
             Fixture().use { fixture ->
                 fixture.project(1); fixture.project(2, owner)
                 val core = Core { error("Inventory must settle before open") }
-                refused { findRetainedMcpCaptureProject(fixture.root, expected, core) }
+                refused { findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()) }
                 assertTrue(core.opened.isEmpty())
             }
         }
@@ -148,7 +148,7 @@ class McpCaptureSourceRecoveryTest {
             fixture.project(1)
             Files.write(fixture.root.resolve("foreign.txt"), byteArrayOf(1))
             val core = Core { error("Foreign entry must refuse") }
-            refused { findRetainedMcpCaptureProject(fixture.root, expected, core) }
+            refused { findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()) }
             assertTrue(core.opened.isEmpty())
         }
         Fixture().use { fixture ->
@@ -156,7 +156,7 @@ class McpCaptureSourceRecoveryTest {
             val invalid = fixture.project(2, complete = false)
             Files.write(invalid, byteArrayOf(1))
             val core = Core { error("Project must be a directory") }
-            refused { findRetainedMcpCaptureProject(fixture.root, expected, core) }
+            refused { findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()) }
             assertTrue(core.opened.isEmpty())
         }
     }
@@ -166,7 +166,7 @@ class McpCaptureSourceRecoveryTest {
             val core = Core { error("Alternate root must refuse") }
             for (root in listOf(Path.of("mcp-captures-v1"), fixture.parent,
                 fixture.root.resolve("..").resolve("mcp-captures-v1"))) {
-                refused { findRetainedMcpCaptureProject(root, expected, core) }
+                refused { findRetainedMcpCaptureProject(root, expected, core, McpCaptureProjectRetirement()) }
             }
             assertTrue(core.opened.isEmpty())
         }
@@ -178,7 +178,7 @@ class McpCaptureSourceRecoveryTest {
             val alias = fixture.parent.resolve("alias")
             symlink(alias, fixture.parent)
             val core = Core { error("Linked root ancestor must refuse") }
-            refused { findRetainedMcpCaptureProject(alias.resolve("mcp-captures-v1"), expected, core) }
+            refused { findRetainedMcpCaptureProject(alias.resolve("mcp-captures-v1"), expected, core, McpCaptureProjectRetirement()) }
             assertTrue(core.opened.isEmpty())
         }
         for (kind in listOf("workdir", "owner", "project")) {
@@ -197,7 +197,7 @@ class McpCaptureSourceRecoveryTest {
                     else -> { Files.delete(candidate); symlink(candidate, outside) }
                 }
                 val core = Core { error("Linked entry must refuse") }
-                refused { findRetainedMcpCaptureProject(fixture.root, expected, core) }
+                refused { findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()) }
                 assertTrue(core.opened.isEmpty())
             }
         }
@@ -212,14 +212,14 @@ class McpCaptureSourceRecoveryTest {
                 if (index > 0) assertTrue(projects[index - 1].closeFinished)
                 projects[index]
             }
-            assertEquals(candidates.last(), findRetainedMcpCaptureProject(fixture.root, expected, core))
+            assertEquals(candidates.last(), findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()))
             assertEquals(32, core.opened.size)
             assertTrue(projects.all { it.closes == 1 && it.closeFinished })
         }
         Fixture().use { fixture ->
             repeat(33) { fixture.project(it + 1) }
             val core = Core { error("Over-limit inventory must refuse before open") }
-            refused { findRetainedMcpCaptureProject(fixture.root, expected, core) }
+            refused { findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()) }
             assertTrue(core.opened.isEmpty())
         }
     }
@@ -234,7 +234,7 @@ class McpCaptureSourceRecoveryTest {
                 if (index < kinds.size) throw CoreFailure(kinds[index])
                 project
             }
-            assertEquals(candidates.last(), findRetainedMcpCaptureProject(fixture.root, expected, core))
+            assertEquals(candidates.last(), findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()))
             assertEquals(candidates, core.opened)
             assertEquals(1, project.closes)
         }
@@ -247,7 +247,7 @@ class McpCaptureSourceRecoveryTest {
         for (error in errors) Fixture().use { fixture ->
             val first = fixture.project(1); fixture.project(2)
             val core = Core { throw error }
-            failed(error) { findRetainedMcpCaptureProject(fixture.root, expected, core) }
+            failed(error) { findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()) }
             assertEquals(listOf(first), core.opened)
         }
     }
@@ -258,7 +258,7 @@ class McpCaptureSourceRecoveryTest {
             val error = IllegalStateException("Fixture info failure")
             val project = Project({ throw error })
             val core = Core { project }
-            failed(error) { findRetainedMcpCaptureProject(fixture.root, expected, core) }
+            failed(error) { findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()) }
             assertEquals(listOf(first), core.opened)
             assertEquals(1, project.closes); assertTrue(project.closeFinished)
         }
@@ -271,7 +271,7 @@ class McpCaptureSourceRecoveryTest {
             val before = Project({ info().copy(hostSeq = 999uL) }, { entered.complete(Unit); finish.await() })
             val after = Project({ info() })
             val core = Core { path -> if (path == first) before else { assertTrue(before.closeFinished); after } }
-            val finding = async { findRetainedMcpCaptureProject(fixture.root, expected, core) }
+            val finding = async { findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()) }
             try {
                 withTimeout(5000) { entered.await() }
                 assertFalse(finding.isCompleted); assertEquals(listOf(first), core.opened)
@@ -290,7 +290,7 @@ class McpCaptureSourceRecoveryTest {
                 assertTrue(currentCoroutineContext().isActive); closing.complete(Unit); finish.await()
             })
             val core = Core { project }
-            val finding = async { findRetainedMcpCaptureProject(fixture.root, expected, core) }
+            val finding = async { findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()) }
             try {
                 withTimeout(5000) { reading.await() }; finding.cancel()
                 withTimeout(5000) { closing.await() }
@@ -307,9 +307,74 @@ class McpCaptureSourceRecoveryTest {
             val error = IllegalStateException("Fixture uncertain close")
             val project = Project({ if (matches) info() else info().copy(hostSeq = 999uL) }, { throw error })
             val core = Core { project }
-            failed(error) { findRetainedMcpCaptureProject(fixture.root, expected, core) }
+            failed(error) { findRetainedMcpCaptureProject(fixture.root, expected, core, McpCaptureProjectRetirement()) }
             assertEquals(listOf(first), core.opened)
             assertEquals(1, project.closes); assertFalse(project.closeFinished)
+        }
+    }
+
+    @Test fun failedRecoveryCloseKeepsExactOwnerAndFencesEveryLaterOpenUntilRetired() = runBlocking {
+        Fixture().use { fixture ->
+            val first = fixture.project(1); val second = fixture.project(2)
+            val failure = IllegalStateException("First native close failed before destroy")
+            var mayClose = false
+            val uncertain = Project({ info().copy(hostSeq = 999uL) }, { if (!mayClose) throw failure })
+            val matched = Project({ info() })
+            val core = Core { path -> if (path == first) uncertain else matched }
+            val retirement = McpCaptureProjectRetirement()
+            failed(failure) { findRetainedMcpCaptureProject(fixture.root, expected, core, retirement) }
+            assertEquals(listOf(first), core.opened)
+            failed(failure) { findRetainedMcpCaptureProject(fixture.root, expected, core, retirement) }
+            assertEquals(listOf(first), core.opened)
+            // The same owner is retried before scanning or opening a second
+            // candidate. A shutdown can settle it even after recovery failed.
+            mayClose = true
+            retirement.settle()
+            assertEquals(3, uncertain.closes); assertTrue(uncertain.closeFinished)
+            assertEquals(second, findRetainedMcpCaptureProject(fixture.root, expected, core, retirement))
+            assertEquals(listOf(first, first, second), core.opened)
+            assertTrue(matched.closeFinished)
+        }
+    }
+
+    @Test fun actualSourceBorrowCallerRetainsFailedCloseBeforeASecondProjectOpen() = runBlocking {
+        Fixture().use { fixture ->
+            val first = fixture.project(1); val second = fixture.project(2)
+            val failure = IllegalStateException("Uncertain source close")
+            var mayClose = false
+            val uncertain = Project({ info() }, { if (!mayClose) throw failure })
+            val matched = Project({ info() })
+            val core = Core { path -> if (path == first) uncertain else matched }
+            val retirement = McpCaptureProjectRetirement()
+            failed(failure) { retirement.borrow(core, listOf(first to expected)) { assertSame(uncertain, it.single()) } }
+            assertEquals(listOf(first), core.opened)
+            failed(failure) { retirement.borrow(core, listOf(second to expected)) { fail("Second borrow escaped failed close") } }
+            assertEquals(listOf(first), core.opened)
+            mayClose = true
+            retirement.borrow(core, listOf(second to expected)) { assertSame(matched, it.single()) }
+            assertEquals(listOf(first, second), core.opened)
+            assertEquals(3, uncertain.closes); assertTrue(uncertain.closeFinished && matched.closeFinished)
+        }
+    }
+
+    @Test fun twoSourceBorrowSettlesBothAndRetainsOnlyTheUncertainOwner() = runBlocking {
+        Fixture().use { fixture ->
+            val first = fixture.project(1); val second = fixture.project(2)
+            val failure = IllegalStateException("After source close failed")
+            var mayClose = false
+            val before = Project({ info() }); val after = Project({ info() }, { if (!mayClose) throw failure })
+            val core = Core { path -> if (path == first) before else after }
+            val retirement = McpCaptureProjectRetirement()
+            failed(failure) { retirement.borrow(core, listOf(first to expected, second to expected)) {
+                assertEquals(listOf(before, after), it)
+            } }
+            assertEquals(listOf(first, second), core.opened)
+            assertEquals(1, before.closes); assertTrue(before.closeFinished)
+            failed(failure) { retirement.settle() }
+            assertEquals(1, before.closes)
+            mayClose = true
+            retirement.settle()
+            assertEquals(3, after.closes); assertTrue(after.closeFinished)
         }
     }
 }

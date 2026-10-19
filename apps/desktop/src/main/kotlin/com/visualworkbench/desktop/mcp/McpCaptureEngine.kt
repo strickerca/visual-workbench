@@ -24,7 +24,9 @@ internal class NativeMcpCaptureEngine private constructor(
     private data class Source(val project:String,val document:String,val asset:String)
     private val sources=LinkedHashMap<Source,Path>()
     private fun source(info:PackageInfo)=Source(info.binding.projectId,info.binding.documentId,info.sourceAssetId)
+    private val projectRetirement=McpCaptureProjectRetirement()
     private var closed=false
+    private var released=false
     private val producers=CoroutineScope(SupervisorJob()+Dispatchers.Default)
     private suspend fun retainEditorTarget(target:CaptureTarget,receipt:CaptureFrameInfo):McpSelectedTarget=gate.withLock {
         check(!closed)
@@ -50,10 +52,11 @@ internal class NativeMcpCaptureEngine private constructor(
     override suspend fun compile(selector:String,checkGrant:suspend()->Unit):WorkbenchCompiledPackage =
         compileVerification(selector,McpCaptureProfile(PackageTarget.Generic(),false),checkGrant)
     override suspend fun compileVerification(selector:String,profile:McpCaptureProfile,checkGrant:suspend()->Unit):WorkbenchCompiledPackage=gate.withLock {
-        check(!closed);val selected=targets[selector]?:throw McpRefused();checkGrant()
+        check(!closed);projectRetirement.settle();currentCoroutineContext().ensureActive()
+        val selected=targets[selector]?:throw McpRefused();checkGrant()
         val fresh=hostCall{service.refreshTarget(selected)};checkGrant()
         val work=withContext(Dispatchers.IO){McpCaptureWork.create(root)}
-        var frame:CapturedFrame?=null;var project:WorkbenchProject?=null;var compiled:WorkbenchCompiledPackage?=null
+        var frame:CapturedFrame?=null;var compiled:WorkbenchCompiledPackage?=null
         try {
             fun id()=core.newId(System.currentTimeMillis().toULong())
             val captured=hostCall(release={it:CapturedFrame->it.destroy()}){operation->service.capture(fresh,id(),work.path.toString(),operation)};frame=captured
@@ -62,8 +65,8 @@ internal class NativeMcpCaptureEngine private constructor(
             withContext(Dispatchers.IO){work.record(receipt)}
             val projectId=id();val document=id();val destination=work.path.resolve("project.vwb")
             val opened=createCaptureProject(CreateFileProject(destination.toString(),projectId,document,id(),deviceId,"MCP window capture",work.path.resolve("capture.png").toString(),work.path.toString(),System.currentTimeMillis()),
-                CaptureImportDescriptor(true,receipt.captureSessionId,receipt.frameId,receipt.geometryRevision,"windows","window",receipt.physicalX,receipt.physicalY,receipt.width,receipt.height,receipt.dpiScale,receipt.timestampNs,receipt.capturedAtMs,receipt.windowHandle,"",receipt.sourceAssetId))
-            project=opened;checkGrant()
+                CaptureImportDescriptor(true,receipt.captureSessionId,receipt.frameId,receipt.geometryRevision,"windows","window",receipt.physicalX,receipt.physicalY,receipt.width,receipt.height,receipt.dpiScale,receipt.timestampNs,receipt.capturedAtMs,receipt.windowHandle,"",receipt.sourceAssetId)).also(projectRetirement::retain)
+            checkGrant()
             val original=opened.info()
             val ticket=semanticWorkflows(opened).beginCapture(WorkflowBinding(original.projectId,document,original.hostSeq,original.stateHash))
             var snapshot:String?=null
@@ -86,43 +89,22 @@ internal class NativeMcpCaptureEngine private constructor(
             sources[source(result.info)]=destination
             // Keep the immutable original and canonical project for recovery,
             // including after revocation or a lost publication receipt.
-            withContext(NonCancellable){opened.close()};project=null
+            projectRetirement.settle()
             captured.destroy();frame=null
             currentCoroutineContext().ensureActive();compiled=null;result
         } finally {
-            withContext(NonCancellable){try{compiled?.close()}finally{try{project?.close()}finally{frame?.destroy()}}}
+            withContext(NonCancellable){try{compiled?.close()}finally{try{projectRetirement.settle()}finally{frame?.destroy()}}}
         }
     }
     override suspend fun <T> withVerificationSources(original:PackageInfo,after:PackageInfo,body:suspend(WorkbenchProject,WorkbenchProject)->T):T = gate.withLock {
-        check(!closed)
+        check(!closed);projectRetirement.settle();currentCoroutineContext().ensureActive()
         val beforePath=sourcePath(original)
         val afterPath=sourcePath(after)
-        require(beforePath!=afterPath)
-        // Paths are minted captures or matched retained private capture projects.
-        // Reopening leases uses the canonical project API; the operation joins
-        // before either owner closes or another capture/engine shutdown proceeds.
-        var before:WorkbenchProject?=null;var next:WorkbenchProject?=null
-        try {
-            before=core.open(beforePath.toString());next=core.open(afterPath.toString())
-            suspend fun check(project:WorkbenchProject,expected:PackageInfo){
-                val info=project.info()
-                require(info.projectId==expected.binding.projectId && expected.binding.documentId in info.documentIds &&
-                    info.hostSeq==expected.binding.hostSeq && info.stateHash==expected.binding.stateHash)
-            }
-            check(before,original);check(next,after)
-            body(before,next)
-        } finally {withContext(NonCancellable){try{next?.close()}finally{before?.close()}}}
+        projectRetirement.borrow(core,listOf(beforePath to original,afterPath to after)){body(it[0],it[1])}
     }
     override suspend fun <T> withVerificationSource(after:PackageInfo,body:suspend(WorkbenchProject)->T):T = gate.withLock {
-        check(!closed)
-        val path=sourcePath(after)
-        val project=core.open(path.toString())
-        try {
-            val info=project.info()
-            require(info.projectId==after.binding.projectId&&after.binding.documentId in info.documentIds&&
-                info.hostSeq==after.binding.hostSeq&&info.stateHash==after.binding.stateHash)
-            body(project)
-        } finally {withContext(NonCancellable){project.close()}}
+        check(!closed);projectRetirement.settle();currentCoroutineContext().ensureActive()
+        projectRetirement.borrow(core,listOf(sourcePath(after) to after)){body(it.single())}
     }
     /** Private source recovery only. This never reconstructs an OS selector or
      * grant. Existing native methods still verify source/capture/blob identity. */
@@ -130,7 +112,7 @@ internal class NativeMcpCaptureEngine private constructor(
         sources[source(expected)]?.let{return it}
         require(sources.size<32)
         val excluded=sources.filterKeys{it!=source(expected)}.values.toSet()
-        val found=findRetainedMcpCaptureProject(root,expected,core,excluded)?:throw McpRefused()
+        val found=findRetainedMcpCaptureProject(root,expected,core,projectRetirement,excluded)?:throw McpRefused()
         sources[source(expected)]=found
         return found
     }
@@ -141,7 +123,13 @@ internal class NativeMcpCaptureEngine private constructor(
         catch(error:CancellationException){operation.cancel();withContext(NonCancellable){try{producer.await()}catch(_:Exception){};owned.getAndSet(null)?.let(release)};throw error}
         finally{operation.destroy()}
     }
-    override suspend fun close(){withContext(NonCancellable){gate.withLock{if(!closed){closed=true;targets.clear();sources.clear();service.destroy();producers.cancel()}}}}
+    override suspend fun close(){withContext(NonCancellable){gate.withLock{
+        closed=true
+        // A failed project close stays reachable and retryable here. Do not
+        // release the capture/runtime owner before exact retirement succeeds.
+        projectRetirement.settle()
+        if(!released){targets.clear();sources.clear();service.destroy();producers.cancel();released=true}
+    }}}
     companion object {
         /** The capture owner calls this with the same target, native receipt
          * and newly opened project it is delivering to the editor. Never create

@@ -4,6 +4,7 @@ import com.visualworkbench.shared.CoreFailure
 import com.visualworkbench.shared.CoreFailureKind
 import com.visualworkbench.shared.PackageInfo
 import com.visualworkbench.shared.WorkbenchCore
+import com.visualworkbench.shared.WorkbenchProject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -23,6 +24,52 @@ private const val RECOVERED_ROOT_COMPONENT_LIMIT = 64
 private val recoveredCaptureName = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 private val recoveredCaptureOwner = "Visual Workbench private MCP capture v1\n".toByteArray(Charsets.UTF_8)
 
+/** The capture engine retains these exact existing owners under its gate until
+ * close succeeds. No new coroutine/native lifetime is created. Cleanup that
+ * fails before native closeSession/destroy is retryable before another
+ * acquisition and during engine shutdown. */
+internal class McpCaptureProjectRetirement {
+    private val projects = ArrayList<WorkbenchProject>(2)
+    fun retain(project: WorkbenchProject) {
+        check(projects.size < 2 && projects.none { it === project })
+        projects.add(project)
+    }
+    /** The engine's one/two-source verification callers share this exact path.
+     * Retain immediately after delivery, before info/body can cancel or throw. */
+    suspend fun <T> borrow(core: WorkbenchCore, sources: List<Pair<Path, PackageInfo>>,
+        body: suspend (List<WorkbenchProject>) -> T): T {
+        require(sources.size in 1..2 && sources.map { it.first }.distinct().size == sources.size)
+        settle()
+        currentCoroutineContext().ensureActive()
+        try {
+            val borrowed = ArrayList<WorkbenchProject>(sources.size)
+            for ((path, expected) in sources) {
+                currentCoroutineContext().ensureActive()
+                val project = core.open(path.toString()).also(::retain)
+                val info = project.info()
+                require(info.projectId == expected.binding.projectId && expected.binding.documentId in info.documentIds &&
+                    info.hostSeq == expected.binding.hostSeq && info.stateHash == expected.binding.stateHash)
+                borrowed.add(project)
+            }
+            currentCoroutineContext().ensureActive()
+            return body(borrowed)
+        } finally { settle() }
+    }
+    suspend fun settle(): Unit = withContext(NonCancellable) {
+        var failure: Throwable? = null
+        for (project in projects.toList().asReversed()) {
+            try {
+                project.close()
+                projects.removeAll { it === project }
+            } catch (error: Throwable) {
+                val previous = failure
+                if (previous == null) failure = error else if (previous !== error) previous.addSuppressed(error)
+            }
+        }
+        failure?.let { throw it }
+    }
+}
+
 /** Finds an existing canonical capture project, not a new source owner/cache.
  * Only the existing engine supplies its app-private mcp-captures-v1 root while
  * serializing its normal source-map/capture lifecycle. No package directory,
@@ -37,13 +84,17 @@ private val recoveredCaptureOwner = "Visual Workbench private MCP capture v1\n".
  * Open one existing WorkbenchProject at a time and close it NonCancellable
  * before continuing/returning. Only Invalid/Storage/Unsupported failures from
  * an unknown candidate's open are skippable; info/close, lifecycle, capacity and
- * worker failures propagate. A failed close never becomes 'not found'. The
+ * worker failures propagate. A failed close stays in the engine's retirement
+ * owner and must settle before another core.open. It never becomes 'not found'. The
  * returned path is merely a hint for the engine's existing source map: that
  * owner reopens it and native verification checks source asset/capture binding.
  */
 internal suspend fun findRetainedMcpCaptureProject(
-    root: Path, expected: PackageInfo, core: WorkbenchCore, excluded: Set<Path> = emptySet(),
+    root: Path, expected: PackageInfo, core: WorkbenchCore, retirement: McpCaptureProjectRetirement,
+    excluded: Set<Path> = emptySet(),
 ): Path? {
+    currentCoroutineContext().ensureActive()
+    retirement.settle()
     currentCoroutineContext().ensureActive()
     require(root.isAbsolute && root == root.normalize() && root.fileName?.toString() == "mcp-captures-v1") {
         "Invalid retained capture root"
@@ -61,7 +112,7 @@ internal suspend fun findRetainedMcpCaptureProject(
         val stillPresent = withContext(Dispatchers.IO) { checkedRecoveredProject(root, candidate.parent) }
         if (stillPresent == null) continue
         val project = try {
-            core.open(candidate.toString())
+            core.open(candidate.toString()).also(retirement::retain)
         } catch (error: CoreFailure) {
             when (error.kind) {
                 CoreFailureKind.Invalid, CoreFailureKind.Storage, CoreFailureKind.Unsupported -> {
@@ -78,9 +129,8 @@ internal suspend fun findRetainedMcpCaptureProject(
             info.projectId == expected.binding.projectId && expected.binding.documentId in info.documentIds &&
                 info.hostSeq == expected.binding.hostSeq && info.stateHash == expected.binding.stateHash
         } finally {
-            // Preserve the actual close failure even during cancellation. An
-            // uncertain owner must stop the scan rather than open a second one.
-            withContext(NonCancellable) { project.close() }
+            // Do not discard an uncertain project owner when close throws.
+            retirement.settle()
         }
         currentCoroutineContext().ensureActive()
         if (matches) {

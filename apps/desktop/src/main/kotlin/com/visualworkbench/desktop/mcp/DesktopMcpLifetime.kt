@@ -4,6 +4,8 @@ import com.visualworkbench.shared.WorkbenchCore
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
 
@@ -15,9 +17,10 @@ internal class McpStartLifetime<T:McpOwnedService>(private val create:suspend()-
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
     private var starting:Deferred<T>?=null
     private var value:T?=null
+    private var undelivered:T?=null
     private var closed=false
-    private var lateCleanupFailure:Throwable?=null
-    private val stopped=CompletableDeferred<Unit>()
+    private val closeGate=Mutex()
+    private var settled=false
     suspend fun start():T {
         val task=synchronized(lock){
             check(!closed);value?.let{return it}
@@ -27,26 +30,30 @@ internal class McpStartLifetime<T:McpOwnedService>(private val create:suspend()-
                     val result=create();acquired=result
                     synchronized(lock){if(closed)throw CancellationException("MCP owner closed");value=result;acquired=null}
                     result
-                }catch(error:Throwable){synchronized(lock){if(closed&&error !is CancellationException)lateCleanupFailure=error};throw error}
-                finally{withContext(NonCancellable){try{acquired?.close()}catch(error:Throwable){synchronized(lock){lateCleanupFailure=error};throw error}}}
+                }finally{withContext(NonCancellable){acquired?.let{owner->
+                    synchronized(lock){undelivered=owner}
+                    owner.close()
+                    synchronized(lock){if(undelivered===owner)undelivered=null}
+                }}}
             }.also{starting=it;it.start()}
         }
         try{return task.await()}
         finally{if(task.isCompleted)synchronized(lock){if(starting===task)starting=null}}
     }
-    suspend fun close(){withContext(NonCancellable){
-        val first=synchronized(lock){if(closed)false else{closed=true;true}}
-        if(first){
-            var error:Throwable?=null
-            try{
-                val producer=synchronized(lock){starting};producer?.cancel();producer?.join()
-                val owned=synchronized(lock){starting=null;value.also{value=null}}
-                try{owned?.close()}finally{synchronized(lock){lateCleanupFailure}?.let{throw it}}
-            }catch(e:Throwable){error=e}
-            finally{scope.cancel();if(error==null)stopped.complete(Unit)else stopped.completeExceptionally(error)}
-        }
-        stopped.await()
-    }}
+    suspend fun close(){withContext(NonCancellable){closeGate.withLock{
+        if(settled)return@withLock
+        synchronized(lock){closed=true}
+        val producer=synchronized(lock){starting};producer?.cancel();producer?.join()
+        val owners=synchronized(lock){val published=value;listOfNotNull(published,undelivered?.takeUnless{it===published})}
+        var failure:Throwable?=null
+        for(owner in owners)try{
+            owner.close()
+            synchronized(lock){if(value===owner)value=null;if(undelivered===owner)undelivered=null}
+        }catch(error:Throwable){val prior=failure;if(prior==null)failure=error else if(prior!==error)prior.addSuppressed(error)}
+        failure?.let{throw it}
+        synchronized(lock){starting=null}
+        scope.cancel();settled=true
+    }}}
 }
 /** A stopped cycle is replaced only after its actual workers/resources settle.
  * Shutdown callers join the same completion; uncertain cleanup seals restarts. */
@@ -55,7 +62,6 @@ internal class McpServiceCycles<T:McpOwnedService>(private val create:suspend()-
     private var lifetime:McpStartLifetime<T>?=null
     private var stopping:CompletableDeferred<Unit>?=null
     private var closed=false
-    private var failure:Throwable?=null
     suspend fun start():T {
         val selected=synchronized(lock){check(!closed&&stopping==null);lifetime?:McpStartLifetime(create).also{lifetime=it}}
         val result=selected.start()
@@ -66,13 +72,12 @@ internal class McpServiceCycles<T:McpOwnedService>(private val create:suspend()-
         var selected:McpStartLifetime<T>?=null
         var first=false
         val completion=synchronized(lock){
-            failure?.let{throw it}
-            stopping?:CompletableDeferred<Unit>().also{stopping=it;selected=lifetime;lifetime=null;first=true}
+            stopping?:CompletableDeferred<Unit>().also{stopping=it;selected=lifetime;first=true}
         }
         if(first){
             var error:Throwable?=null
             try{selected?.close()}catch(value:Throwable){error=value}
-            synchronized(lock){if(error!=null){failure=error;closed=true};stopping=null}
+            synchronized(lock){if(error!=null)closed=true else lifetime=null;stopping=null}
             if(error==null)completion.complete(Unit)else completion.completeExceptionally(error)
         }
         completion.await()
@@ -81,7 +86,7 @@ internal class McpServiceCycles<T:McpOwnedService>(private val create:suspend()-
 }
 internal interface McpDesktopServiceOwner:McpOwnedService { val coordinator:DesktopMcpCoordinator }
 internal class McpDesktopOwned(override val coordinator:DesktopMcpCoordinator,private val bundle:DesktopMcpBundle):McpDesktopServiceOwner {
-    override suspend fun close(){withContext(NonCancellable){try{coordinator.close()}finally{bundle.close()}}}
+    override suspend fun close(){withContext(NonCancellable){coordinator.close();bundle.close()}}
 }
 internal data class McpLifetimeState(val starting:Boolean=false,val owner:DesktopMcpCoordinator?=null,val issue:String?=null,val closed:Boolean=false,
     val failureStage:McpFailureStage?=null)
