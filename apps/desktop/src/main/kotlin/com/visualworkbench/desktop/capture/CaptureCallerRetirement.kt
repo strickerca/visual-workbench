@@ -16,3 +16,17 @@ internal suspend fun withRetiredCaptureCallers(
         closeParents()
     }
 }
+
+/** Agent requests may hold the editor's existing verification borrow. A failed
+ * service retirement must keep that editor and every native parent alive. */
+internal suspend fun withRetiredVerificationAccess(
+    requests: suspend () -> Unit,
+    service: suspend () -> Unit,
+    closeEditorAndParents: suspend () -> Unit,
+) {
+    withContext(NonCancellable) {
+        requests()
+        service()
+        closeEditorAndParents()
+    }
+}

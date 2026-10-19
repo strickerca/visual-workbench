@@ -10,6 +10,7 @@ import com.visualworkbench.desktop.capture.CapturePickerWindow
 import com.visualworkbench.desktop.capture.PickerModal
 import com.visualworkbench.desktop.capture.initializePickerProtection
 import com.visualworkbench.desktop.capture.withRetiredCaptureCallers
+import com.visualworkbench.desktop.capture.withRetiredVerificationAccess
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -30,6 +31,9 @@ import com.visualworkbench.shared.*
 import com.visualworkbench.desktop.mcp.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import java.awt.EventQueue
 import java.awt.FileDialog
 import java.awt.GraphicsEnvironment
@@ -118,6 +122,20 @@ fun main(args: Array<String>) {
         val codexPanels by codexModal.state.collectAsState()
         DisposableEffect(codexModal){onDispose{codexModal.close()}}
         val mcpTasks=remember{McpUiTasks()};val mcpState by mcp.state.collectAsState()
+        val verificationAccess=remember(controller){object:McpVerificationOriginalAccess {
+            override fun owns(expected:PackageInfo):Boolean=controller.ownsVerificationOriginal(expected)
+            override suspend fun <T> withOriginal(expected:PackageInfo,body:suspend(WorkbenchProject)->T):T=
+                controller.withVerificationOriginal(expected,body)
+            override suspend fun <T> withCurrentVerificationOriginal(body:suspend(WorkbenchProject)->T):T=
+                controller.withCurrentVerificationOriginal(body)
+        }}
+        LaunchedEffect(mcp,verificationAccess) {
+            mcp.state.map{it.owner}.distinctUntilChanged().collect{owner->
+                if(owner!=null)try{owner.attachVerificationOriginal(verificationAccess)}
+                catch(error:CancellationException){throw error}
+                catch(_:Exception){controller.report("Verification access could not attach to the current local service. Restart local agent access before retrying.")}
+            }
+        }
         LaunchedEffect(mcp,controller) {
             // Read the current lifetime every iteration, including replacement,
             // reconnect and shutdown. Never retain a prior agent's grant list.
@@ -156,8 +174,15 @@ fun main(args: Array<String>) {
                 lifetime.failureStage == null && agent?.closed != true && agent?.activeCapture == null
         }
         val currentCaptureAdmission by rememberUpdatedState(::localCaptureAdmission)
+        val rememberCapture:suspend(CaptureTarget,CaptureFrameInfo,ProjectInfo,String)->Unit={target,receipt,info,document->
+            // Read one current owner, without starting a service or creating a
+            // grant. Native retention rechecks the exact HWND/process identity.
+            val lifetime=mcp.state.value
+            val owner=lifetime.owner?.takeIf{!lifetime.starting&&!lifetime.closed&&lifetime.failureStage==null}
+            if(owner!=null)owner.rememberEditorCapture(NativeMcpCaptureEngine.editorOrigin(target,receipt,info,document))
+        }
         val capture=remember(scope,controller){com.visualworkbench.desktop.capture.DesktopCaptureController(scope,core,captureService,location.path,device,
-            controller::captureDestination,controller::report,mayCapture={currentCaptureAdmission()})}
+            controller::captureDestination,controller::report,mayCapture={currentCaptureAdmission()},delivered=rememberCapture)}
         val foregroundCaptureState by capture.state.collectAsState()
         fun pickerAdmission(): Boolean = currentCaptureAdmission() && capture.state.value.let {
             !it.busy && !it.cleanupPending && !it.stopping
@@ -170,7 +195,7 @@ fun main(args: Array<String>) {
             saved=controller::captureDestination,modal={open ->
                 if(open)controller.cancelInput()
                 pickerModal.set(open)
-            },mayOpen={currentPickerAdmission()})}
+            },mayOpen={currentPickerAdmission()},delivered=rememberCapture)}
         pickerOwner.set(capturePicker)
         val capturePickerState by capturePicker.state.collectAsState()
         fun retryPickerCleanup(){scope.launch{try{capturePicker.dismiss()}catch(error:CancellationException){throw error}
@@ -243,21 +268,15 @@ fun main(args: Array<String>) {
                             admit = { controller.mayCloseAi() && controller.sealInstructionsForClose() },
                             closeParents = { withRetiredCaptureCallers(capturePicker::shutdown,capture::shutdown) {
                                 remoteView?.let{it.seal("owner_pause");it.close()}
-                                // Retire link-owned helpers before foreign parent teardown.
-                                controller.close();assertRemoteEditRetired()
-                                try { codex.close() } finally { codexModal.close()
-                                try { mcpTasks.close() } finally { try { mcp.close() } finally {
-                                mcpModal.close()
-                                try { assistance.close() } finally {
-                                    try { controller.close() } finally {
-                                        try { sessions.close() } finally {
-                                            try { host.shutdown() } finally { host.destroy() }
-                                        }
-                                    }
+                                try { codex.close() } finally { codexModal.close() }
+                                withRetiredVerificationAccess(mcpTasks::close,{mcp.close();mcpModal.close()}) {
+                                    // Every verification borrow has joined before the
+                                    // editor, links and native parents can retire.
+                                    controller.close();assertRemoteEditRetired()
+                                    assistance.close();sessions.close()
+                                    host.shutdown();host.destroy()
+                                    appOwner.close();appAnchor.close()
                                 }
-                                } }
-                                }
-                                appOwner.close();appAnchor.close()
                             } },
                         )
                     } catch (_: Exception) {

@@ -81,3 +81,44 @@ region owner. Converted model artifacts/catalog admission and genuine Paint
 observations remain implementation/delivery gaps. Existing failed receipts,
 owners and old worktrees are preserved; Krita and expensive aggregate checks
 remain deferred.
+
+## 2026-10-19 capture/Main and remaining interface batch
+
+Parent confirms narrow Astra source acceptance through524e647, including three
+committed geometry tests and40,000 independent extracted-method oracle checks.
+No prior app/new-ABI/runtime limit is closed by that acceptance.
+
+Main now attaches existing exact editor verification access at every current
+MCP owner replacement. Actual foreground/full-window picker capture deliveries
+record native-origin metadata after successful delivery, using final revision
+read before destination close. Optional observation failures do not close/retain
+the successful destination again. Monitor/region origins are not invented.
+Shutdown joins capture/Codex/MCP request/service ownership before editor/native
+parents; the earlier premature/duplicate controller close is removed.49 focused
+capture JUnit methods pass; both current controllers and non-UI caller leaves
+compile with cached unchanged ABI signatures and-Werror. Main/Compose assembly,
+real callback/native capture and whole-app lifecycle remain unrun. See
+CAPTURE_VERIFICATION_CALLERS_20261019.md and its exact text evidence.
+
+PAINT_AND_VERIFICATION_INTERFACE_HANDOFF_20261019.md freezes existing JVM owned
+Paint receipt borrowing and a minimal native source-snapshot/check adapter,
+with a narrow P handback of only that remote_edit block/session registration.
+V receives exact native/shared coordinate-pair DTO/method interfaces inside its
+already-owned modules, plus required actual D/O tile alignment and compiler
+checks. Root does not edit those leaves concurrently. Parent activation remains
+necessary for the existing cloud owners; no new worker was spawned.
+
+E b2c8746's real UniFFI edge-buffer reservation failure is preserved;9511c379
+repairs only delivery.rs and is pending review. G region source2f180f2 and
+portable handoff4821ed18 remain pending review with12 unrun new cases. F helper
+2906b0f6 has returned for review; active R/Android consumers are independent.
+None is overlaid blindly, and all root intake/producer exports must be retained
+when composing older giant_images roots. Model artifact/catalog delivery,
+genuine joined Paint effects and actual D/O verification remain source/artifact
+gaps, distinct from expensive aggregate and hardware validation.
+
+G review subsequently reproduced two P2 source gaps: giant annotations/results
+refuse without an explicit approved untagged-sRGB authority, and the public
+raster region API parses ICC before memory admission. The G owner is repairing
+both and updating the portable patches. Full G acceptance remains held; root
+will preserve actual user color consent when composing the corrected request.

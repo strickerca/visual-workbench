@@ -7,9 +7,10 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CaptureDeliveryTest {
-    private class Project(private val release: suspend () -> Unit) : WorkbenchProject {
+    private class Project(private val describe: suspend () -> ProjectInfo = { error("unused") },
+        private val release: suspend () -> Unit) : WorkbenchProject {
         override val changes: Flow<ProjectChange> get() = error("unused")
-        override suspend fun info(): ProjectInfo = error("unused")
+        override suspend fun info(): ProjectInfo = describe()
         override suspend fun document(documentId: String): DocumentSnapshot = error("unused")
         override suspend fun background(documentId: String, memoryBudgetBytes: ULong, assumeUntaggedSrgb: Boolean): BackgroundImage = error("unused")
         override suspend fun beginStroke(options: StrokeOptions): WorkbenchStroke = error("unused")
@@ -62,5 +63,65 @@ class CaptureDeliveryTest {
             }) { original, error -> assertSame(project, original); pending = error }
         }
         assertSame(failure, pending); assertSame(failure, result.exceptionOrNull())
+    }
+
+    private fun revision(): ProjectInfo = ProjectInfo("project", "Synthetic capture", "device", 3uL,
+        true, false, 2uL, "a".repeat(64), listOf("document"))
+
+    @Test fun observerUsesFinalMetadataReadBeforeDestinationCloseAndRunsAfterDelivery() = runBlocking {
+        val expected = revision(); val order = mutableListOf<String>(); var closes = 0
+        val project = Project(describe = { order += "info"; expected }) { order += "close"; closes++ }
+        deliverCaptureProject(project, { it.close(); order += "delivered" }, observation = { actual ->
+            assertSame(expected, actual); assertEquals(1, closes); order += "observed"
+        }) { _, _ -> fail("Successful delivery must not retain a closed project") }
+        assertEquals(listOf("info", "close", "delivered", "observed"), order)
+    }
+
+    @Test fun observerFailureReportsUnavailableWithoutRetainingOrClosingDeliveredProjectAgain() = runBlocking {
+        for (failure in listOf(IllegalStateException("synthetic origin refusal"), CancellationException("service retired"))) {
+            var closes = 0; var unavailable = 0
+            val project = Project(describe = { revision() }) { closes++ }
+            deliverCaptureProject(project, { it.close() }, observation = { throw failure },
+                observationUnavailable = { unavailable++ }) { _, _ -> fail("Observer cannot retain successful destination ownership") }
+            assertEquals(1, closes); assertEquals(1, unavailable)
+        }
+    }
+
+    @Test fun optionalMetadataFailureStillDeliversAndClosesTheOriginalExactlyOnce() = runBlocking {
+        var closes = 0; var unavailable = 0; var deliveries = 0
+        val project = Project(describe = { throw CoreFailure(CoreFailureKind.Worker) }) { closes++ }
+        deliverCaptureProject(project, { deliveries++; it.close() }, observation = { fail("No metadata was obtained") },
+            observationUnavailable = { unavailable++ }) { _, _ -> fail("Optional metadata cannot fail destination delivery") }
+        assertEquals(1, deliveries); assertEquals(1, closes); assertEquals(1, unavailable)
+    }
+
+    @Test fun destinationFailureRetainsItsExactOwnerAndNeverRecordsAnOrigin() = runBlocking {
+        val error = CoreFailure(CoreFailureKind.Worker); var closes = 0; var observed = false
+        val project = Project(describe = { revision() }) { closes++; throw error }
+        var held: WorkbenchProject? = null
+        val result = runCatching {
+            deliverCaptureProject(project, { it.close() }, observation = { observed = true }) { original, failure ->
+                held = original; assertSame(error, failure)
+            }
+        }
+        assertSame(error, result.exceptionOrNull()); assertSame(project, held)
+        assertFalse(observed); assertEquals(1, closes)
+    }
+
+    @Test fun cancellationAfterDeliveryJoinsOriginObservationWithoutAnotherProjectClose() = runBlocking {
+        val entered = CompletableDeferred<Unit>(); val settle = CompletableDeferred<Unit>()
+        var closes = 0; var observed = false
+        val project = Project(describe = { revision() }) { closes++ }
+        val task = launch(start = CoroutineStart.UNDISPATCHED) {
+            deliverCaptureProject(project, { it.close() }, observation = {
+                entered.complete(Unit); settle.await(); observed = true
+            }) { _, _ -> fail("Joined observation cannot acquire destination ownership") }
+        }
+        try {
+            entered.await(); task.cancel()
+            assertFalse(task.isCompleted); assertEquals(1, closes); assertFalse(observed)
+            settle.complete(Unit); withTimeout(2000) { task.join() }
+            assertTrue(observed); assertEquals(1, closes)
+        } finally { settle.complete(Unit); withContext(NonCancellable) { task.cancelAndJoin() } }
     }
 }

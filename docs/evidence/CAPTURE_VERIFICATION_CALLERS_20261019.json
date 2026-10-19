@@ -1,0 +1,44 @@
+{
+  "status": "focused current capture caller compile and regressions passed",
+  "junit_cases": 49,
+  "commands": [
+    {
+      "name": "callers-compile",
+      "exit_code": 0
+    },
+    {
+      "name": "capture-junit",
+      "exit_code": 0
+    }
+  ],
+  "source_sha256": {
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureDelivery.kt": "c3a95d8dd27b51cecff1d8f2dbca414bc32e34b4556326ad004512988f1dc644",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirement.kt": "7197a6d812241eba36c153d710fd5b330db4609d56b0724314e2cdb8055a6e3e",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CaptureAdmission.kt": "8938d51888c82b74629cd2c0b85241335fa53e4047c4fd87a6669a8f3f1f5f79",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/PickerWorkspace.kt": "1d834052466625f92f0812d52d05a6f85affec6a8c95bb9577ccc9fd994e1a82",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/PickerOwnership.kt": "73536e02591520e9f7d425b549b9fbfa108a8af0874b4f33d4b491c252f983f8",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/PickerDisplay.kt": "f08a1a5d6b5eef1e8a38a4c43081fef65f4a336667c4799d1f124f26130b446b",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CapturePickerController.kt": "834162f53520f07f1adc27ffffc3d5332bc710a3700cdb9af4db64ebf40f9b09",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/DesktopCaptureController.kt": "eca738c976961d07cdda95870c80d911b78b7732d8b928e6272c012310cd7066",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopDiagnosticsLifecycle.kt": "50c6906e678fa13745c6424f5f9e1dc4548a6b141558b0282c4a81b16cbeea9c",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureAdmissionTest.kt": "96488b08a59dd30ea9ff57531161c9abd16422d29d3323e1a61eae3dbd059e1d",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureCallerRetirementTest.kt": "0e2008f4678a2e3cf4112f6b619d86d4efd650de6911d451ac4b89b873fe7a22",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CaptureDeliveryTest.kt": "d52a73c1cab6b5a5538c927813e9bd694ad15d304118bd1fdc2209b83e7bbaff",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt": "d1896ad1b70b3c9d1c97544a29c62fbcbfa622c28129c785e3c0fc24007ea3e3",
+    "tools/tests/check_capture_verification.py": "8f8d24ee8810df4ffc0d02fba6eebf08e38f0ca62078661dd017963b57d19ef0"
+  },
+  "predecessor_abi_sha256": {
+    "apps/shared/build/libs/shared-desktop.jar": "05586d5634b4cbe15b97849b03e0f9bfbf528a400b7351f88a9e15a75d5c6ced",
+    "apps/bindings-core/build/libs/bindings-core.jar": "9a6908d6cfc85324e88420b5f7bae227f8d8b3c0b478e964867d059e5e651ea3",
+    "apps/bindings-host/build/libs/bindings-host.jar": "a7626b9e7f4c40f69af5ccfda299cfd0e5f4a08cc9fb033f125cbe2649a79f54"
+  },
+  "limits": [
+    "Both actual current capture controller sources compiled without substituted factories",
+    "Main/Compose and real controller/MCP wiring not assembled or executed",
+    "Cached predecessor jars supply unchanged core/shared/host signatures",
+    "No actual WGC/UIA/native callback, whole-app shutdown, device or hardware approval"
+  ],
+  "temporary_compiler_outputs_disposed": true,
+  "uncompiled_main_sha256": "01b862bd98ed95930eb8c47aae7c587e0451be17de1882adf8991471e4b9ed68",
+  "main_limit": "Main is source-reviewed only; Compose/module assembly and real MCP callbacks are deferred"
+}

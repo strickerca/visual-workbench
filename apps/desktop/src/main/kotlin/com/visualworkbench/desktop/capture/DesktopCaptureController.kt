@@ -28,6 +28,7 @@ internal class DesktopCaptureController(
     private val projects:Path,private val deviceId:String,
     private val route:()->(suspend(WorkbenchProject,Path,String?)->Unit),private val report:(String)->Unit,
     private val mayCapture: () -> Boolean = { true },
+    private val delivered: (suspend (CaptureTarget, CaptureFrameInfo, ProjectInfo, String) -> Unit)? = null,
 ) {
     private val mutable = MutableStateFlow(ForegroundCaptureState())
     val state = mutable.asStateFlow()
@@ -91,7 +92,10 @@ internal class DesktopCaptureController(
                 // The existing destination owns close at invocation, including
                 // route refusal/cancellation. Do not attempt a second close.
                 project=null
-                deliverCaptureProject(opened,{deliver(it,destination,warning)}){held,error->
+                deliverCaptureProject(opened,{deliver(it,destination,warning)},
+                    observation = if (delivered == null) null else { current -> delivered.invoke(target, receipt, current, document) },
+                    observationUnavailable = { report("Screenshot saved; verification capture identity was unavailable. Choose a fresh capture target before verification.") },
+                ){held,error->
                     retainCleanupFailure(error,listOf(held))
                 }
             }catch(_:CancellationException){report("Capture cancelled. Any published project or completed original remains saved.")}

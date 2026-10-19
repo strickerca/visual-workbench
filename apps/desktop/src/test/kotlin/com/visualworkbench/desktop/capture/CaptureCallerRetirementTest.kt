@@ -6,6 +6,40 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CaptureCallerRetirementTest {
+    @Test fun verificationServiceRefusalKeepsEditorAndNativeParentsAliveForRetry() = runBlocking {
+        val calls = mutableListOf<String>(); var refuses = true
+        val failure = IllegalStateException("synthetic service retirement refusal")
+        suspend fun close() = withRetiredVerificationAccess({ calls += "requests" }, {
+            calls += "service"; if (refuses) throw failure
+        }) { calls += "editor"; calls += "native parents" }
+        assertSame(failure, runCatching { close() }.exceptionOrNull())
+        assertEquals(listOf("requests", "service"), calls)
+        refuses = false; close()
+        assertEquals(listOf("requests", "service", "requests", "service", "editor", "native parents"), calls)
+    }
+
+    @Test fun failedRequestJoinDoesNotCloseServiceOrEditor() = runBlocking {
+        val calls = mutableListOf<String>(); val failure = IllegalStateException("synthetic request join refusal")
+        val result = runCatching { withRetiredVerificationAccess({ throw failure },
+            { calls += "service" }) { calls += "editor" } }
+        assertSame(failure, result.exceptionOrNull()); assertTrue(calls.isEmpty())
+    }
+
+    @Test fun cancelledShutdownJoinsVerificationServiceBeforeEditorAndNativeParents() = runBlocking {
+        val entered = CompletableDeferred<Unit>(); val settle = CompletableDeferred<Unit>()
+        val calls = mutableListOf<String>()
+        val task = launch(start = CoroutineStart.UNDISPATCHED) {
+            withRetiredVerificationAccess({ calls += "requests" }, {
+                entered.complete(Unit); settle.await(); calls += "service"
+            }) { calls += "editor"; calls += "native parents" }
+        }
+        try {
+            entered.await(); task.cancel(); assertFalse(task.isCompleted)
+            assertEquals(listOf("requests"), calls)
+            settle.complete(Unit); withTimeout(2000) { task.join() }
+            assertEquals(listOf("requests", "service", "editor", "native parents"), calls)
+        } finally { settle.complete(Unit); withContext(NonCancellable) { task.cancelAndJoin() } }
+    }
     @Test fun abortedDepartureDoesNotPermanentlyRetireCapture() = runBlocking {
         for (diagnosticsReady in listOf(false, true)) {
             val calls = mutableListOf<String>()

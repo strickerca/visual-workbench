@@ -31,6 +31,7 @@ internal class CapturePickerController(
     private val saved: () -> (suspend (WorkbenchProject, Path, String?) -> Unit),
     private val modal: (Boolean) -> Unit,
     private val mayOpen: () -> Boolean = { true },
+    private val delivered: (suspend (CaptureTarget, CaptureFrameInfo, ProjectInfo, String) -> Unit)? = null,
 ) {
     private val mutable = MutableStateFlow(CapturePickerState())
     val state = mutable.asStateFlow()
@@ -195,7 +196,16 @@ internal class CapturePickerController(
                 requireCurrent(ticket)
                 // The callback owns close even if route validation or delivery throws.
                 pendingProject = null
-                deliverCaptureProject(project, { current.destination(it, destination, warning) }) { held, error ->
+                // A monitor or cropped region is not a full selected-window
+                // origin. Never invent a window selector for those captures.
+                val window = (chosen.selected as? CaptureSelection.Window)?.target
+                    ?.takeIf { !state.value.region && info.sourceKind == "window" }
+                deliverCaptureProject(project, { current.destination(it, destination, warning) },
+                    observation = if (delivered == null || window == null) null else { revision -> delivered.invoke(window, f, revision, documentId) },
+                    observationUnavailable = {
+                        warning = listOfNotNull(warning, "Capture saved; verification capture identity was unavailable. Choose a fresh capture target before verification.").joinToString(" ")
+                    },
+                ) { held, error ->
                     pendingProject = held
                     pendingProjectFailure = error
                     cleanupRefused()
