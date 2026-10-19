@@ -1,6 +1,45 @@
 use super::*;
 use crate::{McpInboxReceipt, McpInboxSide, WorkflowBinding, project::ProjectState, workflow};
+use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
+
+// Decode only the checked manifest's extension presence. The positive O
+// manifest field is composed by the package owner; this leaf also builds on
+// the preceding package base, where that field is not in the Rust type yet.
+#[derive(Deserialize)]
+struct FrameProbe {
+    extensions: FrameExtensions,
+}
+#[derive(Deserialize)]
+struct FrameExtensions {
+    image_output: Option<serde::de::IgnoredAny>,
+}
+fn manifest_output_frame(manifest: &[u8]) -> PackageResult<bool> {
+    let probe: FrameProbe =
+        serde_json::from_slice(manifest).map_err(|_| PackageError::Integrity)?;
+    Ok(probe.extensions.image_output.is_some())
+}
+fn output_frame(package: &vw_package::Package) -> PackageResult<bool> {
+    manifest_output_frame(
+        package
+            .file("manifest.json")
+            .ok_or(PackageError::Integrity)?,
+    )
+}
+
+#[cfg(test)]
+mod frame_tests {
+    use super::*;
+
+    #[test]
+    fn checked_manifest_frame_presence() {
+        assert!(!manifest_output_frame(br#"{"extensions":{}}"#).unwrap());
+        assert!(!manifest_output_frame(br#"{"extensions":{"image_output":null}}"#).unwrap());
+        assert!(manifest_output_frame(br#"{"extensions":{"image_output":{"clockwise_degrees":90,"output_width":256,"output_height":256}}}"#).unwrap());
+        assert!(manifest_output_frame(br#"{"extensions":{"image_output":false}}"#).unwrap());
+        assert!(manifest_output_frame(br#"{}"#).is_err());
+    }
+}
 
 /// Owned checked catalog bytes. Imported lineage is deliberately never read as
 /// evidence of capture identity, owner permission or alignment.
@@ -160,6 +199,9 @@ pub(super) async fn load(
     {
         return Err(PackageError::Stale);
     }
+    if output_frame(&original)? || output_frame(&after)? {
+        return Err(PackageError::Unsupported);
+    }
     let store_pair = vw_store::VerificationReviewPair {
         project_id: original.manifest().source.project_id.clone(),
         original: pair.original.native()?,
@@ -184,6 +226,9 @@ pub(super) fn source_current(
     state: &ProjectState,
     package: &vw_package::Package,
 ) -> PackageResult<()> {
+    if output_frame(package)? {
+        return Err(PackageError::Unsupported);
+    }
     // Both checked packages and a possible prepared follow-up remain owned
     // across the final fences; reserve their complete maxima plus metadata.
     workflow::canonical_workspace(

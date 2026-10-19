@@ -89,6 +89,11 @@ internal class McpVerificationWorkflow(
         val bytes=catalog.readFile(info.packageId,info.target,info.manifestSha256,"manifest.json",4u*1024u*1024u)
         val parts=checkedJsonArrayParts(bytes,"markers",512)
         val root=parts.header
+        // Marker boxes are D-space. Until one checked D-to-O mapping is shared
+        // with the package compiler, an output frame cannot be compared with
+        // the retained O-space PNG, even when its dimensions happen to match.
+        val extensions=root["extensions"] as? Map<*,*>
+        require(extensions?.get("image_output")==null)
         fun objectAt(value:Any?):Map<*,*> = value as? Map<*,*> ?: throw McpRefused()
         fun number(value:Any?):Double = (value as? BigDecimal)?.toDouble()?.takeIf{it.isFinite()}?:throw McpRefused()
         fun rect(value:Any?):Rect {val a=value as? List<*>?:throw McpRefused();require(a.size==4);val v=a.map(::number);require(v[0]>=0&&v[1]>=0&&v[2]>0&&v[3]>0);return Rect(v[0],v[1],v[2],v[3])}
@@ -144,6 +149,9 @@ internal class McpVerificationWorkflow(
         val after=catalog.lookup(pair.after.packageId,pair.after.target,pair.after.manifestSha256).info
         checked(original);checked(after)
         require(original.binding.projectId==expected.projectId&&original.markerCount==expected.markerCount&&original.target==after.target&&original.model==after.model)
+        // Admit both immutable manifests before recording any historical pair.
+        // Either side alone can carry an O-frame that invalidates D-space crops.
+        manifest(original);manifest(after)
         val receipt=inbox.list().singleOrNull{it.receiptId==pair.receiptId&&it.receiptBlake3==pair.receiptBlake3&&!it.retired}?:throw McpRefused()
         require(receipt.packageId==original.packageId&&receipt.target==original.target&&receipt.manifestSha256==original.manifestSha256&&
             receipt.binding==original.binding&&receipt.sourceAssetId==original.sourceAssetId&&receipt.after!=null&&receipt.text==null)

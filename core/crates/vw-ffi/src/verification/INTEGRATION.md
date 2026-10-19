@@ -41,6 +41,36 @@ return/next candidate. Engine reopens and rechecks; native operations additional
 validate source asset/capture/blob/compiler identity. There is no new index,
 source owner, database, selector persistence or cleanup.
 
+The 2026-10-19 P2 repair retains every exact opened capture project in the
+engine until its `close()` succeeds. A failed recovery/verification/compile
+close blocks the next `core.open`; shutdown retries the same owner through the
+coordinator, service lifetime and bundle pin. This changes no native owner API.
+Focused tests cover first-candidate failure, a later borrow, two-source cleanup,
+coordinator retry and sealed service restart. The production native capture
+adapter and actual process teardown remain unrun.
+The exact root-owned `NativeProject.close` retry is meaningful for failures in
+`drainUnadoptedGiants()` before `closeSession`/`destroy`. If `closeSession` or
+`destroy` itself throws, that wrapper currently sets `closed` in `finally`; a
+later `close()` can return without retrying native retirement. Root should review
+that separate native-owner behavior before claiming all close errors recover.
+
+The history admission query now uses two indexed `settings` primary-key ranges
+for TEXT and BLOB namespace keys. The source-SQL SQLite probe includes malformed
+BLOB/TEXT keys and 40,000 unrelated rows: empty history costs 46 VM steps on
+SQLite 3.53.1 (40 on system 3.46.1), while the old predicate costs 200,015.
+The 65-row limit sentinel remains bounded at 1,196/1,190 steps. Native store
+tests remain unrun pending the shared heavy slot.
+
+Until root composes the positive O package and an actual D-to-O comparison,
+`verification/checked.rs` refuses a checked pair if either manifest has a
+non-null `extensions.image_output`, and refuses the current source likewise
+(`PackageError::Unsupported`). Its bounded manifest-field probe builds before
+and after the O type lands. Desktop historical open checks both manifests before
+entry registration; original-only, after-only and equal-size 90-degree cases
+refuse, while ordinary saved history still opens after a current revision change.
+Root must retain these refusal gates when composing O, then replace them with
+one canonical D/O projection before enabling transformed verification.
+
 ## Registration
 
 In `core/crates/vw-ffi/src/lib.rs`, add:
@@ -240,18 +270,18 @@ checks actual export/import history is empty; it is authored, unrun on this tree
 
 ## Checks and proposed central deferred-ledger rows
 
-Executed: cached Kotlin2.4 -Werror current-source probe **74 cases**: shared14,
-JVM ownership2, workflow24, existing coordinator recapture6, registration13,
-source recovery15. Exact shared API/current production workflow/coordinator/
-recovery leaves compile; only JNI factories are substituted. JUnit bodies use
+Executed: cached Kotlin2.4 -Werror current-source probe **87 cases**: shared14,
+JVM ownership2, workflow27, coordinator7, registration13, source recovery18,
+service lifetime6. Exact shared API/current production workflow/coordinator/
+recovery/lifetime leaves compile; only JNI factories are substituted. JUnit bodies use
 small assertion facades; Linux symlink fixtures cannot silently skip. Temporary
 classes/declarations disposed. This does not compile NativeVerification, native
 capture adapter, generated ABI, Compose or the assembled app.
 
-VF1 negative control on this new tree restored only the temporary shared128 MiB
+VF1 negative control on the earlier history tree restored only the temporary shared128 MiB
 default: the actual nonempty Desktop caller failed as expected with Package:Limit,
-preserving the prior accepted regression. Pinned Rust1.99 rustfmt parse/format, common import,
-UTF-8 and diff whitespace guards pass. Native Cargo/Gradle/ABI/device/package
+preserving the prior accepted regression. Pinned Rust1.99 rustfmt parse/format and
+diff whitespace guards pass on this follow-up. Native Cargo/Gradle/ABI/device/package
 work did not run; one heavy slot remains parent-owned. Earlier accepted Node39/39
 and foundation native receipts remain bound to their earlier source only.
 
@@ -260,12 +290,16 @@ Retained cloud text receipts (no captures):
 `20e02a6430b1026be66d50d1bf4ebd82782cc2e25fc856092b90b58e75276eba`;
 `/tmp/vw-t5-01-history-budget-negative-control.log` SHA256
 `38d6096c1c41168531df87ba845b8d10cdcd8ae066d75014b9c82c0711790e95`.
+Follow-up Kotlin receipt `/tmp/vw-t5-01-history-p2-o-kotlin.log` SHA256
+`534a0545ca117a4ea0e6a71db49f1a564c9deb0c8c00a5d320e7cfff98815108`.
+SQL probe: `python3 core/crates/vw-store/tests/probe_verification_history_sql.py`
+and its `--legacy-scan-negative-control` mode, both Python SQLite runtimes.
 
 | Scope | Exact check/journey | Prerequisite and expected result | Status |
 |---|---|---|---|
 | Private store history | `cargo test --locked -p vw-store --test verification_review` | Parent slot;14 tests including6 new history cases: reopen64 rows/all page sizes, v0 absence, cursor/2 MiB/corruption/key/project limits; unchanged portable privacy | Authored, unrun |
 | Native verification | `cargo test --locked -p vw-ffi verification`; `cargo test --locked -p vw-ffi --test verification`; clippy all targets with-D warnings | Native helper/registration hooks; exact private history check/reopen and existing real failure compiler journey | Authored, unrun |
-| Shared/Desktop assembly | `bash apps/gradlew -p apps :shared:desktopTest --tests '*Verification*' :desktop:test --tests 'com.visualworkbench.desktop.mcp.*' -Pkotlin.incremental=false --no-daemon --no-parallel --max-workers=2` | Regenerated ABI, all root hooks and parent slot; real MPP/JUnit/Compose/native capture integration | Deferred;74 focused cases passed |
+| Shared/Desktop assembly | `bash apps/gradlew -p apps :shared:desktopTest --tests '*Verification*' :desktop:test --tests 'com.visualworkbench.desktop.mcp.*' -Pkotlin.incremental=false --no-daemon --no-parallel --max-workers=2` | Regenerated ABI, all root hooks and parent slot; real MPP/JUnit/Compose/native capture integration | Deferred;87 focused cases passed |
 | Registered MCP | `node --test test/*.test.mjs` from mcp with pinned Node24 | Two-line root registration/tool census8 | Prior leaf39/39 retained; full server unrun |
 | Restart/history/privacy | Save review -> full app/service restart -> open original -> Load/Open saved review -> compare -> fresh target/grant -> exact-source save/failure compile; export/import absent private history including BLOB prefix | Root current-original/capture hooks, actual Windows app and archive predicate repair | Source path implemented; actual runtime/privacy journey unrun |
 | A30 / VERIFY-001..004 / AGENT-006 | Original mark/publish -> granted same-target recapture -> per-marker review -> failures package -> text/PNG Compare; revoke/disconnect/retire during work | Authorized real target/runtime/agent transport, coherent parent tree; no inferred pass/fail | Product/hardware acceptance unrun |
