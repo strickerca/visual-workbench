@@ -64,7 +64,6 @@ private class NativeAssistedSource(private val project: WorkbenchProject) : Work
 private class NativeSourceOwner(override val source: AssistedSelectionSource) : AssistedSourcePixelsLease {
     var handle: NSource? = null
     private var charge: NCharge? = null
-    private var deliveryReference: NCharge? = null
     private var pixels: ByteArray? = null
     private var closed: Boolean = false
 
@@ -78,20 +77,12 @@ private class NativeSourceOwner(override val source: AssistedSelectionSource) : 
         // record. A failed ByteArray lift must not hide its last charge handle.
         charge = native.publicationLease()
         val delivery = native.takePixels()
-        // Own the lease before examining the mutable foreign payload. Neither
-        // validation nor cancellation can strand the full-grid charge.
-        deliveryReference = delivery.nativeLease
+        // The bulk record contains bytes only. The prefetched charge and source
+        // retain ownership even when lifting that record fails partway through.
         pixels = delivery.rgba
         if (delivery.rgba.size != source.assistedSourceRgbaBytes())
             throw SelectionFailure(SelectionFailureKind.Corrupt)
-        releaseDeliveryReference()
         releaseHandle()
-    }
-
-    @Synchronized private fun releaseDeliveryReference() {
-        // This is a second Arc of the already retained publication lease.
-        // Drop only its generated handle, never its underlying reservation.
-        deliveryReference?.let { it.destroy(); deliveryReference = null }
     }
 
     @Synchronized private fun releaseHandle() {
@@ -108,7 +99,6 @@ private class NativeSourceOwner(override val source: AssistedSelectionSource) : 
             // All borrowers have retired before this method is called. Drop
             // this owner's bytes before crediting the delivered reservation.
             pixels = null
-            releaseDeliveryReference()
             charge?.let { value -> value.releaseCharge(); value.destroy(); charge = null }
             closed = true
         } catch (error: Throwable) { throw sourceFailure(error) }
