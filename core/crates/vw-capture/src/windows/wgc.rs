@@ -166,14 +166,23 @@ fn capture_selected(
         size,
     ))?;
     let session = api(pool.CreateCaptureSession(&item))?;
-    // These Windows11 24H2 properties fail closed on an older API set.
-    api(session.SetMinUpdateInterval(TimeSpan { Duration: 166_667 }))?;
-    api(session.SetIncludeSecondaryWindows(true))?;
-    api(session.SetIsCursorCaptureEnabled(false))?;
-    // Keep the OS indicator: no permission request or borderless override occurs.
-    api(session.SetIsBorderRequired(true))?;
-    api(session.StartCapture())?;
+    // Install retirement before any fallible session configuration/readback.
     let capture = Session { session, pool };
+    // These Windows11 24H2 properties fail closed on an older API set.
+    api(capture
+        .session
+        .SetMinUpdateInterval(TimeSpan { Duration: 166_667 }))?;
+    api(capture.session.SetIncludeSecondaryWindows(true))?;
+    api(capture.session.SetIsCursorCaptureEnabled(false))?;
+    // Evidence consumers may rely on cursor-free pixels only after the actual
+    // capture session reports the requested policy. Setter success alone does
+    // not establish what will be captured; unknown/retained cursor fails closed.
+    if api(capture.session.IsCursorCaptureEnabled())? {
+        return Err(Error::Unavailable);
+    }
+    // Keep the OS indicator: no permission request or borderless override occurs.
+    api(capture.session.SetIsBorderRequired(true))?;
+    api(capture.session.StartCapture())?;
     let start = Instant::now();
     let frame = loop {
         cancel.check()?;
