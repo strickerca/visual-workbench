@@ -14,6 +14,15 @@ const COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
 const CAPTURE_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_COMMAND_REPLY: usize = 64 * 1024;
 static ACTIVE: AtomicBool = AtomicBool::new(false);
+static RETRYING: AtomicBool = AtomicBool::new(false);
+#[cfg(all(test, not(windows)))]
+static SYNTHETIC_STARTUPS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+#[cfg(all(test, not(windows)))]
+pub(super) fn synthetic_startups_for_test(count: usize) {
+    SYNTHETIC_STARTUPS.store(count, Ordering::Release);
+}
 
 #[derive(Default)]
 pub struct Cancellation(AtomicBool);
@@ -88,6 +97,8 @@ pub(crate) trait Runner: Send {
     fn run(&mut self, args: &[String], cap: usize, timeout: Duration, cancel: &Cancellation)
         -> Result<CommandOutput>;
     fn launch_mirror(&mut self, serial: &str, cancel: &Cancellation) -> Result<u32>;
+    /// Join an uncertain in-flight command before cleanup issues another one.
+    fn settle_io(&mut self) -> Result<()>;
     fn close(&mut self) -> Result<()>;
 }
 
@@ -97,8 +108,11 @@ impl Drop for Permit { fn drop(&mut self) { ACTIVE.store(false, Ordering::Releas
 #[derive(Clone)]
 enum Scratch {
     Unknown { directory: String },
-    Owned { directory: String, file: String },
+    Owned { directory: String, file: String, phase: ScratchPhase },
 }
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum ScratchPhase { FilePresent, FileRemoved, DirectoryRemoved, UncertainFile, UncertainDirectory }
 
 struct Retained {
     runner: Box<dyn Runner>,
@@ -118,20 +132,38 @@ fn args(id: u32, command: &[&str]) -> Vec<String> {
     out
 }
 
-fn cleanup(runner: &mut dyn Runner, selected: &SelectedDevice, scratch: &Scratch) -> Result<()> {
+fn cleanup(runner: &mut dyn Runner, selected: &SelectedDevice, scratch: &mut Scratch) -> Result<()> {
+    runner.settle_io().map_err(|_| Error::RetirementPending)?;
     let fresh = Cancellation::default();
     let current = runner.run(&["devices".into(), "-l".into()], MAX_COMMAND_REPLY,
         COMMAND_TIMEOUT, &fresh)?;
     if current.code != 0 { return Err(Error::RetirementPending); }
     device::still_selected(selected, &current.bytes).map_err(|_| Error::RetirementPending)?;
     let id = selected.transport_id;
-    if let Scratch::Owned { directory, file } = scratch {
-        let result = runner.run(&args(id, &["shell", "rm", "-f", file]), MAX_COMMAND_REPLY,
-            COMMAND_TIMEOUT, &fresh)?;
-        if result.code != 0 { return Err(Error::RetirementPending); }
-        let removed = runner.run(&args(id, &["shell", "rmdir", directory]), MAX_COMMAND_REPLY,
-            COMMAND_TIMEOUT, &fresh)?;
-        if removed.code != 0 { return Err(Error::RetirementPending); }
+    if let Scratch::Owned { directory, file, phase } = scratch {
+        if *phase == ScratchPhase::FilePresent {
+            let result = runner.run(&args(id, &["shell", "rm", "-f", file]), MAX_COMMAND_REPLY,
+                COMMAND_TIMEOUT, &fresh);
+            match result {
+                Ok(reply) if reply.code == 0 => *phase = ScratchPhase::FileRemoved,
+                _ => { *phase = ScratchPhase::UncertainFile; return Err(Error::RetirementPending); }
+            }
+        }
+        if *phase == ScratchPhase::FileRemoved {
+            let exists = runner.run(&args(id, &["shell", "test", "-e", directory]),
+                MAX_COMMAND_REPLY, COMMAND_TIMEOUT, &fresh)?;
+            if exists.code == 1 && exists.bytes.is_empty() {
+                *phase = ScratchPhase::DirectoryRemoved;
+            } else if exists.code == 0 && exists.bytes.is_empty() {
+                let removed = runner.run(&args(id, &["shell", "rmdir", directory]),
+                    MAX_COMMAND_REPLY, COMMAND_TIMEOUT, &fresh);
+                match removed {
+                    Ok(reply) if reply.code == 0 => *phase = ScratchPhase::DirectoryRemoved,
+                    _ => { *phase = ScratchPhase::UncertainDirectory;
+                        return Err(Error::RetirementPending); }
+                }
+            } else { return Err(Error::RetirementPending); }
+        }
     }
     let directory = match scratch {
         Scratch::Unknown { directory } | Scratch::Owned { directory, .. } => directory,
@@ -144,6 +176,12 @@ fn cleanup(runner: &mut dyn Runner, selected: &SelectedDevice, scratch: &Scratch
 
 /// Retry unknown cleanup/tree retirement before admitting another session.
 pub fn retry_retirements() -> Result<usize> {
+    if RETRYING.swap(true, Ordering::AcqRel) { return Ok(1); }
+    struct RetryGuard;
+    impl Drop for RetryGuard {
+        fn drop(&mut self) { RETRYING.store(false, Ordering::Release); }
+    }
+    let _retry_guard = RetryGuard;
     // Never hold a global registry mutex across device IO or process joins.
     let mut list = {
         let mut guard = retained().lock().unwrap_or_else(|e| e.into_inner());
@@ -151,15 +189,15 @@ pub fn retry_retirements() -> Result<usize> {
     };
     let mut index = 0;
     while index < list.len() {
-        let owner = &mut list[index];
-        let cleaned = match (&owner.scratch, &owner.selected) {
-            (Some(scratch), Some(selected)) => cleanup(&mut *owner.runner, selected, scratch).is_ok(),
-            (None, _) => true,
+        let Retained { runner, scratch, selected, .. } = &mut list[index];
+        let cleaned = match (scratch.as_mut(), selected.as_ref()) {
+            (Some(scratch), Some(selected)) => cleanup(&mut **runner, selected, scratch).is_ok(),
+            (None, _) => runner.settle_io().is_ok(),
             _ => false,
         };
         if cleaned {
-            owner.scratch = None;
-            if owner.runner.close().is_ok() {
+            *scratch = None;
+            if runner.close().is_ok() {
                 list.remove(index);
                 continue;
             }
@@ -168,7 +206,15 @@ pub fn retry_retirements() -> Result<usize> {
     }
     let mut guard = retained().lock().unwrap_or_else(|e| e.into_inner());
     guard.extend(list);
-    Ok(guard.len())
+    let pending = guard.len();
+    drop(guard);
+    #[cfg(windows)]
+    let unresolved = super::windows::retry_unresolved();
+    #[cfg(all(test, not(windows)))]
+    let unresolved = SYNTHETIC_STARTUPS.load(Ordering::Acquire);
+    #[cfg(all(not(test), not(windows)))]
+    let unresolved = 0;
+    Ok(pending + unresolved)
 }
 
 pub struct AndroidTunnelOwner {
@@ -188,6 +234,13 @@ pub struct AndroidTunnelOwner {
 fn now_ms() -> Result<u64> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH).map_err(|_| Error::Platform)?.as_millis()
         .try_into().map_err(|_| Error::Limit)?)
+}
+
+pub(super) fn checked_completed_age(image_finished: u64, hierarchy_started: u64,
+    hierarchy_completed: u64, observed: u64) -> Result<u64> {
+    if hierarchy_started < image_finished || hierarchy_completed < hierarchy_started
+        || observed < hierarchy_completed { return Err(Error::Stale); }
+    Ok(observed - image_finished)
 }
 
 impl AndroidTunnelOwner {
@@ -259,6 +312,19 @@ impl AndroidTunnelOwner {
         match self.runner.as_deref_mut() { Some(r) => Ok(r), None => Err(Error::RetirementPending) }
     }
 
+    fn settle_scratch(&mut self) -> Result<()> {
+        let Some(mut scratch) = self.scratch.take() else {
+            return self.runner()?.settle_io();
+        };
+        let selected = self.selected.clone();
+        let result = match self.runner() {
+            Ok(runner) => cleanup(runner, &selected, &mut scratch),
+            Err(error) => Err(error),
+        };
+        if result.is_err() { self.scratch = Some(scratch); }
+        result
+    }
+
     fn selected_current(&mut self, cancel: &Cancellation) -> Result<()> {
         cancel.check()?;
         let reply = self.runner()?.run(&["devices".into(), "-l".into()],
@@ -294,56 +360,71 @@ impl AndroidTunnelOwner {
         self.scratch = Some(Scratch::Unknown { directory: directory.clone() });
         let claimed = self.runner()?.run(&args(id, &["shell", "mkdir", &directory]),
             MAX_COMMAND_REPLY, COMMAND_TIMEOUT, cancel);
-        if let Ok(CommandOutput { code, .. }) = claimed {
-            if code != 0 {
+        let claimed = match claimed {
+            Ok(reply) if reply.code == 0 => reply,
+            Ok(_) => {
                 self.sealed = true;
-                let selected = self.selected.clone();
-                if let Some(scratch) = self.scratch.clone() {
-                    if cleanup(self.runner()?, &selected, &scratch).is_ok() {
-                        self.scratch = None;
-                        return Err(Error::Storage);
-                    }
+                if self.settle_scratch().is_ok() {
+                    return Err(Error::Storage);
                 }
                 return Err(Error::RetirementPending);
-            }
-        } else {
+            },
+            Err(_) => { self.sealed = true; return Err(Error::RetirementPending); },
+        };
+        self.scratch = Some(Scratch::Owned { directory: directory.clone(), file: file.clone(),
+            phase: ScratchPhase::FilePresent });
+        if claimed.started_ms < image.finished_ms || claimed.finished_ms < claimed.started_ms {
             self.sealed = true;
-            return Err(Error::RetirementPending);
+            return if self.settle_scratch().is_ok() { Err(Error::Stale) }
+                else { Err(Error::RetirementPending) };
         }
-        let scratch = Scratch::Owned { directory: directory.clone(), file: file.clone() };
-        self.scratch = Some(scratch.clone());
-        let mut acquisition = (|| {
+        let mut completed_ms = hierarchy_start;
+        let mut acquisition: Result<Option<Vec<capture::SemanticElement>>> = (|| {
             let dumped = self.runner()?.run(&args(id, &["shell", "uiautomator", "dump", &file]),
                 MAX_COMMAND_REPLY, CAPTURE_TIMEOUT, cancel)?;
             hierarchy_start = dumped.started_ms;
-            if hierarchy_start < image.finished_ms { return Err(Error::Stale); }
-            if dumped.code != 0 { return Ok(Hierarchy::Missing); }
+            completed_ms = dumped.finished_ms;
+            if hierarchy_start < claimed.finished_ms || completed_ms < hierarchy_start {
+                return Err(Error::Stale);
+            }
+            if dumped.code != 0 { return Ok(None); }
             self.selected_current(cancel)?;
             let xml = self.runner()?.run(&args(id, &["exec-out", "cat", &file]),
                 capture::MAX_XML + 1, CAPTURE_TIMEOUT, cancel)?;
-            if xml.code != 0 { return Ok(Hierarchy::Missing); }
+            if xml.started_ms < completed_ms || xml.finished_ms < xml.started_ms {
+                return Err(Error::Stale);
+            }
+            completed_ms = xml.finished_ms;
+            if xml.code != 0 { return Ok(None); }
             let elements = capture::hierarchy(&xml.bytes, png.width, png.height)?;
-            let age = hierarchy_start.saturating_sub(image.finished_ms);
-            if age > 2_000 { Ok(Hierarchy::Stale { age_ms: age }) }
-            else { Ok(Hierarchy::Present { elements, age_ms: age }) }
+            Ok(Some(elements))
         })();
         let hierarchy_finish = match now_ms() {
             Ok(value) => value,
             Err(error) => { acquisition = Err(error); hierarchy_start },
         };
-        if hierarchy_finish < hierarchy_start { acquisition = Err(Error::Stale); }
+        let age = match checked_completed_age(image.finished_ms, hierarchy_start,
+            completed_ms, hierarchy_finish) {
+            Ok(value) => value,
+            Err(error) => { acquisition = Err(error); 0 },
+        };
         // Cleanup is mandatory on every success/refusal/cancellation branch.
-        let selected = self.selected.clone();
-        if cleanup(self.runner()?, &selected, &scratch).is_err() {
+        if self.settle_scratch().is_err() {
             self.sealed = true;
             return Err(Error::RetirementPending);
         }
-        self.scratch = None;
         self.selected_current(cancel)?;
         cancel.check()?;
+        let hierarchy = match acquisition? {
+            None => Hierarchy::Missing,
+            Some(elements) => {
+                if age > 2_000 { Hierarchy::Stale { age_ms: age } }
+                else { Hierarchy::Present { elements, age_ms: age } }
+            }
+        };
         Ok(CapturePair {
             session: self.session, device: self.token, source_generation: self.generation,
-            image: png, hierarchy: acquisition?, image_started_ms: image.started_ms,
+            image: png, hierarchy, image_started_ms: image.started_ms,
             image_finished_ms: image.finished_ms, hierarchy_started_ms: Some(hierarchy_start),
             hierarchy_finished_ms: Some(hierarchy_finish),
         })
@@ -351,17 +432,15 @@ impl AndroidTunnelOwner {
 
     pub fn close(&mut self) -> Result<()> {
         self.cancel.cancel();
-        if self.runner.is_none() { return Ok(()); }
-        if let Some(scratch) = self.scratch.clone() {
-            let selected = self.selected.clone();
-            cleanup(self.runner()?, &selected, &scratch).map_err(|_| Error::RetirementPending)?;
-            self.scratch = None;
+        if self.runner.is_none() {
+            return if retry_retirements()? == 0 { Ok(()) } else { Err(Error::RetirementPending) };
         }
+        self.settle_scratch().map_err(|_| Error::RetirementPending)?;
         self.runner()?.close().map_err(|_| Error::RetirementPending)?;
         self.runner = None;
         self.permit = None;
         self.sealed = true;
-        Ok(())
+        if retry_retirements()? == 0 { Ok(()) } else { Err(Error::RetirementPending) }
     }
 }
 

@@ -101,6 +101,10 @@ struct MockState {
     seen: Vec<Vec<String>>,
     close_failures: usize,
     closes: usize,
+    active_io: bool,
+    stall_on: Option<Vec<String>>,
+    settle_failures: usize,
+    settles: usize,
 }
 
 struct MockRunner(Arc<Mutex<MockState>>);
@@ -110,10 +114,16 @@ impl session::Runner for MockRunner {
         -> super::Result<session::CommandOutput> {
         cancel.check()?;
         let mut state = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        if state.active_io { return Err(Error::RetirementPending); }
         let (expected, output) = state.queue.pop_front().ok_or(Error::Platform)?;
         assert_eq!(args, expected);
         assert!(output.bytes.len() <= cap);
         state.seen.push(args.to_vec());
+        if state.stall_on.as_ref().is_some_and(|v| v.as_slice() == args) {
+            state.stall_on = None;
+            state.active_io = true;
+            return Err(Error::Timeout);
+        }
         Ok(output)
     }
     fn launch_mirror(&mut self, serial: &str, _: &session::Cancellation) -> super::Result<u32> {
@@ -122,9 +132,20 @@ impl session::Runner for MockRunner {
     }
     fn close(&mut self) -> super::Result<()> {
         let mut state = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        assert!(!state.active_io);
         state.closes += 1;
         if state.close_failures > 0 { state.close_failures -= 1; Err(Error::RetirementPending) }
         else { Ok(()) }
+    }
+    fn settle_io(&mut self) -> super::Result<()> {
+        let mut state = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        state.settles += 1;
+        if state.settle_failures > 0 {
+            state.settle_failures -= 1;
+            return Err(Error::RetirementPending);
+        }
+        state.active_io = false;
+        Ok(())
     }
 }
 
@@ -141,6 +162,9 @@ impl mirror::WindowProbe for MockProbe {
 
 #[test]
 fn owner_pairs_exact_commands_and_retains_unknown_close_until_retry() -> super::Result<()> {
+    assert_eq!(session::checked_completed_age(1_000, 1_010, 11_000, 11_000)?, 10_000);
+    assert_eq!(session::checked_completed_age(1_000, 1_010, 900, 11_000).err(), Some(Error::Stale));
+    assert_eq!(session::checked_completed_age(1_000, 1_010, 11_000, 10_000).err(), Some(Error::Stale));
     let session = [9u8; 16];
     let nonce = "09".repeat(16);
     let scratch = format!("/sdcard/vw-{nonce}-3");
@@ -158,9 +182,11 @@ fn owner_pairs_exact_commands_and_retains_unknown_close_until_retry() -> super::
         (id(&["shell", "uiautomator", "dump", &xml_path]), reply(0, b"")),
         listed(), (id(&["exec-out", "cat", &xml_path]), reply(0, xml)),
         listed(), (id(&["shell", "rm", "-f", &xml_path]), reply(0, b"")),
+        (id(&["shell", "test", "-e", &scratch]), reply(0, b"")),
         (id(&["shell", "rmdir", &scratch]), reply(0, b"")),
         (id(&["shell", "test", "-e", &scratch]), reply(1, b"")), listed(),
-    ]), seen: vec![], close_failures: 1, closes: 0 }));
+    ]), seen: vec![], close_failures: 1, closes: 0, active_io: false,
+        stall_on: None, settle_failures: 0, settles: 0 }));
     let cancel = session::Cancellation::default();
     let mut owner = session::AndroidTunnelOwner::open_with(Box::new(MockRunner(state.clone())),
         Box::new(MockProbe), selection()?, session, 3, &cancel)?;
@@ -187,23 +213,30 @@ fn owner_pairs_exact_commands_and_retains_unknown_close_until_retry() -> super::
         listed(), (id(&["shell", "mkdir", &scratch]), reply(0, b"")),
         (id(&["shell", "uiautomator", "dump", &xml_path]), reply(0, b"")),
         listed(), (id(&["exec-out", "cat", &xml_path]), reply(0, xml)),
-        listed(), (id(&["shell", "rm", "-f", &xml_path]), reply(1, b"")),
         listed(), (id(&["shell", "rm", "-f", &xml_path]), reply(0, b"")),
+        (id(&["shell", "test", "-e", &scratch]), reply(0, b"")),
         (id(&["shell", "rmdir", &scratch]), reply(0, b"")),
+        (id(&["shell", "test", "-e", &scratch]), reply(2, b"")),
+        listed(),
         (id(&["shell", "test", "-e", &scratch]), reply(1, b"")),
-    ]), seen: vec![], close_failures: 0, closes: 0 }));
+    ]), seen: vec![], close_failures: 0, closes: 0, active_io: false,
+        stall_on: None, settle_failures: 0, settles: 0 }));
     let fresh = session::Cancellation::default();
     let mut pending = session::AndroidTunnelOwner::open_with(Box::new(MockRunner(second.clone())),
         Box::new(MockProbe), selection()?, second_session, 4, &fresh)?;
     assert_eq!(pending.capture_pair(&fresh).err(), Some(Error::RetirementPending));
     assert_eq!(pending.capture_pair(&fresh).err(), Some(Error::RetirementPending));
     let contender = Arc::new(Mutex::new(MockState { queue: VecDeque::new(), seen: vec![],
-        close_failures: 0, closes: 0 }));
+        close_failures: 0, closes: 0, active_io: false, stall_on: None,
+        settle_failures: 0, settles: 0 }));
     assert_eq!(session::AndroidTunnelOwner::open_with(Box::new(MockRunner(contender)),
         Box::new(MockProbe), selection()?, [7; 16], 5, &fresh).err(),
         Some(Error::RetirementPending));
     pending.close()?;
-    assert!(second.lock().unwrap_or_else(|e| e.into_inner()).queue.is_empty());
+    let second = second.lock().unwrap_or_else(|e| e.into_inner());
+    assert!(second.queue.is_empty());
+    assert_eq!(second.seen.iter().filter(|argv| argv.iter().any(|v| v == "rmdir")).count(), 1);
+    drop(second);
 
     let third_session = [6u8; 16];
     let directory = format!("/sdcard/vw-{}-6", "06".repeat(16));
@@ -211,11 +244,95 @@ fn owner_pairs_exact_commands_and_retains_unknown_close_until_retry() -> super::
         listed(), listed(), (id(&["exec-out", "screencap", "-p"]), reply(0, &png())),
         listed(), (id(&["shell", "mkdir", &directory]), reply(1, b"")),
         listed(), (id(&["shell", "test", "-e", &directory]), reply(1, b"")),
-    ]), seen: vec![], close_failures: 0, closes: 0 }));
+    ]), seen: vec![], close_failures: 0, closes: 0, active_io: false,
+        stall_on: None, settle_failures: 0, settles: 0 }));
     let mut absent = session::AndroidTunnelOwner::open_with(Box::new(MockRunner(third.clone())),
         Box::new(MockProbe), selection()?, third_session, 6, &fresh)?;
     assert_eq!(absent.capture_pair(&fresh).err(), Some(Error::Storage));
     absent.close()?;
     assert!(third.lock().unwrap_or_else(|e| e.into_inner()).queue.is_empty());
+
+    let fourth_session = [5u8; 16];
+    let directory = format!("/sdcard/vw-{}-7", "05".repeat(16));
+    let xml_path = format!("{directory}/hierarchy.xml");
+    let stalled = id(&["shell", "uiautomator", "dump", &xml_path]);
+    let fourth = Arc::new(Mutex::new(MockState { queue: VecDeque::from([
+        listed(), listed(), (id(&["exec-out", "screencap", "-p"]), reply(0, &png())),
+        listed(), (id(&["shell", "mkdir", &directory]), reply(0, b"")),
+        (stalled.clone(), reply(0, b"")),
+        listed(), (id(&["shell", "rm", "-f", &xml_path]), reply(0, b"")),
+        (id(&["shell", "test", "-e", &directory]), reply(0, b"")),
+        (id(&["shell", "rmdir", &directory]), reply(0, b"")),
+        (id(&["shell", "test", "-e", &directory]), reply(1, b"")),
+    ]), seen: vec![], close_failures: 0, closes: 0, active_io: false,
+        stall_on: Some(stalled), settle_failures: 2, settles: 0 }));
+    let mut active = session::AndroidTunnelOwner::open_with(Box::new(MockRunner(fourth.clone())),
+        Box::new(MockProbe), selection()?, fourth_session, 7, &fresh)?;
+    assert_eq!(active.capture_pair(&fresh).err(), Some(Error::RetirementPending));
+    assert_eq!(active.close(), Err(Error::RetirementPending));
+    assert_eq!(fourth.lock().unwrap_or_else(|e| e.into_inner()).closes, 0);
+    active.close()?;
+    let fourth = fourth.lock().unwrap_or_else(|e| e.into_inner());
+    assert_eq!(fourth.settles, 3);
+    assert_eq!(fourth.closes, 1);
+    assert!(fourth.queue.is_empty());
+    drop(fourth);
+
+    let fifth_session = [4u8; 16];
+    let directory = format!("/sdcard/vw-{}-8", "04".repeat(16));
+    let xml_path = format!("{directory}/hierarchy.xml");
+    let base = now();
+    let mut image = reply(0, &png());
+    image.started_ms = base - 10_000;
+    image.finished_ms = base - 10_000;
+    let mut dump = reply(0, b"");
+    dump.started_ms = base - 9_990;
+    dump.finished_ms = base - 5_000;
+    let mut claim = reply(0, b"");
+    claim.started_ms = base - 9_998;
+    claim.finished_ms = base - 9_995;
+    let mut hierarchy = reply(0, xml);
+    hierarchy.started_ms = base - 5_000;
+    hierarchy.finished_ms = base - 10;
+    let fifth = Arc::new(Mutex::new(MockState { queue: VecDeque::from([
+        listed(), listed(), (id(&["exec-out", "screencap", "-p"]), image),
+        listed(), (id(&["shell", "mkdir", &directory]), claim),
+        (id(&["shell", "uiautomator", "dump", &xml_path]), dump),
+        listed(), (id(&["exec-out", "cat", &xml_path]), hierarchy),
+        listed(), (id(&["shell", "rm", "-f", &xml_path]), reply(0, b"")),
+        (id(&["shell", "test", "-e", &directory]), reply(0, b"")),
+        (id(&["shell", "rmdir", &directory]), reply(0, b"")),
+        (id(&["shell", "test", "-e", &directory]), reply(1, b"")), listed(),
+    ]), seen: vec![], close_failures: 0, closes: 0, active_io: false,
+        stall_on: None, settle_failures: 0, settles: 0 }));
+    let mut stale = session::AndroidTunnelOwner::open_with(Box::new(MockRunner(fifth.clone())),
+        Box::new(MockProbe), selection()?, fifth_session, 8, &fresh)?;
+    let pair = stale.capture_pair(&fresh)?;
+    assert!(matches!(pair.hierarchy, capture::Hierarchy::Stale { age_ms } if age_ms >= 10_000));
+    stale.close()?;
+    assert!(fifth.lock().unwrap_or_else(|e| e.into_inner()).queue.is_empty());
+
+    #[cfg(not(windows))]
+    {
+        let sixth = Arc::new(Mutex::new(MockState { queue: VecDeque::from([listed()]),
+            seen: vec![], close_failures: 0, closes: 0, active_io: false,
+            stall_on: None, settle_failures: 0, settles: 0 }));
+        let mut owner = session::AndroidTunnelOwner::open_with(Box::new(MockRunner(sixth.clone())),
+            Box::new(MockProbe), selection()?, [3; 16], 9, &fresh)?;
+        session::synthetic_startups_for_test(1);
+        assert_eq!(owner.close(), Err(Error::RetirementPending));
+        assert_eq!(owner.close(), Err(Error::RetirementPending));
+        assert_eq!(sixth.lock().unwrap_or_else(|e| e.into_inner()).closes, 1);
+        assert_eq!(session::retry_retirements()?, 1);
+        let blocked = Arc::new(Mutex::new(MockState { queue: VecDeque::new(), seen: vec![],
+            close_failures: 0, closes: 0, active_io: false, stall_on: None,
+            settle_failures: 0, settles: 0 }));
+        assert_eq!(session::AndroidTunnelOwner::open_with(Box::new(MockRunner(blocked)),
+            Box::new(MockProbe), selection()?, [3; 16], 9, &fresh).err(),
+            Some(Error::RetirementPending));
+        session::synthetic_startups_for_test(0);
+        owner.close()?;
+        assert_eq!(session::retry_retirements()?, 0);
+    }
     Ok(())
 }

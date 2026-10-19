@@ -52,6 +52,16 @@ deleting it; an absence query can settle it, while a present directory needs
 owner reconciliation before release. This prevents cleanup from deleting a
 pre-existing or contested device path.
 
+The later review repairs retain an in-flight IO reader/Job until it is retired
+and joined before any device cleanup command. Scratch cleanup tracks file
+removal, directory removal and final absence separately; a failed absence
+query after successful `rmdir` retries only the query. Uncertain mutation
+responses never trigger a destructive retry against a potentially contested
+path. The suspended-launch unresolved-child queue is included in the public
+retirement count and close/unload fence. Hierarchy freshness uses ordered
+image/dump/XML command intervals and completed acquisition time, so a ten-second
+dump cannot appear fresh because it began ten milliseconds after the image.
+
 `check_source` queries the current selected native window/monitor/region and
 enumerates windows owned by the actual retained scrcpy process handle. It
 checks liveness/PID before and after enumeration, rechecks a selected window's
@@ -92,5 +102,8 @@ checkpoint. Do not treat the source as a passed runtime or product gate.
 The Windows path, scrcpy v4.1 argv/environment, adb server noninterference,
 device scratch cleanup, OS window ownership, real PNG/XML fidelity, packaging,
 and root caller hooks require later authorized Windows/device validation.
+The current scrcpy launch uses `--no-control`; it does not implement the
+TUNNEL-005 phone-control path. That remains a separate code gap, not a tested
+or accepted control feature.
 Krita, paid services, credentials, deployment and GUI/device actions were not
 used for this candidate.

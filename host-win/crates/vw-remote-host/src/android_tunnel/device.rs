@@ -26,9 +26,9 @@ impl UsbSelection {
 
 #[derive(Clone, Eq, PartialEq)]
 pub(crate) struct SelectedDevice {
-    serial: String,
-    model: String,
-    transport_id: u32,
+    pub(super) serial: String,
+    pub(super) model: String,
+    pub(super) transport_id: u32,
 }
 
 /// Opaque per-session binding; no serial or transport is exposed to consumers.

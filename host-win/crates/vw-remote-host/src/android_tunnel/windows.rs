@@ -79,7 +79,14 @@ fn retain_unresolved(child: Child) {
     unresolved_startups().lock().unwrap_or_else(|e| e.into_inner()).push(child);
 }
 
-fn retry_unresolved() -> Result<()> {
+pub(super) fn retry_unresolved() -> usize {
+    static RETRYING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if RETRYING.swap(true, std::sync::atomic::Ordering::AcqRel) { return 1; }
+    struct RetryGuard(&'static std::sync::atomic::AtomicBool);
+    impl Drop for RetryGuard {
+        fn drop(&mut self) { self.0.store(false, std::sync::atomic::Ordering::Release); }
+    }
+    let _retry_guard = RetryGuard(&RETRYING);
     let mut pending = {
         let mut guard = unresolved_startups().lock().unwrap_or_else(|e| e.into_inner());
         std::mem::take(&mut *guard)
@@ -87,7 +94,7 @@ fn retry_unresolved() -> Result<()> {
     pending.retain(|child| child.retire(Duration::from_millis(100)).is_err());
     let mut guard = unresolved_startups().lock().unwrap_or_else(|e| e.into_inner());
     guard.extend(pending);
-    if guard.is_empty() { Ok(()) } else { Err(Error::RetirementPending) }
+    guard.len()
 }
 
 impl Child {
@@ -387,6 +394,7 @@ impl Runner for WindowsJobRunner {
         self.mirror = Some(child);
         Ok(pid)
     }
+    fn settle_io(&mut self) -> Result<()> { self.close_active() }
     fn close(&mut self) -> Result<()> {
         self.close_active()?;
         if let Some(mirror) = &self.mirror { mirror.retire(Duration::from_secs(2))?; }
@@ -407,7 +415,7 @@ impl WindowsJobRunner {
 
 pub(super) fn open(runtime: AdmittedRuntime, adb: OwnerAdb)
     -> Result<(Box<dyn Runner>, Box<dyn WindowProbe>)> {
-    retry_unresolved()?;
+    if retry_unresolved() != 0 { return Err(Error::RetirementPending); }
     if runtime.client.parent() == adb.path.parent() { return Err(Error::RuntimeUnavailable); }
     let adb = Pinned::open(&adb.path, None)?;
     let mut adb_file = adb.pins.executable.file().try_clone().map_err(|_| Error::RuntimeUnavailable)?;
