@@ -1,0 +1,37 @@
+{
+  "status": "actual close-body boundary regression passed",
+  "junit_cases": 7,
+  "negative_control_ref": "134b421ba5e5732c6cbdb90b1cb73ee831f56793",
+  "commands": [
+    {
+      "name": "current-compile",
+      "exit_code": 0
+    },
+    {
+      "name": "current-junit",
+      "exit_code": 0
+    },
+    {
+      "name": "prior-source-negative-compile",
+      "exit_code": 0
+    },
+    {
+      "name": "prior-source-negative-junit",
+      "exit_code": 1
+    }
+  ],
+  "source_sha256": {
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCore.kt": "fe21c419b1da6643a738d865a51828fd9bc154d5ad93c70e0263e1e03c4161cb",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeOwnership.kt": "a1b2c04a7becf90ffb3e6002b5217551c7428be444fa5a7ca7a342b006e4a62d",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/GiantImportOwnership.kt": "68f3cb53e3a987ea830c6e8830516680eff04e0c8a74f5be8b48c4c8381981dd",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImportsApi.kt": "60c36508339c733ae044588050ccae35bb397a0502b9c1149ae5787c299f6d7f",
+    "tools/tests/check_native_project_close.py": "28d7f960a4b9823bba3319f1bcd4d607d4c4a01c566b22555cf25003bde97b45"
+  },
+  "temporary_compiler_outputs_disposed": true,
+  "limits": [
+    "Actual production close body/error mapping/release dispatcher/giant owner compiled unchanged",
+    "Foreign handle and unadopted-child drain substituted at their call boundary",
+    "NativeProject whole class/new ABI/real JNI/app lifecycle not executed",
+    "Cached predecessor shared/bindings jars used for unchanged core types; no device evidence"
+  ]
+}

@@ -136,6 +136,7 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
     override suspend fun exportFile(options: FileExportOptions): FileExportResult { if (closed.get()) throw CoreFailure(CoreFailureKind.Closed); return exportFileNative(handle, options) }
     private val closed = java.util.concurrent.atomic.AtomicBoolean(false)
     private val closeMutex = Mutex()
+    private var retirementFailure: Throwable? = null
     private suspend fun <T> call(block: suspend (Cancellation) -> T): T = native { if(closed.get()) throw CoreFailure(CoreFailureKind.Closed); block(it) }
     override val changes: Flow<ProjectChange> = callbackFlow {
         val subscription = handle.subscribe(object : StateListener {
@@ -191,13 +192,25 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
                 documentPasswords.clear(); documentPages.clear()
                 return@withLock
             }
-            if(!closed.get()) {
+            // Ordinary worker shutdown errors are reported after its state is
+            // destroyed. Preserve that result; do not retry native destruction
+            // or turn a later close into a no-op success.
+            retirementFailure?.let { throw it }
+            if (closed.get()) return@withLock
             // A cancelled open may retain a native child whose close failed.
             // Its actual retirement must settle before the parent worker closes.
             drainUnadoptedGiants()
-            try { handle.closeSession() } catch(error:CoreException) { throw mapFailure(error) }
-            finally { closed.set(true);documentPasswords.clear();documentPages.clear();handle.destroy() }
+            var failure: Throwable? = null
+            try { handle.closeSession() }
+            catch(error:CoreException) { failure = mapFailure(error) }
+            catch(error:Throwable) { failure = error }
+            closed.set(true);documentPasswords.clear();documentPages.clear()
+            try { handle.destroy() }
+            catch(error:Throwable) {
+                val prior = failure
+                if(prior == null) failure = error else if(prior !== error) prior.addSuppressed(error)
             }
+            failure?.let { retirementFailure = it; throw it }
         }
     }
 }
