@@ -7,7 +7,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::SocketAddr,
     sync::{
         Arc, Mutex, Weak,
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -18,9 +18,12 @@ use tokio::sync::{mpsc, watch};
 use vw_model::{AssetId, DeviceId, Id};
 use vw_net::{
     CarrierIo, ConnectionSender, LocalHello, Receive, SecureConnection,
-    carrier::{PinnedTls, QuicCarrier, QuicListener, TcpCarrier},
+    carrier::{PinnedTls, QuicListener, TcpCarrier},
 };
 use vw_proto::v1::{self as pb, envelope::Body};
+
+#[path = "carrier_switch.rs"]
+mod carrier_switch;
 
 #[path = "focus.rs"]
 mod focus;
@@ -650,37 +653,7 @@ pub(super) async fn establish(
             }
             Err(error)
         }
-        Route::Client(addresses) => {
-            let mut error = SessionError::Transport;
-            for (carrier, address) in addresses {
-                let tls = manager.pinned_tls(peer)?;
-                let io = if *carrier == AppCarrier::TcpAdb {
-                    TcpCarrier::connect(*address, &tls)
-                        .await
-                        .map(CarrierIo::Tcp)
-                } else {
-                    let bind = SocketAddr::new(
-                        if address.is_ipv4() {
-                            IpAddr::V4(Ipv4Addr::UNSPECIFIED)
-                        } else {
-                            IpAddr::V6(Ipv6Addr::UNSPECIFIED)
-                        },
-                        0,
-                    );
-                    QuicCarrier::connect(bind, *address, &tls)
-                        .await
-                        .map(CarrierIo::Quic)
-                };
-                match io {
-                    Ok(io) => match SecureConnection::client(io, local).await {
-                        Ok(connection) => return Ok((*carrier, connection)),
-                        Err(value) => error = value.into(),
-                    },
-                    Err(value) => error = value.into(),
-                }
-            }
-            Err(error)
-        }
+        Route::Client(addresses) => carrier_switch::connect(addresses, manager, peer, local).await,
     }
 }
 async fn establish_for_project(
