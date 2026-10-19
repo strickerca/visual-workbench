@@ -9,6 +9,7 @@ mod metadata;
 mod pixels;
 mod render;
 mod source;
+mod source_region;
 mod stream;
 mod text;
 pub use display::{DisplayImage, display_preview_rgba8, display_rgba8};
@@ -28,6 +29,9 @@ pub use image_output::{
 pub use pixels::{DecodeLimits, DecodedImage, Pixels, decode, standard_srgb_profile};
 pub use render::{AssetResolver, RenderOptions, render_document};
 pub use source::{BorrowedSource, JpegSpool, PngSpool, RasterSource, SourceInfo, SpoolLimits};
+pub use source_region::{
+    compose_document_region, downsample_composed_box_rgba8, region_composition_estimate,
+};
 pub use stream::{
     MarkedDocument, StreamLimits, StreamPlan, StreamReport, export_document_png_to, export_png_to,
     plan_png,

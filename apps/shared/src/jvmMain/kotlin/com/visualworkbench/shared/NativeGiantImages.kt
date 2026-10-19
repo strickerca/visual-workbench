@@ -82,7 +82,7 @@ internal suspend fun openGiantImageNative(project: ProjectSession,binding:Workfl
         catch(error:GiantImageException){throw mapGiantFailure(error)}
     return NativeGiantImage(native)
 }
-private class NativeGiantImage(private val native:NImage):GiantImage {
+private class NativeGiantImage(private val native:NImage):GiantImage,GiantEditingImage {
     private val gate=Mutex();private var closed=false
     // Every pending owner is reached under gate, including the joined late
     // completion callback. Failed retirement remains charged for an exact retry.
@@ -108,7 +108,8 @@ private class NativeGiantImage(private val native:NImage):GiantImage {
         val value=native.viewport(NViewport(view.left,view.top,view.right,view.bottom,view.a,view.b,view.c,view.d),cancel)
         GiantViewportPlan(value.assetId,value.manifestHash,value.level,value.visible.map{GiantTileAddress(it.level,it.x,it.y)},value.prefetch.map{GiantTileAddress(it.level,it.x,it.y)})
     }
-    override suspend fun tile(address:GiantTileAddress,foreign:SessionResourceCharge):GiantTilePixels=gate.withLock{
+    private suspend fun ownedTile(foreign:SessionResourceCharge,
+        prepare:suspend(Cancellation)->NPreparedTile):GiantTilePixels=gate.withLock{
         if(closed)throw GiantImageFailure(GiantImageFailureKind.Closed)
         drainTiles()
         val reservation=foreign as? NativeResourceCharge ?: throw GiantImageFailure(GiantImageFailureKind.Invalid)
@@ -117,7 +118,7 @@ private class NativeGiantImage(private val native:NImage):GiantImage {
         // retired here, retaining its exact owner if cleanup fails.
         val prepared=try{settledStream(release={value:NPreparedTile->
             try { retireTile(tileOwner(value)) } catch (_:Throwable) { /* retained for retry */ }
-        }){native.prepareTile(NAddress(address.level,address.x,address.y),it)}}
+        }){prepare(it)}}
             catch(error:GiantImageException){throw mapGiantFailure(error)}
         val owner=tileOwner(prepared)
         val result=try {
@@ -134,6 +135,11 @@ private class NativeGiantImage(private val native:NImage):GiantImage {
         retireTile(owner)
         result
     }
+    override suspend fun tile(address:GiantTileAddress,foreign:SessionResourceCharge):GiantTilePixels=
+        ownedTile(foreign){native.prepareTile(NAddress(address.level,address.x,address.y),it)}
+    override suspend fun editingTile(address:GiantTileAddress,foreign:SessionResourceCharge,
+        assumeUntaggedSrgb:Boolean):GiantTilePixels=
+        ownedTile(foreign){native.prepareEditingTile(NAddress(address.level,address.x,address.y),assumeUntaggedSrgb,it)}
     override suspend fun close():Unit=withContext(NonCancellable){gate.withLock{
         drainTiles()
         if(!closed){giantNative{native.closeSession()};closed=true;native.destroy()}

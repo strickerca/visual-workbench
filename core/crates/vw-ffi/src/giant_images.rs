@@ -60,6 +60,15 @@ impl GiantImage {
         let (pixels, outgoing) = delivery.into_parts();
         marshal_delivery(pixels, outgoing)
     }
+    pub async fn prepare_editing_tile(
+        &self,
+        address: GiantTileAddress,
+        assume_untagged_srgb: bool,
+        cancellation: Arc<crate::Cancellation>,
+    ) -> GiantImageResult<Arc<PreparedGiantTile>> {
+        self.read_editing_tile(address, assume_untagged_srgb, cancellation)
+            .await
+    }
     pub async fn close(&self) -> GiantImageResult<()> {
         self.close_worker().await
     }

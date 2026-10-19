@@ -173,3 +173,27 @@ LiteRT dependencies and existing stable APIs. Parent activation remains explicit
 E47f76bf actual cleanup-ordering repair and G08332934+b75cea58 corrected production/
 test stack remain current review inputs. No earlier incomplete giant accounting
 stack is accepted or merged; no device/model/runtime gate is inferred.
+
+## 2026-10-19 accepted giant native composition
+
+Complete E47f76bf stack is composed after parent/Astra acceptance. Three pure
+source/test leaves match exactly; giant_images root and NativeGiantImages retain
+root intake/producer registration and add only the reviewed G export/adapter
+hooks. E allocation/serialization/retirement findings are closed at its fixture
+scope: ten owner cases, four independent checks (not summed), retained8708bytes
+through hash deallocation and zero after final drop, ABI bound over65536lengths.
+G08332934 production plus isolated-fixture correction b75cea58 is composed with
+all14 returned source/handoff leaves exact. Its three portable patches apply
+cleanly after the preserved E/root header conflict resolution. Explicit actual
+untagged-sRGB consent is forwarded unchanged. Combined Linux vw-ffi library
+check passes12.03s with the same ProviderAdapter dead_code warning; strict Clippy
+is not passed. G8raster/4native/1Kotlin methods, generated ABI, real native/JVM
+retirement and app/canvas integration remain unrun.
+
+GIANT_VIEWPORT_CALLER_HANDOFF_20261019.md gives idle G the actual shared viewport
+dispatch and Desktop host mode bridge through parent activation; R/Android retain
+their controller/canvas paths. Model/runtime admission stays empty pending E's
+actual artifact delivery grant. Exact source/hook/log hashes and current limits
+are in evidence/GIANT_DELIVERY_REGION_COMPOSED_20261019.json. R's composed source
+remains explicitly held for its three known defects; no main merge, broad build,
+device/performance/physical gate or worktree disposal occurs in this batch.

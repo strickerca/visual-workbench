@@ -1,0 +1,67 @@
+{
+  "date": "2026-10-19",
+  "status": "accepted E and production G composed with explicit root hooks; platform composed viewport selection remains code work",
+  "E": {
+    "ref": "47f76bf9876abeed1d2685416196264efa99b91c",
+    "byte_identical_paths": [
+      "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/GiantTileDeliveryOwnershipTest.kt",
+      "core/crates/vw-ffi/src/giant_images/delivery.rs",
+      "core/crates/vw-ffi/src/giant_images/dto.rs"
+    ],
+    "parent_review_evidence": [
+      "ten allocator-observed boundary fixtures",
+      "four independent checks, not summed as unique cases",
+      "8708 retained bytes at hash deallocation then final zero",
+      "ABI-growth bound checked across all65536 RGBA lengths"
+    ]
+  },
+  "G": {
+    "ref": "b75cea58a40cc209c50a2d1ca8b2445f4966d00c",
+    "production_review_ref": "08332934ea1db907b068dd3ecaf18c91f7f7d083",
+    "byte_identical_paths": [
+      "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImagesApi.kt",
+      "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/GiantEditingCapabilityTest.kt",
+      "core/crates/vw-ffi/src/giant_images/editing.rs",
+      "core/crates/vw-ffi/src/giant_images/editing_tests.rs",
+      "core/crates/vw-ffi/src/giant_images/provider.rs",
+      "core/crates/vw-ffi/src/giant_images/tiles.rs",
+      "core/crates/vw-ffi/src/giant_images/tiles_region_tests.rs",
+      "core/crates/vw-raster/src/source_region.rs",
+      "core/crates/vw-raster/tests/source_region.rs",
+      "docs/handoffs/giant-region-20261019/ASTRA_P2_EVIDENCE.md",
+      "docs/handoffs/giant-region-20261019/README.md",
+      "docs/handoffs/giant-region-20261019/root-giant-after-E.patch",
+      "docs/handoffs/giant-region-20261019/root-jvm-after-E.patch",
+      "docs/handoffs/giant-region-20261019/root-raster-checkpoint.patch"
+    ],
+    "unrun_regressions": {
+      "raster": 8,
+      "native": 4,
+      "Kotlin": 1
+    }
+  },
+  "root_source_sha256": {
+    "core/crates/vw-ffi/src/giant_images.rs": "311f82f495d35592d3f56c84a5291d17726871692b79d45280e63658e8b30905",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeGiantImages.kt": "7bd12e06124f14d6c09d4b42789feedc2173e2be2d07d27039b689175910e4c7",
+    "core/crates/vw-raster/src/lib.rs": "0de3fb8557ac7483607d0e3dff95fd979133bb186f4ccf1d2d1e1e5eb2817ec5"
+  },
+  "root_hooks": [
+    "Resolved only E giant root header/export conflicts, preserving intake/producer registration",
+    "Applied all three updated portable G patches after exact applicability checks",
+    "Shared/JVM/native explicit untagged-sRGB forwarding",
+    "Shared prefetched owner delivery before bulk; source and composed tile paths share retirement"
+  ],
+  "executed": {
+    "command": "cargo check --locked --offline -p vw-ffi --lib -j2",
+    "result": "pass,12.03s; one pre-existing Linux ProviderAdapter dead_code warning",
+    "log": "/tmp/vw-giant-composed-native-check-20261019.log",
+    "sha256": "3b47aac60c64913ff1a7ac3aeb8f7e6273f001b4a67030e3997f10c98dc87770"
+  },
+  "limits": [
+    "G full regression cases not run",
+    "Generated JNI/JVM/new shared ABI and platform native retirement unrun",
+    "Composed viewport dispatch/controller/canvas activation remains implementation work",
+    "R681cf9da remains held for three identified source defects",
+    "Strict Clippy/final native/shared/apps/lint/package and physical acceptance unrun"
+  ]
+}
