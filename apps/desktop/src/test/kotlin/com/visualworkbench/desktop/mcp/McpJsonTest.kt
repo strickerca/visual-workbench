@@ -19,4 +19,15 @@ class McpJsonTest {
         assertThrows(Exception::class.java){McpJson.decode(("{\"a\":["+"0,".repeat(32769)+"0]}").toByteArray())}
         assertThrows(Exception::class.java){McpJson.decode(byteArrayOf(0xff.toByte()))}
     }
+    @Test fun unicodeEscapesRequireFourAsciiHexDigitsAndDecodedKeysRemainUnique() {
+        assertEquals(BigDecimal("2"), McpJson.decode("{\"output_\\u0077idth\":2}".toByteArray())["output_width"])
+        assertEquals("é", McpJson.decode("{\"text\":\"\\u00E9\"}".toByteArray())["text"])
+        for (bad in listOf("+077", "-077", "٠077", "0G77", "007g", "077")) {
+            val json = "{\"text\":\"\\u${bad}\"}"
+            assertThrows(IllegalArgumentException::class.java) { McpJson.decode(json.toByteArray()) }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            McpJson.decode("{\"output_width\":2,\"output_\\u0077idth\":3}".toByteArray())
+        }
+    }
 }
