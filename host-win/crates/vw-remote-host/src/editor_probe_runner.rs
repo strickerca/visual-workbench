@@ -4,12 +4,16 @@
 mod finite;
 #[path = "editor_probe_runner/frame.rs"]
 mod frame;
+mod paint_observation;
 use crate::{
     Error, Result,
     process::{
         Cancellation,
         windows::{Child, Pins},
     },
+};
+pub use paint_observation::{
+    PaintControlsObservation, PaintObservationHelper, retry_paint_observation_retirements,
 };
 use serde::Serialize;
 use std::{
@@ -60,10 +64,14 @@ struct Owner {
     io: Option<JoinHandle<Outcome>>,
     _permit: Permit,
     input_uncertain: Arc<AtomicBool>,
+    // A programmatic observation retains the actual parent source through any
+    // failed child/Job/IO retirement, using this same existing failure owner.
+    _source: Option<Arc<crate::editor_source::SourceLease>>,
 }
 struct PendingOwner {
     owner: Owner,
     receipt: Receipt,
+    quiet: bool,
 }
 enum Collection<T> {
     Pending(Error),
@@ -638,7 +646,11 @@ fn pending(owner: Owner, mut receipt: Receipt, cause: Error) -> Result<()> {
         .get_or_init(|| Mutex::new(Vec::new()))
         .lock()
         .unwrap_or_else(|e| e.into_inner())
-        .push(PendingOwner { owner, receipt });
+        .push(PendingOwner {
+            owner,
+            receipt,
+            quiet: false,
+        });
     emit(&output)?;
     Err(Error::RetirementPending)
 }
@@ -821,6 +833,7 @@ fn run_for(effect: bool) -> Result<()> {
         io: None,
         _permit: permit,
         input_uncertain,
+        _source: None,
     };
     let mut error = owner.child.startup_error.clone();
     if error.is_none() {
@@ -901,9 +914,13 @@ pub fn wait_retained() {
                 Collection::Joined { pid, code, outcome } => {
                     let retained = &mut owners[index];
                     retained.receipt.input_retirement_complete = retained.owner.may_retire();
-                    finished(&mut retained.receipt, pid, code, outcome);
-                    if let Err(error) = emit(&retained.receipt) {
-                        eprintln!("editor-probe-runner: retired failure receipt output: {error}");
+                    if !retained.quiet {
+                        finished(&mut retained.receipt, pid, code, outcome);
+                        if let Err(error) = emit(&retained.receipt) {
+                            eprintln!(
+                                "editor-probe-runner: retired failure receipt output: {error}"
+                            );
+                        }
                     }
                     // A join returning an error is completed; its Failed
                     // receipt above preserves that outcome before release.

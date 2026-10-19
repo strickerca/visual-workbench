@@ -57,6 +57,34 @@ internal object RemoteCompatibilityImportCases {
         closeFirst.join()
         check(closeFinished&&borrowerRetired&&borrower.isCompleted)
         check(borrows.borrow { 1 }==null)
+        var released=0
+        val token=Any()
+        check(withJoinedCompatibilityObservation({token},{check(it===token);released++}) {
+            check(it===token&&released==0);42
+        }==42&&released==1)
+        check(runCatching { withJoinedCompatibilityObservation({token},{released++}) {
+            throw IllegalArgumentException("callback fixture")
+        }}.isFailure&&released==2)
+        check(runCatching { withJoinedCompatibilityObservation<Any,Unit>(
+            {throw IllegalArgumentException("producer fixture")},{released++},{})
+        }.isFailure&&released==2)
+        val producerEntered=CompletableDeferred<Unit>()
+        val producerReturn=java.util.concurrent.CountDownLatch(1)
+        val producerReleased=java.util.concurrent.atomic.AtomicInteger()
+        var callbackEntered=false
+        val undelivered=launch(Dispatchers.Default) {
+            withJoinedCompatibilityObservation({
+                producerEntered.complete(Unit)
+                check(producerReturn.await(5,java.util.concurrent.TimeUnit.SECONDS));token
+            },{producerReleased.incrementAndGet()}) {callbackEntered=true}
+        }
+        producerEntered.await();undelivered.cancel();producerReturn.countDown();undelivered.join()
+        check(!callbackEntered&&producerReleased.get()==1)
+        val callbackReady=CompletableDeferred<Unit>()
+        val cancelledRead=launch(start=CoroutineStart.UNDISPATCHED) {
+            withJoinedCompatibilityObservation({token},{released++}) {callbackReady.complete(Unit);awaitCancellation()}
+        }
+        callbackReady.await();check(released==2);cancelledRead.cancelAndJoin();check(released==3)
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
         val dispatcher=FixtureDispatcher(target,owner)
         val palette=RemoteEditorPalette(dispatcher,scope)
@@ -65,6 +93,12 @@ internal object RemoteCompatibilityImportCases {
             check(palette.state.value.compatibility==decoded.records)
             check(palette.state.value.target!!.verifiedActions==setOf(RemoteEditorAction.Undo))
             check(dispatcher.commands==0)
+            check(palette.observeCompatibility())
+            check(palette.state.value.compatibility.all{it.result==RemoteCompatibilityResult.NotTested})
+            check(palette.state.value.compatibility.size==7&&dispatcher.commands==0)
+            check(palette.state.value.target!!.verifiedActions==setOf(RemoteEditorAction.Undo))
+            check(palette.state.value.message!!.contains("Not tested"))
+            check(palette.importCompatibilityReceipt(bytes,target))
             val unowned=receipt("Unsupported")
             check(palette.importCompatibilityReceipt(unowned,target))
             check(palette.state.value.compatibility==decoded.records)
@@ -80,7 +114,7 @@ internal object RemoteCompatibilityImportCases {
             check(closed&&closing.isCompleted&&!palette.state.value.busy)
             check(owner.enters==owner.exits)
         } finally { owner.retire?.complete(Unit);palette.close();scope.cancel() }
-        10
+        16
     }
     private fun target():RemoteTargetState {
         val binding=RemoteTargetBinding(1uL,"capture",1uL,"target",1u,"input")
@@ -111,6 +145,11 @@ internal object RemoteCompatibilityImportCases {
         }
         override suspend fun admitCompatibilityReceipt(expected:RemoteTargetState,bytes:ByteArray):RemoteCompatibilityAdmission? =
             NativeRemoteCompatibility.admitCurrent(expected,bytes,{target.value},owner)
+        override suspend fun observeCompatibility(expected:RemoteTargetState):RemoteCompatibilityAdmission? =
+            RemoteCompatibilityAdmission(expected,"paint.brush","c".repeat(64),RemoteCompatibilityAspect.entries.map {
+                RemoteToolCompatibility(expected.identity,"paint.brush","c".repeat(64),RemoteEditorInputApi.Unknown,
+                    it,RemoteCompatibilityResult.NotTested,RemoteCompatibilityMethod.NotPerformed,null,null)
+            })
     }
 }
 public fun main():Unit {println("Compatibility import synthetic groups passed: ${RemoteCompatibilityImportCases.run()}")}

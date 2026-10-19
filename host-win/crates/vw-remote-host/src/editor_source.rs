@@ -147,6 +147,29 @@ fn identity(value: &vw_host::RemoteEditorImageIdentity) -> ImageIdentity {
     }
 }
 impl SourceLease {
+    /// Parent-side lease for the installed-Paint query-only producer. This
+    /// explicit policy never follows a failed ordinary-source open.
+    pub fn open_paint_observation(
+        target: &Target,
+        owner: u32,
+        expected: &ImageIdentity,
+    ) -> Result<Self> {
+        let budget = SourceBudget::new(
+            Arc::new(vw_capture::Cancellation::default()),
+            Duration::from_secs(5),
+        )?;
+        Self::open(
+            target,
+            owner,
+            expected,
+            SourcePolicy::InstalledPaint,
+            &budget,
+        )
+    }
+    pub fn verify_observation(&self, target: &Target, owner: u32) -> Result<()> {
+        let budget = SourceBudget::new(self.cancel.clone(), Duration::from_secs(5))?;
+        self.verify(target, owner, &budget)
+    }
     /// Policy/expected identity must come from the admitted exact target/profile
     /// evidence. No filename/title or failed ordinary open chooses InstalledPaint.
     pub fn open(

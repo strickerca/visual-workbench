@@ -3,6 +3,7 @@ package com.visualworkbench.shared
 /** Only the checked runtime adapter implements this capability in production.
  * Raw file bytes, caller flags, profile digests and input ACKs are not evidence. */
 internal interface RemoteCompatibilityImportCapability {
+    suspend fun observeCompatibility(expected:RemoteTargetState):RemoteCompatibilityAdmission? = null
     suspend fun admitCompatibilityReceipt(expected:RemoteTargetState,bytes:ByteArray):RemoteCompatibilityAdmission?
 }
 internal data class RemoteCompatibilityAdmission(

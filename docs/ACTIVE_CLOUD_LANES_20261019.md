@@ -8,12 +8,12 @@ worker, sent an outgoing cloud task message or run model conversion.
 
 | Lane | Current objective | Exact task contract / disposition |
 |---|---|---|
-| E backend/model | Actual pinned model/toolchain/reference-parity/artifact delivery | ASSISTED_MODEL_DELIVERY_HANDOFF_20261019.md. Giant repair47f76bf is accepted/composed. No conversion execution/artifacts are confirmed. Unrelated old-main T3.07 e8ff4bf is preserved separately, not composed or model evidence |
-| Android platform | Repair AND1–4 plus actual tonal/format/assisted/composed-giant callers | ANDROID_REMAINING_CALLER_HANDOFF_20261019.md, ANDROID_AND4_TRANSFER_BOUNDARY_20261019.md, GIANT_PLATFORM_CALLER_EXTENSION_20261019.md.398c0f is held. An old T5.04 Air no-change audit is not this task's result |
-| R Desktop | Actual composed giant controller/canvas mode/consent/currentness adoption | GIANT_PLATFORM_CALLER_EXTENSION_20261019.md. Ordinary frame/tonal/export repair e212c275 is accepted/composed; current transient movement is wireframe only |
+| E backend/model | Actual pinned model/toolchain/reference-parity/artifact delivery | ASSISTED_MODEL_DELIVERY_HANDOFF_20261019.md. Giant repair47f76bf is accepted/composed. e28987e now publishes actual host conversion/parity/tooling evidence; private binaries still require transfer to root, and Android/license/runtime/memory admission remains closed. Unrelated old-main T3.07 e8ff4bf is preserved separately, not composed or model evidence |
+| Android platform | Repair AND1–4 plus actual tonal/format/assisted/composed-giant callers | ANDROID_REMAINING_CALLER_HANDOFF_20261019.md, ANDROID_AND4_TRANSFER_BOUNDARY_20261019.md, GIANT_PLATFORM_CALLER_EXTENSION_20261019.md.df7edbe now contains actual AND1–4/caller repairs and is under review, with new tests unrun. Earlier398c0f hold is superseded only after that review. An old T5.04 Air no-change audit is not this task's result |
+| R Desktop | Actual composed giant controller/canvas mode/consent/currentness adoption | GIANT_PLATFORM_CALLER_EXTENSION_20261019.md. Ordinary frame/tonal/export repair e212c275 is accepted/composed; 02aa0e5 composed caller/Retry is accepted with14 isolated cases and ready to compose; current transient movement is wireframe only |
 | G viewport | Shared composed dispatch/Desktop host bridge handback | e72f2f1 is accepted/composed with parent-reported25 focused cases. Controller/canvas adoption stays R/Android-owned; do not overlay their roots |
-| P Paint | Genuine joined observed-receipt source/factory wiring | PAINT_NATIVE_OBSERVATION_GRANT_20261018.md and PAINT_AND_VERIFICATION_INTERFACE_HANDOFF_20261019.md. A parser/hash/ACK/profile is not effect/physical evidence. No new experiment is implicitly executed |
-| V verification | Actual D/O geometry/pixel comparison and failure compiler checks | PAINT_AND_VERIFICATION_INTERFACE_HANDOFF_20261019.md and VERIFICATION_PACKAGE_GEOMETRY_20261019.md. Root package helper is authored; transformed comparison remains refused until real normalization/alignment is implemented |
+| Root Paint continuation | Query-only source/helper owner and normal factory, then positive evidence gap | PAINT_NATIVE_OBSERVATION_GRANT_20261018.md and PAINT_AND_VERIFICATION_INTERFACE_HANDOFF_20261019.md. Latest parent explicitly grants the missing implementation to root. P importer/fixes are promoted as a candidate; root native query/normal factory supplies only NotTested rows. Causal effect and physical-gesture producers remain code gaps. A parser/hash/ACK/profile is not effect/physical evidence. No new experiment is implicitly executed |
+| V verification | Actual D/O geometry/pixel comparison and failure compiler checks | PAINT_AND_VERIFICATION_INTERFACE_HANDOFF_20261019.md and VERIFICATION_PACKAGE_GEOMETRY_20261019.md. Root package helper is composed and independently checked; V7698bc4 coordinate/pixel/failure-crop source is now published under review. Existing V-owned leaves already cover remaining normalization/registration/failure checks; root owns final binding registration |
 | F formats/export | Accepted immutable projection/parser handback |81413d81 is accepted/composed. Preserve that shared MCP JSON repair when returning V from an older base. No new old-main audit is requested |
 | Root integration | Contracts/registrations, Main/dialogs/manifests/locks, reviewed composition, current ledger and exact pending gaps | ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md and DEFERRED_VALIDATION_LEDGER_20261018.md. Main6d505416 remains unchanged pending coherent reviewed/validated work |
 
@@ -30,8 +30,9 @@ task files, and no assignment sender/rewriter in the inspected setup/model tools
 or active grants. Registry dependency AGENTS files do not govern project source.
 The root tool list exposes no outgoing cloud-thread sender; none was invoked.
 This does not inspect another worker's private checkout or platform message
-routing and does not prove a cause for either discrepancy. Parent is checking
-the actual E/Android task/checkout and dirty repair state.
+routing and does not prove a cause for either discrepancy. Parent investigated the actual E/Android task/checkout and dirty repair state;
+subsequent actual E e28987e and Android df7edbe deliverables supersede the old
+status without erasing the retained routing evidence.
 
 Acceptance is source-scoped unless exact execution is recorded. Retain failed
 and superseded receipts, old worktrees and unimplemented/unrun distinctions.

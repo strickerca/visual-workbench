@@ -16,6 +16,8 @@ use vw_remote::{Binding, Frame, Scope, Target, VideoConfig, applied::Applied};
 mod admission;
 #[path = "remote_commands.rs"]
 mod commands;
+#[path = "remote_compatibility.rs"]
+mod compatibility;
 #[cfg(windows)]
 #[path = "remote_host.rs"]
 mod host;
@@ -27,6 +29,7 @@ mod retired;
 mod stream;
 use commands::PendingCommand;
 pub use commands::RemoteCommandResult;
+pub use compatibility::RemoteCompatibilityObservation;
 
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct RemoteRuntimeFiles {

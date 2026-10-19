@@ -272,3 +272,30 @@ contracts in ACTIVE_CLOUD_LANES_20261019.md. Useful old E e8ff4bf/T5.04 audit wo
 is preserved separately; actual model conversion and AND1–4 repairs remain
 unconfirmed/unresolved until source/artifact evidence arrives. No redundant old
 audit, heavy build or device work was launched by root during this check.
+
+
+## 2026-10-19 root Paint owner and new caller handoffs
+
+Root supplies actual query-only native Paint source/helper ownership and normal
+factory/receipt wiring; see PAINT_RUNTIME_OBSERVATION_20261019.md. All seven
+compatibility aspects remain NotTested. Causal drawing-effect and physical
+owner-gesture producers remain implementation gaps, not just tests awaiting a
+run. Windows helper/FFI code and the new generated-binding adapter are authored,
+uncompiled in this slice. Native close signals helper cancellation before
+joining borrowers; actual Windows cancellation/retirement remains unrun.
+
+| Scope | Exact deferred check | Current evidence / limit |
+|---|---|---|
+| Paint native | Windows `cargo test --locked -p vw-remote-host --all-targets`; `cargo test --locked -p vw-ffi query_receipt`; strict clippy | Five exact projection/receipt functions/tests pass with cached dependencies; actual helper/SourceLease/Job/IO/native object not compiled or executed |
+| Paint shared/Desktop | Regenerate core ABI once for `RemoteCompatibilityObservation`, `remoteObserveCompatibility`, `remoteConfigureObservationHelper`; compile actual NativeCompatibilityRuntimeAccess/NativeRemoteEdit/NativeSessions/Main; shared RemoteCompatibilityImportTest and Desktop runtime/palette suites |16 focused Kotlin groups +5 file cases;16 existing palette cases;33 actual runtime/catalog JUnit cases and33 package-report cases pass separately. No whole module/Compose/JNI pass |
+| Paint runtime | Current authenticated installed Paint target -> Read current controls -> all seven NotTested; import exact canonical receipt; replace source/settings/helper or close/cancel at acquisition/callback/query/retirement -> refuse, retain until joined | No GUI input/capture/experiment, device or Windows execution performed. Positive effect/physical support unavailable |
+| Desktop giant corrected02aa0e5 | DesktopGiantChoiceTest, DesktopGiantChoiceRetirementTest, DesktopComposedCanvasTest, GiantComposedViewportBoundaryTest, DesktopGiantFormatRetryTest; actual composed level>2 refusal and retry/retirement/quarantine | Parent accepted14 isolated cases after same-revision metadata Retry repair. Full controller, Gradle/Desktop/JNI/Windows/device suites unrun. G's13 native/raster cases stay distinct |
+| Android df7edbe | New AND1–4 provider/controller and baked/composed/source-reference unit/device tests; actual format/tone/mask/giant flows | Source candidate under review; tests authored/unrun. Mandatory receipt validator precedes writer/share lease. No reviewed model catalog/runtime admission supplied |
+| V7698bc4 | Native verification/package geometry suites; regenerated coordinate DTO bindings; Desktop normalized-pixel/workflow/registration/failure suites; actual capture/Compare/failure package | Candidate under review; five isolated pixel tests + synthetic workflow probe reported. Full native, Gradle, recapture/device unrun |
+| E e28987e private delivery | Transfer/hash-check `delivery-manifest-v3.json` a97d339dd323f6045a6bf10c54c2ea9e687799023869cd655459c13866f1014f and its referenced tree; AndroidLiteRT2.3/JNI/APK/notices/license/working-set/cancellation/workflow | Host CPU19 tensor comparisons max6.77e-05 and31 tooling tests reported. Worker-local directory absent here; no shared-filesystem assumption. Production catalog remains empty |
+
+Focused test failures are retained in the Paint JSON evidence: initial cached
+Rust artifact selection used incompatible serde instances (fixed by matching
+Cargo fingerprints), and runtime inventory's old six-file lease assertion
+expected13 instead of14 (updated for the pinned seventh file, then33/33 pass).
+Temporary compiler products were disposed; no private screenshots were created.

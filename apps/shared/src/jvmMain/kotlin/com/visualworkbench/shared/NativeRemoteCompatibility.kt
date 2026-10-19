@@ -8,6 +8,21 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+
+/** Acquisition and disposal stay in the same bracket even when a synchronous
+ * bounded producer returns after cancellation, before dispatcher delivery. */
+internal suspend fun <T:Any,R> withJoinedCompatibilityObservation(
+    create:()->T,release:(T)->Unit,body:suspend(T)->R,
+):R {
+    val caller=currentCoroutineContext()
+    caller.ensureActive()
+    return withContext(NonCancellable) {
+        val owned=create()
+        try { withContext(caller) { body(owned) } } finally { release(owned) }
+    }
+}
 
 /** Closing fences new borrows, cancels current ones, and waits for their
  * cancellation cleanup before the native session can release the handle. The
@@ -34,6 +49,9 @@ internal class NativeCompatibilityBorrowOwner {
  * must retain that owner/current observation until completion, including cancel.
  * It must never reconstruct an owned receipt from caller JSON or a trusted flag. */
 internal interface NativeCompatibilityObservationAccess {
+    suspend fun withCurrentObservation(expected:RemoteTargetState,
+        body:suspend(NativeOwnedCompatibilityReceipt?)->RemoteCompatibilityAdmission?,
+    ):RemoteCompatibilityAdmission? = body(null)
     suspend fun withCurrentReceipt(
         expected:RemoteTargetState,
         receiptSha256:String,

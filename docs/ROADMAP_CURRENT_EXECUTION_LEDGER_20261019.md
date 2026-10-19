@@ -10,25 +10,29 @@ automatically accepted active implementation. No old worktree was cleaned.
 | Phase | Implemented/composed source | Remaining implementation/delivery | Validation/gate state |
 |---|---|---|---|
 | 0–2 foundations | Main checkpoint, native/shared ownership, ordinary editor/transport, source-bound archives/offline recovery and existing partial Paint/stream foundations | Recovered work is promoted only through explicit reviewed leaves; no blanket stale overlay | Earlier evidence stays exact to its source/artifact. Physical/user gates remain open; cloud compilation never passes them |
-| 3 capture and image editing | Actual capture Main/access/origin callbacks; canonical frame/D-tones; accepted F original formats/export projections; native giant input/URI and complete E47f76bf charged tile delivery; G08332934+b75cea58 lossless region composition and root/JVM registration; R e212c275 Desktop caller/guide/preview repair | Actual composed giant viewport bridge/callers; Android tonal/PSD/RAW/assisted paths; actual model conversion/parity/artifacts/catalog/memory delivery. Recovered stream-finish source still requires deliberate reconciliation | Native combined Linux library check passes with one known provider warning. G13 regressions/new ABI/apps/platform journeys unrun. Android398c0f held for4 source findings; R repair accepted at source scope. Wireframe move preview is current behavior; painted-pixel move is absent |
-| 4 remote Paint | Prior remote lifecycle/input controls and published compatibility importer candidate retained; P owns genuine joined observation/factory source work | Normal runtime must supply actual causally joined observed effect/tool/settings/identity owner; parser/hash/ACK/profile facts cannot replace it | No new GUI experiment/input/capture/device use. Genuine Paint effect and physical/S Pen support remain unproved. Krita deferred |
-| 5 verification/providers/operations | A provider/settings/cost source composed without live calls; V private review/history/source retention; actual Main verification attachment; checked positive O packages and unchanged ordinary compiler; standalone LiteRT graph/notices registered with passing Maven census | V real D/O pixel alignment remains behind an explicit refusal. Root checked package geometry helper is authored, not alignment. Genuine Paint owner feed and optional Android tunnel/stream-finish reconciliation remain code work | Provider quality/live calls, actual models, generated ABI, whole apps/lint/package/native policy and OS/runtime/deployment/physical journeys stay separate. No credential/signing/security/device changes |
+| 3 capture and image editing | Actual capture Main/access/origin callbacks; canonical frame/D-tones; accepted F original formats/export projections; native giant input/URI and complete E47f76bf charged tile delivery; G08332934+b75cea58 lossless region composition and root/JVM registration; R e212c275 Desktop caller/guide/preview repair | Shared composed bridge is composed; accepted Desktop02aa0e5 caller/Retry is ready for composition; Androiddf7edbe caller/AND1–4 is under review. E e28987e delivers actual host conversion/parity tooling and private artifacts; transfer, license/runtime/catalog/memory admissions remain. Recovered stream-finish source still requires deliberate reconciliation | Native combined Linux library check passes with one known provider warning. G13 regressions/new ABI/apps/platform journeys unrun. Android398c0f held for4 source findings; R repair accepted at source scope. Wireframe move preview is current behavior; painted-pixel move is absent |
+| 4 remote Paint | Prior lifecycle/input controls; P importer/fixes promoted as a candidate; root supplies genuine query-only native source/helper owner, normal factory, exact receipt reader and current-controls action | Current controls produce only NotTested rows. Normal causal drawing-effect and physical owner-gesture producers remain missing; parser/hash/ACK/profile facts cannot replace them | No new GUI experiment/input/capture/device use. Genuine Paint effect and physical/S Pen support remain unproved. Krita deferred |
+| 5 verification/providers/operations | A provider/settings/cost source composed without live calls; V private review/history/source retention; actual Main verification attachment; checked positive O packages and unchanged ordinary compiler; standalone LiteRT graph/notices registered with passing Maven census | V d1c24a4 coordinate bridge +7698bc4 positive pixel/failure-crop implementation are published under review, not yet composed. Canonical geometry has independent focused checks. Positive Paint evidence and optional Android tunnel/stream-finish reconciliation remain code work | Provider quality/live calls, Android model execution/admission, generated ABI, whole apps/lint/package/native policy and OS/runtime/deployment/physical journeys stay separate. No credential/signing/security/device changes |
 
 Active nonoverlapping lanes remain parent-managed:
 
-- E actual model/toolchain/reference-parity/artifact delivery uses the single
-  parent-allocated conversion slot. Production catalog remains empty.
-- G shared viewport/visible-mode and Desktop giant host bridge; R and Android
-  retain controller/canvas adoption and baked/unbaked overlay classification.
-- Android ordinary tonal/format/assisted callers and four398c0f repairs, including
-  the mandatory AND4 staged transfer validator before provider writer/share lease.
-- P joined Paint observation/borrow factory; V canonical D/O geometry plus actual
-  paired-pixel alignment and failure compiler checks. Their active leaves remain
-  exclusive; root's new package helper does not change those source refusals.
-- Root contracts/registrations/manifests/locks/Main/dialog integration, source
-  composition and acceptance ledger. New native geometry tests are authored/unrun
-  under the implementation-first policy/model slot reservation; conversion
-  execution is unconfirmed. No per-small-commit binding rebuild.
+- E e28987e host conversion and parity are now evidenced:19 tensor comparisons,
+  max absolute error6.77e-05,31 offline tooling tests. Private model directory is
+  not available in this root environment; parent-controlled private transfer or
+  reproducible fresh conversion is required. Production catalog remains empty.
+- G viewport bridge e72f2f1 is accepted/composed. R corrected02aa0e5 is accepted
+  with14 parent-reported isolated cases; whole-controller/runtime checks remain.
+- Android df7edbe contains actual AND1–4/tonal/giant/format/assisted source and is
+  under review; its new unit/device tests remain unrun.
+- V owns paired-pixel normalization/registration and native failure-crop/source
+  validation in its existing exclusive leaves.7698bc4 is under review; its five
+  isolated pixel tests and synthetic workflow probe do not pass native/runtime.
+  Root supplies existing canonical geometry and final ABI registration; no
+  additional ownership grant is needed for those V-owned leaves.
+- Root supplies query-only Paint normal ownership/factory and packaging source,
+  contracts/registrations/manifests/locks/Main integration and source disposition.
+  Positive effect/physical evidence remains code work. No per-small-commit ABI
+  regeneration or broad native/app build was run for this batch.
 
 Recent review dispositions: F81413d81 accepted and composed; complete E47f76bf
 accepted/composed, retaining root URI intake/producer exports; G production

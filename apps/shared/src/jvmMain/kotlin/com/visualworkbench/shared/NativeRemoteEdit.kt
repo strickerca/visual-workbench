@@ -14,8 +14,11 @@ internal interface NativeRemoteAccess { fun remoteEditHandle():WorkbenchRemoteEd
 public fun remoteEdit(link:ProjectLink):WorkbenchRemoteEdit = (link as? NativeRemoteAccess)?.remoteEditHandle() ?: throw SessionFailure(SessionFailureKind.Invalid)
 /** Called by the pinned desktop runtime only; peer/project/UI paths cannot
  * supply a helper or profile inventory. Existing locked inventory is retained. */
-public fun configureRemoteEditRuntime(remote:WorkbenchRemoteEdit,videoPath:String,videoSha256:String,inputPath:String,inputSha256:String,profilePath:String?=null,profileSha256:String?=null) {
-    (remote as? NativeRemoteEdit)?.configure(RemoteRuntimeFiles(videoPath,videoSha256,inputPath,inputSha256,profilePath,profileSha256)) ?: throw SessionFailure(SessionFailureKind.Invalid)
+public fun configureRemoteEditRuntime(remote:WorkbenchRemoteEdit,videoPath:String,videoSha256:String,inputPath:String,inputSha256:String,profilePath:String?=null,profileSha256:String?=null,observationPath:String?=null,observationSha256:String?=null) {
+    val native=remote as? NativeRemoteEdit ?: throw SessionFailure(SessionFailureKind.Invalid)
+    require((observationPath==null)==(observationSha256==null))
+    native.configure(RemoteRuntimeFiles(videoPath,videoSha256,inputPath,inputSha256,profilePath,profileSha256))
+    if(observationPath!=null&&observationSha256!=null)native.configureObservation(observationPath,observationSha256)
 }
 private val remoteOwners=ConcurrentHashMap.newKeySet<NativeRemoteEdit>()
 public fun remoteEditOwnerCount():Int = remoteOwners.size
@@ -72,6 +75,7 @@ internal class NativeRemoteEdit(private val handle:LiveSession,private val linkO
     internal fun isRetired():Boolean = retired.get()
     private suspend fun <T> native(block:suspend()->T):T = withContext(Dispatchers.Default){try{open();block()}catch(error:SessionException){throw sessionFailure(error)}}
     internal fun configure(files:RemoteRuntimeFiles){open();try{handle.remoteConfigureRuntime(files)}catch(error:SessionException){throw sessionFailure(error)}}
+    internal fun configureObservation(path:String,sha256:String){open();try{handle.remoteConfigureObservationHelper(path,sha256)}catch(error:SessionException){throw sessionFailure(error)}}
     override fun invalidateConsumers(){consumers.invalidate()}
     override fun seal(reason:String){
         invalidateConsumers()
@@ -155,6 +159,20 @@ internal class NativeRemoteEdit(private val handle:LiveSession,private val linkO
         })
     }
     /** Close cancels and joins this read before touching the native handle. */
+    override suspend fun observeCompatibility(expected:RemoteTargetState):RemoteCompatibilityAdmission? = native {
+        compatibilityBorrows.borrow {
+            open()
+            val before=handle.remoteDisplay().common().target
+            if(before?.binding!=expected.binding||before.identity!=expected.identity)return@borrow null
+            val result=compatibilityObservations?.withCurrentObservation(expected) { owned->
+                if(owned==null)null else NativeRemoteCompatibility.decode(expected,owned.receipt)
+            }
+            currentCoroutineContext().ensureActive()
+            open()
+            val after=handle.remoteDisplay().common().target
+            result.takeIf{after?.binding==expected.binding&&after.identity==expected.identity}
+        }
+    }
     override suspend fun admitCompatibilityReceipt(expected:RemoteTargetState,bytes:ByteArray):RemoteCompatibilityAdmission? = native {
         compatibilityBorrows.borrow {
             open()
@@ -171,7 +189,13 @@ internal class NativeRemoteEdit(private val handle:LiveSession,private val linkO
     }
     override suspend fun close(){releaseNative{
         closing.set(true)
+        consumers.invalidate()
+        // Signal the hub's actual helper cancellation registry before waiting
+        // for receipt borrowers. The handle and parent stay owned through join.
+        val observationPauseFailure=try{handle.remotePause("owner_pause");null}
+            catch(error:SessionException){if(error is SessionException.Closed)null else sessionFailure(error)}
         compatibilityBorrows.closeAndJoin()
+        observationPauseFailure?.let{throw it}
         closeMutex.withLock{
         if(retired.get())return@withLock
         val ownedConsumers=consumers.fence();consumers.invalidate()

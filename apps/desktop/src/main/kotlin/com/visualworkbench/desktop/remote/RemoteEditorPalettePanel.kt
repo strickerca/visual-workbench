@@ -26,6 +26,10 @@ import com.visualworkbench.shared.*
                 }
             }
             remoteEditorLimits(identity.editor).forEach{Text(remoteEditorLimitText(it),style=MaterialTheme.typography.caption)}
+            if(identity.editor==RemoteEditorKind.Paint) {
+                OutlinedButton({controller.observeCompatibility()},enabled=!state.closed&&!state.busy,
+                    modifier=Modifier.fillMaxWidth()){Text("Read current Paint controls")}
+            }
             RemoteCompatibilityImportButton(controller)
             remoteEditorCompatibilitySummary(state).forEach{Text(it,style=MaterialTheme.typography.caption)}
         }

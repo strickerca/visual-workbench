@@ -31,8 +31,9 @@ pub use agent_capture::AgentCaptureDisplay;
 #[path = "remote_edit.rs"]
 mod remote_edit;
 pub use remote_edit::{
-    RemoteAcknowledgment, RemoteCommandResult, RemoteDisplay, RemoteFrame, RemoteInputAdmitted,
-    RemoteRuntimeFiles, RemoteWindow, remote_helpers_retirement_count,
+    RemoteAcknowledgment, RemoteCommandResult, RemoteCompatibilityObservation, RemoteDisplay,
+    RemoteFrame, RemoteInputAdmitted, RemoteRuntimeFiles, RemoteWindow,
+    remote_helpers_retirement_count,
 };
 
 pub(super) const MAX_TRANSFER: u64 = 64 * 1024 * 1024;

@@ -64,7 +64,7 @@ internal class DesktopNativeRuntime private constructor(val directory: Path, pri
         if (closed.compareAndSet(false, true)) leases.asReversed().forEach { runCatching { it.close() } }
     }
     companion object {
-        private val names = setOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-hevc-helper.exe", "vw-input-helper.exe")
+        private val names = setOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-hevc-helper.exe", "vw-input-helper.exe", "vw-editor-probe.exe")
         private const val MAX_FILE = 256L * 1024 * 1024
         private const val MAX_TOTAL = 512L * 1024 * 1024
         private const val MANIFEST = "vw-native-runtime.sha256"
@@ -189,14 +189,14 @@ internal class DesktopNativeRuntime private constructor(val directory: Path, pri
         private data class CreatedFile(val path: Path, val key: Any?)
         private fun parseManifest(bytes: ByteArray): List<Entry> {
             if (bytes.size !in 1..4096 || bytes.any { it.toInt() !in 10..126 || it.toInt() in 11..31 }) throw NativeRuntimeFailure("The native runtime manifest is invalid.")
-            val pattern = Regex("([0-9a-f]{64}) ([1-9][0-9]{0,8}) (vw_core\\.dll|vw_host\\.dll|vw-connection-helper\\.exe|vw-capture-helper\\.exe|vw-hevc-helper\\.exe|vw-input-helper\\.exe)")
+            val pattern = Regex("([0-9a-f]{64}) ([1-9][0-9]{0,8}) (vw_core\\.dll|vw_host\\.dll|vw-connection-helper\\.exe|vw-capture-helper\\.exe|vw-hevc-helper\\.exe|vw-input-helper\\.exe|vw-editor-probe\\.exe)")
             val entries = bytes.toString(Charsets.US_ASCII).lineSequence().filter(String::isNotEmpty).map { line ->
                 val match = pattern.matchEntire(line) ?: throw NativeRuntimeFailure("The native runtime manifest is invalid.")
                 val size = match.groupValues[2].toLong()
                 if (size !in 1..MAX_FILE) throw NativeRuntimeFailure("A native runtime file exceeds its admission limit.")
                 Entry(match.groupValues[1], size, match.groupValues[3])
             }.toList()
-            if (entries.size != 6 || entries.map { it.name }.toSet() != names || entries.sumOf { it.bytes } > MAX_TOTAL) throw NativeRuntimeFailure("The native runtime inventory is incomplete or exceeds its bound.")
+            if (entries.size != names.size || entries.map { it.name }.toSet() != names || entries.sumOf { it.bytes } > MAX_TOTAL) throw NativeRuntimeFailure("The native runtime inventory is incomplete or exceeds its bound.")
             return entries
         }
         private fun ensureDirectories(path: Path, guard: NativeFileGuard, pinned: MutableList<AutoCloseable>) {

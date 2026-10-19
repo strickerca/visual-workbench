@@ -1,0 +1,117 @@
+{
+  "status": "query-only Paint owner/factory source candidate; positive effect/physical producer missing",
+  "base": "6b5dc8cee68a68ed719ac1f28e907296e68b44e3",
+  "promoted_P_commits": [
+    "b159203",
+    "e272457",
+    "867bbe6",
+    "2426655",
+    "b962195"
+  ],
+  "checks": [
+    {
+      "scope": "Kotlin importer/ownership groups",
+      "passed": 16,
+      "compiler": "cached Kotlin2.4.0",
+      "command": "python3 apps/shared/src/commonTest/paint/run_compatibility_probe.py"
+    },
+    {
+      "scope": "same probe Desktop file cases",
+      "passed": 5
+    },
+    {
+      "scope": "existing Paint palette cases",
+      "passed": 16,
+      "compiler": "cached Kotlin2.4.0",
+      "command": "python3 apps/shared/src/commonTest/paint/run_probe.py"
+    },
+    {
+      "scope": "exact Rust projection/receipt functions",
+      "passed": 5,
+      "command": "python3 tools/tests/check_paint_observation_projection.py",
+      "substitution": "Only native receipt SessionError enum; real cached vw-remote types and matched serde dependencies"
+    },
+    {
+      "scope": "actual runtime/catalog leaves and existing JUnit",
+      "passed": 33,
+      "compiler": "cached Kotlin2.4.20",
+      "command": "python3 tools/tests/check_paint_runtime.py"
+    },
+    {
+      "scope": "Python distribution inventory/report fixtures",
+      "passed": 33,
+      "command": "python3 -m unittest discover -s tools/desktop-test -p test_reports.py -q"
+    },
+    {
+      "scope": "changed Rust rustfmt parse/format and whitespace",
+      "status": "passed"
+    }
+  ],
+  "prior_failed_attempts": [
+    {
+      "scope": "isolated Rust harness",
+      "reason": "Initially selected incompatible cached serde instances; matched Cargo dependency fingerprints and then passed. Production source was not the cause."
+    },
+    {
+      "scope": "runtime inventory JUnit",
+      "reason": "Old six-file lease assertion expected13 while seventh pinned file correctly held14; fixture updated, then33 pass."
+    }
+  ],
+  "remaining": [
+    "Windows host/helper/FFI compilation and strict native lint/tests",
+    "Single coherent core ABI generation; actual NativeCompatibilityRuntimeAccess/NativeRemoteEdit/NativeSessions/Main/Compose compile",
+    "Actual Windows query/cancel/currentness/retirement and packaged probe identities",
+    "Normal causal drawing-effect producer implementation",
+    "Normal physical owner-gesture producer implementation and actual physical acceptance"
+  ],
+  "source_sha256": {
+    "apps/desktop/build.gradle.kts": "a3f22330f0763bce8ed1ffd02b5f5104ab8bdac8125cd91a1dec5b596efc36db",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopNativeRuntime.kt": "db1a75605c3272da8893d4403c55678cccca248378cd2954c8377e83320816bd",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": "b04b8c5d0cb078350aceffb5c650230ae20fe90272adaf394fa3c3b6016be2e0",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/remote/RemoteEditorPalettePanel.kt": "6ee6d7201d47968d6e10b2d4d6991f8fbec44eee97220ca5a96c109559549f11",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt": "6345cb273329f407129fea7b0ec39fa5b183de4347962c9d43a269a8740bf8b6",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopRemoteCatalogTest.kt": "36256cf9375257602fd85c4801ec152f96c3b75a3aa1aed27bacd291fec597b5",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/NativeRuntimeAnchorTest.kt": "2b2fd8d4fe195e32959f1dabcb94b5fc0d01ea79e89f3ba0fd14f3f4617d033f",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteCompatibilityImport.kt": "35a88958c26a8bba6ed0c1f6850cee62938bf0852b9e91d119da80edd7fbe976",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditorPalette.kt": "5454551f8b77beacfc4c1f7a6c87c1b75f1413e11bbda16d27ffe193bebc10a9",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeRemoteCompatibility.kt": "37616e37fdfc680c01d6e47ad8aca3ef9e5cdaf2c3b6ea2714efb7ef7cceb8ab",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeRemoteEdit.kt": "cd91d33c7f24cc6ef427c9571a7a1fcb9689cfe977b84b5422aad23f39548ac8",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeSessions.kt": "c9a96be4b5805265418457673104ac27a35abae66c317a7ff07ea82e3f143afe",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/RemoteCompatibilityImportCases.kt": "b813354941190eb6b85598ca620b48705a637e4decfc28e2422f84263a4a584c",
+    "build.ps1": "b74f13d434c27357495b8f1a01cf24182f5cf40a2de7b5a5a96ff138bda58f2e",
+    "core/crates/vw-ffi/src/session/link.rs": "2de542366e8c22cb7b035cfd627feb4be72ab00c381752945d3a0f2da4e965a2",
+    "core/crates/vw-ffi/src/session/remote_edit.rs": "2c941d7c1326eb1f0d251025865d075dabede5b2ec60d33d5c6b4465217a87a8",
+    "core/crates/vw-ffi/src/session/remote_host.rs": "770537e378a370a0cca0c4a596f4015b6cfb45662d52e5a29e7d4788caa34203",
+    "host-win/crates/vw-remote-host/src/editor_probe_runner.rs": "9dcf6943154c2243248c50a547331f62e0f9eae80bf9775d1d50d743775eac45",
+    "host-win/crates/vw-remote-host/src/editor_source.rs": "ea0a214b65b2fd59748aaeaefed78b5a41f8c99e5ca001accab9c4242d15944c",
+    "tools/desktop-test/reports.py": "c40d2a7e2e54cc332904474f8d51aa803c554809d8911cd0c136466ab61e6d62",
+    "tools/desktop-test/test_reports.py": "c740c5e499a2a0534f425e9da8ba551108b1c65780eee3f4a5a726535f37baa0",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCompatibilityRuntimeAccess.kt": "20dd316fe82e83c2c811d4522dbc9ce0ee520396a175793dfb55b38f2928541c",
+    "core/crates/vw-ffi/src/session/remote_compatibility.rs": "9be6e6186425e9539f5b0a81e7bd70a143de1b657da05260ca1c4733c3e77ec9",
+    "host-win/crates/vw-remote-host/src/editor_probe_runner/paint_observation.rs": "6731a5e3fb5f4bca80289f7ae9f640cd62d616b038a75ba93c146e2280bf6aa3",
+    "tools/tests/check_paint_observation_projection.py": "9fa0eff62aa225e42ddc7a21935d36f8ca276cb14905a163185bb8c39fb6cb1f",
+    "tools/tests/check_paint_runtime.py": "9313ed00341a63d95bd97ad02e66eb4ac4b3a7a3ec13f63fc2291668bb1faa84"
+  },
+  "logs": {
+    "/tmp/vw-paint-compatibility-20261019.log": {
+      "sha256": "2ddf72fd609ea6d211a774dc6d473150bfce0dcf841e9e852b1e362dca6bd6c9",
+      "bytes": 172
+    },
+    "/tmp/vw-paint-observation-projection-20261019.log": {
+      "sha256": "a1d722fa804b2600d31400fe5fe9d0be34622cca8d292424c8f134877fd0fc62",
+      "bytes": 543
+    },
+    "/tmp/vw-paint-runtime-20261019.log": {
+      "sha256": "4182371a2b97702ec337aca26a6b97aaca5cd26f5ae96f0a2ca5c3b85e7c178a",
+      "bytes": 206
+    },
+    "/tmp/vw-paint-package-reports-20261019.log": {
+      "sha256": "3f38224cbdffdddbe193e429aaa8be2c716327e3ef929599558855bd5687ab0c",
+      "bytes": 98
+    }
+  },
+  "temporary_compiler_outputs_disposed": true,
+  "private_images_created": false,
+  "model_delivery_directory_available_in_root": false,
+  "hardware_provider_GUI_or_paid_execution_performed": false
+}

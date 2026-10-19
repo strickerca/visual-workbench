@@ -19,6 +19,8 @@ pub(super) struct Runtime {
     video: Arc<LockedHelper>,
     input: Arc<LockedHelper>,
     profile: Option<vw_remote::profile::PackagedProfile>,
+    pub(super) observation:
+        Option<Arc<vw_remote_host::editor_probe_runner::PaintObservationHelper>>,
 }
 pub(super) struct Worker {
     cancel: Arc<Cancellation>,
@@ -77,7 +79,10 @@ pub(super) fn pending_retirement_count() -> SessionResult<usize> {
             at += 1
         }
     }
-    Ok(workers.len() + process::retry_retirements().map_err(failure)?)
+    Ok(workers.len()
+        + process::retry_retirements().map_err(failure)?
+        + vw_remote_host::editor_probe_runner::retry_paint_observation_retirements()
+            .map_err(failure)?)
 }
 pub(super) fn retirement_count() -> SessionResult<usize> {
     let pending = pending_retirement_count()?;
@@ -656,6 +661,7 @@ impl RemoteHub {
             video,
             input,
             profile,
+            observation: None,
         });
         Ok(())
     }

@@ -101,7 +101,7 @@ fun main(args: Array<String>) {
             var candidate:WorkbenchRemoteEdit?=null
             try{withAdmittedRemoteCatalog(remoteCatalog){catalog->
                 val remote=controller.remoteCapability();candidate=remote
-                configureRemoteEditRuntime(remote,nativeRuntime.directory.resolve("vw-hevc-helper.exe").toString(),nativeRuntime.packagedHash("vw-hevc-helper.exe"),nativeRuntime.directory.resolve("vw-input-helper.exe").toString(),nativeRuntime.packagedHash("vw-input-helper.exe"),catalog?.path?.toString(),catalog?.sha256)
+                configureRemoteEditRuntime(remote,nativeRuntime.directory.resolve("vw-hevc-helper.exe").toString(),nativeRuntime.packagedHash("vw-hevc-helper.exe"),nativeRuntime.directory.resolve("vw-input-helper.exe").toString(),nativeRuntime.packagedHash("vw-input-helper.exe"),catalog?.path?.toString(),catalog?.sha256,nativeRuntime.directory.resolve("vw-editor-probe.exe").toString(),nativeRuntime.packagedHash("vw-editor-probe.exe"))
                 remoteView=remote;candidate=null
             }}catch(error:NativeRuntimeFailure){candidate?.let(::retireRemoteEditLater);controller.report(error.message?:"The packaged remote runtime was refused.")}
             catch(_:Exception){candidate?.let(::retireRemoteEditLater);controller.report("Remote editing requires an authenticated USB tether link and the packaged helpers.")}
