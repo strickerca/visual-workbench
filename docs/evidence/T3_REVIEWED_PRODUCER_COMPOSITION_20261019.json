@@ -1,0 +1,261 @@
+{
+  "schema": "vw.t3-reviewed-producer-composition.v1",
+  "status": "PASS WITH GAPS",
+  "date_utc": "2026-10-19",
+  "root_before_merge": "774c0484b8c0fb5414a4182969bf04af44a3866b",
+  "accepted_g": "edf2883041f4346c2bf91463ac543e9657584c06",
+  "source_manifest": [
+    {
+      "path": "Cargo.lock",
+      "bytes": 104783,
+      "sha256": "700f780434821fc0b8847dfc9009d29f049f30796b6f1491af50559e02d0c0c0"
+    },
+    {
+      "path": "apps/desktop/build.gradle.kts",
+      "bytes": 12419,
+      "sha256": "21d8020602fc6ab0ccb7e77463e2ac406b17ed8a4d4aa45febb810a804dde204"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopNativeRuntime.kt",
+      "bytes": 21269,
+      "sha256": "48f4c1ccd6015276af6ebcba2387385aca6abc9040d1ec38fbe50d90fef68721"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopNativeRuntimeTest.kt",
+      "bytes": 7948,
+      "sha256": "a67c4eaf887e87c62ae2b1cba003aadd3616a565511440a50c2146381a025b41"
+    },
+    {
+      "path": "build.ps1",
+      "bytes": 60857,
+      "sha256": "a898f3e5f3655dfd514165f03fd667fcc3ffaac47113945eab9b6aa2929adbe4"
+    },
+    {
+      "path": "core/crates/vw-capture/Cargo.toml",
+      "bytes": 1594,
+      "sha256": "8a7f6d38cc677d42eedb5c08cf339aaf7201a12c23e35b2ea2dc72e1dae4f45f"
+    },
+    {
+      "path": "core/crates/vw-capture/src/bin/stream_helper.rs",
+      "bytes": 13079,
+      "sha256": "186969beb35ff76537a1a66818163aaf6b5207c6658f1d02270d5216a4f50d75"
+    },
+    {
+      "path": "core/crates/vw-capture/src/lib.rs",
+      "bytes": 10944,
+      "sha256": "eebf234ce295bbf228968d6fd5d70004b478f6686ae382ea5b6be1bfcc3e6bbb"
+    },
+    {
+      "path": "core/crates/vw-capture/src/stream.rs",
+      "bytes": 15181,
+      "sha256": "1253883d63044acf4fce29a7e135e7af9faadff1ae0b3df77931fdbfae52e294"
+    },
+    {
+      "path": "core/crates/vw-capture/src/stream_process.rs",
+      "bytes": 36571,
+      "sha256": "840365f94fee83f9abbb82f7add2e896da54754211b0076df2d98ad3af22a8ef"
+    },
+    {
+      "path": "core/crates/vw-capture/src/stream_wire.rs",
+      "bytes": 16203,
+      "sha256": "b373f5c7ed2723b4deab939117c793631ac754723b23b6e08e7ad047711e5aa6"
+    },
+    {
+      "path": "core/crates/vw-capture/src/windows/mod.rs",
+      "bytes": 7134,
+      "sha256": "b7f540f97475d0f3d816f110273013d9805fab8284b0d431f156be0c2c186830"
+    },
+    {
+      "path": "core/crates/vw-capture/src/windows/stream.rs",
+      "bytes": 14610,
+      "sha256": "824c3fb19458255b69f80cea342062683adc0bada0aa61b311f32bd67464567f"
+    },
+    {
+      "path": "core/crates/vw-capture/tests/stream_producer.rs",
+      "bytes": 9610,
+      "sha256": "82674ceaf56b5c9151b789a3a69b3aaded77509832e250fd79a5296b3822d580"
+    },
+    {
+      "path": "core/crates/vw-capture/tests/stream_wire.rs",
+      "bytes": 6155,
+      "sha256": "1d5a59a00a84282a025618f2e5d55d46aeda4bf119f16aaac30495034aca7024"
+    },
+    {
+      "path": "core/crates/vw-capture/tests/stream_wire_allocation.rs",
+      "bytes": 5456,
+      "sha256": "854eb556b01069b6a210c4d4826fff1f7d8cfa878e1e57500d4d3752568c311a"
+    },
+    {
+      "path": "tools/desktop-test/reports.py",
+      "bytes": 23647,
+      "sha256": "416b509a4e5693416b2e2e500c6555e8b9273d869b578754285a16cf3aee0b0e"
+    },
+    {
+      "path": "tools/desktop-test/test_reports.py",
+      "bytes": 18560,
+      "sha256": "6384b02a9e19002249aea9e571d14eaabed15d3a422876e1577939a9cdd2c490"
+    }
+  ],
+  "accepted_g_files": [
+    {
+      "path": "core/crates/vw-capture/src/bin/stream_helper.rs",
+      "accepted_sha256": "186969beb35ff76537a1a66818163aaf6b5207c6658f1d02270d5216a4f50d75",
+      "active_sha256": "186969beb35ff76537a1a66818163aaf6b5207c6658f1d02270d5216a4f50d75"
+    },
+    {
+      "path": "core/crates/vw-capture/src/stream.rs",
+      "accepted_sha256": "8c86a8fc523720eee2742257c72922e0103e88dc228d16e97425baede5dbd4d6",
+      "active_sha256": "1253883d63044acf4fce29a7e135e7af9faadff1ae0b3df77931fdbfae52e294"
+    },
+    {
+      "path": "core/crates/vw-capture/src/stream_process.rs",
+      "accepted_sha256": "702007521e2256008738218fd84d711607735755a22b0ae7151d9a44661176f3",
+      "active_sha256": "840365f94fee83f9abbb82f7add2e896da54754211b0076df2d98ad3af22a8ef"
+    },
+    {
+      "path": "core/crates/vw-capture/src/stream_wire.rs",
+      "accepted_sha256": "b373f5c7ed2723b4deab939117c793631ac754723b23b6e08e7ad047711e5aa6",
+      "active_sha256": "b373f5c7ed2723b4deab939117c793631ac754723b23b6e08e7ad047711e5aa6"
+    },
+    {
+      "path": "core/crates/vw-capture/src/windows/stream.rs",
+      "accepted_sha256": "824c3fb19458255b69f80cea342062683adc0bada0aa61b311f32bd67464567f",
+      "active_sha256": "824c3fb19458255b69f80cea342062683adc0bada0aa61b311f32bd67464567f"
+    },
+    {
+      "path": "core/crates/vw-capture/tests/stream_producer.rs",
+      "accepted_sha256": "7a25e2e12767fb806a27cb2ec2d131aca36d607eb7a4e5991c97b8982cdfde10",
+      "active_sha256": "82674ceaf56b5c9151b789a3a69b3aaded77509832e250fd79a5296b3822d580"
+    },
+    {
+      "path": "core/crates/vw-capture/tests/stream_wire.rs",
+      "accepted_sha256": "f0c355e07a1c157606bb0b70a50198abe3091e8bbda6f7439eb6def5839098e3",
+      "active_sha256": "1d5a59a00a84282a025618f2e5d55d46aeda4bf119f16aaac30495034aca7024"
+    },
+    {
+      "path": "core/crates/vw-capture/tests/stream_wire_allocation.rs",
+      "accepted_sha256": "d391ce741c00b8fcdda9a15b10c1bd7f0c80b5b2cc17d6ea3c9d6f1220d0d7ba",
+      "active_sha256": "854eb556b01069b6a210c4d4826fff1f7d8cfa878e1e57500d4d3752568c311a"
+    },
+    {
+      "path": "docs/LIVE_ANNOTATE_PRODUCER_HANDOFF_20261019.md",
+      "accepted_sha256": "ec7735af332f9d30ed61cd57ad6b37f27f6eea2e7d7f01444510a957f0463933",
+      "active_sha256": "ec7735af332f9d30ed61cd57ad6b37f27f6eea2e7d7f01444510a957f0463933"
+    }
+  ],
+  "checks": [
+    {
+      "kind": "all_linux_capture_targets_check",
+      "command": "cargo check --offline -p vw-capture --all-targets -j2",
+      "result": "PASS",
+      "log": {
+        "path": "/tmp/vw-stream-producer-composition-check-20261019-initial.log",
+        "bytes": 564,
+        "sha256": "fa116c85bb6526b0c9cd5a19f366189694cd84e39ac723bcf9e613434ffc50a4"
+      }
+    },
+    {
+      "kind": "capture_and_producer_tests",
+      "command": "cargo test --locked --offline -p vw-capture --lib --bin vw-capture-stream-helper --test stream_producer --test stream_wire --test stream_wire_allocation -j2 -- --test-threads=2",
+      "result": "PASS;29lib+1helper+5producer+2wire+2allocation",
+      "log": {
+        "path": "/tmp/vw-stream-producer-composition-tests-20261019-initial.log",
+        "bytes": 5040,
+        "sha256": "ce239fc946bca2ac3dbe091a758f76b1cb15612c9f29168717df66bfb55abcf3"
+      }
+    },
+    {
+      "kind": "capture_all_targets_strict_clippy",
+      "command": "cargo clippy --locked --offline -p vw-capture --all-targets --no-deps -j2 -- -D warnings",
+      "result": "PASS",
+      "log": {
+        "path": "/tmp/vw-stream-producer-composition-all-clippy-20261019-final.log",
+        "bytes": 156,
+        "sha256": "dcd9cc84eada36bf75015d7a32ef725474048e7b1567ebf7f8ac15ec719e9ac8"
+      }
+    },
+    {
+      "kind": "capture_format",
+      "command": "cargo fmt -p vw-capture -- --check",
+      "result": "PASS",
+      "log": {
+        "path": "/tmp/vw-stream-producer-composition-format-20261019-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "kind": "runtime_report_fixtures",
+      "command": "python3 -m unittest discover -s tools/desktop-test -p 'test_reports.py'",
+      "result": "PASS;33 synthetic fixtures",
+      "log": {
+        "path": "/tmp/vw-stream-producer-runtime-reports-20261019.log",
+        "bytes": 132,
+        "sha256": "e631c78c4e0c9396fc3aba2a63e991ea0a32ccd231e0cef41ce7f66a036c7525"
+      }
+    },
+    {
+      "kind": "desktop_runtime_and_retirement",
+      "command": "bash apps/gradlew -p apps :desktop:test --tests '*DesktopNativeRuntimeTest' --tests '*DesktopInstructionFocusTest' -x :desktop:packageConnectionRuntime --offline --no-daemon --max-workers=2",
+      "result": "PASS;9runtime+3retirement;actual Desktop production/test compilation; Windows packaging excluded",
+      "log": {
+        "path": "/tmp/vw-stream-producer-runtime-desktop-tests-20261019-initial.log",
+        "bytes": 4123,
+        "sha256": "81c22a7566bbf15c8d7ed74c89f0fba1f73525973f32ae0bc4ed23241ea2197d"
+      }
+    }
+  ],
+  "desktop_test_results": [
+    {
+      "class": "com.visualworkbench.desktop.DesktopNativeRuntimeTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "com.visualworkbench.desktop.DesktopInstructionFocusTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "root_adaptations": [
+    "actual library/bin/windows ToolHelp and existing pinned internal dependency registrations plus lockfile",
+    "actual native capture UTC attached before FrameTiles serialization; current12field preflight and exact header UTC/zero local delivery/source/input authority checks",
+    "Windows StreamProcess.open_budgeted accepts the actual injected SessionBudget; its parser/packet/validation use that exact pool; existing budget() retains exact identity",
+    "exact nine-file packaged runtime inventory includes the distinct vw-capture-stream-helper.exe; build-source association/report and missing/substituted fixture checks updated",
+    "Clippy bounded384byte reply enum documented; synthetic fixtures explicitly permit test assertions; test module moved after production items"
+  ],
+  "parent_review_scope": "Parent independently accepts repaired G stack including EDF complete JSON parse/error allocation bound; root registration/clock/runtime adaptations await their own review. Parent allocator9methods/11804rejection cases are separate scope, not a duplicate root pass.",
+  "pending_code": [
+    "actual authenticated publisher/producer budget/lifetime facade and platform adapters; open_budgeted has no production caller yet",
+    "Main/WorkbenchApp and both controller normal stream entry/attachment/status/retirement wiring; Root Android private-child APIs are committed as774c048",
+    "R b94fa553143f7c398d60173c33e526ff150c3cd7 receiver canvas fetched but parent review pending, not composed",
+    "existing Android stream module handback/review/composition",
+    "F explicit TUNNEL005 control remains pending; wrong old formats9926a56 is preserved separately and not composed"
+  ],
+  "pending_validation": [
+    "Windows compilation/Job/WGC/process/clock/native source/renderer journeys; Linux does not compile cfg(windows) bodies",
+    "actual generated producer facade API and matching fresh native binaries/JNI/app/runtime packaging",
+    "15fps/eight-frame300MB/swap/resume/performance/physical/owner acceptance; source metrics are not measurements",
+    "earlier strict aggregate FFI/raster diagnostics and workspace-wide missing module remain open"
+  ],
+  "no_live_gui_input_device_provider_or_windows_runtime_execution": true,
+  "no_binding_generation_this_registration_slice": true,
+  "main_merged": false,
+  "old_worktrees_cleaned": false,
+  "preserved_failures": [
+    {
+      "path": "/tmp/vw-stream-producer-composition-clippy-20261019-initial.log",
+      "bytes": 1802,
+      "sha256": "c35c958c6fc4ee009e48492753dd62c1c129d94fd1119ec633f274122af91325"
+    },
+    {
+      "path": "/tmp/vw-stream-producer-composition-all-clippy-20261019.log",
+      "bytes": 1346,
+      "sha256": "31041fff0a8d844ec987de03559cc2eea873a171f0fab5940d042bbf7846665d"
+    }
+  ]
+}

@@ -15,6 +15,8 @@ blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pur
 ring = "=0.17.14"
 vw-model = { path = "../vw-model", version = "=0.1.0" }
 vw-geom = { path = "../vw-geom", version = "=0.1.0" }
+vw-stream = { path = "../vw-stream", version = "=0.1.0" }
+vw-proto = { path = "../vw-proto", version = "=0.1.0" }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "=0.62.2", features = [
@@ -25,7 +27,8 @@ windows = { version = "=0.62.2", features = [
     "Win32_System_Ole", "Win32_System_Variant", "Win32_System_Threading",
     "Win32_System_Performance", "Win32_System_WinRT", "Win32_System_WinRT_Graphics_Capture",
     "Win32_System_WinRT_Direct3D11", "Win32_UI_Accessibility", "Win32_UI_HiDpi",
-    "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_System_JobObjects"
+    "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_System_JobObjects",
+    "Win32_System_Diagnostics_ToolHelp"
 ] }
 
 [dev-dependencies]
@@ -34,3 +37,7 @@ tempfile = "=3.27.0"
 [[bin]]
 name = "vw-capture-helper"
 path = "src/bin/helper.rs"
+
+[[bin]]
+name = "vw-capture-stream-helper"
+path = "src/bin/stream_helper.rs"

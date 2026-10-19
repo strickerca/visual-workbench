@@ -9,6 +9,9 @@ pub use fixed_target::refreshed_target;
 mod image;
 pub mod picker;
 pub mod process;
+pub mod stream;
+pub mod stream_process;
+pub mod stream_wire;
 #[cfg(windows)]
 pub mod windows;
 pub use admission::*;

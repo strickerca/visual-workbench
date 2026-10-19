@@ -3352,6 +3352,8 @@ dependencies = [
  "thiserror",
  "vw-geom",
  "vw-model",
+ "vw-proto",
+ "vw-stream",
  "windows",
 ]
 

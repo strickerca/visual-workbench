@@ -189,13 +189,13 @@ class Distribution(unittest.TestCase):
         self.assertEqual(result["launcher"], r.EXE)
         self.assertEqual(result["native_inputs"], self.native)
         self.assertIn("runtime/lib/modules", result["files"])
-        self.assertEqual(set(r.NATIVES), {"vw-capture-helper.exe", "vw-connection-helper.exe",
+        self.assertEqual(set(r.NATIVES), {"vw-capture-helper.exe", "vw-capture-stream-helper.exe", "vw-connection-helper.exe",
             "vw-hevc-helper.exe", "vw-input-helper.exe", "vw-editor-probe.exe", "vw-paint-drawing-helper.exe", "vw_core.dll", "vw_host.dll"})
         self.assertEqual(set(result["native_inputs"]), set(r.NATIVES) | {"vw-bindgen.exe"})
 
     def test_remote_helpers_are_required_and_payload_hashes_are_bound(self):
         original = self.contents.copy()
-        for helper in ("vw-hevc-helper.exe", "vw-input-helper.exe", "vw-editor-probe.exe", "vw-paint-drawing-helper.exe"):
+        for helper in ("vw-capture-stream-helper.exe", "vw-hevc-helper.exe", "vw-input-helper.exe", "vw-editor-probe.exe", "vw-paint-drawing-helper.exe"):
             for mode, code in (("missing", "packaged_resources_missing"), ("substituted", "native_resource_binding")):
                 with self.subTest(helper=helper, mode=mode):
                     self.contents = original.copy()

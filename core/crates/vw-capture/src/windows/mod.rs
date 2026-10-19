@@ -4,6 +4,7 @@ pub mod hotkey;
 pub mod picker;
 mod picker_capture;
 pub mod region_hotkey;
+pub mod stream;
 pub use picker_capture::capture as capture_picker;
 mod uia;
 mod wgc;

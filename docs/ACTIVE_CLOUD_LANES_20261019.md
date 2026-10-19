@@ -46,6 +46,17 @@ remaining composition/shared capacity decisions and child method signatures are
 T3_STREAM_PLATFORM_ROOT_ADAPTERS_20261019.md; normal app stream entry points are
 not yet wired. Parent now accepts G edf28830 complete allocation repair; root composition follows.
 
+Root producer component increment: parent-accepted G edf28830 is composed with
+actual clock/protocol adaptation, module/bin/Cargo/ToolHelp/lock registration,
+open_budgeted actual pool injection and a ninth exact runtime helper. Its named
+native tests and strict all-target Clippy/format pass; runtime report33 and
+Desktop9 runtime/3 retirement cases pass with Windows packaging excluded. No
+actual foreign producer facade/shared capacity caller or normal app wiring is
+claimed. R b94fa553 is fetched and awaiting parent review; Android stream
+handback remains pending. F was redirected again from unrelated old formats
+9926a56 to current TUNNEL-005 control; preserve its dirty source and do not
+compose the wrong-task formats overlay as tunnel completion.
+
 | Lane | Current objective | Exact task contract / disposition |
 |---|---|---|
 | E backend/model | Actual pinned model/toolchain/reference-parity/artifact delivery | ASSISTED_MODEL_DELIVERY_HANDOFF_20261019.md. Giant repair47f76bf is accepted/composed. e28987e is composed as61c0ec8 and publishes actual host conversion/parity/tooling evidence; root31 offline tool tests pass; private Library archives are now available, but root signed downloads fail HTTPS proxy CONNECT403 before bytes; no conversion repeated. Android/license/runtime/memory admission remains closed. Unrelated old-main T3.07 e8ff4bf is preserved separately, not composed or model evidence |

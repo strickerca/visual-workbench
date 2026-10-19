@@ -64,7 +64,7 @@ internal class DesktopNativeRuntime private constructor(val directory: Path, pri
         if (closed.compareAndSet(false, true)) leases.asReversed().forEach { runCatching { it.close() } }
     }
     companion object {
-        private val names = setOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-hevc-helper.exe", "vw-input-helper.exe", "vw-editor-probe.exe", "vw-paint-drawing-helper.exe")
+        private val names = setOf("vw_core.dll", "vw_host.dll", "vw-connection-helper.exe", "vw-capture-helper.exe", "vw-capture-stream-helper.exe", "vw-hevc-helper.exe", "vw-input-helper.exe", "vw-editor-probe.exe", "vw-paint-drawing-helper.exe")
         private const val MAX_FILE = 256L * 1024 * 1024
         private const val MAX_TOTAL = 512L * 1024 * 1024
         private const val MANIFEST = "vw-native-runtime.sha256"
@@ -189,7 +189,7 @@ internal class DesktopNativeRuntime private constructor(val directory: Path, pri
         private data class CreatedFile(val path: Path, val key: Any?)
         private fun parseManifest(bytes: ByteArray): List<Entry> {
             if (bytes.size !in 1..4096 || bytes.any { it.toInt() !in 10..126 || it.toInt() in 11..31 }) throw NativeRuntimeFailure("The native runtime manifest is invalid.")
-            val pattern = Regex("([0-9a-f]{64}) ([1-9][0-9]{0,8}) (vw_core\\.dll|vw_host\\.dll|vw-connection-helper\\.exe|vw-capture-helper\\.exe|vw-hevc-helper\\.exe|vw-input-helper\\.exe|vw-editor-probe\\.exe|vw-paint-drawing-helper\\.exe)")
+            val pattern = Regex("([0-9a-f]{64}) ([1-9][0-9]{0,8}) (vw_core\\.dll|vw_host\\.dll|vw-connection-helper\\.exe|vw-capture-helper\\.exe|vw-capture-stream-helper\\.exe|vw-hevc-helper\\.exe|vw-input-helper\\.exe|vw-editor-probe\\.exe|vw-paint-drawing-helper\\.exe)")
             val entries = bytes.toString(Charsets.US_ASCII).lineSequence().filter(String::isNotEmpty).map { line ->
                 val match = pattern.matchEntire(line) ?: throw NativeRuntimeFailure("The native runtime manifest is invalid.")
                 val size = match.groupValues[2].toLong()

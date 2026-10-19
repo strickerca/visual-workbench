@@ -89,11 +89,11 @@ must match every requested source/frame/time field before transient transfer.
 
 ## G integration dependency, distinct from its held source review
 
-G a6268af6 is fetched/read but not composed. The parent reviewed its replacement
-9e970b5 and holds it for JSON workspace undercharging: a bounded 16 KiB header
-can allocate about 279 KiB against its 32 KiB reservation. The existing G owner
-pushed90d02999f0f2d6c70c9d82359468e811c784de05 for that repair; root has fetched
-it for inspection and must await parent review closure before composition.
+Parent accepts G edf2883041f4346c2bf91463ac543e9657584c06 after full JSON
+failure-path allocation review. Root now composes the repaired stack with
+module/bin/dependency/ToolHelp registration, current clock validation,
+open_budgeted pool injection and the exact ninth helper inventory. Actual
+foreign budget/lifetime facade and normal app callers remain code work.
 Its base predates these wire fields. The current root library supplies
 `EncodedTiles::with_captured_at_ms(actual_clock_ms)`, preserving its allocation
 charge and frame identity. At composition the producer must call it after
@@ -106,8 +106,8 @@ epoch/source correlation; that is different from the zero local payload fields.
 
 Root still owns approved G module/bin/Cargo/ToolHelp registration, exact helper
 runtime inventory, host FFI facade and actual selected-source producer wiring.
-Do not substitute the one-shot helper, self-hash an arbitrary executable or
-activate the held G source before its reviewed repair arrives.
+Do not substitute the one-shot helper or self-hash an arbitrary executable.
+The accepted registered component is not an active app capture workflow.
 
 ## Exact remaining code versus validation
 

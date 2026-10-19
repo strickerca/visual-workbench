@@ -1,0 +1,496 @@
+//! Private, length-delimited helper pipe. Headers are untrusted data; neither
+//! side treats their echoed owner/source fields as a capture grant.
+use crate::{
+    Error, FrameIdentity, Result,
+    stream::{OfferFeedback, StreamRequest, stream_error},
+};
+use serde::{Deserialize, Serialize};
+use std::io::{Read, Write};
+use vw_stream::{BudgetedBytes, Cancellation, MemoryCharge, MemoryKind, SessionBudget};
+
+pub const MAX_HEADER_BYTES: usize = 16 * 1024;
+pub const MAX_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
+const MAX_JSON_TOKENS: usize = 512;
+const MAX_JSON_DEPTH: usize = 16;
+const MAX_JSON_STRING_BYTES: usize = 1024;
+// Internally tagged Serde enums can temporarily materialize JSON Content
+// nodes before the variant is known. Bound that graph before deserialization:
+// at most 512 tokens, 16 levels, 1024 source bytes per string and 16 KiB total.
+// Four KiB per token covers map/vector growth and node metadata. Eight copies
+// of the text cover simultaneous decoded-string growth, typed values and Serde's
+// rejection-message formatting, including reallocation peaks. The extra 64 KiB
+// covers fixed parser/DTO state. The maximum charge is under 2.25 MiB.
+const JSON_NODE_WORK_BYTES: u64 = 4096;
+const JSON_TEXT_WORK_COPIES: u64 = 8;
+const JSON_FIXED_WORK_BYTES: u64 = 64 * 1024;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Command {
+    Open {
+        request: StreamRequest,
+    },
+    Poll {
+        sequence: u64,
+        connection_epoch: u64,
+        source_generation: u64,
+        feedback: Option<OfferFeedback>,
+        repair_keyframe: bool,
+    },
+    Original {
+        sequence: u64,
+        connection_epoch: u64,
+        source_generation: u64,
+        identity: FrameIdentity,
+    },
+    Stop {
+        sequence: u64,
+        connection_epoch: u64,
+        source_generation: u64,
+    },
+}
+impl Command {
+    pub fn sequence(&self) -> Option<u64> {
+        match self {
+            Self::Open { .. } => None,
+            Self::Poll { sequence, .. }
+            | Self::Original { sequence, .. }
+            | Self::Stop { sequence, .. } => Some(*sequence),
+        }
+    }
+    pub fn binding(&self) -> Option<(u64, u64)> {
+        match self {
+            Self::Open { .. } => None,
+            Self::Poll {
+                connection_epoch,
+                source_generation,
+                ..
+            }
+            | Self::Original {
+                connection_epoch,
+                source_generation,
+                ..
+            }
+            | Self::Stop {
+                connection_epoch,
+                source_generation,
+                ..
+            } => Some((*connection_epoch, *source_generation)),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "reply", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Header {
+    Ready {
+        request_hash: String,
+        connection_epoch: u64,
+        source_generation: u64,
+        ring_frames: usize,
+        ring_bytes: u64,
+        endpoint_bytes: u64,
+        border_visible: bool,
+    },
+    Tiles {
+        sequence: u64,
+        connection_epoch: u64,
+        source_generation: u64,
+        frame_id: u64,
+        timestamp_ns: u64,
+        captured_at_ms: i64,
+        keyframe: bool,
+        payload_bytes: u32,
+    },
+    Original {
+        sequence: u64,
+        connection_epoch: u64,
+        source_generation: u64,
+        identity: FrameIdentity,
+        asset_id: String,
+        payload_bytes: u32,
+    },
+    Idle {
+        sequence: u64,
+        connection_epoch: u64,
+        source_generation: u64,
+        retained_frames: usize,
+        retained_bytes: u64,
+    },
+    Refused {
+        sequence: u64,
+        connection_epoch: u64,
+        source_generation: u64,
+        error: Error,
+    },
+    Stopped {
+        sequence: u64,
+        connection_epoch: u64,
+        source_generation: u64,
+    },
+}
+impl Header {
+    pub fn sequence(&self) -> Option<u64> {
+        match self {
+            Self::Ready { .. } => None,
+            Self::Tiles { sequence, .. }
+            | Self::Original { sequence, .. }
+            | Self::Idle { sequence, .. }
+            | Self::Refused { sequence, .. }
+            | Self::Stopped { sequence, .. } => Some(*sequence),
+        }
+    }
+    pub fn binding(&self) -> (u64, u64) {
+        match self {
+            Self::Ready {
+                connection_epoch,
+                source_generation,
+                ..
+            }
+            | Self::Tiles {
+                connection_epoch,
+                source_generation,
+                ..
+            }
+            | Self::Original {
+                connection_epoch,
+                source_generation,
+                ..
+            }
+            | Self::Idle {
+                connection_epoch,
+                source_generation,
+                ..
+            }
+            | Self::Refused {
+                connection_epoch,
+                source_generation,
+                ..
+            }
+            | Self::Stopped {
+                connection_epoch,
+                source_generation,
+                ..
+            } => (*connection_epoch, *source_generation),
+        }
+    }
+    pub fn payload_len(&self) -> Result<usize> {
+        match self {
+            Self::Tiles { payload_bytes, .. }
+                if *payload_bytes as usize <= vw_stream::MAX_TILE_BYTES + 64 * 1024 =>
+            {
+                Ok(*payload_bytes as usize)
+            }
+            Self::Original { payload_bytes, .. }
+                if *payload_bytes as usize <= MAX_PAYLOAD_BYTES =>
+            {
+                Ok(*payload_bytes as usize)
+            }
+            Self::Tiles { .. } | Self::Original { .. } => Err(Error::Limit),
+            _ => Ok(0),
+        }
+    }
+}
+
+pub struct Packet {
+    pub header: Header,
+    pub payload: BudgetedBytes,
+    _header_charge: MemoryCharge,
+}
+impl Packet {
+    pub fn belongs_to(&self, budget: &SessionBudget) -> bool {
+        self.payload.charge().belongs_to(budget) && self._header_charge.belongs_to(budget)
+    }
+}
+pub struct ReceivedCommand {
+    pub command: Command,
+    _charge: MemoryCharge,
+}
+
+fn write_header<W: Write, T: Serialize>(
+    output: &mut W,
+    value: &T,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<()> {
+    let mut owned = BudgetedBytes::allocate(budget, MemoryKind::Transfer, MAX_HEADER_BYTES, cancel)
+        .map_err(stream_error)?;
+    let mut cursor = std::io::Cursor::new(owned.bytes_mut());
+    serde_json::to_writer(&mut cursor, value).map_err(|_| Error::Limit)?;
+    let size = usize::try_from(cursor.position()).map_err(|_| Error::Limit)?;
+    if size == 0 || size > MAX_HEADER_BYTES {
+        return Err(Error::Limit);
+    }
+    cancel.check().map_err(stream_error)?;
+    output
+        .write_all(&u32::try_from(size).map_err(|_| Error::Limit)?.to_le_bytes())
+        .and_then(|()| output.write_all(&owned.bytes()[..size]))
+        .map_err(|_| Error::Platform)
+}
+// Allocation-free lexical census. Serde still validates the full JSON grammar;
+// this gate refuses inputs that could make its tagged-enum buffering large.
+fn json_workspace(bytes: &[u8]) -> Result<u64> {
+    let mut tokens = 0usize;
+    let mut depth = 0usize;
+    let mut quoted = false;
+    let mut escaped = false;
+    let mut atom = false;
+    let mut string_bytes = 0usize;
+    for &byte in bytes {
+        if quoted {
+            if byte < 0x20 || byte == 0x7f {
+                // No platform source identifier needs raw control/DEL bytes.
+                // Refuse them before Serde formats a potentially long error.
+                return Err(Error::Invalid);
+            }
+            if byte == b'"' && !escaped {
+                quoted = false;
+                continue;
+            }
+            string_bytes += 1;
+            if string_bytes > MAX_JSON_STRING_BYTES {
+                return Err(Error::Limit);
+            }
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            }
+            continue;
+        }
+        match byte {
+            b'"' => {
+                quoted = true;
+                string_bytes = 0;
+                atom = false;
+                tokens += 1;
+            }
+            b'{' | b'[' => {
+                depth += 1;
+                if depth > MAX_JSON_DEPTH {
+                    return Err(Error::Limit);
+                }
+                atom = false;
+                tokens += 1;
+            }
+            b'}' | b']' => {
+                depth = depth.checked_sub(1).ok_or(Error::Invalid)?;
+                atom = false;
+                tokens += 1;
+            }
+            b':' | b',' => {
+                atom = false;
+                tokens += 1;
+            }
+            b' ' | b'\t' | b'\r' | b'\n' => atom = false,
+            _ => {
+                if !atom {
+                    tokens += 1;
+                    atom = true;
+                }
+            }
+        }
+        if tokens > MAX_JSON_TOKENS {
+            return Err(Error::Limit);
+        }
+    }
+    if quoted || depth != 0 || tokens == 0 {
+        return Err(Error::Invalid);
+    }
+    Ok(JSON_FIXED_WORK_BYTES
+        + JSON_NODE_WORK_BYTES * tokens as u64
+        + JSON_TEXT_WORK_COPIES * bytes.len() as u64)
+}
+
+fn read_header_with<R: Read, T>(
+    input: &mut R,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+    parse: impl FnOnce(&[u8]) -> Result<T>,
+) -> Result<(T, MemoryCharge)> {
+    cancel.check().map_err(stream_error)?;
+    let mut len = [0u8; 4];
+    input.read_exact(&mut len).map_err(|_| Error::Platform)?;
+    let n = u32::from_le_bytes(len) as usize;
+    if n == 0 || n > MAX_HEADER_BYTES {
+        return Err(Error::Limit);
+    }
+    let mut owned =
+        BudgetedBytes::allocate(budget, MemoryKind::Transfer, n, cancel).map_err(stream_error)?;
+    input
+        .read_exact(owned.bytes_mut())
+        .map_err(|_| Error::Platform)?;
+    cancel.check().map_err(stream_error)?;
+    let workspace = json_workspace(owned.bytes())?;
+    // Keep the whole graph charge with the command/packet through its lifetime.
+    // No Serde call runs until this specific lexical bound is admitted.
+    let dto_charge = budget
+        .reserve(MemoryKind::Transfer, workspace)
+        .map_err(stream_error)?;
+    let parsed = parse(owned.bytes())?;
+    Ok((parsed, dto_charge))
+}
+fn read_header<R: Read, T: for<'de> Deserialize<'de>>(
+    input: &mut R,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<(T, MemoryCharge)> {
+    read_header_with(input, budget, cancel, |bytes| {
+        serde_json::from_slice(bytes).map_err(|_| Error::Invalid)
+    })
+}
+pub fn write_command<W: Write>(
+    output: &mut W,
+    command: &Command,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<()> {
+    write_header(output, command, budget, cancel)?;
+    output.flush().map_err(|_| Error::Platform)
+}
+pub fn command_hash(
+    command: &Command,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<String> {
+    let mut owned = BudgetedBytes::allocate(budget, MemoryKind::Transfer, MAX_HEADER_BYTES, cancel)
+        .map_err(stream_error)?;
+    let mut cursor = std::io::Cursor::new(owned.bytes_mut());
+    serde_json::to_writer(&mut cursor, command).map_err(|_| Error::Limit)?;
+    let size = usize::try_from(cursor.position()).map_err(|_| Error::Limit)?;
+    if size == 0 || size > MAX_HEADER_BYTES {
+        return Err(Error::Limit);
+    }
+    Ok(vw_model::AssetId::hash(&owned.bytes()[..size]).to_string())
+}
+pub fn read_command<R: Read>(
+    input: &mut R,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<ReceivedCommand> {
+    let (command, charge) = read_header(input, budget, cancel)?;
+    Ok(ReceivedCommand {
+        command,
+        _charge: charge,
+    })
+}
+pub fn write_packet<W: Write>(
+    output: &mut W,
+    header: &Header,
+    payload: &[u8],
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<()> {
+    if header.payload_len()? != payload.len() {
+        return Err(Error::Invalid);
+    }
+    write_header(output, header, budget, cancel)?;
+    cancel.check().map_err(stream_error)?;
+    output
+        .write_all(payload)
+        .and_then(|()| output.flush())
+        .map_err(|_| Error::Platform)
+}
+pub fn read_packet<R: Read>(
+    input: &mut R,
+    budget: &SessionBudget,
+    cancel: &Cancellation,
+) -> Result<Packet> {
+    let (header, header_charge): (Header, MemoryCharge) = read_header(input, budget, cancel)?;
+    let len = header.payload_len()?;
+    let mut payload =
+        BudgetedBytes::allocate(budget, MemoryKind::Transfer, len, cancel).map_err(stream_error)?;
+    input
+        .read_exact(payload.bytes_mut())
+        .map_err(|_| Error::Platform)?;
+    cancel.check().map_err(stream_error)?;
+    Ok(Packet {
+        header,
+        payload,
+        _header_charge: header_charge,
+    })
+}
+
+#[cfg(test)]
+mod allocation_tests {
+    use super::*;
+    use std::{cell::Cell, io::Cursor};
+
+    #[test]
+    fn hostile_near_maximum_header_never_enters_allocating_deserializer() {
+        let mut json = b"{\"command\":\"poll\"".to_vec();
+        while json.len() + b",\"x\":0".len() < 16_029 {
+            json.extend_from_slice(b",\"x\":0");
+        }
+        json.resize(16_029, b' ');
+        json.push(b'}');
+        assert_eq!(json.len(), 16_030);
+        let mut wire = (json.len() as u32).to_le_bytes().to_vec();
+        wire.extend_from_slice(&json);
+        // The former 16 KiB DTO reservation let this class of header enter
+        // Serde with only 32,414 bytes admitted. It can buffer many Content
+        // nodes before rejecting the duplicate/unknown fields.
+        let budget = SessionBudget::new(32_414).expect("budget");
+        let called = Cell::new(false);
+        let result: Result<((), MemoryCharge)> = read_header_with(
+            &mut Cursor::new(wire),
+            &budget,
+            &Cancellation::default(),
+            |_| {
+                called.set(true);
+                Ok(())
+            },
+        );
+        assert!(matches!(result, Err(Error::Limit)));
+        assert!(!called.get());
+        assert_eq!(budget.used_bytes(), 0);
+    }
+
+    #[test]
+    fn admitted_shape_reserves_its_calculated_workspace_before_parse() {
+        let json = br#"{"command":"stop","sequence":1,"connection_epoch":2,"source_generation":3}"#;
+        let workspace = json_workspace(json).expect("shape");
+        assert!(workspace > MAX_HEADER_BYTES as u64);
+        let mut wire = (json.len() as u32).to_le_bytes().to_vec();
+        wire.extend_from_slice(json);
+        let budget = SessionBudget::new(json.len() as u64 + workspace - 1).expect("budget");
+        let called = Cell::new(false);
+        let result: Result<((), MemoryCharge)> = read_header_with(
+            &mut Cursor::new(wire),
+            &budget,
+            &Cancellation::default(),
+            |_| {
+                called.set(true);
+                Ok(())
+            },
+        );
+        assert!(matches!(result, Err(Error::Limit)));
+        assert!(!called.get());
+        assert_eq!(budget.used_bytes(), 0);
+    }
+
+    #[test]
+    fn long_or_control_bearing_header_string_is_refused_before_deserialization() {
+        for value in [vec![b'x'; 8_533], vec![0x7f; 8_533]] {
+            let mut json = b"{\"reply\":\"ready\",\"request_hash\":\"\\\\".to_vec();
+            json.extend_from_slice(&value);
+            json.extend_from_slice(b"\"}");
+            let mut wire = (json.len() as u32).to_le_bytes().to_vec();
+            wire.extend_from_slice(&json);
+            let budget = SessionBudget::new(112_297).expect("budget");
+            let called = Cell::new(false);
+            let result: Result<((), MemoryCharge)> = read_header_with(
+                &mut Cursor::new(wire),
+                &budget,
+                &Cancellation::default(),
+                |_| {
+                    called.set(true);
+                    Ok(())
+                },
+            );
+            assert!(matches!(result, Err(Error::Invalid | Error::Limit)));
+            assert!(!called.get());
+            assert_eq!(budget.used_bytes(), 0);
+        }
+    }
+}
