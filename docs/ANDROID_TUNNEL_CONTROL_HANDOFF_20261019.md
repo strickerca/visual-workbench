@@ -31,6 +31,9 @@ The root call sequence is:
    controlling launch and burns the challenge. After an uncertain retirement
    or failed replacement the owner is sealed; call `close()` and, if needed,
    `retry_retirements()` until the old Job and IO are proved retired.
+   A changed device, dead mirror or changed binary observed while consuming a
+   supplied permit also burns that permit and seals the owner; restoring the
+   old census cannot make the same permit usable again.
 5. Capture callers must retain `mirror_revision()` from the current owner and
    pass it into `check_source(source, revision)` before capture/readback or
    publication. Reusing an old mirror revision returns `Stale`; the native
@@ -39,6 +42,10 @@ The root call sequence is:
    or closed; it does not assert that a phone input event was delivered.
    `revoke_control()` closes the exact owned mirror/IO. A return to viewing
    requires a new owner session and challenge.
+
+Revocation and later retirement retries attempt mirror shutdown even if active
+adb IO or scratch cleanup fails. The owner remains retained until both cleanup
+and process retirement succeed; a partial success is never reported as closed.
 
 The root still owns the native/shared FFI, actual UI confirmation, session
 controller wiring, runtime/license registration, and source-loop guard hooks.

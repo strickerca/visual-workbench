@@ -115,6 +115,10 @@ impl OwnerControlPermit {
         Ok(())
     }
 
+    pub(super) fn reject(&mut self) {
+        self.consumed = true;
+    }
+
     #[cfg(test)]
     pub(super) fn synthetic_for_test(
         challenge: &ControlChallenge,

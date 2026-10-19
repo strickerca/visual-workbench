@@ -197,6 +197,7 @@ struct MockState {
     launches: Vec<control::InteractionMode>,
     retire_failures: usize,
     retire_count: usize,
+    close_mirror_attempts: usize,
     next_pid: u32,
     binary_identity: [u8; 32],
     cancel_on_retire: Option<Arc<session::Cancellation>>,
@@ -217,6 +218,7 @@ impl Default for MockState {
             launches: Vec::new(),
             retire_failures: 0,
             retire_count: 0,
+            close_mirror_attempts: 0,
             next_pid: 4242,
             binary_identity: [7; 32],
             cancel_on_retire: None,
@@ -303,13 +305,18 @@ impl session::Runner for MockRunner {
     }
     fn close(&mut self) -> super::Result<()> {
         let mut state = self.0.lock().unwrap_or_else(|e| e.into_inner());
-        assert!(!state.active_io);
         state.closes += 1;
+        let io_pending = state.active_io;
+        if state.mirror_alive {
+            state.close_mirror_attempts += 1;
+            state.mirror_alive = false;
+        }
         if state.close_failures > 0 {
             state.close_failures -= 1;
             Err(Error::RetirementPending)
+        } else if io_pending {
+            Err(Error::RetirementPending)
         } else {
-            state.mirror_alive = false;
             Ok(())
         }
     }
@@ -607,11 +614,16 @@ fn owner_pairs_exact_commands_and_retains_unknown_close_until_retry() -> super::
         Some(Error::RetirementPending)
     );
     assert_eq!(active.close(), Err(Error::RetirementPending));
-    assert_eq!(fourth.lock().unwrap_or_else(|e| e.into_inner()).closes, 0);
+    {
+        let state = fourth.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(state.closes, 1);
+        assert_eq!(state.close_mirror_attempts, 1);
+        assert!(!state.mirror_alive);
+    }
     active.close()?;
     let fourth = fourth.lock().unwrap_or_else(|e| e.into_inner());
     assert_eq!(fourth.settles, 3);
-    assert_eq!(fourth.closes, 1);
+    assert_eq!(fourth.closes, 2);
     assert!(fourth.queue.is_empty());
     drop(fourth);
 
@@ -795,6 +807,87 @@ fn owner_pairs_exact_commands_and_retains_unknown_close_until_retry() -> super::
     assert_eq!(state.retire_count, 1);
     drop(state);
 
+    let revoke_io = Arc::new(Mutex::new(MockState {
+        queue: VecDeque::from([listed(), listed(), listed(), listed()]),
+        ..MockState::default()
+    }));
+    let mut owner = session::AndroidTunnelOwner::open_with(
+        Box::new(MockRunner(revoke_io.clone())),
+        Box::new(MockProbe),
+        selection()?,
+        [16; 16],
+        16,
+        &fresh,
+    )?;
+    let challenge = owner.control_challenge(&fresh)?;
+    let mut permit =
+        control::OwnerControlPermit::synthetic_for_test(&challenge, Duration::from_secs(5))?;
+    owner.enable_control(Some(&mut permit), &fresh)?;
+    {
+        let mut state = revoke_io.lock().unwrap_or_else(|e| e.into_inner());
+        state.active_io = true;
+        state.settle_failures = 1;
+    }
+    assert_eq!(owner.revoke_control(), Err(Error::RetirementPending));
+    assert_eq!(
+        owner.interaction_state(),
+        control::InteractionState::RetirementPending
+    );
+    {
+        let state = revoke_io.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(state.close_mirror_attempts, 1);
+        assert!(!state.mirror_alive);
+        assert!(state.active_io);
+    }
+    owner.close()?;
+    assert_eq!(owner.interaction_state(), control::InteractionState::Closed);
+    assert_eq!(
+        revoke_io.lock().unwrap_or_else(|e| e.into_inner()).closes,
+        2
+    );
+
+    let retained_io = Arc::new(Mutex::new(MockState {
+        queue: VecDeque::from([listed()]),
+        ..MockState::default()
+    }));
+    let mut owner = session::AndroidTunnelOwner::open_with(
+        Box::new(MockRunner(retained_io.clone())),
+        Box::new(MockProbe),
+        selection()?,
+        [18; 16],
+        18,
+        &fresh,
+    )?;
+    {
+        let mut state = retained_io.lock().unwrap_or_else(|e| e.into_inner());
+        state.active_io = true;
+        state.settle_failures = 3;
+    }
+    assert_eq!(owner.revoke_control(), Err(Error::RetirementPending));
+    assert_eq!(
+        retained_io
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .close_mirror_attempts,
+        1
+    );
+    drop(owner);
+    assert_eq!(session::retry_retirements()?, 1);
+    assert_eq!(
+        retained_io
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .close_mirror_attempts,
+        1
+    );
+    assert_eq!(session::retry_retirements()?, 0);
+    assert!(
+        !retained_io
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .active_io
+    );
+
     let pending_mode = Arc::new(Mutex::new(MockState {
         queue: VecDeque::from([listed(), listed(), listed()]),
         retire_failures: 1,
@@ -896,6 +989,51 @@ fn owner_pairs_exact_commands_and_retains_unknown_close_until_retry() -> super::
     );
     owner.close()?;
 
+    let changed_device =
+        b"List of devices attached\nUSB124\tdevice usb:1-1 model:SM_S918U transport_id:7\n\n";
+    let device_mismatch = Arc::new(Mutex::new(MockState {
+        queue: VecDeque::from([
+            listed(),
+            listed(),
+            (
+                vec!["devices".into(), "-l".into()],
+                reply(0, changed_device),
+            ),
+        ]),
+        ..MockState::default()
+    }));
+    let mut owner = session::AndroidTunnelOwner::open_with(
+        Box::new(MockRunner(device_mismatch.clone())),
+        Box::new(MockProbe),
+        selection()?,
+        [17; 16],
+        17,
+        &fresh,
+    )?;
+    let challenge = owner.control_challenge(&fresh)?;
+    let mut permit =
+        control::OwnerControlPermit::synthetic_for_test(&challenge, Duration::from_secs(5))?;
+    assert_eq!(
+        owner.enable_control(Some(&mut permit), &fresh),
+        Err(Error::Stale)
+    );
+    assert_eq!(
+        permit.consume(&challenge, Instant::now()),
+        Err(Error::Consent)
+    );
+    assert_eq!(
+        owner.interaction_state(),
+        control::InteractionState::RetirementPending
+    );
+    assert_eq!(
+        device_mismatch
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .launches,
+        vec![control::InteractionMode::ViewOnly]
+    );
+    owner.close()?;
+
     let disconnected = Arc::new(Mutex::new(MockState {
         queue: VecDeque::from([listed(), listed(), listed()]),
         ..MockState::default()
@@ -918,6 +1056,10 @@ fn owner_pairs_exact_commands_and_retains_unknown_close_until_retry() -> super::
     assert_eq!(
         owner.enable_control(Some(&mut permit), &fresh),
         Err(Error::RetirementPending)
+    );
+    assert_eq!(
+        permit.consume(&challenge, Instant::now()),
+        Err(Error::Consent)
     );
     assert_eq!(
         owner.interaction_state(),
@@ -954,6 +1096,10 @@ fn owner_pairs_exact_commands_and_retains_unknown_close_until_retry() -> super::
     assert_eq!(
         owner.enable_control(Some(&mut permit), &fresh),
         Err(Error::RuntimeUnavailable)
+    );
+    assert_eq!(
+        permit.consume(&challenge, Instant::now()),
+        Err(Error::Consent)
     );
     assert_eq!(
         changed_binary

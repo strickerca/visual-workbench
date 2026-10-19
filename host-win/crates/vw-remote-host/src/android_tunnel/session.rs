@@ -315,10 +315,13 @@ pub fn retry_retirements() -> Result<usize> {
         };
         if cleaned {
             *scratch = None;
-            if runner.close().is_ok() {
-                list.remove(index);
-                continue;
-            }
+        }
+        // A failed scratch/IO cleanup must not postpone retirement of the
+        // independently owned mirror. Retain the runner until both settle.
+        let retired = runner.close().is_ok();
+        if cleaned && retired {
+            list.remove(index);
+            continue;
         }
         index += 1;
     }
@@ -583,7 +586,21 @@ impl AndroidTunnelOwner {
         permit: Option<&mut OwnerControlPermit>,
         cancel: &Cancellation,
     ) -> Result<()> {
-        let challenge = self.control_challenge(cancel)?;
+        let challenge = match self.control_challenge(cancel) {
+            Ok(challenge) => challenge,
+            Err(error) => {
+                // A changed/unknown device, process, or binary identity cannot
+                // leave the same owner grant available for a later retry.
+                if error != Error::Cancelled
+                    && let Some(permit) = permit
+                {
+                    permit.reject();
+                    self.control_nonce = None;
+                    self.sealed = true;
+                }
+                return Err(error);
+            }
+        };
         let permit = permit.ok_or(Error::Consent)?;
         let admitted = permit.consume(&challenge, std::time::Instant::now());
         // Even a mismatched/expired permit burns this challenge. Root must
@@ -813,11 +830,14 @@ impl AndroidTunnelOwner {
                 Err(Error::RetirementPending)
             };
         }
-        self.settle_scratch()
-            .map_err(|_| Error::RetirementPending)?;
-        self.runner()?
-            .close()
-            .map_err(|_| Error::RetirementPending)?;
+        self.sealed = true;
+        let scratch = self.settle_scratch();
+        // Always attempt owned mirror shutdown, even when an adb command or
+        // scratch cleanup remains uncertain. Neither failure releases owner.
+        let retirement = self.runner()?.close();
+        if scratch.is_err() || retirement.is_err() {
+            return Err(Error::RetirementPending);
+        }
         self.runner = None;
         self.permit = None;
         self.sealed = true;

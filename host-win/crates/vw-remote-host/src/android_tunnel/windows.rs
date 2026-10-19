@@ -686,12 +686,18 @@ impl Runner for WindowsJobRunner {
         Ok(pid)
     }
     fn retire_mirror(&mut self) -> Result<()> {
-        self.close_active()?;
+        let io = self.close_active();
         let mirror = self.mirror.as_ref().ok_or(Error::RetirementPending)?;
-        mirror.retire(Duration::from_secs(2))?;
-        self.mirror = None;
-        *self.mirror_handle.lock().unwrap_or_else(|e| e.into_inner()) = None;
-        Ok(())
+        let retirement = mirror.retire(Duration::from_secs(2));
+        if retirement.is_ok() {
+            self.mirror = None;
+            *self.mirror_handle.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        }
+        if io.is_err() || retirement.is_err() {
+            Err(Error::RetirementPending)
+        } else {
+            Ok(())
+        }
     }
     fn mirror_alive(&self) -> Result<bool> {
         match &self.mirror {
@@ -712,11 +718,11 @@ impl Runner for WindowsJobRunner {
         self.close_active()
     }
     fn close(&mut self) -> Result<()> {
-        self.close_active()?;
         if self.mirror.is_some() {
-            self.retire_mirror()?;
+            self.retire_mirror()
+        } else {
+            self.close_active()
         }
-        Ok(())
     }
 }
 
