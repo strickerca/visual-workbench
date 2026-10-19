@@ -22,9 +22,13 @@ pub const VERIFICATION_REVIEW_HISTORY_MAX_ROWS: u32 = 8;
 pub const VERIFICATION_REVIEW_HISTORY_MAX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_NOTE: usize = 32 * 1024;
 const MAX_NOTES: usize = 128 * 1024;
-// Read only bounded key previews and scalar admission metadata. Byte-prefix
-// matching also catches malformed BLOB keys regardless of GLOB compile options.
-const HISTORY_ADMISSION_SQL: &str = "SELECT typeof(key),length(CAST(key AS BLOB)),typeof(value),length(CAST(value AS BLOB)),substr(CAST(key AS BLOB),1,?3) FROM settings WHERE substr(CAST(key AS BLOB),1,?1)=CAST(?2 AS BLOB) LIMIT ?4";
+// The immediate ASCII successor of the fixed prefix's final '.' bounds every
+// namespace key, including malformed suffixes. Separate TEXT/BLOB ranges use
+// settings' existing primary-key index; applying substr/CAST to WHERE's key
+// would scan unrelated settings even for an empty history. Projections read
+// only scalar admission metadata and bounded key previews, never raw notes.
+const VERIFICATION_REVIEW_PREFIX_END: &str = "vw.verification-review.v1/";
+const HISTORY_ADMISSION_SQL: &str = "SELECT typeof(key),length(CAST(key AS BLOB)),typeof(value),length(CAST(value AS BLOB)),substr(CAST(key AS BLOB),1,?3) FROM settings WHERE key>=?1 AND key<?2 UNION ALL SELECT typeof(key),length(CAST(key AS BLOB)),typeof(value),length(CAST(value AS BLOB)),substr(CAST(key AS BLOB),1,?3) FROM settings WHERE key>=CAST(?1 AS BLOB) AND key<CAST(?2 AS BLOB) LIMIT ?4";
 
 #[derive(Debug, thiserror::Error)]
 pub enum VerificationReviewError {
@@ -335,8 +339,8 @@ struct HistoryRow {
 fn history_rows(connection: &Connection) -> VerificationReviewResult<Vec<HistoryRow>> {
     let mut statement = connection.prepare(HISTORY_ADMISSION_SQL)?;
     let mut query = statement.query(params![
-        VERIFICATION_REVIEW_PREFIX.len() as i64,
         VERIFICATION_REVIEW_PREFIX,
+        VERIFICATION_REVIEW_PREFIX_END,
         (VERIFICATION_REVIEW_PREFIX.len() + 64) as i64,
         (VERIFICATION_REVIEW_MAX_ROWS + 1) as i64,
     ])?;
