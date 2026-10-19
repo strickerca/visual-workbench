@@ -92,6 +92,27 @@ class GiantAndroidCanvasInstrumentedTest {
             assertTrue(checkNotNull(owner.frame).generation>old.generation)
         } finally { withContext(NonCancellable) { owner.close() }; parent.cancel() }
     }
+    @Test fun composedModeUsesEditingTilesAndRefusesASourceFrameAtDraw() = runBlocking {
+        val parent=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
+        val source=Source();val pool=Resources();var editingCalls=0;var approved=false
+        val editing=object:GiantImage by source,GiantEditingImage {
+            override suspend fun editingTile(address:GiantTileAddress,foreign:SessionResourceCharge,
+                assumeUntaggedSrgb:Boolean):GiantTilePixels {
+                editingCalls++;approved=assumeUntaggedSrgb;return tile()
+            }
+        }
+        val owner=GiantAndroidCanvas.create(parent,editing,pool,binding,1L,{_,_->true},{},{},
+            content=GiantTileContent.Composed,assumeUntaggedSrgb=true)
+        try {
+            withContext(Dispatchers.Main.immediate){owner.update(Core(),camera,PrecisionFrame())}
+            until{owner.status.ready}
+            val frame=checkNotNull(owner.matchingFrame(binding,1L,view,GiantTileContent.Composed))
+            assertEquals(GiantTileContent.Composed,frame.content)
+            assertNull(owner.matchingFrame(binding,1L,view,GiantTileContent.Source))
+            assertEquals(1,editingCalls);assertTrue(approved)
+        } finally {withContext(NonCancellable){owner.close()};parent.cancel()}
+        assertTrue(source.closed);assertEquals(0uL,pool.used)
+    }
     @Test fun failedFactoryCleanupReturnsTheExactOwnerForRootQuarantine() = runBlocking {
         val parent = CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
         val source = Source().apply { failClose=true }

@@ -34,6 +34,8 @@ internal class GiantAndroidCanvas private constructor(
     private val binding: WorkflowBinding,
     private val epoch: Long,
     private val isCurrent: (WorkflowBinding, Long) -> Boolean,
+    val content: GiantTileContent,
+    private val assumeUntaggedSrgb: Boolean,
     private val retireSurface: suspend () -> Unit,
     private val changed: () -> Unit,
 ) {
@@ -58,7 +60,7 @@ internal class GiantAndroidCanvas private constructor(
     }
     val frame: GiantVisibleFrame<Bitmap>? get() {
         val view = latestView ?: return null
-        return matchingFrame(binding, epoch, view)
+        return matchingFrame(binding, epoch, view, content)
     }
 
     private val backend = object : GiantRenderBackend<Bitmap> {
@@ -85,7 +87,7 @@ internal class GiantAndroidCanvas private constructor(
     private fun install(scope: CoroutineScope) {
         val onMain = CoroutineScope(scope.coroutineContext + Dispatchers.Main.immediate)
         val session = GiantViewportSession(onMain, image, backend, binding, epoch,
-            isCurrent, resources, GIANT_ANDROID_TILE_BYTES)
+            isCurrent, resources, GIANT_ANDROID_TILE_BYTES, content, assumeUntaggedSrgb)
         viewport = session
         observer = onMain.launch(start = CoroutineStart.UNDISPATCHED) {
             session.state.collect { if (published && !sealed) changed() }
@@ -109,17 +111,20 @@ internal class GiantAndroidCanvas private constructor(
 
     /** Root repeats this at actual draw, under its render-session fence, and
      * must not reuse the returned frame after that reader/pipeline retires. */
-    fun matchingFrame(binding: WorkflowBinding, epoch: Long, viewport: GiantViewport): GiantVisibleFrame<Bitmap>? {
+    fun matchingFrame(binding: WorkflowBinding, epoch: Long, viewport: GiantViewport,
+        expectedContent: GiantTileContent = content): GiantVisibleFrame<Bitmap>? {
         val value = candidate ?: return null
         val state = status
         if (!surfaceReserved || !state.ready || value.generation != state.generation ||
-            this.binding != binding || this.epoch != epoch || latestView != viewport ||
+            this.binding != binding || this.epoch != epoch || content != expectedContent ||
+            value.content != expectedContent || latestView != viewport ||
             !isCurrent(binding, epoch) || !value.matches(binding, epoch, viewport)) return null
         // Recheck publication after callbacks/state reads; root owns the exact
         // draw/retirement lock, this read alone is not a graphics retirement ACK.
         val finalState = status
         return value.takeIf { candidate === it && surfaceReserved && finalState.ready &&
-            finalState.generation == it.generation && latestView == viewport && isCurrent(binding, epoch) }
+            finalState.generation == it.generation && it.content == expectedContent &&
+            latestView == viewport && isCurrent(binding, epoch) }
     }
 
     suspend fun close(): Unit = withContext(NonCancellable + Dispatchers.Main.immediate) {
@@ -142,10 +147,13 @@ internal class GiantAndroidCanvas private constructor(
     companion object {
         suspend fun create(scope: CoroutineScope, image: GiantImage, resources: SessionResources,
             binding: WorkflowBinding, epoch: Long, isCurrent: (WorkflowBinding, Long) -> Boolean,
-            retireSurface: suspend () -> Unit, changed: () -> Unit): GiantAndroidCanvas {
+            retireSurface: suspend () -> Unit, changed: () -> Unit,
+            content: GiantTileContent = GiantTileContent.Source,
+            assumeUntaggedSrgb: Boolean = false): GiantAndroidCanvas {
             // Allocate the cleanup owner BEFORE the first suspension; never lose
             // acquired resources to prompt cancellation of a dispatcher return.
-            val owner = GiantAndroidCanvas(image, resources, binding, epoch, isCurrent, retireSurface, changed)
+            val owner = GiantAndroidCanvas(image, resources, binding, epoch, isCurrent,
+                content, assumeUntaggedSrgb, retireSurface, changed)
             try {
                 currentCoroutineContext().ensureActive()
                 scope.coroutineContext[Job]?.ensureActive()

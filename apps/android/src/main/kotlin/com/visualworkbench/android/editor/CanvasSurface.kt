@@ -184,7 +184,13 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         if (state != null) enqueue(target, state)
     }
 
-    private fun wet(scene: CanvasScene) = scene.provisional.isNotEmpty() || scene.transformed.isNotEmpty() || scene.hidden.isNotEmpty() || scene.documentDraft!=null
+    private fun wet(scene: CanvasScene): Boolean {
+        val composed = (scene.document.hasToneAdjustments && scene.background != null) ||
+            scene.giantFrame?.content == com.visualworkbench.shared.GiantTileContent.Composed
+        val baked = bakedCanonicalIds(scene.document, composed)
+        return scene.provisional.isNotEmpty() || scene.transformed.isNotEmpty() ||
+            transientHiddenIds(scene.hidden, baked).isNotEmpty() || scene.documentDraft != null
+    }
 
     private fun drawOwned(canvas:Canvas,snapshot:CanvasScene,target:RenderSession) {
         if(snapshot.giantMode){
