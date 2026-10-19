@@ -29,17 +29,25 @@ and translated failed-marker regions against saved crops before host work.
 Native pair/source currentness uses checked geometry rather than the temporary
 frame refusal. The ordinary scalar path is retained for unframed packages.
 
-Cheap isolated Kotlin compilation and execution passed five normalized-pixel
-regression methods plus the complete synthetic workflow routing probe (including
-framed semantic comparison/failure routing, rotated after-frame image
-registration, partial-crop refusal and historical source mismatch). Rustfmt
-and whitespace checks passed. Native FFI/package
+The reproducible cheap probe is
+`python3 apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/probe_verification_workflow.py`.
+It now compiles the normalized helper and supplies the coordinate API stub;
+96 focused Kotlin cases pass, including five normalized-pixel methods, framed
+semantic comparison/failure routing, rotated after-frame image registration,
+partial-crop refusal and historical source mismatch. Its temporary declarations
+and classes are disposed. Rustfmt and whitespace checks passed. Native FFI/package
 tests, generated-binding compilation, full Desktop/ABI and real capture/device
 acceptance are **unrun**: the parent holds the shared heavy slot. Exact deferred
 checks after root composition: `cargo test --locked --offline -p vw-ffi verification -j2`,
 `cargo test --locked --offline -p vw-package verification_geometry:: -j2`, and
 the focused Desktop verification tests. No OS recapture, actual target
 registration or A30 pass is claimed.
+
+The P2 follow-up excludes `vw_model::IMAGE_OUTPUT_LAYER_KIND` when native
+failure authoring chooses a layer. A framed-after integration regression places
+that reserved layer before the ordinary art layer, compiles one failed marker,
+and checks the follow-up retains the after frame and original-marker lineage.
+That native regression is authored but **unrun** pending the shared build slot.
 
 Base `47f2b82da1799a8481af7e92998f5ea56dc9c087`; branch
 `cloud/t5-01-history-20261018`; grant

@@ -41,8 +41,10 @@ private fun assertTrue(value:Boolean){check(value)}
 private fun assertTrue(message:String,value:Boolean){check(value){message}}
 private fun assertFalse(value:Boolean){check(!value)}
 private fun assertEquals(expected:Any?,actual:Any?){check(expected==actual){"Expected=$expected actual=$actual"}}
+private fun assertArrayEquals(expected:ByteArray,actual:ByteArray){check(expected.contentEquals(actual))}
 private fun assertSame(expected:Any?,actual:Any?){check(expected===actual)}
 private fun assertNull(value:Any?){check(value==null)}
+private fun assertNotNull(value:Any?){check(value!=null)}
 private fun fail(message:String):Nothing=error(message)
 private inline fun <reified T:Throwable> assertFailsWith(noinline block:()->Unit):T {
     try{block()}catch(error:Throwable){check(error is T);return error};error("Expected failure")
@@ -60,8 +62,13 @@ with tempfile.TemporaryDirectory(prefix='vw-verification-workflow-') as scratch:
     sources['WorkflowBinding.kt'] = 'package com.visualworkbench.shared\n' + binding[0]
     for name in ('PackagesApi.kt', 'McpInboxApi.kt'):
         sources[name] = (shared / name).read_text().split('public expect')[0]
+    verification_api = (shared / 'VerificationApi.kt').read_text()
+    coordinate_expect = ('public expect suspend fun verificationCoordinates(catalog: WorkbenchPackageCatalog,\n'
+                         '    pair: VerificationPair): VerificationCoordinatePair')
+    assert verification_api.count(coordinate_expect) == 1
+    verification_api = verification_api.replace(coordinate_expect, '')
     sources['VerificationApi.kt'] = re.sub(r'^public expect fun verification(?:Workflows|History)\([^\n]*(?:\n    [^\n]*)?', '',
-        (shared / 'VerificationApi.kt').read_text(), flags=re.MULTILINE)
+        verification_api, flags=re.MULTILINE)
     if args.legacy_failure_budget_negative_control:
         current = 'memoryBudgetBytes: ULong = 256uL * 1024uL * 1024uL'
         assert sources['VerificationApi.kt'].count(current) == 1
@@ -74,6 +81,8 @@ with tempfile.TemporaryDirectory(prefix='vw-verification-workflow-') as scratch:
 public fun verificationWorkflows(original:WorkbenchProject,after:WorkbenchProject,catalog:WorkbenchPackageCatalog,inbox:WorkbenchMcpInbox):WorkbenchVerification=error("JNI intentionally unavailable in focused probe")
 @Suppress("UNUSED_PARAMETER")
 public fun verificationHistory(original:WorkbenchProject):WorkbenchVerificationHistory=error("JNI intentionally unavailable in focused probe")
+@Suppress("UNUSED_PARAMETER")
+public suspend fun verificationCoordinates(catalog:WorkbenchPackageCatalog,pair:VerificationPair):VerificationCoordinatePair=error("JNI intentionally unavailable in focused probe")
 '''
     host = (production / 'DesktopMcpHost.kt').read_text()
     sources['OwnerTypes.kt'] = 'package com.visualworkbench.desktop.mcp\n' + host[host.index('/** These callbacks'):host.index('/** Terminate')]
@@ -103,6 +112,11 @@ public fun verificationHistory(original:WorkbenchProject):WorkbenchVerificationH
     assert len(registration_names) == 13
     registration_tests = '\n'.join(line for line in registration_tests.splitlines() if not line.startswith('import org.junit.')).replace('@Test ', '')
     sources['RegistrationSelectedTests.kt'] = registration_tests + helpers
+    normalization_tests = (tests / 'McpNormalizedVerificationTest.kt').read_text()
+    normalization_names = re.findall(r'@Test fun (\w+)\(', normalization_tests)
+    assert len(normalization_names) == 5
+    normalization_tests = '\n'.join(line for line in normalization_tests.splitlines() if not line.startswith('import org.junit.')).replace('@Test ', '')
+    sources['NormalizationSelectedTests.kt'] = normalization_tests + helpers
     recovery_tests = (tests / 'McpCaptureSourceRecoveryTest.kt').read_text()
     recovery_names = re.findall(r'@Test fun (\w+)\(', recovery_tests)
     assert len(recovery_names) == 18
@@ -131,6 +145,7 @@ internal object DesktopMcpService {
 '''
     coordinator_calls = ['println("RUN ' + name + '")\nMcpCoordinatorTest().' + name + '()\nprintln("PASS ' + name + '")' for name in coordinator_names]
     coordinator_calls += ['McpImageRegistrationTest().' + name + '()\nprintln("PASS ' + name + '")' for name in registration_names]
+    coordinator_calls += ['McpNormalizedVerificationTest().' + name + '()\nprintln("PASS ' + name + '")' for name in normalization_names]
     coordinator_calls += ['McpCaptureSourceRecoveryTest().' + name + '()\nprintln("PASS ' + name + '")' for name in recovery_names]
     coordinator_calls += ['McpStartupTest().' + name + '()\nprintln("PASS ' + name + '")' for name in startup_names]
     sources['CoordinatorProbe.kt'] = 'package com.visualworkbench.desktop.mcp\nfun main(){\n' + '\n'.join(coordinator_calls) + '\n}\n'
@@ -140,7 +155,7 @@ internal object DesktopMcpService {
         path.write_text(text)
         files.append(str(path))
     files += [str(shared / 'VerificationInteraction.kt'), str(jvm / 'PackageOwnership.kt')]
-    files += [str(production / name) for name in ('McpJson.kt','McpVerificationTargets.kt','McpMarkerAssessments.kt','McpSemanticMarkerAlignment.kt','McpImageRegistration.kt','McpVerificationWorkflow.kt','McpCaptureSourceRecovery.kt','DesktopMcpLifetime.kt')]
+    files += [str(production / name) for name in ('McpJson.kt','McpVerificationTargets.kt','McpMarkerAssessments.kt','McpSemanticMarkerAlignment.kt','McpImageRegistration.kt','McpNormalizedVerification.kt','McpVerificationWorkflow.kt','McpCaptureSourceRecovery.kt','DesktopMcpLifetime.kt')]
     files += [str(tests / 'McpVerificationWorkflowProbe.kt')]
     output = scratch / 'classes'
     command = [str(java), '-Xmx384m', '-cp', str(lib / '*'), 'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler', '-no-stdlib', '-no-reflect', '-Werror', '-jvm-target', '21', '-classpath', classpath, '-d', str(output), *files]
