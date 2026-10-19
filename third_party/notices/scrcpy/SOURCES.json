@@ -1,0 +1,54 @@
+{
+  "schema": "vw.scrcpy-source-notices.v1",
+  "notice_scope": "Public tagged source text; actual dynamic DLL license remains unverified",
+  "files": [
+    {
+      "path": "scrcpy-v4.1-Apache-2.0.txt",
+      "component": "scrcpy 4.1",
+      "source_terms": "Apache-2.0",
+      "source_url": "https://github.com/Genymobile/scrcpy/blob/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0/LICENSE",
+      "bytes": 11387,
+      "sha256": "01c12035bf35af37241298dc7ad538eb2a07e5c940437bc6876feeaa9d1951d0"
+    },
+    {
+      "path": "ffmpeg-8.1.2-LGPL-2.1.txt",
+      "component": "FFmpeg 8.1.2",
+      "source_terms": "LGPL-2.1-or-later source terms",
+      "source_url": "https://github.com/FFmpeg/FFmpeg/blob/1c2c67c0b9f7f66ab32c19dcf7f227bcd290aa4c/COPYING.LGPLv2.1",
+      "bytes": 26517,
+      "sha256": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30"
+    },
+    {
+      "path": "ffmpeg-8.1.2-LICENSE.md",
+      "component": "FFmpeg 8.1.2",
+      "source_terms": "FFmpeg source license summary and external component obligations",
+      "source_url": "https://github.com/FFmpeg/FFmpeg/blob/1c2c67c0b9f7f66ab32c19dcf7f227bcd290aa4c/LICENSE.md",
+      "bytes": 4346,
+      "sha256": "2e1d16c72fd74e12063776371da757322f8b77589386532f4fd8634bde7de1af"
+    },
+    {
+      "path": "libusb-1.0.30-LGPL-2.1.txt",
+      "component": "libusb 1.0.30",
+      "source_terms": "LGPL-2.1-or-later source terms",
+      "source_url": "https://github.com/libusb/libusb/blob/87a55632db62c9bdc58cd31d3ccfa673f1bb017f/COPYING",
+      "bytes": 26436,
+      "sha256": "5df07007198989c622f5d41de8d703e7bef3d0e79d62e24332ee739a452af62a"
+    },
+    {
+      "path": "SDL-3.4.12-LICENSE.txt",
+      "component": "SDL 3.4.12",
+      "source_terms": "Zlib source terms",
+      "source_url": "https://github.com/libsdl-org/SDL/blob/f87239e71e42da91ca317a12eefb82cfbf3393eb/LICENSE.txt",
+      "bytes": 884,
+      "sha256": "1c040b8271b37e5076359f8fd54240e371114112924d2df81ef87c7d6a1dfdfd"
+    },
+    {
+      "path": "dav1d-1.5.3-COPYING.txt",
+      "component": "dav1d 1.5.3",
+      "source_terms": "BSD-2-Clause source terms",
+      "source_url": "https://github.com/videolan/dav1d/blob/0664c109d1b85503bc32bf89920f951cacf5702e/COPYING",
+      "bytes": 1317,
+      "sha256": "dd92c3c2247c5651606fc23a5e2d6a1ebc5ace9a3e49cbde0e12f05ad1cb1ee5"
+    }
+  ]
+}

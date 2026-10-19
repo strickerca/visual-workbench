@@ -1,0 +1,122 @@
+{
+  "archive": {
+    "bytes": 11305298,
+    "sha256": "5b12172b3264b2889f4583ee64752ce832e29bc8b1089dca81093459697165db",
+    "url": "https://github.com/Genymobile/scrcpy/releases/download/v4.1/scrcpy-win64-v4.1.zip"
+  },
+  "excluded": [
+    {
+      "bytes": 108184,
+      "disposition": "excluded; never extracted",
+      "name": "AdbWinApi.dll",
+      "sha256": "120bef587119c6cb926b86b9be90fdfbce38937588eae28cd91a94ce63c7b965"
+    },
+    {
+      "bytes": 73368,
+      "disposition": "excluded; never extracted",
+      "name": "AdbWinUsbApi.dll",
+      "sha256": "6ca69a2ca0e31309c087d288f058977d421ad03500e4c3e1dbd981241a069c60"
+    },
+    {
+      "bytes": 8485016,
+      "disposition": "excluded; never extracted",
+      "name": "adb.exe",
+      "sha256": "957e46b8615f7af5b7292a2ddabe98d2e61940c3fb2b0545756507f080613e71"
+    },
+    {
+      "bytes": 5,
+      "disposition": "excluded; never extracted",
+      "name": "open_a_terminal_here.bat",
+      "sha256": "843758795a84d0d035a7d277ad29cc1ff1702048b4b61ae74b9e3439ae683423"
+    },
+    {
+      "bytes": 212,
+      "disposition": "excluded; never extracted",
+      "name": "scrcpy-noconsole.vbs",
+      "sha256": "3ccda94c161f18cef07c50d4d3c4913eb883d4b0fe3b939c35fae52784fb1d2b"
+    }
+  ],
+  "files": [
+    {
+      "architecture": null,
+      "bytes": 11387,
+      "name": "LICENSE.txt",
+      "role": "scrcpy-license-text",
+      "sha256": "01c12035bf35af37241298dc7ad538eb2a07e5c940437bc6876feeaa9d1951d0"
+    },
+    {
+      "architecture": "PE32+ AMD64 (0x8664)",
+      "bytes": 5366478,
+      "name": "SDL3.dll",
+      "role": "sdl-dynamic",
+      "sha256": "0619eb2da6032984dc6e2098897aeacdbd66b0415bb87bc03e628159ba60b15d"
+    },
+    {
+      "architecture": "PE32+ AMD64 (0x8664)",
+      "bytes": 8603648,
+      "name": "avcodec-62.dll",
+      "role": "ffmpeg-dynamic",
+      "sha256": "7179de2b132e78eb0a76458a0a3859dfe1edcbb6d2eeb4a456f03f7ae96d5b66"
+    },
+    {
+      "architecture": "PE32+ AMD64 (0x8664)",
+      "bytes": 723456,
+      "name": "avformat-62.dll",
+      "role": "ffmpeg-dynamic",
+      "sha256": "7232316acce00371d89f589748b570d95885ea6bbfc1972a0a9d3b884903eee1"
+    },
+    {
+      "architecture": "PE32+ AMD64 (0x8664)",
+      "bytes": 1039360,
+      "name": "avutil-60.dll",
+      "role": "ffmpeg-dynamic",
+      "sha256": "3d6170dd68549c6f39b8d8710a37f79d9678905df705a8b0a6bc7ea9037daddf"
+    },
+    {
+      "architecture": null,
+      "bytes": 4703,
+      "name": "disconnected.png",
+      "role": "client-resource",
+      "sha256": "e394873cd3e2cc3ab0cca6212b10ed2a8a0fad11a05675c8a9fa6f26f3ae12c0"
+    },
+    {
+      "architecture": "PE32+ AMD64 (0x8664)",
+      "bytes": 227005,
+      "name": "libusb-1.0.dll",
+      "role": "libusb-dynamic",
+      "sha256": "8ec130918a476b0dbd114c803e71314360608ceabdd2b6f38c83f6f208c608e0"
+    },
+    {
+      "architecture": null,
+      "bytes": 733706,
+      "name": "scrcpy-server",
+      "role": "android-server",
+      "sha256": "deacb991ed2509715160ffdc7907e47b4160eb30d1566217e9047fd5b8850cae"
+    },
+    {
+      "architecture": "PE32+ AMD64 (0x8664)",
+      "bytes": 720524,
+      "name": "scrcpy.exe",
+      "role": "client",
+      "sha256": "575ca1284345c7b3975585bc61b66d564a9a4f1ecb28fbb4c599c92a124054a9"
+    },
+    {
+      "architecture": null,
+      "bytes": 6530,
+      "name": "scrcpy.png",
+      "role": "client-resource",
+      "sha256": "8e8ca237898faa16014cdd118396af53405b423f3db0508c50cc3edce08eb313"
+    },
+    {
+      "architecture": "PE32+ AMD64 (0x8664)",
+      "bytes": 139776,
+      "name": "swresample-6.dll",
+      "role": "ffmpeg-dynamic",
+      "sha256": "4cc809d2cd822e186906fbc9d8a0acffa937e35de1282b2e2ab7346cfed96fed"
+    }
+  ],
+  "license_state": "pending-actual-DLL-review; not admitted for distribution",
+  "schema": "vw.scrcpy-prepared.v1",
+  "server_sha256": "deacb991ed2509715160ffdc7907e47b4160eb30d1566217e9047fd5b8850cae",
+  "version": "4.1"
+}
