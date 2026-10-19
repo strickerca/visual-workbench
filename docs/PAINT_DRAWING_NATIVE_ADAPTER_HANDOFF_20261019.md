@@ -1,5 +1,13 @@
 # Root native drawing adapter preparation
 
+Current root integration supersedes the earlier pending-factory/barrier sections
+below. `remote_drawing.rs`, `remote_drawing_gate.rs`, the actual serial host input
+worker and `NativeDrawingRuntimeAccess.kt` now implement that source path. P's
+scoped c2098fe handle is composed as9103cf5; F55505c6 repair as32befbd. See
+`evidence/PAINT_CONCRETE_NATIVE_INTEGRATION_20261019.json` for exact source hashes,
+phase tests and remaining Windows/binding/app/runtime gates. This new root source
+is a final-review candidate, not a passed Windows or hardware implementation.
+
 Root's current source adds `NativeRemoteDrawingOwner.kt` and wires the real
 `NativeRemoteEdit` capability to its session consumer registry. The actual
 foreign access is deliberately absent from the normal factory until the

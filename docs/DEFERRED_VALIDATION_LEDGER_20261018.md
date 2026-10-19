@@ -422,3 +422,25 @@ validate every intermediate redirect; bound inventory reads. Its composed
 source remains an inactive held candidate and no runtime admission was added.
 Root must compose the repair before treating preparation as accepted or merging
 that held source to main. Earlier6-case results remain narrow fixture evidence.
+
+
+## Concrete Paint integration source candidate, 2026-10-19
+
+Actual factory/Main helper hash, optional peer reservation, serial host helper
+retirement/resume, scoped source/authorization/currentness, completed native
+cache and P per-run cleanup handle are implemented. P c2098fe ->9103cf5 and
+F55505c6 ->32befbd are composed; F admission still waits independent closure and
+actual DLL/native notice evidence. New root source awaits final review.
+Linux library check passes with the existing ProviderAdapter warning; native
+admission9/network80/geometry5/owned giant publication1 and common16/native-owner
+13/importer16/file5/source-stamp3 scopes pass separately. F11 offline cases pass.
+Native graph checks also repaired missing vw-package->vw-geom registration and
+a stale giant test to use the real prepared delivery/lease API.
+
+MSVC cross-check stops before the new Windows source in cc-rs because lib.exe is
+absent. Fresh coherent core/host bindings, actual foreign gateway/Compose/apps/
+JNI/native Windows tests and Paint/focus/capture/input/physical journeys remain
+unrun. No stale generated-jar compile is acceptance. No GUI/capture/provider or
+device was executed; model admission, blocked Library transfer and old worktrees
+remain unchanged. Exact evidence and failure-log hashes are in
+PAINT_CONCRETE_NATIVE_INTEGRATION_20261019.json.

@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "date_utc": "2026-10-19T04:55:55.548314+00:00",
+  "kind": "concrete Paint native factory, input reservation and publication integration source candidate",
+  "accepted_predecessor": "e13d6a541098f32a705ef40e9f83ec97b7e92615",
+  "root_pre_source_head": "36b1d64c8a9d41122a53a59bf1ce270e8365f01b",
+  "source_sha256": {
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": "7b68ab0ef88a0865cab3b1adf9cffe0ec51eb93f157c0493139ecb16ae237b97",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/remote/RemoteDrawingCheckPanel.kt": "51e0315ba9b1d9ea8469e2ce878e8d9dce823bbfe1da692828bb1c7a4b546cef",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteDrawingCheck.kt": "5080ee22a29b2020adacb8236217ba9463d3859d04b79ece4e65392252bd3952",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCompatibilityRuntimeAccess.kt": "e817204ee20a9be261f2feb0cf2a3c96bbc5133ab74d047cb09078b3cb47e6b7",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeRemoteDrawingOwner.kt": "2ce6930cde4bd72fbfc2b40b2ccb239c7b0ab878718fa1cf8c02abd488da6c73",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeRemoteEdit.kt": "4ebe1fc717698cfb60cf60c6ee9b8f55e83616b25c1aa82e651d5819704291eb",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeSessions.kt": "5b2f8b07b1957636a80fb6372b9b90d4b41d0ce5d3c0570b8e079209e400dc13",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/NativeDrawingOwnerCases.kt": "df0e99dc969a2602090c9df3efae2f976a728c7acab02d3159e522f9d2cac492",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/RemoteDrawingCheckCases.kt": "7f0aa5b53ac8b030c2f6ef5a41234ee6d711df91972a8f89067f9337cd551b9a",
+    "contracts/vw_protocol.proto": "e53dbe2ac9807147ddb135bfd8440add28687d4ea99a0086504450f72da5f586",
+    "core/crates/vw-ffi/src/session/link.rs": "293f51861efcb31f2dceb303313c815d485068f46eb66bd59b2161bf0d7ae2de",
+    "core/crates/vw-ffi/src/session/remote_admission.rs": "c4de8cadd4d488e5212b69a45732ef009bceb42be33603cdefc11c8333badf6b",
+    "core/crates/vw-ffi/src/session/remote_commands.rs": "b006d5e9266d8e2eae4383dcbb1418c2a2d9f8851737fce0cca3b03b6217140e",
+    "core/crates/vw-ffi/src/session/remote_compatibility.rs": "31da13396352b52806bf00ab0c0211dad062f18698bf6a7cb0879af7338ea741",
+    "core/crates/vw-ffi/src/session/remote_edit.rs": "7c663b8c942bfb24b26bfc0ca7dd80cd433de359b562a90c2ee163bb2fc72640",
+    "core/crates/vw-ffi/src/session/remote_host.rs": "9df50866525ecc1efbdd861819357edf943ad87f7f4f6b718a0b183f0d17bc27",
+    "core/crates/vw-ffi/src/session/remote_retired.rs": "48fa11abfe5a30c77d09de223338ca614ab9857e1a83f6973234c8d5248f06d8",
+    "core/crates/vw-net/src/session.rs": "8c1d19d72b1b1481b60c6e59013279dc4e0aedd3c5e3576a6d5b06f869f31d09",
+    "core/crates/vw-remote/src/applied.rs": "82f940a818e3a66252fc0b4b6d7fe9595484b011040b2b1a293a031cac0a51ba",
+    "host-win/crates/vw-remote-host/src/platform/mod.rs": "f4b2c48b31a5557885e37c7b21c8cd66850651e12a7f55661bc1b3fef4366976",
+    "tools/tests/check_paint_source_scope.py": "55c7ca46536116c73d71bcfa139d433e8c20412b153ec231485852d2fe96757f",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeDrawingRuntimeAccess.kt": "28985799615d9c7d254be84fc6dab138448e57fe16883f8217efaa335ef7da19",
+    "core/crates/vw-ffi/src/session/remote_drawing.rs": "f4b3d007f1671a1f610cb1f10fc37c70ae60f45c44b88bd8733bd0ecf4e25a99",
+    "core/crates/vw-ffi/src/session/remote_drawing_gate.rs": "c10b6bcf73bbf35f7b0d70779582ff38860e51f4a9cb7aa4d4c3c48539d398ca"
+  },
+  "worker_composition": {
+    "P_retirement": "c2098fe350c4fba2646fc6efd742af96a5f62b7b -> 9103cf5; exact handle taken before run_confirmed, actual per-run retry/status retained",
+    "F_repair": "55505c6a9237d8c825ec5d79ff98b6a572fef99f -> 32befbd; 11 scoped tests pass; parent independent closure/admission pending"
+  },
+  "implemented": [
+    "normal NativeLink factory supplies actual foreign drawing gateway; Main passes eighth packaged helper path/hash",
+    "bilateral optional paint_drawing_check_v1 capability and closed drawing CONTROL reservation; no fabricated input sequence or ACK",
+    "peer native admission requires settled contact/queue/rendered pen coverage; actual host serial input worker closes old helper with Job/IO/zero-held proof before query preparation",
+    "global native owner fence blocks other sessions from granting input while helper permit is parked; same scoped input helper reopens with fresh authority only after safe retirement",
+    "one-shot native P producer with exact native SourceLease, context hash including actual helper hashes, native UUID marker/sample ids and serialized source/grant/cancel authorization",
+    "final native source plus fresh helper tool/settings query and session/grant/runtime/cancel checks before source-owned evidence cache/publication",
+    "query-only controls remain NotTested; file receipt path can select only exact hash of existing same-session owned completed evidence after fresh controls validation",
+    "per-run failed P owner/source/Job/IO/private files/exclusion retained; unknown canvas never becomes restored; stale-owner abort cannot pause successor",
+    "Desktop actual confirmation window disposed before Run/Cancel, selected-source foreground restoration without bypass, outside-pointer keyboard instructions; recovery status exposed while cleanup stays pending"
+  ],
+  "validation": {
+    "linux_native_library": "PASS; one existing ProviderAdapter dead-code warning; no new gate warnings",
+    "ffi_admission_tests": 9,
+    "network_phase_tests": 80,
+    "package_geometry_tests": 5,
+    "owned_giant_publication_tests": 1,
+    "common_drawing_lifecycle_cases": 16,
+    "native_owner_boundary_cases": 13,
+    "existing_importer_groups": 16,
+    "existing_desktop_file_guards": 5,
+    "scope_predicate_cases": 3,
+    "scrcpy_offline_cases": 11,
+    "scope": "Each count is its own named source/boundary scope, not a combined app/runtime gate. Common JVM compiler is cached Kotlin2.4.0 with strict API/warnings denied; no fake generated APIs."
+  },
+  "log_sha256": {
+    "linux_library": "110365a361d9972e1b14c4f53e95252f0a71b580bd0970739ffe53b92c3a77cd",
+    "ffi_admission": "8d5a343d1f3187f237557365b127b48c803e3523ec58ec001d96f1fce78bc9bb",
+    "network_phase": "ed6ff97b8821d064207ab2f9e865333353253738b62e9d4a357036782c7075d1",
+    "jvm_boundaries": "6ff662aec067e1117005730d7e501a354df081d0e69398d43ec98114d5814be1",
+    "source_stamp": "ee6776647ea775835681c208b3a6e26fb54cdb709ee685bf75a1925f421b72b9",
+    "geometry": "69ce365419d9dedcdd68b6814b8f987d353252e0f61181044eb9dd496c6f1ea3",
+    "giant_publication": "b1a43873c2fc8fa5b1b74427a763320fb63e4585ba23ac238cd73f46f280ea73",
+    "scrcpy": "a753a61bbd66b614c67a60ed94a734f70863220a816d6a064364b1e97a253671",
+    "msvc_blocker": "e674c4872e244e5a3a7304b882be4d4e9280df1d6bc09456ebf5bac27c975e91"
+  },
+  "preserved_failures": [
+    "/tmp/vw-concrete-drawing-ffi-check-20261019.log: composed geometry missing existing vw-geom dependency; manifest/lock repaired",
+    "/tmp/vw-concrete-drawing-ffi-check-20261019-second.log: new private method visibility; corrected",
+    "/tmp/vw-drawing-admission-tests-20261019.log: prior giant publication test called retired tile API; updated to actual prepared delivery with lease before bytes"
+  ],
+  "blockers": [
+    "MSVC cross-check stopped in cc-rs before Windows integration compilation: missing lib.exe; no toolchain/security change attempted",
+    "Fresh coherent core/host bindings and actual NativeDrawingRuntimeAccess/NativeRemoteEdit/Compose/apps/JNI compilation/runtime remain deferred; stale generated jars are not acceptance",
+    "P Windows/helper/UIA/WGC/focus/drawing/retirement journeys and physical pen/device/user gates unrun",
+    "F actual DLL configuration/native aggregate notices and runtime admission remain held; production model catalog/null pins and private Library CONNECT403 unchanged"
+  ],
+  "review": "new concrete root integration source awaits parent final review; earlier e13d6a54 acceptance does not cover this source",
+  "no_actual_gui_capture_input_provider_or_device_execution": true
+}
