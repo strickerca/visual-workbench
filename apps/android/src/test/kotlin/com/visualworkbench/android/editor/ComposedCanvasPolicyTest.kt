@@ -3,6 +3,11 @@
 package com.visualworkbench.android.editor
 
 import com.visualworkbench.shared.*
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -32,14 +37,33 @@ class ComposedCanvasPolicyTest {
         assertEquals(setOf("art","result"),baked) // Original pixels remain until commit.
     }
 
-    @Test fun orderedChangeStillReloadsPixelsWhenUndoRemovesTheLastTone() {
+    @Test fun orderedChangeStillReloadsPixelsWhenUndoRemovesAnEstablishedTone() {
         val obligation=ComposedReloadObligation()
         assertFalse(obligation.needsReload(false))
-        obligation.revokeComposedPixels() // Observe hides the stale bitmap before the new document arrives.
+        obligation.arm() // Observe hides the stale composed bitmap before the new document arrives.
         assertTrue(obligation.pending)
         assertTrue(obligation.needsReload(false)) // The refreshed document has no tone.
         obligation.settle()
         assertFalse(obligation.needsReload(false))
         assertTrue(obligation.needsReload(true))
+    }
+
+    @Test fun firstToneUndoBeforeAdoptionSurvivesCancellationFailureAndRepeatedChanges() = runBlocking {
+        val obligation=ComposedReloadObligation()
+        val held=CompletableDeferred<Unit>()
+        val first=launch(start=CoroutineStart.UNDISPATCHED) {
+            obligation.arm() // First tone clears source pixels, then awaits composition.
+            held.await()
+            obligation.settle()
+        }
+        obligation.arm() // Ordered undo arrives before any composed bitmap exists.
+        assertTrue(obligation.needsReload(false))
+        first.cancelAndJoin() // The stale composition is discarded before adoption.
+        assertTrue(obligation.pending)
+        obligation.arm() // A second ordered change cannot consume the reload.
+        runCatching { obligation.arm(); error("background decode failed") }
+        assertTrue(obligation.needsReload(false))
+        obligation.settle() // The exact current ordinary background is adopted.
+        assertFalse(obligation.needsReload(false))
     }
 }

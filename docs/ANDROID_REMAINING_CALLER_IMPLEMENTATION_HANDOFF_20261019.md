@@ -28,8 +28,10 @@ The other checkout's uncommitted work was preserved. Krita remains deferred.
   GiantAndroidCanvas binds immutable Source/Composed mode and the source-specific
   color choice to one existing viewport owner. Draw admission stays atomic on the
   graphics thread. Native levels above 2 remain an explicit composed-tile limit.
-  AND7 carries a reload obligation after hiding stale composed pixels on an
-  ordered change, including undo of the last saved tone.
+  AND7 arms a reload obligation before first ordinary tone composition clears
+  source pixels, and on ordered changes from a tone document. It survives
+  failure, cancellation and repeated changes until a current bitmap is adopted,
+  including undo of the last tone before first composition completes.
 - `8f94190`, `8e75eaa`, `4399716`: the document picker exposes PDF-compatible AI
   to the PDF/password importer, whose native intake requires a PDF signature.
   The bounded 64 MiB ordinary provider staging now calls native PSD/PSB
@@ -55,8 +57,9 @@ additional format staging seam used under the remaining-caller directive.
 
 ## Checks and limits
 
-`git diff --check`, staged-byte secret-pattern checks, and six focused source-order
-checks for the receipt guard, reload, retirement and giant cleanup passed. Newly authored Android unit and device
+`git diff --check`, staged-byte secret-pattern checks, six focused source-order
+checks for the receipt guard, reload, retirement and giant cleanup, and five
+first-adoption reload order checks passed. Newly authored Android unit and device
 tests cover baked draw classification, composed giant mode, provider refusal,
 source-reference fencing, last-tone reload, stale assisted retirement and export
 receipt limits/escapes; they have **not run**. No aggregate Gradle/ABI/lint,
