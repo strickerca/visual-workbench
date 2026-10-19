@@ -15,9 +15,25 @@ internal enum class OrdinaryImportKind { Image, FlattenedComposite, RawPreview, 
 internal fun ordinaryImportKind(suffix: String): OrdinaryImportKind = when (suffix.removePrefix(".").lowercase(Locale.ROOT)) {
     "png", "jpg", "jpeg", "webp", "heic", "heif", "avif", "bmp", "tif", "tiff" -> OrdinaryImportKind.Image
     "psd", "psb" -> OrdinaryImportKind.FlattenedComposite
-    "dng", "cr2", "nef", "arw" -> OrdinaryImportKind.RawPreview
+    "dng", "cr2" -> OrdinaryImportKind.RawPreview
     "ai" -> OrdinaryImportKind.PdfCompatibleAi
     else -> OrdinaryImportKind.Unsupported
+}
+
+/** A content provider's display name selects the explicit route; only a name
+ * without an extension may use one of the picker's exact ordinary-image MIME
+ * types. Decoder/native byte checks remain authoritative for every route. */
+internal fun ordinaryImportKindForFile(title: String, mime: String?): OrdinaryImportKind {
+    val suffix=title.substringAfterLast('.',"")
+    if(suffix.isNotEmpty())return ordinaryImportKind(suffix)
+    return when(mime?.lowercase(Locale.ROOT)) {
+        "image/png","image/jpeg","image/webp","image/heic","image/heif","image/avif",
+        "image/bmp","image/tiff" -> OrdinaryImportKind.Image
+        "image/vnd.adobe.photoshop","application/vnd.adobe.photoshop" -> OrdinaryImportKind.FlattenedComposite
+        "image/x-adobe-dng" -> OrdinaryImportKind.RawPreview
+        "image/x-canon-cr2" -> OrdinaryImportKind.RawPreview
+        else -> OrdinaryImportKind.Unsupported
+    }
 }
 
 internal suspend fun createOrdinaryImageProject(kind: OrdinaryImportKind, core: WorkbenchStreamingCore, options: CreateFileProject): WorkbenchProject = when (kind) {

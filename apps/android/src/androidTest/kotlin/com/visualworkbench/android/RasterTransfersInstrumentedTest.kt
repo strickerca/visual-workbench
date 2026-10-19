@@ -43,6 +43,8 @@ class RasterTransfersInstrumentedTest {
         private val pipeEnds = mutableListOf<ParcelFileDescriptor>()
         val opened = CompletableDeferred<ParcelFileDescriptor>()
         val outputWriterOpens = AtomicInteger()
+        var displayName = "Synthetic original.png"
+        var mediaType = "image/png"
         fun stallInput() { val pipe = ParcelFileDescriptor.createPipe(); pipeEnds.addAll(pipe); inputOverride = pipe[0] }
         fun stallOutput() { val pipe = ParcelFileDescriptor.createPipe(); pipeEnds.addAll(pipe); outputOverride = pipe[1] }
         val context = object : ContextWrapper(actual) {
@@ -57,8 +59,8 @@ class RasterTransfersInstrumentedTest {
             finally { bitmap.recycle() }
             val provider=object:ContentProvider(){
                 override fun onCreate()=true
-                override fun query(uri:Uri,projection:Array<out String>?,selection:String?,selectionArgs:Array<out String>?,sortOrder:String?):Cursor = MatrixCursor(arrayOf(OpenableColumns.DISPLAY_NAME)).also { it.addRow(arrayOf("Synthetic original.png")) }
-                override fun getType(uri:Uri)="image/png"
+                override fun query(uri:Uri,projection:Array<out String>?,selection:String?,selectionArgs:Array<out String>?,sortOrder:String?):Cursor = MatrixCursor(arrayOf(OpenableColumns.DISPLAY_NAME)).also { it.addRow(arrayOf(displayName)) }
+                override fun getType(uri:Uri)=mediaType
                 override fun insert(uri:Uri,values:ContentValues?):Uri?=null
                 override fun update(uri:Uri,values:ContentValues?,selection:String?,selectionArgs:Array<out String>?)=0
                 override fun delete(uri:Uri,selection:String?,selectionArgs:Array<out String>?):Int = if(uri==output&&destination.delete())1 else 0
@@ -92,6 +94,19 @@ class RasterTransfersInstrumentedTest {
                 try { assertEquals(63,pixels.width);assertEquals(49,pixels.height);assertEquals(0xff456789.toInt(),pixels.getPixel(30,20)) } finally { pixels.recycle() }
                 assertTrue(stages.any{it.contains("Rendering")});assertTrue(stages.any{it.contains("Saving")});fixture.assertNoWorkspaces()
             } finally { withContext(NonCancellable){project.close()} }
+        }
+    }
+    @Test fun unsupportedRawAndAiNeverReachAnImageDecoderOrOpenSource() = runBlocking {
+        for(name in listOf("unsupported.NEF","PDF drawing.ai")) Fixture().use { fixture ->
+            fixture.displayName=name;fixture.mediaType="application/octet-stream"
+            val decoder=object:WorkbenchStreamingCore {
+                override suspend fun createFile(options:CreateFileProject):WorkbenchProject = error("image decoder was reached")
+            }
+            try {
+                RasterTransfers(fixture.context).importImage(fixture.input,decoder,{_,_,_->error("project options were reached")}){}
+                fail("unsupported intake reached the source")
+            } catch (_:IllegalArgumentException) { }
+            assertFalse(fixture.opened.isCompleted);fixture.assertNoWorkspaces()
         }
     }
 
