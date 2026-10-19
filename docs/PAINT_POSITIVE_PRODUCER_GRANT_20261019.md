@@ -163,3 +163,42 @@ failure/disposal tests. Root's nine evaluator tests validate numeric admissibili
 not the actual producer. Windows/native/ABI/app/real experiment and physical
 acceptance remain deferred; use cheap focused source checks and the parent heavy
 slot rule. No per-small-commit binding regeneration.
+
+## Current root composition and adapter handback
+
+P is now active onbd13132d. Root composed the accepted Android b1a6f94 stack
+and V2ec0b15 including00f1f26, preserving both lanes' source. Do not overlay their
+roots when returning the producer.
+
+Root has authored the real common UI lifetime in `RemoteDrawingCheck.kt` and a
+conditional Desktop confirmation dialog. The actual private gateway contract is
+`RemoteDrawingCheckCapability.prepareDrawingCheck(expected)` returning a retained
+`RemotePreparedDrawingCheck`. Preparation is query-only; `runConfirmed()` is
+one-shot. `close()` returns actual `Unchanged/Restored/RecoveryNeeded/Unknown`
+canvas state only after child/Job/IO/private-file retirement; failure retains
+that same owner. `Restored` requires the actual numeric pixel proof. No getter is
+called after foreign destruction. A recovery outcome fences this input session
+even across missing observations or geometry refresh. These synthetic lifecycle
+tests and UI source do not supply the concrete NativeRemoteEdit capability.
+
+The native adapter must retain prepared owners through the actual session's
+consumer/borrow lifetime while the confirmation dialog waits. A short borrow
+that ends at preparation delivery cannot protect an escaped foreign owner from
+session close. Root will register that owner before bulk DTO delivery, retain
+failed cleanup, and join it before parent handle destruction. Native completed
+evidence must be retained by that same session and actual source context before
+the preparation's transient resources are retired; no global receipt registry
+or receipt-import promotion. Other query-only controls reads remain NotTested.
+
+Root's WGC path now installs session/pool RAII before fallible configuration and
+reads back `IsCursorCaptureEnabled()` after disabling it; true or unavailable
+refuses capture. Actual Windows compile/runtime remains unrun. P should derive
+the evaluator's cursor-free projection from this checked path, with its own
+actual parked-point/source/capture witnesses, never from caller metadata.
+
+Root still owns the real sequenced phone admission/input-helper exclusion and
+normal foreign adapter/registration. Return P's exact preparation/one-shot
+completion/retirement APIs and actual ownership hooks promptly; its fixed parent
+authorization callback above remains unchanged. Root will not expose the UI
+action as supported until that actual producer, source owner, input barrier and
+packaged pinned helper are wired together.
