@@ -19,11 +19,13 @@ internal fun showFrameControls(available: Boolean, state: ImageFramesState): Boo
     val panel by owner.panel.collectAsState()
     val review by owner.review.state.collectAsState()
     val frame by editor.imageFrames.state.collectAsState()
+    val tone by owner.tones.state.collectAsState()
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
         DocumentNavigatorPanel(owner.navigator,{owner.activate(EditorWorkflowPanel.Documents,it)},owner::choose,owner::cancelSwitch)
         LocalViewsPanel(owner.views,{owner.activate(EditorWorkflowPanel.SavedViews,it)},owner::saveView,owner::restoreView)
         LayersPanel(owner.controls,editor::workflowId,setOfNotNull(editor.selected),{owner.activate(EditorWorkflowPanel.Layers,it)})
-        ToneControlsPanel(owner.tones,{owner.activate(EditorWorkflowPanel.Tones,it)})
+        if(editor.toneControlsAvailable || tone.blocksInput) ToneControlsPanel(owner.tones,{owner.activate(EditorWorkflowPanel.Tones,it)})
+        else OutlinedButton({},Modifier.heightIn(min=48.dp),enabled=false){Text("Tone unavailable for this source")}
         if(showFrameControls(editor.frameControlsAvailable,frame)) ImageFramesPanel(editor.imageFrames,editor::framePanel)
         else OutlinedButton({},Modifier.heightIn(min=48.dp),enabled=false){Text("Output frame unavailable for this source")}
         OutlinedButton({owner.activate(EditorWorkflowPanel.OfflineReview,true)},Modifier.heightIn(min=48.dp),enabled=editor.document!=null){Text("Offline conflicts")}

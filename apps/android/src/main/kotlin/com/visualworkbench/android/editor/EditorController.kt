@@ -99,16 +99,46 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var documentPressEpoch:Long=0
     private var documentPressRegion=false
     private val canvasOwners=CanvasRetirementOwner()
+    private data class ComposedBackgroundOwner(val project: WorkbenchProject, val epoch: Long,
+        val documentId: String, val page: UInt?, val binding: WorkflowBinding)
+    private var composedBackground: ComposedBackgroundOwner? = null
+    private fun composedCurrent(doc: DocumentSnapshot): Boolean {
+        val revision = doc.render.revision
+        val owner = composedBackground ?: return false
+        return owner.project === project && owner.epoch == epoch && owner.documentId == doc.documentId &&
+            owner.page == doc.page && owner.binding == WorkflowBinding(revision.projectId, doc.documentId,
+            revision.hostSeq, revision.stateHash) && background != null
+    }
+    private suspend fun preparedDrawing(items: List<RenderItem>): List<DrawObject> =
+        prepareEditorObjects(core, items.filterNot { it.shape is Shape.Adjustment })
     private var giantRenderReady=false
     private var updatingGiant=false
     private val canvasRetirement:suspend()->Unit = {giantRenderReady=false;canvasOwners.retireAll()}
     internal var giantMode by mutableStateOf(false); private set
     internal var giantIssue by mutableStateOf<String?>(null); private set
     private val giantDraw = java.util.concurrent.atomic.AtomicReference<GiantVisibleFrame<Bitmap>?>(null)
+    private fun expectedGiantContent(doc: DocumentSnapshot): GiantTileContent =
+        if (doc.hasToneAdjustments) GiantTileContent.Composed else GiantTileContent.Source
+    private fun approvedAssumption(doc: DocumentSnapshot): Boolean {
+        val format = originalFormat ?: return false
+        val revision = doc.render.revision
+        return colorAssumed && colorAssumedSourceAsset == format.sourceAssetId &&
+            format.binding == WorkflowBinding(revision.projectId, doc.documentId, revision.hostSeq, revision.stateHash)
+    }
     private val giantOwner = GiantAttachmentOwner<GiantAndroidCanvas>(
         attachment={val p=project;val doc=document;if(p!=null&&doc!=null&&!disposing)DocumentAttachment(p,doc,epoch)else null},
         create={image,resources,binding,attached,current->
-            GiantAndroidCanvas.create(scope,image,resources,binding,attached,current,{canvasRetirement()}){publish()}
+            val snapshot = document?.takeIf { doc ->
+                val revision = doc.render.revision
+                WorkflowBinding(revision.projectId, doc.documentId, revision.hostSeq, revision.stateHash) == binding
+            }
+            // The factory consumes image ownership even if a replacement document
+            // wins this race before it can allocate its first surface.
+            GiantAndroidCanvas.create(scope,image,resources,binding,attached,
+                { value, captured -> snapshot!=null && current(value,captured) },
+                {canvasRetirement()},{publish()},
+                content=snapshot?.let(::expectedGiantContent) ?: GiantTileContent.Source,
+                assumeUntaggedSrgb=snapshot?.let(::approvedAssumption)==true)
         }, closeView={it.close()}, changed={giantDraw.set(null);publish()},
         diskCacheBytes=2uL*1024uL*1024uL*1024uL,ramCacheBytes=64uL*1024uL*1024uL,
         failedCreationOwner={ (it as? GiantAndroidCreationFailure)?.owner })
@@ -117,21 +147,29 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     internal fun canvasRendererRetired(hook:suspend()->Unit){canvasOwners.confirmed(hook)}
     internal fun canvasRendererRetiring(){giantRenderReady=false}
     internal fun giantRenderCompleted(frame:GiantVisibleFrame<Bitmap>,hook:suspend()->Unit){
-        if(canvasOwners.canCreate(hook)&&giantDraw.get()===frame)giantRenderReady=true
+        if(canvasOwners.canCreate(hook)&&giantFrameCurrent(frame))giantRenderReady=true
     }
     private fun giantInputReady(doc:DocumentSnapshot):Boolean = giantRenderReady&&giantFrame(doc)!=null
-    internal fun giantFrameCurrent(frame:GiantVisibleFrame<Bitmap>):Boolean = giantDraw.get() === frame
+    internal fun giantFrameCurrent(frame:GiantVisibleFrame<Bitmap>):Boolean =
+        giantDraw.get() === frame && document?.let { frame.content == expectedGiantContent(it) && giantFrame(it) === frame } == true
     private fun giantFrame(doc:DocumentSnapshot):GiantVisibleFrame<Bitmap>? {
         if(!giantMode)return null
         val view=giantOwner.current?:return null
         val revision=doc.render.revision
         return runCatching{view.matchingFrame(WorkflowBinding(revision.projectId,doc.documentId,revision.hostSeq,revision.stateHash),epoch,
-            giantViewport(core,camera,precision.frame()))}.getOrNull()
+            giantViewport(core,camera,precision.frame()),expectedGiantContent(doc))}.getOrNull()
     }
     private suspend fun detachGiant() {giantOwner.detach();giantMode=false;giantIssue=null;giantDraw.set(null)}
     private suspend fun loadGiantBackground(current:WorkbenchProject,doc:DocumentSnapshot) {
-        giantMode=true;background=null;giantDraw.set(null);giantRenderReady=false;giantOwner.invalidate()
-        if(!colorAssumed){
+        giantMode=true;background=null;composedBackground=null;giantDraw.set(null);giantRenderReady=false;giantOwner.invalidate()
+        val revision = doc.render.revision
+        val format = originalFormat?.takeIf { it.binding == WorkflowBinding(revision.projectId,doc.documentId,
+            revision.hostSeq,revision.stateHash) }
+        if(format==null){
+            needsColorConsent=false;blockingMessage="The giant original's color and source information could not be checked. Reopen the project to retry."
+            publish();return
+        }
+        if(format.untagged&&!approvedAssumption(doc)){
             needsColorConsent=true;blockingMessage="Tiled display requires an explicit sRGB assumption for this untagged source. The original remains unchanged."
             publish();return
         }
@@ -156,9 +194,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             refreshAdmission.invalidate();documentRefresh.invalidate()
             cancelTool();imageFrames.detach();workflows.detach();rotation.detach();detachGiant();erasers.detach();selections.detach();documentOwnerDiscardDraw()
             val next=(attached.project as WorkbenchDocumentsProject).selectDocumentPage(attached.snapshot.documentId,page)
-            val drawing=prepareEditorObjects(core,next.render.items)
+            val drawing=preparedDrawing(next.render.items)
             if(project!==attached.project||epoch!=attached.epoch||disposing)throw DocumentFailure(DocumentFailureKind.Stale)
-            document=next;info=next.render.revision;objects=drawing;background=null;selected=null;cameraFitted=false
+            document=next;info=next.render.revision;objects=drawing;background=null;composedBackground=null;selected=null;cameraFitted=false
             selections.bind(attached.project,next,epoch,refreshAdmission.capture().sequence,camera)
             erasers.bind(attached.project,next,epoch,refreshAdmission.capture().sequence,camera)
             instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();bindWorkflows();enterWorkflows()
@@ -312,6 +350,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var previewJob: Job? = null
     private var previewHandle: WorkbenchStroke? = null
     private var colorAssumed = false
+    private var colorAssumedSourceAsset: String? = null
     private var canvasSink: ((CanvasScene) -> Unit)? = null
     private var operationCount = 0
     private var eraserLast: Point? = null
@@ -369,7 +408,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     val aiResults=AiResultController(scope,core,::aiAttachment,{camera},::aiPoses,image=::aiReadBitmap,abandonImage=AiBitmap::abandon)
     fun aiKeyStore():AndroidProviderKeyStore = AndroidProviderRuntime.initialize(getApplication())
     private fun aiFrame()=aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),camera,aiPoses())}
-    private fun aiResultReady()=document?.render?.items?.none{it.shape is Shape.Result}!=false||aiFrame()!=null
+    private fun aiResultReady()=document?.render?.items?.none{it.shape is Shape.Result}!=false||
+        document?.let { composedCurrent(it) || giantFrame(it)?.content == GiantTileContent.Composed }==true||aiFrame()!=null
     fun openAi(){
         if(workflows.blocksInput()||imageFrames.state.value.blocksInput)return
         if(documents.state.value.descriptor!=null){message="AI image edits require a raster image document.";return}
@@ -421,6 +461,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         } }, ::imageFrameWorkflows)
     internal val frameControlsAvailable: Boolean get() = document?.let { !giantDisplayRequired(it) } == true &&
         documents.state.value.descriptor == null && originalFormat != null && originalFormat?.rawPreview != true
+    internal val toneControlsAvailable: Boolean get() = document != null && documents.state.value.descriptor == null &&
+        originalFormat != null && originalFormat?.rawPreview != true
     internal fun framePanel(active: Boolean) {
         if (active && !imageFrames.state.value.blocksInput && (!frameControlsAvailable || !workflowIdle())) {
             message = if (originalFormat?.rawPreview == true) "RAW sensor originals are not editable through the embedded preview."
@@ -472,7 +514,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private suspend fun adoptWorkflowDocument(a:EditorWorkflowAttachment,target:DocumentSnapshot){
         if(project!==a.project||epoch!=a.epoch||document?.documentId!=a.document.documentId||document?.page!=a.document.page||document?.render?.revision?.sameDocumentRevision(a.document.render.revision)!=true||disposing)
             throw WorkflowFailure(WorkflowFailureKind.Stale)
-        val drawing=prepareEditorObjects(core,target.render.items)
+        val drawing=preparedDrawing(target.render.items)
         cancelTool();followPeer=false
         // Keep the authenticated ProjectLink and native project/history. Only
         // subscriptions carrying the old attachment token retire here.
@@ -502,9 +544,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 if(actual.projectId!=expected.projectId||actual.hostSeq!=expected.hostSeq||actual.stateHash!=expected.stateHash||target.documentId !in actual.documentIds)
                     throw WorkflowFailure(WorkflowFailureKind.Stale)
                 invalidateExport();clearPeerObjects();captureArrivals.detach();captureNavigationGeneration++
-                epoch++;refreshAdmission.reset();documentRefresh.invalidate();aiRetiring=false;colorAssumed=false
+                epoch++;refreshAdmission.reset();documentRefresh.invalidate();aiRetiring=false;colorAssumed=false;colorAssumedSourceAsset=null
                 if(!precisionClosed)precision.reset()
-                document=target;info=target.render.revision;objects=drawing;background=null;scene=null;selected=null
+                document=target;info=target.render.revision;objects=drawing;background=null;composedBackground=null;scene=null;selected=null
                 transientShape=null;transformed=emptyMap();erased=emptySet();hoverPoint=null;selectedStyleDraft=null
                 pendingPreviews.clear();pendingTransforms.clear();pendingErases.clear()
                 blockingMessage=null;needsColorConsent=false;originalFormatNotice=null;originalFormat=null;cameraFitted=false;lastViewport=null
@@ -559,7 +601,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
 
     private var canvasHook:(suspend()->Unit)?=null
     fun attachCanvas(sink:(CanvasScene)->Unit,retire:suspend()->Unit = {},ready:()->Unit = {}) {
-        canvasOwners.attach(retire,ready);canvasHook=retire;canvasSink=sink;giantRenderReady=false;scene?.let(sink)
+        canvasOwners.attach(retire,ready);canvasHook=retire;canvasSink=sink;giantRenderReady=false;scene?.let { sink(renderScene(it)) }
     }
     fun detachCanvas(retire:(suspend()->Unit)?=null) {
         val hook=retire?:canvasHook
@@ -1067,14 +1109,16 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 info = current.info()
                 val doc = info?.documentIds?.firstOrNull() ?: error("This project has no image document")
                 val snapshot = current.document(doc)
-                val drawing = prepareEditorObjects(core, snapshot.render.items)
+                val drawing = preparedDrawing(snapshot.render.items)
                 if (disposing || token != epoch || current !== project) return@launch
                 document = snapshot; info = snapshot.render.revision; objects = drawing
                 documentOwner.bind(current,snapshot)
                 instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
                 observeProject(current, token)
-                colorAssumed = knownSrgb; screen = WorkbenchScreen.Canvas; cameraFitted = false
-                fit(); bindWorkflows();enterWorkflows();refreshOriginalFormatNotice(); loadBackground()
+                colorAssumed = knownSrgb; colorAssumedSourceAsset=null; screen = WorkbenchScreen.Canvas; cameraFitted = false
+                fit(); bindWorkflows();enterWorkflows();refreshOriginalFormatNotice()
+                if(knownSrgb)colorAssumedSourceAsset=originalFormat?.sourceAssetId
+                loadBackground()
                 if (onOpened != null) completion = ProjectOpenCompletion(current, token)
             } catch (cancel: CancellationException) { throw cancel }
             catch (error: SessionFailure) {
@@ -1146,7 +1190,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                                 failedCaptureOpen = value.createdHostSeq; captureArrivals.changed(current, token); return@capture
                             }
                             val next = current.document(value.binding.documentId)
-                            val drawing = prepareEditorObjects(core, next.render.items)
+                            val drawing = preparedDrawing(next.render.items)
                             staged = captureDisplayBitmap(current.background(next.documentId, memoryBudgetBytes = 96uL * 1024uL * 1024uL, assumeUntaggedSrgb = false))
                             val checked = current.info()
                             if (!stillOwned() || !receivedCaptureIdle(ownInstructions = true) || checked.hostSeq != next.render.revision.hostSeq ||
@@ -1157,7 +1201,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                             cancelTool(); invalidateExport(); clearPeerObjects(); aiRetiring = false
                             refreshAdmission.invalidate();documentRefresh.invalidate()
                             document = next; info = next.render.revision; objects = drawing; selected = null
-                            background = staged; staged = null; blockingMessage = null; needsColorConsent = false; colorAssumed = false
+                            background = staged; staged = null; composedBackground=null; blockingMessage = null; needsColorConsent = false; colorAssumed = false; colorAssumedSourceAsset=null
                             originalFormat = null; originalFormatNotice = null
                             screen = WorkbenchScreen.Canvas; cameraFitted = false; fit();bindWorkflows();enterWorkflows();refreshOriginalFormatNotice()
                             captureArrivals.acknowledge(value); failedCaptureOpen = null
@@ -1194,7 +1238,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         imageFrames.detach();workflows.detach();rotation.detach()
         documentOwner.detach()
         if(!precisionClosed)precision.reset()
-        scene=null
+        scene=null;composedBackground=null
         exportReady = null
         invalidateExport()
         detachGiant()
@@ -1215,7 +1259,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             try { previous?.close() }
             finally {
                 document = null; info = null
-                background = null; objects = emptyList(); selected = null; transientShape = null
+                background = null; composedBackground = null; colorAssumed=false; colorAssumedSourceAsset=null; objects = emptyList(); selected = null; transientShape = null
                 transformed = emptyMap(); erased = emptySet(); scene = null; blockingMessage = null; needsColorConsent = false; originalFormatNotice = null; originalFormat = null
             }
         }
@@ -1243,6 +1287,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         refreshAdmission.observe(change.sequence)) {
                         captureArrivals.changed(current, token)
                         giantOwner.observe(change.project)
+                        if(composedBackground!=null && document?.render?.revision?.let { old ->
+                            old.projectId==change.project.projectId && (old.hostSeq!=change.project.hostSeq || old.stateHash!=change.project.stateHash) }==true){
+                            composedBackground=null;background=null
+                        }
                         imageFrames.observe(change.sequence)
                         workflows.observe(change.project,change.sequence)
                         erasers.observe(change); selections.observe(change)
@@ -1334,7 +1382,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     if (requested != null && connection?.status in setOf(SyncStatus.Syncing, SyncStatus.Synced)) {
                         val preview = created.peerPreviews(requested.documentId)
                         if (lastSequence != preview.sequence) {
-                            val drawing = prepareEditorObjects(core, preview.items)
+                            val drawing = preparedDrawing(preview.items)
                             // A returned query belongs to both a visible revision and
                             // a connected status generation. Neither later OPS nor an
                             // offline/reconnect transition may resurrect its overlay.
@@ -1436,11 +1484,44 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val current = project ?: return
         val doc = document ?: return
         val token = epoch
-        if(documents.state.value.descriptor!=null){detachGiant();background=null;blockingMessage=null;needsColorConsent=false;publish();return}
+        val ticket = refreshAdmission.capture()
+        val revision = doc.render.revision
+        val binding = WorkflowBinding(revision.projectId,doc.documentId,revision.hostSeq,revision.stateHash)
+        fun stillCurrent(): Boolean = !disposing && project === current && token == epoch && refreshAdmission.accepts(ticket) &&
+            document?.let { it.documentId == doc.documentId && it.page == doc.page &&
+                WorkflowBinding(it.render.revision.projectId,it.documentId,it.render.revision.hostSeq,it.render.revision.stateHash) == binding } == true
+        if(documents.state.value.descriptor!=null){detachGiant();background=null;composedBackground=null;blockingMessage=null;needsColorConsent=false;publish();return}
         if(giantDisplayRequired(doc)){loadGiantBackground(current,doc);return}
         if(giantMode||giantOwner.retaining)detachGiant()
+        val composed = doc.hasToneAdjustments
+        val format = originalFormat?.takeIf { it.binding == binding }
+        if(composed){
+            background=null;composedBackground=null
+            if(format==null || format.rawPreview){
+                needsColorConsent=false
+                blockingMessage=if(format?.rawPreview==true) "Saved tone composition is unavailable for an embedded RAW preview. The sensor original remains unchanged."
+                    else "The saved tone composition needs verified source information. Reopen the project to retry."
+                publish();return
+            }
+            if(format.untagged && !approvedAssumption(doc)){
+                needsColorConsent=true
+                blockingMessage="Tone display requires explicit sRGB consent for this untagged original. The original remains unchanged."
+                publish();return
+            }
+        }
         try {
-            val image = current.background(doc.documentId, assumeUntaggedSrgb = colorAssumed)
+            val assumed = approvedAssumption(doc)
+            val image = if(composed){
+                val value=imageFrameWorkflows(current).editingBackground(binding,assumed)
+                if(value.binding!=binding || value.width!=doc.width || value.height!=doc.height ||
+                    value.sourceBitDepth.toUInt()!=doc.bitDepth || value.sourceAssetId.length!=64 ||
+                    value.sourceAssetId.any { it !in "0123456789abcdef" } ||
+                    value.rgba.size.toULong()!=doc.width.toULong()*doc.height.toULong()*4uL ||
+                    value.sourceAssetId!=format?.sourceAssetId) throw WorkflowFailure(WorkflowFailureKind.Stale)
+                BackgroundImage(value.width,value.height,value.rgba,value.sourceAssetId,value.sourceBitDepth,value.iccProfile)
+            }else current.background(doc.documentId, assumeUntaggedSrgb = assumed)
+            currentCoroutineContext().ensureActive()
+            if(!stillCurrent())return
             val bitmap = withContext(Dispatchers.Default) {
                 require(image.width in 1u..50_000u && image.height in 1u..50_000u)
                 val width = image.width.toInt(); val height = image.height.toInt()
@@ -1460,12 +1541,19 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     out
                 } catch (error: Exception) { out.recycle(); throw error }
             }
-            if (token != epoch) return
-            background = bitmap; blockingMessage = null; needsColorConsent = false
+            var adopted=false
+            try {
+                currentCoroutineContext().ensureActive()
+                if(!stillCurrent())return
+                background = bitmap
+                composedBackground = if(composed) ComposedBackgroundOwner(current,token,doc.documentId,doc.page,binding) else null
+                blockingMessage = null; needsColorConsent = false
+                adopted=true
+            } finally { if(!adopted) bitmap.recycle() }
         } catch (cancel: CancellationException) { throw cancel }
         catch (error: CoreFailure) {
-            if (token != epoch) return
-            needsColorConsent = error.kind == CoreFailureKind.Raster && !colorAssumed
+            if(!stillCurrent())return
+            needsColorConsent = error.kind == CoreFailureKind.Raster && !approvedAssumption(doc) && format?.untagged==true
             blockingMessage = if (error.kind == CoreFailureKind.Backpressure)
                 "This image exceeds the current full-resolution display memory budget. Its original is saved unchanged. Bounded tiled display is still required before all images up to 50 megapixels can be edited."
             else if (error.kind == CoreFailureKind.ImageCodecUnavailable)
@@ -1473,12 +1561,18 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             else if (needsColorConsent)
                 "The image could not be converted for display. If it has no embedded color profile, you can explicitly treat its colors as sRGB. The original will remain unchanged."
             else "The image could not be displayed safely. Its original remains saved; no smaller replacement was created."
+        } catch(error: Exception){
+            currentCoroutineContext().ensureActive()
+            if(!stillCurrent())return
+            blockingMessage=if(composed) "The saved tone composition could not be displayed. Retry or reopen before editing; saved data is intact."
+                else "The image could not be displayed safely. Its original remains saved."
         }
         publish()
     }
     fun assumeSrgb() {
         if (busy || !needsColorConsent) return
-        colorAssumed = true; busy = true; invalidateExport()
+        val source=originalFormat?.sourceAssetId ?: run { message="The original source could not be checked. Reopen the project before approving its colors.";return }
+        colorAssumed = true; colorAssumedSourceAsset=source; busy = true; invalidateExport()
         scope.launch { try { loadBackground() } catch (error: Exception) { report(error) } finally { busy = false } }
     }
 
@@ -1499,6 +1593,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         cameraFitted = camera.viewportWidth > 1 && camera.viewportHeight > 1
         unsnappedRotation = 0.0
         publish()
+    }
+    private fun renderScene(value: CanvasScene): CanvasScene {
+        val composed = if(value.giantMode)value.giantFrame?.content==GiantTileContent.Composed
+            else composedCurrent(value.document)
+        val baked=bakedCanonicalIds(value.document,composed)
+        return if(baked.isEmpty())value else value.copy(hidden=value.hidden+baked,
+            provisional=value.provisional.filterNot { it.item.objectId in baked })
     }
     private fun publish() {
         if(synchronizingPrecision||updatingGiant)return
@@ -1537,11 +1638,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val giantFrame=if(giantUpdateFailed)null else giantFrame(doc)
         if(giantDraw.get()!==giantFrame)giantRenderReady=false
         giantDraw.set(giantFrame)
-        val next = CanvasScene(++sceneRevision, doc, background, camera, core.cameraMatrix(camera), visibleObjects,
+        val displayBackground=background.takeIf { !doc.hasToneAdjustments || composedCurrent(doc) }
+        val next = CanvasScene(++sceneRevision, doc, displayBackground, camera, core.cameraMatrix(camera), visibleObjects,
             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
             aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame,rotationHandle=rotationHandle())
-        scene = next; canvasSink?.invoke(next)
+        scene = next
+        canvasSink?.invoke(renderScene(next))
         workflows.remember(camera)
         documents.viewport(camera)
         val viewport = PeerViewport(doc.documentId, core.mapPoints(camera, true, listOf(Point(0.0, 0.0),
@@ -1581,7 +1684,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     internal fun precisionInputAllowed():Boolean = !disposing&&!rotationUnavailable()&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
         !instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&
         !ai.state.value.open&&aiResultReady()&&blockingMessage==null&&textDraft==null&&!showBrush&&!showContext&&instructionAdmission.allows(false,false,false,false)&&
-        document?.let{background!=null||documentOwner.matchingFrame(it,epoch)!=null||giantInputReady(it)}==true
+        document?.let{(!it.hasToneAdjustments || composedCurrent(it) || (giantMode && giantInputReady(it))) &&
+            (background!=null||documentOwner.matchingFrame(it,epoch)!=null||giantInputReady(it))}==true
     override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
         interruptAirInput()
         if(rotationUnavailable()||workflows.blocksInput()||imageFrames.state.value.blocksInput||ai.state.value.open||!aiResultReady())return
@@ -1954,19 +2058,24 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val doc = document ?: return
         val fetched = documentRefresh.load(doc,{document}){current.document(doc.documentId)} ?: return
         val next = fetched.snapshot
-        val drawing = prepareEditorObjects(core, next.render.items)
+        val drawing = preparedDrawing(next.render.items)
         if (token != epoch || project !== current || disposing || !refreshAdmission.accepts(ticket) ||
             !documentRefresh.accepts(fetched.ticket,document,next)) return
         // The document and its own revision are one native snapshot. Host sequence
         // alone cannot order optimistic edits sharing the same accepted base.
         if (document?.render?.revision != next.render.revision) clearPeerObjects()
+        val priorComposition=composedBackground!=null
+        if(document?.render?.revision!=next.render.revision && (priorComposition || next.hasToneAdjustments)){
+            background=null;composedBackground=null
+        }
         info = next.render.revision
         if(giantMode||giantOwner.retaining)giantOwner.invalidate()
         document = next; objects = drawing
         documentOwner.bind(current,next)
         bindWorkflows()
-        if(giantMode||giantDisplayRequired(next))loadBackground()
+        if(priorComposition || next.hasToneAdjustments)publish()
         refreshOriginalFormatNotice()
+        if(giantMode||giantDisplayRequired(next)||next.hasToneAdjustments||priorComposition)loadBackground()
         instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
         if (exportReady?.matches(info, document) != true) exportReady = null
         if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq) {
@@ -2104,7 +2213,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         return ExportOptions(doc.documentId, format = selection.encoding.format(selection.quality),
             marked = selection.marked, region = region, convertToSrgb = selection.convertToSrgb,
             matteRgb = selection.matteRgb,
-            allowDepthReduction = selection.allowDepthReduction, assumeUntaggedSrgb = colorAssumed)
+            allowDepthReduction = selection.allowDepthReduction, assumeUntaggedSrgb = approvedAssumption(doc))
     }
     fun prepareExport() {
         if (busy || pending != 0 || imageFrames.state.value.blocksInput || workflows.blocksInput()) return
