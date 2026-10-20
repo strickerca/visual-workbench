@@ -32,9 +32,12 @@ use windows::{
 };
 #[path = "hil/controller_surface.rs"]
 mod controller_surface;
+#[path = "hil/receiver_readiness.rs"]
+mod receiver_readiness;
 const CLASS: &str = "VisualWorkbenchRemoteGuardHarnessM4";
 const HANDOFF: u32 = WM_APP + 101;
 const COUNTS: u32 = WM_APP + 102;
+const STARTUP_MESSAGE_BATCH: usize = 64;
 struct Handle(HANDLE);
 impl Drop for Handle {
     fn drop(&mut self) {
@@ -406,6 +409,25 @@ fn publish_target(output: &Path, target: &Target) -> Result<()> {
     let _ = std::fs::remove_file(pending);
     Ok(())
 }
+fn pump_receiver_startup() -> Result<()> {
+    // Bound each batch so sustained traffic cannot starve the startup deadline.
+    for _ in 0..STARTUP_MESSAGE_BATCH {
+        let mut message = MSG::default();
+        // SAFETY: initialized buffer for the owning UI thread. No state borrow
+        // crosses dispatch; ordinary paint, activation and clicks are serviced.
+        unsafe {
+            if !PeekMessageW(&mut message, None, 0, 0, PM_REMOVE).as_bool() {
+                break;
+            }
+            if message.message == WM_QUIT {
+                return Err(Error::Unavailable);
+            }
+            let _ = TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    }
+    Ok(())
+}
 fn surface(output: &Path, position: i32, controller_fixture: bool) -> Result<()> {
     platform::initialize_hil_dpi()?;
     std::fs::create_dir(output)?;
@@ -479,12 +501,6 @@ fn surface(output: &Path, position: i32, controller_fixture: bool) -> Result<()>
         // Read-only fixture receipt. The injection driver supplies its actual PID
         // later; this surface never injects or creates a control grant itself.
         let target = platform::query_target(hwnd.0 as usize as u64, u32::MAX, id(1)?)?;
-        if controller_fixture {
-            // Ordinary exact owned-window foreground acquisition, followed by
-            // full HWND/PID/thread/creation/geometry and actual foreground proof.
-            // No global key, thread attachment or foreground-lock bypass.
-            platform::focus_for_owner_grant(&target, u32::MAX)?;
-        }
         // SAFETY: deadline timer belongs to our own window.
         if unsafe { SetTimer(Some(hwnd), 1, 300000, None) } == 0 {
             return Err(Error::Unavailable);
@@ -494,6 +510,27 @@ fn surface(output: &Path, position: i32, controller_fixture: bool) -> Result<()>
             if unsafe { SetTimer(Some(hwnd), controller_surface::TIMER_ID, 100, None) } == 0 {
                 return Err(Error::Unavailable);
             }
+            let started = Instant::now();
+            let startup_state = &raw const *state;
+            receiver_readiness::wait_for_focus(
+                || started.elapsed(),
+                || {
+                    pump_receiver_startup()?;
+                    // SAFETY: the owning UI thread retains this Box through
+                    // window destruction; no reference crosses native dispatch.
+                    if unsafe { (*startup_state).failed } {
+                        return Err(Error::Io);
+                    }
+                    receiver_readiness::acquire_focus(
+                        target.window,
+                        || platform::unchanged(&target, u32::MAX),
+                        // SAFETY: query-only actual foreground on our UI thread.
+                        || unsafe { GetForegroundWindow() }.0 as usize as u64,
+                        || platform::focus_for_owner_grant(&target, u32::MAX),
+                    )
+                },
+                thread::sleep,
+            )?;
         }
         publish_target(output, &target)?;
         // No grant-capable identity is published until all readiness work passed.

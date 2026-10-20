@@ -37,7 +37,8 @@ EXTRA=(
     'apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemoteGhostInkTest.kt',
     'tools/remote-edit/controller_input_reports.py','tools/remote-edit/test_controller_input_reports.py',
     'host-win/crates/vw-remote-host/src/hil.rs',
-    'host-win/crates/vw-remote-host/src/hil/controller_surface.rs')
+    'host-win/crates/vw-remote-host/src/hil/controller_surface.rs',
+    'host-win/crates/vw-remote-host/src/hil/receiver_readiness.rs')
 REQUIRED=(
     'host-win/crates/vw-remote-host/src/platform/shortcuts/krita_controls/wheel.rs',
     'host-win/crates/vw-remote-host/src/editor_effect/krita/wheel.rs',
