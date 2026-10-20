@@ -1,0 +1,56 @@
+{
+  "schema": "vw-release-assembly-root-hook-v1",
+  "date": "2026-10-20",
+  "base_main": "90c0ee22d5e7d94a56c54068f85bf63ffa481b68",
+  "branch": "cloud/release-assembly-hook-20261020",
+  "source_sha256": {
+    "build.ps1": "571262eb417261e2cab75009010ca3da9eb04e5004dfb5d4371cae5f7e029e5e",
+    "tools/release/README.md": "b3a23bdb844b13f0902d01f06b6bc9b044b961678640ff83bec99c9dca9a7aec",
+    "tools/release/package-windows.ps1": "51204fe5169aa57d10ff56f6e5530cdfdd18dda5effb57b6af20b7a8b61efd92",
+    "tools/release/assemble.py": "03da525a89a5c5642c4b8e5441b671190f5486f7d0b4ee7adee2343abaa473fa",
+    "tools/release/test_assemble.py": "ae14580228ca460c1dc3af993ee6fb33202ec6e69c388fce34624b29a0e1a7fd"
+  },
+  "checks": [
+    {
+      "name": "existing-synthetic-assembler",
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout120s python3 -m unittest discover -s tools/release -p test_assemble.py -v",
+      "result": "passed",
+      "cases": 41,
+      "scope": "Existing Python backend/validators with synthetic inputs; not PowerShell root entry or Windows wrapper execution"
+    },
+    {
+      "name": "root-offline-policy",
+      "command": "python3 tools/check_setup.py all",
+      "result": "ids,third-party,workspace passed"
+    }
+  ],
+  "logs": {
+    "release-assembly-hook-python-tests.log": {
+      "path": "/workspace/.vw-tools/evidence/20261020-resume/release-assembly-hook-python-tests.log",
+      "sha256": "0c1a7ec59f9dc87ffb44bcce04f18d5014315e439e8138522fe933df687abe62"
+    },
+    "release-assembly-hook-policy.log": {
+      "path": "/workspace/.vw-tools/evidence/20261020-resume/release-assembly-hook-policy.log",
+      "sha256": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197"
+    }
+  },
+  "source_review": {
+    "reviewer": "gpt-6-astra",
+    "lane": "tunnel_boundary_review",
+    "result": "No actionable findings on final root hook, explicit PowerShell7 guard and documentation",
+    "scope": "Read-only source; no reviewer builds or execution"
+  },
+  "not_executed": [
+    "PowerShell parse: pwsh absent in current cloud toolchain",
+    "Root assemble-release command and existing Windows wrapper",
+    "Windows NTFS/sharing/reparse and actual process cleanup",
+    "Product assembly, installer/package creation, signing, install, deployment, GUI/device/provider actions"
+  ],
+  "separate_remaining": [
+    "Root Gradle/MSI build hook and actual admitted Windows artifacts",
+    "Toolchain/guide/runtime/DLL/native aggregate/license admission and package acceptance"
+  ],
+  "main_preserved": true,
+  "release_ready": false,
+  "runtimes_admitted": false
+}

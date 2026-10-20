@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-remote-helpers', 'test-remote-helpers', 'build-remote-integration', 'build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-editor', 'lint-editor', 'test-shared', 'test-apps', 'test-mcp', 'build-ai', 'test-ai', 'build-managed-apps', 'package-managed-apps', 'package-background-apps', 'package-android-app', 'package-desktop-app', 'test-paint-integration', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'build-desktop-distribution', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-remote-helpers', 'test-remote-helpers', 'build-remote-integration', 'build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-editor', 'lint-editor', 'test-shared', 'test-apps', 'test-mcp', 'build-ai', 'test-ai', 'build-managed-apps', 'package-managed-apps', 'package-background-apps', 'package-android-app', 'package-desktop-app', 'assemble-release', 'test-paint-integration', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'build-desktop-distribution', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
     [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'pairing', 'shared-ffi', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
@@ -18,7 +18,12 @@ param(
     [string]$BackgroundInputs,
     [ValidatePattern('^[0-9a-f]{64}$')][string]$BackgroundInputsSha256,
     [string]$AndroidPackageInputs,
-    [ValidatePattern('^[0-9a-f]{64}$')][string]$AndroidPackageInputsSha256
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$AndroidPackageInputsSha256,
+    [string]$ReleaseManifest,
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$ReleaseManifestSha256,
+    [string]$ReleaseDestination,
+    [string]$ReleasePythonExecutable,
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$ReleasePythonSha256
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -375,6 +380,12 @@ function Save-BackgroundNativeResults {
 }
 
 try {
+    $releaseParameterNames = @('ReleaseManifest', 'ReleaseManifestSha256', 'ReleaseDestination', 'ReleasePythonExecutable', 'ReleasePythonSha256')
+    foreach ($releaseName in $releaseParameterNames) {
+        if ($Command -ne 'assemble-release' -and $PSBoundParameters.ContainsKey($releaseName)) {
+            throw 'Release assembly inputs are limited to assemble-release.'
+        }
+    }
     if ($PairingTests -and $ProjectFlowTests) { throw 'Select one focused managed test batch' }
     if ($ProjectFlowTests -and $Command -ne 'package-managed-apps') { throw 'Focused project-flow tests require managed packaging' }
     if ($PairingTests -and $Command -ne 'package-managed-apps') { throw 'Focused pairing tests require managed packaging' }
@@ -382,6 +393,19 @@ try {
     if ($Command -ne 'package-background-apps' -and ($BackgroundInputs -or $BackgroundInputsSha256)) { throw 'Background inputs are limited to background packaging' }
     if ($Command -cnotin @('package-android-app', 'package-desktop-app', 'test-paint-integration') -and ($AndroidPackageInputs -or $AndroidPackageInputsSha256)) { throw 'App package inputs are limited to incremental normal app integration' }
     switch ($Command) {
+        'assemble-release' {
+            if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'Release assembly requires PowerShell 7 (pwsh).' }
+            foreach ($releaseName in $releaseParameterNames) {
+                if (-not $PSBoundParameters.ContainsKey($releaseName) -or [string]::IsNullOrWhiteSpace([string]$PSBoundParameters[$releaseName])) {
+                    throw 'Release assembly requires explicit manifest, manifest SHA256, destination, Python executable and Python SHA256.'
+                }
+            }
+            if ($TimeoutSeconds -gt 3600) { throw 'Release assembly timeout must be between 1 and 3600 seconds.' }
+            & (Join-Path $projectRoot 'tools/release/package-windows.ps1') `
+                -Root $projectRoot -Manifest $ReleaseManifest -ManifestSha256 $ReleaseManifestSha256 `
+                -Destination $ReleaseDestination -PythonExecutable $ReleasePythonExecutable `
+                -PythonSha256 $ReleasePythonSha256 -TimeoutSeconds $TimeoutSeconds
+        }
         'doctor' { Run-Step 'doctor' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/doctor.ps1', '-Strict') }
         'license-check' { Run-LicenseGate }
         { $_ -in @('test-editor','lint-editor') } {
