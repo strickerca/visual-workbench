@@ -167,7 +167,10 @@ impl Owner {
             ))
             .map_err(|_| SessionError::Invalid)?;
             use sha2::{Digest, Sha256};
-            let context_sha = format!("{:x}", Sha256::digest(context_bytes));
+            let context_sha = Sha256::digest(context_bytes)
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>();
             let weak = Arc::downgrade(self);
             let current: producer::Current = Arc::new(move || {
                 let o = weak.upgrade().ok_or(vw_remote::Error::Cancelled)?;
