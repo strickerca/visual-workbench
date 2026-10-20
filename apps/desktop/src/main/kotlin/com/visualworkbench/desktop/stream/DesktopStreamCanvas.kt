@@ -12,7 +12,6 @@ import java.awt.EventQueue
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Rectangle
-import java.awt.Toolkit
 import java.awt.geom.AffineTransform
 import java.awt.image.BufferStrategy
 import kotlin.math.ceil
@@ -149,7 +148,6 @@ internal class DesktopStreamPainter(private val core:WorkbenchCore,private val w
         checkEdt()
         check(!peerBoundsRejected.get())
         submitStreamBuffer(strategy,{drawSlot(it,slot)},{
-            Toolkit.getDefaultToolkit().sync()
             check(canvas.isShowing&&!peerBoundsRejected.get()&&surfaceBytes()<=slot.raster.admittedSurfaceBytes)
         })
     }

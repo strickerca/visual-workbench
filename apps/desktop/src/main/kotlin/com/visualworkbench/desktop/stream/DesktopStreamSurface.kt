@@ -6,9 +6,11 @@ import java.awt.Canvas
 import java.awt.Dimension
 import java.awt.GraphicsConfiguration
 import java.awt.Graphics
+import java.awt.Graphics2D
 import java.awt.ImageCapabilities
 import java.awt.Rectangle
 import java.awt.Transparency
+import java.awt.Toolkit
 import java.awt.geom.AffineTransform
 import java.awt.image.BufferedImage
 import java.awt.image.BufferStrategy
@@ -108,6 +110,16 @@ internal open class BoundedStreamCanvas(private val peerTransform:(Canvas)->Affi
                 creationTransform=AffineTransform(current)
             }
             return super.getDrawGraphics()
+        }
+        override fun show(){
+            val target=checkNotNull(this@BoundedStreamCanvas.graphics){"Stream destination graphics disappeared"}
+            try {
+                val graphics=target as? Graphics2D?:error("Stream destination graphics are unsupported")
+                val source=checkNotNull(backBuffers?.singleOrNull())
+                submitStreamDestination(graphics,
+                    {it.drawImage(source,0,0,width,height,0,0,width,height,null)},
+                    {Toolkit.getDefaultToolkit().sync()})
+            }finally{target.dispose()}
         }
         override fun dispose(){super.dispose();if(ownedStrategy===this)ownedStrategy=null}
     }
