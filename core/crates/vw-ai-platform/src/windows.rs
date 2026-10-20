@@ -125,6 +125,7 @@ impl SecretProvider for ScopedWindowsCredentials {
         Secret::from_protected_bytes(bytes).map_err(|_| CredentialFailure::Invalid)
     }
 }
+#[cfg(test)]
 fn target() -> Vec<u16> {
     TARGET.encode_utf16().chain(std::iter::once(0)).collect()
 }

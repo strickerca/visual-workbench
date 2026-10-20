@@ -215,7 +215,10 @@ impl LiveSession {
             };
             if let Some(cached) = cached {
                 use sha2::{Digest, Sha256};
-                let sha = format!("{:x}", Sha256::digest(&cached.receipt));
+                let sha = Sha256::digest(&cached.receipt)
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>();
                 if sha == receipt_sha256 && cached.context.current(&self.remote).is_ok() {
                     let mut guard = observation.owned.lock().map_err(|_| SessionError::Worker)?;
                     let owned = guard.as_mut().ok_or(SessionError::Closed)?;
