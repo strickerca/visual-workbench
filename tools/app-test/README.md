@@ -67,7 +67,7 @@ relaunch on foreground contention; a contested UI assertion remains inconclusive
 
 ## Assertion and evidence boundary
 
-`inventory.json` explicitly names all 154 current methods. Every Kotlin test source
+`inventory.json` explicitly names all 225 current methods. Every Kotlin test source
 is parsed before the build; additions, removals, skips, unusual test declaration
 shapes or parameterization require a reviewed inventory/parser update. This
 prevents a new test from silently avoiding the evidence contract. The same source
@@ -77,7 +77,7 @@ and Android Rust library are included. Native directory properties are pinned
 with explicit canonical `-P` arguments; unbound environment overrides refuse.
 This binds the generator inputs without claiming a new compiler-provenance run.
 
-Passing requires all 154 distinct test start/success pairs, consistent exact
+Passing requires all 225 distinct test start/success pairs, consistent exact
 `current`/`numtests` counters, no failed/ignored/assumption statuses, no extra or
 missing methods, one matching `OK (N tests)` summary and final instrumentation
 code `-1`. Printed success prose alone never establishes a pass. Direct adb
@@ -85,6 +85,19 @@ status capture is bounded to 8 MiB, reads 4 KiB chunks into a 16-chunk queue,
 reports elapsed/output-byte progress every five seconds, and has a phase deadline.
 The existing process helper owns Windows Job/process-tree cleanup. Capture failure
 cannot leave an assertion pass and triggers owned-package cleanup.
+
+The 2026-10-20 source reconciliation retains the exact 12 remote decoder cases
+and the original Phase 2 154-name SHA256 invariant. One historical test,
+`AiServiceControllerInstrumentedTest#laterCloseCallersObserveTheSameSettledFailure`,
+was replaced in source by retained-owner close/retry tests. The fixture explicitly
+pins that retirement and all 60 reviewed additions, reconstructing the historical
+154 names before checking their unchanged hash. Current execution requires the
+153 surviving baseline cases, 12 remote cases and 60 additions; the retired case
+is historical evidence only. Additions cover AI grid/service ownership, giant
+canvas retirement, document refresh, polygon/precision/tilt input, raster export,
+pairing state and four stream pixel cases. Only the exact `stream` subpackage is
+newly admitted; unknown or deeper package names still refuse. This inventory
+repair is source-only until a fresh bound run records every current case.
 
 The final `.local/app-hil-<run>.json` is text only: source/APK/native/signer hashes,
 case identities, actual passed counts, process results and cleanup states. Failed
