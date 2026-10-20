@@ -28,7 +28,7 @@ pub(super) fn fixture(root: &std::path::Path) -> (OriginalOffer, tempfile::Named
     let mut writer = ring
         .begin_frame(frame.clone(), &Cancellation::default())
         .unwrap();
-    for p in writer.rgba_mut().chunks_exact_mut(4) {
+    for p in writer.rgba_mut().as_chunks_mut::<4>().0 {
         p.copy_from_slice(&[40, 80, 120, 255]);
     }
     let original = writer.finish(&Cancellation::default()).unwrap();

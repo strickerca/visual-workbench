@@ -58,7 +58,7 @@ pub(super) fn packet(n: u64, generation: u64) -> pb::FrameTiles {
     let frame = identity(n);
     let mut ring = FrameRing::default_for(frame.session.clone(), frame.geometry.clone()).unwrap();
     let mut pixels = ring.begin_frame(frame, &Cancellation::default()).unwrap();
-    for rgba in pixels.rgba_mut().chunks_exact_mut(4) {
+    for rgba in pixels.rgba_mut().as_chunks_mut::<4>().0 {
         rgba.copy_from_slice(&[n as u8, 120, 160, 255]);
     }
     let original = pixels.finish(&Cancellation::default()).unwrap();

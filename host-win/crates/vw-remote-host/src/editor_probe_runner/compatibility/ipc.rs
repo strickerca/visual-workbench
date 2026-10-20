@@ -120,6 +120,9 @@ pub(super) struct Click {
     pub pointer_after: [i64; 2],
 }
 
+// One MAX_LINE-bounded record is decoded at a time; retain its inline owned
+// value without adding a separate allocation/indirection to the fixed transcript.
+#[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum Line {
@@ -240,8 +243,10 @@ pub(super) fn blank_white(first: &[u8], second: &[u8]) -> Result<()> {
         || first.is_empty()
         || !first.len().is_multiple_of(4)
         || first
-            .chunks_exact(4)
-            .any(|pixel| pixel != [255, 255, 255, 255])
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .any(|pixel| *pixel != [255, 255, 255, 255])
     {
         Err(Error::Unavailable)
     } else {
@@ -255,13 +260,15 @@ pub(super) fn admitted_dot_delta(
     dot: [i64; 2],
 ) -> Result<()> {
     let width = usize::try_from(width).map_err(|_| Error::Limit)?;
-    if width == 0 || before.len() != after.len() || before.len() % 4 != 0 {
+    if width == 0 || before.len() != after.len() || !before.len().is_multiple_of(4) {
         return Err(Error::Invalid);
     }
     let mut center_hit = false;
     for (index, (previous, current)) in before
-        .chunks_exact(4)
-        .zip(after.chunks_exact(4))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(after.as_chunks::<4>().0.iter())
         .enumerate()
     {
         if previous == current {
@@ -284,6 +291,7 @@ pub(super) fn admitted_dot_delta(
 }
 /// A refusal-only guard while the child waits at Ready. The same files are
 /// independently decoded again after process/Job/IO retirement for proof.
+#[allow(clippy::too_many_arguments)] // Explicit transcript, source lease, target and cancellation guards.
 fn preflight_pixels(
     step: Step,
     transcript: &Transcript,
@@ -418,6 +426,7 @@ fn preflight_pixels(
 
 /// The IO worker holds both pipe ends and pins while this state machine runs.
 /// Every Ready is phase-checked; uncertainty precedes the root guard callback.
+#[allow(clippy::too_many_arguments)] // Explicit pipe, authorization, cancellation and pinned-source owners.
 pub(super) fn exchange(
     mut input: File,
     mut output: File,

@@ -468,12 +468,12 @@ async fn editing_background_and_tiles_include_canonical_tones_annotations_and_d_
         width: 16,
         height: 16,
     };
-    let untouched = editing(&project, outside.clone()).await;
+    let untouched = editing(&project, outside).await;
     tone(&project, 20).await;
-    let toned = editing(&project, outside.clone()).await;
+    let toned = editing(&project, outside).await;
     assert_ne!(toned.rgba, untouched.rgba);
     annotate(&project, 21).await;
-    let annotated = editing(&project, outside.clone()).await;
+    let annotated = editing(&project, outside).await;
     assert_ne!(annotated.rgba, toned.rgba);
     apply(&project, 22, set()).await;
     let after = editing(&project, outside).await;

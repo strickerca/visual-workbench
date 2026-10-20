@@ -92,7 +92,7 @@ impl Canvas<'_> {
         {
             return Err(Error::Invalid);
         }
-        if self.rgba.chunks_exact(4).any(|p| p[3] != 255) {
+        if self.rgba.as_chunks::<4>().0.iter().any(|p| p[3] != 255) {
             return Err(Error::Unavailable);
         }
         if !self.os_cursor_capture_disabled
@@ -238,8 +238,10 @@ pub(super) fn evaluate(check: DrawingCheck<'_>) -> Result<DrawingEvidence> {
             .any(|frame| frame.rgba != check.after[0].rgba)
         || original
             .rgba
-            .chunks_exact(4)
-            .any(|pixel| pixel != [255, 255, 255, 255])
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .any(|pixel| *pixel != [255, 255, 255, 255])
     {
         return Err(Error::Unavailable);
     }
@@ -258,8 +260,10 @@ pub(super) fn evaluate(check: DrawingCheck<'_>) -> Result<DrawingEvidence> {
     let mut hits_center = false;
     for (index, (before, after)) in original
         .rgba
-        .chunks_exact(4)
-        .zip(check.after[0].rgba.chunks_exact(4))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(check.after[0].rgba.as_chunks::<4>().0.iter())
         .enumerate()
     {
         if before == after {

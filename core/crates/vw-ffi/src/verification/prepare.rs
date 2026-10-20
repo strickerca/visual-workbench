@@ -177,28 +177,6 @@ fn admit_failure_crops(checked: &CheckedPair, request: &CompileRequest) -> Packa
     }
     Ok(())
 }
-#[cfg(test)]
-mod frame_tests {
-    #![allow(clippy::unwrap_used)]
-    use super::*;
-    #[test]
-    fn failure_region_requires_the_entire_saved_crop_even_with_padded_image_pixels() {
-        let image = vw_package::VerificationImageGeometry {
-            source_size: [100, 80],
-            output_size: [30, 40],
-            image_size: [64, 64],
-            content_size: [30, 40],
-            crop_document: vw_geom::Rect::new(10.0, 20.0, 30.0, 40.0).unwrap(),
-            document_to_image: vw_geom::Affine::IDENTITY,
-            image_to_document: vw_geom::Affine::IDENTITY,
-            has_output_frame: true,
-        };
-        assert!(admit_failure_region(image, [12.0, 25.0, 10.0, 12.0]).is_ok());
-        assert!(admit_failure_region(image, [9.0, 25.0, 10.0, 12.0]).is_err());
-        assert!(admit_failure_region(image, [35.0, 25.0, 10.0, 12.0]).is_err());
-        assert!(admit_failure_region(image, [12.0, 25.0, 0.0, 12.0]).is_err());
-    }
-}
 fn role(value: &str) -> PackageResult<Role> {
     match value {
         "none" => Ok(Role::None),
@@ -518,4 +496,27 @@ pub(super) fn compile(
     stop.check()?;
     source_current(state, &checked.after)?;
     Ok(package)
+}
+
+#[cfg(test)]
+mod frame_tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+    #[test]
+    fn failure_region_requires_the_entire_saved_crop_even_with_padded_image_pixels() {
+        let image = vw_package::VerificationImageGeometry {
+            source_size: [100, 80],
+            output_size: [30, 40],
+            image_size: [64, 64],
+            content_size: [30, 40],
+            crop_document: vw_geom::Rect::new(10.0, 20.0, 30.0, 40.0).unwrap(),
+            document_to_image: vw_geom::Affine::IDENTITY,
+            image_to_document: vw_geom::Affine::IDENTITY,
+            has_output_frame: true,
+        };
+        assert!(admit_failure_region(image, [12.0, 25.0, 10.0, 12.0]).is_ok());
+        assert!(admit_failure_region(image, [9.0, 25.0, 10.0, 12.0]).is_err());
+        assert!(admit_failure_region(image, [35.0, 25.0, 10.0, 12.0]).is_err());
+        assert!(admit_failure_region(image, [12.0, 25.0, 0.0, 12.0]).is_err());
+    }
 }

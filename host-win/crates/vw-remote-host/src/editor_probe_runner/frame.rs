@@ -757,6 +757,7 @@ fn canvas_frame_valid(
 /// The drawing producer calls this only after its own Child/Job receipt and IO
 /// join. It validates the original WGC target and reads exact pinned canvas PNG
 /// bytes, then decodes one RGBA frame at a time under the numeric pixel bound.
+#[allow(clippy::too_many_arguments)] // Explicit file pin, target/session, timing and pixel-limit evidence.
 pub(super) fn joined_canvas_rgba(
     pin: &Pin,
     frame: &vw_capture::CanvasFrameReceipt,

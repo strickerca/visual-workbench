@@ -93,11 +93,11 @@ pub(super) fn retirement_count() -> SessionResult<usize> {
 #[cfg(windows)]
 impl Owner {
     fn signal_cancel(&self) {
-        if let Some(hub) = self.hub.upgrade() {
-            if let Ok(_state) = hub.state.lock() {
-                self.cancel.cancel();
-                return;
-            }
+        if let Some(hub) = self.hub.upgrade()
+            && let Ok(_state) = hub.state.lock()
+        {
+            self.cancel.cancel();
+            return;
         }
         self.cancel.cancel();
     }
@@ -385,19 +385,17 @@ impl Owner {
     fn abort(&self) {
         self.gate.cancelled.store(true, Ordering::Release);
         self.worker_cancel.cancel();
-        if let Some(hub) = self.hub.upgrade() {
-            if let Ok(mut s) = hub.state.lock() {
-                // Never pause a successor. Only this actual gate/binding may retire.
-                if s.drawing
-                    .as_ref()
-                    .is_some_and(|g| Arc::ptr_eq(g, &self.gate))
-                    && s.binding.as_ref() == Some(&self.context.binding)
-                {
-                    let _ = hub.send_control(&mut s, "pause", "owner_pause");
-                    RemoteHub::retire_authority(&mut s);
-                    let _ = hub.publish(&mut s, "paused", Some("owner_pause"));
-                }
-            }
+        // Never pause a successor. Only this actual gate/binding may retire.
+        if let Some(hub) = self.hub.upgrade()
+            && let Ok(mut s) = hub.state.lock()
+            && s.drawing
+                .as_ref()
+                .is_some_and(|g| Arc::ptr_eq(g, &self.gate))
+            && s.binding.as_ref() == Some(&self.context.binding)
+        {
+            let _ = hub.send_control(&mut s, "pause", "owner_pause");
+            RemoteHub::retire_authority(&mut s);
+            let _ = hub.publish(&mut s, "paused", Some("owner_pause"));
         }
     }
     fn retire(&self) -> SessionResult<RemoteDrawingCanvas> {

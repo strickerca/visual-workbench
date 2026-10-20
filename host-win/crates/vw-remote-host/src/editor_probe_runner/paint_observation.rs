@@ -248,11 +248,11 @@ pub fn retry_paint_observation_retirements() -> Result<usize> {
         }
         match owners[at].owner.collect() {
             Collection::Joined { .. } => {
-                if let Some(temp) = owners[at].owner.private_temp.as_mut() {
-                    if temp.dispose().is_err() {
-                        at += 1;
-                        continue;
-                    }
+                if let Some(temp) = owners[at].owner.private_temp.as_mut()
+                    && temp.dispose().is_err()
+                {
+                    at += 1;
+                    continue;
                 }
                 owners.remove(at);
             }

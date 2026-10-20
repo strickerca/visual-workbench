@@ -478,10 +478,8 @@ impl PrivateTempLease {
         self.ancestor.verify()?;
         self.root_pin.as_ref().ok_or(Error::Invalid)?.verify()?;
         self.marker_pin.as_ref().ok_or(Error::Invalid)?.verify()?;
-        for dir in &self.dirs {
-            if let Some(pin) = dir {
-                pin.verify()?;
-            }
+        for pin in self.dirs.iter().flatten() {
+            pin.verify()?;
         }
         Ok(())
     }
@@ -543,6 +541,7 @@ impl PrivateTempLease {
 
 /// Query-only preparation. The exact packaged observation and drawing helpers
 /// are pinned before any state can be returned to a confirming owner.
+#[allow(clippy::too_many_arguments)] // Keep packaged-helper/source leases and owner authorization explicit.
 pub fn prepare_paint_drawing(
     paths: PaintDrawingPaths,
     target: Target,
@@ -646,6 +645,7 @@ fn joined_click(
     })
 }
 
+#[allow(clippy::too_many_arguments)] // Independent owner, request, target, transcript and retirement evidence.
 fn evaluate(
     owner: &Owner,
     expected: &Request,

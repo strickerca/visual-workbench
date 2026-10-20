@@ -25,11 +25,12 @@ fn admit_send_estimate(
 mod send_estimate_tests {
     use super::*;
     #[test]
-    fn flux_uses_its_reviewed_flat_quote_while_token_providers_need_a_dated_estimate() {
+    fn flux_uses_its_reviewed_flat_quote_while_token_providers_need_a_dated_estimate()
+    -> AiEditResult<()> {
         let flux = vw_ai::config::ProviderKind::Flux1Fill {
             image_price_microusd: 50_000,
         };
-        let today = configuration::day("2026-10-18").unwrap();
+        let today = configuration::day("2026-10-18")?;
         let token = AiTokenEstimate {
             schema: 1,
             text_input: 10,
@@ -60,6 +61,7 @@ mod send_estimate_tests {
             )
             .is_ok()
         );
+        Ok(())
     }
 }
 pub(super) struct RequestState {

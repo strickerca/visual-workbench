@@ -247,10 +247,9 @@ mod tests {
                 if target
                     .compare_exchange(address, 0, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
+                    && let Some(budget) = OBSERVED_BUDGET.get()
                 {
-                    if let Some(budget) = OBSERVED_BUDGET.get() {
-                        receipt.store(budget.used_bytes(), Ordering::SeqCst);
-                    }
+                    receipt.store(budget.used_bytes(), Ordering::SeqCst);
                 }
             }
             // SAFETY: The pointer and layout are the exact pair supplied by

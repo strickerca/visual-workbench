@@ -377,10 +377,10 @@ fn validate_tile(bytes: &[u8], level: u8, region: vw_assets::TileRegion) -> Resu
     {
         return Err(Error::Binding);
     }
-    if let vw_raster::Pixels::Rgba8(p) = &decoded.pixels {
-        if p.chunks_exact(4).any(|rgba| rgba[3] != 255) {
-            return Err(Error::Unsupported);
-        }
+    if let vw_raster::Pixels::Rgba8(p) = &decoded.pixels
+        && p.as_chunks::<4>().0.iter().any(|rgba| rgba[3] != 255)
+    {
+        return Err(Error::Unsupported);
     }
     Ok(())
 }

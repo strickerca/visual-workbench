@@ -135,7 +135,7 @@ fn capture(
     let mut color = None;
     // This WGC call runs in this same helper process, never a nested process.
     // The capture API requires and checks SetIsCursorCaptureEnabled(false).
-    let frame = vw_capture::windows::capture_canvas_fixture(request, &cancel, &mut color)
+    let frame = vw_capture::windows::capture_canvas_fixture(request, cancel, &mut color)
         .map_err(|_| Error::Unavailable)?;
     if color.is_some() {
         return Err(Error::Unavailable);

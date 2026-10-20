@@ -130,6 +130,8 @@ struct InputPending {
     event: pb::InputEvent,
     arrived: Instant,
 }
+// The eight-slot input queue keeps owned events inline, without per-item boxing.
+#[allow(clippy::large_enum_variant)]
 enum Pending {
     Input(InputPending),
     Drawing(Arc<drawing_gate::Gate>),
