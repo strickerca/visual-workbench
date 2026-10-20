@@ -70,11 +70,13 @@ impl Fixture {
         file.write_all(&original).unwrap();
         file.seek(SeekFrom::Start(0)).unwrap();
         let budget = SessionBudget::new(vw_stream::PHONE_SESSION_BYTES).unwrap();
+        // CompletedOutput requires the canonical native path representation.
+        // On Windows canonicalize adds the extended-length prefix; create the
+        // fixture under that parent instead of weakening the production check.
+        let parent = std::env::temp_dir().canonicalize().unwrap();
+        let work = tempfile::tempdir_in(parent).unwrap();
         let source = input::prepare(
-            input::RootOwnedPickedOriginal {
-                file,
-                work: tempfile::tempdir().unwrap(),
-            },
+            input::RootOwnedPickedOriginal { file, work },
             input::GiantInputLimits {
                 max_original_bytes: MIB,
                 max_work_disk_bytes: 512 * MIB,

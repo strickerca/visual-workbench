@@ -403,9 +403,18 @@ async fn durable_manual_cas_checks_real_pair_and_compiles_only_failed_markers_ag
         .verification_coordinate_pair(pair.clone(), cancel())
         .await
         .unwrap();
-    assert_eq!(coordinates.pair, pair);
-    assert_eq!(coordinates.original.key, key(&original_package));
-    assert_eq!(coordinates.after.key, key(&after_package));
+    assert!(
+        coordinates.pair == pair,
+        "verification coordinates must retain the requested package pair"
+    );
+    assert!(
+        coordinates.original.key == key(&original_package),
+        "original coordinates must retain the original package key"
+    );
+    assert!(
+        coordinates.after.key == key(&after_package),
+        "after coordinates must retain the after package key"
+    );
     assert_eq!(coordinates.original.binding, original_package.binding);
     assert_eq!(coordinates.after.binding, after_package.binding);
     assert_eq!(
