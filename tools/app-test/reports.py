@@ -34,11 +34,28 @@ SURFACE_AWAIT_PHASES = frozenset({
 }) | frozenset(f"{prefix}-{tool}" for prefix in ("input-ready", "gesture") for tool in (
     "Pen", "Highlighter", "Marker", "Line", "Arrow", "Rectangle", "Ellipse", "Select", "Text", "Eraser",
 ))
+SURFACE_CLOSE_STAGES = frozenset({
+    "Requested", "Queued", "Navigation", "CaptureStream", "Assisted", "MutationGate", "MutationAcquired",
+    "ProjectClose", "ImageFrames", "Workflows", "Rotation", "DocumentOwner", "Giant", "Erasers", "Selections",
+    "InstructionFocus", "Semantics", "Instructions", "Ai", "ChangeObserver", "RefreshObserver", "Link",
+    "ProjectStorage", "ProjectsCatalog", "NavigationInstructionCleanup", "Finished",
+})
+SURFACE_CLOSE_STATUSES = frozenset({"Running", "Settled", "Failed", "Completed", "Declined"})
 SYNC_AWAIT_CASE = "com.visualworkbench.android.EditorSyncInstrumentedTest#oldPageRefreshCannotAdoptOrRebindAfterSameRevisionNavigation"
 SYNC_AWAIT_PHASES = frozenset({
     "InitialPdfPage", "OldReadEntered", "PageOneAdopted", "OldReadDelivered", "EraserEdit",
     "FixtureStartup", "FixtureCanvasReady", "FixtureCloseEntered", "FixtureCloseRetained",
 })
+SURFACE_NAVIGATION_MESSAGES = {
+    "Close the current controls or finish their operation first.": "controls_blocked",
+    "Save or discard the instruction draft before closing this project.": "instruction_unsaved",
+    "Finish or cancel the image transfer before leaving this screen.": "transfer",
+    "Finishing the current edit. Try returning to projects in a moment.": "pending_edit",
+    "Save the paid Result or explicitly discard its review before replacing or closing this project.": "ai_decision",
+    "Apply or explicitly discard the private tone changes before leaving this document.": "tone_changes",
+    "Finish the layer edit or explicitly discard its retry handle before leaving this document.": "layer_edit",
+    "Finish or cancel the document switch first.": "document_switch",
+}
 require = common.require
 Rejected = common.Rejected
 
@@ -280,6 +297,44 @@ def instrumentation(text: str, expected: list[str]) -> dict:
             "instrumentation_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
 
 
+def surface_timeout_state(header: str) -> dict | None:
+    # The optional close snapshot is captured once on Main by the fixture.
+    # Split only its exact ordered suffix; never absorb malformed close fields
+    # into the private blocked-message tail or infer values from suppressed text.
+    if len(header) > 2560:
+        return None
+    close = None
+    if " close_" in header:
+        keys = (" close_attempt=", " close_stage=", " close_status=", " close_failed_stage=")
+        if header.count(" close_") != 4 or any(header.count(key) != 1 for key in keys):
+            return None
+        suffix = re.fullmatch(r"([^\r\n]+) close_attempt=(0|[1-9][0-9]{0,9}) close_stage=([A-Za-z]{1,32}) close_status=([A-Za-z]{1,32}) close_failed_stage=([A-Za-z]{1,32})", header)
+        if not suffix:
+            return None
+        header, attempt, stage, status, failed = suffix.groups()
+        attempt = int(attempt)
+        if attempt == 0:
+            if (stage, status, failed) != ("None", "None", "None"):
+                return None
+        elif not (attempt <= 2147483647 and stage in SURFACE_CLOSE_STAGES and
+                  status in SURFACE_CLOSE_STATUSES and (failed == "None" or failed in SURFACE_CLOSE_STAGES)):
+            return None
+        close = {"attempt": attempt, "stage": stage, "status": status, "failed_stage": failed}
+    # The unescaped fixture fields must each occur exactly once. Ambiguous,
+    # oversized or malformed details contribute no flags and no private text.
+    if len(header) > 2304 or any(header.count(token) != 1 for token in (" pending=", " message=", " blocked=")):
+        return None
+    match = re.fullmatch(r"INSTRUMENTATION_STATUS: stack=java\.lang\.AssertionError: Timed out in [A-Za-z0-9-]{1,64}: busy=(true|false) pending=(0|-?[1-9][0-9]{0,9}) message=([^\r\n]{1,1024}) blocked=([^\r\n]{1,1024})", header)
+    if not match or not -2147483648 <= int(match[2]) <= 2147483647:
+        return None
+    result = {"busy": match[1] == "true", "pending_nonzero": match[2] != "0",
+              "message_kind": "none" if match[3] == "null" else SURFACE_NAVIGATION_MESSAGES.get(match[3], "unknown"),
+              "blocked_present": match[4] != "null"}
+    if close is not None:
+        result["close_progress"] = close
+    return result
+
+
 def failure_observation(text: str, expected: list[str]) -> dict:
     """Whitelisted diagnostics even when no passing result can be established."""
     require(len(text.encode("utf-8")) <= MAX_OUTPUT, "instrumentation_output_limit")
@@ -289,6 +344,8 @@ def failure_observation(text: str, expected: list[str]) -> dict:
     source_frames = []
     exception_kind = None
     surface_phase = None
+    surface_state = None
+    stack_headers = 0
     sync_phase = None
     for line in text.splitlines():
         # Retain only an exact known test class's Kotlin line numbers, never
@@ -299,12 +356,17 @@ def failure_observation(text: str, expected: list[str]) -> dict:
         kind = re.match(r"INSTRUMENTATION_STATUS: stack=(java\.lang\.(?:AssertionError|IllegalArgumentException|IllegalStateException)|org\.junit\.ComparisonFailure|java\.util\.concurrent\.CancellationException|kotlinx\.coroutines\.(?:TimeoutCancellationException|JobCancellationException)|com\.visualworkbench\.android\.editor\.GiantAndroidCreationFailure)(?::|$)", line)
         if kind:
             exception_kind = kind[1]
-        # Only fixed phase vocabularies may leave the private failure text.
-        # Surface diagnostics inspect the primary assertion prefix, never its
-        # busy/message/blocking tail or a suppressed cleanup assertion.
-        surface_timeout = re.match(r"INSTRUMENTATION_STATUS: stack=java\.lang\.AssertionError: Timed out in ([A-Za-z0-9-]{1,64}):", line)
-        if surface_timeout and surface_timeout[1] in SURFACE_AWAIT_PHASES:
-            surface_phase = surface_timeout[1]
+        # A sole primary header may contribute a fixed phase and bounded flags.
+        # Suppressed frames cannot supply it; duplicate headers omit all derived
+        # Surface fields rather than selecting one potentially ambiguous header.
+        if line.startswith("INSTRUMENTATION_STATUS: stack="):
+            stack_headers += 1
+            surface_phase = None
+            surface_state = None
+            surface_timeout = re.match(r"INSTRUMENTATION_STATUS: stack=java\.lang\.AssertionError: Timed out in ([A-Za-z0-9-]{1,64}):", line)
+            if stack_headers == 1 and surface_timeout and surface_timeout[1] in SURFACE_AWAIT_PHASES:
+                surface_phase = surface_timeout[1]
+                surface_state = surface_timeout_state(line)
         sync_timeout = re.fullmatch(r"\s*Suppressed: com\.visualworkbench\.android\.EditorSyncInstrumentedTest\$TimeoutPhase: VW_SYNC_AWAIT_PHASE=([A-Za-z]{1,32})", line)
         if sync_phase is None and sync_timeout and sync_timeout[1] in SYNC_AWAIT_PHASES:
             sync_phase = sync_timeout[1]
@@ -327,6 +389,8 @@ def failure_observation(text: str, expected: list[str]) -> dict:
                         observation["exception_kind"] = exception_kind
                     if identity in SURFACE_AWAIT_CASES and exception_kind == "java.lang.AssertionError" and surface_phase:
                         observation["await_phase"] = surface_phase
+                        if surface_state is not None:
+                            observation["surface_timeout_state"] = surface_state
                     if identity == SYNC_AWAIT_CASE and exception_kind == "kotlinx.coroutines.TimeoutCancellationException" and sync_phase:
                         observation["await_phase"] = sync_phase
                 observed.append(observation)
@@ -334,6 +398,8 @@ def failure_observation(text: str, expected: list[str]) -> dict:
             source_frames = []
             exception_kind = None
             surface_phase = None
+            surface_state = None
+            stack_headers = 0
             sync_phase = None
     return {"raw_output_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
             "observed_statuses": observed, "assertions_passed": False}

@@ -34,5 +34,9 @@ foreach($name in @('vw_core-old.exe','vw_core-0123456789abcdef.exe/../other.exe'
 $r=Copy-CoreUnitRecord;$r.executable='[redacted]/target/other/vw_core-0123456789abcdef.exe';$r.filenames=@($r.executable);Assert-CoreUnitRefused 'outside-deps' @(($r|ConvertTo-Json -Compress -Depth 8),$complete)
 $r=Copy-CoreUnitRecord;$r.filenames=@();Assert-CoreUnitRefused 'unlisted-executable' @(($r|ConvertTo-Json -Compress -Depth 8),$complete)
 $r=Copy-CoreUnitRecord;$r.filenames=@($r.executable,$r.executable);Assert-CoreUnitRefused 'duplicate-listed-executable' @(($r|ConvertTo-Json -Compress -Depth 8),$complete)
-if($passed -ne 26){throw "Unexpected parser case census: $passed"}
+$arguments=@(Get-VwCoreUnitArguments)
+if($arguments.Count -ne 2 -or $arguments[0] -cne '--test-threads=1' -or $arguments[1] -cne '--show-output'){throw 'Full core test arguments must serialize and retain successful wrapper proof'};$passed++
+$arguments=@(Get-VwCoreUnitArguments -TestFilter 'session::')
+if($arguments.Count -ne 3 -or $arguments[0] -cne 'session::' -or $arguments[1] -cne '--test-threads=1' -or $arguments[2] -cne '--show-output'){throw 'Filtered core test arguments changed'};$passed++
+if($passed -ne 28){throw "Unexpected parser case census: $passed"}
 Write-Host "core-unit-parser: $passed cases passed; no native/compiler execution"

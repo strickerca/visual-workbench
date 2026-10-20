@@ -59,11 +59,41 @@ fn tiff_16_keeps_adjacent_samples_and_zero_alpha_color_exact() {
     );
     image.icc = Some(vw_raster::standard_srgb_profile().unwrap());
     let bytes = encoded(&image, ExportFormat::Tiff16);
-    let imported = decode(&bytes, Limits::default(), &|| false).unwrap();
+    let peak = Limits::decode_peak_bytes(
+        image.width,
+        image.height,
+        bytes.len() as u64,
+        image.icc.as_ref().unwrap().len(),
+    )
+    .unwrap();
+    let limits = Limits {
+        memory_bytes: peak,
+        ..Limits::default()
+    };
+    let imported = decode(&bytes, limits, &|| false).unwrap();
     assert_eq!(imported.image.pixels, image.pixels);
     assert_eq!(imported.image.icc, image.icc);
     assert_eq!(imported.header.bit_depth, 16);
     assert_eq!(imported.header.orientation, 1);
+    assert!(matches!(
+        decode(
+            &bytes,
+            Limits {
+                memory_bytes: peak - 1,
+                ..limits
+            },
+            &|| false
+        ),
+        Err(Error::Limit)
+    ));
+    assert!(matches!(
+        Limits::decode_peak_bytes(1, 1, u64::MAX, 0),
+        Err(Error::Limit)
+    ));
+    assert!(matches!(
+        Limits::decode_peak_bytes(u32::MAX, u32::MAX, 0, 0),
+        Err(Error::Limit)
+    ));
 }
 
 #[test]

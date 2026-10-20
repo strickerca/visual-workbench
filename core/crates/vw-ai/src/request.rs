@@ -821,9 +821,7 @@ impl FluxCostReceipt {
     /// Exact conversion: one BFL credit is $0.01, or 10,000 micro-USD.
     /// Fractional micro-USD values stay unresolved rather than being rounded.
     pub fn microusd(&self) -> Option<u64> {
-        let (mantissa, exponent) = if let Some((m, e)) = self
-            .credits_decimal
-            .split_once(|c: char| c == 'e' || c == 'E')
+        let (mantissa, exponent) = if let Some((m, e)) = self.credits_decimal.split_once(['e', 'E'])
         {
             (m, e.parse::<i32>().ok()?)
         } else {

@@ -372,29 +372,101 @@ async fn finalized_tiff_bytes_contain_source_revision_and_exact_clean_pixels_at_
 }
 
 #[tokio::test]
-async fn bmp_export_is_refused_instead_of_publishing_a_file_without_required_provenance() {
+async fn bmp_exports_embed_required_provenance_and_preserve_pixels() {
     let root = temp();
-    let (_, bytes) = fixture(8);
-    let project = memory_project(&root.path().join("project"), bytes).await;
+    let (image, original) = fixture(8);
+    let source_asset = AssetId::hash(&original);
+    let project_path = root.path().join("project");
+    let project = memory_project(&project_path, original.clone()).await;
+    let before = project.info().await.unwrap();
     let mut request = options();
     request.marked = false;
     request.format = ImageFormat::Bmp8;
-    assert!(matches!(
-        project.export_image(request, cancel()).await,
-        Err(CoreError::Raster)
-    ));
-    assert!(matches!(
+    let buffered = project.export_image(request, cancel()).await.unwrap();
+    let destination = output(root.path(), "provenance.bmp", ImageFormat::Bmp8);
+    let published = project
+        .export_transfer_file(destination.clone(), cancel())
+        .await
+        .unwrap();
+    let delivered = std::fs::read(&destination.output_path).unwrap();
+    assert_eq!(published.encoded_bytes, delivered.len() as u64);
+    for (bytes, hash, metadata_json, revision) in [
+        (
+            buffered.bytes.as_slice(),
+            buffered.blake3.as_str(),
+            buffered.metadata_json.as_str(),
+            &buffered.revision,
+        ),
+        (
+            delivered.as_slice(),
+            published.blake3.as_str(),
+            published.metadata_json.as_str(),
+            &published.revision,
+        ),
+    ] {
+        assert_eq!(bytes.get(..2), Some(b"BM".as_slice()));
+        assert_eq!(hash, AssetId::hash(bytes).to_string());
+        let embedded = vw_formats::bmp_provenance(bytes, vw_formats::Limits::default())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(embedded).unwrap(),
+            serde_json::from_str::<serde_json::Value>(metadata_json).unwrap()
+        );
+        let metadata: vw_raster::ExportMetadata = serde_json::from_str(embedded).unwrap();
+        assert_eq!(metadata.source_asset, source_asset.to_string());
+        assert_eq!(
+            (
+                metadata.source_width,
+                metadata.source_height,
+                metadata.output_width,
+                metadata.output_height,
+                metadata.source_bit_depth,
+            ),
+            (2, 3, 2, 3, 8)
+        );
+        assert!(metadata.image_output.is_none());
+        assert_eq!(metadata.settings.format, vw_raster::ExportFormat::Bmp8);
+        assert_eq!(metadata.settings.revision.host_seq, revision.host_seq);
+        assert_eq!(
+            metadata
+                .settings
+                .revision
+                .state_hash
+                .iter()
+                .map(|v| format!("{v:02x}"))
+                .collect::<String>(),
+            revision.state_hash
+        );
+        assert_eq!(revision, &before);
+        let decoded = vw_formats::decode(bytes, vw_formats::Limits::default(), &|| false)
+            .unwrap()
+            .image;
+        assert_eq!(
+            (decoded.width, decoded.height, decoded.pixels.bit_depth()),
+            (2, 3, 8)
+        );
+        assert_eq!(decoded.pixels, image.pixels);
+        assert_eq!(decoded.icc, image.icc);
+    }
+    // A valid carrier still cannot replace an existing caller destination.
+    assert!(
         project
-            .export_transfer_file(
-                output(root.path(), "gated.bmp", ImageFormat::Bmp8),
-                cancel()
-            )
-            .await,
-        Err(TransferError::Unsupported)
-    ));
-    assert!(!root.path().join("gated.bmp").exists());
+            .export_transfer_file(destination.clone(), cancel())
+            .await
+            .is_err()
+    );
+    assert_eq!(std::fs::read(&destination.output_path).unwrap(), delivered);
+    assert_eq!(project.info().await.unwrap(), before);
     no_scratch(root.path());
     project.close().await.unwrap();
+    assert_eq!(
+        vw_store::BlobStore::new(&project_path)
+            .unwrap()
+            .read(&source_asset)
+            .unwrap(),
+        original
+    );
 }
 async fn image_asset(project: &ProjectSession) -> String {
     let info = project.info().await.unwrap();

@@ -65,17 +65,8 @@ fn decode_work(asset: &pb::AddAsset) -> WorkflowResult<u64> {
     if asset.byte_size == 0 || asset.byte_size > MAX_ENCODED {
         return Err(WorkflowError::Limit);
     }
-    // Full decode/orientation and checked profile copies; the floor also
-    // admits the existing BMP/TIFF adapter before its codec starts.
-    add(
-        add(
-            asset_pixels(asset)?
-                .checked_mul(40)
-                .ok_or(WorkflowError::Limit)?,
-            64 * MIB,
-        )?,
-        asset.byte_size,
-    )
+    asset_pixels(asset)?;
+    crate::format_images::decode_workspace_bytes(asset)
 }
 fn resolver_work(
     project: &Project,

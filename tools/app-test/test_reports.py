@@ -179,6 +179,7 @@ class InstrumentationCases(unittest.TestCase):
             with self.subTest(case=case, stack_kind=stack.split(":", 2)[1]):
                 report = reports.failure_observation(text, [case])
                 self.assertNotIn("await_phase", report["observed_statuses"][0])
+                self.assertNotIn("surface_timeout_state", report["observed_statuses"][0])
                 self.assertNotIn("secret", json.dumps(report))
                 self.assertNotIn("private", json.dumps(report))
 
@@ -189,6 +190,166 @@ class InstrumentationCases(unittest.TestCase):
         text += block(A, 2, 2, -2)
         report = reports.failure_observation(text, [surface, A])
         self.assertEqual(report["observed_statuses"], [{"case": surface, "status_code": 0}, {"case": A, "status_code": -2}])
+
+
+    def test_surface_primary_timeout_retains_only_finite_state(self):
+        case = sorted(reports.SURFACE_AWAIT_CASES)[0]
+        for message, kind in dict(reports.SURFACE_NAVIGATION_MESSAGES, null="none").items():
+            stack = ("INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Timed out in close-owned-project: "
+                     f"busy=false pending=0 message={message} blocked=null\n")
+            text = block(case, 1, 1, -2).replace("INSTRUMENTATION_STATUS_CODE:", stack + "INSTRUMENTATION_STATUS_CODE:")
+            observation = reports.failure_observation(text, [case])["observed_statuses"][0]
+            self.assertEqual(observation["surface_timeout_state"], {"busy": False, "pending_nonzero": False,
+                "message_kind": kind, "blocked_present": False})
+            self.assertNotIn(message, json.dumps(observation))
+            self.refused(text, (case,))
+        stack = ("INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Timed out in close-owned-project: "
+                 "busy=true pending=987654 message=secret /private/project blocked=private block details\n")
+        text = block(case, 1, 1, -2).replace("INSTRUMENTATION_STATUS_CODE:", stack + "INSTRUMENTATION_STATUS_CODE:")
+        report = reports.failure_observation(text, [case])
+        self.assertEqual(report["observed_statuses"][0]["surface_timeout_state"],
+            {"busy": True, "pending_nonzero": True, "message_kind": "unknown", "blocked_present": True})
+        for private in ("secret", "private", "987654", "block details"):
+            self.assertNotIn(private, json.dumps(report))
+
+    def test_surface_state_omits_malformed_or_ambiguous_details(self):
+        case = sorted(reports.SURFACE_AWAIT_CASES)[0]
+        prefix = "INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Timed out in close-owned-project: "
+        for detail in ("busy=true message=null blocked=null", "busy=True pending=0 message=null blocked=null",
+                       "busy=false pending=00 message=null blocked=null", "busy=false pending=2147483648 message=null blocked=null",
+                       "busy=true pending=0 message=private blocked=forged blocked=null",
+                       "busy=true pending=0 message=private message=forged blocked=null",
+                       "busy=true pending=0 message=" + "x" * 1025 + " blocked=null"):
+            text = block(case, 1, 1, -2).replace("INSTRUMENTATION_STATUS_CODE:", prefix + detail + "\nINSTRUMENTATION_STATUS_CODE:")
+            report = reports.failure_observation(text, [case])
+            self.assertNotIn("surface_timeout_state", report["observed_statuses"][0])
+            self.assertNotIn("private", json.dumps(report))
+
+    def test_surface_primary_header_excludes_suppressed_and_duplicate_cleanup(self):
+        case = sorted(reports.SURFACE_AWAIT_CASES)[0]
+        primary = ("INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Timed out in save-text: "
+                   "busy=true pending=1 message=null blocked=null\n")
+        close = primary.replace("save-text", "close-owned-project")
+        suppressed = "\tSuppressed: " + close.removeprefix("INSTRUMENTATION_STATUS: stack=")
+        for stack, phase in (("INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: primary private\n" + suppressed, None),
+                             (primary + suppressed, "save-text"), (primary + close, None), (primary + primary, None)):
+            text = block(case, 1, 1, -2).replace("INSTRUMENTATION_STATUS_CODE:", stack + "INSTRUMENTATION_STATUS_CODE:")
+            observation = reports.failure_observation(text, [case])["observed_statuses"][0]
+            self.assertEqual(observation.get("await_phase"), phase)
+            if phase is None:
+                self.assertNotIn("surface_timeout_state", observation)
+            else:
+                self.assertTrue(observation["surface_timeout_state"]["busy"])
+            self.assertNotIn("private", json.dumps(observation))
+
+
+
+    def close_snapshot_failure(self, suffix, case=None, code=-2):
+        case = case or sorted(reports.SURFACE_AWAIT_CASES)[0]
+        header = ("INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Timed out in close-owned-project: "
+                  "busy=false pending=0 message=null blocked=null" + suffix + "\n")
+        text = block(case, 1, 1, code).replace("INSTRUMENTATION_STATUS_CODE:", header + "INSTRUMENTATION_STATUS_CODE:")
+        return text, reports.failure_observation(text, [case])["observed_statuses"][0]
+
+    def test_surface_close_snapshot_preserves_existing_finite_state_and_sentinel(self):
+        text, observation = self.close_snapshot_failure(
+            " close_attempt=0 close_stage=None close_status=None close_failed_stage=None")
+        self.assertEqual(observation["surface_timeout_state"], {
+            "busy": False, "pending_nonzero": False, "message_kind": "none", "blocked_present": False,
+            "close_progress": {"attempt": 0, "stage": "None", "status": "None", "failed_stage": "None"}})
+        self.assertEqual(observation["await_phase"], "close-owned-project")
+        self.refused(text, (observation["case"],))
+
+    def test_surface_close_snapshot_accepts_exact_finite_stages_statuses_and_first_failure(self):
+        stages = (
+            "Requested", "Queued", "Navigation", "CaptureStream", "Assisted", "MutationGate", "MutationAcquired",
+            "ProjectClose", "ImageFrames", "Workflows", "Rotation", "DocumentOwner", "Giant", "Erasers", "Selections",
+            "InstructionFocus", "Semantics", "Instructions", "Ai", "ChangeObserver", "RefreshObserver", "Link",
+            "ProjectStorage", "ProjectsCatalog", "NavigationInstructionCleanup", "Finished",
+        )
+        statuses = ("Running", "Settled", "Failed", "Completed", "Declined")
+        self.assertEqual(reports.SURFACE_CLOSE_STAGES, frozenset(stages))
+        self.assertEqual(reports.SURFACE_CLOSE_STATUSES, frozenset(statuses))
+        for stage in stages:
+            for status in statuses:
+                with self.subTest(stage=stage, status=status):
+                    _, observation = self.close_snapshot_failure(
+                        f" close_attempt=1 close_stage={stage} close_status={status} close_failed_stage=None")
+                    self.assertEqual(observation["surface_timeout_state"]["close_progress"],
+                        {"attempt": 1, "stage": stage, "status": status, "failed_stage": "None"})
+        for failed in stages:
+            _, observation = self.close_snapshot_failure(
+                f" close_attempt=2147483647 close_stage=Workflows close_status=Failed close_failed_stage={failed}")
+            self.assertEqual(observation["surface_timeout_state"]["close_progress"]["failed_stage"], failed)
+
+    def test_surface_close_snapshot_rejects_noncanonical_overflow_and_mismatched_sentinel(self):
+        live = " close_attempt=1 close_stage=Workflows close_status=Running close_failed_stage=None"
+        invalid = [live.replace("attempt=1", "attempt=" + value) for value in
+                   ("00", "01", "+1", "-1", "1.0", "2147483648", "99999999999", "private", "")]
+        invalid += [live.replace("attempt=1", "attempt=0"),
+                    live.replace("stage=Workflows", "stage=None"),
+                    live.replace("status=Running", "status=None"),
+                    " close_attempt=0 close_stage=None close_status=None close_failed_stage=Workflows"]
+        for suffix in invalid:
+            with self.subTest(suffix=suffix):
+                _, observation = self.close_snapshot_failure(suffix)
+                self.assertNotIn("surface_timeout_state", observation)
+                self.assertNotIn("private", json.dumps(observation))
+
+    def test_surface_close_snapshot_rejects_unknown_duplicate_reordered_and_private_tails(self):
+        live = " close_attempt=1 close_stage=Workflows close_status=Running close_failed_stage=None"
+        for suffix in (live.replace("Workflows", "Private"), live.replace("Running", "Private"),
+                       live.replace("failed_stage=None", "failed_stage=Private"),
+                       live + " close_attempt=2", live + " close_stage=Finished", live + live,
+                       live + " private /secret/project", live + " close_private=secret",
+                       live.replace("close_attempt=1 close_stage=Workflows", "close_stage=Workflows close_attempt=1"),
+                       live.replace("close_status=Running", "close_Status=Running"),
+                       live.replace("close_status=Running", "close_status=RunningPrivate"),
+                       live.replace("close_stage=Workflows", "close_stage=" + "x" * 2561)):
+            with self.subTest(suffix=suffix[:100]):
+                _, observation = self.close_snapshot_failure(suffix)
+                self.assertNotIn("surface_timeout_state", observation)
+                self.assertNotIn("secret", json.dumps(observation))
+                self.assertNotIn("Private", json.dumps(observation))
+
+    def test_surface_close_snapshot_is_case_bound_and_never_establishes_acceptance(self):
+        suffix = " close_attempt=1 close_stage=Workflows close_status=Running close_failed_stage=None"
+        for case in reports.SURFACE_AWAIT_CASES:
+            text, observation = self.close_snapshot_failure(suffix, case)
+            self.assertIn("close_progress", observation["surface_timeout_state"])
+            self.refused(text, (case,))
+            self.assertFalse(reports.failure_observation(text, [case])["assertions_passed"])
+        for case, code in ((A, -2), (None, 0), (None, 1)):
+            _, observation = self.close_snapshot_failure(suffix, case, code)
+            self.assertNotIn("surface_timeout_state", observation)
+
+    def test_surface_close_snapshot_ignores_suppressed_wrong_kind_and_duplicate_headers(self):
+        suffix = " close_attempt=1 close_stage=Workflows close_status=Running close_failed_stage=None"
+        text, observation = self.close_snapshot_failure(suffix)
+        header = next(line for line in text.splitlines() if line.startswith("INSTRUMENTATION_STATUS: stack="))
+        for replacement in (header.replace("java.lang.AssertionError", "java.lang.IllegalStateException"),
+                            "INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: primary private\n\tSuppressed: " +
+                            header.removeprefix("INSTRUMENTATION_STATUS: stack="),
+                            header + "\n" + header,
+                            header + "\n" + header.replace("attempt=1", "attempt=2")):
+            changed = text.replace(header, replacement)
+            report = reports.failure_observation(changed, [observation["case"]])
+            self.assertNotIn("surface_timeout_state", report["observed_statuses"][0])
+            self.assertNotIn("private", json.dumps(report))
+
+    def test_surface_close_snapshot_resets_between_cases_and_keeps_private_fields_redacted(self):
+        suffix = " close_attempt=1 close_stage=Workflows close_status=Failed close_failed_stage=ImageFrames"
+        text, observation = self.close_snapshot_failure(suffix)
+        text = text.replace("message=null blocked=null", "message=secret personal project blocked=/private/file")
+        text += block(A, 2, 2, -2)
+        report = reports.failure_observation(text, [observation["case"], A])
+        state = report["observed_statuses"][0]["surface_timeout_state"]
+        self.assertEqual(state["message_kind"], "unknown")
+        self.assertTrue(state["blocked_present"])
+        self.assertEqual(state["close_progress"]["failed_stage"], "ImageFrames")
+        self.assertEqual(report["observed_statuses"][1], {"case": A, "status_code": -2})
+        for private in ("secret", "personal", "private", "/file"):
+            self.assertNotIn(private, json.dumps(report))
 
 
 class ArtifactCases(unittest.TestCase):

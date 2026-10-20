@@ -1,0 +1,139 @@
+{
+  "schema": "vw-editor-close-phase-v1",
+  "log_tag": "VW_EDITOR_CLOSE",
+  "message_format": "attempt=<positive-int> stage=<stage> status=<status> failed_stage=<stage-or-None>",
+  "field_order": [
+    "attempt",
+    "stage",
+    "status",
+    "failed_stage"
+  ],
+  "attempt": {
+    "min": 1,
+    "max": 2147483647,
+    "wraps": true,
+    "meaning": "synthetic diagnostic label; ownership uses attempt object identity"
+  },
+  "stages": [
+    "Requested",
+    "Queued",
+    "Navigation",
+    "CaptureStream",
+    "Assisted",
+    "MutationGate",
+    "MutationAcquired",
+    "ProjectClose",
+    "ImageFrames",
+    "Workflows",
+    "Rotation",
+    "DocumentOwner",
+    "Giant",
+    "Erasers",
+    "Selections",
+    "InstructionFocus",
+    "Semantics",
+    "Instructions",
+    "Ai",
+    "ChangeObserver",
+    "RefreshObserver",
+    "Link",
+    "ProjectStorage",
+    "ProjectsCatalog",
+    "NavigationInstructionCleanup",
+    "Finished"
+  ],
+  "statuses": [
+    "Running",
+    "Settled",
+    "Failed",
+    "Completed",
+    "Declined"
+  ],
+  "failed_stage_none": "None",
+  "internal_snapshot": {
+    "location": "EditorController.closeProgress",
+    "fields": [
+      "attempt",
+      "stage",
+      "status",
+      "failedStage"
+    ],
+    "nullable_before_first_attempt": true,
+    "failedStage_none": null,
+    "main_thread_read": true
+  },
+  "queued_retry": {
+    "event": {
+      "stage": "Queued",
+      "status": "Running",
+      "failed_stage": "None"
+    },
+    "active_snapshot_replaced": false
+  },
+  "semantics": {
+    "Running": "existing body has started; not retirement proof",
+    "Settled": "existing body returned; outer failed_stage can remain set",
+    "Failed": "existing body threw; first failed_stage retained",
+    "Completed": "full owning attempt finished without recorded failure",
+    "Declined": "owning attempt finished without accepting full navigation and without recorded failure"
+  },
+  "privacy": "fixed enums and synthetic attempt only; no IDs, paths, payloads or exception messages",
+  "source_sha256": "918f603dff49c6922e6d1b7791f52efa80ca3a8bb32c999406ddb2f4cf37aaab",
+  "production_behavior_fix": false,
+  "actual_S23_execution": false,
+  "live_attempt_tracking": "One latest snapshot per actual unfinished attempt; every finish removes its record. Active finish immediately emits the oldest unfinished successor latest phase, even while that successor remains suspended. No completed-event history.",
+  "instrumentation_timeout_suffix": {
+    "capture": "Read editor.closeProgress once on main, then append the captured value to the existing instrumentation timeout text. Local reporter owns this wiring; cloud production probe emits logcat but harness does not read logcat.",
+    "format": "close_attempt=<attempt> close_stage=<stage> close_status=<status> close_failed_stage=<stage-or-None>",
+    "field_order": [
+      "close_attempt",
+      "close_stage",
+      "close_status",
+      "close_failed_stage"
+    ],
+    "live_attempt_bounds": {
+      "min": 1,
+      "max": 2147483647
+    },
+    "initial_null_snapshot": "close_attempt=0 close_stage=None close_status=None close_failed_stage=None",
+    "live_example": "close_attempt=1 close_stage=Workflows close_status=Running close_failed_stage=None",
+    "failed_example": "close_attempt=1 close_stage=Workflows close_status=Failed close_failed_stage=Workflows",
+    "initial_status_sentinel": "None",
+    "initial_stage_sentinel": "None",
+    "live_status_values": [
+      "Running",
+      "Settled",
+      "Failed",
+      "Completed",
+      "Declined"
+    ],
+    "live_stage_values": [
+      "Requested",
+      "Queued",
+      "Navigation",
+      "CaptureStream",
+      "Assisted",
+      "MutationGate",
+      "MutationAcquired",
+      "ProjectClose",
+      "ImageFrames",
+      "Workflows",
+      "Rotation",
+      "DocumentOwner",
+      "Giant",
+      "Erasers",
+      "Selections",
+      "InstructionFocus",
+      "Semantics",
+      "Instructions",
+      "Ai",
+      "ChangeObserver",
+      "RefreshObserver",
+      "Link",
+      "ProjectStorage",
+      "ProjectsCatalog",
+      "NavigationInstructionCleanup",
+      "Finished"
+    ]
+  }
+}

@@ -45,15 +45,56 @@ function Assert-VwCoreUnitResult {
     $starts=@($Lines | Where-Object { $_ -cmatch '^running [1-9][0-9]* tests?$' })
     $ends=@($Lines | Where-Object { $_ -cmatch '^test result: ' })
     if($starts.Count -ne 1 -or $ends.Count -ne 1 -or
-       $ends[0] -cnotmatch '^test result: ok\. ([1-9][0-9]*) passed; 0 failed; 0 ignored; 0 measured; [0-9]+ filtered out; finished in [0-9.]+s$'){
-        throw 'Core unit test execution census missing, empty, ignored, or failed'
+       $ends[0] -cnotmatch '^test result: ok\. ([1-9][0-9]*) passed; 0 failed; ([01]) ignored; 0 measured; [0-9]+ filtered out; finished in [0-9.]+s$'){
+        throw 'Core unit test execution census missing, empty, failed, or unexpected ignored count'
     }
-    $count=[int]$Matches[1]
-    if($starts[0] -cnotmatch '^running ([1-9][0-9]*) tests?$' -or [int]$Matches[1] -ne $count){throw 'Core unit start/end census mismatch'}
+    $count=[int]$Matches[1];$ignored=[int]$Matches[2]
+    if($starts[0] -cnotmatch '^running ([1-9][0-9]*) tests?$' -or [int]$Matches[1] -ne ($count+$ignored)){throw 'Core unit start/end census mismatch'}
     $names=@(foreach($line in $Lines){if($line -cmatch '^test ([A-Za-z0-9_:]+) \.\.\. ok$'){$Matches[1]}})
     if($names.Count -ne $count -or @($names|Sort-Object -Unique).Count -ne $count){throw 'Core unit passing-case census mismatch'}
+    $caseLines=@($Lines | Where-Object {$_.StartsWith('test ',[StringComparison]::Ordinal) -and -not $_.StartsWith('test result: ',[StringComparison]::Ordinal)})
+    $ignoredLines=@($caseLines | Where-Object {$_ -cmatch '^test [A-Za-z0-9_:]+ \.\.\. ignored(?:, .*)?$'})
+    if($caseLines.Count -ne ($count+$ignored) -or $ignoredLines.Count -ne $ignored){throw 'Core unit case-status census mismatch'}
+    if($ignored -eq 1){
+        # This test deliberately retains a process-global permit in its child.
+        # The ordinary wrapper must pass AND expose its post-child-success proof
+        # in its own --show-output section; a bare ignored result is insufficient.
+        $probe='giant_images::producer::picked::tests::quarantine_probe'
+        $wrapper='giant_images::producer::picked::tests::cleanup_failure_retains_the_real_admission_in_an_isolated_process'
+        $reason='Executed by the bounded quarantine wrapper; do not leak this process-global permit into unrelated tests'
+        if($ignoredLines[0] -cne ('test '+$probe+' ... ignored, '+$reason) -or @($names | Where-Object {$_ -ceq $wrapper}).Count -ne 1){throw 'Core unit ignored probe lacks its passing isolation wrapper'}
+        $header='---- '+$wrapper+' stdout ----'
+        $marker='quarantine probe executed: 1 passed; same4MiB retained and third input refused'
+        $headers=@(for($i=0;$i -lt $Lines.Count;$i++){if($Lines[$i] -ceq $header){$i}})
+        $markers=@(for($i=0;$i -lt $Lines.Count;$i++){if($Lines[$i] -ceq $marker){$i}})
+        if($headers.Count -ne 1 -or $markers.Count -ne 1 -or $markers[0] -le $headers[0]){throw 'Core unit quarantine child proof missing or duplicate'}
+        # Libtest prints successful stdout after all case statuses and before
+        # its final census. Refuse foreign sections or nonempty intervening text.
+        $lastCase=-1;$end=-1
+        for($i=0;$i -lt $Lines.Count;$i++){
+            if($Lines[$i] -cin $caseLines){$lastCase=$i}
+            if($Lines[$i] -ceq $ends[0]){$end=$i}
+        }
+        if($headers[0] -le $lastCase -or $markers[0] -ge $end){throw 'Core unit quarantine proof is outside successful stdout'}
+        $successSections=0
+        for($i=$lastCase+1;$i -lt $headers[0];$i++){
+            if($Lines[$i] -ceq 'successes:'){$successSections++}
+            if($Lines[$i] -ceq 'failures:'){throw 'Core unit quarantine proof is inside failure output'}
+        }
+        if($successSections -ne 1){throw 'Core unit quarantine successful stdout heading missing or duplicate'}
+        for($i=$headers[0]+1;$i -lt $markers[0];$i++){if($Lines[$i] -cne ''){throw 'Core unit quarantine proof belongs to a foreign section'}}
+    }
     foreach($name in $RequiredTests){if(@($names|Where-Object {$_ -ceq $name}).Count -ne 1){throw 'Required core regression did not execute'}}
     return $count
+}
+
+function Get-VwCoreUnitArguments {
+    param([string]$TestFilter)
+    # Process-global admission tests must be serialized. Successful stdout is
+    # needed only as fixed proof for the exact wrapper-accounted ignored probe.
+    $arguments=@('--test-threads=1','--show-output')
+    if($TestFilter){$arguments=@($TestFilter)+$arguments}
+    return $arguments
 }
 
 function Invoke-VwCoreUnitTest {
@@ -81,8 +122,7 @@ function Invoke-VwCoreUnitTest {
         $sha=[Security.Cryptography.SHA256]::Create()
         try{$before=[BitConverter]::ToString($sha.ComputeHash($lease)).Replace('-','').ToLowerInvariant();$lease.Position=0
             Write-Host "[test-ffi-core-unit] exact executable SHA256 $before"
-            $testArgs=@('--test-threads=2')
-            if($TestFilter){$testArgs=@($TestFilter)+$testArgs}
+            $testArgs=@(Get-VwCoreUnitArguments -TestFilter $TestFilter)
             $run=Invoke-VwProcess -FilePath $exe -ArgumentList $testArgs -WorkingDirectory $ProjectRoot -Phase 'test-ffi-core-unit' -TimeoutSeconds $Limit -Capture
             $run.Lines|Write-Host
             $lease.Position=0;$after=[BitConverter]::ToString($sha.ComputeHash($lease)).Replace('-','').ToLowerInvariant()

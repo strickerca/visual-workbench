@@ -36,7 +36,16 @@ class EditorSurfaceInstrumentedTest {
             SystemClock.sleep(25)
         }
         var detail = ""
-        scenario.onActivity { detail = "busy=${it.editor.busy} pending=${it.editor.pending} message=${it.editor.message} blocked=${it.editor.blockingMessage}" }
+        scenario.onActivity { activity ->
+            val editor = activity.editor
+            val close = editor.closeProgress
+            val closeDetail = if (close == null) {
+                "close_attempt=0 close_stage=None close_status=None close_failed_stage=None"
+            } else {
+                "close_attempt=${close.attempt} close_stage=${close.stage.name} close_status=${close.status.name} close_failed_stage=${close.failedStage?.name ?: "None"}"
+            }
+            detail = "busy=${editor.busy} pending=${editor.pending} message=${editor.message} blocked=${editor.blockingMessage} $closeDetail"
+        }
         fail("Timed out in $phase: $detail")
     }
     private fun canvas(view: View): CanvasSurface? {

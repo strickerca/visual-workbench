@@ -44,6 +44,22 @@ impl Default for Limits {
     }
 }
 impl Limits {
+    /// Estimate decode workspace from borrowed source metadata without allocating.
+    /// This is checked arithmetic only; callers must still admit their complete
+    /// workspace, and decode retains every container, metadata and memory guard.
+    pub fn decode_peak_bytes(width: u32, height: u32, encoded: u64, icc: usize) -> Result<u64> {
+        let pixels = u64::from(width)
+            .checked_mul(u64::from(height))
+            .ok_or(Error::Limit)?;
+        // Source/callback storage, native decode buffer, RGBA expansion,
+        // orientation copy, bounded 16MiB ICC parse and TIFF metadata/workspace.
+        pixels
+            .checked_mul(32)
+            .and_then(|n| n.checked_add(encoded.checked_mul(2)?))
+            .and_then(|n| n.checked_add((icc as u64).checked_mul(4)?))
+            .and_then(|n| n.checked_add(64 * 1024 * 1024))
+            .ok_or(Error::Limit)
+    }
     pub fn validate(self) -> Result<Self> {
         if self.encoded_bytes == 0
             || self.encoded_bytes > 256 * 1024 * 1024
@@ -80,14 +96,7 @@ impl Limits {
         {
             return Err(Error::Limit);
         }
-        // Source/callback storage, native decode buffer, RGBA expansion,
-        // orientation copy, bounded 16MiB ICC parse and TIFF metadata/workspace.
-        let peak = pixels
-            .checked_mul(32)
-            .and_then(|n| n.checked_add(encoded.checked_mul(2)?))
-            .and_then(|n| n.checked_add((icc as u64).checked_mul(4)?))
-            .and_then(|n| n.checked_add(64 * 1024 * 1024))
-            .ok_or(Error::Limit)?;
+        let peak = Self::decode_peak_bytes(width, height, encoded, icc)?;
         if peak > self.memory_bytes {
             Err(Error::Limit)
         } else {

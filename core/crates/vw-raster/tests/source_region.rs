@@ -171,8 +171,9 @@ fn accepted_result_uses_existing_resolver_and_full_d_transform() -> TestResult {
             created_at_ms: 0,
         },
     );
-    let (id, object) = object(&document, &layer, 21, Shape::ResultId(result_id.to_proto()))?;
-    project.objects.insert(id, object);
+    let (object_id, result_object) =
+        object(&document, &layer, 21, Shape::ResultId(result_id.to_proto()))?;
+    project.objects.insert(object_id, result_object);
     project.validate()?;
     let region = tile();
     let info = BorrowedSource::new(&source)?.info().clone();
@@ -360,6 +361,14 @@ fn composed_box_reduction_uses_original_samples_and_partial_edge_blocks() -> Tes
     assert_eq!(
         downsample_composed_box_rgba8(&source, 2, 1, 1, &|| false)?,
         vec![0, 0, 255, 128]
+    );
+    // Hidden RGB in an entirely transparent block must not survive reduction.
+    source.pixels = Pixels::Rgba8(vec![
+        255, 0, 0, 0, 0, 255, 0, 0, 0, 0, 255, 0, 255, 255, 255, 0,
+    ]);
+    assert_eq!(
+        downsample_composed_box_rgba8(&source, 2, 1, 1, &|| false)?,
+        vec![0, 0, 0, 0]
     );
     Ok(())
 }

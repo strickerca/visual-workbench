@@ -72,6 +72,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private val assistedPins: AssistedSelectionPins? = null,
     private val streamDraftOnly: Boolean = false) : AndroidViewModel(application), CanvasGestureSink {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val closeTrace = EditorCloseProgress { value ->
+        android.util.Log.i("VW_EDITOR_CLOSE", "attempt=${value.attempt} stage=${value.stage.name} status=${value.status.name} failed_stage=${value.failedStage?.name ?: "None"}")
+    }
+    internal val closeProgress: EditorCloseSnapshot? get() = closeTrace.current
     private val captureStreamSessions = StreamRootOwner<AndroidStreamSession> { it.close() }
     private val captureStreamAnnotations = StreamRootOwner<CaptureAnnotationSession> { it.close() }
     private val captureStreamReceivers = StreamRootOwner<WorkbenchCaptureStream> { it.close() }
@@ -1285,26 +1289,40 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             if (pending != 0) { message = "Finishing the current edit. Try returning to projects in a moment."; return }
             busy = true
             scope.launch {
-                var instructionSeal = false
+                val closing = closeTrace.begin()
+                var navigationClosed = false
                 try {
-                    closeCaptureStream();closeAssisted()
-                    val closed = mutations.withLock {
-                        if (!instructionEditor.sealIfClean()) {
-                            message = "Save or discard the instruction draft before closing this project."
-                            screen = WorkbenchScreen.Instructions; false
-                        } else {
-                            instructionSeal = true; closeCurrent(); true
+                    closing.step(EditorCloseStage.Navigation) {
+                        var instructionSeal = false
+                        try {
+                            closing.step(EditorCloseStage.CaptureStream) { closeCaptureStream() }
+                            closing.step(EditorCloseStage.Assisted) { closeAssisted() }
+                            val closed = closing.step(EditorCloseStage.MutationGate) {
+                                mutations.withLock {
+                                    closing.reached(EditorCloseStage.MutationAcquired)
+                                    if (!instructionEditor.sealIfClean()) {
+                                        message = "Save or discard the instruction draft before closing this project."
+                                        screen = WorkbenchScreen.Instructions; false
+                                    } else {
+                                        instructionSeal = true; closeCurrent(closing); true
+                                    }
+                                }
+                            }
+                            if (closed) {
+                                closing.step(EditorCloseStage.ProjectsCatalog) { refreshProjects() }
+                                screen = next; navigationClosed = true
+                            }
+                        } catch (error: Exception) { report(error) }
+                        finally {
+                            if (instructionSeal && !disposing) {
+                                closing.step(EditorCloseStage.NavigationInstructionCleanup) {
+                                    instructionEditor.detach(); instructionEditor.resume(); semanticEditor.resumeAfterReplacement(); instructionEditor.refresh(); instructionFocus.revisionChanged()
+                                }
+                            }
+                            busy = false
                         }
                     }
-                    if (closed) { refreshProjects(); screen = next }
-                }
-                catch (error: Exception) { report(error) }
-                finally {
-                    if (instructionSeal && !disposing) {
-                        instructionEditor.detach(); instructionEditor.resume(); semanticEditor.resumeAfterReplacement(); instructionEditor.refresh(); instructionFocus.revisionChanged()
-                    }
-                    busy = false
-                }
+                } finally { closing.finish(navigationClosed) }
             }
         } else screen = next
     }
@@ -1573,41 +1591,54 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
         nextWork.start()
     }
-    private suspend fun closeCurrent() {
-        check(!captureStreamBlocksParent) { "Close the capture stream before replacing its project" }
-        interruptAirInput(clearView = true, clearBarrel = true)
-        withContext(NonCancellable) {
-        closeAssisted();imageFrames.detach();workflows.detach();rotation.detach()
-        documentOwner.detach()
-        if(!precisionClosed)precision.reset()
-        scene=null;composedBackground=null
-        exportReady = null
-        invalidateExport()
-        detachGiant()
-        erasers.detach(); selections.detach()
-        instructionFocus.detach()
-        semanticEditor.detach()
-        instructionEditor.detach()
-        retireAi()
-        captureArrivals.detach(); failedCaptureOpen = null
-        epoch++; refreshAdmission.reset();documentRefresh.invalidate()
-        changesJob?.cancelAndJoin(); changesJob = null
-        refreshQueue?.close(); refreshQueue = null
-        refreshJob?.cancelAndJoin(); refreshJob = null
-        try { detachLink() }
-        finally {
-            previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
-            val previous = project; project = null
-            try { if(!streamDraftOnly || previous !== streamBorrow)previous?.close() }
-            finally {
-                document = null; info = null
-                background = null; composedBackground = null; colorAssumed=false; colorAssumedSourceAsset=null; objects = emptyList(); selected = null; transientShape = null
-                transformed = emptyMap(); erased = emptySet(); scene = null; blockingMessage = null; needsColorConsent = false; originalFormatNotice = null; originalFormat = null
+    private suspend fun closeCurrent(attempt: EditorCloseProgress.Attempt? = null) {
+        val closing = attempt ?: closeTrace.begin()
+        var completed = false
+        try {
+            closing.step(EditorCloseStage.ProjectClose) {
+                check(!captureStreamBlocksParent) { "Close the capture stream before replacing its project" }
+                interruptAirInput(clearView = true, clearBarrel = true)
+                withContext(NonCancellable) {
+                    closing.step(EditorCloseStage.Assisted) { closeAssisted() }
+                    closing.step(EditorCloseStage.ImageFrames) { imageFrames.detach() }
+                    closing.step(EditorCloseStage.Workflows) { workflows.detach() }
+                    closing.step(EditorCloseStage.Rotation) { rotation.detach() }
+                    closing.step(EditorCloseStage.DocumentOwner) { documentOwner.detach() }
+                    if(!precisionClosed)precision.reset()
+                    scene=null;composedBackground=null
+                    exportReady = null
+                    invalidateExport()
+                    closing.step(EditorCloseStage.Giant) { detachGiant() }
+                    closing.step(EditorCloseStage.Erasers) { erasers.detach() }
+                    closing.step(EditorCloseStage.Selections) { selections.detach() }
+                    closing.step(EditorCloseStage.InstructionFocus) { instructionFocus.detach() }
+                    closing.step(EditorCloseStage.Semantics) { semanticEditor.detach() }
+                    closing.step(EditorCloseStage.Instructions) { instructionEditor.detach() }
+                    closing.step(EditorCloseStage.Ai) { retireAi() }
+                    captureArrivals.detach(); failedCaptureOpen = null
+                    epoch++; refreshAdmission.reset();documentRefresh.invalidate()
+                    closing.step(EditorCloseStage.ChangeObserver) { changesJob?.cancelAndJoin(); changesJob = null }
+                    closing.step(EditorCloseStage.RefreshObserver) {
+                        refreshQueue?.close(); refreshQueue = null
+                        refreshJob?.cancelAndJoin(); refreshJob = null
+                    }
+                    try { closing.step(EditorCloseStage.Link) { detachLink() } }
+                    finally {
+                        previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
+                        val previous = project; project = null
+                        try { closing.step(EditorCloseStage.ProjectStorage) { if(!streamDraftOnly || previous !== streamBorrow)previous?.close() } }
+                        finally {
+                            document = null; info = null
+                            background = null; composedBackground = null; colorAssumed=false; colorAssumedSourceAsset=null; objects = emptyList(); selected = null; transientShape = null
+                            transformed = emptyMap(); erased = emptySet(); scene = null; blockingMessage = null; needsColorConsent = false; originalFormatNotice = null; originalFormat = null
+                        }
+                    }
+                    // Published render snapshots may still reference the old bitmap. Allow
+                    // normal reachability to release it instead of recycling under a draw.
+                }
             }
-        }
-        // Published render snapshots may still reference the old bitmap. Allow
-        // normal reachability to release it instead of recycling under a draw.
-        }
+            completed = true
+        } finally { if (attempt == null) closing.finish(completed) }
     }
 
     private fun observeProject(current: WorkbenchProject, token: Long) {

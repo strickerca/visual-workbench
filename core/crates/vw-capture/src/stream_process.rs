@@ -454,15 +454,17 @@ mod owned {
                     .map_err(|_| Error::Platform)?
                     .0 as usize,
             );
-            let mut entry = THREADENTRY32::default();
-            entry.dwSize = std::mem::size_of::<THREADENTRY32>() as u32;
+            let mut entry = THREADENTRY32 {
+                dwSize: std::mem::size_of::<THREADENTRY32>() as u32,
+                ..Default::default()
+            };
             Thread32First(snapshot.raw(), &mut entry).map_err(|_| Error::Platform)?;
             let mut found = None;
             loop {
-                if entry.th32OwnerProcessID == process_id {
-                    if found.replace(entry.th32ThreadID).is_some() {
-                        return Err(Error::Platform);
-                    }
+                if entry.th32OwnerProcessID == process_id
+                    && found.replace(entry.th32ThreadID).is_some()
+                {
+                    return Err(Error::Platform);
                 }
                 if Thread32Next(snapshot.raw(), &mut entry).is_err() {
                     if GetLastError() != ERROR_NO_MORE_FILES {

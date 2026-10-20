@@ -446,9 +446,10 @@ async fn source_and_retained_region_pixels_obey_the_callers_export_budget() {
     let mut request = options();
     request.marked = false;
     request.memory_budget_bytes = 1;
+    // Canonical workspace is admitted before source decoding or codec work.
     assert!(matches!(
         project.export_image(request.clone(), cancel()).await,
-        Err(CoreError::Raster)
+        Err(CoreError::Backpressure)
     ));
     // The codec's 1px region estimate alone fits, but the retained 64x64 RGBA
     // source must also fit before the codec starts.

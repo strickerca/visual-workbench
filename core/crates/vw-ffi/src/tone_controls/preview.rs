@@ -20,15 +20,7 @@ fn pixels(asset: &pb::AddAsset) -> WorkflowResult<u64> {
         .ok_or(WorkflowError::Limit)
 }
 fn decode_work(asset: &pb::AddAsset) -> WorkflowResult<u64> {
-    // Encoded bytes plus full decode/orientation/profile workspace. The 64MiB
-    // floor also admits the bounded BMP/TIFF adapter before its codec starts.
-    add(
-        add(
-            pixels(asset)?.checked_mul(40).ok_or(WorkflowError::Limit)?,
-            64 * MIB,
-        )?,
-        asset.byte_size,
-    )
+    crate::format_images::decode_workspace_bytes(asset)
 }
 struct Admission {
     extra: u64,
@@ -219,7 +211,7 @@ impl AssetResolver for Assets<'_> {
         }
         let decode_budget = decode_work(asset)
             .map_err(|_| RasterError::Allocation)?
-            .checked_sub(length)
+            .checked_sub(bytes.capacity() as u64)
             .ok_or(RasterError::Allocation)?;
         let image = crate::format_images::decode(
             &bytes,

@@ -39,10 +39,10 @@ class EditorSyncInstrumentedTest {
     }
 
     @Test fun oldPageRefreshCannotAdoptOrRebindAfterSameRevisionNavigation()=runBlocking {
-        fixture { editor,core,_ ->
+        fixture(initialPdf = true) { editor,core,_ ->
             val project=core.current
-            withContext(Dispatchers.Main){project.pdf=true;project.change(1u,0xff0000ffu)}
-            inAwaitPhase(AwaitPhase.InitialPdfPage) { waitUntil{editor.document?.page==0u&&!editor.documents.state.value.busy} }
+            withContext(Dispatchers.Main){project.change(1u,0xff0000ffu)}
+            inAwaitPhase(AwaitPhase.InitialPdfPage) { waitUntil { pdfFixtureReady(editor, "state-1") } }
             val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();val delivered=CompletableDeferred<Unit>()
             try {
                 withContext(Dispatchers.Main){project.nextRead={captured->entered.complete(Unit);release.await();delivered.complete(Unit);captured};project.change(2u,0x00ff00ffu)}
@@ -333,10 +333,11 @@ class EditorSyncInstrumentedTest {
         withContext(Dispatchers.Main) { editor.pairing.choosePeer("synthetic-peer"); editor.pairing.sessionAddress = "192.0.2.1:443"; editor.connectCurrent() }
         waitUntil { editor.connection != null && !editor.busy }
     }
-    private suspend fun fixture(capture: (ProjectLink) -> WorkbenchAgentCaptureStatus = ::agentCaptureStatus, action: suspend (EditorController, FakeCore, FakeLink) -> Unit) {
+    private suspend fun fixture(capture: (ProjectLink) -> WorkbenchAgentCaptureStatus = ::agentCaptureStatus,
+        initialPdf: Boolean = false, action: suspend (EditorController, FakeCore, FakeLink) -> Unit) {
         val base = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as Application
         val app = IsolatedEditorApplication(base)
-        val events = mutableListOf<String>(); val link = FakeLink(events); val core = FakeCore(events)
+        val events = mutableListOf<String>(); val link = FakeLink(events); val core = FakeCore(events, initialPdf)
         val sessions = object : SessionLifecycleInstrumentedTest.FakeSessions() {
             override suspend fun pairedDevices() = listOf(PairedDevice("synthetic-peer", "a".repeat(64), 1uL, null))
             override suspend fun projectRole(project: WorkbenchProject) = ProjectSessionRole("synthetic-project", "synthetic-device", "synthetic-device", true, 0u, 0u)
@@ -351,7 +352,10 @@ class EditorSyncInstrumentedTest {
             try {
                 inAwaitPhase(AwaitPhase.FixtureStartup) { waitUntil { !current.busy } }
                 withContext(Dispatchers.Main) { current.viewport(200, 200, 1f); current.newCanvas() }
-                inAwaitPhase(AwaitPhase.FixtureCanvasReady) { waitUntil { !current.busy && current.scene?.background != null } }
+                inAwaitPhase(AwaitPhase.FixtureCanvasReady) {
+                    if (initialPdf) waitUntil { pdfFixtureReady(current) }
+                    else waitUntil { !current.busy && current.scene?.background != null }
+                }
                 action(current, core, link)
             } catch (error: Throwable) {
                 primaryFailure = error
@@ -389,15 +393,33 @@ class EditorSyncInstrumentedTest {
             }
         }
     }
+    // This synthetic PDF has no raster worker/frame; page ownership and bound
+    // controllers establish fixture readiness without requiring a bitmap.
+    private fun pdfFixtureReady(editor: EditorController, stateHash: String? = null): Boolean {
+        val snapshot = editor.document ?: return false
+        val scene = editor.scene ?: return false
+        val documentState = editor.documents.state.value
+        val descriptor = documentState.descriptor ?: return false
+        return !editor.busy && editor.pending == 0 && !documentState.busy &&
+            !editor.selections.state.value.busy && !editor.erasers.state.value.busy &&
+            scene.document === snapshot && snapshot.page == 0u && documentState.page == 0u &&
+            descriptor.kind == EditableKind.Pdf && descriptor.documentId == snapshot.documentId &&
+            descriptor.revision.sameDocumentRevision(snapshot.render.revision) &&
+            editor.info?.sameDocumentRevision(snapshot.render.revision) == true &&
+            (stateHash == null || snapshot.render.revision.stateHash == stateHash)
+    }
     private suspend fun waitUntil(check: () -> Boolean) = withTimeout(10_000) { while (!withContext(Dispatchers.Main) { check() }) delay(10) }
     private fun sample(x: Double, y: Double, time: Long) = PenSample(1, PointerTool.Pen, x, y, time, .5f, .5f, null, null, 0)
 
-    private class FakeCore(private val events: MutableList<String>) : WorkbenchCore {
+    private class FakeCore(private val events: MutableList<String>, private val initialPdf: Boolean = false) : WorkbenchCore {
         lateinit var current: FakeProject
         private val identities = workbenchCore()
         override fun newId(unixMs: ULong): String = identities.newId(unixMs)
         override fun newDeviceId(): String = identities.newDeviceId()
-        override suspend fun create(options: CreateProject): WorkbenchProject = FakeProject(options, events).also { current = it }
+        override suspend fun create(options: CreateProject): WorkbenchProject = FakeProject(options, events).also {
+            // Configure the source before the controller can attach its first snapshot.
+            it.pdf = initialPdf; current = it
+        }
         override suspend fun open(path: String): WorkbenchProject = throw CoreFailure(CoreFailureKind.Unsupported)
         override suspend fun layoutText(text: String, font: String, size: Float): TextLayout = error("unused")
         override fun cameraMatrix(camera: Camera, inverse: Boolean) = if (inverse) Transform(1 / camera.scale, 0.0, 0.0, 1 / camera.scale,

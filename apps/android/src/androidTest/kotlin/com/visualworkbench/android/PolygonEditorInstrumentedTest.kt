@@ -29,9 +29,9 @@ class PolygonEditorInstrumentedTest {
         fixture { editor, router ->
             val before = withContext(Dispatchers.Main) { checkNotNull(editor.info).stateHash }
             withContext(Dispatchers.Main) {
-                tap(router, 30.0, 30.0, 100)
-                tap(router, 90.0, 30.0, 200)
-                tap(router, 60.0, 90.0, 300)
+                tap(editor, router, 30.0, 30.0, 100)
+                tap(editor, router, 90.0, 30.0, 200)
+                tap(editor, router, 60.0, 90.0, 300)
                 assertEquals(3, editor.selections.state.value.draft?.points?.size)
                 assertEquals(before, editor.info?.stateHash)
                 assertTrue(editor.selections.interaction.finishPolygon())
@@ -49,20 +49,26 @@ class PolygonEditorInstrumentedTest {
 
     @Test fun canceledContactAndChangedViewportCannotReuseEarlierPolygonVertices() = runBlocking {
         fixture { editor, router ->
+            val before = withContext(Dispatchers.Main) { editor.info?.stateHash }
             withContext(Dispatchers.Main) {
-                val before = editor.info?.stateHash
-                tap(router, 30.0, 30.0, 100)
-                tap(router, 90.0, 30.0, 200)
+                tap(editor, router, 30.0, 30.0, 100)
+                tap(editor, router, 90.0, 30.0, 200)
+                assertEquals(2, editor.selections.state.value.draft?.points?.size)
+                assertInputReady(editor)
                 router.accept(packet(MotionEvent.ACTION_DOWN, 60.0, 90.0, 300))
                 router.accept(packet(MotionEvent.ACTION_CANCEL, 60.0, 90.0, 301, canceled = true))
                 assertNull(editor.selections.state.value.draft)
                 assertFalse(editor.selections.interaction.finishPolygon())
-                tap(router, 30.0, 30.0, 400)
-                tap(router, 90.0, 30.0, 500)
+                tap(editor, router, 30.0, 30.0, 400)
+                tap(editor, router, 90.0, 30.0, 500)
+                assertEquals(2, editor.selections.state.value.draft?.points?.size)
                 editor.pan(8.0, 0.0)
                 assertNull(editor.selections.state.value.draft)
                 assertFalse(editor.selections.interaction.finishPolygon())
-                tap(router, 60.0, 90.0, 600)
+            }
+            waitUntil { inputReady(editor) }
+            withContext(Dispatchers.Main) {
+                tap(editor, router, 60.0, 90.0, 600)
                 assertEquals(1, editor.selections.state.value.draft?.points?.size)
                 assertFalse(editor.selections.interaction.finishPolygon())
                 editor.cancelTool()
@@ -94,7 +100,9 @@ class PolygonEditorInstrumentedTest {
             withContext(Dispatchers.Main) { editor.viewport(128, 128, 1f); editor.newCanvas() }
             waitUntil { !editor.busy && editor.scene?.background != null }
             withContext(Dispatchers.Main) { editor.selections.interaction.tool(SelectionTool.Polygon) }
-            waitUntil { editor.selections.state.value.canDraw }
+            // Selection canDraw alone does not include the editor's instruction,
+            // semantic, document, modal and precision/display admission gates.
+            waitUntil { inputReady(editor) }
             block(editor, CanvasGestureRouter(editor, 4.0))
         } finally {
             // Only the exact project created by this fixture is removed, and
@@ -113,7 +121,15 @@ class PolygonEditorInstrumentedTest {
     private suspend fun waitUntil(condition: () -> Boolean) = withTimeout(10_000) {
         while (!withContext(Dispatchers.Main) { condition() }) delay(10)
     }
-    private fun tap(router: CanvasGestureRouter, x: Double, y: Double, time: Long) {
+    private fun inputReady(editor: EditorController): Boolean = editor.selections.state.value.canDraw &&
+        editor.precisionInputAllowed() && editor.erasers.tools.route() == EraserInputRoute.Selection
+    private fun assertInputReady(editor: EditorController) {
+        assertTrue("Editor precision input must be admitted before the synthetic contact", editor.precisionInputAllowed())
+        assertTrue("Polygon selection must be drawable before the synthetic contact", editor.selections.state.value.canDraw)
+        assertEquals(EraserInputRoute.Selection, editor.erasers.tools.route())
+    }
+    private fun tap(editor: EditorController, router: CanvasGestureRouter, x: Double, y: Double, time: Long) {
+        assertInputReady(editor)
         router.accept(packet(MotionEvent.ACTION_DOWN, x, y, time))
         router.accept(packet(MotionEvent.ACTION_UP, x, y, time + 1))
     }

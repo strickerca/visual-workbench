@@ -185,13 +185,7 @@ pub(super) fn read(
     // canonical/codec plus native/ABI/foreign reservations are acquired below
     // before visible-state hashing or any source/file/pixel allocation.
     let canonical = crate::workflow::canonical_workspace(state, budget, false).map_err(workflow)?;
-    let decode = add(
-        add(
-            pixels.checked_mul(40).ok_or(SelectionError::Limit)?,
-            64 * MIB,
-        )?,
-        source.byte_size,
-    )?;
+    let decode = crate::format_images::decode_workspace_bytes(source).map_err(workflow)?;
     let profile = if source.icc_profile.is_empty() {
         0
     } else {

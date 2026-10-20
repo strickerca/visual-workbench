@@ -524,7 +524,28 @@ async fn tagged_oriented_sixteen_bit_tiff_uses_the_canonical_format_decoder() {
     let project = project(&root.path().join("p"), bytes.clone()).await;
     let doc = document(&project).await;
     assert_eq!((doc.width, doc.height, doc.source_bit_depth), (3, 2, 16));
+    let pool = shared_session_resources().unwrap();
+    let baseline = pool.used_bytes();
+    let low_budget = 64 * 1024 * 1024;
+    assert!(matches!(
+        project
+            .assisted_source_pixels(
+                doc.binding.clone(),
+                3,
+                2,
+                16,
+                None,
+                false,
+                low_budget,
+                cancel()
+            )
+            .await,
+        Err(SelectionError::Memory { estimated, budget })
+            if budget == low_budget && estimated > budget
+    ));
+    assert_eq!(pool.used_bytes(), baseline);
     let owner = acquire(&project, &doc, false).await;
+    assert!(pool.used_bytes() > baseline);
     let delivery_lease = owner.publication_lease().unwrap();
     let delivery = owner.take_pixels().unwrap();
     owner.release_source().unwrap();
@@ -534,6 +555,7 @@ async fn tagged_oriented_sixteen_bit_tiff_uses_the_canonical_format_decoder() {
     let expected = vw_raster::display_rgba8(decoded, BUDGET, false, &|| false).unwrap();
     assert_eq!(delivery.rgba, expected.rgba);
     retire(delivery, delivery_lease);
+    assert_eq!(pool.used_bytes(), baseline);
     project.close().await.unwrap();
 }
 

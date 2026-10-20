@@ -73,6 +73,7 @@ pub fn region_composition_estimate(
 /// The input is the exact original-resolution region at `region` in the full D
 /// grid. The existing layer/tonal/result renderer receives its real D origin.
 /// Output crop and O-space dimensions have no bearing on editing visibility.
+#[allow(clippy::too_many_arguments)] // Explicit original binding, D region, renderer and cancellation policies.
 pub fn compose_document_region(
     source: &DecodedImage,
     full: &SourceInfo,
@@ -163,11 +164,11 @@ pub fn downsample_composed_box_rgba8(
                 }
             }
             for channel in color {
-                output.push(if alpha == 0 {
-                    0
-                } else {
-                    ((channel + alpha / 2) / alpha) as u8
-                });
+                output.push(
+                    (channel + alpha / 2)
+                        .checked_div(alpha)
+                        .map_or(0, |value| value as u8),
+                );
             }
             output.push(((alpha + samples / 2) / samples) as u8);
         }

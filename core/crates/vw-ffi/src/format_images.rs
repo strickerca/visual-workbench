@@ -58,6 +58,31 @@ fn error(e: vw_formats::Error) -> RasterError {
         vw_formats::Error::Io(_) => RasterError::Io,
     }
 }
+/// Admit both the existing generic decoder envelope and the canonical format
+/// decoder's metadata-only peak. The borrowed input Vec stays live outside the
+/// codec; its separate encoded allowance is subtracted by each resolver using
+/// the actual allocation capacity before passing the codec its remaining cap.
+pub(crate) fn decode_workspace_bytes(asset: &vw_proto::v1::AddAsset) -> Result<u64, WorkflowError> {
+    let pixels = u64::from(asset.width)
+        .checked_mul(u64::from(asset.height))
+        .ok_or(WorkflowError::Limit)?;
+    let generic = pixels
+        .checked_mul(40)
+        .and_then(|n| n.checked_add(64 * MIB))
+        .and_then(|n| n.checked_add(asset.byte_size))
+        .ok_or(WorkflowError::Limit)?;
+    let format = vw_formats::Limits::decode_peak_bytes(
+        asset.width,
+        asset.height,
+        asset.byte_size,
+        asset.icc_profile.len(),
+    )
+    .map_err(|_| WorkflowError::Limit)?
+    .checked_add(asset.byte_size)
+    .ok_or(WorkflowError::Limit)?;
+    Ok(generic.max(format))
+}
+
 pub(crate) fn decode(
     bytes: &[u8],
     l: DecodeLimits,

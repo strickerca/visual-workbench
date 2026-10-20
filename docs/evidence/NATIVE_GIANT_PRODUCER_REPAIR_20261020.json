@@ -1,0 +1,139 @@
+{
+  "source_base": "c241229371517e96a9d98033e43a0c68adb72ea1",
+  "source": {
+    "core/crates/vw-ffi/src/giant_images/producer/android_bridge/tests.rs": {
+      "bytes": 15801,
+      "sha256": "9db25449e7c9e96cb5d749d3fa39b3d2f696cae72576fcfc292427f792e31bdd"
+    },
+    "core/crates/vw-ffi/tests/verification.rs": {
+      "bytes": 23934,
+      "sha256": "a1930b44820215b0b448a57fdfba8fe63b3fc13b99d7282ed29b97fafd66c7bc"
+    }
+  },
+  "runs": [
+    {
+      "label": "producer",
+      "executable": "target/debug/deps/vw_core-eee4db57387e06e0",
+      "executable_sha256": "420b615c91d0a3ef81cb210967c40df15e1811b45c4cabc5a4a6d1894b235d06",
+      "args": [
+        "giant_images::producer::",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "timeout_seconds": 120,
+      "elapsed_seconds": 0.561,
+      "exit_code": 0,
+      "summary": "test result: ok. 62 passed; 0 failed; 1 ignored; 0 measured; 418 filtered out; finished in 0.56s",
+      "log": "producer.log",
+      "log_sha256": "3a54fc92473102442592e55d556bd872856f068b3f970a1051a9edc336264689"
+    },
+    {
+      "label": "verification",
+      "executable": "target/debug/deps/verification-fdb9b02e0ae2d8a7",
+      "executable_sha256": "59f06cb8614f0b630099731bb50df8281504e176e4d9fc51f5af8dc556a59561",
+      "args": [
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "timeout_seconds": 90,
+      "elapsed_seconds": 1.861,
+      "exit_code": 0,
+      "summary": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.86s",
+      "log": "verification.log",
+      "log_sha256": "eba224d31a06a6fabef8711113944760e2ed0ff8b0a1b77d4ed546633467eb01"
+    }
+  ],
+  "required_producer_cases_passed": [
+    "giant_images::producer::android_bridge::tests::closing_native_input_after_uncertain_foreign_exit_preserves_marker_until_retry",
+    "giant_images::producer::android_bridge::tests::real_publication_adopts_all_four_parts_and_keeps_only_its_project_charge_until_close",
+    "giant_images::producer::android_bridge::tests::typed_copy_refusals_independent_output_and_failed_android_retirement_preserve_owners",
+    "giant_images::producer::picked::tests::startup_saturation_retires_the_input_without_starting_its_body",
+    "giant_images::producer::picked::tests::two_selected_inputs_prepare_without_a_second_permit_or_charge",
+    "giant_images::producer::uri_staging::tests::failed_reader_close_retains_exact_reader_staging_and_original_quota",
+    "giant_images::producer::uri_staging::tests::uri_admission_precedes_filesystem_and_reader_open"
+  ],
+  "quarantine_wrapper": "giant_images::producer::picked::tests::cleanup_failure_retains_the_real_admission_in_an_isolated_process",
+  "quarantine_top_level_ignored": 1,
+  "quarantine_child_passed": 1,
+  "platform": "Linux x86_64; no Windows/Android execution",
+  "schema": "vw-native-giant-producer-repair-v1",
+  "date_utc": "2026-10-20",
+  "branch": "cloud/native-giant-producer-repair-20261020",
+  "production_source_changed": false,
+  "runner_changed": false,
+  "windows_replay": "pending; path and concurrency causality not established on Windows",
+  "remote_main_writes": false,
+  "compile": {
+    "final_exit_code": 0,
+    "initial_success_superseded": "Initial compile included optional alias assertion subsequently removed; final-source compile passed separately.",
+    "limits": {
+      "timeout_seconds": 240,
+      "workers": 1,
+      "virtual_memory_kib": 12582912
+    },
+    "command": "cargo +1.99.0 test --locked --offline -p vw-ffi --lib --test verification --no-run --message-format=json -j1"
+  },
+  "logs": {
+    "compile.jsonl": {
+      "bytes": 288829,
+      "sha256": "53e99d054178bc4954c35299f658bdead13b66b33b7a3db439d2590cb14edd64",
+      "location": "external cloud evidence directory"
+    },
+    "compile.log": {
+      "bytes": 150,
+      "sha256": "69d90df6dc930f84096979515e8bebb9b0933702570195cb433f75ce583d64f4",
+      "location": "external cloud evidence directory"
+    },
+    "final-compile.jsonl": {
+      "bytes": 288827,
+      "sha256": "6324f0ccb9558224484aa434698bd8062c18ba409f9ea0256e04e46aaf131240",
+      "location": "external cloud evidence directory"
+    },
+    "final-compile.log": {
+      "bytes": 150,
+      "sha256": "ad839cefd15e423eb5ae596d67e90a1a46aca8e3273e1154fe89f40b4d35cb4f",
+      "location": "external cloud evidence directory"
+    },
+    "producer.log": {
+      "bytes": 7602,
+      "sha256": "3a54fc92473102442592e55d556bd872856f068b3f970a1051a9edc336264689",
+      "location": "external cloud evidence directory"
+    },
+    "verification.log": {
+      "bytes": 295,
+      "sha256": "eba224d31a06a6fabef8711113944760e2ed0ff8b0a1b77d4ed546633467eb01",
+      "location": "external cloud evidence directory"
+    },
+    "focused-receipt.json": {
+      "bytes": 2832,
+      "sha256": "2d6b817fd21859759d5a4befc3b566da46ed5b9362f9bf4d861cdbedfbcedabf",
+      "location": "external cloud evidence directory"
+    },
+    "policy.log": {
+      "bytes": 62,
+      "sha256": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197",
+      "location": "external cloud evidence directory"
+    }
+  },
+  "review": {
+    "status": "narrow source and evidence clearance; no actionable blockers",
+    "reviewer": "gpt-6-astra",
+    "lane": "tunnel_boundary_review",
+    "scope": "Frozen source hashes, equivalent equality assertions, canonical fixture, exact Cargo/binary/log bindings, seven regression names, bounded child witness and pending runner/Windows limits",
+    "tests_or_builds_by_reviewer": false
+  },
+  "remaining": [
+    "Windows runner single-thread correction and exact delegated-child census with refusal regressions",
+    "Windows native producer and verification replay on exact candidate, then aggregate",
+    "Android/JNI/device/performance/physical acceptance"
+  ],
+  "checks": {
+    "rustfmt_two_owned_files": "passed",
+    "git_diff_check": "passed",
+    "setup_policy": {
+      "ids": "passed",
+      "third_party": "passed",
+      "workspace": "passed"
+    }
+  }
+}

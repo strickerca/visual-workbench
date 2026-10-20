@@ -183,7 +183,7 @@ async fn export_geometry_reads_saved_frame_without_panel_and_refuses_stale_bindi
             .await,
         Err(WorkflowError::Cancelled)
     ));
-    project.close_session().await.unwrap();
+    project.close().await.unwrap();
 }
 async fn prepare(
     project: &Arc<ProjectSession>,
@@ -561,7 +561,7 @@ async fn editing_background_and_tiles_include_canonical_tones_annotations_and_d_
 }
 
 #[tokio::test]
-async fn png_and_tiff_exports_match_preview_and_embed_true_source_extent_and_output_map() {
+async fn png_tiff_and_bmp_exports_match_preview_and_embed_true_source_extent_and_output_map() {
     let _serial = TESTS.lock().await;
     for depth in [8, 16] {
         let root = temp();
@@ -582,11 +582,14 @@ async fn png_and_tiff_exports_match_preview_and_embed_true_source_extent_and_out
             } else {
                 ImageFormat::Tiff8
             },
+            ImageFormat::Bmp8,
         ] {
             let mut request = options();
             request.format = format.clone();
             request.convert_to_srgb = true;
+            request.allow_depth_reduction = matches!(format, ImageFormat::Bmp8);
             let result = project.export_image(request, cancel()).await.unwrap();
+            assert_eq!(result.blake3, AssetId::hash(&result.bytes).to_string());
             let metadata: vw_raster::ExportMetadata =
                 serde_json::from_str(&result.metadata_json).unwrap();
             assert_eq!(
@@ -613,12 +616,40 @@ async fn png_and_tiff_exports_match_preview_and_embed_true_source_extent_and_out
             );
             let embedded = if matches!(format, ImageFormat::Png8 | ImageFormat::Png16) {
                 png_metadata(&result.bytes)
+            } else if matches!(format, ImageFormat::Bmp8) {
+                serde_json::from_str(
+                    vw_formats::bmp_provenance(&result.bytes, vw_formats::Limits::default())
+                        .unwrap()
+                        .unwrap(),
+                )
+                .unwrap()
             } else {
                 tiff_metadata(&result.bytes)
             };
+            assert_eq!(
+                serde_json::to_value(&embedded).unwrap(),
+                serde_json::from_str::<serde_json::Value>(&result.metadata_json).unwrap()
+            );
+            assert_eq!(
+                embedded.settings.revision.host_seq,
+                result.revision.host_seq
+            );
+            assert_eq!(
+                embedded
+                    .settings
+                    .revision
+                    .state_hash
+                    .iter()
+                    .map(|v| format!("{v:02x}"))
+                    .collect::<String>(),
+                result.revision.state_hash
+            );
             assert_eq!((embedded.source_width, embedded.source_height), (64, 64));
             assert_eq!(embedded.image_output, Some(frame));
-            let decoded = if matches!(format, ImageFormat::Tiff8 | ImageFormat::Tiff16) {
+            let decoded = if matches!(
+                format,
+                ImageFormat::Tiff8 | ImageFormat::Tiff16 | ImageFormat::Bmp8
+            ) {
                 vw_formats::decode(&result.bytes, vw_formats::Limits::default(), &|| false)
                     .unwrap()
                     .image
@@ -627,14 +658,29 @@ async fn png_and_tiff_exports_match_preview_and_embed_true_source_extent_and_out
             };
             assert_eq!(
                 (decoded.width, decoded.height, decoded.pixels.bit_depth()),
-                (12, 16, depth)
+                (
+                    12,
+                    16,
+                    if matches!(format, ImageFormat::Bmp8) {
+                        8
+                    } else {
+                        depth
+                    }
+                )
             );
             assert_eq!(decoded.pixels.rgba8(), expected.rgba);
+            assert_eq!(
+                decoded.icc,
+                Some(vw_raster::standard_srgb_profile().unwrap())
+            );
+            assert_eq!(
+                decoded
+                    .icc
+                    .as_ref()
+                    .map(|profile| AssetId::hash(profile).to_string()),
+                embedded.output_icc_hash
+            );
         }
-        let mut bmp = options();
-        bmp.format = ImageFormat::Bmp8;
-        bmp.allow_depth_reduction = true;
-        assert!(project.export_image(bmp, cancel()).await.is_err());
         project.close().await.unwrap();
     }
 }
