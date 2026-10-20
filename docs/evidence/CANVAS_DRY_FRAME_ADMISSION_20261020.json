@@ -1,0 +1,127 @@
+{
+  "schema": "vw-canvas-dry-admission-evidence-v1",
+  "date": "2026-10-20",
+  "source_base": "397a8852bef495c2f723147b28cd06571fd570fa",
+  "source_base_tree": "dcf799cc9e65d7a61cfb3872d79396a845ff61e5",
+  "source_sha256": {
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasDryFrames.kt": "2375bcf137b2719d795557477382d8e92f144cd9edaa99a905c547ff1fa0ddbc",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/editor/CanvasDryFramesTest.kt": "f7be4f5041ed67c3d26da8393bd4e6c249a7e0a3761f92e586de8e7b1b6e36b9",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/DocumentRetirementProgress.kt": "4a95cd46bc147a1b55135703a97f23d1c30842b67215310a3110b1565d3b456d",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDocuments.kt": "3c08fce363afe0f22e6974ed3d5ff36b224b5441de8a397ce446a0cd26dba583",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt": "2785efac0fc834d7d5f0494d74be5467e743d99a76a26d413079595ca7cc7ae0",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/editor/DocumentRetirementProgressTest.kt": "3be05baa765e1ae34fa7c39bfa6a7efcdbdbf9ae0a5b2ad1437f5d1df504e4c3",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentController.kt": "f4aea6855493f73d08b49b8ca08d708aaee4b2dd86a48509d7af4dbfc97feab3",
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/DocumentControllerTest.kt": "ed2a9911e9d30372d695652b7bf95413dae41971cc4ad6072afff5a179a2fd7c",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/DocumentDrawFrame.kt": "443be63c70dea6ab5b65eba146ad22256491ca65bb28453145e97a007b14e15f",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/DocumentDrawFrameTest.kt": "8b214f417c3d9d436d1396546ee9b5f7d0aebe38778d2fd0b6ba6ab93d1246a4",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentTileOwnership.kt": "a9d9807537ff44e15ac6e87b83d6edea1fbfcf7da2564be032db4c19d6abbbe6",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/documents/DocumentTileOwnershipTest.kt": "35201483efe554e56ec3a5d6e9f17ec8b03553f9a33b1162dcb39d625141e942",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorCloseProgress.kt": "918f603dff49c6922e6d1b7791f52efa80ca3a8bb32c999406ddb2f4cf37aaab",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt": "a4d823c12c4b0b44916edab626758b21801a0b96dc11a308dd426e76b1882453",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasRetirementOwner.kt": "d7ff24f385fe4edcdd0c1e93141bb17f3651dc75b0be1b456180fa8b1555527b",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/editor/EditorCloseProgressTest.kt": "ae56bc2b8ab52b6321dcf9fc39cd6b7b934451b24c67c282a4b7eaa3d74abb38",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/editor/CanvasRetirementOwnerTest.kt": "a06c94db8e64f220453dc94987ecbc900f2274f5fa10de416998f093493d3b5f",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/EditorWorkflows.kt": "cd8620682f52c25599530c114e9c380f33905e8ac2a4b4b1c478db8f56a0a988",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/LocalViewsInteraction.kt": "40cf20c469bc8562c5627ad35908ec190f1d14821da41b2c0dff9a0fc6044a01",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/EditorWorkflowsTest.kt": "3377bab76ecb4a15e8231462684a68d5699fc3d4bc766da406a43344c1b82dc2",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/LocalViewsInteractionTest.kt": "87497c51a0d7af0487caf5f9e94a2935db08c4f935057ec32849d15dd02a5142"
+  },
+  "parent_reported_S23": {
+    "published_source": "397a8852bef495c2f723147b28cd06571fd570fa",
+    "local_equivalent_prefix": "82cb7f9",
+    "document": {
+      "attempt": 2,
+      "stage": "SurfaceRetirement",
+      "status": "Running",
+      "failed_stage": null
+    },
+    "canvas": {
+      "generation": 2,
+      "reason": "SurfaceChanged",
+      "milestone": "ReleaseRequested",
+      "failed_milestone": null
+    },
+    "close": {
+      "attempt": 2,
+      "stage": "DocumentOwner",
+      "status": "Running",
+      "failed_stage": null
+    },
+    "cleanup": "passed",
+    "normal_app": "unchanged",
+    "raw_receipt_inspected_in_cloud": false,
+    "renderer_thread_stack_available_in_cloud": false,
+    "actual_device_API_path_confirmed_in_cloud": false
+  },
+  "pinned_library": {
+    "coordinate": "androidx.graphics:graphics-core:1.0.4",
+    "source_url": "https://dl.google.com/dl/android/maven2/androidx/graphics/graphics-core/1.0.4/graphics-core-1.0.4-sources.jar",
+    "sources_jar_sha256": "469793ba6b322b1690ab152a09458c0a8e0c030e5ff44296fa9dcc3b22ce90f8",
+    "classes_jar_sha256": "b2be3177fb2afd6d3665725a1de5d737773c0e59b6e470d47e3c3ffe37cbec27",
+    "source_file_sha256": {
+      "CanvasFrontBufferedRenderer.kt": "c08a23a8bfc167b6915ebc1dc86be3a396ad37f5b412711d08e672eea5c7a917",
+      "CanvasBufferedRenderer.kt": "770347e26444516d2bd26a73c8851244bfa3082e71415658e41f6bb53ebd3cb7",
+      "CanvasBufferedRendererV34.kt": "c464bb09b26009856ea592787e3404c952c43564a2b43f7e2162f1e14ce77f82",
+      "BufferPool.kt": "2e02150804816c496bb41959b6b33fa974e333149744b70846af5b61e7bc9c21",
+      "RenderQueue.kt": "ab4edfca44e92b7c9fde439fdca175c9022f4c9a1ec4ad18d0a8abce19c34c2a"
+    },
+    "counterexample_API_path": "API34+ CanvasBufferedRendererV34"
+  },
+  "demonstrated_source_defect": "Application dry admission reopened in onDrawMultiBufferedLayer before asynchronous completion. Four admitted draws can block a three-buffer acquisition on the same executor needed for earlier hardware completion and queued release.",
+  "repair": "Hold one application Request identity until its draw has been observed and all observed multi-buffer draw callbacks complete. Count implicit draws conservatively, coalesce latest scene, and seal on session retirement.",
+  "unchanged_release_callback_body_from_session_null_onward": true,
+  "diagnostic_schema_unchanged": true,
+  "retirement_proof": "Original actual library release callback, original reader close and original deferred completion; gate counts never replace that proof.",
+  "validation": {
+    "compile_exit": 0,
+    "test_exit": 0,
+    "passed": 95,
+    "new_cases": 9,
+    "test_counts": {
+      "CanvasDryFramesTest": 9,
+      "DocumentRetirementProgressTest": 13,
+      "DocumentControllerTest": 13,
+      "DocumentDrawFrameTest": 5,
+      "DocumentTileOwnershipTest": 8,
+      "EditorCloseProgressTest": 10,
+      "CanvasRetirementOwnerTest": 9,
+      "EditorWorkflowsTest": 9,
+      "LocalViewsInteractionTest": 19
+    },
+    "fresh_sources": 21,
+    "actual_CanvasSurface_compiled": true,
+    "cached_dependencies": "Cached Android/shared/bindings classes and Android SDK; fresh named source only",
+    "timeouts_seconds": {
+      "compile": 100,
+      "tests": 35
+    },
+    "heap_megabytes": {
+      "compile": 768,
+      "tests": 256
+    },
+    "baseline_warnings": 4,
+    "all_warning_source_lines_in_base": true,
+    "synthetic_counterexample": "Finite three-buffer same-executor schedule stalls with old recording boundary; repaired admission coalesces and permits completion. Does not execute AndroidX/GPU.",
+    "external_evidence_sha256": {
+      "run-focused.py": "f5df43a0c7ab2ad82b5a37c2bdfca01f000b95d1e852e85e0d392005926edbe6",
+      "focused-run.json": "f9c76651afa70767bb84b407b46994cd86b1f4bf1f9608a9a5a2a5ca56d9527a",
+      "compile.log": "1e99d6740d173ff5eab32325aff5c0e41e4b227d44ab650081a2e2784f8db554",
+      "tests.log": "694fb9e868cb9bd5fb5ed029813a45e11d4a2417c4105b1745a2c3d44308f488"
+    }
+  },
+  "independent_review": {
+    "reviewer": "Astra existing tunnel_boundary_review lane",
+    "source_verdict": "Clear, all seven Android/MCP frozen hashes match; no actionable ordering/ownership regression.",
+    "execution_receipt_review": "Clear: all 21 source bindings and log hashes match; compile/test exit 0, 95 pass; pinned library hashes match and original release body is unchanged.",
+    "no_reviewer_builds_tests_or_mutations": true,
+    "executor_model_effort_metadata": "Existing coding session cannot independently inspect actual model/effort metadata; requested Sol6.1/xhigh not independently verified"
+  },
+  "limits": {
+    "observed_S23_cause_proven": false,
+    "actual_S23_success": false,
+    "fresh_APK_or_JNI_GPU_execution": false,
+    "arbitrary_framework_only_redraw_storm_bounded": false,
+    "main_updated": false
+  },
+  "next_action": "Local rebuild/replay keeps existing bound and all 12 timeout fields. Confirm device API path; if release remains pending capture bounded CanvasRenderThread stack before cleanup. BufferPool.obtainFromPool/Condition.await supports this source schedule; SyncFenceCompat.awaitForever identifies a different wait. Physical/product gates remain pending."
+}
