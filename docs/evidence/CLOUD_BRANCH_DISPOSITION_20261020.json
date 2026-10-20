@@ -1,0 +1,172 @@
+{
+  "schema": "vw-cloud-branch-disposition-v1",
+  "date": "2026-10-20",
+  "published_main": "53c291e58b8a55512827bd5345b854bf8ec3b16f",
+  "remote_main_verified": "53c291e58b8a55512827bd5345b854bf8ec3b16f",
+  "single_worktree": [
+    "worktree /workspace/visual-workbench",
+    "HEAD 53c291e58b8a55512827bd5345b854bf8ec3b16f",
+    "branch refs/heads/cloud/roadmap-source-integration-20261018"
+  ],
+  "obsolete_worktrees_removed": 0,
+  "local_branches_removed": 16,
+  "branches": [
+    {
+      "branch": "cloud/capture-air-caller-integration-20261018",
+      "head": "70475b818b2ca5bf02b4a3539fb038c864410d83",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/capture-air-verification-draft-20261018",
+      "head": "f661eca9d2f6d6d6ebe4fc31ed2d0a5c6ec095e0",
+      "contained_in_published_main": false,
+      "disposition": "retain unique committed history, published and remote-verified; not promoted as active implementation",
+      "remote_head": "f661eca9d2f6d6d6ebe4fc31ed2d0a5c6ec095e0",
+      "patch_equivalence": [
+        "- 2b03c4e2f15b4cf3ddb6144f84adae1f9ef5402c",
+        "- 9f9f1ff212bcf92cc336cacb8b60e30b7fae206a",
+        "- 3b51354c5c5dad90ca1c36a9497b362d4a9f81b3",
+        "- e8c1aa5c8283e9bd6f271813f2c69aea0f956e55",
+        "- 0e5c236d5c5bbd2f7ae0c78de602c2153483abc6",
+        "- e143574b598fcfc767fc3c0c8abd87df63b34d0d",
+        "+ 1e9230d994bb5b37040ecf97c9b3b530c7748227",
+        "+ cf64b952a4361f6631742208ccd87c2f532795e0",
+        "- 61692fd43640bc25a8626f59f254d16d98c3c0b2",
+        "- a5b683d2ab6431e0f8330faecac3cbc5d954f9f5"
+      ]
+    },
+    {
+      "branch": "cloud/diagnostics-privacy-integration-20261018",
+      "head": "074b6c603f68f19e137b7d5c0ee0a60f88c8e855",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/document-copy-identity-20261018",
+      "head": "bca245eda44a470906c23c464f60fdd2af618016",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/editing-lifecycle-fixes-20261018",
+      "head": "a1ad07f9fecdd3ce78a9a80c978d45cfc815e641",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/editing-offline-integration-20261018",
+      "head": "707e940841373b076ebbe750c01319df2d992eed",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/giant-foreign-retirement-fix-20261018",
+      "head": "02f5766d236b9cfbef2c88257fc38785a4e21d07",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/giant-picked-input-integration-20261018",
+      "head": "1307a7a0039ddf2952d564d4b044b76bba2796e1",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/giant-producer-draft-20261018",
+      "head": "c0d1e602dc3609fe7eb37688aa2674345db645d5",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/giant-public-intake-20261018",
+      "head": "2f018f296a4333f44ae9c5d02e1a4c885998434d",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/giant-stream-integration-20261018",
+      "head": "6f3e2f3b9ed7a760d4dd7f4c6f26fa44dc5ad88d",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/image-error-seam-20261018",
+      "head": "bf0d5f4b067aa0f255097a0fa56a1979d4234d73",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/roadmap-integration-20261018",
+      "head": "070758ac3b0537b4ea9efc0f6d21b23792d47762",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/roadmap-parallel-grants-20261018",
+      "head": "1dc90e2546ab05cb5edf91bf5b969423c07468e4",
+      "contained_in_published_main": false,
+      "disposition": "retain unique committed history, published and remote-verified; not promoted as active implementation",
+      "remote_head": "1dc90e2546ab05cb5edf91bf5b969423c07468e4",
+      "patch_equivalence": [
+        "- 1dc90e2546ab05cb5edf91bf5b969423c07468e4"
+      ]
+    },
+    {
+      "branch": "cloud/roadmap-source-integration-20261018",
+      "head": "53c291e58b8a55512827bd5345b854bf8ec3b16f",
+      "contained_in_published_main": true,
+      "disposition": "retain active integration/main or original workspace baseline ref"
+    },
+    {
+      "branch": "cloud/t3-05-integration-20261018",
+      "head": "83663107d864b21d22d2e746b9ca6eb80d47beac",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/verification-archive-privacy-20261018",
+      "head": "806d3547ed74565bb14e386bf4860e4e4cb6eff0",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/verification-lineage-contract-20261018",
+      "head": "8bf738ad72c86ee3e7c752e98e6d8b54bb03eed8",
+      "contained_in_published_main": false,
+      "disposition": "retain unique committed history, published and remote-verified; not promoted as active implementation",
+      "remote_head": "8bf738ad72c86ee3e7c752e98e6d8b54bb03eed8",
+      "patch_equivalence": [
+        "- 88946bae68a265bf98a4e30f2f75b6066a1afc88",
+        "+ 8b7e6ca3766132da8a12ffde2e7b463db8423682",
+        "+ 8bf738ad72c86ee3e7c752e98e6d8b54bb03eed8"
+      ]
+    },
+    {
+      "branch": "cloud/verification-native-integration-20261018",
+      "head": "6d505416963fb42009921bd3fb8639994e73752a",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "cloud/verification-owner-integration-20261018",
+      "head": "30b77615fe0ce79b2b1a044a0704ae2c7d186c14",
+      "contained_in_published_main": true,
+      "disposition": "delete local branch after confirmed main publication; every commit remains reachable from main"
+    },
+    {
+      "branch": "main",
+      "head": "53c291e58b8a55512827bd5345b854bf8ec3b16f",
+      "contained_in_published_main": true,
+      "disposition": "retain active integration/main or original workspace baseline ref"
+    },
+    {
+      "branch": "work",
+      "head": "67b0af376612f999a0ea2543ad99a98fddd69b22",
+      "contained_in_published_main": true,
+      "disposition": "retain active integration/main or original workspace baseline ref"
+    }
+  ],
+  "external_lane_refs": "Preserved; original owners/parent control their worktrees and review. No remote branch or unique source was deleted.",
+  "recovery_archive": "origin/recovery/source-candidates-20261018 at0d91b70558a995fa7654021de7465b1d3f615e3d retained outside active functionality."
+}

@@ -13,8 +13,10 @@ Current producer/tunnel integration passes101 stream,73 capture,14 native tunnel
 13 registered host tunnel plus5 standalone contracts,53 shared and35 Desktop
 focused JVM cases. Astra source review is clear for the integrated root ownership
 boundaries. Actual generated bindings and shared/Desktop production/test compile
-pass. The external Desktop receiver candidate dae67bb remains held for its
-original Astra closure; earlier held candidates have not been promoted.
+pass. The external Desktop receiver candidate dae67bb remains held: earlier P1/P2 repairs
+are Astra-accepted, but destination loss/repaint during Toolkit.sync can still
+return a false presentation receipt. Owner repair is active on explicit Sol6.1/xhigh; earlier
+held candidates have not been promoted.
 
 The first fresh Android native build found two inaccessible giant URI helpers;
 root corrected their visibility only to the enclosing giant_images module.
@@ -27,7 +29,8 @@ Windows cross-source checking fails before completion because the Linux host
 lacks the MSVC librarian lib.exe. Windows .dll/.exe runtime packaging is excluded
 from Linux Gradle checks and remains unverified. The previous combined core run
 is incomplete after329 completed cases and a120-second bound at the5,000-row
-recovery fixture; no aggregate core pass is claimed. New affected suites above
+recovery fixture; that exact case now passes separately in162.87seconds. No
+fresh whole-core aggregate pass is claimed. New affected suites above
 are narrower and retain their own source/result bindings.
 
 Model/checkpoint/TinyViT and Android/native aggregate admission, E artifact

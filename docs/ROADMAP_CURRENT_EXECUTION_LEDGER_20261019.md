@@ -12,7 +12,7 @@ credentials/signing, paid Actions, provider calls and physical acceptance are ex
 | --- | --- | --- |
 | 0–2 baseline | Reviewed editor, geometry, archive/offline, authenticated transport, provider/package/MCP source remains integrated | Historical software evidence remains source-bound; G0–G2 and real provider/physical gates stay open |
 | T3.02 producer and phone receiver | Accepted G is registered in `c0a13e5`; current root implements the real same-pool native helper caller/pump, thread-joined cancellation, shared process budget, explicit Desktop publication with connection-epoch fencing, Android root receiver/draft ownership and mounted borrowed annotation editor | Actual Windows capture, phone presentation, >=15fps/ring/memory/latency, freeze/lossless/Save/resume journeys remain unverified |
-| T3.02 Desktop receiver | External owner's latest candidate is `dae67bb097c63041edc52c642965a4e0f0a17c93`; root has not composed held receiver leaves | Original assigned Astra review must close the actual JDK HiDPI fallback findings. Earlier `b94fa553`, `3eb702c`, `482c423c` and `cbe9c66f` are superseded held candidates |
+| T3.02 Desktop receiver | External owner's latest candidate is `dae67bb097c63041edc52c642965a4e0f0a17c93`; root has not composed held receiver leaves | Astra accepted P1/P2 but holds a new blit receipt defect: independent D3D destination loss/repaint during Toolkit.sync can still return true. Owner repair is active on explicit Sol6.1/xhigh; final review and root Desktop receiver/draft/controller/UI integration remain open. Earlier `b94fa553`, `3eb702c`, `482c423c` and `cbe9c66f` are superseded held candidates |
 | T3.03–05, T3.07–11 | Accepted precision/selection, giant/composed images, PDF/SVG/redaction, formats/color/export, controls/rebase/provider callers are already composed | Runtime/codec/PDFium/qpdf/libvips admission, fresh platform journeys, scale/performance and physical acceptance remain; do not overlay recovered archives or restart completed leaf work |
 | T3.06 model runtime | E's granted source matches accepted `110d4ec`; host conversion/parity and original census preserved | Artifact transfer still CONNECT403 before bytes. Checkpoint/weights/TinyViT, native aggregate, Android runtime/memory/catalog admission remain closed; no alternate transfer route |
 | T4 bounded Paint | Accepted `e57b941` / `c2098fe`, composed as `9103cf5`, remains intact | Actual Windows/Paint behavior and physical positive gesture compatibility are separate from mouse/source fixtures. Krita and the broader deferred Phase4 scope stay deferred |
@@ -34,8 +34,11 @@ focused methods, native16KiB alignment and final library strict checks pass; see
 All796 recovered candidates/manifests at exact recovery commit
 `0d91b70558a995fa7654021de7465b1d3f615e3d` remain preserved outside active code.
 Recovered candidates are promoted only through reviewed module composition.
-Current local worktree inventory contains this single dirty integration worktree;
-no unique worktree or branch is eligible for destructive cleanup from that fact.
+Main is published and verified at53c291e58b8a55512827bd5345b854bf8ec3b16f.
+The one active local worktree is retained. After proving main ancestry, root
+removed16 fully contained local branches; three unique historical branches
+remain remote-verified and preserved. No remote branch or unique source was
+deleted. See `evidence/CLOUD_BRANCH_DISPOSITION_20261020.json`.
 No completion percentage, product gate or physical acceptance is asserted.
 
 ## Reconciled current disposition — 2026-10-19

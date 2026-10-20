@@ -48,6 +48,8 @@ hashes. Raw logs remain outside Git in the named evidence directory.
 | Host tunnel |13 registered tests passed; the separate five raw contract fixtures also passed (overlap, not18 unique cases) |
 | Store migration/output/history |55 passed |
 | Native import/export |11 passed |
+| Remaining core selection |22 passed; two intentional child-test entry points remain ignored in ordinary runs |
+| Isolated offline recovery |5,000-row case passed in162.87seconds; not a target-device performance result |
 | Shared JVM |53 passed |
 | Desktop JVM |35 passed, including20 tunnel and6 publication cases |
 | Android JVM |10 methods passed; four module methods contain31 subordinate scenarios |
@@ -78,11 +80,23 @@ inspection is distinct from the checks executed by root.
 ## Open boundaries
 
 External Desktop receiver `dae67bb097c63041edc52c642965a4e0f0a17c93` remains
-held for its original Astra HiDPI review; its leaves have not been composed.
+held after Astra accepted its earlier P1/P2 repairs but found a new blit
+presentation-receipt defect: independent D3D destination loss/repaint during
+Toolkit.sync can still return true. The owner has resumed that repair on explicit Sol6.1/xhigh;
+its leaves have not been composed. Root Desktop receiver/draft/controller/UI
+integration follows accepted leaves; it is still code work rather than an
+already completed caller awaiting hardware only.
 Windows cross-source checking is blocked by missing MSVC `lib.exe`. No Windows
 DLL/EXE build or runtime package pass follows from Linux or ARM64 compilation.
 The earlier combined core attempt completed329 cases before its120-second bound
-at the5,000-row recovery fixture; it remains an incomplete aggregate run.
+at the5,000-row recovery fixture. That exact case now passes in isolation in
+162.87seconds, including exact queued rows, counter restoration, reopen and
+integrity. The earlier aggregate command remains incomplete; its329 passes are
+not relabeled as a fresh final-tree run. The22 remaining uncovered ordinary
+cases now pass in a separate selection. All479 ordinary current test names are
+accounted for across these source-bound runs; two intentionally ignored child
+entry points belong to bounded parent fixtures. This bookkeeping does not turn
+the earlier aggregate command into a fresh full-suite final-tree pass.
 
 E artifact transfer remains CONNECT403 before bytes. Model/checkpoint/TinyViT,
 native aggregate and Android memory/runtime/catalog admission remain closed.
@@ -95,3 +109,14 @@ frame rate/memory/latency/thermal, physical S Pen/Bluetooth, A01–A30 and owner
 remain unverified. Krita and the broader deferred Phase4 scope remain deferred.
 See the current [execution ledger](ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md)
 and [deferred validation ledger](DEFERRED_VALIDATION_LEDGER_20261018.md).
+
+## Publication and preservation
+
+The reviewed integration is committed as
+`53c291e58b8a55512827bd5345b854bf8ec3b16f` and fast-forwarded to public main,
+with the remote SHA verified. Subsequent documentation records this publication
+and the [branch disposition](evidence/CLOUD_BRANCH_DISPOSITION_20261020.json).
+All16 removed local branch tips are ancestors of published main. Three branches
+with unique history remain preserved at exact remote-verified heads; no stale
+candidate code was overlaid merely to merge its history. The active worktree and
+external lane/recovery refs remain intact. No remote branch was deleted.

@@ -249,6 +249,61 @@
       "log": "/workspace/.vw-tools/evidence/20261020-resume/notice-tunnel-tests-final.log",
       "log_sha256": "574a45a302e089009ee4a1beb17ccb17aab902a5075e611cd72a7796326a8e30",
       "cases": 11
+    },
+    {
+      "name": "offline-5000-exact-recovery",
+      "status": "passed",
+      "command": "cargo test --offline -p vw-ffi --lib session::offline_recovery_tests::real_startup_restores_five_thousand_exact_rows_and_counter_floor_after_reopen -j2 -- --exact --test-threads=1",
+      "cases": 1,
+      "test_seconds": 162.87,
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/offline-5000-isolated-final.log",
+      "log_sha256": "b93d36eadbbcadf8082a1961cd14f0793085109f1fe2e5fe634d34486f6c27c8",
+      "scope": "Isolated original timed-out case; exact queued rows, counter floor, undo state, close/reopen and integrity. Not a device/performance acceptance result."
+    },
+    {
+      "name": "remaining-core-selection",
+      "status": "passed",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "-p",
+        "vw-ffi",
+        "--lib",
+        "-j2",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "giant_images::intake::tests::fifo_replacement_child",
+        "giant_images::producer::picked::tests::quarantine_probe",
+        "queries::output_tests::disabled_frames_keep_ordinary_export_and_clean_tones_still_compose",
+        "queries::output_tests::output_query_admits_budget_before_reading_a_corrupt_source_and_preserves_state",
+        "queries::output_tests::query_export_regions_are_output_coordinates_and_refuse_outside_output",
+        "queries::output_tests::query_png_and_external_tiff_use_output_pixels_and_embed_source_identity",
+        "queries::output_tests::render_lists_and_snapshots_omit_frame_metadata_but_keep_ordinary_crop_guides",
+        "session::offline_recovery_tests::recovered_pending_inverse_chain_supports_ordinary_undo_without_counter_reuse",
+        "session::offline_recovery_tests::saved_phone_result_uses_real_transaction_bound_asset_and_acknowledgement_callers",
+        "session::preview::tests::committed_close_before_ops_stops_replays_but_keeps_bounded_visual_grace",
+        "session::preview::tests::conflicting_overlap_totals_and_cross_direction_ids_fail_closed",
+        "session::preview::tests::control_order_and_four_live_slots_are_enforced_without_mutating_on_refusal",
+        "session::preview::tests::dropped_initial_delta_repairs_raw_prefix_and_canonical_geometry",
+        "session::preview::tests::early_active_generation_survives_many_newer_closures_and_old_repairs_are_bound",
+        "session::preview::tests::hundred_thousand_preview_samples_are_bounded_before_append",
+        "session::preview::tests::new_shape_keeps_kind_and_authority_while_geometry_changes_then_retires_without_resurrection",
+        "session::preview::tests::object_previews_coalesce_and_wait_for_the_next_send_interval",
+        "session::preview::tests::ops_before_open_uses_durable_authority_including_cancelled_history_after_reopen",
+        "session::preview::tests::own_accepted_stroke_before_ui_finish_retires_only_the_exact_bound_gesture",
+        "session::preview::tests::reconnect_suffix_does_not_reopen_partial_stroke_or_fail_the_new_connection",
+        "session::preview::tests::ten_thousand_mixed_completions_and_cancels_keep_live_state_bounded_and_never_resurrect",
+        "session::runtime::tests::cancelled_calls_release_admission_and_close_ignores_queue_pressure",
+        "streaming_ffi::format_seek_tests::final_hash_includes_header_rewrites_and_ignores_the_write_order",
+        "streaming_ffi::format_seek_tests::final_hash_refuses_cancelled_and_wrong_length_receipts"
+      ],
+      "cases": 22,
+      "ignored_helper_cases": 2,
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/ffi-uncovered-final-tests.log",
+      "log_sha256": "f85ac2845a3f01f66e3bc94ddcf29c377a4a400b306569fd57b873a8cda825be",
+      "scope": "Current test names absent from earlier aggregate/focused pass logs; two helper entry points intentionally ignored because bounded parent tests run them in isolation."
     }
   ],
   "junit": [
@@ -345,6 +400,10 @@
     "target/android-jni/arm64-v8a/libvw_core.so": {
       "bytes": 256813120,
       "sha256": "7d04c55db9fde5b4a49a792016e53b6ab47435adacfd6af6e75cae2cfafd6191"
+    },
+    "apps/shared/build/generated/uniffi/core/com/visualworkbench/bindings/core/vw_core.kt": {
+      "bytes": 1603420,
+      "sha256": "ce8eb7dbaafc5502d0d978e43c4d53e88017e493f70f6806fe842a55ee2bc24c"
     }
   },
   "source_review": {
@@ -357,9 +416,9 @@
   "production_tunnel_catalog_admitted": false,
   "model_catalog_admitted": false,
   "remaining": [
-    "Original external Astra Desktop receiver HiDPI review; held leaves not composed",
+    "Desktop receiver presentation-receipt repair and original Astra closure, then root receiver/draft/controller/UI integration; prior P1/P2 accepted, owner repair active, held leaves not composed",
     "Windows cross-source/artifact checks blocked by missing MSVC lib.exe; no DLL/EXE packaging pass",
-    "Combined core attempt incomplete after329 completed cases and120-second bound at5,000-row recovery fixture; not rerun as an aggregate",
+    "Earlier aggregate command remains incomplete after329 passes and120-second bound; isolated5,000-row case now passes in162.87s. Earlier passes and final focused runs are separate source-bound evidence, not a fresh whole-suite pass.",
     "E artifact CONNECT403 before bytes; alternate route prohibited",
     "Checkpoint/weights/TinyViT, actual native aggregate, model memory/runtime admission",
     "Configured scrcpy DLL/native aggregate, dynamic replaceability and notices admission",
@@ -391,5 +450,14 @@
       "log": "/workspace/.vw-tools/evidence/20261020-resume/android-final-compile-tests.log",
       "sha256": "847ac23e528e6714c54f1c7bab6f6de653cf0ffee1936061b758cf19f90ecaff"
     }
+  },
+  "held_desktop_receiver_status": "Earlier P1/P2 accepted by original Astra; new independent D3D destination loss/repaint during Toolkit.sync can still return true blit receipt. Owner repair active on explicit Sol6.1/xhigh, admitted turn01a1588f-0150-743a-8b74-5a30d4614944. Candidate is not composed.",
+  "coverage_bookkeeping": {
+    "listed_current_core_tests": 481,
+    "earlier_aggregate_passed_names": 329,
+    "normal_test_names_accounted_across_separate_runs": 479,
+    "intentional_ignored_child_entrypoints": 2,
+    "selection_log_sha256": "a7b43fca5c206177c695b5398d0202feafd3697db8ce7e858f891cd46958a694",
+    "limit": "Name accounting across source-bound earlier/final focused runs; does not claim a fresh whole-suite final-tree pass or target-device evidence."
   }
 }

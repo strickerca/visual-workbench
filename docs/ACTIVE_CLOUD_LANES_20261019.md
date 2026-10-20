@@ -1,5 +1,40 @@
 # Active cloud deliverables
 
+## Current integrated disposition — 2026-10-20
+
+This section supersedes historical active/held/missing-code rows below. Main is
+published and verified at53c291e58b8a55512827bd5345b854bf8ec3b16f. Root's accepted
+G caller/producer, Android receiver/draft root, F tunnel host/native/shared/UI,
+real screenshot/stream mirror guards and joined failed-owner retirement are now
+integrated. Fresh affected native/store/shared/Desktop/Android checks, generated
+bindings, fresh ARM64/JNI and instrumentation compilation pass; details and exact
+limits are in `CLOUD_ROOT_INTEGRATION_20261020.md` and its source-bound receipt.
+Schema3 output persistence1783ccc and exact notice proposal disposition a742eb3
+are included. Runtime/model catalogs remain closed; no device/provider/GUI ran.
+
+The remaining external Desktop receiver candidate is dae67bb097c63041edc52c642965a4e0f0a17c93,
+held for a new blit presentation-receipt defect: D3D destination loss/repaint
+during Toolkit.sync can still return true. Astra accepted its earlier P1/P2
+repairs; the owner has now resumed this repair on explicit Sol6.1/xhigh. Root did not compose older held receiver
+leaves or dispatch a duplicate lane. G/F/Android/Paint/V/E accepted leaf work is
+complete under its current grants; remaining windows/device/runtime/license and
+physical boundaries do not justify restarting those source tasks.
+
+Windows source/artifact validation is blocked by missing MSVC lib.exe. E artifact
+transfer remains CONNECT403 before bytes; model/checkpoint/TinyViT and actual
+native aggregate/runtime/memory admission remain closed. Tunnel configured DLL
+licenses/aggregate/replaceability/notices admission also remains closed. No paid
+Actions, deployment/signing, device identity changes, alternate denied-artifact
+route or deferred Krita work is authorized by the current integration.
+
+Root removed16 local branches only after proving full ancestry in published
+main. Three unique historical branches are retained with exact remote-verified
+heads. This environment has one active worktree; no unique worktree/source or
+remote branch was deleted. See `evidence/CLOUD_BRANCH_DISPOSITION_20261020.json`.
+Root still owns Desktop receiver/draft/controller/UI integration after the
+held leaves are accepted. This code is not reported as completed. Parent controls
+original cloud lane dispatch and external worktree disposition.
+
 Current parent delegations and explicit grants supersede this map if they
 change. This file records active objectives; historical task names, audits,
 AGENTS checkpoint pauses and old-main checkouts do not replace them.
