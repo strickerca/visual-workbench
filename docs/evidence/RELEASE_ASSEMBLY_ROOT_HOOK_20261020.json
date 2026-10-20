@@ -13,7 +13,7 @@
   "checks": [
     {
       "name": "existing-synthetic-assembler",
-      "command": "PYTHONDONTWRITEBYTECODE=1 timeout120s python3 -m unittest discover -s tools/release -p test_assemble.py -v",
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 -m unittest discover -s tools/release -p test_assemble.py -v",
       "result": "passed",
       "cases": 41,
       "scope": "Existing Python backend/validators with synthetic inputs; not PowerShell root entry or Windows wrapper execution"
