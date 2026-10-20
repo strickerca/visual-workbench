@@ -64,6 +64,38 @@ class Reports(unittest.TestCase):
         with self.assertRaisesRegex(r.Rejected, "^mcp_lifecycle$"):
             r.startup(value.replace("bundle_inventory", "private_value"), "mcp")
 
+    def test_mcp_step_and_failure_reason_survive_only_as_rejected_fixed_codes(self):
+        for step in r.MCP_SMOKE_STEPS:
+            for reason in r.MCP_FAILURE_REASONS:
+                marker = f"VW_DESKTOP_MCP failed=true stage=unknown step={step} reason={reason}"
+                value = GOOD.replace(r.EXIT, marker + "\n" + r.EXIT)
+                with self.subTest(step=step, reason=reason), self.assertRaisesRegex(
+                        r.Rejected, f"^mcp_unknown_{step}_{reason}$"):
+                    r.startup(value, "mcp")
+        for stage in r.MCP_FAILURE_STAGES:
+            marker = f"VW_DESKTOP_MCP failed=true stage={stage} step=first_start reason=refused"
+            value = GOOD.replace(r.EXIT, marker + "\n" + r.EXIT)
+            with self.subTest(stage=stage), self.assertRaisesRegex(
+                    r.Rejected, f"^mcp_{stage}_first_start_refused$"):
+                r.startup(value, "mcp")
+
+    def test_mcp_diagnostics_refuse_unknown_partial_or_private_fields(self):
+        marker = "VW_DESKTOP_MCP failed=true stage=unknown step=first_start reason=timeout"
+        invalid = (
+            marker.replace("unknown", "private_stage"),
+            marker.replace("first_start", "private_step"),
+            marker.replace("timeout", "private_reason"),
+            marker.replace(" step=first_start", ""),
+            marker.replace(" reason=timeout", ""),
+            marker.replace("stage=unknown", "stage=bundle_inventory"),
+            marker + " detail=private_value",
+            marker.replace("first_start", "first_start/private_value"),
+        )
+        for candidate in invalid:
+            value = GOOD.replace(r.EXIT, candidate + "\n" + r.EXIT)
+            with self.subTest(marker=candidate), self.assertRaisesRegex(r.Rejected, "^mcp_lifecycle$"):
+                r.startup(value, "mcp")
+
     def test_missing_duplicate_out_of_order_markers(self):
         lines = GOOD.splitlines()
         for candidate in ("\n".join(lines[:2]), GOOD + lines[0], "\n".join(reversed(lines))):

@@ -67,7 +67,7 @@ relaunch on foreground contention; a contested UI assertion remains inconclusive
 
 ## Assertion and evidence boundary
 
-`inventory.json` explicitly names all 154 current methods. Every Kotlin test source
+`inventory.json` explicitly names all 225 current methods. Every Kotlin test source
 is parsed before the build; additions, removals, skips, unusual test declaration
 shapes or parameterization require a reviewed inventory/parser update. This
 prevents a new test from silently avoiding the evidence contract. The same source
@@ -77,7 +77,7 @@ and Android Rust library are included. Native directory properties are pinned
 with explicit canonical `-P` arguments; unbound environment overrides refuse.
 This binds the generator inputs without claiming a new compiler-provenance run.
 
-Passing requires all 154 distinct test start/success pairs, consistent exact
+Passing requires all 225 distinct test start/success pairs, consistent exact
 `current`/`numtests` counters, no failed/ignored/assumption statuses, no extra or
 missing methods, one matching `OK (N tests)` summary and final instrumentation
 code `-1`. Printed success prose alone never establishes a pass. Direct adb
@@ -86,6 +86,19 @@ reports elapsed/output-byte progress every five seconds, and has a phase deadlin
 The existing process helper owns Windows Job/process-tree cleanup. Capture failure
 cannot leave an assertion pass and triggers owned-package cleanup.
 
+The 2026-10-20 source reconciliation retains the exact 12 remote decoder cases
+and the original Phase 2 154-name SHA256 invariant. One historical test,
+`AiServiceControllerInstrumentedTest#laterCloseCallersObserveTheSameSettledFailure`,
+was replaced in source by retained-owner close/retry tests. The fixture explicitly
+pins that retirement and all 60 reviewed additions, reconstructing the historical
+154 names before checking their unchanged hash. Current execution requires the
+153 surviving baseline cases, 12 remote cases and 60 additions; the retired case
+is historical evidence only. Additions cover AI grid/service ownership, giant
+canvas retirement, document refresh, polygon/precision/tilt input, raster export,
+pairing state and four stream pixel cases. Only the exact `stream` subpackage is
+newly admitted; unknown or deeper package names still refuse. This inventory
+repair is source-only until a fresh bound run records every current case.
+
 The final `.local/app-hil-<run>.json` is text only: source/APK/native/signer hashes,
 case identities, actual passed counts, process results and cleanup states. Failed
 instrumentation retains a hash and whitelisted known test/status observations;
@@ -93,12 +106,31 @@ raw stacks, device serials, installed paths and other private output are not
 published. Private temporary command/manifests/output files are deleted only
 after exact run-marker, containment and no-reparse checks. No screenshots exist.
 
+Failure diagnosis retains only fixed Java/JUnit, coroutine timeout/cancellation
+and exact `GiantAndroidCreationFailure` class names plus known test-source line
+numbers. Messages, assertion values and arbitrary classes/frames stay private;
+these observations never pass instrumentation. Surface fixture cleanup preserves
+the primary body failure and suppresses any secondary cleanup failure, without
+waiving cleanup or deleting a project whose close was unconfirmed.
+
 An uninstall is allowed only for these two package IDs after absence-before,
 confirmed successful installation and an exact match to the already verified
 signed APK. Unknown install outcomes or changed package bytes are preserved and
 cleanup is reported failed. The normal app is not a fallback cleanup target.
 Successful removal naturally disposes only the isolated app's own preferences,
 projects and UID-owned Keystore entries; no owner state is captured or restored.
+
+An attempted install without confirmed `Success` remains `pending`, including
+when the host adb process retired and a later package query would look absent.
+Package absence cannot settle an outstanding device installer. The receipt sets
+`cleanup.device_installer_pending=true` and `cleanup.owned_packages=false` and
+retains the private recovery work. This minimum guard does not infer a terminal
+session, abandon an unknown session or uninstall an unowned package. Exact
+installer-session recovery remains a separate owner action. The synthetic
+`pwsh -NoProfile -File tools/app-test/test_cleanup.ps1` fixture loads only the
+production cleanup function from its syntax tree and substitutes all package/ADB
+operations; it exercises lost install responses, apparent absence/presence,
+known success, changed bytes and missing pre-install ownership without a device.
 
 The original tests include real-core synthetic projects, ownership/cancellation,
 provider pipe/proxy I/O, surface input and lifecycle tests. Their previous real

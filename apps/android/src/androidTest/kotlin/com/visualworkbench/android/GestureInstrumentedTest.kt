@@ -54,7 +54,9 @@ class GestureInstrumentedTest {
         router.drawWithFinger = true
         router.accept(packet(MotionEvent.ACTION_DOWN, 1, finger(1, time = 200)))
         router.accept(packet(MotionEvent.ACTION_POINTER_DOWN, 2, finger(1, time = 210), finger(2, 20.0, time = 210)))
+        assertEquals(2, sink.canceled); assertEquals(0, sink.committed)
         router.accept(packet(MotionEvent.ACTION_POINTER_UP, 2, finger(1, time = 220), finger(2, 20.0, time = 220), canceled = true))
+        assertEquals(2, sink.canceled); assertEquals(0, sink.committed); assertEquals(0, sink.undo)
         router.accept(packet(MotionEvent.ACTION_UP, 1, finger(1, time = 230)))
         assertEquals(2, sink.canceled); assertEquals(0, sink.committed); assertEquals(0, sink.undo)
     }

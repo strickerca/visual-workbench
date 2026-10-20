@@ -38,6 +38,12 @@ READY = re.compile(r"VW_DESKTOP_READY startup_ms=([0-9]{1,8}) composeDensity=([0
 FRAME = re.compile(r"VW_DESKTOP_SMOKE_FRAME window_dpi=([0-9]{1,4}) window_pmv2=true drawn=true\Z")
 EXIT = "VW_DESKTOP_EXIT startup_smoke=true cleanup=complete"
 MCP = "VW_DESKTOP_MCP cycles=2 duplicate_owner=refused grants=0 sends=0 cleanup=complete"
+MCP_FAILURE_STAGES = frozenset(("unknown", "bundle_parents", "bundle_manifest", "bundle_extract",
+    "bundle_markers", "bundle_inventory", "bundle_verify", "service_root", "catalog", "inbox",
+    "capture_helper", "host_ready", "coordinator"))
+MCP_SMOKE_STEPS = frozenset(("duplicate_owner", "first_start", "first_idle", "repeated_start", "first_stop",
+    "second_start", "second_identity", "second_idle", "second_stop"))
+MCP_FAILURE_REASONS = frozenset(("timeout", "invariant", "refused", "cancelled", "unexpected"))
 
 
 class Rejected(ValueError):
@@ -389,11 +395,15 @@ def startup(text: str, mode: str = "startup") -> dict:
     frame = FRAME.fullmatch(markers[1])
     require(ready is not None and frame is not None and markers[-1] == EXIT, "startup_marker_order")
     if mode == "mcp":
-        failure = re.fullmatch(r"VW_DESKTOP_MCP failed=true stage=([a-z_]+)", markers[2])
-        if failure and failure[1] in {"unknown", "bundle_parents", "bundle_manifest", "bundle_extract",
-                "bundle_markers", "bundle_inventory", "bundle_verify", "service_root", "catalog", "inbox",
-                "capture_helper", "host_ready", "coordinator"}:
-            raise Rejected("mcp_" + failure[1])
+        failure = re.fullmatch(r"VW_DESKTOP_MCP failed=true stage=([a-z_]+)(?: step=([a-z_]+) reason=([a-z_]+))?", markers[2])
+        if failure:
+            stage, step, reason = failure.groups()
+            require(stage in MCP_FAILURE_STAGES, "mcp_lifecycle")
+            if step is None:
+                raise Rejected("mcp_" + stage)  # Historical fixed-stage receipts remain failures.
+            require(step in MCP_SMOKE_STEPS and reason in MCP_FAILURE_REASONS and
+                    (stage == "unknown" or reason == "refused"), "mcp_lifecycle")
+            raise Rejected(f"mcp_{stage}_{step}_{reason}")
         require(markers[2] == MCP, "mcp_lifecycle")
     elapsed = int(ready[1])
     density = float(ready[2])

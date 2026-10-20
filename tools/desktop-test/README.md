@@ -1,18 +1,18 @@
-# Desktop app-image startup candidate
+# Desktop app-image startup verification
 
-Source-only candidate for T1.09/T1.12, 2026-10-03. No build, test, launch,
-credential read, device action or screenshot was performed by its author.
-The central validation lane must review/import these files and apply the
-literal `integration.patch` against its recorded `BASES.json`. The patch is
-not applied in this worktree. It touches only Main.kt, desktop Gradle and the
-root build entry point. No additional library dependency is introduced.
+The Main.kt, desktop Gradle and root build hooks are integrated in the current
+tree. `integration.patch` and `BASES.json` preserve the original 2026-10-03
+source-only T1.09/T1.12 handoff; do not reapply that historical patch. Its author
+performed no build, test, launch, credential read, device action or screenshot.
+The dated execution evidence below remains scoped to its recorded source and
+artifacts. No additional library dependency is introduced.
 
 ## Central integration and execution
 
 The parent must serialize these commands with all other Gradle/native work:
 
 ```powershell
-# Inspect BASES.json and apply only after git apply --check succeeds.
+# Current integration is already applied; retain BASES.json as historical evidence.
 python -m unittest discover -s tools/desktop-test -p test_reports.py
 pwsh -NoProfile -File tools/desktop-test/test_lease.ps1
 pwsh -NoProfile -File tools/desktop-test/test_capture.ps1
@@ -68,6 +68,20 @@ capture, package publication, external client or Send is requested; those remain
 separate acceptance checks. The duplicate-owner check probes the actual lock
 from the running process; it is not a second-process launch test. The default
 `-Mode startup` still checks ordinary startup and shutdown without starting MCP.
+
+The MCP smoke keeps its existing 90-second lifecycle budget. A failure emits
+only fixed enum fields, for example
+`VW_DESKTOP_MCP failed=true stage=unknown step=first_start reason=timeout`.
+`step` identifies duplicate-owner admission, first start/idle, repeated start,
+first stop, second start/identity/idle or second stop. `reason` distinguishes
+timeout, invariant, refusal, cancellation and unexpected failure; a known
+bundle/service refusal retains its existing fixed stage. No exception message,
+stack, runtime path or private child stderr is included. The collector allows
+only these fixed vocabularies and always rejects a failure marker, even after
+ordinary process exit and complete cleanup. Historical stage-only failures
+remain rejected. These diagnostic changes are source-only until a fresh bound
+build and packaged run supplies evidence; the prior `mcp_unknown` receipt does
+not establish a timeout or a particular failed lifecycle step.
 
 `main_to_drawn_frame_ms` starts inside JVM `main`, so it excludes launcher/JVM
 startup and is not a cold-start measurement. The process receipt separately

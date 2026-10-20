@@ -1,0 +1,182 @@
+{
+  "schema": "vw-windows-mcp-hil-integration-v1",
+  "date": "2026-10-20",
+  "base_main": "3bb8b7a6329d3c040dffbd885af3ec5b1b61a584",
+  "accepted_windows_branch": "task/windows-s23-acceptance-20261020",
+  "accepted_windows_head": "893400746ca87774ae182093e053660e94db33b2",
+  "accepted_windows_tree": "e89227bdcce0b2c1f3314167c1963b29cb0c8c7f",
+  "published_diagnostics_head": "a7674f4eddccafbec03e7776fa070f68f8ef6146",
+  "local_diagnostics_head": "d463a19981f233c7201304cebd6735ccfaa5acf7",
+  "accepted_leaves_exact": {
+    "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorSurfaceInstrumentedTest.kt": {
+      "bytes": 11135,
+      "sha256": "3c66e9d1fb3a758039e7e70cc8eb5612dcd16e335710ce7fa5a8a6c2cd051fcf"
+    },
+    "apps/android/src/androidTest/kotlin/com/visualworkbench/android/GestureInstrumentedTest.kt": {
+      "bytes": 7973,
+      "sha256": "afc1e14b9f498a9aa0e2ffd277797db0c7d8df74babdcf82bc9800fceed129d4"
+    },
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/GiantAndroidCanvas.kt": {
+      "bytes": 10591,
+      "sha256": "cfc152a4f438964a2ac36363ee04bcd241207cb25fab5daf7197f4dfd2d47b44"
+    },
+    "apps/android/src/main/kotlin/com/visualworkbench/android/input/CanvasGestureRouter.kt": {
+      "bytes": 8923,
+      "sha256": "c701b68d2fd09860d549ce491f1f6a4bc2eba6a1af97b544c1949ac33f479b6a"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": {
+      "bytes": 65717,
+      "sha256": "c91b2bbf5488b8a0d0c26a96d2bb3cdd5d4ed8eec3fe436eea082013dd12afee"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpRuntimeSmoke.kt": {
+      "bytes": 3546,
+      "sha256": "5fa660f6f8abd42831cc18eb263af9dfb570cae018547062bf11e5da5a7723bf"
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpRuntimeSmokeTest.kt": {
+      "bytes": 2680,
+      "sha256": "6ed7f55c2d6399e4171be3ea5b9bbd1d8bc18e06b49392cc28bc63ade9798616"
+    },
+    "build.ps1": {
+      "bytes": 64575,
+      "sha256": "ffbabf1f5aafd92849e919d1a8eea5ff9b80740ebc5c06dfcb7b116a7e3085dc"
+    },
+    "tools/app-test/README.md": {
+      "bytes": 11570,
+      "sha256": "5a8f1095632322c743bd79db9f72151cf40bd320c5e3fbe7d685424182a7946a"
+    },
+    "tools/app-test/inventory.json": {
+      "bytes": 28635,
+      "sha256": "8882aa38f15ebbf0c3a10c54d31a2d6ddcb94119d1abf6cc2390972b0f4d9136"
+    },
+    "tools/app-test/reports.py": {
+      "bytes": 18744,
+      "sha256": "44e611112f6fa79f20f13b880915b03bfdff86b25c5eb8c853040993dfd800fb"
+    },
+    "tools/app-test/run_android.ps1": {
+      "bytes": 17619,
+      "sha256": "96aedd558aeb0aa3830d7ae5092e0f6cbdd37a2bf46437b3c151535762c1497b"
+    },
+    "tools/app-test/test_cleanup.ps1": {
+      "bytes": 4663,
+      "sha256": "9c6e0e7c6c0dc09632666372171ac6905915850417c18578975aa13589eb9e92"
+    },
+    "tools/app-test/test_reports.py": {
+      "bytes": 26387,
+      "sha256": "e74dd2044c538633ba3f4165317fbfe004ca4061c0be07f5c7487d0f72069415"
+    },
+    "tools/desktop-test/README.md": {
+      "bytes": 11405,
+      "sha256": "ee73127f0587b389da85f0b36cb542df11bdec8f888a42d345911aea4976332b"
+    },
+    "tools/desktop-test/reports.py": {
+      "bytes": 24907,
+      "sha256": "6517ddbc3b535be74301f0cf5b64c0a64d9547d8f2fa2721463dec2732a11087"
+    },
+    "tools/desktop-test/test_reports.py": {
+      "bytes": 24341,
+      "sha256": "a85be7b0d636beec23fd7d446126be204aab90f88fd3fa0d00a8e2f856c7d146"
+    }
+  },
+  "preserved_diagnostics_code": {
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/diagnostics/DiagnosticsExportDialog.kt": {
+      "bytes": 15961,
+      "sha256": "576def04c44666152b167210dc352ee3df54fe6ee5beb1adfcb27af35ef3650b"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/diagnostics/DiagnosticOwnedFile.kt": {
+      "bytes": 8446,
+      "sha256": "a74240bc9122dfd7589a090a8754f5ee70cb28367a287b6f7c746327298198e8"
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/diagnostics/WindowsDiagnosticOwnedFileTest.kt": {
+      "bytes": 9208,
+      "sha256": "16c1810932c50ba902be55cce389934921428434ab3f6bb18473b760ffd3f4f1"
+    },
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/RemoteCompatibilityImportTest.kt": {
+      "bytes": 425,
+      "sha256": "ecb92c5ab337542179050567e36861a43c96cf23f5fb88b4048bed7f19a06045"
+    }
+  },
+  "integration_documentation": {
+    "docs/WINDOWS_DIAGNOSTICS_IDENTITY_20261020.md": {
+      "bytes": 3669,
+      "sha256": "2460621a6ec1d2cdabdfe682ab1b118d7d348143943e48adfc93013e90747c98"
+    },
+    "docs/evidence/WINDOWS_DIAGNOSTICS_IDENTITY_20261020.json": {
+      "bytes": 5722,
+      "sha256": "2909f990c0f821b9fe7040b000ed81f0d627d5adaf02b6951e0de9a354dc047c"
+    },
+    "docs/WINDOWS_MCP_HIL_INTEGRATION_20261020.md": {
+      "bytes": 3227,
+      "sha256": "d5ca8d7f39ecbdec66a225be5451e917fcdd04ef11aa9fb383b2bc080c45ffb8"
+    }
+  },
+  "source_review": {
+    "reviewer": "gpt-6-astra",
+    "lane": "tunnel_boundary_review",
+    "result": "No production blockers; exact17-leaf integration, preserved diagnostics code, strict MCP/HIL predicates and225 distinct current methods verified",
+    "documentation_precision_corrected": "Shared wrapper changed; runner unchanged; diagnostic document hash refreshed",
+    "reviewer_tests_or_builds": false
+  },
+  "cloud_checks": [
+    {
+      "suite": "Android HIL parser",
+      "methods_passed": 31,
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 -m unittest discover -s tools/app-test -p 'test_*.py' -v",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-diagnostics-identity/android-hil-parser-tests.log",
+        "bytes": 4703,
+        "sha256": "692e34988b11391f44e61ac7840862f9e17dca5e97d6f2128f085194a3ac0038"
+      }
+    },
+    {
+      "suite": "Desktop collector",
+      "methods_passed": 41,
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 -m unittest discover -s tools/desktop-test -p test_reports.py -v",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-diagnostics-identity/desktop-parser-tests.log",
+        "bytes": 5243,
+        "sha256": "551059c0a5a56ed565d117fe16cd1a0c704d41bf7cc0bb0fd7fa3a41bd752d2d"
+      }
+    },
+    {
+      "suite": "Diagnostics/shared focused JVM",
+      "methods_passed": 22,
+      "windows_native_execution": false,
+      "evidence": "WINDOWS_DIAGNOSTICS_IDENTITY_20261020.json"
+    },
+    {
+      "suite": "Offline policy",
+      "checks_passed": 3,
+      "ids": "passed",
+      "third_party": "passed",
+      "workspace": "passed",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-diagnostics-identity/policy-integration.log",
+        "bytes": 62,
+        "sha256": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197"
+      }
+    }
+  ],
+  "relayed_windows_device_run": {
+    "source": "Accepted8934007 commit metadata and parent Windows lane report",
+    "started": 225,
+    "passed": 222,
+    "failed": 3,
+    "skipped": 0,
+    "task_owned_cleanup_complete": true,
+    "raw_device_logs_inspected_by_cloud": false,
+    "applies_to_final_merged_runtime": false
+  },
+  "remaining_local_lane": [
+    "Windows native diagnostics publication and cleanup replay",
+    "MCP packaged lifecycle failure diagnosis and runtime replay",
+    "Surface wait, sync and canvas factory cancellation failures",
+    "Full managed/package/device checks and toolchain admission"
+  ],
+  "unpublished_desktop_candidate_included": false,
+  "cloud_heavy_builds": 0,
+  "binding_or_ownership_regeneration": false,
+  "device_actions": false,
+  "provider_calls": false,
+  "release_ready": false,
+  "physical_acceptance": false
+}

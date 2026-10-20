@@ -36,7 +36,7 @@ an automatically discovered test count. The actual runner executes successfully.
 Focused cached Kotlin compilation and JUnit execute 22 methods on Linux:
 11 existing publication tests, 10 synthetic native-call contract tests and the
 shared wrapper. The publication body is a literal extraction from the actual
-UI source; the full new helper and both changed shared fixture sources are
+UI source; the full new helper and the shared wrapper and unchanged runner are
 compiled. Unchanged shared dependencies use existing compiled classes. No UI
 stub replaces the publication, and no Gradle/native build or binding generation
 runs. Astra independently clears the final source. Three offline policy checks
