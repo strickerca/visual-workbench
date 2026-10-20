@@ -492,13 +492,14 @@ fun main(args: Array<String>) {
                     check(info.windowPerMonitorV2 && info.windowDpi > 0u) { "Window DPI readiness failed" }
                     println("VW_DESKTOP_READY startup_ms=$startupMs composeDensity=$density pmv2=${dpi.perMonitorV2}")
                     println("VW_DESKTOP_SMOKE_FRAME window_dpi=${info.windowDpi} window_pmv2=${info.windowPerMonitorV2} drawn=true")
+                    val mcpSmokeProgress = McpSmokeProgress()
                     try {
                         if (mcpRuntimeSmoke) {
-                            withTimeout(90_000) { verifyPackagedMcpLifecycle(mcp, appAnchor.directory) }
+                            withTimeout(90_000) { verifyPackagedMcpLifecycle(mcp, appAnchor.directory, mcpSmokeProgress) }
                             println("VW_DESKTOP_MCP cycles=2 duplicate_owner=refused grants=0 sends=0 cleanup=complete")
                         }
                     } catch (error: Exception) {
-                        println("VW_DESKTOP_MCP failed=true stage=${(error as? McpRefused)?.stage?.name ?: "unknown"}")
+                        println(mcpSmokeProgress.failureMarker(error))
                     } finally { quit() }
                 } else println("VW_DESKTOP_READY startup_ms=$startupMs composeDensity=$density pmv2=${dpi.perMonitorV2}")
             }
