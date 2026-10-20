@@ -1,6 +1,7 @@
 """Small synthetic, stdlib-only checks. No builds, real packages or devices."""
 from contextlib import ExitStack, redirect_stdout, nullcontext
 import copy
+import errno
 import hashlib
 import io
 import json
@@ -322,6 +323,29 @@ class Assembly(unittest.TestCase):
     def test_source_mutation_while_streaming_is_detected(self):
         original = a.Directory.open
         source_path = self.root / "built/artifact.bin"
+        source_before = source_path.read_bytes()
+        mutation_attempts = []
+        # Establish that the fixture admits a writer before the retained lease.
+        with source_path.open("r+b") as stream:
+            self.assertEqual(stream.read(), source_before)
+        def native_writer_is_refused():
+            import ctypes
+            from ctypes import wintypes
+            api = ctypes.WinDLL("kernel32", use_last_error=True)
+            api.CreateFileW.argtypes = (wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                                       wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE)
+            api.CreateFileW.restype = wintypes.HANDLE
+            api.CloseHandle.argtypes = (wintypes.HANDLE,)
+            api.CloseHandle.restype = wintypes.BOOL
+            ctypes.set_last_error(0)
+            # Request a second writer without creating, truncating or writing.
+            handle = api.CreateFileW(str(source_path), 0x40000000, 7, None, 3, 0x00200000, None)
+            error = ctypes.get_last_error()
+            invalid = wintypes.HANDLE(-1).value
+            if handle not in (None, invalid):
+                self.assertTrue(api.CloseHandle(handle))
+            self.assertEqual(handle, invalid)
+            self.assertEqual(error, 32)  # ERROR_SHARING_VIOLATION, not access denied.
         class MutatingStream:
             def __init__(self, stream): self.stream, self.changed = stream, False
             def __enter__(self): return self
@@ -331,14 +355,35 @@ class Assembly(unittest.TestCase):
                 data = self.stream.read(count)
                 if data and not self.changed:
                     self.changed = True
+                    mutation_attempts.append(True)
+                    if os.name == "nt":
+                        native_writer_is_refused()
                     source_path.write_bytes(b"concurrently changed bytes")
                 return data
         def changed(parent, leaf, write=False):
             stream = original(parent, leaf, write)
             return MutatingStream(stream) if parent.path / leaf == source_path and not write else stream
         with patch.object(a.Directory, "open", changed):
-            self.refuses("input_changed")
+            if os.name == "nt":
+                # The native read lease denies this second writer. CPython's
+                # CRT open can expose sharing violation 32 as EACCES without a
+                # winerror attribute; neither form permits source mutation.
+                with self.assertRaises(PermissionError) as refused:
+                    self.run_assembly()
+                self.assertEqual(refused.exception.errno, errno.EACCES)
+                self.assertIn(getattr(refused.exception, "winerror", None), (None, 32))
+                self.assertEqual(refused.exception.filename, str(source_path))
+                self.assertEqual(source_path.read_bytes(), source_before)
+            else:
+                self.refuses("input_changed")
+                self.assertEqual(source_path.read_bytes(), b"concurrently changed bytes")
+        self.assertEqual(mutation_attempts, [True])
+        if os.name == "nt":
+            # The same writer is admitted again once the failed read retires.
+            with source_path.open("r+b") as stream:
+                self.assertEqual(stream.read(), source_before)
         self.incomplete()
+        self.assertFalse((self.destination / "COMPLETE").exists())
 
     def test_simulated_windows_reparse_attributes_refuse(self):
         info = (self.root / "project.txt").stat()
@@ -536,14 +581,23 @@ class Assembly(unittest.TestCase):
         self.assertEqual(moved.read_bytes(), b"")
 
     def test_output_containment_and_missing_parent_refuse(self):
+        before = self.before()
+        paths_before = set(self.base.rglob("*"))
         self.destination = self.root
         self.refuses("output_root")
         self.destination = self.root / "built/artifact.bin/child"
         self.refuses("output_overlaps_input")
         self.destination = self.base / "missing/child"
-        with self.assertRaises(FileNotFoundError):
-            self.run_assembly()
+        if os.name == "nt":
+            with self.assertRaisesRegex(a.Rejected, "^path_lease_unavailable$"):
+                self.run_assembly()
+        else:
+            with self.assertRaises(FileNotFoundError):
+                self.run_assembly()
         self.assertFalse(self.destination.parent.exists())
+        self.assertFalse(self.destination.exists())
+        self.assertEqual(self.before(), before)
+        self.assertEqual(set(self.base.rglob("*")), paths_before)
 
     def test_cli_returns_only_static_refusal_without_private_paths(self):
         argv = ["assemble.py", "--root", str(self.root), "--manifest", ".local/manifest.json",

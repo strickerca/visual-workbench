@@ -1,0 +1,140 @@
+{
+  "schema": "vw-windows-release-integration-v1",
+  "date": "2026-10-20",
+  "base_main": "d6ab2404b4e4d247462064d5ed9c7f6dc426ce6e",
+  "accepted_native_head": "c08078e7e7ccd77fd995679b1468977c5951b115",
+  "local_merge": "fbd17e0bd8f800fb98dcb700e809358438853eea",
+  "local_merge_parents": [
+    "d6ab2404b4e4d247462064d5ed9c7f6dc426ce6e",
+    "c08078e7e7ccd77fd995679b1468977c5951b115"
+  ],
+  "source": {
+    "core/crates/vw-ai-platform/src/windows.rs": {
+      "bytes": 9640,
+      "sha256": "39a76c61bb0c09e6f9d53ab7c3d8163c91e0a360e482b74523c5a92ba767dd5d"
+    },
+    "core/crates/vw-ffi/src/session/remote_compatibility.rs": {
+      "bytes": 14187,
+      "sha256": "862bc188c81936fcac0da3823712baf02c049133b9e032ec3a2c8980bcc252e4"
+    },
+    "core/crates/vw-ffi/src/session/remote_drawing.rs": {
+      "bytes": 33950,
+      "sha256": "e90cda9f72fc0e2fed0825a8ee77da90c5e17288e758a94e48768e086b670637"
+    },
+    "docs/WINDOWS_NATIVE_BUILD_REPAIR_20261020.md": {
+      "bytes": 2264,
+      "sha256": "b711ea4ce942a949b1d7e9395d02c4c6275edba4dadf5effe13818291b10a137"
+    },
+    "tools/release/test_assemble.py": {
+      "bytes": 38063,
+      "sha256": "3eb285a87a8b64424e222739f12b3bc837350a855d9978e31139b2dc203aff0c"
+    },
+    "docs/WINDOWS_RELEASE_INTEGRATION_20261020.md": {
+      "bytes": 3203,
+      "sha256": "7b6f0dd717168d4255b823a47c43d1274414204a091840794eb394f9de115e2a"
+    }
+  },
+  "native_leaves_exact_to_accepted_head": true,
+  "preserved_release_source": {
+    "build.ps1": {
+      "bytes": 64439,
+      "sha256": "d4573b67b56e3f8a5cb13666aaf77dd20285cb71a5161c6be5b523adb37fe18c"
+    },
+    "tools/process.psm1": {
+      "bytes": 21468,
+      "sha256": "e37d175b9bef406b07009ec8a3ae69f5581088f47bfc31c9f77aea8df2f5c94c"
+    },
+    "tools/release/assemble.py": {
+      "bytes": 37811,
+      "sha256": "5925b0294291fcee585af45ac90db79f495fc0f385d4e4bf89673d8ec04fc769"
+    },
+    "tools/release/msi.py": {
+      "bytes": 28786,
+      "sha256": "611663b486a68650a888e1718a0cc440e788254dc81786d512b03c105a10631d"
+    },
+    "tools/release/build-msi.ps1": {
+      "bytes": 12641,
+      "sha256": "247dd4076b75b8f76a9d30aa56b0ce1f8d3ef97ed1159394b9e878cff1d79f58"
+    },
+    "tools/release/test_msi.py": {
+      "bytes": 26180,
+      "sha256": "1b172396e08b346811f4d03b2f80559a1c117d97172ee398a9d6d6594765b620"
+    },
+    "tools/release/test_msi_wrapper.ps1": {
+      "bytes": 8597,
+      "sha256": "4a92026ece72d96a24b70ff95123bb34a44131eac7470279d7c0cf2eed4da02c"
+    }
+  },
+  "parent_relayed_windows_lane": {
+    "native_android_bindings_goldens_alignment": "passed per parent",
+    "source": "Windows task 01a1590d-d35c-7616-80a6-b1b8b23ad03a, accepted native candidate",
+    "raw_windows_logs_inspected_by_cloud": false,
+    "fresh_final_integration_full_build_claimed": false
+  },
+  "windows_assembler_report_before_fixture_fix": {
+    "methods": 48,
+    "passed": 39,
+    "posix_only_skipped": 7,
+    "failed": 2,
+    "source": "Parent-relayed Windows replay",
+    "repaired_fixtures": [
+      "test_source_mutation_while_streaming_is_detected",
+      "test_output_containment_and_missing_parent_refuse"
+    ],
+    "failure_diagnoses": "Parent-relayed exact Windows failures: PermissionError under retained input read lease; path_lease_unavailable for deliberately absent output parent",
+    "repaired_windows_replay": "pending; no Windows pass claimed"
+  },
+  "fixture_contract": {
+    "streaming_windows": "Native write-open under the exact held read must fail INVALID_HANDLE_VALUE/GetLastError32 without write/truncate; Python PermissionError EACCES and exact filename; exactly one attempt; source bytes unchanged; r+b works before/after; failed tree/no COMPLETE",
+    "streaming_posix": "Exact input_changed; injected bytes demonstrably changed; failed tree/no COMPLETE",
+    "missing_parent_windows": "Exact Rejected path_lease_unavailable",
+    "missing_parent_posix": "FileNotFoundError",
+    "containment_and_missing_parent": "Root/overlap refusals retained; missing parent/output absent; original bytes/metadata and fixture path set unchanged",
+    "production_lease_or_mutation_checks_changed": false,
+    "new_skip_added": false,
+    "windows_fixture_paths_executed_in_cloud": false
+  },
+  "cloud_checks": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 -m unittest discover -s tools/release -p test_assemble.py -v",
+      "methods": 48,
+      "executed_passes": 46,
+      "windows_only_skips": 2,
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-windows-integration/assembler-final-fixture-tests.log",
+        "bytes": 7323,
+        "sha256": "f608a73fcdb9ef34182c6ff2847b06e195daf856b3e102781ccc076aeb918a5d"
+      }
+    },
+    {
+      "command": "python3 tools/check_setup.py",
+      "result": "ids,third-party,workspace passed",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-windows-integration/policy-final.log",
+        "bytes": 62,
+        "sha256": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197"
+      }
+    }
+  ],
+  "source_review": {
+    "reviewer": "gpt-6-astra",
+    "lane": "tunnel_boundary_review",
+    "result": "Exact four-file native merge preservation and final 3eb285a87a8b64424e222739f12b3bc837350a855d9978e31139b2dc203aff0c fixture independently clear; no actionable findings",
+    "scope": "Read-only source and git comparisons; no reviewer tests/builds/mutations",
+    "receipt_bindings_verified": {
+      "source_files": 6,
+      "preserved_release_files": 7,
+      "logs": 2
+    }
+  },
+  "remaining_windows_handoff": [
+    "Replay all 48 assembler methods including both repaired platform-specific fixtures; retain any new unexpected failure trace",
+    "Retain actual image/source/launcher/MCP/native/runtime evidence from local build",
+    "Continue separate package/device/S23/runtime and owner acceptance"
+  ],
+  "cloud_heavy_builds": 0,
+  "binding_regeneration": false,
+  "device_actions": false,
+  "release_ready": false,
+  "physical_acceptance": false
+}
