@@ -39,7 +39,43 @@ $canvasFiles=[Collections.Generic.List[string]]::new()
 $cursorSamples=[Collections.Generic.List[object]]::new();$cursorAnchor=$null
 $ownedDirectories=[Collections.Generic.List[string]]::new()
 $phase='artifact_binding';$work=[Diagnostics.Stopwatch]::StartNew()
+$diagnostic=[ordered]@{checkpoint='artifact_binding';refusal_code='unknown';helper_role='none';helper_exit_code='unknown';helper_timed_out='unknown';helper_output_limit='unknown';native_error='unknown';native_capture_refusal='unknown'}
 $receipt=[ordered]@{schema=1;kind='owned-paint-phone-visible-drawing';run_id=$run;status='failed';failure_phase=$phase;artifact_manifest_sha256=$ArtifactManifestSha256;source_count=0;paint_sha256=$PaintSha256;helper_bindings=[ordered]@{probe_runner=$ProbeRunnerSha256;probe=$ProbeSha256;frame_runner=$FrameRunnerSha256;capture=$CaptureHelperSha256};fixture_sha256=$null;created_process=$null;process_created=$null;initial_thread=$null;selected_window=$null;selected_thread=$null;suspended_before_job_assignment=$false;exact_image_verified_before_resume=$false;actual_private_job=$false;source_observation_sha256=$null;phone=$null;pixel_evidence=$null;editor_effect=$false;software_generated_input=$false;physical_pen_fidelity=$false;latency_acceptance=$false;input_settlement='NoInputStarted';editor_process_and_job_retired=$false;helper_processes_jobs_and_io_retired=$false;private_images_disposed=$false;failure_error_type=$null}
+$receipt.failure_diagnostics=$diagnostic
+
+function Get-PaintRefusalCode([string]$Message){
+    # Exact static messages only. Unknown bodies never enter the receipt.
+    switch -CaseSensitive ($Message){
+        'Bounded Paint work deadline exceeded' {'work_deadline';break}
+        'Native helper startup failed' {'helper_startup';break}
+        'Native helper did not complete bounded work' {'helper_work';break}
+        'Actual owned Paint foreground/root identity changed' {'editor_identity';break}
+        'Actual mouse pointer must remain outside the owned Paint canvas' {'cursor_in_canvas';break}
+        'Actual mouse cursor moved between canvas samples' {'cursor_between_samples';break}
+        'Actual mouse cursor moved during canvas sample' {'cursor_during_sample';break}
+        'Actual native WGC canvas sample refused' {'frame_verdict';break}
+        'Exact native canvas filename required' {'canvas_filename';break}
+        'Bound bytes changed' {'bound_bytes';break}
+        'Stable native blank baseline required' {'baseline_stability';break}
+        'Opaque sRGB baseline required' {'baseline_color';break}
+        'Native canvas is not the fresh white fixture' {'baseline_white';break}
+        'Actual stable Paint pixel effect refused' {'pixel_effect';break}
+        'Private image disposal incomplete' {'private_disposal';break}
+        default {'unknown'}
+    }
+}
+function Save-PaintFrameDiagnostic([string]$Raw,[string]$ExpectedSample){
+    # Best-effort closed projection only; never acceptance evidence.
+    try{
+        if($Raw.Length -gt 4194304){return}
+        $v=$Raw.Trim().Split("`n")[-1]|ConvertFrom-Json -AsHashtable -Depth 55
+        if($v.schema -ne 1 -or $v.operation -cne 'owned-blank-editor-wgc-metrics' -or $v.sampling_scope -cne 'verified_editor_canvas' -or $v.status -cnotin @('Measured','Failed','RetirementPending') -or $v.capture_session_id -cne $captureSession -or $v.sample_id -cne $ExpectedSample -or $v.helper_sha256 -cne $CaptureHelperSha256 -or -not $v.ContainsKey('error') -or -not $v.ContainsKey('capture_refusal')){return}
+        $value=$v.error
+        $diagnostic.native_error=if($null -eq $value){'none'}elseif($value -is [string] -and $value -cin @('Invalid','Limit','TargetChanged','Ungranted','Unavailable','Timeout','Cancelled','PartialInput','Io','RetirementPending')){$value}elseif($value -is [Collections.IDictionary] -and $value.Count -eq 1 -and @($value.Keys)[0] -ceq 'Platform'){'Platform'}else{'unknown'}
+        $value=$v.capture_refusal
+        $diagnostic.native_capture_refusal=if($null -eq $value){'none'}elseif($value -is [string] -and $value -cin @('invalid','consent','stale','own_window','unavailable','limit','color_depth','codec_missing','timeout','cancelled','busy','storage','platform','unsupported')){$value}else{'unknown'}
+    }catch{} # Parsing cannot change the original guard or failure.
+}
 
 function Assert-Plain([string]$Path){
     $full=[IO.Path]::GetFullPath($Path)
@@ -75,7 +111,8 @@ function Wait-ChildSettlement($Child,[switch]$RequestRetirement){
         Start-Sleep -Milliseconds 50
     }
 }
-function Invoke-OwnedHelper([string]$Path,[string[]]$Arguments,[int]$Seconds=30,[switch]$Verdict,[ref]$VerdictExitCode){
+function Invoke-OwnedHelper([string]$Path,[string[]]$Arguments,[int]$Seconds=30,[switch]$Verdict,[ref]$VerdictExitCode,[ValidateSet('probe_runner','frame_runner','pixel_evaluator')][string]$Role,[string]$FrameSample){
+    $diagnostic.helper_role=$Role;$diagnostic.helper_exit_code='unknown';$diagnostic.helper_timed_out='unknown';$diagnostic.helper_output_limit='unknown';$diagnostic.native_error='unknown';$diagnostic.native_capture_refusal='unknown'
     Assert-WorkBudget
     $child=[M4FrameChild]::Launch($Path,$Arguments,$true);$children.Add($child)
     $timer=[Diagnostics.Stopwatch]::StartNew();$timedOut=$false;$workCompleted=$false
@@ -90,16 +127,19 @@ function Invoke-OwnedHelper([string]$Path,[string[]]$Arguments,[int]$Seconds=30,
         # These helpers are input-free. Their complete nested Job and output
         # workers must still settle before any private image can be removed.
         Wait-ChildSettlement $child -RequestRetirement:(-not $workCompleted)
+        $diagnostic.helper_timed_out=$timedOut;$diagnostic.helper_output_limit=$child.OutputTooLarge
+        try{$diagnostic.helper_exit_code=[uint32]$child.ExitCode}catch{}
     }
     $output=$child.StandardOutput
     $code=$child.ExitCode
+    if($Role -ceq 'frame_runner' -and -not $child.OutputTooLarge){Save-PaintFrameDiagnostic $output $FrameSample}
     if($timedOut -or $child.OutputTooLarge -or ($code -ne 0 -and -not($Verdict -and $code -eq 1))){throw 'Native helper did not complete bounded work'}
     if($null -ne $VerdictExitCode){$VerdictExitCode.Value=$code}
     return $output
 }
 function Invoke-PaintProbe([string]$Mode,$Request){
     $json=$Request|ConvertTo-Json -Depth 15 -Compress
-    $raw=Invoke-OwnedHelper $ProbeRunnerPath @($ProbePath,$ProbeSha256,$Mode,$json)
+    $raw=Invoke-OwnedHelper $ProbeRunnerPath @($ProbePath,$ProbeSha256,$Mode,$json) -Role probe_runner
     $wrapper=$raw|ConvertFrom-Json -AsHashtable -Depth 50
     if($wrapper.schema -ne 1 -or $wrapper.status -cne 'Observed' -or $wrapper.probe_sha256 -cne $ProbeSha256 -or $wrapper.probe_exit_code -ne 0 -or $null -ne $wrapper.error -or $null -ne $wrapper.retirement_error -or $null -ne $wrapper.io_error -or $wrapper.suspended_before_job_assignment -ne $true -or $wrapper.exact_image_verified_before_resume -ne $true -or $wrapper.process_and_job_retired -ne $true -or $wrapper.io_joined -ne $true -or $wrapper.profile_authority -ne $false -or $wrapper.effect_harness -ne $false){throw 'Native probe owner proof refused'}
     $native=$wrapper.observation
@@ -114,24 +154,27 @@ function Read-CanvasCursor {
     if($point[0] -ge $canvas.x -and $point[0] -lt ([long]$canvas.x+$canvas.width) -and $point[1] -ge $canvas.y -and $point[1] -lt ([long]$canvas.y+$canvas.height)){throw 'Actual mouse pointer must remain outside the owned Paint canvas'}
     return [ordered]@{x=$point[0];y=$point[1]}
 }
-function Capture-Paint([string]$Label){
+function Capture-Paint([ValidateSet('baseline1','baseline2','after1','after2')][string]$Label){
+    $diagnostic.checkpoint=$Label+'_work_editor'
     Assert-WorkBudget;Assert-Editor
     $Sample=[M4FrameChild]::NewNativeId()
-    $cursorBefore=Read-CanvasCursor
+    $diagnostic.checkpoint=$Label+'_cursor_before';$cursorBefore=Read-CanvasCursor
     if($null -eq $script:cursorAnchor){$script:cursorAnchor=$cursorBefore}
     if($cursorBefore.x -ne $script:cursorAnchor.x -or $cursorBefore.y -ne $script:cursorAnchor.y){throw 'Actual mouse cursor moved between canvas samples'}
     $request=[ordered]@{schema=1;ownerPid=$PID;target=$target;image=$image;sourcePolicy='installed_paint';explicitOwnerCapture=$true;ownedBlankFixture=$true;captureHelperPath=$CaptureHelperPath;captureHelperSha256=$CaptureHelperSha256;captureSessionId=$captureSession;privateTempRoot=$privateRoot;markerNonce=$nativeRun;sampleId=$Sample;canvasRectHost=$canvas;samplingScope='verified_editor_canvas';expectedPaintFrame=$paintFrame}
-    $raw=Invoke-OwnedHelper $FrameRunnerPath @(($request|ConvertTo-Json -Depth 20 -Compress))
+    $diagnostic.checkpoint=$Label+'_helper'
+    $raw=Invoke-OwnedHelper $FrameRunnerPath @(($request|ConvertTo-Json -Depth 20 -Compress)) -Role frame_runner -FrameSample $Sample
+    $diagnostic.checkpoint=$Label+'_parse_verdict'
     $value=$raw.Trim().Split("`n")[-1]|ConvertFrom-Json -AsHashtable -Depth 55
     if($value.schema -ne 1 -or $value.status -cne 'Measured' -or $value.operation -cne 'owned-blank-editor-wgc-metrics' -or $value.sampling_scope -cne 'verified_editor_canvas' -or $value.capture_session_id -cne $captureSession -or $value.sample_id -cne $Sample -or $value.helper_sha256 -cne $CaptureHelperSha256 -or $value.helper_exit_code -ne 0 -or $value.process_and_job_retired -ne $true -or $value.io_worker_started -ne $true -or $value.io_join_completed -ne $true -or $value.suspended_before_job_assignment -ne $true -or $value.exact_image_verified_before_resume -ne $true -or $null -ne $value.error -or $null -ne $value.retirement_error -or $null -ne $value.io_error -or $null -ne $value.capture_refusal -or $value.input_sent -ne $false -or $value.profile_authority -ne $false -or $null -eq $value.canvas_metrics -or $null -eq $value.canvas_frame -or $null -ne $value.metrics -or $null -ne $value.frame){throw 'Actual native WGC canvas sample refused'}
     if($value.canvas_frame.filename -cne 'capture-canvas.png'){throw 'Exact native canvas filename required'}
     $png=Join-Path (Join-Path $privateRoot $Sample) $value.canvas_frame.filename
-    [void](Pin-File $png $value.canvas_metrics.image.png_sha256)
+    $diagnostic.checkpoint=$Label+'_image_pin';[void](Pin-File $png $value.canvas_metrics.image.png_sha256)
     $canvasFiles.Add($png)
-    $cursorAfter=Read-CanvasCursor
+    $diagnostic.checkpoint=$Label+'_cursor_after';$cursorAfter=Read-CanvasCursor
     if($cursorAfter.x -ne $script:cursorAnchor.x -or $cursorAfter.y -ne $script:cursorAnchor.y){throw 'Actual mouse cursor moved during canvas sample'}
     $cursorSamples.Add([ordered]@{before=$cursorBefore;after=$cursorAfter})
-    Assert-Editor
+    $diagnostic.checkpoint=$Label+'_editor_after';Assert-Editor
     return $value
 }
 function Wait-RemoteSettlement {
@@ -186,7 +229,7 @@ try{
     . (Join-Path $PSScriptRoot 'editor_phone_owner.ps1')
     . (Join-Path $PSScriptRoot 'input_owner_contracts.ps1')
     Assert-WorkBudget
-    $phase='owned_blank_launch'
+    $phase='owned_blank_launch';$diagnostic.checkpoint=$phase
     $privateRoot=Join-Path ([IO.Path]::GetTempPath()) ('VisualWorkbench-editor-metrics-'+$nativeRun)
     $fixtureRoot=Join-Path ([IO.Path]::GetTempPath()) ('VisualWorkbench-paint-phone-'+$run)
     foreach($directory in @($privateRoot,$fixtureRoot)){[M4FrameChild]::CreateOwnedDirectory($directory);$ownedDirectories.Add($directory);Assert-Plain $directory}
@@ -205,7 +248,7 @@ try{
     $focus=[Diagnostics.Stopwatch]::StartNew()
     while(-not $editor.IsForeground){Assert-WorkBudget;if($focus.Elapsed.TotalSeconds -ge 5){throw 'Normal owned Paint foreground acquisition refused'};$editor.RequestNormalForeground();Start-Sleep -Milliseconds 100}
     Assert-Editor
-    $phase='native_canvas_binding'
+    $phase='native_canvas_binding';$diagnostic.checkpoint=$phase
     $bound=Invoke-PaintProbe '--bind-paint' ([ordered]@{schema=1;window=$editor.Window;process_id=$editor.Process.Id;owner_pid=$PID;token=$nativeRun})
     $target=$bound.target;$image=$bound.image
     if([string]$target.process_created -cne [string]$editor.Created -or $target.process_id -ne $editor.Process.Id -or $target.window -ne $editor.Window -or $target.thread_id -ne $editor.WindowThreadId -or $image.executableName -cne 'mspaint.exe'){throw 'Native binding differs from created Paint identity'}
@@ -220,10 +263,11 @@ try{
     $phase='baseline_wgc';$baseline=@((Capture-Paint 'baseline1'),(Capture-Paint 'baseline2'))
     # Refuse a nonblank or unstable baseline BEFORE authorizing phone input.
     $first=$baseline[0].canvas_metrics.image;$second=$baseline[1].canvas_metrics.image
+    $diagnostic.checkpoint='baseline_assertions'
     if($first.decoded_rgba_sha256 -cne $second.decoded_rgba_sha256 -or $first.canvas_pixels -ne ([long]$canvas.width*$canvas.height)){throw 'Stable native blank baseline required'}
     foreach($sample in $baseline){$metric=$sample.canvas_metrics.image;if($metric.alpha_not_opaque_pixels -ne 0 -or $metric.explicit_srgb -ne $true){throw 'Opaque sRGB baseline required'};foreach($channel in 0..3){if($metric.rgba_min[$channel] -ne 255 -or $metric.rgba_max[$channel] -ne 255 -or $metric.rgba_sum[$channel] -ne ([long]$metric.canvas_pixels*255)){throw 'Native canvas is not the fresh white fixture'}}}
     Assert-WorkBudget;Assert-Editor
-    $phase='phone_stroke'
+    $phase='phone_stroke';$diagnostic.checkpoint=$phase
     Write-Host 'Dispatching synthetic short S23 phone stroke into the exact owned Paint canvas'
     $phoneStarted=[M4FrameChild]::Clock100ns()
     $phone=Invoke-M4OwnedEditorPhoneStroke -OwnedEditor $editor -EditorKind paint -Target $target -CanvasRect $canvas -ExecutableSha256 $PaintSha256 -SourceObservationSha256 $receipt.source_observation_sha256 -PrivateRunDirectory $fixtureRoot -ArtifactManifest $ArtifactManifest -ArtifactManifestSha256 $ArtifactManifestSha256 -SourceHashes $sourceHashes -UsbInterfaceIndex $UsbInterfaceIndex -UsbDeviceInstanceSha256 $UsbDeviceInstanceSha256 -PcUsbAddress $PcUsbAddress -PhoneUsbAddress $PhoneUsbAddress -Port $Port -Settlement ([ref]$remoteSettlement)
@@ -239,16 +283,16 @@ try{
     $evaluation=[ordered]@{schema=1;target=$target;image=$image;paint_frame=$paintFrame;canvas_rect=$canvas;baseline=$baseline;after=$after;phone=$phone;native_phone=$nativePhone;canvas_files=@($canvasFiles);stroke_ppm=$phone.stroke_ppm;stroke_radius_pixels=16;cursor_samples=@($cursorSamples)}
     $evaluationPath=Join-Path $fixtureRoot 'pixel-evaluation.json';Write-NewJson $evaluationPath $evaluation
     [void](Pin-File $evaluationPath (Get-FileHash -LiteralPath $evaluationPath -Algorithm SHA256).Hash.ToLowerInvariant())
-    $phase='pixel_assertion'
+    $phase='pixel_assertion';$diagnostic.checkpoint=$phase
     $pixelExit=$null
-    $evaluated=Invoke-OwnedHelper $PythonPath @((Join-Path $PSScriptRoot 'paint_phone_reports.py'),'--input',$evaluationPath) -Verdict -VerdictExitCode ([ref]$pixelExit)
+    $evaluated=Invoke-OwnedHelper $PythonPath @((Join-Path $PSScriptRoot 'paint_phone_reports.py'),'--input',$evaluationPath) -Verdict -VerdictExitCode ([ref]$pixelExit) -Role pixel_evaluator
     $proof=$evaluated|ConvertFrom-Json -AsHashtable -Depth 30
     $receipt.pixel_evidence=$proof
     if($pixelExit -ne 0 -or $proof.schema -ne 1 -or $proof.status -cne 'passed' -or $proof.accepted -ne $true -or $proof.editor_effect -ne $true){throw 'Actual stable Paint pixel effect refused'}
     $receipt.editor_effect=$true;$receipt.status='passed';$receipt.failure_phase=$null
     if($InspectSeconds -gt 0){Write-Host ('Verified Paint canvas pixel change; retaining visible owned document for '+$InspectSeconds+' seconds');$inspection=[Diagnostics.Stopwatch]::StartNew();while($inspection.Elapsed.TotalSeconds -lt $InspectSeconds -and -not $editor.HasExited){Start-Sleep -Milliseconds 100}}
 }catch{
-    $receipt.failure_phase=$phase;$receipt.failure_error_type=$_.Exception.GetType().Name
+    $receipt.failure_phase=$phase;$receipt.failure_error_type=$_.Exception.GetType().Name;$diagnostic.refusal_code=Get-PaintRefusalCode $_.Exception.Message
     Write-Host ('Paint phone visible-drawing acceptance failed in phase='+$phase+'; private details withheld')
 }finally{
     # Never finally-kill an editor while the direct adapter owes real release.
@@ -270,7 +314,7 @@ try{
             if(Test-Path -LiteralPath $directory){throw 'Private image disposal incomplete'}
         }
         $receipt.private_images_disposed=$true
-    }catch{$receipt.status='failed';$receipt.failure_phase='private_disposal';$receipt.failure_error_type=$_.Exception.GetType().Name}
+    }catch{$receipt.status='failed';$receipt.failure_phase='private_disposal';$receipt.failure_error_type=$_.Exception.GetType().Name;$diagnostic.checkpoint='private_disposal';$diagnostic.refusal_code=Get-PaintRefusalCode $_.Exception.Message}
     $local=Join-Path $repo '.local';if(-not(Test-Path -LiteralPath $local)){[void][IO.Directory]::CreateDirectory($local)};Assert-Plain $local
     Write-NewJson (Join-Path $local ('paint-phone-visible-'+$run+'.json')) $receipt
 }
