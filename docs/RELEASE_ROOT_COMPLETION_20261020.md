@@ -1,5 +1,10 @@
 # Release source completion and remaining cloud scope — 2026-10-20
 
+Historical bounded-grant receipt. The later overnight grant activates
+[MSI source closeout](MSI_RELEASE_CLOSEOUT_20261020.md); its implemented producer
+supersedes the missing-hook/source-work statements below. Tool/runtime/license
+and actual installer acceptance still require their own evidence.
+
 Base is published main `6a263dd5b330a3769203bba6cd17156c47f114f0`.
 The accepted Desktop18158c7 renderer and its root integration are unchanged.
 The previously reviewed release branch `2a70c7c04ddd5a67a250eb891dc44501ea78097f`

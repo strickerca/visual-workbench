@@ -1,0 +1,186 @@
+{
+  "schema": "vw-msi-release-closeout-v1",
+  "date": "2026-10-20",
+  "base_main": "2a04efab0659f6ac821275618b60ff26c5457074",
+  "source": {
+    "build.ps1": {
+      "bytes": 64439,
+      "sha256": "d4573b67b56e3f8a5cb13666aaf77dd20285cb71a5161c6be5b523adb37fe18c"
+    },
+    "tools/process.psm1": {
+      "bytes": 21468,
+      "sha256": "e37d175b9bef406b07009ec8a3ae69f5581088f47bfc31c9f77aea8df2f5c94c"
+    },
+    "tools/release/build-msi.ps1": {
+      "bytes": 12641,
+      "sha256": "247dd4076b75b8f76a9d30aa56b0ce1f8d3ef97ed1159394b9e878cff1d79f58"
+    },
+    "tools/release/msi.py": {
+      "bytes": 28786,
+      "sha256": "611663b486a68650a888e1718a0cc440e788254dc81786d512b03c105a10631d"
+    },
+    "tools/release/test_msi.py": {
+      "bytes": 26180,
+      "sha256": "1b172396e08b346811f4d03b2f80559a1c117d97172ee398a9d6d6594765b620"
+    },
+    "tools/release/test_msi_wrapper.ps1": {
+      "bytes": 8597,
+      "sha256": "4a92026ece72d96a24b70ff95123bb34a44131eac7470279d7c0cf2eed4da02c"
+    },
+    "tools/release/assemble.py": {
+      "bytes": 37811,
+      "sha256": "5925b0294291fcee585af45ac90db79f495fc0f385d4e4bf89673d8ec04fc769"
+    },
+    "tools/release/test_assemble.py": {
+      "bytes": 35020,
+      "sha256": "237c6190fa9d87310ef11e9150c7e3d2cbecf0d6c2312b46066de7b3d5a16c2c"
+    },
+    "tools/release/probe_windows_metadata.py": {
+      "bytes": 3149,
+      "sha256": "81db40c52ec023bcef646058645e853f97d2d5f006fffb4e680ba56bc7a68706"
+    },
+    "tools/release/README.md": {
+      "bytes": 17607,
+      "sha256": "617cbb1287455169378ab53bfd9cad20bdc22113b8b55674afa9bb56b441453a"
+    },
+    "tools/release/MSI_INPUTS.md": {
+      "bytes": 6374,
+      "sha256": "919e418808cb889c06c920db7bcc62d27a204c01641446a90de3472f527cb2d9"
+    },
+    "docs/MSI_RELEASE_CLOSEOUT_20261020.md": {
+      "bytes": 3207,
+      "sha256": "5ab93da66d4a0b7bf0071ee3a455ecccc94e52b726431a665077b85f8890dd05"
+    },
+    "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md": {
+      "bytes": 22007,
+      "sha256": "2e8c7b1e9b76a0c53497ef7f70d20d1f37d7014ebe36aaffa1eb1d9dff758ad4"
+    },
+    "docs/ROADMAP_REMAINING_PHASES_20261020.md": {
+      "bytes": 4907,
+      "sha256": "88d91593049cdcf30b959ed0f822f4c4803c1bbe1e962f31c01bce915fe02e66"
+    },
+    "docs/RELEASE_ROOT_COMPLETION_20261020.md": {
+      "bytes": 6723,
+      "sha256": "dc78f8141487ccdbb770c3757dc29091c487ecd4dcca2fbf1e0dcdab388f6371"
+    }
+  },
+  "checks": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 -m unittest discover -s tools/release -p test_assemble.py -v",
+      "methods": 48,
+      "executed_passed": 46,
+      "skipped": 2,
+      "scope": "Linux stdlib tests; synthetic app/OS seams in MSI; four actual-Windows witnesses not executed here",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-closeout/assembler-native-metadata-tests.log",
+        "bytes": 7323,
+        "sha256": "2441c247156c4b42cc92bb116db346505c5641c9d709f23ff092775363f8d58b"
+      }
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 -m unittest discover -s tools/release -p test_msi.py -v",
+      "methods": 35,
+      "executed_passed": 33,
+      "skipped": 2,
+      "scope": "Linux stdlib tests; synthetic app/OS seams in MSI; four actual-Windows witnesses not executed here",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-closeout/msi-backend-final-tests.log",
+        "bytes": 5748,
+        "sha256": "e24ba4fd2ee99b22a080be50de0869508a2e005453df940fd24f727d56fc2fcc"
+      }
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 -m unittest discover -s tools/desktop-test -p test_reports.py -v",
+      "methods": 39,
+      "executed_passed": 39,
+      "skipped": 0,
+      "scope": "Linux stdlib tests; synthetic app/OS seams in MSI; four actual-Windows witnesses not executed here",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-closeout/desktop-reports-tests.log",
+        "bytes": 4919,
+        "sha256": "a3eaa858e503437082c233f1865e2e05f89336aeea8be47ce7702d78d57707a7"
+      }
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 -m unittest discover -s tools/desktop-test -p test_personal_package.py -v",
+      "methods": 16,
+      "executed_passed": 16,
+      "skipped": 0,
+      "scope": "Linux stdlib tests; synthetic app/OS seams in MSI; four actual-Windows witnesses not executed here",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-closeout/personal-package-tests.log",
+        "bytes": 2727,
+        "sha256": "82e6a43c04b3408e1cdb828d5015a68e39e3ee0a380beb9ed76c2c34c56f315a"
+      }
+    },
+    {
+      "command": "python3 tools/check_setup.py",
+      "result": "ids,third-party,workspace passed",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-closeout/msi-policy-final.log",
+        "bytes": 62,
+        "sha256": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197"
+      }
+    }
+  ],
+  "test_methods": 138,
+  "executed_passes": 134,
+  "windows_only_skips_on_linux": 4,
+  "source_review": {
+    "reviewer": "gpt-6-astra",
+    "lane": "tunnel_boundary_review",
+    "result": "Production source clearance; Python bootstrap P1 and Windows fixture identity P2 closed. README historical contradiction corrected after final production clearance. Final receipt review separate.",
+    "scope": "Independent read-only source; reviewer ran no tests/builds/Git"
+  },
+  "metadata_repair": {
+    "published_main": "2a04efab0659f6ac821275618b60ff26c5457074",
+    "source_receipt": "docs/evidence/WINDOWS_RELEASE_METADATA_20261020.json",
+    "actual_windows_replay_pending": true
+  },
+  "parent_relayed_windows_observations": {
+    "task": "01a1590d-d35c-7616-80a6-b1b8b23ad03a",
+    "jpackage_sha256": "afd944cbf952a461d283a7df7714c12cdc05fd29441eae04526966d71357e9a2",
+    "jdk_release_sha256": "07117c72ce033949c14878e07fbf2fe23f59a1f8c90a6d1351b5c89099847ce7",
+    "wix_installation_and_license_inventory": "absent",
+    "finalized_app_image": "not supplied",
+    "raw_logs_or_tools_inspected_by_cloud": false,
+    "jdk_jpackage_version_components": [
+      21,
+      0,
+      12,
+      1
+    ]
+  },
+  "wix_denial": {
+    "target": "https://api.github.com/repos/wixtoolset/wix3/releases/tags/wix3141rtm",
+    "method": "GET",
+    "denial_class": "Proxy HTTPS CONNECT403 before HTTP response bytes (urllib.error.URLError wrapping tunnel OSError)",
+    "metadata_or_artifact_bytes_received": false,
+    "alternate_artifact_transfer_attempted": false,
+    "official_candidate_information": "Official WiX3.14.1 release page names wix314-binaries.zip; no exact archive pin/tool/license admission established",
+    "supported_delivery_without_wix": "Existing finalized complete app-image package; not MSI acceptance"
+  },
+  "not_executed": [
+    "PowerShell wrapper parse or16-case wrapper fixture on cloud (PowerShell absent)",
+    "Actual Windows native metadata or host identity witnesses",
+    "Actual JDK/WiX process, MSI build or complete toolchain admission",
+    "MSI database/payload/signature/install/uninstall/restore/launch acceptance",
+    "Signing, deployment, spending, credential changes, new legal agreement acceptance",
+    "GUI/provider/device/S23 operations in cloud"
+  ],
+  "required_windows_handoff": [
+    "Use final producer source and regenerate matching image/receipts after build.ps1/process.psm1 changes",
+    "Run test_msi_wrapper.ps1 (16 cases, two owned PowerShell children; no app/device)",
+    "Replay48 assembler and35 MSI test methods, with applicable POSIX skips distinguished",
+    "Supply complete JDK/WiX/Python inventories and existing authorized inventory/compatibility/license evidence",
+    "Run package-desktop-msi only with admitted inputs; validate resulting MSI database/payload and applicable real install/recovery separately"
+  ],
+  "application_and_renderer_changed": false,
+  "generated_bindings_regenerated": false,
+  "heavy_builds_run_in_cloud": 0,
+  "msi_source_implemented": true,
+  "msi_toolchain_admitted": false,
+  "msi_built": false,
+  "release_ready": false,
+  "physical_acceptance": false
+}

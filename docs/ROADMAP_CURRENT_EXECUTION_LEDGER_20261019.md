@@ -1,5 +1,19 @@
 # Current phased execution ledger
 
+## Overnight practical release closeout — 2026-10-20
+
+The new overnight grant supplies a separate Windows/S23 validation task and
+activates remaining practical release implementation. Cloud has implemented
+[the finalized-image MSI producer](MSI_RELEASE_CLOSEOUT_20261020.md) and fixed
+[Windows release metadata comparison](WINDOWS_RELEASE_METADATA_20261020.md)
+without removing real mutation checks. MSI source is no longer missing; exact
+WiX/tool/license and finalized-image admission, Windows execution and actual
+installer/payload acceptance remain open. The latest four focused Python suites
+run138 methods:134 executed passes and four actual-Windows skips on Linux.
+Windows owns the actual replay and its separately assigned native compile fixes.
+The accepted renderer and deferred editor scope are unchanged. Earlier bounded
+"no further independent source" statements below describe their prior grant.
+
 ## Release source reconciliation — 2026-10-20
 
 On published main `6a263dd5b330a3769203bba6cd17156c47f114f0`, the remaining

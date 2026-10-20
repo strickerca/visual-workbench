@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-remote-helpers', 'test-remote-helpers', 'build-remote-integration', 'build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-editor', 'lint-editor', 'test-shared', 'test-apps', 'test-mcp', 'build-ai', 'test-ai', 'build-managed-apps', 'package-managed-apps', 'package-background-apps', 'package-android-app', 'package-desktop-app', 'assemble-release', 'test-paint-integration', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'build-desktop-distribution', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-remote-helpers', 'test-remote-helpers', 'build-remote-integration', 'build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-editor', 'lint-editor', 'test-shared', 'test-apps', 'test-mcp', 'build-ai', 'test-ai', 'build-managed-apps', 'package-managed-apps', 'package-background-apps', 'package-android-app', 'package-desktop-app', 'package-desktop-msi', 'assemble-release', 'test-paint-integration', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'build-desktop-distribution', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
     [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'pairing', 'shared-ffi', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
@@ -23,7 +23,10 @@ param(
     [ValidatePattern('^[0-9a-f]{64}$')][string]$ReleaseManifestSha256,
     [string]$ReleaseDestination,
     [string]$ReleasePythonExecutable,
-    [ValidatePattern('^[0-9a-f]{64}$')][string]$ReleasePythonSha256
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$ReleasePythonSha256,
+    [string]$MsiToolchainManifest,
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$MsiToolchainSha256,
+    [string]$MsiWorkDirectory
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -386,6 +389,12 @@ try {
             throw 'Release assembly inputs are limited to assemble-release.'
         }
     }
+    $msiParameterNames = @('MsiToolchainManifest', 'MsiToolchainSha256', 'MsiWorkDirectory')
+    foreach ($msiName in $msiParameterNames) {
+        if ($Command -ne 'package-desktop-msi' -and $PSBoundParameters.ContainsKey($msiName)) {
+            throw 'MSI toolchain/work inputs are limited to package-desktop-msi.'
+        }
+    }
     if ($PairingTests -and $ProjectFlowTests) { throw 'Select one focused managed test batch' }
     if ($ProjectFlowTests -and $Command -ne 'package-managed-apps') { throw 'Focused project-flow tests require managed packaging' }
     if ($PairingTests -and $Command -ne 'package-managed-apps') { throw 'Focused pairing tests require managed packaging' }
@@ -393,6 +402,24 @@ try {
     if ($Command -ne 'package-background-apps' -and ($BackgroundInputs -or $BackgroundInputsSha256)) { throw 'Background inputs are limited to background packaging' }
     if ($Command -cnotin @('package-android-app', 'package-desktop-app', 'test-paint-integration') -and ($AndroidPackageInputs -or $AndroidPackageInputsSha256)) { throw 'App package inputs are limited to incremental normal app integration' }
     switch ($Command) {
+        'package-desktop-msi' {
+            if ($PSVersionTable.PSVersion -lt [version]'7.2') { throw 'MSI production requires PowerShell 7.2 or later.' }
+            foreach ($msiName in $msiParameterNames) {
+                if (-not $PSBoundParameters.ContainsKey($msiName) -or [string]::IsNullOrWhiteSpace([string]$PSBoundParameters[$msiName])) {
+                    throw 'MSI production requires an explicit toolchain manifest/hash and fresh work directory.'
+                }
+            }
+            if ($TimeoutSeconds -gt 3600) { throw 'MSI process timeout must be between 1 and 3600 seconds.' }
+            $msiArguments = @{ Root = $projectRoot; ToolchainManifest = $MsiToolchainManifest;
+                ToolchainSha256 = $MsiToolchainSha256; WorkDirectory = $MsiWorkDirectory; TimeoutSeconds = $TimeoutSeconds }
+            if ($PSBoundParameters.ContainsKey('RemoteEditorCatalog') -or $PSBoundParameters.ContainsKey('RemoteEditorCatalogSha256')) {
+                if ([string]::IsNullOrWhiteSpace($RemoteEditorCatalog) -or [string]::IsNullOrWhiteSpace($RemoteEditorCatalogSha256)) {
+                    throw 'MSI catalog requires an exact root-relative path/hash pair.'
+                }
+                $msiArguments.Catalog = $RemoteEditorCatalog; $msiArguments.CatalogSha256 = $RemoteEditorCatalogSha256
+            }
+            & (Join-Path $projectRoot 'tools/release/build-msi.ps1') @msiArguments
+        }
         'assemble-release' {
             if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'Release assembly requires PowerShell 7 (pwsh).' }
             foreach ($releaseName in $releaseParameterNames) {

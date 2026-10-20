@@ -252,18 +252,24 @@ existing hash-bound manifest/source record, and the assembler independently
 checks exact inputs, notices and available package validators. The caller must
 still supply genuinely admitted artifacts; hashes do not self-admit a runtime. The separate
 root admission must populate the toolchain-record/guide slots with exact reviewed
-bytes or retain the explicit missing-prerequisite statuses. The
-root MSI build hook remains deferred until the parent reviews its exact Gradle
-task, configuration, dependencies, license gates, runtime pins and output
-receipt. Once that hook produces a real already built MSI, list its exact bytes
-as `external-package`; this does not pass MSI validation. The new root entry
-is source-reviewed by Astra. Its underlying synthetic Python suite passes41
-cases and root offline policy passes. PowerShell is absent in the cloud, so
+bytes or retain the explicit missing-prerequisite statuses. The separate
+finalized-image MSI producer is implemented below; actual toolchain/license,
+execution and output admission remain open. Once it produces a real already
+built MSI, list its exact bytes as `external-package`; this does not pass MSI
+validation. The original root entry was source-reviewed by Astra, with41
+synthetic Python cases and root offline policy passing in its dated receipt.
+PowerShell is absent in the cloud, so
 PowerShell parsing/execution and Windows wrapper/NTFS/process-tree checks remain
 unrun. No product assembly, package, installer, signature or deployment was
 produced by this change. See `docs/RELEASE_ASSEMBLY_ROOT_HOOK_20261020.md`.
 
-## Remaining MSI build handoff
+## Finalized-image MSI build hook
+
+`build.ps1 package-desktop-msi` now implements the explicit finalized-image
+route with [`build-msi.ps1`](build-msi.ps1) and [`msi.py`](msi.py). Exact manifest
+fields, root flags, input/process ownership and the remaining Windows tool and
+license admission are described in [MSI_INPUTS.md](MSI_INPUTS.md). This source
+does not supply an admitted WiX installation or complete toolchain manifest.
 
 The current `package-desktop-app` source in [`build.ps1`](../../build.ps1)
 invokes `:desktop:createDistributable` with admitted native/MCP resources and a
@@ -285,7 +291,7 @@ WiX selection pending. A plugin's default download URL is not an admitted pin;
 this handoff authorizes no download, tool installation or guessed runtime path.
 The later output receipt must bind the already admitted image and producer
 inputs to the actual MSI's bytes and hash. Until those prerequisites are met,
-there is no MSI build hook or MSI-ready claim. The existing assembler can copy
+the hook cannot produce an admitted MSI and makes no MSI-ready claim. The existing assembler can copy
 explicit already-built MSI bytes as `external-package` with its stated limits.
 
 Still deferred: real Windows/NTFS reparse, junction and sharing-violation tests;

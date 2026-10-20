@@ -186,7 +186,8 @@ function Invoke-VwProcess {
         [string[]]$RedactValues = @(),
         [switch]$Capture,
         [switch]$SensitiveCapture,
-        [switch]$CleanCompilerTelemetry
+        [switch]$CleanCompilerTelemetry,
+        [System.Collections.IDictionary]$Environment
     )
     $commandInfo = Get-Command $FilePath -ErrorAction SilentlyContinue
     if (-not $commandInfo -and -not (Test-Path -LiteralPath $FilePath -PathType Leaf)) {
@@ -211,6 +212,19 @@ function Invoke-VwProcess {
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
+    # An admitted packaging caller can supply a complete child environment.
+    # This changes only the new process, never the shell or existing callers.
+    if ($PSBoundParameters.ContainsKey('Environment')) {
+        if ($null -eq $Environment) { throw "[$Phase] Explicit child environment required" }
+        $startInfo.EnvironmentVariables.Clear()
+        foreach ($entry in $Environment.GetEnumerator()) {
+            if ($entry.Key -isnot [string] -or $entry.Key -cnotmatch '^[A-Za-z_][A-Za-z0-9_]*$' -or
+                $entry.Value -isnot [string] -or $entry.Value.Contains([char]0)) {
+                throw "[$Phase] Invalid explicit child environment"
+            }
+            $startInfo.EnvironmentVariables[$entry.Key] = $entry.Value
+        }
+    }
     # The public dependency repositories used by this build require no tokens.
     # Remove unrelated inherited credentials before any compiler/helper runs;
     # also redact their original values if another tool prints them indirectly.

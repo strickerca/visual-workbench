@@ -35,10 +35,17 @@ transfer remains CONNECT403 before bytes. Source/runtime/license/physical limits
 are tracked in [the execution ledger](ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md)
 and [deferred validation ledger](DEFERRED_VALIDATION_LEDGER_20261018.md).
 
-The [release source reconciliation](RELEASE_ROOT_COMPLETION_20261020.md) records
+The [MSI source closeout](MSI_RELEASE_CLOSEOUT_20261020.md) implements the
+finalized-image producer under the later overnight grant. Exact WiX/license and
+final image admission, Windows execution and actual installer acceptance remain
+open. Its new focused batch has134 executed Python passes and four Windows-only
+skips on Linux. The separately published Windows metadata repair needs actual
+Windows replay; local source and S23 work remain with the Windows task.
+
+The earlier [release source reconciliation](RELEASE_ROOT_COMPLETION_20261020.md) records
 the concrete cloud packaging corrections and96 passing Python tests. PowerShell
 is absent, so root/wrapper execution and actual Windows assembly remain unrun.
-No further independent cloud implementation item was identified within the
-current grant; the remaining work needs the listed artifacts, runtime/toolchain,
+No further independent cloud implementation item was identified within that
+earlier grant; the remaining work needs the listed artifacts, runtime/toolchain,
 device/owner evidence or a later scope grant. Historical task dependencies do
 not authorize reopening accepted source or deferred Krita/broader Phase4 work.
