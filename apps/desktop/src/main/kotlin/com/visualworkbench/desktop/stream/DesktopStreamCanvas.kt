@@ -28,6 +28,7 @@ internal interface DesktopStreamBackend {
     fun canStartDraw():Boolean
     fun offer(slot:StreamCanvasSlot):Boolean
     fun commit(slot:StreamCanvasSlot)
+    fun isCommitted(slot:StreamCanvasSlot):Boolean
     fun rollback(slot:StreamCanvasSlot,offered:Boolean)
     fun retire()
 }
@@ -71,6 +72,19 @@ internal class DesktopStreamPainter(private val core:WorkbenchCore,private val w
     private val canvas=object:Canvas() {
         override fun addNotify(){super.addNotify();wake()}
         override fun removeNotify(){pending?.permit?.refuse();pending?.losslessPaint?.cancel();super.removeNotify()}
+        override fun setBounds(x:Int,y:Int,width:Int,height:Int){
+            val scale=graphicsConfiguration?.defaultTransform
+            val admitted=width<=0||height<=0||runCatching{
+                physicalCanvasBytes(width,height,scale?.scaleX?:1.0,scale?.scaleY?:1.0)
+            }.isSuccess
+            if(!admitted){
+                try{bufferStrategy?.dispose();strategySurfaceBytes=0L}catch(error:Throwable){paintFailed(error)}
+                super.setBounds(x,y,0,0)
+                paintFailed(IllegalArgumentException("Capture destination exceeds its physical surface limit"))
+                return
+            }
+            super.setBounds(x,y,width,height)
+        }
         override fun paint(graphics:Graphics){
             val trial=pending
             val slot=if(trial?.permit?.canDisplay()==false)positive else trial?:positive
@@ -153,6 +167,7 @@ internal class DesktopStreamPainter(private val core:WorkbenchCore,private val w
         val old=positive;positive=slot;pending=null
         try{old?.raster?.close()}catch(error:Throwable){old?.raster?.let(quarantine);sealed=true;throw error}
     }
+    override fun isCommitted(slot:StreamCanvasSlot):Boolean {checkEdt();return positive===slot}
     override fun rollback(slot:StreamCanvasSlot,offered:Boolean){
         checkEdt()
         val installed=pending===slot

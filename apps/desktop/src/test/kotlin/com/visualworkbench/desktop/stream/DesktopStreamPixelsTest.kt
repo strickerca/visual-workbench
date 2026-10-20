@@ -14,8 +14,10 @@ class DesktopStreamPixelsTest {
     private val frame=CaptureStreamFrame("capture",7u,2u,2u,2u,14,29,1.25,3u,900L,1000L,"windows")
     private class Charge:SessionResourceCharge {var closes=0;override fun close(){closes++}}
     private class Resources:SessionResources {
-        val charge=Charge();var requested:ULong?=null
-        override suspend fun reserveForeign(bytes:ULong):SessionResourceCharge {requested=bytes;return charge}
+        val charges=mutableListOf<Charge>();val requested=mutableListOf<ULong>()
+        override suspend fun reserveForeign(bytes:ULong):SessionResourceCharge {
+            requested+=bytes;return Charge().also(charges::add)
+        }
     }
     private class Pixels(override val frame:CaptureStreamFrame,private val reply:ByteArray):CaptureStreamPixels {
         val rows=mutableListOf<Pair<UInt,UInt>>()
@@ -29,24 +31,26 @@ class DesktopStreamPixelsTest {
     @Test fun exactRowsBecomeChargedPlatformPixelsAndKeepFullSourceDimensions()=runBlocking {
         val resources=Resources()
         val pixels=Pixels(frame,byteArrayOf(1,2,3,-1,4,5,6,-1,7,8,9,-1,10,11,12,-1))
-        val raster=readStreamRaster(pixels,resources){error("Unexpected failed close")}
+        val surface=reserveStreamSurface(resources)
+        val raster=readStreamRaster(pixels,resources,surface,16L){error("Unexpected failed close")}
         assertEquals(listOf(0u to 2u),pixels.rows)
-        assertEquals(streamRasterCharge(streamRasterSize(frame),16L),resources.requested)
-        assertTrue(streamRasterCharge(streamRasterSize(frame),64L)>checkNotNull(resources.requested))
+        assertEquals(listOf(STREAM_PLATFORM_SURFACE_RESERVE.toULong(),streamRasterCharge(streamRasterSize(frame))),resources.requested)
+        assertEquals(STREAM_SURFACE_RGBA_MAX.toLong(),raster.admittedSurfaceBytes)
         assertEquals(0xff010203.toInt(),raster.image?.getRGB(0,0))
         assertEquals(0xff0a0b0c.toInt(),raster.image?.getRGB(1,1))
         assertEquals(2,raster.image?.width)
         raster.close();raster.close()
-        assertEquals(1,resources.charge.closes)
+        assertEquals(listOf(0,1),resources.charges.map{it.closes})
+        surface.close()
+        assertEquals(listOf(1,1),resources.charges.map{it.closes})
     }
 
     @Test fun hidpiAdmissionCountsPhysicalPixelsAndRetainedDestinationCopies() {
         assertEquals(4L*100L*50L*4L,physicalCanvasBytes(100,50,2.0,2.0))
         assertEquals(4L*151L*76L,physicalCanvasBytes(100,50,1.501,1.501))
         val size=streamRasterSize(frame)
-        val physical=physicalCanvasBytes(100,50,2.0,2.0)
-        assertEquals((size.bytes.toLong()*3L+physical*STREAM_PLATFORM_SURFACE_COPIES+
-            STREAM_ROW_REPLY_MAX+16L*1024L).toULong(),streamRasterCharge(size,physical))
+        assertEquals((size.bytes.toLong()*3L+STREAM_ROW_REPLY_MAX+16L*1024L).toULong(),streamRasterCharge(size))
+        assertEquals(3L*STREAM_SURFACE_RGBA_MAX,STREAM_PLATFORM_SURFACE_RESERVE)
         assertThrows(IllegalArgumentException::class.java){physicalCanvasBytes(8192,8192,3.0,3.0)}
     }
 
@@ -76,10 +80,15 @@ class DesktopStreamPixelsTest {
         val resources=Resources()
         assertThrows(IllegalArgumentException::class.java){streamRasterSize(frame.copy(width=8193u))}
         assertThrows(IllegalArgumentException::class.java){streamRasterSize(frame.copy(width=4096u,height=4096u))}
-        assertNull(resources.requested)
+        assertTrue(resources.requested.isEmpty())
         val pixels=Pixels(frame,byteArrayOf(1,2,3))
-        assertThrows(IllegalArgumentException::class.java){runBlocking {readStreamRaster(pixels,resources){error("Unexpected quarantine")}}}
-        assertEquals(1,resources.charge.closes)
+        val surface=reserveStreamSurface(resources)
+        assertThrows(IllegalArgumentException::class.java){runBlocking {
+            readStreamRaster(pixels,resources,surface,16L){error("Unexpected quarantine")}
+        }}
+        assertEquals(listOf(0,1),resources.charges.map{it.closes})
+        surface.close()
+        assertEquals(listOf(1,1),resources.charges.map{it.closes})
     }
 
     @Test fun drawPermitSettlesOnlyAfterPaintOrCertainPrepaintRefusal()=runBlocking {

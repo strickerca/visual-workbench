@@ -12,14 +12,15 @@ import java.awt.image.DataBufferInt
 internal const val STREAM_ROW_REPLY_MAX = 256 * 1024
 internal const val STREAM_FRAME_RGBA_MAX = 32 * 1024 * 1024
 internal const val STREAM_SURFACE_RGBA_MAX = 64 * 1024 * 1024
-// AWT's destination plus a possible accelerated/staging copy are retained
-// while the admitted raster can be redrawn. Account three physical surfaces.
+// Admit the full supported native envelope once before BufferStrategy exists.
+// It remains held even if resize/DPI changes the backing before the next draw.
 internal const val STREAM_PLATFORM_SURFACE_COPIES = 3L
+internal const val STREAM_PLATFORM_SURFACE_RESERVE = STREAM_SURFACE_RGBA_MAX.toLong()*STREAM_PLATFORM_SURFACE_COPIES
 
 internal data class StreamRasterSize(val width:Int,val height:Int,val rowBytes:Int,val bytes:Int)
 
-/** Four copies cover the incoming row DTO, assembled RGBA, Java raster and a
- * possible platform drawing copy. Reject before foreign reads or allocation. */
+/** Source RGBA and Java image are held with a third source-sized workspace;
+ * native destination buffers have their own view-lifetime reservation. */
 internal fun streamRasterSize(frame:CaptureStreamFrame):StreamRasterSize {
     val width=frame.width.toLong();val height=frame.height.toLong()
     require(width in 1..8192 && height in 1..8192 && frame.dpiScale.isFinite() && frame.dpiScale>0.0)
@@ -38,12 +39,22 @@ internal fun losslessBackgroundMatches(state:CaptureAnnotationState,background:C
         background.lossless&&background.originalAssetId!=null&&background.draftId==draft.draftId&&
         background.frame==draft.frame&&current.connectionEpoch==connectionEpoch
 }
-internal fun streamRasterCharge(size:StreamRasterSize,platformSurfaceBytes:Long):ULong {
-    val surface=if(platformSurfaceBytes==0L)size.bytes.toLong() else platformSurfaceBytes
-    require(surface in 4..STREAM_SURFACE_RGBA_MAX.toLong())
-    return (size.bytes.toLong()*3L+surface*STREAM_PLATFORM_SURFACE_COPIES+
-        STREAM_ROW_REPLY_MAX+16L*1024L).toULong()
+internal fun streamRasterCharge(size:StreamRasterSize):ULong =
+    (size.bytes.toLong()*3L+STREAM_ROW_REPLY_MAX+16L*1024L).toULong()
+
+internal class StreamSurfaceLease(private val charge:SessionResourceCharge) {
+    val capacityBytes:Long=STREAM_SURFACE_RGBA_MAX.toLong()
+    private var closed=false
+    private var failure:Throwable?=null
+    fun requireAdmitted(actualBytes:Long){check(!closed&&failure==null);require(actualBytes in 4..capacityBytes)}
+    fun close(){
+        failure?.let{throw it}
+        if(closed)return
+        try{charge.close();closed=true}catch(error:Throwable){failure=error;throw error}
+    }
 }
+internal suspend fun reserveStreamSurface(resources:SessionResources):StreamSurfaceLease =
+    StreamSurfaceLease(resources.reserveForeign(STREAM_PLATFORM_SURFACE_RESERVE.toULong()))
 
 /** A failed charge release stays owned; a second call reports the same failure. */
 internal class StreamRaster(private val charge:SessionResourceCharge,val admittedSurfaceBytes:Long) {
@@ -82,10 +93,10 @@ internal class StreamDrawPermit {
 
 /** Reads exact opaque RGBA rows; no full-frame native reply is requested. */
 internal suspend fun readStreamRaster(pixels:CaptureStreamPixels,resources:SessionResources,
-    platformSurfaceBytes:Long=0L,quarantine:(StreamRaster)->Unit):StreamRaster {
+    surface:StreamSurfaceLease,platformSurfaceBytes:Long,quarantine:(StreamRaster)->Unit):StreamRaster {
     val size=streamRasterSize(pixels.frame)
-    val admittedSurface=if(platformSurfaceBytes==0L)size.bytes.toLong() else platformSurfaceBytes
-    val held=StreamRaster(resources.reserveForeign(streamRasterCharge(size,admittedSurface)),admittedSurface)
+    surface.requireAdmitted(platformSurfaceBytes)
+    val held=StreamRaster(resources.reserveForeign(streamRasterCharge(size)),surface.capacityBytes)
     try {
         val rgba=ByteArray(size.bytes)
         var row=0

@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
 import org.junit.Test
 import javax.swing.JPanel
+import javax.swing.SwingUtilities
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -16,7 +17,8 @@ class DesktopStreamViewTest {
     private class Charge:SessionResourceCharge {var closes=0;override fun close(){closes++}}
     private class Resources:SessionResources {
         val charges=mutableListOf<Charge>()
-        override suspend fun reserveForeign(bytes:ULong):SessionResourceCharge=Charge().also{charges+=it}
+        val requests=mutableListOf<ULong>()
+        override suspend fun reserveForeign(bytes:ULong):SessionResourceCharge=Charge().also{requests+=bytes;charges+=it}
     }
     private class Draw(override val frame:CaptureStreamFrame):CaptureStreamDraw {
         val receipts=mutableListOf<Boolean>();@Volatile var closes=0
@@ -49,6 +51,9 @@ class DesktopStreamViewTest {
         var positive:StreamCanvasSlot?=null
         var retired=false
         var failRetire=false
+        var failCommitAfterInstall=false
+        var rollbackCount=0
+        val retained=mutableListOf<StreamRaster>()
         var offerEntered:CountDownLatch?=null
         var offerRelease:CountDownLatch?=null
         var retireEntered:CountDownLatch?=null
@@ -56,7 +61,8 @@ class DesktopStreamViewTest {
         var boundCamera:Camera?=null
         override fun setCamera(value:Camera?){boundCamera=value}
         override fun mapPointer(point:Point)=point
-        override fun surfaceBytes()=16L
+        @Volatile var surfaceBytesValue=16L
+        override fun surfaceBytes()=surfaceBytesValue
         override fun canStartDraw()=!retired&&pending==null
         override fun offer(slot:StreamCanvasSlot):Boolean {
             pending=slot;offered.complete(Unit)
@@ -64,9 +70,15 @@ class DesktopStreamViewTest {
             offerEntered?.countDown();offerRelease?.await(5,TimeUnit.SECONDS)
             return true
         }
-        override fun commit(slot:StreamCanvasSlot){check(pending===slot);positive?.raster?.close();positive=slot;pending=null}
-        override fun rollback(slot:StreamCanvasSlot,offered:Boolean){if(pending===slot)pending=null;slot.raster.close()}
-        override fun retire(){retireEntered?.countDown();retireRelease?.await(5,TimeUnit.SECONDS);retired=true;if(failRetire)error("retained platform surface");pending?.raster?.close();positive?.raster?.close();pending=null;positive=null}
+        override fun commit(slot:StreamCanvasSlot){
+            check(pending===slot)
+            val old=positive;positive=slot;pending=null
+            if(failCommitAfterInstall){old?.raster?.let(retained::add);error("old bitmap retirement failed after install")}
+            old?.raster?.close()
+        }
+        override fun isCommitted(slot:StreamCanvasSlot)=positive===slot
+        override fun rollback(slot:StreamCanvasSlot,offered:Boolean){rollbackCount++;if(pending===slot)pending=null;slot.raster.close()}
+        override fun retire(){retireEntered?.countDown();retireRelease?.await(5,TimeUnit.SECONDS);retired=true;if(failRetire)error("retained platform surface");pending?.raster?.close();positive?.raster?.close();retained.forEach(StreamRaster::close);pending=null;positive=null}
     }
     private val core=object:WorkbenchCore {
         override fun newId(unixMs:ULong)=error("Unused")
@@ -92,7 +104,7 @@ class DesktopStreamViewTest {
         }finally{view.close();scope.cancel()}
         assertTrue(backend.retired)
         assertEquals(0,stream.closes)
-        assertEquals(listOf(1),resources.charges.map{it.closes})
+        assertEquals(listOf(1,1),resources.charges.map{it.closes})
     }
 
     @Test fun contactBeforePaintRefusesOnlyTheUndrawnTicketAndKeepsNoFalseFrame()=runBlocking {
@@ -121,7 +133,7 @@ class DesktopStreamViewTest {
             release.complete(Unit);closing.join()
             assertEquals(listOf(false),draw.receipts)
             assertEquals(1,draw.closes)
-            assertEquals(listOf(1),resources.charges.map{it.closes})
+            assertEquals(listOf(1,1),resources.charges.map{it.closes})
         }finally{release.complete(Unit);scope.cancel()}
         assertEquals(0,stream.closes)
 
@@ -161,9 +173,9 @@ class DesktopStreamViewTest {
             assertEquals(camera,backend.boundCamera)
             assertEquals(frame,view.state.value.displayed)
             assertTrue(view.state.value.lossless)
-            assertEquals(listOf(1,0),resources.charges.map{it.closes})
+            assertEquals(listOf(0,1,0),resources.charges.map{it.closes})
         }finally{view.close();scope.cancel()}
-        assertEquals(listOf(1,1),resources.charges.map{it.closes})
+        assertEquals(listOf(1,1,1),resources.charges.map{it.closes})
         assertEquals(0,stream.closes)
     }
 
@@ -181,7 +193,7 @@ class DesktopStreamViewTest {
             assertEquals(listOf(false),draw.receipts)
             assertNull(view.state.value.displayed)
             assertFalse(backend.offered.isCompleted)
-            assertEquals(listOf(1),resources.charges.map{it.closes})
+            assertEquals(listOf(0,1),resources.charges.map{it.closes})
         }finally{release.complete(Unit);view.close();scope.cancel()}
     }
 
@@ -247,5 +259,78 @@ class DesktopStreamViewTest {
             assertEquals(frame,backend.positive?.frame)
             assertFalse(view.state.value.lossless)
         }finally{view.close();scope.cancel()}
+    }
+
+    @Test fun failedCommitAfterInstallKeepsTheInstalledLosslessRasterOwnedUntilRetirement()=runBlocking {
+        val stream=Stream(live).apply{draws+=Draw(frame)};val backend=Backend(true);val resources=Resources()
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+        val view=DesktopStreamView(scope,core,stream,{true},resources,Dispatchers.Unconfined,{_,_,_,_->backend})
+        try {
+            withTimeout(5000){while(view.state.value.displayed!=frame)yield()}
+            view.stopLiveDraws();backend.failCommitAfterInstall=true
+            stream.background=object:CaptureFrozenBackground {
+                override val frame=this@DesktopStreamViewTest.frame
+                override val draftId="draft";override val lossless=true;override val originalAssetId="c".repeat(64)
+                override suspend fun rgbaRows(firstRow:UInt,rowCount:UInt)=ByteArray(16){if(it%4==3)(-1).toByte() else 27.toByte()}
+                override suspend fun close()=Unit
+            }
+            val draft=CaptureDraftInfo("draft","document",frame,"b".repeat(64),5u)
+            val state=CaptureAnnotationState(CaptureFreezeReceipt("draft",frame.frameId,frame.captureSessionId,
+                frame.sourceGeneration),draft,lossless=true)
+            assertTrue(runCatching{view.adoptLossless({},{state})}.isFailure)
+            assertNotNull(backend.positive)
+            assertEquals(0,backend.rollbackCount)
+            assertEquals(listOf(0,0,0),resources.charges.map{it.closes})
+            assertTrue(view.state.value.sealed)
+            assertFalse(view.state.value.lossless)
+        }finally{view.close();scope.cancel()}
+        assertEquals(listOf(1,1,1),resources.charges.map{it.closes})
+    }
+
+    @Test fun nativeSurfaceEnvelopePrecedesStrategyAndSurvivesResizeBetweenDraws()=runBlocking {
+        val second=frame.copy(frameId=8u)
+        val stream=Stream(live).apply{draws+=Draw(frame);draws+=Draw(second)}
+        val backend=Backend(true);val resources=Resources()
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+        val view=DesktopStreamView(scope,core,stream,{true},resources,Dispatchers.Unconfined,{_,_,_,_->backend})
+        try {
+            withTimeout(5000){while(view.state.value.displayed!=frame)yield()}
+            assertEquals(STREAM_PLATFORM_SURFACE_RESERVE.toULong(),resources.requests.first())
+            assertEquals(0,resources.charges.first().closes)
+            backend.surfaceBytesValue=STREAM_SURFACE_RGBA_MAX.toLong()
+            stream.advance(live.copy(sequence=2u))
+            withTimeout(5000){while(view.state.value.displayed!=second)yield()}
+            assertEquals(3,resources.requests.size)
+            assertEquals(STREAM_PLATFORM_SURFACE_RESERVE.toULong(),resources.requests.first())
+            assertEquals(STREAM_SURFACE_RGBA_MAX.toLong(),backend.positive?.raster?.admittedSurfaceBytes)
+            assertEquals(0,resources.charges.first().closes)
+        }finally{view.close();scope.cancel()}
+        assertEquals(listOf(1,1,1),resources.charges.map{it.closes})
+    }
+
+    @Test fun oversizedCanvasBoundsAreRefusedBeforeNativePeerResize() {
+        val failures=mutableListOf<Throwable>()
+        val painter=DesktopStreamPainter(core,{}, {},failures::add)
+        SwingUtilities.invokeAndWait {
+            painter.container.setSize(8192,8192)
+            painter.container.doLayout()
+            assertTrue(failures.isNotEmpty())
+            assertEquals(0,painter.container.getComponent(0).width)
+            painter.retire()
+        }
+    }
+
+    @Test fun failedStrategyRetirementRetainsTheNativeSurfaceCharge()=runBlocking {
+        val stream=Stream(live).apply{draws+=Draw(frame)}
+        val backend=Backend(true).apply{failRetire=true};val resources=Resources()
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+        val view=DesktopStreamView(scope,core,stream,{true},resources,Dispatchers.Unconfined,{_,_,_,_->backend})
+        try {
+            withTimeout(5000){while(view.state.value.displayed!=frame)yield()}
+            assertTrue(runCatching{view.close()}.isFailure)
+            assertEquals(0,resources.charges.first().closes)
+            assertTrue(runCatching{view.close()}.isFailure)
+            assertEquals(0,resources.charges.first().closes)
+        }finally{scope.cancel()}
     }
 }

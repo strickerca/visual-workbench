@@ -34,6 +34,8 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
     private val failedDraws=mutableListOf<CaptureStreamDraw>()
     private val failedBackgrounds=mutableListOf<CaptureFrozenBackground>()
     private val pending=AtomicReference<StreamCanvasSlot?>(null)
+    private val surfaceGate=Mutex()
+    private var surfaceLease:StreamSurfaceLease?=null
     private val adoptionGate=Mutex()
     private val closeGate=Mutex()
     @Volatile private var adoptionJob:Job?=null
@@ -58,8 +60,9 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
             if(current.stage!=CaptureStreamStage.Live||!current.sourceAvailable)continue
             if(!withContext(ui){attached()}){seal("The capture view detached.");break}
             if(!withContext(ui){painter.canStartDraw()})continue
+            val surface=ensureSurface()
             val draw=stream.beginDraw()?:continue
-            try{process(draw)}catch(cancel:CancellationException){throw cancel}
+            try{process(draw,surface)}catch(cancel:CancellationException){throw cancel}
             catch(_:Exception){seal("The capture frame could not be presented. Close this view before retrying.");break}
         }}catch(cancel:CancellationException){throw cancel}
         catch(_:Exception){seal("The capture receiver stopped. The last verified frame remains visible.")}
@@ -71,8 +74,15 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
     private fun quarantineRaster(value:StreamRaster){synchronized(quarantinedRasters){quarantinedRasters+=value}}
     private fun paintFailed(@Suppress("UNUSED_PARAMETER") error:Throwable){seal("The capture canvas could not finish drawing. The last verified frame remains owned.")}
     private fun seal(message:String){admitting=false;mutable.value=mutable.value.copy(sealed=true,failure=message);pending.get()?.permit?.refuse()}
+    private suspend fun ensureSurface():StreamSurfaceLease=surfaceGate.withLock {
+        surfaceLease?.let{return@withLock it}
+        val admitted=withContext(NonCancellable){reserveStreamSurface(resources)}
+        surfaceLease=admitted
+        currentCoroutineContext().ensureActive()
+        admitted
+    }
 
-    private suspend fun process(draw:CaptureStreamDraw){
+    private suspend fun process(draw:CaptureStreamDraw,surfaceLease:StreamSurfaceLease){
         var raster:StreamRaster?=null
         var slot:StreamCanvasSlot?=null
         var offered=false
@@ -86,7 +96,7 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
                 current.stage==CaptureStreamStage.Live&&current.sourceAvailable){
                 val surface=withContext(ui){painter.surfaceBytes()}
                 raster=withContext(Dispatchers.Default){
-                    readStreamRaster(draw,resources,surface,::quarantineRaster).also(rasterHandoff::set)
+                    readStreamRaster(draw,resources,surfaceLease,surface,::quarantineRaster).also(rasterHandoff::set)
                 }
                 currentCoroutineContext().ensureActive()
                 val after=stream.signal()
@@ -164,9 +174,10 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
             val background=stream.frozenBackground()?:return@withLock false
             try {
                 require(losslessBackgroundMatches(owned,background,initial.connectionEpoch,stream.signal()))
+                val surfaceLease=ensureSurface()
                 val surface=withContext(ui){painter.surfaceBytes()}
                 raster=withContext(Dispatchers.Default){
-                    readStreamRaster(background,resources,surface,::quarantineRaster).also(rasterHandoff::set)
+                    readStreamRaster(background,resources,surfaceLease,surface,::quarantineRaster).also(rasterHandoff::set)
                 }
             }finally{
                 withContext(NonCancellable){try{background.close()}catch(error:Throwable){
@@ -189,11 +200,19 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
             mutable.value=mutable.value.copy(displayed=draft.frame,lossless=true)
             true
         }catch(cancel:CancellationException){throw cancel}
-        catch(error:Throwable){seal("The lossless background could not be adopted. The provisional preview remains owned.");throw error}
+        catch(error:Throwable){seal("The lossless canvas could not finish adoption. Keep the paired project open until retirement.");throw error}
         finally{
             try{withContext(NonCancellable){
                 raster=raster?:rasterHandoff.get()
-                slot?.let{candidate->try{withContext(ui){painter.rollback(candidate,offered)}}catch(error:Throwable){seal("The lossless canvas could not retire its provisional bitmap.");throw error}}
+                slot?.let{candidate->
+                    val installed=try{withContext(ui){painter.isCommitted(candidate)}}catch(error:Throwable){
+                        quarantineRaster(candidate.raster)
+                        seal("The lossless canvas ownership could not be verified; keep the paired project open.")
+                        throw error
+                    }
+                    if(installed){slot=null;raster=null;rasterHandoff.set(null)}
+                    else try{withContext(ui){painter.rollback(candidate,offered)}}catch(error:Throwable){seal("The lossless canvas could not retire its provisional bitmap.");throw error}
+                }
                 if(slot==null)raster?.let{try{it.close()}catch(error:Throwable){quarantineRaster(it);seal("The lossless bitmap could not retire.");throw error}}
             }}finally{adoptionJob=null}
         }
@@ -216,8 +235,12 @@ internal class DesktopStreamView(private val scope:CoroutineScope,private val co
             try{worker.cancelAndJoin()}catch(error:Throwable){failure=error}
             try{collector.cancelAndJoin()}catch(error:Throwable){if(failure==null)failure=error else failure.addSuppressed(error)}
             adoptionJob?.takeIf{it!==caller}?.let{try{it.cancelAndJoin()}catch(error:Throwable){if(failure==null)failure=error else failure.addSuppressed(error)}}
+            var canvasRetired=false
             adoptionGate.withLock {
-                try{withContext(ui){painter.retire()}}catch(error:Throwable){if(failure==null)failure=error else failure.addSuppressed(error)}
+                try{withContext(ui){painter.retire()};canvasRetired=true}catch(error:Throwable){if(failure==null)failure=error else failure.addSuppressed(error)}
+            }
+            if(canvasRetired)try{surfaceLease?.close();surfaceLease=null}catch(error:Throwable){
+                if(failure==null)failure=error else failure.addSuppressed(error)
             }
             if(synchronized(quarantinedRasters){quarantinedRasters.isNotEmpty()}||
                 synchronized(failedDraws){failedDraws.isNotEmpty()}||synchronized(failedBackgrounds){failedBackgrounds.isNotEmpty()})
