@@ -60,6 +60,28 @@ class McpStartupTest {
             fails{DesktopMcpBundle.prepare(dir,resources,guard)};assertTrue(Files.exists(folder.resolve("injected.dll")))
         }finally{deleteFixture(dir)}
     }
+    @Test fun startupPhaseCountersRetainFullHashAndUnknownFileRefusals(){
+        val dir=Files.createTempDirectory("vw-mcp-timing-").toRealPath()
+        val resources=NativeResources{name->when{name==DesktopMcpBundle.MANIFEST->manifest().inputStream();name.startsWith("mcp-server/")->byteArrayOf(1).inputStream();else->null}}
+        val progress=McpStartupProgress{0L}
+        try{
+            progress.begin()
+            val first=DesktopMcpBundle.prepare(dir,resources,guard,progress)
+            val folder=first.runtime.root;first.close();progress.finish()
+            assertEquals(requiredRuntime.size,progress.snapshot().verifiedFiles)
+            assertEquals(requiredRuntime.size.toLong(),progress.snapshot().verifiedBytes)
+            assertEquals(McpStartupPhase.bundle_verify,progress.snapshot().phase)
+            Files.write(folder.resolve("node.exe"),byteArrayOf(2));progress.begin()
+            fails{DesktopMcpBundle.prepare(dir,resources,guard,progress)}
+            assertEquals(McpStartupPhase.bundle_verify,progress.snapshot().phase)
+            assertEquals(2,progress.snapshot().verifiedFiles) // Only the two prior accepted hashes.
+            Files.write(folder.resolve("node.exe"),byteArrayOf(1));Files.write(folder.resolve("injected.dll"),byteArrayOf(1));progress.begin()
+            fails{DesktopMcpBundle.prepare(dir,resources,guard,progress)}
+            assertEquals(McpStartupPhase.bundle_inventory,progress.snapshot().phase)
+            assertEquals(0,progress.snapshot().verifiedFiles)
+            assertTrue(Files.exists(folder.resolve("injected.dll")))
+        }finally{deleteFixture(dir)}
+    }
     @Test fun appMarkerIsExactBoundedNonsecretCommand(){
         val nonce=UUID.randomUUID().toString();val bytes=DesktopAppOwner.encode(AppStartRequest.Mcp,nonce,1000)
         assertEquals(AppRequest(AppStartRequest.Mcp,nonce,1000),DesktopAppOwner.decode(bytes))
