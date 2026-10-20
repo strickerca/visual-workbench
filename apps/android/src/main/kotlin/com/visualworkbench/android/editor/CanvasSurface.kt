@@ -31,14 +31,15 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         var closed = false
         var latest: CanvasScene? = null
         var frontQueued = false
-        var dryQueued = false
+        val dryFrames = CanvasDryFrames()
         var drawn = 0L
         var frontDrawn = 0L
         var documentReader:DocumentDrawLease<PreparedDocumentTile>?=null
         var giantDrawn:GiantVisibleFrame<Bitmap>?=null
         var giantFrontDrawn:GiantVisibleFrame<Bitmap>?=null
     }
-    private data class Frame(val session: RenderSession, val dry: Boolean, val inputMs: Long)
+    private data class Frame(val session: RenderSession, val dry: Boolean, val inputMs: Long,
+                             val dryRequest: CanvasDryFrames.Request? = null)
     private val lock = Any()
     private val main = Handler(Looper.getMainLooper())
     private val stylus = StylusInput()
@@ -111,13 +112,13 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
 
     private fun enqueue(target: RenderSession, dry: Boolean) {
         val current = renderer ?: return
-        val send = synchronized(lock) {
-            if (target.closed || target !== session) false
-            else if (dry) { if (target.dryQueued) false else { target.dryQueued = true; true } }
-            else { if (target.frontQueued) false else { target.frontQueued = true; true } }
+        val frame = synchronized(lock) {
+            if (target.closed || target !== session) null
+            else if (dry) target.dryFrames.request()?.let { Frame(target, true, lastInputMs, it) }
+            else if (target.frontQueued) null
+            else { target.frontQueued = true; Frame(target, false, lastInputMs) }
         }
-        if (!send) return
-        val frame = Frame(target, dry, lastInputMs)
+        if (frame == null) return
         if (dry) current.renderMultiBufferedLayer(listOf(frame)) else current.renderFrontBufferedLayer(frame)
     }
 
@@ -136,8 +137,10 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
             }
             override fun onDrawMultiBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, params: Collection<Frame>) {
                 val snapshot = synchronized(lock) {
-                    currentSession.dryQueued = false
-                    if (currentSession.closed) null else currentSession.latest?.also { currentSession.drawn = it.revision;currentSession.giantDrawn=it.giantFrame }
+                    if (currentSession.closed) null else {
+                        currentSession.dryFrames.drawStarted(params.mapNotNull { it.dryRequest })
+                        currentSession.latest?.also { currentSession.drawn = it.revision;currentSession.giantDrawn=it.giantFrame }
+                    }
                 }
                 if (snapshot == null) canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
                 else drawOwned(canvas,snapshot,currentSession)
@@ -156,6 +159,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                                                             multiBufferedLayerSurfaceControl: SurfaceControlCompat,
                                                             transaction: SurfaceControlCompat.Transaction) {
                 synchronized(lock) {
+                    if (!currentSession.closed) currentSession.dryFrames.drawCompleted()
                     currentSession.frontDrawn = minOf(currentSession.frontDrawn, currentSession.drawn)
                     if (currentSession.closed || currentSession.giantDrawn?.let{!controller.giantFrameCurrent(it)}==true) {
                         transaction.setVisibility(frontBufferedLayerSurfaceControl, false)
@@ -212,7 +216,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private fun retireRenderer(reason:CanvasRetirementReason):CompletableDeferred<Unit> {
         controller.canvasRendererRetiring()
         val target=session
-        synchronized(lock) { target?.closed = true }
+        synchronized(lock) { target?.closed = true; target?.dryFrames?.close() }
         session=null
         val previous=renderer;renderer=null
         if(previous!=null){
