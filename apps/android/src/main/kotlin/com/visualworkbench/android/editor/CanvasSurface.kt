@@ -50,6 +50,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private var session: RenderSession? = null
     private var retiring = false
     private var retirement=CompletableDeferred<Unit>().apply{complete(Unit)}
+    private val retirementProgress=CanvasRetirementProgress()
     private var surfaceWidth = 0
     private var surfaceHeight = 0
     private var latest: CanvasScene? = null
@@ -66,23 +67,23 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
                 val changed = surfaceWidth != width || surfaceHeight != height
                 surfaceWidth = width; surfaceHeight = height
-                if (changed) { cancelInput(); retireRenderer(); controller.viewport(width, height, resources.displayMetrics.density) }
+                if (changed) { cancelInput(); retireRenderer(CanvasRetirementReason.SurfaceChanged); controller.viewport(width, height, resources.displayMetrics.density) }
                 ensureRenderer()
             }
             override fun surfaceDestroyed(holder: SurfaceHolder) {
-                surfaceWidth = 0; surfaceHeight = 0; cancelInput(); retireRenderer()
+                surfaceWidth = 0; surfaceHeight = 0; cancelInput(); retireRenderer(CanvasRetirementReason.SurfaceDestroyed)
             }
         })
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow(); attached = true
-        controller.attachCanvas(::publish,retirementHook,::ensureRenderer)
+        controller.attachCanvas(::publish,retirementHook,::ensureRenderer,{retirementProgress.current})
         ensureRenderer()
     }
     override fun onDetachedFromWindow() {
         attached = false; cancelInput(); controller.detachCanvas(retirementHook)
-        retireRenderer().invokeOnCompletion{error->if(error==null)main.post{if(!attached)controller.canvasRendererRetired(retirementHook)}}
+        retireRenderer(CanvasRetirementReason.WindowDetached).invokeOnCompletion{error->if(error==null)main.post{if(!attached)controller.canvasRendererRetired(retirementHook)}}
         super.onDetachedFromWindow()
     }
 
@@ -103,7 +104,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         latest = scene
         if(session==null)ensureRenderer()
         val target = session ?: return
-        if(target.latest?.documentFrame!==scene.documentFrame){retireRenderer();return}
+        if(target.latest?.documentFrame!==scene.documentFrame){retireRenderer(CanvasRetirementReason.DocumentFrameChanged);return}
         synchronized(lock) { if (!target.closed) target.latest = scene }
         enqueue(target, !wet(scene))
     }
@@ -207,8 +208,8 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         if(snapshot.documentFrame==null)PrecisionDrawing.draw(canvas,snapshot)
         else reader?.read{tiles->PrecisionDrawing.draw(canvas,snapshot.copy(documentTiles=tiles))}
     }
-    private suspend fun retireForProject(){latest=null;retireRenderer().await()}
-    private fun retireRenderer():CompletableDeferred<Unit> {
+    private suspend fun retireForProject(){latest=null;retireRenderer(CanvasRetirementReason.ProjectRetirement).await()}
+    private fun retireRenderer(reason:CanvasRetirementReason):CompletableDeferred<Unit> {
         controller.canvasRendererRetiring()
         val target=session
         synchronized(lock) { target?.closed = true }
@@ -217,11 +218,30 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         if(previous!=null){
             retiring=true;retirement=CompletableDeferred()
             val joined=retirement
-            previous.release(true){main.post{
-                try{target?.documentReader?.close();target?.documentReader=null;joined.complete(Unit)}
-                catch(error:Exception){joined.completeExceptionally(error)}
-                finally{retiring=false;ensureRenderer()}
-            }}
+            val release=retirementProgress.begin(reason)
+            try {
+                previous.release(true){
+                    release.reached(CanvasRetirementMilestone.LibraryCallbackEntered)
+                    val posted=main.post{
+                        release.reached(CanvasRetirementMilestone.MainCallbackEntered)
+                        var readerClosed=false
+                        try{
+                            release.reached(CanvasRetirementMilestone.ReaderCloseRunning)
+                            target?.documentReader?.close();target?.documentReader=null
+                            readerClosed=true
+                            release.reached(CanvasRetirementMilestone.ReaderClosed)
+                            joined.complete(Unit)
+                            release.reached(CanvasRetirementMilestone.CompletionPublished)
+                        }
+                        catch(error:Exception){
+                            release.failed(if(readerClosed)CanvasRetirementMilestone.CompletionPublished else CanvasRetirementMilestone.ReaderCloseRunning)
+                            joined.completeExceptionally(error)
+                        }
+                        finally{retiring=false;ensureRenderer()}
+                    }
+                    if(!posted)release.failed(CanvasRetirementMilestone.MainCallbackEntered)
+                }
+            }catch(error:Throwable){release.failed(CanvasRetirementMilestone.ReleaseRequested);throw error}
         }
         return retirement
     }

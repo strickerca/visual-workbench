@@ -13,20 +13,35 @@ internal class CanvasRetirementOwner {
     private val gate=Mutex()
     private var retiring=false
     private var failure:Throwable?=null
-    fun attach(hook:suspend()->Unit,ready:()->Unit){retained+=hook;current=hook;wake=ready}
+    private val observations=linkedMapOf<suspend()->Unit,()->CanvasRetirementSnapshot?>()
+    private var awaitedObservation:(()->CanvasRetirementSnapshot?)?=null
+    val progress:CanvasRetirementSnapshot? get() {
+        val awaited=awaitedObservation
+        val observe=awaited?:retained.firstOrNull()?.let{observations[it]}?:return null
+        return try{observe()}catch(_:Exception){null}
+    }
+    fun attach(hook:suspend()->Unit,ready:()->Unit)=attach(hook,ready,{null})
+    fun attach(hook:suspend()->Unit,ready:()->Unit,observe:()->CanvasRetirementSnapshot?){
+        retained+=hook;observations[hook]=observe;current=hook;wake=ready
+    }
     fun detach(hook:suspend()->Unit):Boolean {
         if(current!==hook)return false
         current=null;wake=null;return true
     }
     fun canCreate(hook:suspend()->Unit):Boolean = !retiring&&failure==null&&current===hook&&retained.firstOrNull()===hook
-    fun confirmed(hook:suspend()->Unit){if(current!==hook)retained.remove(hook);wake?.invoke()}
+    fun confirmed(hook:suspend()->Unit){if(current!==hook){retained.remove(hook);observations.remove(hook)};wake?.invoke()}
     suspend fun retireAll():Unit=gate.withLock {
         failure?.let{throw it}
         retiring=true
         try {
             val joined=mutableSetOf<suspend()->Unit>()
             // Include surfaces attached while an earlier release was suspended.
-            while(true){val hook=retained.firstOrNull{it !in joined}?:break;hook();joined+=hook}
+            while(true){
+                val hook=retained.firstOrNull{it !in joined}?:break
+                awaitedObservation=observations[hook]
+                hook();joined+=hook
+            }
+            awaitedObservation=null
         } catch(error:Throwable){failure=error;throw error}
         finally{retiring=false;wake?.invoke()}
     }

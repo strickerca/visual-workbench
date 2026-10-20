@@ -76,6 +76,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         android.util.Log.i("VW_EDITOR_CLOSE", "attempt=${value.attempt} stage=${value.stage.name} status=${value.status.name} failed_stage=${value.failedStage?.name ?: "None"}")
     }
     internal val closeProgress: EditorCloseSnapshot? get() = closeTrace.current
+    /** Read once on Main for the finite timeout reporter; each component owns
+     * its own snapshot, so this does not claim a cross-component atomic read. */
+    internal val retirementTimeoutSuffix: String get() {
+        val docSnapshot = documentRetirementProgress
+        val canvasSnapshot = canvasRetirementProgress
+        val closeSnapshot = closeProgress
+        return formatRetirementTimeoutSuffix(docSnapshot, canvasSnapshot, closeSnapshot)
+    }
     private val captureStreamSessions = StreamRootOwner<AndroidStreamSession> { it.close() }
     private val captureStreamAnnotations = StreamRootOwner<CaptureAnnotationSession> { it.close() }
     private val captureStreamReceivers = StreamRootOwner<WorkbenchCaptureStream> { it.close() }
@@ -259,6 +267,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var documentPressEpoch:Long=0
     private var documentPressRegion=false
     private val canvasOwners=CanvasRetirementOwner()
+    internal val canvasRetirementProgress:CanvasRetirementSnapshot? get()=canvasOwners.progress
     private data class ComposedBackgroundOwner(val project: WorkbenchProject, val epoch: Long,
         val documentId: String, val page: UInt?, val binding: WorkflowBinding)
     private var composedBackground: ComposedBackgroundOwner? = null
@@ -365,6 +374,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();fit();bindWorkflows();enterWorkflows()
         } }, { publish() },application,{canvasRetirement()})
     val documents:DocumentController get()=documentOwner.controller
+    internal val documentRetirementProgress:DocumentRetirementSnapshot? get()=documentOwner.progress
     private fun documentRevisionMatches(attached:DocumentAttachment):Boolean = document?.render?.revision?.sameDocumentRevision(attached.snapshot.render.revision)==true
     private suspend fun documentOwnerDiscardDraw(){documentOwner.discardDraw()}
     private val repository = ProjectRepository(application, core)
@@ -921,8 +931,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
 
     private var canvasHook:(suspend()->Unit)?=null
-    fun attachCanvas(sink:(CanvasScene)->Unit,retire:suspend()->Unit = {},ready:()->Unit = {}) {
-        canvasOwners.attach(retire,ready);canvasHook=retire;canvasSink=sink;giantRenderReady=false;scene?.let { sink(renderScene(it)) }
+    fun attachCanvas(sink:(CanvasScene)->Unit,retire:suspend()->Unit = {},ready:()->Unit = {}) =
+        attachCanvas(sink,retire,ready,{null})
+    fun attachCanvas(sink:(CanvasScene)->Unit,retire:suspend()->Unit,ready:()->Unit,observeRetirement:()->CanvasRetirementSnapshot?) {
+        canvasOwners.attach(retire,ready,observeRetirement);canvasHook=retire;canvasSink=sink;giantRenderReady=false;scene?.let { sink(renderScene(it)) }
     }
     fun detachCanvas(retire:(suspend()->Unit)?=null) {
         val hook=retire?:canvasHook
