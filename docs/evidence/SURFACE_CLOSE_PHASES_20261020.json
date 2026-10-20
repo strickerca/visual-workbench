@@ -1,0 +1,170 @@
+{
+  "source_base": "106884244ebdaee57d47da6b93fe18eb4b5afb74",
+  "compiler": "Kotlin 2.4.20 cached artifacts; JDK21",
+  "jvm_target": 21,
+  "source_sha256": {
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorCloseProgress.kt": "918f603dff49c6922e6d1b7791f52efa80ca3a8bb32c999406ddb2f4cf37aaab",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt": "6641e0ee0bf2b7303bdf9b23bf73612861b4f942cb8a970480866798e388cde2",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasRetirementOwner.kt": "f2440279306761b501fb8a17f6701dfa22925181003fa103aef83ac62e24fa33",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/editor/EditorCloseProgressTest.kt": "ae56bc2b8ab52b6321dcf9fc39cd6b7b934451b24c67c282a4b7eaa3d74abb38",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/editor/CanvasRetirementOwnerTest.kt": "57212a5850436f769f828ef2e9bb9496b0e964d79f565265bf11208e62f9b924",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/EditorWorkflows.kt": "cd8620682f52c25599530c114e9c380f33905e8ac2a4b4b1c478db8f56a0a988",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/LocalViewsInteraction.kt": "40cf20c469bc8562c5627ad35908ec190f1d14821da41b2c0dff9a0fc6044a01",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/EditorWorkflowsTest.kt": "3377bab76ecb4a15e8231462684a68d5699fc3d4bc766da406a43344c1b82dc2",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/LocalViewsInteractionTest.kt": "87497c51a0d7af0487caf5f9e94a2935db08c4f935057ec32849d15dd02a5142"
+  },
+  "tests": [
+    "com.visualworkbench.android.editor.EditorCloseProgressTest",
+    "com.visualworkbench.android.editor.CanvasRetirementOwnerTest",
+    "com.visualworkbench.shared.EditorWorkflowsTest",
+    "com.visualworkbench.shared.LocalViewsInteractionTest"
+  ],
+  "compile_exit": 0,
+  "test_exit": 0,
+  "actual_edited_controller_compiled": true,
+  "old_helper_counterexample": false,
+  "unchanged_dependencies": "Cached Android/shared/bindings classes and Android SDK; fresh named source only",
+  "gradle_or_binding_generation": false,
+  "android_runtime_execution": false,
+  "timeout_seconds": {
+    "compile": 100,
+    "tests": 35
+  },
+  "heap_megabytes": {
+    "compile": 768,
+    "tests": 256
+  },
+  "schema": "vw-surface-close-phases-v1",
+  "date_utc": "2026-10-20",
+  "branch": "cloud/surface-close-navigation-20261020",
+  "scope": "Diagnostic observations only; source cause and repair pending exact S23 phase replay",
+  "source_behavior_fix": false,
+  "test_count": 42,
+  "test_methods": {
+    "EditorCloseProgressTest": 10,
+    "CanvasRetirementOwnerTest": 4,
+    "EditorWorkflowsTest": 9,
+    "LocalViewsInteractionTest": 19
+  },
+  "failed": 0,
+  "known_compile_warnings": [
+    {
+      "diagnostic": "unnecessary safe call on a non-null receiver of type 'SessionStatus'.",
+      "code_unchanged_from_base": true
+    },
+    {
+      "diagnostic": "unnecessary safe call on a non-null receiver of type 'SessionStatus'.",
+      "code_unchanged_from_base": true
+    },
+    {
+      "diagnostic": "the corresponding parameter in the supertype 'CanvasGestureSink' is named 'sample'. This may cause problems when calling this function with named arguments.",
+      "code_unchanged_from_base": true
+    },
+    {
+      "diagnostic": "unnecessary safe call on a non-null receiver of type 'RenderItem'.",
+      "code_unchanged_from_base": true
+    }
+  ],
+  "warnings_in_new_helper_or_tests": 0,
+  "diagnostic_schema": "SURFACE_CLOSE_PHASE_SCHEMA_20261020.json",
+  "diagnostic_handoff_regression": {
+    "review_finding": "Initial probe failed to promote an already-suspended successor after the first navigation released the mutex and held catalog refresh.",
+    "red": {
+      "source": "exact preserved original helper",
+      "passed": 9,
+      "failed": 1,
+      "test": "finishingPostLockNavigationImmediatelyExposesAnAlreadySuspendedSuccessor",
+      "failure": "Expected attempt2 DocumentOwner/Running; observed attempt1 Finished/Completed",
+      "production_timeout_cause_proven": false
+    },
+    "green": "Corrected helper and10 diagnostic tests passed inside final42-case suite; no production close behavior changed"
+  },
+  "review": {
+    "status": "final source and evidence clearance; P2 diagnostic handoff defect closed; no actionable blockers",
+    "reviewer": "gpt-6-astra",
+    "lane": "tunnel_boundary_review",
+    "scope": "All9source bindings/12log hashes and schema enums/hash;42passing cases and exact red counterexample; unchanged controller ordering/persistence/waits; actual S23 cause remains unresolved",
+    "tests_or_builds_by_reviewer": false
+  },
+  "parser_coordination": "Parent confirmed local schema compatible before publication. Harness does not read logcat; local reporter must append the published four-field timeout suffix from a single main-thread editor.closeProgress capture. Statuses, attempt bounds and initial null sentinel are in the published schema.",
+  "main_written": false,
+  "remaining": [
+    "Local reporter appends published close_attempt/close_stage/close_status/close_failed_stage suffix from one main-thread snapshot to instrumentation timeout text",
+    "Exact S23 drawing-tool replay with current45s bound and active phase/admission-state evidence",
+    "Minimal demonstrated-cause repair and deterministic regression after runtime phase evidence"
+  ],
+  "logs": {
+    "compile.log": {
+      "bytes": 1417,
+      "sha256": "a529184cb085d1134457bc3aaf2a33349073ad5f43c3eb74bb225bed6e49dc40",
+      "location": "external cloud evidence directory"
+    },
+    "tests.log": {
+      "bytes": 92,
+      "sha256": "149afc7077907b7a472adc0922280d9d123d1967128cfea6405a28bf4c509450",
+      "location": "external cloud evidence directory"
+    },
+    "focused-run.json": {
+      "bytes": 2322,
+      "sha256": "cb3ac995846040fc10d9cba1a793c77bf8fa15102aa054e56ff34357fdeba349",
+      "location": "external cloud evidence directory"
+    },
+    "source-diagnosis.json": {
+      "bytes": 2709,
+      "sha256": "61c3db33ed317d1d444a3812269089a7a21aeead991b16e7de4184ca76b1baa2",
+      "location": "external cloud evidence directory"
+    },
+    "policy.log": {
+      "bytes": 62,
+      "sha256": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197",
+      "location": "external cloud evidence directory"
+    },
+    "compile-attempt1.log": {
+      "bytes": 1417,
+      "sha256": "a529184cb085d1134457bc3aaf2a33349073ad5f43c3eb74bb225bed6e49dc40",
+      "location": "external cloud evidence directory"
+    },
+    "tests-attempt1.log": {
+      "bytes": 90,
+      "sha256": "f5de667dc9579f754048b4d0bbe7161b66c683a65d65c034b7c27dbdfa49d444",
+      "location": "external cloud evidence directory"
+    },
+    "focused-run-attempt1.json": {
+      "bytes": 2284,
+      "sha256": "a71eb644ebbbcdb181b095c52b08daa41a3cd9949e344763e55137e5bdaf6a35",
+      "location": "external cloud evidence directory"
+    },
+    "review-attempt1.json": {
+      "bytes": 933,
+      "sha256": "b2a821c243fccb79ade0703d5c6161696f88ddc9b880e36b167de5fd8f32ce16",
+      "location": "external cloud evidence directory"
+    },
+    "red-regression/compile.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "location": "external cloud evidence directory"
+    },
+    "red-regression/tests.log": {
+      "bytes": 1606,
+      "sha256": "bcc8d34b266a25f1dba58cc04ba6a79648de21f3b9b87dc1b49bc6330eb3e014",
+      "location": "external cloud evidence directory"
+    },
+    "red-regression/focused-run.json": {
+      "bytes": 1013,
+      "sha256": "0268e908ef73894f35d8f6b544fdb9de5b24d096e900db91e28530cf44985277",
+      "location": "external cloud evidence directory"
+    }
+  },
+  "policy_checks": {
+    "ids": "passed",
+    "third_party": "passed",
+    "workspace": "passed"
+  },
+  "implementation_lane": {
+    "task": "tunnel_desktop_completion",
+    "requested_model": "gpt-6.1-sol",
+    "requested_reasoning": "xhigh",
+    "runtime_metadata_exposed": false,
+    "note": "Worker could not independently inspect model/effort metadata; no override or spawn performed."
+  }
+}
