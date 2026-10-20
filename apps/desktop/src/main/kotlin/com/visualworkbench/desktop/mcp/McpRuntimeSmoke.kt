@@ -12,11 +12,23 @@ internal enum class McpSmokeStep {
     second_start, second_identity, second_idle, second_stop,
 }
 internal enum class McpSmokeFailureReason { timeout, invariant, refused, cancelled, unexpected }
-internal class McpSmokeProgress {
+internal class McpSmokeProgress(private val nowNanos:()->Long=System::nanoTime,
+    private val diagnostic:(String)->Unit={println(it)}) {
     private var current = McpSmokeStep.duplicate_owner
+    private var startup:McpStartupProgress?=null
+    fun observe(value:McpStartupProgress){startup=value}
     suspend fun <T> at(step: McpSmokeStep, body: suspend () -> T): T {
         current = step
-        return body()
+        val started=nowNanos();var completed=false
+        try{return body().also{completed=true}}
+        finally{
+            val elapsed=McpStartupProgress.elapsedMillis(started,nowNanos())
+            val details=startup?.snapshot()?.fields()?:"attempt=0 phase=unknown start_ms=0"
+            // Supplementary fixed counters do not alter the strict success/failure
+            // marker, deadline, producer ownership or cleanup predicates.
+            try{diagnostic("VW_MCP_TIMING step=${step.name} completed=$completed step_ms=$elapsed $details")}
+            catch(_:Exception){/* A diagnostic sink cannot change the operation. */}
+        }
     }
     fun failureMarker(error: Exception): String {
         val stage = (error as? McpRefused)?.stage ?: McpFailureStage.unknown
@@ -35,6 +47,7 @@ internal class McpSmokeProgress {
  * lifecycle without publishing packages, granting capture or sending messages.
  * The application still owns shutdown if any check or cancellation fails. */
 internal suspend fun verifyPackagedMcpLifecycle(service: DesktopMcpLifetime, anchor: Path, progress: McpSmokeProgress) {
+    progress.observe(service.startupProgress)
     progress.at(McpSmokeStep.duplicate_owner) {
         withContext(Dispatchers.IO) {
             val duplicate = DesktopAppOwner.claim(anchor)

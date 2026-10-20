@@ -1,0 +1,184 @@
+{
+  "schema": "vw-mcp-startup-timing-v1",
+  "date": "2026-10-20",
+  "base_main": "6f7b379be2b697aef1be02abbffe527c4012a1ce",
+  "source": {
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpStartupProgress.kt": {
+      "bytes": 4194,
+      "sha256": "8a9ce260a0535d578fc1fa2e116e9dc9746b084063d7eb8c828a9086b2838f43"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpRuntime.kt": {
+      "bytes": 3305,
+      "sha256": "570de5310907ee5f1163175cf50170212162f7373e2e99d377fcb9fb301598ac"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/DesktopMcpBundle.kt": {
+      "bytes": 9003,
+      "sha256": "d73f18254361603581993eb4219e383e34a606b649847718c320e2ad507db83c"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/DesktopMcpLifetime.kt": {
+      "bytes": 8385,
+      "sha256": "398ce8d4845b31ee70b62c3b5c66011dde417eb5182dbf548edccad38e82643f"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpRuntimeSmoke.kt": {
+      "bytes": 4430,
+      "sha256": "c0f6fa2b00d64328cdb7cf8e15723c0de5669fc5ba3c54e7b33146066b3996df"
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpStartupProgressTest.kt": {
+      "bytes": 3301,
+      "sha256": "0c447a7be7d5c4f56299df94f394167ae211c0638f72beac70e7a98d86e4192f"
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpRuntimeSmokeTest.kt": {
+      "bytes": 4431,
+      "sha256": "cd9560d32d1008013eb822391717faaef59385bac206d65cc9858feddaf23277"
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpStartupTest.kt": {
+      "bytes": 13679,
+      "sha256": "6bf39a864e7197c3bfe73585b8923f5bfe6ad14bac618c4c8d56db32f4f11733"
+    },
+    "docs/MCP_STARTUP_TIMING_20261020.md": {
+      "bytes": 4601,
+      "sha256": "7df6e768995c0b95949f4cdec3626125171520eb4b1ac34c1ccd67fda6e4a2b9"
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/probe_verification_workflow.py": {
+      "bytes": 12660,
+      "sha256": "eebba1de5e637350aba2e2b870714af4e2aaa6627e0cc9015d19df8d6987c68f"
+    }
+  },
+  "preserved_main_service_collector": {
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": {
+      "bytes": 65717,
+      "sha256": "c91b2bbf5488b8a0d0c26a96d2bb3cdd5d4ed8eec3fe436eea082013dd12afee"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/DesktopMcpService.kt": {
+      "bytes": 5132,
+      "sha256": "3b697408dbdf48347636c35bd820b8af7822ec1d478f527dd435bff5f1b1f9e1"
+    },
+    "tools/desktop-test/reports.py": {
+      "bytes": 24907,
+      "sha256": "6517ddbc3b535be74301f0cf5b64c0a64d9547d8f2fa2721463dec2732a11087"
+    }
+  },
+  "observed_windows_failure": {
+    "source": "Parent-relayed Windows packaged probe; raw logs uninspected by cloud",
+    "code": "mcp_unknown_second_start_timeout",
+    "completed_steps": [
+      "first_start",
+      "first_idle",
+      "repeated_start",
+      "first_stop"
+    ],
+    "original_total_budget_milliseconds": 90000,
+    "budget_changed": false,
+    "reported_inventory_files": 1514,
+    "reported_inventory_size": "approximately119 MB",
+    "exact_windows_phase_measurements": "pending",
+    "restart_deadlock_proven": false,
+    "timeout_fixed": false
+  },
+  "diagnostic_contract": {
+    "lines_per_probe_maximum": 9,
+    "prefix": "VW_MCP_TIMING",
+    "closed_phases": [
+      "unknown",
+      "bundle_parents",
+      "bundle_manifest",
+      "bundle_extract",
+      "bundle_markers",
+      "bundle_inventory",
+      "bundle_verify",
+      "service_open",
+      "ready"
+    ],
+    "service_open_is_aggregate_factory": true,
+    "hash_counts_advance_only_after_matching_digest": true,
+    "hash_counts_are_full_runtime_acceptance": false,
+    "times_are_monotonic_bounded_diagnostic_counters": true,
+    "per_phase_millisecond_cap": 3600000,
+    "paths_identifiers_or_exception_text": false,
+    "strict_success_failure_marker_changed": false,
+    "verification_or_lifecycle_predicates_weakened": false,
+    "producer_retirement_inferred_from_observer_cancellation": false
+  },
+  "focused_checks": {
+    "compiler": "Cached Kotlin 2.4.20; JVM21",
+    "actual_production_files_compiled": 5,
+    "actual_test_files_compiled": 3,
+    "cached_dependencies": "Existing Desktop/shared JVM and binding classes",
+    "junit_methods": 25,
+    "executed_passes": 22,
+    "actual_windows_assumption_skips": 3,
+    "failures": 0,
+    "collector_tests_passed": 41,
+    "timing_collector_compatibility_checks_passed": 3,
+    "offline_policy_checks_passed": 3,
+    "full_managed_build": false,
+    "logs": {
+      "compile.log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-mcp-startup-timing/compile.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tests.log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-mcp-startup-timing/tests.log",
+        "bytes": 351,
+        "sha256": "139a2229e2f7ef7dfbf7b8ef5f7841b5a1497ed69fe309d2f053fac906a56030"
+      },
+      "test-counts.log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-mcp-startup-timing/test-counts.log",
+        "bytes": 363,
+        "sha256": "9d41fd4f0003298f045dcee6395508a84b2074cc44cfe398daecd8ad659a669b"
+      },
+      "collector-tests.log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-mcp-startup-timing/collector-tests.log",
+        "bytes": 5243,
+        "sha256": "db03ac526093c778bbfbb7fed71d56edd03f1ab31229a4c43215ceaecef8ee39"
+      },
+      "timing-collector-compatibility.log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-mcp-startup-timing/timing-collector-compatibility.log",
+        "bytes": 103,
+        "sha256": "6b9f50b5fdb37d106a921dbeed0430a16535e29c8989e26f18a6db096dd2f260"
+      },
+      "policy.log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-mcp-startup-timing/policy.log",
+        "bytes": 62,
+        "sha256": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197"
+      },
+      "focused-run.json": {
+        "path": "/workspace/.vw-tools/evidence/20261020-mcp-startup-timing/focused-run.json",
+        "bytes": 1851,
+        "sha256": "4b820e95b01db50263baaab94c6591ae3cd3c2336de4d4c5819a5d3b99c78cb3"
+      }
+    },
+    "auxiliary_workflow_source_probe": {
+      "passed_cases": 96,
+      "overlapping_startup_cases": "Present; not added to a unique combined test count",
+      "native_factory": "Intentionally unavailable",
+      "temporary_classes_and_declarations": "Disposed by owned temporary directory",
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/probe_verification_workflow.py",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-mcp-startup-timing/workflow-source-probe.log",
+        "bytes": 7273,
+        "sha256": "3a84a95d3b25778238de77f996b03de0bef5a0c410ee667491bbf11349907a42"
+      }
+    }
+  },
+  "independent_review": {
+    "reviewer": "gpt-6-astra",
+    "lane": "tunnel_boundary_review",
+    "result": "No actionable findings in eight source/test leaves; bounded telemetry, producer ownership, strict markers and unchanged90s budget cleared",
+    "reviewer_tests_builds_or_mutations": false,
+    "source_probe_fixture_update": "Two-line optional parameter and actual progress source-list alignment independently clear; native factory remains unavailable"
+  },
+  "next_windows_replay": [
+    "Rebuild exact source-bound app image with existing admitted resources and same90s smoke budget",
+    "Retain bounded first_start/first_stop/second_start timing fields and per-cycle hash counts",
+    "Continue rejecting timeout and incomplete retirement; diagnose measured phase before selecting fix or budget change"
+  ],
+  "cloud_heavy_builds": 0,
+  "binding_regeneration": false,
+  "device_actions": false,
+  "provider_calls": false,
+  "runtime_success": false,
+  "release_ready": false,
+  "physical_acceptance": false
+}

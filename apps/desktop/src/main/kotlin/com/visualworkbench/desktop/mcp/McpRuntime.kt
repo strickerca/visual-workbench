@@ -11,7 +11,7 @@ import java.security.MessageDigest
 internal class McpRuntime private constructor(val root: Path) {
     val executable: Path get() = root.resolve("vw-mcp-host.exe")
     companion object {
-        fun verify(root: Path, trustedHashes: Map<String,String>,serverOnly:Boolean=false): McpRuntime {
+        fun verify(root: Path, trustedHashes: Map<String,String>,serverOnly:Boolean=false,progress:McpStartupProgress?=null): McpRuntime {
             require(trustedHashes.size in 4..20_000)
             val base=root.toAbsolutePath().normalize()
             require(base==root && Files.isDirectory(base,LinkOption.NOFOLLOW_LINKS))
@@ -26,6 +26,7 @@ internal class McpRuntime private constructor(val root: Path) {
                 val digest=MessageDigest.getInstance("SHA-256")
                 Files.newInputStream(path).use { input -> val buffer=ByteArray(65536);var read=0L;while(true){val n=input.read(buffer);if(n<0)break;read+=n;require(read<=size);digest.update(buffer,0,n)};require(read==size) }
                 require(digest.digest().joinToString(""){"%02x".format(it)}==expected)
+                progress?.verifiedFile(size)
             }
             val required=if(serverOnly)listOf("vw-mcp-host.exe","vw-mcp-package.exe","node.exe","mcp/src/main.mjs") else listOf("VisualWorkbench.exe","vw-mcp-host.exe","vw-mcp.exe","vw-mcp-package.exe","node.exe","mcp/src/main.mjs")
             for(name in required+listOf("vw-codex-host.exe", "mcp/codex/main.mjs", "mcp/codex/client.mjs", "mcp/codex/package.mjs", "mcp/codex/process.mjs", "mcp/codex/schema.mjs", "mcp/codex/schema-worker.mjs", "mcp/codex/image-profiles.json")) require(trustedHashes.containsKey(name))

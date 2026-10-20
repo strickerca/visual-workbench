@@ -38,21 +38,25 @@ internal class DesktopMcpBundle private constructor(
             require(names.none{it=="vw-mcp.exe" || it.endsWith(".jar") || it=="VisualWorkbench.exe" || it=="VisualWorkbenchDev.exe"})
             return entries
         }
-        fun prepare(privateParent:Path):DesktopMcpBundle=prepare(privateParent,
-            NativeResources{DesktopMcpBundle::class.java.classLoader.getResourceAsStream(it)},WindowsNativeFileGuard())
-        internal fun prepare(parent:Path,resources:NativeResources,guard:NativeFileGuard):DesktopMcpBundle{
+        fun prepare(privateParent:Path,progress:McpStartupProgress?=null):DesktopMcpBundle=prepare(privateParent,
+            NativeResources{DesktopMcpBundle::class.java.classLoader.getResourceAsStream(it)},WindowsNativeFileGuard(),progress)
+        internal fun prepare(parent:Path,resources:NativeResources,guard:NativeFileGuard,progress:McpStartupProgress?=null):DesktopMcpBundle{
             val pins=mutableListOf<AutoCloseable>()
             var stage=McpFailureStage.bundle_parents
             try{
+                progress?.phase(stage)
                 require(parent.isAbsolute && parent==parent.normalize())
                 for(ancestor in generateSequence(parent){it.parent}.toList().asReversed()){
                     guard.check(ancestor);require(Files.isDirectory(ancestor,LinkOption.NOFOLLOW_LINKS) && ancestor.toRealPath()==ancestor)
                     pins+=guard.pinDirectory(ancestor)
                 }
                 stage=McpFailureStage.bundle_manifest
+                progress?.phase(stage)
                 val manifest=resources.open(MANIFEST)?.use{it.readNBytes(MAX_MANIFEST+1)}?:throw McpRefused()
                 val entries=parse(manifest);val key=hex(MessageDigest.getInstance("SHA-256").digest(manifest))
+                progress?.inventory(entries.size,entries.sumOf{it.bytes})
                 stage=McpFailureStage.bundle_extract
+                progress?.phase(stage)
                 val base=parent.resolve("mcp-server-bundles-v1")
                 directory(base,guard,pins)
                 val folder=base.resolve(key)
@@ -77,11 +81,13 @@ internal class DesktopMcpBundle private constructor(
                     write(folder.resolve("ready"),manifest)
                 }else{guard.check(folder);pins+=guard.pinDirectory(folder)}
                 stage=McpFailureStage.bundle_markers
+                progress?.phase(stage)
                 require(Files.newDirectoryStream(folder).use{it.take(4).map{p->p.fileName.toString()}.toSet()}==setOf("owner","ready","runtime"))
                 for(marker in listOf("owner","ready")){val path=folder.resolve(marker);guard.check(path);pins+=guard.pin(path)}
                 require(read(folder.resolve("owner"),256).contentEquals(("VisualWorkbench MCP server v1\n"+key+"\n").toByteArray()))
                 require(read(folder.resolve("ready"),MAX_MANIFEST).contentEquals(manifest))
                 stage=McpFailureStage.bundle_inventory
+                progress?.phase(stage)
                 val runtime=folder.resolve("runtime");val expected=entries.associateBy{it.name};val actual=HashSet<String>();var visited=0
                 Files.walk(runtime,33).use{walk->walk.forEach{path->
                     require(++visited<=30_000);guard.check(path);require(path.toRealPath()==path)
@@ -92,7 +98,8 @@ internal class DesktopMcpBundle private constructor(
                 }}
                 require(actual==expected.keys)
                 stage=McpFailureStage.bundle_verify
-                val verified=McpRuntime.verify(runtime,entries.associate{it.name to it.hash},serverOnly=true)
+                progress?.phase(stage)
+                val verified=McpRuntime.verify(runtime,entries.associate{it.name to it.hash},serverOnly=true,progress=progress)
                 return DesktopMcpBundle(verified,pins.toList())
             }catch(error:Exception){pins.asReversed().forEach{runCatching{it.close()}};throw McpRefused(stage)}
             // Partial or preexisting bundles are intentionally retained; no path-based cleanup.

@@ -90,13 +90,19 @@ internal class McpDesktopOwned(override val coordinator:DesktopMcpCoordinator,pr
 }
 internal data class McpLifetimeState(val starting:Boolean=false,val owner:DesktopMcpCoordinator?=null,val issue:String?=null,val closed:Boolean=false,
     val failureStage:McpFailureStage?=null)
-internal class DesktopMcpLifetime internal constructor(create:suspend()->McpDesktopServiceOwner) {
-    constructor(privateParent:Path,helper:Path,helperHash:String,core:WorkbenchCore,device:String):this({openMcpDesktopService(privateParent,helper,helperHash,core,device)})
+internal class DesktopMcpLifetime private constructor(create:suspend(McpStartupProgress)->McpDesktopServiceOwner,
+    internal val startupProgress:McpStartupProgress) {
+    internal constructor(create:suspend()->McpDesktopServiceOwner):this({_->create()},McpStartupProgress())
+    constructor(privateParent:Path,helper:Path,helperHash:String,core:WorkbenchCore,device:String):this(
+        {progress->openMcpDesktopService(privateParent,helper,helperHash,core,device,progress)},McpStartupProgress())
     private val lock=Any()
     private var generation=0L
     private val mutable=MutableStateFlow(McpLifetimeState())
     val state:StateFlow<McpLifetimeState> = mutable
-    private val cycles=McpServiceCycles(create)
+    private val cycles=McpServiceCycles{
+        startupProgress.begin()
+        try{create(startupProgress)}finally{startupProgress.finish()}
+    }
     private var stopping=false
     suspend fun start(){
         val epoch=synchronized(lock){if(mutable.value.closed||stopping)throw McpRefused();mutable.value=mutable.value.copy(starting=true,issue=null);generation}
@@ -117,13 +123,16 @@ internal class DesktopMcpLifetime internal constructor(create:suspend()->McpDesk
     suspend fun close(){withContext(NonCancellable){synchronized(lock){generation++;stopping=true;mutable.value=mutable.value.copy(starting=false,closed=true)};try{cycles.close();synchronized(lock){mutable.value=McpLifetimeState(closed=true)}}catch(error:Throwable){synchronized(lock){mutable.value=mutable.value.copy(issue="Service shutdown could not be confirmed. Capture status is unknown.")};throw error}}}
 }
 
-private suspend fun openMcpDesktopService(privateParent:Path,helper:Path,helperHash:String,core:WorkbenchCore,device:String):McpDesktopServiceOwner {
+private suspend fun openMcpDesktopService(privateParent:Path,helper:Path,helperHash:String,core:WorkbenchCore,device:String,
+    progress:McpStartupProgress):McpDesktopServiceOwner {
     return run {
         val held=AtomicReference<DesktopMcpBundle?>(null)
         var coordinator:DesktopMcpCoordinator?=null
         try{
-            val bundle=withContext(Dispatchers.IO){DesktopMcpBundle.prepare(privateParent).also{held.set(it)}}
+            val bundle=withContext(Dispatchers.IO){DesktopMcpBundle.prepare(privateParent,progress).also{held.set(it)}}
+            progress.phase(McpStartupPhase.service_open)
             val owner=DesktopMcpService.open(bundle.runtime,privateParent,helper,helperHash,core,device);coordinator=owner
+            progress.phase(McpStartupPhase.ready)
             McpDesktopOwned(owner,bundle).also{held.set(null);coordinator=null}
         }finally{withContext(NonCancellable){try{coordinator?.close()}finally{held.getAndSet(null)?.close()}}}
     }
