@@ -1,0 +1,48 @@
+{
+  "schema": "vw-release-root-publication-v1",
+  "date": "2026-10-20",
+  "repository": "https://github.com/strickerca/visual-workbench",
+  "base_main": "6a263dd5b330a3769203bba6cd17156c47f114f0",
+  "integration_branch": "cloud/release-root-completion-20261020",
+  "reviewed_source_publication_tip": "875a9b74b91c962cdfd47b4205d9352f34948c7d",
+  "published_source_tree_sha": "b781ec65076248271e18781df287fe83b05f0210",
+  "publication_method": "Existing authorized GitHub connector Git data tools; local HTTPS Git push lacked credentials. No credential, signing or deployment changes.",
+  "commit_mapping": [
+    {
+      "local_commit": "4841faade7eed53118b04e94324d124fca7870df",
+      "published_commit": "9f2449bb423e34022d164f661bd0a7149f848461",
+      "identical_tree_sha": "0d122d1bcebbee2d7ac1ccceb36b4c54b980e64f"
+    },
+    {
+      "local_commit": "558aa0307419ca86bf5a9a7de837abfdd41c60ba",
+      "published_commit": "e4c761e2bbf55227751a4ef7a69cd50c483044b0",
+      "identical_tree_sha": "07abff79005ae7cc9c4eaab7a9dd9d6c4fa2c3ea"
+    },
+    {
+      "local_commit": "0a9dcf2f191232dc6bd5688f0d177702f55c1781",
+      "published_commit": "875a9b74b91c962cdfd47b4205d9352f34948c7d",
+      "identical_tree_sha": "b781ec65076248271e18781df287fe83b05f0210"
+    }
+  ],
+  "verification": "Fetched published branch with Git; all three tree SHAs and the exact ordered ancestry from base_main match. Author/committer metadata, one extra terminal message newline and dependent commit IDs differ from local reconciliation history; message text matches.",
+  "preservation": {
+    "local_commit_branch": "cloud/release-root-completion-local-20261020",
+    "original_release_branch": "cloud/release-assembly-hook-20261020",
+    "original_release_head": "2a70c7c04ddd5a67a250eb891dc44501ea78097f"
+  },
+  "source_receipt": {
+    "path": "docs/evidence/RELEASE_ROOT_COMPLETION_20261020.json",
+    "sha256": "567e5c21e5c446d7b6d413da0db46959e93ce817c136f2c9675c0d769e257355"
+  },
+  "additional_check": {
+    "name": "gitleaks",
+    "scope": "Three local reviewed integration commits; exact trees published above",
+    "result": "3 commits scanned; no leaks found",
+    "log_path": "/workspace/.vw-tools/evidence/20261020-release/release-root-gitleaks.log",
+    "log_sha256": "3ef442ef9b658fb4a64ca32b0a1858be26423bb2a3def91eef323e553fcc7d65"
+  },
+  "main_promotion": "Promote the reviewed published source plus this publication-only receipt by a non-forced expected-base ref update. Final remote branch/main heads are verified and reported after this receipt commit; this file does not self-reference a future commit SHA.",
+  "runtime_admission": false,
+  "release_ready": false,
+  "physical_acceptance": false
+}
