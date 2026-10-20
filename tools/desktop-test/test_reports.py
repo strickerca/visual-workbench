@@ -17,6 +17,15 @@ GOOD = ("VW_DESKTOP_READY startup_ms=812 composeDensity=2.0 pmv2=true\n"
         "VW_DESKTOP_SMOKE_FRAME window_dpi=192 window_pmv2=true drawn=true\n"
         "VW_DESKTOP_EXIT startup_smoke=true cleanup=complete\n")
 
+LAUNCHER_OPTIONS = (
+    "-Djpackage.app-version=0.0.1",
+    "-Dsun.java2d.dpiaware=true",
+    "-Dskiko.renderApi=DIRECT3D",
+    "--add-exports=java.desktop/sun.java2d=ALL-UNNAMED",
+    "--add-exports=java.desktop/sun.java2d.d3d=ALL-UNNAMED",
+    "-Dcompose.interop.blending=true",
+)
+
 
 def proof():
     return {"phase": "desktop-startup", "exit_code": 0, "parent_exit_code": 0,
@@ -132,6 +141,66 @@ class Reports(unittest.TestCase):
             self.assertEqual(target.read_bytes(), before)
 
 
+class LauncherConfig(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.directory = Path(self.temp.name)
+        (self.directory / "app").mkdir()
+        self.config = self.directory / "app" / (r.APP + ".cfg")
+
+    def parse(self, options):
+        self.config.write_text("[Application]\napp.mainclass=com.visualworkbench.desktop.MainKt\n"
+                               "app.classpath=$APPDIR\\app.jar\n[JavaOptions]\n" +
+                               "".join("java-options=" + value + "\n" for value in options), encoding="utf-8")
+        r.launcher_config(self.directory, {"app/app.jar": {}})
+
+    def test_required_stream_options_allow_both_exact_exports(self):
+        self.parse(LAUNCHER_OPTIONS)
+        self.parse(reversed(LAUNCHER_OPTIONS))
+
+    def test_every_required_option_must_be_present(self):
+        for missing in LAUNCHER_OPTIONS:
+            with self.subTest(missing=missing), self.assertRaisesRegex(r.Rejected, "^launcher_options$"):
+                self.parse(value for value in LAUNCHER_OPTIONS if value != missing)
+
+    def test_duplicate_exports_and_properties_are_refused(self):
+        optional = ("-Dskiko.library.path=$APPDIR", "-Dcompose.application.configure.swing.globals=true",
+                    "-Dcompose.application.resources.dir=$APPDIR/resources")
+        for duplicate in LAUNCHER_OPTIONS + optional:
+            options = LAUNCHER_OPTIONS + ((duplicate,) if duplicate in LAUNCHER_OPTIONS else (duplicate, duplicate))
+            with self.subTest(duplicate=duplicate), self.assertRaisesRegex(r.Rejected, "^launcher_options$"):
+                self.parse(options)
+
+    def test_unapproved_exports_and_other_jvm_switches_are_refused(self):
+        for extra in ("--add-exports=java.desktop/sun.awt=ALL-UNNAMED",
+                      "--add-exports=java.desktop/sun.java2d=unreviewed.module",
+                      "--add-exports=java.desktop/sun.java2d.d3d=ALL-UNNAMED,unreviewed.module",
+                      "--add-opens=java.desktop/sun.java2d=ALL-UNNAMED", "-javaagent:unreviewed.jar"):
+            with self.subTest(extra=extra), self.assertRaisesRegex(r.Rejected, "^launcher_options$"):
+                self.parse(LAUNCHER_OPTIONS + (extra,))
+
+    def test_conflicting_required_property_values_are_refused(self):
+        for conflict in ("-Djpackage.app-version=0.0.2", "-Dsun.java2d.dpiaware=false",
+                         "-Dskiko.renderApi=SOFTWARE", "-Dcompose.interop.blending=false"):
+            with self.subTest(conflict=conflict), self.assertRaisesRegex(r.Rejected, "^launcher_options$"):
+                self.parse(LAUNCHER_OPTIONS + (conflict,))
+
+    def test_confined_optional_properties_keep_their_exact_path_constraints(self):
+        for separator in ("/", "\\", "\\\\"):
+            with self.subTest(separator=separator):
+                self.parse(LAUNCHER_OPTIONS + ("-Dskiko.library.path=$APPDIR",
+                           "-Dcompose.application.configure.swing.globals=true",
+                           "-Dcompose.application.resources.dir=$APPDIR" + separator + "resources"))
+        for extra in ("-Dskiko.library.path=C:\\external", "-Dcompose.application.resources.dir=$APPDIR/../external",
+                      "-Dcompose.application.configure.swing.globals=false", "-Dunknown.property=true"):
+            with self.subTest(extra=extra), self.assertRaisesRegex(r.Rejected, "^launcher_options$"):
+                self.parse(LAUNCHER_OPTIONS + (extra,))
+        with self.assertRaisesRegex(r.Rejected, "^launcher_options$"):
+            self.parse(LAUNCHER_OPTIONS + ("-Dcompose.application.resources.dir=$APPDIR/resources",
+                       "-Dcompose.application.resources.dir=$APPDIR\\resources"))
+
+
 class Distribution(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -157,10 +226,8 @@ class Distribution(unittest.TestCase):
         (self.directory / "runtime/lib/modules").write_bytes(b"synthetic modules")
         self.config = self.directory / "app" / (r.APP + ".cfg")
         self.config.write_text("[Application]\napp.mainclass=com.visualworkbench.desktop.MainKt\n"
-                               "app.classpath=$APPDIR\\app.jar\n[JavaOptions]\n"
-                               "java-options=-Djpackage.app-version=0.0.1\n"
-                               "java-options=-Dsun.java2d.dpiaware=true\n"
-                               "java-options=-Dskiko.renderApi=DIRECT3D\n", encoding="utf-8")
+                               "app.classpath=$APPDIR\\app.jar\n[JavaOptions]\n" +
+                               "".join("java-options=" + value + "\n" for value in LAUNCHER_OPTIONS), encoding="utf-8")
         self.contents = {"win32-x86-64/" + n: (self.root / "target/debug" / n).read_bytes() for n in r.NATIVES}
         self.contents[r.NONCE_RESOURCE] = (self.nonce + "\n").encode()
         self.contents["com/visualworkbench/desktop/MainKt.class"] = b"synthetic class, never loaded"

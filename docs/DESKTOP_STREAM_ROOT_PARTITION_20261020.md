@@ -1,5 +1,10 @@
 # Desktop receiver integration partition
 
+Historical planning snapshot, preserved from release-hook2a70c7c. Its receiver
+implementation and review dependencies are superseded by the published
+[Desktop receiver integration](DESKTOP_STREAM_RECEIVER_INTEGRATION_20261020.md)
+at main6a263dd5. Do not reactivate held renderer work from this dated plan.
+
 Base: verified main90c0ee22d5e7d94a56c54068f85bf63ffa481b68. This is the next
 implementation partition, not a claim that its callers or rendering are present.
 Root owns every path below except the five reviewed leaf modules and their tests.

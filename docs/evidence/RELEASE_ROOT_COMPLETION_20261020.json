@@ -1,0 +1,177 @@
+{
+  "schema": "vw-release-root-completion-v1",
+  "date": "2026-10-20",
+  "base_main": "6a263dd5b330a3769203bba6cd17156c47f114f0",
+  "branch": "cloud/release-root-completion-20261020",
+  "preserved_release_head": "2a70c7c04ddd5a67a250eb891dc44501ea78097f",
+  "reconciled_commits": [
+    {
+      "original": "fe7a4b9b9d2f494707cc128d23fb950d1786131b",
+      "composed": "4841faade7eed53118b04e94324d124fca7870df"
+    },
+    {
+      "original": "2a70c7c04ddd5a67a250eb891dc44501ea78097f",
+      "composed": "558aa0307419ca86bf5a9a7de837abfdd41c60ba"
+    }
+  ],
+  "source": {
+    "build.ps1": {
+      "bytes": 62518,
+      "sha256": "571262eb417261e2cab75009010ca3da9eb04e5004dfb5d4371cae5f7e029e5e"
+    },
+    "apps/desktop/build.gradle.kts": {
+      "bytes": 12658,
+      "sha256": "5ba07298c7a758f1f36b6653246ab6f76c502ede9f32da01e6f8fb3e3e5f5bab"
+    },
+    "tools/release/package-windows.ps1": {
+      "bytes": 3827,
+      "sha256": "51204fe5169aa57d10ff56f6e5530cdfdd18dda5effb57b6af20b7a8b61efd92"
+    },
+    "tools/release/assemble.py": {
+      "bytes": 33837,
+      "sha256": "03da525a89a5c5642c4b8e5441b671190f5486f7d0b4ee7adee2343abaa473fa"
+    },
+    "tools/release/test_assemble.py": {
+      "bytes": 28647,
+      "sha256": "ae14580228ca460c1dc3af993ee6fb33202ec6e69c388fce34624b29a0e1a7fd"
+    },
+    "tools/release/README.md": {
+      "bytes": 17220,
+      "sha256": "6e08b9a7ed48fda34809a4fbe76f97e904b661065605c47b11072a1b9dc6bfd0"
+    },
+    "tools/desktop-test/reports.py": {
+      "bytes": 24185,
+      "sha256": "4049a3a3f887d3b56844fa1fbe70389ded99fd2af216fc841589b605393b8c48"
+    },
+    "tools/desktop-test/test_reports.py": {
+      "bytes": 22506,
+      "sha256": "03ce1c002536d7b886a0d424b2cbd39dea64fa0546f4362c1f2af47b024c4832"
+    },
+    "tools/desktop-test/personal_package.py": {
+      "bytes": 10903,
+      "sha256": "ca7e9287eadec2233986849780aebf6c202790d0f965c899b0451959b8f55f38"
+    },
+    "tools/desktop-test/test_personal_package.py": {
+      "bytes": 8204,
+      "sha256": "e48819e0bbaae380cec409ae4fa3132869a4df0797452c566988f6bbf30119a6"
+    },
+    "docs/UNINSTALL_RECOVERY.md": {
+      "bytes": 6362,
+      "sha256": "09e692039cde24729379b0d21a2321106cfb9b68b8ec29b370984219ed092e86"
+    },
+    "docs/QUICKSTART.md": {
+      "bytes": 4035,
+      "sha256": "d4632a9ea87b02b0067a738dc09419e1ca173ddab77016fa15edde31e17f7a9b"
+    },
+    "docs/DESKTOP_STREAM_ROOT_PARTITION_20261020.md": {
+      "bytes": 10086,
+      "sha256": "296438bd0edd21138945b4a1c481dd5e681f592ac1d5649b5c90c827220b3aee"
+    },
+    "docs/RELEASE_ASSEMBLY_ROOT_HOOK_20261020.md": {
+      "bytes": 1933,
+      "sha256": "3dcfe6ec4e5f26be1e8f39ce5f1d21d9e90cd6a59b814e1208dcbe8daeb84767"
+    },
+    "docs/RELEASE_ROOT_COMPLETION_20261020.md": {
+      "bytes": 6425,
+      "sha256": "baf4f9354087bc229ac3ec025453c7d62ece4c8eeb98afde1b86db976d45827a"
+    },
+    "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md": {
+      "bytes": 21096,
+      "sha256": "6dfef791896f710993f747d388e2b54d76bbc5383b97232717e57050aab8a4e4"
+    },
+    "docs/ROADMAP_REMAINING_PHASES_20261020.md": {
+      "bytes": 4432,
+      "sha256": "458b5589d46abd0a6c85331914e36f32eee1a23c3190b5d045274ca9fe5c3b64"
+    }
+  },
+  "checks": [
+    {
+      "name": "launcher-report-validation",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/desktop-test -p test_reports.py -v",
+      "result": "passed",
+      "test_methods": 39,
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-release/launcher-validator-tests.log",
+        "bytes": 4919,
+        "sha256": "a264d4049201b7da78773203da9efb431ff2651b658e7918be8bbbae9663fc48"
+      }
+    },
+    {
+      "name": "personal-package-validation",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/desktop-test -p test_personal_package.py -v",
+      "result": "passed",
+      "test_methods": 16,
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-release/personal-package-tests.log",
+        "bytes": 2727,
+        "sha256": "57d6ef598580dbbb4cc265d3aec9fbda0a609fc6017b5682e578468bce114bb6"
+      }
+    },
+    {
+      "name": "synthetic-release-assembly",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/release -p test_assemble.py -v",
+      "result": "passed",
+      "test_methods": 41,
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-release/release-assembly-final-tests.log",
+        "bytes": 6029,
+        "sha256": "ecd797c907969c740c0389b9c070712ec56f812c9329f609733788db3c1c10ee"
+      }
+    },
+    {
+      "name": "root-offline-policy",
+      "command": "python3 tools/check_setup.py",
+      "result": "ids,third-party,workspace passed",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-release/release-root-policy-final.log",
+        "bytes": 62,
+        "sha256": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197"
+      }
+    }
+  ],
+  "python_test_methods": 96,
+  "source_review": {
+    "reviewer": "gpt-6-astra",
+    "lane": "tunnel_boundary_review",
+    "result": "No actionable findings in final hook, exact launcher admission and tests, recovery guide, MSI handoff and completion/roadmap documentation",
+    "scope": "Independent read-only source review; reviewer ran no tests/builds. Receipt fields generated after source clearance."
+  },
+  "runtime_observations": {
+    "pwsh": "not found in current environment",
+    "powershell": "not found in current environment",
+    "windows_msvc_lib_exe": "still absent per preserved Windows build failure; not retried in this partition"
+  },
+  "not_executed": [
+    "PowerShell parse, root assemble-release or Windows wrapper execution",
+    "Windows NTFS/reparse/sharing or actual process cleanup",
+    "Actual app image, installer/MSI, signed APK or product assembly",
+    "Windows GPU/Compose/D3D presentation, actual packaged launcher or GUI/capture/input",
+    "Phone/device/physical/Bluetooth/performance/thermal/owner acceptance",
+    "Live provider, model/decoder/tunnel execution, blocked artifact retrieval or deployment"
+  ],
+  "remaining_msi_code_work": {
+    "hook_exists": false,
+    "prerequisites": [
+      "Reviewed exact Windows JDK/jpackage/WiX inventory and hashes",
+      "License/notice and exact packaging task graph review",
+      "Finalized app-image receipt after Complete-McpApplicationImage"
+    ],
+    "required_order": "createDistributable -> Complete-McpApplicationImage -> desktop receipt -> admitted-image MSI packaging -> output byte/hash receipt",
+    "current_assembler_limit": "Explicit external-package MSI bytes/source association; no MSI structure, installation or signature proof"
+  },
+  "deferred_scope": [
+    "Krita",
+    "broader Phase4 text/driver/Photoshop/plugin/palette work",
+    "full G4"
+  ],
+  "owner_decisions_open": [
+    "INSTR-005 dated next-release plan or owner-approved drop",
+    "G0-G5 and actual A01-A30 acceptance"
+  ],
+  "bounded_cloud_source_partition_complete": true,
+  "further_independent_cloud_implementation_identified": false,
+  "release_ready": false,
+  "runtimes_admitted": false,
+  "physical_acceptance": false,
+  "preservation": "Original hook branch/receipt and recovery/source refs retained; accepted renderer unchanged; no worktree or remote ref removed in this partition"
+}

@@ -1,5 +1,31 @@
 # Current phased execution ledger
 
+## Release source reconciliation — 2026-10-20
+
+On published main `6a263dd5b330a3769203bba6cd17156c47f114f0`, the remaining
+independently executable cloud packaging work is reconciled in
+[the release completion record](RELEASE_ROOT_COMPLETION_20261020.md). The
+previously reviewed `2a70c7c` root assembly entry is composed without changing
+the accepted Desktop renderer. Launcher admission now requires the exact two
+Java2D exports and blending property already configured by Desktop Gradle;
+duplicate or unapproved switches still fail. All96 affected Python tests and
+the three offline policy checks pass. A source-backed backup/update/removal/
+recovery guide is linked from Quick Start and the release manifest example.
+
+No additional independently executable implementation item was identified in
+the currently authorized cloud scope. This is a bounded source disposition,
+not completion of Phases3–5. MSI construction remains code work gated by a
+reviewed Windows jpackage/WiX inventory, licenses and finalized app-image
+inputs; no speculative installer hook is added. PowerShell and Windows/MSVC
+runtime checks, model/decoder/tunnel artifact and license admission, live
+provider journeys, device/physical acceptance and owner decisions remain open.
+The exact remaining categories and next admission inputs are in the completion
+record and [remaining phases](ROADMAP_REMAINING_PHASES_20261020.md).
+
+Historical branch names, pending-source rows and publication SHAs below describe
+their dated snapshots. The source closures above and immediately below supersede
+them; retained archives are not new active implementation or runtime admission.
+
 ## Desktop receiver implementation closure — 2026-10-20
 
 The accepted Desktop18158c7 modules are now deliberately promoted and actual

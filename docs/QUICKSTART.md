@@ -1,5 +1,9 @@
 # Visual Workbench quick start
 
+Before replacing or removing a build, follow [Back up, update, recover and
+remove](UNINSTALL_RECOVERY.md). A rendered image export is not an editable
+project backup.
+
 This guide describes the current development app. Check `docs/evidence/` for
 the tested build and outstanding checks. Current isolated app tests also run on
 the S23 Ultra; neither automated phone suite establishes physical S Pen

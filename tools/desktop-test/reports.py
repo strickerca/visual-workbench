@@ -301,15 +301,23 @@ def launcher_config(directory: Path, inventory: dict) -> None:
             len(classpath) == len(set(classpath)), "launcher_main")
     require(set(classpath) == {Path(p).name for p in inventory if p.startswith("app/") and p.endswith(".jar")},
             "unlisted_classpath")
-    required = {"-Djpackage.app-version=0.0.1", "-Dsun.java2d.dpiaware=true", "-Dskiko.renderApi=DIRECT3D"}
+    required = {"-Djpackage.app-version=0.0.1", "-Dsun.java2d.dpiaware=true", "-Dskiko.renderApi=DIRECT3D",
+                "--add-exports=java.desktop/sun.java2d=ALL-UNNAMED",
+                "--add-exports=java.desktop/sun.java2d.d3d=ALL-UNNAMED",
+                "-Dcompose.interop.blending=true"}
     # Compose's packager adds only confined resource/Skiko paths and its Swing
     # setup switch. Accept the literal Windows escaping forms, never an external
     # path, generic JVM switch, injected agent or duplicate property override.
+    # The two exact Java2D exports above are required by the stream renderer.
+    # Their module/package is the option identity; distinct approved exports
+    # may coexist, but repeating an export or overriding its target may not.
     optional = {"-Dskiko.library.path=$APPDIR", "-Dcompose.application.configure.swing.globals=true"}
     optional.update("-Dcompose.application.resources.dir=$APPDIR" + sep + "resources"
                     for sep in ("/", "\\", "\\\\"))
+    identities = {value.rsplit("=", 1)[0] if value.startswith("--add-exports=") else value.split("=", 1)[0]
+                  for value in options}
     require(required <= set(options) <= required | optional and
-            len({value.split("=", 1)[0] for value in options}) == len(options), "launcher_options")
+            len(identities) == len(options), "launcher_options")
 
 
 def distribution(root: Path, nonce: str) -> dict:

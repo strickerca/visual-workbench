@@ -1,5 +1,10 @@
 # Explicit root release-assembly entry
 
+This historical source receipt is now reconciled onto main6a263dd5's Desktop
+integration by [the release completion record](RELEASE_ROOT_COMPLETION_20261020.md).
+Its original evidence remains unchanged; the later record binds fresh checks
+and the current launcher validator without claiming PowerShell execution.
+
 On base main90c0ee22d5e7d94a56c54068f85bf63ffa481b68, build.ps1 lacked the
 exact assembly entry already proposed by tools/release/README.md. The new
 assemble-release command forwards the five explicit manifest/hash/destination/

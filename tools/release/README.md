@@ -43,7 +43,7 @@ descriptors to fill from actual admitted inputs, not executable examples:
   "catalog": null,
   "release_documents": {
     "toolchain_record": {"path": "docs/TOOLCHAIN.md", "bytes": 123, "sha256": "<64 lowercase hex>"},
-    "uninstall_recovery_guide": null
+    "uninstall_recovery_guide": {"path": "docs/UNINSTALL_RECOVERY.md", "bytes": 123, "sha256": "<64 lowercase hex>"}
   },
   "external_dependencies": [
     {"id": "licensed-decoder", "reason": "No reviewed licensed binary was supplied"}
@@ -86,6 +86,10 @@ omitted `release_documents` object, are recorded as
 producer evidence and guide content (including driver/certificate removal and
 project backup); the assembler does not invent actual producer tool versions,
 perform removal, or claim guide acceptance. `release_ready` is always `false`.
+The current source guide is [`docs/UNINSTALL_RECOVERY.md`](../../docs/UNINSTALL_RECOVERY.md).
+Its descriptor above still requires the actual reviewed byte count and SHA256;
+the file's existence does not admit a package or pass backup/recovery or A20
+acceptance.
 Optional `external_dependencies` records supplied missing licensed decoder,
 composite, runtime or package prerequisites without treating them as completed:
 at most 64 unique lowercase slug IDs and 512 ASCII characters per reason. A
@@ -258,6 +262,31 @@ cases and root offline policy passes. PowerShell is absent in the cloud, so
 PowerShell parsing/execution and Windows wrapper/NTFS/process-tree checks remain
 unrun. No product assembly, package, installer, signature or deployment was
 produced by this change. See `docs/RELEASE_ASSEMBLY_ROOT_HOOK_20261020.md`.
+
+## Remaining MSI build handoff
+
+The current `package-desktop-app` source in [`build.ps1`](../../build.ps1)
+invokes `:desktop:createDistributable` with admitted native/MCP resources and a
+fresh build nonce. It then calls `Complete-McpApplicationImage` from
+[`tools/mcp-build.ps1`](../mcp-build.ps1), which binds the final `vw-mcp.exe` to
+the actual app-image inventory, before recording the desktop receipt. The
+fixed image is `apps/desktop/build/compose/binaries/main/app/VisualWorkbenchDev`.
+An MSI packaging step must consume that finalized, admitted image; replacing
+`createDistributable` with an installer task would package before the final
+bridge is copied. The existing desktop and personal-package checks must still
+bind the exact source, nonce, native/MCP/runtime files and notices.
+
+[`apps/desktop/build.gradle.kts`](../../apps/desktop/build.gradle.kts) currently
+defines the application image without an MSI target. Before adding an installer
+task, root must review its exact Gradle/jpackage task graph and inputs, the
+actual Windows JDK/jpackage and compatible WiX inventory and hashes, and their
+license/notice coverage. [`docs/TOOLCHAIN.md`](../../docs/TOOLCHAIN.md) leaves
+WiX selection pending. A plugin's default download URL is not an admitted pin;
+this handoff authorizes no download, tool installation or guessed runtime path.
+The later output receipt must bind the already admitted image and producer
+inputs to the actual MSI's bytes and hash. Until those prerequisites are met,
+there is no MSI build hook or MSI-ready claim. The existing assembler can copy
+explicit already-built MSI bytes as `external-package` with its stated limits.
 
 Still deferred: real Windows/NTFS reparse, junction and sharing-violation tests;
 PowerShell parsing/execution and process-tree failure cleanup; actual complete
