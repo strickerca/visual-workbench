@@ -61,7 +61,7 @@ pub fn export_vwbz(
     copy_connection.pragma_update(None, "journal_mode", "DELETE")?;
     // Refuse injected triggers/schema changes before scrubbing the private copy:
     // a DELETE trigger could otherwise move a removed note into an exported row.
-    crate::migrations::verify_schema(&copy_connection, 2)?;
+    crate::migrations::verify_schema(&copy_connection, crate::migrations::CURRENT_VERSION)?;
     copy_connection.execute("UPDATE devices SET label = NULL", [])?;
     // Installation-local camera positions and bookmark names never leave this
     // installation. VACUUM below also removes their former page contents.

@@ -305,7 +305,7 @@ fn admit_schema(connection: &Connection) -> Result<()> {
     if count > 256 || !(0..=65_536).contains(&bytes) {
         return Err(LocalViewError::Limit);
     }
-    migrations::verify_schema(connection, 2)?;
+    migrations::verify_schema(connection, migrations::CURRENT_VERSION)?;
     Ok(())
 }
 impl ProjectStore {

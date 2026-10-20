@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-20",
+  "base": "27052c34af20cf779039ebcf95b975e69c2ac796",
+  "scope": "SQLite schema3 output-layer persistence; runtime synthetic local projects only",
+  "change": "Validated forward migrations1/2->3, preserves all layer/object fields with foreign_keys ON, historical schema fingerprints, same ordinary-open history checks inside Immediate before mutation; no schema writable bypass",
+  "review": {
+    "model_requested": "gpt-6-astra",
+    "task": "/root/tunnel_boundary_review",
+    "result": "No actionable source findings; testexecutionrootowned"
+  },
+  "sources": [
+    {
+      "path": "contracts/storage.sql",
+      "sha256": "dd18a53188c4c8012abfecce9d1801f7064a87e4043f9f575e3ba5a41a829f78"
+    },
+    {
+      "path": "core/crates/vw-store/migrations/003_image_output.sql",
+      "sha256": "56d538812f1752419fc34c9f2101c153295fdd24b21858bf708e1aff1778d21b"
+    },
+    {
+      "path": "core/crates/vw-store/src/archive.rs",
+      "sha256": "6d6ee9921896ad76cf02a816ba4d361875525314be589076922477fc24c4ee89"
+    },
+    {
+      "path": "core/crates/vw-store/src/database.rs",
+      "sha256": "d535d41cb5a75c75f78b9500e7f3a331735dc4f3a84d479357849a1b7c5fdec8"
+    },
+    {
+      "path": "core/crates/vw-store/src/local_views.rs",
+      "sha256": "e87f588d0f35f80120e4b3a014d4e89543f6cfa7162bea5212563c9785631708"
+    },
+    {
+      "path": "core/crates/vw-store/src/migrations.rs",
+      "sha256": "164cf22ced3aa3f1ad0abd8cf673e7b9c514ff324e1555bcc9f6fb84ea89a09c"
+    },
+    {
+      "path": "core/crates/vw-store/src/verification_review.rs",
+      "sha256": "1091df1441e627a3c560a38115dc3aa5b584d3c52c7d15dfe3d65779b8cd0de6"
+    },
+    {
+      "path": "core/crates/vw-store/tests/migrations.rs",
+      "sha256": "8d56d7bc423d0e9fa01852d2fa442e482dbb5430e6e52ab9087a3bf92c65d060"
+    },
+    {
+      "path": "core/crates/vw-store/tests/output_layers.rs",
+      "sha256": "010f02b0f33a03484ae2782d1869934d72704434d9737a121dc9b10bba426989"
+    }
+  ],
+  "checks": [
+    {
+      "path": "/workspace/.vw-tools/evidence/20261020-resume/store-migration-final-tests.log",
+      "sha256": "facc81ffe3e56700f70a17a45856d1b27ce58147b6f999d8d1389a7b7a7e10cc",
+      "passed_cases": 55,
+      "failed_cases": 0
+    },
+    {
+      "path": "/workspace/.vw-tools/evidence/20261020-resume/output-storage-integration.log",
+      "sha256": "23df47afe7250312a1562887f68950da2dab04cf96c01220a48f3a074358c84d",
+      "passed_cases": 11,
+      "failed_cases": 0
+    }
+  ],
+  "limits": [
+    "Windows and Android native artifacts not covered by this source/software receipt",
+    "No device or owner acceptance claimed",
+    "No destructive migration or real owner database was executed"
+  ]
+}

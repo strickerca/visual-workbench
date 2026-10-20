@@ -255,7 +255,7 @@ fn admit_schema(connection: &Connection) -> VerificationReviewResult<()> {
     if count > 256 || !(0..=65_536).contains(&bytes) {
         return Err(VerificationReviewError::Limit);
     }
-    migrations::verify_schema(connection, 2)?;
+    migrations::verify_schema(connection, migrations::CURRENT_VERSION)?;
     Ok(())
 }
 fn load(

@@ -9,19 +9,30 @@ use vw_ops::HostSequencer;
 pub(crate) const SCHEMA: &str = include_str!("../../../../contracts/storage.sql");
 const MIGRATION_2: &str = include_str!("../migrations/002_checkpoints.sql");
 const MIGRATION_1: &str = include_str!("../migrations/001_draft.sql");
+const MIGRATION_3: &str = include_str!("../migrations/003_image_output.sql");
+pub(crate) const CURRENT_VERSION: i64 = 3;
 type SchemaRows = Vec<(String, String, String, String)>;
 static SCHEMA_1: std::sync::OnceLock<SchemaRows> = std::sync::OnceLock::new();
 static SCHEMA_2: std::sync::OnceLock<SchemaRows> = std::sync::OnceLock::new();
+static SCHEMA_3: std::sync::OnceLock<SchemaRows> = std::sync::OnceLock::new();
 
 pub(crate) fn verify_schema(connection: &Connection, version: i64) -> Result<(), StoreError> {
-    let (sql, cached) = match version {
-        1 => (MIGRATION_1, &SCHEMA_1),
-        2 => (SCHEMA, &SCHEMA_2),
+    let cached = match version {
+        1 => &SCHEMA_1,
+        2 => &SCHEMA_2,
+        3 => &SCHEMA_3,
         other => return Err(StoreError::UnsupportedSchema(other)),
     };
     if cached.get().is_none() {
         let reference = Connection::open_in_memory()?;
-        reference.execute_batch(sql)?;
+        match version {
+            1 => reference.execute_batch(MIGRATION_1)?,
+            2 => {
+                reference.execute_batch(MIGRATION_1)?;
+                reference.execute_batch(MIGRATION_2)?;
+            }
+            _ => reference.execute_batch(SCHEMA)?,
+        }
         let _ = cached.set(schema_rows(&reference)?);
     }
     if Some(&schema_rows(connection)?) != cached.get() {
@@ -58,7 +69,20 @@ pub(crate) fn upgrade(connection: &mut Connection) -> Result<(), StoreError> {
         .map_err(|_| StoreError::Corrupt("schema version"))?;
     verify_schema(connection, version)?;
     match version {
-        2 => return Ok(()),
+        3 => return Ok(()),
+        2 => {
+            let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            // Recheck the exact old schema inside the write transaction, then
+            // perform the same canonical/checkpoint/log/projection validation
+            // as ordinary open. Corrupt data never partially upgrades.
+            verify_schema(&tx, 2)?;
+            let _validated = crate::database::restore(&tx)?;
+            tx.execute_batch(MIGRATION_3)?;
+            verify_schema(&tx, CURRENT_VERSION)?;
+            crate::database::integrity(&tx)?;
+            tx.commit()?;
+            return Ok(());
+        }
         1 => {}
         other => return Err(StoreError::UnsupportedSchema(other)),
     }
@@ -165,6 +189,8 @@ pub(crate) fn upgrade(connection: &mut Connection) -> Result<(), StoreError> {
     }
     crate::projections::verify_assets(&tx, host.project())?;
     crate::database::validate_pending(&tx, host.project())?;
+    tx.execute_batch(MIGRATION_3)?;
+    verify_schema(&tx, CURRENT_VERSION)?;
     crate::database::integrity(&tx)?;
     tx.commit()?;
     Ok(())

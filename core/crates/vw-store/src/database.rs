@@ -193,53 +193,18 @@ impl ProjectStore {
         let lock = lock_project(&root)?;
         let mut connection = connect(&root, false)?;
         migrations::upgrade(&mut connection)?;
-        integrity(&connection)?;
-        check_all_column_bounds(&connection)?;
-        check_payload_bounds(&connection)?;
-        let (seq,state,hash,time,checkpoint,digest):(i64,Vec<u8>,String,i64,Vec<u8>,String) = connection.query_row(
-            "SELECT host_seq,state,state_hash,created_at,checkpoint,checkpoint_hash FROM snapshots ORDER BY host_seq DESC LIMIT 1", [],
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?)))?;
-        if seq < 0 || time < 0 || AssetId::hash(&checkpoint).as_str() != digest {
-            return Err(StoreError::Corrupt("checkpoint binding"));
-        }
-        let mut host = HostSequencer::from_checkpoint_bytes(&checkpoint)?;
-        let state = Project::from_canonical_bytes(&state)?;
-        if host.project() != &state
-            || host.project().state_hash()?.as_str() != hash
-            || host.revision()?.host_seq != seq as u64
-        {
-            return Err(StoreError::Corrupt("snapshot state"));
-        }
-        let device: String =
-            connection.query_row("SELECT value FROM meta WHERE key='host_device'", [], |r| {
-                r.get(0)
-            })?;
-        let project_id: String =
-            connection.query_row("SELECT value FROM meta WHERE key='project_id'", [], |r| {
-                r.get(0)
-            })?;
-        if device != host.host_device().as_str() || project_id != host.project().id.as_str() {
-            return Err(StoreError::Corrupt("project identity"));
-        }
-        verify_prefix(&connection, &host, seq)?;
-        let replayed = replay_log(&connection, &mut host, seq, true)?;
-        let conflicts = read_conflicts(&connection)?;
-        if conflicts != host.conflicts() {
-            return Err(StoreError::Corrupt("conflict projection"));
-        }
-        super::projections::verify_assets(&connection, host.project())?;
-        super::projections::verify(
-            &connection,
-            host.project(),
-            sql_u64(host.revision()?.host_seq)?,
-        )?;
-        validate_pending(&connection, host.project())?;
+        let Restored {
+            host,
+            seq,
+            time,
+            replayed,
+        } = restore(&connection)?;
         Ok(Self {
             root,
             connection,
             host,
             _lock: lock,
-            last_snapshot_seq: seq as u64,
+            last_snapshot_seq: seq,
             last_snapshot_ms: time,
             replayed_transactions: replayed,
         })
@@ -372,7 +337,7 @@ impl ProjectStore {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        migrations::verify_schema(&tx, 2)?;
+        migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
         check_all_column_bounds(&tx)?;
         check_payload_bounds(&tx)?;
         let durable_seq: i64 =
@@ -551,7 +516,7 @@ impl ProjectStore {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        migrations::verify_schema(&tx, 2)?;
+        migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
         tx.execute("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
             params![seq,uuid(txn.txn_id.as_ref())?,authenticated.as_str(),base_seq,optional_uuid(txn.gesture_id.as_ref())?,bytes,candidate.project().state_hash()?.as_str(),txn.created_at_wall_ms,accepted_at_ms,acceptance.ack.encode_to_vec()])?;
         observer(CommitStage::LogWritten);
@@ -691,7 +656,7 @@ impl ProjectStore {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        migrations::verify_schema(&tx, 2)?;
+        migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
         let durable: Option<(Vec<u8>, Vec<u8>)> = tx
             .query_row("SELECT txn,ack FROM op_log WHERE txn_id=?1", [&id], |row| {
                 Ok((row.get(0)?, row.get(1)?))
@@ -1088,4 +1053,62 @@ pub(crate) fn check_all_column_bounds(db: &Connection) -> Result<(), StoreError>
         }
     }
     Ok(())
+}
+
+/// Exact ordinary-open validation, also used inside the v2-to-v3 migration
+/// transaction before any schema mutation. Canonical history stays authoritative.
+pub(crate) struct Restored {
+    pub(crate) host: HostSequencer,
+    pub(crate) seq: u64,
+    pub(crate) time: i64,
+    pub(crate) replayed: u64,
+}
+pub(crate) fn restore(connection: &Connection) -> Result<Restored, StoreError> {
+    integrity(connection)?;
+    check_all_column_bounds(connection)?;
+    check_payload_bounds(connection)?;
+    let (seq,state,hash,time,checkpoint,digest):(i64,Vec<u8>,String,i64,Vec<u8>,String) = connection.query_row(
+            "SELECT host_seq,state,state_hash,created_at,checkpoint,checkpoint_hash FROM snapshots ORDER BY host_seq DESC LIMIT 1", [],
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?)))?;
+    if seq < 0 || time < 0 || AssetId::hash(&checkpoint).as_str() != digest {
+        return Err(StoreError::Corrupt("checkpoint binding"));
+    }
+    let mut host = HostSequencer::from_checkpoint_bytes(&checkpoint)?;
+    let state = Project::from_canonical_bytes(&state)?;
+    if host.project() != &state
+        || host.project().state_hash()?.as_str() != hash
+        || host.revision()?.host_seq != seq as u64
+    {
+        return Err(StoreError::Corrupt("snapshot state"));
+    }
+    let device: String =
+        connection.query_row("SELECT value FROM meta WHERE key='host_device'", [], |r| {
+            r.get(0)
+        })?;
+    let project_id: String =
+        connection.query_row("SELECT value FROM meta WHERE key='project_id'", [], |r| {
+            r.get(0)
+        })?;
+    if device != host.host_device().as_str() || project_id != host.project().id.as_str() {
+        return Err(StoreError::Corrupt("project identity"));
+    }
+    verify_prefix(connection, &host, seq)?;
+    let replayed = replay_log(connection, &mut host, seq, true)?;
+    let conflicts = read_conflicts(connection)?;
+    if conflicts != host.conflicts() {
+        return Err(StoreError::Corrupt("conflict projection"));
+    }
+    super::projections::verify_assets(connection, host.project())?;
+    super::projections::verify(
+        connection,
+        host.project(),
+        sql_u64(host.revision()?.host_seq)?,
+    )?;
+    validate_pending(connection, host.project())?;
+    Ok(Restored {
+        host,
+        seq: seq as u64,
+        time,
+        replayed,
+    })
 }
