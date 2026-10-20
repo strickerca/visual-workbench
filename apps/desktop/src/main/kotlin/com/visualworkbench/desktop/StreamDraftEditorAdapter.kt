@@ -46,6 +46,7 @@ internal class StreamDraftEditorAdapter private constructor(
     private var registered = false
     private var controllerDisposed = false
     private var scopeRetired = false
+    internal val renderLifetime = StreamDraftRenderLifetime()
 
     val state: StateFlow<EditorState>
         get() { initializationFailure?.let { throw it }; return controller.state }
@@ -80,6 +81,7 @@ internal class StreamDraftEditorAdapter private constructor(
             retirement.withLock {
                 if (closed) return@withLock
                 if (!controllerDisposed) {
+                    renderLifetime.close()
                     controller.disposeStreamEditor()
                     controllerDisposed = true
                 }

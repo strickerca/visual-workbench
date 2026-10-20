@@ -1,5 +1,19 @@
 # Current phased execution ledger
 
+## Desktop receiver implementation closure — 2026-10-20
+
+The accepted Desktop18158c7 modules are now deliberately promoted and actual
+root receiver/controller/panel wiring is implemented on the preserved main90c0ee2
+and borrowed-draft8396012 ancestry. This supersedes the held Desktop/source
+dependency rows below. The final125-method Desktop batch and three offline
+setup checks pass; Astra closes the final root source findings. The new receiver
+entry, source/camera overlay, first-contact buffering, immutable Save/retry,
+degraded/discard decisions, fresh resume and joined failure ownership are detailed
+in `DESKTOP_STREAM_RECEIVER_INTEGRATION_20261020.md` and its source-bound receipt.
+T3.02 still requires actual Windows/GPU composition, packaged launcher, real
+stream/freeze/Save/resume, device/performance and owner acceptance. Phases3–5
+runtime/admission and physical gaps remain; no phase gate passes from this batch.
+
 ## Current integration — 2026-10-20
 
 This section supersedes the historical code/review dependencies below. Root is

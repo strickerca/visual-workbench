@@ -153,7 +153,8 @@ internal fun DrawScope.drawGeometry(item:RenderItem,geometry:CanvasGeometry,prev
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier=Modifier,giantFrame:GiantVisibleFrame<GiantBitmap>?=null){
+internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier:Modifier=Modifier,giantFrame:GiantVisibleFrame<GiantBitmap>?=null,
+    acceptInput:Boolean=true,renderLifetime:StreamDraftRenderLifetime?=null){
     val latestGiant by rememberUpdatedState(giantFrame)
     val latest by rememberUpdatedState(state)
     val aiResultState by controller.aiResults.state.collectAsState()
@@ -164,6 +165,7 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
     val requestedOverlay=remember(binding,state.documentPage,state.peerFrame,state.previewStyles,state.wetStroke){overlayItems(state)}
     val latestOverlay by rememberUpdatedState(requestedOverlay)
     LaunchedEffect(binding,requestedOverlay,state.composedGuideIds){
+        if(renderLifetime?.register(checkNotNull(currentCoroutineContext()[kotlinx.coroutines.Job]))==false)return@LaunchedEffect
         overlay=null
         val requested=binding?:return@LaunchedEffect
         try{
@@ -177,6 +179,7 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
         catch(_:Exception){controller.report("An intermediate preview could not be drawn. Saved edits remain available.")}
     }
     LaunchedEffect(binding,state.document,state.documentPage,state.composedGuideIds){
+        if(renderLifetime?.register(checkNotNull(currentCoroutineContext()[kotlinx.coroutines.Job]))==false)return@LaunchedEffect
         prepared=null
         val document=state.document?:return@LaunchedEffect
         val requested=checkNotNull(binding)
@@ -197,13 +200,14 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
         catch(_:Exception){prepared=null;controller.canvasFailed(requested,"Canvas geometry could not be prepared. Reopen the project before editing; saved data is intact.")}
     }
     LaunchedEffect(prepared,aiResultState.frame,state.view.camera,state.preview,state.peerFrame,state.composedBackground,state.background,giantFrame){
+        if(renderLifetime?.register(checkNotNull(currentCoroutineContext()[kotlinx.coroutines.Job]))==false)return@LaunchedEffect
         prepared?.current(latest)?.takeIf{controller.aiResultReady()}?.let{controller.canvasPrepared(it.binding)}
     }
     val documentReader=remember(state.documentFrame){controller.documentReader(state.documentFrame)}
     DisposableEffect(documentReader){onDispose{documentReader?.close()}}
     Canvas(modifier.fillMaxSize().clipToBounds().focusRequester(focus).onFocusChanged{controller.canvasFocus(it.isFocused)}.focusable()
         .onSizeChanged{controller.viewport(it.width.toDouble(),it.height.toDouble())}
-        .onPointerEvent(PointerEventType.Scroll){event->val change=event.changes.firstOrNull()?:return@onPointerEvent;val delta=change.scrollDelta;if(event.keyboardModifiers.isCtrlPressed){controller.zoom(kotlin.math.exp(-delta.y.toDouble()*0.12),Point(change.position.x.toDouble(),change.position.y.toDouble()))}else{controller.pan(-delta.x*28.0,-delta.y*28.0)};change.consume()}
+        .then(if(acceptInput)Modifier.onPointerEvent(PointerEventType.Scroll){event->val change=event.changes.firstOrNull()?:return@onPointerEvent;val delta=change.scrollDelta;if(event.keyboardModifiers.isCtrlPressed){controller.zoom(kotlin.math.exp(-delta.y.toDouble()*0.12),Point(change.position.x.toDouble(),change.position.y.toDouble()))}else{controller.pan(-delta.x*28.0,-delta.y*28.0)};change.consume()}
         .onPointerEvent(PointerEventType.Move){event->event.changes.firstOrNull()?.takeIf{!it.pressed}?.let{controller.precisionHover(Point(it.position.x.toDouble(),it.position.y.toDouble()))}}
         .onPointerEvent(PointerEventType.Exit){controller.precisionHover(null)}
         .pointerInput(controller){awaitEachGesture{
@@ -212,9 +216,10 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
             var completed=false
             try{while(true){val event=awaitPointerEvent();val change=event.changes.firstOrNull{it.id==down.id}?:break;if(!change.pressed){controller.precisionUp(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis,snapRotation15=event.keyboardModifiers.isShiftPressed);completed=true;change.consume();break};controller.precisionMove(Point(change.position.x.toDouble(),change.position.y.toDouble()),change.uptimeMillis,snapRotation15=event.keyboardModifiers.isShiftPressed);change.consume()}}
             finally{if(completed)controller.finishPointerContact()else controller.cancelInput()}
-        }}
+        }} else Modifier)
     ){
         val current=latest
+        if(renderLifetime?.admitting==false)return@Canvas
         drawEditorSurface(current)
         val frame=prepared?.current(current)?:return@Canvas
         val composed=current.composedBackground?.takeIf{composedCanvasCurrent(current,frame.binding)}

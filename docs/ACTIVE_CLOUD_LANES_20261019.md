@@ -1,5 +1,20 @@
 # Active cloud deliverables
 
+## Desktop receiver source closure — 2026-10-20
+
+This update supersedes the historical held Desktop/caller rows below. Parent
+accepts bounded Desktop18158c7 presentation closure; root promotes its exact six
+production/eight test leaves and integrates the actual receiver/session/panel
+with borrowed draft8396012, transparent overlay, stable first-contact layout,
+size/DPI replay cancellation, parent modal/menu/shortcut fences, exact Save retry,
+explicit degraded/discard decisions, fresh resume and joined retained retirement.
+The final125-case combined Desktop run, three setup-policy checks and independent
+Astra source review pass. See `DESKTOP_STREAM_RECEIVER_INTEGRATION_20261020.md`
+and its receipt. Main90c0ee2 remains the preserved integration ancestor; release
+hook2a70c7c remains on its separate branch. Actual Windows/GPU/package, real
+stream/input/performance/device and owner gates remain unverified. Model and
+tunnel runtime/license admission and deferred Krita boundaries are unchanged.
+
 ## Current integrated disposition — 2026-10-20
 
 This section supersedes historical active/held/missing-code rows below. Main is

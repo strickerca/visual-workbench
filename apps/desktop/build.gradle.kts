@@ -29,10 +29,15 @@ dependencies {
     implementation("com.google.zxing:core:3.5.4")
     testImplementation("junit:junit:4.13.2")
 }
+val streamJvmOptions = listOf(
+    "--add-exports=java.desktop/sun.java2d=ALL-UNNAMED",
+    "--add-exports=java.desktop/sun.java2d.d3d=ALL-UNNAMED",
+    "-Dcompose.interop.blending=true",
+)
 compose.desktop {
     application {
         mainClass = "com.visualworkbench.desktop.MainKt"
-        jvmArgs += listOf("-Dsun.java2d.dpiaware=true", "-Dskiko.renderApi=DIRECT3D")
+        jvmArgs += listOf("-Dsun.java2d.dpiaware=true", "-Dskiko.renderApi=DIRECT3D") + streamJvmOptions
         nativeDistributions {
             packageName = "VisualWorkbenchDev"
             packageVersion = "0.0.1"
@@ -189,5 +194,6 @@ tasks.register("remoteIntegrationClasspath") {
 // Skiko extracts the pinned native runtime for drawing tests. Keep that cache in
 // this build tree so restricted CI does not require writable user-home state.
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    jvmArgs(streamJvmOptions)
     systemProperty("skiko.data.path",layout.buildDirectory.dir("skikoTestCache").get().asFile.absolutePath)
 }

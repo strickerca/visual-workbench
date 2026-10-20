@@ -45,6 +45,7 @@ private val palette=listOf(0x78dcc8ffu,0xffd580ffu,0xf68282ffu,0x91b7ffffu,0xfff
 fun main(args: Array<String>) {
     // Refuse unknown/duplicate arguments before native, preference or UI work.
     require(args.isEmpty() || args.contentEquals(arrayOf("--startup-smoke")) || args.contentEquals(arrayOf("--mcp-runtime-smoke")) || args.contentEquals(arrayOf("--mcp-minimized"))) { "Unsupported desktop argument" }
+    System.setProperty("compose.interop.blending", "true")
     val mcpRuntimeSmoke = args.contentEquals(arrayOf("--mcp-runtime-smoke"))
     val startupSmoke = args.contentEquals(arrayOf("--startup-smoke")) || mcpRuntimeSmoke
     val mcpMinimized = args.contentEquals(arrayOf("--mcp-minimized"))
@@ -67,7 +68,7 @@ fun main(args: Array<String>) {
     }
     Runtime.getRuntime().addShutdownHook(Thread({appOwner.close();appAnchor.close()},"vw-app-owner-release"))
     val core=workbenchCore()
-    nativeRuntime.armRetirementFence {assertRemoteEditRetired();assertAndroidTunnelRetired()}
+    nativeRuntime.armRetirementFence {assertRemoteEditRetired();assertAndroidTunnelRetired();assertDesktopStreamsRetired()}
     val remoteCatalog=loadRemoteCatalog{nativeRuntime.packagedRemoteCatalog()}
     val preferences=DesktopPreferences(local.resolve("Visual Workbench/settings.properties"));val saved=preferences.window();val device=preferences.device(core)
     val documents=FileSystemView.getFileSystemView().defaultDirectory.toPath()
@@ -79,6 +80,7 @@ fun main(args: Array<String>) {
     application {
         val scope=rememberCoroutineScope();val sessions=remember{DesktopSessionController(scope,device,labelStore=PeerLabelStore(local.resolve("Visual Workbench/peer-labels.properties")))};val assistance=remember{ConnectionAssistanceController(scope,NativeConnectionAssistance())};val controller=remember{EditorController(scope,core,host,location,device,local.resolve("VisualWorkbench/transfer-work")).also{it.useSessionService(sessions);it.useAiDirectory(local.resolve("Visual Workbench"))}};val editor by controller.state.collectAsState()
         val documentState by controller.documents.state.collectAsState()
+        val streamRoot by controller.captureStream.collectAsState()
         var quitting by remember { mutableStateOf(false) }
         var startupMs by remember { mutableStateOf<Long?>(null) }
         var nativePickerCount by remember { mutableStateOf(0) }
@@ -94,7 +96,7 @@ fun main(args: Array<String>) {
         val pickerOwner=remember{java.util.concurrent.atomic.AtomicReference<CapturePickerController?>(null)}
         val tunnelOwner=remember{java.util.concurrent.atomic.AtomicReference<DesktopAndroidTunnel?>(null)}
         fun pickerBlocking():Boolean=pickerOwner.get()?.state?.value?.let{it.open||it.cleanupPending||it.stopping}==true
-        fun commandsAllowed(): Boolean = tunnelOwner.get()?.state?.value?.open!=true && !pickerBlocking() && projectPicker == null && !controller.workflows.blocksInput() && !controller.frames.state.value.blocksInput && diagnosticsLifecycle.allowsCommand(quitting)
+        fun commandsAllowed(): Boolean = !controller.captureStreamBlocksParent && tunnelOwner.get()?.state?.value?.open!=true && !pickerBlocking() && projectPicker == null && !controller.workflows.blocksInput() && !controller.frames.state.value.blocksInput && diagnosticsLifecycle.allowsCommand(quitting)
         var captureSettings by remember{mutableStateOf(false)}
         var remoteView by remember{mutableStateOf<WorkbenchRemoteEdit?>(null)}
         fun openRemoteView(){
@@ -158,7 +160,7 @@ fun main(args: Array<String>) {
         var dpiText by remember{mutableStateOf("Checking display scale…")}
         fun competingModal(ignorePicker: ProjectFilePickerRequest? = null): Boolean {
             val current = controller.state.value
-            return tunnelOwner.get()?.state?.value?.open==true || pickerBlocking() || controller.workflows.blocksInput() || controller.frames.state.value.blocksInput || (projectPicker != null && projectPicker !== ignorePicker) ||
+            return controller.captureStreamBlocksParent || tunnelOwner.get()?.state?.value?.open==true || pickerBlocking() || controller.workflows.blocksInput() || controller.frames.state.value.blocksInput || (projectPicker != null && projectPicker !== ignorePicker) ||
                 documentImport!=null||nativePickerCount != 0 || codexModal.state.value.settings ||
                 mcpModal.state.value.let { it.settings || it.compare != null } || captureSettings || remoteView != null ||
                 current.textAnchor != null || current.exportOpen || current.pasteOpen || controller.ai.state.value.open
@@ -210,6 +212,7 @@ fun main(args: Array<String>) {
         fun retryPickerCleanup(){scope.launch{try{capturePicker.dismiss()}catch(error:CancellationException){throw error}
             catch(_:Exception){controller.report("Capture cleanup is pending. Keep the editor open and retry after its work settles.")}}}
         fun instructionDialog(value: Command?) {
+            if(value!=null&&controller.captureStreamBlocksParent)return
             if (value == Command.Diagnostics && competingModal()) return
             val changed = diagnosticsLifecycle.changeRoute(value == Command.Diagnostics, quitting, prepare = {
                 controller.cancelInput()
@@ -264,6 +267,7 @@ fun main(args: Array<String>) {
             }
         }
         fun quit() {
+            if(controller.captureStreamBlocksParent){controller.report("Save or explicitly close the capture draft before quitting.");return}
             if (!retireProjectPicker()) return
             closeDocumentImport(false)
             if(!controller.mayCloseAi())return
@@ -289,7 +293,7 @@ fun main(args: Array<String>) {
                                 withRetiredVerificationAccess(mcpTasks::close,{mcp.close();mcpModal.close()}) {
                                     // Every verification borrow has joined before the
                                     // editor, links and native parents can retire.
-                                    controller.close();assertRemoteEditRetired();assertAndroidTunnelRetired()
+                                    controller.close();assertRemoteEditRetired();assertAndroidTunnelRetired();assertDesktopStreamsRetired()
                                     assistance.close();sessions.close()
                                     host.shutdown();host.destroy()
                                     appOwner.close();appAnchor.close()
@@ -325,7 +329,7 @@ fun main(args: Array<String>) {
         }
         mcpState.owner?.let{McpCaptureIndicator(it)}
         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
-        val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,tunnelOwner.get()?.state?.value?.open==true||pickerBlocking()||controller.workflows.blocksInput()||controller.frames.state.value.blocksInput||codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
+        val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,controller.captureStreamBlocksParent||tunnelOwner.get()?.state?.value?.open==true||pickerBlocking()||controller.workflows.blocksInput()||controller.frames.state.value.blocksInput||codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
             onPreviewKeyEvent=canvasShortcut) {
             DisposableEffect(window, controller) {
@@ -453,6 +457,7 @@ fun main(args: Array<String>) {
                 }finally{try{chooser.dispose()}finally{chooserLease.close()}}
             }
             fun action(command:Command){
+                if(controller.captureStreamBlocksParent){if(command==Command.Quit)quit();return}
                 if ((tunnelOwner.get()?.state?.value?.open==true || pickerBlocking() || projectPicker != null || documentImport != null) && command != Command.Quit) return
                 if (!diagnosticsLifecycle.allowsCommand(quitting,command==Command.Diagnostics,command==Command.Quit)) return
                 dispatch(command,false,controller,{mode(it)},{instructionDialog(it)},{quit()})
@@ -506,13 +511,14 @@ fun main(args: Array<String>) {
                 Menu("Edit"){for(c in listOf(Command.Undo,Command.Redo,Command.Delete,Command.SelectAll,Command.ClearSelection,Command.Color,Command.WidthUp,Command.WidthDown,Command.NudgeLeft,Command.NudgeRight,Command.NudgeUp,Command.NudgeDown))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
                 Menu("Tools"){for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout,Command.CycleMarker,Command.Instructions))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
                 Menu("View"){for(c in listOf(Command.Fit,Command.ActualPixels,Command.ZoomIn,Command.ZoomOut,Command.Windowed,Command.Maximized,Command.Fullscreen,Command.FollowPeer,Command.MatchPeer,Command.PeerOutline))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
-                Menu("Workbench"){Item("Remote Krita / Paint…",enabled=commandsAllowed()&&editor.sync?.carrier==SessionCarrier.QuicTether,onClick={openRemoteView()});Item("Send package to Codex",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();codexModal.settings();mcpModal.dismiss()}});Item("Local agents and Compare",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();mcpModal.settings();codexModal.dismiss()}});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Android USB mirror…",enabled=pickerAdmission(),onClick=androidTunnel::show);Item("Capture source…",enabled=pickerAdmission()&&mcpCaptureState?.activeCapture==null&&!foregroundCaptureState.busy,onClick={capturePicker.open()});Item("Retry capture cleanup",enabled=capturePickerState.cleanupPending,onClick=::retryPickerCleanup);Item("Foreground capture settings…",enabled=captureProtected&&commandsAllowed()&&!competingModal()&&dialog==null&&!foregroundCaptureState.stopping,onClick={captureDialog(true)})}
+                Menu("Workbench"){Item("Receive paired live capture…",enabled=commandsAllowed()&&!competingModal()&&controller.canOpenCaptureStream&&!foregroundCaptureState.busy&&!foregroundCaptureState.cleanupPending,onClick={if(commandsAllowed()&&!competingModal()&&!foregroundCaptureState.busy&&!foregroundCaptureState.cleanupPending)controller.openCaptureStream()});Item("Remote Krita / Paint…",enabled=commandsAllowed()&&editor.sync?.carrier==SessionCarrier.QuicTether,onClick={openRemoteView()});Item("Send package to Codex",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();codexModal.settings();mcpModal.dismiss()}});Item("Local agents and Compare",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();mcpModal.settings();codexModal.dismiss()}});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Android USB mirror…",enabled=pickerAdmission(),onClick=androidTunnel::show);Item("Capture source…",enabled=pickerAdmission()&&mcpCaptureState?.activeCapture==null&&!foregroundCaptureState.busy,onClick={capturePicker.open()});Item("Retry capture cleanup",enabled=capturePickerState.cleanupPending,onClick=::retryPickerCleanup);Item("Foreground capture settings…",enabled=captureProtected&&commandsAllowed()&&!competingModal()&&dialog==null&&!foregroundCaptureState.stopping,onClick={captureDialog(true)})}
             }
             MaterialTheme(colors=darkColors(primary=accent,secondary=Color(0xffe8bb75),background=Color(0xff101720),surface=Color(0xff18222e))){
                 Box(Modifier.fillMaxSize().drawWithContent {
                     drawContent()
                     if (startupSmoke) firstDraw.complete(Unit)
-                }) { EditorShell(controller,editor,dpiText,quitting,::action,::saveSelection,::saveDocument,canvasShortcut) }
+                }) { if(streamRoot.blocksParent)DesktopStreamPanel(controller,streamRoot)
+                    else EditorShell(controller,editor,dpiText,quitting,::action,::saveSelection,::saveDocument,canvasShortcut) }
                 if(codexPanels.settings){
                     val catalogOwner=mcpState.owner
                     val published=if(catalogOwner!=null){val catalog by catalogOwner.state.collectAsState();catalog.packages}else emptyList()

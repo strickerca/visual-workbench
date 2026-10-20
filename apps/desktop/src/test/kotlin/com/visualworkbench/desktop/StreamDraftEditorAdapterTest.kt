@@ -11,6 +11,40 @@ import java.nio.file.Path
 /** Exercises the real controller against borrowed in-memory projects. These
  * checks acquire no native project, bitmap, provider, window or stream module. */
 class StreamDraftEditorAdapterTest {
+    @Test fun resizeAfterPointerUpCancelsHeldFirstContactReplay() = streamDraftAdapterFixture { f ->
+        assertChangedViewportRefusesReplay(f, changeDensity = false)
+    }
+    @Test fun densityChangeAfterPointerUpCancelsHeldFirstContactReplay() = streamDraftAdapterFixture { f ->
+        assertChangedViewportRefusesReplay(f, changeDensity = true)
+    }
+    private suspend fun CoroutineScope.assertChangedViewportRefusesReplay(f:StreamDraftAdapterTestFixture,changeDensity:Boolean){
+        val adapter=f.create()
+        adapter.controller.canvasPrepared(checkNotNull(adapter.state.value.document).binding(adapter.state.value.projectEpoch))
+        assertTrue(adapter.state.value.canvasReady)
+        var visible:StreamDraftEditorAdapter?=null
+        val entered=CompletableDeferred<Unit>();val release=f.gate()
+        val input=DesktopStreamContactInput(this,{visible},{true},freeze={_,_->
+            entered.complete(Unit)
+            withContext(NonCancellable){release.await()}
+            visible=adapter
+            adapter
+        },report={})
+        input.viewport(f.camera.viewportWidth,f.camera.viewportHeight,1.0)
+        assertTrue(input.down(StreamContactSample(Point(10.0,10.0),1),f.camera,1.0))
+        entered.await()
+        input.up(StreamContactSample(Point(20.0,20.0),2))
+        input.viewport(f.camera.viewportWidth+if(changeDensity)0.0 else 40.0,f.camera.viewportHeight,
+            if(changeDensity)2.0 else 1.0)
+        assertTrue(input.busy) // Late freeze result remains owned until the cancelled worker joins.
+        release.complete(Unit)
+        while(input.busy){yield();delay(1)}
+        adapter.sealEdits() // Drain any erroneously replayed ink before asserting no native admission.
+        assertEquals(0,f.project.strokeBegins)
+        assertEquals(0,f.project.edits)
+        assertSame(adapter,f.retained)
+        assertTrue(adapter.ready)
+        assertFalse(input.busy)
+    }
     @Test fun retainPrecedesSuspendedAcquisitionAndReadyUsesTheExactExternalCamera() = streamDraftAdapterFixture { f ->
         val acquired = CompletableDeferred<Unit>()
         val release = f.gate()
@@ -392,6 +426,7 @@ private class StreamDraftAdapterTestProject : WorkbenchProject {
     var edits = 0
     var committedEdits = 0
     var infoReads = 0
+    var strokeBegins = 0
     var items = emptyList<RenderItem>()
     val commands = mutableListOf<List<EditCommand>>()
     var backgroundReads = 0
@@ -412,7 +447,7 @@ private class StreamDraftAdapterTestProject : WorkbenchProject {
     override suspend fun background(documentId: String, memoryBudgetBytes: ULong, assumeUntaggedSrgb: Boolean): BackgroundImage {
         backgroundReads++; error("The borrowed overlay must not read source pixels")
     }
-    override suspend fun beginStroke(options: StrokeOptions): WorkbenchStroke = error("Unused")
+    override suspend fun beginStroke(options: StrokeOptions): WorkbenchStroke { strokeBegins++;error("Unused") }
     override suspend fun edit(options: EditOptions, commands: List<EditCommand>): ProjectInfo {
         edits++; editGate()
         this.commands += commands

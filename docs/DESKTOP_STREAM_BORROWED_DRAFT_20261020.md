@@ -1,5 +1,9 @@
 # Desktop borrowed stream draft — 2026-10-20
 
+This records the historical independent partition. Its normal receiver/panel
+successor is now implemented in [Desktop stream receiver integration](DESKTOP_STREAM_RECEIVER_INTEGRATION_20261020.md);
+the private draft's earlier source-bound test receipt remains preserved.
+
 This independent T3.02 implementation partition starts from main
 `90c0ee22d5e7d94a56c54068f85bf63ffa481b68`. It prepares the private Desktop
 annotation editor and transparent canvas. It does not activate the normal

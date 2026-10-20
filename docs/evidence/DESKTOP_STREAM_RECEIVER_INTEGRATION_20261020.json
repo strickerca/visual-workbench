@@ -1,0 +1,416 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-20T10:14:46.872677+00:00",
+  "main_ancestor": "90c0ee22d5e7d94a56c54068f85bf63ffa481b68",
+  "borrowed_draft_base": "8396012668aae8a507cb8d6ab2584be04f313472",
+  "branch": "cloud/desktop-stream-receiver-root-20261020",
+  "accepted_leaf_commit": "18158c7cd7b26210da1e0b1ff40bba26bb1f1d60",
+  "exact_promoted_leaf_paths": [
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/stream/DesktopStreamCanvas.kt",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/stream/DesktopStreamDestination.kt",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPixels.kt",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPresentationEpoch.kt",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/stream/DesktopStreamSurface.kt",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/stream/DesktopStreamView.kt",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamDestinationJdkWitness.kt",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamDestinationTest.kt",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPixelsTest.kt",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPresentationEpochJdkWitness.kt",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPresentationEpochTest.kt",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamSurfaceJdkWitness.kt",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamSurfaceTest.kt",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamViewTest.kt"
+  ],
+  "preserved_release_hook": "2a70c7c04ddd5a67a250eb891dc44501ea78097f",
+  "files": [
+    {
+      "path": "apps/desktop/build.gradle.kts",
+      "sha256": "5ba07298c7a758f1f36b6653246ab6f76c502ede9f32da01e6f8fb3e3e5f5bab"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopStreamContactInput.kt",
+      "sha256": "a1a6895c604358ad47ad8f25896894a85f61fc91bb9329c7fdb31f3720c67e16"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopStreamPanel.kt",
+      "sha256": "a6b588763e1f951877cb105edafc5b99dc531f272cab9fd705e5274b4676128b"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopStreamPanelLayout.kt",
+      "sha256": "2ba5b10eb93ad23fcca0cc67a0e75a3b2c65b05fe9edcee3415ad8b6b4ecde24"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopStreamRoot.kt",
+      "sha256": "a7a5bb30f5c558cd55c63390fbd158fb744d3ab391ede3f011bc469b4cdc305c"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopStreamSession.kt",
+      "sha256": "a4cfe59bf742da2f86f637bb788e5a90e1e43ccf29968bb2bbe5629615f694e2"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt",
+      "sha256": "a77de444e4c13fef38939e1a6d752ed2dabde79213a6b370bf0a9e3e3bbed15b"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt",
+      "sha256": "1e6b86ad701a9eabf8135af5cb4e2faaaf5dd0b85931dc607f4e0263ce5c94a4"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt",
+      "sha256": "881b173905e580e773f3c1dbbceafbcc36e893bddcf8c7484464f9df0584b281"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/StreamDraftEditorAdapter.kt",
+      "sha256": "e5c9af1d46d5018cfeac8b936de1d9a686b7bb4b0f72430db9039029d5b05a73"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/StreamDraftRenderLifetime.kt",
+      "sha256": "69522e61bbb3b3c019f0dc635f2ed327420ca7d122a6f62417bfbc9b964a9b2c"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/stream/DesktopStreamCanvas.kt",
+      "sha256": "c0dd4de42ceacc180ea4caa1caa9b8283a88146a4bfa19a6270a8af60a8f81fc"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/stream/DesktopStreamDestination.kt",
+      "sha256": "5e49cc175ba9ba63f0152d9b97b1160a233566bab9ff76436abdaf30059d403e"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPixels.kt",
+      "sha256": "7469956b0d4ca87234e5f911178d0450f78a70e2dc9f8217f3d277c9ec5cbbe1"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPresentationEpoch.kt",
+      "sha256": "404cedf6afd88ae59cdd464097c7b6c2ed604f8554f8ab12a33f093c0f3a599d"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/stream/DesktopStreamSurface.kt",
+      "sha256": "2e3087cc707da419626fa3ef4797faf3e986d86fe669fdb5312d13c40a46ef73"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/stream/DesktopStreamView.kt",
+      "sha256": "967c977bddb74f2c3e81acfcbc53db583eba4394b6a03219e961fae027e3bdb9"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopStreamPanelLayoutTest.kt",
+      "sha256": "2d798874cd01fa17638bcbc0fc0659c6009a32a6f6f40e3ed30374bc4f0a45f8"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopStreamRootTest.kt",
+      "sha256": "9059fb8d8a8c02b988f77abd8d9760974578dc27c27a962a16d92a24a8b52c72"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopStreamSessionTest.kt",
+      "sha256": "c0bf49d45aef8f705b6cf05a0d31797123a0b27eb8fd1e47ee7645863a6b96aa"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/StreamDraftEditorAdapterTest.kt",
+      "sha256": "00a31c5ece1f1924cb4fb1066a2dfbab108befb5e3f9d78a36bc68345ec543b0"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/StreamDraftRenderLifetimeTest.kt",
+      "sha256": "f87941cadff2d1b3cccb90a30358229d7d5e022f0290cf7f5bf388cfdcdb51cf"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamDestinationJdkWitness.kt",
+      "sha256": "631c08822f968b1e2b3aa9b257a0d676ebef4a59510709a029b8840b3f0db405"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamDestinationTest.kt",
+      "sha256": "d0d2fa440e88ce848f0664d7a4d56483f76acf97ad8a33db13e339ac7b4923e8"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPixelsTest.kt",
+      "sha256": "c08598e1c0badee6ca3e27f96fec9d560fcae48f72688a85831df8ced7d9ee6e"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPresentationEpochJdkWitness.kt",
+      "sha256": "4c1f4211a917dac7d846686e44025fa9b0fb196eba3b4442a85a7db5c30684fc"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamPresentationEpochTest.kt",
+      "sha256": "bfcc06b2b8244d5fcceda0bfb64c7bb1be39eb68c1947f4a8572a4a4f304e4a6"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamSurfaceJdkWitness.kt",
+      "sha256": "044169661d42e235751e78dc16729584ed152b0dcb091ca0e991a4888474c017"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamSurfaceTest.kt",
+      "sha256": "d5d1fe1c27d26eb5dfdb7b6483b40276879c6665888c9bdc3f1931d2776371ba"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/stream/DesktopStreamViewTest.kt",
+      "sha256": "3befa8900ae6ab5d05dc6d10347f771084f4a7e40922a4d36b4b4003bb4d89fd"
+    },
+    {
+      "path": "docs/ACTIVE_CLOUD_LANES_20261019.md",
+      "sha256": "46b34b5da85fa2b8b8edbffc2e09cb315edff504011c5d8a5485c2064f770de7"
+    },
+    {
+      "path": "docs/DESKTOP_STREAM_BORROWED_DRAFT_20261020.md",
+      "sha256": "462d6c6f56ec87054bbcd3f549845ca5b24ac387693b93bf380f34a71a4b44f5"
+    },
+    {
+      "path": "docs/DESKTOP_STREAM_RECEIVER_INTEGRATION_20261020.md",
+      "sha256": "9684d0514b6387c1bf7659f3ec4aee78ac0e040ca03127556d3f63092b887a4a"
+    },
+    {
+      "path": "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md",
+      "sha256": "a9cecdf0edc9c81127c4500e02d9c4023a96da5d270b81b1229422ed1bc9ec5f"
+    },
+    {
+      "path": "docs/ROADMAP_REMAINING_PHASES_20261020.md",
+      "sha256": "d032d97c5856f1fbd73c1a55ff40a624f070e5d24da38281d9e25e13ff5cf772"
+    }
+  ],
+  "checks": [
+    {
+      "name": "combined Desktop tests",
+      "exit_code": 0,
+      "tests": 125,
+      "suites": [
+        {
+          "name": "com.visualworkbench.desktop.DesktopAndroidTunnelTest",
+          "tests": "20",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:22.422Z",
+          "time": "0.225",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopAndroidTunnelTest.xml",
+          "sha256": "d6a2cbbbc99924be4993f6048a4753f07916b74e2dc264791c582a1f78b31318"
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopBackgroundDisplayTest",
+          "tests": "7",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:22.649Z",
+          "time": "0.363",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopBackgroundDisplayTest.xml",
+          "sha256": "cdfbf859b22d850d8b1d51074e7f9d75747a174ca07d84c0a3ee5824c7a39f4e"
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopSessionsTest",
+          "tests": "9",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:23.015Z",
+          "time": "0.111",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopSessionsTest.xml",
+          "sha256": "12c03454102bdbf6df12f49dfc5fcb6cf6a4082a94ce82f7ea75c7a04e80a7f2"
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopStreamPanelLayoutTest",
+          "tests": "1",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:23.129Z",
+          "time": "0.478",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopStreamPanelLayoutTest.xml",
+          "sha256": "362c81472de774e2eb5a00b08c7946670e2024525a9dd811c95e7772b0428d85"
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopStreamPublicationTest",
+          "tests": "6",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:23.611Z",
+          "time": "0.021",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopStreamPublicationTest.xml",
+          "sha256": "03daca84b236e464df642730426a90ac30a9a714a6368d2c275794334fed0130"
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopStreamRootTest",
+          "tests": "6",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:23.635Z",
+          "time": "0.112",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopStreamRootTest.xml",
+          "sha256": "4b7b662921b72f2f7f5d55110ea654acda907314208e5a48a6bf1fa1170c4e59"
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopStreamSessionTest",
+          "tests": "22",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:23.758Z",
+          "time": "0.079",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopStreamSessionTest.xml",
+          "sha256": "0ab69d44c2d23994d69aa44a918945fc35501b9a4adeb6970fed1b740614fa91"
+        },
+        {
+          "name": "com.visualworkbench.desktop.StreamDraftCanvasTest",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:23.839Z",
+          "time": "0.003",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.StreamDraftCanvasTest.xml",
+          "sha256": "60d0dcbc488765e4fa5876bdbd8f24dbaa1c7db3761351aaf435cb50a4fc38d0"
+        },
+        {
+          "name": "com.visualworkbench.desktop.StreamDraftEditorAdapterTest",
+          "tests": "15",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:23.845Z",
+          "time": "1.526",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.StreamDraftEditorAdapterTest.xml",
+          "sha256": "49c37a605ba23579b86c1d6e52fedc32c283e6a7e4c626ef8594f0366b884304"
+        },
+        {
+          "name": "com.visualworkbench.desktop.StreamDraftRenderLifetimeTest",
+          "tests": "5",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:25.373Z",
+          "time": "0.005",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.StreamDraftRenderLifetimeTest.xml",
+          "sha256": "44e6a7e08106eefc270e53ce51b2b08f2bd0b0b26c9c04627ee94fda30865ab3"
+        },
+        {
+          "name": "com.visualworkbench.desktop.stream.DesktopStreamDestinationTest",
+          "tests": "4",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:25.380Z",
+          "time": "0.025",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.stream.DesktopStreamDestinationTest.xml",
+          "sha256": "d8807fec83ad92f624a77bf1c2cf9bb11e6b86f3de20f2b27522e8817483cd32"
+        },
+        {
+          "name": "com.visualworkbench.desktop.stream.DesktopStreamPixelsTest",
+          "tests": "6",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:25.408Z",
+          "time": "0.011",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.stream.DesktopStreamPixelsTest.xml",
+          "sha256": "85dc225e76d66ef0c0a6dfd7dee07208cf59197785b30c9bc5d236f807fe7c74"
+        },
+        {
+          "name": "com.visualworkbench.desktop.stream.DesktopStreamPresentationEpochTest",
+          "tests": "4",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:25.421Z",
+          "time": "0.023",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.stream.DesktopStreamPresentationEpochTest.xml",
+          "sha256": "7838eb6e8557098f68d817c994ec73075e9859695a8ad2d7c0086c8914b7f2e4"
+        },
+        {
+          "name": "com.visualworkbench.desktop.stream.DesktopStreamSurfaceTest",
+          "tests": "4",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:25.446Z",
+          "time": "0.008",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.stream.DesktopStreamSurfaceTest.xml",
+          "sha256": "9219e0680f49963df1d3e1db926c1d2ca578ac2d3334b2b7a91df729c98eac5c"
+        },
+        {
+          "name": "com.visualworkbench.desktop.stream.DesktopStreamViewTest",
+          "tests": "13",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T10:12:25.463Z",
+          "time": "0.094",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.stream.DesktopStreamViewTest.xml",
+          "sha256": "7df36b094afa8876347f32da63a03f306ecec0c5c71e2850067e4620b4158fcc"
+        }
+      ],
+      "bootstrap": "source /workspace/.vw-tools/cloud-setup/start.sh",
+      "cwd": "apps",
+      "command": "flock -n /workspace/.vw-tools/heavy-build.lock timeout 180s bash ./gradlew --offline --no-daemon --max-workers=2 :desktop:test --tests 'com.visualworkbench.desktop.stream.*' --tests 'com.visualworkbench.desktop.DesktopStream*Test' --tests 'com.visualworkbench.desktop.StreamDraft*Test' --tests 'com.visualworkbench.desktop.DesktopSessionsTest' --tests 'com.visualworkbench.desktop.DesktopAndroidTunnelTest' --tests 'com.visualworkbench.desktop.DesktopBackgroundDisplayTest' -x :desktop:packageConnectionRuntime",
+      "result": "BUILD SUCCESSFUL in 45s",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/desktop-stream-receiver-combined-tests-reviewed.log",
+      "log_sha256": "47a2b0e6ecb64a49e36aeea7c3960e03c74de1fbbb64d8049aa06b883a0bb6ee"
+    },
+    {
+      "name": "repository setup policy",
+      "command": "python3 tools/check_setup.py",
+      "exit_code": 0,
+      "passed": [
+        "ids",
+        "third-party",
+        "workspace"
+      ]
+    },
+    {
+      "name": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "name": "exact accepted leaf composition",
+      "passed_files": 14,
+      "result": "all six production and eight test/witness files byte-identical to accepted leaf commit"
+    }
+  ],
+  "review": {
+    "reviewer_agent": "/root/tunnel_boundary_review",
+    "model": "gpt-6-astra",
+    "result": "No remaining actionable findings in delegated root scope; accepted leaves not broadly re-audited.",
+    "source_review_only": true,
+    "closed_findings": [
+      "stable canvas origin/viewport across freeze and new status/tool content",
+      "primary mouse/stylus admission",
+      "shared parent menu/dialog guard",
+      "post-UP pending contact cancellation on resize/DPI"
+    ],
+    "verified_hashes": {
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopStreamContactInput.kt": "a1a6895c604358ad47ad8f25896894a85f61fc91bb9329c7fdb31f3720c67e16",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopStreamPanel.kt": "a6b588763e1f951877cb105edafc5b99dc531f272cab9fd705e5274b4676128b",
+      "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": "881b173905e580e773f3c1dbbceafbcc36e893bddcf8c7484464f9df0584b281"
+    }
+  },
+  "intermediate_runs": [
+    {
+      "tests": 121,
+      "failures": 4,
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/desktop-stream-receiver-combined-tests.log",
+      "reason": "new root fixtures exposed uncaught focus restoration failure; repaired focus-only failure handling after real stream retirement",
+      "log_sha256": "eb960e193cd94172d3efe1efc019f54498f804016b625038a654a45dd7f81f7f"
+    },
+    {
+      "tests": 123,
+      "failures": 0,
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/desktop-stream-receiver-combined-tests-final.log",
+      "scope": "before final parent-menu and post-UP resize/DPI fixes; not the final source receipt",
+      "log_sha256": "f0e1136c1a38410091054931df9dd6845cc955dfe7331084df582d07dd4abe52"
+    }
+  ],
+  "not_verified": [
+    "Windows heavyweight Canvas/SwingPanel/Compose interop blending and actual draw/input composition",
+    "Windows Direct3D/presentation/HiDPI runtime after root composition",
+    "Actual packaged launcher arguments and Windows runtime inventory/packages",
+    "Real peer stream/freeze/original-adoption/Save/resume/source-loss journeys",
+    "Physical pen, frame-rate, memory, latency, Bluetooth, thermal and owner acceptance",
+    "Model/tunnel native aggregate/runtime/license admission"
+  ],
+  "environment_warnings": [
+    "Linux JDK lacks sun.java2d.d3d (both required exports remain configured)",
+    "Fontconfig cache unwritable; named off-screen layout/pixel tests still pass"
+  ],
+  "scope_limits": [
+    "Stream Save counters reserve disjoint stream-plan ranges only; ordinary edits use native nextLamport after every stream plan retires",
+    "No public protocol/DTO/native/FFI/generated-binding/Cargo/lockfile/Android change; no redundant native regeneration",
+    "No GUI window, capture, device, provider, paid Actions, deployment or signing operation executed"
+  ]
+}
