@@ -554,5 +554,129 @@ class Assembly(unittest.TestCase):
         self.assertEqual(output.getvalue(), "RELEASE_ASSEMBLY_REJECTED:manifest_binding\n")
 
 
+class WindowsMetadata(unittest.TestCase):
+    def native(self, **changes):
+        fields = {"attributes": 0x80, "size": 7, "links": 1, "volume": 42,
+                  "file_id": bytes(range(1, 17)), "written": 116444736000000123,
+                  "changed": 116444736000000456, "created": 116444736000000001}
+        return a.windows_metadata(**(fields | changes))
+
+    def test_native_snapshot_keeps_change_time_distinct_from_creation_time(self):
+        native = self.native()
+        legacy_path = SimpleNamespace(**vars(native))
+        legacy_path.st_ctime_ns = legacy_path.st_birthtime_ns
+        self.assertNotEqual(a.snapshot(native), a.snapshot(legacy_path))
+        self.assertEqual(native.st_ctime_ns, 45600)
+        self.assertEqual(native.st_birthtime_ns, 100)
+        self.assertNotEqual(a.snapshot(native), a.snapshot(self.native(changed=116444736000000457)))
+        self.assertEqual(a.identity(native), a.identity(self.native(changed=116444736000000457)))
+
+    def test_native_identity_size_mtime_links_and_reparse_checks_remain_active(self):
+        original = self.native()
+        for changed in ({"volume": 43}, {"file_id": b"x" * 16}, {"size": 8}, {"links": 2},
+                        {"written": 116444736000000124}):
+            with self.subTest(changed=changed):
+                self.assertNotEqual(a.snapshot(original), a.snapshot(self.native(**changed)))
+        with self.assertRaisesRegex(a.Rejected, "^hardlinked_input$"):
+            a.ordinary(self.native(links=2), False)
+        with self.assertRaisesRegex(a.Rejected, "^redirected_path$"):
+            a.ordinary(self.native(attributes=0x480), False)
+        with self.assertRaisesRegex(a.Rejected, "^native_metadata$"):
+            self.native(file_id=bytes(16))
+
+    def test_native_handle_queries_all_required_fields_without_clock_fallback(self):
+        calls = []
+
+        class Api:
+            def GetFileInformationByHandleEx(owner, handle, kind, pointer, size):
+                calls.append((kind, size))
+                value = pointer._obj
+                if kind == 0:
+                    value.created, value.written, value.changed, value.attributes = (
+                        116444736000000001, 116444736000000123, 116444736000000456, 0x80)
+                elif kind == 1:
+                    value.size, value.links, value.directory = 7, 1, 0
+                elif kind == 18:
+                    value.volume = 42
+                    value.file_id[:] = bytes(range(1, 17))
+                return 1
+
+        native = a.windows_handle_metadata(123, Api())
+        self.assertEqual(a.snapshot(native), a.snapshot(self.native()))
+        self.assertEqual(calls, [(0, 40), (1, 24), (18, 24)])
+        failed = SimpleNamespace(GetFileInformationByHandleEx=lambda *_: 0)
+        with self.assertRaisesRegex(a.Rejected, "^native_metadata_unavailable$"):
+            a.windows_handle_metadata(123, failed)
+
+    def test_path_metadata_uses_short_shared_query_and_closes_it(self):
+        expected = self.native()
+        events = []
+
+        class Lease:
+            def __init__(owner, path, directory, *, metadata_only):
+                events.append((path, directory, metadata_only))
+            def metadata(owner):
+                return expected
+            def close(owner):
+                events.append("closed")
+
+        path = Path("fixture")
+        with patch.object(a, "WindowsLease", Lease):
+            self.assertIs(a.windows_path_metadata(path), expected)
+        self.assertEqual(events, [(path, None, True), "closed"])
+
+    def test_change_time_only_mutation_during_input_read_is_refused(self):
+        with tempfile.TemporaryDirectory(prefix="vw-metadata-unit-") as tmp, ExitStack() as stack:
+            root = Path(tmp)
+            (root / "input.bin").write_bytes(b"unchanged bytes")
+            source = a.Inputs(root, stack, {})
+            original = a.fstat_metadata
+            calls = 0
+
+            def changed(fd):
+                nonlocal calls
+                current = original(fd)
+                calls += 1
+                if calls == 1:
+                    return current
+                return SimpleNamespace(**{key: (current.st_ctime_ns + 100 if key == "st_ctime_ns" else getattr(current, key))
+                    for key in ("st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns", "st_ctime_ns", "st_nlink")})
+
+            with patch.object(a, "fstat_metadata", changed), self.assertRaisesRegex(a.Rejected, "^input_changed$"):
+                source.read("input.bin", None, 1024)
+
+    @unittest.skipUnless(os.name == "nt", "actual Windows path/handle metadata witness")
+    def test_windows_open_writer_and_closed_path_have_coherent_native_metadata(self):
+        with tempfile.TemporaryDirectory(prefix="vw-metadata-unit-") as tmp, ExitStack() as stack:
+            directory = a.get_dir(Path(tmp), stack, {})
+            with directory.open("owned.bin", True) as stream:
+                stream.write(b"owned bytes")
+                stream.flush()
+                os.fsync(stream.fileno())
+                opened = a.fstat_metadata(stream.fileno())
+                by_path = directory.stat("owned.bin")
+                self.assertEqual(a.snapshot(opened), a.snapshot(by_path))
+            self.assertEqual(a.snapshot(opened), a.snapshot(directory.stat("owned.bin")))
+
+    @unittest.skipUnless(os.name == "nt", "actual Windows restored-mtime mutation witness")
+    def test_windows_restoring_mtime_does_not_hide_change_clock(self):
+        with tempfile.TemporaryDirectory(prefix="vw-metadata-unit-") as tmp, ExitStack() as stack:
+            root = Path(tmp)
+            path = root / "input.bin"
+            path.write_bytes(b"original")
+            directory = a.get_dir(root, stack, {})
+            before = directory.stat("input.bin")
+            source = a.Inputs(root, stack, {})
+            source.read("input.bin", None, 1024)
+            path.write_bytes(b"modified")
+            os.utime(path, ns=(before.st_mtime_ns, before.st_mtime_ns))
+            after = directory.stat("input.bin")
+            self.assertEqual(before.st_mtime_ns, after.st_mtime_ns)
+            self.assertEqual(before.st_size, after.st_size)
+            self.assertNotEqual(before.st_ctime_ns, after.st_ctime_ns)
+            with self.assertRaisesRegex(a.Rejected, "^input_identity_changed$"):
+                source.read("input.bin", None, 1024)
+
+
 if __name__ == "__main__":
     unittest.main()

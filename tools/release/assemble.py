@@ -13,6 +13,7 @@ import re
 import stat
 import struct
 import sys
+from types import SimpleNamespace
 import zipfile
 
 CHUNK = 1024 * 1024
@@ -102,6 +103,74 @@ def snapshot(info) -> tuple:
     return identity(info) + (info.st_size, info.st_mtime_ns, info.st_ctime_ns, info.st_nlink)
 
 
+def windows_metadata(attributes: int, size: int, links: int, volume: int, file_id: bytes,
+                     written: int, changed: int, created: int):
+    """One native clock/identity representation for both path and handle reads.
+
+    CPython 3.14's path stat replaces ChangeTime with CreationTime for legacy
+    st_ctime, while fstat retains ChangeTime. Do not compare those two meanings
+    or discard the change clock. FILE_BASIC_INFO supplies the same ChangeTime
+    for every native metadata query below (100 ns ticks since 1601).
+    https://github.com/python/cpython/blob/3.14/Modules/posixmodule.c
+    https://github.com/python/cpython/blob/3.14/Python/fileutils.c
+    """
+    require(all(type(value) is int for value in (attributes, size, links, volume, written, changed, created)) and
+            size >= 0 and links > 0 and volume >= 0 and len(file_id) == 16 and any(file_id), "native_metadata")
+    epoch = 116444736000000000
+    return SimpleNamespace(st_mode=stat.S_IFDIR if attributes & 0x10 else stat.S_IFREG,
+                           st_dev=volume, st_ino=int.from_bytes(file_id, "little"), st_size=size,
+                           st_mtime_ns=(written - epoch) * 100, st_ctime_ns=(changed - epoch) * 100,
+                           st_birthtime_ns=(created - epoch) * 100, st_nlink=links,
+                           st_file_attributes=attributes)
+
+
+def windows_handle_metadata(handle, api=None):
+    import ctypes
+    from ctypes import wintypes
+    if api is None:
+        api = ctypes.WinDLL("kernel32", use_last_error=True)
+        api.GetFileInformationByHandleEx.argtypes = (wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD)
+        api.GetFileInformationByHandleEx.restype = wintypes.BOOL
+
+    class Basic(ctypes.Structure):
+        _fields_ = [("created", ctypes.c_int64), ("accessed", ctypes.c_int64),
+                    ("written", ctypes.c_int64), ("changed", ctypes.c_int64), ("attributes", ctypes.c_uint32)]
+
+    class Standard(ctypes.Structure):
+        _fields_ = [("allocated", ctypes.c_int64), ("size", ctypes.c_int64), ("links", ctypes.c_uint32),
+                    ("delete_pending", ctypes.c_ubyte), ("directory", ctypes.c_ubyte)]
+
+    class FileId(ctypes.Structure):
+        _fields_ = [("volume", ctypes.c_uint64), ("file_id", ctypes.c_ubyte * 16)]
+
+    basic, standard, file_id = Basic(), Standard(), FileId()
+    for kind, value in ((0, basic), (1, standard), (18, file_id)):
+        require(bool(api.GetFileInformationByHandleEx(handle, kind, ctypes.byref(value), ctypes.sizeof(value))),
+                "native_metadata_unavailable")
+    require(not standard.delete_pending and bool(standard.directory) == bool(basic.attributes & 0x10),
+            "native_metadata_type")
+    return windows_metadata(basic.attributes, standard.size, standard.links, file_id.volume,
+                            bytes(file_id.file_id), basic.written, basic.changed, basic.created)
+
+
+def fstat_metadata(fd: int):
+    if os.name != "nt":
+        return os.fstat(fd)
+    import msvcrt
+    return windows_handle_metadata(msvcrt.get_osfhandle(fd))
+
+
+def windows_path_metadata(path: Path, directory: bool | None = None):
+    # A short metadata query must coexist with our output writer. Retained read
+    # leases still deny write/delete; this query denies neither and detects
+    # redirects/aliases and changes using the same native fields as fstat.
+    lease = WindowsLease(path, directory, metadata_only=True)
+    try:
+        return lease.metadata()
+    finally:
+        lease.close()
+
+
 def ordinary(info, directory: bool) -> None:
     require(not stat.S_ISLNK(info.st_mode) and
             not getattr(info, "st_file_attributes", 0) & 0x400, "redirected_path")
@@ -118,7 +187,7 @@ class WindowsLease:
     file handles deny write/delete sharing while bytes are read. This backend is
     source-only until the deferred real-Windows tests have run.
     """
-    def __init__(self, path: Path, directory: bool):
+    def __init__(self, path: Path, directory: bool | None, *, metadata_only: bool = False):
         import ctypes
         from ctypes import wintypes
         self.api = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -128,16 +197,17 @@ class WindowsLease:
         self.api.CloseHandle.argtypes = (wintypes.HANDLE,)
         self.api.GetFileInformationByHandleEx.argtypes = (wintypes.HANDLE, ctypes.c_int,
                                                          wintypes.LPVOID, wintypes.DWORD)
+        self.api.GetFileInformationByHandleEx.restype = wintypes.BOOL
         self.api.GetFinalPathNameByHandleW.argtypes = (wintypes.HANDLE, wintypes.LPWSTR,
                                                      wintypes.DWORD, wintypes.DWORD)
-        self.handle = self.api.CreateFileW(str(path), 0x80 if directory else 0x80000000,
-                                          3 if directory else 1, None, 3,
-                                          0x00200000 | (0x02000000 if directory else 0x80), None)
+        self.handle = self.api.CreateFileW(str(path), 0x80 if directory or metadata_only else 0x80000000,
+                                          7 if metadata_only else (3 if directory else 1), None, 3,
+                                          0x00200000 | (0x02000000 if directory or metadata_only else 0x80), None)
         require(self.handle not in (None, wintypes.HANDLE(-1).value), "path_lease_unavailable")
         try:
             info = (wintypes.DWORD * 2)()
             require(bool(self.api.GetFileInformationByHandleEx(self.handle, 9, info, 8)), "path_lease_metadata")
-            require(not info[0] & 0x400 and bool(info[0] & 0x10) == directory, "redirected_path")
+            require(not info[0] & 0x400 and (directory is None or bool(info[0] & 0x10) == directory), "redirected_path")
             buffer = ctypes.create_unicode_buffer(32768)
             size = self.api.GetFinalPathNameByHandleW(self.handle, buffer, len(buffer), 0)
             require(0 < size < len(buffer), "path_lease_resolution")
@@ -151,6 +221,9 @@ class WindowsLease:
         if self.handle is not None:
             self.api.CloseHandle(self.handle)
             self.handle = None
+
+    def metadata(self):
+        return windows_handle_metadata(self.handle, self.api)
 
 
 class Directory:
@@ -193,7 +266,7 @@ class Directory:
     def stat_path(self):
         if self.parent is not None and os.name == "posix":
             return os.stat(self.path.name, dir_fd=self.parent.fd, follow_symlinks=False)
-        return self.path.lstat()
+        return windows_path_metadata(self.path, True) if os.name == "nt" else self.path.lstat()
 
     def check(self):
         if self.parent is not None:
@@ -203,7 +276,8 @@ class Directory:
         require(identity(current) == self.ident, "directory_changed")
 
     def stat(self, leaf: str):
-        return os.stat(leaf, dir_fd=self.fd, follow_symlinks=False) if os.name == "posix" else (self.path / leaf).lstat()
+        return (os.stat(leaf, dir_fd=self.fd, follow_symlinks=False) if os.name == "posix" else
+                windows_path_metadata(self.path / leaf))
 
     def open(self, leaf: str, write: bool = False):
         self.check()
@@ -234,7 +308,7 @@ class Directory:
         return os.scandir(self.fd if os.name == "posix" else self.path)
 
     def metadata(self):
-        return os.fstat(self.fd) if os.name == "posix" else self.path.lstat()
+        return os.fstat(self.fd) if os.name == "posix" else self.lease.metadata()
 
 
 def get_dir(path: Path, stack: ExitStack, cache: dict) -> Directory:
@@ -262,7 +336,7 @@ class Inputs:
         require(previous is None or previous == snapshot(before), "input_identity_changed")
         sha, count, chunks = hashlib.sha256(), 0, []
         with parent.open(path.name) as stream:
-            opened = os.fstat(stream.fileno())
+            opened = fstat_metadata(stream.fileno())
             ordinary(opened, False)
             require(snapshot(opened) == snapshot(before), "input_identity_changed")
             while chunk := stream.read(CHUNK):
@@ -274,7 +348,7 @@ class Inputs:
                     output.write(chunk)
                 if collect:
                     chunks.append(chunk)
-            require(snapshot(os.fstat(stream.fileno())) == snapshot(before), "input_changed")
+            require(snapshot(fstat_metadata(stream.fileno())) == snapshot(before), "input_changed")
         parent.check()
         require(snapshot(parent.stat(path.name)) == snapshot(before), "input_identity_changed")
         actual = {"bytes": count, "sha256": sha.hexdigest()}
@@ -316,7 +390,7 @@ class Output:
               descriptor: dict | None = None, limit: int = MAX_FILE) -> dict:
         parent, leaf = self.parent(relative)
         with parent.open(leaf, True) as stream:
-            opened = os.fstat(stream.fileno())
+            opened = fstat_metadata(stream.fileno())
             self.created.append((parent, leaf, False, identity(opened)))
             ordinary(opened, False)
             if relative == "COMPLETE":
@@ -334,7 +408,7 @@ class Output:
                 actual = {"bytes": len(body), "sha256": hashlib.sha256(body).hexdigest()}
             stream.flush()
             os.fsync(stream.fileno())
-            finished = os.fstat(stream.fileno())
+            finished = fstat_metadata(stream.fileno())
             ordinary(finished, False)
             require(identity(finished) == identity(opened) and finished.st_size == actual["bytes"], "output_changed")
             own = snapshot(finished)
@@ -389,7 +463,7 @@ class Output:
             directory.check()
         require(seen_dirs == set(directories) and seen_files == set(self.files), "output_namespace_missing")
         if self.marker_fd is not None:
-            require(snapshot(os.fstat(self.marker_fd)) == self.identities["COMPLETE"], "completion_marker_changed")
+            require(snapshot(fstat_metadata(self.marker_fd)) == self.identities["COMPLETE"], "completion_marker_changed")
 
     def cleanup(self):
         # A POSIX unlink cannot target a retained inode. A stat followed by

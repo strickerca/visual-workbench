@@ -1,0 +1,76 @@
+{
+  "schema": "vw-windows-release-metadata-v1",
+  "date": "2026-10-20",
+  "base_main": "f3189ed21a57fced2b0025e31636dc62c1d974f2",
+  "source": {
+    "tools/release/assemble.py": {
+      "bytes": 37811,
+      "sha256": "5925b0294291fcee585af45ac90db79f495fc0f385d4e4bf89673d8ec04fc769"
+    },
+    "tools/release/test_assemble.py": {
+      "bytes": 35020,
+      "sha256": "237c6190fa9d87310ef11e9150c7e3d2cbecf0d6c2312b46066de7b3d5a16c2c"
+    },
+    "tools/release/probe_windows_metadata.py": {
+      "bytes": 3149,
+      "sha256": "81db40c52ec023bcef646058645e853f97d2d5f006fffb4e680ba56bc7a68706"
+    },
+    "docs/WINDOWS_RELEASE_METADATA_20261020.md": {
+      "bytes": 2781,
+      "sha256": "d73c8448d18f79519de413faeef869b8cc0a2bbc0cbc36ecda7e447b0f40dff2"
+    }
+  },
+  "reported_windows_baseline": {
+    "source": "Parent-relayed Windows task 01a1590d-d35c-7616-80a6-b1b8b23ad03a",
+    "failures": 18,
+    "errors": 8,
+    "posix_only_skips": 7,
+    "raw_log_inspected_by_cloud": false
+  },
+  "cause": "CPython3.14 Windows pathname stat replaces st_ctime with birthtime, while fstat preserves native ChangeTime; mismatched semantics caused false mutation refusals.",
+  "repair": "One native FileBasicInfo/FileStandardInfo/FileIdInfo representation for Windows pathname and descriptor queries; identity, full128-bit ID, volume, size, link count, write/change clocks and reparse/alias checks retained.",
+  "linux_checks": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 -m unittest discover -s tools/release -p test_assemble.py -v",
+      "methods": 48,
+      "passed": 46,
+      "skipped": 2,
+      "skip_scope": "Two new actual-Windows witnesses; not runtime passes",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-closeout/assembler-native-metadata-tests.log",
+        "bytes": 7323,
+        "sha256": "2441c247156c4b42cc92bb116db346505c5641c9d709f23ff092775363f8d58b"
+      }
+    },
+    {
+      "command": "python3 tools/check_setup.py",
+      "result": "ids,third-party,workspace passed",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-closeout/metadata-policy.log",
+        "bytes": 62,
+        "sha256": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197"
+      }
+    }
+  ],
+  "source_review": {
+    "reviewer": "gpt-6-astra",
+    "lane": "tunnel_boundary_review",
+    "result": "No actionable source findings in three hash-matched repair files; native structure layouts/ownership/mutation/COMPLETE semantics reviewed",
+    "scope": "Read-only; reviewer ran no builds/tests/Git"
+  },
+  "windows_replay_pending": true,
+  "windows_metadata_runtime_verified": false,
+  "not_executed": [
+    "Actual Windows assembly/probe replay",
+    "MSI/package/installer generation",
+    "Signing/installation/deployment",
+    "GUI/capture/provider/device actions"
+  ],
+  "physical_acceptance": false,
+  "release_ready": false,
+  "next_windows_checks": [
+    "Run probe_windows_metadata.py using exact pinned interpreter and a fresh private absolute work directory",
+    "Replay all48 assembler methods on Windows; retain actual open-writer/closed-path and restored-mtime witness results; seven original POSIX-only cases remain Windows-inapplicable",
+    "Retain any writer-lock refusal as a failure witness for deliberate assertion adaptation, never skip failures"
+  ]
+}
