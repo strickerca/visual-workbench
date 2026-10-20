@@ -1,0 +1,126 @@
+{
+  "schema": "vw-windows-diagnostics-identity-v1",
+  "date": "2026-10-20",
+  "base_main": "3bb8b7a6329d3c040dffbd885af3ec5b1b61a584",
+  "source": {
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/diagnostics/DiagnosticsExportDialog.kt": {
+      "bytes": 15961,
+      "sha256": "576def04c44666152b167210dc352ee3df54fe6ee5beb1adfcb27af35ef3650b"
+    },
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/diagnostics/DiagnosticOwnedFile.kt": {
+      "bytes": 8446,
+      "sha256": "a74240bc9122dfd7589a090a8754f5ee70cb28367a287b6f7c746327298198e8"
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/diagnostics/WindowsDiagnosticOwnedFileTest.kt": {
+      "bytes": 9208,
+      "sha256": "16c1810932c50ba902be55cce389934921428434ab3f6bb18473b760ffd3f4f1"
+    },
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/RemoteCompatibilityImportTest.kt": {
+      "bytes": 425,
+      "sha256": "ecb92c5ab337542179050567e36861a43c96cf23f5fb88b4048bed7f19a06045"
+    },
+    "docs/WINDOWS_DIAGNOSTICS_IDENTITY_20261020.md": {
+      "bytes": 3665,
+      "sha256": "9df47df7a4e721cafebb3ea8d9c89e1aeaa339929b7bda16623487b0332d1e3a"
+    }
+  },
+  "unchanged_fixture_and_model": {
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/RemoteCompatibilityImportCases.kt": {
+      "bytes": 10787,
+      "sha256": "b813354941190eb6b85598ca620b48705a637e4decfc28e2422f84263a4a584c"
+    },
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DiagnosticsBundle.kt": {
+      "bytes": 5392,
+      "sha256": "e77556fe6d602c6144609ff58f9f4bb4bdf5374d0e583318c2d6071414e4afd5"
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/diagnostics/DiagnosticsPublicationTest.kt": {
+      "bytes": 9317,
+      "sha256": "cf4899b2c7d26f937f3251f8c25cbb5248901dbdc913ecf5a8e89fac5019581d"
+    }
+  },
+  "windows_identity": {
+    "null_key_fallback": false,
+    "identity": "Native retained creation handle; volume plus all 128 file-ID bits",
+    "publication": "Retained creation handle share5 and identity-checked read pin share3 cover no-replace hard link",
+    "cleanup": "Identity-checked DELETE handle disposition; uncertain original and failed closes retained; scheduled-delete retry never reopens name",
+    "native_identity_bytes_published": false,
+    "actual_windows_execution_in_cloud": false
+  },
+  "compatibility_fixture": {
+    "expected_logical_groups": 16,
+    "automatic_count_discovery": false,
+    "runner_implementation_changed": false,
+    "inventory": [
+      "Owner-backed admission with balanced borrow",
+      "Empty owner records refused",
+      "Missing native-owned receipt refused",
+      "Owner and payload mismatch refused",
+      "Executable identity/version mismatch refused",
+      "Eight malformed or unsupported decoder refusal vectors",
+      "Changed connection epoch prevents admission",
+      "Borrow closure cancels and joins; post-close borrow refused",
+      "Successful joined observation releases once",
+      "Callback failure releases once",
+      "Producer failure releases no unacquired token",
+      "Late producer cancellation joins acquired-token release and skips callback",
+      "Callback cancellation joins release",
+      "Palette imports exact owned records and preserves admitted records against unowned replacement",
+      "All seven NotTested observations without command or action escalation",
+      "Busy command refusal and close joining cancelled owner retirement"
+    ]
+  },
+  "focused_jvm": {
+    "compiler": "Kotlin 2.4.20 cached artifacts",
+    "jvm_target": 21,
+    "junit_methods_passed": 22,
+    "existing_publication_methods": 11,
+    "native_call_contract_fixture_methods": 10,
+    "shared_wrapper_methods": 1,
+    "shared_logical_groups_executed": 16,
+    "publication_body_literal_sha256": "b8a67417cedf74edd96b0c7afaa91aa034b58d5c863310132c32fbe99e2c541c",
+    "full_compose_compile": false,
+    "unchanged_shared_dependencies": "Existing compiled shared JVM classes",
+    "windows_native_calls_executed": false,
+    "logs": {
+      "compile.log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-diagnostics-identity/compile.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tests.log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-diagnostics-identity/tests.log",
+        "bytes": 72,
+        "sha256": "8caa87f77f6c737f594149279a6408ab76b9e6e165cb23f17aa9465888384df8"
+      },
+      "focused-run.json": {
+        "path": "/workspace/.vw-tools/evidence/20261020-diagnostics-identity/focused-run.json",
+        "bytes": 1790,
+        "sha256": "14a4b91559cc27a6b5c7ebbda465844859c50dd565fd7cff454585603ad9a059"
+      }
+    }
+  },
+  "review": {
+    "reviewer": "gpt-6-astra",
+    "lane": "tunnel_boundary_review",
+    "result": "No actionable findings; retained writer revision, exact identity, publication/cleanup retirement and shared16 convention cleared",
+    "tests_or_builds_run_by_reviewer": false
+  },
+  "remaining": [
+    "Actual Windows focused replay of diagnostics publication/native contract/shared wrapper classes",
+    "Full managed build in local lane; no cloud heavy build or binding regeneration",
+    "Separate MCP, Android, package/device/runtime and owner acceptance"
+  ],
+  "device_actions": false,
+  "release_ready": false,
+  "physical_acceptance": false,
+  "policy_checks": {
+    "ids": "passed",
+    "third_party": "passed",
+    "workspace": "passed",
+    "log": {
+      "path": "/workspace/.vw-tools/evidence/20261020-diagnostics-identity/policy.log",
+      "bytes": 62,
+      "sha256": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197"
+    }
+  }
+}

@@ -16,14 +16,9 @@ import java.awt.EventQueue
 import java.awt.FileDialog
 import java.awt.Frame
 import java.nio.ByteBuffer
-import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
-import java.nio.file.NoSuchFileException
 import java.nio.file.Path
-import java.nio.file.StandardOpenOption.CREATE_NEW
-import java.nio.file.StandardOpenOption.WRITE
-import java.nio.file.attribute.BasicFileAttributes
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.roundToLong
@@ -60,9 +55,8 @@ internal class DiagnosticPublication(
     val gate: DiagnosticPublicationGate = DiagnosticPublicationGate(),
     private val nowNanos: () -> Long = System::nanoTime,
 ) {
-    private class OwnedFile(val path: Path, val channel: FileChannel) { var key: Any? = null }
     private val bytes = report.jsonText.toByteArray(Charsets.UTF_8).also { check(it.size in 1..65_536) }
-    private var temporary: OwnedFile? = null
+    private var temporary: DiagnosticOwnedFile? = null
     val cleanupPending: Boolean get() = temporary != null
     var published: Boolean = false
         private set
@@ -83,11 +77,9 @@ internal class DiagnosticPublication(
             check(!Files.exists(destination, NOFOLLOW_LINKS))
             admitted()
             val path = parent.resolve(".vw-diagnostics-${UUID.randomUUID()}.tmp")
-            val owned = OwnedFile(path, FileChannel.open(path, CREATE_NEW, WRITE, NOFOLLOW_LINKS))
+            val owned = createDiagnosticOwnedFile(path)
             temporary = owned // Adopt the actual channel/path before any later read can fail.
-            val original = Files.readAttributes(path, BasicFileAttributes::class.java, NOFOLLOW_LINKS)
-            owned.key = checkNotNull(original.fileKey())
-            check(original.isRegularFile && original.size() == 0L)
+            owned.captureIdentity()
             val buffer = ByteBuffer.wrap(bytes)
             var attempts = 0
             while (buffer.hasRemaining()) {
@@ -95,20 +87,19 @@ internal class DiagnosticPublication(
                 check(attempts++ < bytes.size)
                 val end = minOf(buffer.position() + 4_096, bytes.size)
                 buffer.limit(end)
-                check(owned.channel.write(buffer) > 0)
+                check(owned.write(buffer) > 0)
                 buffer.limit(bytes.size)
             }
             admitted()
-            owned.channel.force(true)
-            owned.channel.close()
-            check(!owned.channel.isOpen)
-            val complete = Files.readAttributes(path, BasicFileAttributes::class.java, NOFOLLOW_LINKS)
-            check(complete.isRegularFile && complete.fileKey() == owned.key && complete.size() == bytes.size.toLong())
+            owned.force()
+            owned.finishWriting()
             admitted()
             if (!gate.beginCommit()) throw PublicationCancelled()
             try {
-                Files.createLink(destination, path)
-                published = true
+                owned.publish(bytes.size.toLong()) {
+                    Files.createLink(destination, path)
+                    published = true
+                }
             } finally { gate.finishCommit() }
             DiagnosticWriteResult.Saved
         } catch (_: PublicationCancelled) { DiagnosticWriteResult.Cancelled }
@@ -121,12 +112,7 @@ internal class DiagnosticPublication(
     fun cleanup(): Boolean {
         val owned = temporary ?: return true
         return try {
-            owned.channel.close()
-            if (owned.channel.isOpen || owned.key == null) return false
-            val current = try { Files.readAttributes(owned.path, BasicFileAttributes::class.java, NOFOLLOW_LINKS) }
-            catch (_: NoSuchFileException) { temporary = null; return true }
-            if (!current.isRegularFile || current.fileKey() != owned.key) return false
-            Files.delete(owned.path)
+            if (!owned.cleanup()) return false
             temporary = null
             true
         } catch (_: Exception) { false }
