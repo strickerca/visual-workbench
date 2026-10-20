@@ -71,7 +71,11 @@ class McpCaptureSourceRecoveryTest {
         try { body(); fail("Unsafe inventory was admitted") } catch (_: IllegalArgumentException) { }
     }
     private suspend fun failed(expected: Throwable, body: suspend () -> Any?) {
-        try { body(); fail("Failure was swallowed") } catch (actual: Throwable) { assertSame(expected, actual) }
+        try { body(); fail("Failure was swallowed") } catch (actual: Throwable) {
+            assertEquals(expected.javaClass, actual.javaClass)
+            // A recovered copy must identify this exact retained original.
+            assertSame(expected, if (actual === expected) actual else actual.cause)
+        }
     }
     private fun symlink(link: Path, target: Path) {
         try { Files.createSymbolicLink(link, target) }

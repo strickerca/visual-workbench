@@ -6,13 +6,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CaptureCallerRetirementTest {
+    private fun assertReportedOriginal(expected: Throwable, actual: Throwable?) {
+        val reported = checkNotNull(actual)
+        assertEquals(expected.javaClass, reported.javaClass)
+        // Recovery may copy the exception once at a coroutine boundary.
+        assertSame(expected, if (reported === expected) reported else reported.cause)
+    }
+
     @Test fun verificationServiceRefusalKeepsEditorAndNativeParentsAliveForRetry() = runBlocking {
         val calls = mutableListOf<String>(); var refuses = true
         val failure = IllegalStateException("synthetic service retirement refusal")
         suspend fun close() = withRetiredVerificationAccess({ calls += "requests" }, {
             calls += "service"; if (refuses) throw failure
         }) { calls += "editor"; calls += "native parents" }
-        assertSame(failure, runCatching { close() }.exceptionOrNull())
+        assertReportedOriginal(failure, runCatching { close() }.exceptionOrNull())
         assertEquals(listOf("requests", "service"), calls)
         refuses = false; close()
         assertEquals(listOf("requests", "service", "requests", "service", "editor", "native parents"), calls)
@@ -22,7 +29,7 @@ class CaptureCallerRetirementTest {
         val calls = mutableListOf<String>(); val failure = IllegalStateException("synthetic request join refusal")
         val result = runCatching { withRetiredVerificationAccess({ throw failure },
             { calls += "service" }) { calls += "editor" } }
-        assertSame(failure, result.exceptionOrNull()); assertTrue(calls.isEmpty())
+        assertReportedOriginal(failure, result.exceptionOrNull()); assertTrue(calls.isEmpty())
     }
 
     @Test fun cancelledShutdownJoinsVerificationServiceBeforeEditorAndNativeParents() = runBlocking {

@@ -78,13 +78,23 @@ class McpCoordinatorTest {
         val owner=DesktopMcpCoordinator(catalog,inbox,connection,capture,newId={receiptId()})
         val failure=IllegalStateException("Capture project retirement uncertain")
         capture.closeFailure=failure
-        try {owner.close();fail("Failed retirement was reported as closed")} catch(error:IllegalStateException){assertSame(failure,error)}
+        suspend fun refusedClose() {
+            try { owner.close(); fail("Failed retirement was reported as closed") }
+            catch (error: IllegalStateException) {
+                assertSame(failure, if (error === failure) error else error.cause)
+            }
+            assertSame(failure, capture.closeFailure)
+            assertFalse(owner.state.value.closed)
+        }
+        refusedClose()
         assertFalse(owner.state.value.closed)
         assertEquals(1,capture.closed);assertEquals(1,catalog.closed);assertEquals(1,inbox.closed);assertEquals(1,connection.closed)
+        refusedClose()
+        assertEquals(2,capture.closed);assertEquals(1,catalog.closed);assertEquals(1,inbox.closed);assertEquals(1,connection.closed)
         capture.closeFailure=null
         owner.close()
         assertTrue(owner.state.value.closed)
-        assertEquals(2,capture.closed);assertEquals(1,catalog.closed);assertEquals(1,inbox.closed);assertEquals(1,connection.closed)
+        assertEquals(3,capture.closed);assertEquals(1,catalog.closed);assertEquals(1,inbox.closed);assertEquals(1,connection.closed)
     }
     @Test fun decoderRefusesAmbiguousOversizeAndNoncanonicalBase64(){
         assertThrows(IllegalArgumentException::class.java){decodeMcpReturn("x","eA==","")}

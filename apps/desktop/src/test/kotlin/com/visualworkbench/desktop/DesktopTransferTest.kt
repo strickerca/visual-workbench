@@ -380,7 +380,9 @@ class DesktopTransferTest {
         val request = f.editor.exportRequest()!!
         f.editor.copyExport(request); f.idle { f.handoff.copies == 1 }
         assertArrayEquals(DATA, f.handoff.copied)
-        assertEquals(request, f.handoff.lastReceipt?.request); assertTrue(f.editor.state.value.exportReady)
+        val projected = request.copy(region = null, width = 8u, height = 6u,
+            projectedGeometry = ImageOutputExportGeometry(request.binding, SOURCE, 8u, 6u, 8u, 6u, null, 8u, 6u))
+        assertEquals(projected, f.handoff.lastReceipt?.request); assertTrue(f.editor.state.value.exportReady)
         assertEquals(0, f.project.bufferedExports)
     }
     @Test fun preparedDragInvalidatesOnSettingsChangeAndGestureOwnsTransferredLease() = controllerFixture { f ->
@@ -480,7 +482,15 @@ private class TransferHandoff : DesktopHandoff {
 }
 private class TransferFixture(val root: Path, scope: CoroutineScope) {
     val project = TransferProject(); val core = TransferCore(project); val handoff = TransferHandoff()
-    val editor = EditorController(scope, core, handoff, LocationPolicy(root.resolve("projects"), true, "fixture"), "owner", root.resolve("private"))
+    val editor = EditorController(scope, core, handoff, LocationPolicy(root.resolve("projects"), true, "fixture"), "owner", root.resolve("private"),
+        exportGeometry = { queried, binding, source, budget ->
+            assertSame(project, queried)
+            assertEquals(WorkflowBinding(project.current.render.revision.projectId, project.current.documentId,
+                project.current.render.revision.hostSeq, project.current.render.revision.stateHash), binding)
+            assertEquals(256uL * 1024uL * 1024uL, budget)
+            ImageOutputExportGeometry(binding, SOURCE, 8u, 6u, 8u, 6u, source,
+                source?.width ?: 8u, source?.height ?: 6u)
+        })
     suspend fun idle(condition: () -> Boolean) { withTimeout(5000) { editor.state.first { !it.busy && condition() } }; yield() }
 }
 private fun controllerFixture(block: suspend (TransferFixture) -> Unit) = temporary { root ->

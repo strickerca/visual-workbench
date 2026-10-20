@@ -113,6 +113,16 @@ these observations never pass instrumentation. Surface fixture cleanup preserves
 the primary body failure and suppresses any secondary cleanup failure, without
 waiving cleanup or deleting a project whose close was unconfirmed.
 
+For the two exact surface fixtures, failure diagnosis may also retain an
+`await_phase` from the finite source phase vocabulary in the primary
+`Timed out in <phase>:` assertion prefix. Its private state/detail tail is
+discarded. The exact stale-page sync fixture adds a fixed suppressed phase
+marker to its original timeout; only its allowlisted enum value is retained,
+and secondary cleanup cannot replace the primary failure. Existing wait limits,
+readiness predicates and all 225 required test names remain unchanged. These
+diagnostics and the giant factory cancellation cleanup repair require a fresh
+bound run; they do not establish a passing result from earlier receipts.
+
 An uninstall is allowed only for these two package IDs after absence-before,
 confirmed successful installation and an exact match to the already verified
 signed APK. Unknown install outcomes or changed package bytes are preserved and

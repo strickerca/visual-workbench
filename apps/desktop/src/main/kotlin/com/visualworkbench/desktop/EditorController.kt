@@ -68,7 +68,8 @@ private data class Drag(val start:Point,val initial:ViewState,val selected:List<
 private data class WidthGesture(val binding:RenderBinding,val items:List<RenderItem>,val live:ObjectPreviewLease?)
 private data class CachedExport(val workspace:TransferWorkspace,val receipt:CompletedExport)
 class EditorController internal constructor(private val scope:CoroutineScope,val core:WorkbenchCore,private val handoff:DesktopHandoff,val location:LocationPolicy,private val deviceId:String,private val workRoot:Path=location.path.resolve(".handoff"),private val streamDraftOnly:Boolean=false,
-    private val streamApi:DesktopStreamReceiverApi=NativeDesktopStreamReceiverApi) {
+    private val streamApi:DesktopStreamReceiverApi=NativeDesktopStreamReceiverApi,
+    private val exportGeometry:suspend (WorkbenchProject,WorkflowBinding,SelectionRegion?,ULong)->ImageOutputExportGeometry=::imageOutputExportGeometry) {
     constructor(scope:CoroutineScope,core:WorkbenchCore,host:HostService,location:LocationPolicy,deviceId:String,workRoot:Path):this(scope,core,NativeDesktopHandoff(host),location,deviceId,workRoot)
     private val mutable=MutableStateFlow(EditorState());val state:StateFlow<EditorState> = mutable
     private var precisionClosed=false
@@ -1197,7 +1198,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         requireCurrent(request)
         val p=project?:throw HandoffFailure("Open a project before exporting.")
         if(!request.matches(p.info())){refresh();throw HandoffFailure("The core revision changed. Review it before exporting.")}
-        val projected=try{projectExport(request,p)}catch(error:WorkflowFailure){
+        val projected=try{projectExport(request,p,exportGeometry)}catch(error:WorkflowFailure){
             throw HandoffFailure(when(error.kind){
                 WorkflowFailureKind.Stale,WorkflowFailureKind.Missing,WorkflowFailureKind.Detached,WorkflowFailureKind.Closed ->
                     "The saved output frame or original changed. Reopen the project and prepare this export again."

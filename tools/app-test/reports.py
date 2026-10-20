@@ -23,6 +23,22 @@ TEST = MAIN + ".test"
 RUNNER = "androidx.test.runner.AndroidJUnitRunner"
 CASE = re.compile(r"com\.visualworkbench\.android(?:\.(?:capture|editor|instructions|remote|stream))?\.[A-Za-z][A-Za-z0-9_]*#[A-Za-z][A-Za-z0-9_]*\Z")
 MAX_OUTPUT = 8 * 1024 * 1024
+SURFACE_AWAIT_CASES = frozenset({
+    "com.visualworkbench.android.EditorSurfaceInstrumentedTest#everyDrawingToolPersistsAndCancellationCreatesNoObject",
+    "com.visualworkbench.android.EditorSurfaceInstrumentedTest#textSelectionMoveResizeEraserUndoAndActivityRecreationUseRealCore",
+})
+SURFACE_AWAIT_PHASES = frozenset({
+    "startup", "new-project-and-background", "finish-owned-edits", "close-owned-project",
+    "closed-for-reopen", "reopen-document", "save-text", "delete-selected", "undo-delete",
+    "renderer-after-recreation",
+}) | frozenset(f"{prefix}-{tool}" for prefix in ("input-ready", "gesture") for tool in (
+    "Pen", "Highlighter", "Marker", "Line", "Arrow", "Rectangle", "Ellipse", "Select", "Text", "Eraser",
+))
+SYNC_AWAIT_CASE = "com.visualworkbench.android.EditorSyncInstrumentedTest#oldPageRefreshCannotAdoptOrRebindAfterSameRevisionNavigation"
+SYNC_AWAIT_PHASES = frozenset({
+    "InitialPdfPage", "OldReadEntered", "PageOneAdopted", "OldReadDelivered", "EraserEdit",
+    "FixtureStartup", "FixtureCanvasReady", "FixtureCloseEntered", "FixtureCloseRetained",
+})
 require = common.require
 Rejected = common.Rejected
 
@@ -272,6 +288,8 @@ def failure_observation(text: str, expected: list[str]) -> dict:
     observed = []
     source_frames = []
     exception_kind = None
+    surface_phase = None
+    sync_phase = None
     for line in text.splitlines():
         # Retain only an exact known test class's Kotlin line numbers, never
         # exception messages, assertion values, local paths or arbitrary frames.
@@ -281,6 +299,15 @@ def failure_observation(text: str, expected: list[str]) -> dict:
         kind = re.match(r"INSTRUMENTATION_STATUS: stack=(java\.lang\.(?:AssertionError|IllegalArgumentException|IllegalStateException)|org\.junit\.ComparisonFailure|java\.util\.concurrent\.CancellationException|kotlinx\.coroutines\.(?:TimeoutCancellationException|JobCancellationException)|com\.visualworkbench\.android\.editor\.GiantAndroidCreationFailure)(?::|$)", line)
         if kind:
             exception_kind = kind[1]
+        # Only fixed phase vocabularies may leave the private failure text.
+        # Surface diagnostics inspect the primary assertion prefix, never its
+        # busy/message/blocking tail or a suppressed cleanup assertion.
+        surface_timeout = re.match(r"INSTRUMENTATION_STATUS: stack=java\.lang\.AssertionError: Timed out in ([A-Za-z0-9-]{1,64}):", line)
+        if surface_timeout and surface_timeout[1] in SURFACE_AWAIT_PHASES:
+            surface_phase = surface_timeout[1]
+        sync_timeout = re.fullmatch(r"\s*Suppressed: com\.visualworkbench\.android\.EditorSyncInstrumentedTest\$TimeoutPhase: VW_SYNC_AWAIT_PHASE=([A-Za-z]{1,32})", line)
+        if sync_phase is None and sync_timeout and sync_timeout[1] in SYNC_AWAIT_PHASES:
+            sync_phase = sync_timeout[1]
         if line.startswith("INSTRUMENTATION_STATUS: ") and "=" in line:
             key, value = line[len("INSTRUMENTATION_STATUS: "):].split("=", 1)
             if key in ("class", "test"):
@@ -298,10 +325,16 @@ def failure_observation(text: str, expected: list[str]) -> dict:
                         observation["test_source_lines"] = lines
                     if exception_kind:
                         observation["exception_kind"] = exception_kind
+                    if identity in SURFACE_AWAIT_CASES and exception_kind == "java.lang.AssertionError" and surface_phase:
+                        observation["await_phase"] = surface_phase
+                    if identity == SYNC_AWAIT_CASE and exception_kind == "kotlinx.coroutines.TimeoutCancellationException" and sync_phase:
+                        observation["await_phase"] = sync_phase
                 observed.append(observation)
             fields = {}
             source_frames = []
             exception_kind = None
+            surface_phase = None
+            sync_phase = None
     return {"raw_output_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
             "observed_statuses": observed, "assertions_passed": False}
 

@@ -171,7 +171,10 @@ internal class GiantAndroidCanvas private constructor(
                 owner.published = true
                 return owner
             } catch (error: Throwable) {
-                try { owner.close() } catch (_: Throwable) { throw GiantAndroidCreationFailure(owner) }
+                // Preserve settlement across close's Main dispatcher return to
+                // a cancelled caller; only an actual cleanup failure owns a quarantine.
+                try { withContext(NonCancellable) { owner.close() } }
+                catch (_: Throwable) { throw GiantAndroidCreationFailure(owner) }
                 throw error
             }
         }

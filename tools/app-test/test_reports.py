@@ -132,6 +132,64 @@ class InstrumentationCases(unittest.TestCase):
             text = block(A, 1, 2, -2).replace("INSTRUMENTATION_STATUS_CODE:", stack + "INSTRUMENTATION_STATUS_CODE:")
             self.assertEqual(reports.failure_observation(text, [A])["observed_statuses"], [{"case": A, "status_code": -2}])
 
+    def test_surface_timeout_retains_only_case_bound_fixed_phase(self):
+        for case in reports.SURFACE_AWAIT_CASES:
+            for phase in reports.SURFACE_AWAIT_PHASES:
+                stack = (f"INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Timed out in {phase}: "
+                         "busy=true message=secret project text blocked=/private/path\n")
+                text = block(case, 1, 1, -2).replace("INSTRUMENTATION_STATUS_CODE:", stack + "INSTRUMENTATION_STATUS_CODE:")
+                with self.subTest(case=case, phase=phase):
+                    report = reports.failure_observation(text, [case])
+                    self.assertEqual(report["observed_statuses"], [{"case": case, "status_code": -2,
+                        "exception_kind": "java.lang.AssertionError", "await_phase": phase}])
+                    self.assertNotIn("secret", json.dumps(report))
+                    self.assertNotIn("private", json.dumps(report))
+                    self.refused(text, (case,))
+
+    def test_sync_timeout_keeps_original_kind_and_first_fixed_phase(self):
+        case = reports.SYNC_AWAIT_CASE
+        for phase in reports.SYNC_AWAIT_PHASES:
+            stack = ("INSTRUMENTATION_STATUS: stack=kotlinx.coroutines.TimeoutCancellationException: secret timeout text\n"
+                     f"\tSuppressed: com.visualworkbench.android.EditorSyncInstrumentedTest$TimeoutPhase: VW_SYNC_AWAIT_PHASE={phase}\n"
+                     "\tSuppressed: kotlinx.coroutines.TimeoutCancellationException: private cleanup detail\n"
+                     "\t\tSuppressed: com.visualworkbench.android.EditorSyncInstrumentedTest$TimeoutPhase: VW_SYNC_AWAIT_PHASE=FixtureCloseRetained\n")
+            text = block(case, 1, 1, -2).replace("INSTRUMENTATION_STATUS_CODE:", stack + "INSTRUMENTATION_STATUS_CODE:")
+            with self.subTest(phase=phase):
+                report = reports.failure_observation(text, [case])
+                self.assertEqual(report["observed_statuses"], [{"case": case, "status_code": -2,
+                    "exception_kind": "kotlinx.coroutines.TimeoutCancellationException", "await_phase": phase}])
+                self.assertNotIn("secret", json.dumps(report))
+                self.assertNotIn("private", json.dumps(report))
+                self.refused(text, (case,))
+
+    def test_timeout_phase_rejects_unknown_cases_suffixes_and_wrong_primary_kind(self):
+        surface = sorted(reports.SURFACE_AWAIT_CASES)[0]
+        marker = "\tSuppressed: com.visualworkbench.android.EditorSyncInstrumentedTest$TimeoutPhase: VW_SYNC_AWAIT_PHASE="
+        trials = (
+            (A, "INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Timed out in save-text: secret\n"),
+            (surface, "INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Timed out in save-text-private: secret\n"),
+            (surface, "INSTRUMENTATION_STATUS: stack=java.lang.IllegalStateException: Timed out in save-text: secret\n"),
+            (A, "INSTRUMENTATION_STATUS: stack=kotlinx.coroutines.TimeoutCancellationException: secret\n" + marker + "PageOneAdopted\n"),
+            (reports.SYNC_AWAIT_CASE, "INSTRUMENTATION_STATUS: stack=kotlinx.coroutines.TimeoutCancellationException: secret\n" + marker + "PageOneAdoptedPrivate\n"),
+            (reports.SYNC_AWAIT_CASE, "INSTRUMENTATION_STATUS: stack=kotlinx.coroutines.TimeoutCancellationException: secret\n" + marker + "PageOneAdopted private\n"),
+            (reports.SYNC_AWAIT_CASE, "INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: secret\n" + marker + "PageOneAdopted\n"),
+        )
+        for case, stack in trials:
+            text = block(case, 1, 1, -2).replace("INSTRUMENTATION_STATUS_CODE:", stack + "INSTRUMENTATION_STATUS_CODE:")
+            with self.subTest(case=case, stack_kind=stack.split(":", 2)[1]):
+                report = reports.failure_observation(text, [case])
+                self.assertNotIn("await_phase", report["observed_statuses"][0])
+                self.assertNotIn("secret", json.dumps(report))
+                self.assertNotIn("private", json.dumps(report))
+
+    def test_timeout_phase_cannot_leak_into_next_case_or_success(self):
+        surface = sorted(reports.SURFACE_AWAIT_CASES)[0]
+        stack = "INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Timed out in save-text: secret\n"
+        text = block(surface, 1, 2, 0).replace("INSTRUMENTATION_STATUS_CODE:", stack + "INSTRUMENTATION_STATUS_CODE:")
+        text += block(A, 2, 2, -2)
+        report = reports.failure_observation(text, [surface, A])
+        self.assertEqual(report["observed_statuses"], [{"case": surface, "status_code": 0}, {"case": A, "status_code": -2}])
+
 
 class ArtifactCases(unittest.TestCase):
     def test_only_isolated_manifest_pair_is_admitted(self):

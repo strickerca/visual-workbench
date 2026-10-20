@@ -23,19 +23,34 @@ import org.junit.runner.RunWith
  * are not network, renderer parity, latency or physical-pen acceptance. */
 @RunWith(AndroidJUnit4::class)
 class EditorSyncInstrumentedTest {
+    private enum class AwaitPhase {
+        InitialPdfPage, OldReadEntered, PageOneAdopted, OldReadDelivered, EraserEdit,
+        FixtureStartup, FixtureCanvasReady, FixtureCloseEntered, FixtureCloseRetained,
+    }
+    private class TimeoutPhase(phase: AwaitPhase) : Exception("VW_SYNC_AWAIT_PHASE=${phase.name}")
+    private suspend fun <T> inAwaitPhase(phase: AwaitPhase, body: suspend () -> T): T {
+        try { return body() }
+        catch (error: TimeoutCancellationException) {
+            // Keep the original timeout as the primary failure. Its diagnostic
+            // contributes one fixed enum value, never an editor/private message.
+            error.addSuppressed(TimeoutPhase(phase))
+            throw error
+        }
+    }
+
     @Test fun oldPageRefreshCannotAdoptOrRebindAfterSameRevisionNavigation()=runBlocking {
         fixture { editor,core,_ ->
             val project=core.current
             withContext(Dispatchers.Main){project.pdf=true;project.change(1u,0xff0000ffu)}
-            waitUntil{editor.document?.page==0u&&!editor.documents.state.value.busy}
+            inAwaitPhase(AwaitPhase.InitialPdfPage) { waitUntil{editor.document?.page==0u&&!editor.documents.state.value.busy} }
             val entered=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>();val delivered=CompletableDeferred<Unit>()
             try {
                 withContext(Dispatchers.Main){project.nextRead={captured->entered.complete(Unit);release.await();delivered.complete(Unit);captured};project.change(2u,0x00ff00ffu)}
-                withTimeout(5000){entered.await()}
+                inAwaitPhase(AwaitPhase.OldReadEntered) { withTimeout(5000){entered.await()} }
                 withContext(Dispatchers.Main){editor.documents.page(1u)}
-                waitUntil{editor.document?.page==1u&&!editor.documents.state.value.busy}
+                inAwaitPhase(AwaitPhase.PageOneAdopted) { waitUntil{editor.document?.page==1u&&!editor.documents.state.value.busy} }
                 val revision=withContext(Dispatchers.Main){checkNotNull(editor.document).render.revision}
-                release.complete(Unit);withTimeout(5000){delivered.await()};withContext(Dispatchers.Main){yield()}
+                release.complete(Unit);inAwaitPhase(AwaitPhase.OldReadDelivered) { withTimeout(5000){delivered.await()} };withContext(Dispatchers.Main){yield()}
                 withContext(Dispatchers.Main){
                     assertEquals(1u,editor.document?.page);assertEquals(revision,editor.document?.render?.revision)
                     assertEquals(listOf("page-1-object"),editor.document?.render?.items?.map{it.objectId})
@@ -45,7 +60,7 @@ class EditorSyncInstrumentedTest {
                     val eraser=editor.erasers.interaction
                     assertTrue(eraser.begin(Point(10.0,10.0),checkNotNull(editor.scene).camera));assertTrue(eraser.finish())
                 }
-                waitUntil{project.lastEdit!=null}
+                inAwaitPhase(AwaitPhase.EraserEdit) { waitUntil{project.lastEdit!=null} }
                 withContext(Dispatchers.Main){assertEquals(listOf("page-1-object"),project.lastEdit?.second?.map{(it as EditCommand.Delete).objectId});assertEquals(1u,project.lastEdit?.first?.page)}
             }finally{release.complete(Unit)}
         }
@@ -329,25 +344,48 @@ class EditorSyncInstrumentedTest {
         }
         val store = ViewModelStore()
         var editor: EditorController? = null
+        var primaryFailure: Throwable? = null
         try {
             editor = withContext(Dispatchers.Main) { EditorController(app, core, capture, sessionFactory = { _, _ -> sessions }).also { store.put("sync", it) } }
             val current = checkNotNull(editor)
             try {
-                waitUntil { !current.busy }
+                inAwaitPhase(AwaitPhase.FixtureStartup) { waitUntil { !current.busy } }
                 withContext(Dispatchers.Main) { current.viewport(200, 200, 1f); current.newCanvas() }
-                waitUntil { !current.busy && current.scene?.background != null }
+                inAwaitPhase(AwaitPhase.FixtureCanvasReady) { waitUntil { !current.busy && current.scene?.background != null } }
                 action(current, core, link)
+            } catch (error: Throwable) {
+                primaryFailure = error
+                throw error
             } finally {
-                withContext(NonCancellable + Dispatchers.Main) { store.clear() }
-                withContext(NonCancellable) { withTimeout(10_000) { checkNotNull(current.scope.coroutineContext[Job]).join() } }
+                try {
+                    withContext(NonCancellable + Dispatchers.Main) { store.clear() }
+                    inAwaitPhase(AwaitPhase.FixtureCloseEntered) {
+                        withContext(NonCancellable) { withTimeout(10_000) { checkNotNull(current.scope.coroutineContext[Job]).join() } }
+                    }
+                } catch (cleanup: Throwable) {
+                    val primary = primaryFailure
+                    if (primary == null) throw cleanup
+                    if (primary !== cleanup) primary.addSuppressed(cleanup)
+                }
             }
+        } catch (error: Throwable) {
+            if (primaryFailure == null) primaryFailure = error
+            throw error
         } finally {
-            withContext(NonCancellable + Dispatchers.Main) { store.clear() }
-            withContext(NonCancellable) {
-                // No files/preferences retire unless every entered editor owner
-                // has actually settled. A timeout intentionally retains them.
-                editor?.let { withTimeout(10_000) { checkNotNull(it.scope.coroutineContext[Job]).join() } }
-                withContext(Dispatchers.IO) { app.close() }
+            try {
+                withContext(NonCancellable + Dispatchers.Main) { store.clear() }
+                withContext(NonCancellable) {
+                    // No files/preferences retire unless every entered editor owner
+                    // has actually settled. A timeout intentionally retains them.
+                    editor?.let { retained -> inAwaitPhase(AwaitPhase.FixtureCloseRetained) {
+                        withTimeout(10_000) { checkNotNull(retained.scope.coroutineContext[Job]).join() }
+                    } }
+                    withContext(Dispatchers.IO) { app.close() }
+                }
+            } catch (cleanup: Throwable) {
+                val primary = primaryFailure
+                if (primary == null) throw cleanup
+                if (primary !== cleanup) primary.addSuppressed(cleanup)
             }
         }
     }
