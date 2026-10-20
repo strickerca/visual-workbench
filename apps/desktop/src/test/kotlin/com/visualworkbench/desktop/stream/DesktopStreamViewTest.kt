@@ -332,7 +332,8 @@ class DesktopStreamViewTest {
             assertEquals(2896,canvas.bounds.width)
             dpi=2.0 // WComponentPeer switches configuration before target.getBounds().
             val peerBounds=canvas.bounds // no Canvas.setBounds at the new DPI
-            assertEquals(2896,canvas.width)
+            assertEquals(peerBounds.width,canvas.width)
+            assertEquals(peerBounds.height,canvas.height)
             assertTrue(peerBounds.width in 1..2895)
             assertTrue(peerBounds.height in 1..2895)
             assertTrue(physicalCanvasBytes(peerBounds.width,peerBounds.height,2.0,2.0)<=STREAM_SURFACE_RGBA_MAX)

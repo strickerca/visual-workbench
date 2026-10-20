@@ -104,28 +104,9 @@ internal class DesktopStreamPainter(private val core:WorkbenchCore,private val w
             paintFailed(IllegalArgumentException("Capture destination exceeds its physical surface limit"))
         }
     }
-    private val canvas=object:Canvas() {
+    private val canvas=object:BoundedStreamCanvas(peerTransform,::rejectOversizedPeer) {
         override fun addNotify(){super.addNotify();wake()}
         override fun removeNotify(){pending?.permit?.refuse();pending?.losslessPaint?.cancel();super.removeNotify()}
-        override fun getBounds():Rectangle {
-            val actual=super.getBounds()
-            val scale=peerTransform(this)
-            val bounded=boundedStreamPeerBounds(actual,scale.scaleX,scale.scaleY)
-            if(bounded.width!=actual.width||bounded.height!=actual.height)rejectOversizedPeer()
-            return bounded
-        }
-        override fun setBounds(x:Int,y:Int,width:Int,height:Int){
-            val scale=peerTransform(this)
-            val admitted=width<=0||height<=0||runCatching{
-                physicalCanvasBytes(width,height,scale.scaleX,scale.scaleY)
-            }.isSuccess
-            if(!admitted){
-                super.setBounds(x,y,0,0)
-                rejectOversizedPeer()
-                return
-            }
-            super.setBounds(x,y,width,height)
-        }
         override fun paint(graphics:Graphics){
             val trial=pending
             val slot=if(trial?.permit?.canDisplay()==false)positive else trial?:positive
@@ -166,6 +147,7 @@ internal class DesktopStreamPainter(private val core:WorkbenchCore,private val w
     }
     private fun show(slot:StreamCanvasSlot,strategy:BufferStrategy){
         checkEdt()
+        check(!peerBoundsRejected.get())
         submitStreamBuffer(strategy,{drawSlot(it,slot)},{
             Toolkit.getDefaultToolkit().sync()
             check(canvas.isShowing&&!peerBoundsRejected.get()&&surfaceBytes()<=slot.raster.admittedSurfaceBytes)
