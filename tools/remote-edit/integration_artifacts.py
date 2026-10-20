@@ -5,6 +5,8 @@ import android_entrypoint_preflight
 
 NATIVES=('vw_core.dll','vw_host.dll','vw-connection-helper.exe','vw-capture-helper.exe','vw-hevc-helper.exe','vw-input-helper.exe')
 EXTRA=(
+    'tools/remote-edit/paint_phone.ps1','tools/remote-edit/paint_phone_native.cs',
+    'tools/remote-edit/paint_phone_reports.py','tools/remote-edit/test_paint_phone_reports.py',
     'tools/remote-edit/editor_phone_owner.ps1',
     'apps/desktop/src/test/kotlin/com/visualworkbench/desktop/RemoteOwnedEditorContractTest.kt',
     'tools/remote-edit/owned_editor_contract.ps1','tools/remote-edit/test_owned_editor_contract.ps1',
