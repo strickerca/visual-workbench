@@ -1,6 +1,7 @@
 package com.visualworkbench.desktop.stream
 
 import java.awt.AWTException
+import java.awt.AWTEvent
 import java.awt.BufferCapabilities
 import java.awt.Canvas
 import java.awt.Dimension
@@ -54,6 +55,12 @@ internal open class BoundedStreamCanvas(private val peerTransform:(Canvas)->Affi
     private val imageConfiguration:(Canvas)->GraphicsConfiguration?={it.graphicsConfiguration},
     private val allocate:(Int,Int,Int)->BufferedImage={w,h,type->BufferedImage(w,h,type)}):Canvas() {
     private var ownedStrategy:BufferStrategy?=null
+    private val presentationEpoch=StreamPresentationEpoch(this)
+    internal fun beginDestinationSubmission()=presentationEpoch.begin()
+    override fun coalesceEvents(existing:AWTEvent,event:AWTEvent):AWTEvent? {
+        presentationEpoch.coalescing(event)
+        return super.coalesceEvents(existing,event)
+    }
     private fun bounded():Rectangle {
         val actual=Rectangle(super.getX(),super.getY(),super.getWidth(),super.getHeight())
         val scale=peerTransform(this)
@@ -115,8 +122,12 @@ internal open class BoundedStreamCanvas(private val peerTransform:(Canvas)->Affi
             val target=checkNotNull(this@BoundedStreamCanvas.graphics){"Stream destination graphics disappeared"}
             try {
                 val graphics=target as? Graphics2D?:error("Stream destination graphics are unsupported")
+                // Initial graphics acquisition may restore an empty destination.
+                // Establish its baseline before the first frame write; every
+                // restoration from this point through submission is observed.
+                val operation=beginDestinationSubmission()
                 val source=checkNotNull(backBuffers?.singleOrNull())
-                submitStreamDestination(graphics,
+                submitStreamDestination(graphics,operation,
                     {it.drawImage(source,0,0,width,height,0,0,width,height,null)},
                     {Toolkit.getDefaultToolkit().sync()})
             }finally{target.dispose()}

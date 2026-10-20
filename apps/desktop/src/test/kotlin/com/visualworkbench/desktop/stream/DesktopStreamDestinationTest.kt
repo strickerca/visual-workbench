@@ -31,7 +31,7 @@ class DesktopStreamDestinationTest {
         override fun contentsRestored()=false
         override fun show(){
             val graphics=BufferedImage(2,2,BufferedImage.TYPE_INT_RGB).createGraphics()
-            try{submitStreamDestination(graphics,{surface.dirty=true;true},sync,{surface})}
+            try{submitStreamDestination(graphics,StreamDestinationState{true},{surface.dirty=true;true},sync,{surface})}
             finally{graphics.dispose()}
         }
     }

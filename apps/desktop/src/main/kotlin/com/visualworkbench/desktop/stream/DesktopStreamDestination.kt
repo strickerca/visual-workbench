@@ -11,22 +11,27 @@ internal interface StreamDestinationSurface {
     fun isSubmitted():Boolean
 }
 
-/** The software source can remain valid while D3D restores/clears its window
- * destination during sync. Only the exact rendered destination state, still
- * valid and submitted after sync, can complete a positive receipt. */
-internal fun submitStreamDestination(graphics:Graphics2D,draw:(Graphics2D)->Boolean,sync:()->Unit,
+/** The operation epoch starts before the first destination write and spans
+ * implicit updater calls inside drawImage as well as explicit sync. The later
+ * pixel-state tracker alone cannot detect a frame cleared before its capture. */
+internal fun submitStreamDestination(graphics:Graphics2D,operation:StreamDestinationState,
+    draw:(Graphics2D)->Boolean,sync:()->Unit,
     observe:(Graphics2D)->StreamDestinationSurface?=JdkStreamDestination::observe){
+    check(operation.isCurrent())
     val before=checkNotNull(observe(graphics)){"Desktop stream destination evidence is unavailable"}
     check(before.isValid()&&!before.isLost())
+    check(operation.isCurrent())
     check(draw(graphics))
+    check(operation.isCurrent()){"Desktop stream destination changed during drawing"}
     val rendered=checkNotNull(observe(graphics))
     check(rendered.identity===before.identity&&rendered.isValid()&&!rendered.isLost())
     val state=rendered.state()
-    check(state.isCurrent())
+    check(state.isCurrent()&&operation.isCurrent())
     sync()
+    check(operation.isCurrent())
     val after=checkNotNull(observe(graphics))
     check(after.identity===rendered.identity&&after.isValid()&&!after.isLost()&&
-        state.isCurrent()&&after.isSubmitted()){"Desktop stream destination did not confirm submission"}
+        state.isCurrent()&&after.isSubmitted()&&operation.isCurrent()){"Desktop stream destination did not confirm submission"}
 }
 
 /** OpenJDK 21 destination evidence; no access bypass or guessed success.
