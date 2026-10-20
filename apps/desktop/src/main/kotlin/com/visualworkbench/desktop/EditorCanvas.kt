@@ -214,14 +214,14 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
             finally{if(completed)controller.finishPointerContact()else controller.cancelInput()}
         }}
     ){
-        drawRect(Color(0xff0c1118))
         val current=latest
+        drawEditorSurface(current)
         val frame=prepared?.current(current)?:return@Canvas
         val composed=current.composedBackground?.takeIf{composedCanvasCurrent(current,frame.binding)}
         val background=current.background.takeIf{current.composedBackground==null||composed!=null}
         val giant=latestGiant
         if(current.giantActive&&(giant==null||!controller.giantFrameCurrent(giant,current)))return@Canvas
-        if(background==null&&current.documentFrame==null&&giant==null&&current.composedBackground==null)return@Canvas
+        if(!editorCanvasHasPixels(current,giant!=null))return@Canvas
         if(current.documentFrame!=null&&documentReader?.binding!=current.documentFrame.binding)return@Canvas
         val doc=frame.document
         if(giant!=null&&giant.content!=expectedGiantContent(doc))return@Canvas
@@ -237,7 +237,7 @@ internal fun EditorCanvas(controller:EditorController,state:EditorState,modifier
         var documentTiles:List<PreparedDocumentTile>?=null
         fun document(camera:Transform,scale:Double,smooth:Boolean){
         withTransform({transform(camera.matrix())}){
-            drawRect(Color.White,size=Size(doc.width.toFloat(),doc.height.toFloat()))
+            drawEditorPage(current,doc.width.toFloat(),doc.height.toFloat())
             // Materialized Results replace transparent document samples. The
             // white presentation page stays outside this composited stack.
             drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f,0f,doc.width.toFloat(),doc.height.toFloat()),Paint())

@@ -1,0 +1,142 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-20T09:44:40.591272+00:00",
+  "base_commit": "90c0ee22d5e7d94a56c54068f85bf63ffa481b68",
+  "branch": "cloud/desktop-stream-draft-root-20261020",
+  "scope": "Independent private Desktop borrowed annotation editor and transparent canvas; no normal stream caller activation or held presentation leaves composed.",
+  "files": [
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt",
+      "sha256": "9f26f4ea27596b2a1e897d5f1fee533d882795b7c973fa56a46a458266e81873"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorCanvas.kt",
+      "sha256": "d7abb07245ae4238a1fa6ba4a918c89dd86a14eaa55aba360e40abe1e59d7351"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/StreamDraftCanvas.kt",
+      "sha256": "820d66925634162709fde6beeb8f27bef93a4213930ab4f46dcd0082a353ff04"
+    },
+    {
+      "path": "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/StreamDraftEditorAdapter.kt",
+      "sha256": "23edb882ac2038d59914a281061fa70b0122924c533651b82588d443e82873ec"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/StreamDraftCanvasTest.kt",
+      "sha256": "c216381a5dea5a60dc53a20fe90a82a9315c91cd6b1adb07dc25a7349e96e2df"
+    },
+    {
+      "path": "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/StreamDraftEditorAdapterTest.kt",
+      "sha256": "e238021eeab183046583100a83ac34d8f171178994de6dbd43e763096f1deeb2"
+    },
+    {
+      "path": "docs/DESKTOP_STREAM_BORROWED_DRAFT_20261020.md",
+      "sha256": "8450130a501e8dcfca5ced2ea52165d4cb35f3704da14feee85538e5b0cb8e61"
+    }
+  ],
+  "checks": [
+    {
+      "name": "focused Desktop JVM tests",
+      "exit_code": 0,
+      "tests": 23,
+      "bootstrap": "source /workspace/.vw-tools/cloud-setup/start.sh",
+      "cwd": "apps",
+      "command": "flock -n /workspace/.vw-tools/heavy-build.lock timeout 180s bash ./gradlew --offline --no-daemon --max-workers=2 :desktop:test --tests 'com.visualworkbench.desktop.StreamDraftEditorAdapterTest' --tests 'com.visualworkbench.desktop.StreamDraftCanvasTest' --tests 'com.visualworkbench.desktop.DesktopBackgroundDisplayTest' -x :desktop:packageConnectionRuntime",
+      "build_result": "BUILD SUCCESSFUL in 45s",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/desktop-stream-borrow-overlay-tests-final.log",
+      "log_sha256": "8be27771ac0980dc027d1c6741a7624891a2566f00cc1ab2b836db753e01baec",
+      "suites": [
+        {
+          "name": "com.visualworkbench.desktop.StreamDraftEditorAdapterTest",
+          "tests": "13",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T09:44:02.407Z",
+          "time": "1.886",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.StreamDraftEditorAdapterTest.xml",
+          "sha256": "c1835b4bf0d605ea37ac9b5580e41d428b5fc74ff5c300b24eda23f42719caa2",
+          "methods": [
+            "successfulSealFencesDirectSubcontrollerEntryPoints",
+            "initializationFailureReturnsTheRetainedChildAndBothReadinessAccessorsReportIt",
+            "adapterPublishesPanAndZoomAfterTheExactInitialCamera",
+            "cancelledFactoryDoesNotCancelOrDiscardItsLateBorrowedInitialization",
+            "cancelledParentStillKeepsALateBorrowUntilExternalRetirementJoinsIt",
+            "initializationCannotCloseAndJoinItsOwnChildScope",
+            "heldIndependentEraseRefusesSealAndLeavesLaterOrdinaryEditsAdmitted",
+            "cancelledConcurrentClosersJoinOneDisposalBeforeRetiringTheScope",
+            "retirementCallbackRunsAfterJoinAndCanRetryWithoutDisposingTheControllerAgain",
+            "externalCloseWaitsForInitializationBeforeEnteringActualControllerDisposal",
+            "retainPrecedesSuspendedAcquisitionAndReadyUsesTheExactExternalCamera",
+            "sealDelegatesToTheRealAcceptedEditQueueAndBlocksLaterMutations",
+            "failedControllerDisposalKeepsTheScopeAndExactBorrowForExplicitRetry"
+          ]
+        },
+        {
+          "name": "com.visualworkbench.desktop.StreamDraftCanvasTest",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T09:44:04.581Z",
+          "time": "0.027",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.StreamDraftCanvasTest.xml",
+          "sha256": "c321b6566c23246f904450977c7b5e6150ca717a5da0954178aa0362332e9ed2",
+          "methods": [
+            "draftAdmitsItsBorrowedBackgroundOnlyAndRefusesASecondPixelOwner",
+            "ordinaryPageAndSurfaceKeepTheirOpaquePaint",
+            "retainedSourceRemainsVisibleUnderTransparentAnnotation"
+          ]
+        },
+        {
+          "name": "com.visualworkbench.desktop.DesktopBackgroundDisplayTest",
+          "tests": "7",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "timestamp": "2026-10-20T09:44:04.297Z",
+          "time": "0.281",
+          "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopBackgroundDisplayTest.xml",
+          "sha256": "65034025a1c0b553180bec52982fd28877310f1247a281a81a6e5ea55d91fe55",
+          "methods": [
+            "roleRefreshAndGeneralMessagesCannotEraseTheBackgroundIssue",
+            "onlyExplicitSrgbConsentChangesTheAssumptionForTheCurrentAttachment",
+            "explicitRetryKeepsTheProjectAndFixedBudgetAndClearsTheIssueOnSuccess",
+            "coroutineCancellationWaitsForItsProducerAndNeverPublishesAnImageOrRefusal",
+            "reopeningTheSameProjectResetsTheIssueAndExplicitColorConsent",
+            "ordinaryRequestAndBitmapFailuresRemainNeutralAndBounded",
+            "displayRefusalsKeepTheAdoptedAttachmentAndSpecificFailureKind"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "review": {
+    "reviewer_agent": "/root/tunnel_boundary_review",
+    "model": "gpt-6-astra",
+    "result": "No remaining actionable findings after Save-boundary fix and final regression source review.",
+    "controller_sha256": "9f26f4ea27596b2a1e897d5f1fee533d882795b7c973fa56a46a458266e81873",
+    "adapter_test_sha256": "e238021eeab183046583100a83ac34d8f171178994de6dbd43e763096f1deeb2",
+    "source_review_only": true
+  },
+  "prior_attempt": {
+    "tests": 20,
+    "failures": 1,
+    "reason": "Failed disposal test compared coroutine-recovered exception identity; repaired type/message/original-cause assertion. This attempt is not counted as a pass."
+  },
+  "not_verified": [
+    "Normal Desktop receiver/panel activation",
+    "Held presentation receipt candidate and actual JDK ordering witnesses",
+    "AWT/Compose frozen-source and transparent-overlay composition",
+    "Active rotation and held selection commit journeys",
+    "Windows runtime packaging, launch and PowerShell execution",
+    "Native immutable Save, exact retry, counter reservation and degraded-save consent in the parent caller",
+    "Real stream/freeze/lossless-adoption/Save/resume and joined whole-session retirement",
+    "Device, provider, frame-rate, memory, latency, S Pen, Bluetooth, thermal and owner acceptance"
+  ],
+  "preserved_main_commit": "90c0ee22d5e7d94a56c54068f85bf63ffa481b68"
+}

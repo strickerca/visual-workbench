@@ -27,7 +27,8 @@ data class EditorState(val document:DocumentSnapshot?=null,val background:ImageB
     val originalFormatInfo:OriginalFormatInfo?=null,val originalFormatUnavailable:Boolean=false,
     val composedBackground:RenderBinding?=null,val composedGuideIds:Set<String> = emptySet(),
     val documentFrame:DocumentDrawFrame<AutoCloseable>?=null,val documentPage:UInt=0u,val precision:PrecisionFrame=PrecisionFrame(),
-    val giantOwnerVersion:Long=0L,val giantActive:Boolean=false,val giantReady:Boolean=false,val giantIssue:String?=null,val giantViewport:GiantViewport?=null) {
+    val giantOwnerVersion:Long=0L,val giantActive:Boolean=false,val giantReady:Boolean=false,val giantIssue:String?=null,val giantViewport:GiantViewport?=null,
+    val isStreamDraft:Boolean=false) {
     val exportReady:Boolean get()=exportReceipt?.request?.matches(this)==true
 }
 internal fun composedSelectionGuideIds(document:DocumentSnapshot,controls:DocumentControlSnapshot,
@@ -66,7 +67,7 @@ internal suspend fun retryWithFreshOriginalFormat(refresh:suspend ()->Unit,load:
 private data class Drag(val start:Point,val initial:ViewState,val selected:List<RenderItem>,val bounds:Rect?,val resize:Boolean,val pan:Boolean,val binding:RenderBinding,val live:ObjectPreviewLease?=null,val newObject:NewObjectPreviewLease?=null,val tool:Tool=Tool.Select)
 private data class WidthGesture(val binding:RenderBinding,val items:List<RenderItem>,val live:ObjectPreviewLease?)
 private data class CachedExport(val workspace:TransferWorkspace,val receipt:CompletedExport)
-class EditorController internal constructor(private val scope:CoroutineScope,val core:WorkbenchCore,private val handoff:DesktopHandoff,val location:LocationPolicy,private val deviceId:String,workRoot:Path=location.path.resolve(".handoff")) {
+class EditorController internal constructor(private val scope:CoroutineScope,val core:WorkbenchCore,private val handoff:DesktopHandoff,val location:LocationPolicy,private val deviceId:String,workRoot:Path=location.path.resolve(".handoff"),private val streamDraftOnly:Boolean=false) {
     constructor(scope:CoroutineScope,core:WorkbenchCore,host:HostService,location:LocationPolicy,deviceId:String,workRoot:Path):this(scope,core,NativeDesktopHandoff(host),location,deviceId,workRoot)
     private val mutable=MutableStateFlow(EditorState());val state:StateFlow<EditorState> = mutable
     private var precisionClosed=false
@@ -163,8 +164,8 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
             view.matchingFrame(choice.binding,generation,viewport)?.takeIf{giantChoiceMatches(it,choice,generation,viewport)} else null})
     }
     private val documentOwner:EditorDocuments=EditorDocuments(scope,core,
-        { val p=project;val snapshot=mutable.value.document;if(p!=null&&snapshot!=null&&!closing)DocumentAttachment(p,snapshot,generation)else null },
-        { val s=mutable.value;!closing&&!workflows.blocksInput()&&!frames.state.value.blocksInput&&!s.busy&&queued==0&&!s.exportOpen&&!s.pasteOpen&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(s.textAnchor!=null,s.exportOpen,s.pasteOpen)&&drag==null&&ink==null&&markerPress==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
+        { val p=project;val snapshot=mutable.value.document;if(p!=null&&snapshot!=null&&!closing&&!streamDraftOnly)DocumentAttachment(p,snapshot,generation)else null },
+        { val s=mutable.value;!closing&&!streamDraftOnly&&!streamEditsSealed&&!workflows.blocksInput()&&!frames.state.value.blocksInput&&!s.busy&&queued==0&&!s.exportOpen&&!s.pasteOpen&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(s.textAnchor!=null,s.exportOpen,s.pasteOpen)&&drag==null&&ink==null&&markerPress==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
         { attached,page -> edits.withLock {
             if(project!==attached.project||generation!=attached.epoch||mutable.value.document?.render?.revision?.sameDocumentRevision(attached.snapshot.render.revision)!=true)throw DocumentFailure(DocumentFailureKind.Stale)
             refreshTicket++;documentRefresh.invalidate()
@@ -182,6 +183,77 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     private suspend fun documentOwnerDiscardDraw(){documentOwner.discardDraw()}
     private var project:WorkbenchProject?=null;private var changes:Job?=null;private val edits=Mutex();private var drag:Drag?=null
     private var closing=false;private var queued=0;private var colorAssumed=false;private var generation=0L
+    private var streamBorrow:WorkbenchProject?=null
+    private var streamDocumentId:String?=null
+    private var streamEditsSealed=false
+    private var streamDisposed=false
+    private val streamDisposal=Mutex()
+    private fun streamDraftCurrent():Boolean=streamDraftOnly&&!closing&&project!=null&&project===streamBorrow&&
+        mutable.value.document?.documentId==streamDocumentId&&mutable.value.isStreamDraft
+
+    /** The native annotation session owns this temporary project and all source
+     * pixels. This editor borrows only its document and exact external camera. */
+    internal suspend fun installStreamDraft(value:WorkbenchProject,documentId:String,initialCamera:Camera){
+        check(streamDraftOnly&&!closing&&streamBorrow==null&&project==null)
+        streamBorrow=value;streamDocumentId=documentId;project=value;aiRetiring=true
+        require(initialCamera.center.x.isFinite()&&initialCamera.center.y.isFinite()&&
+            initialCamera.scale.isFinite()&&initialCamera.scale>0&&initialCamera.rotation.isFinite()&&
+            initialCamera.viewportWidth.isFinite()&&initialCamera.viewportWidth>0&&
+            initialCamera.viewportHeight.isFinite()&&initialCamera.viewportHeight>0)
+        val info=value.info()
+        check(documentId in info.documentIds)
+        val snapshot=value.document(documentId)
+        currentCoroutineContext().ensureActive()
+        check(!closing&&project===value&&snapshot.documentId==documentId&&
+            snapshot.render.revision.projectId==info.projectId&&snapshot.width>0u&&snapshot.height>0u&&
+            !snapshot.hasToneAdjustments&&snapshot.render.items.none{it.shape is Shape.Result})
+        generation++;changeSequence=0uL;refreshTicket++
+        update{EditorState(document=snapshot,view=ViewState(camera=initialCamera),tool=Tool.Pen,
+            projectEpoch=generation,isStreamDraft=true)}
+        selections.bind(value,snapshot,generation,changeSequence,initialCamera)
+        erasers.bind(value,snapshot,generation,changeSequence,initialCamera)
+        changes=scope.launch {
+            try{value.changes.collect{event->
+                if(streamDraftCurrent()&&project===value&&event.sequence>changeSequence){
+                    changeSequence=event.sequence
+                    refresh()
+                }
+            }}catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){if(!closing)report("The annotation revision could not refresh. Keep this draft open or discard it explicitly.")}
+        }
+    }
+    /** Independent gesture owners must finish before Save is admitted. Sealing
+     * then retires their idle capabilities and drains accepted ordinary edits
+     * without rejecting their existing native transaction. */
+    internal suspend fun settleStreamEdits(){
+        check(streamDraftCurrent())
+        check(ink==null&&drag==null&&markerPress==null&&documentPress==null&&widthGesture==null&&
+            !selectionPointer&&!eraserPointer&&mutable.value.textAnchor==null&&
+            erasers.state.value.draft==null&&selections.state.value.draft==null&&
+            !erasers.state.value.busy&&!selections.state.value.busy&&!selections.saved.value.saving&&
+            !rotation.state.value.active&&!rotation.state.value.busy&&
+            !instructionEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&
+            !semanticEditor.state.value.busy){"Finish the annotation contact and pending editor operations before saving"}
+        streamEditsSealed=true
+        // Start both retirements before the first suspension can return control
+        // to the UI. Their direct public interaction methods then have no live
+        // backend, even while an ordinary accepted edit is still draining.
+        withContext(NonCancellable){coroutineScope{
+            launch(start=CoroutineStart.UNDISPATCHED){erasers.detach()}
+            launch(start=CoroutineStart.UNDISPATCHED){selections.detach()}
+        }}
+        while(queued!=0||inkWork!=null){currentCoroutineContext().ensureActive();delay(4)}
+        edits.withLock{check(streamDraftCurrent()&&!mutable.value.busy&&queued==0)}
+    }
+    /** Failed cleanup keeps the exact borrow installed. Only the native draft
+     * owner may close its project after this editor's real retirement. */
+    internal suspend fun disposeStreamEditor():Unit=withContext(NonCancellable){streamDisposal.withLock{
+        check(streamDraftOnly)
+        if(streamDisposed)return@withLock
+        streamEditsSealed=true
+        retireEditor()
+        streamBorrow=null;streamDocumentId=null;streamDisposed=true
+    }}
     private val transferFiles=TransferFiles(workRoot);private var transferJob:Job?=null;private var cachedExport:CachedExport?=null
     private var preparedDrag:Pair<CompletedExport,DesktopDragFile>?=null
     private var widthGesture:WidthGesture?=null
@@ -231,6 +303,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
         return state.document?.render?.items?.none{it.shape is Shape.Result} != false || aiResultFrame()!=null
     }
     fun openAi() {
+        if(streamDraftOnly||streamEditsSealed)return
         if(workflows.blocksInput()||frames.state.value.blocksInput)return
         if(documents.state.value.descriptor!=null){report("AI image edits require a raster image document.");return}
         val current=mutable.value
@@ -253,13 +326,13 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     private data class MarkerPress(val binding: RenderBinding, val first: Point, val camera: Camera, val invertSnapping: Boolean, val physical:Transform, var end: Point = first)
     private var markerPress: MarkerPress? = null
     val instructionEditor = InstructionEditor(scope, edits,
-        { val p = project; val d = mutable.value.document; if (p != null && d != null && !closing) InstructionAttachment(p, d) else null },
+        { val p = project; val d = mutable.value.document; if (p != null && d != null && !closing && !streamEditsSealed) InstructionAttachment(p, d) else null },
         { core.newId(System.currentTimeMillis().toULong()) },
         { p -> val info = p.info(); val now = System.currentTimeMillis(); WorkflowMetadata(core.newId(now.toULong()), deviceId, info.nextLamport, now) },
         { refresh() }, InstructionEntryMethod.PcKeyboard, localFocused = ::localInstructionFocused)
     val semanticEditor = SemanticEditor(scope, edits,
-        { val p = project; val d = mutable.value.document; if (p != null && d != null && !closing) InstructionAttachment(p, d) else null },
-        { val s = mutable.value; !closing && !s.busy && !ai.state.value.open && queued == 0 && drag == null && ink == null &&
+        { val p = project; val d = mutable.value.document; if (p != null && d != null && !closing && !streamEditsSealed) InstructionAttachment(p, d) else null },
+        { val s = mutable.value; !closing && !streamEditsSealed && !s.busy && !ai.state.value.open && queued == 0 && drag == null && ink == null &&
             !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy && instructionAdmission.allows(s.textAnchor != null, s.exportOpen, s.pasteOpen) },
         { p -> val info = p.info(); val now = System.currentTimeMillis(); WorkflowMetadata(core.newId(now.toULong()), deviceId, info.nextLamport, now) },
         { refresh() },
@@ -267,8 +340,8 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
             placement.snapshotId, placement.binding) }, interactionChanged = ::instructionInteractionChanged)
     private val instructionAdmission = com.visualworkbench.desktop.instructions.InstructionFocusAdmission { instructionInteractionChanged() }
     val instructionFocus = InstructionFocusController(scope, instructionEditor,
-        { val p = project; val d = mutable.value.document; if (p != null && d != null && !closing) InstructionAttachment(p, d) else null },
-        { !closing && !mutable.value.busy && !semanticEditor.state.value.busy && drag == null && ink == null && widthGesture == null &&
+        { val p = project; val d = mutable.value.document; if (p != null && d != null && !closing && !streamEditsSealed) InstructionAttachment(p, d) else null },
+        { !closing && !streamEditsSealed && !mutable.value.busy && !semanticEditor.state.value.busy && drag == null && ink == null && widthGesture == null &&
             !ai.state.value.open && instructionAdmission.allows(mutable.value.textAnchor != null, mutable.value.exportOpen, mutable.value.pasteOpen) },
         { id, peer -> update { it.copy(selected = setOf(id), canvasFocused = if (peer) false else it.canvasFocused) } },
         selectedObject = { mutable.value.selected.singleOrNull() })
@@ -303,11 +376,11 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     }
     private fun workflowAttachment():EditorWorkflowAttachment? {
         val p=project;val doc=mutable.value.document
-        return if(p!=null&&doc!=null&&!closing)EditorWorkflowAttachment(p,doc,generation,changeSequence,deviceId)else null
+        return if(p!=null&&doc!=null&&!closing&&!streamDraftOnly)EditorWorkflowAttachment(p,doc,generation,changeSequence,deviceId)else null
     }
     private fun workflowIdle():Boolean {
         val s=mutable.value
-        return !closing&&!s.busy&&queued==0&&!s.exportOpen&&!s.pasteOpen&&s.textAnchor==null&&
+        return !closing&&!streamEditsSealed&&!s.busy&&queued==0&&!s.exportOpen&&!s.pasteOpen&&s.textAnchor==null&&
             !ai.state.value.open&&!ai.needsDecision()&&!instructionEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&
             !semanticEditor.state.value.busy&&instructionAdmission.allows(false,false,false)&&
             drag==null&&ink==null&&inkWork==null&&widthGesture==null&&markerPress==null&&documentPress==null&&
@@ -330,7 +403,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
         localViews=::localViewWorkflows,documentControls=::documentControlWorkflows,reviews=::offlineReviews,toneControls=::toneControlWorkflows)
     internal val frames=ImageFramesInteraction(scope,edits,::workflowId,
         metadata={p->val info=p.info();val now=System.currentTimeMillis();WorkflowMetadata(core.newId(now.toULong()),deviceId,info.nextLamport,now)},
-        mayMutate={val s=mutable.value;!closing&&!s.busy&&queued==0&&!workflows.blocksInput()&&
+        mayMutate={val s=mutable.value;!closing&&!streamEditsSealed&&!s.busy&&queued==0&&!workflows.blocksInput()&&
             !ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&
             instructionAdmission.allows(s.textAnchor!=null,s.exportOpen,s.pasteOpen)},
         committed={if(!closing&&project!=null)refresh()},capability=::imageFrameWorkflows)
@@ -356,7 +429,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     private var rotationPreviewIds:Set<String> = emptySet()
     internal val rotation=ObjectRotationInteraction(scope,edits,::workflowId,::objectRotationTransforms,
         current={val p=project;val s=mutable.value;if(p!=null&&s.document!=null&&!closing)ObjectRotationAttachment(p,s.document,generation,s.view.camera,s.selected)else null},
-        mayMutate={val s=mutable.value;!closing&&!s.busy&&queued==0&&!workflows.blocksInput()&&!frames.state.value.blocksInput&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!ai.state.value.open&&instructionAdmission.allows(s.textAnchor!=null,s.exportOpen,s.pasteOpen)},
+        mayMutate={val s=mutable.value;!closing&&!streamEditsSealed&&!s.busy&&queued==0&&!workflows.blocksInput()&&!frames.state.value.blocksInput&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!ai.state.value.open&&instructionAdmission.allows(s.textAnchor!=null,s.exportOpen,s.pasteOpen)},
         commit={request->
             val doc=mutable.value.document
             if(project!==request.project||doc==null||doc.objectRotationFrame(generation,mutable.value.view.camera)!=request.frame)false
@@ -458,7 +531,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
             core.newId(System.currentTimeMillis().toULong()),System.currentTimeMillis(),choice.target,choice.semanticSnapshotId,choice.includeWindowTitle,choice.assumeSrgb,choice.allowDepth))
     }
     fun clearMessage(){update{it.copy(message=null)}}
-    internal fun useSessionService(value:DesktopSessionController){sessionProvider=value}
+    internal fun useSessionService(value:DesktopSessionController){check(!streamDraftOnly);sessionProvider=value}
     /** Bind this explicit local choice to the same project/document/link while
      * the picker is open; a reconnect never redirects the selected source. */
     internal fun liveCaptureDestination(): (suspend (com.visualworkbench.bindings.host.CaptureSelection,String,String,String)->Unit)? {
@@ -525,7 +598,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
 
     fun report(message:String){update{it.copy(message=message)}}
     private fun task(epoch: Long? = null, allowFrameDeparture:Boolean=false, block: suspend () -> Unit): Job? {
-        if (closing) return null
+        if (closing||streamEditsSealed) return null
         if(workflows.blocksInput()||(!allowFrameDeparture&&frames.state.value.blocksInput)||rotationUnavailable()){report("Close the current workflow panel or finish its operation first.");return null}
         if (queued >= 32) { report("The edit queue is full. Wait for current work to finish."); return null }
         queued++
@@ -559,14 +632,15 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     }
     private fun transfer(epoch:Long,block:suspend()->Unit):Job?{if(transferJob?.isActive==true){report("A transfer is already running. Finish or cancel it first.");return null};val job=task(epoch,block=block);transferJob=job;return job}
     private suspend fun discardExport(){preparedDrag?.second?.close();preparedDrag=null;val prior=cachedExport;cachedExport=null;update{it.copy(exportReceipt=null,exportCheck=null,dragPrepared=false)};prior?.workspace?.close()}
-    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);cancelInput();live.close();changes?.cancelAndJoin();discardExport();frames.beginDeparture();frames.detach();workflows.detach();rotation.detach();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.detach();if(!precisionClosed)precision.reset();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;approvedGiantSourceId=null;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();documentOwner.bind(value,snapshot);fit();bindWorkflows();enterWorkflows();refreshOriginalFormatNotice();loadBackground();refreshRole(value,generation)
+    private suspend fun attach(value:WorkbenchProject,path:Path){var adopted=false;var instructionSeal=false;try{check(!streamDraftOnly){"The annotation editor cannot replace its borrowed project"};if(!sealInstructionsForClose())return;instructionSeal=true;if(!mayCloseAi())return;val info=value.info();val doc=info.documentIds.firstOrNull()?:error("Project has no document");val snapshot=value.document(doc);cancelInput();live.close();changes?.cancelAndJoin();discardExport();frames.beginDeparture();frames.detach();workflows.detach();rotation.detach();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.detach();if(!precisionClosed)precision.reset();project?.close();project=null;if(closing)return;generation++;changeSequence=0uL;refreshTicket++;project=value;aiRetiring=false;adopted=true;colorAssumed=false;approvedGiantSourceId=null;update{EditorState(path=path,view=it.view.copy(peer=null),document=snapshot,projectEpoch=generation,canvasFocused=it.canvasFocused,busy=true,exportSettings=ExportSettings(encoding=if(snapshot.bitDepth>8u)ExportEncoding.Png16 else ExportEncoding.Png8))};selections.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(value,snapshot,generation,changeSequence,mutable.value.view.camera);instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh();documentOwner.bind(value,snapshot);fit();bindWorkflows();enterWorkflows();refreshOriginalFormatNotice();loadBackground();refreshRole(value,generation)
         changes=scope.launch{try{value.changes.collect{event->if(project===value&&event.sequence>changeSequence){giantOwner.observe(event.project);workflows.observe(event.project,event.sequence);frames.observe(event.sequence);erasers.observe(event);selections.observe(event);changeSequence=event.sequence;val current=mutable.value.document?.render?.revision;if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash)&&mutable.value.composedBackground!=null)update{it.copy(background=null,canvasReady=false)};if(current!=null&&(event.project.hostSeq!=current.hostSeq||event.project.stateHash!=current.stateHash||event.project.nextLamport!=current.nextLamport))refresh()else bindWorkflows(false)}}}catch(cancel:CancellationException){throw cancel}catch(_:Exception){report("The saved revision could not be refreshed. Reopen the project to retry.")}}
         }finally{withContext(NonCancellable){
-            try { if(!adopted)value.close() }
+            try { if(!adopted&&value!==streamBorrow)value.close() }
             finally { if(instructionSeal&&!closing){instructionEditor.detach();instructionEditor.resume();semanticEditor.resumeAfterReplacement();instructionEditor.refresh();instructionFocus.revisionChanged()} }
         }}
     }
     private suspend fun refreshOriginalFormatNotice(){
+        if(streamDraftOnly)return
         if(documents.state.value.descriptor!=null){update{it.copy(originalFormatNotice=null,originalFormatInfo=null,originalFormatUnavailable=false)};return}
         val owner=project?:return
         val formats=owner as? WorkbenchOriginalFormats?:return
@@ -590,6 +664,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         }
     }
     private suspend fun loadBackground(forceGiantReplace:Boolean=false){
+        if(streamDraftOnly){check(streamDraftCurrent());return}
         val p=project?:return;val doc=mutable.value.document?:return;val epoch=generation;val assumed=colorAssumed;val ticket=refreshTicket
         if(documents.state.value.descriptor!=null){detachGiant();update{it.copy(background=null,composedBackground=null,composedGuideIds=emptySet(),needsColorConsent=false,backgroundIssue=null,backgroundFailureKind=null)};return}
         if(giantDisplayRequired(doc)){loadGiantBackground(p,doc,forceGiantReplace);return}
@@ -638,7 +713,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
                 else "Image display could not finish. The project remains open; retry the image display.",backgroundFailureKind=null)}
         }
     }
-    fun retryBackground():Job?=task(generation){
+    fun retryBackground():Job?=if(streamDraftOnly)null else task(generation){
         retryWithFreshOriginalFormat(::refreshOriginalFormatNotice){loadBackground(forceGiantReplace=true)}
     }
     fun assumeSrgb(){task(generation){
@@ -684,6 +759,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     }
     fun importImage(path:Path)=importFile(ImportRequest(generation,path.toAbsolutePath().normalize()))
     fun importFile(request: ImportRequest, onStaged: (Boolean) -> Unit = {}, retainAcceptedDrop: Boolean = false): Job? {
+        if(streamDraftOnly){onStaged(false);report("The annotation editor cannot replace its borrowed project.");return null}
         val completed = java.util.concurrent.atomic.AtomicBoolean(false)
         fun finish(value: Boolean) { if (completed.compareAndSet(false, true)) onStaged(value) }
         val job = transfer(request.epoch) {
@@ -722,11 +798,12 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     private suspend fun createImported(input:Path,work:Path,title:String){if(documents.state.value.descriptor!=null){documents.settle();documentOwner.discardDraw()};val streaming=core as? WorkbenchStreamingCore?:throw HandoffFailure("Streaming import is unavailable in this core binding.");val kind=if('.' in title)ordinaryImportKind(title.substringAfterLast('.'))else OrdinaryImportKind.Image;if(kind==OrdinaryImportKind.Unsupported||kind==OrdinaryImportKind.PdfCompatibleAi)throw HandoffFailure("This source needs a supported image or document import route.");val time=System.currentTimeMillis();val id=core.newId(time.toULong());val destination=location.path.toAbsolutePath().resolve("$id.vwb");withContext(Dispatchers.IO){Files.createDirectories(location.path)};val value=try{createOrdinaryImageProject(kind,streaming,CreateFileProject(destination.toString(),id,core.newId(time.toULong()),core.newId(time.toULong()),deviceId,title.take(256),input.toString(),work.toString(),time))}catch(error:CoreFailure){if(error.kind==CoreFailureKind.Raster)throw HandoffFailure("Image import refused. Images over 50 MP, unsupported profiles and sources exceeding the 256 MiB memory budget are not accepted; the original was not resized.");throw error};attach(value,destination);if(project!==value)throw HandoffFailure("The imported image could not be adopted. The source remains unchanged.")}
     fun showPaste(){if(!mutable.value.busy&&!frames.state.value.blocksInput)update{it.copy(pasteOpen=true)}}
     fun dismissPaste(){update{it.copy(pasteOpen=false)}}
-    fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
+    fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){if(streamDraftOnly){report("The annotation editor cannot replace its borrowed project.");return};update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
     fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one image, PDF-compatible AI or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension!="mp4"&&ordinaryImportKind(extension)==OrdinaryImportKind.Unsupported){report("This drop supports admitted images, embedded RAW previews, flattened PSD/PSB composites, PDF-compatible AI and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
-    fun open(path:Path,epoch:Long=generation){task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
-    suspend fun close(){closing=true;frames.beginDeparture();workflows.beginDeparture();giantOwner.invalidate();transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();frames.close();workflows.close();rotation.close();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.close();closePrecision();project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
-    fun closeProject(){if(!mayCloseAi())return;if(!mayCloseInstructions(allowFrameRetirementRetry=true))return;frames.active(false);cancelInput();sessionWork?.cancel();val epoch=generation;val closingTask=task(epoch,allowFrameDeparture=true){
+    fun open(path:Path,epoch:Long=generation){if(streamDraftOnly){report("The annotation editor cannot replace its borrowed project.");return};task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
+    suspend fun close(){if(streamDraftOnly)disposeStreamEditor()else retireEditor()}
+    private suspend fun retireEditor(){closing=true;frames.beginDeparture();workflows.beginDeparture();giantOwner.invalidate();transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();frames.close();workflows.close();rotation.close();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.close();closePrecision();if(!streamDraftOnly)project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
+    fun closeProject(){if(streamDraftOnly){report("Close this annotation through its stream owner.");return};if(!mayCloseAi())return;if(!mayCloseInstructions(allowFrameRetirementRetry=true))return;frames.active(false);cancelInput();sessionWork?.cancel();val epoch=generation;val closingTask=task(epoch,allowFrameDeparture=true){
         // The pre-enqueue check can become stale while another owner holds
         // edits. task has now set busy under that same mutex, fencing Send.
         if(!mayCloseAi()){frames.detach();bindWorkflows(false);return@task}
@@ -753,15 +830,17 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         val currentInfo=p.info()
         if(project!==p||epoch!=generation||ticket!=refreshTicket||observed<changeSequence||!documentRefresh.accepts(fetched.ticket,mutable.value.document,snapshot))return
         if(currentInfo.hostSeq!=snapshot.render.revision.hostSeq||currentInfo.stateHash!=snapshot.render.revision.stateHash)return
+        if(streamDraftOnly)check(snapshot.documentId==streamDocumentId&&!snapshot.hasToneAdjustments&&snapshot.render.items.none{it.shape is Shape.Result})
         when(snapshotDecision(mutable.value.document,snapshot,allowVisibleChange=true)){
             SnapshotDecision.Stale->return
-            SnapshotDecision.Duplicate->{selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);bindWorkflows();return}
+            SnapshotDecision.Duplicate->{if(!streamEditsSealed){selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)};if(!streamDraftOnly)bindWorkflows();return}
             SnapshotDecision.Conflict->{cancelDrag();update{it.copy(canvasReady=false,renderIssue="The same revision returned different content. Reopen the project before editing.")};return}
             SnapshotDecision.Newer->{
                 cancelDrag();cancelWidth();update{it.copy(document=snapshot,selected=it.selected.intersect(snapshot.render.items.filterNot{item->item.locked}.map{item->item.objectId}.toSet()),preview=emptyMap(),previewStyles=emptyMap(),draft=null,peerFrame=null,exportReceipt=null,exportCheck=null,canvasReady=false,renderIssue=null)}
             }
         }
-        selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)
+        if(!streamEditsSealed){selections.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera);erasers.bind(p,snapshot,generation,changeSequence,mutable.value.view.camera)}
+        if(streamDraftOnly){check(streamDraftCurrent()&&!snapshot.hasToneAdjustments&&snapshot.render.items.none{it.shape is Shape.Result});return}
         instructionEditor.refresh();instructionFocus.revisionChanged();semanticEditor.refresh()
         documentOwner.bind(p,snapshot)
         bindWorkflows()
@@ -805,7 +884,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     fun clearSelection(){instructionFocus.localSelection(null);cancelInput();update{it.copy(selected=emptySet(),preview=emptyMap(),draft=null,textAnchor=null)}}
     private fun pointerAllowed(panButton:Boolean):Boolean {
         val s=mutable.value
-        return !closing&&!rotationUnavailable()&&!workflows.blocksInput()&&!frames.state.value.blocksInput&&!ai.state.value.open&&(panButton||s.tool==Tool.Pan||aiResultReady())&&!s.busy&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&s.document!=null&&(s.background!=null||s.documentFrame!=null||giantInputReady())&&s.backgroundIssue==null&&
+        return !closing&&!streamEditsSealed&&!rotationUnavailable()&&!workflows.blocksInput()&&!frames.state.value.blocksInput&&!ai.state.value.open&&(panButton||s.tool==Tool.Pan||aiResultReady())&&!s.busy&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&s.document!=null&&(s.background!=null||s.documentFrame!=null||giantInputReady()||streamDraftCurrent())&&s.backgroundIssue==null&&
             (!s.document.hasToneAdjustments||composedInputReady(s))&&
             (s.canvasReady||panButton||s.tool==Tool.Pan)&&s.renderIssue==null&&s.textAnchor==null&&!s.exportOpen&&!s.pasteOpen&&instructionAdmission.allows(false,false,false)
     }
@@ -850,7 +929,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         }finally{precisionContact=false;precision.end()}
     }
     fun precisionHover(raw:Point?){if(!closing)precision.hover(raw)}
-    fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false,physical:Transform?=null,raw:Point=viewPoint){if(rotationUnavailable()||workflows.blocksInput()||frames.state.value.blocksInput||ai.state.value.open||(!panButton&&mutable.value.tool!=Tool.Pan&&!aiResultReady()))return;val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||(s.background==null&&s.documentFrame==null&&!giantInputReady())||s.backgroundIssue!=null||(s.document.hasToneAdjustments&&!composedInputReady(s))||documents.state.value.busy||(!s.canvasReady&&!panButton&&s.tool!=Tool.Pan)||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||(s.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
+    fun pointerDown(viewPoint:Point,extend:Boolean,panButton:Boolean,uptimeMs:Long=System.nanoTime()/1_000_000,pressure:Float=1f,semanticModifier:Boolean=false,physical:Transform?=null,raw:Point=viewPoint){if(streamEditsSealed||closing||rotationUnavailable()||workflows.blocksInput()||frames.state.value.blocksInput||ai.state.value.open||(!panButton&&mutable.value.tool!=Tool.Pan&&!aiResultReady()))return;val s=mutable.value;if(s.busy||instructionEditor.state.value.busy||semanticEditor.state.value.busy||s.document==null||(s.background==null&&s.documentFrame==null&&!giantInputReady()&&!streamDraftCurrent())||s.backgroundIssue!=null||(s.document.hasToneAdjustments&&!composedInputReady(s))||documents.state.value.busy||(!s.canvasReady&&!panButton&&s.tool!=Tool.Pan)||s.renderIssue!=null)return;val binding=s.document.binding(generation);val point=core.mapPoints(s.view.camera,true,listOf(viewPoint)).single();val pan=panButton||(s.tool==Tool.Pan&&!selections.state.value.active&&!erasers.state.value.active)
         if(!pan&&s.tool==Tool.Select&&erasers.tools.route()==EraserInputRoute.Editor&&startRotation(s,point,raw,physical?:core.cameraMatrix(s.view.camera)))return
         if(!pan)when(erasers.tools.route()){
             EraserInputRoute.Selection->{selectionPointer=selections.interaction.begin(viewPoint,s.view.camera);return}
