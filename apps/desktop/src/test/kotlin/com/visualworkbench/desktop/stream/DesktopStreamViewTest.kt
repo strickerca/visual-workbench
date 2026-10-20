@@ -7,6 +7,8 @@ import org.junit.Assert.*
 import org.junit.Test
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
+import java.awt.Canvas
+import java.awt.geom.AffineTransform
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -312,12 +314,32 @@ class DesktopStreamViewTest {
         val failures=mutableListOf<Throwable>()
         val painter=DesktopStreamPainter(core,{}, {},failures::add)
         SwingUtilities.invokeAndWait {
-            painter.container.setSize(8192,8192)
+            painter.container.setSize(4096,4096)
             painter.container.doLayout()
-            assertTrue(failures.isNotEmpty())
             assertEquals(0,painter.container.getComponent(0).width)
-            painter.retire()
         }
+        SwingUtilities.invokeAndWait {assertTrue(failures.isNotEmpty());painter.retire()}
+    }
+
+    @Test fun peerDpiReplacementIsBoundedWithoutCanvasSetBounds() {
+        val failures=mutableListOf<Throwable>()
+        var dpi=1.0
+        val painter=DesktopStreamPainter(core,{}, {},failures::add,
+            {_:Canvas->AffineTransform.getScaleInstance(dpi,dpi)})
+        SwingUtilities.invokeAndWait {
+            val canvas=painter.container.getComponent(0) as Canvas
+            canvas.setBounds(0,0,2896,2896)
+            assertEquals(2896,canvas.bounds.width)
+            dpi=2.0 // WComponentPeer switches configuration before target.getBounds().
+            val peerBounds=canvas.bounds // no Canvas.setBounds at the new DPI
+            assertEquals(2896,canvas.width)
+            assertTrue(peerBounds.width in 1..2895)
+            assertTrue(peerBounds.height in 1..2895)
+            assertTrue(physicalCanvasBytes(peerBounds.width,peerBounds.height,2.0,2.0)<=STREAM_SURFACE_RGBA_MAX)
+            assertTrue(physicalCanvasBytes(peerBounds.width,peerBounds.height,2.0,2.0)*
+                STREAM_PLATFORM_SURFACE_COPIES<=STREAM_PLATFORM_SURFACE_RESERVE)
+        }
+        SwingUtilities.invokeAndWait {assertTrue(failures.isNotEmpty());painter.retire()}
     }
 
     @Test fun failedStrategyRetirementRetainsTheNativeSurfaceCharge()=runBlocking {

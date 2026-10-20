@@ -50,7 +50,8 @@ class DesktopStreamPixelsTest {
         assertEquals(4L*151L*76L,physicalCanvasBytes(100,50,1.501,1.501))
         val size=streamRasterSize(frame)
         assertEquals((size.bytes.toLong()*3L+STREAM_ROW_REPLY_MAX+16L*1024L).toULong(),streamRasterCharge(size))
-        assertEquals(3L*STREAM_SURFACE_RGBA_MAX,STREAM_PLATFORM_SURFACE_RESERVE)
+        assertEquals(2L*3L*STREAM_SURFACE_RGBA_MAX,STREAM_PLATFORM_SURFACE_RESERVE)
+        assertThrows(IllegalArgumentException::class.java){physicalCanvasBytes(4096,4096,1.0,1.0)}
         assertThrows(IllegalArgumentException::class.java){physicalCanvasBytes(8192,8192,3.0,3.0)}
     }
 

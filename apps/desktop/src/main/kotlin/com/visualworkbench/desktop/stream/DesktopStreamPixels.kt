@@ -11,10 +11,11 @@ import java.awt.image.DataBufferInt
 
 internal const val STREAM_ROW_REPLY_MAX = 256 * 1024
 internal const val STREAM_FRAME_RGBA_MAX = 32 * 1024 * 1024
-internal const val STREAM_SURFACE_RGBA_MAX = 64 * 1024 * 1024
-// Admit the full supported native envelope once before BufferStrategy exists.
-// It remains held even if resize/DPI changes the backing before the next draw.
-internal const val STREAM_PLATFORM_SURFACE_COPIES = 3L
+// Windows WComponentPeer creates replacement front/back surfaces before it
+// flushes the old ones. Bound one generation to 32 MiB and reserve two
+// generations of three surfaces before BufferStrategy exists.
+internal const val STREAM_SURFACE_RGBA_MAX = 32 * 1024 * 1024
+internal const val STREAM_PLATFORM_SURFACE_COPIES = 6L
 internal const val STREAM_PLATFORM_SURFACE_RESERVE = STREAM_SURFACE_RGBA_MAX.toLong()*STREAM_PLATFORM_SURFACE_COPIES
 
 internal data class StreamRasterSize(val width:Int,val height:Int,val rowBytes:Int,val bytes:Int)
