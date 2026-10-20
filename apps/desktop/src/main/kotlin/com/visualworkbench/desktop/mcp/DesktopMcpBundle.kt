@@ -43,6 +43,7 @@ internal class DesktopMcpBundle private constructor(
         internal fun prepare(parent:Path,resources:NativeResources,guard:NativeFileGuard,progress:McpStartupProgress?=null):DesktopMcpBundle{
             val pins=mutableListOf<AutoCloseable>()
             var stage=McpFailureStage.bundle_parents
+            var capacityRefusal:McpRefused?=null
             try{
                 progress?.phase(stage)
                 require(parent.isAbsolute && parent==parent.normalize())
@@ -61,7 +62,12 @@ internal class DesktopMcpBundle private constructor(
                 directory(base,guard,pins)
                 val folder=base.resolve(key)
                 if(!Files.exists(folder,LinkOption.NOFOLLOW_LINKS)){
-                    Files.newDirectoryStream(base).use{stream->require(stream.take(9).count()<8)}
+                    Files.newDirectoryStream(base).use{stream->
+                        if(stream.take(9).count()>=8){
+                            val refused=McpRefused(McpFailureStage.bundle_extract,McpRefusalDetail.cache_capacity)
+                            capacityRefusal=refused;throw refused
+                        }
+                    }
                     Files.createDirectory(folder);guard.check(folder);pins+=guard.pinDirectory(folder)
                     write(folder.resolve("owner"),("VisualWorkbench MCP server v1\n"+key+"\n").toByteArray())
                     val runtime=folder.resolve("runtime");directory(runtime,guard,pins)
@@ -101,7 +107,13 @@ internal class DesktopMcpBundle private constructor(
                 progress?.phase(stage)
                 val verified=McpRuntime.verify(runtime,entries.associate{it.name to it.hash},serverOnly=true,progress=progress)
                 return DesktopMcpBundle(verified,pins.toList())
-            }catch(error:Exception){pins.asReversed().forEach{runCatching{it.close()}};throw McpRefused(stage)}
+            }catch(error:Exception){
+                pins.asReversed().forEach{runCatching{it.close()}}
+                // Only our actual capacity check can attach this guidance;
+                // another resource/guard refusal cannot impersonate it.
+                val detail=capacityRefusal?.takeIf{it===error && stage==McpFailureStage.bundle_extract}?.detail
+                throw McpRefused(stage,detail)
+            }
             // Partial or preexisting bundles are intentionally retained; no path-based cleanup.
         }
         private fun directory(path:Path,guard:NativeFileGuard,pins:MutableList<AutoCloseable>){

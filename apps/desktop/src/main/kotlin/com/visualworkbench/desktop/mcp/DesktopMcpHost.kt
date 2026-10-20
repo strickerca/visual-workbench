@@ -37,7 +37,9 @@ internal enum class McpFailureStage {
     unknown, bundle_parents, bundle_manifest, bundle_extract, bundle_markers,
     bundle_inventory, bundle_verify, service_root, catalog, inbox, capture_helper, host_ready, coordinator,
 }
-internal class McpRefused(val stage: McpFailureStage = McpFailureStage.unknown) : Exception("The local MCP operation was refused.")
+internal enum class McpRefusalDetail { cache_capacity }
+internal class McpRefused(val stage: McpFailureStage = McpFailureStage.unknown,
+    val detail: McpRefusalDetail? = null) : Exception("The local MCP operation was refused.")
 
 /** Terminate the owned supervisor before touching inherited pipe streams: a
  * writer may hold their monitor while a hung child refuses to drain stdin.

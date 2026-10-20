@@ -89,7 +89,7 @@ internal class McpDesktopOwned(override val coordinator:DesktopMcpCoordinator,pr
     override suspend fun close(){withContext(NonCancellable){coordinator.close();bundle.close()}}
 }
 internal data class McpLifetimeState(val starting:Boolean=false,val owner:DesktopMcpCoordinator?=null,val issue:String?=null,val closed:Boolean=false,
-    val failureStage:McpFailureStage?=null)
+    val failureStage:McpFailureStage?=null,val failureDetail:McpRefusalDetail?=null)
 internal class DesktopMcpLifetime private constructor(create:suspend(McpStartupProgress)->McpDesktopServiceOwner,
     internal val startupProgress:McpStartupProgress) {
     internal constructor(create:suspend()->McpDesktopServiceOwner):this({_->create()},McpStartupProgress())
@@ -110,9 +110,15 @@ internal class DesktopMcpLifetime private constructor(create:suspend(McpStartupP
             val service=cycles.start()
             synchronized(lock){if(generation==epoch&&!mutable.value.closed)mutable.value=McpLifetimeState(owner=service.coordinator)}
         }catch(error:CancellationException){throw error}
-        catch(error:Exception){synchronized(lock){if(generation==epoch&&!mutable.value.closed)mutable.value=McpLifetimeState(
-            failureStage=(error as? McpRefused)?.stage?:McpFailureStage.unknown,
-            issue="The packaged MCP service is unavailable or its runtime inventory failed verification. Rebuild the complete MCP package; no alternate listener was started.")}}
+        catch(error:Exception){
+            val refusal=error as? McpRefused
+            val detail=refusal?.detail?.takeIf{refusal.stage==McpFailureStage.bundle_extract && it==McpRefusalDetail.cache_capacity}
+            synchronized(lock){if(generation==epoch&&!mutable.value.closed)mutable.value=McpLifetimeState(
+                failureStage=refusal?.stage?:McpFailureStage.unknown,failureDetail=detail,
+                issue=if(detail==McpRefusalDetail.cache_capacity)
+                    "The local MCP runtime cache has reached its limit of 8 entries. Close every Workbench instance and agent handoff, then ask the build owner to review cache ownership and use before removing anything. Retry after a reviewed slot is available. Rebuilding alone does not free a cache slot."
+                else "The packaged MCP service is unavailable or its runtime inventory failed verification. Rebuild the complete MCP package; no alternate listener was started.")}
+        }
         finally{synchronized(lock){if(generation==epoch&&!mutable.value.closed)mutable.value=mutable.value.copy(starting=false)}}
     }
     suspend fun stop(){withContext(NonCancellable){
