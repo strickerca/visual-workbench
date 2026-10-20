@@ -1,0 +1,93 @@
+{
+  "checks": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/assisted-selection/license-audit/notice_disposition.py",
+      "exit_code": 0,
+      "result": "NOTICE_DISPOSITION_OK; all 125 preserved files and 5 original JSON records match"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/assisted-selection/license-audit/audit.py --source-only",
+      "exit_code": 0,
+      "result": "LICENSE_SOURCE_ONLY_OK; 71 wheels, 258 native files, 118 copied nonempty texts, production_admitted=false"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/assisted-selection/license-audit -p 'test_*.py' -v",
+      "errors": 0,
+      "exit_code": 0,
+      "failures": 0,
+      "tests": 11
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/android-tunnel -p 'test_*.py' -v",
+      "errors": 0,
+      "exit_code": 0,
+      "failures": 0,
+      "tests": 11
+    },
+    {
+      "command": "python3 tools/check_setup.py all",
+      "exit_code": 0,
+      "result": "SETUP ids: PASS; SETUP third-party: PASS; SETUP workspace: PASS"
+    }
+  ],
+  "disposition": {
+    "bytes": 41908,
+    "path": "docs/license-proposals/disposition.json",
+    "sha256": "4c977a0af42aa66d5f5c53805fb78599f92dd25ab1c7df9c9f81149a8dfbe05b"
+  },
+  "limits": [
+    "No full private model/wheel/sdist audit rerun",
+    "No new download, model conversion, provider, DLL, device or application runtime execution",
+    "No Cargo, Gradle or Git command",
+    "No runtime/native aggregate/license or model gate approval"
+  ],
+  "preserved_files": {
+    "assisted-selection": 118,
+    "bytes": 1428759,
+    "scrcpy": 7,
+    "total": 125
+  },
+  "production_admitted": false,
+  "root_license_register": {
+    "bytes": 9401,
+    "path": "third_party/LICENSES",
+    "sha256": "c50654ea4ed2b1a2e20d93b0d11729ea29cbbf5e802feb9bf0c4c2d373bc5c34",
+    "unchanged_by_disposition": true
+  },
+  "schema": "vw-unadmitted-notice-disposition-verification-v1",
+  "source_revision": "27052c34af20cf779039ebcf95b975e69c2ac796",
+  "source_state": "dirty integration tree; unrelated parent and lane work preserved",
+  "tooling_and_explanation": [
+    {
+      "bytes": 6439,
+      "path": "tools/assisted-selection/license-audit/notice_disposition.py",
+      "sha256": "b4e408c46a66570d3e6616d998702e0fc2730198709585353a1de5c9d5a12edb"
+    },
+    {
+      "bytes": 26081,
+      "path": "tools/assisted-selection/license-audit/audit.py",
+      "sha256": "9148504d1c1a0e31aec0e3514dcdc15f552a9bd913b7681eb3feb988c5c8795d"
+    },
+    {
+      "bytes": 5595,
+      "path": "tools/assisted-selection/license-audit/test_audit.py",
+      "sha256": "e9a065f8d40946e6018b51b21bd0e84ef4fb72fa7f2b2e9a9d6c1c65a700aada"
+    },
+    {
+      "bytes": 4127,
+      "path": "tools/assisted-selection/license-audit/test_notice_disposition.py",
+      "sha256": "6708ad4150651585edbeab0f43a763910e80a4c89d4158fdbcf92d37f92610c5"
+    },
+    {
+      "bytes": 11885,
+      "path": "tools/android-tunnel/test_scrcpy_runtime.py",
+      "sha256": "1e72205e45f400509c6c8e3c533e5c539414a75b3774df5d2bce965e4792bf61"
+    },
+    {
+      "bytes": 4215,
+      "path": "docs/license-proposals/README.md",
+      "sha256": "548ff8580a4eb228516820dcfa23a6e3fcb2806e6e8b61e81086b08afd628108"
+    }
+  ],
+  "verified_at_utc": "2026-10-20T08:40:44.293113+00:00"
+}

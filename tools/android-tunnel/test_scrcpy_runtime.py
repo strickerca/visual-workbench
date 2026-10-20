@@ -19,6 +19,12 @@ import sys
 sys.modules[SPEC.name] = runtime
 SPEC.loader.exec_module(runtime)
 
+DISPOSITION_SPEC = importlib.util.spec_from_file_location(
+    "notice_disposition", runtime.ROOT / "tools/assisted-selection/license-audit/notice_disposition.py")
+assert DISPOSITION_SPEC and DISPOSITION_SPEC.loader
+notice_disposition = importlib.util.module_from_spec(DISPOSITION_SPEC)
+DISPOSITION_SPEC.loader.exec_module(notice_disposition)
+
 
 def pe64() -> bytes:
     content = bytearray(256)
@@ -67,11 +73,13 @@ def bundle(directory: Path, *, drop: str | None = None, extra: str | None = None
 
 
 class ScrcpyRuntimeTest(unittest.TestCase):
-    def test_checked_in_inventory_and_public_notice_bytes_are_complete(self):
+    def test_checked_in_inventory_and_unadmitted_notice_proposals_are_complete(self):
         pinned = runtime._pinned_inventory()
         self.assertEqual(runtime.PIN.retain, {row["name"] for row in pinned["files"]})
         self.assertEqual(runtime.PIN.omit, {row["name"] for row in pinned["excluded"]})
-        notices = runtime.ROOT / "third_party" / "notices" / "scrcpy"
+        disposition = notice_disposition.load(runtime.ROOT)
+        notices = notice_disposition.resolve(
+            runtime.ROOT, "third_party/notices/scrcpy/SOURCES.json", disposition).parent
         sources = json.loads((notices / "SOURCES.json").read_text(encoding="utf-8"))
         self.assertEqual("vw.scrcpy-source-notices.v1", sources["schema"])
         for row in sources["files"]:
@@ -89,6 +97,13 @@ class ScrcpyRuntimeTest(unittest.TestCase):
                          {row["path"]: row["sha256"] for row in proposal["binary_and_resource_entries"]})
         self.assertEqual({"notices/scrcpy/" + row["path"]: row["source_url"] for row in sources["files"]},
                          {row["path"]: row["source_url"] for row in proposal["source_notice_entries"]})
+        for row in proposal["source_notice_entries"]:
+            path = notice_disposition.resolve(runtime.ROOT, "third_party/" + row["path"], disposition)
+            self.assertEqual(notices / Path(row["path"]).name, path)
+            self.assertEqual((row["bytes"], row["sha256"]), notice_disposition.file_identity(path))
+        self.assertFalse(disposition["production_admitted"])
+        self.assertIn("blocked", proposal["admission"])
+        self.assertFalse((runtime.ROOT / "third_party/notices/scrcpy").exists())
 
     def test_each_redirect_hop_requires_https_and_an_approved_host(self):
         handler = runtime._ReleaseRedirects()

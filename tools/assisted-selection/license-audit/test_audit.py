@@ -65,13 +65,16 @@ class AuditTests(unittest.TestCase):
     def test_missing_and_changed_notice_copy_refuse(self):
         lock = json.loads(audit.LOCK.read_text())
         sources = json.loads(audit.SOURCES.read_text())
+        manifest_path = self.root / audit.notice_disposition.MANIFEST
+        manifest_path.parent.mkdir(parents=True)
+        shutil.copyfile(audit.REPOSITORY / audit.notice_disposition.MANIFEST, manifest_path)
         for item in sources["notices"]:
-            source = audit.REPOSITORY / item["path"]
-            target = self.root / item["path"]
+            source = audit.notice_disposition.resolve(audit.REPOSITORY, item["path"])
+            target = audit.notice_disposition.resolve(self.root, item["path"])
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
         audit.verify_notice_sources(self.root, lock, sources)
-        sample = self.root / sources["notices"][0]["path"]
+        sample = audit.notice_disposition.resolve(self.root, sources["notices"][0]["path"])
         sample.write_bytes(b"changed text")
         with self.assertRaisesRegex(audit.AuditError, "notice text identity"):
             audit.verify_notice_sources(self.root, lock, sources)

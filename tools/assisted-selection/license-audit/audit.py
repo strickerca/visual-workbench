@@ -13,6 +13,8 @@ import sys
 import tarfile
 from zipfile import BadZipFile, ZipFile
 
+import notice_disposition
+
 
 REPOSITORY = Path(__file__).resolve().parents[3]
 LOCK = REPOSITORY / "tools/assisted-selection/host-wheel-lock.json"
@@ -165,13 +167,14 @@ def verify_notice_sources(repo: Path, lock: dict, sources: dict) -> None:
     require(type(records) is list and len(records) == 118, "notice source count")
     seen = set()
     by_path = {}
+    disposition = notice_disposition.load(repo)
     for row in records:
         path = row["path"]
         require(path.startswith(NOTICE_PREFIX) and path not in seen and
                 ".." not in Path(path).parts, "notice path")
         seen.add(path)
         by_path[path] = row
-        actual = repo / path
+        actual = notice_disposition.resolve(repo, path, disposition)
         require(digest(actual, MAX_NOTICE) == (row["bytes"], row["sha256"]), "notice text identity: " + path)
         require(row["bytes"] > 0, "empty copied notice")
         actual.read_text(encoding="utf-8")
@@ -188,8 +191,11 @@ def verify_notice_sources(repo: Path, lock: dict, sources: dict) -> None:
     for paths in SOURCE_TEXT.values():
         expected.update(NOTICE_PREFIX + path for path in paths)
     require(seen == expected, "missing/unexpected copied license or attribution text")
-    actual_files = {str(path.relative_to(repo)) for path in (repo / NOTICE_PREFIX).rglob("*") if path.is_file()}
-    require(actual_files == expected, "notice tree differs from inventory")
+    proposal_root = repo / notice_disposition.PREFIXES[NOTICE_PREFIX]
+    actual_files = {path.relative_to(repo).as_posix() for path in proposal_root.rglob("*") if path.is_file()}
+    require(actual_files == {notice_disposition.destination(path) for path in expected},
+            "notice proposal tree differs from inventory")
+    require(not (repo / NOTICE_PREFIX).exists(), "unadmitted notices in packaged tree")
     require(sum(not license_text_candidate(row) for wheel in lock["wheels"]
                 for row in wheel["notices"]) == 7, "non-license wheel member count")
 
@@ -225,7 +231,8 @@ def verify_sdist_sources(private: Path, repo: Path, sources: dict) -> None:
                 source = archive.extractfile(item)
                 require(source is not None and stream_digest(source, MAX_NOTICE) ==
                         (row["bytes"], row["sha256"]), "sdist license hash")
-                require(digest(repo / row["path"], MAX_NOTICE) == (row["bytes"], row["sha256"]),
+                require(digest(notice_disposition.resolve(repo, row["path"]), MAX_NOTICE) ==
+                        (row["bytes"], row["sha256"]),
                         "sdist copied text")
 
 
