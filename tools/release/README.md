@@ -213,11 +213,11 @@ injection during validation, bounded namespace enumeration, final-gate file
 replacement and retained-descriptor marker invalidation. These checks do not
 build or package the product.
 
-## Exact root hook proposal (not applied)
+## Explicit root assembly entry (2026-10-20)
 
 Root owns `build.ps1`, Gradle/MSI configuration and pinned runtime staging. The
-minimal assembly integration is a new `assemble-release` command in the root
-ValidateSet and these five root parameters, plus the existing timeout parameter:
+`assemble-release` entry in `build.ps1` forwards these five explicit root
+parameters and the existing timeout to the bounded wrapper:
 
 ```powershell
 [string]$ReleaseManifest,
@@ -227,7 +227,11 @@ ValidateSet and these five root parameters, plus the existing timeout parameter:
 [ValidatePattern('^[0-9a-f]{64}$')][string]$ReleasePythonSha256
 ```
 
-Its exact switch body delegates to the bounded wrapper:
+Run this command with PowerShell7 (`pwsh`), not Windows PowerShell5.1. All five
+inputs must be explicitly bound and nonblank; both hashes require64 lowercase
+hex digits. Release-only parameters are rejected on every other root command,
+including explicitly bound empty values. The assembly timeout is1–3600seconds.
+The root command delegates to the bounded wrapper:
 
 ```powershell
 'assemble-release' {
@@ -239,15 +243,21 @@ Its exact switch body delegates to the bounded wrapper:
 }
 ```
 
-This hook assumes root has admitted an existing manifest and build receipt; it
-must not add an implicit build or infer runtime/MSI output paths. The separate
+The entry adds no implicit build or runtime/MSI discovery. It requires an
+existing hash-bound manifest/source record, and the assembler independently
+checks exact inputs, notices and available package validators. The caller must
+still supply genuinely admitted artifacts; hashes do not self-admit a runtime. The separate
 root admission must populate the toolchain-record/guide slots with exact reviewed
 bytes or retain the explicit missing-prerequisite statuses. The
 root MSI build hook remains deferred until the parent reviews its exact Gradle
 task, configuration, dependencies, license gates, runtime pins and output
 receipt. Once that hook produces a real already built MSI, list its exact bytes
-as `external-package`; this does not pass MSI validation. No Gradle/MSI or
-platform-root change is included here.
+as `external-package`; this does not pass MSI validation. The new root entry
+is source-reviewed by Astra. Its underlying synthetic Python suite passes41
+cases and root offline policy passes. PowerShell is absent in the cloud, so
+PowerShell parsing/execution and Windows wrapper/NTFS/process-tree checks remain
+unrun. No product assembly, package, installer, signature or deployment was
+produced by this change. See `docs/RELEASE_ASSEMBLY_ROOT_HOOK_20261020.md`.
 
 Still deferred: real Windows/NTFS reparse, junction and sharing-violation tests;
 PowerShell parsing/execution and process-tree failure cleanup; actual complete
