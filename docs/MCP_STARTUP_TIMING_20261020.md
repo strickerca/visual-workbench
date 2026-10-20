@@ -47,7 +47,11 @@ Linux. Tests cover phase/cycle accounting, bounded fields, diagnostic sink
 failure, unchanged cancellation/retirement behavior and actual synthetic bundle
 hash/unknown-file refusal paths. The collector's 41 tests, three compatibility
 checks using actual new timing lines and three offline policy checks pass.
-Astra independently clears source. No Gradle/native build, binding regeneration,
+The existing workflow source probe also passes 96 cases after its two-line
+fixture signature/source-list update. It retains deliberately unavailable native
+startup; its overlapping startup cases are separate evidence, not an additional
+unique-test census. Temporary probe classes/declarations are disposed. Astra
+independently clears source and this fixture update. No Gradle/native build, binding regeneration,
 packaged runtime, provider, device or Windows action runs in cloud.
 
 Windows should rebuild the source-bound image through its existing serialized

@@ -36,8 +36,12 @@
       "sha256": "6bf39a864e7197c3bfe73585b8923f5bfe6ad14bac618c4c8d56db32f4f11733"
     },
     "docs/MCP_STARTUP_TIMING_20261020.md": {
-      "bytes": 4270,
-      "sha256": "512c0170cd08b36370286f613d2ff0dd3985924026953ab5cd450892f82084b5"
+      "bytes": 4601,
+      "sha256": "7df6e768995c0b95949f4cdec3626125171520eb4b1ac34c1ccd67fda6e4a2b9"
+    },
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/probe_verification_workflow.py": {
+      "bytes": 12660,
+      "sha256": "eebba1de5e637350aba2e2b870714af4e2aaa6627e0cc9015d19df8d6987c68f"
     }
   },
   "preserved_main_service_collector": {
@@ -144,13 +148,26 @@
         "bytes": 1851,
         "sha256": "4b820e95b01db50263baaab94c6591ae3cd3c2336de4d4c5819a5d3b99c78cb3"
       }
+    },
+    "auxiliary_workflow_source_probe": {
+      "passed_cases": 96,
+      "overlapping_startup_cases": "Present; not added to a unique combined test count",
+      "native_factory": "Intentionally unavailable",
+      "temporary_classes_and_declarations": "Disposed by owned temporary directory",
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/probe_verification_workflow.py",
+      "log": {
+        "path": "/workspace/.vw-tools/evidence/20261020-mcp-startup-timing/workflow-source-probe.log",
+        "bytes": 7273,
+        "sha256": "3a84a95d3b25778238de77f996b03de0bef5a0c410ee667491bbf11349907a42"
+      }
     }
   },
   "independent_review": {
     "reviewer": "gpt-6-astra",
     "lane": "tunnel_boundary_review",
     "result": "No actionable findings in eight source/test leaves; bounded telemetry, producer ownership, strict markers and unchanged90s budget cleared",
-    "reviewer_tests_builds_or_mutations": false
+    "reviewer_tests_builds_or_mutations": false,
+    "source_probe_fixture_update": "Two-line optional parameter and actual progress source-list alignment independently clear; native factory remains unavailable"
   },
   "next_windows_replay": [
     "Rebuild exact source-bound app image with existing admitted resources and same90s smoke budget",

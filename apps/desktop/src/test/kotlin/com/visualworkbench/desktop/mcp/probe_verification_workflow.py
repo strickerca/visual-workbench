@@ -136,7 +136,7 @@ import java.nio.file.Path
 internal class McpRuntime
 internal class DesktopMcpBundle(val runtime:McpRuntime=McpRuntime()):AutoCloseable {
     override fun close(){}
-    companion object {fun prepare(parent:Path)=DesktopMcpBundle()}
+    companion object {fun prepare(parent:Path,progress:McpStartupProgress?=null)=DesktopMcpBundle()}
 }
 internal object DesktopMcpService {
     suspend fun open(runtime:McpRuntime,privateParent:Path,captureHelper:Path,captureSha256:String,
@@ -155,7 +155,7 @@ internal object DesktopMcpService {
         path.write_text(text)
         files.append(str(path))
     files += [str(shared / 'VerificationInteraction.kt'), str(jvm / 'PackageOwnership.kt')]
-    files += [str(production / name) for name in ('McpJson.kt','McpVerificationTargets.kt','McpMarkerAssessments.kt','McpSemanticMarkerAlignment.kt','McpImageRegistration.kt','McpNormalizedVerification.kt','McpVerificationWorkflow.kt','McpCaptureSourceRecovery.kt','DesktopMcpLifetime.kt')]
+    files += [str(production / name) for name in ('McpJson.kt','McpVerificationTargets.kt','McpMarkerAssessments.kt','McpSemanticMarkerAlignment.kt','McpImageRegistration.kt','McpNormalizedVerification.kt','McpVerificationWorkflow.kt','McpCaptureSourceRecovery.kt','DesktopMcpLifetime.kt','McpStartupProgress.kt')]
     files += [str(tests / 'McpVerificationWorkflowProbe.kt')]
     output = scratch / 'classes'
     command = [str(java), '-Xmx384m', '-cp', str(lib / '*'), 'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler', '-no-stdlib', '-no-reflect', '-Werror', '-jvm-target', '21', '-classpath', classpath, '-d', str(output), *files]
