@@ -278,7 +278,7 @@ def failure_observation(text: str, expected: list[str]) -> dict:
         frame = re.fullmatch(r"\s*at (com\.visualworkbench\.[A-Za-z0-9_.$]+)\.[A-Za-z0-9_$<>]+\(([A-Za-z0-9_]+)\.kt:([0-9]{1,6})\)", line)
         if frame and len(source_frames) < 16:
             source_frames.append((frame[1].split("$")[0], frame[2], int(frame[3])))
-        kind = re.match(r"INSTRUMENTATION_STATUS: stack=(java\.lang\.(?:AssertionError|IllegalArgumentException|IllegalStateException)|org\.junit\.ComparisonFailure)(?::|$)", line)
+        kind = re.match(r"INSTRUMENTATION_STATUS: stack=(java\.lang\.(?:AssertionError|IllegalArgumentException|IllegalStateException)|org\.junit\.ComparisonFailure|java\.util\.concurrent\.CancellationException|kotlinx\.coroutines\.(?:TimeoutCancellationException|JobCancellationException)|com\.visualworkbench\.android\.editor\.GiantAndroidCreationFailure)(?::|$)", line)
         if kind:
             exception_kind = kind[1]
         if line.startswith("INSTRUMENTATION_STATUS: ") and "=" in line:

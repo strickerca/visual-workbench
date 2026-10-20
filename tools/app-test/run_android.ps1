@@ -31,7 +31,7 @@ $receipt = [ordered]@{
     source_sha256=$null; instrumentation_observation=$null
     isolated_application=$true; normal_app_tested=$false; normal_app_modified=$false
     device_scope=[ordered]@{owner_user=0;profile_count=$null;global_package_absence_verified=$false;other_profiles_modified=$false;cleanup_owner_user_only=$true}
-    cleanup=[ordered]@{process_trees=$false; owned_packages=$false; private_work_disposed=$false}
+    cleanup=[ordered]@{process_trees=$false; owned_packages=$false; private_work_disposed=$false; device_installer_pending=$false}
 }
 function Assert-PlainPath([string]$Path, [switch]$Directory) {
     $item = Get-Item -LiteralPath ([IO.Path]::GetFullPath($Path)) -Force
@@ -124,10 +124,15 @@ function Cleanup-Packages {
         $package=if($key -ceq 'main'){$packages[0]}else{$packages[1]}
         if(-not $attempted.ContainsKey($package)){continue}
         try{
+            # Retiring the host adb client does not settle its device installer.
+            # Even current package absence cannot prove a lost install completed.
+            # This runner has no exact session terminal proof: retain Pending.
+            if(-not $installed.ContainsKey($package)){
+                $script:receipt.cleanup.device_installer_pending=$true
+                $ok=$false;continue
+            }
+            if($absent[$package] -ne $true -or $null -eq $artifacts){$ok=$false;continue}
             if($null -eq (Package-Path $package)){continue}
-            # An unknown/failed install is not ownership proof, even if the
-            # matching APK appeared after the last absence check. Preserve it.
-            if($absent[$package] -ne $true -or -not $installed.ContainsKey($package) -or $null -eq $artifacts){$ok=$false;continue}
             $artifact=$artifacts.artifacts.$key
             # Matching installed bytes bind the previously verified signer too.
             if(-not (Owned-Package $package $artifact.sha256)){$ok=$false;continue}
@@ -212,7 +217,7 @@ try {
     }
     $receipt.cleanup.owned_packages=Cleanup-Packages
     foreach($handle in $apkLocks.Values){try{$handle.Dispose()}catch{$processesClean=$false}}
-    if($created){
+    if($created -and -not $receipt.cleanup.device_installer_pending){
         try{
             $resolved=[IO.Path]::GetFullPath($owned)
             if([IO.Path]::GetDirectoryName($resolved) -cne $temporaryParent -or [IO.Path]::GetFileName($resolved) -cne ('VisualWorkbench-app-hil-'+$runId)){throw 'Cleanup containment refused.'}
@@ -225,9 +230,12 @@ try {
             Remove-Item -LiteralPath $resolved -Recurse -Force
             $receipt.cleanup.private_work_disposed=-not(Test-Path -LiteralPath $resolved)
         }catch{$receipt.cleanup.private_work_disposed=$false}
-    }else{$receipt.cleanup.private_work_disposed=$true}
+    }elseif(-not $created){$receipt.cleanup.private_work_disposed=$true}
     $receipt.cleanup.process_trees=$processesClean
-    if($assertionsPassed -and $processesClean -and $receipt.cleanup.owned_packages -and $receipt.cleanup.private_work_disposed){$receipt.status='passed';$receipt.failure_phase=$null}
+    if($receipt.cleanup.device_installer_pending){
+        $receipt.status='pending'
+        if($null -eq $receipt.failure_code){$receipt.failure_code='device_installer_pending'}
+    }elseif($assertionsPassed -and $processesClean -and $receipt.cleanup.owned_packages -and $receipt.cleanup.private_work_disposed){$receipt.status='passed';$receipt.failure_phase=$null}
     if($null -ne $lock){
         try{
             $destination=Join-Path $ProjectRoot ('.local/app-hil-'+$runId+'.json')

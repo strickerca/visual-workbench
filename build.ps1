@@ -760,6 +760,7 @@ try {
                 . (Join-Path $projectRoot 'tools/enter-dev.ps1')
                 Run-Step 'test-app-hil-reports' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/app-test', '-p', 'test_*.py', '-v') -Limit 120
                 Run-Step 'test-app-hil-staging' 'pwsh.exe' @('-NoProfile', '-File', 'tools/app-test/test_stage.ps1') -Limit 60
+                Run-Step 'test-app-hil-cleanup-policy' 'pwsh.exe' @('-NoProfile', '-File', 'tools/app-test/test_cleanup.ps1') -Limit 60
                 Run-Step 'test-app-device-scope' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/app-hil-device-fixtures.ps1') -Limit 60
                 Run-Step 'test-app-hil-native-inventory' 'python.exe' @('-m', 'unittest', 'discover', '-s', 'tools/ffi-test', '-p', 'test_apk.py', '-v') -Limit 120
             }

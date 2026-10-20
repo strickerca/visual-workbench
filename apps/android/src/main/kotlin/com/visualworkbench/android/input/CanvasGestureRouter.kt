@@ -62,7 +62,10 @@ internal class CanvasGestureRouter(private val sink: CanvasGestureSink, private 
         }
         if (packet.canceled) {
             // FLAG_CANCELED on POINTER_UP applies to the pointer being lifted.
-            if (packet.action != MotionEvent.ACTION_POINTER_UP || drawing == null || drawing == packet.actionPointer) cancel()
+            // A finger-to-navigation transition already canceled its drawing.
+            // Retire that navigation without canceling the same tool twice.
+            if (packet.action == MotionEvent.ACTION_POINTER_UP && drawing == null) resetContact(cancelIdle = false)
+            else if (packet.action != MotionEvent.ACTION_POINTER_UP || drawing == packet.actionPointer) cancel()
             else lastFrame = withoutLifted(current, packet)
             return
         }

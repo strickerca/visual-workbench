@@ -68,6 +68,7 @@ class EditorSurfaceInstrumentedTest {
     private fun withCanvas(body: (ActivityScenario<MainActivity>, String) -> Unit) {
         var ownedProject: String? = null
         var storageClosed = false
+        var primaryFailure: Throwable? = null
         try {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             try {
@@ -76,23 +77,41 @@ class EditorSurfaceInstrumentedTest {
                 await(scenario, "new-project-and-background") { ready(it) && it.editor.scene?.background != null && canvas(it.window.decorView)?.holder?.surface?.isValid == true }
                 scenario.onActivity { ownedProject = requireNotNull(it.editor.info).projectId; assertNull(it.editor.blockingMessage) }
                 body(scenario, requireNotNull(ownedProject))
+            } catch (error: Throwable) {
+                primaryFailure = error
+                throw error
             } finally {
-                scenario.onActivity { it.editor.cancelTool() }
-                await(scenario, "finish-owned-edits") { it.editor.pending == 0 }
-                scenario.onActivity { it.editor.navigate(WorkbenchScreen.Projects) }
-                await(scenario, "close-owned-project") { it.editor.screen == WorkbenchScreen.Projects && !it.editor.busy }
-                storageClosed = true
+                try {
+                    scenario.onActivity { it.editor.cancelTool() }
+                    await(scenario, "finish-owned-edits") { it.editor.pending == 0 }
+                    scenario.onActivity { it.editor.navigate(WorkbenchScreen.Projects) }
+                    await(scenario, "close-owned-project") { it.editor.screen == WorkbenchScreen.Projects && !it.editor.busy }
+                    storageClosed = true
+                } catch (cleanup: Throwable) {
+                    val primary = primaryFailure
+                    if (primary == null) throw cleanup
+                    if (primary !== cleanup) primary.addSuppressed(cleanup)
+                }
             }
         }
-        } finally { ownedProject?.let { id ->
-            val root = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "projects").canonicalFile
-            val target = File(root, id).canonicalFile
-            assertEquals(root, target.parentFile); assertTrue(id.matches(Regex("[0-9a-fA-F-]{36}")))
-            if (storageClosed) {
-                assertTrue(!target.exists() || target.deleteRecursively())
-                Log.i("VW_EDITOR_TEST", "owned_project_cleanup=true")
-            } else Log.e("VW_EDITOR_TEST", "owned_project_cleanup=false reason=storage_close_unconfirmed")
-        } }
+        } catch (error: Throwable) {
+            if (primaryFailure == null) primaryFailure = error
+            throw error
+        } finally {
+            try { ownedProject?.let { id ->
+                val root = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "projects").canonicalFile
+                val target = File(root, id).canonicalFile
+                assertEquals(root, target.parentFile); assertTrue(id.matches(Regex("[0-9a-fA-F-]{36}")))
+                if (storageClosed) {
+                    assertTrue(!target.exists() || target.deleteRecursively())
+                    Log.i("VW_EDITOR_TEST", "owned_project_cleanup=true")
+                } else Log.e("VW_EDITOR_TEST", "owned_project_cleanup=false reason=storage_close_unconfirmed")
+            } } catch (cleanup: Throwable) {
+                val primary = primaryFailure
+                if (primary == null) throw cleanup
+                if (primary !== cleanup) primary.addSuppressed(cleanup)
+            }
+        }
     }
 
     @Test fun everyDrawingToolPersistsAndCancellationCreatesNoObject() = withCanvas { scenario, id ->

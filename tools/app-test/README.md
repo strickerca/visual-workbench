@@ -106,12 +106,31 @@ raw stacks, device serials, installed paths and other private output are not
 published. Private temporary command/manifests/output files are deleted only
 after exact run-marker, containment and no-reparse checks. No screenshots exist.
 
+Failure diagnosis retains only fixed Java/JUnit, coroutine timeout/cancellation
+and exact `GiantAndroidCreationFailure` class names plus known test-source line
+numbers. Messages, assertion values and arbitrary classes/frames stay private;
+these observations never pass instrumentation. Surface fixture cleanup preserves
+the primary body failure and suppresses any secondary cleanup failure, without
+waiving cleanup or deleting a project whose close was unconfirmed.
+
 An uninstall is allowed only for these two package IDs after absence-before,
 confirmed successful installation and an exact match to the already verified
 signed APK. Unknown install outcomes or changed package bytes are preserved and
 cleanup is reported failed. The normal app is not a fallback cleanup target.
 Successful removal naturally disposes only the isolated app's own preferences,
 projects and UID-owned Keystore entries; no owner state is captured or restored.
+
+An attempted install without confirmed `Success` remains `pending`, including
+when the host adb process retired and a later package query would look absent.
+Package absence cannot settle an outstanding device installer. The receipt sets
+`cleanup.device_installer_pending=true` and `cleanup.owned_packages=false` and
+retains the private recovery work. This minimum guard does not infer a terminal
+session, abandon an unknown session or uninstall an unowned package. Exact
+installer-session recovery remains a separate owner action. The synthetic
+`pwsh -NoProfile -File tools/app-test/test_cleanup.ps1` fixture loads only the
+production cleanup function from its syntax tree and substitutes all package/ADB
+operations; it exercises lost install responses, apparent absence/presence,
+known success, changed bytes and missing pre-install ownership without a device.
 
 The original tests include real-core synthetic projects, ownership/cancellation,
 provider pipe/proxy I/O, surface input and lifecycle tests. Their previous real

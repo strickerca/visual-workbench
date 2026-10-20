@@ -114,6 +114,24 @@ class InstrumentationCases(unittest.TestCase):
         self.assertNotIn("Private", json.dumps(report))
         self.refused(text)
 
+    def test_failure_diagnosis_retains_only_finite_coroutine_and_creation_kinds(self):
+        known = ("java.util.concurrent.CancellationException",
+                 "kotlinx.coroutines.TimeoutCancellationException", "kotlinx.coroutines.JobCancellationException",
+                 "com.visualworkbench.android.editor.GiantAndroidCreationFailure")
+        for kind in known:
+            stack = f"INSTRUMENTATION_STATUS: stack={kind}: secret private runtime text\n"
+            text = block(A, 1, 2, -2).replace("INSTRUMENTATION_STATUS_CODE:", stack + "INSTRUMENTATION_STATUS_CODE:")
+            report = reports.failure_observation(text, [A, B])
+            with self.subTest(kind=kind):
+                self.assertEqual(report["observed_statuses"], [{"case": A, "status_code": -2, "exception_kind": kind}])
+                self.assertNotIn("secret", json.dumps(report))
+                self.assertNotIn("private", json.dumps(report))
+                self.refused(text)
+        for kind in ("kotlinx.coroutines.PrivateFailure", known[0] + "Private", known[-1] + "Private"):
+            stack = f"INSTRUMENTATION_STATUS: stack={kind}: secret private runtime text\n"
+            text = block(A, 1, 2, -2).replace("INSTRUMENTATION_STATUS_CODE:", stack + "INSTRUMENTATION_STATUS_CODE:")
+            self.assertEqual(reports.failure_observation(text, [A])["observed_statuses"], [{"case": A, "status_code": -2}])
+
 
 class ArtifactCases(unittest.TestCase):
     def test_only_isolated_manifest_pair_is_admitted(self):

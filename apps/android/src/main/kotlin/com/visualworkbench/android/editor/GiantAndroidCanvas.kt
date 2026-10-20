@@ -187,7 +187,9 @@ internal fun drawGiantAndroidTiles(canvas: Canvas, frame: GiantVisibleFrame<Bitm
         require(p.x.toULong() + p.documentWidth <= 1_048_576uL && p.y.toULong() + p.documentHeight <= 1_048_576uL)
         check(!bitmap.isRecycled && bitmap.width == p.width.toInt() && bitmap.height == p.height.toInt())
     }
-    val paint = Paint() // Nearest sampling; do not interpolate across tile edges.
+    // Android Q+ constructors enable filtering even with flags=0. Clear it
+    // explicitly so document tiles retain nearest sampling at their edges.
+    val paint = Paint().apply { isFilterBitmap = false }
     for (tile in frame.tiles) {
         val p = tile.pixels; val bitmap = tile.image
         canvas.drawBitmap(bitmap, Rect(0, 0, bitmap.width, bitmap.height),
