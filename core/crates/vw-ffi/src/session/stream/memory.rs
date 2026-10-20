@@ -1,10 +1,9 @@
 //! Actual codec/packet/foreign allocations share an endpoint and process pool.
 use crate::session::{SessionError, SessionResult};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use vw_stream::{MemoryCharge, MemoryKind, SessionBudget};
 
 pub(super) const MAX_RECEIVER_BYTES: u64 = 512 * 1024 * 1024;
-static PROCESS: OnceLock<SessionBudget> = OnceLock::new();
 
 #[derive(Clone)]
 pub(super) struct ByteBudget(SessionBudget);
@@ -17,15 +16,11 @@ impl ByteBudget {
         if limit == 0 || limit > MAX_RECEIVER_BYTES {
             return Err(SessionError::Invalid);
         }
-        let process = match PROCESS.get() {
-            Some(pool) => pool,
-            None => {
-                let pool =
-                    SessionBudget::new(MAX_RECEIVER_BYTES).map_err(super::decoder::map_stream)?;
-                let _ = PROCESS.set(pool);
-                PROCESS.get().ok_or(SessionError::Worker)?
-            }
-        };
+        // Stream endpoint identities remain independent, but their actual
+        // allocations consume the same platform-sized parent as giant images
+        // and foreign renderers. Reopening an endpoint cannot reset that cap.
+        let process =
+            crate::session_resources::shared_budget().map_err(|_| SessionError::Backpressure)?;
         Ok(Self(
             process.child(limit).map_err(super::decoder::map_stream)?,
         ))
@@ -131,3 +126,7 @@ pub(super) fn enqueue(
         .map_err(|_| vw_net::NetError::Backpressure)?;
     sender.enqueue_retained(body, Box::new(reservation))
 }
+
+#[cfg(test)]
+#[path = "memory_tests.rs"]
+mod tests;

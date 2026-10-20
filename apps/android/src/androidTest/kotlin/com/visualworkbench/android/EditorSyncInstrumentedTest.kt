@@ -330,7 +330,7 @@ class EditorSyncInstrumentedTest {
         val store = ViewModelStore()
         var editor: EditorController? = null
         try {
-            editor = withContext(Dispatchers.Main) { EditorController(app, core, capture) { _, _ -> sessions }.also { store.put("sync", it) } }
+            editor = withContext(Dispatchers.Main) { EditorController(app, core, capture, sessionFactory = { _, _ -> sessions }).also { store.put("sync", it) } }
             val current = checkNotNull(editor)
             try {
                 waitUntil { !current.busy }

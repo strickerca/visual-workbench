@@ -22,6 +22,7 @@ serde_json = "=1.0.151"
 ring = "=0.17.14"
 png = "=0.18.1"
 blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+roxmltree = "=0.21.1"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "=0.62.2", features = [
@@ -38,7 +39,8 @@ windows = { version = "=0.62.2", features = [
 ] }
 windows-sys = { version = "=0.61.2", features = [
     "Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem",
-    "Win32_System_Threading", "Win32_System_JobObjects", "Win32_System_Pipes", "Win32_System_IO"
+    "Win32_System_Threading", "Win32_System_JobObjects", "Win32_System_Pipes", "Win32_System_IO",
+    "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_System_WindowsProgramming",
 ] }
 
 [[bin]]

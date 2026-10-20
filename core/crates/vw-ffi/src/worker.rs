@@ -44,10 +44,15 @@ struct Admission {
     capacity: usize,
     closing: bool,
 }
+struct ThreadJoin {
+    handle: Option<std::thread::JoinHandle<()>>,
+    result: Option<Result<()>>,
+}
 pub(crate) struct Worker<T> {
     sender: SyncSender<Message<T>>,
     admission: Arc<Mutex<Admission>>,
     closed: watch::Sender<Option<Result<()>>>,
+    thread: Arc<Mutex<ThreadJoin>>,
 }
 impl<T> Clone for Worker<T> {
     fn clone(&self) -> Self {
@@ -55,6 +60,7 @@ impl<T> Clone for Worker<T> {
             sender: self.sender.clone(),
             admission: self.admission.clone(),
             closed: self.closed.clone(),
+            thread: self.thread.clone(),
         }
     }
 }
@@ -79,8 +85,9 @@ impl<T: Send + 'static> Worker<T> {
         let gate = admission.clone();
         let (closed, _) = watch::channel(None);
         let completion = closed.clone();
-        std::thread::Builder::new()
+        let handle = std::thread::Builder::new()
             .name(name.into())
+            .stack_size(2 * 1024 * 1024)
             .spawn(move || {
                 let completion = Completion(completion);
                 let mut state = state;
@@ -110,7 +117,32 @@ impl<T: Send + 'static> Worker<T> {
             sender,
             admission,
             closed,
+            thread: Arc::new(Mutex::new(ThreadJoin {
+                handle: Some(handle),
+                result: None,
+            })),
         })
+    }
+    fn join(&self) -> Result<()> {
+        let mut thread = self.thread.lock().map_err(|_| CoreError::Worker)?;
+        if let Some(result) = &thread.result {
+            return result.clone();
+        }
+        if thread
+            .handle
+            .as_ref()
+            .is_some_and(|h| h.thread().id() == std::thread::current().id())
+        {
+            return Err(CoreError::Worker);
+        }
+        // State completion precedes the actual thread exit (including TLS
+        // destructors). Serialize join so concurrent close cannot return early.
+        let result = match thread.handle.take() {
+            Some(handle) => handle.join().map_err(|_| CoreError::Worker),
+            None => Err(CoreError::Worker),
+        };
+        thread.result = Some(result.clone());
+        result
     }
     pub(crate) fn enqueue(&self, job: Job<T>) -> Result<()> {
         let mut admission = self.admission.lock().map_err(|_| CoreError::Worker)?;
@@ -145,7 +177,7 @@ impl<T: Send + 'static> Worker<T> {
     /// One reserved FIFO slot survives ordinary queue saturation. Accepted work
     /// drains first; shutdown runs even if its awaiting foreign future is dropped.
     /// Repeated callers observe the same completion and never enqueue duplicates.
-    /// Completion is published only after the worker state has been destroyed.
+    /// Completion includes destroyed state and an actual thread join.
     pub async fn shutdown(
         &self,
         job: impl FnOnce(&mut T) -> Result<()> + Send + 'static,
@@ -166,7 +198,7 @@ impl<T: Send + 'static> Worker<T> {
         }
         loop {
             if let Some(result) = receive.borrow().clone() {
-                return result;
+                return result.and(self.join());
             }
             receive.changed().await.map_err(|_| CoreError::Worker)?;
         }
@@ -201,6 +233,64 @@ pub(crate) async fn startup<R: Send + 'static>(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    #[test]
+    fn shutdown_waits_for_actual_thread_exit_after_state_completion() {
+        use std::{cell::RefCell, time::Duration};
+        struct Exit {
+            entered: mpsc::Sender<()>,
+            release: mpsc::Receiver<()>,
+        }
+        impl Drop for Exit {
+            fn drop(&mut self) {
+                self.entered.send(()).unwrap();
+                self.release.recv().unwrap();
+            }
+        }
+        thread_local! { static EXIT:RefCell<Option<Exit>>=const { RefCell::new(None) }; }
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let worker = Worker::new("ffi-test-thread-join", (), 1).unwrap();
+        let (entered, ready) = mpsc::channel();
+        let (release, wait) = mpsc::channel();
+        runtime
+            .block_on(worker.call(move |_| {
+                EXIT.with(|slot| {
+                    *slot.borrow_mut() = Some(Exit {
+                        entered,
+                        release: wait,
+                    })
+                });
+                Ok(())
+            }))
+            .unwrap();
+        let (send, receive) = mpsc::channel();
+        let closer = worker.clone();
+        let closing = std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            send.send(runtime.block_on(closer.shutdown(|_| Ok(()))))
+                .unwrap();
+        });
+        ready.recv_timeout(Duration::from_secs(5)).unwrap();
+        let returned_early = receive.try_recv().is_ok();
+        release.send(()).unwrap();
+        closing.join().unwrap();
+        assert!(
+            !returned_early,
+            "close returned while its actual thread was still alive"
+        );
+        receive
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap()
+            .unwrap();
+        runtime
+            .block_on(worker.shutdown(|_| Err(CoreError::Invalid)))
+            .unwrap();
+    }
     #[tokio::test]
     async fn shutdown_waits_for_state_destruction_before_publishing_completion() {
         use std::future::{Future, poll_fn};

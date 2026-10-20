@@ -1,5 +1,72 @@
 # Deferred aggregate validation
 
+## 2026-10-20 integrated validation update
+
+This update supersedes the older active-code and no-publication statements below.
+The output-layer schema3 migration is committed/pushed as1783ccc, with55 store
+migration/history/output tests and11 native import/export tests passing. Proposal
+notice disposition a742eb3 preserves125 exact Git blobs outside packaged assets;
+22 local Python tests and root offline license checks pass. Runtime/model
+admission remains closed. Publication is authorized; no app release is implied.
+
+Current producer/tunnel integration passes101 stream,73 capture,14 native tunnel,
+13 registered host tunnel plus5 standalone contracts,53 shared and35 Desktop
+focused JVM cases. Astra source review is clear for the integrated root ownership
+boundaries. Actual generated bindings and shared/Desktop production/test compile
+pass. The external Desktop receiver candidate dae67bb remains held for its
+original Astra closure; earlier held candidates have not been promoted.
+
+The first fresh Android native build found two inaccessible giant URI helpers;
+root corrected their visibility only to the enclosing giant_images module.
+Fresh repaired ARM64/JNI, Android production and instrumentation compile, ten
+focused JVM methods and native16KiB LOAD alignment pass; see the combined
+`CLOUD_ROOT_INTEGRATION_20261020.md` receipt. Compilation alone does not
+prove execution of JNI, Canvas/Surface/Swing rendering or a target device.
+
+Windows cross-source checking fails before completion because the Linux host
+lacks the MSVC librarian lib.exe. Windows .dll/.exe runtime packaging is excluded
+from Linux Gradle checks and remains unverified. The previous combined core run
+is incomplete after329 completed cases and a120-second bound at the5,000-row
+recovery fixture; no aggregate core pass is claimed. New affected suites above
+are narrower and retain their own source/result bindings.
+
+Model/checkpoint/TinyViT and Android/native aggregate admission, E artifact
+transfer CONNECT403, configured scrcpy DLL license/native aggregate/replaceability
+and notices admission, actual Windows/phone/provider journeys, packaging,
+physical S Pen/Bluetooth/latency/frame-rate/memory/thermal and owner gates remain
+open. Krita, broader deferred Phase4, paid Actions, deployment/signing, device
+identity and denied-artifact alternate routes remain outside this continuation.
+
+## 2026-10-20 resumed cloud checkpoint
+
+The current parent resumption and exact preserved-tree/receipt disposition are
+recorded in `CLOUD_RESUMPTION_CHECKPOINT_20261020.md`; this supersedes historical
+active/idle lane descriptions below without replacing their earlier evidence.
+All seven original cloud owners were directly restarted by parent on unfinished
+owned scope. Paint and F subsequently returned completed checkpoints and are
+idle awaiting root integration/platform validation; no repeated busywork is
+assigned. Root verified HEAD27052c34 and preserved the dirty producer/shared/
+Desktop/Android integration. Desktop3eb702c remains held on installed-raster
+cleanup and resize/DPI admission. Accepted Android10e64ec is present as untracked
+module leaves with dirty root wiring; F53be45d remains uncomposed with actual
+runtime/license admission closed. Native pump/actor regression work is active.
+Its first resumed execution now passes15 actual native cases (worker13+pump2),
+using a synthetic helper Provider with real actor/charged-packet/codec/queue/
+retirement owners. `evidence/T3_NATIVE_PRODUCER_PUMP_20261020.json` records exact
+source/log hashes. This does not execute Windows WGC, JNI or a platform surface.
+
+Fresh capture all-target strict Clippy passes. FFI strict Clippy remains blocked
+by five previously recorded diagnostics, not a new producer error. Restored
+Gradle XML records the earlier passing44 shared capture/4 Desktop publication/
+10 Android methods; four Android methods contain31 subordinate scenarios.
+Do not count those as fresh runs or add them to earlier repeated totals. The
+old `/tmp` logs did not survive restoration; persistent Oct20 checkpoint hashes,
+recovered XML hashes and new Clippy logs are outside Git under
+`/workspace/.vw-tools/evidence/20261020-resume/`. No hardware/JNI/runtime gate
+changed. Repository publication authority is restored subject to the required
+approval review of concrete operations; no Git write or approval attempt has
+occurred in this restart. No application deployment/release is authorized.
+
 Root maintains this single ledger from worker handoffs. Accepted main remains
 6d505416. Source integration includes accepted offline/Desktop/Air composition
 dd18c238, editing707a92c/portable9e41ed1, formatsf8df49e9 and public giant

@@ -60,6 +60,9 @@ impl Synthetic {
     }
 }
 impl StreamSource for Synthetic {
+    fn inspect(&mut self, cancel: &Cancellation) -> vw_capture::Result<()> {
+        cancel.check().map_err(vw_capture::stream::stream_error)
+    }
     fn prepare(&mut self, _: u64, _: &Cancellation) -> vw_capture::Result<Option<CaptureStamp>> {
         self.next += 100;
         self.prepared = true;
@@ -288,4 +291,32 @@ fn late_readback_cancellation_drops_the_unpublished_ring_reservation() {
     assert_eq!(budget.used_bytes(), 64 * 1024);
     drop(actor);
     assert_eq!(budget.used_bytes(), 0);
+}
+
+#[test]
+fn frozen_source_inspection_preserves_ring_offer_and_never_reads_a_new_frame() {
+    let request = request();
+    let pool = SessionBudget::new(request.endpoint_bytes).unwrap();
+    let mut producer = StreamProducer::open(request, pool).unwrap();
+    let mut source = Synthetic::new();
+    let first = producer.poll(&mut source, 1, None, false, 100).unwrap();
+    assert!(matches!(first, ProducerReply::Tiles { .. }));
+    let reads = source.reads;
+    let next = source.next;
+    let retained = (producer.retained_frames(), producer.retained_bytes());
+    assert!(matches!(
+        producer.inspect(&mut source).unwrap(),
+        ProducerReply::Idle { .. }
+    ));
+    assert_eq!(source.reads, reads);
+    assert_eq!(source.next, next);
+    assert_eq!(
+        (producer.retained_frames(), producer.retained_bytes()),
+        retained
+    );
+    // Inspection must not acknowledge or discard the outstanding offer.
+    assert!(matches!(
+        producer.poll(&mut source, 2, None, false, 200),
+        Err(Error::Invalid)
+    ));
 }

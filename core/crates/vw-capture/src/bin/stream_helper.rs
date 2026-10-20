@@ -228,6 +228,29 @@ fn run() -> Result<()> {
                             Err(Error::Invalid)
                         }
                     }
+                    Command::InspectSource { .. } => {
+                        let ProducerReply::Idle {
+                            retained_frames,
+                            retained_bytes,
+                        } = producer.inspect(&mut source)?
+                        else {
+                            return Err(Error::Invalid);
+                        };
+                        stream_wire::write_packet(
+                            &mut output,
+                            &Header::Idle {
+                                sequence,
+                                connection_epoch: request.connection_epoch,
+                                source_generation: request.source_generation,
+                                retained_frames,
+                                retained_bytes,
+                            },
+                            &[],
+                            &budget,
+                            &wire_cancel,
+                        )?;
+                        Ok(true)
+                    }
                     Command::Poll {
                         feedback,
                         repair_keyframe,

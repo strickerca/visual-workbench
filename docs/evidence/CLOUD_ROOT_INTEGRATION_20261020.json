@@ -1,0 +1,395 @@
+{
+  "schema": "vw-cloud-root-integration-v1",
+  "date": "2026-10-20",
+  "base_head": "a742eb309b218b20ec1ec553f833d074e8c9f801",
+  "recovery_source": "0d91b70558a995fa7654021de7465b1d3f615e3d",
+  "production_and_test_source_sha256": {
+    "Cargo.lock": "825920d3bf7eeea2a40de180bcafe3c8a39ef976e8c33fbb6af0c70d162dd10f",
+    "apps/android/src/androidTest/kotlin/com/visualworkbench/android/CaptureDeliveryInstrumentedTest.kt": "2292edddbf0940503fe7cd547fb86553c735a05a04f409ca08473a85234f31bf",
+    "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorSyncInstrumentedTest.kt": "f1bee6a1e67d6f2b156f0884caead563c95fb7e38772985645db6c804c7ae800",
+    "apps/android/src/androidTest/kotlin/com/visualworkbench/android/stream/AndroidStreamPixelsInstrumentedTest.kt": "7d67ee86caecc67f6142a7f458a285ef5e083366bc0f1ef68bd5f7f530e2f9d8",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt": "91d4b9d2e51a53b2fea8250a13a924331e7e19cd54a8a84bb91adcbe14e11734",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/StreamDraftEditorAdapter.kt": "b61f2365c05395849c03722af4a01a54a841b92a369edd5389da2fd784a02481",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/stream/AndroidStreamCanvas.kt": "80f6e4d6a85e1e8f0b16746bfc0ccdaa6c4f83b05971167c03c5aff2d2eed0ec",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/stream/AndroidStreamPanel.kt": "5ab253cb0019ae70b4047bb160b63633e2df41de9f6838e269543b21440564fc",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/stream/AndroidStreamPixels.kt": "c7b6b748a6ba6d8709156204c6ef12e90fb3fb84876b9db560d4f81091fb5bd8",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/stream/AndroidStreamSession.kt": "8d6b1545b232b8e6ecafd7ea0a9e4e2468b4f2ef58fb06059e39d6f1e56f7b86",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/stream/StreamCanvasLifecycle.kt": "fd4975297d6f4b28e853ef57dbbd1b626684c88e681db012b8da6cd2be1bfbd6",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/stream/StreamInputFence.kt": "3a88e70e5ea41f766f690606402c1d0d24b4c7d367c618b379f5c91d7d7b322f",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/stream/StreamSignalObservation.kt": "b6242973104fe4d13590b66f5d690c2a1e512199b4adc39d3e1b6abc0060e1cb",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/ui/WorkbenchApp.kt": "d89c2934aa6d65205bdbbe8b274b9a8670abb08c4510b0d8727a02a5251640e7",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/editor/StreamRootIntegrationTest.kt": "5ba751c3b100ec620ca02553ef13344a9b9104df7d99748e28668a866255786f",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/stream/StreamBoundaryContract.kt": "7503f0300f0f55cde0dfbc9b95ea8fbbd07e3b68a6d3fb15de3bcc3e0fd01dab",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/stream/StreamInputContract.kt": "caf021d9d517004db738611121f21b27a372046f17991fba7040c809a1df7768",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/stream/StreamLifecycleContract.kt": "dbb10f1286d9b46ca09f92c1313e14a01c25f0268cf471b7c1cf7f2ca07a4015",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/stream/StreamPlatformTest.kt": "557bfb2e49d314b0948e2721ad3f30bb01da290fca199273cfb01c55ac2b1595",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/stream/check_stream_modules.py": "791fc781275ced8cc52ce7990a58bd49ce4690ae3b0ba46d919b955eff2074fc",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopAndroidTunnel.kt": "cd83ebb5e4a01e3ca5ef7857d516c3d1f4942daebcf9c8874e87838776fca5a7",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopLiveLink.kt": "4e744c18b18aa1e45ffe22ca55da5bae2346b57b0821c04ce06cde8b98a5506c",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/DesktopStreamPublication.kt": "23a43a9dc59946521b0b762dde57c770acfd58f1abb849dc665bea030699540a",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/EditorController.kt": "5aafe0e7b704a2ddb8d7f65b5a02a8b8a2ac6807ec3e7aa80ad1dbf3d302f364",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/Main.kt": "fd51c3b97371991eabc83b1003f2bd3022b1e590bc038fb876e9f1effb1cc876",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/AndroidMirrorCaptureGuard.kt": "4e92fc917808064dac56c5884ede349ae77406798aa24baaff07cbdc4674e45c",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CapturePickerController.kt": "52d8e9c9fcf92e7f8a3a4527dd70de8d796d1b21b42d9b9eebcbf1a8cd4f2cba",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/CapturePickerWindow.kt": "d52357d171cbb8a4366eb322d3d70a588cc8b8f716025c709c7a721b5a67dbd8",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/capture/DesktopCaptureController.kt": "c0d8878233fcdc8f006d6588d52fe08bf9de24cb10e51df7283cc72b8a036aff",
+    "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/mcp/McpCaptureEngine.kt": "cc6baf02ac6c96bdfa2c523168d161938c82593ccb04537057e7efd225fd4b40",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopAndroidTunnelTest.kt": "e77774206bbff54e84dfa48490480ad28d81851ab37986ebf1001d53485f8596",
+    "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopStreamPublicationTest.kt": "b2ead83ecd1163d8e08d0f7975d8bea238ecb5dc89857fb5a1c9d47de31ba73b",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureAndroidTunnelApi.kt": "286482344b1edc7b34431a71bc79d98a8901d6234a2039a58295294a8a53a434",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureLocalApi.kt": "3e304dfda2834c4b1470a5b22c05c564c55e2fcfd305b55e798eb4cd6467bce1",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/CaptureChildren.kt": "3176df3e96deb456475521a0fde756b32a7428a503d051cf4f7852fe21522d45",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeAndroidTunnel.kt": "ef3cb48005aee5e766de77582b023621924fcdecd1606c38b58a5389dc349a41",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCaptureStream.kt": "115246db986b466690985573b9d78103f4ea2bd85471f0bea26a7f38b7938efb",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeLocalCapture.kt": "162352c5af2f8e72daf9b3e4539c237ca00c0fa47f0af4b88e969e8594d2392d",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeSemantics.kt": "e5f832af43c564a8f8d7eb516c05a86ef7ab47eeacfbfdc72a37f2005cfe247a",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeWorkflows.kt": "266a1c0c775eed6be7ff2b531779c501e61e6034f472c242213b74b7258a1ecb",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/SynchronousNativeRetirement.kt": "155750279f727b584933c67dfbef3be0bf8670d7baf07f7cc4bd44ff1fff8d57",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/SynchronousNativeRetirementTest.kt": "26d7f95037f29e76af1944cf903a516506b1a356b3d7af16ff6e4ec77bd60f08",
+    "core/crates/vw-capture/src/bin/stream_helper.rs": "a0257b676efb3e1a315a01ef09572ffa3277955a9d81c839819afae8f2fc95f9",
+    "core/crates/vw-capture/src/stream.rs": "3d18be29198335b8e55451b8572e24194c99387a81552011b83a7be15634e862",
+    "core/crates/vw-capture/src/stream_process.rs": "3259998a7d8fcc0222c4916e1c8101f6002dca0ad89e07ecd15d3d775301853e",
+    "core/crates/vw-capture/src/stream_wire.rs": "02e8018efaf714ab304102076c437eb229a82cf446ae9a91af35d9c2e0150c09",
+    "core/crates/vw-capture/src/windows/stream.rs": "583228661340793b401af5a4c6a4c386e1133a593a2322bde8bc8c2e51cdbeb5",
+    "core/crates/vw-capture/tests/stream_producer.rs": "df8ebf8f23c30a2bc7d282d2f9be1e5ecbe1bb6f952365e774fbf223f4526d53",
+    "core/crates/vw-ffi/Cargo.toml": "dd9dd532bcb99c65e08e70a9b19ed98d3fdcfa6c7c8a999f5d6a1a0161003964",
+    "core/crates/vw-ffi/src/ai_edit/owner.rs": "27078677f772d01d8cf325aa0c014bcb45928101b0020f256b8e639a28f25e79",
+    "core/crates/vw-ffi/src/android_tunnel.rs": "40a30265e2c62d3378aaa2499b5271d9458d2909fa8c7f532c01a9cd86bd7581",
+    "core/crates/vw-ffi/src/android_tunnel/api.rs": "ce8ec023c98db5c46a39bac8a42e2add2c7c3da98316803d9a6940a3b8c24cd2",
+    "core/crates/vw-ffi/src/android_tunnel/contract.rs": "5b833accfaefec63bb29b41fa4b4c852e1f40ffc24192af88cc8a825f1ba27f1",
+    "core/crates/vw-ffi/src/android_tunnel/platform.rs": "8e03c09bf01d92456b849ce904a9db5d062afdab9f11f54e16605a983b588366",
+    "core/crates/vw-ffi/src/android_tunnel/worker.rs": "5a24cf90debbe986d727535804707f0b23d0fd710e4c477a14228240d26bc32b",
+    "core/crates/vw-ffi/src/android_tunnel/worker_tests.rs": "7d5145bc6d7304b9b0ccc4cc8a8b230527db9f72c88f6b518f716d2e35197b88",
+    "core/crates/vw-ffi/src/giant_images/editing.rs": "64aea3fe1bf08cf4f6015a4319e3b11613fc27b526c087cc2805ced3ee3edfc4",
+    "core/crates/vw-ffi/src/giant_images/producer/uri_android.rs": "e116480446bc05d3752c55e2649c8eb7ee8a32482ea8f7a25fc7a1d6136ede76",
+    "core/crates/vw-ffi/src/lib.rs": "8025352797b51766f23dbd64dd548427374f86a15cf0a9fd79125c638399ce1b",
+    "core/crates/vw-ffi/src/session/remote_drawing_gate.rs": "66287f0f70830e6f36199bc11b8a820b393a63116926c3caebca21b20efc9d70",
+    "core/crates/vw-ffi/src/session/stream.rs": "f8d469555acd54e603356a6b81337839b89d40dec21a491e184ff39afd651f20",
+    "core/crates/vw-ffi/src/session/stream/driver.rs": "e361b5a93759fb57877d6657182814c0548b43beabdfbcffae862ea7d15a946d",
+    "core/crates/vw-ffi/src/session/stream/local_producer.rs": "5d8646afc833ac6b0769d70332142116483c3812ad9fb2f5821caa288c58df2d",
+    "core/crates/vw-ffi/src/session/stream/local_producer/contract.rs": "cad96e41db695106f94d4dc033b448c420ffc656954e4d77590013fbac86ad84",
+    "core/crates/vw-ffi/src/session/stream/local_producer/pump_tests.rs": "e9ca45ce68d81fb4e6e54a7243c2ba1a09830a5746d08ec0628f866c30fa583b",
+    "core/crates/vw-ffi/src/session/stream/local_producer/worker.rs": "f59cd4c7c57355c6e005b37c972621630ba46d065b6dc3482b0d2d29261d1ce9",
+    "core/crates/vw-ffi/src/session/stream/local_producer/worker_tests.rs": "9c862540df1caaf493d487c8053da71283863ed3ab68ec98cdc1c19dcc2faf3d",
+    "core/crates/vw-ffi/src/session/stream/memory.rs": "da323516d056e184197216942ae6da7ce9c7c197d8d901b9ed7a92a38b194ca9",
+    "core/crates/vw-ffi/src/session/stream/memory_tests.rs": "44e9b9cb7186a3699641a0417f199e7d0074f952508cc405bfa4585d42e68e0c",
+    "core/crates/vw-ffi/src/session/stream/publication.rs": "2aea0f835b84eb64dd49776d60b2ebffa20907252ac794ad1c2e8d4c876c170a",
+    "core/crates/vw-ffi/src/session/stream/publication_api.rs": "c332d05f3f7c4943a42909b211ea47b785a96590e55247bfb713858ad6ad49cf",
+    "core/crates/vw-ffi/src/streaming_ffi.rs": "babca7a481ebe41a1aa4fe59ce28ebcb58ce0c8e44b61d88df971d03242cb3e6",
+    "core/crates/vw-ffi/src/verification/prepare.rs": "27a13e2385af24c6751973fbb5e219de824445de84e6a22bd374e06b30b87c13",
+    "core/crates/vw-ffi/src/worker.rs": "cf866c44ea331a0756cf2d263d5803dda909b77416a8c3d9b67052533be3aa2d",
+    "host-win/crates/vw-remote-host/Cargo.toml": "91fdecd93c490dad89d0f95d891089b8719f4a19f47453e99d05a9abe10a635f",
+    "host-win/crates/vw-remote-host/src/android_tunnel.rs": "f082483b6aee5e25f35525571ee1f8c24afe0ddda9c8a7427d59672b96196b0c",
+    "host-win/crates/vw-remote-host/src/android_tunnel/capture.rs": "9386e7169e1de9b9d4ca2462bfb1a8258d3ad5d070b04f648221308186f91995",
+    "host-win/crates/vw-remote-host/src/android_tunnel/control.rs": "9d6a6add2a7b36780a9bc0c283b3968da5957b1c522d4c35b0254e79d029a2c9",
+    "host-win/crates/vw-remote-host/src/android_tunnel/device.rs": "d5665fd1ae7c6c5460a51b6d678060df2dff723f0d6f5637cc98341837a6766f",
+    "host-win/crates/vw-remote-host/src/android_tunnel/mirror.rs": "c6c0a2c4067e209aeb5445ae52d22414eacec4bcc110cc54e4d5f101abd7384a",
+    "host-win/crates/vw-remote-host/src/android_tunnel/session.rs": "96c8611649d1cd1a5c0e703a13485e33ed7cbf40c18e7a05040251093bbb08ef",
+    "host-win/crates/vw-remote-host/src/android_tunnel/tests.rs": "1c56a950d003ae561d759c11d5d1d1b9bf284389f859be07f447f3e477f2c909",
+    "host-win/crates/vw-remote-host/src/android_tunnel/windows.rs": "6b352bfb5d046a74e1627344fdb982e1d95ea8aab5cf4f2692cb03d1456b424b",
+    "host-win/crates/vw-remote-host/src/android_tunnel_root.rs": "54d2b88f1d35dc2fd5872c5e66fc33048b0de393325623e9b551499d94ec2b0f",
+    "host-win/crates/vw-remote-host/src/android_tunnel_root_tests.rs": "7f9a493b93cf074b71b1914bdfcb00956e24acfe2f83602214f670d85ce126b4",
+    "host-win/crates/vw-remote-host/src/editor_probe_runner/compatibility.rs": "0452c77b1f06f1c25007dbc69ec840c0ff986eef895eb70ec18936002fd1e2a5",
+    "host-win/crates/vw-remote-host/src/lib.rs": "9cb4638931daf278bdad5e489552d349b40b4e7e2c68436d465881bbfae827d2",
+    "host-win/crates/vw-remote-host/src/process.rs": "836900dec2e77ac872b4fbc91436ea1cc49023fed8e783ebd9a54faa8f87e6b3",
+    "host-win/crates/vw-remote-host/src/process/finite.rs": "879b1eb532a1f1d0f63ddbaa7f1e690f8d94db4594b8924f82793e50c832f842",
+    "host-win/crates/vw-remote-host/tests/android_tunnel_contracts.rs": "b24758e9e07baf1ee88c011815c98a7e828d00b402caccff1bc0a9aa220a7050"
+  },
+  "checks": [
+    {
+      "name": "native-stream",
+      "status": "passed",
+      "command": "cargo test --offline -p vw-ffi --lib session::stream -j2 -- --test-threads=1",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/stream-combined-final.log",
+      "log_sha256": "91735927aff91f0fb22cb26d60c348018c378b0eb934d1fae09b4b9c86c21383",
+      "cases": 101
+    },
+    {
+      "name": "capture-crate",
+      "status": "passed",
+      "command": "cargo test --offline -p vw-capture -j2",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/capture-current.log",
+      "log_sha256": "bc46f85944f2750929b5d00d1239f473a2590ec640144ce91de65925d9318dd5",
+      "cases": 73,
+      "scope": "All capture test targets; no Windows capture execution"
+    },
+    {
+      "name": "native-tunnel",
+      "status": "passed",
+      "command": "cargo test --offline -p vw-ffi --lib android_tunnel -j2",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/tunnel-native-final-source-tests.log",
+      "log_sha256": "c29da7afcbe6f55a03a00c9c8eaa35c6fd3d55a99a5dfe8ef9919feec0e42ef9",
+      "cases": 14
+    },
+    {
+      "name": "registered-and-standalone-host-tunnel",
+      "status": "passed",
+      "command": "cargo test --offline -p vw-remote-host android_tunnel -j2",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/tunnel-host-final-tests.log",
+      "log_sha256": "727c45ed4554686f2fa7312dcfbb04ed505bed5f670568ebfacc61547914a8fc",
+      "cases": {
+        "registered": 13,
+        "standalone_contract": 5
+      },
+      "scope": "Five raw module tests execute again in standalone contract binary; no unique aggregate count"
+    },
+    {
+      "name": "store-migration-output-history",
+      "status": "passed",
+      "command": "cargo test --offline -p vw-store --test migrations --test output_layers --test archives --test local_views --test verification_review --test authenticated_checkpoint -j2",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/store-migration-final-tests.log",
+      "log_sha256": "facc81ffe3e56700f70a17a45856d1b27ce58147b6f999d8d1389a7b7a7e10cc",
+      "cases": 55
+    },
+    {
+      "name": "native-import-export",
+      "status": "passed",
+      "command": "cargo test --offline -p vw-ffi --lib streaming_ffi::tests -j2",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/output-storage-integration.log",
+      "log_sha256": "23df47afe7250312a1562887f68950da2dab04cf96c01220a48f3a074358c84d",
+      "cases": 11
+    },
+    {
+      "name": "ffi-strict",
+      "status": "passed",
+      "command": "cargo clippy --offline -p vw-ffi --lib --no-deps -j2 -- -D warnings",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/ffi-strict-final-source.log",
+      "log_sha256": "0e9fa197e76b29a3c7b8da279c34cab2b8017db84cb6fd56c95e5855ff74aff0"
+    },
+    {
+      "name": "host-strict",
+      "status": "passed",
+      "command": "cargo clippy --offline -p vw-remote-host --lib --no-deps -j2 -- -D warnings",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/host-strict-final-source.log",
+      "log_sha256": "d0a645fe412ee407416ac80b7476e770e63f7ea849a783f870ae467c7cef4764"
+    },
+    {
+      "name": "capture-strict",
+      "status": "passed",
+      "command": "cargo clippy --offline -p vw-capture --all-targets --no-deps -j2 -- -D warnings",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/capture-clippy-initial.log",
+      "log_sha256": "d02bb8fc8617cbafe88933ba7738dad6529a0c510669be8f668e7aa1082c1dd9"
+    },
+    {
+      "name": "workspace-format",
+      "status": "passed",
+      "command": "cargo fmt --all -- --check",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/workspace-format-final-source.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "linux-native-and-binding-input",
+      "status": "passed",
+      "command": "cargo build --offline -p vw-ffi -j2",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/native-linux-binding-repair-build.log",
+      "log_sha256": "7a24500c8b3fbecdf6a24ac151dbe9625aea6cebc99c0d70a86c3bab46971fe8",
+      "scope": "Current exported closeCapture/closeGuard ABI and schema3; preceding cfg/URI-visibility-only cleanup does not change exported signatures"
+    },
+    {
+      "name": "arm64-native",
+      "status": "passed",
+      "command": "cargo ndk -t arm64-v8a --platform 29 -o target/android-jni build --locked --offline -p vw-ffi -j2",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/native-android-binding-repair-build.log",
+      "log_sha256": "f416fe3a523701120ea8424d3baab7f4fa57426e3dc8f50c5dda5d956c3ac4ee"
+    },
+    {
+      "name": "desktop-shared-focused",
+      "status": "passed",
+      "command": "bash ./gradlew --offline --no-daemon --max-workers=2 :shared:desktopTest --tests 'com.visualworkbench.shared.Capture*' --tests 'com.visualworkbench.shared.SynchronousNativeRetirementTest' --tests 'com.visualworkbench.shared.WorkflowOwnershipTest' :desktop:test --tests 'com.visualworkbench.desktop.DesktopAndroidTunnelTest' --tests 'com.visualworkbench.desktop.DesktopStreamPublicationTest' --tests 'com.visualworkbench.desktop.DesktopSessionsTest' -x :desktop:packageConnectionRuntime",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/desktop-shared-focused-tests.log",
+      "log_sha256": "fca018d71908d511a5616e6e558edd0f6afe0a534bcfdfd4eb9e02d6fad178b7",
+      "cases": {
+        "shared": 53,
+        "desktop": 35
+      },
+      "scope": "Windows runtime packaging excluded; real headless JVM tests, no Swing window/device"
+    },
+    {
+      "name": "android-source-and-instrumentation-compile",
+      "status": "passed",
+      "command": "bash ./gradlew --offline --no-daemon --max-workers=2 :android:compileDebugKotlin :android:compileDebugAndroidTestKotlin :android:testDebugUnitTest --tests 'com.visualworkbench.android.stream.*' --tests 'com.visualworkbench.android.editor.StreamRootIntegrationTest'",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/android-final-repaired-compile-tests.log",
+      "log_sha256": "e67c749d11f5bb9b05b426647a573442043620b08bdc57eefa51d5999129bb33",
+      "cases": 10,
+      "scope": "10 focused JVM tests ran in initial command; repaired command retains up-to-date test result and completes instrumentation compile. Four module methods contain31 subordinate scenarios. Instrumentation NOT executed; fresh ARM64 16KiB LOAD alignment passed"
+    },
+    {
+      "name": "offline-package-policy",
+      "status": "passed",
+      "command": "python3 tools/check_setup.py all",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/license-offline-policy-final.log",
+      "log_sha256": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197"
+    },
+    {
+      "name": "cargo-license-source-bans",
+      "status": "passed",
+      "command": "cargo deny --offline check licenses sources bans",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/license-rust-current.log",
+      "log_sha256": "a66243919818c43c2918ed4e07ce81c12160dc6b962dd05304e7ce0e99673821"
+    },
+    {
+      "name": "plan-coverage",
+      "status": "passed",
+      "command": "python3 tools/check_plan_coverage.py",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/plan-coverage-final.log",
+      "log_sha256": "fcbc69d46813eae6c60e78895ad3caded49b4384ddd85340a6df04c25ad768b3"
+    },
+    {
+      "name": "notice-audit-tests",
+      "status": "passed",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/assisted-selection/license-audit -p 'test_*.py' -v",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/notice-audit-tests-final.log",
+      "log_sha256": "c67cb36a56eca1a16b31b4ec8c9341a03dbe5d55c9872d83562c4ba6155a74da",
+      "cases": 11
+    },
+    {
+      "name": "notice-tunnel-tests",
+      "status": "passed",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/android-tunnel -p 'test_*.py' -v",
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/notice-tunnel-tests-final.log",
+      "log_sha256": "574a45a302e089009ee4a1beb17ccb17aab902a5075e611cd72a7796326a8e30",
+      "cases": 11
+    }
+  ],
+  "junit": [
+    {
+      "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.CaptureAnnotationSessionTest.xml",
+      "sha256": "11947ad7742b1015d6f498a341992e270db39fa0990a12d781653bb45d8285b4",
+      "name": "CaptureAnnotationSessionTest[desktop]",
+      "tests": 9,
+      "timestamp": "2026-10-20T08:48:59.039Z"
+    },
+    {
+      "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.CaptureArrivalsTest.xml",
+      "sha256": "bbc58a243f1af36f9eb938050ec4630f40bd237032aac715fa85bfe7652c9435",
+      "name": "CaptureArrivalsTest[desktop]",
+      "tests": 5,
+      "timestamp": "2026-10-20T08:48:59.260Z"
+    },
+    {
+      "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.CaptureChildrenTest.xml",
+      "sha256": "767f393ffe6accab099e928298e6af7104fcd44dabebec253ff8702b4bbfd092",
+      "name": "CaptureChildrenTest[desktop]",
+      "tests": 6,
+      "timestamp": "2026-10-20T08:48:59.360Z"
+    },
+    {
+      "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.CaptureRegionEditorTest.xml",
+      "sha256": "daf03694ab0dabad18fe4900d15dd5ff4276857c95e80039886deec86dc91a6e",
+      "name": "CaptureRegionEditorTest[desktop]",
+      "tests": 19,
+      "timestamp": "2026-10-20T08:48:59.448Z"
+    },
+    {
+      "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.CaptureStreamOwnershipTest.xml",
+      "sha256": "600b62e22f0a24b0563231ca62016f2abaf3d0de795d49a375a8c3043ae3ca20",
+      "name": "CaptureStreamOwnershipTest[desktop]",
+      "tests": 5,
+      "timestamp": "2026-10-20T08:48:59.492Z"
+    },
+    {
+      "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.SynchronousNativeRetirementTest.xml",
+      "sha256": "aa78cef359ba4a403e2dde35d4e7fca1da9a35343158b01f522604ec7fd1ba02",
+      "name": "SynchronousNativeRetirementTest[desktop]",
+      "tests": 3,
+      "timestamp": "2026-10-20T08:48:59.534Z"
+    },
+    {
+      "path": "apps/shared/build/test-results/desktopTest/TEST-com.visualworkbench.shared.WorkflowOwnershipTest.xml",
+      "sha256": "96dd0d36a33726b2fff769b236144d680129f4e1e5682030fb37cc78e57a6799",
+      "name": "WorkflowOwnershipTest[desktop]",
+      "tests": 6,
+      "timestamp": "2026-10-20T08:48:59.571Z"
+    },
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopAndroidTunnelTest.xml",
+      "sha256": "8cc2ab68febeecef67cadad93262125ed11a64a33902ec97dc283568b5d5da1b",
+      "name": "com.visualworkbench.desktop.DesktopAndroidTunnelTest",
+      "tests": 20,
+      "timestamp": "2026-10-20T08:49:30.577Z"
+    },
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopSessionsTest.xml",
+      "sha256": "b9feba2cb2be0a0ece8b53bdb10ef48324c79af375461c200c37e2efcbd27404",
+      "name": "com.visualworkbench.desktop.DesktopSessionsTest",
+      "tests": 9,
+      "timestamp": "2026-10-20T08:49:30.830Z"
+    },
+    {
+      "path": "apps/desktop/build/test-results/test/TEST-com.visualworkbench.desktop.DesktopStreamPublicationTest.xml",
+      "sha256": "063c86b97e391407f00da6b013343b27ce7353b8166cb10d24fb48092e0c8e16",
+      "name": "com.visualworkbench.desktop.DesktopStreamPublicationTest",
+      "tests": 6,
+      "timestamp": "2026-10-20T08:49:30.975Z"
+    },
+    {
+      "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.editor.StreamRootIntegrationTest.xml",
+      "sha256": "4a8520c2787e252428fe268646d04e2f14f560c94ff121deaa65e6175bec3477",
+      "name": "com.visualworkbench.android.editor.StreamRootIntegrationTest",
+      "tests": 6,
+      "timestamp": "2026-10-20T08:57:15.511Z"
+    },
+    {
+      "path": "apps/android/build/test-results/testDebugUnitTest/TEST-com.visualworkbench.android.stream.StreamPlatformTest.xml",
+      "sha256": "b6f279917e8a09f9c4ff432d1d39eb25d454945e4f1e658d95551eac06a4d912",
+      "name": "com.visualworkbench.android.stream.StreamPlatformTest",
+      "tests": 4,
+      "timestamp": "2026-10-20T08:57:15.853Z"
+    }
+  ],
+  "artifacts": {
+    "target/debug/libvw_core.so": {
+      "bytes": 235236504,
+      "sha256": "e31869a722589115567844e996c654fd22119baeb1a652b472fcc69ba0ec8f6c"
+    },
+    "target/android-jni/arm64-v8a/libvw_core.so": {
+      "bytes": 256813120,
+      "sha256": "7d04c55db9fde5b4a49a792016e53b6ab47435adacfd6af6e75cae2cfafd6191"
+    }
+  },
+  "source_review": {
+    "reviewer": "gpt-6-astra",
+    "lane": "tunnel_boundary_review",
+    "result": "no actionable findings",
+    "scope": "Source ownership/cancellation/budget/retirement/import/store/Android/Desktop root boundaries; final URI visibility and Windows cfg cleanup. Reviewer ran no tests."
+  },
+  "held_desktop_receiver": "dae67bb097c63041edc52c642965a4e0f0a17c93",
+  "production_tunnel_catalog_admitted": false,
+  "model_catalog_admitted": false,
+  "remaining": [
+    "Original external Astra Desktop receiver HiDPI review; held leaves not composed",
+    "Windows cross-source/artifact checks blocked by missing MSVC lib.exe; no DLL/EXE packaging pass",
+    "Combined core attempt incomplete after329 completed cases and120-second bound at5,000-row recovery fixture; not rerun as an aggregate",
+    "E artifact CONNECT403 before bytes; alternate route prohibited",
+    "Checkpoint/weights/TinyViT, actual native aggregate, model memory/runtime admission",
+    "Configured scrcpy DLL/native aggregate, dynamic replaceability and notices admission",
+    "Windows/phone/provider/GUI, A01-A30, S Pen/Bluetooth/frame rate/memory/latency/thermal and owner acceptance",
+    "Krita and broader deferred Phase4; signing/deployment/paid Actions excluded"
+  ],
+  "failure_receipts": {
+    "tunnel-native-phase-tests.log": {
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/tunnel-native-phase-tests.log",
+      "sha256": "3ab5ee2d686a5042ff07af7ef04da6e6d4ff67a0b55550fd301870a022e6b913"
+    },
+    "ffi-combined-phase-tests.log": {
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/ffi-combined-phase-tests.log",
+      "sha256": "84e8ed8e72fdf027a39d586afbd6ceb524f90725d38fe36eab67340dd57697e5"
+    },
+    "windows-source-check.log": {
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/windows-source-check.log",
+      "sha256": "b63a26c971439b71be869dacbb468d1cd34db115180522952190a919b3007a79"
+    },
+    "native-android-final-build.log": {
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/native-android-final-build.log",
+      "sha256": "f7a1dc3a19f81f62b35d7b737a4b7b65b8ca6349fa560b8f85a1f0d5b0b6b3c7"
+    },
+    "desktop-shared-binding-repair-compile.log": {
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/desktop-shared-binding-repair-compile.log",
+      "sha256": "b35302b9d3d8b627c1ce52b0003701a9e450f568aac785a4667def390aba52e1"
+    },
+    "android-final-compile-tests.log": {
+      "log": "/workspace/.vw-tools/evidence/20261020-resume/android-final-compile-tests.log",
+      "sha256": "847ac23e528e6714c54f1c7bab6f6de653cf0ffee1936061b758cf19f90ecaff"
+    }
+  }
+}

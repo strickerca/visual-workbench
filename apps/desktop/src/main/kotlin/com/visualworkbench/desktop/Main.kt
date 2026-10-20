@@ -67,7 +67,7 @@ fun main(args: Array<String>) {
     }
     Runtime.getRuntime().addShutdownHook(Thread({appOwner.close();appAnchor.close()},"vw-app-owner-release"))
     val core=workbenchCore()
-    nativeRuntime.armRetirementFence(::assertRemoteEditRetired)
+    nativeRuntime.armRetirementFence {assertRemoteEditRetired();assertAndroidTunnelRetired()}
     val remoteCatalog=loadRemoteCatalog{nativeRuntime.packagedRemoteCatalog()}
     val preferences=DesktopPreferences(local.resolve("Visual Workbench/settings.properties"));val saved=preferences.window();val device=preferences.device(core)
     val documents=FileSystemView.getFileSystemView().defaultDirectory.toPath()
@@ -92,8 +92,9 @@ fun main(args: Array<String>) {
             DesktopDiagnosticsLifecycle({ diagnostics.held }, diagnostics::requestClose, { diagnostics.closeWithin() })
         }
         val pickerOwner=remember{java.util.concurrent.atomic.AtomicReference<CapturePickerController?>(null)}
+        val tunnelOwner=remember{java.util.concurrent.atomic.AtomicReference<DesktopAndroidTunnel?>(null)}
         fun pickerBlocking():Boolean=pickerOwner.get()?.state?.value?.let{it.open||it.cleanupPending||it.stopping}==true
-        fun commandsAllowed(): Boolean = !pickerBlocking() && projectPicker == null && !controller.workflows.blocksInput() && !controller.frames.state.value.blocksInput && diagnosticsLifecycle.allowsCommand(quitting)
+        fun commandsAllowed(): Boolean = tunnelOwner.get()?.state?.value?.open!=true && !pickerBlocking() && projectPicker == null && !controller.workflows.blocksInput() && !controller.frames.state.value.blocksInput && diagnosticsLifecycle.allowsCommand(quitting)
         var captureSettings by remember{mutableStateOf(false)}
         var remoteView by remember{mutableStateOf<WorkbenchRemoteEdit?>(null)}
         fun openRemoteView(){
@@ -157,7 +158,7 @@ fun main(args: Array<String>) {
         var dpiText by remember{mutableStateOf("Checking display scale…")}
         fun competingModal(ignorePicker: ProjectFilePickerRequest? = null): Boolean {
             val current = controller.state.value
-            return pickerBlocking() || controller.workflows.blocksInput() || controller.frames.state.value.blocksInput || (projectPicker != null && projectPicker !== ignorePicker) ||
+            return tunnelOwner.get()?.state?.value?.open==true || pickerBlocking() || controller.workflows.blocksInput() || controller.frames.state.value.blocksInput || (projectPicker != null && projectPicker !== ignorePicker) ||
                 documentImport!=null||nativePickerCount != 0 || codexModal.state.value.settings ||
                 mcpModal.state.value.let { it.settings || it.compare != null } || captureSettings || remoteView != null ||
                 current.textAnchor != null || current.exportOpen || current.pasteOpen || controller.ai.state.value.open
@@ -195,8 +196,16 @@ fun main(args: Array<String>) {
             saved=controller::captureDestination,modal={open ->
                 if(open)controller.cancelInput()
                 pickerModal.set(open)
-            },mayOpen={currentPickerAdmission()},delivered=rememberCapture)}
+            },mayOpen={currentPickerAdmission()},delivered=rememberCapture,
+            liveDestination={controller.liveCaptureDestination()?.let{ destination -> {selection,name -> destination(selection,name,
+                nativeRuntime.directory.resolve("vw-capture-stream-helper.exe").toString(),nativeRuntime.packagedHash("vw-capture-stream-helper.exe"))} }})}
         pickerOwner.set(capturePicker)
+        val tunnelModal=remember(controller){PickerModal(controller::instructionPicker)}
+        val androidTunnel=remember(scope,controller){DesktopAndroidTunnel(scope,core,device,location.path,nativeRuntime.directory.resolve("scrcpy"),
+            beforeOpen={controller.cancelInput();controller.streamPublication.close();check(!capture.state.value.busy);capturePicker.dismiss()},
+            route=controller::captureDestination,modal=tunnelModal::set,mayOpen={currentPickerAdmission()},report=controller::report)}
+        tunnelOwner.set(androidTunnel)
+        controller.setLocalTunnelRetirement(androidTunnel::close)
         val capturePickerState by capturePicker.state.collectAsState()
         fun retryPickerCleanup(){scope.launch{try{capturePicker.dismiss()}catch(error:CancellationException){throw error}
             catch(_:Exception){controller.report("Capture cleanup is pending. Keep the editor open and retry after its work settles.")}}}
@@ -280,7 +289,7 @@ fun main(args: Array<String>) {
                                 withRetiredVerificationAccess(mcpTasks::close,{mcp.close();mcpModal.close()}) {
                                     // Every verification borrow has joined before the
                                     // editor, links and native parents can retire.
-                                    controller.close();assertRemoteEditRetired()
+                                    controller.close();assertRemoteEditRetired();assertAndroidTunnelRetired()
                                     assistance.close();sessions.close()
                                     host.shutdown();host.destroy()
                                     appOwner.close();appAnchor.close()
@@ -316,7 +325,7 @@ fun main(args: Array<String>) {
         }
         mcpState.owner?.let{McpCaptureIndicator(it)}
         fun mode(next:WindowMode){if(next==WindowMode.Fullscreen){if(state.placement!=WindowPlacement.Fullscreen){prior=state.placement.mode();state.placement=WindowPlacement.Fullscreen}else state.placement=prior.placement()}else state.placement=next.placement()}
-        val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,pickerBlocking()||controller.workflows.blocksInput()||controller.frames.state.value.blocksInput||codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
+        val canvasShortcut:(KeyEvent)->Boolean={event->shortcutForFocus(event,editor.canvasFocused,tunnelOwner.get()?.state?.value?.open==true||pickerBlocking()||controller.workflows.blocksInput()||controller.frames.state.value.blocksInput||codexPanels.settings||mcpSettings||mcpCompare!=null||captureSettings||remoteView!=null||dialog!=null||projectPicker!=null||documentImport!=null||diagnostics.held||editor.textAnchor!=null||editor.exportOpen||editor.pasteOpen||controller.ai.state.value.open||(!editor.canvasFocused&&controller.instructionEditor.state.value.field!=null))?.let{if(diagnosticsLifecycle.allowsCommand(quitting,it==Command.Diagnostics,it==Command.Quit))dispatch(it,event.isShiftPressed,controller,{mode(it)},{instructionDialog(it)},{quit()});true}?:false}
         Window(visible=captureChecked,onCloseRequest={quit()},state=state,title=editor.document?.title?.let{"$it · Visual Workbench"}?:"Visual Workbench",undecorated=state.placement==WindowPlacement.Fullscreen,
             onPreviewKeyEvent=canvasShortcut) {
             DisposableEffect(window, controller) {
@@ -444,7 +453,7 @@ fun main(args: Array<String>) {
                 }finally{try{chooser.dispose()}finally{chooserLease.close()}}
             }
             fun action(command:Command){
-                if ((pickerBlocking() || projectPicker != null || documentImport != null) && command != Command.Quit) return
+                if ((tunnelOwner.get()?.state?.value?.open==true || pickerBlocking() || projectPicker != null || documentImport != null) && command != Command.Quit) return
                 if (!diagnosticsLifecycle.allowsCommand(quitting,command==Command.Diagnostics,command==Command.Quit)) return
                 dispatch(command,false,controller,{mode(it)},{instructionDialog(it)},{quit()})
             }
@@ -497,7 +506,7 @@ fun main(args: Array<String>) {
                 Menu("Edit"){for(c in listOf(Command.Undo,Command.Redo,Command.Delete,Command.SelectAll,Command.ClearSelection,Command.Color,Command.WidthUp,Command.WidthDown,Command.NudgeLeft,Command.NudgeRight,Command.NudgeUp,Command.NudgeDown))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
                 Menu("Tools"){for(c in listOf(Command.Select,Command.Pan,Command.Pen,Command.Rectangle,Command.Ellipse,Command.Line,Command.Arrow,Command.Text,Command.Callout,Command.CycleMarker,Command.Instructions))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
                 Menu("View"){for(c in listOf(Command.Fit,Command.ActualPixels,Command.ZoomIn,Command.ZoomOut,Command.Windowed,Command.Maximized,Command.Fullscreen,Command.FollowPeer,Command.MatchPeer,Command.PeerOutline))Item("${c.label}\t${c.shortcut}",onClick={action(c)})}
-                Menu("Workbench"){Item("Remote Krita / Paint…",enabled=commandsAllowed()&&editor.sync?.carrier==SessionCarrier.QuicTether,onClick={openRemoteView()});Item("Send package to Codex",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();codexModal.settings();mcpModal.dismiss()}});Item("Local agents and Compare",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();mcpModal.settings();codexModal.dismiss()}});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Capture source…",enabled=pickerAdmission()&&mcpCaptureState?.activeCapture==null&&!foregroundCaptureState.busy,onClick={capturePicker.open()});Item("Retry capture cleanup",enabled=capturePickerState.cleanupPending,onClick=::retryPickerCleanup);Item("Foreground capture settings…",enabled=captureProtected&&commandsAllowed()&&!competingModal()&&dialog==null&&!foregroundCaptureState.stopping,onClick={captureDialog(true)})}
+                Menu("Workbench"){Item("Remote Krita / Paint…",enabled=commandsAllowed()&&editor.sync?.carrier==SessionCarrier.QuicTether,onClick={openRemoteView()});Item("Send package to Codex",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();codexModal.settings();mcpModal.dismiss()}});Item("Local agents and Compare",enabled=commandsAllowed(),onClick={if(commandsAllowed()){controller.cancelInput();mcpModal.settings();codexModal.dismiss()}});for(c in listOf(Command.Pairing,Command.Settings,Command.Diagnostics))Item("${c.label}\t${c.shortcut}",onClick={action(c)});Item("Android USB mirror…",enabled=pickerAdmission(),onClick=androidTunnel::show);Item("Capture source…",enabled=pickerAdmission()&&mcpCaptureState?.activeCapture==null&&!foregroundCaptureState.busy,onClick={capturePicker.open()});Item("Retry capture cleanup",enabled=capturePickerState.cleanupPending,onClick=::retryPickerCleanup);Item("Foreground capture settings…",enabled=captureProtected&&commandsAllowed()&&!competingModal()&&dialog==null&&!foregroundCaptureState.stopping,onClick={captureDialog(true)})}
             }
             MaterialTheme(colors=darkColors(primary=accent,secondary=Color(0xffe8bb75),background=Color(0xff101720),surface=Color(0xff18222e))){
                 Box(Modifier.fillMaxSize().drawWithContent {
@@ -524,6 +533,7 @@ fun main(args: Array<String>) {
                 AiEditorOverlay(controller)
                 remoteView?.let{remote->com.visualworkbench.desktop.remote.RemoteEditPanel(remote){remoteView=null}}
                 CapturePickerWindow(capturePicker,controller::report)
+                AndroidTunnelPanel(androidTunnel)
                 if(captureSettings)com.visualworkbench.desktop.capture.CaptureSettings(capture){captureDialog(false)}
                 documentImport?.let{(path,epoch)->AlertDialog(onDismissRequest=::dismissDocumentImport,title={Text("Open PDF, SVG or PDF-compatible AI")},text={Column{
                     Text("The original file is preserved. Enter a password only if this PDF requires one.")
@@ -629,6 +639,15 @@ fun main(args: Array<String>) {
             Text(if(editor.exportReady)editor.exportReceipt?.let{"TRANSFER SHELF · ${it.revision} · ${it.width} × ${it.height} px · ${it.request.settings.encoding.label}"}?:"TRANSFER SHELF" else "TRANSFER SHELF · prepare an export for this revision",Modifier.weight(1f),style=MaterialTheme.typography.caption,color=Color(0xff9cabbc))
             NativeFileDragButton(controller,editor.dragPrepared&&editor.exportReady&&!editor.busy,Modifier.width(200.dp).height(38.dp))
             TextButton(onClick=controller::showExport,enabled=editor.document!=null){Text("Export options")}
+        }
+        val livePublication by controller.streamPublication.state.collectAsState()
+        val streamScope=rememberCoroutineScope()
+        var streamNow by remember{mutableStateOf(System.currentTimeMillis())}
+        LaunchedEffect(livePublication.paused){while(livePublication.paused&&isActive){streamNow=System.currentTimeMillis();delay(250)}}
+        if(livePublication.active||livePublication.cleanupPending)Row(Modifier.fillMaxWidth().background(Color(0xff263749)).padding(10.dp),verticalAlignment=Alignment.CenterVertically){
+            Text("${livePublication.source?:"Selected source"} · "+if(livePublication.paused)"FROZEN · ${livePublication.capturedAtMs?.let{((streamNow-it).coerceAtLeast(0)/1000).toString()+" s old"}?:"age unavailable"}" else "LIVE · paired device",Modifier.weight(1f))
+            livePublication.issue?.let{Text(it,Modifier.weight(1f))}
+            TextButton(onClick={streamScope.launch{try{controller.streamPublication.close()}catch(_:Exception){controller.report("Live source cleanup is pending. Retry before leaving this project.")}}}){Text(if(livePublication.cleanupPending)"Retry cleanup" else "Stop sharing")}
         }
         editor.message?.let{message->Row(Modifier.fillMaxWidth().background(Color(0xff263749)).padding(12.dp),verticalAlignment=Alignment.CenterVertically){Text(message,Modifier.weight(1f));TextButton(onClick={controller.clearMessage()}){Text("Dismiss")}}}
         Row(Modifier.fillMaxWidth().background(Color(0xff0f1721)).padding(horizontal=16.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(18.dp),verticalAlignment=Alignment.CenterVertically){Text(syncLabel(editor.sync,editor.sessionRole?.pending?:0u),color=if(editor.sync?.status==SyncStatus.Synced)accent else Color(0xffe8bb75),style=MaterialTheme.typography.caption);Text("INPUT PAUSED",style=MaterialTheme.typography.caption,color=Color(0xff9cabbc));if(editor.exportReady)Text("EXPORT READY",color=accent,style=MaterialTheme.typography.caption);Spacer(Modifier.weight(1f));Text("${"%.0f".format(editor.view.camera.scale*100)}%",style=MaterialTheme.typography.caption);Text(dpiText,style=MaterialTheme.typography.caption)}

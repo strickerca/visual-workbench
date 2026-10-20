@@ -130,7 +130,7 @@ impl Reader for AndroidReader {
     }
 }
 
-pub(super) fn pick(
+pub(in crate::giant_images) fn pick(
     uri: &str,
     work_parent: &Path,
     limits: GiantInputLimits,
@@ -148,7 +148,7 @@ pub(super) fn pick(
 /// Explicit retry of actual close; no timeout, boolean or JNI result directory
 /// can credit a failed reader. Failed directory cleanup keeps its existing
 /// process-life quarantine even after the Java reader has retired.
-pub(super) fn retry_readers(cancel: &Cancellation) -> Result<()> {
+pub(in crate::giant_images) fn retry_readers(cancel: &Cancellation) -> Result<()> {
     cancel.check().map_err(Error::from)?;
     let pending = {
         let mut entries = match quarantine().lock() {

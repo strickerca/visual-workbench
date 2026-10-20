@@ -56,6 +56,11 @@ pub(in crate::session) struct Bridge {
     pending_publication_close: Option<pb::StreamControl>,
 }
 impl Bridge {
+    #[cfg(test)]
+    pub(super) fn test_publication(&mut self) -> Option<&mut Publication> {
+        self.publisher.as_mut()
+    }
+
     pub fn new(endpoint: Arc<Endpoint>, commands: mpsc::Receiver<Command>) -> Self {
         let region = super::region::Mailbox::new(endpoint.clone());
         Self {

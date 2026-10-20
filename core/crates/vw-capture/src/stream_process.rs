@@ -38,7 +38,7 @@ pub fn validate_reply(
                 retained_bytes,
                 ..
             },
-            Command::Poll { .. },
+            Command::Poll { .. } | Command::InspectSource { .. },
         ) if packet.payload.bytes().is_empty()
             && *retained_frames <= crate::stream::STREAM_RING_FRAMES
             && *retained_bytes <= request.ring_bytes =>

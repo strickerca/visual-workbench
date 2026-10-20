@@ -7,8 +7,9 @@ pub(crate) mod windows;
 use crate::{Error, Result};
 #[cfg(not(windows))]
 use std::fs::File;
+#[cfg(windows)]
+use std::io::Read;
 use std::{
-    io::Read,
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex, OnceLock,
@@ -177,6 +178,7 @@ fn admit_reply(
     still_current()
 }
 pub struct LockedHelper {
+    #[cfg_attr(not(windows), allow(dead_code))] // Open refuses unsupported hosts.
     path: PathBuf,
     kind: Kind,
     #[cfg(windows)]
@@ -244,6 +246,7 @@ impl LockedHelper {
 #[cfg(windows)]
 type Child = windows::Child;
 #[cfg(not(windows))]
+#[allow(dead_code)] // Shape shared by the unsupported-host process implementation.
 struct Child {
     stdin: Option<File>,
     stdout: Option<File>,

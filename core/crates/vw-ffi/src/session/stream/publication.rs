@@ -45,6 +45,17 @@ pub(in crate::session) enum Command {
         request_sequence: u64,
         reply: oneshot::Sender<SessionResult<()>>,
     },
+    OpenLocalProducer {
+        lease: u64,
+        options: super::local_producer::CaptureLocalOptions,
+        cancellation: std::sync::Arc<crate::Cancellation>,
+        reply: oneshot::Sender<
+            SessionResult<(
+                std::sync::Arc<super::local_producer::Worker>,
+                vw_capture::stream::StreamRequest,
+            )>,
+        >,
+    },
 }
 impl Command {
     /// Settles only admission that never acquired an actual worker. An active
@@ -59,6 +70,9 @@ impl Command {
                 let _ = reply.send(Err(error));
             }
             Self::Frame { reply, .. } => {
+                let _ = reply.send(Err(error));
+            }
+            Self::OpenLocalProducer { reply, .. } => {
                 let _ = reply.send(Err(error));
             }
             Self::Original { reply, .. } | Self::Unavailable { reply, .. } => {
@@ -101,6 +115,7 @@ pub(super) struct Publication {
     // complete largest incoming Vec is reserved independently from conversion.
     _input: Bytes,
     budget: ByteBudget,
+    producer: Option<std::sync::Arc<super::local_producer::Worker>>,
 }
 impl Publication {
     pub fn new(
@@ -128,6 +143,7 @@ impl Publication {
             failure: None,
             _input: input,
             budget,
+            producer: None,
         })
     }
     pub fn stopped(&self) -> bool {
@@ -157,6 +173,33 @@ impl Publication {
     pub fn command(&mut self, command: Command) -> SessionResult<()> {
         match command {
             command @ Command::Enable { .. } => command.refuse(SessionError::Backpressure),
+            Command::OpenLocalProducer {
+                lease,
+                options,
+                cancellation,
+                reply,
+            } => {
+                if reply.is_closed() {
+                    return Ok(());
+                }
+                let result = (|| {
+                    self.check(lease)?;
+                    if self.producer.is_some() {
+                        return Err(SessionError::Backpressure);
+                    }
+                    let (worker, request) = super::local_producer::start(
+                        self.lease.clone(),
+                        self.order.source(),
+                        options,
+                        self.budget.pool().clone(),
+                        cancellation,
+                    )?;
+                    // Ownership is installed before returning or awaiting IO.
+                    self.producer = Some(worker.clone());
+                    Ok((worker, request))
+                })();
+                let _ = reply.send(result);
+            }
             Command::Frame {
                 lease,
                 encoded,
@@ -438,11 +481,21 @@ impl Publication {
         if let Some(active) = &self.active {
             active.job.cancel();
         }
+        if let Some(producer) = &self.producer {
+            producer.cancel();
+        }
         let result = self.worker.shutdown().await;
         self.active = None;
         self.ready = None;
         self.outgoing = None;
         self.unavailable = None;
+        if let Some(producer) = &self.producer {
+            producer
+                .close()
+                .await
+                .map_err(super::local_producer::map_capture)?;
+        }
+        self.producer = None;
         result
     }
     pub fn completion(&self) -> Weak<Lease> {

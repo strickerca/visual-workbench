@@ -216,7 +216,7 @@ class CaptureDeliveryInstrumentedTest {
         val store = ViewModelStore()
         var editor: EditorController? = null
         try {
-            editor = withContext(Dispatchers.Main) { EditorController(app, core, captureArrivalQuery = query) { _, _ -> sessions }.also { store.put("sync", it) } }
+            editor = withContext(Dispatchers.Main) { EditorController(app, core, captureArrivalQuery = query, sessionFactory = { _, _ -> sessions }).also { store.put("sync", it) } }
             val current = checkNotNull(editor)
             try {
                 waitUntil { !current.busy }

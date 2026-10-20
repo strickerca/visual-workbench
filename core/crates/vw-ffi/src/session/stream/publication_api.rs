@@ -121,9 +121,108 @@ impl CapturePublisher {
             input: Arc::new(Semaphore::new(1)),
         }
     }
+    /// Internal copy uses the same sole input permit/whole-buffer reservation
+    /// as the public API. Acquire before allocating, retain through queue IO.
+    pub(super) async fn publish_local_frame(&self, encoded: &[u8]) -> SessionResult<bool> {
+        self.lease.check()?;
+        if encoded.is_empty() || encoded.len() > vw_proto::capture_admission::MAX_MEDIA_BYTES {
+            return Err(SessionError::Backpressure);
+        }
+        let permit = self
+            .input
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| SessionError::Backpressure)?;
+        let mut copy = Vec::new();
+        copy.try_reserve_exact(encoded.len())
+            .map_err(|_| SessionError::Backpressure)?;
+        copy.extend_from_slice(encoded);
+        let (reply, receive) = oneshot::channel();
+        self.lease.endpoint.send(super::hub::Command::Publication(
+            super::publication::Command::Frame {
+                lease: self.lease.id,
+                encoded: copy,
+                permit,
+                reply,
+            },
+        ))?;
+        receive.await.map_err(|_| SessionError::Closed)?
+    }
+    pub(super) async fn provide_local_original(
+        &self,
+        request_sequence: u64,
+        identity: crate::CaptureImportDescriptor,
+        encoded: &[u8],
+    ) -> SessionResult<()> {
+        self.lease.check()?;
+        if encoded.is_empty() || encoded.len() > vw_stream::MAX_LOSSLESS_BYTES {
+            return Err(SessionError::Backpressure);
+        }
+        let permit = self
+            .input
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| SessionError::Backpressure)?;
+        let mut copy = Vec::new();
+        copy.try_reserve_exact(encoded.len())
+            .map_err(|_| SessionError::Backpressure)?;
+        copy.extend_from_slice(encoded);
+        let (reply, receive) = oneshot::channel();
+        self.lease.endpoint.send(super::hub::Command::Publication(
+            super::publication::Command::Original {
+                lease: self.lease.id,
+                request_sequence,
+                identity,
+                encoded: copy,
+                permit,
+                reply,
+            },
+        ))?;
+        receive.await.map_err(|_| SessionError::Closed)?
+    }
 }
 #[uniffi::export]
 impl CapturePublisher {
+    /// Only a separate explicit local source selection may launch the packaged
+    /// producer. The connected actor retains it before any open can suspend.
+    pub async fn open_local_capture(
+        self: Arc<Self>,
+        options: super::local_producer::CaptureLocalOptions,
+        cancellation: Arc<crate::Cancellation>,
+    ) -> SessionResult<Arc<super::local_producer::CaptureLocalProducer>> {
+        struct Abandoned {
+            cancel: Arc<crate::Cancellation>,
+            settled: bool,
+        }
+        impl Drop for Abandoned {
+            fn drop(&mut self) {
+                if !self.settled {
+                    self.cancel.cancel();
+                }
+            }
+        }
+        self.lease.check()?;
+        let mut abandoned = Abandoned {
+            cancel: cancellation.clone(),
+            settled: false,
+        };
+        let (reply, receive) = oneshot::channel();
+        self.lease.endpoint.send(super::hub::Command::Publication(
+            super::publication::Command::OpenLocalProducer {
+                lease: self.lease.id,
+                options,
+                cancellation,
+                reply,
+            },
+        ))?;
+        let (worker, request) = receive.await.map_err(|_| SessionError::Closed)??;
+        let producer = Arc::new(super::local_producer::CaptureLocalProducer::new(
+            worker, request, self,
+        ));
+        producer.ready().await?;
+        abandoned.settled = true;
+        Ok(producer)
+    }
     pub fn signal(&self) -> CapturePublicationSignal {
         let mut value = self.signal.borrow().clone();
         if self.lease.check().is_err() {

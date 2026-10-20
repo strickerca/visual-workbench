@@ -9,7 +9,6 @@ import com.visualworkbench.bindings.core.WorkflowMetadata as NMetadata
 import com.visualworkbench.bindings.core.ProjectInfo as NInfo
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
-import java.util.concurrent.atomic.AtomicBoolean
 
 private val workflowScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 private val workflowSlots = Semaphore(4)
@@ -63,9 +62,9 @@ internal suspend fun <T> settledWorkflow(release: (T) -> Unit = {}, block: suspe
 internal fun closeWorkflowPlan(value:NPlan){try{value.dispose()}finally{value.destroy()}}
 internal fun wrapWorkflowPlan(value:NPlan):WorkbenchWorkflowPlan = try{NativeWorkflowPlan(value)}catch(error:Throwable){closeWorkflowPlan(value);throw error}
 private class NativeWorkflowPlan(private val handle:NPlan):WorkbenchWorkflowPlan {
-    private val closed=AtomicBoolean(false)
-    private fun check(){if(closed.get())throw WorkflowFailure(WorkflowFailureKind.Closed)}
+    private val retirement=SynchronousNativeRetirement(handle::dispose,handle::destroy)
+    private fun check(){retirement.check()}
     override fun describe():WorkflowPlanInfo=workflowDirect {check();handle.describe().let{WorkflowPlanInfo(it.transactionId,workflowBinding(it.expected),it.operationCount,it.nextLamport)}}
     override suspend fun commit():WorkflowReceipt {check();return settledWorkflow{cancel->handle.commit(cancel).let{WorkflowReceipt(it.transactionId,workflowInfo(it.revision),it.duplicate)}}}
-    override fun close(){if(!closed.getAndSet(true))workflowDirect{closeWorkflowPlan(handle)}}
+    override fun close(){workflowDirect{retirement.close()}}
 }

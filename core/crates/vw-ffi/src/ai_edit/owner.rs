@@ -264,6 +264,8 @@ impl Drop for AiService {
         self.closed.store(true, Ordering::Release);
     }
 }
+// Only Windows/Android construct real credential-backed adapters.
+#[cfg_attr(not(any(windows, target_os = "android")), allow(dead_code))]
 pub(super) enum ProviderAdapter {
     OpenAi(OpenAiAdapter),
     Gemini(GeminiAdapter),

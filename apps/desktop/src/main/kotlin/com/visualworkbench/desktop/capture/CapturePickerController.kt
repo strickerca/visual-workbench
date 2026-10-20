@@ -16,6 +16,7 @@ internal data class CapturePickerState(
     val regionOnly: Boolean = false, val message: String? = null,
     val hotkeyEnabled: Boolean = false, val regionEdges: List<Double>? = null,
     val regionReady: Boolean = false, val cleanupPending: Boolean = false, val stopping: Boolean = false,
+    val canShareLive:Boolean=false,
 )
 
 /** Object identity fences a queued action even if two snapshots hash alike. */
@@ -32,6 +33,7 @@ internal class CapturePickerController(
     private val modal: (Boolean) -> Unit,
     private val mayOpen: () -> Boolean = { true },
     private val delivered: (suspend (CaptureTarget, CaptureFrameInfo, ProjectInfo, String) -> Unit)? = null,
+    private val liveDestination: (() -> (suspend (CaptureSelection,String)->Unit)?)? = null,
 ) {
     private val mutable = MutableStateFlow(CapturePickerState())
     val state = mutable.asStateFlow()
@@ -51,6 +53,7 @@ internal class CapturePickerController(
     private class Draft(
         val work: PickerWorkspace, val selected: CaptureSelection,
         val destination: suspend (WorkbenchProject, Path, String?) -> Unit,
+        val live:(suspend (CaptureSelection,String)->Unit)?,
     ) {
         val frame = AtomicReference<PickerFrame?>(null)
         val destroy = PickerReleaseAction { frame.get()?.destroy() }
@@ -126,7 +129,9 @@ internal class CapturePickerController(
         var ready = false
         try {
             val value = hostCall(release = { current.frame.set(it) }) { operation ->
-                service().captureSelection(source, id(), 1uL, 1u, current.work.path.toString(), operation)
+                guardedMirrorCapture(source.tunnelSource(),{current.frame.set(it)}) {
+                    service().captureSelection(source, id(), 1uL, 1u, current.work.path.toString(), operation)
+                }
             }
             current.frame.set(value)
             val pixels = hostCall { operation -> value.preview(1024u, operation) }
@@ -137,6 +142,7 @@ internal class CapturePickerController(
             requireCurrent(ticket)
             snapshot = current
             mutable.update { it.copy(selected = source, preview = pixels, previewReady = false, region = drawRegion,
+                canShareLive=current.live!=null,
                 message = if (drawRegion) "Draw a rectangle on this snapshot. Save keeps these exact pixels and physical coordinates."
                 else "Lossless snapshot ready. Save creates a new capture document.") }
             ready = true
@@ -226,6 +232,34 @@ internal class CapturePickerController(
 
     fun cancelWork() { operations.invalidate(); regionCancel() }
 
+    /** A second explicit action approves continuous capture of this exact
+     * preview selection. No peer request can invoke this local approval. */
+    fun shareLive(preview:PickerPreview?) {
+        if(state.value.busy||!state.value.acceptsPreview(preview)||!state.value.canShareLive)return
+        launch { ticket->
+            val current=checkNotNull(snapshot)
+            check(state.value.acceptsPreview(preview))
+            var cropped:Draft?=null
+            try {
+                val selected=if(state.value.region){
+                    val target=(current.selected as? CaptureSelection.Monitor)?.target?:error("Region monitor missing")
+                    val crop=newDraft(current.selected,current.destination);cropped=crop
+                    val value=hostCall(release={crop.frame.set(it)}){operation->checkNotNull(current.frame.get()).cropRegion(checkNotNull(region.completedEdges()),crop.work.path.toString(),operation)}
+                    crop.frame.set(value)
+                    val frame=value.info().frame
+                    CaptureSelection.Region(target,frame.physicalX,frame.physicalY,frame.width,frame.height)
+                }else current.selected
+                requireCurrent(ticket)
+                val name=when(selected){is CaptureSelection.Window->state.value.catalog?.windows?.firstOrNull{it.target==selected.target}?.title?:"Selected window";is CaptureSelection.Monitor->"Selected monitor";is CaptureSelection.Region->"Selected region"}
+                checkNotNull(current.live)(selected,name)
+                requireCurrent(ticket)
+                discardDrafts(preserve=false)
+                modal(false)
+                mutable.update{it.copy(open=false,canShareLive=false,message=null)}
+            }finally {withContext(NonCancellable){cropped?.takeIf{it in drafts}?.let{releaseDraft(it,preserve=false)}}}
+        }
+    }
+
     /** Returns only after all capture work and private cleanup has settled.
      * Refusal throws while retaining the modal lease and exact remaining owner. */
     suspend fun dismiss() {
@@ -304,7 +338,7 @@ internal class CapturePickerController(
             // Bounded filesystem setup is installed in its caller owner before
             // cancellation may resume. No capture starts until this owner exists.
             val work = withContext(Dispatchers.IO) { PickerWorkspace.create(projects) }
-            Draft(work, source, destination).also { drafts += it }
+            Draft(work, source, destination,liveDestination?.invoke()).also { drafts += it }
         }
     private suspend fun service(): CaptureService = service ?: openService().also { service = it }
     private fun id(): String = core.newId(System.currentTimeMillis().toULong())

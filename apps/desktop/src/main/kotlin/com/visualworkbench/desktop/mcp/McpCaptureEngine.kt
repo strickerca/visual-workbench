@@ -2,6 +2,8 @@ package com.visualworkbench.desktop.mcp
 
 import com.visualworkbench.bindings.host.*
 import com.visualworkbench.desktop.capture.openDesktopCaptureService
+import com.visualworkbench.desktop.capture.guardedMirrorCapture
+import com.visualworkbench.desktop.capture.PickerReleaseAction
 import com.visualworkbench.shared.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
@@ -25,6 +27,13 @@ internal class NativeMcpCaptureEngine private constructor(
     private val sources=LinkedHashMap<Source,Path>()
     private fun source(info:PackageInfo)=Source(info.binding.projectId,info.binding.documentId,info.sourceAssetId)
     private val projectRetirement=McpCaptureProjectRetirement()
+    private var retainedFrame:Pair<CapturedFrame,PickerReleaseAction>?=null
+    private fun destroyFrame(value:CapturedFrame){
+        val held=retainedFrame?:Pair(value,PickerReleaseAction{value.destroy()}).also{retainedFrame=it}
+        check(held.first===value)
+        held.second.close() // A failed generated destructor is sticky and retained.
+        retainedFrame=null
+    }
     private var closed=false
     private var released=false
     private val producers=CoroutineScope(SupervisorJob()+Dispatchers.Default)
@@ -52,14 +61,18 @@ internal class NativeMcpCaptureEngine private constructor(
     override suspend fun compile(selector:String,checkGrant:suspend()->Unit):WorkbenchCompiledPackage =
         compileVerification(selector,McpCaptureProfile(PackageTarget.Generic(),false),checkGrant)
     override suspend fun compileVerification(selector:String,profile:McpCaptureProfile,checkGrant:suspend()->Unit):WorkbenchCompiledPackage=gate.withLock {
-        check(!closed);projectRetirement.settle();currentCoroutineContext().ensureActive()
+        check(!closed);retainedFrame?.let{destroyFrame(it.first)};projectRetirement.settle();currentCoroutineContext().ensureActive()
         val selected=targets[selector]?:throw McpRefused();checkGrant()
         val fresh=hostCall{service.refreshTarget(selected)};checkGrant()
         val work=withContext(Dispatchers.IO){McpCaptureWork.create(root)}
         var frame:CapturedFrame?=null;var compiled:WorkbenchCompiledPackage?=null
         try {
             fun id()=core.newId(System.currentTimeMillis().toULong())
-            val captured=hostCall(release={it:CapturedFrame->it.destroy()}){operation->service.capture(fresh,id(),work.path.toString(),operation)};frame=captured
+            val captured=hostCall(release={it:CapturedFrame->destroyFrame(it)}){operation->
+                guardedMirrorCapture(TunnelSource.Window(fresh.window),{it:CapturedFrame->frame=it}){
+                    service.capture(fresh,id(),work.path.toString(),operation)
+                }
+            };frame=captured
             val receipt=captured.info();require(receipt.borderVisible && receipt.windowHandle==selected.window)
             require(receipt.bitDepth==8.toUByte());checkGrant()
             withContext(Dispatchers.IO){work.record(receipt)}
@@ -90,10 +103,10 @@ internal class NativeMcpCaptureEngine private constructor(
             // Keep the immutable original and canonical project for recovery,
             // including after revocation or a lost publication receipt.
             projectRetirement.settle()
-            captured.destroy();frame=null
+            destroyFrame(captured);frame=null
             currentCoroutineContext().ensureActive();compiled=null;result
         } finally {
-            withContext(NonCancellable){try{compiled?.close()}finally{try{projectRetirement.settle()}finally{frame?.destroy()}}}
+            withContext(NonCancellable){try{compiled?.close()}finally{try{projectRetirement.settle()}finally{frame?.let(::destroyFrame)}}}
         }
     }
     override suspend fun <T> withVerificationSources(original:PackageInfo,after:PackageInfo,body:suspend(WorkbenchProject,WorkbenchProject)->T):T = gate.withLock {
@@ -128,6 +141,7 @@ internal class NativeMcpCaptureEngine private constructor(
         // A failed project close stays reachable and retryable here. Do not
         // release the capture/runtime owner before exact retirement succeeds.
         projectRetirement.settle()
+        retainedFrame?.let{destroyFrame(it.first)}
         if(!released){targets.clear();sources.clear();service.destroy();producers.cancel();released=true}
     }}}
     companion object {

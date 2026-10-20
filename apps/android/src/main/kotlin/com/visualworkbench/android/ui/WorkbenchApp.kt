@@ -7,6 +7,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import android.app.Activity
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,6 +39,8 @@ import com.visualworkbench.android.assistedselection.AssistedSelectionPanel
 import com.visualworkbench.android.instructions.InstructionsScreen
 import com.visualworkbench.android.instructions.InstructionFocusModal
 import com.visualworkbench.shared.SelectionSaveTicket
+import com.visualworkbench.android.stream.AndroidStreamPanel
+import com.visualworkbench.android.stream.AndroidStreamSession
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
@@ -166,7 +169,8 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
         catch (_: Exception) { editor.shareLaunchFailed(uri) }
     }
     BackHandler(editor.screen != WorkbenchScreen.Projects) {
-        if(editor.assistedPanelOpen)editor.dismissAssistedPanel()
+        if(editor.captureStreamBlocksParent)editor.requestCaptureStreamClose()
+        else if(editor.assistedPanelOpen)editor.dismissAssistedPanel()
         else if(editor.ai.state.value.open)editor.hideAi()
         else if (editor.textDraft != null) editor.dismissText()
         else if (editor.showBrush) editor.brushDialog(false)
@@ -200,7 +204,20 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
                         editor.cancelTool();editor.instructionModal(InstructionFocusModal.DocumentImport,true)
                         try{documentPicker.launch(arrayOf("application/pdf","image/svg+xml","application/postscript","application/illustrator","application/octet-stream"))}catch(_:Exception){editor.instructionModal(InstructionFocusModal.DocumentImport,false);editor.transferMessage("A document picker is unavailable.")}
                     })
-                WorkbenchScreen.Canvas -> EditorScreen(editor, { exportDialog(true) }, ::saveSelection,::saveDocument)
+                WorkbenchScreen.Canvas -> {
+                    val stream = editor.captureStreamOwner
+                    when {
+                        stream != null && editor.captureStreamPanelReady && !editor.captureStreamOpening && !editor.captureStreamClosePending ->
+                            StreamEditorScreen(editor, stream)
+                        editor.captureStreamBlocksParent -> Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(if(editor.captureStreamOpening) "Opening live capture…" else if(editor.captureStreamClosePending) "Closing capture…" else "Capture cleanup is incomplete.")
+                            if(editor.captureStreamOpening || editor.captureStreamClosePending) LinearProgressIndicator(Modifier.fillMaxWidth())
+                            TextButton(editor::closeCaptureStreamPanel, enabled = !editor.captureStreamClosePending,
+                                modifier = Modifier.heightIn(min = 48.dp)) { Text(if(editor.captureStreamOpening) "Cancel" else "Retry close") }
+                        }
+                        else -> EditorScreen(editor, { exportDialog(true) }, ::saveSelection,::saveDocument)
+                    }
+                }
                 WorkbenchScreen.Settings -> Column {
                     TextButton(onClick = { context.startActivity(Intent(context, com.visualworkbench.android.capture.CaptureEntryActivity::class.java)) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Screen capture and accessibility") }
                     TextButton(onClick = { showAirSettings = !showAirSettings }, modifier = Modifier.heightIn(min = 48.dp)) {
@@ -316,6 +333,8 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                             else if(editor.rawPreview)"${it.width} × ${it.height} px · ${it.bitDepth}-bit embedded RAW preview"
                             else "${it.width} × ${it.height} px · ${it.bitDepth}-bit original", style = MaterialTheme.typography.caption) }
                     }
+                    TextButton(editor::openCaptureStream, enabled = editor.canOpenCaptureStream,
+                        modifier = Modifier.heightIn(min = 48.dp)) { Text("Live capture") }
                 }
             }
         }
@@ -411,6 +430,43 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                 TextButton(onClick = { editor.navigate(WorkbenchScreen.Projects) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Back to projects") }
             })
     }
+    }
+}
+
+/** Reserve the same tool row while live and frozen so the first accepted pen
+ * contact never changes viewport merely because its child became available. */
+@Composable
+private fun StreamEditorScreen(editor: EditorController, stream: AndroidStreamSession) {
+    val state by stream.annotation.state.collectAsState()
+    val child = editor.captureStreamDraftEditor?.controller
+    val enabled = child != null && !state.preparing && !state.saving && !state.saveRetry && state.saved == null && !state.editorFailed
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().height(48.dp).horizontalScroll(rememberScrollState())) {
+            listOf(EditorTool.Pen, EditorTool.Highlighter, EditorTool.Marker, EditorTool.Line, EditorTool.Arrow,
+                EditorTool.Rectangle, EditorTool.Ellipse, EditorTool.Text, EditorTool.Select).forEach { tool ->
+                TextButton({ child?.chooseTool(tool) }, enabled = enabled) {
+                    Text(if(child?.tool == tool) "✓ ${tool.shortLabel}" else tool.shortLabel)
+                }
+            }
+            TextButton({ child?.chooseEraser(com.visualworkbench.shared.EraserChoice.Object) }, enabled = enabled) { Text("Erase object") }
+            TextButton({ child?.brushDialog(true) }, enabled = enabled) { Text("Brush") }
+            TextButton({ child?.undo() }, enabled = enabled && child?.info?.canUndo == true && child?.pending == 0) { Text("Undo") }
+            TextButton({ child?.redo() }, enabled = enabled && child?.info?.canRedo == true && child?.pending == 0) { Text("Redo") }
+        }
+        AndroidStreamPanel(stream, editor::closeCaptureStreamPanel, Modifier.weight(1f).fillMaxWidth())
+    }
+    if (child != null) {
+        if (child.showBrush) BrushDialog(child.tool, child.displayedBrush(), child.brushPreview, child::brush) { child.brushDialog(false) }
+        child.textDraft?.let { draft -> TextEditor(draft, child.busy || child.pending != 0, child::saveText, child::dismissText) }
+        if (child.showContext) AlertDialog(onDismissRequest = { child.showContext = false }, title = { Text("Annotation") },
+            text = { Column {
+                TextButton({ child.fit(); child.showContext = false }) { Text("Fit frame") }
+                if(child.selected != null) TextButton(child::deleteSelected) { Text("Delete selected object") }
+                if(child.scene?.objects?.any { it.item.objectId == child.selected && it.item.shape is Shape.Text } == true)
+                    TextButton({ child.editSelectedText(); child.showContext = false }) { Text("Edit text") }
+            } }, confirmButton = { TextButton({ child.showContext = false }) { Text("Close") } })
+        child.message?.let { message -> AlertDialog(onDismissRequest = child::dismissMessage, title = { Text("Annotation") },
+            text = { Text(message) }, confirmButton = { TextButton(child::dismissMessage) { Text("Dismiss") } }) }
     }
 }
 

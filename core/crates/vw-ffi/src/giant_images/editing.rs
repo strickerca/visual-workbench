@@ -316,7 +316,7 @@ impl GiantImage {
         let snapshot = self
             .project
             .call(move |state| {
-                Ok((|| {
+                Ok(
                     source::capture(state, &binding, &closed, &cancel, &budget).and_then(
                         |current| {
                             if !current.same_source(&expected) {
@@ -340,8 +340,8 @@ impl GiantImage {
                                 _charge: charge,
                             })
                         },
-                    )
-                })())
+                    ),
+                )
             })
             .await
             .map_err(Error::from)??;

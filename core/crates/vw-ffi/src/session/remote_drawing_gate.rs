@@ -62,6 +62,8 @@ impl RemoteHub {
         s.drawing_enabled = s.enabled && enabled;
         Ok(())
     }
+    // These bounded fields map directly to the single checked control message.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn drawing_control(
         &self,
         s: &mut State,

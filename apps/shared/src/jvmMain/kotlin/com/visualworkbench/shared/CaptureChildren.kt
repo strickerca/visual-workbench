@@ -17,11 +17,11 @@ internal class CaptureChildren {
         children.add(child)
     }
     @Synchronized private fun retired(child: Pending<*>) { children.remove(child) }
-    suspend fun <T : OwnedSession> acquire(create: suspend (() -> Unit) -> T): T {
+    suspend fun <T : OwnedSession> acquire(cancel: () -> Unit = {}, create: suspend (() -> Unit) -> T): T {
         val pending = Pending<T>(this)
         add(pending)
         return try {
-            val value = joinedCaptureCall(release = { _: T -> pending.close() }) {
+            val value = joinedCaptureCall(cancel = cancel, release = { _: T -> pending.close() }) {
                 try { create { retired(pending) }.also { pending.acquired(it) } }
                 catch (error: Throwable) { pending.failed(); throw error }
             }

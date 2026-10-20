@@ -68,7 +68,11 @@ internal class DesktopCaptureController(
             try{
                 val work=Workspace.create(projects.resolve(".capture-inbox"));workspace=work
                 val now=System.currentTimeMillis();fun id()=core.newId(now.toULong())
-                val captured=hostCall(release={it:CapturedFrame->lateFrame.set(it)}){operation->service.capture(target,id(),work.path.toString(),operation)};frame=captured
+                val captured=hostCall(release={it:CapturedFrame->lateFrame.set(it)}){operation->
+                    guardedMirrorCapture(TunnelSource.Window(target.window),{it:CapturedFrame->lateFrame.set(it)}){
+                        service.capture(target,id(),work.path.toString(),operation)
+                    }
+                };frame=captured
                 val receipt=captured.info();work.record(receipt)
                 val projectId=id();val document=id();val destination=projects.resolve("$projectId.vwb")
                 val opened=createCaptureProject(CreateFileProject(destination.toString(),projectId,document,id(),deviceId,"Screen capture",work.path.resolve("capture.png").toString(),work.path.toString(),System.currentTimeMillis()),

@@ -1,4 +1,8 @@
 //! Production remote helpers. No MFT or UIA provider loads in the JVM.
+// The leaf cannot mint runtime admission; root's private policy/confirmation
+// facade is the production caller. Missing actual license admission refuses.
+pub(crate) mod android_tunnel;
+pub mod android_tunnel_root;
 #[cfg(any(windows, test))]
 mod capture_recovery;
 #[cfg(any(windows, test))]

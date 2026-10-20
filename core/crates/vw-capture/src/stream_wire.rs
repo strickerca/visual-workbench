@@ -43,6 +43,11 @@ pub enum Command {
         source_generation: u64,
         identity: FrameIdentity,
     },
+    InspectSource {
+        sequence: u64,
+        connection_epoch: u64,
+        source_generation: u64,
+    },
     Stop {
         sequence: u64,
         connection_epoch: u64,
@@ -55,6 +60,7 @@ impl Command {
             Self::Open { .. } => None,
             Self::Poll { sequence, .. }
             | Self::Original { sequence, .. }
+            | Self::InspectSource { sequence, .. }
             | Self::Stop { sequence, .. } => Some(*sequence),
         }
     }
@@ -72,6 +78,11 @@ impl Command {
                 ..
             }
             | Self::Stop {
+                connection_epoch,
+                source_generation,
+                ..
+            }
+            | Self::InspectSource {
                 connection_epoch,
                 source_generation,
                 ..

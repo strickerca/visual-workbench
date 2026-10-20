@@ -1,0 +1,86 @@
+{
+  "scope": "Actual Linux native actor/producer/packet/queue tests; synthetic helper Provider only; no Windows/helper/JNI/platform/physical acceptance",
+  "date": "2026-10-20",
+  "base": "27052c34af20cf779039ebcf95b975e69c2ac796",
+  "state": "dirty integration candidate; no Git write or approval attempt",
+  "sources": [
+    {
+      "path": "core/crates/vw-ffi/Cargo.toml",
+      "sha256": "dd9dd532bcb99c65e08e70a9b19ed98d3fdcfa6c7c8a999f5d6a1a0161003964"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "e17df124e66f869a9005695b7a1505752eaa51d316c0d44ab69dbe4ab619cc43"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session/stream.rs",
+      "sha256": "f8d469555acd54e603356a6b81337839b89d40dec21a491e184ff39afd651f20"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session/stream/driver.rs",
+      "sha256": "e361b5a93759fb57877d6657182814c0548b43beabdfbcffae862ea7d15a946d"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session/stream/publication.rs",
+      "sha256": "2aea0f835b84eb64dd49776d60b2ebffa20907252ac794ad1c2e8d4c876c170a"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session/stream/publication_api.rs",
+      "sha256": "c332d05f3f7c4943a42909b211ea47b785a96590e55247bfb713858ad6ad49cf"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session/stream/local_producer.rs",
+      "sha256": "fa09ef791e23ed1d53c54bb5ddc8e18b3f28b1dbe9491bf43e44d2f487a8008d"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session/stream/local_producer/contract.rs",
+      "sha256": "cad96e41db695106f94d4dc033b448c420ffc656954e4d77590013fbac86ad84"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session/stream/local_producer/worker.rs",
+      "sha256": "f59cd4c7c57355c6e005b37c972621630ba46d065b6dc3482b0d2d29261d1ce9"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session/stream/local_producer/worker_tests.rs",
+      "sha256": "9c862540df1caaf493d487c8053da71283863ed3ab68ec98cdc1c19dcc2faf3d"
+    },
+    {
+      "path": "core/crates/vw-ffi/src/session/stream/local_producer/pump_tests.rs",
+      "sha256": "e9ca45ce68d81fb4e6e54a7243c2ba1a09830a5746d08ec0628f866c30fa583b"
+    }
+  ],
+  "checks": [
+    {
+      "command": "cargo test --locked -p vw-ffi --lib session::stream::local_producer -j2 -- --test-threads=2",
+      "result": "PASS: 15 tests; existing worker13 plus new native pump2",
+      "receipt": "/workspace/.vw-tools/evidence/20261020-resume/native-producer-tests-initial.log",
+      "sha256": "9e6b445667f3d3afc45d1ee968d82c6aa4a8966e3e3d4f906a57fe8e1780ee8f"
+    },
+    {
+      "command": "cargo clippy --locked -p vw-capture --all-targets --no-deps -j2 -- -D warnings",
+      "result": "PASS",
+      "receipt": "/workspace/.vw-tools/evidence/20261020-resume/capture-clippy-initial.log",
+      "sha256": "d02bb8fc8617cbafe88933ba7738dad6529a0c510669be8f668e7aa1082c1dd9"
+    },
+    {
+      "command": "cargo clippy --locked -p vw-ffi --lib --no-deps -j2 -- -D warnings",
+      "result": "FAIL: five pre-existing diagnostics; no new producer diagnostic",
+      "receipt": "/workspace/.vw-tools/evidence/20261020-resume/ffi-clippy-initial.log",
+      "sha256": "f637e7835368a89eeab6c8f8a852c57e4c661d2b6659e0c5dd67be8b6c4389b2"
+    }
+  ],
+  "new_test_behavior": [
+    "actual publisher.open_local_capture -> actor installs actual Worker before readiness -> exact same-pool wire Packet checked by G validator -> native codec/queue admission",
+    "accepted and declined MEDIA admission reach next Poll as exact OfferFeedback",
+    "paused InspectSource reads no new frame; exact older admitted Original and scoped PNG transfer; resume retains earlier feedback and repair",
+    "abandoned pump retains actual input permit until native job settles, emits no late frame and refuses successor; actual provider/actor/thread joined and charge retires"
+  ],
+  "remaining": [
+    "new root source review and coherent integration",
+    "Desktop installed-raster and resize/DPI repairs before composition",
+    "root tunnel registration/admission/FFI/app/capture-loop work",
+    "model and native-runtime license/admission closure",
+    "fresh ARM64/JNI/Windows artifacts and actual app/platform/hardware/performance/owner acceptance",
+    "no product or phase gate passed"
+  ]
+}

@@ -190,8 +190,11 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     private val documentRefresh=DocumentRefreshAdmission()
     private var sessionWork:Job?=null;private var sessionProvider:DesktopSessionController?=null
     private var wetCommitted:String?=null
+    internal val streamPublication=DesktopStreamPublication(scope,::report)
+    private var localTunnelRetirement:suspend()->Unit={}
+    internal fun setLocalTunnelRetirement(retire:suspend()->Unit){localTunnelRetirement=retire}
     private val live=DesktopLiveLink(scope,{mutable.value.document?.binding(generation)},::sessionStatus,
-        {frame->update{it.copy(peerFrame=frame)}},::report,::detachInstructionFocus)
+        {frame->update{it.copy(peerFrame=frame)}},::report,::detachInstructionFocus,{streamPublication.close();localTunnelRetirement()})
     internal fun remoteCapability():WorkbenchRemoteEdit {
         check(mutable.value.sync?.carrier==SessionCarrier.QuicTether){"Remote editing requires the selected USB tether route"}
         return remoteEdit(checkNotNull(live.attachment()).link)
@@ -456,6 +459,25 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
     }
     fun clearMessage(){update{it.copy(message=null)}}
     internal fun useSessionService(value:DesktopSessionController){sessionProvider=value}
+    /** Bind this explicit local choice to the same project/document/link while
+     * the picker is open; a reconnect never redirects the selected source. */
+    internal fun liveCaptureDestination(): (suspend (com.visualworkbench.bindings.host.CaptureSelection,String,String,String)->Unit)? {
+        val target=project?:return null
+        val attached=live.attachment()?:return null
+        val document=mutable.value.document?.documentId?:return null
+        val epoch=generation
+        if(mutable.value.sessionRole?.isHost!=true||attached.status.status !in setOf(SyncStatus.Syncing,SyncStatus.Synced))return null
+        val connection=try {val focus=markerFocus(attached.link);LiveCaptureConnectionFence(attached){focus.signal().connectionEpoch}}
+            catch(_:Exception){return null}
+        fun current()=!closing&&project===target&&generation==epoch&&live.attachment()===attached&&
+            mutable.value.document?.documentId==document&&connection.current()
+        return { selection,name,path,hash->
+            if(!current())throw SessionFailure(SessionFailureKind.Closed)
+            val local=selection.localSelection()
+            streamPublication.start(attached.link,local.publicationSource(core.newId(System.currentTimeMillis().toULong()),name),
+                CaptureLocalOptions(true,local,path,hash),::current)
+        }
+    }
     /** Capture the destination BEFORE the hotkey worker begins. A later project,
      * link or visible revision can never silently become the receiver. */
     internal fun captureDestination(): suspend (WorkbenchProject, Path, String?) -> Unit {

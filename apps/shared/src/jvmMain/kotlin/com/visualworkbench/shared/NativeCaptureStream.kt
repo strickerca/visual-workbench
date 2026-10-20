@@ -60,7 +60,7 @@ public actual suspend fun ProjectLink.openCapturePublisher(source: CapturePublic
 }
 internal class NativeCaptureStream(private val handle: NStream, private val retired: () -> Unit) : WorkbenchCaptureStream, OwnedSession {
     internal val children = CaptureChildren()
-    internal suspend fun <T : OwnedSession> acquireChild(create: suspend (() -> Unit) -> T): T = children.acquire(create)
+    internal suspend fun <T : OwnedSession> acquireChild(create: suspend (() -> Unit) -> T): T = children.acquire(create = create)
     private val owner = CaptureNativeOwner()
     internal suspend fun <T> withNative(block: suspend (NStream) -> T): T = owner.call { block(handle) }
     override val signals: Flow<CaptureStreamSignal> = flow {
@@ -122,8 +122,10 @@ internal class NativeCaptureBackground(private val native: NBackground?, private
     }
     override suspend fun close(): Unit { if (native != null) owner.close({}, native::destroy); retired() }
 }
-private class NativeCapturePublisher(private val handle: NPublisher, private val retired: () -> Unit) : WorkbenchCapturePublisher, OwnedSession {
+internal class NativeCapturePublisher(private val handle: NPublisher, private val retired: () -> Unit) : WorkbenchCapturePublisher, OwnedSession {
     private val owner = CaptureNativeOwner()
+    private val children = CaptureChildren()
+    internal suspend fun <T:OwnedSession> openLocal(cancel:()->Unit,create:suspend (NPublisher,()->Unit)->T):T = owner.call { children.acquire(cancel) { retired -> create(handle,retired) } }
     override val signals: Flow<CapturePublicationSignal> = flow {
         var sequence = 0uL
         while (currentCoroutineContext().isActive) {
@@ -144,7 +146,7 @@ private class NativeCapturePublisher(private val handle: NPublisher, private val
     override suspend fun originalUnavailable(requestSequence: ULong): Unit = owner.call {
         joinedCaptureCall { captureCall { handle.originalUnavailable(requestSequence) } }
     }
-    override suspend fun close(): Unit { owner.close({ captureCall { handle.closePublisher() } }, handle::destroy); retired() }
+    override suspend fun close(): Unit { owner.close({ children.close(); captureCall { handle.closePublisher() } }, handle::destroy); retired() }
 }
 public actual suspend fun ProjectLink.captureRegionSignal():CaptureRegionSignal {
     val access=this as? NativeCaptureAccess ?: throw SessionFailure(SessionFailureKind.Invalid)

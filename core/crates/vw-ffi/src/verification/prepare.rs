@@ -43,7 +43,7 @@ pub(super) fn authoring(
         let object = view.object(&marker.object_id).map_err(instruction_error)?;
         markers.push(MarkerAuthoring {
             original_number: *number,
-            style: object.state.style.clone().ok_or(PackageError::Integrity)?,
+            style: object.state.style.ok_or(PackageError::Integrity)?,
             entry_method: EntryMethod::from_canonical(&instruction.definition.entry_method)
                 .map_err(instruction_error)?,
             language: instruction.definition.language.clone(),
@@ -439,7 +439,7 @@ pub(super) fn compile(
                     // been aligned by the checked caller; never relabel old EIDs as
                     // after-capture semantics or reattach imported lineage.
                     element_eids: Vec::new(),
-                    style: authored.style.clone(),
+                    style: authored.style,
                     role: role(&marker.role)?,
                     text: marker.instruction.clone(),
                     entry_method: authored.entry_method,

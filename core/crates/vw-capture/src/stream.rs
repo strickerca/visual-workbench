@@ -131,6 +131,8 @@ impl StreamRequest {
 /// A native frame is acquired first to learn its actual clock value. The ring
 /// reserves its full original before `read_into` can allocate a CPU readback.
 pub trait StreamSource {
+    /// Liveness/geometry/color/cursor validation only; never obtains a frame.
+    fn inspect(&mut self, cancel: &Cancellation) -> Result<()>;
     fn prepare(&mut self, timeout_ms: u64, cancel: &Cancellation) -> Result<Option<CaptureStamp>>;
     fn read_into(&mut self, admitted_rgba: &mut [u8], cancel: &Cancellation) -> Result<()>;
     fn discard(&mut self);
@@ -242,6 +244,13 @@ impl StreamProducer {
             retained_frames: self.retained_frames(),
             retained_bytes: self.retained_bytes(),
         }
+    }
+
+    /// Frozen periods keep exact originals without taking new screenshots.
+    pub fn inspect(&self, source: &mut impl StreamSource) -> Result<ProducerReply> {
+        self.cancel.check().map_err(stream_error)?;
+        source.inspect(&self.cancel)?;
+        Ok(self.idle())
     }
 
     pub fn poll(

@@ -195,20 +195,31 @@ pub async fn create_file_raw_preview_project(
     options: CreateFileImageProject,
     cancellation: Arc<Cancellation>,
 ) -> Result<Arc<ProjectSession>> {
-    create_file_project_mode(options, cancellation, None, true).await
+    create_file_project_mode(options, cancellation, None, true, None).await
 }
 pub(crate) async fn create_file_project_inner(
     options: CreateFileImageProject,
     cancellation: Arc<Cancellation>,
     capture: Option<crate::capture_import::ValidatedCapture>,
 ) -> Result<Arc<ProjectSession>> {
-    create_file_project_mode(options, cancellation, capture, false).await
+    create_file_project_mode(options, cancellation, capture, false, None).await
+}
+/// Retain producer output, scratch namespace and admission until the actual
+/// accepted import job returns, even if its async receiver is abandoned.
+pub(crate) async fn create_owned_capture_project(
+    options: CreateFileImageProject,
+    cancellation: Arc<Cancellation>,
+    capture: crate::capture_import::ValidatedCapture,
+    ownership: Box<dyn Send>,
+) -> Result<Arc<ProjectSession>> {
+    create_file_project_mode(options, cancellation, Some(capture), false, Some(ownership)).await
 }
 async fn create_file_project_mode(
     options: CreateFileImageProject,
     cancellation: Arc<Cancellation>,
     capture: Option<crate::capture_import::ValidatedCapture>,
     raw_preview: bool,
+    ownership: Option<Box<dyn Send>>,
 ) -> Result<Arc<ProjectSession>> {
     validate_path(&options.path)?;
     validate_path(&options.source_path)?;
@@ -222,6 +233,7 @@ async fn create_file_project_mode(
         return Err(CoreError::Invalid);
     }
     crate::worker::startup(move || {
+        let _ownership = ownership;
         cancellation.check()?;
         let permit = SessionPermit::acquire()?;
         let project_id = Id::try_from(options.project_id)?;
@@ -1800,7 +1812,7 @@ fn check_components(path: &Path) -> Result<()> {
     }
     Ok(())
 }
-fn work_directory(path: &str) -> Result<PathBuf> {
+pub(crate) fn work_directory(path: &str) -> Result<PathBuf> {
     validate_path(path)?;
     let path = Path::new(path);
     check_components(path)?;

@@ -1,5 +1,43 @@
 # Current phased execution ledger
 
+## Current integration — 2026-10-20
+
+This section supersedes the historical code/review dependencies below. Root is
+on `cloud/roadmap-source-integration-20261018`. The validated schema3 migration
+is committed/pushed as `1783ccc`; unadmitted notice disposition is committed/pushed
+as `a742eb3`. Repository publication authority is restored; application deployment,
+credentials/signing, paid Actions, provider calls and physical acceptance are excluded.
+
+| Phase / slice | Implemented and reconciled behavior | Remaining dependency or acceptance |
+| --- | --- | --- |
+| 0–2 baseline | Reviewed editor, geometry, archive/offline, authenticated transport, provider/package/MCP source remains integrated | Historical software evidence remains source-bound; G0–G2 and real provider/physical gates stay open |
+| T3.02 producer and phone receiver | Accepted G is registered in `c0a13e5`; current root implements the real same-pool native helper caller/pump, thread-joined cancellation, shared process budget, explicit Desktop publication with connection-epoch fencing, Android root receiver/draft ownership and mounted borrowed annotation editor | Actual Windows capture, phone presentation, >=15fps/ring/memory/latency, freeze/lossless/Save/resume journeys remain unverified |
+| T3.02 Desktop receiver | External owner's latest candidate is `dae67bb097c63041edc52c642965a4e0f0a17c93`; root has not composed held receiver leaves | Original assigned Astra review must close the actual JDK HiDPI fallback findings. Earlier `b94fa553`, `3eb702c`, `482c423c` and `cbe9c66f` are superseded held candidates |
+| T3.03–05, T3.07–11 | Accepted precision/selection, giant/composed images, PDF/SVG/redaction, formats/color/export, controls/rebase/provider callers are already composed | Runtime/codec/PDFium/qpdf/libvips admission, fresh platform journeys, scale/performance and physical acceptance remain; do not overlay recovered archives or restart completed leaf work |
+| T3.06 model runtime | E's granted source matches accepted `110d4ec`; host conversion/parity and original census preserved | Artifact transfer still CONNECT403 before bytes. Checkpoint/weights/TinyViT, native aggregate, Android runtime/memory/catalog admission remain closed; no alternate transfer route |
+| T4 bounded Paint | Accepted `e57b941` / `c2098fe`, composed as `9103cf5`, remains intact | Actual Windows/Paint behavior and physical positive gesture compatibility are separate from mouse/source fixtures. Krita and the broader deferred Phase4 scope stay deferred |
+| T5.01–02 verification | V `2ec0b15` plus root package/FFI/MCP/capture-origin/Main hooks already exist. Schema3 now permits the model's `output` layer, validating old history before atomic migration and preserving exact output acknowledgements/archive round trips | Real recapture/provider quality and A30 remain unrun; no live calls |
+| T5.03 tunnel | Accepted F `53be45d` is privately registered; root implements native actor/typed FFI/shared wrappers, explicit target-bound one-shot confirmation, Desktop modal/retirement and native capture/stream loop guards. Captures retain response/import ownership; failed cleanup and raw-open retries retain exact owners. Closed revoke state is truthful | Compiled approved runtime catalog remains absent: configured DLL licenses/native aggregate, replaceability and notices admission must close before execution. No adb, scrcpy, GUI or device ran |
+| T5.04–06 | Air/diagnostics and bounded personal packaging source remain composed. All125 unadmitted notice candidates are hash-preserved outside packaged `third_party` and the original five census/proposal records are unchanged | Actual Bluetooth/diagnostics/export, complete Windows packages/runtime inventory/MSI and installation/uninstall remain unverified. INSTR-005 owner decision remains open |
+| T5.07 / physical gates | Focused integrated software validation continues with one heavy build and at most two workers | G0–G5/A01–A30, S Pen, frame rate, memory, thermal, latency and owner acceptance are not passed by fixtures or compilation |
+
+Fresh affected checks include 101 stream cases, 73 capture cases, 14 native
+tunnel cases, 13 registered host tunnel cases plus five standalone contract
+cases, 55 store migration/output/history cases, 11 native import/export cases,
+and 88 actual shared/Desktop focused JVM tests. The 22 notice-tool tests and
+root offline/Cargo license policy checks pass. Counts describe their separate
+scopes, with overlapping earlier runs excluded from totals. Fresh ARM64/JNI, Android production and instrumentation compilation, ten Android
+focused methods, native16KiB alignment and final library strict checks pass; see
+`CLOUD_ROOT_INTEGRATION_20261020.md` and its source-bound receipt. Windows cross-source checking is blocked by missing MSVC
+`lib.exe`; no Windows artifact or runtime pass is claimed.
+
+All796 recovered candidates/manifests at exact recovery commit
+`0d91b70558a995fa7654021de7465b1d3f615e3d` remain preserved outside active code.
+Recovered candidates are promoted only through reviewed module composition.
+Current local worktree inventory contains this single dirty integration worktree;
+no unique worktree or branch is eligible for destructive cleanup from that fact.
+No completion percentage, product gate or physical acceptance is asserted.
+
 ## Reconciled current disposition — 2026-10-19
 
 Root T3.02 candidate is authored on `6ae93d495fdfffd511f1e882facb80aaa0ab2dd4`,

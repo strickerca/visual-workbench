@@ -80,6 +80,7 @@ import javax.imageio.ImageIO
                 if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = { controller.save(state.preview) }, enabled = !state.busy && state.acceptsPreview(state.preview) && (!state.region || state.regionReady)) { Text("Save exact snapshot") }
+                    Button(onClick={controller.shareLive(state.preview)},enabled=state.canShareLive&&!state.busy&&state.acceptsPreview(state.preview)&&(!state.region||state.regionReady)){Text("Share live with paired device")}
                     TextButton(onClick = controller::cancelWork, enabled = state.busy) { Text("Cancel operation") }
                     TextButton(onClick = ::closePicker) { Text("Discard preview and close") }
                 }

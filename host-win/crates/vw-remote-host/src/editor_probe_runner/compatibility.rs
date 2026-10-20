@@ -14,9 +14,12 @@ use vw_remote::{Target, profile::ImageIdentity};
 
 #[path = "compatibility/evidence.rs"]
 mod evidence;
+#[path = "compatibility/helper.rs"]
 mod helper;
+#[path = "compatibility/ipc.rs"]
 mod ipc;
 #[cfg(test)]
+#[path = "compatibility/tests.rs"]
 mod tests;
 pub(super) use ipc::AuthorizationGate;
 

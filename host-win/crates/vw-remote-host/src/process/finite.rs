@@ -13,6 +13,7 @@ pub(super) struct Fence {
     stop_sequence: Option<u64>,
 }
 impl Fence {
+    #[cfg(any(windows, test))]
     pub fn with_binding(binding: Option<Binding>) -> Self {
         Self {
             binding,

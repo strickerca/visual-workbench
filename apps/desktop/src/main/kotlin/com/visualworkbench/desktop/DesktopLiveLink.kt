@@ -106,6 +106,7 @@ internal class DesktopLiveLink(
     /** A document switch keeps the authenticated project link. Retire only
      * old-document preview reads and actual queued preview cancellations. */
     suspend fun documentChanging() {
+        beforeRetire()
         previewJob?.cancelAndJoin(); previewJob=null
         while(finishes.isNotEmpty())finishes.toList().forEach{it.join();finishes.remove(it)}
         current?.lastFrame=null;previews(null)

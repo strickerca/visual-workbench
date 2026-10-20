@@ -28,6 +28,8 @@ import com.visualworkbench.shared.*
 import com.visualworkbench.android.session.PairingController
 import com.visualworkbench.android.session.RefreshAdmission
 import com.visualworkbench.android.session.sessionMessage
+import com.visualworkbench.android.stream.AndroidStreamCreationFailure
+import com.visualworkbench.android.stream.AndroidStreamSession
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collect
@@ -70,6 +72,138 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private val assistedPins: AssistedSelectionPins? = null,
     private val streamDraftOnly: Boolean = false) : AndroidViewModel(application), CanvasGestureSink {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val captureStreamSessions = StreamRootOwner<AndroidStreamSession> { it.close() }
+    private val captureStreamAnnotations = StreamRootOwner<CaptureAnnotationSession> { it.close() }
+    private val captureStreamReceivers = StreamRootOwner<WorkbenchCaptureStream> { it.close() }
+    internal val captureStreamOwner: AndroidStreamSession? get() = captureStreamSessions.value
+    internal var captureStreamDraftEditor by mutableStateOf<StreamDraftEditorAdapter?>(null); private set
+    internal var captureStreamOpening by mutableStateOf(false); private set
+    internal var captureStreamPanelReady by mutableStateOf(false); private set
+    private var captureStreamDepartures by mutableStateOf(0)
+    private var captureStreamWork: Job? = null
+    private val captureStreamModal = Any()
+    internal val captureStreamBlocksParent: Boolean get() = captureStreamOpening || captureStreamDepartures != 0 ||
+        captureStreamOwner != null || captureStreamAnnotations.value != null || captureStreamReceivers.value != null
+    internal val captureStreamClosePending: Boolean get() = captureStreamDepartures != 0
+    private fun updateCaptureStreamModal() { airModal(captureStreamModal, captureStreamBlocksParent) }
+    internal val canOpenCaptureStream: Boolean get() = link != null && workflowIdle() && airModals.isEmpty() &&
+        airActivity != null && airResumed && airActivityFocused
+
+    /** Explicit local entry. Receiver, annotation and platform owners are each
+     * retained before cancellation or stale-result checks can lose a result. */
+    internal fun openCaptureStream() {
+        if (!canOpenCaptureStream) return
+        val current = project ?: return
+        val doc = document ?: return
+        val peer = link ?: return
+        val attached = StreamRootAttachment(current, doc.documentId, doc.page, epoch, peer, linkEpoch)
+        var receiver: WorkbenchCaptureStream? = null
+        var nativeEpoch: ULong? = null
+        fun stillAttached(): Boolean = !disposing && captureStreamDepartures == 0 &&
+            attached.matches(project, document?.documentId, document?.page, epoch, link, linkEpoch) &&
+            (nativeEpoch == null || try { receiver?.signal()?.connectionEpoch == nativeEpoch } catch (_: Exception) { false })
+        captureStreamOpening = true // Admission closes before any native allocation.
+        cancelTool(); cancelPrecision(); followPeer = false; updateCaptureStreamModal()
+        val work = scope.launch(start = CoroutineStart.LAZY) {
+            var installed = false
+            val admission = currentCoroutineContext()
+            try {
+                // Mask only the admitted acquisition/registration. Cancellation
+                // is checked against its original context after every result;
+                // its complete owner chain is then joined by finally below.
+                withContext(NonCancellable) {
+                    canvasRetirement() // Keep giant/native charges; join the ACTUAL parent renderer.
+                    admission.ensureActive(); check(stillAttached())
+                    val stream = peer.openCaptureStream()
+                    captureStreamReceivers.retain(stream); receiver = stream
+                    admission.ensureActive(); nativeEpoch = stream.signal().connectionEpoch
+                    check(stillAttached())
+                    val annotation = peer.captureAnnotationSession(current, doc.documentId, stream, ::newId,
+                        { target -> WorkflowMetadata(newId(), repository.deviceId,
+                            repository.streamLamport(target.nextLamport), System.currentTimeMillis()) }, ::stillAttached)
+                    captureStreamAnnotations.retain(annotation); captureStreamReceivers.transferred(stream)
+                    admission.ensureActive(); check(stillAttached())
+                    // The factory consumes annotation immediately. Keep this
+                    // fallback reference until a concrete returned/failed owner
+                    // is registered, including a constructor failing before it
+                    // can expose AndroidStreamCreationFailure.owner.
+                    val owner = try {
+                        AndroidStreamSession.create(getApplication(), scope, annotation, ::stillAttached,
+                            ::captureStreamPenDown, openEditor = { borrowed, draft, viewport ->
+                            StreamDraftEditorAdapter.create(getApplication(), core, borrowed, draft, viewport,
+                                { child -> captureStreamDraftEditor = child },
+                                { child -> if (captureStreamDraftEditor === child) captureStreamDraftEditor = null })
+                        })
+                    } catch (error: AndroidStreamCreationFailure) {
+                        captureStreamSessions.retain(error.owner)
+                        captureStreamAnnotations.transferred(annotation)
+                        throw error
+                    }
+                    captureStreamSessions.retain(owner)
+                    captureStreamAnnotations.transferred(annotation)
+                    admission.ensureActive(); check(stillAttached())
+                    captureStreamPanelReady = true; updateCaptureStreamActivity(); installed = true
+                }
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (error: Exception) { report(error) }
+            finally {
+                withContext(NonCancellable) {
+                    if (!installed) {
+                        captureStreamPanelReady = false
+                        try { retireCaptureStreamOwners() } catch (error: Exception) { report(error) }
+                    }
+                    captureStreamOpening = false; captureStreamWork = null
+                    updateCaptureStreamModal(); publish()
+                }
+            }
+        }
+        captureStreamWork = work
+        work.invokeOnCompletion {
+            // Includes cancellation before the lazy coroutine body entered.
+            if (captureStreamWork === work) {
+                captureStreamWork = null; captureStreamOpening = false; updateCaptureStreamModal(); publish()
+            }
+        }
+        work.start()
+    }
+
+    private suspend fun retireCaptureStreamOwners() {
+        captureStreamSessions.retire()
+        captureStreamAnnotations.retire()
+        captureStreamReceivers.retire()
+        check(captureStreamDraftEditor == null) { "The annotation editor is still retiring" }
+    }
+    /** Called outside mutations: child Save/edits and Surface destruction may
+     * need their own queues while we join canceled/late acquisitions. */
+    private suspend fun closeCaptureStream(): Unit = withContext(NonCancellable) {
+        captureStreamDepartures++; captureStreamPanelReady = false; updateCaptureStreamModal()
+        try {
+            captureStreamWork?.cancelAndJoin()
+            retireCaptureStreamOwners()
+        } finally {
+            captureStreamDepartures--; updateCaptureStreamModal(); publish()
+        }
+    }
+    internal fun closeCaptureStreamPanel() {
+        if (captureStreamClosePending) return
+        val state = captureStreamOwner?.annotation?.state?.value
+        if (state?.saving == true || state?.saveRetry == true) {
+            captureStreamOwner?.requestClose(); return
+        }
+        scope.launch { try { closeCaptureStream() } catch (error: Exception) { report(error) } }
+    }
+    internal fun requestCaptureStreamClose() {
+        captureStreamOwner?.takeIf { captureStreamPanelReady }?.requestClose() ?: closeCaptureStreamPanel()
+    }
+    private fun updateCaptureStreamActivity() {
+        captureStreamOwner?.let { if (airActivity != null && airResumed && airActivityFocused && !disposing) it.activate() else it.background() }
+    }
+    @Suppress("UNUSED_PARAMETER")
+    private fun captureStreamPenDown(sample: PenSample, capabilities: StylusCapabilities): Boolean =
+        sample.tool == PointerTool.Pen && sample.x.isFinite() && sample.y.isFinite() && sample.pressure.isFinite() &&
+            sample.rawPressure.isFinite() && sample.timeMs >= 0 &&
+            airActivity != null && airResumed && airActivityFocused && airModals.all { it === captureStreamModal } &&
+            editorInputAllowed(ownCaptureStream = true)
     private val assistedSource=AssistedSourceGate<WorkbenchProject>()
     internal var assistedActions by mutableStateOf<AssistedSelectionInteraction?>(null); private set
     internal var assistedPanelOpen by mutableStateOf(false); private set
@@ -167,7 +301,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         diskCacheBytes=2uL*1024uL*1024uL*1024uL,ramCacheBytes=64uL*1024uL*1024uL,
         failedCreationOwner={ (it as? GiantAndroidCreationFailure)?.owner })
     internal fun giantSurfaceReady():Boolean = !giantMode || giantOwner.current?.surfaceReserved == true
-    internal fun canCreateCanvas(hook:suspend()->Unit):Boolean = canvasOwners.canCreate(hook)&&giantSurfaceReady()
+    internal fun canCreateCanvas(hook:suspend()->Unit):Boolean = !captureStreamBlocksParent&&canvasOwners.canCreate(hook)&&giantSurfaceReady()
     internal fun canvasRendererRetired(hook:suspend()->Unit){canvasOwners.confirmed(hook)}
     internal fun canvasRendererRetiring(){giantRenderReady=false}
     internal fun giantRenderCompleted(frame:GiantVisibleFrame<Bitmap>,hook:suspend()->Unit){
@@ -213,8 +347,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     private val documentOwner:EditorDocuments=EditorDocuments(scope,core,
         { val p=project;val snapshot=document;if(p!=null&&snapshot!=null&&!disposing)DocumentAttachment(p,snapshot,epoch)else null },
-        { !disposing&&assistedActions==null&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
-        { attached,page -> closeAssisted();mutations.withLock {
+        { !disposing&&!captureStreamBlocksParent&&assistedActions==null&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&!busy&&pending==0&&!ai.state.value.open&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)&&gesture==null&&documentPress==null&&!eraserPointer&&!selectionPointer },
+        { attached,page -> closeCaptureStream();closeAssisted();mutations.withLock {
             if(project!==attached.project||epoch!=attached.epoch||!documentRevisionMatches(attached))throw DocumentFailure(DocumentFailureKind.Stale)
             refreshAdmission.invalidate();documentRefresh.invalidate()
             cancelTool();imageFrames.detach();workflows.detach();rotation.detach();detachGiant();erasers.detach();selections.detach();documentOwnerDiscardDraw()
@@ -246,6 +380,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     var remoteCapability by mutableStateOf<WorkbenchRemoteEdit?>(null); private set
     var remoteOpen by mutableStateOf(false); private set
     fun openRemoteComputer(){
+        if (streamDraftOnly || captureStreamBlocksParent) return
         if(connection?.carrier!=SessionCarrier.QuicTether){message="Connect the selected USB tether route first.";return}
         try{interruptAirInput(clearBarrel = true);remoteCapability=remoteCapability?:remoteEdit(checkNotNull(link));remoteOpen=true;remoteCapability?.let(::observeAirRemote)}
         catch(_:Exception){message="Remote editing is unavailable on this authenticated link."}
@@ -541,7 +676,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         InstructionEntryMethod.PhoneKeyboard, localFocused = ::localInstructionFocused)
     val semanticEditor = SemanticEditor(scope, mutations,
         { val p = project; val d = document; if (p != null && d != null && !disposing) InstructionAttachment(p, d) else null },
-        { !disposing && !busy && !ai.state.value.open && pending == 0 && gesture == null && strokes.isEmpty() &&
+        { !disposing && !captureStreamBlocksParent && !busy && !ai.state.value.open && pending == 0 && gesture == null && strokes.isEmpty() &&
             !instructionEditor.hasUnsaved() && !instructionEditor.state.value.busy &&
             instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) },
         { current -> val next = current.info(); WorkflowMetadata(newId(), repository.deviceId,
@@ -552,7 +687,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private val instructionAdmission = com.visualworkbench.android.instructions.InstructionFocusAdmission { instructionInteractionChanged() }
     val instructionFocus = InstructionFocusController(scope, instructionEditor,
         { val p = project; val d = document; if (p != null && d != null && !disposing) InstructionAttachment(p, d) else null },
-        { !disposing && !busy && !semanticEditor.state.value.busy && pending == 0 && gesture == null && strokes.isEmpty() &&
+        { !disposing && !captureStreamBlocksParent && !busy && !semanticEditor.state.value.busy && pending == 0 && gesture == null && strokes.isEmpty() &&
             !ai.state.value.open && instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null) &&
             screen in setOf(WorkbenchScreen.Canvas, WorkbenchScreen.Instructions) },
         { id, peer -> selected = id; if (peer) screen = WorkbenchScreen.Instructions; publish() }, selectedObject = { selected })
@@ -562,6 +697,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     internal fun instructionModal(owner: com.visualworkbench.android.instructions.InstructionFocusModal, active: Boolean) { instructionAdmission.modal(owner, active) }
     internal fun clearInstructionModals() { instructionAdmission.clear() }
     fun editInstruction() {
+        if (streamDraftOnly || captureStreamBlocksParent) return
         if (document == null) { message = "Open a document first."; return }
         cancelTool(); screen = WorkbenchScreen.Instructions
         selected?.let(instructionEditor::focusObject) ?: instructionEditor.focusGlobal()
@@ -577,14 +713,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         metadata={owned->val next=owned.project.info();WorkflowMetadata(newId(),repository.deviceId,repository.instructionLamport(next.nextLamport),System.currentTimeMillis())},
         refreshAfterMutation={owned->if(owned.sameProject(aiAttachment()))refresh(owned.project,owned.project.info(),epoch)},
         image=::aiReadBitmap,abandonImage=AiBitmap::abandon,
-        canOperate={!disposing&&!busy&&pending==0&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy})
+        canOperate={!streamDraftOnly&&!captureStreamBlocksParent&&!disposing&&!busy&&pending==0&&!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy})
     val aiResults=AiResultController(scope,core,::aiAttachment,{camera},::aiPoses,image=::aiReadBitmap,abandonImage=AiBitmap::abandon)
     fun aiKeyStore():AndroidProviderKeyStore = AndroidProviderRuntime.initialize(getApplication())
     private fun aiFrame()=aiResults.state.value.frame?.takeIf{it.matches(aiAttachment(),camera,aiPoses())}
     private fun aiResultReady()=document?.render?.items?.none{it.shape is Shape.Result}!=false||
         document?.let { composedCurrent(it) || giantFrame(it)?.content == GiantTileContent.Composed }==true||aiFrame()!=null
     fun openAi(){
-        if(streamDraftOnly)return
+        if(streamDraftOnly||captureStreamBlocksParent)return
         if(workflows.blocksInput()||imageFrames.state.value.blocksInput)return
         if(documents.state.value.descriptor!=null){message="AI image edits require a raster image document.";return}
         if(disposing||busy||pending!=0||document==null||textDraft!=null||showBrush||showContext||blockingMessage!=null)return
@@ -609,7 +745,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         return if(current!=null&&doc!=null&&!disposing)EditorWorkflowAttachment(current,doc,epoch,refreshAdmission.capture().sequence,repository.deviceId)else null
     }
     private fun workflowIdle():Boolean = !streamDraftOnly && frameIdle() && !imageFrames.state.value.blocksInput
-    private fun frameIdle():Boolean = !streamDraftOnly&&!disposing&&assistedActions==null&&!busy&&pending==0&&operationCount==0&&screen==WorkbenchScreen.Canvas&&
+    private fun frameIdle():Boolean = !streamDraftOnly&&!disposing&&!captureStreamBlocksParent&&assistedActions==null&&!busy&&pending==0&&operationCount==0&&screen==WorkbenchScreen.Canvas&&
         !navigationContactActive&&!rotation.state.value.active&&!rotationUnavailable()&&gesture==null&&strokes.isEmpty()&&documentPress==null&&!selectionPointer&&!eraserPointer&&
         sliderGesture==null&&selectedStyleDraft==null&&!showBrush&&!showContext&&textDraft==null&&blockingMessage==null&&
         !ai.state.value.open&&!ai.needsDecision()&&!instructionEditor.state.value.busy&&!instructionEditor.hasUnsaved()&&
@@ -650,9 +786,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var rotationDisplay:ObjectRotationHandle?=null
     private var rotationPhysical:Transform?=null
     internal var rotationSnap15 by mutableStateOf(false); private set
-    internal fun rotationSnap(value:Boolean){if(!disposing&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput)rotationSnap15=value}
+    internal fun rotationSnap(value:Boolean){if(!streamEditsSealed&&!captureStreamBlocksParent&&!disposing&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput)rotationSnap15=value}
     private fun rotationUnavailable():Boolean=rotation.state.value.busy||rotation.state.value.failure==ObjectRotationFailure.Unconfirmed
-    private fun rotationAdmission():Boolean = !disposing&&!busy&&pending==0&&operationCount==0&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&
+    private fun rotationAdmission():Boolean = !streamEditsSealed&&!captureStreamBlocksParent&&!disposing&&!busy&&pending==0&&operationCount==0&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&
         !instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!ai.state.value.open&&
         instructionAdmission.allows(textDraft!=null,showBrush,showContext,blockingMessage!=null)
     internal val rotation=ObjectRotationInteraction(scope,mutations,::newId,::objectRotationTransforms,
@@ -689,6 +825,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     private suspend fun enterWorkflows(){if(!streamDraftOnly)workflowAttachment()?.let{workflows.enter(it)}}
     private suspend fun adoptWorkflowDocument(a:EditorWorkflowAttachment,target:DocumentSnapshot){
+        // Workflow admission excludes stream acquisition. This callback already
+        // owns mutations, so it must never try to join stream retirement here.
+        check(!captureStreamBlocksParent)
         if(project!==a.project||epoch!=a.epoch||document?.documentId!=a.document.documentId||document?.page!=a.document.page||document?.render?.revision?.sameDocumentRevision(a.document.render.revision)!=true||disposing)
             throw WorkflowFailure(WorkflowFailureKind.Stale)
         val drawing=preparedDrawing(target.render.items)
@@ -791,6 +930,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     internal fun attachAirActivity(owner: Any, receive: (KeyEvent) -> Boolean, schedule: () -> Unit) {
         interruptAirInput(clearBarrel = true); airActivity = owner; airResumed = false; airActivityFocused = false
         airKeyReceiver = receive; airSchedule = schedule; configureAirActions()
+        updateCaptureStreamActivity()
     }
     internal fun airActivityCurrent(owner: Any): Boolean = airActivity === owner
     internal fun airActivityKey(owner: Any, event: KeyEvent): Boolean =
@@ -799,16 +939,19 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (airActivity !== owner || airResumed == resumed) return
         if (!resumed) resetAirRemoteMotion()
         interruptAirInput(clearBarrel = true); airResumed = resumed
+        updateCaptureStreamActivity()
     }
     internal fun airActivityFocus(owner: Any, focused: Boolean) {
         if (airActivity !== owner || airActivityFocused == focused) return
         interruptAirInput(clearBarrel = true); airActivityFocused = focused
+        updateCaptureStreamActivity()
     }
     internal fun detachAirActivity(owner: Any) {
         if (airActivity !== owner) return
         resetAirRemoteMotion()
         interruptAirInput(clearBarrel = true); airActivity = null; airResumed = false; airActivityFocused = false
         airKeyReceiver = null; airSchedule = null
+        updateCaptureStreamActivity()
     }
     private fun airKey(event: KeyEvent): Boolean {
         val received = airKeyReceiver?.invoke(event) == true
@@ -1080,12 +1223,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         preferences = value; configureAirActions(); preferencesQueue.trySend(value); publish()
     }
     fun chooseTool(value: EditorTool) {
+        if (captureStreamBlocksParent || streamEditsSealed || (streamDraftOnly && value == EditorTool.Callout)) return
         if (value == EditorTool.Eraser) {
             chooseEraser(if (erasers.state.value.mode == EraserMode.Stroke) EraserChoice.Stroke else EraserChoice.Object); return
         }
         cancelTool(); erasers.tools.drawing(); tool = value; showContext = false; hoverPoint = null; publish()
     }
     fun chooseEraser(value: EraserChoice) {
+        if (captureStreamBlocksParent || streamEditsSealed) return
         if (streamDraftOnly && value != EraserChoice.Object) { message = "Use the object eraser in this annotation draft."; return }
         cancelTool(); erasers.tools.choose(value, selected); showContext = false; hoverPoint = null; publish()
     }
@@ -1095,6 +1240,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         return if (style == null) preferences.brush(tool) else preferences.brush(tool).copy(width = style.width.coerceIn(.25, 256.0), colorArgb = EditorDrawing.argb(style.rgba).toLong() and 0xffffffffL)
     }
     fun brush(value: BrushPreference) {
+        if (streamEditsSealed || captureStreamBlocksParent) return
         val item = if (tool == EditorTool.Select) objects.firstOrNull { it.item.objectId == selected }?.item else null
         if (item != null) {
             val style = item.style.copy(width = value.width, rgba = EditorDrawing.rgba(value.colorArgb))
@@ -1107,6 +1253,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (showBrush) previewBrush()
     }
     fun brushDialog(show: Boolean) {
+        if (show && (streamEditsSealed || captureStreamBlocksParent)) return
         if (!show && selectedStyleDraft != null) {
             val item = objects.firstOrNull { it.item.objectId == selected }?.item
             val style = selectedStyleDraft
@@ -1123,6 +1270,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     fun navigate(next: WorkbenchScreen) {
         if (streamDraftOnly && next != WorkbenchScreen.Canvas) return
+        if (captureStreamBlocksParent) { requestCaptureStreamClose(); return }
         if(workflows.blocksInput()||imageFrames.state.value.blocksInput){message="Close the current controls or finish their operation first.";return}
         captureNavigationGeneration++ // Explicit navigation invalidates any staged arrival before suspension.
         if(next==WorkbenchScreen.Projects&&!mayCloseAi())return
@@ -1139,7 +1287,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             scope.launch {
                 var instructionSeal = false
                 try {
-                    closeAssisted()
+                    closeCaptureStream();closeAssisted()
                     val closed = mutations.withLock {
                         if (!instructionEditor.sealIfClean()) {
                             message = "Save or discard the instruction draft before closing this project."
@@ -1162,6 +1310,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     fun returnFromSettings() { captureNavigationGeneration++; screen = if (project == null) WorkbenchScreen.Projects else WorkbenchScreen.Canvas }
     fun onBackground() {
+        captureStreamOwner?.background()
         interruptAirInput()
         invalidateAssisted();scope.launch { try{closeAssisted()}catch(error:Exception){report(error)} }
         remoteCapability?.seal("background")
@@ -1271,7 +1420,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             var instructionSeal = false
             var completion: ProjectOpenCompletion<WorkbenchProject>? = null
             try {
-                closeAssisted()
+                closeCaptureStream();closeAssisted()
                 val opened=mutations.withLock {
                     if(disposing)return@withLock false
                     if (!instructionEditor.sealIfClean()) {
@@ -1339,13 +1488,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var captureNavigationGeneration = 0L
     private var navigationContactActive = false
     override fun navigationContact(active: Boolean) {
+        if (captureStreamBlocksParent) { if (!active) navigationContactActive = false; return }
         if (navigationContactActive == active) return
         navigationContactActive = active
         if (active) cancelTool()
         captureNavigationGeneration++
         instructionInteractionChanged()
     }
-    private fun receivedCaptureIdle(ownInstructions: Boolean = false, ownSemantics: Boolean = false): Boolean = !disposing && !imageFrames.state.value.blocksInput && !navigationContactActive && pending == 0 && gesture == null && strokes.isEmpty() &&
+    private fun receivedCaptureIdle(ownInstructions: Boolean = false, ownSemantics: Boolean = false): Boolean = !disposing && !captureStreamBlocksParent && !imageFrames.state.value.blocksInput && !navigationContactActive && pending == 0 && gesture == null && strokes.isEmpty() &&
         !ai.state.value.open && !instructionEditor.hasUnsaved() && (ownInstructions || !instructionEditor.state.value.busy) && (ownSemantics || !semanticEditor.state.value.busy) &&
         !selections.state.value.active && !erasers.state.value.active &&
         instructionAdmission.allows(textDraft != null, showBrush, showContext, blockingMessage != null)
@@ -1424,6 +1574,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         nextWork.start()
     }
     private suspend fun closeCurrent() {
+        check(!captureStreamBlocksParent) { "Close the capture stream before replacing its project" }
         interruptAirInput(clearView = true, clearBarrel = true)
         withContext(NonCancellable) {
         closeAssisted();imageFrames.detach();workflows.detach();rotation.detach()
@@ -1509,6 +1660,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         busy = true
         connectionJob = scope.launch {
             try {
+                closeCaptureStream()
                 mutations.withLock {
                     if (disposing || project !== current || token != epoch) return@withLock
                     detachLink()
@@ -1602,6 +1754,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private fun clearPeerObjects() { peerAdmission++; peerObjects = emptyList() }
 
     private suspend fun detachLink() {
+        check(!captureStreamBlocksParent) { "Close the capture stream before retiring its connection" }
         interruptAirInput()
         withContext(NonCancellable) {
         agentCapture.detach()
@@ -1618,11 +1771,20 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     fun disconnect() {
         if (busy) return
-        cancelTool(); scope.launch { try { detachLink(); publish() } catch (error: Exception) { report(error) } }
+        busy = true; cancelTool()
+        scope.launch {
+            try { closeCaptureStream();detachLink(); publish() }
+            catch (error: Exception) { report(error) }
+            finally { busy = false }
+        }
     }
-    fun revoke(peer: String) { pairing.revoke(peer) { cancelTool(); detachLink(); publish() } }
-    fun matchPeer() { if(workflows.blocksInput()||imageFrames.state.value.blocksInput)return;followPeer = false; matchPeerCamera(); publish() }
-    fun followPeer(enabled: Boolean) { if(workflows.blocksInput()||imageFrames.state.value.blocksInput)return;followPeer = enabled; if (enabled) matchPeerCamera(); publish() }
+    fun revoke(peer: String) { pairing.revoke(peer) {
+        check(!busy && pending == 0) { "Finish the current edit before revoking this computer" }
+        busy = true; cancelTool()
+        try { closeCaptureStream();detachLink(); publish() } finally { busy = false }
+    } }
+    fun matchPeer() { if(captureStreamBlocksParent||workflows.blocksInput()||imageFrames.state.value.blocksInput)return;followPeer = false; matchPeerCamera(); publish() }
+    fun followPeer(enabled: Boolean) { if(captureStreamBlocksParent||workflows.blocksInput()||imageFrames.state.value.blocksInput)return;followPeer = enabled; if (enabled) matchPeerCamera(); publish() }
     private fun matchPeerCamera() {
         val view = connection?.peerViewport?.takeIf { it.documentId == document?.documentId && it.corners.size == 4 } ?: return
         val first = view.corners[0]; val next = view.corners[1]
@@ -1880,13 +2042,15 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                                    val revision: ProjectInfo? = null, val newObjectId: String? = null,
                                    val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false,val physical:Transform=Transform())
 
-    internal fun precisionInputAllowed():Boolean = !streamEditsSealed&&!disposing&&!rotationUnavailable()&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
+    private fun editorInputAllowed(ownCaptureStream: Boolean = false): Boolean =
+        (ownCaptureStream || !captureStreamBlocksParent) && !streamEditsSealed&&!disposing&&!rotationUnavailable()&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
         !instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&
-        !ai.state.value.open&&aiResultReady()&&blockingMessage==null&&textDraft==null&&!showBrush&&!showContext&&instructionAdmission.allows(false,false,false,false)&&
+        !ai.state.value.open&&blockingMessage==null&&textDraft==null&&!showBrush&&!showContext&&instructionAdmission.allows(false,false,false,false)
+    internal fun precisionInputAllowed():Boolean = editorInputAllowed() && airModals.isEmpty() && aiResultReady() &&
         document?.let{(!it.hasToneAdjustments || composedCurrent(it) || (giantMode && giantInputReady(it))) &&
             (background!=null||streamBackgroundReady()||documentOwner.matchingFrame(it,epoch)!=null||giantInputReady(it))}==true
     override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
-        if(streamEditsSealed)return
+        if(streamEditsSealed||captureStreamBlocksParent)return
         if (streamDraftOnly && rawSample.tool == PointerTool.Eraser && erasers.state.value.mode != EraserMode.Object) return
         interruptAirInput()
         if(rotationUnavailable()||workflows.blocksInput()||imageFrames.state.value.blocksInput||ai.state.value.open||!aiResultReady())return
@@ -2245,7 +2409,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                      createdAtMs: Long = System.currentTimeMillis()) {
         val current = project ?: return
         if (commands.isEmpty()) return
-        if(streamEditsSealed){finishRemotePreview(previewLink,gestureId,true);return}
+        if(streamEditsSealed||captureStreamBlocksParent){finishRemotePreview(previewLink,gestureId,true);return}
         if(rotationUnavailable()||workflows.blocksInput()||imageFrames.state.value.blocksInput){finishRemotePreview(previewLink,gestureId,true);message="Finish or close the current controls before editing.";return}
         if (operationCount >= 32) { finishRemotePreview(previewLink, gestureId, true); message = "The edit queue is full. Try the edit again after saving finishes."; return }
         val token = epoch
@@ -2310,7 +2474,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
     fun saveText(text: String, font: String, size: Double) {
-        if (busy || pending != 0) return
+        if (streamEditsSealed || captureStreamBlocksParent || busy || pending != 0) return
         val draft = textDraft ?: return
         if (text.isBlank() || text.length > 16_384 || font !in listOf("Inter", "Noto Sans", "Noto Sans Mono") || !size.isFinite() || size !in 4.0..512.0) {
             message = "Enter text up to 16,384 characters and choose a size from 4 to 512 pixels."; return
@@ -2338,6 +2502,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         textDraft = TextDraft(item.objectId, text.anchor, text.text, text.font, text.size)
     }
     fun deleteSelected() {
+        if (streamEditsSealed || captureStreamBlocksParent) return
         selected?.let { id ->
             if (objects.any { it.item.objectId == id && it.item.shape is Shape.Marker }) {
                 screen = WorkbenchScreen.Instructions; instructionEditor.deleteMarker(id)
@@ -2349,7 +2514,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     override fun undo() = undoRedo(false)
     override fun redo() = undoRedo(true)
     private fun undoRedo(redo: Boolean) {
-        if(streamEditsSealed)return
+        if(streamEditsSealed||captureStreamBlocksParent)return
         if (busy || workflows.blocksInput() || imageFrames.state.value.blocksInput) return
         cancelTool()
         if (pending != 0) { message = "Wait for the current edit to finish before undo or redo."; return }
@@ -2367,7 +2532,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
 
     override fun pan(dx: Double, dy: Double) {
-        if (gesture != null) return
+        if (streamEditsSealed || captureStreamBlocksParent || gesture != null) return
         followPeer = false
         invalidateViewCheck()
         val middle = Point(camera.viewportWidth / 2, camera.viewportHeight / 2)
@@ -2375,7 +2540,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         camera = camera.copy(center = next); publish()
     }
     override fun pinch(previousX: Double, previousY: Double, nextX: Double, nextY: Double, scale: Double, radians: Double) {
-        if (gesture != null || !scale.isFinite() || scale <= 0 || !radians.isFinite()) return
+        if (streamEditsSealed || captureStreamBlocksParent || gesture != null || !scale.isFinite() || scale <= 0 || !radians.isFinite()) return
         followPeer = false
         invalidateViewCheck()
         val anchored = core.mapPoints(camera, true, listOf(Point(previousX, previousY))).single()
@@ -2388,11 +2553,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         camera = next.copy(center = Point(next.center.x + anchored.x - under.x, next.center.y + anchored.y - under.y)); publish()
     }
     override fun contextMenu(x: Double, y: Double) {
+        if (streamEditsSealed || captureStreamBlocksParent) return
         cancelTool()
         selected = scene?.let { EditorDrawing.hit(it, Point(x, y), 8 * density)?.item?.objectId }
         showContext = true; publish()
     }
     override fun hover(sample: PenSample?, capabilities: StylusCapabilities) {
+        if (streamEditsSealed || captureStreamBlocksParent) return
         this.capabilities = capabilities
         hoverPoint = sample?.let { Point(it.x, it.y) };precision.hover(hoverPoint);publish()
     }
@@ -2652,7 +2819,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 // can miss a project returned while the ViewModel is clearing.
                 try {
                     incomingJob?.join()
-                    try { connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin(); closeAssisted();mutations.withLock { closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision() } }
+                    connectionJob?.cancelAndJoin(); captureOpenWork?.cancelAndJoin()
+                    // A failed stream cleanup must also retain its exact parent
+                    // link/service. Do not enter the pairing-close finally until
+                    // all stream/child/surface owners have actually retired.
+                    closeCaptureStream()
+                    try { closeAssisted();mutations.withLock { closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision() } }
                     finally {
                         try { pairing.close() }
                         finally {
@@ -2662,7 +2834,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                     }
                 } catch (error: Exception) {
                     report(error)
-                    DocumentRetirementRegistry.retain(this@EditorController){closeAssisted();mutations.withLock{closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision()}}
+                    DocumentRetirementRegistry.retain(this@EditorController){closeCaptureStream();closeAssisted();mutations.withLock{closeCurrent();imageFrames.close();workflows.close();rotation.close();documentOwner.close();closePrecision()};pairing.close()}
                 } finally { scope.cancel() }
             }
         }

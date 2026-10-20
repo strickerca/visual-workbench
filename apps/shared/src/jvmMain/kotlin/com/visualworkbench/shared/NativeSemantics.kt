@@ -10,7 +10,6 @@ import com.visualworkbench.bindings.core.SemanticCaptureInfo as NCapture
 import com.visualworkbench.bindings.core.QueryRect
 import com.visualworkbench.bindings.core.Point as NPoint
 import com.visualworkbench.bindings.core.Transform as NTransform
-import java.util.concurrent.atomic.AtomicBoolean
 
 public actual fun semanticWorkflows(project:WorkbenchProject):WorkbenchSemantics=NativeSemantics(nativeProjectHandle(project))
 private fun SemanticPlatform.native():NPlatform=when(this){SemanticPlatform.Uia->NPlatform.UIA;SemanticPlatform.AndroidAx->NPlatform.ANDROID_AX;SemanticPlatform.ChromiumUia->NPlatform.CHROMIUM_UIA}
@@ -55,13 +54,13 @@ private class NativeSemantics(private val handle:ProjectSession):WorkbenchSemant
     }
 }
 private class NativeSemanticCollection(private val handle:NCollection):WorkbenchSemanticCollection{
-    private val closed=AtomicBoolean(false)
-    private fun check(){if(closed.get())throw WorkflowFailure(WorkflowFailureKind.Closed)}
+    private val retirement=SynchronousNativeRetirement(handle::dispose,handle::destroy)
+    private fun check(){retirement.check()}
     override fun describe():SemanticCaptureInfo=workflowDirect{check();handle.describe().common()}
     override suspend fun prepare(metadata:WorkflowMetadata,snapshotId:String,platform:SemanticPlatform,frameDeltaMs:Int,collectionElapsedMs:ULong,boundsSpace:SemanticBoundsSpace,elements:List<CapturedSemanticElement>):WorkbenchWorkflowPlan{
         check();smallSnapshot(snapshotId);admitElements(elements);val rows=elements.map{it.native()};val meta=workflowMetadata(metadata)
         val result=settledWorkflow(release=::closeWorkflowPlan){cancel->handle.prepare(meta,snapshotId,platform.native(),frameDeltaMs,collectionElapsedMs,boundsSpace.native(),rows,cancel)}
         return wrapWorkflowPlan(result)
     }
-    override fun close(){if(!closed.getAndSet(true))workflowDirect{closeCollection(handle)}}
+    override fun close(){workflowDirect{retirement.close()}}
 }

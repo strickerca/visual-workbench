@@ -166,6 +166,15 @@ impl WgcStream {
     }
 }
 impl StreamSource for WgcStream {
+    fn inspect(&mut self, cancel: &Cancellation) -> Result<()> {
+        cancel.check().map_err(stream_error)?;
+        check_source(&self.request)?;
+        require_sdr(&self.dxgi, &self.request)?;
+        if api(self.session.0.IsCursorCaptureEnabled())? {
+            return Err(Error::Unavailable);
+        }
+        Ok(())
+    }
     fn prepare(&mut self, timeout_ms: u64, cancel: &Cancellation) -> Result<Option<CaptureStamp>> {
         self.pending = None;
         check_source(&self.request)?;

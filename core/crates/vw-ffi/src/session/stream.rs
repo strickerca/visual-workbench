@@ -6,6 +6,7 @@ pub(in crate::session) mod draft;
 mod driver;
 pub(in crate::session) mod hub;
 mod incoming;
+mod local_producer;
 mod lossless;
 mod memory;
 mod order;
@@ -31,6 +32,10 @@ pub use draft::{
 };
 pub(super) use driver::Bridge;
 pub(super) use hub::Hub;
+pub use local_producer::{
+    CaptureLocalMonitor, CaptureLocalOptions, CaptureLocalProducer, CaptureLocalProgress,
+    CaptureLocalRect, CaptureLocalSelection, CaptureLocalWindow,
+};
 pub use publication_api::{
     CaptureOriginalRequest, CapturePublicationSignal, CapturePublishSource, CapturePublisher,
 };
