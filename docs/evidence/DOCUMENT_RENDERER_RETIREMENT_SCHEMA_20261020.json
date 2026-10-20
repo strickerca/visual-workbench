@@ -1,0 +1,103 @@
+{
+  "schema": "vw-document-renderer-retirement-v1",
+  "source_base": "cb29511566e7eb316b7e1fbb1bc401db12724299",
+  "production_timeout_cause_fixed": false,
+  "harness_reads_logcat": false,
+  "instrumentation_integration": {
+    "main_thread": true,
+    "replacement": "val closeDetail = editor.retirementTimeoutSuffix",
+    "then": "Append closeDetail to existing instrumentation timeout text in the same single main-thread state capture; local owns reporter/parser changes.",
+    "snapshot_capture": "Getter captures each of documentRetirementProgress,canvasRetirementProgress,closeProgress once; no cross-component atomic snapshot claim."
+  },
+  "field_order": [
+    "doc_attempt",
+    "doc_stage",
+    "doc_status",
+    "doc_failed_stage",
+    "canvas_generation",
+    "canvas_reason",
+    "canvas_milestone",
+    "canvas_failed_milestone",
+    "close_attempt",
+    "close_stage",
+    "close_status",
+    "close_failed_stage"
+  ],
+  "null_suffix": "doc_attempt=0 doc_stage=None doc_status=None doc_failed_stage=None canvas_generation=0 canvas_reason=None canvas_milestone=None canvas_failed_milestone=None close_attempt=0 close_stage=None close_status=None close_failed_stage=None",
+  "live_example": "doc_attempt=1 doc_stage=SurfaceRetirement doc_status=Running doc_failed_stage=None canvas_generation=2 canvas_reason=SurfaceChanged canvas_milestone=ReleaseRequested canvas_failed_milestone=None close_attempt=2 close_stage=DocumentOwner close_status=Running close_failed_stage=None",
+  "counter_bounds": {
+    "live_min": 1,
+    "live_max": 2147483647,
+    "wraps": true,
+    "null_group_counter": 0,
+    "ownership": "Object identity, not diagnostic number; document attempt per document owner, canvas generation per Surface, close attempt per editor controller."
+  },
+  "none": "None",
+  "document": {
+    "getter": "editor.documentRetirementProgress",
+    "nullable_before_first_attempt": true,
+    "fields": [
+      "attempt",
+      "stage",
+      "status",
+      "failedStage"
+    ],
+    "stages": [
+      "Requested",
+      "TaskJoin",
+      "DrawGate",
+      "DrawGateAcquired",
+      "Adopt",
+      "SurfaceRetirement",
+      "FrameRetirement",
+      "CacheClose",
+      "Finished"
+    ],
+    "statuses": [
+      "Running",
+      "Settled",
+      "Failed",
+      "Completed"
+    ],
+    "failedStage_none": null,
+    "promotion": "Only live-attempt latest snapshots retained; finished removed; suspended successor promoted immediately."
+  },
+  "canvas": {
+    "getter": "editor.canvasRetirementProgress",
+    "nullable_without_release_observation": true,
+    "fields": [
+      "generation",
+      "reason",
+      "milestone",
+      "failedMilestone"
+    ],
+    "reasons": [
+      "SurfaceChanged",
+      "SurfaceDestroyed",
+      "WindowDetached",
+      "DocumentFrameChanged",
+      "ProjectRetirement"
+    ],
+    "milestones": [
+      "ReleaseRequested",
+      "LibraryCallbackEntered",
+      "MainCallbackEntered",
+      "ReaderCloseRunning",
+      "ReaderClosed",
+      "CompletionPublished",
+      "Failed"
+    ],
+    "failedMilestone_none": null,
+    "selection": "Exact currently awaited aggregate hook, including detached retained hooks; failed observation retained; oldest retained hook observation when aggregate idle. Observer exception returns null without changing retirement.",
+    "thread_visibility": "LibraryCallbackEntered recorded atomically before posting Main; callback token identity cannot overwrite a successor generation.",
+    "pending_release": "Project retirement reuses an existing pending release generation/reason; no fabricated second release observation."
+  },
+  "legacy_close": {
+    "schema": "SURFACE_CLOSE_PHASE_SCHEMA_20261020.json",
+    "fields_unchanged": true,
+    "placed_last": true
+  },
+  "privacy": "Counters and fixed enum names only; no source/project/device IDs, paths, payloads or exception text.",
+  "source_sha256": "4a95cd46bc147a1b55135703a97f23d1c30842b67215310a3110b1565d3b456d",
+  "local_parser_compatibility": "Full schema and one-line reporter handoff supplied to parent/local; acknowledgement and local instrumentation/parser integration remain pending. Device replay must capture all 12 fields."
+}

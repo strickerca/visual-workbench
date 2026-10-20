@@ -352,6 +352,172 @@ class InstrumentationCases(unittest.TestCase):
             self.assertNotIn(private, json.dumps(report))
 
 
+    def retirement_suffix(self):
+        return (" doc_attempt=1 doc_stage=SurfaceRetirement doc_status=Running doc_failed_stage=None"
+                " canvas_generation=2 canvas_reason=SurfaceChanged canvas_milestone=ReleaseRequested canvas_failed_milestone=None"
+                " close_attempt=2 close_stage=DocumentOwner close_status=Running close_failed_stage=None")
+
+    def test_document_renderer_timeout_retains_all_twelve_fields_and_legacy_flags(self):
+        suffix = self.retirement_suffix()
+        text, observation = self.close_snapshot_failure(suffix)
+        text = text.replace("close-owned-project:", "closed-for-reopen:")
+        report = reports.failure_observation(text, [observation["case"]])
+        self.assertEqual(report["observed_statuses"][0]["surface_timeout_state"], {
+            "busy": False, "pending_nonzero": False, "message_kind": "none", "blocked_present": False,
+            "document_retirement_progress": {"attempt": 1, "stage": "SurfaceRetirement", "status": "Running", "failed_stage": "None"},
+            "canvas_retirement_progress": {"generation": 2, "reason": "SurfaceChanged", "milestone": "ReleaseRequested", "failed_milestone": "None"},
+            "close_progress": {"attempt": 2, "stage": "DocumentOwner", "status": "Running", "failed_stage": "None"}})
+        self.assertEqual(report["observed_statuses"][0]["await_phase"], "closed-for-reopen")
+        self.assertFalse(report["assertions_passed"])
+        self.refused(text, (observation["case"],))
+
+    def test_document_renderer_null_groups_are_exact_and_counters_remain_independent(self):
+        live = self.retirement_suffix()
+        groups = (
+            ("doc_attempt=1 doc_stage=SurfaceRetirement doc_status=Running doc_failed_stage=None",
+             "doc_attempt=0 doc_stage=None doc_status=None doc_failed_stage=None", "document_retirement_progress", "attempt"),
+            ("canvas_generation=2 canvas_reason=SurfaceChanged canvas_milestone=ReleaseRequested canvas_failed_milestone=None",
+             "canvas_generation=0 canvas_reason=None canvas_milestone=None canvas_failed_milestone=None", "canvas_retirement_progress", "generation"),
+            ("close_attempt=2 close_stage=DocumentOwner close_status=Running close_failed_stage=None",
+             "close_attempt=0 close_stage=None close_status=None close_failed_stage=None", "close_progress", "attempt"),
+        )
+        for mask in range(8):
+            suffix = live
+            for index, (before, after, _, _) in enumerate(groups):
+                if mask & (1 << index):
+                    suffix = suffix.replace(before, after)
+            _, observation = self.close_snapshot_failure(suffix)
+            state = observation["surface_timeout_state"]
+            for index, (_, _, key, counter) in enumerate(groups):
+                if mask & (1 << index):
+                    self.assertEqual(set(state[key].values()), {0, "None"})
+                    self.assertEqual(state[key][counter], 0)
+                else:
+                    self.assertGreater(state[key][counter], 0)
+        # Diagnostic labels wrap independently; numerical equality/order is not ownership.
+        suffix = live.replace("doc_attempt=1", "doc_attempt=2147483647").replace("close_attempt=2", "close_attempt=1")
+        _, observation = self.close_snapshot_failure(suffix)
+        self.assertEqual(observation["surface_timeout_state"]["document_retirement_progress"]["attempt"], 2147483647)
+
+    def test_document_renderer_vocabularies_match_the_published_schema(self):
+        stages = ("Requested", "TaskJoin", "DrawGate", "DrawGateAcquired", "Adopt", "SurfaceRetirement",
+                  "FrameRetirement", "CacheClose", "Finished")
+        statuses = ("Running", "Settled", "Failed", "Completed")
+        reasons = ("SurfaceChanged", "SurfaceDestroyed", "WindowDetached", "DocumentFrameChanged", "ProjectRetirement")
+        milestones = ("ReleaseRequested", "LibraryCallbackEntered", "MainCallbackEntered", "ReaderCloseRunning",
+                      "ReaderClosed", "CompletionPublished", "Failed")
+        self.assertEqual(reports.SURFACE_DOCUMENT_STAGES, frozenset(stages))
+        self.assertEqual(reports.SURFACE_DOCUMENT_STATUSES, frozenset(statuses))
+        self.assertEqual(reports.SURFACE_CANVAS_REASONS, frozenset(reasons))
+        self.assertEqual(reports.SURFACE_CANVAS_MILESTONES, frozenset(milestones))
+        for stage in stages:
+            for status in statuses:
+                suffix = self.retirement_suffix().replace("doc_stage=SurfaceRetirement", "doc_stage=" + stage).replace("doc_status=Running", "doc_status=" + status)
+                _, observation = self.close_snapshot_failure(suffix)
+                self.assertEqual(observation["surface_timeout_state"]["document_retirement_progress"]["stage"], stage)
+        for reason in reasons:
+            for milestone in milestones:
+                suffix = self.retirement_suffix().replace("canvas_reason=SurfaceChanged", "canvas_reason=" + reason).replace("canvas_milestone=ReleaseRequested", "canvas_milestone=" + milestone)
+                _, observation = self.close_snapshot_failure(suffix)
+                self.assertEqual(observation["surface_timeout_state"]["canvas_retirement_progress"]["milestone"], milestone)
+        for failed in stages:
+            _, observation = self.close_snapshot_failure(self.retirement_suffix().replace("doc_failed_stage=None", "doc_failed_stage=" + failed))
+            self.assertEqual(observation["surface_timeout_state"]["document_retirement_progress"]["failed_stage"], failed)
+        for failed in milestones:
+            _, observation = self.close_snapshot_failure(self.retirement_suffix().replace("canvas_failed_milestone=None", "canvas_failed_milestone=" + failed))
+            self.assertEqual(observation["surface_timeout_state"]["canvas_retirement_progress"]["failed_milestone"], failed)
+
+    def test_document_renderer_rejects_noncanonical_counters_and_mismatched_null_groups(self):
+        live = self.retirement_suffix()
+        for key, value in (("doc_attempt", "1"), ("canvas_generation", "2"), ("close_attempt", "2")):
+            for invalid in ("0", "00", "01", "+1", "-1", "2147483648", "99999999999", "private", "1.0", ""):
+                with self.subTest(key=key, invalid=invalid):
+                    _, observation = self.close_snapshot_failure(live.replace(key + "=" + value, key + "=" + invalid))
+                    self.assertNotIn("surface_timeout_state", observation)
+        for key, value in (("doc_stage", "SurfaceRetirement"), ("doc_status", "Running"),
+                           ("canvas_reason", "SurfaceChanged"), ("canvas_milestone", "ReleaseRequested")):
+            _, observation = self.close_snapshot_failure(live.replace(key + "=" + value, key + "=None"))
+            self.assertNotIn("surface_timeout_state", observation)
+        null = (" doc_attempt=0 doc_stage=None doc_status=None doc_failed_stage=None"
+                " canvas_generation=0 canvas_reason=None canvas_milestone=None canvas_failed_milestone=None"
+                " close_attempt=0 close_stage=None close_status=None close_failed_stage=None")
+        for before, after in (("doc_failed_stage=None", "doc_failed_stage=CacheClose"),
+                              ("canvas_failed_milestone=None", "canvas_failed_milestone=ReaderCloseRunning"),
+                              ("close_failed_stage=None", "close_failed_stage=DocumentOwner")):
+            _, observation = self.close_snapshot_failure(null.replace(before, after))
+            self.assertNotIn("surface_timeout_state", observation)
+
+    def test_document_renderer_rejects_partial_duplicate_reordered_and_unknown_suffixes(self):
+        live = self.retirement_suffix()
+        fields = live.split()
+        bad = [" " + " ".join(fields[:index] + fields[index + 1:]) for index in range(len(fields))]
+        bad += [live + " " + field for field in fields]
+        bad += [live + live, live + " private /secret/project", live + " doc_private=secret",
+                " " + " ".join(fields[4:8] + fields[:4] + fields[8:]),
+                " " + " ".join(fields[1:2] + fields[:1] + fields[2:]),
+                live.replace("doc_stage=SurfaceRetirement", "doc_stage=Private"),
+                live.replace("doc_status=Running", "doc_status=Declined"),
+                live.replace("doc_failed_stage=None", "doc_failed_stage=Private"),
+                live.replace("canvas_reason=SurfaceChanged", "canvas_reason=Private"),
+                live.replace("canvas_milestone=ReleaseRequested", "canvas_milestone=Running"),
+                live.replace("canvas_failed_milestone=None", "canvas_failed_milestone=Private"),
+                live.replace("doc_attempt", "Doc_attempt"), live.replace("canvas_reason", "CANVAS_REASON"),
+                live.replace("doc_stage=SurfaceRetirement", "doc_stage=" + "x" * 3073)]
+        for suffix in bad:
+            with self.subTest(suffix=suffix[:120]):
+                _, observation = self.close_snapshot_failure(suffix)
+                self.assertNotIn("surface_timeout_state", observation)
+                for private in ("secret", "private", "Private", "/project"):
+                    self.assertNotIn(private, json.dumps(observation))
+
+    def test_document_renderer_rejects_nested_fields_hidden_before_a_legacy_close_suffix(self):
+        # Partial/new markers must not disappear into the legacy blocked tail.
+        close = " close_attempt=2 close_stage=DocumentOwner close_status=Running close_failed_stage=None"
+        for hidden in (" doc_attempt=1", " canvas_generation=2", " DOC_STAGE=SurfaceRetirement",
+                       " doc_private=secret", " canvas_milestone=Private"):
+            _, observation = self.close_snapshot_failure(hidden + close)
+            self.assertNotIn("surface_timeout_state", observation)
+        # Valid legacy four-field transcripts continue to report their own schema.
+        _, observation = self.close_snapshot_failure(close)
+        self.assertIn("close_progress", observation["surface_timeout_state"])
+        self.assertNotIn("document_retirement_progress", observation["surface_timeout_state"])
+
+    def test_document_renderer_snapshots_are_primary_case_bound_and_do_not_leak_to_next_status(self):
+        suffix = self.retirement_suffix()
+        text, observation = self.close_snapshot_failure(suffix)
+        header = next(line for line in text.splitlines() if line.startswith("INSTRUMENTATION_STATUS: stack="))
+        for changed in (text.replace(header, header.replace("java.lang.AssertionError", "java.lang.IllegalStateException")),
+                        text.replace(header, "INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: private primary\n\tSuppressed: " + header.removeprefix("INSTRUMENTATION_STATUS: stack=")),
+                        text.replace(header, header + "\n" + header),
+                        text.replace(header, header + "\n" + header.replace("doc_attempt=1", "doc_attempt=3"))):
+            report = reports.failure_observation(changed, [observation["case"]])
+            self.assertNotIn("surface_timeout_state", report["observed_statuses"][0])
+            self.assertNotIn("private", json.dumps(report))
+        for case in reports.SURFACE_AWAIT_CASES:
+            _, current = self.close_snapshot_failure(suffix, case)
+            self.assertIn("document_retirement_progress", current["surface_timeout_state"])
+        for case, code in ((A, -2), (None, 0), (None, 1)):
+            _, current = self.close_snapshot_failure(suffix, case, code)
+            self.assertNotIn("surface_timeout_state", current)
+        report = reports.failure_observation(text + block(A, 2, 2, -2), [observation["case"], A])
+        self.assertEqual(report["observed_statuses"][1], {"case": A, "status_code": -2})
+
+    def test_document_renderer_snapshots_never_retain_private_messages_or_pass_acceptance(self):
+        text, observation = self.close_snapshot_failure(self.retirement_suffix())
+        text = text.replace("message=null blocked=null", "message=secret personal project blocked=/private/file")
+        report = reports.failure_observation(text, [observation["case"]])
+        state = report["observed_statuses"][0]["surface_timeout_state"]
+        self.assertEqual(state["message_kind"], "unknown")
+        self.assertTrue(state["blocked_present"])
+        self.assertEqual(len(state["document_retirement_progress"]), 4)
+        self.assertEqual(len(state["canvas_retirement_progress"]), 4)
+        self.assertEqual(len(state["close_progress"]), 4)
+        for private in ("secret", "personal", "private", "/file"):
+            self.assertNotIn(private, json.dumps(report))
+        self.assertFalse(report["assertions_passed"])
+        self.refused(text, (observation["case"],))
+
+
 class ArtifactCases(unittest.TestCase):
     def test_only_isolated_manifest_pair_is_admitted(self):
         reports.manifest(manifest(), False)

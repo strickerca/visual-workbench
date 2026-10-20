@@ -18,6 +18,8 @@ internal class EditorDocuments(private val scope:CoroutineScope, private val cor
     val controller=DocumentController(scope,core,jobs,attachment,admitted,changePage)
     private val cache=DocumentTileCache(128L*1024*1024)
     private var cacheBytes=0L
+    private val retirementProgress=DocumentRetirementProgress()
+    val progress:DocumentRetirementSnapshot? get()=retirementProgress.current
     private val gate=Mutex()
     private val retired=mutableListOf<DocumentDrawFrame<PreparedDocumentTile>>()
     var frame:DocumentDrawFrame<PreparedDocumentTile>?=null;private set
@@ -83,13 +85,19 @@ internal class EditorDocuments(private val scope:CoroutineScope, private val cor
         }
     }
     suspend fun detach() {
-        controller.close()
-        gate.withLock {
-            observed=null;adopt(null)
-            retireSurface()
-            for(value in retired){value.close();value.awaitRetired()}
-            retired.clear();cache.close();cacheBytes=0
-        }
+        val attempt=retirementProgress.begin()
+        try {
+            attempt.step(DocumentRetirementStage.TaskJoin){controller.close()}
+            attempt.step(DocumentRetirementStage.DrawGate){gate.withLock {
+                attempt.reached(DocumentRetirementStage.DrawGateAcquired)
+                attempt.step(DocumentRetirementStage.Adopt){observed=null;adopt(null)}
+                attempt.step(DocumentRetirementStage.SurfaceRetirement){retireSurface()}
+                attempt.step(DocumentRetirementStage.FrameRetirement){
+                    for(value in retired){value.close();value.awaitRetired()}
+                }
+                attempt.step(DocumentRetirementStage.CacheClose){retired.clear();cache.close();cacheBytes=0}
+            }}
+        } finally {attempt.finish()}
     }
     suspend fun close() {
         withContext(NonCancellable){

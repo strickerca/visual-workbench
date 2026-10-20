@@ -41,6 +41,18 @@ SURFACE_CLOSE_STAGES = frozenset({
     "ProjectStorage", "ProjectsCatalog", "NavigationInstructionCleanup", "Finished",
 })
 SURFACE_CLOSE_STATUSES = frozenset({"Running", "Settled", "Failed", "Completed", "Declined"})
+SURFACE_DOCUMENT_STAGES = frozenset({
+    "Requested", "TaskJoin", "DrawGate", "DrawGateAcquired", "Adopt", "SurfaceRetirement",
+    "FrameRetirement", "CacheClose", "Finished",
+})
+SURFACE_DOCUMENT_STATUSES = frozenset({"Running", "Settled", "Failed", "Completed"})
+SURFACE_CANVAS_REASONS = frozenset({
+    "SurfaceChanged", "SurfaceDestroyed", "WindowDetached", "DocumentFrameChanged", "ProjectRetirement",
+})
+SURFACE_CANVAS_MILESTONES = frozenset({
+    "ReleaseRequested", "LibraryCallbackEntered", "MainCallbackEntered", "ReaderCloseRunning",
+    "ReaderClosed", "CompletionPublished", "Failed",
+})
 SYNC_AWAIT_CASE = "com.visualworkbench.android.EditorSyncInstrumentedTest#oldPageRefreshCannotAdoptOrRebindAfterSameRevisionNavigation"
 SYNC_AWAIT_PHASES = frozenset({
     "InitialPdfPage", "OldReadEntered", "PageOneAdopted", "OldReadDelivered", "EraserEdit",
@@ -297,42 +309,64 @@ def instrumentation(text: str, expected: list[str]) -> dict:
             "instrumentation_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
 
 
+def surface_progress_group(values: tuple[str, ...], first: frozenset[str],
+                           second: frozenset[str], failed: frozenset[str]) -> bool:
+    counter, one, two, failure = values
+    if counter == "0":
+        return (one, two, failure) == ("None", "None", "None")
+    return (1 <= int(counter) <= 2147483647 and one in first and two in second and
+            (failure == "None" or failure in failed))
+
+
 def surface_timeout_state(header: str) -> dict | None:
-    # The optional close snapshot is captured once on Main by the fixture.
-    # Split only its exact ordered suffix; never absorb malformed close fields
-    # into the private blocked-message tail or infer values from suppressed text.
-    if len(header) > 2560:
+    # One Main-thread getter captures each component once; their counters are
+    # independent labels, not proof of an atomic observation or causal repair.
+    if len(header) > 3072:
         return None
-    close = None
-    if " close_" in header:
-        keys = (" close_attempt=", " close_stage=", " close_status=", " close_failed_stage=")
-        if header.count(" close_") != 4 or any(header.count(key) != 1 for key in keys):
+    progress = {}
+    if re.search(r" (?:doc|canvas|close)_", header, re.IGNORECASE):
+        nested = re.search(r" (?:doc|canvas)_", header, re.IGNORECASE) is not None
+        close_keys = (" close_attempt=", " close_stage=", " close_status=", " close_failed_stage=")
+        nested_keys = (" doc_attempt=", " doc_stage=", " doc_status=", " doc_failed_stage=",
+                       " canvas_generation=", " canvas_reason=", " canvas_milestone=", " canvas_failed_milestone=")
+        keys = nested_keys + close_keys if nested else close_keys
+        if (len(re.findall(r" (?:doc|canvas|close)_", header, re.IGNORECASE)) != len(keys) or
+                any(header.count(key) != 1 for key in keys)):
             return None
-        suffix = re.fullmatch(r"([^\r\n]+) close_attempt=(0|[1-9][0-9]{0,9}) close_stage=([A-Za-z]{1,32}) close_status=([A-Za-z]{1,32}) close_failed_stage=([A-Za-z]{1,32})", header)
+        counter = r"(0|[1-9][0-9]{0,9})"
+        value = r"([A-Za-z]{1,32})"
+        pattern = (fr" close_attempt={counter} close_stage={value} close_status={value} close_failed_stage={value}")
+        if nested:
+            pattern = (fr" doc_attempt={counter} doc_stage={value} doc_status={value} doc_failed_stage={value}"
+                       fr" canvas_generation={counter} canvas_reason={value} canvas_milestone={value} canvas_failed_milestone={value}" + pattern)
+        suffix = re.fullmatch(r"([^\r\n]+)" + pattern, header)
         if not suffix:
             return None
-        header, attempt, stage, status, failed = suffix.groups()
-        attempt = int(attempt)
-        if attempt == 0:
-            if (stage, status, failed) != ("None", "None", "None"):
-                return None
-        elif not (attempt <= 2147483647 and stage in SURFACE_CLOSE_STAGES and
-                  status in SURFACE_CLOSE_STATUSES and (failed == "None" or failed in SURFACE_CLOSE_STAGES)):
+        header, *fields = suffix.groups()
+        close = tuple(fields[-4:])
+        if not surface_progress_group(close, SURFACE_CLOSE_STAGES, SURFACE_CLOSE_STATUSES, SURFACE_CLOSE_STAGES):
             return None
-        close = {"attempt": attempt, "stage": stage, "status": status, "failed_stage": failed}
-    # The unescaped fixture fields must each occur exactly once. Ambiguous,
-    # oversized or malformed details contribute no flags and no private text.
+        if nested:
+            doc, canvas = tuple(fields[:4]), tuple(fields[4:8])
+            if not (surface_progress_group(doc, SURFACE_DOCUMENT_STAGES, SURFACE_DOCUMENT_STATUSES, SURFACE_DOCUMENT_STAGES) and
+                    surface_progress_group(canvas, SURFACE_CANVAS_REASONS, SURFACE_CANVAS_MILESTONES, SURFACE_CANVAS_MILESTONES)):
+                return None
+            progress["document_retirement_progress"] = dict(zip(("attempt", "stage", "status", "failed_stage"),
+                                                                (int(doc[0]), *doc[1:])))
+            progress["canvas_retirement_progress"] = dict(zip(("generation", "reason", "milestone", "failed_milestone"),
+                                                              (int(canvas[0]), *canvas[1:])))
+        progress["close_progress"] = dict(zip(("attempt", "stage", "status", "failed_stage"),
+                                              (int(close[0]), *close[1:])))
+    # Preserve the bounded legacy flags after validating the complete suffix.
+    # Unknown/private message and blocking prose never enter the receipt.
     if len(header) > 2304 or any(header.count(token) != 1 for token in (" pending=", " message=", " blocked=")):
         return None
     match = re.fullmatch(r"INSTRUMENTATION_STATUS: stack=java\.lang\.AssertionError: Timed out in [A-Za-z0-9-]{1,64}: busy=(true|false) pending=(0|-?[1-9][0-9]{0,9}) message=([^\r\n]{1,1024}) blocked=([^\r\n]{1,1024})", header)
     if not match or not -2147483648 <= int(match[2]) <= 2147483647:
         return None
-    result = {"busy": match[1] == "true", "pending_nonzero": match[2] != "0",
-              "message_kind": "none" if match[3] == "null" else SURFACE_NAVIGATION_MESSAGES.get(match[3], "unknown"),
-              "blocked_present": match[4] != "null"}
-    if close is not None:
-        result["close_progress"] = close
-    return result
+    return {"busy": match[1] == "true", "pending_nonzero": match[2] != "0",
+            "message_kind": "none" if match[3] == "null" else SURFACE_NAVIGATION_MESSAGES.get(match[3], "unknown"),
+            "blocked_present": match[4] != "null", **progress}
 
 
 def failure_observation(text: str, expected: list[str]) -> dict:

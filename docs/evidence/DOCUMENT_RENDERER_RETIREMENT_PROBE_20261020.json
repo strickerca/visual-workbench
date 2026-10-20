@@ -1,0 +1,139 @@
+{
+  "schema": "vw-document-renderer-retirement-evidence-v1",
+  "date": "2026-10-20",
+  "kind": "nested retirement diagnostic, not a causal repair",
+  "source_base": "cb29511566e7eb316b7e1fbb1bc401db12724299",
+  "source_base_tree": "344125cbd0a10acbae1a58699b3ddeca2578469b",
+  "source_sha256": {
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/DocumentRetirementProgress.kt": "4a95cd46bc147a1b55135703a97f23d1c30842b67215310a3110b1565d3b456d",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorDocuments.kt": "3c08fce363afe0f22e6974ed3d5ff36b224b5441de8a397ce446a0cd26dba583",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasSurface.kt": "ed31e30b8a924bb47437dc03af8d3f2dbd0ccf36a70f347edabccb2d94cb8f83",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/editor/DocumentRetirementProgressTest.kt": "3be05baa765e1ae34fa7c39bfa6a7efcdbdbf9ae0a5b2ad1437f5d1df504e4c3",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/DocumentController.kt": "f4aea6855493f73d08b49b8ca08d708aaee4b2dd86a48509d7af4dbfc97feab3",
+    "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/DocumentControllerTest.kt": "ed2a9911e9d30372d695652b7bf95413dae41971cc4ad6072afff5a179a2fd7c",
+    "apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/DocumentDrawFrame.kt": "443be63c70dea6ab5b65eba146ad22256491ca65bb28453145e97a007b14e15f",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/DocumentDrawFrameTest.kt": "8b214f417c3d9d436d1396546ee9b5f7d0aebe38778d2fd0b6ba6ab93d1246a4",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/documents/DocumentTileOwnership.kt": "a9d9807537ff44e15ac6e87b83d6edea1fbfcf7da2564be032db4c19d6abbbe6",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/documents/DocumentTileOwnershipTest.kt": "35201483efe554e56ec3a5d6e9f17ec8b03553f9a33b1162dcb39d625141e942",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorCloseProgress.kt": "918f603dff49c6922e6d1b7791f52efa80ca3a8bb32c999406ddb2f4cf37aaab",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/EditorController.kt": "a4d823c12c4b0b44916edab626758b21801a0b96dc11a308dd426e76b1882453",
+    "apps/android/src/main/kotlin/com/visualworkbench/android/editor/CanvasRetirementOwner.kt": "d7ff24f385fe4edcdd0c1e93141bb17f3651dc75b0be1b456180fa8b1555527b",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/editor/EditorCloseProgressTest.kt": "ae56bc2b8ab52b6321dcf9fc39cd6b7b934451b24c67c282a4b7eaa3d74abb38",
+    "apps/android/src/test/kotlin/com/visualworkbench/android/editor/CanvasRetirementOwnerTest.kt": "a06c94db8e64f220453dc94987ecbc900f2274f5fa10de416998f093493d3b5f",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/EditorWorkflows.kt": "cd8620682f52c25599530c114e9c380f33905e8ac2a4b4b1c478db8f56a0a988",
+    "apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/LocalViewsInteraction.kt": "40cf20c469bc8562c5627ad35908ec190f1d14821da41b2c0dff9a0fc6044a01",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/EditorWorkflowsTest.kt": "3377bab76ecb4a15e8231462684a68d5699fc3d4bc766da406a43344c1b82dc2",
+    "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/LocalViewsInteractionTest.kt": "87497c51a0d7af0487caf5f9e94a2935db08c4f935057ec32849d15dd02a5142"
+  },
+  "parent_reported_S23_evidence": {
+    "receipt": "app-hil-fresh-diagnostic-64ee1c9ac0544a16b0ca803e5e065fcb.json",
+    "sha256": "2534728860f691768adfa64256fb0526a36a873b285b73af813573f2375c1422",
+    "raw_receipt_inspected_in_cloud": false,
+    "snapshot": {
+      "attempt": 2,
+      "stage": "DocumentOwner",
+      "status": "Running",
+      "failedStage": null,
+      "busy": true,
+      "pending": 0,
+      "displayed_message": null
+    },
+    "cleanup": "passed, parent report",
+    "normal_app": "unchanged, parent report"
+  },
+  "source_conclusion": "No deterministic Kotlin deadlock/callback-loss cause established. Snapshot encloses task join, draw gate, actual renderer release and frame readers. Preserve all retirement proof and add nested observations for actual wait.",
+  "pinned_artifact_inspection": {
+    "package": "androidx.graphics:graphics-core",
+    "version": [
+      1,
+      0,
+      4
+    ],
+    "classes_jar_sha256": "b2be3177fb2afd6d3665725a1de5d737773c0e59b6e470d47e3c3ffe37cbec27",
+    "inspection": "Pinned classes bytecode; RenderQueue.release(true) clears queued work but waits for an in-flight frame to complete before invoking release callback."
+  },
+  "diagnostic_contract": {
+    "schema_file": "DOCUMENT_RENDERER_RETIREMENT_SCHEMA_20261020.json",
+    "schema_sha256": "a0770a7f92885818e97048558726a3bfc8c4ce4a06868edad5d3585849abc6cd",
+    "field_count": 12,
+    "instrumentation_capture_on_main": "val closeDetail = editor.retirementTimeoutSuffix",
+    "snapshot_consistency": "Each of three snapshots read once; no cross-component atomicity claimed",
+    "legacy_close_fields_unchanged_and_last": true,
+    "local_reporter_parser_integrated_in_this_branch": false,
+    "local_reporter_parser_confirmation": "pending parent/local acknowledgement"
+  },
+  "validation": {
+    "compiler": "Kotlin 2.4.20 cached artifacts; JDK21",
+    "jvm_target": 21,
+    "compile_exit": 0,
+    "test_exit": 0,
+    "passed": 86,
+    "failed": 0,
+    "new_cases": 18,
+    "test_counts": {
+      "DocumentRetirementProgressTest": 13,
+      "DocumentControllerTest": 13,
+      "DocumentDrawFrameTest": 5,
+      "DocumentTileOwnershipTest": 8,
+      "EditorCloseProgressTest": 10,
+      "CanvasRetirementOwnerTest": 9,
+      "EditorWorkflowsTest": 9,
+      "LocalViewsInteractionTest": 19
+    },
+    "actual_five_modified_production_sources_compiled": true,
+    "cached_dependencies": "Cached Android/shared/bindings classes and Android SDK; fresh named source only",
+    "timeout_seconds": {
+      "compile": 100,
+      "tests": 35
+    },
+    "heap_megabytes": {
+      "compile": 768,
+      "tests": 256
+    },
+    "heavy_slot": "one compiler/test sequence under project heavy-build lock",
+    "warnings": {
+      "count": 4,
+      "all_warning_source_lines_present_in_base": true,
+      "scope": "unchanged EditorController safe-call and parameter-name warnings"
+    },
+    "policy_checks": [
+      "ids PASS",
+      "third-party PASS",
+      "workspace PASS"
+    ],
+    "external_evidence_sha256": {
+      "run-focused.py": "e6c8e32ef1f7bdb8a3201b9db388c48d3619164fc03cef5f9e52f4801671d9e5",
+      "compile.log": "1e99d6740d173ff5eab32325aff5c0e41e4b227d44ab650081a2e2784f8db554",
+      "tests.log": "6af9837811e3b27197a0252cd5ac738a1ddd8d31643358c7523cb4d0ce1f8a9c",
+      "focused-run.json": "c54d592e90901bc560a232ca56152b151969c81a979c0a4fb099399234ebb579",
+      "policy.log": "f5e6320331b58761322e9b6bfef0e523b47fb87d7ef78df46fe56070d8eab197"
+    },
+    "baseline_source_diagnosis_sha256": "2d5beeae2779583302a0ecfbaef5e21dc1fcfcfefc7f7378dc9623ea0aa00387"
+  },
+  "independent_review": {
+    "reviewer": "Astra, existing /root/tunnel_boundary_review lane",
+    "source_verdict": "No actionable ownership or ordering regression found",
+    "reviewed": "Five production files, two test files, schema and handoff documentation",
+    "execution_receipt_review": "Clear: all 19 source bindings match, compile/test exit 0, 86 test cases agree with eight class counts, four baseline warnings unchanged. Reviewer read external focused-run receipt/logs; repository receipt generated afterward.",
+    "no_reviewer_tests_builds_or_mutations": true,
+    "executor_session_metadata": "Existing coding lane could not inspect actual model/effort; requested Sol 6.1 / xhigh not independently verified"
+  },
+  "preserved_behavior": [
+    "original waits and cancellation",
+    "actual renderer release callback",
+    "original draw-reader close and deferred completion",
+    "retained failed-owner proof",
+    "existing mutation admission and final writes"
+  ],
+  "limits": {
+    "full_gradle_or_fresh_bindings": false,
+    "fresh_APK": false,
+    "JNI_GPU_or_device_execution": false,
+    "timeout_cause_fixed": false,
+    "S23_acceptance_passed": false,
+    "raw_parent_device_receipt_inspected_in_cloud": false,
+    "main_updated_by_cloud": false,
+    "instrumentation_reporter_or_parser_changed_by_cloud": false
+  },
+  "next_action": "Local lane integrates the getter into instrumentation timeout text and parser, replays the same focused S23 case at its existing bound, and binds all three snapshot groups to actual source/artifacts before choosing a minimal causal repair."
+}
