@@ -58,7 +58,7 @@ class EditorSurfaceInstrumentedTest {
      * child SurfaceControls, so PixelCopy of the SurfaceView's own Surface or of
      * the Window cannot observe it; only a display composition screenshot can. */
     private class CanvasProbe(val canvas: Rect, val page: RectF, val pagePoint: Point, val surround: Int, val railAtEnd: Boolean)
-    private class PresentSample(val presented: Boolean, val blackFraction: Double, val detail: String)
+    private class PresentSample(val presented: Boolean, val blackFraction: Double, val blackBandFraction: Double, val detail: String)
 
     private fun canvasProbe(activity: MainActivity): CanvasProbe? {
         val view = canvas(activity.window.decorView) ?: return null
@@ -73,7 +73,7 @@ class EditorSurfaceInstrumentedTest {
         // Lower-right page area: every drawing fixture in this class stays above/left of it.
         val inside = EditorDrawing.map(scene.matrix, Point(w * .85, h * .85))
         return CanvasProbe(Rect(location[0], location[1], location[0] + view.width, location[1] + view.height), page,
-            Point(inside.x + location[0], inside.y + location[1]), if (scene.dark) 0xff17252d.toInt() else 0xffdce5e3.toInt(),
+            Point(inside.x + location[0], inside.y + location[1]), EditorDrawing.surroundArgb(scene.dark),
             activity.editor.preferences.leftHanded)
     }
 
@@ -87,14 +87,29 @@ class EditorSurfaceInstrumentedTest {
             return if (ix in 0 until shot.width && iy in 0 until shot.height) shot.getPixel(ix, iy) else null
         }
         val c = probe.canvas
-        // The tool rail overlays one canvas edge; the central band never contains it.
-        var black = 0; var total = 0
-        for (gy in 0 until 32) for (gx in 0 until 16) {
-            val color = pixel(c.left + c.width() * (.3 + .4 * (gx + .5) / 16), c.top + c.height() * ((gy + .5) / 32)) ?: continue
-            total++
-            if (Color.red(color) <= 10 && Color.green(color) <= 10 && Color.blue(color) <= 10) black++
+        // The tool rail overlays one canvas edge; the central 40% band never contains it.
+        // Every row of the band is sampled so a partial black strip is measured too.
+        val band = Rect(c.left + (c.width() * .3).toInt(), c.top, c.left + (c.width() * .7).toInt(), c.bottom)
+        var black = 0; var total = 0; var run = 0; var longestRun = 0
+        if (band.intersect(0, 0, shot.width, shot.height) && band.width() > 0) {
+            val rowPixels = IntArray(band.width())
+            for (y in band.top until band.bottom) {
+                shot.getPixels(rowPixels, 0, band.width(), band.left, y, band.width(), 1)
+                var rowBlack = 0; var rowTotal = 0
+                var x = 0
+                while (x < rowPixels.size) {
+                    val color = rowPixels[x]
+                    rowTotal++
+                    if (Color.red(color) <= 10 && Color.green(color) <= 10 && Color.blue(color) <= 10) rowBlack++
+                    x += 8
+                }
+                black += rowBlack; total += rowTotal
+                // A row is black when >=90% of its samples are near-black.
+                if (rowBlack * 10 >= rowTotal * 9) { run++; if (run > longestRun) longestRun = run } else run = 0
+            }
         }
         val fraction = if (total == 0) 1.0 else black.toDouble() / total
+        val bandFraction = if (c.height() <= 0) 1.0 else longestRun.toDouble() / c.height()
         val pageColors = (-1..1).flatMap { dy -> (-1..1).map { dx -> pixel(probe.pagePoint.x + 4 * dx, probe.pagePoint.y + 4 * dy) } }
         val white = pageColors.all { it != null && near(it, Color.WHITE, 12) }
         val surroundPoints = buildList {
@@ -107,19 +122,21 @@ class EditorSurfaceInstrumentedTest {
         val surroundColors = surroundPoints.map { pixel(it.x, it.y) }
         val surround = surroundColors.isNotEmpty() && surroundColors.all { it != null && near(it, probe.surround, 16) }
         fun hex(value: Int?) = value?.let { String.format("%08x", it) } ?: "none"
-        return PresentSample(white && surround && fraction < .01, fraction,
-            "page=${hex(pageColors[4])} surround=${surroundColors.joinToString(",") { hex(it) }} black=${"%.3f".format(fraction)}")
+        return PresentSample(white && surround && fraction < .01 && bandFraction < .02, fraction, bandFraction,
+            "page=${hex(pageColors[4])} surround=${surroundColors.joinToString(",") { hex(it) }} black=${"%.3f".format(fraction)} " +
+                "black_band=${"%.3f".format(bandFraction)}")
     }
 
     /** Polls composited display pixels: the page must be white, the surround its
-     * theme colour and the canvas band <1% near-black. Any sample that is >=90%
-     * black during the observation window fails, so a transient black presentation
-     * gap is reported with its count, not only a persistent one. Screenshots stay
-     * in memory and are recycled immediately. */
+     * theme colour and the canvas band <1% near-black with no contiguous black
+     * strip of >=2% of the canvas rows. Any sample that is >=90% black, or that
+     * contains such a strip, during the observation window fails, so a transient
+     * full or partial black presentation gap is reported with its count, not only
+     * a persistent one. Screenshots stay in memory and are recycled immediately. */
     private fun assertPresented(scenario: ActivityScenario<MainActivity>, phase: String, deadlineMs: Long = 2_000, observeMs: Long = 800) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         val start = SystemClock.uptimeMillis()
-        var samples = 0; var blackSamples = 0; var firstBlackMs = -1L; var lastBlackMs = -1L
+        var samples = 0; var blackSamples = 0; var bandSamples = 0; var firstBlackMs = -1L; var lastBlackMs = -1L
         var firstPresentedMs = -1L; var lastPresented = false; var detail = "canvas-unavailable"
         while (true) {
             var probe: CanvasProbe? = null
@@ -135,7 +152,11 @@ class EditorSurfaceInstrumentedTest {
                     try {
                         val sample = presentSample(shot, current)
                         samples++
-                        if (sample.blackFraction >= .9) { blackSamples++; if (firstBlackMs < 0) firstBlackMs = elapsed; lastBlackMs = elapsed }
+                        val fullBlack = sample.blackFraction >= .9
+                        val blackBand = sample.blackBandFraction >= .02
+                        if (fullBlack) blackSamples++
+                        if (blackBand) bandSamples++
+                        if (fullBlack || blackBand) { if (firstBlackMs < 0) firstBlackMs = elapsed; lastBlackMs = elapsed }
                         lastPresented = sample.presented; detail = sample.detail
                         if (sample.presented && firstPresentedMs < 0) firstPresentedMs = elapsed
                     } finally { shot.recycle() }
@@ -144,10 +165,10 @@ class EditorSurfaceInstrumentedTest {
             val now = SystemClock.uptimeMillis() - start
             if ((lastPresented && now >= observeMs) || now >= deadlineMs) break
         }
-        val summary = "phase=$phase samples=$samples black_samples=$blackSamples first_black_ms=$firstBlackMs " +
-            "last_black_ms=$lastBlackMs first_presented_ms=$firstPresentedMs presented=$lastPresented $detail"
+        val summary = "phase=$phase samples=$samples black_samples=$blackSamples black_band_samples=$bandSamples " +
+            "first_black_ms=$firstBlackMs last_black_ms=$lastBlackMs first_presented_ms=$firstPresentedMs presented=$lastPresented $detail"
         Log.i("VW_CANVAS_PRESENT", summary)
-        if (!lastPresented || blackSamples > 0) fail("Canvas presentation failed: $summary")
+        if (!lastPresented || blackSamples > 0 || bandSamples > 0) fail("Canvas presentation failed: $summary")
     }
 
     private fun resizeCanvas(scenario: ActivityScenario<MainActivity>, phase: String, shrink: Boolean, action: (MainActivity) -> Unit) {

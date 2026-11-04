@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -32,14 +33,23 @@ import java.util.concurrent.TimeUnit
  *
  * The canvas exists only in AndroidX child layers: the SurfaceView's own opaque
  * surface is never drawn and shows black wherever no generation has a committed
- * frame. A size change is therefore make-before-break. The presented generation
- * stays attached until its successor's first multi-buffered frame is committed and
- * is released only then, so at most two generations (two AndroidX buffer pools)
- * coexist: the predecessor survives the successor's first frame (normally 1-3
- * display frames; Main waits at most [SUCCESSOR_PRESENT_WAIT_MS] before AndroidX
- * resizes the predecessor) plus its asynchronous release. No generation is
- * allocated while any release is settling, so a third pool never exists. Giant
- * mode keeps break-before-make so its single surface reservation is never shared. */
+ * frame. A size change is therefore make-before-break: the presented generation is
+ * kept and one successor is created at the new size. The kept generation is
+ * released only after the successor's first frame is committed AND the kept
+ * generation's own AndroidX resize redraw (which carries SurfaceView's redraw
+ * completion) has finished, or [KEPT_REDRAW_FALLBACK_MS] after the successor
+ * presented. Main waits at most [SUCCESSOR_PRESENT_WAIT_MS] for the successor
+ * before AndroidX resizes the kept generation in place.
+ *
+ * Generations: at most two (kept + successor), and no generation is allocated
+ * while any release is settling. Buffer pools are bounded but not two: AndroidX
+ * rebuilds the kept generation in place at the new size and releases its
+ * pre-resize pools asynchronously, so up to three pool sets exist transiently
+ * (successor, kept resized, kept pre-resize) and two until the kept generation
+ * leaves. A further resize before the successor presents rebuilds both
+ * generations in place, transiently up to four pool sets; later resizes are
+ * deferred into one coalesced replacement. Giant mode keeps break-before-make so
+ * its single surface reservation is never shared. */
 internal class CanvasSurface(context: Context, val controller: EditorController) : SurfaceView(context) {
     private class RenderSession {
         var closed = false
@@ -54,6 +64,11 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         /** Released once a visible multi-buffered frame of this generation is committed. */
         val firstPresent = CountDownLatch(1)
         val presented: Boolean get() = firstPresent.count == 0L
+        /** Layer of the last completed multi-buffered frame (under [lock]). */
+        var lastMultiLayer: SurfaceControlCompat? = null
+        /** An AndroidX in-place resize is pending: its redraw lands on a new layer (under [lock]). */
+        var awaitingResizeRedraw = false
+        var resizeFrom: SurfaceControlCompat? = null
     }
     private class Generation(val renderer: CanvasFrontBufferedRenderer<Frame>, val session: RenderSession)
     private data class Frame(val session: RenderSession, val dry: Boolean, val inputMs: Long,
@@ -67,10 +82,8 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private val retirementHook:suspend()->Unit = {retireForProject()}
     private var renderer: CanvasFrontBufferedRenderer<Frame>? = null
     private var session: RenderSession? = null
-    /** The presented generation kept while its successor prepares its first frame. */
-    private var kept: Generation? = null
-    /** A resize arrived while a release was settling: replace once it settles. */
-    private var replaceAfterRelease = false
+    private val replacement = CanvasReplacement<Generation>()
+    private val keptFallback = Runnable { replacement.fallback()?.let { release(it, CanvasRetirementReason.SurfaceChanged) } }
     private val generations = CanvasGenerations()
     private val retirementProgress=CanvasRetirementProgress()
     private val redraws = CanvasRedrawHandshake({ task, delay -> main.postDelayed(task, delay) }, { main.removeCallbacks(it) }, REDRAW_FALLBACK_MS)
@@ -100,8 +113,10 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
             override fun surfaceRedrawNeeded(holder: SurfaceHolder) {}
             // Finish SurfaceView's redraw only over a committed frame (bounded);
             // finishing first would cut the window hole over an empty black layer.
+            // Giant frames stay hidden until their tiles are current, so giant mode
+            // keeps the earlier immediate completion instead of waiting the fallback.
             override fun surfaceRedrawNeededAsync(holder: SurfaceHolder, drawingFinished: Runnable) {
-                redraws.request(drawingFinished, !attached || session?.presented == true)
+                redraws.request(drawingFinished, !attached || controller.giantMode || session?.presented == true)
             }
         })
     }
@@ -160,56 +175,99 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private fun resize(width: Int, height: Int) {
         val density = resources.displayMetrics.density
         val current = renderer; val currentSession = session
-        if (current == null || currentSession == null || controller.giantMode) {
-            retireRenderer(CanvasRetirementReason.SurfaceChanged); controller.viewport(width, height, density); return
+        when (replacement.resizeAction(current != null && currentSession != null, controller.giantMode, generations.releasing)) {
+            CanvasReplacement.ResizeAction.RetireAll -> {
+                retireRenderer(CanvasRetirementReason.SurfaceChanged); controller.viewport(width, height, density)
+            }
+            CanvasReplacement.ResizeAction.Defer -> {
+                // A replacement is still settling. Presented generations resize in
+                // place through their own AndroidX holder callbacks (AndroidX's own
+                // layer swap can leave one render's gap); one coalesced replacement
+                // follows once the release settles, because an in-place rebuild can
+                // lose a completion and wedge that generation's dry-frame accounting.
+                currentSession?.let(::awaitResizeRedraw)
+                replacement.kept?.let {
+                    awaitResizeRedraw(it.session)
+                    // The kept generation redraws again: restart its bounded fallback.
+                    main.removeCallbacks(keptFallback); main.postDelayed(keptFallback, KEPT_REDRAW_FALLBACK_MS)
+                }
+                controller.viewport(width, height, density); keptFollowsLatest()
+            }
+            CanvasReplacement.ResizeAction.Replace -> {
+                val keptGeneration = Generation(checkNotNull(current), checkNotNull(currentSession))
+                // AndroidX resizes the kept generation in place right after this
+                // callback; its redraw must finish before that generation may leave.
+                awaitResizeRedraw(keptGeneration.session)
+                replacement.keep(keptGeneration, awaitRedraw = true)
+                renderer = null; session = null
+                controller.viewport(width, height, density) // Its publish creates the successor from the new viewport.
+                ensureRenderer()
+                val successor = session ?: run { restoreKept(); return }
+                keptFollowsLatest()
+                // Wait (bounded) so the kept generation's AndroidX layer swap finds
+                // the successor's frame already committed underneath.
+                val started = SystemClock.uptimeMillis()
+                val presented = successor.firstPresent.await(SUCCESSOR_PRESENT_WAIT_MS, TimeUnit.MILLISECONDS)
+                Log.i(LOG_TAG, "resize successor_wait_ms=${SystemClock.uptimeMillis() - started} presented=$presented")
+            }
         }
-        if (!generations.canReplace(true, kept != null, false)) {
-            // A replacement is still settling. Presented generations resize through
-            // their own AndroidX holder callbacks; replace once the release settles.
-            replaceAfterRelease = true
-            controller.viewport(width, height, density); keptFollowsLatest(); return
-        }
-        kept = Generation(current, currentSession); renderer = null; session = null
-        controller.viewport(width, height, density) // Its publish creates the successor from the new viewport.
-        ensureRenderer()
-        val successor = session ?: run { restoreKept(); return }
-        keptFollowsLatest()
-        // AndroidX resizes the kept generation from its own holder callback right
-        // after this one, swapping that generation's layers. Wait (bounded) so the
-        // swap finds the successor's frame already committed underneath.
-        successor.firstPresent.await(SUCCESSOR_PRESENT_WAIT_MS, TimeUnit.MILLISECONDS)
     }
 
-    /** The kept generation's own AndroidX resize redraw paints the newest scene. */
+    /** Main: [target]'s pending AndroidX in-place resize redraws onto a new layer. */
+    private fun awaitResizeRedraw(target: RenderSession) {
+        synchronized(lock) { target.awaitingResizeRedraw = true; target.resizeFrom = target.lastMultiLayer }
+    }
+
+    /** Main: [target]'s in-place resize redraw completed (its SurfaceView redraw completion ran or is running). */
+    private fun resizeRedrawn(target: RenderSession) {
+        val keptGeneration = replacement.kept ?: return
+        if (keptGeneration.session !== target) return
+        replacement.keptRedrawn(keptGeneration)?.let(::retireKeptGeneration)
+    }
+
+    /** The kept generation's own AndroidX resize redraw paints the newest scene of the same document frame. */
     private fun keptFollowsLatest() {
-        val target = kept ?: return
-        synchronized(lock) { if (!target.session.closed) target.session.latest = latest }
+        val target = replacement.kept ?: return
+        val scene = latest ?: return
+        synchronized(lock) {
+            if (!target.session.closed && target.session.latest?.documentFrame === scene.documentFrame) target.session.latest = scene
+        }
     }
 
     /** No successor could be allocated: the kept generation stays current. */
     private fun restoreKept() {
-        val target = kept ?: return
-        kept = null; renderer = target.renderer; session = target.session
-        synchronized(lock) { if (!target.session.closed) target.session.latest = latest }
+        val target = replacement.restore() ?: return
+        main.removeCallbacks(keptFallback)
+        renderer = target.renderer; session = target.session
+        val scene = latest ?: return
+        // Same rule as publish: a different document frame needs a renderer with its reader.
+        if (target.session.latest?.documentFrame !== scene.documentFrame) { retireRenderer(CanvasRetirementReason.DocumentFrameChanged); return }
+        synchronized(lock) { if (!target.session.closed) target.session.latest = scene }
     }
 
     private fun replaceAfterSettled() {
-        if (!replaceAfterRelease || generations.releasing || kept != null) return
-        replaceAfterRelease = false
+        if (!replacement.replaceDue(generations.releasing)) return
         val current = renderer ?: return; val currentSession = session ?: return
         if (controller.giantMode) return
         // No layer swap is pending: the successor is created above the presented
-        // generation and covers it once its first frame commits.
-        kept = Generation(current, currentSession); renderer = null; session = null
+        // generation and covers it once its first frame commits. A redraw still
+        // pending from an earlier in-place resize must finish before it leaves.
+        replacement.keep(Generation(current, currentSession), awaitRedraw = synchronized(lock) { currentSession.awaitingResizeRedraw })
+        renderer = null; session = null
         ensureRenderer()
         if (session == null) restoreKept()
+    }
+
+    private fun retireKeptGeneration(target: Generation) {
+        main.removeCallbacks(keptFallback)
+        release(target, CanvasRetirementReason.SurfaceChanged)
     }
 
     private fun ensureRenderer() {
         if (!attached || !controller.canCreateCanvas(retirementHook) || !holder.surface.isValid || width <= 0 || height <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0 || latest == null || !generations.canCreate(renderer != null)) return
         val currentSession = RenderSession().also { it.latest = latest;it.documentReader=latest?.documentFrame?.acquire() }
         session = currentSession
-        renderer = CanvasFrontBufferedRenderer(this, object : CanvasFrontBufferedRenderer.Callback<Frame> {
+        renderer = try { CanvasFrontBufferedRenderer(this, object : CanvasFrontBufferedRenderer.Callback<Frame> {
             override fun onDrawFrontBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, param: Frame) {
                 val snapshot = synchronized(lock) {
                     currentSession.frontQueued = false
@@ -241,9 +299,18 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
             override fun onMultiBufferedLayerRenderComplete(frontBufferedLayerSurfaceControl: SurfaceControlCompat,
                                                             multiBufferedLayerSurfaceControl: SurfaceControlCompat,
                                                             transaction: SurfaceControlCompat.Transaction) {
+                var redrawnAfterResize = false
                 val visible = synchronized(lock) {
                     if (!currentSession.closed) currentSession.dryFrames.drawCompleted()
                     currentSession.frontDrawn = minOf(currentSession.frontDrawn, currentSession.drawn)
+                    // Callbacks for the pre-resize layer can only precede AndroidX's
+                    // release of that layer, which precedes the resize redraw on this
+                    // thread: the first callback on another layer is that redraw.
+                    if (currentSession.awaitingResizeRedraw &&
+                        (currentSession.resizeFrom == null || multiBufferedLayerSurfaceControl !== currentSession.resizeFrom)) {
+                        currentSession.awaitingResizeRedraw = false; redrawnAfterResize = true
+                    }
+                    currentSession.lastMultiLayer = multiBufferedLayerSurfaceControl
                     val hidden = currentSession.closed || currentSession.giantDrawn?.let{!controller.giantFrameCurrent(it)}==true
                     if (hidden) {
                         transaction.setVisibility(frontBufferedLayerSurfaceControl, false)
@@ -251,6 +318,10 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                     }
                     !hidden
                 }
+                // AndroidX runs SurfaceView's redraw completion right after this
+                // callback on this thread; a release posted from Main now queues
+                // behind it, so quitting this thread can no longer drop it.
+                if (redrawnAfterResize) main.post { resizeRedrawn(currentSession) }
                 // Presentation means committed, not recorded: only then may a kept
                 // predecessor leave or SurfaceView cut its window hole over this layer.
                 if (visible && !currentSession.presented) {
@@ -258,7 +329,8 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                         transaction.addTransactionCommittedListener({ it.run() }, object : SurfaceControlCompat.TransactionCommittedListener {
                             override fun onTransactionCommitted() { presented(currentSession) }
                         })
-                    else main.post { presented(currentSession) }
+                    // No committed listener before API 31; Main may be waiting in resize.
+                    else presented(currentSession)
                 }
                 currentSession.giantDrawn?.let{frame->main.post{
                     if(!currentSession.closed&&currentSession===session&&controller.giantFrameCurrent(frame))
@@ -269,7 +341,13 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                 // make a following stroke disappear until its next input event.
                 main.post { redrawNewer(currentSession) }
             }
-        })
+        }) } catch (error: Throwable) {
+            // A renderer that failed to construct owns nothing; never leak the reader lease.
+            synchronized(lock) { currentSession.closed = true; currentSession.dryFrames.close() }
+            if (session === currentSession) session = null
+            currentSession.documentReader?.close(); currentSession.documentReader = null
+            throw error
+        }
         enqueue(currentSession, true)
     }
 
@@ -279,7 +357,9 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         target.firstPresent.countDown()
         main.post {
             if (target !== session || target.closed) return@post
-            retireKept(CanvasRetirementReason.SurfaceChanged)
+            val retire = replacement.successorPresented()
+            if (retire != null) retireKeptGeneration(retire)
+            else if (replacement.kept != null) { main.removeCallbacks(keptFallback); main.postDelayed(keptFallback, KEPT_REDRAW_FALLBACK_MS) }
             redraws.finish()
         }
     }
@@ -321,17 +401,14 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     /** Retires every generation, kept and current; completes after all releases settle. */
     private fun retireRenderer(reason:CanvasRetirementReason):CompletableDeferred<Unit> {
         controller.canvasRendererRetiring()
-        replaceAfterRelease=false
-        retireKept(reason)
+        replacement.clearDeferred()
+        main.removeCallbacks(keptFallback)
+        replacement.take()?.let{release(it,reason)}
         val target=session;val previous=renderer
         session=null;renderer=null
         if(previous!=null&&target!=null)release(Generation(previous,target),reason)
         else if(target!=null)synchronized(lock){target.closed=true;target.dryFrames.close()}
         return generations.joined()
-    }
-    private fun retireKept(reason:CanvasRetirementReason) {
-        val target=kept?:return
-        kept=null;release(target,reason)
     }
     private fun release(target:Generation,reason:CanvasRetirementReason) {
         val owned=target.session
@@ -409,5 +486,8 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         const val SUCCESSOR_PRESENT_WAIT_MS = 150L
         /** Upper bound for holding SurfaceView's redraw completion. */
         const val REDRAW_FALLBACK_MS = 750L
+        /** After the successor presented, retire the kept generation even if its resize redraw never completes. */
+        const val KEPT_REDRAW_FALLBACK_MS = 500L
+        const val LOG_TAG = "VW_CANVAS"
     }
 }

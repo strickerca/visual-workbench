@@ -69,28 +69,61 @@ logcat had 14 `LowLatencyCanvas` "released" warnings, one per resize.
 ## Fix (`CanvasSurface`, `CanvasGenerations`)
 
 - **Make-before-break on size change.** The presented generation (renderer,
-  buffer pool and scene slot) is kept, and a successor is created at the new
-  size from the new viewport scene. The kept generation is released only after
-  the successor's first visible multi-buffered frame is *committed*
-  (`SurfaceControlCompat.Transaction.addTransactionCommittedListener`).
-  - Main waits at most 150 ms in `surfaceChanged`. That way AndroidX's own
-    resize of the kept generation, which runs from its holder callback right
-    after ours, finds the successor's frame already committed underneath.
-  - **Bounded overlap:** at most two generations, so two AndroidX buffer pools,
-    coexist. The predecessor lives until the successor's first committed frame
-    (normally 1-3 display frames) plus its asynchronous release.
-  - No generation is allocated while any release settles, so a third pool
-    never exists.
-  - A resize that arrives while a replacement is still settling lets the
-    presented generations resize through AndroidX. They are replaced
-    make-before-break once the release settles.
-- **Giant mode** keeps break-before-make. Its single surface reservation is
-  never shared.
+  buffer pools and scene slot) is kept, and a successor is created at the new
+  size from the new viewport scene. The kept generation is released only when
+  both of these hold:
+  - the successor's first visible multi-buffered frame is *committed*
+    (`SurfaceControlCompat.Transaction.addTransactionCommittedListener`;
+    before API 31 the completion callback signals directly), and
+  - the kept generation's own AndroidX resize redraw has completed. That
+    redraw carries SurfaceView's `drawingFinished`; releasing earlier would
+    quit the kept handler thread before AndroidX runs it. The redraw is
+    detected as the first completion on a layer other than the pre-resize
+    one.
+
+  If that redraw never completes, a bounded fallback releases the kept
+  generation 500 ms after the successor presented. Main waits at most 150 ms
+  in `surfaceChanged` (the measured wait is logged as `VW_CANVAS
+  resize successor_wait_ms=`), so AndroidX's own resize of the kept
+  generation, which runs from its holder callback right after ours, finds the
+  successor's frame already committed underneath.
+- **Bounded overlap.**
+  - Generations: at most two (kept and successor). No generation is
+    allocated while any release settles.
+  - Buffer pools: AndroidX rebuilds the kept generation in place at the new
+    size and releases its pre-resize pools asynchronously. So up to three
+    pool sets exist transiently (successor, kept resized, kept pre-resize),
+    and two until the kept generation leaves. This is normally 1-3 display
+    frames plus the release.
+  - A second resize before the successor presents rebuilds both generations
+    in place, transiently up to four pool sets.
+- **Rapid successive resizes.** A resize while a replacement is still
+  settling is deferred. The presented generations resize in place through
+  AndroidX, whose own layer swap can leave a gap of one render. One coalesced
+  make-before-break replacement follows once the release settles. That
+  replacement is not redundant: an in-place AndroidX rebuild can lose a
+  completion callback and wedge the generation's dry-frame accounting.
+  `CanvasReplacement` holds this state machine and has JVM unit tests.
+- **Giant mode** keeps break-before-make: its single surface reservation is
+  never shared. Its redraw completion stays immediate (giant frames are
+  hidden until their tiles are current). Pre-existing: a giant resize still
+  releases inside the SurfaceView dispatch, so that renderer's redraw
+  completion is dropped as before.
 - **Redraw handshake.** The holder callback is now `Callback2`. SurfaceView's
   `drawingFinished` is held until this canvas has committed a frame, bounded
-  by a 750 ms fallback (`CanvasRedrawHandshake`). The canvas host box paints
-  the surround (`EditorDrawing.surroundArgb`), so a SurfaceView without its
-  hole shows the surround, never black.
+  by one 750 ms fallback that later requests do not restart
+  (`CanvasRedrawHandshake`). The canvas host box paints the surround
+  (`EditorDrawing.surroundArgb`), so a SurfaceView without its hole shows the
+  surround, never black.
+- **Releases join as a batch.** `CanvasGenerations.joined()` completes only
+  after every overlapping release (for example a kept release and a window
+  detach) has settled. It then fails with the first failure. With nothing
+  outstanding it reports the last batch.
+- **Document frames.** The kept generation only follows a newer scene with
+  the same document frame. A restored generation whose document frame changed
+  is retired, using the same rule as `publish`.
+- **Constructor failure.** If the AndroidX renderer constructor throws, the
+  session closes and its reader lease is released.
 - **Retirement confirmation.** A window-detached retirement now confirms its
   `CanvasRetirementOwner` hook even when it completed exceptionally. That is
   only possible after AndroidX released the pipeline: the document reader
@@ -135,12 +168,28 @@ and `CanvasDryFramesTest`. `tools/app-test` Python: 53 tests OK.
   core commit `9108b0f`) by copying them into the worktree's `target/`. No
   Rust compile ran; the license gate's `cargo deny check` ran as part of the
   harness.
+- **Review follow-up (code only, not yet built or run).** The independent
+  review of `b562578` found nothing blocking. Its findings are addressed in
+  the follow-up commit, but builds were paused when it was written: it is
+  **not compiled, not unit-tested and not device-tested**. The device results
+  above belong to `b562578`. The follow-up also tightens the pixel assertion:
+  it now fails on any contiguous near-black strip of at least 2% of the
+  canvas rows, not only on samples that are 90% or more black.
+- **Still break-before-make:** a document-frame change (`publish`), a giant
+  resize, and a restored generation whose document frame changed. These
+  release inside the dispatch, as before.
+- `CanvasRetirementProgress` reports only the most recent release, so with
+  overlapping releases the timeout diagnostic shows the latest one.
+- If the kept generation never completed a frame before the resize, its
+  first later completion is taken as the resize redraw. In that rare case the
+  redraw completion can still be dropped.
 - **Not verified:**
   - Giant-mode and document-page resizes on device (no fixture exercises
     them).
   - Rotation, split-screen and fold window-manager-synced resizes.
   - Behaviour when the successor misses the 150 ms bound (a brief gap is then
     possible).
+  - The follow-up commit's behaviour on device (see above).
   - Physical S Pen use.
   - Owner visual acceptance.
   - Sampling cadence was about 25-40 ms. A gap shorter than one sample

@@ -290,13 +290,35 @@
     "usb_tethering_changed": false,
     "main_checkout_target_modified": false
   },
-  "bounded_overlap": "at most two renderer generations (two AndroidX buffer pools); predecessor released after the successor's first committed multi-buffered frame (Main waits <=150 ms in surfaceChanged); no allocation while a release settles; giant mode keeps break-before-make",
+  "bounded_overlap": "generations: at most two (kept + successor), none allocated while a release settles; buffer pools: AndroidX rebuilds the kept generation in place and releases its pre-resize pools asynchronously, so up to three pool sets transiently (successor, kept resized, kept pre-resize) and two until the kept generation leaves; a second resize before the successor presents can reach four transiently; giant mode keeps break-before-make. This statement corrects the b562578 KDoc, which claimed two pools.",
   "unverified": [
     "giant-mode and document-page resizes on device",
     "rotation/split-screen/fold WM-synced resizes",
     "successor exceeding the 150 ms bound",
     "gaps shorter than one ~25-40 ms sample interval",
     "physical S Pen",
-    "owner visual acceptance"
-  ]
+    "owner visual acceptance",
+    "review follow-up commit: not compiled, not unit-tested, not device-tested"
+  ],
+  "review_followup": {
+    "reviewed_commits": [
+      "b562578",
+      "be75e3f"
+    ],
+    "blocking_findings": 0,
+    "addressed": [
+      "M1 kept generation retired only after successor presented and its own AndroidX resize redraw completed (500 ms fallback after present)",
+      "M2 true transient pool bound documented (KDoc and doc)",
+      "L1 API<31 presents directly instead of posting to a blocked Main",
+      "L2 releases join as a batch: wait for all, fail with first failure; detach-during-overlap test",
+      "L3 rapid resizes coalesce into one deferred replacement; residual in-place gap and why the replacement is needed documented",
+      "L4 giant mode completes SurfaceView redraw immediately; giant in-dispatch release noted as pre-existing",
+      "lows: single fallback timer, document-frame checks for kept/restored generations, constructor-failure lease release, duplicate KDoc, logged successor wait",
+      "tests: contiguous black band (>=2% of canvas rows) fails the pixel assertion; surround colour from EditorDrawing.surroundArgb; CanvasReplacement state-machine unit tests; giant canReplace test removed"
+    ],
+    "built": false,
+    "unit_tests_run": false,
+    "device_run": false,
+    "reason": "owner paused all builds; code written and committed for the coordinator to compile and re-run"
+  }
 }
