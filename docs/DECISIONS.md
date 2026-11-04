@@ -312,3 +312,36 @@ collecting a baseline, not permission to relabel 30-second samples as 1 Hz data.
 - **Unchanged:** requirement IDs, priorities, acceptance text and all performance
   targets. G0–G3 still need their own owner confirmations. Live provider spend is
   asked at the step that needs it.
+
+## D22 — Stage 1 tool and runtime license admissions — 2026-11-04
+
+- **Status:** owner-approved on 2026-11-04 after reviewing
+  [STAGE1_LICENSE_PACKETS_20261104.md](license-proposals/STAGE1_LICENSE_PACKETS_20261104.md).
+  Each admission takes effect only once its condition is met and recorded in
+  evidence.
+- **B2 assisted selection:**
+  - **Admitted:** MobileSAM-vit_t (code Apache-2.0; the checkpoint has no
+    explicit license and is taken as Apache-2.0 from its repository), its
+    TinyViT/Swin (MIT) and SAM (Apache-2.0) lineage, and the LiteRT 2.3.0
+    Android runtime (Apache-2.0).
+  - **Ships:** only the two converted `.tflite` graphs and the three LiteRT AARs.
+    Conversion wheels are host-only.
+  - **Conditions:** reproduce the graphs locally (WSL Ubuntu) from the pinned
+    public sources, recording the new hashes. Scan the shipped LiteRT arm64
+    `.so` files for GPL/LGPL code before admission; any finding blocks
+    admission under the Android no-LGPL policy.
+- **B3 MSI tooling:**
+  - **Admitted:** WiX Toolset 3.14.1 (MS-RL), as a build tool only. With the
+    jpackage options in use, no WiX component is embedded in the MSI.
+  - **Conditions:** use the official `wix314-binaries.zip` and record its
+    SHA-256 (none is published). Do not use the cached WiX 3.11.
+  - **Note:** WiX v3 is out of community support.
+- **B3 Android tunnel:**
+  - **Admitted:** scrcpy v4.1 (Apache-2.0) and its six DLLs (SDL3: zlib;
+    FFmpeg 8.1.2 avcodec/avformat/avutil/swresample: LGPL-2.1+; libusb-1.0:
+    LGPL-2.1+), loaded as separate, replaceable DLLs for personal use. adb stays
+    the owner's own platform-tools.
+  - **Condition:** a read-only scan of the exact pinned DLL bytes must confirm
+    an LGPL (non-GPL, non-nonfree) build before admission.
+- **Unchanged:** the no-GPL/AGPL policy, the license gate and public
+  distribution boundaries.
