@@ -258,6 +258,44 @@
       "source_url": "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/646b7f569718921d7d4b5b8e22572ff6c76f2596/LICENSE",
       "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
       "notice_scope": "zlib embedded in the skiko 0.150.1 Skia DLL; revision pinned by JetBrains/skia 1f14f1166a DEPS (retrieved 2026-11-04)."
+    },
+    {
+      "path": "notices/Skia-m150-libwebp-845d5476-COPYING.txt",
+      "license": "BSD-3-Clause",
+      "covers": ["libwebp"],
+      "source_url": "https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/COPYING",
+      "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf",
+      "notice_scope": "libwebp (skia_use_libwebp_decode/encode) embedded in the skiko 0.150.1 Skia DLL; revision pinned by JetBrains/skia 1f14f1166a DEPS (retrieved 2026-11-04)."
+    },
+    {
+      "path": "notices/Skia-m150-libwebp-845d5476-PATENTS.txt",
+      "license": "BSD-3-Clause",
+      "source_url": "https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/PATENTS",
+      "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c",
+      "notice_scope": "Additional patent grant accompanying libwebp's BSD-3-Clause COPYING at the same revision (retrieved 2026-11-04)."
+    },
+    {
+      "path": "notices/Skia-m150-spirv-cross-b8fcf307-LICENSE.txt",
+      "license": "Apache-2.0",
+      "covers": ["SPIRV-Cross"],
+      "source_url": "https://chromium.googlesource.com/external/github.com/KhronosGroup/SPIRV-Cross/+/b8fcf307f1f347089e3c46eb4451d27f32ebc8d3/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "notice_scope": "SPIRV-Cross (skia_use_direct3d, gpu_shared) embedded in the skiko 0.150.1 Skia DLL; revision pinned by JetBrains/skia 1f14f1166a DEPS (retrieved 2026-11-04). Byte-identical to the Wuffs Apache-2.0 text; kept as its own file for provenance."
+    },
+    {
+      "path": "notices/Skia-m150-d3d12allocator-169895d5-LICENSE.txt",
+      "license": "MIT",
+      "covers": ["D3D12MemoryAllocator"],
+      "source_url": "https://skia.googlesource.com/external/github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator.git/+/169895d529dfce00390a20e69c2f516066fe7a3b/LICENSE.txt",
+      "sha256": "e078ee4f8c5ed0673f4d93b5318557eb8b4e0d7dbccef2ab45c763c7693f0f37",
+      "notice_scope": "D3D12MemoryAllocator (skia_use_direct3d) compiled into the skiko 0.150.1 Skia DLL; revision pinned by JetBrains/skia 1f14f1166a DEPS (retrieved 2026-11-04)."
+    },
+    {
+      "path": "notices/Skia-m150-d3d12allocator-169895d5-NOTICES.txt",
+      "license": "MIT",
+      "source_url": "https://skia.googlesource.com/external/github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator.git/+/169895d529dfce00390a20e69c2f516066fe7a3b/NOTICES.txt",
+      "sha256": "454c8e691b2637c10c7ea3eb51c342369a8ed5e617ed25dc69ade8f86b0a3b72",
+      "notice_scope": "D3D12MemoryAllocator's third-party notices (AMD, microsoft-directx-graphics-samples and VulkanMemoryAllocator, all MIT; premake BSD-3-Clause is its build tool) at the same revision (retrieved 2026-11-04)."
     }
   ]
 }

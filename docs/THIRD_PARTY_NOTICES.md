@@ -179,6 +179,12 @@ python tools\release\generate_notices.py --output .local\notices-<release> --gra
 
 ### Resolutions and owner decisions (2026-11-04)
 
+The 2026-11-04 offline run used the existing census report and local caches,
+without the desktop image. Status: `complete`, 0 unresolved, deterministic
+across runs. It found 427 shipped components: 273 Rust, 142 Maven, 9 npm and 3
+bundled (Node, Rust standard library, NDK LLVM runtime), with 211 distinct
+texts. Output sha256 is `98b258ce…de3a`.
+
 Owner-approved texts were added to `third_party/LICENSES`:
 
 - `notices/MPL-2.0.txt` (sha256 `3f3d9e00…9b04`), from
@@ -214,30 +220,35 @@ lists them too. The decision also classifies the ICU LICENSE as Unicode-3.0.
 That file's GPL-with-exception sections cover build-time autoconf files (for
 example `aclocal.m4`, ICU4C only) that are not compiled into the DLL.
 
-### Open item: skiko Windows DLL
+### skiko Windows DLL
 
 The skiko Windows build configuration (skia-pack `script/build.py`:
 `is_official_build`, `skia_use_direct3d=true`; Skia `gn/skia.gni` defaults at
-`1f14f1166a`) also compiles in three libraries whose texts are not yet
-retained:
+`1f14f1166a`) also compiles in three more libraries:
 
 - **libwebp:** `skia_use_libwebp_decode/encode`. The DLL contains WebP chunk
   tags (VP8X, VP8L, WEBP).
 - **SPIRV-Cross:** pulled in by `skia_use_direct3d` (the `gpu_shared` target).
   The DLL contains SPIRV-Cross HLSL strings.
-- **D3D12MemoryAllocator:** pulled in by `skia_use_direct3d`.
+- **D3D12MemoryAllocator:** pulled in by `skia_use_direct3d`; it is recorded
+  through the supplement's `build_components`.
 
 `dng_sdk`/`piex` are off on Windows (`skia_use_piex = !is_win`), and FreeType
-is off on Windows. Until the three texts are retained, the bundle stays
-`incomplete` and assembly refuses it. Their upstream license files at the
-pinned revisions:
+is off on Windows.
 
-- https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/COPYING
-  (BSD-3-Clause) and `/PATENTS`.
-- https://chromium.googlesource.com/external/github.com/KhronosGroup/SPIRV-Cross/+/b8fcf307f1f347089e3c46eb4451d27f32ebc8d3/LICENSE
-  (Apache-2.0).
-- https://skia.googlesource.com/external/github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator.git/+/169895d529dfce00390a20e69c2f516066fe7a3b/LICENSE.txt
-  (MIT) and `/NOTICES.txt`.
+Their texts were retained on 2026-11-04 (owner-approved) at the pinned
+revisions:
+
+- libwebp `COPYING` and `PATENTS` at `845d5476`.
+- SPIRV-Cross `LICENSE` at `b8fcf307`. It is byte-identical to the Wuffs
+  Apache-2.0 text, but kept as its own file for provenance.
+- D3D12MemoryAllocator `LICENSE.txt` and `NOTICES.txt` at `169895d5`.
+
+The libwebp, SPIRV-Cross and D3D12MemoryAllocator texts carry explicit `covers`
+entries. D3D12MemoryAllocator's `NOTICES.txt` adds AMD,
+microsoft-directx-graphics-samples and VulkanMemoryAllocator code, all MIT; its
+premake (BSD-3-Clause) entry is a build tool. With these, the 2026-11-04 run
+is `complete`.
 
 ### Rebuilds still needed
 
