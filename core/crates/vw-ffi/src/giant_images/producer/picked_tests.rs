@@ -1,6 +1,6 @@
-//! Synthetic local ownership tests, not producer/device approval. Run the full
-//! giant_images suite with --test-threads=1: legacy producer tests have their own
-//! serialization guard around the SAME process-global two-input admission.
+//! Synthetic local ownership tests, not producer/device approval. Every
+//! giant_images test that takes the process-global two-input admission holds
+//! `serial_inputs()`, so the suite runs under parallel test threads.
 //! The quarantine probe runs in a bounded child test process because it correctly
 //! retains its input permit for process life; it never resets that real counter.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

@@ -79,6 +79,8 @@ fn explicit_usb_selection_refuses_injection_ambiguity_and_status_substitution() 
     );
     assert!(session::OwnerAdb::select("adb.exe".into()).is_err());
     assert!(session::OwnerAdb::select("/tmp/scrcpy/adb.exe".into()).is_err());
+    #[cfg(windows)]
+    assert!(session::OwnerAdb::select(r"C:\scrcpy\adb.exe".into()).is_err());
     assert!(device::UsbSelection::new("SM S918U".into(), 7).is_err());
     assert!(device::UsbSelection::new("SM_S918U".into(), 0).is_err());
     let selected = device::select(DEVICES.as_bytes(), &selection()?)?;

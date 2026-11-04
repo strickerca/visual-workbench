@@ -635,10 +635,11 @@ fn receipt(package: &vw_package::Package) -> serde_json::Value {
     let m = package.manifest();
     serde_json::json!({"schema":1,"project_id":m.source.project_id,"document_id":m.source.document_id,"host_seq":m.extensions.host_seq,"state_hash":m.extensions.state_hash,"source_asset":m.source.asset_hash,"mapping":m.extensions.overview_mapping,"image_output":m.extensions.image_output})
 }
+type NamedFiles = Vec<(String, Vec<u8>)>;
 fn replace_clean_receipt(
     package: &vw_package::Package,
     data: &serde_json::Value,
-) -> Result<Vec<(String, Vec<u8>)>, Box<dyn std::error::Error>> {
+) -> Result<NamedFiles, Box<dyn std::error::Error>> {
     use sha2::{Digest, Sha256};
     let image = vw_raster::decode(
         package.file("images/clean_source.png").ok_or("image")?,

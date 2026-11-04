@@ -1,5 +1,5 @@
 //! Synthetic archive fixtures, including deliberately malformed ZIP metadata.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::fs::{self, File};
 use std::io::{Read, Write};
@@ -935,14 +935,13 @@ fn malformed_private_keys(prefix: &str, encoding: &str) -> Vec<rusqlite::types::
 
 fn setting_bytes(path: &Path) -> Vec<(Vec<u8>, Vec<u8>)> {
     let connection = rusqlite::Connection::open(path.join("project.sqlite")).unwrap();
-    let rows = connection
+    connection
         .prepare("SELECT CAST(key AS BLOB), CAST(value AS BLOB) FROM settings ORDER BY key")
         .unwrap()
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
         .unwrap()
         .collect::<Result<_, _>>()
-        .unwrap();
-    rows
+        .unwrap()
 }
 
 #[test]

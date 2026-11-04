@@ -159,7 +159,6 @@ fn scoped_capture_ack_preempts_queued_bulk_blob_data() {
             total_size: 1,
             data: vec![1],
             last: true,
-            ..Default::default()
         }))
         .unwrap();
     session

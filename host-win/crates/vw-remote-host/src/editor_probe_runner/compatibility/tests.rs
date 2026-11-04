@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::panic)]
 use super::*;
 use std::{
     io::Cursor,

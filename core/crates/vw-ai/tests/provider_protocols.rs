@@ -274,6 +274,11 @@ fn flux_download_keeps_attempt_unsettled_and_local_exterior_proof() -> TestResul
         .image()
         .encode_png(Limits::default(), &NeverCancel)?;
     prepared.verify_candidate(&encoded, &NeverCancel)?;
+    let untagged = png8(256, 256, |_, _| [200, 10, 20, 255])?;
+    assert!(matches!(
+        prepared.verify_candidate(&untagged, &NeverCancel),
+        Err(Error::Invalid(_))
+    ));
     // Candidate verification refuses untagged color, so tag the changed image
     // like an encoded result; the exterior proof must then reject it.
     let changed = {

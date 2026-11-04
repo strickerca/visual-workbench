@@ -6,7 +6,6 @@ use std::{
     time::Duration,
 };
 const MIB: u64 = 1024 * 1024;
-static SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 struct Fixture {
     context: Context,
     android: PathBuf,
@@ -132,8 +131,10 @@ impl Fixture {
 // One input-owning test keeps the existing two-input process limit meaningful
 // beside the producer lane's independently serialized fixture family.
 #[tokio::test]
+// The shared std input-permit lock serializes this whole current-thread test.
+#[allow(clippy::await_holding_lock)]
 async fn typed_copy_refusals_independent_output_and_failed_android_retirement_preserve_owners() {
-    let _serial = SERIAL.lock().await;
+    let _serial = crate::giant_images::serial_inputs();
     let mut f = Fixture::new();
     let baseline = f.context.budget.used_bytes();
     assert_eq!(baseline, 4 * MIB);
@@ -228,8 +229,10 @@ async fn typed_copy_refusals_independent_output_and_failed_android_retirement_pr
 }
 
 #[tokio::test]
+// The shared std input-permit lock serializes this whole current-thread test.
+#[allow(clippy::await_holding_lock)]
 async fn real_publication_adopts_all_four_parts_and_keeps_only_its_project_charge_until_close() {
-    let _serial = SERIAL.lock().await;
+    let _serial = crate::giant_images::serial_inputs();
     let f = Fixture::new();
     let budget = f.context.budget.clone();
     let original = f.original.clone();
@@ -287,8 +290,10 @@ async fn real_publication_adopts_all_four_parts_and_keeps_only_its_project_charg
 /// PreparedSource/OwnedDirectory and 4 MiB admission are closed after each
 /// failed exit, while the simulated Java owner still holds its exact 80 MiB.
 #[tokio::test]
+// The shared std input-permit lock serializes this whole current-thread test.
+#[allow(clippy::await_holding_lock)]
 async fn closing_native_input_after_uncertain_foreign_exit_preserves_marker_until_retry() {
-    let _serial = SERIAL.lock().await;
+    let _serial = crate::giant_images::serial_inputs();
     for exit in [
         "cleanup",
         "jni",
@@ -386,8 +391,10 @@ async fn closing_native_input_after_uncertain_foreign_exit_preserves_marker_unti
 }
 
 #[tokio::test]
+// The shared std input-permit lock serializes this whole current-thread test.
+#[allow(clippy::await_holding_lock)]
 async fn foreign_source_pins_are_bounded_and_confirmation_is_exact() {
-    let _serial = SERIAL.lock().await;
+    let _serial = crate::giant_images::serial_inputs();
     let f = Fixture::new();
     let pins = foreign_retirement::ForeignSources::new();
     assert!(matches!(
