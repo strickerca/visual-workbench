@@ -1,6 +1,6 @@
 # Release source completion and remaining cloud scope — 2026-10-20
 
-> **Reconciled 2026-11-03:** some statements here are stale (held `dae67bb`, pending main promotion, missing MSI hook, cloud-only `lib.exe`, release-hook hashes). See [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
+> **Reconciled 2026-11-03:** stale here: "no MSI build hook" (superseded by `d6ab240`) and release-hook hashes `4841faa`/`558aa03` (actual: `9f2449b`/`e4c761e`). See [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
 
 Historical bounded-grant receipt. The later overnight grant activates
 [MSI source closeout](MSI_RELEASE_CLOSEOUT_20261020.md); its implemented producer

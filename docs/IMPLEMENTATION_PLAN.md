@@ -5,12 +5,12 @@ Revision 2026-10-01. Companion to BUILD_SPECIFICATION.md v2.0 and REQUIREMENTS.j
 ## Completion roadmap — 2026-11-03 (active)
 
 Owner-selected finish line: a **personal G5 build**. Close M4-KP (Paint only),
-record G0–G3 and G5, and finish with an installable unsigned MSI and APK for
-personal use. Krita, T4.02, T4.05, T4.06, broader editors and full G4 remain
-deferred (see the dated DECISIONS.md entry). Claude Code executes slices; an
+record G0–G3 and G5, and finish with an installable MSI and APK for personal use, without
+release signing (the APK keeps its existing development signer). Krita, T4.02, T4.05, T4.06, broader editors and full G4 remain
+deferred (D21, pending owner confirmation). Claude Code executes slices; an
 independent Claude reviewer agent reviews each slice before it merges into main. The model
-archive route and tool-license admission are pre-authorized once each license is
-shown to the owner. Live provider spend is not pre-authorized. Status at entry:
+archive route and tool-license admission are pre-authorized after each license is
+shown to the owner and confirmed. Live provider spend is not pre-authorized. Status at entry:
 main `2b6b2ea`, 1 of 189 requirements passed, no gate recorded; see
 [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
 
@@ -21,7 +21,7 @@ main `2b6b2ea`, 1 of 189 requirements passed, no gate recorded; see
 | 2 M4-KP | Paint catalog calibration/admission; T4.03 guards (checklist item 4); T4.04 ghost ink; T4.07 Paint compatibility record; T4.08 essential controls; T4.01 ≥30 fps / PERF-003; personal packaging; owner drawing session | M4-KP checkpoint |
 | 3 G0–G2 | T0.04/05/06/10/11 carry-overs and T0.12; A01/A02/A06 plus daily use; A13/A21–A24/A26/A29 plus A06 re-run in real apps | G0, G1, G2 |
 | 4 Phase 3 | T3.01–T3.11 runtime/device work and confirmed source gaps; T3.12 scenarios | G3 |
-| 5 Phase 5 | T5.01–T5.05, T5.08 decisions, T5.06 MSI build/install/uninstall with admitted WiX and notices, T5.07 release-build scenarios and reports | Personal G5 |
+| 5 Phase 5 | Depends on M4-KP instead of T4.09 only once D21 is confirmed. T5.01–T5.05, T5.08 decisions, T5.06 MSI build/install/uninstall with admitted WiX and notices, T5.07 release-build scenarios and reports | Personal G5 |
 
 Device time on the S23 and owner gate confirmations are the critical path.
 Historical entries below remain as dated history.

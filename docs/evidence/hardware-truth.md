@@ -118,9 +118,10 @@ target-device performance. Physical thermal/recovery baselines remain absent.
 Stage 0 of the 2026-11 completion roadmap. The connected Android device is the
 OnePlus IN2019 (model inventory only); the S23 Ultra (SM-S918U) is **not
 connected** at this snapshot. The latest S23 software evidence is the 2026-10-20
-checkpoint (225/225 isolated S23 instrumentation cases and a passing software-input
-balanced replay; see `../WINDOWS_S23_ACCEPTANCE_20261020.md` and
-`../STATE_RECONCILIATION_20261103.md`). Physical S Pen pressure, hover,
+checkpoint's 225/225 isolated S23 instrumentation cases
+(`../WINDOWS_S23_ACCEPTANCE_20261020.md`) and the later passing software-input
+balanced replay after the `b9d541b` focus repair
+(`../STATE_RECONCILIATION_20261103.md`). Physical S Pen pressure, hover,
 tilt/orientation, report rate, Air Actions, thermal and carrier-recovery rows
 above remain unmeasured; Stage 2 and Stage 3 need the S23 connected.
 

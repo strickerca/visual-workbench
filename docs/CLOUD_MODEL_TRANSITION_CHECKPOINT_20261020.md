@@ -1,5 +1,7 @@
 # Implementation continuation checkpoint
 
+> **Reconciled 2026-11-03:** stale here: held `dae67bb` (closed in `6a263dd`) and the cloud-only MSVC `lib.exe` blocker. See [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
+
 Parent requested this current turn end so the explicitly selected
 `gpt-6.1-sol` / `xhigh` configuration can apply on the next implementation turn.
 Independent reviews must use Astra. Current root and both local implementation

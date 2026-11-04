@@ -1,6 +1,6 @@
 # Active cloud deliverables
 
-> **Reconciled 2026-11-03:** some statements here are stale (held `dae67bb`, pending main promotion, missing MSI hook, cloud-only `lib.exe`, release-hook hashes). See [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
+> **Reconciled 2026-11-03:** stale here: held `dae67bb` (closed in `6a263dd`) and the cloud-only MSVC `lib.exe` blocker. See [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
 
 ## Desktop receiver source closure — 2026-10-20
 

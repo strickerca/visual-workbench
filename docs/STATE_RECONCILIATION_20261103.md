@@ -9,11 +9,11 @@ original receipts.
 
 | Stale statement | Where | Current fact | Check |
 | --- | --- | --- | --- |
-| Desktop receiver candidate `dae67bb` "held" for the blit presentation-receipt defect | ACTIVE_CLOUD_LANES_20261019 (middle section), CLOUD_ROOT_INTEGRATION_20261020, CLOUD_RESUMPTION_CHECKPOINT_20261020, DEFERRED_VALIDATION_LEDGER_20261018, ROADMAP_CURRENT_EXECUTION_LEDGER_20261019 (T3.02 row) | Closed in source. The bounded Desktop `18158c7` successor was accepted. Its 6 production and 8 test leaves were promoted in `6a263dd` (in main; 125-method Desktop batch plus independent review). The branch is intentionally unmerged. | `git merge-base --is-ancestor 6a263dd main` |
+| Desktop receiver candidate `dae67bb` "held" for the blit presentation-receipt defect | ACTIVE_CLOUD_LANES_20261019 (middle section), CLOUD_MODEL_TRANSITION_CHECKPOINT_20261020, CLOUD_ROOT_INTEGRATION_20261020, CLOUD_RESUMPTION_CHECKPOINT_20261020, DEFERRED_VALIDATION_LEDGER_20261018, ROADMAP_CURRENT_EXECUTION_LEDGER_20261019 (T3.02 row) | Closed in source. The bounded Desktop `18158c7` successor was accepted. Its 6 production and 8 test leaves were promoted in `6a263dd` (in main; 125-method Desktop batch plus independent review). The branch is intentionally unmerged. | `git merge-base --is-ancestor 6a263dd main` |
 | "Main promotion: pending approval" | WINDOWS_S23_ACCEPTANCE_20261020 | Done. `f2302cc` and all later work are in main. | ancestry |
 | "No MSI build hook exists" | RELEASE_ROOT_COMPLETION_20261020 | Superseded by MSI_RELEASE_CLOSEOUT_20261020 / `d6ab240` (in main). `build.ps1` has `package-desktop-msi` and `assemble-release`. | ancestry, `build.ps1` ValidateSet |
 | Release-hook cherry-picks `4841faa…` / `558aa03…` | RELEASE_ROOT_COMPLETION_20261020 | Those objects do not exist locally. The actual commits in main are `9f2449b` and `e4c761e`. | `git cat-file`, ancestry |
-| Windows build "blocked by missing MSVC lib.exe" | ROADMAP_REMAINING_PHASES_20261020, ACTIVE_CLOUD_LANES_20261019 | Applies only to the Linux cloud cross-check. This laptop has MSVC 14.44.35207 (VS 2022 Build Tools 17.14) and 14.50.35717 (VS Build Tools 2026 18.5), with x64 `lib.exe`, plus Windows SDK 10.0.26100.0. | `vswhere`, file presence |
+| Windows build "blocked by missing MSVC lib.exe" | ROADMAP_REMAINING_PHASES_20261020, ACTIVE_CLOUD_LANES_20261019, CLOUD_MODEL_TRANSITION_CHECKPOINT_20261020 | Applies only to the Linux cloud cross-check. This laptop has MSVC 14.44.35207 (VS 2022 Build Tools 17.14) and 14.50.35717 (VS Build Tools 2026 18.5), with x64 `lib.exe`, plus Windows SDK 10.0.26100.0. | `vswhere`, file presence |
 | Paint provider budget 500 ms | IMPLEMENTATION_PLAN (2026-10-07 entry) | 750 ms since R161 (parent 1,000 ms, managed 2,500 ms). A note was added under that entry. | plan R161 entries |
 
 ## Unrecorded local result
@@ -38,9 +38,11 @@ replay that docs/ had not recorded:
   (`visual_acceptance_passed=false`).
 - **B6:** the visible phone→Paint run failed twice at `baseline_wgc`. The second
   failure was `cursor_in_canvas`.
-- **B7:** the Windows owned guard stopped before its census with "remote edit
-  control not granted".
-- **B8:** the packaged MCP two-cycle smoke aborted at `canonical_path_changed`.
+- **B7:** the Windows owned guard (103 cases) stopped before its census because
+  remote edit control was not granted at initial owned-foreground readiness.
+- **B8:** the packaged MCP two-cycle smoke never ran (`smoke_executed=false`):
+  the owner-approved cache preflight failed at `pin_cache_ancestors` with
+  `canonical_path_changed` before any smoke started.
 
 ## Environment at entry
 
@@ -53,21 +55,24 @@ replay that docs/ had not recorded:
 
 ## Requirement status sync
 
-A read-only source audit of the 51 `not_started` requirements found:
+A read-only source audit of the 51 `not_started` requirements
+([receipt](evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md)) found:
 
-- **40 with integrated implementing source and tests.** They are now
-  `in_progress` / `not_tested`, with a dated evidence entry each.
-- **4 partial:** FORMAT-009, FORMAT-012, VERIFY-001 and LIC-003. These are also
-  now `in_progress`; each evidence entry names what is missing.
+- **38 with integrated implementing source and tests.** They are now
+  `in_progress` / `not_tested`, each citing the audit receipt.
+- **6 partial:** FORMAT-009, FORMAT-012, VERIFY-001, VERIFY-004, QUALITY-006
+  and LIC-003. These are also now `in_progress`; each evidence entry states what
+  is present and what is missing.
 - **6 measurement-only:** PERF-001, PERF-005, PERF-006, PERF-007, PERF-008 and
-  QUALITY-008. They stay `not_started` until measured.
+  QUALITY-008. They stay `not_started` until measured. PERF-007 also has the
+  unconfirmed code question listed below.
 - **INSTR-005:** no source by design. It needs a dated owner decision (T5.08).
 
-Verify status is unchanged. "Source present" means the source and test files
+The audit is not a verification run, and verify status is unchanged. "Source present" means the source and test files
 exist and are wired into the app roots; it does not mean they compiled or passed.
 `check_plan_coverage.py`: OK (189 requirements, 66 tasks, 26 prompts).
 
-Genuine code gaps carried into later stages:
+Code gaps carried into later stages (the partial requirements above, plus one open question):
 
 - **T5.01:** VERIFY-001 and VERIFY-004. Phone-screen and tunnel captures never
   register a verification target (`McpVerificationTargets` is fed only by Desktop
@@ -97,6 +102,7 @@ B3); FORMAT-006, QUALITY-001 and QUALITY-002 (PDFium, qpdf and LPAC runtime admi
   `archive/original-main-edit-20261020` and `archive/stash-original-main-20261020`.
   Main already contains the evolved `ProjectFilePickerRequest` form of that
   `Main.kt` draft.
+- **Deleted (already in main):** `task/phase2-editor-integration` (`679dc28`).
 - **Kept:** remote branches, `recovery/source-candidates-20261018` and
   `task/m4-krita-paint`. All 6 locked retired worktrees are kept. Five
   (`desktop`, `image-spike`, `ink-core`, `m4-input-retention`, `transport`) hold

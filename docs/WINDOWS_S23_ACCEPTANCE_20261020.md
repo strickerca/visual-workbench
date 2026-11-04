@@ -1,6 +1,6 @@
 # Windows and S23 bounded software checkpoint — 2026-10-20
 
-> **Reconciled 2026-11-03:** some statements here are stale (held `dae67bb`, pending main promotion, missing MSI hook, cloud-only `lib.exe`, release-hook hashes). See [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
+> **Reconciled 2026-11-03:** stale here: pending main promotion (done; `f2302cc` is in main). See [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
 
 **Release ready: false.** Current software tests, fresh Desktop build and packaged startup smoke passed. The owner-approved MCP cache action was aborted on a path-identity mismatch before mutation; packaged MCP and product acceptance remain open.
 

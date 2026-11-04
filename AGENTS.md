@@ -1,8 +1,8 @@
 # Visual Workbench implementation guidance
 
 Owner direction (2026-11-03): the goal is a personal G5 build: close M4-KP
-(Paint only), record G0–G3 and G5, and finish with an installable unsigned MSI
-and APK for personal use. Krita, T4.02, T4.05, T4.06, broader editors and full
+(Paint only), record G0–G3 and G5, and finish with an installable MSI and APK for personal use,
+without release signing (the APK keeps its existing development signer). Krita, T4.02, T4.05, T4.06, broader editors and full
 G4 stay deferred. Public signing/distribution is out of scope. The active
 sequence is the 2026-11 completion roadmap in `docs/IMPLEMENTATION_PLAN.md`
 (Stages 0–5). This supersedes the cloud continuation and pause/scope entries

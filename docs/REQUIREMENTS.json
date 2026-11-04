@@ -334,7 +334,7 @@
         "A01"
       ],
       "evidence": [
-        "docs/T3_07_SAVED_VIEWS_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -453,7 +453,7 @@
         "A03"
       ],
       "evidence": [
-        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -483,7 +483,7 @@
         "A04"
       ],
       "evidence": [
-        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -510,7 +510,7 @@
       ],
       "evidence": [
         "docs/evidence/T1.01.md — 10,000-case lens latch property suite per platform; math evidence only, product lens behavior remains T3.04.",
-        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -536,7 +536,7 @@
         "A04"
       ],
       "evidence": [
-        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -564,7 +564,7 @@
         "A05"
       ],
       "evidence": [
-        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -592,7 +592,7 @@
         "A09"
       ],
       "evidence": [
-        "docs/T5_04_AIR_ACTIONS_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -620,7 +620,7 @@
         "A09"
       ],
       "evidence": [
-        "docs/T5_04_AIR_ACTIONS_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -647,7 +647,7 @@
         "A09"
       ],
       "evidence": [
-        "docs/AIR_ACTIONS_PREFERENCES_NEXT_LANE_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -707,7 +707,7 @@
       ],
       "evidence": [
         "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
-        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -737,7 +737,7 @@
       ],
       "evidence": [
         "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
-        "docs/evidence/T3.05-DEDICATED-LEAVES-20261018.json — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -795,7 +795,7 @@
         "A03"
       ],
       "evidence": [
-        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -915,7 +915,7 @@
         "A02"
       ],
       "evidence": [
-        "docs/evidence/T3.07-LAYER-CONTROL-LEAVES-20261018.json — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1087,7 +1087,7 @@
         "A11"
       ],
       "evidence": [
-        "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md (T3.07) — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1148,7 +1148,7 @@
         "A02"
       ],
       "evidence": [
-        "docs/evidence/T3.07-ROTATION-CONTACT-LEAVES-20261018.json — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1175,7 +1175,7 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T3.05-DEDICATED-LEAVES-20261018.json — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1203,7 +1203,7 @@
         "A21"
       ],
       "evidence": [
-        "docs/EDITING_OUTPUT_ASSISTED_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1232,7 +1232,7 @@
         "A21"
       ],
       "evidence": [
-        "docs/ASSISTED_RUNTIME_REGISTRATION_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement. Runtime blocked: production LiteRT catalog is empty until model admission (Stage 1 B2)."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: empty production LiteRT catalog (B2); 100 ms."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1423,7 +1423,7 @@
         "A07"
       ],
       "evidence": [
-        "docs/T3_01_DESKTOP_CALLER_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1449,7 +1449,7 @@
         "A18"
       ],
       "evidence": [
-        "docs/ANDROID_TUNNEL_RUNTIME_HANDOFF_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement. Runtime blocked until tunnel license admission (Stage 1 B3)."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: tunnel license admission (B3); device run."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1505,7 +1505,7 @@
         "A18"
       ],
       "evidence": [
-        "docs/ANDROID_TUNNEL_SESSION_HANDOFF_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement. Runtime blocked: COMPILED_APPROVED_CATALOG is None until scrcpy/DLL license admission (Stage 1 B3)."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: COMPILED_APPROVED_CATALOG is None until B3."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1593,7 +1593,7 @@
         "A18"
       ],
       "evidence": [
-        "docs/ANDROID_TUNNEL_CONTROL_HANDOFF_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement. Runtime blocked until tunnel license admission (Stage 1 B3)."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: B3; device run."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2292,7 +2292,7 @@
       ],
       "evidence": [
         "docs/evidence/T0.09.md",
-        "docs/NATIVE_GIANT_PRODUCER_REPAIR_20261020.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2404,7 +2404,7 @@
         "A12"
       ],
       "evidence": [
-        "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md (T3.09) — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2432,7 +2432,7 @@
         "A12"
       ],
       "evidence": [
-        "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md (T3.09) — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2489,7 +2489,7 @@
         "A15"
       ],
       "evidence": [
-        "docs/FORMAT_ROOT_COMPLETION_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): partial source; missing: PSD/PSB composite present; PDF-compatible AI opens as a PDF document rather than a labelled flattened composite (T5.08)."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: partial source; present: PSD/PSB labelled composite; missing: PDF-compatible AI opens as a PDF document, not a labelled flattened composite (T5.08)."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2568,7 +2568,7 @@
         "A10"
       ],
       "evidence": [
-        "docs/FORMAT_ROOT_COMPLETION_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): partial source; missing: embedded-JPEG preview for TIFF-based DNG/CR2 only; Android platform DNG and Windows WIC Raw Image Extension routes missing (T5.08)."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: partial source; present: embedded-JPEG preview for TIFF-based DNG/CR2; missing: Android platform DNG and Windows WIC Raw Image Extension routes (T5.08)."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2594,7 +2594,7 @@
         "A11"
       ],
       "evidence": [
-        "docs/FORMAT_ROOT_COMPLETION_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2621,7 +2621,7 @@
         "A11"
       ],
       "evidence": [
-        "docs/FORMAT_ROOT_COMPLETION_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3145,7 +3145,7 @@
         "A19"
       ],
       "evidence": [
-        "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md (T3.09) — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3172,7 +3172,7 @@
         "A19"
       ],
       "evidence": [
-        "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md (T3.09) — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3198,7 +3198,7 @@
         "A19"
       ],
       "evidence": [
-        "docs/DIAGNOSTICS_PRIVACY_COMPOSED_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3311,7 +3311,7 @@
         "A20"
       ],
       "evidence": [
-        "docs/MSI_RELEASE_CLOSEOUT_20261020.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: partial source; present: TOOLCHAIN/SHA256SUMS/notices assembly and MSI hook; missing: reproducibility comparison tool, generated notices (LIC-003), WiX/jpackage admission and Windows run (T5.06)."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3678,7 +3678,7 @@
         "A18"
       ],
       "evidence": [
-        "docs/ANDROID_TUNNEL_SESSION_HANDOFF_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement. Runtime blocked until tunnel license admission (Stage 1 B3)."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: B3; device run."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3975,7 +3975,7 @@
         "A30"
       ],
       "evidence": [
-        "docs/T5_01_VERIFICATION_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4150,7 +4150,7 @@
         "A21"
       ],
       "evidence": [
-        "docs/AI_EDITOR_RESERVED_BOUNDARIES_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4179,7 +4179,7 @@
         "A25"
       ],
       "evidence": [
-        "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md (T3.11) — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4208,7 +4208,7 @@
         "A30"
       ],
       "evidence": [
-        "docs/CAPTURE_VERIFICATION_CALLERS_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): partial source; missing: Desktop window recapture and alignment present; phone-screen/tunnel captures never register a verification target (T5.01)."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: partial source; present: Desktop window recapture and alignment; missing: phone-screen and tunnel captures never register a verification target (T5.01)."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4236,7 +4236,7 @@
         "A30"
       ],
       "evidence": [
-        "docs/VERIFICATION_NATIVE_COMPOSED_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4264,7 +4264,7 @@
         "A30"
       ],
       "evidence": [
-        "docs/VERIFICATION_NATIVE_COMPOSED_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4293,7 +4293,7 @@
         "A30"
       ],
       "evidence": [
-        "docs/VERIFICATION_NATIVE_COMPOSED_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: partial source; present: grant-gated recapture_package and get_marker_comparison; missing: phone recapture inherits the VERIFY-001 gap (T5.01)."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4409,7 +4409,7 @@
         "A25"
       ],
       "evidence": [
-        "docs/T3_11_OFFLINE_REVIEW_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4438,7 +4438,7 @@
         "A25"
       ],
       "evidence": [
-        "docs/T3_11_OFFLINE_REVIEW_CALLER_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4865,7 +4865,7 @@
         "A20"
       ],
       "evidence": [
-        "docs/RELEASE_ROOT_COMPLETION_20261020.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): partial source; missing: notices come from a curated hash-bound list, not generated from the resolved Cargo/Gradle/npm tree plus bundled binaries; 125 candidates unadmitted (T5.06)."
+        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: partial source; present: curated hash-bound notices; missing: generation from the resolved Cargo/Gradle/npm tree plus bundled binaries; 125 candidates unadmitted (T5.06)."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",

@@ -291,18 +291,22 @@ collecting a baseline, not permission to relabel 30-second samples as 1 Hz data.
 - **Status:** owner-selected scope (2026-11-03 completion roadmap); written
   2026-11-03 and **awaiting owner confirmation** of this exact entry before T5.x
   relies on it.
-- **Decision:** the project finishes at a personal G5 build: an installable,
-  unsigned MSI and APK for the owner's own use. Public code signing (Authenticode/EV,
+- **Decision:** the project finishes at a personal G5 build: an installable MSI
+  and APK for the owner's own use, without release signing (the APK keeps its
+  existing development signer). Public code signing (Authenticode/EV,
   Android release key) and distribution are out of scope. The owner chose to keep
-  every D20 deferral (Krita acceptance, T4.02, T4.05, T4.06, broader editors and
-  palettes, expanded carrier-switch acceptance, full T4.09/G4).
+  every D20 deferral (T4.02, T4.05, T4.06, the Krita plugin, broader editors and
+  palettes, expanded carrier-switch acceptance, full T4.09/G4) and the separate
+  2026-10-07 deferral of Krita acceptance.
 - **Dependency substitution:** for this personal finish line, the recorded M4-KP
   checkpoint (Paint only) replaces T4.09 as the Phase 4 dependency of
   T5.01–T5.05. This revises D20's gate boundary for that purpose only; full G4
   stays pending and no G4 scenario is passed by M4-KP.
-- **Scenario accounting at G5:** A15, A16 and A17 depend wholly on deferred
+- **Scenario accounting at G5:** A16 and A17 depend wholly on deferred
   requirements and are recorded `not_applicable` for the personal G5, with the
-  reason. A08 and A27 run in their focused Paint form; their full Krita/Photoshop
+  reason. A15 stays applicable: ADOBE-005 is deferred, but its ADOBE-008 (P1)
+  and FORMAT-009 (P2) clauses run at G5 unless the owner defers them in their
+  own dated entry. A08 and A27 run in their focused Paint form; their full Krita/Photoshop
   clauses stay pending. Each other A01–A30 scenario runs on the release build.
   The T5.07 untested list names every deferred requirement and scenario.
 - **Unchanged:** requirement IDs, priorities, acceptance text and all performance
