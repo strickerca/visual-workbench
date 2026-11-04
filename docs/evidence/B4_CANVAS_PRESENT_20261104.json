@@ -1,0 +1,302 @@
+{
+  "schema": 1,
+  "kind": "b4-canvas-presentation",
+  "date": "2026-11-04",
+  "branch": "task/b4-canvas-present-20261104",
+  "base_main": "961cd8059daaa967955aff96698fe34712ed80b9",
+  "commits": {
+    "reproduction_test": "adcf122c8336d4019c21c68a5681191a1a61b712",
+    "fix": "b562578bb085f127c5e347534acd3fdb2dbc98cc"
+  },
+  "device": {
+    "model": "SM-S918U",
+    "android_release": "17",
+    "owner_user": 0,
+    "profile_count": 2,
+    "selected_explicitly": true,
+    "other_devices_used": false
+  },
+  "route": "build.ps1 hil-test app (tools/hil-test.ps1 -> tools/app-test/run_android.ps1), full reviewed inventory; the runner has no class filter",
+  "native_inputs": {
+    "source": "main checkout target/ (built 2026-11-04 after last core commit 9108b0f), copied into the worktree target/; no Rust compile; license gate ran cargo deny check only",
+    "sha256": {
+      "target/android-jni/arm64-v8a/libvw_core.so": "628c1b4a293b5d58db71930235a4cf79b051054cb6a167731b3d1b2244af5a63",
+      "target/debug/vw_core.dll": "f6cc2751c8400e1c8468cc12babad483c82e0f1ada412ddda3562e9b2fa271c2",
+      "target/debug/vw-bindgen.exe": "e8ba1d91c007e6c884eefeb72a3ba5fbe7a5a0d1bbe67f1830367c73403e412c"
+    }
+  },
+  "assertion": {
+    "test": "com.visualworkbench.android.EditorSurfaceInstrumentedTest#eraserResizeAndRecreationPresentCanvasPixels",
+    "also_applied_to": "textSelectionMoveResizeEraserUndoAndActivityRecreationUseRealCore (post-recreation wait)",
+    "method": "UiAutomation.takeScreenshot composited display, in memory, recycled per sample; page white +-12, theme surround +-16, <1% near-black (<=10) in the rail-free canvas band; fail on any sample >=90% near-black during the observation window",
+    "why_not_pixelcopy": "the canvas is in AndroidX child SurfaceControls; PixelCopy of the SurfaceView reads its never-drawn own Surface and PixelCopy of the Window excludes SurfaceView layers"
+  },
+  "before": {
+    "source_commit": "adcf122",
+    "receipt": "app-hil-3503bf8c388546cf8e54496366f73952.json",
+    "receipt_sha256": "30efd84d0816c4a979db7608ec162854059d3a832e569469fc922b38b6025bb2",
+    "status": "failed",
+    "failure_phase": "app-hil-collect",
+    "failure_code": "test_failed_skipped_or_ignored",
+    "started": 226,
+    "passed": 224,
+    "failed": [
+      {
+        "case": "com.visualworkbench.android.EditorSurfaceInstrumentedTest#eraserResizeAndRecreationPresentCanvasPixels",
+        "exception_kind": "java.lang.AssertionError",
+        "status_code": -2,
+        "test_source_lines": [
+          119,
+          150,
+          193,
+          289,
+          294
+        ]
+      },
+      {
+        "case": "com.visualworkbench.android.EditorSurfaceInstrumentedTest#textSelectionMoveResizeEraserUndoAndActivityRecreationUseRealCore",
+        "exception_kind": "java.lang.AssertionError",
+        "status_code": -2,
+        "test_source_lines": [
+          119,
+          150,
+          193,
+          255,
+          283
+        ]
+      }
+    ],
+    "canvas_surface_sha256": "2785efac0fc834d7d5f0494d74be5467e743d99a76a26d413079595ca7cc7ae0",
+    "apk_sha256": {
+      "main": "cb97cab7b4e57d45651d37b47eaa5c1bcc37ba29b5af856501b55cf11dfa735c",
+      "test": "779b92a35929281949077e7005d86eaa8288f215afbadd3e4935e9aed11a68e2"
+    },
+    "phase_seconds": {
+      "app-hil-assemble-isolated": 319.678,
+      "app-hil-instrumentation": 39.775
+    },
+    "presentation": {
+      "baseline": {
+        "samples": 31,
+        "black_samples": 0,
+        "first_black_ms": -1,
+        "last_black_ms": -1,
+        "first_presented_ms": 0,
+        "final_presented": true
+      },
+      "after-eraser-resize": {
+        "samples": 30,
+        "black_samples": 1,
+        "first_black_ms": 0,
+        "last_black_ms": 0,
+        "first_presented_ms": 28,
+        "final_presented": true
+      },
+      "renderer-after-recreation": {
+        "samples": 26,
+        "black_samples": 1,
+        "first_black_ms": 0,
+        "last_black_ms": 0,
+        "first_presented_ms": 114,
+        "final_presented": true
+      }
+    },
+    "presentation_note": "the eraser test stopped at its first failing phase; recreation in that test was not reached",
+    "lowlatency_released_renderer_redraw_warnings": 14,
+    "cleanup": {
+      "process_trees": true,
+      "owned_packages": true,
+      "private_work_disposed": true,
+      "device_installer_pending": false
+    }
+  },
+  "after": {
+    "source_commit": "b562578",
+    "receipt": "app-hil-af2c5415c186470e8d35111db4623d14.json",
+    "receipt_sha256": "3dcd82229f653e77e713d80954a2176bc77c39ff0fc5ab93eb8aa6da8806eddc",
+    "status": "passed",
+    "passed": 226,
+    "skipped": 0,
+    "instrumentation_sha256": "2d44246f2accced996900269efc1911c09e0e2049c7a2242ebadb625a43f40a2",
+    "canvas_surface_sha256": "75b3adf24aede394e25e4a364b9af27bdcfd70477af834cd68afd3d5bf8cce97",
+    "apk_sha256": {
+      "main": "61551d3d246a3d2191e591076efc7606557cb78e612995d7554cf731dfa45daf",
+      "test": "779b92a35929281949077e7005d86eaa8288f215afbadd3e4935e9aed11a68e2"
+    },
+    "phase_seconds": {
+      "app-hil-assemble-isolated": 279.612,
+      "app-hil-instrumentation": 42.896
+    },
+    "presentation": {
+      "baseline": {
+        "samples": 28,
+        "black_samples": 0,
+        "first_black_ms": -1,
+        "last_black_ms": -1,
+        "first_presented_ms": 5,
+        "final_presented": true
+      },
+      "after-eraser-resize": {
+        "samples": 24,
+        "black_samples": 0,
+        "first_black_ms": -1,
+        "last_black_ms": -1,
+        "first_presented_ms": 0,
+        "final_presented": true
+      },
+      "after-recreation": {
+        "samples": 34,
+        "black_samples": 0,
+        "first_black_ms": -1,
+        "last_black_ms": -1,
+        "first_presented_ms": 30,
+        "final_presented": true
+      },
+      "after-pen-resize": {
+        "samples": 27,
+        "black_samples": 0,
+        "first_black_ms": -1,
+        "last_black_ms": -1,
+        "first_presented_ms": 0,
+        "final_presented": true
+      },
+      "renderer-after-recreation": {
+        "samples": 20,
+        "black_samples": 0,
+        "first_black_ms": -1,
+        "last_black_ms": -1,
+        "first_presented_ms": 117,
+        "final_presented": true
+      }
+    },
+    "lowlatency_released_renderer_redraw_warnings": 0,
+    "cleanup": {
+      "process_trees": true,
+      "owned_packages": true,
+      "private_work_disposed": true,
+      "device_installer_pending": false
+    }
+  },
+  "after_repeat": {
+    "source_commit": "b562578",
+    "receipt": "app-hil-37b1e2b9d7ea47018820e5c4d8f0a3fe.json",
+    "receipt_sha256": "b4d765ccc4cebadd0434395b2d61d2215db3b92172db2eb146c8600ce137168f",
+    "status": "passed",
+    "passed": 226,
+    "skipped": 0,
+    "instrumentation_sha256": "860ff638c37897dc6793e6f4c176d9b856b229b505842845121bdbdc70856790",
+    "apk_sha256": {
+      "main": "61551d3d246a3d2191e591076efc7606557cb78e612995d7554cf731dfa45daf",
+      "test": "779b92a35929281949077e7005d86eaa8288f215afbadd3e4935e9aed11a68e2"
+    },
+    "phase_seconds": {
+      "app-hil-assemble-isolated": 290.56,
+      "app-hil-instrumentation": 42.242
+    },
+    "presentation": {
+      "baseline": {
+        "samples": 26,
+        "black_samples": 0,
+        "first_black_ms": -1,
+        "last_black_ms": -1,
+        "first_presented_ms": 0,
+        "final_presented": true
+      },
+      "after-eraser-resize": {
+        "samples": 27,
+        "black_samples": 0,
+        "first_black_ms": -1,
+        "last_black_ms": -1,
+        "first_presented_ms": 0,
+        "final_presented": true
+      },
+      "after-recreation": {
+        "samples": 32,
+        "black_samples": 0,
+        "first_black_ms": -1,
+        "last_black_ms": -1,
+        "first_presented_ms": 34,
+        "final_presented": true
+      },
+      "after-pen-resize": {
+        "samples": 25,
+        "black_samples": 0,
+        "first_black_ms": -1,
+        "last_black_ms": -1,
+        "first_presented_ms": 0,
+        "final_presented": true
+      },
+      "renderer-after-recreation": {
+        "samples": 32,
+        "black_samples": 0,
+        "first_black_ms": -1,
+        "last_black_ms": -1,
+        "first_presented_ms": 34,
+        "final_presented": true
+      }
+    },
+    "lowlatency_released_renderer_redraw_warnings": 0,
+    "cleanup": {
+      "process_trees": true,
+      "owned_packages": true,
+      "private_work_disposed": true,
+      "device_installer_pending": false
+    }
+  },
+  "unit_tests": {
+    "android_testDebugUnitTest": {
+      "variant_build_dir": "apps/android/build-hil (-PvwAndroidHil=true, same sources)",
+      "suites": 43,
+      "tests": 240,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "new": {
+        "CanvasGenerationsTest": 5,
+        "CanvasRedrawHandshakeTest": 3
+      },
+      "unchanged_related": {
+        "CanvasRetirementOwnerTest": 9,
+        "CanvasDryFramesTest": 9
+      }
+    },
+    "tools_app_test_python": {
+      "tests": 53,
+      "result": "OK"
+    },
+    "shared_desktop": "not rerun: no shared source changed and no shared test covers canvas retirement"
+  },
+  "privacy_and_cleanup": {
+    "screenshots_retained": 0,
+    "video_retained": 0,
+    "screenshots": "in-memory only inside the instrumentation test",
+    "diagnostic_logcat": {
+      "filtered_tags": [
+        "VW_CANVAS_PRESENT",
+        "LowLatencyCanvas",
+        "TestRunner",
+        "AndroidRuntime",
+        "VW_EDITOR_TEST"
+      ],
+      "sha256": {
+        "before": "68aaf7a03bab21db09e40423c81c786c064dbc6d1b3a19d24195cb04220f4187",
+        "after": "65a74fa68c9815f906759e753b12aa46aedf1757ad71ca1c8f189b6fe86e22b4",
+        "after_repeat": "f1feb1002c6ed8986c03af46364d8aff43d38ac2d5bd8833d8362b8e242dc0a3"
+      },
+      "retained": false
+    },
+    "hil_packages_absent_after_each_run": true,
+    "normal_app_untouched": true,
+    "usb_tethering_changed": false,
+    "main_checkout_target_modified": false
+  },
+  "bounded_overlap": "at most two renderer generations (two AndroidX buffer pools); predecessor released after the successor's first committed multi-buffered frame (Main waits <=150 ms in surfaceChanged); no allocation while a release settles; giant mode keeps break-before-make",
+  "unverified": [
+    "giant-mode and document-page resizes on device",
+    "rotation/split-screen/fold WM-synced resizes",
+    "successor exceeding the 150 ms bound",
+    "gaps shorter than one ~25-40 ms sample interval",
+    "physical S Pen",
+    "owner visual acceptance"
+  ]
+}
