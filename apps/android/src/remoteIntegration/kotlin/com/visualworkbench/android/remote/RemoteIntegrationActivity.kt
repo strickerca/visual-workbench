@@ -1,15 +1,21 @@
 package com.visualworkbench.android.remote
 
+import android.graphics.Color
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.lifecycle.Lifecycle
 import com.visualworkbench.shared.RemoteTargetBinding
 import com.visualworkbench.shared.RemoteViewport
 import androidx.activity.ComponentActivity
 import com.visualworkbench.shared.WorkbenchRemoteEdit
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.*
 
 /** Included only in the explicit isolated integration source set. The fixture
@@ -18,13 +24,75 @@ internal class RemoteIntegrationActivity:ComponentActivity() {
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
     lateinit var controller:RemoteEditController;private set
     private lateinit var view:RemoteSurfaceView
+    private var prompt:TextView?=null
+    private var promptBlock:String?=null
+    private var promptStrokes=0
+    // Main-thread window-delivery witness. Activity dispatch is entered only from
+    // this window's input pipeline; the synthetic producer below calls the view
+    // directly and is counted separately. Observation only, never authority.
+    private class WindowFrame(val depth:Int,val deviceId:Int,val eventTime:Long)
+    private var windowFrame=WindowFrame(0,0,0L)
+    private val windowDeliveryCount=AtomicLong()
+    private val syntheticDispatchCount=AtomicLong()
+    val witness:RemoteInputDeliveryWitness=object:RemoteInputDeliveryWitness {
+        override fun windowDelivered(event:MotionEvent):Boolean {
+            val frame=windowFrame
+            // ViewGroup may hand the view an offset copy or a synthesized hover
+            // enter/exit; both keep the delivered event's device and event time.
+            return frame.depth>0&&frame.deviceId==event.deviceId&&frame.eventTime==event.eventTime
+        }
+        override val syntheticDispatches:Long get()=syntheticDispatchCount.get()
+        override val windowDeliveries:Long get()=windowDeliveryCount.get()
+    }
+    private fun enterWindow(event:MotionEvent):WindowFrame {
+        windowDeliveryCount.incrementAndGet()
+        val prior=windowFrame;windowFrame=WindowFrame(prior.depth+1,event.deviceId,event.eventTime);return prior
+    }
+    override fun dispatchTouchEvent(event:MotionEvent):Boolean {
+        val prior=enterWindow(event)
+        try{return super.dispatchTouchEvent(event)}finally{windowFrame=prior}
+    }
+    override fun dispatchGenericMotionEvent(event:MotionEvent):Boolean {
+        val prior=enterWindow(event)
+        try{return super.dispatchGenericMotionEvent(event)}finally{windowFrame=prior}
+    }
     override fun onCreate(state:Bundle?){
         super.onCreate(state);check(packageName=="com.visualworkbench.android.hil")
         val id=requireNotNull(intent.getStringExtra("ownedRunId"))
+        val block=intent.getStringExtra("ownerPhysicalBlock")
+        val strokes=intent.getIntExtra("ownerPhysicalStrokes",0)
+        check(block==null||(block in REMOTE_PHYSICAL_BLOCKS&&strokes in 1..64))
         val remote=requireNotNull(owners.remove(id))
         controller=RemoteEditController(remote,scope)
-        view=RemoteSurfaceView(this,controller);setContentView(view)
+        view=RemoteSurfaceView(this,controller)
+        if(block==null)setContentView(view)
+        else{
+            // The prompt sits outside the remote surface so it never covers or
+            // intercepts the owner's pen on the remote canvas.
+            promptBlock=block;promptStrokes=strokes
+            val label=TextView(this).apply{
+                setTextColor(Color.WHITE);setBackgroundColor(Color.rgb(28,28,30));textSize=16f
+                setPadding(40,28,40,28);importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                text=ownerPhysicalPrompt(block,strokes,0)
+            }
+            prompt=label
+            setContentView(LinearLayout(this).apply{
+                orientation=LinearLayout.VERTICAL
+                addView(label,LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT))
+                addView(view,LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1f))
+            })
+        }
         scope.launch{controller.display.collect{view.configure(it.config)}}
+    }
+    /** Integration-only physical observation. The witness and journal never
+     * dispatch, grant, or replay input; only the owner's pen produces samples. */
+    fun armPhysicalJournal(journal:RemotePhysicalGestureJournal){
+        check(promptBlock!=null&&syntheticDispatchCount.get()==0L)
+        controller.armPhysicalJournal(journal,witness)
+    }
+    fun ownerProgress(admitted:Int,finished:Boolean=false){
+        val block=promptBlock?:return
+        prompt?.text=if(finished)"Pen test recorded. You can put the pen down." else ownerPhysicalPrompt(block,promptStrokes,admitted)
     }
     /** Isolated integration variant only: software-generated events enter the
      * actual SurfaceView dispatch route, never native input/ACK methods. */
@@ -61,6 +129,7 @@ internal class RemoteIntegrationActivity:ComponentActivity() {
                     setAxisValue(MotionEvent.AXIS_TILT,0f);setAxisValue(MotionEvent.AXIS_ORIENTATION,0f)
                 }
                 val event=MotionEvent.obtain(downTime,SystemClock.uptimeMillis(),action,1,arrayOf(properties),arrayOf(point),0,0,1f,1f,0,0,InputDevice.SOURCE_STYLUS,0)
+                syntheticDispatchCount.incrementAndGet()
                 try{check(view.dispatchTouchEvent(event))}finally{event.recycle()}
             }
         }catch(error:Throwable){controller.deactivate("owner_pause");throw error}
@@ -80,6 +149,21 @@ internal class RemoteIntegrationActivity:ComponentActivity() {
         super.onDestroy()
     }
     companion object {
+        fun ownerPhysicalPrompt(block:String,strokes:Int,admitted:Int):String {
+            val paint=block.startsWith("paint-")
+            val where=if(paint)"the Paint canvas" else "the test window"
+            val task=when(block.removePrefix("paint-")){
+                "pressure"->"Draw $strokes strokes on $where. In each stroke, go from a light touch to a firm press."
+                "hover"->"Hold the pen just above $where and sweep across it $strokes times. Don't touch the screen."
+                "barrel"->"Hold the pen's side button and draw $strokes strokes on $where."
+                "eraser"->"Turn the pen to its eraser end and draw $strokes strokes on $where. A pen without an eraser end can't finish this step."
+                "eraser-tool"->"With the Eraser tool selected in Paint, erase across the earlier strokes $strokes times."
+                else->"Draw $strokes strokes on $where."
+            }
+            return "Pen test: $task
+Use only the pen. A finger or palm touch stops the test.
+Recorded: $admitted of $strokes"
+        }
         private val owners=ConcurrentHashMap<String,WorkbenchRemoteEdit>()
         private val pending=ConcurrentHashMap.newKeySet<RemoteEditController>()
         private val retirement=CoroutineScope(SupervisorJob()+Dispatchers.Default)
