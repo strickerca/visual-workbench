@@ -25,6 +25,7 @@ internal data class McpVerificationPackage(
  * alignment, physical capture acceptance, a grant or an exterior-pixel proof. */
 internal data class McpVerificationRecapture(
     val original: McpVerificationPackage, val recaptured: McpVerificationPackage,
+    val kind: McpVerificationTargetKind = McpVerificationTargetKind.Window,
 )
 
 /** Session-only relation. The native engine remains the sole selector -> exact
@@ -32,10 +33,12 @@ internal data class McpVerificationRecapture(
  * All methods are synchronized; no lock is retained during capture or IO. */
 internal class McpVerificationTargets {
     private data class Source(val project: String, val document: String, val asset: String)
-    private class Origin(val selector: String)
+    /** A Phone origin has no selector until the owner binds a live PC route. */
+    private class Origin(val selector: String?, val kind: McpVerificationTargetKind)
     private class Bound(val source: McpVerificationPackage, val origin: Origin)
     internal class Ticket internal constructor(
         internal val original: McpVerificationPackage, internal val selector: String,
+        internal val kind: McpVerificationTargetKind = McpVerificationTargetKind.Window,
     )
     private val origins = linkedMapOf<Source, Origin>()
     private val packages = linkedMapOf<Pair<String, String>, Bound>()
@@ -47,24 +50,72 @@ internal class McpVerificationTargets {
 
     /** Owner calls only after the existing native compile for this selector
      * settles. Package metadata supplied by an agent cannot establish a route. */
-    @Synchronized fun rememberCapture(info: PackageInfo, selector: String) {
+    @Synchronized fun rememberCapture(info: PackageInfo, selector: String,
+        kind: McpVerificationTargetKind = McpVerificationTargetKind.Window) {
         val identity = McpVerificationPackage.of(info)
-        rememberSource(identity.binding,identity.sourceAssetId,selector)
+        rememberSource(identity.binding,identity.sourceAssetId,selector,kind)
     }
 
     /** Existing Desktop capture delivery supplies this private association;
      * native retains its exact target before any marked revision is published. */
-    @Synchronized fun rememberSource(binding:WorkflowBinding,asset:String,selector:String) {
+    @Synchronized fun rememberSource(binding:WorkflowBinding,asset:String,selector:String,
+        kind:McpVerificationTargetKind=McpVerificationTargetKind.Window) {
         live(); require(selector.matches(Regex("[a-zA-Z0-9_-]{1,64}")))
+        // Phone origins are created unbound and only an owner binding adds a route.
+        require(kind != McpVerificationTargetKind.Phone)
         require(binding.projectId.matches(Regex("[0-9a-f-]{36}"))&&binding.documentId.matches(Regex("[0-9a-f-]{36}"))&&asset.matches(Regex("[0-9a-f]{64}")))
         val source = Source(binding.projectId,binding.documentId,asset)
         val previous = origins[source]
-        // An identical image in another selected window is not target proof.
-        require(previous == null || previous.selector == selector)
+        // An identical image in another selected window/session is not target proof.
+        require(previous == null || (previous.selector == selector && previous.kind == kind))
         if (previous == null) {
             check(origins.size < 64) { "Verification source limit" }
-            origins[source] = Origin(selector)
+            origins[source] = Origin(selector, kind)
         }
+    }
+
+    /** A phone-screen capture made by the phone app reached this PC inside a
+     * replicated project, so no PC capture route is known. Register it unbound;
+     * the session link cannot request a phone screenshot. Returns whether the
+     * source is (now) a Phone origin; an existing routed origin is never changed. */
+    @Synchronized fun rememberPhoneSource(info: PackageInfo): Boolean {
+        live(); val identity = McpVerificationPackage.of(info)
+        val source = source(identity)
+        val previous = origins[source]
+        if (previous != null) return previous.kind == McpVerificationTargetKind.Phone
+        check(origins.size < 64) { "Verification source limit" }
+        origins[source] = Origin(null, McpVerificationTargetKind.Phone)
+        return true
+    }
+
+    /** Explicit local owner action only: the owner attests that this live PC
+     * route captures the same phone screen. Applies to phone-app captures and
+     * to tunnel captures whose exact session was replaced; a window origin can
+     * never be rebound. A new route makes the origin owner-bound (Phone), and
+     * pending tickets for the earlier route are invalidated because the origin
+     * object is replaced. Re-binding the same route is a no-op. */
+    @Synchronized fun bindPhone(info: PackageInfo, selector: String) {
+        live(); require(selector.matches(Regex("[a-zA-Z0-9_-]{1,64}")))
+        val identity = McpVerificationPackage.of(info)
+        val bound = packages[key(identity)] ?: error("Original target unavailable")
+        require(bound.source == identity)
+        val old = bound.origin
+        require(old.kind != McpVerificationTargetKind.Window && origins[source(identity)] === old)
+        if (old.selector == selector) return
+        val next = Origin(selector, McpVerificationTargetKind.Phone)
+        origins[source(identity)] = next
+        packages.replaceAll { _, value -> if (value.origin === old) Bound(value.source, next) else value }
+    }
+
+    /** Origin kind of a bound package, or null when it has no verification route. */
+    @Synchronized fun kind(info: PackageInfo): McpVerificationTargetKind? {
+        live(); return packages[key(McpVerificationPackage.of(info))]?.origin?.kind
+    }
+
+    /** True only for a Phone origin that still needs an owner binding. */
+    @Synchronized fun unboundPhone(info: PackageInfo): Boolean {
+        live(); val origin = packages[key(McpVerificationPackage.of(info))]?.origin ?: return false
+        return origin.kind == McpVerificationTargetKind.Phone && origin.selector == null
     }
 
     /** A later marked revision of the same canonical source can be bound after
@@ -85,8 +136,9 @@ internal class McpVerificationTargets {
         live(); val identity = McpVerificationPackage.of(info)
         val bound = packages[key(identity)] ?: error("Original target unavailable")
         require(bound.source == identity)
+        val selector = bound.origin.selector ?: throw McpRecaptureUnavailable(McpRecaptureRefusal.PhoneRouteUnbound)
         check(pending.size < 4) { "Verification recapture limit" }
-        return Ticket(identity, bound.origin.selector).also { pending[it] = bound }
+        return Ticket(identity, selector, bound.origin.kind).also { pending[it] = bound }
     }
 
     @Synchronized fun checkCurrent(ticket: Ticket) {
@@ -103,7 +155,7 @@ internal class McpVerificationTargets {
             checkCurrent(ticket)
             val result = McpVerificationPackage.of(after)
             require(result.packageId != ticket.original.packageId && result.target == ticket.original.target)
-            return McpVerificationRecapture(ticket.original, result)
+            return McpVerificationRecapture(ticket.original, result, ticket.kind)
         } finally { pending.remove(ticket) }
     }
 

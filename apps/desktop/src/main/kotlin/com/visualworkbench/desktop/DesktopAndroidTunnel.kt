@@ -8,6 +8,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import com.visualworkbench.bindings.host.excludeCaptureWindows
 import com.visualworkbench.desktop.capture.deliverCaptureProject
+import com.visualworkbench.desktop.mcp.McpPhoneCaptureOrigin
+import com.visualworkbench.desktop.mcp.McpPhoneCaptureRoute
+import com.visualworkbench.desktop.mcp.McpRecaptureRefusal
+import com.visualworkbench.desktop.mcp.McpRecaptureUnavailable
+import com.visualworkbench.desktop.mcp.mcpRecaptureFailure
 import com.visualworkbench.shared.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +49,9 @@ internal class DesktopAndroidTunnel(
     private val beforeOpen: suspend () -> Unit,
     private val route: () -> (suspend (WorkbenchProject, Path, String?) -> Unit),
     private val modal: (Boolean) -> Unit, private val mayOpen: () -> Boolean, private val report: (String) -> Unit,
+    /** Optional verification observer. It receives metadata plus this exact live
+     * session's recapture route after delivery; it can never open or widen it. */
+    private val delivered: (suspend (McpPhoneCaptureOrigin) -> Unit)? = null,
     private val factories: DesktopTunnelFactories = DesktopTunnelFactories(),
 ) {
     private val mutable = MutableStateFlow(DesktopTunnelState())
@@ -60,6 +68,8 @@ internal class DesktopAndroidTunnel(
     private var heldCollection: WorkbenchSemanticCollection? = null
     private var heldPlan: WorkbenchWorkflowPlan? = null
     private var heldWork: Path? = null
+    private var sessionId: String? = null
+    private var screenRoute: TunnelScreenRoute? = null
 
     fun show() = synchronized(admission) {
         if (stopping || !scope.isActive || mutable.value.open || mutable.value.cleanupPending || !mayOpen()) return@synchronized
@@ -127,15 +137,99 @@ internal class DesktopAndroidTunnel(
         beforeOpen()
         currentCoroutineContext().ensureActive()
         nativeAttempted = true // An ownerless failed acquisition can still need native retirement.
-        val opened = acquireOwned({ synchronized(admission) { owner = it } }) {
-            factories.open(TunnelOptions(true, runtime.toString(), adb, model, transport,
-                core.newId(System.currentTimeMillis().toULong())))
+        val session = core.newId(System.currentTimeMillis().toULong())
+        val opened = acquireOwned({ synchronized(admission) { owner = it; sessionId = session } }) {
+            factories.open(TunnelOptions(true, runtime.toString(), adb, model, transport, session))
         }
         currentCoroutineContext().ensureActive()
         val actual = opened.state()
         require(actual.mode == TunnelMode.ViewOnly)
         publish { it.copy(connected = true, mode = actual.mode,
             message = "View only. Phone input requires a fresh local confirmation.") }
+        synchronized(admission) {
+            if (!stopping && owner === opened && sessionId == session) screenRoute = TunnelScreenRoute(opened, session, model)
+        }
+    }
+
+    /** The current exact session's phone-screen route, for an explicit owner
+     * binding. Null unless a view-only or owner-control session is connected. */
+    fun phoneScreenRoute(): McpPhoneCaptureRoute? = synchronized(admission) {
+        screenRoute?.takeIf { it.liveLocked() }
+    }
+
+    /** Verification recapture through this exact owner-opened session. It uses
+     * the same single-operation admission as Capture, so UI work and close()
+     * exclude/join it. Phone input mode is irrelevant: screencap needs none. */
+    private inner class TunnelScreenRoute(
+        val session: WorkbenchAndroidTunnel, val id: String, model: String,
+    ) : McpPhoneCaptureRoute {
+        override val description = "USB tunnel ${model.take(64)}"
+        fun liveLocked(): Boolean = owner === session && sessionId == id && screenRoute === this &&
+            mutable.value.connected && !stopping && !mutable.value.cleanupPending && scope.isActive
+        override fun checkAvailable() {
+            synchronized(admission) {
+                // Runtime admission first: until the approved catalog is compiled
+                // in, every tunnel route fails closed with this exact reason.
+                if (!factories.available()) throw McpRecaptureUnavailable(McpRecaptureRefusal.TunnelRuntimeUnavailable)
+                if (!liveLocked()) throw McpRecaptureUnavailable(McpRecaptureRefusal.PhoneDisconnected)
+            }
+        }
+        override suspend fun <T> capture(body: suspend (WorkbenchTunnelCapture) -> T): T {
+            val job = synchronized(admission) {
+                if (!factories.available()) throw McpRecaptureUnavailable(McpRecaptureRefusal.TunnelRuntimeUnavailable)
+                if (!liveLocked()) throw McpRecaptureUnavailable(McpRecaptureRefusal.PhoneDisconnected)
+                if (operation?.isCompleted == false || mutable.value.target != null)
+                    throw McpRecaptureUnavailable(McpRecaptureRefusal.SourceBusy)
+                mutable.update { it.copy(busy = true) }
+                scope.async(start = CoroutineStart.LAZY) {
+                    // Failures stay in the result: this child must not fail its parent scope.
+                    try { Result.success(recaptureInside(session, id, body)) }
+                    catch (error: CancellationException) { throw error }
+                    catch (error: Exception) { Result.failure<T>(error) }
+                }.also { job ->
+                    operation = job
+                    job.invokeOnCompletion {
+                        synchronized(admission) {
+                            if (operation === job) {
+                                operation = null
+                                mutable.update { it.copy(busy = stopping) }
+                            }
+                        }
+                    }
+                }
+            }
+            job.start()
+            val outcome = try { job.await() }
+            catch (error: CancellationException) {
+                job.cancel()
+                withContext(NonCancellable) { job.join() }
+                // The caller's own cancellation wins; close() cancelling only the
+                // tunnel operation is a retired source, not a caller cancellation.
+                currentCoroutineContext().ensureActive()
+                throw McpRecaptureUnavailable(McpRecaptureRefusal.PhoneDisconnected)
+            }
+            return outcome.getOrThrow()
+        }
+    }
+
+    private suspend fun <T> recaptureInside(session: WorkbenchAndroidTunnel, expected: String,
+        body: suspend (WorkbenchTunnelCapture) -> T): T {
+        val captured = try { acquireOwned({ heldCapture = it }) { session.capture() } }
+            catch (error: TunnelFailure) { throw mcpRecaptureFailure(error) }
+        try {
+            // The native capture names its session; a replacement session is not the same phone.
+            if (captured.info().captureSessionId != expected) throw McpRecaptureUnavailable(McpRecaptureRefusal.PhoneDisconnected)
+            return body(captured)
+        } finally {
+            withContext(NonCancellable) {
+                try { captured.close(); heldCapture = null }
+                catch (error: Exception) {
+                    mutable.update { it.copy(cleanupPending = true) }
+                    report("Android capture cleanup is pending. Native owners remain held.")
+                    throw error
+                }
+            }
+        }
     }
 
     fun requestControl() = launch(admit = {
@@ -187,6 +281,7 @@ internal class DesktopAndroidTunnel(
             onAdmitted = { destinationRoute = route() }) {
             val deliver = checkNotNull(destinationRoute)
             var deliveryFailed = false
+            val liveRoute = synchronized(admission) { screenRoute?.takeIf { it.session === owner } }
             try {
                 val captured = acquireOwned({ heldCapture = it }) { checkNotNull(owner).capture() }
                 val info = captured.info()
@@ -223,11 +318,21 @@ internal class DesktopAndroidTunnel(
                 // The canonical destination owns project close at invocation.
                 // An escaping ordinary error means its close was unproved.
                 heldProject = null
-                deliverCaptureProject(opened, { deliver(it, destination, warning) }, retainFailure = { held, _ ->
-                    heldProject = held
-                    deliveryFailed = true
-                    mutable.update { it.copy(cleanupPending = true) }
-                })
+                val observe = delivered
+                deliverCaptureProject(opened, { deliver(it, destination, warning) },
+                    observation = if (observe == null) null else { current ->
+                        // Only the exact session that produced these pixels may recapture them.
+                        val live = checkNotNull(liveRoute)
+                        require(info.captureSessionId == live.id && document in current.documentIds)
+                        observe(McpPhoneCaptureOrigin(WorkflowBinding(current.projectId, document, current.hostSeq, current.stateHash),
+                            info.assetId, live))
+                    },
+                    observationUnavailable = { report("Screenshot saved; phone verification identity was unavailable. Reconnect the phone before verification.") },
+                    retainFailure = { held, _ ->
+                        heldProject = held
+                        deliveryFailed = true
+                        mutable.update { it.copy(cleanupPending = true) }
+                    })
                 publish { it.copy(message = "Lossless Android capture saved.${warning?.let { text -> " $text" }.orEmpty()}") }
             } finally {
                 withContext(NonCancellable) {
@@ -286,8 +391,10 @@ internal class DesktopAndroidTunnel(
     }
 
     private suspend fun retireSession() {
+        // Invalidate the recapture route before the native owner starts closing.
+        synchronized(admission) { screenRoute = null }
         owner?.close()
-        synchronized(admission) { owner = null }
+        synchronized(admission) { owner = null; sessionId = null }
         if (nativeAttempted) {
             factories.retryRetirement()
             factories.assertRetired()

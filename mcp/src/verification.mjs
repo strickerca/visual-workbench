@@ -3,6 +3,12 @@ import { ID_PATTERN, LIMITS, Refused, encoded, hex, identifier, requireThat } fr
 
 const targets = ['claude', 'openai', 'gemini', 'generic'];
 const identityFields = ['package_id', 'target', 'manifest_sha256'];
+// Route category of the original only; never a selector, window or device identity.
+const sourceKinds = Object.freeze({
+  window: 'Recapture of the original window published.',
+  tunnel: 'Recapture of the phone screen through the USB tunnel published.',
+  phone: 'Recapture of the phone screen through the owner-bound USB tunnel published.',
+});
 const comparisonFields = [...identityFields, 'receipt_id', 'receipt_blake3', 'n'];
 const idSchema = { type: 'string', pattern: ID_PATTERN };
 // Native inbox receipts and stored review pairs use UUIDv7 vw_model::Id values.
@@ -105,17 +111,19 @@ export function registerVerificationTools(tool, { packages, owner, principal }) 
       checkedIdentity(entry, original); const markers = markerCount(entry); cancelled(signal);
       const result = await owner.call('verification_recapture', { session: principal, ...original }, signal);
       cancelled(signal);
-      fields(result, ['original', 'after', 'receipt_id', 'receipt_blake3', 'marker_count']);
+      fields(result, ['original', 'after', 'receipt_id', 'receipt_blake3', 'marker_count', 'source_kind']);
       const before = identity(result.original), after = identity(result.after);
       equalIdentity(before, original);
       requireThat(after.package_id !== original.package_id && after.target === original.target, 'package_changed');
       receiptId(result.receipt_id); hex(result.receipt_blake3);
       requireThat(Number.isInteger(result.marker_count) && result.marker_count === markers);
+      requireThat(typeof result.source_kind === 'string' && Object.hasOwn(sourceKinds, result.source_kind));
+      const kind = result.source_kind;
       return packages.withChecked(after.package_id, after.target, signal, async published => {
         checkedIdentity(published, after); cancelled(signal);
         const response = {
-          content: [{ type: 'text', text: 'Recapture published. Marker correspondence and owner review remain separate.' }],
-          structuredContent: { original: before, after, receipt_id: result.receipt_id, receipt_blake3: result.receipt_blake3, marker_count: markers },
+          content: [{ type: 'text', text: `${sourceKinds[kind]} Marker correspondence and owner review remain separate.` }],
+          structuredContent: { original: before, after, receipt_id: result.receipt_id, receipt_blake3: result.receipt_blake3, marker_count: markers, source_kind: kind },
         };
         encoded(response); return response;
       });

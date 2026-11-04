@@ -203,9 +203,17 @@ fun main(args: Array<String>) {
                 nativeRuntime.directory.resolve("vw-capture-stream-helper.exe").toString(),nativeRuntime.packagedHash("vw-capture-stream-helper.exe"))} }})}
         pickerOwner.set(capturePicker)
         val tunnelModal=remember(controller){PickerModal(controller::instructionPicker)}
+        val rememberTunnelCapture:suspend(com.visualworkbench.desktop.mcp.McpPhoneCaptureOrigin)->Unit={origin->
+            // Same rule as window captures: one current owner, no service start,
+            // no grant. The route is the exact live tunnel session.
+            val lifetime=mcp.state.value
+            val owner=lifetime.owner?.takeIf{!lifetime.starting&&!lifetime.closed&&lifetime.failureStage==null}
+            if(owner!=null)owner.rememberPhoneCapture(origin)
+        }
         val androidTunnel=remember(scope,controller){DesktopAndroidTunnel(scope,core,device,location.path,nativeRuntime.directory.resolve("scrcpy"),
             beforeOpen={controller.cancelInput();controller.streamPublication.close();check(!capture.state.value.busy);capturePicker.dismiss()},
-            route=controller::captureDestination,modal=tunnelModal::set,mayOpen={currentPickerAdmission()},report=controller::report)}
+            route=controller::captureDestination,modal=tunnelModal::set,mayOpen={currentPickerAdmission()},report=controller::report,
+            delivered=rememberTunnelCapture)}
         tunnelOwner.set(androidTunnel)
         controller.setLocalTunnelRetirement(androidTunnel::close)
         val capturePickerState by capturePicker.state.collectAsState()
@@ -529,7 +537,7 @@ fun main(args: Array<String>) {
                     val owner=mcpState.owner
                     if(owner!=null)McpSettingsPanel(owner,{choice->mcpTasks.run{
                         val value=controller.compileForMcp(choice);try{owner.publish(value)}finally{withContext(NonCancellable){value.close()}}
-                    }},{receipt->mcpModal.compare(receipt)},{mcpModal.dismiss()},onStop={
+                    }},{receipt->mcpModal.compare(receipt)},{mcpModal.dismiss()},phoneRoute={androidTunnel.phoneScreenRoute()},onStop={
                         scope.launch(start=CoroutineStart.UNDISPATCHED){try{mcpModal.settings();mcp.stop()}catch(_:Exception){controller.report("Local service shutdown is uncertain. Restart the application before admitting another owner.")}}
                     })
                     else AlertDialog(onDismissRequest={mcpModal.dismiss()},title={Text("Local agent access")},text={Text(mcpState.issue?:"Start the local service to expose explicitly published packages. Capture grants and Send stay off until your separate actions.")},

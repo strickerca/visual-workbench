@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { crc32, deflateSync } from 'node:zlib';
 import { LIMITS, Refused, requireThat } from '../src/bounds.mjs';
-import { Owner } from '../src/owner.mjs';
+import { OWNER_REFUSALS, Owner } from '../src/owner.mjs';
 import { registerVerificationTools } from '../src/verification.mjs';
 
 const original = Object.freeze({ package_id: '019a3aaa-0123-789a-8abc-0123456789ab', target: 'generic', manifest_sha256: 'a'.repeat(64) });
@@ -38,7 +38,7 @@ function fixture({ recapture, comparison, owner: injectedOwner, missingAfter = f
     return action(found);
   } });
   const answers = {
-    recapture: recapture ?? { original: { ...original }, after: { ...after }, ...receipt, marker_count: 2 },
+    recapture: recapture ?? { original: { ...original }, after: { ...after }, ...receipt, marker_count: 2, source_kind: 'window' },
     comparison: comparison ?? { ...request, status: 'aligned', method: 'semantic', before_png: image(), after_png: image(), width: 2, height: 1 },
   };
   const owner = injectedOwner ?? Object.freeze({ call: async (method, payload, signal) => {
@@ -65,7 +65,7 @@ test('registration exposes only the bounded identity-based recapture and compari
 
 test('recapture checks the original and published after hash, forwarding cancellation and only public identity fields', async () => {
   const f = fixture(), stop = new AbortController(); const result = await recapture(f, original, stop.signal);
-  assert.deepEqual(result.structuredContent, { original, after, ...receipt, marker_count: 2 });
+  assert.deepEqual(result.structuredContent, { original, after, ...receipt, marker_count: 2, source_kind: 'window' });
   assert.deepEqual(f.checks, [{ id: original.package_id, target: original.target, signal: stop.signal },
     { id: after.package_id, target: after.target, signal: stop.signal }]);
   assert.deepEqual(f.calls, [{ method: 'verification_recapture', payload: { session: 'fixture:authorized-owner', ...original }, signal: stop.signal }]);
@@ -123,14 +123,16 @@ test('a changed original hash refuses recapture before owner work', async () => 
 });
 
 test('unknown owner fields, mismatched identities, receipts and marker counts refuse recapture', async () => {
-  const make = () => ({ original: { ...original }, after: { ...after }, ...receipt, marker_count: 2 });
+  const make = () => ({ original: { ...original }, after: { ...after }, ...receipt, marker_count: 2, source_kind: 'window' });
   const variants = [null, [], { ...make(), note: 'private' }, { ...make(), selector: 'private' },
     { ...make(), original: { ...original, note: 'private' } }, { ...make(), after: { ...after, verdict: 'pass' } },
     { ...make(), original: { ...original, manifest_sha256: 'd'.repeat(64) } },
     { ...make(), after: { ...original } }, { ...make(), after: { ...after, target: 'claude' } },
     { ...make(), after: { ...after, manifest_sha256: 'bad' } }, { ...make(), receipt_id: 'bad' },
     { ...make(), receipt_blake3: 'bad' }, { ...make(), marker_count: 1 }, { ...make(), marker_count: '2' },
-    { ...make(), marker_count: 513 }];
+    { ...make(), marker_count: 513 }, { ...make(), source_kind: 'adb' }, { ...make(), source_kind: 'Window' },
+    { ...make(), source_kind: '__proto__' }, { ...make(), source_kind: null }, { ...make(), source_kind: ['phone'] },
+    (({ source_kind: _, ...rest }) => rest)(make())];
   for (const value of variants) {
     const f = fixture(); f.answers.recapture = value; await invalid(recapture(f));
   }
@@ -233,4 +235,55 @@ test('real Owner cancellation is forwarded and retains native admission until th
     await assert.rejects(owner.drain(1), error => error.code === 'owner_busy');
     owner.reply({ id: messages[0].id, ok: true, result: f.answers.comparison }); await owner.drain(10);
   } finally { owner.close(); }
+});
+
+test('phone and tunnel recaptures carry only their public route category', async () => {
+  for (const [kind, pattern] of [['tunnel', /USB tunnel/], ['phone', /owner-bound USB tunnel/], ['window', /original window/]]) {
+    const f = fixture(); f.answers.recapture.source_kind = kind;
+    const result = await recapture(f);
+    assert.equal(result.structuredContent.source_kind, kind);
+    assert.match(result.content[0].text, pattern);
+    assert.match(result.content[0].text, /owner review remain separate/);
+    assert.deepEqual(f.calls.map(call => call.payload), [{ session: 'fixture:authorized-owner', ...original }]);
+    assert.ok(!JSON.stringify(result).includes('selector'));
+  }
+});
+
+test('marker comparison for a phone-route receipt uses the same identity-only request', async () => {
+  const f = fixture(); f.answers.recapture.source_kind = 'phone'; f.answers.comparison.n = 2;
+  const recaptured = await recapture(f);
+  const result = await compare(f, { ...original, receipt_id: recaptured.structuredContent.receipt_id,
+    receipt_blake3: recaptured.structuredContent.receipt_blake3, n: 2 });
+  assert.equal(result.structuredContent.status, 'aligned');
+  assert.deepEqual(f.calls[1], { method: 'verification_compare', payload: { session: 'fixture:authorized-owner', ...request, n: 2 }, signal: undefined });
+});
+
+test('owner refusals surface only allowlisted source-availability codes', async () => {
+  const messages = []; let requested; let received = new Promise(done => { requested = done; });
+  const owner = new Owner({ send: async message => { messages.push(message); if (message.kind === 'owner/request') requested(); } });
+  const f = fixture({ owner });
+  try {
+    for (const code of OWNER_REFUSALS) {
+      const pending = recapture(f); await received; received = new Promise(done => { requested = done; });
+      owner.reply({ id: messages.at(-1).id, ok: false, code });
+      await assert.rejects(pending, error => error instanceof Refused && error.code === code);
+    }
+    for (const code of [undefined, 'internal path C:/private', 'owner_refused', 'capture_grant_required', 42, '']) {
+      const pending = compare(f); await received; received = new Promise(done => { requested = done; });
+      owner.reply({ id: messages.at(-1).id, ok: false, code });
+      await assert.rejects(pending, error => error instanceof Refused && error.code === 'owner_refused');
+    }
+    // A code alongside ok:true never turns a success into a refusal.
+    const pending = recapture(f); await received;
+    owner.reply({ id: messages.at(-1).id, ok: true, code: 'phone_disconnected', result: f.answers.recapture });
+    assert.equal((await pending).structuredContent.source_kind, 'window');
+    await owner.drain(10);
+  } finally { owner.close(); }
+});
+
+test('the tunnel runtime refusal reaches the agent before any recapture result is trusted', async () => {
+  const owner = Object.freeze({ call: async () => { throw new Refused('tunnel_runtime_unavailable'); } });
+  const f = fixture({ owner });
+  await assert.rejects(recapture(f), error => error.code === 'tunnel_runtime_unavailable');
+  assert.equal(f.checks.length, 1);
 });

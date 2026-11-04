@@ -9,7 +9,8 @@ import java.nio.file.Path
 import java.util.Base64
 import java.util.UUID
 
-internal data class McpSelectedTarget(val selector:String,val description:String)
+internal data class McpSelectedTarget(val selector:String,val description:String,
+    val kind:McpVerificationTargetKind=McpVerificationTargetKind.Window)
 internal interface McpCaptureEngine {
     /** Owner action: a temporary hotkey samples the foreground target before app focus. */
     suspend fun select():McpSelectedTarget
@@ -23,6 +24,9 @@ internal interface McpCaptureEngine {
      * project from a public package directory or a caller-supplied filesystem path. */
     suspend fun <T> withVerificationSources(original:PackageInfo,after:PackageInfo,body:suspend(WorkbenchProject,WorkbenchProject)->T):T = throw McpRefused()
     suspend fun <T> withVerificationSource(after:PackageInfo,body:suspend(WorkbenchProject)->T):T = throw McpRefused()
+    /** Retain one owner-opened phone-screen route as a grantable selector. It is
+     * usable only by verification recapture; plain capture stays window-only. */
+    suspend fun retainPhoneRoute(route:McpPhoneScreenRoute):McpSelectedTarget = throw McpRecaptureUnavailable(McpRecaptureRefusal.SourceUnavailable)
     suspend fun close()
 }
 internal data class McpCaptureProfile(val target:PackageTarget,val includeWindowTitle:Boolean)
@@ -35,6 +39,11 @@ internal data class McpDesktopState(
     val retiring:Set<String> = emptySet(),val sendPreview:McpClaudePreview?=null,
     val verificationReceipts:Set<String> = emptySet(),
     val verificationHistory:VerificationReviewHistoryPage?=null,
+    /** "packageId/target" of phone-app captures awaiting an owner USB binding. */
+    val phoneUnbound:Set<String> = emptySet(),
+    /** "packageId/target" of phone-screen originals (tunnel or phone-app) that
+     * the owner may (re)bind to the connected USB tunnel session. */
+    val phoneScreens:Set<String> = emptySet(),
     val message:String?=null,val closed:Boolean=false,
 )
 
@@ -108,13 +117,30 @@ internal class DesktopMcpCoordinator(
         // Verification routing is optional. Its bounded session registry cannot
         // turn an already durable ordinary publication into a failed result.
         val verificationAvailable=verificationEligible && try {
-            verificationTargets.rememberPackage(saved.info)
-        } catch(_:IllegalArgumentException) { false } catch(_:IllegalStateException) { false }
+            verificationTargets.rememberPackage(saved.info) || (phoneCapture(saved.info) &&
+                verificationTargets.rememberPhoneSource(saved.info) && verificationTargets.rememberPackage(saved.info))
+        } catch(error:CancellationException) { throw error }
+        catch(_:IllegalArgumentException) { false } catch(_:IllegalStateException) { false }
+        val unboundPhone=verificationAvailable && try { verificationTargets.unboundPhone(saved.info) }
+            catch(_:IllegalArgumentException) { false } catch(_:IllegalStateException) { false }
+        val phoneScreen=verificationAvailable && try { verificationTargets.kind(saved.info).let{it==McpVerificationTargetKind.Tunnel||it==McpVerificationTargetKind.Phone} }
+            catch(_:IllegalArgumentException) { false } catch(_:IllegalStateException) { false }
+        val savedKey=key(saved.info.packageId,saved.info.target)
         mutable.update{state->state.copy(packages=(state.packages.filterNot{it.info.packageId==saved.info.packageId&&it.info.target==saved.info.target}+saved),sendPreview=null,
-            message=if(verificationAvailable)state.message else "Package saved. Its original capture target is unavailable for verification.")}
+            phoneUnbound=if(unboundPhone)state.phoneUnbound+savedKey else state.phoneUnbound-savedKey,
+            phoneScreens=if(phoneScreen)state.phoneScreens+savedKey else state.phoneScreens-savedKey,
+            message=if(unboundPhone)"Phone capture saved. Bind the connected USB phone before an agent can recapture it."
+                else if(verificationAvailable)state.message else "Package saved. Its original capture target is unavailable for verification.")}
         beforeExpose();connection.publish(Path.of(saved.directory),saved.info.manifestSha256)
         saved
     }
+    /** A phone-app screen capture reaches this PC only inside a project from the
+     * session link; the link carries no capture request back to the phone. Its
+     * checked manifest names the android platform. A live tunnel capture is
+     * registered earlier with its exact route and never reaches this check. */
+    private suspend fun phoneCapture(info:PackageInfo):Boolean = try {
+        mcpManifestCapturePlatform(catalog.readFile(info.packageId,info.target,info.manifestSha256,"manifest.json",4u*1024u*1024u))=="android"
+    } catch(error:CancellationException) { throw error } catch(_:Exception) { false }
     /** Durable local packages are never silently exposed on service start. */
     suspend fun expose(selected:PublishedPackage)=owned {
         catalogGate.withLock {
@@ -125,7 +151,7 @@ internal class DesktopMcpCoordinator(
     }
     suspend fun retirePackage(selected:PublishedPackage)=owned {
         val itemKey=key(selected.info.packageId,selected.info.target)
-        catalogGate.withLock{verificationTargets.retire(selected.info);verification.retire(selected.info);mutable.update{it.copy(retiring=it.retiring+itemKey,sendPreview=null)}}
+        catalogGate.withLock{verificationTargets.retire(selected.info);verification.retire(selected.info);mutable.update{it.copy(retiring=it.retiring+itemKey,phoneUnbound=it.phoneUnbound-itemKey,phoneScreens=it.phoneScreens-itemKey,sendPreview=null)}}
         // Do not hold catalogGate while draining callbacks: an unrelated capture
         // callback may be publishing, and must settle before this receipt.
         connection.unpublish(selected.info.packageId,selected.info.target,selected.info.manifestSha256)
@@ -285,8 +311,9 @@ internal class DesktopMcpCoordinator(
                 val compiled=if(profile==null)captureEngine.compile(selector){checkCapture()} else captureEngine.compileVerification(selector,profile){checkCapture()}
                 try {
                     checkCapture()
+                    val kind=mutable.value.targets.singleOrNull{it.selector==selector}?.kind?:McpVerificationTargetKind.Window
                     val verificationEligible=try {
-                        verificationTargets.rememberCapture(compiled.info,selector);true
+                        verificationTargets.rememberCapture(compiled.info,selector,kind);true
                     } catch(_:IllegalArgumentException) { false } catch(_:IllegalStateException) { false }
                     // An unregistered/conflicting capture must never inherit an
                     // older origin merely because its canonical bytes coincide.
@@ -324,6 +351,30 @@ internal class DesktopMcpCoordinator(
         catalogGate.withLock{verificationTargets.rememberSource(origin.binding,origin.sourceAssetId,selected.selector)}
         mutable.update{it.copy(targets=if(it.targets.any{target->target.selector==selected.selector})it.targets else it.targets+selected)}
     }
+    /** Called by the tunnel owner while it delivers its exact capture. The route
+     * is that live owner-opened session; retaining it mints no grant. */
+    suspend fun rememberPhoneCapture(origin:McpPhoneCaptureOrigin)=owned {
+        val selected=captureGate.withLock{captureEngine.retainPhoneRoute(origin.route)}
+        require(selected.kind==McpVerificationTargetKind.Tunnel)
+        catalogGate.withLock{verificationTargets.rememberSource(origin.binding,origin.sourceAssetId,selected.selector,McpVerificationTargetKind.Tunnel)}
+        mutable.update{it.copy(targets=if(it.targets.any{target->target.selector==selected.selector})it.targets else it.targets+selected)}
+    }
+    /** Explicit local owner action, never an McpOwnerActions method: the owner
+     * attests that the connected USB phone shows the screen this phone-app or
+     * earlier tunnel capture came from. Refuses when no live tunnel route exists
+     * and for window originals. Binding mints no grant. */
+    suspend fun bindPhoneScreen(selected:PublishedPackage,route:McpPhoneScreenRoute?)=owned {
+        val live=route?:throw McpRecaptureUnavailable(McpRecaptureRefusal.PhoneDisconnected)
+        live.checkAvailable()
+        val target=captureGate.withLock{captureEngine.retainPhoneRoute(live)}
+        val itemKey=key(selected.info.packageId,selected.info.target)
+        catalogGate.withLock{
+            val exact=checkedVerificationPackage(selected.info).info
+            verificationTargets.bindPhone(exact,target.selector)
+        }
+        mutable.update{it.copy(targets=if(it.targets.any{t->t.selector==target.selector})it.targets else it.targets+target,
+            phoneUnbound=it.phoneUnbound-itemKey,message="Phone capture bound to the connected USB phone. Grant that phone screen before an agent recaptures it.")}
+    }
     override suspend fun recaptureVerification(session:String,packageId:String,target:String,manifestHash:String):McpVerificationReceipt {
         live(session)
         val original=owned(session){catalogGate.withLock{catalog.lookup(packageId,target,manifestHash).info.also{checkedVerificationPackage(it)}}}
@@ -332,7 +383,8 @@ internal class DesktopMcpCoordinator(
             withVerificationGrant(session,original){
                 val result=verification.remember(recaptured,session)
                 val returns=inbox.list()
-                mutable.update{it.copy(inbox=returns,verificationReceipts=it.verificationReceipts+result.receiptId,message="Original window recaptured. Manual marker review is ready.")}
+                val recapturedText=when(recaptured.kind){McpVerificationTargetKind.Window->"Original window recaptured.";else->"Phone screen recaptured through the USB tunnel."}
+                mutable.update{it.copy(inbox=returns,verificationReceipts=it.verificationReceipts+result.receiptId,message="$recapturedText Manual marker review is ready.")}
                 result
             }
         }}}}

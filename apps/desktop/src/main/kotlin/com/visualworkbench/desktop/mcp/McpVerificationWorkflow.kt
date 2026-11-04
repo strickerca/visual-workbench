@@ -29,9 +29,12 @@ internal class McpEditorCaptureOrigin internal constructor(
     internal val retain:suspend(McpCaptureEngine)->McpSelectedTarget,
 )
 internal data class McpVerificationReceipt(val original:VerificationPackageKey,val after:VerificationPackageKey,
-    val receiptId:String,val receiptBlake3:String,val markerCount:UInt) {
+    val receiptId:String,val receiptBlake3:String,val markerCount:UInt,
+    val sourceKind:McpVerificationTargetKind=McpVerificationTargetKind.Window) {
+    /** source_kind names the original's route category only; no selector/device. */
     fun wire():Map<String,Any?> = mapOf("original" to original.wire(),"after" to after.wire(),
-        "receipt_id" to receiptId,"receipt_blake3" to receiptBlake3,"marker_count" to markerCount.toLong())
+        "receipt_id" to receiptId,"receipt_blake3" to receiptBlake3,"marker_count" to markerCount.toLong(),
+        "source_kind" to sourceKind.wire)
 }
 private fun VerificationPackageKey.wire():Map<String,Any?> = mapOf("package_id" to packageId,"target" to target,"manifest_sha256" to manifestSha256)
 internal fun PackageInfo.verificationKey()=VerificationPackageKey(packageId,target,manifestSha256)
@@ -178,7 +181,7 @@ internal class McpVerificationWorkflow(
         require(!receipt.retired&&receipt.after!=null)
         val entry=Entry(original,after,receipt,recapture)
         entries[receipt.receiptId]=entry
-        return McpVerificationReceipt(entry.pair.original,entry.pair.after,receipt.receiptId,receipt.receiptBlake3,original.markerCount)
+        return McpVerificationReceipt(entry.pair.original,entry.pair.after,receipt.receiptId,receipt.receiptBlake3,original.markerCount,recapture.kind)
     }
     private suspend fun checkedIdentity(value:McpVerificationPackage):PackageInfo {
         val found=catalog.lookup(value.packageId,value.target,value.manifestSha256).info

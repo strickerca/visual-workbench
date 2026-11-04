@@ -15,14 +15,17 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
 
 /** Explicit local owner controls. Bridge PIDs identify an authenticated local
  * connection, not an asserted product identity. No connection is auto-granted. */
-@Composable internal fun McpSettingsPanel(owner:DesktopMcpCoordinator,onCompile:suspend(McpCompileChoice)->Unit,onCompare:(McpInboxReceipt)->Unit,onClose:()->Unit,onStop:()->Unit={}) {
+@Composable internal fun McpSettingsPanel(owner:DesktopMcpCoordinator,onCompile:suspend(McpCompileChoice)->Unit,onCompare:(McpInboxReceipt)->Unit,onClose:()->Unit,onStop:()->Unit={},
+    phoneRoute:()->McpPhoneScreenRoute?={null}) {
     val state by owner.state.collectAsState();val scope=rememberCoroutineScope()
     var busy by remember{mutableStateOf(false)};var message by remember{mutableStateOf<String?>(null)}
     var selectedAgent by remember{mutableStateOf<String?>(null)};var selectedTarget by remember{mutableStateOf<String?>(null)}
     var profile by remember{mutableStateOf("generic")};var model by remember{mutableStateOf("")}
     var snapshot by remember{mutableStateOf("")};var title by remember{mutableStateOf(false)}
     var assumeSrgb by remember{mutableStateOf(false)};var depth by remember{mutableStateOf(false)}
-    fun act(body:suspend()->Unit){if(busy)return;busy=true;message=null;scope.launch{try{body()}catch(error:CancellationException){throw error}catch(_:Exception){message="The operation was refused or did not finish. Refresh to recover durable publication; do not assume it was sent."}finally{busy=false}}}
+    fun act(body:suspend()->Unit){if(busy)return;busy=true;message=null;scope.launch{try{body()}catch(error:CancellationException){throw error}
+        catch(error:McpRecaptureUnavailable){message=error.reason.message}
+        catch(_:Exception){message="The operation was refused or did not finish. Refresh to recover durable publication; do not assume it was sent."}finally{busy=false}}}
     AlertDialog(onDismissRequest=onClose,title={Text("Local agent access")},text={Column(Modifier.width(850.dp).heightIn(max=750.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
         Text("Local service: 127.0.0.1:${state.port} | credentials stay in Windows Credential Manager")
         Text("Access is limited to immutable packages. Capture requires a separate grant for a selected window and connection.",style=MaterialTheme.typography.caption)
@@ -52,7 +55,8 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
                     TextButton(enabled=!busy&&state.agents.any{it.connection==selectedAgent},onClick={val agent=selectedAgent;if(agent!=null)act{
                         val comparison=owner.recaptureVerification(agent,info.packageId,info.target,info.manifestSha256)
                         owner.state.value.inbox.singleOrNull{it.receiptId==comparison.receiptId&&it.receiptBlake3==comparison.receiptBlake3}?.let(onCompare)
-                    }}){Text("Recapture original window")}
+                    }}){Text("Recapture original")}
+                    if("${info.packageId}/${info.target}" in state.phoneScreens)TextButton(enabled=!busy,onClick={act{owner.bindPhoneScreen(published,phoneRoute())}}){Text("Bind connected USB phone")}
                     TextButton(enabled=!busy,onClick={act{owner.retirePackage(published)}}){Text("Unpublish and retire")}
                 }
             }
@@ -74,6 +78,7 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
         Button(enabled=!busy&&state.agents.any{it.connection==grantAgent}&&grantTarget!=null,onClick={if(grantAgent!=null&&grantTarget!=null)act{owner.grant(grantAgent,listOf(grantTarget),60_000)}}){Text("Grant selected bridge 60 seconds for this window")}
         state.grants.forEach{grant->Row{Text("${grant.connection.take(8)} | ${grant.selectors.size} window(s)",Modifier.weight(1f));TextButton(onClick={act{owner.revoke(grant.connection)}},enabled=!busy){Text("Revoke")}}}
         Text("Grants expire, are lost on restart/disconnect, and never permit capture of app-owned windows. A visible capture indicator must draw before every request.",style=MaterialTheme.typography.caption)
+        Text("Phone screens are recaptured only through an open USB tunnel session. Bind a phone capture only when that connected phone is the one it came from.",style=MaterialTheme.typography.caption)
         Divider();Text("Saved verification reviews",style=MaterialTheme.typography.h6)
         Text("Load private saved decisions from the original project currently open in the editor. Targets and capture grants are never restored.",style=MaterialTheme.typography.caption)
         TextButton(enabled=!busy,onClick={act{owner.loadVerificationHistory()}}){Text("Load saved reviews from open original")}

@@ -1,5 +1,8 @@
 package com.visualworkbench.desktop
 
+import com.visualworkbench.desktop.mcp.McpPhoneCaptureOrigin
+import com.visualworkbench.desktop.mcp.McpRecaptureRefusal
+import com.visualworkbench.desktop.mcp.McpRecaptureUnavailable
 import com.visualworkbench.shared.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.emptyFlow
@@ -362,9 +365,141 @@ class DesktopAndroidTunnelTest {
         assertEquals(70uL, valid.elapsedMs)
     }
 
-    private fun fixture(available: Boolean = true, body: suspend CoroutineScope.(DesktopTunnelTestFixture) -> Unit) = runBlocking {
+    @Test fun phoneScreenRouteExistsOnlyForTheExactConnectedSession() = fixture { f ->
+        assertNull(f.controller.phoneScreenRoute())
+        f.connect()
+        val route = checkNotNull(f.controller.phoneScreenRoute())
+        assertSame(route, f.controller.phoneScreenRoute())
+        route.checkAvailable()
+        f.capture.metadata = tunnelTestInfo().copy(captureSessionId = checkNotNull(f.lastOptions).sessionId)
+        val frame = route.capture { captured -> assertEquals(0, f.capture.closes); captured.info().frameId }
+        assertEquals(11uL, frame)
+        assertEquals(1, f.capture.closes)
+        assertEquals(1, f.tunnel.captures)
+        assertEquals(0, f.deliveries)
+        f.controller.close()
+        assertNull(f.controller.phoneScreenRoute())
+        assertEquals(McpRecaptureRefusal.PhoneDisconnected, tunnelTestRefusal { route.checkAvailable() })
+        assertEquals(McpRecaptureRefusal.PhoneDisconnected, tunnelTestRefusal { route.capture { } })
+        assertEquals(1, f.tunnel.captures)
+    }
+
+    @Test fun unadmittedTunnelRuntimeFailsClosedBeforeAnyPhoneCapture() = fixture { f ->
+        f.connect()
+        val route = checkNotNull(f.controller.phoneScreenRoute())
+        f.runtimeAvailable = false
+        assertEquals(McpRecaptureRefusal.TunnelRuntimeUnavailable, tunnelTestRefusal { route.checkAvailable() })
+        assertEquals(McpRecaptureRefusal.TunnelRuntimeUnavailable, tunnelTestRefusal { route.capture { } })
+        assertEquals(0, f.tunnel.captures)
+    }
+
+    @Test fun noRouteExistsWhenTheRuntimeWasNeverAdmitted() = fixture(available = false) { f ->
+        f.controller.connect("adb.exe", "model", 17u)
+        f.idle()
+        assertNull(f.controller.phoneScreenRoute())
+        assertEquals(0, f.opens)
+    }
+
+    @Test fun terminalRevokeRetiresTheRouteBeforeTheSessionCloses() = fixture { f ->
+        f.connect()
+        val route = checkNotNull(f.controller.phoneScreenRoute())
+        val target = f.confirmation()
+        f.controller.confirmControl(target)
+        f.idle()
+        // Owner control does not change the screencap route.
+        assertSame(route, f.controller.phoneScreenRoute())
+        f.controller.revokeControl()
+        f.idle()
+        assertNull(f.controller.phoneScreenRoute())
+        assertEquals(McpRecaptureRefusal.PhoneDisconnected, tunnelTestRefusal { route.capture { } })
+        assertEquals(0, f.tunnel.captures)
+    }
+
+    @Test fun routeCaptureIsRefusedWhileUiWorkOrAConfirmationIsPending() = fixture { f ->
+        f.connect()
+        val route = checkNotNull(f.controller.phoneScreenRoute())
+        val entered = CompletableDeferred<Unit>()
+        val release = f.gate()
+        f.tunnel.captureAction = { entered.complete(Unit); release.await(); f.capture }
+        f.controller.capture()
+        entered.await()
+        assertEquals(McpRecaptureRefusal.SourceBusy, tunnelTestRefusal { route.capture { } })
+        release.complete(Unit)
+        f.idle()
+        assertEquals(1, f.tunnel.captures)
+        f.tunnel.captureAction = { f.capture }
+        val target = f.confirmation()
+        assertEquals(McpRecaptureRefusal.SourceBusy, tunnelTestRefusal { route.capture { } })
+        f.controller.cancelConfirmation(target)
+        f.idle()
+        assertEquals(1, f.tunnel.captures)
+    }
+
+    @Test fun aCaptureNamingAnotherSessionIsRefusedAndClosed() = fixture { f ->
+        f.connect()
+        val route = checkNotNull(f.controller.phoneScreenRoute())
+        var entered = false
+        assertEquals(McpRecaptureRefusal.PhoneDisconnected, tunnelTestRefusal { route.capture { entered = true } })
+        assertFalse(entered)
+        assertEquals(1, f.capture.closes)
+        assertFalse(f.controller.state.value.cleanupPending)
+    }
+
+    @Test fun nativeFeedbackLoopRefusalIsReportedAsSuchAndNeverBypassed() = fixture { f ->
+        f.connect()
+        val route = checkNotNull(f.controller.phoneScreenRoute())
+        f.tunnel.captureAction = { throw TunnelFailure(TunnelFailureKind.FeedbackLoop) }
+        assertEquals(McpRecaptureRefusal.FeedbackLoop, tunnelTestRefusal { route.capture { } })
+        assertEquals(1, f.tunnel.captures)
+        assertEquals(0, f.capture.closes)
+        assertFalse(f.controller.state.value.cleanupPending)
+    }
+
+    @Test fun closeJoinsAnInFlightRouteCaptureAndReportsTheRetiredSource() = fixture { f ->
+        f.connect()
+        val route = checkNotNull(f.controller.phoneScreenRoute())
+        f.capture.metadata = tunnelTestInfo().copy(captureSessionId = checkNotNull(f.lastOptions).sessionId)
+        val entered = CompletableDeferred<Unit>()
+        val release = f.gate()
+        val pending = async { tunnelTestRefusal { route.capture { entered.complete(Unit); tunnelTestLateResult(release, Unit) } } }
+        entered.await()
+        val closing = async(start = CoroutineStart.UNDISPATCHED) { f.controller.close() }
+        assertFalse(closing.isCompleted)
+        release.complete(Unit)
+        closing.await()
+        assertEquals(McpRecaptureRefusal.PhoneDisconnected, pending.await())
+        assertEquals(1, f.capture.closes)
+        assertTrue(f.events.indexOf("capture:close") < f.events.indexOf("tunnel:close"))
+    }
+
+    @Test fun deliveredTunnelCaptureCarriesTheExactLiveSessionRoute() = fixture(observeOrigins = true) { f ->
+        f.connect()
+        val route = checkNotNull(f.controller.phoneScreenRoute())
+        f.capture.metadata = tunnelTestInfo().copy(captureSessionId = checkNotNull(f.lastOptions).sessionId)
+        f.project.infoOverride = { tunnelTestProjectInfo.copy(documentIds = listOf(checkNotNull(f.capture.options).documentId)) }
+        f.controller.capture()
+        f.idle()
+        val origin = f.origins.single()
+        assertSame(route, origin.route)
+        assertEquals(checkNotNull(f.capture.options).documentId, origin.binding.documentId)
+        assertEquals(tunnelTestProjectInfo.projectId, origin.binding.projectId)
+        assertEquals("fixture-asset", origin.sourceAssetId)
+        assertEquals(1, f.deliveries)
+    }
+
+    @Test fun aDeliveredCaptureFromAnotherSessionGetsNoVerificationRoute() = fixture(observeOrigins = true) { f ->
+        f.connect()
+        f.controller.capture()
+        f.idle()
+        assertTrue(f.origins.isEmpty())
+        assertEquals(1, f.deliveries)
+        assertTrue(f.reports.any { it.contains("verification identity was unavailable") })
+    }
+
+    private fun fixture(available: Boolean = true, observeOrigins: Boolean = false,
+        body: suspend CoroutineScope.(DesktopTunnelTestFixture) -> Unit) = runBlocking {
         withTimeout(5000) {
-            val f = DesktopTunnelTestFixture(this, available)
+            val f = DesktopTunnelTestFixture(this, available, observeOrigins)
             try { body(f) } finally {
                 withContext(NonCancellable) {
                     f.gates.forEach { it.complete(Unit) }
@@ -382,7 +517,7 @@ class DesktopAndroidTunnelTest {
     }
 }
 
-private class DesktopTunnelTestFixture(parent: CoroutineScope, available: Boolean) {
+private class DesktopTunnelTestFixture(parent: CoroutineScope, available: Boolean, observeOrigins: Boolean) {
     val root: Path = Files.createTempDirectory("vw-desktop-tunnel-").toRealPath()
     val scope = CoroutineScope(parent.coroutineContext + SupervisorJob(parent.coroutineContext[Job]))
     val gates = mutableListOf<CompletableDeferred<Unit>>()
@@ -393,6 +528,10 @@ private class DesktopTunnelTestFixture(parent: CoroutineScope, available: Boolea
     val capture = DesktopTunnelTestCapture(project, events)
     val semantics = DesktopTunnelTestSemantics(events)
     var opens = 0
+    var runtimeAvailable = available
+    var lastOptions: TunnelOptions? = null
+    val origins = mutableListOf<McpPhoneCaptureOrigin>()
+    val reports = mutableListOf<String>()
     var preparations = 0
     var retries = 0
     var assertions = 0
@@ -416,8 +555,10 @@ private class DesktopTunnelTestFixture(parent: CoroutineScope, available: Boolea
                 captured.close()
             }
             deliver
-        }, modal = { modals += it }, mayOpen = { true }, report = {}, factories = DesktopTunnelFactories(
-            available = { available }, open = { opens++; open(it) },
+        }, modal = { modals += it }, mayOpen = { true }, report = { reports += it },
+        delivered = if (observeOrigins) { origin -> origins += origin } else null,
+        factories = DesktopTunnelFactories(
+            available = { runtimeAvailable }, open = { opens++; lastOptions = it; open(it) },
             retryRetirement = { retries++; if (retryFailure) error("native retirement retained") },
             assertRetired = { assertions++ }, semantics = { semantics },
             deleteWork = { Files.delete(it); workDeletes++; afterWorkDelete() }))
@@ -427,6 +568,9 @@ private class DesktopTunnelTestFixture(parent: CoroutineScope, available: Boolea
     suspend fun connect() { controller.connect("adb.exe", "model", 17u); idle(); assertTrue(controller.state.value.connected) }
     suspend fun confirmation(): TunnelTarget { controller.requestControl(); idle(); return checkNotNull(controller.state.value.target) }
 }
+
+private suspend fun tunnelTestRefusal(block: suspend () -> Unit): McpRecaptureRefusal? =
+    try { block(); null } catch (error: McpRecaptureUnavailable) { error.reason }
 
 private suspend fun <T> tunnelTestLateResult(release: CompletableDeferred<Unit>, result: T): T {
     try { release.await() }
@@ -494,8 +638,9 @@ private class DesktopTunnelTestCapture(private val project: WorkbenchProject, pr
 private class DesktopTunnelTestProject(private val events: MutableList<String>) : WorkbenchProject {
     var closes = 0
     var closeFailure = false
+    var infoOverride: (() -> ProjectInfo)? = null
     override val changes = emptyFlow<ProjectChange>()
-    override suspend fun info() = tunnelTestProjectInfo
+    override suspend fun info() = infoOverride?.invoke() ?: tunnelTestProjectInfo
     override suspend fun document(documentId: String): DocumentSnapshot = error("Unused")
     override suspend fun background(documentId: String, memoryBudgetBytes: ULong, assumeUntaggedSrgb: Boolean): BackgroundImage = error("Unused")
     override suspend fun beginStroke(options: StrokeOptions): WorkbenchStroke = error("Unused")
