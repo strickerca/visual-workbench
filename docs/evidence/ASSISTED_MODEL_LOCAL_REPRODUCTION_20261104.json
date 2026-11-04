@@ -1,0 +1,175 @@
+{
+  "schema": "vw-assisted-local-reproduction-receipt-v1",
+  "date": "2026-11-04",
+  "blocker": "B2",
+  "decision": "D22 (owner-approved with conditions; see branch task/s0-rebaseline-20261103 docs/DECISIONS.md)",
+  "status": "graphs-reproduced-byte-identical; host-cpu-parity-passed; litert-so-scan-no-gpl-lgpl-markers; production-admission-open",
+  "source_tree": {
+    "base_commit": "2b6b2ea4092717ea62184099c36d659c34d6f557",
+    "tool_files_sha256": {
+      "tools/assisted-selection/convert_mobile_sam.py": "fae8bfb7cc8fe47300930f73129a21347c2b40de5680e235c7e0bd72a15bb432",
+      "tools/assisted-selection/verify_artifacts.py": "70c53a51b7b58b6a9f1f77325d4bb093cb5eea0a530ff4afc902d2f8c577b5ca",
+      "tools/assisted-selection/model-runtime-candidate.json": "8a6a9a05a18e71da0956112ae796afe8da44b2de8853bb00dd9636e243796ee1",
+      "tools/assisted-selection/host-wheel-requirements.txt": "c270e982f8017c4ba6069a3e73fe5b7e84f2593ee500d087e017bee3582e9f03",
+      "tools/assisted-selection/host-wheel-lock.json": "c0f62036a3dca78d52f3564399a7d657313143ce811a52aa47cd4b47633ffc17",
+      "tools/assisted-selection/offline_exec.py": "915f2073c3028482eea66661f693fab904f245ccb0bafae625a04d37de3e5585",
+      "tools/assisted-selection/reference_parity.py": "2224e616b117a9feaf66bd217527aeebf13e548fd2b2474a3a1ccc8a60529be4",
+      "tools/assisted-selection/tflite_parity.py": "fb226eca2d1e92474f2ac57b59575ed8d42795d57f3149d286e726a8ff253676",
+      "tools/assisted-selection/download_pinned_inputs.py": "df2d217788514bfa5c165594bda178a1035fbce15fc60a339db4a8a5bbfc8c24"
+    },
+    "tool_files_modified": false
+  },
+  "host": {
+    "environment": "WSL2 distro Ubuntu on Windows 11 host",
+    "os_release": "Ubuntu 26.04 LTS (Resolute Raccoon)",
+    "kernel": "6.6.87.2-microsoft-standard-WSL2",
+    "glibc": "2.43",
+    "cpus_visible": 4,
+    "vm_memory_cap_mib": 1536,
+    "vm_swap_mib": 4096,
+    "system_python": "3.14.4 (unused)",
+    "apt_python311_available": false,
+    "apt_packages_installed": [],
+    "python": {
+      "source": "python-build-standalone release 20261003 (github.com/astral-sh/python-build-standalone)",
+      "archive": "cpython-3.11.17+20261003-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "archive_bytes": 30785899,
+      "archive_sha256": "aadcba18994cb8f9ee752aceb31d61e04f75b5d900d76fb575c6fbfabadec434",
+      "archive_sha256_source": "release SHA256SUMS, verified with sha256sum -c",
+      "python_binary_sha256": "a2886d92ebf115fde6eb05569bda5ce2d09113adad3264a267b29f7dbff2c076",
+      "matches_host_wheel_lock_python_binary_sha256": true,
+      "version": "3.11.17 (main, Oct 3 2026) [Clang 22.1.3]",
+      "install_location": "<wsl-private>/vw-assisted-20261104/x-install_only_stripped (user space, outside the repo)",
+      "note": "the non-stripped install_only archive (sha256 c624af93...58b8) was also fetched and verified, but its binary hash 2fb92c83...e768 does not match the lock, so it was discarded"
+    },
+    "venv": "<wsl-private>/vw-assisted-20261104/venv (pip 24.0 bundled)"
+  },
+  "preparation_networked": {
+    "wheel_download": {
+      "command": "python -m pip download --no-deps --only-binary=:all: --require-hashes -r tools/host-wheel-requirements.txt -d wheelhouse --index-url https://pypi.org/simple --extra-index-url https://download.pytorch.org/whl/cpu",
+      "result": "71 wheels downloaded, all hash-checked by pip"
+    },
+    "wheelhouse_vs_lock": {
+      "lock_wheels": 71,
+      "wheelhouse_files": 71,
+      "byte_or_hash_mismatches": 0,
+      "extra_files": 0,
+      "total_bytes": 483134587
+    },
+    "wheel_install": {
+      "command": "python -m pip install --no-index --find-links wheelhouse --require-hashes -r tools/host-wheel-requirements.txt",
+      "result": "success; pip freeze --all lists 71 distributions"
+    },
+    "inputs": {
+      "command": "python download_pinned_inputs.py --root inputs",
+      "source_commit": "f706ad9c4eb7f219c00d9050e46328518ffb65d2",
+      "checkpoint": {"path": "mobile_sam.pt", "bytes": 40728226, "sha256": "6dbb90523a35330fedd7f1d3dfc66f995213d81b29a5ca8108dbcdd4e37d6c2f", "verified": true},
+      "source_files_verified": 10,
+      "source_files_total_bytes": 88068
+    }
+  },
+  "offline_execution": {
+    "launcher": "tools/assisted-selection/offline_exec.py (libseccomp denies socket/connect/bind/listen/accept/send*/recv*/io_uring_setup; RLIMIT_AS 10 GiB; RLIMIT_FSIZE 512 MiB)",
+    "seccomp_probe": "socket() inside launcher -> EPERM (errno 1): network denial effective under WSL2 kernel",
+    "threads": "OMP_NUM_THREADS=MKL_NUM_THREADS=OPENBLAS_NUM_THREADS=2; scripts set torch/LiteRT to 2 threads",
+    "deviation": "Handoff order 'offline_exec.py timeout N python ...' fails on Ubuntu 26.04 because timeout is uutils coreutils 0.8.0 and exits 126 'Operation not permitted' under the seccomp filter. Wall-time bound was applied outside instead: 'timeout N python offline_exec.py python SCRIPT ...'. Seccomp still applies to the whole script process. Conversion wall bound raised from 1200 s to 3600 s because the VM is memory-capped; actual run took 141 s.",
+    "steps": [
+      {"step": "synthetic tool tests", "command": "python -m unittest discover -s tools/tests -v", "result": "31 tests OK"},
+      {"step": "reference parity attempt 1", "result": "exit 126 (uutils timeout EPERM under seccomp); no output produced; log retained"},
+      {"step": "reference parity", "command": "timeout 1200 python offline_exec.py python reference_parity.py --source-root inputs/MobileSAM-pinned --checkpoint inputs/mobile_sam.pt --output artifacts/reference-parity-golden.json --golden artifacts/reference-golden.npz", "exit": 0, "wall_seconds": 56.65, "max_rss_bytes": 687357952, "cases": 28},
+      {"step": "conversion", "command": "timeout 3600 python offline_exec.py python convert_mobile_sam.py --source-root inputs/MobileSAM-pinned --checkpoint inputs/mobile_sam.pt --output artifacts/mobile-sam-fixed66", "exit": 0, "wall_seconds": 140.94, "max_rss_bytes": 734703616, "printed": "pending-admission modelArtifactSha256=7ea1a2fe7c979305e65372d85cb3255e49434667cfaa1c636c8d2052518af9f4"},
+      {"step": "host LiteRT parity", "command": "timeout 1800 python offline_exec.py python tflite_parity.py --bundle artifacts/mobile-sam-fixed66 --golden artifacts/reference-golden.npz --output artifacts/tflite-parity.json", "exit": 0, "wall_seconds": 19.16, "max_rss_bytes": 337580032},
+      {"step": "verify catalog", "command": "python verify_artifacts.py catalog", "result": {"production_admissions": 0, "status": "research-only"}},
+      {"step": "verify model", "command": "python verify_artifacts.py model --root artifacts/mobile-sam-fixed66 --manifest model-manifest.json --sha256 7ea1a2fe...f9f4", "result": {"production_admitted": false, "sha256": "7ea1a2fe7c979305e65372d85cb3255e49434667cfaa1c636c8d2052518af9f4", "status": "pending-admission"}},
+      {"step": "runtime manifest + verify", "command": "python verify_artifacts.py runtime-manifest --root runtime-aars --manifest runtime-manifest.json; python verify_artifacts.py runtime --root runtime-aars --manifest runtime-manifest.json --sha256 09b7032d...a3c3", "result": {"production_admitted": false, "sha256": "09b7032db257a8df0e1a41784d8b8064a3b0f0ac8ba6faffdc069d4a7c0ea3c3", "status": "pending-admission"}}
+    ],
+    "not_run": [
+      "make_delivery_manifest.py: hard-codes the 2026-10-19 cloud layout (13 cloud log names, artifacts/host-notices-v3 notice copies); not applicable to this local run without tool edits"
+    ]
+  },
+  "artifacts": {
+    "storage": ".local/assisted-model-20261104/ in the main checkout (gitignored); working copy in <wsl-private>/vw-assisted-20261104/artifacts",
+    "model_manifest": {"path": "mobile-sam-fixed66/model-manifest.json", "bytes": 4659, "sha256": "7ea1a2fe7c979305e65372d85cb3255e49434667cfaa1c636c8d2052518af9f4"},
+    "encoder": {"path": "mobile-sam-fixed66/encoder.tflite", "bytes": 28142464, "sha256": "92f0ac2134bb88bb5e555cdb1dd7080bc4620fbe31790a799abcb4c26156f4d3", "tensor_count": 1166, "sum_static_tensor_bytes": 4939392612, "max_static_tensor_bytes": 67108864,
+      "operators": ["ADD/0/v1", "CONV_2D/3/v1", "DEPTHWISE_CONV_2D/4/v1", "FULLY_CONNECTED/9/v5", "MUL/18/v1", "RESHAPE/22/v1", "SOFTMAX/25/v1", "PAD/34/v1", "TRANSPOSE/39/v6", "MEAN/40/v1", "SUB/41/v1", "DIV/42/v1", "SLICE/65/v1", "SUM/74/v1", "SQRT/75/v1", "RSQRT/76/v1", "SQUARED_DIFFERENCE/99/v1", "BATCH_MATMUL/126/v1", "GELU/150/v1"],
+      "inputs": [{"signature_name": "image", "tensor_name": "serving_default_image", "tensor_index": 0, "dtype": "float32", "shape": [1, 3, 1024, 1024]}],
+      "outputs": [{"signature_name": "image_embeddings", "tensor_name": "serving_default_image_embeddings_output", "tensor_index": 979, "dtype": "float32", "shape": [1, 256, 64, 64]}]},
+    "prompt_decoder": {"path": "mobile-sam-fixed66/prompt_decoder.tflite", "bytes": 18853624, "sha256": "9c0f89743e7056c18f4ee771e299d7db848aa14b500c025b452851fb3e2dbb78", "tensor_count": 640, "sum_static_tensor_bytes": 607768577, "max_static_tensor_bytes": 9306112,
+      "operators": ["ADD/0/v1", "CONCATENATION/2/v1", "FULLY_CONNECTED/9/v5", "MUL/18/v1", "RESHAPE/22/v1", "SOFTMAX/25/v1", "TRANSPOSE/39/v1", "MEAN/40/v1", "SUB/41/v1", "DIV/42/v1", "CAST/53/v1", "LESS/58/v1", "SLICE/65/v1", "SIN/66/v1", "TRANSPOSE_CONV/67/v3", "EQUAL/71/v1", "SUM/74/v1", "SQRT/75/v1", "RSQRT/76/v1", "LOGICAL_AND/86/v1", "SQUARED_DIFFERENCE/99/v1", "COS/108/v1", "SELECT_V2/123/v1", "BATCH_MATMUL/126/v1", "GELU/150/v1"],
+      "inputs": [
+        {"signature_name": "image_embeddings", "tensor_name": "serving_default_image_embeddings", "tensor_index": 0, "dtype": "float32", "shape": [1, 256, 64, 64]},
+        {"signature_name": "point_coords", "tensor_name": "serving_default_point_coords", "tensor_index": 1, "dtype": "float32", "shape": [1, 66, 2]},
+        {"signature_name": "point_labels", "tensor_name": "serving_default_point_labels", "tensor_index": 2, "dtype": "int32", "shape": [1, 66]},
+        {"signature_name": "point_valid", "tensor_name": "serving_default_point_valid", "tensor_index": 3, "dtype": "int32", "shape": [1, 66]},
+        {"signature_name": "token_count", "tensor_name": "serving_default_token_count", "tensor_index": 4, "dtype": "int32", "shape": [1]}],
+      "outputs": [
+        {"signature_name": "mask_logits", "tensor_name": "serving_default_mask_logits_output", "tensor_index": 540, "dtype": "float32", "shape": [1, 1, 256, 256]},
+        {"signature_name": "score", "tensor_name": "serving_default_score_output", "tensor_index": 545, "dtype": "float32", "shape": [1, 1]}]},
+    "runtime_manifest": {"path": "runtime-manifest.json", "bytes": 539, "sha256": "09b7032db257a8df0e1a41784d8b8064a3b0f0ac8ba6faffdc069d4a7c0ea3c3"},
+    "reference_parity_json": {"path": "reference-parity-golden.json", "bytes": 3553, "sha256": "a2a55d4f518af06b4d35f01f8b7504126fcfe7dbb67f6c0d7175669b2eba1f36"},
+    "reference_golden_npz": {"path": "reference-golden.npz", "bytes": 13291417, "sha256": "50416f1d672d73e44a96647d6c77597491ee138fbb28e0548815369fa261ac1a"},
+    "tflite_parity_json": {"path": "tflite-parity.json", "bytes": 2996, "sha256": "e71e050b268c50755a2dd69c219f4bb35cf866fccd93774b33fbb1012279df97"},
+    "comparison_with_2026_10_19_cloud_build": {
+      "encoder_sha256_identical": true,
+      "prompt_decoder_sha256_identical": true,
+      "model_manifest_sha256_identical": true,
+      "note": "The fresh local conversion is byte-identical to the unreachable cloud archives recorded in HOST_DELIVERY_20261019.md and Packet 1; the hashes are now independently reproduced, not reused."
+    }
+  },
+  "parity": {
+    "reference_upstream_vs_wrapper": {
+      "tolerance": "atol=rtol=1e-4 (inverse resize/orientation exact)",
+      "cases": 28,
+      "encoder_max_abs": 0.0,
+      "decoder_mask_max_abs": 2.002716064453125e-05,
+      "decoder_score_max_abs": 2.384185791015625e-07,
+      "inverse_resize_and_8_orientations_max_abs": 0.0,
+      "result": "pass"
+    },
+    "host_litert_2_2_0_cpu_vs_golden": {
+      "tolerance": "atol=rtol=1e-3",
+      "comparisons": 19,
+      "encoder_max_abs": 8.642673492431641e-07,
+      "max_abs_over_all": 6.771087646484375e-05,
+      "max_abs_case": "box.mask",
+      "rss_peak_bytes": {"encoder_allocated": 89247744, "encoder_executed": 282791936, "both_allocated": 285806592, "both_executed": 337580032},
+      "result": "pass"
+    },
+    "not_covered": "Android LiteRT 2.3.0 CPU/GPU execution, packaged JNI/APK identity, device working set, cancellation, quality and latency"
+  },
+  "litert_so_scan": {
+    "condition": "D22: scan shipped LiteRT arm64 .so files for GPL/LGPL code before admission",
+    "storage": ".local/litert-aar-scan-20261104/ (aars/, so-scan.json, so-component-identifiers.json)",
+    "method": "read-only: Python zipfile member read into memory, ELF64 header/section/DT_NEEDED parse, ASCII string (>=6 chars) regex search; nothing loaded or executed",
+    "aars": [
+      {"role": "litert-api", "path": "litert-api-2.3.0.aar", "bytes": 945619, "sha256": "20f630e9ed0b4f0564da616fd3d6406f3013cacad7d492cbe2963330f519256b", "pin_match": true},
+      {"role": "litert", "path": "litert-2.3.0.aar", "bytes": 7640140, "sha256": "9508c6e9142646f0f2bc1fe68b3925fb470ee7ddd29114540339a04a8ab189dc", "pin_match": true},
+      {"role": "litert-gpu", "path": "litert-gpu-2.3.0.aar", "bytes": 4695499, "sha256": "173a4c3813601f7e9542f4e6a49e237775e2f9ce1e0948f35407098bffb1824f", "pin_match": true}
+    ],
+    "arm64_so": [
+      {"member": "jni/arm64-v8a/liblitert_jni.so", "aar": "litert-api", "bytes": 529296, "sha256": "b4bc082f740076f09d566b2deaa8a1af6b1ec1252d20c3688acb8405d69871dc", "elf_machine": 183, "dt_needed": ["libandroid.so", "libdl.so", "libm.so", "liblog.so", "libc.so"]},
+      {"member": "jni/arm64-v8a/libLiteRt.so", "aar": "litert", "bytes": 5629696, "sha256": "e5b7e3413a8b428b1a1b669f368cf613058868bc7b63e10d0b9c2e6ba55c97d8", "elf_machine": 183, "dt_needed": ["libdl.so", "libGLESv3.so", "libEGL.so", "libm.so", "liblog.so", "libc.so"]},
+      {"member": "jni/arm64-v8a/libLiteRtClGlAccelerator.so", "aar": "litert-gpu", "bytes": 3253032, "sha256": "c200369269a3994b646a8d0ac56ff29127c6ce742abcfd345a7d478eab3b6c6d", "elf_machine": 183, "dt_needed": ["libandroid.so", "libdl.so", "libm.so", "libGLESv3.so", "libEGL.so", "liblog.so", "libc.so"]}
+    ],
+    "arm64_so_hashes_match_registration_record": true,
+    "toolchain_comment": "Android clang 21.0.0 (r563880b/c) and google3 clang; Linker: LLD (all three)",
+    "strong_license_marker_hits": 0,
+    "strong_patterns": ["GNU General Public License", "GNU Lesser General Public License", "GNU Library General Public License", "GNU Affero", "GPL-2.0", "GPL-3.0", "LGPL-2.1", "LGPL-3.0", "LGPLv2", "LGPLv3", "GPLv2", "GPLv3", "Free Software Foundation", "either version 2", "either version 3", "version 2 of the License", "version 3 of the License", "www.gnu.org/licenses", "Classpath exception", "GCC Runtime Library Exception", "copyleft", "\\bGPL\\b", "\\bLGPL\\b"],
+    "weak_marker_hits": "only \\bGNU\\b x5 per file, all ELF section names (.gnu.version, .gnu.version_d, .gnu.version_r, .gnu.hash, .note.gnu.build-id); a broader 'gnu' substring also matched __gnu_strerror_r (bionic libc import) and DW_CFA_GNU_negative_offset_extended (DWARF opcode text in LLVM libunwind)",
+    "no_hits_for": ["libgcc", "libstdc++", "glibc", "libgomp", "libiberty", "readline", "libgmp", "libmpfr", "ffmpeg", "libav", "x264", "libiconv", "gettext", "GNU C Library", "binutils", "libbfd", "GLIBC_", "GLIBCXX_", "CXXABI_", "eigen", "license", "copyright"],
+    "embedded_component_identifiers": ["abseil (absl)", "XNNPACK", "ruy", "fft2d", "cpuinfo", "flatbuffers", "protobuf (hardening flag)", "tcmalloc malloc_hook", "LLVM libc++/libc++abi/libunwind"],
+    "non_arm64_members_scanned": "armeabi-v7a and x86_64 copies also show zero strong hits (not shipped for arm64-only S23/IN2019 targets; ELF32 parse skipped)",
+    "result": "no GPL/LGPL license or library markers in the shipped arm64 .so bytes",
+    "limitations": "String scanning cannot prove absence of copyleft-derived code that carries no text marker; the .so files have no .symtab. Embedded component licenses (Apache-2.0 / BSD / MIT / Apache-2.0 WITH LLVM-exception) should be confirmed against the AAR THIRD_PARTY_NOTICE.txt by root license review."
+  },
+  "catalog_entry_not_added": {
+    "file": "apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/assistedselection/backend/LiteRtCatalog.kt",
+    "would_add": "LiteRtReviewedAdmission(pins=AssistedSelectionPins(modelArtifactSha256=\"7ea1a2fe7c979305e65372d85cb3255e49434667cfaa1c636c8d2052518af9f4\", runtimeArtifactSha256=\"09b7032db257a8df0e1a41784d8b8064a3b0f0ac8ba6faffdc069d4a7c0ea3c3\", modelLicenseAdmissionId=<D22 B2 model id>, runtimeLicenseAdmissionId=<D22 B2 runtime id>, runtimeAdmissionId=<OPEN>), modelManifest=\"mobile-sam-fixed66/model-manifest.json\", runtimeManifest=\"runtime-manifest.json\", installedApks=<OPEN: post-build reviewed APK/split identities>, memory=LiteRtReviewedMemory(<OPEN: reviewed working-set evidence>))",
+    "blocked_on": ["runtimeAdmissionId (Android CPU/GPU execution)", "installedApks post-build review", "LiteRtReviewedMemory working-set evidence", "owner/root recording of D22 admission IDs"]
+  },
+  "cleanup": {
+    "deleted": ["<wsl-private>/vw-assisted-20261104/x-install_only (unused non-matching Python extraction, created in this run)"],
+    "retained_outside_git": ["<wsl-private>/vw-assisted-20261104 (python, venv, wheelhouse, inputs, artifacts, logs)", ".local/assisted-model-20261104", ".local/litert-aar-scan-20261104"],
+    "no_binaries_in_git": true
+  }
+}
