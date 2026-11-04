@@ -39,13 +39,13 @@ class Assembly(unittest.TestCase):
         self.generated_notices()
         self.refresh()
 
-    def generated_notices(self, coverage=None, status="complete", selected="MIT", inputs=None):
+    def generated_notices(self, coverage=None, status="complete", selected="MIT", inputs=None, skipped=()):
         """A synthetic generator bundle rendered by the real generate_notices code."""
         g = a.NOTICES
         text = b"synthetic package MIT text\n"
         digest = hashlib.sha256(text).hexdigest()
         receipt = {"schema": g.SCHEMA, "generator": "tools/release/generate_notices.py", "status": status,
-                   "inputs": inputs or {},
+                   "inputs": inputs or {}, "skipped": sorted(skipped),
                    "coverage": sorted(g.DESKTOP_COVERAGE | g.ANDROID_COVERAGE if coverage is None else coverage),
                    "components": [{"ecosystem": "cargo", "name": "demo", "version": "1.0.0", "declared": "MIT OR GPL-3.0",
                                    "selected": selected, "scope": ["rust:x86_64-pc-windows-msvc"], "sources": {},
@@ -173,6 +173,24 @@ class Assembly(unittest.TestCase):
         self.destination = self.base / "delivery-apk"
         self.replace_artifact("built/test.apk", fixtures.apk(), "apk")
         self.refuses("notices_android_coverage")
+        self.assertFalse(self.destination.exists())
+
+    def test_generated_notices_skips_must_be_declared(self):
+        self.generated_notices(skipped=["gradle"])
+        self.refresh()
+        self.refuses("notices_undeclared_skip")
+        self.assertFalse(self.destination.exists())
+        self.spec["generated_notices"]["declared_skips"] = ["gradle"]
+        self.refresh()
+        self.assertEqual(self.run_assembly()["generated_notices"]["skipped"], ["gradle"])
+        self.spec["generated_notices"]["declared_skips"] = ["unknown"]
+        self.refresh()
+        self.refuses("generated_notices", lambda: a.manifest(self.spec))
+
+    def test_msi_requires_desktop_notice_coverage(self):
+        self.generated_notices(coverage=sorted(a.NOTICES.ANDROID_COVERAGE))
+        self.replace_artifact("built/test.msi", b"synthetic opaque external package", "external-package")
+        self.refuses("notices_desktop_coverage")
         self.assertFalse(self.destination.exists())
 
     def test_generated_notices_refuse_inputs_that_differ_from_the_binding(self):

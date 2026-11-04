@@ -133,19 +133,38 @@ is made by this assembly step. Preserve all actual runtime/legal files when a
 desktop image is delivered.
 
 `generated_notices` (required, LIC-003) names the exact output of
-`generate_notices.py`. Assembly never regenerates it. Before creating the
-destination it checks the hash-bound text and receipt with
-`generate_notices.verify_bundle`. The text must equal the deterministic
-rendering of the receipt and its license texts, and the status must be
-`complete`. Every selected license must be on the `check_setup.py` allow list,
-or be the documented Java runtime exception. `desktop-file` artifacts require
-the Windows Rust, desktop Gradle, MCP npm, Node and Java runtime coverage. `apk`
-artifacts require the Android Rust and Gradle coverage. Any generator input
-(for example `Cargo.lock`) that the source binding also declares must have
-identical bytes. `THIRD-PARTY-NOTICES.txt` and `third-party-notices.json` are
-delivered byte for byte; the inventory records their hashes and component
-counts. See `docs/THIRD_PARTY_NOTICES.md` for how the generator decides what
-ships.
+`generate_notices.py`. An optional `declared_skips` list names ecosystems
+(`cargo`, `gradle`, `npm`, `bundled`) that the release accepts as not
+generated. Assembly never regenerates the bundle. Before it creates the
+destination, `generate_notices.verify_bundle` checks the hash-bound text and
+receipt for the following:
+
+- **Rendering:** the text equals the deterministic rendering of the receipt and
+  its license texts.
+- **Status:** the generator reported `complete` with nothing unresolved, and no
+  ecosystem was skipped unless declared.
+- **Policy:** every selected license is on the `check_setup.py` allow list, or
+  is the documented Java runtime exception.
+- **Coverage:**
+  - `desktop-file` and `external-package` (MSI) artifacts require the Windows
+    Rust, desktop Gradle, MCP npm, Node, Java runtime and Rust standard library
+    coverage.
+  - `apk` artifacts require the Android Rust, Android Gradle, Rust standard
+    library and NDK LLVM runtime coverage.
+- **Freshness:** any generator input (for example `Cargo.lock`) that the source
+  binding also declares has identical bytes.
+- **Desktop cross-check:** the delivered `runtime/legal/**` files must equal the
+  Java runtime texts in the receipt, and any delivered `node.exe` must match the
+  Node record's executable hash.
+
+These checks do not prove that every byte in a delivered artifact came from
+the generator's graphs. Coverage names graphs that were generated; it does not
+inspect APK or MSI contents. `THIRD-PARTY-NOTICES.txt` and
+`third-party-notices.json` are delivered byte for byte at the top of the release
+directory, and the inventory records their hashes and component counts. They
+are not inserted into the APK or the desktop image; those carry the curated
+`third_party/notices` resources. See `docs/THIRD_PARTY_NOTICES.md` for how the
+generator decides what ships.
 
 Bounds: 8 MiB per JSON or generated metadata file; 4,096 artifacts; 2 GiB per
 artifact; 8 GiB total artifacts; 24,000 source/evidence entries; 2 GiB per source

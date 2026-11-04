@@ -543,7 +543,12 @@ def manifest(value: dict) -> dict:
         require(row["path"].startswith("third_party/notices/") and len(row["path"].split("/")) == 3 and row["bytes"] > 0, "notice_path")
     require(sum(row["bytes"] for row in value["notices"]) <= 32 * CHUNK, "notice_total")
     generated = value["generated_notices"]
-    require(isinstance(generated, dict) and set(generated) == {"text", "receipt"}, "generated_notices")
+    # declared_skips: ecosystems the release explicitly accepts as not generated.
+    require(isinstance(generated, dict) and {"text", "receipt"} <= set(generated) <=
+            {"text", "receipt", "declared_skips"}, "generated_notices")
+    skips = generated.get("declared_skips", [])
+    require(isinstance(skips, list) and len(set(skips)) == len(skips) and
+            all(item in NOTICES.ECOSYSTEMS for item in skips), "generated_notices")
     descriptor(generated["text"], GENERATED_TEXT_LIMIT)
     descriptor(generated["receipt"], MAX_JSON)
     require(generated["text"]["bytes"] > 0 and generated["receipt"]["bytes"] > 0, "generated_notices")
@@ -685,7 +690,9 @@ def assemble(root: Path, manifest_name: str, expected_sha256: str, destination: 
         try:
             generated_summary = NOTICES.verify_bundle(
                 notice_receipt, notice_text, artifact_kinds=frozenset(row["kind"] for row in spec["artifacts"]),
-                declarations=declarations)
+                declarations=declarations, declared_skips=frozenset(generated.get("declared_skips", [])),
+                desktop_files={row["path"].removeprefix(DESKTOP): row["sha256"]
+                               for row in spec["artifacts"] if row["kind"] == "desktop-file"})
         except NOTICES.Refused as error:
             raise Rejected(str(error)) from error
         output = Output(destination, stack, cache)

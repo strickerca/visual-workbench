@@ -13,12 +13,17 @@ Shipped scope (everything else is excluded and listed in the receipt):
   the workspace crates that produce shipped binaries (RUST_ROOTS). Proc-macro
   crates run on the build host and are not traversed. First-party workspace
   crates are proprietary and excluded. Crate bytes come from the registry cache
-  archive whose SHA-256 equals the Cargo.lock checksum.
+  archive whose SHA-256 equals the Cargo.lock checksum. The metadata JSON is
+  bound by hash in the receipt.
+* Rust standard library and the Android NDK LLVM runtime (libunwind/builtins)
+  statically linked into every shipped Rust binary: the pinned toolchain's own
+  notice files.
 * Gradle: the application census written by `generateApplicationLicenseReport`
   (the producer of `checkDependencyLicenses`), restricted to the product
   configurations in GRADLE_SHIPPING. Bench/probe/spike apps are excluded.
   Artifact bytes come from the read-only Gradle module cache and are checked
   against the module metadata SHA-256 (or the cache's SHA-1 directory name).
+  Bundled native libraries are probed read-only for embedded third-party code.
 * npm: production (non-dev) entries of mcp/package-lock.json as admitted by
   tools/check_npm_licenses.py; texts are the reviewed, hash-bound notices.
 * Bundled binaries: the Node runtime record and, when supplied, the jlink Java
@@ -54,6 +59,9 @@ HASH = re.compile(r"[0-9a-f]{64}\Z")
 JAVA_RUNTIME = "java-runtime"
 JAVA_EXCEPTION = "GPL-2.0 WITH Classpath-exception-2.0"
 CRATES_IO = "registry+https://github.com/rust-lang/crates.io-index"
+RUST_TOOLCHAIN = "1.99.0"           # rust-toolchain.toml
+NDK_VERSION = "30.0.16248370"       # tools/enter-dev.ps1
+ECOSYSTEMS = ("cargo", "gradle", "npm", "bundled")
 
 # Workspace crates whose binaries ship (build.ps1 native build lists and
 # tools/desktop-test/reports.py NATIVES/MCP_REQUIRED; vw-bindgen is a build tool
@@ -67,15 +75,20 @@ RUST_ROOTS = {
 GRADLE_SHIPPING = (":android:debugRuntimeClasspath", ":android:releaseRuntimeClasspath",
                    ":desktop:runtimeClasspath", ":shared:desktopRuntimeClasspath")
 NPM_SCOPE = "npm:mcp-production"
+RUST_STD = "rust-std"
+NDK_RUNTIME = "android-ndk-llvm-runtime"
 DESKTOP_COVERAGE = frozenset({"rust:x86_64-pc-windows-msvc", ":desktop:runtimeClasspath", NPM_SCOPE,
-                              "bundled:node-runtime", "bundled:" + JAVA_RUNTIME})
-ANDROID_COVERAGE = frozenset({"rust:aarch64-linux-android", ":android:debugRuntimeClasspath"})
+                              "bundled:node-runtime", "bundled:" + JAVA_RUNTIME, "bundled:" + RUST_STD})
+ANDROID_COVERAGE = frozenset({"rust:aarch64-linux-android", ":android:debugRuntimeClasspath",
+                              "bundled:" + RUST_STD, "bundled:" + NDK_RUNTIME})
 FORBIDDEN = re.compile(r"\b(?:A?GPL|LGPL|SSPL|BUSL|CC-BY-NC)(?:[-\s]|$)|General Public License|non[- ]commercial", re.I)
 NAME = re.compile(r"(?i)^(?:licen[cs]e|copying|copyright|notice|patents|unlicense|third[-_]?party[-_]?notices?)"
                   r"(?:[-_. ][a-z0-9._ -]*)?$|^[a-z0-9.]+[-_]licen[cs]e(?:\.[a-z]+)?$")
 CODE = frozenset((".rs", ".java", ".kt", ".class", ".py", ".js", ".mjs", ".cjs", ".ts", ".c", ".h", ".cc",
                   ".cpp", ".go", ".json", ".toml", ".yml", ".yaml", ".html", ".xml", ".sh", ".ps1", ".bat",
                   ".in", ".cmake", ".sql", ".properties", ".kotlin_module", ".pom"))
+# NOTICE/COPYRIGHT/PATENTS/THIRD_PARTY files always ship but never count as the
+# text of a license.
 ALWAYS = re.compile(r"(?i)^(?:notice|copyright|patents|third[-_]?party)")
 SKIP_DIRS = frozenset(("test", "tests", "testdata", "examples", "example", "benches", "bench", "docs", "doc",
                        "fuzz", "ci", ".github", "target"))
@@ -115,6 +128,24 @@ REPOSITORY = Path(__file__).absolute().parents[2]
 # One allow list for every ecosystem: tools/check_setup.py (also enforces deny.toml).
 SETUP = sys.modules.get("check_setup") or _load("check_setup", REPOSITORY / "tools/check_setup.py")
 ALLOWED = frozenset(SETUP.ALLOWED)
+
+
+def strict_json(raw: bytes, code: str) -> dict:
+    """JSON object with duplicate keys and non-finite constants refused."""
+    def unique(pairs):
+        value = {}
+        for key, item in pairs:
+            require(key not in value, code)
+            value[key] = item
+        return value
+    require(len(raw) <= MAX_JSON, code)
+    try:
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=unique,
+                           parse_constant=lambda _: (_ for _ in ()).throw(Refused(code)))
+    except (UnicodeError, json.JSONDecodeError, RecursionError) as error:
+        raise Refused(code) from error
+    require(isinstance(value, dict), code)
+    return value
 
 
 # ---------------------------------------------------------------- SPDX policy
@@ -175,20 +206,26 @@ def spdx_dnf(expression: str) -> list[tuple[str, ...]]:
 
 def family(term: str) -> str:
     base = term.split(" WITH ")[0].upper()
-    for prefix, name in (("APACHE", "apache"), ("MIT", "mit"), ("BSD", "bsd"), ("0BSD", "isc"), ("ISC", "isc"),
-                         ("ZLIB", "zlib"), ("UNICODE", "unicode"), ("MPL", "mpl"), ("BSL", "bsl"), ("CC0", "cc0"),
-                         ("UNLICENSE", "unlicense"), ("OFL", "ofl"), ("AGPL", "gpl"), ("LGPL", "lgpl"), ("GPL", "gpl")):
+    for prefix, name in (("APACHE", "apache"), ("MIT-MODERN", "mit-modern"), ("MIT", "mit"), ("BSD", "bsd"),
+                         ("0BSD", "isc"), ("ISC", "isc"), ("ZLIB", "zlib"), ("UNICODE", "unicode"), ("MPL", "mpl"),
+                         ("BSL", "bsl"), ("CC0", "cc0"), ("UNLICENSE", "unlicense"), ("OFL", "ofl"),
+                         ("IJG", "ijg"), ("LIBPNG", "libpng"), ("AGPL", "gpl"), ("LGPL", "lgpl"), ("GPL", "gpl")):
         if base.startswith(prefix):
             return name
     return base.lower()
 
 
 def detect(data: bytes) -> frozenset:
-    """Coarse license-family detection, used only to pick among package files."""
+    """Coarse license-family detection from full license texts.
+
+    Short pointer files ("Licensed under the Apache License 2.0, see ...") do
+    not match: Apache-2.0 requires its terms-and-conditions body.
+    """
     text = re.sub(r"\s+", " ", data[:65536].decode("utf-8", "replace")).lower()
     found = set()
-    checks = (("apache", "apache license" in text and ("version 2.0" in text or "2.0" in text)),
+    checks = (("apache", "apache license" in text and "terms and conditions for use, reproduction" in text),
               ("mit", "permission is hereby granted, free of charge" in text),
+              ("mit-modern", "permission is hereby granted, without written agreement and without license" in text),
               ("bsd", "redistribution and use in source and binary forms" in text),
               ("isc", "permission to use, copy, modify, and/or distribute this software" in text or
                "permission to use, copy, modify, and distribute this software for any purpose" in text),
@@ -199,6 +236,8 @@ def detect(data: bytes) -> frozenset:
               ("cc0", "cc0" in text or "creative commons legal code" in text),
               ("unlicense", "free and unencumbered software released into the public domain" in text),
               ("ofl", "sil open font license" in text),
+              ("ijg", "independent jpeg group" in text),
+              ("libpng", "png reference library license" in text),
               ("lgpl", "gnu lesser general public license" in text or "gnu library general public" in text),
               ("gpl", "gnu general public license" in text and "lesser" not in text[:400]))
     for name, hit in checks:
@@ -238,6 +277,7 @@ class Builder:
         self.excluded = {}
         self.inputs = {}
         self.coverage = set()
+        self.skipped = set()
         self.canonical = canonical  # spdx term -> (origin, bytes)
 
     def exclude(self, reason: str, item: str) -> None:
@@ -252,8 +292,17 @@ class Builder:
 
     def add(self, ecosystem: str, name: str, version: str, declared: str, dnf, files: list, scope: str,
             sources: dict | None = None, extra: list | None = None, forced: str | None = None,
-            notes: list | None = None, declaration_only: bool = False) -> None:
-        """files: (origin, bytes) from the package; extra: (origin, bytes) always shipped."""
+            notes: list | None = None, declaration: dict | None = None, reviewed: list | None = None) -> None:
+        """Select a license branch and the texts that ship for one component.
+
+        files: package files as (origin, bytes) or (origin, bytes, keep); keep
+        files always ship (vendored notices below a native crate's root).
+        extra: hash-bound retained texts, always shipped. forced: a reviewed
+        selection that must equal one branch of the declared expression.
+        reviewed: package files accepted by review as the text of a license.
+        declaration: owner-approved declaration-only entry naming the exact
+        package files (hash-bound) that ship instead of an absent upstream text.
+        """
         key = (ecosystem, name, version)
         if key in self.components:
             self.components[key]["scope"].add(scope)
@@ -262,21 +311,37 @@ class Builder:
         for value in (name, version, declared):
             require(ascii_text(value, 512), "component_identity")
         extra = extra or []
+        files = [row if len(row) == 3 else (row[0], row[1], False) for row in files]
         if forced is not None:
-            dnf = [tuple(selected_terms(forced))]
+            branch = tuple(selected_terms(forced))
+            require(any(set(branch) == set(candidate) for candidate in dnf), "supplement_selection")
+            dnf = [branch]
         allowed = [branch for branch in dnf if all(term_allowed(t) for t in branch)]
         if not allowed:
             bad = sorted({t for branch in dnf for t in branch if not term_allowed(t)})
             kind = "forbidden_license" if any(FORBIDDEN.search(t) for t in bad) else "unknown_license"
             self.unresolved.append({"component": ident, "reason": kind, "detail": ", ".join(bad) or declared})
             return
-        labelled = [(origin, data, detect(data)) for origin, data in files]
-        retained_labels = [detect(data) for _, data in extra]
-        present = set().union(*(labels for _, _, labels in labelled), *retained_labels)
-        # Unrecognised LICENSE/COPYING files may hold the selected text; NOTICE,
-        # COPYRIGHT and PATENTS files never stand in for a missing license text.
-        unclassified = any(not labels and not ALWAYS.match(leaf(origin))
-                           for origin, _, labels in labelled)
+        by_origin = {origin: data for origin, data, _ in files}
+
+        def bound(rows, code):
+            found = {}
+            for row in rows or []:
+                origin = "package:" + row["file"]
+                require(origin in by_origin and sha256(by_origin[origin]) == row["sha256"], code)
+                found[origin] = row
+            return found
+
+        reviewed_rows = bound(reviewed, "reviewed_file_binding")
+        declared_rows = bound(declaration["files"] if declaration else [], "declaration_file_binding")
+        labelled = [(origin, data, keep, detect(data)) for origin, data, keep in files]
+        present = set()
+        for origin, _, _, labels in labelled:
+            if not ALWAYS.match(leaf(origin)):
+                present |= labels
+        for _, data in extra:
+            present |= detect(data)
+        present |= {family(row["license"]) for row in reviewed_rows.values()}
         choice, canonical, warnings = None, [], []
         for branch in allowed:
             if all(family(t) in present for t in branch):
@@ -290,26 +355,26 @@ class Builder:
                     warnings.append("package ships no license text for " + ", ".join(missing) +
                                     "; canonical text from a retained package file is used")
                     break
-        if choice is None and declaration_only and labelled:
-            # Owner-approved: upstream publishes no text for the declared license.
-            # Record the declaration and ship every license file the package has.
+        if choice is None and declared_rows:
             choice = allowed[0]
             warnings.append("declaration only: upstream publishes no " + " AND ".join(choice) +
-                            " text; the package's declared license is recorded and its bundled license files ship")
-        if choice is None and (unclassified or extra):
-            choice = allowed[0]
-            warnings.append("license text not matched to the selected license by content; all package license files are included")
+                            " text; the declared license is recorded and the named package files ship")
         if choice is None:
             self.unresolved.append({"component": ident, "reason": "license_text_missing",
-                                    "detail": "no package license file for " + " OR ".join(" AND ".join(b) for b in allowed)})
+                                    "detail": "no package license text for " + " OR ".join(" AND ".join(b) for b in allowed)})
             return
+        for origin, row in sorted(reviewed_rows.items()):
+            warnings.append(f"reviewed: {origin} accepted as {row['license']} text")
         for note in notes or []:
             require(ascii_text(note, 1024), "supplement_note")
             warnings.append(note)
         families = {family(t) for t in choice}
         texts = []
-        for origin, data, labels in labelled:
-            if declaration_only or not labels or labels & families or ALWAYS.match(leaf(origin)):
+        for origin, data, keep, labels in labelled:
+            always = keep or ALWAYS.match(leaf(origin)) or origin in reviewed_rows or origin in declared_rows
+            if declaration and not always:
+                continue
+            if always or not labels or labels & families:
                 texts.append({"origin": origin, "sha256": self.text(data)})
         for origin, data in extra:
             texts.append({"origin": origin, "sha256": self.text(data)})
@@ -338,6 +403,7 @@ class Builder:
             "schema": SCHEMA, "generator": "tools/release/generate_notices.py",
             "status": "complete" if not self.unresolved else "incomplete",
             "inputs": dict(sorted(self.inputs.items())), "coverage": sorted(self.coverage),
+            "skipped": sorted(self.skipped),
             "components": components,
             "counts": {eco: sum(1 for c in components if c["ecosystem"] == eco)
                        for eco in sorted({c["ecosystem"] for c in components})},
@@ -384,41 +450,28 @@ def finalize(receipt: dict, texts: dict) -> tuple[bytes, bytes, dict]:
 
 
 # ------------------------------------------------------------- verification
-def _strict_json(raw: bytes) -> dict:
-    def unique(pairs):
-        value = {}
-        for key, item in pairs:
-            require(key not in value, "notices_json_duplicate")
-            value[key] = item
-        return value
-    require(len(raw) <= MAX_JSON, "notices_receipt_size")
-    try:
-        value = json.loads(raw.decode("utf-8"), object_pairs_hook=unique,
-                           parse_constant=lambda _: (_ for _ in ()).throw(Refused("notices_json_constant")))
-    except (UnicodeError, json.JSONDecodeError, RecursionError) as error:
-        raise Refused("notices_receipt_structure") from error
-    require(isinstance(value, dict), "notices_receipt_structure")
-    return value
-
-
 def verify_bundle(receipt_raw: bytes, text_raw: bytes, *, artifact_kinds=frozenset(),
-                  declarations: dict | None = None) -> dict:
+                  declarations: dict | None = None, declared_skips=frozenset(),
+                  desktop_files: dict | None = None) -> dict:
     """Re-check a generated bundle without regenerating it (used by assembly).
 
-    The text must be exactly render(receipt, texts), every component must carry
-    at least one text, every selected license must satisfy the allow list (or be
-    the documented Java runtime exception), status must be complete, coverage
-    must include every graph the delivered artifact kinds contain, and any input
-    the release binding also declares must have identical bytes.
+    Checked: the text is exactly render(receipt, texts); every component has at
+    least one text and a selected license on the allow list (or the documented
+    Java runtime exception); status is complete; coverage includes the graphs
+    the delivered artifact kinds contain (an MSI contains the desktop image);
+    no ecosystem was skipped unless the release declares it; any input the
+    release binding also declares has identical bytes; and, when desktop image
+    files are supplied, the Java runtime legal files and node.exe match them.
+    This does not prove that the artifacts were built from these graphs.
     """
-    receipt = _strict_json(receipt_raw)
-    keys = {"schema", "generator", "status", "inputs", "coverage", "components", "counts", "excluded",
+    receipt = strict_json(receipt_raw, "notices_receipt_structure")
+    keys = {"schema", "generator", "status", "inputs", "coverage", "skipped", "components", "counts", "excluded",
             "unresolved", "texts", "output"}
     require(set(receipt) == keys and receipt["schema"] == SCHEMA, "notices_schema")
     require(receipt["status"] == "complete" and receipt["unresolved"] == [], "notices_incomplete")
     require(receipt["output"] == {"path": TEXT_NAME, **blob(text_raw)}, "notices_text_binding")
     require(isinstance(receipt["texts"], dict) and receipt["texts"], "notices_texts")
-    texts, cursor = {}, 0
+    texts = {}
     marker = text_raw.find(b"LICENSE TEXTS\n\n")
     require(marker >= 0, "notices_text_structure")
     cursor = marker + len(b"LICENSE TEXTS\n\n")
@@ -453,17 +506,31 @@ def verify_bundle(receipt_raw: bytes, text_raw: bytes, *, artifact_kinds=frozens
         else:
             require(all(term_allowed(t) for t in selected_terms(row["selected"])), "notices_forbidden_license")
     require(used == set(texts), "notices_unused_text")
+    require(isinstance(receipt["skipped"], list) and set(receipt["skipped"]) <= set(declared_skips),
+            "notices_undeclared_skip")
     coverage = set(receipt["coverage"])
-    if "desktop-file" in artifact_kinds:
+    if artifact_kinds & {"desktop-file", "external-package"}:
         require(DESKTOP_COVERAGE <= coverage, "notices_desktop_coverage")
     if "apk" in artifact_kinds:
         require(ANDROID_COVERAGE <= coverage, "notices_android_coverage")
     for path, expected in (declarations or {}).items():
         if path in receipt["inputs"]:
             require(receipt["inputs"][path] == expected, "notices_stale_input")
+    if desktop_files:
+        java = [row for row in receipt["components"] if row["ecosystem"] == "bundled" and row["name"] == JAVA_RUNTIME]
+        legal = {path: digest for path, digest in desktop_files.items() if path.startswith("runtime/legal/")}
+        if legal or java:
+            require(len(java) == 1, "notices_java_runtime_mismatch")
+            noticed = {t["origin"].removeprefix("package:"): t["sha256"] for t in java[0]["texts"]}
+            require(noticed == legal, "notices_java_runtime_mismatch")
+        node = [row for row in receipt["components"] if row["ecosystem"] == "bundled" and row["name"] == "node-runtime"]
+        for path, digest in desktop_files.items():
+            if PurePosixPath(path).name.lower() == "node.exe":
+                require(len(node) == 1 and node[0]["sources"].get("executable_sha256") == digest,
+                        "notices_node_mismatch")
     return {"status": receipt["status"], "components": len(receipt["components"]),
-            "counts": receipt["counts"], "coverage": sorted(coverage), "texts": len(texts),
-            "output_sha256": receipt["output"]["sha256"]}
+            "counts": receipt["counts"], "coverage": sorted(coverage), "skipped": receipt["skipped"],
+            "texts": len(texts), "output_sha256": receipt["output"]["sha256"]}
 
 
 # ---------------------------------------------------------------- inputs
@@ -475,21 +542,90 @@ def read_file(path: Path, limit: int = MAX_ARCHIVE) -> bytes:
     return data
 
 
-def retained(root: Path, relative: str, expected: str | None = None) -> bytes:
+def retained_entry(root: Path, relative: str, expected: str | None = None) -> tuple[bytes, dict]:
     """A curated notice must be registered in third_party/LICENSES with that hash."""
     require(relative.startswith("third_party/notices/") and ".." not in relative.split("/"), "retained_path")
-    manifest = json.loads(read_file(root / "third_party/LICENSES", MAX_JSON))
+    manifest = strict_json(read_file(root / "third_party/LICENSES", MAX_JSON), "retained_manifest")
     entry = next((row for row in manifest["files"] if "third_party/" + row["path"] == relative), None)
     require(entry is not None, "retained_unlisted")
     data = read_file(root / relative, MAX_TEXT)
     require(sha256(data) == entry["sha256"] and (expected is None or expected == entry["sha256"]), "retained_hash")
-    return data
+    covers = entry.get("covers", [])
+    require(isinstance(covers, list) and all(name in EMBEDDED for name in covers), "retained_covers")
+    if covers:
+        # A notice that claims to cover a library by registration must at least
+        # be the full text of the license it is registered under.
+        require(family(entry["license"]) in detect(data), "retained_covers_family")
+    return data, entry
+
+
+def retained(root: Path, relative: str, expected: str | None = None) -> bytes:
+    return retained_entry(root, relative, expected)[0]
+
+
+SUPPLEMENT_TOP = {"schema", "canonical_texts", "components", "bundled"}
+SUPPLEMENT_ROW = {"ecosystem", "name", "version", "selected", "notices", "notes", "native_review",
+                  "declaration_only", "reviewed_files", "pom_licenses_are_alternatives", "build_components",
+                  "provenance", "reason"}
+
+
+def validate_supplements(value: dict) -> dict:
+    require(set(value) <= SUPPLEMENT_TOP and value.get("schema") == 1, "supplement_schema")
+
+    def hashed(row, keys, code):
+        require(isinstance(row, dict) and set(row) == keys and isinstance(row["sha256"], str) and
+                HASH.fullmatch(row["sha256"]) is not None, code)
+
+    for term, row in value.get("canonical_texts", {}).items():
+        require(isinstance(row, dict) and {"path", "sha256"} <= set(row) <= {"path", "sha256", "reason"},
+                "supplement_canonical")
+    seen = set()
+    for row in value.get("components", []):
+        require(isinstance(row, dict) and {"ecosystem", "name", "version", "notices", "reason"} <= set(row) <=
+                SUPPLEMENT_ROW and row["ecosystem"] in ("cargo", "maven"), "supplement_row")
+        key = (row["ecosystem"], row["name"], row["version"])
+        require(key not in seen and all(ascii_text(v, 512) for v in key), "supplement_duplicate")
+        seen.add(key)
+        require(ascii_text(row["reason"], 2048), "supplement_row")
+        require(row.get("selected") is None or ascii_text(row["selected"], 256), "supplement_row")
+        require(isinstance(row["notices"], list), "supplement_row")
+        for notice in row["notices"]:
+            hashed(notice, {"path", "sha256"}, "supplement_notice")
+        require(isinstance(row.get("notes", []), list) and all(ascii_text(n, 1024) for n in row.get("notes", [])),
+                "supplement_notes")
+        review = row.get("native_review")
+        if review is not None:
+            require(isinstance(review, dict) and set(review) == {"source_url", "revision", "summary", "reviewed"} and
+                    all(ascii_text(v, 1024) for v in review.values()) and review["source_url"].startswith("https://"),
+                    "supplement_native_review")
+        declaration = row.get("declaration_only")
+        if declaration is not None:
+            require(isinstance(declaration, dict) and set(declaration) == {"files"} and
+                    isinstance(declaration["files"], list) and declaration["files"], "supplement_declaration")
+            for item in declaration["files"]:
+                hashed(item, {"file", "sha256"}, "supplement_declaration")
+        for item in row.get("reviewed_files", []):
+            require(isinstance(item, dict) and set(item) == {"file", "sha256", "license"} and
+                    HASH.fullmatch(str(item["sha256"])) is not None and item["license"] in ALLOWED,
+                    "supplement_reviewed_file")
+        require(row.get("pom_licenses_are_alternatives", False) in (True, False) and
+                (row["ecosystem"] == "maven" or "pom_licenses_are_alternatives" not in row), "supplement_row")
+        build = row.get("build_components")
+        if build is not None:
+            require(isinstance(build, dict) and set(build) == {"components", "evidence"} and
+                    isinstance(build["components"], list) and all(c in EMBEDDED for c in build["components"]) and
+                    isinstance(build["evidence"], list) and build["evidence"] and
+                    all(ascii_text(e, 1024) and e.startswith("https://") for e in build["evidence"]),
+                    "supplement_build_components")
+    for row in value.get("bundled", []):
+        require(isinstance(row, dict) and {"id", "record", "license", "notice"} <= set(row) <=
+                {"id", "record", "name", "license", "notice", "reason"}, "supplement_bundled")
+    return value
 
 
 def load_supplements(root: Path, builder: Builder | None = None) -> dict:
     raw = read_file(root / "tools/licenses/notice-supplements.json", MAX_JSON)
-    value = json.loads(raw)
-    require(value.get("schema") == 1, "supplement_schema")
+    value = validate_supplements(strict_json(raw, "supplement_schema"))
     if builder is not None:
         builder.inputs["tools/licenses/notice-supplements.json"] = blob(raw)
         builder.inputs["third_party/LICENSES"] = blob(read_file(root / "third_party/LICENSES", MAX_JSON))
@@ -503,10 +639,15 @@ def supplement_for(supplements: dict, ecosystem: str, name: str, version: str) -
     return rows[0] if rows else None
 
 
-def supplement_texts(root: Path, supplement: dict | None) -> list:
+def supplement_entries(root: Path, supplement: dict | None) -> list:
+    """[(origin, bytes, third_party/LICENSES entry)] for a supplement's notices."""
     if not supplement:
         return []
-    return [("retained:" + n["path"], retained(root, n["path"], n["sha256"])) for n in supplement.get("notices", [])]
+    found = []
+    for notice in supplement.get("notices", []):
+        data, entry = retained_entry(root, notice["path"], notice["sha256"])
+        found.append(("retained:" + notice["path"], data, entry))
+    return found
 
 
 def canonical_texts(root: Path, supplements: dict) -> dict:
@@ -528,7 +669,12 @@ def cargo_lock(root: Path) -> tuple[dict, bytes]:
     return packages, raw
 
 
-def crate_files(cargo_home: Path, name: str, version: str, checksum: str | None, links: bool) -> tuple[list, dict]:
+def crate_files(cargo_home: Path, name: str, version: str, checksum: str | None, native: bool) -> tuple[list, dict]:
+    """License files from the registry archive whose SHA-256 is the lock checksum.
+
+    Native-wrapping crates also contribute files up to two directories below
+    the root (vendored C sources); those always ship (keep=True).
+    """
     prefix = f"{name}-{version}"
     archive = None
     for index in sorted((cargo_home / "registry/cache").glob("*")):
@@ -539,7 +685,7 @@ def crate_files(cargo_home: Path, name: str, version: str, checksum: str | None,
                 archive = data
                 break
     files = []
-    depth = 3 if links else 1
+    depth = 3 if native else 1
 
     def wanted(parts: tuple) -> bool:
         return (len(parts) <= depth and is_license_file(parts[-1]) and
@@ -554,21 +700,36 @@ def crate_files(cargo_home: Path, name: str, version: str, checksum: str | None,
                 require(member.size <= MAX_TEXT, "license_text_size")
                 stream = tar.extractfile(member)
                 require(stream is not None, "crate_member")
-                files.append(("package:" + "/".join(parts[1:]), stream.read()))
+                files.append(("package:" + "/".join(parts[1:]), stream.read(), len(parts) > 2))
         return sorted(files), {"crate_sha256": checksum}
     # No archive whose SHA-256 equals the Cargo.lock checksum: never fall back to
     # unverified extracted sources; the caller records the crate as unresolved.
     return [], {}
 
 
+def parse_metadata(raw: bytes, lock: dict) -> dict:
+    """cargo metadata JSON, cross-checked against Cargo.lock."""
+    data = strict_json(raw, "cargo_metadata_structure")
+    require(data.get("version") == 1 and isinstance(data.get("resolve"), dict), "cargo_metadata_structure")
+    for package in data["packages"]:
+        if package.get("source") == CRATES_IO:
+            entry = lock.get((package["name"], package["version"]))
+            require(entry is not None and entry.get("source") == CRATES_IO, "cargo_metadata_lock_mismatch")
+        elif package.get("source") is None:
+            require((package["name"], package["version"]) in lock, "cargo_metadata_lock_mismatch")
+    return data
+
+
 def cargo_components(builder: Builder, root: Path, metadata: dict, cargo_home: Path,
                      supplements: dict | None = None) -> None:
+    """metadata: {target triple: raw `cargo metadata` JSON bytes}."""
     lock, raw = cargo_lock(root)
     builder.inputs["Cargo.lock"] = blob(raw)
     reached_any = set()
     for triple in sorted(metadata):
         require(triple in RUST_ROOTS, "rust_target")
-        data = metadata[triple]
+        builder.inputs[f"cargo-metadata/{triple}.json"] = blob(metadata[triple])
+        data = parse_metadata(metadata[triple], lock)
         packages = {row["id"]: row for row in data["packages"]}
         nodes = {row["id"]: row for row in data["resolve"]["nodes"]}
         members = set(data["workspace_members"])
@@ -612,18 +773,16 @@ def cargo_components(builder: Builder, root: Path, metadata: dict, cargo_home: P
                 builder.unresolved.append({"component": ident, "reason": "unknown_license",
                                            "detail": "license-file only; needs review"})
                 continue
-            # Native-wrapping crates vendor C sources whose notices sit below the root.
             native = bool(package.get("links")) or name.endswith("-sys")
             files, sources = crate_files(cargo_home, name, version, entry["checksum"], native)
             if not sources:
                 builder.unresolved.append({"component": ident, "reason": "crate_source_unavailable",
                                            "detail": "registry cache archive matching Cargo.lock checksum not found"})
                 continue
-            supplement = supplement_for(supplements or {}, "cargo", name, version)
+            supplement = supplement_for(supplements or {}, "cargo", name, version) or {}
             builder.add("cargo", name, version, declared, spdx_dnf(declared), files, scope, sources,
-                        supplement_texts(root, supplement), supplement.get("selected") if supplement else None,
-                        supplement.get("notes", []) if supplement else None,
-                        bool(supplement and supplement.get("declaration_only") is True))
+                        [(o, d) for o, d, _ in supplement_entries(root, supplement)], supplement.get("selected"),
+                        supplement.get("notes"), supplement.get("declaration_only"), supplement.get("reviewed_files"))
     for (name, version), row in lock.items():
         if (name, version) not in reached_any and row.get("source") == CRATES_IO:
             builder.exclude("cargo:not-in-shipped-graph(dev/build/other-target/tool)", f"{name} {version}")
@@ -637,22 +796,87 @@ def run_cargo_metadata(root: Path, toolchain: str) -> dict:
                                  "--offline", "--all-features", "--filter-platform", triple],
                                 cwd=root, capture_output=True, timeout=600, check=False)
         require(result.returncode == 0, "cargo_metadata_failed")
-        found[triple] = json.loads(result.stdout)
+        found[triple] = result.stdout
     return found
 
 
+def toolchain_components(builder: Builder, rust_toolchain: Path | None, android_ndk: Path | None) -> None:
+    """Rust std (std/core/alloc and vendored crates) and the NDK LLVM runtime.
+
+    Every shipped Rust binary statically links the standard library; Android
+    binaries also link the NDK's LLVM libunwind and compiler builtins. The
+    pinned toolchains' own notice files are the texts.
+    """
+    if rust_toolchain is not None:
+        base = Path(rust_toolchain)
+        manifest = read_file(base / "lib/rustlib/multirust-channel-manifest.toml", 4 * 1024 * 1024).decode("utf-8")
+        require(re.search(r'\[pkg\.rust\]\s*\nversion = "' + re.escape(RUST_TOOLCHAIN) + r' ', manifest) is not None,
+                "rust_toolchain_version")
+        for triple in RUST_ROOTS:
+            require((base / f"lib/rustlib/manifest-rust-std-{triple}").is_file(), "rust_std_target_missing")
+        docs = "share/doc/rust/"
+        files = [("toolchain:" + docs + name, read_file(base / docs / name, MAX_TEXT), True)
+                 for name in ("COPYRIGHT-library.html", "licenses/Apache-2.0.txt", "licenses/MIT.txt")]
+        scope = "bundled:" + RUST_STD
+        builder.coverage.add(scope)
+        builder.add("bundled", RUST_STD, RUST_TOOLCHAIN, "MIT OR Apache-2.0", spdx_dnf("MIT OR Apache-2.0"),
+                    files, scope, {"toolchain_manifest_sha256": sha256(manifest.encode())},
+                    notes=["aggregate notice of the pinned toolchain (share/doc/rust/COPYRIGHT-library.html) covering "
+                           "std/core/alloc and every out-of-tree crate of the standard-library workspace (a superset "
+                           "of what links), each with its own declared license and texts"])
+    if android_ndk is not None:
+        base = Path(android_ndk)
+        properties = read_file(base / "source.properties", 64 * 1024).decode("utf-8", "replace")
+        require(re.search(r"^Pkg\.Revision = " + re.escape(NDK_VERSION) + r"\s*$", properties, re.M) is not None,
+                "android_ndk_version")
+        notices = sorted(base.glob("toolchains/llvm/prebuilt/*/NOTICE"))
+        require(len(notices) == 1, "android_ndk_notice")
+        data = read_file(notices[0], MAX_TEXT)
+        scope = "bundled:" + NDK_RUNTIME
+        builder.coverage.add(scope)
+        term = "Apache-2.0 WITH LLVM-exception"
+        # The NOTICE file is the LLVM project's license text here, so it is
+        # passed as a trusted text (a NOTICE-named package file never counts).
+        builder.add("bundled", NDK_RUNTIME, NDK_VERSION, term, [(term,)], [], scope,
+                    {"source_properties_sha256": sha256(properties.encode())},
+                    [("toolchain:" + notices[0].relative_to(base).as_posix(), data)],
+                    notes=["LLVM libunwind and compiler builtins statically linked into the Android Rust library; "
+                           "notice from the pinned NDK's LLVM toolchain"])
+
+
 # ------------------------------------------------------------------ Gradle
-def _gradle_artifacts(cache: Path, group: str, module: str, version: str) -> tuple[list, str, list]:
-    """Return ([(file name, bytes)], kind, redirect targets) for one coordinate.
+ANDROID_SCOPES = frozenset((":android:debugRuntimeClasspath", ":android:releaseRuntimeClasspath"))
+
+
+def _variant_applies(variant: dict, environments: frozenset) -> bool:
+    """Whether a runtime variant can be selected by one of the shipped graphs."""
+    attributes = variant.get("attributes", {})
+    environment = attributes.get("org.gradle.jvm.environment")
+    platform = attributes.get("org.jetbrains.kotlin.platform.type")
+    if environment is not None:
+        # The Gradle JVM environment is authoritative (KMP Android libraries
+        # may still report kotlin platform type "jvm").
+        return environment in environments
+    if platform == "androidJvm" and "android" not in environments:
+        return False
+    if platform == "jvm" and "standard-jvm" not in environments:
+        return False
+    return True
+
+
+def _gradle_artifacts(cache: Path, group: str, module: str, version: str,
+                      environments: frozenset = frozenset(("android", "standard-jvm"))) -> tuple[list, str, list]:
+    """Return ([(file name, bytes)], kind, detail) for one coordinate.
 
     Only JVM/Android runtime library variants (org.gradle.usage java-runtime)
     reach an APK or desktop classpath; Kotlin metadata, other platforms and
     documentation variants are ignored. kind is "artifacts"; "redirect" when
-    every runtime variant is published by another module (Gradle module
-    metadata available-at); "platform" for POM-packaged BOM/platform modules;
-    "no-artifact" when runtime variants only declare dependencies; or
-    "absent" when the cache does not hold the bytes. The module metadata
-    SHA-256, or the cache's SHA-1 directory name, binds every byte read.
+    every runtime variant is published by another module (detail lists the
+    targets); "platform" for POM-packaged BOM/platform modules; "no-artifact"
+    when runtime variants only declare dependencies; "partial" when some named
+    runtime files are not cached (detail lists them); or "absent". Every byte
+    read is bound by the module-metadata SHA-256 or the cache SHA-1 directory;
+    all cached candidates are tried before a hash refusal.
     """
     base = cache / group / module / version
     if not base.is_dir():
@@ -663,6 +887,9 @@ def _gradle_artifacts(cache: Path, group: str, module: str, version: str) -> tup
         runtime = [variant for variant in value.get("variants", [])
                    if variant.get("attributes", {}).get("org.gradle.usage") == "java-runtime"
                    and variant.get("attributes", {}).get("org.gradle.category", "library") == "library"]
+        # Prefer variants for the consuming environment; with none, Gradle's
+        # compatibility rules select the remaining JVM runtime variants.
+        runtime = [variant for variant in runtime if _variant_applies(variant, environments)] or runtime
         if runtime and all("available-at" in variant for variant in runtime):
             targets = sorted({variant["available-at"]["group"] + ":" + variant["available-at"]["module"] + ":" +
                               variant["available-at"]["version"] for variant in runtime})
@@ -671,17 +898,26 @@ def _gradle_artifacts(cache: Path, group: str, module: str, version: str) -> tup
         for variant in runtime:
             for row in variant.get("files", []):
                 wanted[row["name"]] = row.get("sha256")
-        files = []
+        files, missing = [], []
         for name, digest in sorted(wanted.items()):
             candidates = sorted(base.glob("*/" + name))
-            if candidates:
-                data = read_file(candidates[0])
-                require(digest is None or sha256(data) == digest, "gradle_cache_hash")
-                files.append((name, data))
+            match = None
+            for candidate in candidates:
+                data = read_file(candidate)
+                if digest is None or sha256(data) == digest:
+                    match = data
+                    break
+            require(match is not None or not candidates, "gradle_cache_hash")
+            if match is None:
+                missing.append(name)
+            else:
+                files.append((name, match))
+        if files and missing:
+            return files, "partial", missing
         if files:
             return files, "artifacts", []
         if wanted:
-            return [], "absent", []
+            return [], "absent", sorted(wanted)
         if runtime:
             # Runtime variants that only declare dependencies (e.g. JetBrains
             # aliases of AndroidX); the dependency itself is a census entry.
@@ -691,26 +927,38 @@ def _gradle_artifacts(cache: Path, group: str, module: str, version: str) -> tup
         return [], "platform", []
     files = []
     for suffix in (".jar", ".aar"):
-        for candidate in sorted(base.glob(f"*/{module}-{version}{suffix}")):
+        candidates = sorted(base.glob(f"*/{module}-{version}{suffix}"))
+        valid = None
+        for candidate in candidates:
             data = read_file(candidate)
-            require(hashlib.sha1(data).hexdigest() == candidate.parent.name, "gradle_cache_hash")
-            files.append((candidate.name, data))
+            if hashlib.sha1(data).hexdigest() == candidate.parent.name:
+                valid = (candidate.name, data)
+                break
+        require(valid is not None or not candidates, "gradle_cache_hash")
+        if valid is not None:
+            files.append(valid)
     return files, "artifacts" if files else "absent", []
 
 
 NATIVE = (".so", ".dll", ".dylib", ".jnilib")
 # Read-only byte probe of bundled native libraries for well-known embedded
-# third-party code: (identifying byte strings, words a covering notice contains).
+# third-party code: (alternative signatures, each a tuple of byte strings that
+# must all occur; words a covering notice's content contains).
 EMBEDDED = {
-    "zlib": ((b"Jean-loup Gailly",), ("zlib", "jean-loup gailly")),
-    "libpng": ((b"Glenn Randers-Pehrson", b"Cosmin Truta"), ("libpng",)),
-    "libjpeg-turbo": ((b"libjpeg-turbo Project", b"Independent JPEG Group"), ("libjpeg",)),
-    "FreeType": ((b"The FreeType Project", b"FT_Init_FreeType"), ("freetype",)),
-    "HarfBuzz": ((b"HarfBuzz", b"harfbuzz"), ("harfbuzz",)),
-    "ICU": ((b"icudt",), ("icu license", "unicode, inc", "international components for unicode")),
-    "expat": ((b"XML_ParserCreate", b"expat_"), ("expat",)),
-    "Wuffs": ((b"wuffs",), ("wuffs",)),
-    "libwebp": ((b"WebPDecode", b"libwebp"), ("libwebp", "webm project")),
+    "zlib": (((b"Jean-loup Gailly",),), ("zlib", "jean-loup gailly")),
+    "libpng": (((b"Glenn Randers-Pehrson",), (b"Cosmin Truta",)), ("libpng",)),
+    "libjpeg-turbo": (((b"libjpeg-turbo Project",), (b"Independent JPEG Group",)), ("libjpeg",)),
+    "FreeType": (((b"The FreeType Project",), (b"FT_Init_FreeType",)), ("freetype",)),
+    "HarfBuzz": (((b"HarfBuzz",), (b"harfbuzz",)), ("harfbuzz",)),
+    "ICU": (((b"icudt",),), ("icu license", "unicode, inc", "international components for unicode")),
+    "expat": (((b"XML_ParserCreate",), (b"expat_",)), ("expat",)),
+    "Wuffs": (((b"wuffs",),), ("wuffs",)),
+    "libwebp": (((b"WebPDecode",), (b"libwebp",), (b"VP8X", b"VP8L", b"WEBP")), ("libwebp", "webm project")),
+    "SPIRV-Cross": (((b"SPIRV-Cross",), (b"SPIRV_Cross_",)), ("spirv-cross",)),
+    "D3D12MemoryAllocator": (((b"D3D12MA",), (b"D3D12MemoryAllocator",)), ("d3d12memoryallocator", "d3d12 memory allocator")),
+    "brotli": (((b"BrotliDecoder",), (b"BrotliEncoder",)), ("brotli",)),
+    "dng_sdk": (((b"dng_sdk",), (b"Adobe DNG",)), ("dng sdk", "adobe systems")),
+    "piex": (((b"piex::",),), ("piex",)),
 }
 
 
@@ -731,22 +979,10 @@ def embedded_components(files: list) -> list:
     detected = set()
     for _, data in files:
         for blob_bytes in native_blobs(data):
-            for name, (signatures, _) in EMBEDDED.items():
-                if any(signature in blob_bytes for signature in signatures):
+            for name, (alternatives, _) in EMBEDDED.items():
+                if any(all(part in blob_bytes for part in alternative) for alternative in alternatives):
                     detected.add(name)
     return sorted(detected)
-
-
-def native_count(data: bytes, depth: int = 0) -> int:
-    count = 0
-    with zipfile.ZipFile(io.BytesIO(data)) as archive:
-        for entry in archive.infolist():
-            if entry.filename.lower().endswith(NATIVE):
-                count += 1
-            elif depth == 0 and entry.filename.endswith(".jar") and (entry.filename == "classes.jar" or
-                                                                     entry.filename.startswith("libs/")):
-                count += native_count(archive.read(entry), 1)
-    return count
 
 
 def zip_license_files(name: str, data: bytes, depth: int = 0) -> list:
@@ -781,16 +1017,18 @@ def gradle_components(builder: Builder, root: Path, report_path: Path, cache: Pa
     for module in sorted(annotated, key=lambda m: (m["moduleName"], m["moduleVersion"])):
         name, version = module["moduleName"], module["moduleVersion"]
         key = f"{name}:{version}"
+        ident = f"maven:{key}"
         scopes = sorted(set(module["configurations"]) & set(GRADLE_SHIPPING))
         if not scopes:
             builder.exclude("maven:non-product-configuration", key)
             continue
         group, artifact = name.split(":")
-        files, kind, targets = _gradle_artifacts(cache, group, artifact, version)
+        environments = frozenset(("android" if scope in ANDROID_SCOPES else "standard-jvm") for scope in scopes)
+        files, kind, detail = _gradle_artifacts(cache, group, artifact, version, environments)
         if kind == "redirect":
-            if not any(target in census for target in targets):
-                builder.unresolved.append({"component": f"maven:{key}", "reason": "redirect_target_missing",
-                                           "detail": ", ".join(targets)})
+            if not any(target in census for target in detail):
+                builder.unresolved.append({"component": ident, "reason": "redirect_target_missing",
+                                           "detail": ", ".join(detail)})
                 continue
             builder.exclude("maven:gradle-metadata-redirect(runtime bytes published by another listed module)", key)
             continue
@@ -800,60 +1038,71 @@ def gradle_components(builder: Builder, root: Path, report_path: Path, cache: Pa
         if kind == "no-artifact":
             builder.exclude("maven:dependency-only-runtime-variant(no artifact)", key)
             continue
+        if kind in ("absent", "partial"):
+            # Uninspected bytes may hold notices or native code: fail closed.
+            builder.unresolved.append({"component": ident, "reason": "gradle_artifact_" + (
+                "unavailable" if kind == "absent" else "partial"),
+                "detail": "not in the local Gradle cache: " + (", ".join(detail) or "artifact")})
+            continue
         labels = [row.get("spdxLicense") or row.get("moduleLicense") or "" for row in module["moduleLicenses"]]
-        mapped = [gradle.ALIASES.get(label.strip(), label.strip()) for label in labels]
+        mapped = list(dict.fromkeys(gradle.ALIASES.get(label.strip(), label.strip()) for label in labels))
         declared = "; ".join(label.strip() for label in labels) or "none declared"
-        supplement = supplement_for(supplements, "maven", name, version)
-        forced = supplement.get("selected") if supplement else None
-        if forced is not None:
-            require(forced in mapped, "supplement_selection")
+        supplement = supplement_for(supplements, "maven", name, version) or {}
         if not mapped or any(not label for label in mapped):
-            builder.unresolved.append({"component": f"maven:{key}", "reason": "unknown_license", "detail": declared})
+            builder.unresolved.append({"component": ident, "reason": "unknown_license", "detail": declared})
             continue
         texts = []
         for file_name, data in files:
             texts += zip_license_files(file_name, data)
-        retained_texts = supplement_texts(root, supplement)
+        entries = supplement_entries(root, supplement)
         if module.get("licenseSourceReviewedArtifact") == key:
-            retained_texts += [("retained:" + n["path"], retained(root, n["path"], n["sha256"]))
-                               for n in reviewed[key]["notices"]]
+            for notice in reviewed[key]["notices"]:
+                data, entry = retained_entry(root, notice["path"], notice["sha256"])
+                entries.append(("retained:" + notice["path"], data, entry))
+        retained_texts = [(origin, data) for origin, data, _ in entries]
         sources = {"artifacts": [{"name": n, "sha256": sha256(d)} for n, d in files]}
-        if kind == "absent":
-            sources["warning"] = "artifact bytes not present in the local Gradle cache; package files not inspected"
-        natives = sum(native_count(data) for _, data in files)
-        if natives:
-            sources["native_libraries"] = natives
-        reviewed_native = bool(supplement and ascii_text(supplement.get("native_review") or "", 1024))
-        embedded = embedded_components(files) if natives else []
+        blobs = [b for _, data in files for b in native_blobs(data)]
+        if blobs:
+            sources["native_libraries"] = len(blobs)
+        review = supplement.get("native_review")
+        build = supplement.get("build_components") or {}
+        embedded = sorted(set(embedded_components(files)) | set(build.get("components", []))) if blobs else []
         if embedded:
             sources["embedded_native_components"] = embedded
             shipped = b"\n".join(data for _, data in texts + retained_texts).decode("utf-8", "replace").lower()
-            # A generic text (e.g. plain Apache-2.0) names no project; a retained
-            # notice registered under the library's name in third_party/LICENSES
-            # covers it by that registered name.
-            named = " ".join(leaf(origin) for origin, _ in retained_texts).lower()
-            missing = [name for name in embedded
-                       if not any(word in shipped for word in EMBEDDED[name][1]) and name.lower() not in named]
+            covered = {name for _, _, entry in entries for name in entry.get("covers", [])}
+            missing = [part for part in embedded
+                       if not any(word in shipped for word in EMBEDDED[part][1]) and part not in covered]
             if missing:
-                builder.unresolved.append({"component": f"maven:{key}", "reason": "embedded_native_notice_missing",
+                builder.unresolved.append({"component": ident, "reason": "embedded_native_notice_missing",
                                            "detail": "bundled native code contains " + ", ".join(missing) +
                                                      " with no notice in the shipped texts"})
                 continue
-        if natives and not texts and not retained_texts and not reviewed_native:
+        if blobs and not texts and not retained_texts and review is None:
             # A bundled native library may embed third-party code whose notice
             # the Maven license declaration does not cover; require a package
-            # notice or a reviewed supplement instead of assuming none.
-            builder.unresolved.append({"component": f"maven:{key}", "reason": "native_notice_unestablished",
-                                       "detail": f"{natives} bundled native libraries and no package license file"})
+            # notice or a structured review instead of assuming none.
+            builder.unresolved.append({"component": ident, "reason": "native_notice_unestablished",
+                                       "detail": f"{len(blobs)} bundled native libraries and no package license file"})
             continue
         # Maven lists multiple <license> rows without operator semantics; the
-        # existing gate requires each of them, so they are treated as AND.
-        dnf = [tuple(dict.fromkeys(mapped))]
+        # existing gate requires each of them (AND). Only an explicit reviewed
+        # supplement flag treats them as alternatives (e.g. JNA's dual license).
+        if supplement.get("pom_licenses_are_alternatives") is True:
+            dnf = [(label,) for label in mapped]
+        else:
+            dnf = [tuple(mapped)]
+        notes = list(supplement.get("notes", []))
+        if review is not None:
+            notes.append(f"native review: {review['summary']} (source {review['source_url']} at {review['revision']}, "
+                         f"reviewed {review['reviewed']})")
+        if build:
+            notes.append("native build configuration includes " + ", ".join(build["components"]) + " (" +
+                         "; ".join(build["evidence"]) + ")")
         for scope in scopes:
             builder.add("maven", name, version, declared if ascii_text(declared, 512) else "non-ascii declaration",
-                        dnf, texts, scope, sources, retained_texts, forced,
-                        (supplement.get("notes", []) + ([supplement["native_review"]] if reviewed_native else []))
-                        if supplement else None)
+                        dnf, texts, scope, sources, retained_texts, supplement.get("selected"), notes,
+                        None, supplement.get("reviewed_files"))
 
 
 # --------------------------------------------------------------------- npm
@@ -922,8 +1171,11 @@ def bundled_components(builder: Builder, root: Path, supplements: dict, desktop_
 # --------------------------------------------------------------------- CLI
 def generate(root: Path, *, metadata: dict | None, cargo_home: Path, gradle_report: Path | None,
              gradle_cache: Path, npm_modules: Path | None, desktop_image: Path | None,
+             rust_toolchain: Path | None = None, android_ndk: Path | None = None,
              skip: frozenset = frozenset()) -> tuple[bytes, bytes, dict]:
+    require(set(skip) <= set(ECOSYSTEMS), "skip_unknown")
     builder = Builder({})
+    builder.skipped = set(skip)
     supplements = load_supplements(root, builder)
     builder.canonical = canonical_texts(root, supplements)
     if "cargo" not in skip:
@@ -935,7 +1187,21 @@ def generate(root: Path, *, metadata: dict | None, cargo_home: Path, gradle_repo
         npm_components(builder, root, npm_modules)
     if "bundled" not in skip:
         bundled_components(builder, root, supplements, desktop_image)
+        toolchain_components(builder, rust_toolchain, android_ndk)
     return builder.finish()
+
+
+def default_rust_toolchain(home: Path) -> Path | None:
+    base = Path(os.environ.get("RUSTUP_HOME") or home / ".rustup") / "toolchains"
+    found = sorted(p for p in base.glob(RUST_TOOLCHAIN + "-*") if (p / "share/doc/rust/COPYRIGHT-library.html").is_file())
+    return found[0] if found else None
+
+
+def default_android_ndk(home: Path) -> Path | None:
+    sdk = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
+    base = Path(sdk) if sdk else Path(os.environ.get("LOCALAPPDATA") or home / "AppData/Local") / "Android/Sdk"
+    candidate = base / "ndk" / NDK_VERSION
+    return candidate if candidate.is_dir() else None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -945,8 +1211,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, required=True, help="fresh directory to create")
     parser.add_argument("--cargo-metadata", action="append", default=[], metavar="TRIPLE=FILE",
                         help="pre-captured `cargo metadata --locked --offline --all-features --filter-platform TRIPLE`")
-    parser.add_argument("--cargo-toolchain", default="1.99.0")
+    parser.add_argument("--cargo-toolchain", default=RUST_TOOLCHAIN)
     parser.add_argument("--cargo-home", type=Path, default=Path(os.environ.get("CARGO_HOME") or home / ".cargo"))
+    parser.add_argument("--rust-toolchain", type=Path, default=None,
+                        help=f"rustup toolchain directory for {RUST_TOOLCHAIN} (default: located under RUSTUP_HOME)")
+    parser.add_argument("--android-ndk", type=Path, default=None,
+                        help=f"pinned Android NDK {NDK_VERSION} directory (default: ANDROID_HOME/ndk/{NDK_VERSION})")
     parser.add_argument("--gradle-report", type=Path, default=None,
                         help="dependencies.json written by generateApplicationLicenseReport "
                              "(default apps/build/reports/dependency-license/dependencies.json)")
@@ -955,35 +1225,37 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--npm-modules", type=Path, default=None, help="installed mcp/ directory (cross-check only)")
     parser.add_argument("--desktop-image", type=Path, default=None,
                         help="built jpackage app image (VisualWorkbenchDev) for the Java runtime legal files")
-    parser.add_argument("--skip", action="append", default=[], choices=("cargo", "gradle", "npm", "bundled"))
+    parser.add_argument("--skip", action="append", default=[], choices=ECOSYSTEMS)
     args = parser.parse_args(argv)
     root = args.root.absolute()
     skip = frozenset(args.skip)
-    metadata = None
-    if "cargo" not in skip:
-        if args.cargo_metadata:
-            metadata = {}
-            for item in args.cargo_metadata:
-                triple, _, path = item.partition("=")
-                metadata[triple] = json.loads(read_file(Path(path), MAX_ARCHIVE))
-        else:
-            metadata = run_cargo_metadata(root, args.cargo_toolchain)
     report = args.gradle_report or root / "apps/build/reports/dependency-license/dependencies.json"
     try:
-        text, receipt_raw, receipt = generate(root, metadata=metadata, cargo_home=args.cargo_home,
-                                              gradle_report=report, gradle_cache=args.gradle_cache,
-                                              npm_modules=args.npm_modules, desktop_image=args.desktop_image,
-                                              skip=skip)
-    except (Refused, OSError, ValueError, KeyError, TypeError, tarfile.TarError, zipfile.BadZipFile) as error:
+        metadata = None
+        if "cargo" not in skip:
+            if args.cargo_metadata:
+                metadata = {}
+                for item in args.cargo_metadata:
+                    triple, _, path = item.partition("=")
+                    metadata[triple] = read_file(Path(path), MAX_ARCHIVE)
+            else:
+                metadata = run_cargo_metadata(root, args.cargo_toolchain)
+        text, receipt_raw, receipt = generate(
+            root, metadata=metadata, cargo_home=args.cargo_home, gradle_report=report,
+            gradle_cache=args.gradle_cache, npm_modules=args.npm_modules, desktop_image=args.desktop_image,
+            rust_toolchain=args.rust_toolchain or default_rust_toolchain(home),
+            android_ndk=args.android_ndk or default_android_ndk(home), skip=skip)
+        args.output.mkdir()  # exclusive: never reuse an existing delivery directory
+        (args.output / TEXT_NAME).write_bytes(text)
+        (args.output / RECEIPT_NAME).write_bytes(receipt_raw)
+    except (Refused, OSError, ValueError, KeyError, TypeError, tarfile.TarError, zipfile.BadZipFile,
+            subprocess.SubprocessError) as error:
         code = str(error) if isinstance(error, Refused) else type(error).__name__
         print("NOTICES_GENERATION_REFUSED:" + code)
         return 1
-    args.output.mkdir()  # exclusive: never reuse an existing delivery directory
-    (args.output / TEXT_NAME).write_bytes(text)
-    (args.output / RECEIPT_NAME).write_bytes(receipt_raw)
     print(json.dumps({"status": receipt["status"], "counts": receipt["counts"],
                       "unresolved": len(receipt["unresolved"]), "coverage": receipt["coverage"],
-                      "texts": len(receipt["texts"]), "output": receipt["output"],
+                      "skipped": receipt["skipped"], "texts": len(receipt["texts"]), "output": receipt["output"],
                       "receipt": blob(receipt_raw)}, sort_keys=True))
     for row in receipt["unresolved"]:
         print(f"UNRESOLVED {row['component']} {row['reason']}: {row['detail']}")
