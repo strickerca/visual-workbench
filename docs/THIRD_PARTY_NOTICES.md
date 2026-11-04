@@ -119,32 +119,42 @@ covered:
 python tools\release\generate_notices.py --output .local\notices-<release> --gradle-report apps\build\reports\dependency-license\dependencies.json --desktop-image apps\desktop\build\compose\binaries\main\app\VisualWorkbenchDev
 ```
 
+The generator also scans the bytes of bundled native libraries in Maven
+artifacts, read-only, for known embedded third-party code: zlib, libpng,
+libjpeg-turbo, FreeType, HarfBuzz, ICU, expat, Wuffs and libwebp. A component
+stays unresolved until one of its shipped texts covers each detected library.
+
 The 2026-11-04 offline run used the existing census report and local caches,
-without the desktop image. It found 417 shipped components: 266 Rust, 141
-Maven, 9 npm and 1 bundled (Node). The `androidx.graphics` graphics-core 1.0.4
-and graphics-path 1.0.1 native libraries are resolved by a recorded source
-review (`native_review`): they are AndroidX's own Apache-2.0 JNI code. That
-review was against `androidx-main`, not a pinned release revision. Eight
-components remain unresolved, so the bundle is incomplete and assembly refuses
-it:
+without the desktop image. It found 424 shipped components: 273 Rust, 141
+Maven, 9 npm and 1 bundled (Node). Owner-approved texts were added to
+`third_party/LICENSES` on 2026-11-04:
 
-- The six `uniffi*` 0.32.2 crates (MPL-2.0) ship no license text. Retain the
-  MPL-2.0 text from mozilla.org. Because uniffi ships unmodified, MPL-2.0 3.2(a)
-  also requires a note saying where the Source Code Form is (mozilla/uniffi-rs
-  at commit `7bc621ee9d0d15371d792612707ba5ed4111f950`). A supplement `notes`
-  entry renders that note in the notices file.
-- `org.jetbrains.skiko:skiko-awt-runtime-windows-x64` 0.150.1 bundles a Skia
-  DLL. Retain Skia's BSD-3-Clause LICENSE from JetBrains/skia at commit
-  `1f14f1166a847cb0e148f981600bf1e3e6ca6e46` (tag `m150-1f14f1166a`, which skiko
-  v0.150.1 builds against). The notices of Skia's own bundled third-party
-  libraries are still unestablished.
-- `libwebp-sys` 0.14.4: the upstream repository at the crate's commit
-  (`3a40281fd97537b693174acb7375d64d3b471a56`) publishes no license text. Only
-  `Cargo.toml` declares MIT. This needs an owner decision.
+- `notices/MPL-2.0.txt` (sha256 `3f3d9e00…9b04`), from
+  https://www.mozilla.org/media/MPL/2.0/index.txt. It covers the six
+  unmodified `uniffi*` 0.32.2 crates. A supplement note in the notices file
+  gives the MPL-2.0 3.2(a) Source Code Form location: mozilla/uniffi-rs at
+  commit `7bc621ee9d0d15371d792612707ba5ed4111f950`.
+- `notices/Skia-m150-1f14f1166a-LICENSE.txt` (sha256 `5f787c1d…8dbd`), from
+  JetBrains/skia commit `1f14f1166a847cb0e148f981600bf1e3e6ca6e46` (tag
+  `m150-1f14f1166a`, which skiko v0.150.1 builds against).
 
-The identified sources are recorded under `pending_retention` in
-`notice-supplements.json`; the generator does not read that list. A new file
-under `third_party/notices` must be registered in `third_party/LICENSES`. It
-then becomes part of the notice resources packaged into both apps, so the APK
-and desktop builds must be rebuilt. Java runtime coverage needs a built desktop
-image.
+Other resolutions:
+
+- `libwebp-sys` 0.14.4 is a declaration-only entry, by owner decision. The
+  upstream repository at the crate's commit publishes no license text, so the
+  declared MIT is recorded without an invented copyright line. The crate's
+  vendored libwebp `COPYING` (BSD-3-Clause) and `PATENTS` files ship.
+- The `androidx.graphics` graphics-core 1.0.4 and graphics-path 1.0.1 native
+  libraries are AndroidX's own Apache-2.0 JNI code. A `native_review` records
+  this; the review was against `androidx-main`, not a pinned release revision.
+
+**Open item:** `org.jetbrains.skiko:skiko-awt-runtime-windows-x64` 0.150.1.
+Its DLL contains copyright or identifying strings for libjpeg-turbo, libpng,
+zlib (1.3.0.1), HarfBuzz, ICU data, expat and Wuffs. Skia's LICENSE covers none
+of them. Until their texts are retained, the bundle stays `incomplete` and
+assembly refuses it.
+
+Adding files under `third_party/notices` changes the notice resources packaged
+into both apps (the desktop resources and the Android assets). The APK and
+desktop image must be rebuilt before the package notice checks pass. Java
+runtime coverage needs a built desktop image.

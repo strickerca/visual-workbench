@@ -194,6 +194,20 @@
       "source_url": "https://dl.google.com/dl/android/maven2/com/google/ai/edge/litert/litert/2.3.0/litert-2.3.0.aar#THIRD_PARTY_NOTICE.txt",
       "sha256": "db6e1ff4b16c11eb01c45f135928527a50a05282739054686793ec70f442f119",
       "notice_scope": "Primary upstream artifact declaration; verbatim aggregate notices retained. Individual native/APK component scope remains pending, not an admission of all listed source/build dependencies."
+    },
+    {
+      "path": "notices/MPL-2.0.txt",
+      "license": "MPL-2.0",
+      "source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt",
+      "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
+      "notice_scope": "Official MPL-2.0 text (retrieved 2026-11-04) for the unmodified uniffi 0.32.2 crates, which ship no license file."
+    },
+    {
+      "path": "notices/Skia-m150-1f14f1166a-LICENSE.txt",
+      "license": "BSD-3-Clause",
+      "source_url": "https://raw.githubusercontent.com/JetBrains/skia/1f14f1166a847cb0e148f981600bf1e3e6ca6e46/LICENSE",
+      "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd",
+      "notice_scope": "Skia LICENSE at JetBrains/skia tag m150-1f14f1166a (retrieved 2026-11-04), the revision skiko 0.150.1 builds against. Covers Skia only; notices for third-party code linked into the skiko DLL are not established."
     }
   ]
 }

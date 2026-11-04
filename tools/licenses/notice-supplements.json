@@ -47,30 +47,85 @@
       "notices": [],
       "native_review": "Bundled libandroidx.graphics.path.so is AndroidX's own JNI code (graphics/graphics-path/src/main/cpp: Conic, PathIterator, pathway, math/), Apache-2.0, The Android Open Source Project (Conic.cpp also carries an AOSP 2006 copyright); no vendored third-party native code found. Reviewed 2026-11-04 against androidx-main, not a pinned 1.0.1 revision.",
       "reason": "The AAR ships no license file; the Apache-2.0 text is therefore the canonical retained text. Source: https://github.com/androidx/androidx/tree/androidx-main/graphics/graphics-path/src/main/cpp"
-    }
-  ],
-  "pending_retention": [
-    {
-      "status": "identified, not retained: byte-exact download needs owner approval; the generator does not read this list",
-      "components": ["cargo:uniffi@0.32.2", "cargo:uniffi_bindgen@0.32.2", "cargo:uniffi_core@0.32.2", "cargo:uniffi_meta@0.32.2", "cargo:uniffi_pipeline@0.32.2", "cargo:uniffi_udl@0.32.2"],
-      "license": "MPL-2.0",
-      "source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt",
-      "planned_path": "third_party/notices/MPL-2.0.txt",
-      "note": "Crate VCS commit 7bc621ee9d0d15371d792612707ba5ed4111f950 (mozilla/uniffi-rs, from .cargo_vcs_info.json). Shipped unmodified, so MPL-2.0 3.2(a) needs the license text plus where to get the Source Code Form: https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950"
     },
     {
-      "status": "identified, not retained: byte-exact download needs owner approval; the generator does not read this list",
-      "components": ["maven:org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.150.1"],
-      "license": "BSD-3-Clause",
-      "source_url": "https://raw.githubusercontent.com/JetBrains/skia/1f14f1166a847cb0e148f981600bf1e3e6ca6e46/LICENSE",
-      "planned_path": "third_party/notices/Skia-m150-1f14f1166a-LICENSE.txt",
-      "note": "skiko v0.150.1 skiko/gradle.properties sets dependencies.skia=m150-1f14f1166a (JetBrains/skia tag, commit 1f14f1166a847cb0e148f981600bf1e3e6ca6e46). skiko itself is Apache-2.0 with no NOTICE file found. The Skia DLL may also link Skia third_party libraries (FreeType, HarfBuzz, ICU, libpng, zlib, expat, libjpeg-turbo, libwebp); their notices are not yet established."
+      "ecosystem": "cargo",
+      "name": "uniffi",
+      "version": "0.32.2",
+      "selected": null,
+      "notices": [{"path": "third_party/notices/MPL-2.0.txt", "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"}],
+      "notes": ["MPL-2.0 Source Code Form (unmodified): https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950/uniffi"],
+      "provenance": {"source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt", "retrieved": "2026-11-04", "crate_vcs_commit": "7bc621ee9d0d15371d792612707ba5ed4111f950"},
+      "reason": "The crate ships no license file. The official MPL-2.0 text is retained; uniffi is shipped unmodified, so MPL-2.0 section 3.2(a) is met by the text plus the source-location note."
     },
     {
-      "status": "owner decision needed: upstream publishes no license text",
-      "components": ["cargo:libwebp-sys@0.14.4"],
-      "license": "MIT",
-      "note": "Crate VCS commit 3a40281fd97537b693174acb7375d64d3b471a56 (NoXF/libwebp-sys) has no LICENSE/COPYING file; README has no license statement; only Cargo.toml declares license = \"MIT\". An MIT text cannot be retained without inventing a copyright line. The vendored libwebp COPYING (BSD-3-Clause) and PATENTS ship in the crate."
+      "ecosystem": "cargo",
+      "name": "uniffi_bindgen",
+      "version": "0.32.2",
+      "selected": null,
+      "notices": [{"path": "third_party/notices/MPL-2.0.txt", "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"}],
+      "notes": ["MPL-2.0 Source Code Form (unmodified): https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950/uniffi_bindgen"],
+      "provenance": {"source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt", "retrieved": "2026-11-04", "crate_vcs_commit": "7bc621ee9d0d15371d792612707ba5ed4111f950"},
+      "reason": "The crate ships no license file. The official MPL-2.0 text is retained; uniffi is shipped unmodified, so MPL-2.0 section 3.2(a) is met by the text plus the source-location note."
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "uniffi_core",
+      "version": "0.32.2",
+      "selected": null,
+      "notices": [{"path": "third_party/notices/MPL-2.0.txt", "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"}],
+      "notes": ["MPL-2.0 Source Code Form (unmodified): https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950/uniffi_core"],
+      "provenance": {"source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt", "retrieved": "2026-11-04", "crate_vcs_commit": "7bc621ee9d0d15371d792612707ba5ed4111f950"},
+      "reason": "The crate ships no license file. The official MPL-2.0 text is retained; uniffi is shipped unmodified, so MPL-2.0 section 3.2(a) is met by the text plus the source-location note."
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "uniffi_meta",
+      "version": "0.32.2",
+      "selected": null,
+      "notices": [{"path": "third_party/notices/MPL-2.0.txt", "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"}],
+      "notes": ["MPL-2.0 Source Code Form (unmodified): https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950/uniffi_meta"],
+      "provenance": {"source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt", "retrieved": "2026-11-04", "crate_vcs_commit": "7bc621ee9d0d15371d792612707ba5ed4111f950"},
+      "reason": "The crate ships no license file. The official MPL-2.0 text is retained; uniffi is shipped unmodified, so MPL-2.0 section 3.2(a) is met by the text plus the source-location note."
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "uniffi_pipeline",
+      "version": "0.32.2",
+      "selected": null,
+      "notices": [{"path": "third_party/notices/MPL-2.0.txt", "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"}],
+      "notes": ["MPL-2.0 Source Code Form (unmodified): https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950/uniffi_pipeline"],
+      "provenance": {"source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt", "retrieved": "2026-11-04", "crate_vcs_commit": "7bc621ee9d0d15371d792612707ba5ed4111f950"},
+      "reason": "The crate ships no license file. The official MPL-2.0 text is retained; uniffi is shipped unmodified, so MPL-2.0 section 3.2(a) is met by the text plus the source-location note."
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "uniffi_udl",
+      "version": "0.32.2",
+      "selected": null,
+      "notices": [{"path": "third_party/notices/MPL-2.0.txt", "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"}],
+      "notes": ["MPL-2.0 Source Code Form (unmodified): https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950/uniffi_udl"],
+      "provenance": {"source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt", "retrieved": "2026-11-04", "crate_vcs_commit": "7bc621ee9d0d15371d792612707ba5ed4111f950"},
+      "reason": "The crate ships no license file. The official MPL-2.0 text is retained; uniffi is shipped unmodified, so MPL-2.0 section 3.2(a) is met by the text plus the source-location note."
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "libwebp-sys",
+      "version": "0.14.4",
+      "selected": null,
+      "notices": [],
+      "declaration_only": true,
+      "provenance": {"crate_vcs_commit": "3a40281fd97537b693174acb7375d64d3b471a56", "repository": "https://github.com/NoXF/libwebp-sys", "reviewed": "2026-11-04"},
+      "reason": "Owner decision 2026-11-04: upstream publishes no license text at the crate's commit (no LICENSE/COPYING, no README statement); Cargo.toml declares MIT. The declaration is recorded without an invented copyright line, and the crate's vendored libwebp COPYING (BSD-3-Clause) and PATENTS ship."
+    },
+    {
+      "ecosystem": "maven",
+      "name": "org.jetbrains.skiko:skiko-awt-runtime-windows-x64",
+      "version": "0.150.1",
+      "selected": null,
+      "notices": [{"path": "third_party/notices/Skia-m150-1f14f1166a-LICENSE.txt", "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd"}],
+      "provenance": {"source_url": "https://raw.githubusercontent.com/JetBrains/skia/1f14f1166a847cb0e148f981600bf1e3e6ca6e46/LICENSE", "retrieved": "2026-11-04", "skia_tag": "m150-1f14f1166a", "skiko_setting": "skiko v0.150.1 skiko/gradle.properties dependencies.skia=m150-1f14f1166a"},
+      "reason": "skiko is Apache-2.0 with no NOTICE file; its DLL bundles Skia (BSD-3-Clause). Third-party code linked into the DLL is checked by the generator's native byte probe and stays unresolved until its notices are retained."
     }
   ],
   "bundled": [

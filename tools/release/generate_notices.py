@@ -252,7 +252,7 @@ class Builder:
 
     def add(self, ecosystem: str, name: str, version: str, declared: str, dnf, files: list, scope: str,
             sources: dict | None = None, extra: list | None = None, forced: str | None = None,
-            notes: list | None = None) -> None:
+            notes: list | None = None, declaration_only: bool = False) -> None:
         """files: (origin, bytes) from the package; extra: (origin, bytes) always shipped."""
         key = (ecosystem, name, version)
         if key in self.components:
@@ -290,6 +290,12 @@ class Builder:
                     warnings.append("package ships no license text for " + ", ".join(missing) +
                                     "; canonical text from a retained package file is used")
                     break
+        if choice is None and declaration_only and labelled:
+            # Owner-approved: upstream publishes no text for the declared license.
+            # Record the declaration and ship every license file the package has.
+            choice = allowed[0]
+            warnings.append("declaration only: upstream publishes no " + " AND ".join(choice) +
+                            " text; the package's declared license is recorded and its bundled license files ship")
         if choice is None and (unclassified or extra):
             choice = allowed[0]
             warnings.append("license text not matched to the selected license by content; all package license files are included")
@@ -303,7 +309,7 @@ class Builder:
         families = {family(t) for t in choice}
         texts = []
         for origin, data, labels in labelled:
-            if not labels or labels & families or ALWAYS.match(leaf(origin)):
+            if declaration_only or not labels or labels & families or ALWAYS.match(leaf(origin)):
                 texts.append({"origin": origin, "sha256": self.text(data)})
         for origin, data in extra:
             texts.append({"origin": origin, "sha256": self.text(data)})
@@ -616,7 +622,8 @@ def cargo_components(builder: Builder, root: Path, metadata: dict, cargo_home: P
             supplement = supplement_for(supplements or {}, "cargo", name, version)
             builder.add("cargo", name, version, declared, spdx_dnf(declared), files, scope, sources,
                         supplement_texts(root, supplement), supplement.get("selected") if supplement else None,
-                        supplement.get("notes", []) if supplement else None)
+                        supplement.get("notes", []) if supplement else None,
+                        bool(supplement and supplement.get("declaration_only") is True))
     for (name, version), row in lock.items():
         if (name, version) not in reached_any and row.get("source") == CRATES_IO:
             builder.exclude("cargo:not-in-shipped-graph(dev/build/other-target/tool)", f"{name} {version}")
@@ -692,6 +699,42 @@ def _gradle_artifacts(cache: Path, group: str, module: str, version: str) -> tup
 
 
 NATIVE = (".so", ".dll", ".dylib", ".jnilib")
+# Read-only byte probe of bundled native libraries for well-known embedded
+# third-party code: (identifying byte strings, words a covering notice contains).
+EMBEDDED = {
+    "zlib": ((b"Jean-loup Gailly",), ("zlib", "jean-loup gailly")),
+    "libpng": ((b"Glenn Randers-Pehrson", b"Cosmin Truta"), ("libpng",)),
+    "libjpeg-turbo": ((b"libjpeg-turbo Project", b"Independent JPEG Group"), ("libjpeg",)),
+    "FreeType": ((b"The FreeType Project", b"FT_Init_FreeType"), ("freetype",)),
+    "HarfBuzz": ((b"HarfBuzz", b"harfbuzz"), ("harfbuzz",)),
+    "ICU": ((b"icudt",), ("icu license", "unicode, inc", "international components for unicode")),
+    "expat": ((b"XML_ParserCreate", b"expat_"), ("expat",)),
+    "Wuffs": ((b"wuffs",), ("wuffs",)),
+    "libwebp": ((b"WebPDecode", b"libwebp"), ("libwebp", "webm project")),
+}
+
+
+def native_blobs(data: bytes, depth: int = 0) -> list:
+    found = []
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        for entry in archive.infolist():
+            if entry.filename.lower().endswith(NATIVE):
+                require(entry.file_size <= MAX_ARCHIVE, "native_size")
+                found.append(archive.read(entry))
+            elif depth == 0 and entry.filename.endswith(".jar") and (entry.filename == "classes.jar" or
+                                                                     entry.filename.startswith("libs/")):
+                found += native_blobs(archive.read(entry), 1)
+    return found
+
+
+def embedded_components(files: list) -> list:
+    detected = set()
+    for _, data in files:
+        for blob_bytes in native_blobs(data):
+            for name, (signatures, _) in EMBEDDED.items():
+                if any(signature in blob_bytes for signature in signatures):
+                    detected.add(name)
+    return sorted(detected)
 
 
 def native_count(data: bytes, depth: int = 0) -> int:
@@ -781,6 +824,16 @@ def gradle_components(builder: Builder, root: Path, report_path: Path, cache: Pa
         if natives:
             sources["native_libraries"] = natives
         reviewed_native = bool(supplement and ascii_text(supplement.get("native_review") or "", 1024))
+        embedded = embedded_components(files) if natives else []
+        if embedded:
+            sources["embedded_native_components"] = embedded
+            shipped = b"\n".join(data for _, data in texts + retained_texts).decode("utf-8", "replace").lower()
+            missing = [name for name in embedded if not any(word in shipped for word in EMBEDDED[name][1])]
+            if missing:
+                builder.unresolved.append({"component": f"maven:{key}", "reason": "embedded_native_notice_missing",
+                                           "detail": "bundled native code contains " + ", ".join(missing) +
+                                                     " with no notice in the shipped texts"})
+                continue
         if natives and not texts and not retained_texts and not reviewed_native:
             # A bundled native library may embed third-party code whose notice
             # the Maven license declaration does not cover; require a package

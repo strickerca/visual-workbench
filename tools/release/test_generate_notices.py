@@ -120,6 +120,21 @@ class Selection(unittest.TestCase):
         self.assertEqual(row["selected"], "MIT")
         self.assertEqual([t["origin"] for t in row["texts"]], ["package:LICENSE-MIT"])
 
+    def test_declaration_only_records_declared_license_and_ships_package_files(self):
+        files = [("package:vendor/COPYING", BSD), ("package:vendor/PATENTS", b"Additional patent grant\n")]
+        b = self.builder()
+        b.add("cargo", "w-sys", "1.0.0", "MIT", [("MIT",)], files, "rust:t")
+        self.assertEqual(b.unresolved[-1]["reason"], "license_text_missing")
+        b = self.builder()
+        b.add("cargo", "w-sys", "1.0.0", "MIT", [("MIT",)], files, "rust:t", declaration_only=True)
+        row = self.only(b)
+        self.assertEqual(row["selected"], "MIT")
+        self.assertEqual([t["origin"] for t in row["texts"]], ["package:vendor/COPYING", "package:vendor/PATENTS"])
+        self.assertTrue(row["warnings"][0].startswith("declaration only:"))
+        b = self.builder()
+        b.add("cargo", "empty", "1.0.0", "MIT", [("MIT",)], [], "rust:t", declaration_only=True)
+        self.assertEqual(b.unresolved[-1]["reason"], "license_text_missing")  # nothing at all to ship
+
     def test_forced_selection_and_retained_texts(self):
         b = self.builder()
         b.add("maven", "jna", "5", "LGPL-2.1-or-later; Apache-2.0", [("LGPL-2.1-or-later", "Apache-2.0")],
@@ -414,6 +429,29 @@ class Generation(Fixture):
         bare = next(c for c in receipt["components"] if c["name"] == "org.example:apache-bare")
         self.assertIn("x.dll is the project's own Apache-2.0 JNI code", bare["warnings"])
         self.assertEqual(g.verify_bundle(raw, text)["status"], "complete")
+
+    def test_embedded_native_components_need_a_covering_notice(self):
+        body = jar({"lib/x.dll": b"MZ...deflate 1.3 Copyright Jean-loup Gailly and Mark Adler...", "LICENSE": APACHE})
+        for old in (self.gradle_cache / "org.example/apache-bare/2.0").glob("*/apache-bare-2.0.jar"):
+            old.unlink()
+        self.cache_file("org.example", "apache-bare", "2.0", "apache-bare-2.0.jar", body)
+        _, _, receipt = self.generate()
+        self.assertIn({"component": "maven:org.example:apache-bare:2.0", "reason": "embedded_native_notice_missing",
+                       "detail": "bundled native code contains zlib with no notice in the shipped texts"},
+                      receipt["unresolved"])
+        zlib = self.retain("zlib-LICENSE.txt", b"zlib License\nThis software is provided 'as-is'\n", "Zlib")
+        self.put(self.root / "third_party/LICENSES", json.dumps(
+            {"schema_version": 1, "files": sorted(self.retained.values(), key=lambda r: r["path"])}).encode())
+        path = self.root / "tools/licenses/notice-supplements.json"
+        supplements = json.loads(path.read_bytes())
+        supplements["components"] = [{"ecosystem": "maven", "name": "org.example:apache-bare", "version": "2.0",
+                                      "selected": None, "notices": [{"path": zlib, "sha256": sha(
+                                          self.root.joinpath(zlib).read_bytes())}]}]
+        path.write_bytes(json.dumps(supplements).encode())
+        _, _, receipt = self.generate()
+        self.assertEqual(receipt["status"], "complete", receipt["unresolved"])
+        bare = next(c for c in receipt["components"] if c["name"] == "org.example:apache-bare")
+        self.assertEqual(bare["sources"]["embedded_native_components"], ["zlib"])
 
     def test_gradle_cache_bytes_are_hash_bound(self):
         for path in (self.gradle_cache / "org.example/with-license/1.0").glob("*/with-license-1.0.jar"):
