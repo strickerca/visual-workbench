@@ -61,10 +61,12 @@ def main():
         subprocess.run(compile + ["-Xfriend-paths=" + str(out), "-classpath", runtime,
             str(shared / "jvmTest/kotlin/com/visualworkbench/shared/RemoteCompatibilityImportCases.kt"),
             str(shared / "jvmTest/kotlin/com/visualworkbench/shared/RemoteDrawingCheckCases.kt"),
-            str(shared / "jvmTest/kotlin/com/visualworkbench/shared/NativeDrawingOwnerCases.kt")], check=True, timeout=45)
+            str(shared / "jvmTest/kotlin/com/visualworkbench/shared/NativeDrawingOwnerCases.kt"),
+            str(shared / "jvmTest/kotlin/com/visualworkbench/shared/RemotePhysicalCompatibilityCases.kt")], check=True, timeout=45)
         subprocess.run([java, "-Xmx128m", "-cp", runtime, "com.visualworkbench.shared.RemoteCompatibilityImportCasesKt"], check=True, timeout=20)
         subprocess.run([java, "-Xmx128m", "-cp", runtime, "com.visualworkbench.shared.RemoteDrawingCheckCasesKt"], check=True, timeout=30)
         subprocess.run([java, "-Xmx128m", "-cp", runtime, "com.visualworkbench.shared.NativeDrawingOwnerCasesKt"], check=True, timeout=30)
+        subprocess.run([java, "-Xmx128m", "-cp", runtime, "com.visualworkbench.shared.RemotePhysicalCompatibilityCasesKt"], check=True, timeout=20)
         desktop = ROOT / "apps/desktop/src/main/kotlin/com/visualworkbench/desktop/remote/RemoteCompatibilityImport.kt"
         text = desktop.read_text()
         start, end = text.index("internal fun sameImportTarget("), text.index("private suspend fun chooseCompatibilityReceipt(")
