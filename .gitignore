@@ -28,3 +28,4 @@ __pycache__/
 *.p8
 
 **/node_modules/
+.claude/worktrees/

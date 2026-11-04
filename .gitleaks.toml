@@ -5,7 +5,7 @@ useDefault = true
 
 [[allowlists]]
 description = "Generated build output and preserved input packages are not source"
-paths = ['''(^|/)(target|build|build-hil|\.gradle|\.kotlin|\.local|\.git|fixtures-private|generated)/''']
+paths = ['''(^|/)(target|build|build-hil|\.gradle|\.kotlin|\.local|\.git|\.claude|fixtures-private|generated)/''']
 
 [[allowlists]]
 description = "Exact source SHA-256 entries whose Kotlin filenames contain Api; reviewed Phase 1 binding receipts"
