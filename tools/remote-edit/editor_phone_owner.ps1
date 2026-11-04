@@ -19,6 +19,9 @@ function Invoke-M4OwnedEditorPhoneStroke {
         [Parameter(Mandatory)][string]$PcUsbAddress,
         [Parameter(Mandatory)][string]$PhoneUsbAddress,
         [Parameter(Mandatory)][int]$Port,
+        # Owner-physical Paint block: the owner's pen, never a synthetic stroke.
+        [ValidateSet('paint-pressure','paint-hover','paint-barrel','paint-eraser','paint-eraser-tool')][string]$OwnerBlock,
+        [ValidateRange(0,64)][int]$OwnerStrokes=0,
         [ref]$Settlement
     )
     $repo=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -27,11 +30,15 @@ function Invoke-M4OwnedEditorPhoneStroke {
     # Only this source-owned boundary reports whether input was ever admitted.
     # A caller may retain the same mutable state object through every exception.
     $settlementState=[ordered]@{State='NoInputStarted';NativeReceiptPath=$null;ContractSha256=$null}
+    $ownerPhysical=[bool]$OwnerBlock
+    if($ownerPhysical -ne ($OwnerStrokes -gt 0) -or ($ownerPhysical -and $EditorKind -cne 'paint')){throw 'Owner-physical Paint block requires its stroke count'}
     if($null -ne $Settlement){$Settlement.Value=$settlementState}
     try{
         # The caller retains the complete current source/artifact cohort. These
         # executable owner dependencies are additionally leased across the call.
-        foreach($name in @('tools/remote-edit/integration_input_owner.ps1','tools/remote-edit/owned_editor_contract.ps1','tools/remote-edit/input_owner_contracts.ps1','tools/remote-edit/input_owner_startup.ps1','tools/remote-edit/input_process_output.cs','tools/process.psm1')){
+        $dependencies=@('tools/remote-edit/integration_input_owner.ps1','tools/remote-edit/owned_editor_contract.ps1','tools/remote-edit/input_owner_contracts.ps1','tools/remote-edit/input_owner_startup.ps1','tools/remote-edit/input_process_output.cs','tools/process.psm1')
+        if($ownerPhysical){$dependencies+=@('tools/remote-edit/physical_gesture_reports.py','tools/pen-inject/analyze.py')}
+        foreach($name in $dependencies){
             if(-not $SourceHashes.Contains($name) -or $SourceHashes[$name] -cnotmatch '\A[a-f0-9]{64}\z'){throw 'Bound editor phone dependency required'}
             $path=Join-Path $repo $name;$item=Get-Item -LiteralPath $path
             while($null -ne $item){if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){throw 'Redirected editor phone dependency'};$item=if($item -is [IO.DirectoryInfo]){$item.Parent}else{$item.Directory}}
@@ -66,7 +73,8 @@ function Invoke-M4OwnedEditorPhoneStroke {
         # this parent or destination while the inner release remains Pending.
         $nativePath=$null
         $settlementState.State='Pending'
-        & (Join-Path $PSScriptRoot 'integration_input_owner.ps1') -Execute -OwnerReady -ArtifactManifest $ArtifactManifest -ArtifactManifestSha256 $ArtifactManifestSha256 -UsbInterfaceIndex $UsbInterfaceIndex -UsbDeviceInstanceSha256 $UsbDeviceInstanceSha256 -PcUsbAddress $PcUsbAddress -PhoneUsbAddress $PhoneUsbAddress -Port $Port -InputScenario balanced -OwnedEditorContract $contractPath -OwnedEditorContractSha256 $contractHash -OwnedEditorOwner $OwnedEditor -CompletedReceiptPath ([ref]$nativePath)
+        $scenario=if($ownerPhysical){@{InputScenario='owner-physical';OwnerBlock=$OwnerBlock;OwnerStrokes=$OwnerStrokes}}else{@{InputScenario='balanced'}}
+        & (Join-Path $PSScriptRoot 'integration_input_owner.ps1') -Execute -OwnerReady -ArtifactManifest $ArtifactManifest -ArtifactManifestSha256 $ArtifactManifestSha256 -UsbInterfaceIndex $UsbInterfaceIndex -UsbDeviceInstanceSha256 $UsbDeviceInstanceSha256 -PcUsbAddress $PcUsbAddress -PhoneUsbAddress $PhoneUsbAddress -Port $Port @scenario -OwnedEditorContract $contractPath -OwnedEditorContractSha256 $contractHash -OwnedEditorOwner $OwnedEditor -CompletedReceiptPath ([ref]$nativePath)
         $ownerExit=$LASTEXITCODE;$returned=$true
         # The retained entry point returns its exact fresh receipt only after
         # actual settlement. Presence/exit alone is never input acceptance.
@@ -81,6 +89,18 @@ function Invoke-M4OwnedEditorPhoneStroke {
         if($null -eq $native -or -not(Test-M4InputRunnerRetired ([pscustomobject]$native) $native.run_id)){throw 'Actual editor phone/native/input/Job/IO settlement missing'}
         # Retirement is independent of the later phone/pixel acceptance verdict.
         $settlementState.State='Retired'
+        if($ownerPhysical){
+            # Physical provenance comes only from the inner closed validator.
+            $retainedName='physical-journal-'+$native.run_id+'.json'
+            if($ownerExit -ne 0 -or $native.status -cne 'passed' -or $native.physical_records_validated -ne $true -or $native.physical_owner_gesture -ne $true -or $native.software_generated_input -ne $false -or $native.physical_owner_block -cne $OwnerBlock -or $native.phone_render_records_validated -ne $true -or $native.external_editor_destination_retained -ne $true -or $native.editor_phone_records_validated -ne $false -or $native.controller_input_records_validated -ne $false -or $native.editor_effect -ne $false -or $native.owned_packages_cleanup -ne $true -or $native.physical_journal_retained -cne $retainedName -or $native.physical_journal_sha256 -cnotmatch '\A[a-f0-9]{64}\z'){throw 'Owned editor physical phone correlation failed'}
+            $journalPath=Join-Path $PrivateRunDirectory $retainedName
+            $item=Get-Item -LiteralPath $journalPath
+            while($null -ne $item){if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){throw 'Redirected physical journal'};$item=if($item -is [IO.DirectoryInfo]){$item.Parent}else{$item.Directory}}
+            $journalLease=[IO.File]::Open($journalPath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+            try{if([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($journalLease)).ToLowerInvariant() -cne $native.physical_journal_sha256){throw 'Retained physical journal changed'}}finally{$journalLease.Dispose()}
+            if(-not $OwnedEditor.IsOwnedJobMember([uint64]$Target.process_created) -or -not $OwnedEditor.MatchesSelectedOwnedWindow([long]$Target.window,[uint32]$Target.thread_id,[uint64]$Target.process_created)){throw 'Editor ownership changed after remote retirement'}
+            return [ordered]@{schema=1;status='phone-physical-correlated';block=$OwnerBlock;native_receipt_path=$nativePath;native_receipt_sha256=(Get-FileHash -LiteralPath $nativePath -Algorithm SHA256).Hash.ToLowerInvariant();contract_sha256=$contractHash;journal_path=$journalPath;journal_sha256=$native.physical_journal_sha256;actual_remote_retirement=$true;retained_parent_returned=$returned;receiver_observed=$false;editor_effect=$false;local_history_may_begin=$true;physical_owner_gesture=$true;software_generated_input=$false;latency_acceptance=$false}
+        }
         if($ownerExit -ne 0 -or $native.status -cne 'passed' -or $native.editor_phone_records_validated -ne $true -or $native.phone_render_records_validated -ne $true -or $native.external_editor_destination_retained -ne $true -or $native.controller_input_records_validated -ne $false -or $native.editor_effect -ne $false -or $native.owned_packages_cleanup -ne $true){throw 'Owned editor phone correlation failed'}
         if(-not $OwnedEditor.IsOwnedJobMember([uint64]$Target.process_created) -or -not $OwnedEditor.MatchesSelectedOwnedWindow([long]$Target.window,[uint32]$Target.thread_id,[uint64]$Target.process_created)){throw 'Editor ownership changed after remote retirement'}
         return [ordered]@{schema=1;status='phone-stroke-correlated';native_receipt_path=$nativePath;native_receipt_sha256=(Get-FileHash -LiteralPath $nativePath -Algorithm SHA256).Hash.ToLowerInvariant();contract_sha256=$contractHash;stroke_ppm=$contract.stroke_ppm;actual_remote_retirement=$true;retained_parent_returned=$returned;receiver_observed=$false;editor_effect=$false;local_history_may_begin=$true;physical_pen_fidelity=$false;latency_acceptance=$false}

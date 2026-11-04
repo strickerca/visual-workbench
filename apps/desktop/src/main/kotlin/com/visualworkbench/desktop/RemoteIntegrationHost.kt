@@ -78,6 +78,14 @@ internal object RemoteIntegrationHost {
             require(Files.size(heldScenarioPath) in 1..64)
             Files.readString(heldScenarioPath).also{require(it in setOf("pause-held","background-held","disconnect-held"))}
         }else null
+        // Owner-physical runs wait for the owner's strokes on the phone; the
+        // marker only extends this bounded wait and grants no input authority.
+        val physicalMarker=root.resolve("owner-physical")
+        val ownerPhysical=Files.exists(physicalMarker,LinkOption.NOFOLLOW_LINKS)
+        if(ownerPhysical){
+            require(controllerInput&&heldScenario==null);WindowsNativeFileGuard().check(physicalMarker)
+            require(Files.isRegularFile(physicalMarker,LinkOption.NOFOLLOW_LINKS)&&Files.size(physicalMarker)==32L&&Files.readString(physicalMarker)==runId)
+        }
         val editorMarker=root.resolve("owned-editor.txt")
         val editorKind=if(Files.exists(editorMarker,LinkOption.NOFOLLOW_LINKS)){
             require(controllerInput&&heldScenario==null)
@@ -96,7 +104,7 @@ internal object RemoteIntegrationHost {
         try {
             println("REMOTE_HOST_PHASE:host_owners_starting")
             cancellation=Cancellation()
-            withTimeout(180_000) {
+            withTimeout(if(ownerPhysical)360_000L else 180_000L) {
                 // From this point only the existing actual-retirement finally
                 // owns cleanup; a startup exception cannot claim no owners.
                 nativeOwnersStarted=true

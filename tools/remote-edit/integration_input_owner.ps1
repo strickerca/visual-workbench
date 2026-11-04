@@ -10,7 +10,9 @@ param(
     [Parameter(Mandatory)][string]$PcUsbAddress,
     [Parameter(Mandatory)][string]$PhoneUsbAddress,
     [Parameter(Mandatory)][int]$Port,
-    [ValidateSet("balanced","pause-held","background-held","disconnect-held")][string]$InputScenario="balanced",
+    [ValidateSet("balanced","pause-held","background-held","disconnect-held","owner-physical")][string]$InputScenario="balanced",
+    [ValidateSet('pressure','hover','barrel','eraser','paint-pressure','paint-hover','paint-barrel','paint-eraser','paint-eraser-tool')][string]$OwnerBlock,
+    [ValidateRange(0,64)][int]$OwnerStrokes=0,
     [string]$OwnedEditorContract,
     [string]$OwnedEditorContractSha256,
     [object]$OwnedEditorOwner,
@@ -25,10 +27,15 @@ Import-Module (Join-Path $root 'tools/process.psm1')
 . (Join-Path $PSScriptRoot 'input_owner_startup.ps1')
 Initialize-M4InputReaders
 $editorContractLease=$null
+# Owner-physical: no synthetic dispatch. paint-* blocks need the retained editor
+# parent; harness blocks use the owned receiver surface and refuse an editor.
+$ownerPhysical=$InputScenario -ceq 'owner-physical'
+if($ownerPhysical -ne [bool]$OwnerBlock -or $ownerPhysical -ne ($OwnerStrokes -gt 0)){throw 'Owner-physical scenario requires exactly its block and stroke count.'}
+if($ownerPhysical -and $OwnerBlock.StartsWith('paint-',[StringComparison]::Ordinal) -ne [bool]$OwnedEditorContract){throw 'Paint physical blocks require the retained editor parent.'}
 if($OwnedEditorContract -or $OwnedEditorContractSha256 -or $null -ne $OwnedEditorOwner){
     # This route is callable only by the in-process retained editor parent.
     # A path/JSON string without its live native Job owner is never sufficient.
-    if($InputScenario -cne 'balanced' -or -not $OwnedEditorContract -or $OwnedEditorContractSha256 -cnotmatch '\A[a-f0-9]{64}\z' -or $null -eq $OwnedEditorOwner -or $OwnedEditorOwner.GetType().FullName -cne 'M4FrameChild'){throw 'Actual retained editor owner required'}
+    if($InputScenario -cnotin @('balanced','owner-physical') -or-not $OwnedEditorContract -or $OwnedEditorContractSha256 -cnotmatch '\A[a-f0-9]{64}\z' -or $null -eq $OwnedEditorOwner -or $OwnedEditorOwner.GetType().FullName -cne 'M4FrameChild'){throw 'Actual retained editor owner required'}
     . (Join-Path $PSScriptRoot 'owned_editor_contract.ps1')
     $item=Get-Item -LiteralPath $OwnedEditorContract
     while($null -ne $item){if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){throw 'Redirected editor contract'};$item=if($item -is [IO.DirectoryInfo]){$item.Parent}else{$item.Directory}}
@@ -58,6 +65,7 @@ foreach($arg in @('-NoProfile','-File',(Join-Path $PSScriptRoot 'integration.ps1
 foreach($name in @('ArtifactManifest','ArtifactManifestSha256','UsbInterfaceIndex','UsbDeviceInstanceSha256','PcUsbAddress','PhoneUsbAddress','Port')){
     [void]$process.StartInfo.ArgumentList.Add('-'+$name);[void]$process.StartInfo.ArgumentList.Add([string]$PSBoundParameters[$name])
 }
+if($ownerPhysical){foreach($arg in @('-OwnerBlock',$OwnerBlock,'-OwnerStrokes',[string]$OwnerStrokes)){[void]$process.StartInfo.ArgumentList.Add($arg)}}
 if($null -ne $editorContractLease){
     foreach($name in @('OwnedEditorContract','OwnedEditorContractSha256')){[void]$process.StartInfo.ArgumentList.Add('-'+$name);[void]$process.StartInfo.ArgumentList.Add([string]$PSBoundParameters[$name])}
 }
@@ -91,7 +99,7 @@ function Wait-RetainedInputOwner {
         while($output.Lines.TryDequeue([ref]$line)){
             # Only source-owned bounded progress enters the console. Runner owns
             # the complete sanitized receipt; arbitrary native output stays private.
-            if($line -cmatch '^(?:Remote integration phase=[a-zA-Z0-9_-]+ waiting=[0-9]+s|Real remote integration: phase=[a-zA-Z0-9_-]{1,64} elapsed=[0-9]{1,9}s|Real remote integration stopped in phase=[a-zA-Z0-9_-]{1,64}\. Private details and addresses are withheld\.|Remote host failure: code=(?:none|closed|pending|partial_input|backpressure|timeout|transport|worker|unavailable|invalid|authentication|session_other|cancelled|argument|state|assertion|io|other)|Remote host retirement: first=(?:none|closed|pending|partial_input|backpressure|timeout|transport|worker|unavailable|invalid|authentication|session_other|cancelled|argument|state|assertion|io|other) current=(?:none|closed|pending|partial_input|backpressure|timeout|transport|worker|unavailable|invalid|authentication|session_other|cancelled|argument|state|assertion|io|other) attempts=[0-9]{1,19} failures=[0-9]{1,19}|Pending actual input/native/phone retirement; owned destination and Jobs remain alive|Retaining actual inputful Job/IO until exit and joins|Text-only integration receipt: remote-normal-integration-[a-f0-9]{32}\.json; status=[a-z]+)$'){try{Write-Host $line}catch{}}
+            if($line -cmatch '^(?:Remote integration phase=[a-zA-Z0-9_-]+ waiting=[0-9]+s|Real remote integration: phase=[a-zA-Z0-9_-]{1,64} elapsed=[0-9]{1,9}s|Real remote integration stopped in phase=[a-zA-Z0-9_-]{1,64}\. Private details and addresses are withheld\.|Remote host failure: code=(?:none|closed|pending|partial_input|backpressure|timeout|transport|worker|unavailable|invalid|authentication|session_other|cancelled|argument|state|assertion|io|other)|Remote host retirement: first=(?:none|closed|pending|partial_input|backpressure|timeout|transport|worker|unavailable|invalid|authentication|session_other|cancelled|argument|state|assertion|io|other) current=(?:none|closed|pending|partial_input|backpressure|timeout|transport|worker|unavailable|invalid|authentication|session_other|cancelled|argument|state|assertion|io|other) attempts=[0-9]{1,19} failures=[0-9]{1,19}|Pending actual input/native/phone retirement; owned destination and Jobs remain alive|Retaining actual inputful Job/IO until exit and joins|Text-only integration receipt: remote-normal-integration-[a-f0-9]{32}\.json; status=[a-z]+|Owner-physical pen test: block=[a-z-]{1,24} strokes=[1-9][0-9]?\. Follow the prompt on the phone once the remote window appears\.)$'){try{Write-Host $line}catch{}}
         }
         try{
             if((Test-M4InputChildSettled $entry) -and (Test-RunnerSettlement)){return}

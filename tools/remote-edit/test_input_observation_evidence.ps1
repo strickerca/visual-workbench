@@ -86,5 +86,29 @@ $refused=$false;try{[void](Get-M4HeldStatusLine 'INSTRUMENTATION_STATUS: remote_
 Check $refused 'Unknown strict lifecycle key admitted'
 $actualCalls=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.CommandAst] -and $n.GetCommandName() -ceq 'Get-M4HeldStatusLine'},$true))
 Check ($actualCalls.Count -eq 1) 'Tested strict reader is not wired into production runner'
-if($count -ne 30){throw 'Unexpected test census'}
-Write-Output 'Input observation pure cases: 30 passed; no process/device execution.'
+# Owner-physical: closed keys come from the actual Android producer; only the
+# exact physical route value is retained, and the strict reader is wired once.
+$physicalKeys=@([regex]::Matches($producerText,'putString\("(remote_physical_[a-z0-9_]+)"')|ForEach-Object{$_.Groups[1].Value}|Sort-Object -Unique)
+$physicalPatterns=Get-M4InputObservationPatterns 'physical'
+Check ($physicalKeys.Count -eq 11 -and ($physicalKeys -join ',') -ceq (@($physicalPatterns.Keys|Sort-Object) -join ',')) 'Producer and closed physical schema differ'
+$physicalValues=@{remote_physical_binding="3,$uuid,5,$uuid,1,$uuid";remote_physical_block='paint-pressure';remote_physical_strokes='6,6';remote_physical_samples='1234';remote_physical_sequences='1,1234';remote_physical_owner=$uuid;remote_physical_ack='40,12,1234';remote_physical_echo='1234,0,0';remote_physical_witness='2000,0';remote_physical_journal=('b'*64)+',345678';remote_physical_route='surface_touch,software_generated=false,physical_owner_gesture=true,window_delivered=true,synthetic_dispatches=0,ack_covered=true,latency_acceptance=false'}
+$state=New-M4InputObservationEvidence;$observed=New-M4InputObservationReceipt
+foreach($key in $physicalKeys){
+    $line="INSTRUMENTATION_STATUS: $key=$($physicalValues[$key])"
+    $parsed=Get-M4PhysicalStatusLine $line
+    if($null -eq $parsed -or $parsed.Value -cne $physicalValues[$key]){throw 'Strict physical reader dropped actual key'}
+    Add-M4InputObservationEvidence $state $observed $line
+}
+Add-M4InputObservationEvidence $state $observed 'INSTRUMENTATION_STATUS_CODE: 0'
+Check ($observed.physical.observed_count -eq 1 -and @($observed.physical.records[0].PSObject.Properties).Count -eq 11 -and $observed.physical.withheld_fields -eq 0 -and -not $observed.physical.records_validated -and -not $observed.physical.acceptance) 'Physical observation lost or gained authority'
+Add-M4InputObservationEvidence $state $observed 'INSTRUMENTATION_STATUS: remote_physical_route=surface_touch,software_generated=true,ghost_ack_fade=true,physical_pen_fidelity=false,editor_effect=false,latency_acceptance=false'
+Check ($observed.physical.withheld_fields -eq 1 -and $observed.physical.partial_record.remote_physical_route -ceq '[withheld]') 'Synthetic route admitted as physical'
+Add-M4InputObservationEvidence $state $observed 'INSTRUMENTATION_STATUS: remote_physical_route=surface_touch,software_generated=false,physical_owner_gesture=false,window_delivered=true,synthetic_dispatches=0,ack_covered=true,latency_acceptance=false'
+Check ($observed.physical.duplicate_fields -eq 1 -and $observed.balanced.observed_count -eq 0) 'Physical route value escaped or crossed kinds'
+$refused=$false;try{[void](Get-M4PhysicalStatusLine 'INSTRUMENTATION_STATUS: remote_physical_secret=private')}catch{$refused=$true}
+Check $refused 'Unknown strict physical key admitted'
+$physicalCalls=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.CommandAst] -and $n.GetCommandName() -ceq 'Get-M4PhysicalStatusLine'},$true))
+Check ($physicalCalls.Count -eq 1) 'Strict physical reader is not wired into production runner'
+Check ($source -cmatch "if\(\`$ownerPhysical\)\{\s*# Physical provenance is claimed only after its closed validator passed\.\s*if\(\`$receipt\.physical_records_validated -ne \`$true" -and $source -cmatch '\}else\{\$receipt\.software_generated_input=\$true\}') 'Physical route branch at software_generated_input missing'
+if($count -ne 37){throw 'Unexpected test census'}
+Write-Output 'Input observation pure cases: 37 passed; no process/device execution.'

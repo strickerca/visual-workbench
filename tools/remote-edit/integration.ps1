@@ -11,7 +11,9 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$')][string]$PhoneUsbAddress,
     [Parameter(Mandatory)][ValidateRange(1024,65535)][int]$Port,
     [switch]$ControllerInput,
-    [ValidateSet("balanced","pause-held","background-held","disconnect-held")][string]$InputScenario="balanced",
+    [ValidateSet("balanced","pause-held","background-held","disconnect-held","owner-physical")][string]$InputScenario="balanced",
+    [ValidateSet('pressure','hover','barrel','eraser','paint-pressure','paint-hover','paint-barrel','paint-eraser','paint-eraser-tool')][string]$OwnerBlock,
+    [ValidateRange(0,64)][int]$OwnerStrokes=0,
     [string]$RetainedInputGate,
     [string]$RetainedInputNonce,
     [string]$OwnedEditorContract,
@@ -29,7 +31,14 @@ $packages=@('com.visualworkbench.android.hil','com.visualworkbench.android.hil.t
 $instrumentationSelection='com.visualworkbench.android.remote.RemoteNormalPathInstrumentedTest'
 if($ControllerInput){if([string]::IsNullOrEmpty($RetainedInputGate) -or $RetainedInputNonce -cnotmatch '^[a-f0-9]{32}$'){throw 'Use the retained input owner entry point.'}}elseif($RetainedInputGate -or $RetainedInputNonce){throw 'Unexpected retained input parent gate.'}
 if(-not $ControllerInput -and $InputScenario -cne 'balanced'){throw 'Held scenario requires retained controller-input owner.'}
-if($OwnedEditorContract -or $OwnedEditorContractSha256){if(-not $ControllerInput -or $InputScenario -cne 'balanced' -or -not $OwnedEditorContract -or $OwnedEditorContractSha256 -cnotmatch '\A[a-f0-9]{64}\z'){throw 'Explicit balanced retained editor route required'}}
+# Owner-physical: only the owner's pen produces input. Harness blocks use the
+# owned receiver surface; paint-* blocks require the retained editor route.
+$ownerPhysical=$InputScenario -ceq 'owner-physical'
+if($ownerPhysical -ne [bool]$OwnerBlock -or $ownerPhysical -ne ($OwnerStrokes -gt 0)){throw 'Owner-physical scenario requires exactly its block and stroke count.'}
+$heldScenario=$InputScenario -cin @('pause-held','background-held','disconnect-held')
+$paintPhysical=$ownerPhysical -and $OwnerBlock.StartsWith('paint-',[StringComparison]::Ordinal)
+if($ownerPhysical -and $paintPhysical -ne [bool]$OwnedEditorContract){throw 'Paint physical blocks require the retained editor route; harness blocks refuse it.'}
+if($OwnedEditorContract -or $OwnedEditorContractSha256){if(-not $ControllerInput -or $InputScenario -cnotin @('balanced','owner-physical') -or -not $OwnedEditorContract -or $OwnedEditorContractSha256 -cnotmatch '\A[a-f0-9]{64}\z'){throw 'Explicit balanced retained editor route required'}}
 $ownedEditor=$null
 $runId=if($ControllerInput){$RetainedInputNonce}else{[guid]::NewGuid().ToString('N')}
 $temporaryParent=[IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
@@ -78,6 +87,11 @@ $hostStreamCounterKeys=@('capture_polls','capture_idle','encoded_frames','config
 $streamCounterKeys=@('capture_polls','capture_idle','encoded_frames','config_enqueued','media_enqueued','config_received','media_received','media_no_config','media_retired','media_admitted','frame_taken','state_published','state_stale','frames_emitted','frame_scope_discarded','frames_received','scope_discarded','inactive_discarded','surface_waited','surface_deadline','surface_invalidated','decoder_opened','decoder_refused','startup_failed','frames_queued','queue_refused','rendered')
 $diagnostics=[Collections.Generic.List[object]]::new();$diagnosticTotal=0;$diagnosticDropped=0;$phoneRetired=$false;$startupProof=$null
 $receipt=[ordered]@{schema=1;kind='normal-native-remote-usb-integration';status='failed';failure_phase=$phase;run_id=$runId;model='SM-S918U';source_count=0;artifact_manifest_sha256=$ArtifactManifestSha256;carrier='QuicTether';physical_route_verified=$false;owner_user=0;profiles_preserved=$false;phone_render_records=@();phone_render_observed_count=0;phone_render_records_validated=$false;render_validation_reason_code=$null;phone_render_partial_record=$null;phone_render_observations_omitted=0;phone_phase_transitions=@();phone_phase_transitions_omitted=0;phone_last_phase=$null;phone_stream_snapshots=[ordered]@{};host_source_selections=@();host_carrier_diagnostic=$null;host_first_carrier_failure=$null;host_carrier_snapshot_available=$false;host_first_run_failure=$null;host_retirement_diagnostic=$null;host_grant_diagnostic=$null;host_grant_failure=$null;receiver_observation=$null;receiver_journal_evidence=$null;receiver_evidence_capture_failed=$false;controller_input_validation_reason=$null;controller_input_records_validated=$false;editor_phone_records_validated=$false;owned_editor_contract_sha256=$OwnedEditorContractSha256;external_editor_destination_retained=$false;phone_actual_retirement=$false;host_actual_retirement=$false;process_cleanup=$false;owned_packages_cleanup=$false;private_work_disposed=$false;input_grant_attempted=$false;input_granted=$false;input_attempted=$false;input_dispatch_completed=$false;input_retirement_confirmed=$false;retained_input_nonce=$RetainedInputNonce;controller_input_requested=[bool]$ControllerInput;controller_input_scenario=$InputScenario;held_lifecycle_records=@();held_lifecycle_records_validated=$false;held_lifecycle_validation_reason=$null;held_lifecycle_evidence=$null;held_evidence_capture_failed=$false;controller_input_records=@();owned_receiver_counts=$null;software_generated_input=$false;physical_pen_fidelity=$false;editor_effect=$false;latency_acceptance=$false;screenshots_created=0;failure_error_type=$null;failure_error_code=$null;diagnostic_records=@();diagnostic_total=0;diagnostic_dropped=0;phone_retirement_phase_seen=$false;phone_no_owner_startup_proven=$false;host_no_owner_startup_proven=$false}
+foreach($key in @('physical_owner_gesture','physical_records_validated')){$receipt[$key]=$false}
+$receipt.physical_owner_block=if($ownerPhysical){$OwnerBlock}else{$null};$receipt.physical_owner_strokes=$OwnerStrokes
+foreach($key in @('physical_journal_sha256','physical_journal_bytes','physical_validation_reason','physical_validation','physical_evidence','physical_journal_retained')){$receipt[$key]=$null}
+$receipt.physical_records=@()
+$physicalRecords=[Collections.Generic.List[object]]::new();$physicalRecord=@{};$physicalJournal=$null
 . (Join-Path $PSScriptRoot 'render_observation_evidence.ps1')
 . (Join-Path $PSScriptRoot 'receiver_observation.ps1')
 . (Join-Path $PSScriptRoot 'input_observation_evidence.ps1')
@@ -116,6 +130,48 @@ function Publish-HeldPhoneGate {
     $gatePath="no_backup/remote-integration-$runId/held-native-ready"
     $command="run-as $($packages[0]) sh -c 'test ! -e $gatePath && test ! -e $gatePath.tmp && echo $encoded | base64 -d > $gatePath.tmp && mv $gatePath.tmp $gatePath'"
     [void](Adb 'publish-owned-held-trigger-gate' @('shell',$command))
+}
+# The phone wrote its journal into the exact owned package's private run
+# directory. Pull those bytes through bounded run-as, require the phone's own
+# size/hash claim, then answer with the hash before the phone disposes them.
+function Receive-M4PhysicalJournal($Record){
+    $parts=([string]$Record.remote_physical_journal).Split(',')
+    if($parts.Count -ne 2 -or $parts[0] -cnotmatch '\A[a-f0-9]{64}\z' -or $parts[1] -cnotmatch '\A[1-9][0-9]{0,6}\z' -or [long]$parts[1] -gt 6291456){throw 'Physical journal claim refused.'}
+    $remotePath="no_backup/remote-integration-$runId/physical-journal.json"
+    $size=Adb 'stat-owned-physical-journal' @('shell',"run-as $($packages[0]) stat -c %s $remotePath") 15
+    $sizeLines=@($size.Lines|ForEach-Object{$_.Trim()}|Where-Object{$_})
+    if($sizeLines.Count -ne 1 -or $sizeLines[0] -cnotmatch '\A[0-9]{1,8}\z' -or [long]$sizeLines[0] -ne [long]$parts[1]){throw 'Physical journal size differs from phone claim.'}
+    $pulled=Adb 'pull-owned-physical-journal' @('shell',"run-as $($packages[0]) base64 $remotePath") 90
+    $text=(@($pulled.Lines|ForEach-Object{$_.Trim()})-join '')
+    if($text.Length -gt 8400000 -or $text -cnotmatch '\A[A-Za-z0-9+/]+={0,2}\z'){throw 'Physical journal transfer refused.'}
+    $bytes=[Convert]::FromBase64String($text)
+    if($bytes.Length -ne [long]$parts[1] -or (Hash-Bytes $bytes) -cne $parts[0]){throw 'Pulled physical journal differs from phone hash.'}
+    $local=Join-Path $owned 'physical-journal.json'
+    $f=[IO.File]::Open($local,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read)
+    try{$f.Write($bytes,0,$bytes.Length);$f.Flush($true)}finally{$f.Dispose()}
+    Pin-File $local $parts[0]
+    $script:physicalJournal=[pscustomobject]@{Path=$local;Sha256=$parts[0];Bytes=$bytes.Length}
+    $receipt.physical_journal_sha256=$parts[0];$receipt.physical_journal_bytes=$bytes.Length
+    $values=@('M4_PHYSICAL_JOURNAL_PULLED_V1',$runId,$parts[0])
+    $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($values -join "`n")))
+    # Only a fixed header, hex run ID/hash and base64 enter this exact owned
+    # package's private no_backup path. No global ADB/network settings change.
+    $gatePath="no_backup/remote-integration-$runId/physical-journal-pulled"
+    $command="run-as $($packages[0]) sh -c 'test ! -e $gatePath && test ! -e $gatePath.tmp && echo $encoded | base64 -d > $gatePath.tmp && mv $gatePath.tmp $gatePath'"
+    [void](Adb 'publish-physical-journal-pulled' @('shell',$command))
+}
+function Save-M4PhysicalValidationReport($Result){
+    $text=$Result.Lines -join "`n"
+    if($text.Length -gt 131072){throw 'Bounded physical validator response unavailable.'}
+    try{$report=$text|ConvertFrom-Json -ErrorAction Stop}catch{throw 'Bounded physical validator response unavailable.'}
+    if($report.schema -ne 1 -or $report.operation -cne 'remote-physical-gesture' -or $report.status -cnotin @('passed','rejected') -or $report.records_validated -isnot [bool] -or $report.physical_owner_gesture -isnot [bool] -or $report.rejection_reason -cnotmatch '\A[a-z_]{1,48}\z' -or $report.evidence.schema -ne 1 -or $report.evidence.acceptance -ne $false){throw 'Bounded physical validator response unavailable.'}
+    # Source-bound Python emits only closed labels, counts and hashes.
+    $receipt.physical_evidence=$report.evidence;$receipt.physical_validation_reason=$report.rejection_reason
+    if($report.status -ceq 'passed'){
+        if($report.validation.physical_owner_gesture -ne $true -or $report.validation.software_generated_input -ne $false -or $report.validation.latency_acceptance -ne $false -or $report.validation.journal_sha256 -cne $physicalJournal.Sha256){throw 'Bounded physical validator response unavailable.'}
+        $receipt.physical_validation=$report.validation
+    }
+    return $report
 }
 function Get-IntegrationDiagnosticLine([string]$Line){
     if($null -eq $Line -or $Line.Length -gt 2048){return $null}
@@ -632,7 +688,7 @@ try {
     if($null -eq $artifact.android_fixture_features -or ($fixtureFeatures.Count -ne 0 -and ($fixtureFeatures.Count -ne 1 -or $fixtureFeatures[0] -cne 'integration-carrier-fault'))){throw 'Closed fixture feature inventory required.'}
     $hostFixtureFeatures=@($artifact.host_fixture_features)
     if($null -eq $artifact.host_fixture_features -or ($hostFixtureFeatures.Count -ne 0 -and ($hostFixtureFeatures.Count -ne 1 -or $hostFixtureFeatures[0] -cne 'integration-carrier-fault'))){throw 'Closed host fixture feature inventory required.'}
-    if($InputScenario -cne 'balanced' -and ($fixtureFeatures -cnotcontains 'integration-carrier-fault' -or $hostFixtureFeatures -cnotcontains 'integration-carrier-fault')){throw 'Held scenarios require explicit host and Android fixture features before input.'}
+    if($heldScenario -and ($fixtureFeatures -cnotcontains 'integration-carrier-fault' -or $hostFixtureFeatures -cnotcontains 'integration-carrier-fault')){throw 'Held scenarios require explicit host and Android fixture features before input.'}
     if(@($artifact.sources).Count -lt 25 -or @($artifact.classpath_bindings).Count -lt 10){throw 'Concrete source/classpath bindings missing.'}
     if($artifact.inventory_only -ne $true -or $artifact.root_build_review_required -ne $true -or @($artifact.build_receipts).Count -lt 3){throw 'Root-reviewed fresh build receipt bindings required.'}
     Pin-File $artifact.source_map.path $artifact.source_map.sha256
@@ -709,10 +765,12 @@ try {
         Assert-M4OwnedEditorAlive $ownedEditor
         $receipt.external_editor_destination_retained=$true
     }
-    if($InputScenario -cne 'balanced'){[IO.File]::WriteAllText((Join-Path $owned 'held-scenario'),$InputScenario,[Text.UTF8Encoding]::new($false))}
+    if($heldScenario){[IO.File]::WriteAllText((Join-Path $owned 'held-scenario'),$InputScenario,[Text.UTF8Encoding]::new($false))}
     if($ControllerInput){[IO.File]::WriteAllText((Join-Path $owned 'controller-input-owner'),$runId,[Text.UTF8Encoding]::new($false))}
+    # Marker only extends the host's bounded wait for owner strokes; no authority.
+    if($ownerPhysical){[IO.File]::WriteAllText((Join-Path $owned 'owner-physical'),$runId,[Text.UTF8Encoding]::new($false))}
     if($null -eq $ownedEditor){
-    $surfaceMode=if($ControllerInput){'--surface-controller'}else{'--surface'}
+    $surfaceMode=if($ownerPhysical){'--surface-controller-physical'}elseif($ControllerInput){'--surface-controller'}else{'--surface'}
     $surface=Start-Owned 'owned-wgc-target' $artifact.harness.path @($surfaceMode,(Join-Path $owned 'window'),'80') $true
     $script:phase='owned_target_readiness';$clock=[Diagnostics.Stopwatch]::StartNew()
     $targetFile=Join-Path $owned 'window/target.json'
@@ -748,14 +806,17 @@ try {
     # invocation. It and addresses are redacted before any output/log recording.
     $instrumentArgs=@('-s',$device.Serial,'shell','am','instrument','--user','0','-w','-r','-e','class',$instrumentationSelection,'-e','remoteRunId',$runId,'-e','remoteBootstrap',$bootstrap)
     if($ControllerInput){$instrumentArgs+=@('-e','remoteControllerInput','true','-e','remoteInputScenario',$InputScenario)}
-    if($null -ne $ownedEditor){Assert-M4OwnedEditorAlive $ownedEditor;$instrumentArgs+=@('-e','remoteOwnedEditorKind',$ownedEditor.editor_kind,'-e','remoteEditorStroke',($ownedEditor.stroke_ppm -join ','))}
+    if($ownerPhysical){$instrumentArgs+=@('-e','remoteOwnerBlock',$OwnerBlock,'-e','remoteOwnerStrokes',[string]$OwnerStrokes)}
+    if($null -ne $ownedEditor){Assert-M4OwnedEditorAlive $ownedEditor;if(-not $ownerPhysical){$instrumentArgs+=@('-e','remoteOwnedEditorKind',$ownedEditor.editor_kind,'-e','remoteEditorStroke',($ownedEditor.stroke_ppm -join ','))}}
     $instrumentArgs+=($packages[1]+'/androidx.test.runner.AndroidJUnitRunner')
+    if($ownerPhysical){Write-Host "Owner-physical pen test: block=$OwnerBlock strokes=$OwnerStrokes. Follow the prompt on the phone once the remote window appears."}
     $instrument=Start-Owned 'real-phone-controller' $device.AdbPath $instrumentArgs
     $clock=[Diagnostics.Stopwatch]::StartNew();$next=0;$restart=1;$phoneRetired=$false;$ok=$false;$failure=$false;$record=@{}
     $script:phase='phone-controller-start'
     while(-not $instrument.Process.HasExited -or -not $instrument.Output.IsComplete -or -not $instrument.Output.Lines.IsEmpty){
         Drain-IntegrationDiagnostics $hostOwner
-        if($clock.Elapsed.TotalSeconds -ge 180){throw 'Real phone integration deadline exceeded.'}
+        # Owner strokes (<=120 s) plus ACK/pull waits extend only this route.
+        if($clock.Elapsed.TotalSeconds -ge $(if($ownerPhysical){360}else{180})){throw 'Real phone integration deadline exceeded.'}
         if($hostOwner.Process.HasExited){throw 'Real host exited during phone integration.'}
         $line=$null
         while($instrument.Output.Lines.TryDequeue([ref]$line)){
@@ -764,13 +825,23 @@ try {
                 if(-not $ControllerInput -or $inputRecord.ContainsKey($Matches[1])){throw 'Unexpected/duplicate actual controller input record.'}
                 $inputRecord[$Matches[1]]=$Matches[2]
             }
+            elseif($null -ne ($physicalStatus=Get-M4PhysicalStatusLine $line)){
+                if(-not $ownerPhysical -or $physicalRecord.ContainsKey($physicalStatus.Key)){throw 'Unexpected/duplicate physical gesture record.'}
+                $physicalRecord[$physicalStatus.Key]=$physicalStatus.Value
+            }
+            elseif($line -ceq 'INSTRUMENTATION_STATUS_CODE: 0' -and $physicalRecord.Count -gt 0){$physicalRecords.Add([pscustomobject]$physicalRecord);$physicalRecord=@{}}
+            elseif($line -ceq 'INSTRUMENTATION_STATUS: remote_phase=physical_journal_ready'){
+                if(-not $ownerPhysical -or $physicalRecords.Count -ne 1 -or $physicalRecord.Count -ne 0 -or $null -ne $physicalJournal){throw 'Unexpected physical journal phase.'}
+                $script:phase='phone-physical-journal-pull'
+                Receive-M4PhysicalJournal $physicalRecords[0]
+            }
             elseif($null -ne ($heldStatus=Get-M4HeldStatusLine $line)){
-                if(-not $ControllerInput -or $InputScenario -ceq 'balanced' -or $lifecycleRecord.ContainsKey($heldStatus.Key)){throw 'Unexpected held lifecycle record.'}
+                if(-not $ControllerInput -or -not $heldScenario -or $lifecycleRecord.ContainsKey($heldStatus.Key)){throw 'Unexpected held lifecycle record.'}
                 $lifecycleRecord[$heldStatus.Key]=$heldStatus.Value
             }
             elseif($line -ceq 'INSTRUMENTATION_STATUS_CODE: 0' -and $lifecycleRecord.Count -gt 0){$lifecycleRecords.Add([pscustomobject]$lifecycleRecord);$lifecycleRecord=@{}}
             elseif($line -ceq 'INSTRUMENTATION_STATUS: remote_phase=controller_input_held_ready'){
-                if($InputScenario -ceq 'balanced'){throw 'Unexpected held pre-Down phase.'}
+                if(-not $heldScenario){throw 'Unexpected held pre-Down phase.'}
                 $armed=Await-File 'held-witness-armed' 15 $hostOwner;Assert-Plain $armed
                 if([IO.File]::ReadAllText($armed) -cne $runId){throw 'Exact host witness arm missing.'}
                 $gatePath="no_backup/remote-integration-$runId/held-host-armed"
@@ -779,7 +850,7 @@ try {
                 [void](Adb 'publish-exact-host-witness-arm' @('shell',$command))
             }
             elseif($line -ceq 'INSTRUMENTATION_STATUS: remote_phase=controller_input_held_admitted'){
-                if($InputScenario -ceq 'balanced' -or $null -ne $heldPrefix){throw 'Unexpected held input phase.'}
+                if(-not $heldScenario -or $null -ne $heldPrefix){throw 'Unexpected held input phase.'}
                 $journal=Join-Path $owned 'window/received.jsonl';Assert-Plain $journal
                 [void](Run 'prove-actual-native-held-prefix' 'python.exe' @((Join-Path $PSScriptRoot 'controller_lifecycle_reports.py'),'ready',$journal,(Join-Path $owned 'held-native-prefix.json'),$runId,$InputScenario) 15)
                 $heldPrefix=Get-Content -Raw -LiteralPath (Join-Path $owned 'held-native-prefix.json')|ConvertFrom-Json
@@ -793,7 +864,7 @@ try {
             elseif($line -ceq 'INSTRUMENTATION_STATUS: remote_phase=controller_input_ready'){
                 if(-not $ControllerInput){throw 'Unexpected actual controller input phase.'}
                 $script:phase='phone-controller-input-grant';Assert-UsbRoute
-                if($InputScenario -cne 'balanced' -and -not ('VwHeldClockR24' -as [type])){Add-Type -Path (Join-Path $PSScriptRoot 'lifecycle_clock.cs')}
+                if($heldScenario -and -not ('VwHeldClockR24' -as [type])){Add-Type -Path (Join-Path $PSScriptRoot 'lifecycle_clock.cs')}
                 # Record possible native grant before publishing its trigger.
                 $receipt.input_grant_attempted=$null;$receipt.input_granted=$null;$receipt.input_attempted=$null;$receipt.input_dispatch_completed=$null
                 [IO.File]::WriteAllText((Join-Path $owned 'input-ready'),$runId,[Text.UTF8Encoding]::new($false))
@@ -835,7 +906,7 @@ try {
     # This census is observation only. Preserve it even if the strict parser or
     # its process fails, so a later failure cannot masquerade as zero renders.
     if($receipt.phone_render_observed_count -ne $records.Count){throw 'Exact render observation census differs from case records.'}
-    $validation=Run 'validate-exact-render-records' 'python.exe' @((Join-Path $projectRoot 'tools/remote-edit/integration_reports.py'),(Join-Path $owned 'render-records.json'),$InputScenario) 30 -AllowNonzero
+    $validation=Run 'validate-exact-render-records' 'python.exe' @((Join-Path $projectRoot 'tools/remote-edit/integration_reports.py'),(Join-Path $owned 'render-records.json'),$(if($ownerPhysical){'balanced'}else{$InputScenario})) 30 -AllowNonzero
     $validationText=$validation.Lines -join "`n"
     if($validationText.Length -gt 16384){throw 'Exact render validator response unavailable.'}
     try{$verdict=$validationText|ConvertFrom-Json -ErrorAction Stop}catch{throw 'Exact render validator response unavailable.'}
@@ -852,7 +923,7 @@ try {
     $proof=Get-Content -Raw -LiteralPath (Join-Path $owned 'host-receipt.txt')
     if($proof -notmatch '(?m)^actual_owners_retired=true$'){throw 'Host native helper ownership not retired.'}
     if($ControllerInput){
-        if(($InputScenario -ceq 'balanced' -and ($inputRecords.Count -ne 1 -or $lifecycleRecords.Count -ne 0)) -or ($InputScenario -cne 'balanced' -and ($inputRecords.Count -ne 0 -or $lifecycleRecords.Count -ne 1 -or -not $lifecycleTriggered)) -or $inputRecord.Count -ne 0 -or $lifecycleRecord.Count -ne 0 -or $proof -cnotmatch '(?m)^input_granted=true$' -or $proof -cnotmatch '(?m)^controller_input_complete=true$'){throw 'Exact actual controller input/host census failed.'}
+        if(($InputScenario -ceq 'balanced' -and ($inputRecords.Count -ne 1 -or $lifecycleRecords.Count -ne 0)) -or ($heldScenario -and ($inputRecords.Count -ne 0 -or $lifecycleRecords.Count -ne 1 -or -not $lifecycleTriggered)) -or ($ownerPhysical -and ($inputRecords.Count -ne 0 -or $lifecycleRecords.Count -ne 0 -or $physicalRecords.Count -ne 1 -or $null -eq $physicalJournal)) -or (-not $ownerPhysical -and $physicalRecords.Count -ne 0) -or $physicalRecord.Count -ne 0 -or $inputRecord.Count -ne 0 -or $lifecycleRecord.Count -ne 0 -or $proof -cnotmatch '(?m)^input_granted=true$' -or $proof -cnotmatch '(?m)^controller_input_complete=true$'){throw 'Exact actual controller input/host census failed.'}
         # Close the paint-only owned surface after both actual native host and
         # phone owners retired, then read its complete real receiver journal.
         if(-not(Test-M4InputHostRetired $proof $runId $hostOwner.Process.Id)){throw 'Host actual retirement binding failed.'}
@@ -865,9 +936,15 @@ try {
         $receiver=Get-Content -Raw -LiteralPath $receiverFile|ConvertFrom-Json
         if($receiver.Count -ne 6){throw 'Owned input receiver category census failed.'}
         $receivedFile=Join-Path $owned 'window/received.jsonl';Assert-Plain $receivedFile
-        if((Get-Item -LiteralPath $receivedFile).Length -gt 262144){throw 'Owned receiver journal exceeds bound.'}
+        if((Get-Item -LiteralPath $receivedFile).Length -gt $(if($ownerPhysical){16777216}else{262144})){throw 'Owned receiver journal exceeds bound.'}
         $inputPath=Join-Path $owned 'controller-input-records.json';[IO.File]::WriteAllText($inputPath,(ConvertTo-Json -InputObject @($inputRecords) -Depth 8),[Text.UTF8Encoding]::new($false))
-        if($InputScenario -ceq 'balanced'){
+        if($ownerPhysical){
+            $physicalPath=Join-Path $owned 'physical-records.json';[IO.File]::WriteAllText($physicalPath,(ConvertTo-Json -InputObject @($physicalRecords) -Depth 8),[Text.UTF8Encoding]::new($false))
+            $physicalValidation=Run 'validate-owner-physical-gesture' 'python.exe' @((Join-Path $PSScriptRoot 'physical_gesture_reports.py'),'harness',$physicalJournal.Path,$physicalPath,(Join-Path $owned 'render-records.json'),$receiverFile,$receivedFile) 90 -AllowNonzero
+            $physicalVerdict=Save-M4PhysicalValidationReport $physicalValidation
+            if($physicalValidation.ExitCode -ne 0 -or $physicalVerdict.status -cne 'passed' -or $physicalVerdict.records_validated -ne $true -or $physicalVerdict.physical_owner_gesture -ne $true){throw 'Owner physical gesture validation rejected observed evidence.'}
+            $receipt.physical_records_validated=$true
+        }elseif($InputScenario -ceq 'balanced'){
         $inputValidation=Run 'validate-actual-controller-input' 'python.exe' @((Join-Path $projectRoot 'tools/remote-edit/controller_input_reports.py'),$inputPath,(Join-Path $owned 'render-records.json'),$receiverFile,$receivedFile) 30 -AllowNonzero
         $inputVerdict=Save-M4ControllerValidationReport $inputValidation
         if($inputValidation.ExitCode -ne 0 -or $inputVerdict.status -cne 'passed' -or $inputVerdict.records_validated -ne $true -or $inputVerdict.rejection_reason -cne 'none'){throw 'Actual controller input validation rejected observed evidence.'}
@@ -884,14 +961,34 @@ try {
             # Preserve the strict phone admission/ACK/ghost correlation while
             # leaving actual editor pixels to the still-retained parent.
             Assert-M4OwnedEditorAlive $ownedEditor
+            if($ownerPhysical){
+                # Paint block: phone provenance/ACK only. Editor pixels remain the
+                # retained parent's evidence, so the exact journal is handed back.
+                $physicalPath=Join-Path $owned 'physical-records.json';[IO.File]::WriteAllText($physicalPath,(ConvertTo-Json -InputObject @($physicalRecords) -Depth 8),[Text.UTF8Encoding]::new($false))
+                $physicalValidation=Run 'validate-owner-physical-phone' 'python.exe' @((Join-Path $PSScriptRoot 'physical_gesture_reports.py'),'phone',$physicalJournal.Path,$physicalPath,(Join-Path $owned 'render-records.json')) 90 -AllowNonzero
+                $physicalVerdict=Save-M4PhysicalValidationReport $physicalValidation
+                if($physicalValidation.ExitCode -ne 0 -or $physicalVerdict.status -cne 'passed' -or $physicalVerdict.records_validated -ne $true -or $physicalVerdict.physical_owner_gesture -ne $true){throw 'Owner physical phone validation rejected observed evidence.'}
+                $retained=Join-Path ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($OwnedEditorContract))) ('physical-journal-'+$runId+'.json')
+                Assert-Plain ([IO.Path]::GetDirectoryName($retained))
+                [IO.File]::Copy($physicalJournal.Path,$retained,$false)
+                if((Get-FileHash -LiteralPath $retained -Algorithm SHA256).Hash.ToLowerInvariant() -cne $physicalJournal.Sha256){throw 'Retained physical journal copy differs.'}
+                $receipt.physical_journal_retained=[IO.Path]::GetFileName($retained)
+                $receipt.physical_records_validated=$true
+            }else{
             $inputPath=Join-Path $owned 'controller-input-records.json';[IO.File]::WriteAllText($inputPath,(ConvertTo-Json -InputObject @($inputRecords) -Depth 8),[Text.UTF8Encoding]::new($false))
             $inputValidation=Run 'validate-editor-phone-correlation' 'python.exe' @((Join-Path $PSScriptRoot 'editor_phone_reports.py'),$inputPath,(Join-Path $owned 'render-records.json')) 30 -AllowNonzero
             if($inputValidation.Lines.Count -ne 1){throw 'Bounded editor phone verdict required'}
             $inputVerdict=$inputValidation.Lines[0]|ConvertFrom-Json -AsHashtable
             if($inputValidation.ExitCode -ne 0 -or $inputVerdict.status -cne 'passed' -or $inputVerdict.operation -cne 'owned-editor-phone-correlation' -or $inputVerdict.phone_records_validated -ne $true -or $inputVerdict.receiver_observed -ne $false -or $inputVerdict.editor_effect -ne $false){throw 'Editor phone correlation refused'}
             $receipt.editor_phone_records_validated=$true
+            }
         }
-        $receipt.controller_input_records=@($inputRecords);$receipt.input_granted=$true;$receipt.input_attempted=$true;$receipt.input_dispatch_completed=$true;$receipt.software_generated_input=$true
+        $receipt.controller_input_records=@($inputRecords);$receipt.input_granted=$true;$receipt.input_attempted=$true;$receipt.input_dispatch_completed=$true
+        if($ownerPhysical){
+            # Physical provenance is claimed only after its closed validator passed.
+            if($receipt.physical_records_validated -ne $true -or $null -eq $receipt.physical_validation){throw 'Owner physical route requires its passed validator.'}
+            $receipt.physical_records=@($physicalRecords);$receipt.software_generated_input=$false;$receipt.physical_owner_gesture=$true
+        }else{$receipt.software_generated_input=$true}
     }elseif($inputRecords.Count -ne 0 -or $inputRecord.Count -ne 0){throw 'Unexpected controller input receipt in viewing-only route.'}
     $receipt.host_actual_retirement=$true
     if($ControllerInput){$receipt.input_retirement_confirmed=$true}
@@ -980,7 +1077,9 @@ try {
     # Capture final receiver observations only after actual destination/owner
     # settlement, including when an earlier rendering/input phase threw.
     $receiverEvidenceRetained=$true
-    if($ControllerInput -and $created -and $allClean -and (Test-Path -LiteralPath (Join-Path $owned 'window/received.jsonl') -PathType Leaf)){
+    # The owner-physical receiver journal exceeds the legacy observer bound; its
+    # closed physical validator report retains that route's evidence instead.
+    if($ControllerInput -and -not $ownerPhysical -and $created -and $allClean -and (Test-Path -LiteralPath (Join-Path $owned 'window/received.jsonl') -PathType Leaf)){
         if($null -eq $receipt.receiver_journal_evidence -or $receipt.receiver_journal_evidence.snapshot_complete -ne $true){
             $savedPhase=$phase
             try{
@@ -993,7 +1092,7 @@ try {
             finally{$script:phase=$savedPhase}
         }
     }
-    if($ControllerInput -and $InputScenario -cne 'balanced' -and $created -and $allClean -and $null -eq $receipt.held_lifecycle_evidence){
+    if($ControllerInput -and $InputScenario -cin @('pause-held','background-held','disconnect-held') -and $created -and $allClean -and $null -eq $receipt.held_lifecycle_evidence){
             $savedPhase=$phase
             try{
                 $lifecyclePath=Join-Path $owned 'controller-lifecycle-observed.json'
