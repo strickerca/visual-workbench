@@ -37,7 +37,7 @@ function Invoke-M4OwnedEditorPhoneStroke {
         # The caller retains the complete current source/artifact cohort. These
         # executable owner dependencies are additionally leased across the call.
         $dependencies=@('tools/remote-edit/integration_input_owner.ps1','tools/remote-edit/owned_editor_contract.ps1','tools/remote-edit/input_owner_contracts.ps1','tools/remote-edit/input_owner_startup.ps1','tools/remote-edit/input_process_output.cs','tools/process.psm1')
-        if($ownerPhysical){$dependencies+=@('tools/remote-edit/physical_gesture_reports.py','tools/pen-inject/analyze.py')}
+        if($ownerPhysical){$dependencies+=@('tools/remote-edit/physical_gesture_reports.py','tools/remote-edit/controller_input_reports.py','tools/remote-edit/integration_reports.py','tools/pen-inject/analyze.py')}
         foreach($name in $dependencies){
             if(-not $SourceHashes.Contains($name) -or $SourceHashes[$name] -cnotmatch '\A[a-f0-9]{64}\z'){throw 'Bound editor phone dependency required'}
             $path=Join-Path $repo $name;$item=Get-Item -LiteralPath $path

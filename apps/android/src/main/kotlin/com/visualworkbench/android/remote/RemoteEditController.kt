@@ -107,8 +107,8 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
      * it never changes grant, admission, ACK or ghost behavior, except that a
      * closed journal drops later events locally (no seal) so the recorded
      * samples keep exact ACK/echo coverage. */
-    fun armPhysicalJournal(journal:RemotePhysicalGestureJournal,witness:RemoteInputDeliveryWitness){physical.set(PhysicalCapture(journal,witness))}
-    fun disarmPhysicalJournal(){physical.set(null)}
+    internal fun armPhysicalJournal(journal:RemotePhysicalGestureJournal,witness:RemoteInputDeliveryWitness){physical.set(PhysicalCapture(journal,witness))}
+    internal fun disarmPhysicalJournal(){physical.set(null)}
     init {
         remote.registerConsumer(this)
         // NativeRemoteEdit synchronously invalidates registered consumers before
@@ -346,8 +346,8 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
         // Integration-armed provenance is copied before admission so every
         // natively admitted sample can name its event. Never input authority.
         val journalEvent=if(capture==null)null else{
-            event.device?.let{capture.journal.recordDevice(inputDeviceCapability(it))}
-            capture.journal.recordEvent(captureRemoteInputProvenance(event,capture.witness.windowDelivered(event)),event.action,capture.witness.syntheticDispatches)
+            event.device?.let{if(!capture.journal.hasDevice(it.id))capture.journal.recordDevice(inputDeviceCapability(it))}
+            capture.journal.recordEvent(captureRemoteInputProvenance(event,capture.witness),event.action,capture.witness.syntheticDispatches)
                 ?:return false
         }
         val axes=try{com.visualworkbench.android.input.StylusInput().snapshot(event)}catch(_:IllegalArgumentException){return rejectTouch("axes")}

@@ -73,11 +73,13 @@ try{
     Remove-Case
     # Validator report projection.
     $record=Reset-Case $bytes ($sha+','+$bytes.Length);Receive-M4PhysicalJournal $record
-    $passed=@{schema=1;operation='remote-physical-gesture';status='passed';rejection_reason='none';records_validated=$true;physical_owner_gesture=$true;evidence=@{schema=1;acceptance=$false};validation=@{physical_owner_gesture=$true;software_generated_input=$false;latency_acceptance=$false;journal_sha256=$sha}}
+    $passed=@{schema=1;operation='remote-physical-gesture';status='passed';rejection_reason='none';records_validated=$true;physical_owner_gesture=$true;evidence=@{schema=1;acceptance=$false};validation=@{physical_owner_gesture=$true;software_generated_input=$false;latency_acceptance=$false;journal_sha256=$sha;run_id=$runId}}
     $report=Save-M4PhysicalValidationReport ([pscustomobject]@{Lines=@(($passed|ConvertTo-Json -Depth 6 -Compress))})
     Check ($report.status -ceq 'passed' -and $receipt.physical_validation.journal_sha256 -ceq $sha -and $receipt.physical_validation_reason -ceq 'none') 'Passed report not retained'
-    $forged=$passed.Clone();$forged.validation=@{physical_owner_gesture=$true;software_generated_input=$false;latency_acceptance=$false;journal_sha256=('c'*64)}
+    $forged=$passed.Clone();$forged.validation=@{physical_owner_gesture=$true;software_generated_input=$false;latency_acceptance=$false;journal_sha256=('c'*64);run_id=$runId}
     Check (Refused {Save-M4PhysicalValidationReport ([pscustomobject]@{Lines=@(($forged|ConvertTo-Json -Depth 6 -Compress))})}) 'Report for different journal admitted'
+    $foreign=$passed.Clone();$foreign.validation=@{physical_owner_gesture=$true;software_generated_input=$false;latency_acceptance=$false;journal_sha256=$sha;run_id=('f'*32)}
+    Check (Refused {Save-M4PhysicalValidationReport ([pscustomobject]@{Lines=@(($foreign|ConvertTo-Json -Depth 6 -Compress))})}) 'Report for a different run admitted'
     $rejected=@{schema=1;operation='remote-physical-gesture';status='rejected';rejection_reason='non_physical_origin';records_validated=$false;physical_owner_gesture=$false;evidence=@{schema=1;acceptance=$false}}
     $receipt.physical_validation=$null
     $report=Save-M4PhysicalValidationReport ([pscustomobject]@{Lines=@(($rejected|ConvertTo-Json -Depth 6 -Compress))})
@@ -87,5 +89,5 @@ try{
     $bad=$rejected.Clone();$bad.rejection_reason='C:\private\path'
     Check (Refused {Save-M4PhysicalValidationReport ([pscustomobject]@{Lines=@(($bad|ConvertTo-Json -Depth 6 -Compress))})}) 'Open rejection text admitted'
 }finally{if($null -ne (Get-Variable -Name owned -Scope Script -ErrorAction SilentlyContinue)){Remove-Case}}
-if($count -ne 19){throw "Unexpected test census $count"}
-Write-Output 'Physical journal pull/report pure cases: 19 passed; no process/device execution.'
+if($count -ne 20){throw "Unexpected test census $count"}
+Write-Output 'Physical journal pull/report pure cases: 20 passed; no process/device execution.'

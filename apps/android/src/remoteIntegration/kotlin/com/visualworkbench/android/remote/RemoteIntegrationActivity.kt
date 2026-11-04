@@ -1,6 +1,7 @@
 package com.visualworkbench.android.remote
 
 import android.graphics.Color
+import android.hardware.input.InputManager
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.InputDevice
@@ -15,7 +16,6 @@ import com.visualworkbench.shared.RemoteViewport
 import androidx.activity.ComponentActivity
 import com.visualworkbench.shared.WorkbenchRemoteEdit
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.*
 
 /** Included only in the explicit isolated integration source set. The fixture
@@ -27,34 +27,27 @@ internal class RemoteIntegrationActivity:ComponentActivity() {
     private var prompt:TextView?=null
     private var promptBlock:String?=null
     private var promptStrokes=0
-    // Main-thread window-delivery witness. Activity dispatch is entered only from
-    // this window's input pipeline; the synthetic producer below calls the view
+    // Main-thread window-delivery witness. Activity dispatch is entered from this
+    // window's input pipeline; DOWN/UP are checked against the dispatcher's
+    // signature on entry (API 30+). The synthetic producer below calls the view
     // directly and is counted separately. Observation only, never authority.
-    private class WindowFrame(val depth:Int,val deviceId:Int,val eventTime:Long)
-    private var windowFrame=WindowFrame(0,0,0L)
-    private val windowDeliveryCount=AtomicLong()
-    private val syntheticDispatchCount=AtomicLong()
+    // In-process callers of dispatchTouchEvent fail the DOWN/UP signature check.
+    private val ledger=RemoteWindowDeliveryLedger()
+    private val inputManager:InputManager? by lazy{getSystemService(InputManager::class.java)}
     val witness:RemoteInputDeliveryWitness=object:RemoteInputDeliveryWitness {
-        override fun windowDelivered(event:MotionEvent):Boolean {
-            val frame=windowFrame
-            // ViewGroup may hand the view an offset copy or a synthesized hover
-            // enter/exit; both keep the delivered event's device and event time.
-            return frame.depth>0&&frame.deviceId==event.deviceId&&frame.eventTime==event.eventTime
-        }
-        override val syntheticDispatches:Long get()=syntheticDispatchCount.get()
-        override val windowDeliveries:Long get()=windowDeliveryCount.get()
+        override fun delivery(event:MotionEvent):RemoteWindowDelivery = ledger.delivery(event.deviceId,event.eventTime,event.actionMasked)
+        override val syntheticDispatches:Long get()=ledger.syntheticDispatches
+        override val windowDeliveries:Long get()=ledger.windowDeliveries
     }
-    private fun enterWindow(event:MotionEvent):WindowFrame {
-        windowDeliveryCount.incrementAndGet()
-        val prior=windowFrame;windowFrame=WindowFrame(prior.depth+1,event.deviceId,event.eventTime);return prior
-    }
+    private fun enterWindow(event:MotionEvent):Any =
+        ledger.enter(event.deviceId,event.eventTime,event.actionMasked,verifyRemoteInputEvent(inputManager,event))
     override fun dispatchTouchEvent(event:MotionEvent):Boolean {
         val prior=enterWindow(event)
-        try{return super.dispatchTouchEvent(event)}finally{windowFrame=prior}
+        try{return super.dispatchTouchEvent(event)}finally{ledger.exit(prior)}
     }
     override fun dispatchGenericMotionEvent(event:MotionEvent):Boolean {
         val prior=enterWindow(event)
-        try{return super.dispatchGenericMotionEvent(event)}finally{windowFrame=prior}
+        try{return super.dispatchGenericMotionEvent(event)}finally{ledger.exit(prior)}
     }
     override fun onCreate(state:Bundle?){
         super.onCreate(state);check(packageName=="com.visualworkbench.android.hil")
@@ -73,6 +66,9 @@ internal class RemoteIntegrationActivity:ComponentActivity() {
             val label=TextView(this).apply{
                 setTextColor(Color.WHITE);setBackgroundColor(Color.rgb(28,28,30));textSize=16f
                 setPadding(40,28,40,28);importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                // A fixed line count keeps the prompt height constant. Any change
+                // in the remote surface size would seal the active grant.
+                setLines(PROMPT_LINES);ellipsize=android.text.TextUtils.TruncateAt.END
                 text=ownerPhysicalPrompt(block,strokes,0)
             }
             prompt=label
@@ -86,8 +82,8 @@ internal class RemoteIntegrationActivity:ComponentActivity() {
     }
     /** Integration-only physical observation. The witness and journal never
      * dispatch, grant, or replay input; only the owner's pen produces samples. */
-    fun armPhysicalJournal(journal:RemotePhysicalGestureJournal){
-        check(promptBlock!=null&&syntheticDispatchCount.get()==0L)
+    internal fun armPhysicalJournal(journal:RemotePhysicalGestureJournal){
+        check(promptBlock!=null&&ledger.syntheticDispatches==0L)
         controller.armPhysicalJournal(journal,witness)
     }
     fun ownerProgress(admitted:Int,finished:Boolean=false){
@@ -129,7 +125,7 @@ internal class RemoteIntegrationActivity:ComponentActivity() {
                     setAxisValue(MotionEvent.AXIS_TILT,0f);setAxisValue(MotionEvent.AXIS_ORIENTATION,0f)
                 }
                 val event=MotionEvent.obtain(downTime,SystemClock.uptimeMillis(),action,1,arrayOf(properties),arrayOf(point),0,0,1f,1f,0,0,InputDevice.SOURCE_STYLUS,0)
-                syntheticDispatchCount.incrementAndGet()
+                ledger.syntheticDispatch()
                 try{check(view.dispatchTouchEvent(event))}finally{event.recycle()}
             }
         }catch(error:Throwable){controller.deactivate("owner_pause");throw error}
@@ -149,11 +145,12 @@ internal class RemoteIntegrationActivity:ComponentActivity() {
         super.onDestroy()
     }
     companion object {
+        private const val PROMPT_LINES=6
         fun ownerPhysicalPrompt(block:String,strokes:Int,admitted:Int):String {
             val paint=block.startsWith("paint-")
             val where=if(paint)"the Paint canvas" else "the test window"
             val task=when(block.removePrefix("paint-")){
-                "pressure"->"Draw $strokes strokes on $where. In each stroke, go from a light touch to a firm press."
+                "pressure"->"Draw $strokes strokes on $where. Alternate: light to firm in one stroke, firm to light in the next."
                 "hover"->"Hold the pen just above $where and sweep across it $strokes times. Don't touch the screen."
                 "barrel"->"Hold the pen's side button and draw $strokes strokes on $where."
                 "eraser"->"Turn the pen to its eraser end and draw $strokes strokes on $where. A pen without an eraser end can't finish this step."

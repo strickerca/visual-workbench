@@ -271,7 +271,6 @@ class RemoteNormalPathInstrumentedTest {
                 val now=System.nanoTime();if(now>=report){phase("waiting_owner_physical_strokes");report=now+2_000_000_000L};delay(20)
             }
             phase("controller_input_dispatch_completed")
-            requireNotNull(scenario).onActivity{it.ownerProgress(ownerStrokes,finished=true)}
             val admitted=journal.progress()
             val firstSequence=requireNotNull(admitted.firstSequence);val lastSequence=requireNotNull(admitted.lastSequence)
             check(firstSequence==1uL&&lastSequence>=firstSequence)
@@ -333,6 +332,9 @@ class RemoteNormalPathInstrumentedTest {
             check(allPhysical){"Admitted input was not exclusively physical stylus input"}
             active.deactivate("owner_pause");native.pause("owner_pause")
             check(active.inputObservation.value==null&&active.ghost.snapshot(System.nanoTime()).isEmpty())
+            // Prompt text changes only after the grant is released; its height
+            // is fixed anyway, so the remote surface size never changes mid-grant.
+            requireNotNull(scenario).onActivity{it.ownerProgress(ownerStrokes,finished=true)}
             phase("controller_input_complete")
         }
         suspend fun controllerHeld(first:RemoteRenderedFrameObservation){

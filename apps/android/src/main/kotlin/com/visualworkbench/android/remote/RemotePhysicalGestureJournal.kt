@@ -4,11 +4,33 @@ import com.visualworkbench.android.diagnostics.InputDeviceCapability
 import com.visualworkbench.shared.RemotePenPhase
 
 /** Observation-only provenance of one borrowed MotionEvent. It never grants,
- * widens or restores input authority, and carries no device name/descriptor. */
+ * widens or restores input authority, and carries no device name/descriptor.
+ *
+ * What PhysicalStylus does prove: the event entered this Activity's window
+ * dispatch (not a direct View call); its DOWN/UP was HMAC-verified by the
+ * system InputDispatcher (API 30+ verifyInputEvent; unavailable on API 29, so
+ * never PhysicalStylus there); it came from a non-virtual device id that
+ * declares stylus and reports the stylus+touchscreen digitizer source
+ * combination; neither the accessibility (0x800) nor generated-gesture (0x8)
+ * flag is set; and the owner performed no synthetic dispatch. Journal-level
+ * checks (tools/remote-edit/physical_gesture_reports.py) additionally require
+ * hardware-shaped axes: varying pressure, declared tilt/orientation/distance
+ * present and varying, and batched history.
+ *
+ * What it does NOT prove: that no privileged injector (shell, UiAutomation,
+ * instrumentation) crafted events matching every one of those predicates, or
+ * that a human held the pen. Injected events are dispatched and signed by the
+ * same InputDispatcher; only their shape, not their signature, differs. */
 internal enum class RemoteInputOrigin { PhysicalStylus, Injected, Direct, Unknown }
+
+/** DOWN/UP signature check result. The dispatcher signs only DOWN and UP. */
+internal enum class RemoteInputVerification { Verified, Refused, NotSigned, Unavailable, NotDelivered }
+internal data class RemoteWindowDelivery(val delivered:Boolean,val verification:RemoteInputVerification)
 
 internal data class RemoteInputProvenance(
     val deviceId:Int,
+    /** InputDevice.getSources(); null when the device lookup failed. */
+    val deviceSources:Int?,
     /** null when the InputDevice lookup failed; never guessed. */
     val deviceVirtual:Boolean?,
     val declaresStylus:Boolean,
@@ -21,29 +43,88 @@ internal data class RemoteInputProvenance(
     val classification:Int,
     val historySize:Int,
     val eventTimeNanos:Long,
+    val actionMasked:Int,
     /** Witnessed inside the Activity's window dispatch of this same event. */
     val windowDelivered:Boolean,
+    val verification:RemoteInputVerification,
+)
+
+/** Primitive facts copied from one borrowed MotionEvent and its device. */
+internal data class RemoteMotionFacts(
+    val deviceId:Int,val deviceSources:Int?,val deviceVirtual:Boolean?,val declaresStylus:Boolean,val external:Boolean?,
+    val source:Int,val toolType:Int,val flags:Int,val buttonState:Int,val actionButton:Int,val classification:Int,
+    val historySize:Int,val eventTimeNanos:Long,val eventTimeMillis:Long,val actionMasked:Int,
 )
 
 /** Hidden MotionEvent.FLAG_IS_ACCESSIBILITY_EVENT: injected by an accessibility service. */
 internal const val REMOTE_MOTION_FLAG_ACCESSIBILITY:Int=0x800
+/** Hidden MotionEvent.FLAG_IS_GENERATED_GESTURE: synthesized by a gesture generator. */
+internal const val REMOTE_MOTION_FLAG_GENERATED_GESTURE:Int=0x8
 /** InputDevice.SOURCE_STYLUS (SOURCE_CLASS_POINTER included). */
 internal const val REMOTE_SOURCE_STYLUS:Int=0x00004002
+/** SOURCE_STYLUS|SOURCE_TOUCHSCREEN: the combination a built-in pen digitizer
+ * reports. `input stylus ...` injects SOURCE_STYLUS alone and is refused. */
+internal const val REMOTE_SOURCE_PEN_DIGITIZER:Int=0x00005002
 internal const val REMOTE_TOOL_TYPE_STYLUS:Int=2
 internal const val REMOTE_TOOL_TYPE_ERASER:Int=4
+internal const val REMOTE_ACTION_DOWN:Int=0
+internal const val REMOTE_ACTION_UP:Int=1
 
 /** Pure classification. PhysicalStylus requires every predicate; anything not
  * proven physical stays Injected, Direct or Unknown and is never promoted. */
 internal fun classifyRemoteInput(value:RemoteInputProvenance,syntheticDispatches:Long):RemoteInputOrigin = when {
     // The synthetic producer calls View.dispatchTouchEvent directly.
     !value.windowDelivered->RemoteInputOrigin.Direct
-    value.deviceId==-1||value.deviceVirtual==true||value.flags and REMOTE_MOTION_FLAG_ACCESSIBILITY!=0->RemoteInputOrigin.Injected
+    value.deviceId==-1||value.deviceVirtual==true||
+        value.flags and (REMOTE_MOTION_FLAG_ACCESSIBILITY or REMOTE_MOTION_FLAG_GENERATED_GESTURE)!=0||
+        value.verification==RemoteInputVerification.Refused->RemoteInputOrigin.Injected
     // A run that also performed direct synthetic dispatch cannot vouch for any event.
     syntheticDispatches!=0L->RemoteInputOrigin.Unknown
     value.deviceVirtual==null||!value.declaresStylus->RemoteInputOrigin.Unknown
     value.toolType!=REMOTE_TOOL_TYPE_STYLUS&&value.toolType!=REMOTE_TOOL_TYPE_ERASER->RemoteInputOrigin.Unknown
-    value.source and REMOTE_SOURCE_STYLUS!=REMOTE_SOURCE_STYLUS->RemoteInputOrigin.Unknown
+    value.deviceSources==null||value.deviceSources and REMOTE_SOURCE_PEN_DIGITIZER!=REMOTE_SOURCE_PEN_DIGITIZER->RemoteInputOrigin.Unknown
+    value.source and REMOTE_SOURCE_PEN_DIGITIZER!=REMOTE_SOURCE_PEN_DIGITIZER->RemoteInputOrigin.Unknown
+    // Signed actions must carry an actual dispatcher signature (API 30+).
+    value.actionMasked==REMOTE_ACTION_DOWN||value.actionMasked==REMOTE_ACTION_UP->
+        if(value.verification==RemoteInputVerification.Verified)RemoteInputOrigin.PhysicalStylus else RemoteInputOrigin.Unknown
     else->RemoteInputOrigin.PhysicalStylus
+}
+
+internal fun remoteInputProvenance(facts:RemoteMotionFacts,delivery:RemoteWindowDelivery):RemoteInputProvenance =
+    RemoteInputProvenance(facts.deviceId,facts.deviceSources,facts.deviceVirtual,facts.declaresStylus,facts.external,facts.source,
+        facts.toolType,facts.flags,facts.buttonState,facts.actionButton,facts.classification,facts.historySize,facts.eventTimeNanos,
+        facts.actionMasked,delivery.delivered,if(delivery.delivered)delivery.verification else RemoteInputVerification.NotDelivered)
+
+/** Main-thread window-delivery ledger for the integration Activity. A frame is
+ * entered only by the Activity's window dispatch; ViewGroup offset copies and
+ * synthesized hover enter/exit keep the device id and event time. The owner's
+ * direct synthetic View dispatches are counted separately. Not thread-safe:
+ * every call happens on the UI thread that dispatches input. */
+internal class RemoteWindowDeliveryLedger {
+    private class Frame(val depth:Int,val deviceId:Int,val eventTimeMillis:Long,val actionMasked:Int,val verification:RemoteInputVerification)
+    private var frame=Frame(0,0,0L,-1,RemoteInputVerification.NotDelivered)
+    private val deliveries=java.util.concurrent.atomic.AtomicLong()
+    private val synthetic=java.util.concurrent.atomic.AtomicLong()
+    val windowDeliveries:Long get()=deliveries.get()
+    val syntheticDispatches:Long get()=synthetic.get()
+    /** Returns the token to pass to [exit]. */
+    fun enter(deviceId:Int,eventTimeMillis:Long,actionMasked:Int,verification:RemoteInputVerification):Any {
+        deliveries.incrementAndGet()
+        val prior=frame;frame=Frame(prior.depth+1,deviceId,eventTimeMillis,actionMasked,verification);return prior
+    }
+    fun exit(token:Any){frame=token as Frame}
+    fun syntheticDispatch(){synthetic.incrementAndGet()}
+    fun delivery(deviceId:Int,eventTimeMillis:Long,actionMasked:Int):RemoteWindowDelivery {
+        val current=frame
+        if(current.depth<=0||current.deviceId!=deviceId||current.eventTimeMillis!=eventTimeMillis)
+            return RemoteWindowDelivery(false,RemoteInputVerification.NotDelivered)
+        val signed=actionMasked==REMOTE_ACTION_DOWN||actionMasked==REMOTE_ACTION_UP
+        return RemoteWindowDelivery(true,when{
+            !signed->RemoteInputVerification.NotSigned
+            current.actionMasked==actionMasked->current.verification
+            else->RemoteInputVerification.NotSigned
+        })
+    }
 }
 
 internal data class RemotePhysicalJournalEvent(
@@ -107,6 +188,9 @@ internal class RemotePhysicalGestureJournal(
     private var admittedStrokes=0;private var admittedContact=false;private var admittedHover=false
 
     fun accepting():Boolean = synchronized(lock){accepting}
+
+    /** Lets the caller skip building a census for an already recorded device. */
+    fun hasDevice(deviceId:Int):Boolean = synchronized(lock){devices.containsKey(deviceId)}
 
     fun recordDevice(device:InputDeviceCapability):Unit = synchronized(lock){
         if(!accepting||devices.containsKey(device.deviceId))return
@@ -232,11 +316,13 @@ internal fun RemotePhysicalJournalSnapshot.toJson(header:RemotePhysicalJournalHe
         out.append("{\"event\":").append(e.event).append(",\"action\":").append(e.action)
             .append(",\"device_id\":").append(p.deviceId).append(",\"device_virtual\":").jsonBool(p.deviceVirtual)
             .append(",\"declares_stylus\":").append(p.declaresStylus).append(",\"external\":").jsonBool(p.external)
+            .append(",\"device_sources\":").append(p.deviceSources?.toString()?:"null")
             .append(",\"source\":").append(p.source).append(",\"tool_type\":").append(p.toolType)
             .append(",\"flags\":").append(p.flags).append(",\"button_state\":").append(p.buttonState)
             .append(",\"action_button\":").append(p.actionButton).append(",\"classification\":").append(p.classification)
             .append(",\"history_size\":").append(p.historySize).append(",\"event_time_ns\":").append(p.eventTimeNanos)
-            .append(",\"window_delivered\":").append(p.windowDelivered).append(",\"origin\":").jsonString(e.origin.name).append('}')
+            .append(",\"window_delivered\":").append(p.windowDelivered).append(",\"verification\":").jsonString(p.verification.name)
+            .append(",\"origin\":").jsonString(e.origin.name).append('}')
     }
     out.append("],\"samples\":[")
     samples.forEachIndexed{i,s->

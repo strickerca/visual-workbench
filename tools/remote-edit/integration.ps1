@@ -168,7 +168,7 @@ function Save-M4PhysicalValidationReport($Result){
     # Source-bound Python emits only closed labels, counts and hashes.
     $receipt.physical_evidence=$report.evidence;$receipt.physical_validation_reason=$report.rejection_reason
     if($report.status -ceq 'passed'){
-        if($report.validation.physical_owner_gesture -ne $true -or $report.validation.software_generated_input -ne $false -or $report.validation.latency_acceptance -ne $false -or $report.validation.journal_sha256 -cne $physicalJournal.Sha256){throw 'Bounded physical validator response unavailable.'}
+        if($report.validation.physical_owner_gesture -ne $true -or $report.validation.software_generated_input -ne $false -or $report.validation.latency_acceptance -ne $false -or $report.validation.journal_sha256 -cne $physicalJournal.Sha256 -or $report.validation.run_id -cne $runId){throw 'Bounded physical validator response unavailable.'}
         $receipt.physical_validation=$report.validation
     }
     return $report
@@ -940,7 +940,7 @@ try {
         $inputPath=Join-Path $owned 'controller-input-records.json';[IO.File]::WriteAllText($inputPath,(ConvertTo-Json -InputObject @($inputRecords) -Depth 8),[Text.UTF8Encoding]::new($false))
         if($ownerPhysical){
             $physicalPath=Join-Path $owned 'physical-records.json';[IO.File]::WriteAllText($physicalPath,(ConvertTo-Json -InputObject @($physicalRecords) -Depth 8),[Text.UTF8Encoding]::new($false))
-            $physicalValidation=Run 'validate-owner-physical-gesture' 'python.exe' @((Join-Path $PSScriptRoot 'physical_gesture_reports.py'),'harness',$physicalJournal.Path,$physicalPath,(Join-Path $owned 'render-records.json'),$receiverFile,$receivedFile) 90 -AllowNonzero
+            $physicalValidation=Run 'validate-owner-physical-gesture' 'python.exe' @((Join-Path $PSScriptRoot 'physical_gesture_reports.py'),'harness',$runId,$physicalJournal.Path,$physicalPath,(Join-Path $owned 'render-records.json'),$receiverFile,$receivedFile) 90 -AllowNonzero
             $physicalVerdict=Save-M4PhysicalValidationReport $physicalValidation
             if($physicalValidation.ExitCode -ne 0 -or $physicalVerdict.status -cne 'passed' -or $physicalVerdict.records_validated -ne $true -or $physicalVerdict.physical_owner_gesture -ne $true){throw 'Owner physical gesture validation rejected observed evidence.'}
             $receipt.physical_records_validated=$true
@@ -965,7 +965,7 @@ try {
                 # Paint block: phone provenance/ACK only. Editor pixels remain the
                 # retained parent's evidence, so the exact journal is handed back.
                 $physicalPath=Join-Path $owned 'physical-records.json';[IO.File]::WriteAllText($physicalPath,(ConvertTo-Json -InputObject @($physicalRecords) -Depth 8),[Text.UTF8Encoding]::new($false))
-                $physicalValidation=Run 'validate-owner-physical-phone' 'python.exe' @((Join-Path $PSScriptRoot 'physical_gesture_reports.py'),'phone',$physicalJournal.Path,$physicalPath,(Join-Path $owned 'render-records.json')) 90 -AllowNonzero
+                $physicalValidation=Run 'validate-owner-physical-phone' 'python.exe' @((Join-Path $PSScriptRoot 'physical_gesture_reports.py'),'phone',$runId,$physicalJournal.Path,$physicalPath,(Join-Path $owned 'render-records.json')) 90 -AllowNonzero
                 $physicalVerdict=Save-M4PhysicalValidationReport $physicalValidation
                 if($physicalValidation.ExitCode -ne 0 -or $physicalVerdict.status -cne 'passed' -or $physicalVerdict.records_validated -ne $true -or $physicalVerdict.physical_owner_gesture -ne $true){throw 'Owner physical phone validation rejected observed evidence.'}
                 $retained=Join-Path ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($OwnedEditorContract))) ('physical-journal-'+$runId+'.json')

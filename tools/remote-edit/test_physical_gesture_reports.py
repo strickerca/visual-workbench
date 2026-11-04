@@ -11,7 +11,9 @@ import controller_input_reports
 import physical_gesture_reports as reports
 
 HERE = Path(__file__).resolve().parent
+RUN = "0123456789abcdef0123456789abcdef"
 DOWN, MOVE, UP, HOVER, LEAVE = 0x12006, 0x22006, 0x42002, 0x22002, 0x20000
+ACTIONS = {"Down": 0, "Up": 1, "Move": 2, "Hover": 7, "Leave": 10}
 
 
 def ident(n):
@@ -30,11 +32,13 @@ def views():
     return rows
 
 
-def event(index, tool=2, buttons=0, delivered=True, origin="PhysicalStylus", device=7):
-    return {"event": index, "action": 2, "device_id": device, "device_virtual": False, "declares_stylus": True,
-            "external": False, "source": 0x5002, "tool_type": tool, "flags": 0, "button_state": buttons,
-            "action_button": 0, "classification": 0, "history_size": 0, "event_time_ns": 1_000_000 + index,
-            "window_delivered": delivered, "origin": origin}
+def event(index, tool=2, buttons=0, delivered=True, origin="PhysicalStylus", device=7, phase="Move", history=0, source=0x5002):
+    action = ACTIONS[phase]
+    verification = "NotDelivered" if not delivered else ("Verified" if action in (0, 1) else "NotSigned")
+    return {"event": index, "action": action, "device_id": device, "device_virtual": False, "declares_stylus": True,
+            "external": False, "device_sources": 0x5002, "source": source, "tool_type": tool, "flags": 0, "button_state": buttons,
+            "action_button": 0, "classification": 0, "history_size": history, "event_time_ns": 1_000_000 + index,
+            "window_delivered": delivered, "verification": verification, "origin": origin}
 
 
 class Builder:
@@ -62,12 +66,15 @@ class Builder:
 
     def add(self, phase, x, y, pressure, flags, tool, buttons):
         index = len(self.events)
-        self.events.append(event(index, tool, buttons))
+        # Hardware batching: every Move event carries one historical frame; every
+        # other Move row is that historical sample.
+        historical = phase == "Move" and len(self.samples) % 2 == 1
+        self.events.append(event(index, tool, buttons, phase=phase, history=1 if phase in ("Move", "Hover") else 0))
         sent = min(1024, int(pressure * 1024 + 0.5))
         self.samples.append({"seq": len(self.samples) + 1, "event": index, "phase": phase, "host_x": x, "host_y": y,
                              "sent_pressure": sent, "raw_pressure": pressure, "raw_tilt": 0.25, "raw_orientation": 1.5,
                              "raw_distance": 0.0, "tilt_x": 3, "tilt_y": -4, "pen_mask": 15, "pen_flags": flags,
-                             "sampled_ns": 2_000_000 + len(self.samples), "historical": False, "origin": "PhysicalStylus"})
+                             "sampled_ns": 2_000_000 + len(self.samples), "historical": historical, "origin": "PhysicalStylus"})
         pointer = {"Down": DOWN, "Move": MOVE, "Up": UP, "Hover": HOVER, "Leave": LEAVE}[phase]
         message_index = {"Down": 0, "Up": 2}.get(phase, 1)
         self.counts[message_index] += 1
@@ -127,7 +134,7 @@ class PhysicalGestureReportsTest(unittest.TestCase):
         counts, receiver = list(builder.counts), copy.deepcopy(builder.receiver)
         if receiver_change:
             receiver_change(counts, receiver)
-        return reports.report("harness", journal, raw, records, render, counts, receiver)
+        return reports.report("harness", journal, raw, records, render, counts, receiver, RUN)
 
     def refused(self, reason, *args, **kwargs):
         result = self.run_harness(*args, **kwargs)
@@ -141,7 +148,9 @@ class PhysicalGestureReportsTest(unittest.TestCase):
         self.assertEqual("passed", result["status"], result)
         v = result["validation"]
         self.assertGreaterEqual(v["pressure_pairs"], 200)
-        self.assertGreaterEqual(v["pressure_pearson_r"], 0.95)
+        self.assertGreaterEqual(v["transport_pressure_r"], 0.95)
+        self.assertEqual(reports.PHYSICAL_CLAIM, v["physical_claim"])
+        self.assertTrue(v["physical_claim"].endswith("not_proof_against_crafted_privileged_injection"))
         self.assertGreaterEqual(v["strokes"], 5)
         self.assertTrue(v["physical_owner_gesture"])
         self.assertFalse(v["software_generated_input"])
@@ -151,13 +160,13 @@ class PhysicalGestureReportsTest(unittest.TestCase):
 
     def test_synthetic_direct_dispatch_claiming_physical_is_refused(self):
         def direct(j):
-            j["events"][5].update(window_delivered=False, origin="Direct")
+            j["events"][5].update(window_delivered=False, verification="NotDelivered", origin="Direct")
             for s in j["samples"]:
                 if s["event"] == 5:
                     s["origin"] = "Direct"
         self.refused("non_physical_origin", Builder(), direct)
         # The same direct dispatch while still labelled physical is a forged origin.
-        self.refused("origin_mismatch", Builder(), lambda j: j["events"][5].update(window_delivered=False))
+        self.refused("origin_mismatch", Builder(), lambda j: j["events"][5].update(window_delivered=False, verification="NotDelivered"))
         self.refused("synthetic_dispatch", Builder(), lambda j: j.update(synthetic_dispatches=1))
         self.refused("software_route_refused", Builder(),
                      record_change=lambda r: r.update(remote_physical_route=controller_input_reports.ROUTE))
@@ -295,18 +304,19 @@ class PhysicalGestureReportsTest(unittest.TestCase):
         journal = builder.journal()
         raw = encode(journal)
         render = views()
-        result = reports.report("phone", journal, raw, record(journal, raw, render), render)
+        result = reports.report("phone", journal, raw, record(journal, raw, render), render, run_id=RUN)
         self.assertEqual("passed", result["status"], result)
         self.assertFalse(result["validation"]["receiver_observed"])
+        self.assertEqual("run_binding", reports.report("phone", journal, raw, record(journal, raw, render), render, run_id="f" * 32)["rejection_reason"])
         harness = Builder()
         journal = harness.journal()
         raw = encode(journal)
-        result = reports.report("phone", journal, raw, record(journal, raw, render), render)
+        result = reports.report("phone", journal, raw, record(journal, raw, render), render, run_id=RUN)
         self.assertEqual("receiver_mode", result["rejection_reason"])
         tool = Builder("paint-eraser-tool", strokes=2, moves=10)
         journal = tool.journal()
         raw = encode(journal)
-        self.assertEqual("passed", reports.report("phone", journal, raw, record(journal, raw, render), render)["status"])
+        self.assertEqual("passed", reports.report("phone", journal, raw, record(journal, raw, render), render, run_id=RUN)["status"])
 
     def test_cli_reads_bounded_files_and_reports_closed_json(self):
         builder = Builder()
@@ -321,7 +331,7 @@ class PhysicalGestureReportsTest(unittest.TestCase):
             paths["views.json"].write_text(json.dumps(render))
             paths["counts.json"].write_text(json.dumps(builder.counts))
             paths["received.jsonl"].write_text("".join(json.dumps(e) + "\n" for e in builder.receiver))
-            argv = [sys.executable, str(HERE / "physical_gesture_reports.py"), "harness"] + [str(p) for p in paths.values()]
+            argv = [sys.executable, str(HERE / "physical_gesture_reports.py"), "harness", RUN] + [str(p) for p in paths.values()]
             done = subprocess.run(argv, capture_output=True, text=True, timeout=60, cwd=str(HERE))
             self.assertEqual(0, done.returncode, done.stdout + done.stderr)
             self.assertEqual("passed", json.loads(done.stdout)["status"])
@@ -329,17 +339,126 @@ class PhysicalGestureReportsTest(unittest.TestCase):
             done = subprocess.run(argv, capture_output=True, text=True, timeout=60, cwd=str(HERE))
             self.assertEqual(1, done.returncode)
             self.assertEqual("duplicate_json_key", json.loads(done.stdout)["rejection_reason"])
-            done = subprocess.run(argv[:4], capture_output=True, text=True, timeout=60, cwd=str(HERE))
+            done = subprocess.run(argv[:5], capture_output=True, text=True, timeout=60, cwd=str(HERE))
             self.assertEqual("arguments", json.loads(done.stdout)["rejection_reason"])
 
     def test_kotlin_classifier_mirror_matches_documented_rules(self):
         base = event(0)
+        down = event(0, phase="Down")
         self.assertEqual("PhysicalStylus", reports.classify(base, 0))
+        self.assertEqual("PhysicalStylus", reports.classify(down, 0))
         self.assertEqual("Direct", reports.classify(dict(base, window_delivered=False), 0))
         self.assertEqual("Injected", reports.classify(dict(base, device_virtual=True), 0))
+        self.assertEqual("Injected", reports.classify(dict(base, flags=0x8), 0))
+        self.assertEqual("Injected", reports.classify(dict(down, verification="Refused"), 0))
         self.assertEqual("Unknown", reports.classify(base, 1))
         self.assertEqual("Unknown", reports.classify(dict(base, device_virtual=None), 0))
         self.assertEqual("Unknown", reports.classify(dict(base, source=0x1002), 0))
+        self.assertEqual("Unknown", reports.classify(dict(base, source=0x4002), 0))
+        self.assertEqual("Unknown", reports.classify(dict(base, device_sources=0x4002), 0))
+        self.assertEqual("Unknown", reports.classify(dict(base, device_sources=None), 0))
+        self.assertEqual("Unknown", reports.classify(dict(down, verification="Unavailable"), 0))
+        self.assertEqual("Unknown", reports.classify(dict(down, verification="NotSigned"), 0))
+
+    def test_injection_shaped_journals_are_refused_for_every_block(self):
+        for block in reports.BLOCKS:
+            hover_only = block in reports.HOVER_BLOCKS
+            flags = 1 if block.endswith("barrel") else 4 if block.endswith("eraser") else 0
+            buttons = 0x20 if flags == 1 else 0
+            tool = 4 if flags == 4 else 2
+            mode = "harness" if block in reports.HARNESS_BLOCKS else "phone"
+            # `input stylus swipe`: real stylus-capable device id, signed DOWN/UP,
+            # SOURCE_STYLUS only, constant pressure 1.0, no axes, no batching.
+            for forged_source, label in ((0x4002, "PhysicalStylus"), (0x4002, "Unknown"), (0x5002, "PhysicalStylus")):
+                builder = Builder(block, strokes=6, moves=39, flags=flags, tool=tool, buttons=buttons)
+                journal = builder.journal()
+                for e in journal["events"]:
+                    e.update(source=forged_source, history_size=0, origin=label)
+                for s in journal["samples"]:
+                    s.update(origin=label, historical=False, raw_tilt=None, raw_orientation=None)
+                    if s["phase"] in ("Down", "Move"):
+                        s.update(raw_pressure=1.0, sent_pressure=1024)
+                raw = encode(journal)
+                render = views()
+                result = reports.report(mode, journal, raw, record(journal, raw, render), render,
+                                        list(builder.counts), copy.deepcopy(builder.receiver), RUN)
+                self.assertEqual("rejected", result["status"], (block, forged_source, label))
+                self.assertFalse(result["physical_owner_gesture"])
+                if forged_source == 0x4002:
+                    self.assertEqual("non_physical_origin" if label == "Unknown" else "origin_mismatch", result["rejection_reason"], block)
+                else:
+                    self.assertIn(result["rejection_reason"], {"hardware_history", "constant_pressure"}, block)
+
+    def test_declared_axes_must_be_present_and_varying(self):
+        declare = lambda j: j["input_devices"][0]["ranges"].extend(
+            {"axis": axis, "source": 0x5002, "min": -1.0, "max": 1.0, "flat": 0.0, "fuzz": 0.0, "resolution": 0.0} for axis in (8, 24, 25))
+        # The fixture's constant tilt/orientation cannot come from a hardware pen.
+        self.refused("hardware_axes", Builder(), declare)
+
+        def varying(j):
+            declare(j)
+            for i, s in enumerate(j["samples"]):
+                s.update(raw_tilt=0.2 + (i % 7) * 0.01, raw_orientation=1.0 + (i % 5) * 0.02, raw_distance=0.0 if s["phase"] != "Hover" else 0.1 + (i % 3) * 0.05)
+        self.assertEqual("passed", self.run_harness(Builder(), varying)["status"])
+
+        def missing(j):
+            varying(j)
+            j["samples"][5]["raw_tilt"] = None
+        self.refused("hardware_axes", Builder(), missing)
+
+    def test_batched_history_and_contact_pressure_variation_are_required(self):
+        def unbatched(j):
+            for e in j["events"]:
+                e["history_size"] = 0
+            for s in j["samples"]:
+                s["historical"] = False
+        self.refused("hardware_history", Builder(), unbatched)
+
+        def no_historical_rows(j):
+            for s in j["samples"]:
+                s["historical"] = False
+        self.refused("hardware_history", Builder(), no_historical_rows)
+
+        def constant(j):
+            for s in j["samples"]:
+                if s["phase"] in ("Down", "Move"):
+                    s.update(raw_pressure=0.6, sent_pressure=614)
+        for block, flags, buttons, tool in (("barrel", 1, 0x20, 2), ("eraser", 4, 0, 4)):
+            self.refused("constant_pressure", Builder(block, strokes=2, moves=10, flags=flags, buttons=buttons, tool=tool), constant)
+
+    def test_held_flag_noncontact_and_duplicate_hover_rows_are_tolerated(self):
+        def after_up_with_flag(counts, receiver):
+            up = next(i for i, e in enumerate(receiver) if e["index"] == 2)
+            repeat = copy.deepcopy(receiver[up])
+            repeat.update(index=1, message=0x245, pointer_flags=HOVER, pressure=0)
+            repeat["pen_history"][0].update(pointer_flags=HOVER, pressure=0, frame_id=77777, performance_count=77777)
+            receiver.insert(up + 1, repeat)
+            first_hover = next(i for i, e in enumerate(receiver) if e["pointer_flags"] == HOVER and i != up + 1)
+            duplicate = copy.deepcopy(receiver[first_hover])
+            duplicate["pen_history"][0].update(frame_id=66666, performance_count=66666)
+            receiver.insert(first_hover + 1, duplicate)
+            counts[1] += 2
+            for i, e in enumerate(r for r in receiver if r["index"] == 1):
+                e["count"] = i + 1
+        result = self.run_harness(Builder("barrel", strokes=2, moves=10, flags=1, buttons=0x20), receiver_change=after_up_with_flag)
+        self.assertEqual("passed", result["status"], result)
+        self.assertEqual((1, 1), (result["validation"]["os_noncontact_after_up"], result["validation"]["os_duplicate_hover"]))
+
+        def after_up_wrong_flag(counts, receiver):
+            after_up_with_flag(counts, receiver)
+            up = next(i for i, e in enumerate(receiver) if e["index"] == 2)
+            receiver[up + 1]["pen_history"][0]["pen_flags"] = 4
+        self.refused("receiver_unmatched", Builder("barrel", strokes=2, moves=10, flags=1, buttons=0x20), receiver_change=after_up_wrong_flag)
+
+    def test_receiver_rows_with_provenance_and_clock_metadata_are_admitted(self):
+        def annotate(counts, receiver):
+            for i, e in enumerate(receiver):
+                e["received_qpc"] = {"schema": 1, "counter": 10_000 + i, "frequency": 10_000_000}
+                e["input_provenance"] = {"schema": 1, "source_available": True, "device_type": 2, "origin_id": 2,
+                                         "message_extra_info": "0000000000000000"}
+        self.assertEqual("passed", self.run_harness(Builder(), receiver_change=annotate)["status"])
+        self.refused("receiver_provenance_shape", Builder(),
+                     receiver_change=lambda c, r: r[3].update(input_provenance={"schema": 1, "source_available": True}))
 
 
 if __name__ == "__main__":
