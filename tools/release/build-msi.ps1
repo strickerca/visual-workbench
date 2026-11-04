@@ -147,6 +147,7 @@ try {
     $python = Assert-MsiPythonInventory $toolchain.python
     $backend = Join-Path $Root 'tools/release/msi.py'
     foreach ($path in @($backend, $PSCommandPath, (Join-Path $Root 'tools/release/assemble.py'),
+        (Join-Path $Root 'tools/release/generate_notices.py'), (Join-Path $Root 'tools/check_setup.py'),
         (Join-Path $Root 'tools/desktop-test/reports.py'), (Join-Path $Root 'tools/desktop-test/personal_package.py'),
         (Join-Path $Root 'tools/ffi-test/check_apk.py'), (Join-Path $Root 'tools/process.psm1'),
         (Join-Path $Root 'tools/desktop-test/lease.psm1'))) { Pin-MsiPath $path $false }

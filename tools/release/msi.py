@@ -33,6 +33,7 @@ METADATA = {"name": "VisualWorkbenchDev", "version": "0.0.1", "vendor": "Visual 
             "per_user_install": True, "start_menu": True}
 PACKAGE = "VisualWorkbenchDev-0.0.1.msi"
 BACKEND = ("tools/release/msi.py", "tools/release/assemble.py", "tools/release/build-msi.ps1",
+           "tools/release/generate_notices.py", "tools/check_setup.py",
            "tools/release/test_msi_wrapper.ps1",
            "tools/desktop-test/reports.py", "tools/desktop-test/personal_package.py",
            "tools/ffi-test/check_apk.py", "tools/process.psm1", "tools/desktop-test/lease.psm1")

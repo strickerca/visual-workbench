@@ -36,7 +36,27 @@ class Assembly(unittest.TestCase):
         self.spec = {"schema": "vw-release-assembly-v1", "release_id": "synthetic-1", "binding": {},
                      "artifacts": [artifact], "notice_manifest": self.row("third_party/LICENSES"),
                      "notices": [self.row("third_party/notices/MIT.txt")], "catalog": None}
+        self.generated_notices()
         self.refresh()
+
+    def generated_notices(self, coverage=None, status="complete", selected="MIT", inputs=None, skipped=()):
+        """A synthetic generator bundle rendered by the real generate_notices code."""
+        g = a.NOTICES
+        text = b"synthetic package MIT text\n"
+        digest = hashlib.sha256(text).hexdigest()
+        receipt = {"schema": g.SCHEMA, "generator": "tools/release/generate_notices.py", "status": status,
+                   "inputs": inputs or {}, "skipped": sorted(skipped),
+                   "coverage": sorted(g.DESKTOP_COVERAGE | g.ANDROID_COVERAGE if coverage is None else coverage),
+                   "components": [{"ecosystem": "cargo", "name": "demo", "version": "1.0.0", "declared": "MIT OR GPL-3.0",
+                                   "selected": selected, "scope": ["rust:x86_64-pc-windows-msvc"], "sources": {},
+                                   "texts": [{"origin": "package:LICENSE-MIT", "sha256": digest}], "warnings": []}],
+                   "counts": {"cargo": 1}, "excluded": {}, "unresolved": [],
+                   "texts": {digest: {"bytes": len(text)}}}
+        body, raw, _ = g.finalize(receipt, {digest: text})
+        self.put(".local/notices/THIRD-PARTY-NOTICES.txt", body)
+        self.put(".local/notices/third-party-notices.json", raw)
+        self.spec["generated_notices"] = {"text": self.row(".local/notices/THIRD-PARTY-NOTICES.txt"),
+                                          "receipt": self.row(".local/notices/third-party-notices.json")}
 
     def tearDown(self):
         self.temp.cleanup()
@@ -101,11 +121,88 @@ class Assembly(unittest.TestCase):
         self.assertEqual(marker, hashlib.sha256((self.destination / "inventory.json").read_bytes()).hexdigest() + "  inventory.json\n")
         input_names = {row["path"] for row in result["inputs"]}
         self.assertEqual(input_names, {"project.txt", "built/artifact.bin", ".local/binding.json", ".local/manifest.json",
-                                      "third_party/LICENSES", "third_party/notices/MIT.txt"})
-        text = (self.destination / "THIRD-PARTY-NOTICES.txt").read_text()
-        self.assertIn(self.row("third_party/notices/MIT.txt")["sha256"], text)
-        self.assertIn("https://example.test/notice", text)
+                                      "third_party/LICENSES", "third_party/notices/MIT.txt",
+                                      ".local/notices/THIRD-PARTY-NOTICES.txt", ".local/notices/third-party-notices.json"})
+        # LIC-003: the delivered notices are the generator's exact bytes.
+        self.assertEqual((self.destination / "THIRD-PARTY-NOTICES.txt").read_bytes(),
+                         (self.root / ".local/notices/THIRD-PARTY-NOTICES.txt").read_bytes())
+        self.assertEqual((self.destination / "third-party-notices.json").read_bytes(),
+                         (self.root / ".local/notices/third-party-notices.json").read_bytes())
+        self.assertEqual(result["generated_notices"]["status"], "complete")
+        self.assertEqual(result["generated_notices"]["components"], 1)
+        self.assertEqual(result["generated_notices"]["text"], a.blob(self.spec["generated_notices"]["text"]))
         self.assertEqual(result["notices"][0]["bytes"], len(b"synthetic full notice\n"))
+
+    def test_generated_notices_are_required_and_bound(self):
+        spec = copy.deepcopy(self.spec)
+        del spec["generated_notices"]
+        self.refuses("manifest_schema", lambda: a.manifest(spec))
+        spec = copy.deepcopy(self.spec)
+        spec["generated_notices"] = {"text": spec["generated_notices"]["text"]}
+        self.refuses("generated_notices", lambda: a.manifest(spec))
+        self.put(".local/notices/THIRD-PARTY-NOTICES.txt", b"edited after generation\n")
+        self.refuses("input_binding")
+        self.assertFalse(self.destination.exists())
+
+    def test_generated_notice_policy_refuses_before_destination(self):
+        for code, options in (("notices_incomplete", {"status": "incomplete"}),
+                              ("notices_forbidden_license", {"selected": "GPL-3.0"}),
+                              ("notices_forbidden_license", {"selected": "MIT AND LicenseRef-Unknown"})):
+            with self.subTest(code=code, options=options):
+                self.generated_notices(**options)
+                self.refresh()
+                self.refuses(code)
+                self.assertFalse(self.destination.exists())
+
+    def test_generated_notice_receipt_edits_refuse(self):
+        receipt = json.loads((self.root / ".local/notices/third-party-notices.json").read_bytes())
+        receipt["components"][0]["selected"] = "Apache-2.0"  # edited after rendering
+        self.put(".local/notices/third-party-notices.json", a.json_bytes(receipt))
+        self.spec["generated_notices"]["receipt"] = self.row(".local/notices/third-party-notices.json")
+        self.refresh()
+        self.refuses("notices_text_render")
+        self.assertFalse(self.destination.exists())
+
+    def test_generated_notices_require_artifact_coverage(self):
+        self.generated_notices(coverage=sorted(a.NOTICES.DESKTOP_COVERAGE))
+        self.refresh()
+        self.run_assembly()  # opaque artifacts impose no graph coverage
+        path = Path(a.__file__).absolute().parents[1] / "ffi-test/test_apk.py"
+        with patch.dict(sys.modules, {"check_apk": a.APK}):
+            fixtures = a._module("vw_release_apk_test_fixtures", path)
+        self.destination = self.base / "delivery-apk"
+        self.replace_artifact("built/test.apk", fixtures.apk(), "apk")
+        self.refuses("notices_android_coverage")
+        self.assertFalse(self.destination.exists())
+
+    def test_generated_notices_skips_must_be_declared(self):
+        self.generated_notices(skipped=["gradle"])
+        self.refresh()
+        self.refuses("notices_undeclared_skip")
+        self.assertFalse(self.destination.exists())
+        self.spec["generated_notices"]["declared_skips"] = ["gradle"]
+        self.refresh()
+        self.assertEqual(self.run_assembly()["generated_notices"]["skipped"], ["gradle"])
+        self.spec["generated_notices"]["declared_skips"] = ["unknown"]
+        self.refresh()
+        self.refuses("generated_notices", lambda: a.manifest(self.spec))
+
+    def test_msi_requires_desktop_notice_coverage(self):
+        self.generated_notices(coverage=sorted(a.NOTICES.ANDROID_COVERAGE))
+        self.replace_artifact("built/test.msi", b"synthetic opaque external package", "external-package")
+        self.refuses("notices_desktop_coverage")
+        self.assertFalse(self.destination.exists())
+
+    def test_generated_notices_refuse_inputs_that_differ_from_the_binding(self):
+        self.put("Cargo.lock", b"current lock\n")
+        self.proof["sources"].append(self.row("Cargo.lock"))
+        self.generated_notices(inputs={"Cargo.lock": {"bytes": 3, "sha256": "0" * 64}})
+        self.refresh()
+        self.refuses("notices_stale_input")
+        self.assertFalse(self.destination.exists())
+        self.generated_notices(inputs={"Cargo.lock": a.blob(self.row("Cargo.lock"))})
+        self.refresh()
+        self.assertEqual(self.run_assembly()["generated_notices"]["status"], "complete")
 
     def test_existing_destination_is_preserved(self):
         self.destination.mkdir()

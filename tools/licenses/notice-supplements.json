@@ -1,0 +1,318 @@
+{
+  "schema": 1,
+  "canonical_texts": {
+    "Apache-2.0": {
+      "path": "third_party/notices/JNA-5.19.1-Apache-2.0.txt",
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+      "reason": "Complete Apache-2.0 text retained from JNA 5.19.1 (AL2.0). Used only when an Apache-2.0 component ships no license file of its own; the text contains no holder-specific notice."
+    }
+  },
+  "components": [
+    {
+      "ecosystem": "maven",
+      "name": "net.java.dev.jna:jna",
+      "version": "5.19.1",
+      "selected": "Apache-2.0",
+      "notices": [
+        {
+          "path": "third_party/notices/JNA-5.19.1-LICENSE.txt",
+          "sha256": "07c938b23950ab7d47a24ef35f9f5da3a05ae164278dc959ad6994135ed59ff1"
+        },
+        {
+          "path": "third_party/notices/JNA-5.19.1-Apache-2.0.txt",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "path": "third_party/notices/JNA-libffi-LICENSE.txt",
+          "sha256": "2c9c2acb9743e6b007b91350475308aee44691d96aa20eacef8e199988c8c388"
+        }
+      ],
+      "reason": "JNA is dual licensed; the project selects Apache-2.0 (tools/check_gradle_licenses.py). The bundled jnidispatch native library includes libffi (MIT). The POM lists LGPL-2.1-or-later and Apache-2.0 as two <license> rows; upstream documents them as alternatives (dual license, retained JNA LICENSE), so they are treated as OR.",
+      "pom_licenses_are_alternatives": true
+    },
+    {
+      "ecosystem": "maven",
+      "name": "androidx.camera:camera-core",
+      "version": "1.6.2",
+      "selected": null,
+      "notices": [
+        {
+          "path": "third_party/notices/libyuv-LICENSE.txt",
+          "sha256": "2b2cc1180c7e6988328ad2033b04b80117419db9c4c584918bbb3cfec7e9364f"
+        }
+      ],
+      "reason": "camera-core bundles libyuv (BSD-3-Clause); see apps/android/DEPENDENCY_PROVENANCE.md for the revision limits."
+    },
+    {
+      "ecosystem": "maven",
+      "name": "androidx.graphics:graphics-core",
+      "version": "1.0.4",
+      "selected": null,
+      "notices": [],
+      "native_review": {
+        "source_url": "https://github.com/androidx/androidx/tree/androidx-main/graphics/graphics-core/src/main/cpp",
+        "revision": "androidx-main as of 2026-11-04 (not pinned to the released artifact's revision)",
+        "summary": "Bundled libgraphics-core.so is AndroidX's own JNI code (graphics/graphics-core/src/main/cpp: egl_utils, graphics-core, sync_fence), Apache-2.0, The Android Open Source Project; no vendored third-party native code found",
+        "reviewed": "2026-11-04"
+      },
+      "reason": "The AAR ships no license file; the Apache-2.0 text is therefore the canonical retained text. Source: https://github.com/androidx/androidx/tree/androidx-main/graphics/graphics-core/src/main/cpp"
+    },
+    {
+      "ecosystem": "maven",
+      "name": "androidx.graphics:graphics-path",
+      "version": "1.0.1",
+      "selected": null,
+      "notices": [],
+      "native_review": {
+        "source_url": "https://github.com/androidx/androidx/tree/androidx-main/graphics/graphics-path/src/main/cpp",
+        "revision": "androidx-main as of 2026-11-04 (not pinned to the released artifact's revision)",
+        "summary": "Bundled libandroidx.graphics.path.so is AndroidX's own JNI code (graphics/graphics-path/src/main/cpp: Conic, PathIterator, pathway, math/), Apache-2.0, The Android Open Source Project (Conic.cpp also carries an AOSP 2006 copyright); no vendored third-party native code found",
+        "reviewed": "2026-11-04"
+      },
+      "reason": "The AAR ships no license file; the Apache-2.0 text is therefore the canonical retained text. Source: https://github.com/androidx/androidx/tree/androidx-main/graphics/graphics-path/src/main/cpp"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "uniffi",
+      "version": "0.32.2",
+      "selected": null,
+      "notices": [
+        {
+          "path": "third_party/notices/MPL-2.0.txt",
+          "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+        }
+      ],
+      "notes": [
+        "MPL-2.0 Source Code Form (unmodified): https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950/uniffi"
+      ],
+      "provenance": {
+        "source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt",
+        "retrieved": "2026-11-04",
+        "crate_vcs_commit": "7bc621ee9d0d15371d792612707ba5ed4111f950"
+      },
+      "reason": "The crate ships no license file. The official MPL-2.0 text is retained; uniffi is shipped unmodified, so MPL-2.0 section 3.2(a) is met by the text plus the source-location note."
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "uniffi_bindgen",
+      "version": "0.32.2",
+      "selected": null,
+      "notices": [
+        {
+          "path": "third_party/notices/MPL-2.0.txt",
+          "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+        }
+      ],
+      "notes": [
+        "MPL-2.0 Source Code Form (unmodified): https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950/uniffi_bindgen"
+      ],
+      "provenance": {
+        "source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt",
+        "retrieved": "2026-11-04",
+        "crate_vcs_commit": "7bc621ee9d0d15371d792612707ba5ed4111f950"
+      },
+      "reason": "The crate ships no license file. The official MPL-2.0 text is retained; uniffi is shipped unmodified, so MPL-2.0 section 3.2(a) is met by the text plus the source-location note."
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "uniffi_core",
+      "version": "0.32.2",
+      "selected": null,
+      "notices": [
+        {
+          "path": "third_party/notices/MPL-2.0.txt",
+          "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+        }
+      ],
+      "notes": [
+        "MPL-2.0 Source Code Form (unmodified): https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950/uniffi_core"
+      ],
+      "provenance": {
+        "source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt",
+        "retrieved": "2026-11-04",
+        "crate_vcs_commit": "7bc621ee9d0d15371d792612707ba5ed4111f950"
+      },
+      "reason": "The crate ships no license file. The official MPL-2.0 text is retained; uniffi is shipped unmodified, so MPL-2.0 section 3.2(a) is met by the text plus the source-location note."
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "uniffi_meta",
+      "version": "0.32.2",
+      "selected": null,
+      "notices": [
+        {
+          "path": "third_party/notices/MPL-2.0.txt",
+          "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+        }
+      ],
+      "notes": [
+        "MPL-2.0 Source Code Form (unmodified): https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950/uniffi_meta"
+      ],
+      "provenance": {
+        "source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt",
+        "retrieved": "2026-11-04",
+        "crate_vcs_commit": "7bc621ee9d0d15371d792612707ba5ed4111f950"
+      },
+      "reason": "The crate ships no license file. The official MPL-2.0 text is retained; uniffi is shipped unmodified, so MPL-2.0 section 3.2(a) is met by the text plus the source-location note."
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "uniffi_pipeline",
+      "version": "0.32.2",
+      "selected": null,
+      "notices": [
+        {
+          "path": "third_party/notices/MPL-2.0.txt",
+          "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+        }
+      ],
+      "notes": [
+        "MPL-2.0 Source Code Form (unmodified): https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950/uniffi_pipeline"
+      ],
+      "provenance": {
+        "source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt",
+        "retrieved": "2026-11-04",
+        "crate_vcs_commit": "7bc621ee9d0d15371d792612707ba5ed4111f950"
+      },
+      "reason": "The crate ships no license file. The official MPL-2.0 text is retained; uniffi is shipped unmodified, so MPL-2.0 section 3.2(a) is met by the text plus the source-location note."
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "uniffi_udl",
+      "version": "0.32.2",
+      "selected": null,
+      "notices": [
+        {
+          "path": "third_party/notices/MPL-2.0.txt",
+          "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+        }
+      ],
+      "notes": [
+        "MPL-2.0 Source Code Form (unmodified): https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950/uniffi_udl"
+      ],
+      "provenance": {
+        "source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt",
+        "retrieved": "2026-11-04",
+        "crate_vcs_commit": "7bc621ee9d0d15371d792612707ba5ed4111f950"
+      },
+      "reason": "The crate ships no license file. The official MPL-2.0 text is retained; uniffi is shipped unmodified, so MPL-2.0 section 3.2(a) is met by the text plus the source-location note."
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "libwebp-sys",
+      "version": "0.14.4",
+      "selected": null,
+      "notices": [],
+      "declaration_only": {
+        "files": [
+          {
+            "file": "vendor/COPYING",
+            "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf"
+          },
+          {
+            "file": "vendor/PATENTS",
+            "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c"
+          }
+        ]
+      },
+      "provenance": {
+        "crate_vcs_commit": "3a40281fd97537b693174acb7375d64d3b471a56",
+        "repository": "https://github.com/NoXF/libwebp-sys",
+        "reviewed": "2026-11-04"
+      },
+      "reason": "Owner decision 2026-11-04: upstream publishes no license text at the crate's commit (no LICENSE/COPYING, no README statement); Cargo.toml declares MIT. The declaration is recorded without an invented copyright line, and the crate's vendored libwebp COPYING (BSD-3-Clause) and PATENTS ship."
+    },
+    {
+      "ecosystem": "maven",
+      "name": "org.jetbrains.skiko:skiko-awt-runtime-windows-x64",
+      "version": "0.150.1",
+      "selected": null,
+      "notices": [
+        {
+          "path": "third_party/notices/Skia-m150-1f14f1166a-LICENSE.txt",
+          "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd"
+        },
+        {
+          "path": "third_party/notices/Skia-m150-expat-6154446f-COPYING.txt",
+          "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87"
+        },
+        {
+          "path": "third_party/notices/Skia-m150-harfbuzz-9cb1fee5-COPYING.txt",
+          "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64"
+        },
+        {
+          "path": "third_party/notices/Skia-m150-icu-364118a1-LICENSE.txt",
+          "sha256": "17510cf7a58b4879b887ec05a45d72cf1b73544dd9ec7e72f20110ed104229ee"
+        },
+        {
+          "path": "third_party/notices/Skia-m150-libjpeg-turbo-e14cbfaa-LICENSE.md",
+          "sha256": "96f5b328adbb78eeaaec6980d73fd558cb1e4d62560ed615646bc3cf5e532430"
+        },
+        {
+          "path": "third_party/notices/Skia-m150-libpng-d5515b5b-LICENSE.txt",
+          "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526"
+        },
+        {
+          "path": "third_party/notices/Skia-m150-wuffs-e3f919cc-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "third_party/notices/Skia-m150-zlib-646b7f56-LICENSE.txt",
+          "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c"
+        },
+        {
+          "path": "third_party/notices/Skia-m150-libwebp-845d5476-COPYING.txt",
+          "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf"
+        },
+        {
+          "path": "third_party/notices/Skia-m150-libwebp-845d5476-PATENTS.txt",
+          "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c"
+        },
+        {
+          "path": "third_party/notices/Skia-m150-spirv-cross-b8fcf307-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "third_party/notices/Skia-m150-d3d12allocator-169895d5-LICENSE.txt",
+          "sha256": "e078ee4f8c5ed0673f4d93b5318557eb8b4e0d7dbccef2ab45c763c7693f0f37"
+        },
+        {
+          "path": "third_party/notices/Skia-m150-d3d12allocator-169895d5-NOTICES.txt",
+          "sha256": "454c8e691b2637c10c7ea3eb51c342369a8ed5e617ed25dc69ade8f86b0a3b72"
+        }
+      ],
+      "provenance": {
+        "source_url": "https://raw.githubusercontent.com/JetBrains/skia/1f14f1166a847cb0e148f981600bf1e3e6ca6e46/LICENSE",
+        "retrieved": "2026-11-04",
+        "skia_tag": "m150-1f14f1166a",
+        "skiko_setting": "skiko v0.150.1 skiko/gradle.properties dependencies.skia=m150-1f14f1166a",
+        "embedded_revisions": "JetBrains/skia 1f14f1166a DEPS pins expat 6154446f, harfbuzz 9cb1fee5, icu 364118a1, libjpeg-turbo e14cbfaa, libpng d5515b5b, wuffs e3f919cc, zlib 646b7f56 (owner-approved retrieval 2026-11-04; source URLs in third_party/LICENSES); libwebp 845d5476, SPIRV-Cross b8fcf307, D3D12MemoryAllocator 169895d5 (owner-approved retrieval 2026-11-04)"
+      },
+      "reason": "skiko is Apache-2.0 with no NOTICE file; its DLL bundles Skia (BSD-3-Clause) and, per the generator's read-only byte probe, libjpeg-turbo, libpng, zlib, HarfBuzz, ICU, expat and Wuffs. FreeType and libwebp were not detected. ICU is classified Unicode-3.0 (owner decision 2026-11-04); its GPL-with-exception text covers build-time autoconf files not compiled into the DLL. Windows build configuration (skia-pack: skia_use_direct3d=true, is_official_build; Skia gn defaults: skia_use_libwebp_decode/encode=true, skia_use_piex=!is_win so no dng_sdk/piex, skia_use_freetype false on Windows) adds D3D12MemoryAllocator, SPIRV-Cross and libwebp; the byte probe also finds SPIRV-Cross and WebP chunk tags.",
+      "build_components": {
+        "components": [
+          "D3D12MemoryAllocator",
+          "SPIRV-Cross",
+          "libwebp"
+        ],
+        "evidence": [
+          "https://raw.githubusercontent.com/JetBrains/skia-pack/main/script/build.py",
+          "https://raw.githubusercontent.com/JetBrains/skia/1f14f1166a847cb0e148f981600bf1e3e6ca6e46/gn/skia.gni",
+          "https://raw.githubusercontent.com/JetBrains/skia/1f14f1166a847cb0e148f981600bf1e3e6ca6e46/BUILD.gn"
+        ]
+      }
+    }
+  ],
+  "bundled": [
+    {
+      "id": "node-runtime",
+      "record": "tools/licenses/node-runtime.json",
+      "name": "Node.js runtime (node.exe)",
+      "license": "MIT",
+      "notice": {
+        "path": "third_party/notices/Node-24.21.0-LICENSE.txt"
+      },
+      "reason": "Shipped as node.exe inside the desktop MCP bundle; the record binds the executable hash and its complete bundled LICENSE."
+    }
+  ]
+}

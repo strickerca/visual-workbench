@@ -64,3 +64,195 @@ notice; npm and Node's build tools are not distributed. Source/build-tool licens
 clauses retained in that complete notice do not identify additional shipped
 executables. The complete runtime file inventory is generated before packaging;
 the installed bridge then embeds the completed application image inventory.
+
+## Generated release notices (LIC-003)
+
+Release `THIRD-PARTY-NOTICES.txt` is generated from the resolved dependency set
+by `tools/release/generate_notices.py`. It is no longer the curated list above.
+Every license text is copied byte for byte from the component's own package
+files, its pinned toolchain, or a hash-bound retained copy registered in
+`third_party/LICENSES`. The generator writes no license text.
+`tools/licenses/notice-supplements.json` holds the reviewed supplements. It is
+parsed strictly: duplicate keys and unknown fields are refused, and each row
+type has a fixed schema.
+
+**Where the notices go:** the generated notices and their receipt are delivered
+at the top of the assembled release directory. They are not inserted into the
+APK or the desktop image, which carry the curated `third_party/notices`
+resources. The release directory is treated as satisfying LIC-003 unless the
+owner decides otherwise.
+
+### What counts as shipped
+
+- **Rust:** `cargo metadata --locked --offline --all-features` for each
+  product target (`x86_64-pc-windows-msvc`, `aarch64-linux-android`). The
+  metadata JSON is bound by hash in the receipt, and every package in it must
+  agree with `Cargo.lock`.
+  - The walk starts at the crates whose binaries ship (`vw-ffi`, `vw-host-ffi`,
+    `vw-capture`, `vw-remote-host`, `vw-mcp-native`; Android: `vw-ffi`) and
+    follows normal edges only. Dev- and build-dependencies are excluded.
+  - Proc-macro crates run on the build host and are not traversed. Workspace
+    crates are first-party.
+  - Crate bytes come from the registry cache archive whose SHA-256 equals the
+    `Cargo.lock` checksum. `all-features` matches `deny.toml`, so the set is a
+    superset of any one build.
+  - Native-wrapping crates (`-sys` or `links`) always ship every license file
+    found up to two directories below their root. For example, `zstd-sys`
+    ships `zstd/COPYING` (zstd's GPL-2.0 alternative) beside its BSD texts.
+- **Rust standard library:** std, core, alloc and their vendored crates are
+  statically linked into every Rust binary. The notice is the pinned 1.99.0
+  toolchain's `share/doc/rust/COPYRIGHT-library.html`, plus its MIT and
+  Apache-2.0 texts. That aggregate covers the whole standard-library workspace,
+  a superset of what links.
+- **Android NDK runtime:** LLVM libunwind and compiler builtins are statically
+  linked into the Android library. The notice is the pinned NDK
+  30.0.16248370's LLVM `NOTICE`, under Apache-2.0 WITH LLVM-exception.
+- **Gradle:** the census `dependencies.json` that `generateApplicationLicenseReport`
+  writes for `checkDependencyLicenses`, read through the existing
+  `check_gradle_licenses.read_pom_report`.
+  - Only the `:android` and `:desktop` (plus `:shared:desktop`) runtime
+    configurations count. The bench, probe and spike apps do not ship.
+  - Artifact bytes come from the read-only Gradle cache. They are checked
+    against the module-metadata SHA-256 or the cache's SHA-1 directory name,
+    and every cached candidate is tried before a hash refusal.
+  - Only runtime variants for the consuming environment count (Android or
+    standard JVM).
+  - An artifact that is missing from the cache, or only partly cached, is
+    unresolved; it is never assumed.
+  - Redirect, dependency-only and BOM modules have no artifact of their own
+    and are excluded.
+  - Several `<license>` rows in a POM are treated as AND. Only a reviewed
+    `pom_licenses_are_alternatives` flag treats them as OR (the JNA dual
+    license).
+- **npm:** production entries of `mcp/package-lock.json` admitted by
+  `check_npm_licenses.py`. The 11 dev-only packages are excluded.
+- **Bundled binaries:** the Node runtime record. When `--desktop-image` names a
+  built app image, the generator also copies the jlink runtime's `legal/` files
+  under the documented Java runtime exception. Assembly cross-checks those files
+  and `node.exe` against the delivered desktop image. The 125 unadmitted
+  model/runtime/scrcpy proposals under `docs/license-proposals/` stay out,
+  because no shipped artifact contains them.
+
+### Selection rules
+
+- **Policy:** a license outside the `check_setup.py` allow list fails the run.
+- **What counts as license text:** only full texts do. NOTICE, COPYRIGHT,
+  PATENTS and THIRD_PARTY files, and short pointer files such as "Licensed
+  under the Apache License...", always ship but never count. Apache-2.0 is
+  recognised only by its terms-and-conditions body.
+- **Canonical Apache-2.0 fallback:** if the only Apache file is a pointer, or
+  there is none, the canonical retained Apache-2.0 text is used.
+  `pdfium-render` 0.9.4 is a real example.
+- **Unrecognised files:** a LICENSE or COPYING whose wording is not recognised
+  counts only through a hash-bound `reviewed_files` supplement.
+- **Reviewed selections:** a `selected` value in a supplement must be one branch
+  of the declared expression.
+- **Declaration-only entries** must name the exact package files they ship,
+  bound by hash.
+- **Native reviews** need a structured record: source URL, revision, summary
+  and review date.
+- **Embedded native libraries:** bundled native libraries in Maven artifacts
+  are scanned, read-only, for embedded third-party code: zlib, libpng,
+  libjpeg-turbo, FreeType, HarfBuzz, ICU, expat, Wuffs, libwebp, SPIRV-Cross,
+  D3D12MemoryAllocator, brotli, dng_sdk and piex. A supplement's
+  `build_components` adds libraries that the build configuration proves present
+  but strings cannot show. Each such library must be covered, either by the
+  content of a shipped text or by an explicit `covers` registration in
+  `third_party/LICENSES`. A `covers` registration is only accepted when the
+  file is the full text of the license it is registered under.
+- **Receipt:** skipped ecosystems are recorded, and assembly refuses them unless
+  the release declares the skip.
+
+A failing run is still written for diagnosis, with status `incomplete` and exit
+code 2. `tools/release/assemble.py` refuses any incomplete bundle.
+
+### Running it
+
+The generator needs the Gradle census report. Run it after `build.ps1
+license-check`, which runs Gradle `checkDependencyLicenses`. For desktop
+deliveries, run it after the app image is built, so the Java runtime is
+covered:
+
+```powershell
+python tools\release\generate_notices.py --output .local\notices-<release> --gradle-report apps\build\reports\dependency-license\dependencies.json --desktop-image apps\desktop\build\compose\binaries\main\app\VisualWorkbenchDev
+```
+
+### Resolutions and owner decisions (2026-11-04)
+
+The 2026-11-04 offline run used the existing census report and local caches,
+without the desktop image. Status: `complete`, 0 unresolved, deterministic
+across runs. It found 427 shipped components: 273 Rust, 142 Maven, 9 npm and 3
+bundled (Node, Rust standard library, NDK LLVM runtime), with 211 distinct
+texts. Output sha256 is `98b258ce…de3a`.
+
+Owner-approved texts were added to `third_party/LICENSES`:
+
+- `notices/MPL-2.0.txt` (sha256 `3f3d9e00…9b04`), from
+  https://www.mozilla.org/media/MPL/2.0/index.txt. It covers the six
+  unmodified `uniffi*` 0.32.2 crates. A supplement note in the notices file
+  gives the MPL-2.0 3.2(a) Source Code Form location: mozilla/uniffi-rs at
+  commit `7bc621ee9d0d15371d792612707ba5ed4111f950`.
+- `notices/Skia-m150-1f14f1166a-LICENSE.txt` (sha256 `5f787c1d…8dbd`), from
+  JetBrains/skia commit `1f14f1166a847cb0e148f981600bf1e3e6ca6e46` (tag
+  `m150-1f14f1166a`, which skiko v0.150.1 builds against).
+- The expat, HarfBuzz, ICU, libjpeg-turbo, libpng, Wuffs and zlib texts, as
+  `notices/Skia-m150-*`, at the revisions that JetBrains/skia `1f14f1166a` DEPS
+  pins. The source URLs are in `third_party/LICENSES`. The Wuffs text is plain
+  Apache-2.0 and carries `"covers": ["Wuffs"]`.
+
+Other resolutions:
+
+- `libwebp-sys` 0.14.4 is a declaration-only entry, by owner decision. The
+  upstream repository at the crate's commit publishes no license text, so the
+  declared MIT is recorded without an invented copyright line. The crate's
+  vendored libwebp `COPYING` (BSD-3-Clause) and `PATENTS` files ship; their
+  hashes are bound.
+- The `androidx.graphics` graphics-core 1.0.4 and graphics-path 1.0.1 native
+  libraries are AndroidX's own Apache-2.0 JNI code. A structured
+  `native_review` records this; the review was against `androidx-main`, not a
+  pinned release revision.
+
+**Owner decision 2026-11-04:** the global allow list, in both
+`tools/check_setup.py` and `deny.toml` (kept identical), gains
+`MIT-Modern-Variant` (HarfBuzz "Old MIT"), `IJG` (libjpeg-turbo, with
+BSD-3-Clause and Zlib) and `libpng-2.0`. `docs/BUILD_SPECIFICATION.md` 2.5 now
+lists them too. The decision also classifies the ICU LICENSE as Unicode-3.0.
+That file's GPL-with-exception sections cover build-time autoconf files (for
+example `aclocal.m4`, ICU4C only) that are not compiled into the DLL.
+
+### skiko Windows DLL
+
+The skiko Windows build configuration (skia-pack `script/build.py`:
+`is_official_build`, `skia_use_direct3d=true`; Skia `gn/skia.gni` defaults at
+`1f14f1166a`) also compiles in three more libraries:
+
+- **libwebp:** `skia_use_libwebp_decode/encode`. The DLL contains WebP chunk
+  tags (VP8X, VP8L, WEBP).
+- **SPIRV-Cross:** pulled in by `skia_use_direct3d` (the `gpu_shared` target).
+  The DLL contains SPIRV-Cross HLSL strings.
+- **D3D12MemoryAllocator:** pulled in by `skia_use_direct3d`; it is recorded
+  through the supplement's `build_components`.
+
+`dng_sdk`/`piex` are off on Windows (`skia_use_piex = !is_win`), and FreeType
+is off on Windows.
+
+Their texts were retained on 2026-11-04 (owner-approved) at the pinned
+revisions:
+
+- libwebp `COPYING` and `PATENTS` at `845d5476`.
+- SPIRV-Cross `LICENSE` at `b8fcf307`. It is byte-identical to the Wuffs
+  Apache-2.0 text, but kept as its own file for provenance.
+- D3D12MemoryAllocator `LICENSE.txt` and `NOTICES.txt` at `169895d5`.
+
+The libwebp, SPIRV-Cross and D3D12MemoryAllocator texts carry explicit `covers`
+entries. D3D12MemoryAllocator's `NOTICES.txt` adds AMD,
+microsoft-directx-graphics-samples and VulkanMemoryAllocator code, all MIT; its
+premake (BSD-3-Clause) entry is a build tool. With these, the 2026-11-04 run
+is `complete`.
+
+### Rebuilds still needed
+
+Adding files under `third_party/notices` changes the notice resources packaged
+into both apps (the desktop resources and the Android assets). The APK and
+desktop image must be rebuilt before the package notice checks pass. Java
+runtime coverage needs a built desktop image.

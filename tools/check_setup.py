@@ -19,6 +19,8 @@ ALLOWED = frozenset({
     "MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause",
     "BSD-3-Clause", "ISC", "Zlib", "Unicode-3.0", "Unicode-DFS-2016",
     "CC0-1.0", "MPL-2.0", "BSL-1.0", "OFL-1.1",
+    # Owner decision 2026-11-04 (LIC-003): permissive notices embedded in the skiko Skia DLL.
+    "MIT-Modern-Variant", "IJG", "libpng-2.0",
 })
 REQ_ID = re.compile(r"^[A-Z][A-Z0-9]*-\d{3}$")
 
