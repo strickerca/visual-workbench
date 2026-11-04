@@ -37,11 +37,35 @@ Check ($ids.Count -eq 2 -and $ids[0] -ceq '0' -and $ids[1] -ceq '150') 'profile 
 foreach ($bad in @(@('Users:'), @('Users:', '	UserInfo{150:Private:1030}'), @('Error: permission denied'), @('Users:', '	UserInfo{0:Owner:13}', 'garbage'))) {
     Check (Test-Refused { Get-VwAndroidProfileIds $bad }) 'ambiguous profile inventory refused'
 }
-Check (Test-VwPackageListed 'com.visualworkbench.android' @('package:com.visualworkbench.android.hil', 'package:com.visualworkbench.android')) 'exact normal package listed among substring siblings'
-Check (-not (Test-VwPackageListed 'com.visualworkbench.android' @('package:com.visualworkbench.android.hil'))) 'HIL sibling alone is not the normal package'
-Check (-not (Test-VwPackageListed 'com.visualworkbench.android' @())) 'empty listing is absent'
-Check (Test-Refused { Test-VwPackageListed 'com.visualworkbench.android' @('Exception occurred while executing') }) 'error listing refused'
-Check (Test-Refused { Test-VwPackageListed 'com.visualworkbench.android' @('package:com.visualworkbench.android', 'package:com.visualworkbench.android') }) 'duplicate listing refused'
+# One dumpsys read covers every profile (pm list --user N is refused for
+# shell on Secure Folder/work profiles). Rows outside the package section and
+# sibling packages are ignored.
+function New-PackageDump([hashtable]$States, [string[]]$Order, [switch]$DuplicateUser, [switch]$NoInstalledField, [switch]$TwoSections) {
+    $rows = @('Activity Resolver Table:', '  Non-Data Actions:', '      android.intent.action.MAIN:', '        5d3a9b2 com.visualworkbench.android/.MainActivity filter 1a2b', '', 'Packages:',
+        '  Package [com.visualworkbench.android.hil] (77aa01):', '    userId=10301', '    User 0: ceDataInode=9 installed=true hidden=false', '    User 150: ceDataInode=9 installed=true hidden=false',
+        '  Package [com.visualworkbench.android] (5d3a9b2):', '    userId=10234', '    versionCode=1 minSdk=29 targetSdk=36', '    pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]')
+    foreach ($id in $Order) {
+        $installed = if ($States.ContainsKey($id) -and $States[$id]) { 'true' } else { 'false' }
+        $field = if ($NoInstalledField) { '' } else { ' installed=' + $installed }
+        $rows += ('    User ' + $id + ': ceDataInode=1' + $field + ' hidden=false suspended=false stopped=false notLaunched=false enabled=0')
+        $rows += @('      gids=[3003]', '      runtime permissions:')
+        if ($DuplicateUser) { $rows += ('    User ' + $id + ': ceDataInode=1 installed=false hidden=false') }
+    }
+    if ($TwoSections) { $rows += @('Hidden system packages:', '  Package [com.visualworkbench.android] (5d3a9b3):', '    User 0: ceDataInode=1 installed=true') }
+    $rows += @('', 'Queries:', '  system apps queryable: false', 'Dexopt state:', '  [com.visualworkbench.android]', '    User 150: installed=true')
+    return $rows
+}
+$states = Get-VwPackageUserStates 'com.visualworkbench.android' (New-PackageDump @{ '0' = $true } @('0', '150'))
+Check ($states.Count -eq 2 -and $states['0'] -eq $true -and $states['150'] -eq $false) 'per-user package states parsed from one dumpsys section'
+Check ((Get-VwPackageUserStates 'com.visualworkbench.android' (New-PackageDump @{ '0' = $true; '150' = $true } @('0', '150')))['150'] -eq $true) 'other-profile installation detected'
+Check (Test-Refused { Get-VwPackageUserStates 'com.visualworkbench.android' @('Unable to find package: com.visualworkbench.android') }) 'missing package section refused'
+Check (Test-Refused { Get-VwPackageUserStates 'com.visualworkbench.android' (New-PackageDump @{ '0' = $true } @('0') -DuplicateUser) }) 'duplicate user row refused'
+Check (Test-Refused { Get-VwPackageUserStates 'com.visualworkbench.android' (New-PackageDump @{ '0' = $true } @('0') -NoInstalledField) }) 'user row without installed state refused'
+Check (Test-Refused { Get-VwPackageUserStates 'com.visualworkbench.android' (New-PackageDump @{ '0' = $true } @('0') -TwoSections) }) 'two package sections refused'
+Check (Test-Refused { Get-VwPackageUserStates 'com.visualworkbench.android' (New-PackageDump @{ '150' = $true } @('150')) }) 'section without owner user refused'
+Check ((Get-VwProcessState 0 @('12345')) -ceq 'alive' -and (Get-VwProcessState 0 @('12345 12399')) -ceq 'alive') 'pidof alive parsed'
+Check ((Get-VwProcessState 1 @()) -ceq 'absent') 'pidof absent parsed'
+Check ((Get-VwProcessState 0 @('pidof: permission denied')) -ceq 'unknown' -and (Get-VwProcessState 124 @()) -ceq 'unknown') 'pidof unknown parsed'
 $dir = '/data/app/~~Zx1Q==/com.visualworkbench.android-Ab2C=='
 $set = @(Get-VwInstalledApkSet @("package:$dir/split_config.xxhdpi.apk", "package:$dir/base.apk"))
 Check ($set.Count -eq 2 -and $set[0].Name -ceq 'base.apk' -and $set[1].Name -ceq 'split_config.xxhdpi.apk' -and $set[0].Remote -ceq "$dir/base.apk") 'base/split inventory ordered with base first'
@@ -60,6 +84,8 @@ Check (Test-VwNormalForeground @('  topResumedActivity=ActivityRecord{1a2b u0 co
 Check (Test-VwNormalForeground @('  mResumedActivity: ActivityRecord{1a2b u0 com.visualworkbench.android/com.visualworkbench.android.MainActivity t42}')) 'full component foreground recognized'
 Check (-not (Test-VwNormalForeground @('  topResumedActivity=ActivityRecord{1a2b u0 com.visualworkbench.android.hil/com.visualworkbench.android.MainActivity t42}'))) 'HIL package foreground refused'
 Check (-not (Test-VwNormalForeground @('  topResumedActivity=ActivityRecord{1a2b u150 com.visualworkbench.android/.MainActivity t42}'))) 'other profile foreground refused'
+Check (-not (Test-VwNormalForeground @('    mLastResumedActivity: ActivityRecord{1a2b u0 com.visualworkbench.android/.MainActivity t42}', '      Hist #0: ActivityRecord{1a2b u0 com.visualworkbench.android/.MainActivity t42} topResumedActivity'))) 'only anchored resumed-activity rows count'
+Check (Test-VwNormalForeground @('    ResumedActivity: ActivityRecord{1a2b u0 com.visualworkbench.android/.MainActivity t42}')) 'ResumedActivity row recognized'
 
 # ---------- Source drift: launcher activity and package ----------
 [xml]$manifest = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'apps/android/src/main/AndroidManifest.xml')
@@ -86,8 +112,12 @@ function New-FakePhone {
         dir = $dir
         files = [ordered]@{ 'base.apk' = $InstalledText }
         installModes = New-Object Collections.Generic.List[string]
-        launchOk = $true
+        launchMode = 'ok'
         foreground = $true
+        processAlive = $true
+        packageAbsent = $false
+        dumpIds = $null
+        serverChecks = New-Object Collections.Generic.List[bool]
         calls = New-Object Collections.Generic.List[object]
     }
     $phone.installModes.Add('success')
@@ -96,6 +126,7 @@ function New-FakePhone {
 function New-FakeAdb($Phone) {
     # GetNewClosure captures only these locals.
     $hashText = ${function:Get-TextSha256}
+    $packageDump = ${function:New-PackageDump}
     $encoding = New-Object Text.UTF8Encoding -ArgumentList $false
     return {
         param($Device, [string]$Phase, [string[]]$Arguments, [int]$Seconds)
@@ -107,6 +138,7 @@ function New-FakeAdb($Phone) {
             $mode = if ($Phone.installModes.Count -gt 0) { $Phone.installModes[0] } else { 'success' }
             if ($Phone.installModes.Count -gt 1) { $Phone.installModes.RemoveAt(0) }
             if ($mode -ceq 'failure') { return & $result 1 @('Performing Streamed Install', 'adb: failed to install: Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package signatures do not match]') }
+            if ($mode -ceq 'timeout-unchanged') { return & $result 124 @('Performing Streamed Install') }
             $Phone.files = [ordered]@{}
             $Phone.dir = '/data/app/~~N' + $Phone.calls.Count + '==/com.visualworkbench.android-Q' + $Phone.calls.Count + '=='
             foreach ($path in $Paths) {
@@ -116,14 +148,24 @@ function New-FakeAdb($Phone) {
                 if ($mode -ceq 'corrupt') { $text += ';corrupted' }
                 $Phone.files[$name] = $text
             }
+            if ($mode -ceq 'timeout-installed') { return & $result 124 @('Performing Streamed Install') }
             return & $result 0 @('Performing Streamed Install', 'Success')
         }
         if ($line -ceq 'shell am get-current-user') { return & $result 0 @($Phone.currentUser) }
         if ($line -ceq 'shell pm list users') { return & $result 0 $Phone.users }
-        if ($line -cmatch '^shell pm list packages --user ([0-9]+) com\.visualworkbench\.android$') {
-            $rows = @('package:com.visualworkbench.android.hil')
-            if ($Phone.packageUsers.ContainsKey($Matches[1]) -and $Phone.packageUsers[$Matches[1]]) { $rows += 'package:com.visualworkbench.android' }
-            return & $result 0 $rows
+        if ($line -cmatch '^shell pm list packages --user ([0-9]+) ') {
+            # Real S23 behavior for Secure Folder/work profiles from shell.
+            if ($Matches[1] -cne '0') { return & $result 255 @('Exception occurred while executing ''list'':', ('java.lang.SecurityException: Shell does not have permission to access user ' + $Matches[1])) }
+            return & $result 0 @('package:com.visualworkbench.android.hil', 'package:com.visualworkbench.android')
+        }
+        if ($line -ceq 'shell dumpsys package com.visualworkbench.android') {
+            if ($Phone.packageAbsent) { return & $result 0 @('Unable to find package: com.visualworkbench.android') }
+            $order = if ($null -ne $Phone.dumpIds) { @($Phone.dumpIds) } else { @($Phone.users | ForEach-Object { if ($_ -cmatch 'UserInfo\{([0-9]+):') { $Matches[1] } }) }
+            return & $result 0 (& $packageDump $Phone.packageUsers $order)
+        }
+        if ($line -ceq 'shell pidof com.visualworkbench.android') {
+            if ($Phone.processAlive) { return & $result 0 @('12345') }
+            return & $result 1 @()
         }
         if ($line -ceq 'shell pm path --user 0 com.visualworkbench.android') {
             return & $result 0 @($Phone.files.Keys | ForEach-Object { 'package:' + $Phone.dir + '/' + $_ })
@@ -141,7 +183,8 @@ function New-FakeAdb($Phone) {
         if ($Arguments.Count -eq 5 -and $line.StartsWith('install -r --user 0 ')) { return & $installFrom @($Arguments[4]) }
         if ($Arguments.Count -gt 5 -and $line.StartsWith('install-multiple -r --user 0 ')) { return & $installFrom @($Arguments[4..($Arguments.Count - 1)]) }
         if ($line -ceq 'shell am start -W --user 0 -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n com.visualworkbench.android/.MainActivity') {
-            if ($Phone.launchOk) { return & $result 0 @('Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] }', 'Status: ok', 'LaunchState: COLD') }
+            if ($Phone.launchMode -ceq 'ok') { return & $result 0 @('Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] }', 'Status: ok', 'LaunchState: COLD') }
+            if ($Phone.launchMode -ceq 'timeout') { return & $result 0 @('Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] }', 'Status: timeout', 'LaunchState: UNKNOWN (0)') }
             return & $result 0 @('Starting: Intent { }', 'Error: Activity class {com.visualworkbench.android/.MainActivity} does not exist.')
         }
         if ($line -ceq 'shell dumpsys activity activities') {
@@ -149,6 +192,14 @@ function New-FakeAdb($Phone) {
             return & $result 0 @('  topResumedActivity=ActivityRecord{1a2b u0 com.other.app/.Main t41}')
         }
         throw "Fake adb received an unexpected command: $line"
+    }.GetNewClosure()
+}
+function New-FakeServer($Phone) {
+    return {
+        if ($Phone.serverChecks.Count -gt 0) {
+            $alive = $Phone.serverChecks[0]; $Phone.serverChecks.RemoveAt(0)
+            if (-not $alive) { throw 'Existing adb server unavailable.' }
+        }
     }.GetNewClosure()
 }
 $fakeSigner = {
@@ -169,16 +220,19 @@ $fakeAapt = {
 $base = Join-Path ([IO.Path]::GetTempPath()) ('vw-normal-delivery-fixtures-' + [guid]::NewGuid().ToString('N'))
 $script:scenario = 0
 function Invoke-Scenario {
-    param($Phone, [string]$ApkText, [string]$Sha256, [string]$Model = 'SM-S918U', [string]$DeviceModel = 'SM-S918U')
+    param($Phone, [string]$ApkText, [string]$Sha256, [string]$Model = 'SM-S918U', [string]$DeviceModel = 'SM-S918U', [string]$ApkName)
     $script:scenario++
     $root = Join-Path $base ('root-' + $script:scenario)
     [void][IO.Directory]::CreateDirectory($root)
-    $apk = Join-Path $base ('input-' + $script:scenario + '.apk')
+    if (-not $ApkName) { $ApkName = 'input-' + $script:scenario + '.apk' }
+    $apkDirectory = Join-Path $base ('input-' + $script:scenario)
+    [void][IO.Directory]::CreateDirectory($apkDirectory)
+    $apk = Join-Path $apkDirectory $ApkName
     [IO.File]::WriteAllText($apk, $ApkText, $utf8)
     if (-not $Sha256) { $Sha256 = Get-TextSha256 $ApkText }
     $deviceModel = $DeviceModel; $fakeSerial = $serial
     $select = { [pscustomobject]@{ Model = $deviceModel; Serial = $fakeSerial; AdbPath = 'fake-adb' } }.GetNewClosure()
-    $receipt = Invoke-VwNormalDelivery -ProjectRoot $root -ApkPath $apk -ApkSha256 $Sha256 -ExpectedModel $Model -SelectDevice $select -Adb (New-FakeAdb $Phone) -ApkSigner $fakeSigner -Aapt $fakeAapt -ForegroundAttempts 2 -ForegroundDelaySeconds 0 6>$null
+    $receipt = Invoke-VwNormalDelivery -ProjectRoot $root -ApkPath $apk -ApkSha256 $Sha256 -ExpectedModel $Model -SelectDevice $select -Adb (New-FakeAdb $Phone) -ApkSigner $fakeSigner -Aapt $fakeAapt -AssertAdbServer (New-FakeServer $Phone) -ForegroundAttempts 2 -ForegroundDelaySeconds 0 -InstallSettleSeconds 0 -ProcessCheckDelaySeconds 0 6>$null
     $receiptFile = Join-Path $root ('.local/android-normal-delivery-' + $receipt.run_id + '.json')
     Check (Test-Path -LiteralPath $receiptFile -PathType Leaf) 'receipt written under .local'
     $json = [IO.File]::ReadAllText($receiptFile)
@@ -188,9 +242,10 @@ function Invoke-Scenario {
     foreach ($call in $Phone.calls) {
         $tokens = @($call)
         Check (-not ($tokens -ccontains '-d') -and -not ($tokens -ccontains 'uninstall') -and -not ($tokens -ccontains 'clear') -and -not ($tokens -ccontains '-k') -and -not ($tokens -ccontains 'force-stop')) 'no downgrade, uninstall, data clear or force-stop'
+        Check (-not (($tokens -join ' ') -cmatch '^shell pm list packages')) 'profile scope never uses per-user pm list'
         if ($tokens[0] -like 'install*') { Check ($tokens[1] -ceq '-r' -and $tokens[2] -ceq '--user' -and $tokens[3] -ceq '0') 'install uses -r --user 0 only' }
     }
-    return [pscustomobject]@{ Receipt = $receipt; Root = $root; Apk = $apk }
+    return [pscustomobject]@{ Receipt = $receipt; Root = $root; Apk = $apk; Json = $json }
 }
 function Get-InstallCalls($Phone) {
     # Each call is a string[]; return the outer array as one object.
@@ -209,7 +264,7 @@ try {
     Check ($r.status -ceq 'delivered') 'happy path delivered'
     Check ($phone.files['base.apk'] -ceq $newText) 'new bytes installed'
     Check ($r.readback.matches -and $r.readback.sha256 -ceq (Get-TextSha256 $newText)) 'installed bytes read back'
-    Check ($r.launch.status_ok -and $r.launch.foreground) 'normal launch in foreground'
+    Check ($r.launch.status_ok -and $r.launch.foreground -and $r.launch.process_state_after_launch -ceq 'alive') 'normal launch in foreground with live process'
     Check ($r.input.signer_sha256 -ceq $signerA -and $r.installed_before.signer_sha256 -ceq $signerA) 'signers recorded'
     $backupBase = Join-Path $run.Root ('.local/android-normal-backups/' + $r.run_id + '/base.apk')
     Check ((Test-Path -LiteralPath $backupBase) -and (Get-VwFileSha256 $backupBase) -ceq (Get-TextSha256 $oldText)) 'previous base APK backed up with hash'
@@ -294,10 +349,17 @@ try {
     $calls = Get-InstallCalls $phone
     Check ($r.status -ceq 'rolled-back' -and @($calls[1])[0] -ceq 'install-multiple' -and @($calls[1]).Count -eq 6 -and $phone.files.Count -eq 2 -and $phone.files['split_config.xxhdpi.apk'] -ceq $splitText) 'split install rolled back with install-multiple'
 
-    # 13. Launch failure: rolled back.
-    $phone = New-FakePhone $oldText; $phone.launchOk = $false; $phone.installModes.Add('success')
+    # 13. Launch failure or timeout after verified install: never rolled back
+    # (the new build may already have migrated app data).
+    $phone = New-FakePhone $oldText; $phone.launchMode = 'error'
     $r = (Invoke-Scenario $phone $newText).Receipt
-    Check ($r.status -ceq 'rolled-back' -and $r.failure_code -ceq 'launch_failed' -and $phone.files['base.apk'] -ceq $oldText) 'launch failure rolled back'
+    Check ($r.status -ceq 'delivered-launch-inconclusive' -and $r.failure_code -ceq 'launch_failed' -and -not $r.rollback.attempted -and (Get-InstallCalls $phone).Count -eq 1 -and $phone.files['base.apk'] -ceq $newText) 'launch failure is inconclusive without rollback'
+    $phone = New-FakePhone $oldText; $phone.launchMode = 'timeout'
+    $r = (Invoke-Scenario $phone $newText).Receipt
+    Check ($r.status -ceq 'delivered-launch-inconclusive' -and $r.failure_code -ceq 'launch_timeout' -and -not $r.rollback.attempted -and $phone.files['base.apk'] -ceq $newText) 'slow cold start timeout is inconclusive without rollback'
+    $phone = New-FakePhone $oldText; $phone.processAlive = $false
+    $r = (Invoke-Scenario $phone $newText).Receipt
+    Check ($r.status -ceq 'delivered-process-exited' -and $r.launch.foreground -and $r.launch.process_state_after_launch -ceq 'absent' -and -not $r.rollback.attempted -and $phone.files['base.apk'] -ceq $newText) 'process exit after launch reported without rollback'
 
     # 14. Foreground not observed: verified bytes kept, inconclusive.
     $phone = New-FakePhone $oldText; $phone.foreground = $false
@@ -310,6 +372,40 @@ try {
     $r = $run.Receipt
     Check ($r.status -ceq 'rollback-failed' -and $r.rollback.attempted -and -not $r.rollback.succeeded -and $r.rollback.failure_code -ceq 'install_failed_update_incompatible' -and $r.backup.retained -and (Test-Path -LiteralPath (Join-Path $run.Root ('.local/android-normal-backups/' + $r.run_id + '/base.apk')))) 'failed rollback reported with retained backup'
 
+    # 17. Package section absent / profile rows inconsistent with pm list users.
+    $phone = New-FakePhone $oldText; $phone.packageAbsent = $true
+    Check ((Invoke-Scenario $phone $newText).Receipt.failure_code -ceq 'package_user_states') 'absent package section refused'
+    $phone = New-FakePhone $oldText
+    $phone.users = @('Users:', '	UserInfo{0:Owner:c13} running', '	UserInfo{150:Secure Folder:1030}'); $phone.dumpIds = @('0')
+    Check ((Invoke-Scenario $phone $newText).Receipt.failure_code -ceq 'package_user_states_inconsistent') 'missing profile row refused'
+
+    # 18. Byte-identical delivery: distinct status, nothing installed.
+    $phone = New-FakePhone $newText
+    $r = (Invoke-Scenario $phone $newText).Receipt
+    Check ($r.status -ceq 'already-installed' -and $r.install.skipped_identical -and -not $r.install.attempted -and (Get-InstallCalls $phone).Count -eq 0 -and $r.readback.matches -and $r.launch.foreground) 'identical bytes reported as already installed'
+
+    # 19. adb install timeout: settled delayed re-reads decide the outcome.
+    $phone = New-FakePhone $oldText; $phone.installModes[0] = 'timeout-unchanged'
+    $r = (Invoke-Scenario $phone $newText).Receipt
+    Check ($r.status -ceq 'install-timeout-unchanged' -and $r.install.timed_out -and $r.install.settled_after_timeout -ceq 'previous-bytes' -and -not $r.rollback.needed -and (Get-InstallCalls $phone).Count -eq 1) 'install timeout with previous bytes is distinct from refused install'
+    $phone = New-FakePhone $oldText; $phone.installModes[0] = 'timeout-installed'
+    $r = (Invoke-Scenario $phone $newText).Receipt
+    Check ($r.status -ceq 'delivered' -and $r.install.timed_out -and $r.install.settled_after_timeout -ceq 'delivered-bytes' -and $r.readback.matches) 'install timeout that settled on the delivered bytes continues verification'
+
+    # 20. adb server re-verified before install and before rollback.
+    $phone = New-FakePhone $oldText; $phone.serverChecks.Add($false)
+    $r = (Invoke-Scenario $phone $newText).Receipt
+    Check ($r.status -ceq 'refused' -and $r.failure_code -ceq 'adb_server_unavailable' -and (Get-InstallCalls $phone).Count -eq 0) 'missing adb server refuses before install'
+    $phone = New-FakePhone $oldText; $phone.installModes[0] = 'corrupt'; $phone.serverChecks.Add($true); $phone.serverChecks.Add($false)
+    $r = (Invoke-Scenario $phone $newText).Receipt
+    Check ($r.status -ceq 'rollback-failed' -and $r.rollback.failure_code -ceq 'adb_server_unavailable' -and (Get-InstallCalls $phone).Count -eq 1) 'missing adb server before rollback is reported, not bypassed'
+
+    # 21. Privacy refusal keeps the outcome in a minimal redacted receipt.
+    $phone = New-FakePhone $oldText
+    $run = Invoke-Scenario $phone $newText -ApkName ($serial + '.apk')
+    $minimal = $run.Json | ConvertFrom-Json
+    Check ($run.Receipt.status -ceq 'delivered' -and $minimal.status -ceq 'delivered' -and $minimal.receipt_redacted -eq $true -and $minimal.redaction_reason -ceq 'privacy_check') 'privacy refusal writes a minimal receipt with the status'
+
     # 16. Concurrent delivery lock.
     $phone = New-FakePhone $oldText
     $lockRoot = Join-Path $base 'locked'
@@ -318,7 +414,7 @@ try {
     try {
         $apk = Join-Path $base 'locked.apk'; [IO.File]::WriteAllText($apk, $newText, $utf8)
         $select = { [pscustomobject]@{ Model = 'SM-S918U'; Serial = $serial } }.GetNewClosure()
-        $r = Invoke-VwNormalDelivery -ProjectRoot $lockRoot -ApkPath $apk -ApkSha256 (Get-TextSha256 $newText) -ExpectedModel 'SM-S918U' -SelectDevice $select -Adb (New-FakeAdb $phone) -ApkSigner $fakeSigner -Aapt $fakeAapt 6>$null
+        $r = Invoke-VwNormalDelivery -ProjectRoot $lockRoot -ApkPath $apk -ApkSha256 (Get-TextSha256 $newText) -ExpectedModel 'SM-S918U' -SelectDevice $select -Adb (New-FakeAdb $phone) -ApkSigner $fakeSigner -Aapt $fakeAapt -AssertAdbServer (New-FakeServer $phone) 6>$null
         Check ($r.failure_code -ceq 'delivery_lock_held' -and $phone.calls.Count -eq 0) 'concurrent delivery refused'
     } finally { $held.Dispose() }
 

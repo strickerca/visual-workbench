@@ -46,31 +46,66 @@ inputs are refused on every other `build.ps1` command.
    needs exactly one matching online physical device and never falls back to
    another one. The adb server must already be running and match the client
    version.
-5. Requires the current user to be 0. Reads `pm list users` through the
-   reviewed owner-profile parser, and requires the package to be installed for
-   user 0 and **absent from every other profile**. An APK update would also
-   change any other profile that holds the package, so that case is refused.
+5. Requires the current user to be 0 and reads `pm list users` through the
+   reviewed owner-profile parser. A single `dumpsys package
+   com.visualworkbench.android` read then gives the package's
+   `User N: ... installed=true/false` row for every profile. Per-user
+   `pm list packages --user N` is not used, because shell is refused on Secure
+   Folder and work profiles (DISALLOW_DEBUGGING_FEATURES). Delivery requires
+   exactly one package section and one row for each listed profile. The
+   package must be installed for user 0 and **absent from every other
+   profile**. An APK update would also change any other profile that holds
+   the package, so that case is refused.
 6. Backs up every installed APK (`pm path --user 0`: base and splits) with
    `adb pull` into `.local/android-normal-backups/<run-id>/`. Each pulled
    file's hash must match the phone's `sha256sum`. `backup.json` records the
    names and hashes.
 7. Runs apksigner on the backed-up APKs: they must have one signer between
    them, and it must equal the new APK's signer. The new versionCode must not
-   be lower than the installed one.
-8. `adb install -r --user 0 <apk>`. It never uses `-d`, never uninstalls, and
-   never clears app data.
+   be lower than the installed one. If the installed APK already has exactly
+   the input bytes, nothing is installed (`already-installed`).
+8. Checks that the existing adb server is still alive, then runs
+   `adb install -r --user 0 <apk>`. It never uses `-d`, never uninstalls, and
+   never clears app data. If the install times out (exit 124), the outcome is
+   unknown, because the phone's install session can outlive the killed adb
+   client. The state is re-read after a delay (30 s, up to 3 reads) until two
+   reads agree:
+   - Delivered bytes: verification continues.
+   - Previous bytes: `install-timeout-unchanged`.
+   - Anything else: rollback.
 9. Reads the result back: `pm path` must show a single `base.apk`. That file is
    pulled, and both its local hash and the phone's `sha256sum` must equal the
    input SHA-256. The other-profile check runs again.
 10. Launches the app normally with
-    `am start -W --user 0 -a MAIN -c LAUNCHER -n com.visualworkbench.android/.MainActivity`,
-    then checks up to 3 times that the user-0 normal activity is resumed.
-11. If a check fails after the install, it restores the backup with
-    `install -r --user 0`, or `install-multiple` when there were splits. It then
-    verifies every restored file's hash against the backup. This applies to a
-    readback or profile mismatch, a failed launch, or a device error. If
-    Android refused the install, the old bytes are confirmed still in place and
-    nothing is reinstalled.
+    `am start -W --user 0 -a MAIN -c LAUNCHER -n com.visualworkbench.android/.MainActivity`.
+    It then checks up to 3 times that the user-0 normal activity is resumed,
+    matching only anchored `topResumedActivity=`, `mResumedActivity:` or
+    `ResumedActivity:` rows. After a short delay it runs `pidof` to catch an
+    immediate crash.
+11. **Rollback only before launch.** If a check fails after the install attempt
+    but before launch, it restores the backup with `install -r --user 0`, or
+    `install-multiple` when there were splits. It then verifies every restored
+    file's hash. Such checks include an unknown install outcome, a readback or
+    profile-scope mismatch, or a device error. The adb server is re-checked
+    first. If Android refused the install, the old bytes are confirmed still in
+    place and nothing is reinstalled.
+
+## Why no rollback after launch
+
+Once the new build has started, it may already have migrated app data, for
+example the vw-store schema. Reinstalling older code could leave an app that
+fails with `UnsupportedSchema` on its own data, while the receipt says
+`rolled-back`. A slow cold start can also show up as `Status: timeout` or hit
+the 30 s limit even though the new process ran. So these outcomes are never
+rolled back automatically:
+
+- launch failure
+- launch timeout
+- foreground not observed
+- process exited after launch
+
+Each gets a distinct status for the owner to diagnose, and the backup stays
+available for a deliberate manual decision.
 
 ## Receipt and privacy
 
@@ -80,21 +115,27 @@ receipt containing:
 - schema, status, phases, failure phase and failure code
 - the input name, hash, signer and versionCode
 - the installed-before hashes and signer
-- readback, launch and rollback results
+- install, timeout, readback, launch, process and rollback results
 
-The receipt never contains device serials or local absolute paths. The
-receipt writer refuses to write a receipt that contains either one. The serial
-is redacted from all bounded-process output. adb, apksigner and aapt2 output
-stays in memory and is never written to log files. Screenshots: none.
+The receipt never contains device serials or local absolute paths. If the
+privacy check finds either one (for example an APK file named after a serial),
+it writes a minimal redacted receipt instead, with only the status, codes and
+`receipt_redacted=true`, and still prints the status. The serial is redacted
+from all bounded-process output. adb, apksigner and aapt2 output stays in memory
+and is never written to log files. Screenshots: none.
 
 | Status | Meaning | Exit |
 |---|---|---|
-| `delivered` | Installed, read back, normal launch observed in foreground | 0 |
-| `delivered-foreground-inconclusive` | Installed and read back. Foreground was not observed (shared phone), so the result is inconclusive. No other app was stopped and nothing was rolled back | 1 |
-| `refused` | A precondition failed. Nothing was installed | 1 |
+| `delivered` | Installed, read back, normal launch in foreground, process alive | 0 |
+| `already-installed` | The installed APK already had these exact bytes. Nothing was installed. Normal launch observed | 0 |
+| `delivered-foreground-inconclusive` | Installed and read back. Foreground was not observed (shared phone). No other app was stopped and nothing was rolled back | 1 |
+| `delivered-launch-inconclusive` | Installed and read back. Launch failed, timed out or could not be confirmed. Not rolled back (see above) | 1 |
+| `delivered-process-exited` | Installed, read back and shown, but the process was gone shortly after launch (possible crash). Not rolled back | 1 |
+| `refused` | A precondition failed (including a missing adb server before install). Nothing was installed | 1 |
 | `install-failed-unchanged` | Android refused the install. The previous bytes were confirmed in place | 1 |
-| `rolled-back` | A check failed after the install. The backup was reinstalled and verified | 1 |
-| `rollback-failed` | Rollback could not be verified. Keep the backup and do **not** uninstall the app. Diagnose manually | 1 |
+| `install-timeout-unchanged` | adb install timed out. Settled delayed reads show the previous bytes. A device-side session may still finish, so re-check before retrying | 1 |
+| `rolled-back` | A check failed after the install and before launch. The backup was reinstalled and verified | 1 |
+| `rollback-failed` | Rollback could not be verified (including a missing adb server). Keep the backup and do **not** uninstall the app. Diagnose manually | 1 |
 
 ## Limits
 
@@ -106,8 +147,12 @@ stays in memory and is never written to log files. Screenshots: none.
   downgrade, and Android refuses it without `-d`. The script never uses `-d`,
   so such a rollback reports `rollback-failed`. The current app has a fixed
   `versionCode = 1`.
-- `install-multiple` with `--user 0` and the Samsung `dumpsys activity`
-  resumed-activity format have only been checked against synthetic fixtures.
+- The following have only been checked against synthetic fixtures:
+  - `install-multiple` with `--user 0`
+  - the `dumpsys package` per-user row format
+  - the Samsung `dumpsys activity` resumed-activity format
+  - `pidof`
+
   No real device run of this route has happened yet. The first real delivery
   is its acceptance.
 - Test-only APKs (`android:testOnly`) are refused by Android because the route

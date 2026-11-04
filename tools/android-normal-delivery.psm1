@@ -83,20 +83,36 @@ function Get-VwAndroidProfileIds {
     return $ids
 }
 
-function Test-VwPackageListed {
+function Get-VwPackageUserStates {
     param([Parameter(Mandatory = $true)][string]$Package, [AllowEmptyCollection()][string[]]$Lines)
-    # `pm list packages FILTER` is a substring filter; tolerate related names
-    # (for example the isolated .hil package) but refuse any other output.
-    $count = 0
-    foreach ($line in @(@($Lines) | Where-Object { $_ -and $_.Trim() })) {
-        $trimmed = $line.Trim()
-        if ($trimmed -cnotmatch '^package:([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)$') { Stop-VwDelivery 'package_inventory' }
-        $listed = $Matches[1]
-        if (-not $listed.Contains($Package)) { Stop-VwDelivery 'package_inventory' }
-        if ($listed -ceq $Package) { $count++ }
+    # One `dumpsys package PKG` read covers every profile. Per-user
+    # `pm list packages --user N` is refused for shell on Secure Folder/work
+    # profiles (DISALLOW_DEBUGGING_FEATURES), so it cannot prove absence there.
+    # Exactly one package section; its `User N: ... installed=bool` rows only.
+    $rows = @($Lines)
+    $header = '^  Package \[' + [regex]::Escape($Package) + '\] \([0-9A-Fa-f]{1,16}\):\s*$'
+    $starts = @(for ($index = 0; $index -lt $rows.Count; $index++) { if ($rows[$index] -cmatch $header) { $index } })
+    if ($starts.Count -ne 1) { Stop-VwDelivery 'package_user_states' }
+    $states = @{}
+    for ($index = $starts[0] + 1; $index -lt $rows.Count; $index++) {
+        $line = [string]$rows[$index]
+        if ($line -cmatch '^\S' -or $line -cmatch '^ {0,2}\S') { break }
+        if ($line -cmatch '^\s+User ([0-9]{1,10}):') {
+            if ($line -cnotmatch '^\s+User ([0-9]{1,10}): .*\binstalled=(true|false)\b') { Stop-VwDelivery 'package_user_states' }
+            if ($states.ContainsKey($Matches[1])) { Stop-VwDelivery 'package_user_states' }
+            $states[$Matches[1]] = $Matches[2] -ceq 'true'
+        }
     }
-    if ($count -gt 1) { Stop-VwDelivery 'package_inventory' }
-    return $count -eq 1
+    if ($states.Count -eq 0 -or -not $states.ContainsKey('0')) { Stop-VwDelivery 'package_user_states' }
+    return $states
+}
+
+function Get-VwProcessState {
+    param([int]$ExitCode, [AllowEmptyCollection()][string[]]$Lines)
+    $rows = @(@($Lines) | Where-Object { $_ -and $_.Trim() })
+    if ($ExitCode -eq 0 -and $rows.Count -eq 1 -and $rows[0].Trim() -cmatch '^[0-9]{1,10}(?: [0-9]{1,10})*$') { return 'alive' }
+    if ($ExitCode -eq 1 -and $rows.Count -eq 0) { return 'absent' }
+    return 'unknown'
 }
 
 function Get-VwInstalledApkSet {
@@ -149,7 +165,7 @@ function Test-VwNormalForeground {
     param([AllowEmptyCollection()][string[]]$Lines)
     # Owner user 0 and the exact normal package only; the isolated .hil package
     # and other profiles never satisfy this predicate.
-    $resumed = @(@($Lines) | Where-Object { $_ -cmatch '(?:mResumedActivity|topResumedActivity|ResumedActivity)' })
+    $resumed = @(@($Lines) | Where-Object { $_ -cmatch '^\s*(?:topResumedActivity=|mResumedActivity:|ResumedActivity:)' })
     foreach ($line in $resumed) {
         if ($line -cmatch '\bu0 com\.visualworkbench\.android/(?:\.|com\.visualworkbench\.android\.)MainActivity\b') { return $true }
     }
@@ -212,6 +228,18 @@ function Invoke-VwNormalDelivery {
       Adb:          { param($Device, [string]$Phase, [string[]]$Arguments, [int]$Seconds) }
       ApkSigner:    { param([string]$Phase, [string]$Path) }   # apksigner verify --verbose --print-certs
       Aapt:         { param([string]$Phase, [string]$Path) }   # aapt2 dump badging
+      AssertAdbServer: { } throws unless the existing adb server is alive
+        (checked again right before install and before rollback, so an
+        `adb -s` call never spawns a server inside a bounded job).
+
+    Rollback policy: automatic rollback happens only for failures after the
+    install attempt and BEFORE launch (install outcome unknown, readback or
+    profile-scope mismatch, device errors). Once the new build has been
+    launched it may already have migrated app data (for example the vw-store
+    schema); reinstalling older code could then leave an app that cannot open
+    its own data while the receipt claims success. Launch failure, launch
+    timeout, missing foreground or an exited process are therefore reported
+    as distinct non-rollback statuses for owner diagnosis.
     #>
     [CmdletBinding()]
     param(
@@ -223,9 +251,12 @@ function Invoke-VwNormalDelivery {
         [Parameter(Mandatory = $true)][scriptblock]$Adb,
         [Parameter(Mandatory = $true)][scriptblock]$ApkSigner,
         [Parameter(Mandatory = $true)][scriptblock]$Aapt,
+        [Parameter(Mandatory = $true)][scriptblock]$AssertAdbServer,
         [ValidatePattern('^[0-9a-f]{32}$')][string]$RunId = ([guid]::NewGuid().ToString('N')),
         [ValidateRange(1, 5)][int]$ForegroundAttempts = 3,
-        [ValidateRange(0, 10)][int]$ForegroundDelaySeconds = 2
+        [ValidateRange(0, 10)][int]$ForegroundDelaySeconds = 2,
+        [ValidateRange(0, 600)][int]$InstallSettleSeconds = 30,
+        [ValidateRange(0, 30)][int]$ProcessCheckDelaySeconds = 3
     )
     $root = [IO.Path]::GetFullPath($ProjectRoot)
     $package = $script:NormalPackage
@@ -239,13 +270,13 @@ function Invoke-VwNormalDelivery {
         device_scope = [ordered]@{ current_user = $null; profile_count = $null; installed_for_owner = $false; other_profiles_with_package = $null; other_profiles_modified = $false }
         installed_before = [ordered]@{ signer_sha256 = $null; version_code = $null; version_name = $null; files = @() }
         backup = [ordered]@{ directory = $null; complete = $false; device_digest_bound = $false; retained = $false }
-        install = [ordered]@{ attempted = $false; success_reported = $false; arguments = @('install', '-r', '--user', '0', '<apk>'); downgrade_flag = $false; uninstall_performed = $false; data_cleared = $false }
+        install = [ordered]@{ attempted = $false; skipped_identical = $false; success_reported = $false; timed_out = $false; settled_after_timeout = $null; arguments = @('install', '-r', '--user', '0', '<apk>'); downgrade_flag = $false; uninstall_performed = $false; data_cleared = $false }
         readback = [ordered]@{ file_count = $null; sha256 = $null; matches = $false }
-        launch = [ordered]@{ component = $script:NormalComponent; status_ok = $false; foreground = $false; attempts = 0 }
-        rollback = [ordered]@{ needed = $false; attempted = $false; succeeded = $false; reason = $null; failure_code = $null; may_require_downgrade = $false }
+        launch = [ordered]@{ component = $script:NormalComponent; attempted = $false; status_ok = $false; foreground = $false; attempts = 0; process_state_after_launch = $null }
+        rollback = [ordered]@{ needed = $false; attempted = $false; succeeded = $false; reason = $null; failure_code = $null; may_require_downgrade = $false; policy = 'pre-launch-failures-only' }
         privacy = [ordered]@{ device_serial_recorded = $false; local_paths_recorded = $false; screenshots_created = 0 }
     }
-    $ctx = @{ phase = 'local-state'; device = $null; installAttempted = $false; lock = $null; apkStream = $null; local = $null; backupDir = $null; backup = @(); profileIds = @() }
+    $ctx = @{ phase = 'local-state'; device = $null; installAttempted = $false; launchAttempted = $false; identical = $false; lock = $null; apkStream = $null; local = $null; backupDir = $null; backup = @(); profileIds = @() }
 
     function Enter-Phase([string]$Name) {
         $ctx.phase = $Name
@@ -277,13 +308,28 @@ function Invoke-VwNormalDelivery {
         }
         return $true
     }
-    function Assert-PackageScope([string]$Stage) {
-        $others = 0; $owner = $false
-        foreach ($id in @($ctx.profileIds)) {
-            $listing = Invoke-Device ('normal-delivery-package-scope-' + $Stage) @('shell', 'pm', 'list', 'packages', '--user', $id, $package)
-            $listed = Test-VwPackageListed -Package $package -Lines $listing.Lines
-            if ($id -ceq '0') { $owner = $listed } elseif ($listed) { $others++ }
+    function ConvertTo-Expected($State) {
+        return @(@($State) | ForEach-Object { [ordered]@{ name = $_.Name; sha256 = $_.Sha256 } })
+    }
+    function Read-SettledState {
+        # A killed adb client does not stop the device-side install session.
+        # Require two identical delayed reads before deciding anything.
+        $previous = $null
+        for ($read = 1; $read -le 3; $read++) {
+            if ($InstallSettleSeconds -gt 0) { Start-Sleep -Seconds $InstallSettleSeconds }
+            $state = @(Read-InstalledState)
+            if ($null -ne $previous -and (Test-StateMatches $state (ConvertTo-Expected $previous))) { return $state }
+            $previous = $state
         }
+        Stop-VwDelivery 'install_timeout_unsettled'
+    }
+    function Assert-PackageScope([string]$Stage) {
+        $dump = Invoke-Device ('normal-delivery-package-scope-' + $Stage) @('shell', 'dumpsys', 'package', $package) 60
+        $states = Get-VwPackageUserStates -Package $package -Lines $dump.Lines
+        $ids = @($ctx.profileIds)
+        if (@($states.Keys).Count -ne $ids.Count -or @($ids | Where-Object { -not $states.ContainsKey($_) }).Count -ne 0) { Stop-VwDelivery 'package_user_states_inconsistent' }
+        $owner = [bool]$states['0']
+        $others = @($ids | Where-Object { $_ -cne '0' -and $states[$_] }).Count
         $receipt.device_scope.installed_for_owner = $owner
         $receipt.device_scope.other_profiles_with_package = $others
         if (-not $owner) { Stop-VwDelivery 'package_not_installed_for_owner' }
@@ -295,12 +341,15 @@ function Invoke-VwNormalDelivery {
         $rollback = $receipt.rollback
         $rollback.reason = $Reason
         try {
+            # Never let an `adb -s` call spawn a replacement server in a job.
+            try { & $AssertAdbServer } catch { $rollback.failure_code = 'adb_server_unavailable'; Stop-VwDelivery 'adb_server_unavailable' }
             $current = $null
             try { $current = @(Read-InstalledState) } catch { $current = $null }
             if ($null -ne $current -and (Test-StateMatches $current $ctx.backup)) {
-                # Android installs are atomic: a refused install keeps the old bytes.
+                # Android installs are atomic: a refused install keeps the old
+                # bytes. A timed-out install reaches here only after settled reads.
                 $rollback.needed = $false
-                $receipt.status = 'install-failed-unchanged'
+                $receipt.status = if ($Reason -like 'install_timeout*') { 'install-timeout-unchanged' } else { 'install-failed-unchanged' }
                 return
             }
             $rollback.needed = $true
@@ -450,38 +499,71 @@ function Invoke-VwNormalDelivery {
         Set-PhaseStatus 'passed'
 
         Enter-Phase 'install'
-        $ctx.installAttempted = $true
-        $receipt.install.attempted = $true
-        $installed = Invoke-Device 'normal-delivery-install' @('install', '-r', '--user', '0', $apk) 300 -AllowFailure
-        $receipt.install.success_reported = $installed.ExitCode -eq 0 -and (Test-VwInstallSuccess $installed.Lines)
-        if (-not $receipt.install.success_reported) { Stop-VwDelivery (Get-VwInstallFailureCode $installed.Lines) }
-        Set-PhaseStatus 'passed'
+        $ctx.identical = $files.Count -eq 1 -and $files[0].name -ceq 'base.apk' -and $files[0].sha256 -ceq $ApkSha256
+        if ($ctx.identical) {
+            # Already the exact delivered bytes: nothing to install or roll back.
+            $receipt.install.skipped_identical = $true
+            Set-PhaseStatus 'skipped'
+        } else {
+            try { & $AssertAdbServer } catch { Stop-VwDelivery 'adb_server_unavailable' }
+            $ctx.installAttempted = $true
+            $receipt.install.attempted = $true
+            $installed = Invoke-Device 'normal-delivery-install' @('install', '-r', '--user', '0', $apk) 300 -AllowFailure
+            $receipt.install.success_reported = $installed.ExitCode -eq 0 -and (Test-VwInstallSuccess $installed.Lines)
+            if ($installed.ExitCode -eq 124) {
+                # Timeout: the outcome is unknown until settled delayed reads.
+                $receipt.install.timed_out = $true
+                $settled = @(Read-SettledState)
+                if (Test-StateMatches $settled @([ordered]@{ name = 'base.apk'; sha256 = $ApkSha256 })) {
+                    $receipt.install.settled_after_timeout = 'delivered-bytes'
+                } elseif (Test-StateMatches $settled $ctx.backup) {
+                    $receipt.install.settled_after_timeout = 'previous-bytes'
+                    Stop-VwDelivery 'install_timeout_unchanged'
+                } else {
+                    $receipt.install.settled_after_timeout = 'unknown-bytes'
+                    Stop-VwDelivery 'install_timeout_unknown'
+                }
+            } elseif (-not $receipt.install.success_reported) { Stop-VwDelivery (Get-VwInstallFailureCode $installed.Lines) }
+            Set-PhaseStatus 'passed'
+        }
 
         Enter-Phase 'readback'
-        $paths = Invoke-Device 'normal-delivery-installed-paths' @('shell', 'pm', 'path', '--user', '0', $package)
-        $after = @(Get-VwInstalledApkSet $paths.Lines)
-        $receipt.readback.file_count = $after.Count
-        if ($after.Count -ne 1) { Stop-VwDelivery 'readback_unexpected_splits' }
-        $readDirectory = Join-Path $ctx.backupDir 'readback'
-        [void][IO.Directory]::CreateDirectory($readDirectory)
-        $readFile = Join-Path $readDirectory 'base.apk'
-        Invoke-Device 'normal-delivery-readback-pull' @('pull', $after[0].Remote, $readFile) 300 | Out-Null
-        if (-not (Test-Path -LiteralPath $readFile -PathType Leaf)) { Stop-VwDelivery 'readback_pull_missing' }
-        Assert-VwPlainPath $readFile
-        $readDigest = Get-VwFileSha256 $readFile
-        $receipt.readback.sha256 = $readDigest
-        $deviceDigest = Invoke-Device 'normal-delivery-device-digest' @('shell', 'sha256sum', $after[0].Remote) 60
-        if ($readDigest -cne $ApkSha256 -or (Get-VwDeviceDigest $after[0].Remote $deviceDigest.Lines) -cne $ApkSha256) { Stop-VwDelivery 'readback_sha256_mismatch' }
-        Remove-Item -LiteralPath $readFile -Force
-        Remove-Item -LiteralPath $readDirectory -Force
-        Assert-PackageScope 'after'
-        $receipt.readback.matches = $true
-        Set-PhaseStatus 'passed'
+        if ($ctx.identical) {
+            # The backup pull already bound these exact installed bytes.
+            $receipt.readback.file_count = 1
+            $receipt.readback.sha256 = $files[0].sha256
+            $receipt.readback.matches = $true
+            Set-PhaseStatus 'skipped'
+        } else {
+            $paths = Invoke-Device 'normal-delivery-installed-paths' @('shell', 'pm', 'path', '--user', '0', $package)
+            $after = @(Get-VwInstalledApkSet $paths.Lines)
+            $receipt.readback.file_count = $after.Count
+            if ($after.Count -ne 1) { Stop-VwDelivery 'readback_unexpected_splits' }
+            $readDirectory = Join-Path $ctx.backupDir 'readback'
+            [void][IO.Directory]::CreateDirectory($readDirectory)
+            $readFile = Join-Path $readDirectory 'base.apk'
+            Invoke-Device 'normal-delivery-readback-pull' @('pull', $after[0].Remote, $readFile) 300 | Out-Null
+            if (-not (Test-Path -LiteralPath $readFile -PathType Leaf)) { Stop-VwDelivery 'readback_pull_missing' }
+            Assert-VwPlainPath $readFile
+            $readDigest = Get-VwFileSha256 $readFile
+            $receipt.readback.sha256 = $readDigest
+            $deviceDigest = Invoke-Device 'normal-delivery-device-digest' @('shell', 'sha256sum', $after[0].Remote) 60
+            if ($readDigest -cne $ApkSha256 -or (Get-VwDeviceDigest $after[0].Remote $deviceDigest.Lines) -cne $ApkSha256) { Stop-VwDelivery 'readback_sha256_mismatch' }
+            Remove-Item -LiteralPath $readFile -Force
+            Remove-Item -LiteralPath $readDirectory -Force
+            Assert-PackageScope 'after'
+            $receipt.readback.matches = $true
+            Set-PhaseStatus 'passed'
+        }
 
+        # From here on the new build may run and migrate app data: no automatic
+        # rollback (see the policy above). Failures become non-rollback statuses.
         Enter-Phase 'launch'
+        $ctx.launchAttempted = $true
+        $receipt.launch.attempted = $true
         $launch = Invoke-Device 'normal-delivery-launch' @('shell', 'am', 'start', '-W', '--user', '0', '-a', 'android.intent.action.MAIN', '-c', 'android.intent.category.LAUNCHER', '-n', $script:NormalComponent) 30 -AllowFailure
         $receipt.launch.status_ok = $launch.ExitCode -eq 0 -and (Test-VwLaunchStatus $launch.Lines)
-        if (-not $receipt.launch.status_ok) { Stop-VwDelivery 'launch_failed' }
+        if (-not $receipt.launch.status_ok) { Stop-VwDelivery $(if ($launch.ExitCode -eq 124 -or (@($launch.Lines) -join "`n") -cmatch '(?m)^Status:\s*timeout\s*$') { 'launch_timeout' } else { 'launch_failed' }) }
         Set-PhaseStatus 'passed'
 
         Enter-Phase 'foreground'
@@ -491,16 +573,35 @@ function Invoke-VwNormalDelivery {
             if (Test-VwNormalForeground $activities.Lines) { $receipt.launch.foreground = $true; break }
             if ($attempt -lt $ForegroundAttempts -and $ForegroundDelaySeconds -gt 0) { Start-Sleep -Seconds $ForegroundDelaySeconds }
         }
-        if ($receipt.launch.foreground) {
-            Set-PhaseStatus 'passed'
-            $receipt.status = 'delivered'
-        } else {
+        if (-not $receipt.launch.foreground) {
             # Verified bytes stay installed. A shared phone can hold focus
             # elsewhere; never stop another app to win foreground.
             Set-PhaseStatus 'inconclusive'
             $receipt.status = 'delivered-foreground-inconclusive'
             $receipt.failure_phase = 'foreground'
             $receipt.failure_code = 'foreground_not_observed'
+        } else {
+            Set-PhaseStatus 'passed'
+            Enter-Phase 'process-check'
+            # Detect an immediate crash after the first frame; report only.
+            if ($ProcessCheckDelaySeconds -gt 0) { Start-Sleep -Seconds $ProcessCheckDelaySeconds }
+            $processes = Invoke-Device 'normal-delivery-process-check' @('shell', 'pidof', $package) 30 -AllowFailure
+            $processState = Get-VwProcessState $processes.ExitCode $processes.Lines
+            $receipt.launch.process_state_after_launch = $processState
+            if ($processState -ceq 'alive') {
+                Set-PhaseStatus 'passed'
+                $receipt.status = if ($ctx.identical) { 'already-installed' } else { 'delivered' }
+            } elseif ($processState -ceq 'absent') {
+                Set-PhaseStatus 'failed'
+                $receipt.status = 'delivered-process-exited'
+                $receipt.failure_phase = 'process-check'
+                $receipt.failure_code = 'process_exited_after_launch'
+            } else {
+                Set-PhaseStatus 'inconclusive'
+                $receipt.status = 'delivered-launch-inconclusive'
+                $receipt.failure_phase = 'process-check'
+                $receipt.failure_code = 'process_state_unknown'
+            }
         }
     } catch {
         $code = if ($_.Exception.Message -cmatch '^VW_DELIVERY:([a-z][a-z0-9_]{0,79})$') { $Matches[1] } else { 'unexpected_error' }
@@ -509,7 +610,10 @@ function Invoke-VwNormalDelivery {
         $receipt.failure_code = $code
         Set-PhaseStatus 'failed'
         $receipt.status = 'refused'
-        if ($ctx.installAttempted) {
+        if ($ctx.launchAttempted) {
+            # Verified bytes were launched (or a launch was attempted): keep them.
+            $receipt.status = 'delivered-launch-inconclusive'
+        } elseif ($ctx.installAttempted) {
             $receipt.status = 'failed-after-install'
             Invoke-Rollback $code
         }
@@ -517,16 +621,24 @@ function Invoke-VwNormalDelivery {
         if ($null -ne $ctx.apkStream) { $ctx.apkStream.Dispose() }
         try {
             if ($null -ne $ctx.lock) {
-                $json = $receipt | ConvertTo-Json -Depth 10
-                $serial = if ($null -ne $ctx.device -and $null -ne $ctx.device.PSObject.Properties['Serial']) { [string]$ctx.device.Serial } else { '' }
-                $forbidden = @($root, $root.Replace('\', '\\'), $root.Replace('\', '/'))
-                if ($serial) { $forbidden += $serial }
-                if (@($forbidden | Where-Object { $json.IndexOf($_, [StringComparison]::OrdinalIgnoreCase) -ge 0 }).Count -ne 0) {
-                    throw 'Receipt privacy check failed; receipt not written.'
-                }
                 $name = 'android-normal-delivery-' + $RunId + '.json'
-                Write-VwPrivateText (Join-Path $ctx.local $name) $json
-                Write-Host ("[normal-delivery] receipt: .local/$name; status=" + $receipt.status)
+                try {
+                    $json = $receipt | ConvertTo-Json -Depth 10
+                    $serial = if ($null -ne $ctx.device -and $null -ne $ctx.device.PSObject.Properties['Serial']) { [string]$ctx.device.Serial } else { '' }
+                    $forbidden = @($root, $root.Replace('\', '\\'), $root.Replace('\', '/'))
+                    if ($serial) { $forbidden += $serial }
+                    if (@($forbidden | Where-Object { $json.IndexOf($_, [StringComparison]::OrdinalIgnoreCase) -ge 0 }).Count -ne 0) {
+                        # Keep the outcome: write only fixed codes, no free text.
+                        Write-Host '[normal-delivery] receipt privacy check matched a serial or local path; writing a minimal redacted receipt.'
+                        $json = [ordered]@{ schema = 1; kind = 'android-normal-delivery'; run_id = $RunId; package = $package; status = $receipt.status
+                            failure_phase = $receipt.failure_phase; failure_code = $receipt.failure_code; rollback_succeeded = $receipt.rollback.succeeded
+                            receipt_redacted = $true; redaction_reason = 'privacy_check' } | ConvertTo-Json -Depth 4
+                    }
+                    Write-VwPrivateText (Join-Path $ctx.local $name) $json
+                    Write-Host ("[normal-delivery] receipt: .local/$name; status=" + $receipt.status)
+                } catch {
+                    Write-Host ("[normal-delivery] WARNING: receipt could not be written; status=" + $receipt.status)
+                }
             }
         } finally {
             if ($null -ne $ctx.lock) { $ctx.lock.Dispose() }
@@ -535,4 +647,4 @@ function Invoke-VwNormalDelivery {
     return $receipt
 }
 
-Export-ModuleMember -Function Get-VwNormalDeliveryConstants, Get-VwApkSignerDigest, Get-VwApkBadging, Get-VwAndroidProfileIds, Test-VwPackageListed, Get-VwInstalledApkSet, Get-VwDeviceDigest, Test-VwInstallSuccess, Get-VwInstallFailureCode, Test-VwLaunchStatus, Test-VwNormalForeground, Assert-VwExistingAdbServer, Assert-VwPlainPath, Get-VwFileSha256, Invoke-VwNormalDelivery
+Export-ModuleMember -Function Get-VwNormalDeliveryConstants, Get-VwApkSignerDigest, Get-VwApkBadging, Get-VwAndroidProfileIds, Get-VwPackageUserStates, Get-VwProcessState, Get-VwInstalledApkSet, Get-VwDeviceDigest, Test-VwInstallSuccess, Get-VwInstallFailureCode, Test-VwLaunchStatus, Test-VwNormalForeground, Assert-VwExistingAdbServer, Assert-VwPlainPath, Get-VwFileSha256, Invoke-VwNormalDelivery
