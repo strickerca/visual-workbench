@@ -42,6 +42,8 @@ $lease = [VwDesktopLease]::new()
 $pinnedDirectories = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 try {
     $files = @($PythonExecutable, (Join-Path $Root 'tools\release\assemble.py'),
+        (Join-Path $Root 'tools\release\generate_notices.py'),
+        (Join-Path $Root 'tools\check_setup.py'),
         (Join-Path $Root 'tools\desktop-test\reports.py'),
         (Join-Path $Root 'tools\desktop-test\personal_package.py'),
         (Join-Path $Root 'tools\ffi-test\check_apk.py'))

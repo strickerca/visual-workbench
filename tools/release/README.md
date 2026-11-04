@@ -41,6 +41,10 @@ descriptors to fill from actual admitted inputs, not executable examples:
     {"path": "third_party/notices/ACTUAL-NOTICE.txt", "bytes": 123, "sha256": "<64 lowercase hex>"}
   ],
   "catalog": null,
+  "generated_notices": {
+    "text": {"path": ".local/notices/THIRD-PARTY-NOTICES.txt", "bytes": 123, "sha256": "<64 lowercase hex>"},
+    "receipt": {"path": ".local/notices/third-party-notices.json", "bytes": 123, "sha256": "<64 lowercase hex>"}
+  },
   "release_documents": {
     "toolchain_record": {"path": "docs/TOOLCHAIN.md", "bytes": 123, "sha256": "<64 lowercase hex>"},
     "uninstall_recovery_guide": {"path": "docs/UNINSTALL_RECOVERY.md", "bytes": 123, "sha256": "<64 lowercase hex>"}
@@ -128,6 +132,21 @@ are delivered along with the source manifest. No license-compatibility decision
 is made by this assembly step. Preserve all actual runtime/legal files when a
 desktop image is delivered.
 
+`generated_notices` (required, LIC-003) names the exact output of
+`generate_notices.py`. Assembly never regenerates it. Before creating the
+destination it checks the hash-bound text and receipt with
+`generate_notices.verify_bundle`. The text must equal the deterministic
+rendering of the receipt and its license texts, and the status must be
+`complete`. Every selected license must be on the `check_setup.py` allow list,
+or be the documented Java runtime exception. `desktop-file` artifacts require
+the Windows Rust, desktop Gradle, MCP npm, Node and Java runtime coverage. `apk`
+artifacts require the Android Rust and Gradle coverage. Any generator input
+(for example `Cargo.lock`) that the source binding also declares must have
+identical bytes. `THIRD-PARTY-NOTICES.txt` and `third-party-notices.json` are
+delivered byte for byte; the inventory records their hashes and component
+counts. See `docs/THIRD_PARTY_NOTICES.md` for how the generator decides what
+ships.
+
 Bounds: 8 MiB per JSON or generated metadata file; 4,096 artifacts; 2 GiB per
 artifact; 8 GiB total artifacts; 24,000 source/evidence entries; 2 GiB per source
 file and 4 GiB aggregate source/evidence bytes; 512 nonempty notices, 4 MiB each
@@ -204,6 +223,7 @@ code without host paths.
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tools/release -p test_assemble.py -v
+PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tools/release -p test_generate_notices.py -v
 ```
 
 Fixtures contain synthetic source/notices/build bytes and reuse the existing

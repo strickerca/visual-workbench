@@ -27,6 +27,7 @@ MAX_SOURCE_TOTAL = 4 * 1024**3
 MAX_OUTPUT_ENTRIES = 32768
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 DESKTOP = "apps/desktop/build/compose/binaries/main/app/VisualWorkbenchDev/"
+GENERATED_TEXT_LIMIT = 64 * CHUNK
 DOCUMENTS = {"toolchain_record": "release-docs/TOOLCHAIN.txt",
              "uninstall_recovery_guide": "release-docs/UNINSTALL-RECOVERY.txt"}
 
@@ -47,7 +48,9 @@ def validators():
         reports = sys.modules["reports"]
         personal = _module("vw_release_personal", base / "tools/desktop-test/personal_package.py")
     apk = _module("vw_release_apk", base / "tools/ffi-test/check_apk.py")
-    return reports, personal, apk
+    # LIC-003: generated notices are verified, never regenerated, during assembly.
+    notices = _module("vw_release_notices", base / "tools/release/generate_notices.py")
+    return reports, personal, apk, notices
 
 
 def _module(name: str, path: Path):
@@ -526,7 +529,8 @@ def json_bytes(value: dict) -> bytes:
 
 
 def manifest(value: dict) -> dict:
-    required = {"schema", "release_id", "binding", "artifacts", "notice_manifest", "notices", "catalog"}
+    required = {"schema", "release_id", "binding", "artifacts", "notice_manifest", "notices", "catalog",
+                "generated_notices"}
     require(required <= set(value) <= required | {"release_documents", "external_dependencies"}
             and value["schema"] == "vw-release-assembly-v1", "manifest_schema")
     require(isinstance(value["release_id"], str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", value["release_id"]), "release_id")
@@ -538,6 +542,11 @@ def manifest(value: dict) -> dict:
         descriptor(row, 4 * CHUNK)
         require(row["path"].startswith("third_party/notices/") and len(row["path"].split("/")) == 3 and row["bytes"] > 0, "notice_path")
     require(sum(row["bytes"] for row in value["notices"]) <= 32 * CHUNK, "notice_total")
+    generated = value["generated_notices"]
+    require(isinstance(generated, dict) and set(generated) == {"text", "receipt"}, "generated_notices")
+    descriptor(generated["text"], GENERATED_TEXT_LIMIT)
+    descriptor(generated["receipt"], MAX_JSON)
+    require(generated["text"]["bytes"] > 0 and generated["receipt"]["bytes"] > 0, "generated_notices")
     require(isinstance(value["artifacts"], list) and 0 < len(value["artifacts"]) <= MAX_ARTIFACTS, "artifact_count")
     for row in value["artifacts"]:
         require(isinstance(row, dict) and set(row) == {"path", "bytes", "sha256", "destination", "kind"}, "artifact_descriptor")
@@ -567,7 +576,8 @@ def manifest(value: dict) -> dict:
                 isinstance(row["reason"], str) and 0 < len(row["reason"]) <= 512 and
                 all(32 <= ord(ch) < 127 for ch in row["reason"]), "external_dependency")
     require(len({row["id"] for row in dependencies}) == len(dependencies), "external_dependency_duplicate")
-    all_inputs = [value["binding"], value["notice_manifest"], *value["notices"], *value["artifacts"]]
+    all_inputs = [value["binding"], value["notice_manifest"], *value["notices"], *value["artifacts"],
+                  generated["text"], generated["receipt"]]
     all_inputs.extend(row for row in documents.values() if row is not None)
     if value["catalog"] is not None:
         all_inputs.append(value["catalog"])
@@ -645,12 +655,14 @@ def assemble(root: Path, manifest_name: str, expected_sha256: str, destination: 
         proof = parse(proof_raw)
         sources = binding(proof, spec["artifacts"])
         documents = spec.get("release_documents", dict.fromkeys(DOCUMENTS))
-        all_rows = [*sources, spec["binding"], spec["notice_manifest"], *spec["notices"], *spec["artifacts"]]
+        generated = spec["generated_notices"]
+        all_rows = [*sources, spec["binding"], spec["notice_manifest"], *spec["notices"], *spec["artifacts"],
+                    generated["text"], generated["receipt"]]
         all_rows.extend(row for row in documents.values() if row is not None)
         if spec["catalog"] is not None:
             all_rows.append(spec["catalog"])
         all_rows.append({"path": manifest_name, **actual})
-        require(len(all_rows) <= MAX_SOURCES + MAX_ARTIFACTS + 518, "input_count")
+        require(len(all_rows) <= MAX_SOURCES + MAX_ARTIFACTS + 520, "input_count")
         declarations = {}
         folds = {}
         for row in all_rows:
@@ -665,6 +677,17 @@ def assemble(root: Path, manifest_name: str, expected_sha256: str, destination: 
             source.read(row["path"], row, MAX_SOURCE_FILE)
         if spec["catalog"] is not None:
             source.read(spec["catalog"]["path"], spec["catalog"], 32 * 1024)
+        # LIC-003: THIRD-PARTY-NOTICES is the generator's exact output. Recheck
+        # its rendering, policy, completeness, artifact coverage and staleness
+        # against the release binding before any destination exists.
+        _, notice_text = source.read(generated["text"]["path"], generated["text"], GENERATED_TEXT_LIMIT, collect=True)
+        _, notice_receipt = source.read(generated["receipt"]["path"], generated["receipt"], MAX_JSON, collect=True)
+        try:
+            generated_summary = NOTICES.verify_bundle(
+                notice_receipt, notice_text, artifact_kinds=frozenset(row["kind"] for row in spec["artifacts"]),
+                declarations=declarations)
+        except NOTICES.Refused as error:
+            raise Rejected(str(error)) from error
         output = Output(destination, stack, cache)
         output.write("release-manifest.json", raw)
         output.write("source-binding.json", proof_raw)
@@ -686,12 +709,8 @@ def assemble(root: Path, manifest_name: str, expected_sha256: str, destination: 
         for row in spec["artifacts"]:
             output.write(row["destination"], source=source, descriptor=row)
         package_results = validate_packages(root, output, spec, declarations, PERSONAL, APK)
-        lines = ["Visual Workbench release assembly - actual notice inputs", "",
-                 "License names and URLs are copied from third_party/LICENSES; no compatibility decision is made.", ""]
-        for row in notice_rows:
-            lines += [f"third_party/notices/{row['resource']} | {row['license']} | {row['bytes']} bytes | SHA256 {row['sha256']}", row["source_url"]]
-        lines += ["", "Preserve all delivered runtime/legal files. Runtime legal files are in the artifact inventory.", ""]
-        output.write("THIRD-PARTY-NOTICES.txt", "\n".join(lines).encode())
+        output.write("THIRD-PARTY-NOTICES.txt", source=source, descriptor=generated["text"], limit=GENERATED_TEXT_LIMIT)
+        output.write("third-party-notices.json", source=source, descriptor=generated["receipt"], limit=MAX_JSON)
         # Recheck original identities and bytes after package validators, and
         # every copied output before publishing the inventory/COMPLETE marker.
         for relative, expected in declarations.items():
@@ -706,6 +725,8 @@ def assemble(root: Path, manifest_name: str, expected_sha256: str, destination: 
                   "source_binding": "exact declared current-source and artifact hashes; build causality and revision label are not authenticated",
                   "inputs": [{"path": key, **value} for key, value in sorted(declarations.items())],
                   "files": dict(sorted(output.files.items())), "notices": notice_rows, "package_checks": package_results,
+                  "generated_notices": {"text": blob(generated["text"]), "receipt": blob(generated["receipt"]),
+                                        **generated_summary},
                   "release_prerequisites": prerequisites, "release_ready": False,
                   "external_dependencies": spec.get("external_dependencies", []),
                   "output_namespace_entry_limit": MAX_OUTPUT_ENTRIES,
@@ -746,7 +767,7 @@ def main() -> int:
     return 0
 
 
-REPORTS, PERSONAL, APK = validators()
+REPORTS, PERSONAL, APK, NOTICES = validators()
 
 if __name__ == "__main__":
     raise SystemExit(main())

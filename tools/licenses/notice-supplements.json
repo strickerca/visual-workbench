@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "canonical_texts": {
+    "Apache-2.0": {
+      "path": "third_party/notices/JNA-5.19.1-Apache-2.0.txt",
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+      "reason": "Complete Apache-2.0 text retained from JNA 5.19.1 (AL2.0). Used only when an Apache-2.0 component ships no license file of its own; the text contains no holder-specific notice."
+    }
+  },
+  "components": [
+    {
+      "ecosystem": "maven",
+      "name": "net.java.dev.jna:jna",
+      "version": "5.19.1",
+      "selected": "Apache-2.0",
+      "notices": [
+        {"path": "third_party/notices/JNA-5.19.1-LICENSE.txt", "sha256": "07c938b23950ab7d47a24ef35f9f5da3a05ae164278dc959ad6994135ed59ff1"},
+        {"path": "third_party/notices/JNA-5.19.1-Apache-2.0.txt", "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"},
+        {"path": "third_party/notices/JNA-libffi-LICENSE.txt", "sha256": "2c9c2acb9743e6b007b91350475308aee44691d96aa20eacef8e199988c8c388"}
+      ],
+      "reason": "JNA is dual licensed; the project selects Apache-2.0 (tools/check_gradle_licenses.py). The bundled jnidispatch native library includes libffi (MIT)."
+    },
+    {
+      "ecosystem": "maven",
+      "name": "androidx.camera:camera-core",
+      "version": "1.6.2",
+      "selected": null,
+      "notices": [
+        {"path": "third_party/notices/libyuv-LICENSE.txt", "sha256": "2b2cc1180c7e6988328ad2033b04b80117419db9c4c584918bbb3cfec7e9364f"}
+      ],
+      "reason": "camera-core bundles libyuv (BSD-3-Clause); see apps/android/DEPENDENCY_PROVENANCE.md for the revision limits."
+    }
+  ],
+  "bundled": [
+    {
+      "id": "node-runtime",
+      "record": "tools/licenses/node-runtime.json",
+      "name": "Node.js runtime (node.exe)",
+      "license": "MIT",
+      "notice": {"path": "third_party/notices/Node-24.21.0-LICENSE.txt"},
+      "reason": "Shipped as node.exe inside the desktop MCP bundle; the record binds the executable hash and its complete bundled LICENSE."
+    }
+  ]
+}

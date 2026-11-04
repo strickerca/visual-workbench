@@ -64,3 +64,74 @@ notice; npm and Node's build tools are not distributed. Source/build-tool licens
 clauses retained in that complete notice do not identify additional shipped
 executables. The complete runtime file inventory is generated before packaging;
 the installed bridge then embeds the completed application image inventory.
+
+## Generated release notices (LIC-003)
+
+Release `THIRD-PARTY-NOTICES.txt` is generated from the resolved dependency set
+by `tools/release/generate_notices.py`. It is no longer the curated list above.
+The curated `third_party/LICENSES` files remain the app-embedded notices. The
+generator also uses them as hash-bound supplements: the JNA/libffi and libyuv
+notices, the Node runtime notice, the npm notices, and one canonical Apache-2.0
+text. `tools/licenses/notice-supplements.json` binds those supplements. Each
+license text is copied byte for byte from the component's own package files.
+The generator writes no license text.
+
+What counts as shipped:
+
+- **Rust:** `cargo metadata --locked --offline --all-features` for each
+  product target (`x86_64-pc-windows-msvc`, `aarch64-linux-android`). The walk
+  starts at the crates whose binaries ship (`vw-ffi`, `vw-host-ffi`,
+  `vw-capture`, `vw-remote-host`, `vw-mcp-native`; Android: `vw-ffi`) and
+  follows normal edges only. Dev- and build-dependencies are excluded.
+  Proc-macro crates run on the build host and are not traversed. Workspace
+  crates are first-party. Crate bytes come from the registry cache archive
+  whose SHA-256 equals the `Cargo.lock` checksum. `all-features` matches
+  `deny.toml`, so the set is a superset of any one build.
+- **Gradle:** the census `dependencies.json` that `generateApplicationLicenseReport`
+  writes for `checkDependencyLicenses`, read through the existing
+  `check_gradle_licenses.read_pom_report`. Only the `:android` and `:desktop`
+  (plus `:shared:desktop`) runtime configurations count. The bench, probe and
+  spike apps do not ship. Artifact bytes come from the read-only Gradle cache.
+  They are checked against the module-metadata SHA-256 or the cache's SHA-1
+  directory name. Redirect, dependency-only and BOM modules have no artifact of
+  their own and are excluded.
+- **npm:** production entries of `mcp/package-lock.json` admitted by
+  `check_npm_licenses.py`. The 11 dev-only packages are excluded.
+- **Bundled binaries:** the Node runtime record. When `--desktop-image` names a
+  built app image, the generator also copies the jlink runtime's `legal/` files
+  under the documented Java runtime exception. The 125 unadmitted
+  model/runtime/scrcpy proposals under `docs/license-proposals/` stay out,
+  because no shipped artifact contains them.
+
+Unknown or forbidden licenses (anything outside the `check_setup.py` allow list)
+fail the run. So does a missing license text, unless the license is Apache-2.0,
+whose text carries no holder-specific notice. A bundled native library without
+any package notice also fails. The run is still written for diagnosis, with
+status `incomplete` and exit code 2. `tools/release/assemble.py` refuses any
+incomplete bundle.
+
+The generator needs the Gradle census report. Run it after `build.ps1
+license-check`, which runs Gradle `checkDependencyLicenses`. For desktop
+deliveries, run it after the app image is built, so the Java runtime is
+covered:
+
+```powershell
+python tools\release\generate_notices.py --output .local\notices-<release> --gradle-report apps\build\reports\dependency-license\dependencies.json --desktop-image apps\desktop\build\compose\binaries\main\app\VisualWorkbenchDev
+```
+
+The 2026-11-04 offline run used the existing census report and local caches,
+without the desktop image. It found 415 shipped components: 266 Rust, 139
+Maven, 9 npm and 1 bundled (Node). Ten remain unresolved, so the bundle is
+incomplete and assembly refuses it:
+
+- The six `uniffi*` 0.32.2 crates (MPL-2.0) ship no license text.
+- `libwebp-sys` 0.14.4 ships no text for its MIT wrapper. Its vendored libwebp
+  `COPYING` and `PATENTS` files are present.
+- Three artifacts bundle native libraries without a notice:
+  `androidx.graphics:graphics-core` 1.0.4, `graphics-path` 1.0.1 and
+  `org.jetbrains.skiko:skiko-awt-runtime-windows-x64` 0.150.1. Skia's
+  BSD-3-Clause notice has not been established.
+
+Each needs a reviewed, retained upstream text added to `third_party/LICENSES`
+and `notice-supplements.json`. Java runtime coverage needs a built desktop
+image.
