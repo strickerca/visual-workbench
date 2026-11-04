@@ -23,6 +23,8 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
     var profile by remember{mutableStateOf("generic")};var model by remember{mutableStateOf("")}
     var snapshot by remember{mutableStateOf("")};var title by remember{mutableStateOf(false)}
     var assumeSrgb by remember{mutableStateOf(false)};var depth by remember{mutableStateOf(false)}
+    // The exact package and live route shown in the binding confirmation.
+    var bindRequest by remember{mutableStateOf<Pair<PublishedPackage,McpPhoneScreenRoute>?>(null)}
     fun act(body:suspend()->Unit){if(busy)return;busy=true;message=null;scope.launch{try{body()}catch(error:CancellationException){throw error}
         catch(error:McpRecaptureUnavailable){message=error.reason.message}
         catch(_:Exception){message="The operation was refused or did not finish. Refresh to recover durable publication; do not assume it was sent."}finally{busy=false}}}
@@ -56,9 +58,22 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
                         val comparison=owner.recaptureVerification(agent,info.packageId,info.target,info.manifestSha256)
                         owner.state.value.inbox.singleOrNull{it.receiptId==comparison.receiptId&&it.receiptBlake3==comparison.receiptBlake3}?.let(onCompare)
                     }}){Text("Recapture original")}
-                    if("${info.packageId}/${info.target}" in state.phoneScreens)TextButton(enabled=!busy,onClick={act{owner.bindPhoneScreen(published,phoneRoute())}}){Text("Bind connected USB phone")}
+                    if("${info.packageId}/${info.target}" in state.phoneScreens)TextButton(enabled=!busy&&bindRequest==null,onClick={
+                        val route=phoneRoute()
+                        // No live route: the coordinator reports the exact reason (runtime or disconnected).
+                        if(route==null)act{owner.bindPhoneScreen(published,null)} else bindRequest=published to route
+                    }){Text("Bind connected USB phone…")}
                     TextButton(enabled=!busy,onClick={act{owner.retirePackage(published)}}){Text("Unpublish and retire")}
                 }
+            }
+        }
+        bindRequest?.let{(pending,route)->
+            Divider();Text("Confirm phone binding",style=MaterialTheme.typography.h6)
+            Text("Bind this phone capture to ${route.description}? Confirm only if this is the phone the capture came from. "+
+                "Agents you then grant can request full-device screenshots and on-screen UI text from it. A different screen size is refused.")
+            Row{
+                Button(enabled=!busy,onClick={bindRequest=null;act{owner.bindPhoneScreen(pending,route)}}){Text("Bind to ${route.description}")}
+                TextButton(onClick={bindRequest=null}){Text("Cancel")}
             }
         }
         state.sendPreview?.let{displayed->
@@ -75,10 +90,18 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
         Button(enabled=!busy&&state.targets.size<16,onClick={act{owner.selectTarget()}}){Text("Choose a capture window")}
         state.targets.forEach{target->Row{RadioButton(selectedTarget==target.selector,{selectedTarget=target.selector});Text(target.description,Modifier.padding(top=12.dp))}}
         val grantAgent=selectedAgent;val grantTarget=selectedTarget
-        Button(enabled=!busy&&state.agents.any{it.connection==grantAgent}&&grantTarget!=null,onClick={if(grantAgent!=null&&grantTarget!=null)act{owner.grant(grantAgent,listOf(grantTarget),60_000)}}){Text("Grant selected bridge 60 seconds for this window")}
-        state.grants.forEach{grant->Row{Text("${grant.connection.take(8)} | ${grant.selectors.size} window(s)",Modifier.weight(1f));TextButton(onClick={act{owner.revoke(grant.connection)}},enabled=!busy){Text("Revoke")}}}
+        val phoneSelectors=state.targets.filter{it.kind!=McpVerificationTargetKind.Window}.map{it.selector}.toSet()
+        val grantingPhone=grantTarget!=null&&grantTarget in phoneSelectors
+        Button(enabled=!busy&&state.agents.any{it.connection==grantAgent}&&grantTarget!=null,onClick={if(grantAgent!=null&&grantTarget!=null)act{owner.grant(grantAgent,listOf(grantTarget),60_000)}}){
+            Text(if(grantingPhone)"Grant selected bridge 60 seconds for this phone screen" else "Grant selected bridge 60 seconds for this window")}
+        if(grantingPhone)Text("A phone-screen grant lets that bridge request recaptures of the whole connected phone screen, including on-screen UI text, until it expires (at most 10 minutes) or you revoke it.",style=MaterialTheme.typography.caption)
+        state.grants.forEach{grant->Row{
+            val phones=grant.selectors.count{it in phoneSelectors}
+            Text("${grant.connection.take(8)} | ${grant.selectors.size-phones} window(s)${if(phones>0)", $phones phone screen(s)" else ""}",Modifier.weight(1f))
+            TextButton(onClick={act{owner.revoke(grant.connection)}},enabled=!busy){Text("Revoke")}
+        }}
         Text("Grants expire, are lost on restart/disconnect, and never permit capture of app-owned windows. A visible capture indicator must draw before every request.",style=MaterialTheme.typography.caption)
-        Text("Phone screens are recaptured only through an open USB tunnel session. Bind a phone capture only when that connected phone is the one it came from.",style=MaterialTheme.typography.caption)
+        Text("Phone screens are recaptured only through an open USB tunnel session, as full-device screenshots with UI text. Bind a phone capture only when that connected phone is the one it came from.",style=MaterialTheme.typography.caption)
         Divider();Text("Saved verification reviews",style=MaterialTheme.typography.h6)
         Text("Load private saved decisions from the original project currently open in the editor. Targets and capture grants are never restored.",style=MaterialTheme.typography.caption)
         TextButton(enabled=!busy,onClick={act{owner.loadVerificationHistory()}}){Text("Load saved reviews from open original")}
@@ -124,8 +147,12 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
             catch(_:Exception){/* No draw acknowledgment: the actual capture gate refuses. */}
         }
         MaterialTheme {Surface(Modifier.fillMaxSize()){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-            Text(if(activity!=null)"Capturing the granted window"else"Agent capture permission is enabled",style=MaterialTheme.typography.h6)
+            val phoneSelectors=state.targets.filter{it.kind!=McpVerificationTargetKind.Window}.map{it.selector}.toSet()
+            val capturingPhone=activity!=null&&activity.selector in phoneSelectors
+            Text(if(capturingPhone)"Capturing the granted phone screen" else if(activity!=null)"Capturing the granted window" else "Agent capture permission is enabled",style=MaterialTheme.typography.h6)
             Text("${state.grants.size} active grant(s). This indicator remains until grants end and capture work settles.",style=MaterialTheme.typography.caption)
+            if(state.grants.any{grant->grant.selectors.any{it in phoneSelectors}})
+                Text("Includes the connected phone's full screen and on-screen UI text.",style=MaterialTheme.typography.caption)
             Button(onClick={revoke()},enabled=!stopping){Text("Revoke capture grants")}
             issue?.let{Text(it,style=MaterialTheme.typography.caption)}
         }}}

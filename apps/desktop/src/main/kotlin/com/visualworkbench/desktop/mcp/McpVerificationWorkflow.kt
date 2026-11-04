@@ -165,7 +165,9 @@ internal class McpVerificationWorkflow(
         }
         checkHistory(expected)
         require(entries.size<32||receipt.receiptId in entries)
-        val relation=McpVerificationRecapture(McpVerificationPackage.of(original),McpVerificationPackage.of(after))
+        // The owner's recapture receipt carries the fixed source label, so an
+        // owner-attested phone pairing stays labeled after a restart.
+        val relation=McpVerificationRecapture(McpVerificationPackage.of(original),McpVerificationPackage.of(after),mcpRecaptureKind(receipt.note))
         val entry=Entry(original,after,receipt,relation,expected)
         coordinates(entry,manifest(original),manifest(after))
         entries[receipt.receiptId]=entry
@@ -177,7 +179,8 @@ internal class McpVerificationWorkflow(
         require(original.target==after.target && original.model==after.model)
         val image=after.images.single{it.role=="clean_source"}
         val png=catalog.readFile(after.packageId,after.target,after.manifestSha256,image.path,4u*1024u*1024u)
-        val receipt=inbox.submit(catalog,McpInboxSubmission(newId(),original.packageId,original.target,original.manifestSha256,session,System.currentTimeMillis(),png=png))
+        val receipt=inbox.submit(catalog,McpInboxSubmission(newId(),original.packageId,original.target,original.manifestSha256,session,System.currentTimeMillis(),png=png,
+            note=mcpRecaptureNote(recapture.kind)))
         require(!receipt.retired&&receipt.after!=null)
         val entry=Entry(original,after,receipt,recapture)
         entries[receipt.receiptId]=entry

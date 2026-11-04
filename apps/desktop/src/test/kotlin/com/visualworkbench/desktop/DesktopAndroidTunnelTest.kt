@@ -489,11 +489,71 @@ class DesktopAndroidTunnelTest {
 
     @Test fun aDeliveredCaptureFromAnotherSessionGetsNoVerificationRoute() = fixture(observeOrigins = true) { f ->
         f.connect()
+        // Only the session identity differs: the document is the real delivered one.
+        f.project.infoOverride = { tunnelTestProjectInfo.copy(documentIds = listOf(checkNotNull(f.capture.options).documentId)) }
+        f.capture.metadata = tunnelTestInfo().copy(captureSessionId = "another-session")
         f.controller.capture()
         f.idle()
         assertTrue(f.origins.isEmpty())
         assertEquals(1, f.deliveries)
         assertTrue(f.reports.any { it.contains("verification identity was unavailable") })
+    }
+
+    @Test fun callerCancellationNeverCancelsTheOwnersTunnelSession() = fixture { f ->
+        f.connect()
+        val route = checkNotNull(f.controller.phoneScreenRoute())
+        f.capture.metadata = tunnelTestInfo().copy(captureSessionId = checkNotNull(f.lastOptions).sessionId)
+        val entered = CompletableDeferred<Unit>()
+        val release = f.gate()
+        f.tunnel.captureAction = {
+            entered.complete(Unit)
+            // Like the native wrapper: a cancellation delivered here is session-wide.
+            try { release.await() } catch (error: CancellationException) { f.tunnel.cancel(); throw error }
+            f.capture
+        }
+        var bodyRan = false
+        val caller = async { route.capture { bodyRan = true } }
+        entered.await()
+        caller.cancel()
+        yield()
+        // Joined: the native screencap settles before the cancelled caller returns.
+        assertFalse(caller.isCompleted)
+        release.complete(Unit)
+        assertTrue(runCatching { caller.await() }.exceptionOrNull() is CancellationException)
+        assertFalse(f.events.contains("tunnel:cancel"))
+        assertFalse(bodyRan)
+        assertEquals(1, f.capture.closes)
+        assertTrue(f.controller.state.value.connected)
+        assertFalse(f.controller.state.value.cleanupPending)
+        assertSame(route, f.controller.phoneScreenRoute())
+        // The owner's session stays usable for the next recapture.
+        f.tunnel.captureAction = { f.capture }
+        assertEquals(11uL, route.capture { it.info().frameId })
+        assertEquals(2, f.tunnel.captures)
+        assertFalse(f.events.contains("tunnel:cancel"))
+    }
+
+    @Test fun readinessRefusesBusyAndRetirementIsPermanent() = fixture { f ->
+        f.connect()
+        val route = checkNotNull(f.controller.phoneScreenRoute())
+        assertFalse(route.retired)
+        route.checkReady()
+        val target = f.confirmation()
+        assertEquals(McpRecaptureRefusal.SourceBusy, tunnelTestRefusal { route.checkReady() })
+        route.checkAvailable() // A pending confirmation is transient, not a lost session.
+        f.controller.cancelConfirmation(target)
+        f.idle()
+        route.checkReady()
+        assertTrue(route.description.contains("model"))
+        f.controller.close()
+        assertTrue(route.retired)
+        f.open = { DesktopTunnelTestSession(f.events).also { it.captureAction = { f.capture } } }
+        f.controller.show()
+        f.connect()
+        val next = checkNotNull(f.controller.phoneScreenRoute())
+        assertNotSame(route, next)
+        assertTrue(route.retired)
+        assertFalse(next.retired)
     }
 
     private fun fixture(available: Boolean = true, observeOrigins: Boolean = false,

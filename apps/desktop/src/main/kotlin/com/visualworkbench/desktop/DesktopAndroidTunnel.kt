@@ -159,11 +159,15 @@ internal class DesktopAndroidTunnel(
 
     /** Verification recapture through this exact owner-opened session. It uses
      * the same single-operation admission as Capture, so UI work and close()
-     * exclude/join it. Phone input mode is irrelevant: screencap needs none. */
+     * exclude/join it. Phone input mode is irrelevant: screencap needs none.
+     * A caller (agent) cancellation never reaches the native session: the
+     * wrapper's cancel hook is session-wide and would end the owner's mirror. */
     private inner class TunnelScreenRoute(
         val session: WorkbenchAndroidTunnel, val id: String, model: String,
     ) : McpPhoneCaptureRoute {
-        override val description = "USB tunnel ${model.take(64)}"
+        // The owner-selected USB model, as already shown in the tunnel dialog.
+        override val description = "USB phone ${model.take(64)}"
+        override val retired: Boolean get() = synchronized(admission) { screenRoute !== this }
         fun liveLocked(): Boolean = owner === session && sessionId == id && screenRoute === this &&
             mutable.value.connected && !stopping && !mutable.value.cleanupPending && scope.isActive
         override fun checkAvailable() {
@@ -172,6 +176,13 @@ internal class DesktopAndroidTunnel(
                 // in, every tunnel route fails closed with this exact reason.
                 if (!factories.available()) throw McpRecaptureUnavailable(McpRecaptureRefusal.TunnelRuntimeUnavailable)
                 if (!liveLocked()) throw McpRecaptureUnavailable(McpRecaptureRefusal.PhoneDisconnected)
+            }
+        }
+        override fun checkReady() {
+            synchronized(admission) {
+                checkAvailable()
+                if (operation?.isCompleted == false || mutable.value.target != null)
+                    throw McpRecaptureUnavailable(McpRecaptureRefusal.SourceBusy)
             }
         }
         override suspend fun <T> capture(body: suspend (WorkbenchTunnelCapture) -> T): T {
@@ -201,6 +212,9 @@ internal class DesktopAndroidTunnel(
             job.start()
             val outcome = try { job.await() }
             catch (error: CancellationException) {
+                // Safe to cancel: the native acquisition below is NonCancellable,
+                // so this stops only later import/compile work. Join so native
+                // work has settled (bounded by its own timeouts) before returning.
                 job.cancel()
                 withContext(NonCancellable) { job.join() }
                 // The caller's own cancellation wins; close() cancelling only the
@@ -214,15 +228,24 @@ internal class DesktopAndroidTunnel(
 
     private suspend fun <T> recaptureInside(session: WorkbenchAndroidTunnel, expected: String,
         body: suspend (WorkbenchTunnelCapture) -> T): T {
-        val captured = try { acquireOwned({ heldCapture = it }) { session.capture() } }
-            catch (error: TunnelFailure) { throw mcpRecaptureFailure(error) }
         try {
+            // NonCancellable: native screencap/uiautomator runs to its own bounded
+            // completion and is then discarded if this operation was cancelled.
+            // The producer retains the owner in heldCapture before any handoff,
+            // so finally closes it even when the result is never delivered here.
+            withContext(NonCancellable) {
+                try { acquireOwned({ heldCapture = it }) { session.capture() } }
+                catch (error: TunnelFailure) { throw mcpRecaptureFailure(error) }
+            }
+            val captured = checkNotNull(heldCapture)
+            currentCoroutineContext().ensureActive()
             // The native capture names its session; a replacement session is not the same phone.
             if (captured.info().captureSessionId != expected) throw McpRecaptureUnavailable(McpRecaptureRefusal.PhoneDisconnected)
             return body(captured)
         } finally {
             withContext(NonCancellable) {
-                try { captured.close(); heldCapture = null }
+                val held = heldCapture
+                if (held != null) try { held.close(); heldCapture = null }
                 catch (error: Exception) {
                     mutable.update { it.copy(cleanupPending = true) }
                     report("Android capture cleanup is pending. Native owners remain held.")

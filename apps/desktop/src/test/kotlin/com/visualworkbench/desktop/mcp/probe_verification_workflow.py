@@ -104,7 +104,7 @@ public suspend fun verificationCoordinates(catalog:WorkbenchPackageCatalog,pair:
     selected_tests = original_coordinator_tests[:original_coordinator_tests.index('    @Test fun decoder')]
     selected_tests += original_coordinator_tests[original_coordinator_tests.index('    private suspend fun <T> drawCapture'):]
     coordinator_names = re.findall(r'@Test fun (\w+)\(', selected_tests)
-    assert len(coordinator_names) == 13
+    assert len(coordinator_names) == 17
     selected_tests = '\n'.join(line for line in selected_tests.splitlines() if not line.startswith('import org.junit.')).replace('@Test ', '')
     sources['CoordinatorSelectedTests.kt'] = selected_tests + helpers
     registration_tests = (tests / 'McpImageRegistrationTest.kt').read_text()

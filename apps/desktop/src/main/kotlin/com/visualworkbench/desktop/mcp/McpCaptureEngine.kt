@@ -58,6 +58,15 @@ internal class NativeMcpCaptureEngine private constructor(
         val selector=existing?.key?:run{require(targets.size+phoneRoutes.size<16);UUID.randomUUID().toString().also{phoneRoutes[it]=capturing}}
         McpSelectedTarget(selector,"Phone screen | ${capturing.description}",McpVerificationTargetKind.Tunnel)
     }
+    /** Drop routes whose exact session closed, so they neither hold a slot nor
+     * retain a closed session. The coordinator unbinds their origins. */
+    override suspend fun pruneRetiredRoutes():Set<String> = gate.withLock {
+        check(!closed)
+        val dead=phoneRoutes.filterValues{it.retired}.keys.toSet()
+        dead.forEach{phoneRoutes.remove(it)}
+        dead
+    }
+    override fun phoneRuntimeAvailable():Boolean = androidTunnelAvailable()
     override suspend fun select():McpSelectedTarget=gate.withLock {
         check(!closed);require(targets.size+phoneRoutes.size<16)
         // Owner activates another window and presses Ctrl+Alt+M. Native callback
@@ -76,16 +85,14 @@ internal class NativeMcpCaptureEngine private constructor(
         compileSelected(selector,profile,true,checkGrant)
     private suspend fun compileSelected(selector:String,profile:McpCaptureProfile,verification:Boolean,checkGrant:suspend()->Unit):WorkbenchCompiledPackage=gate.withLock {
         check(!closed);retainedFrame?.let{destroyFrame(it.first)};projectRetirement.settle();currentCoroutineContext().ensureActive()
-        val route=phoneRoutes[selector]
-        if(route!=null){
-            // capture_window never reaches a phone; only a verification recapture does.
-            if(!verification)throw McpRefused()
-            return@withLock compilePhone(route,profile,checkGrant)
-        }
+        // capture_window never reaches a phone; only a verification recapture does.
+        val route=mcpSelectPhoneRoute(phoneRoutes,selector,verification)
+        if(route!=null)return@withLock compilePhone(route,profile,checkGrant)
         val selected=targets[selector]?:throw McpRefused();checkGrant()
         val fresh=hostCall{service.refreshTarget(selected)};checkGrant()
         val work=withContext(Dispatchers.IO){McpCaptureWork.create(root)}
         var frame:CapturedFrame?=null;var compiled:WorkbenchCompiledPackage?=null
+        var delivered=false
         try {
             fun id()=core.newId(System.currentTimeMillis().toULong())
             val captured=try {
@@ -96,8 +103,7 @@ internal class NativeMcpCaptureEngine private constructor(
                 }
             } catch(error:TunnelFailure) {
                 // CAPTURE-008: the guard refused; report it as such, never retry around it.
-                if(error.kind==TunnelFailureKind.FeedbackLoop)throw McpRecaptureUnavailable(McpRecaptureRefusal.FeedbackLoop)
-                throw error
+                throw mcpGuardFailure(error)
             };frame=captured
             val receipt=captured.info();require(receipt.borderVisible && receipt.windowHandle==selected.window)
             require(receipt.bitDepth==8.toUByte());checkGrant()
@@ -130,29 +136,40 @@ internal class NativeMcpCaptureEngine private constructor(
             // including after revocation or a lost publication receipt.
             projectRetirement.settle()
             destroyFrame(captured);frame=null
-            currentCoroutineContext().ensureActive();compiled=null;result
+            currentCoroutineContext().ensureActive();compiled=null;delivered=true;result
         } finally {
-            withContext(NonCancellable){try{compiled?.close()}finally{try{projectRetirement.settle()}finally{frame?.let(::destroyFrame)}}}
+            withContext(NonCancellable){try{compiled?.close()}finally{try{projectRetirement.settle()}finally{try{frame?.let(::destroyFrame)}
+                finally{if(!delivered)discardUnused(work)}}}}
         }
+    }
+    /** A refused/failed capture that wrote nothing but the owner marker would
+     * otherwise consume one of the inbox's ~31 slots forever. Anything else
+     * (a screenshot, partial project) stays for recovery, as before. */
+    private suspend fun discardUnused(work:McpCaptureWork) {
+        try{withContext(Dispatchers.IO){work.discardIfUnused()}}catch(_:Exception){/* Leave it for owner cleanup. */}
     }
     /** Phone recapture into this engine's private retained capture inventory, so
      * the existing source map/recovery/borrow path serves it unchanged. */
     private suspend fun compilePhone(route:McpPhoneCaptureRoute,profile:McpCaptureProfile,checkGrant:suspend()->Unit):WorkbenchCompiledPackage {
-        route.checkAvailable();checkGrant()
-        val work=withContext(Dispatchers.IO){McpCaptureWork.create(root)}
+        // Admission (runtime, exact session, not busy) precedes any directory.
+        route.checkReady();checkGrant()
+        var work:McpCaptureWork?=null
+        var delivered=false
         try {
-            val result=compileMcpPhoneCapture(route,work.path,core,deviceId,profile,checkGrant,projectRetirement::retain,
-                {projectRetirement.settle()},{withContext(Dispatchers.IO){work.semanticUnavailable()}})
+            val result=compileMcpPhoneCapture(route,{withContext(Dispatchers.IO){McpCaptureWork.create(root)}.also{work=it}.path},
+                core,deviceId,profile,checkGrant,projectRetirement::retain,
+                {projectRetirement.settle()},{withContext(Dispatchers.IO){checkNotNull(work).semanticUnavailable()}})
             var compiled:WorkbenchCompiledPackage?=result.compiled
             try {
                 currentCoroutineContext().ensureActive()
                 require(sources.size<32 || source(result.compiled.info) in sources)
-                withContext(Dispatchers.IO){work.recordPhone(result.compiled.info.sourceAssetId)}
+                val owned=checkNotNull(work)
+                withContext(Dispatchers.IO){owned.recordPhone(result.compiled.info.sourceAssetId)}
                 sources[source(result.compiled.info)]=result.project
-                currentCoroutineContext().ensureActive();compiled=null
+                currentCoroutineContext().ensureActive();compiled=null;delivered=true
                 return result.compiled
             } finally {withContext(NonCancellable){compiled?.close()}}
-        } finally {withContext(NonCancellable){projectRetirement.settle()}}
+        } finally {withContext(NonCancellable){try{projectRetirement.settle()}finally{if(!delivered)work?.let{discardUnused(it)}}}}
     }
     override suspend fun <T> withVerificationSources(original:PackageInfo,after:PackageInfo,body:suspend(WorkbenchProject,WorkbenchProject)->T):T = gate.withLock {
         check(!closed);projectRetirement.settle();currentCoroutineContext().ensureActive()
@@ -216,6 +233,14 @@ internal class NativeMcpCaptureEngine private constructor(
 private class McpCaptureWork private constructor(val path:Path) {
     fun record(receipt:CaptureFrameInfo){write(path.resolve("recovery.txt"),"Visual Workbench MCP capture original\nFile: capture.png\nSource BLAKE3: ${receipt.sourceAssetId}\nExtent: ${receipt.width} x ${receipt.height}\nCanonical project: project.vwb (if published)\n")}
     fun semanticUnavailable(){write(path.resolve("semantic-unavailable.txt"),"This capture has no accepted accessibility snapshot. No element identity was invented.\n")}
+    fun discardIfUnused():Boolean {
+        plain(path)
+        val names=Files.list(path).use{children->children.iterator().asSequence().take(4).map{it.fileName.toString()}.toList()}
+        if(names!=listOf("owner-v1"))return false
+        val marker=path.resolve("owner-v1")
+        require(Files.isRegularFile(marker,LinkOption.NOFOLLOW_LINKS)&&Files.size(marker)<=2048)
+        Files.delete(marker);Files.delete(path);return true
+    }
     fun recordPhone(asset:String){require(asset.matches(Regex("[0-9a-f]{64}")));write(path.resolve("recovery.txt"),"Visual Workbench MCP phone-screen recapture\nSource: owner-opened USB tunnel (screencap)\nSource BLAKE3: $asset\nCanonical project: project.vwb\n")}
     companion object {
         fun prepare(parent:Path):Path {

@@ -132,11 +132,20 @@ fun main(args: Array<String>) {
             override suspend fun <T> withCurrentVerificationOriginal(body:suspend(WorkbenchProject)->T):T=
                 controller.withCurrentVerificationOriginal(body)
         }}
+        // Tunnel captures delivered while no local service owner existed. Kept
+        // (bounded, in memory only) so they register as tunnel captures when an
+        // owner starts, instead of later looking like phone-app captures.
+        val pendingTunnelOrigins=remember{ArrayDeque<com.visualworkbench.desktop.mcp.McpPhoneCaptureOrigin>()}
         LaunchedEffect(mcp,verificationAccess) {
             mcp.state.map{it.owner}.distinctUntilChanged().collect{owner->
                 if(owner!=null)try{owner.attachVerificationOriginal(verificationAccess)}
                 catch(error:CancellationException){throw error}
                 catch(_:Exception){controller.report("Verification access could not attach to the current local service. Restart local agent access before retrying.")}
+                if(owner!=null){
+                    val replay=synchronized(pendingTunnelOrigins){pendingTunnelOrigins.toList().also{pendingTunnelOrigins.clear()}}
+                    for(origin in replay)try{owner.rememberPhoneCapture(origin)}
+                    catch(error:CancellationException){throw error}catch(_:Exception){/* Package stays unrouted; it is reported at publication. */}
+                }
             }
         }
         LaunchedEffect(mcp,controller) {
@@ -209,6 +218,7 @@ fun main(args: Array<String>) {
             val lifetime=mcp.state.value
             val owner=lifetime.owner?.takeIf{!lifetime.starting&&!lifetime.closed&&lifetime.failureStage==null}
             if(owner!=null)owner.rememberPhoneCapture(origin)
+            else synchronized(pendingTunnelOrigins){if(pendingTunnelOrigins.size>=16)pendingTunnelOrigins.removeFirst();pendingTunnelOrigins.addLast(origin)}
         }
         val androidTunnel=remember(scope,controller){DesktopAndroidTunnel(scope,core,device,location.path,nativeRuntime.directory.resolve("scrcpy"),
             beforeOpen={controller.cancelInput();controller.streamPublication.close();check(!capture.state.value.busy);capturePicker.dismiss()},

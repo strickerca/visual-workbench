@@ -24,7 +24,7 @@ class McpPhoneVerificationTest {
         targets.rememberSource(original.binding, original.sourceAssetId, "phone-route", McpVerificationTargetKind.Tunnel)
         assertTrue(targets.rememberPackage(original))
         assertEquals(McpVerificationTargetKind.Tunnel, targets.kind(original))
-        assertFalse(targets.unboundPhone(original))
+        assertFalse(targets.needsBinding(original))
         val ticket = targets.begin(original)
         assertEquals("phone-route", ticket.selector)
         val pair = targets.complete(ticket, info("after", WorkflowBinding(id("after-project"), id("after-document"), 1uL, "e".repeat(64))))
@@ -38,10 +38,10 @@ class McpPhoneVerificationTest {
         assertTrue(targets.rememberPhoneSource(original))
         assertTrue(targets.rememberPackage(original))
         assertEquals(McpVerificationTargetKind.Phone, targets.kind(original))
-        assertTrue(targets.unboundPhone(original))
+        assertTrue(targets.needsBinding(original))
         assertEquals(McpRecaptureRefusal.PhoneRouteUnbound, refusal { targets.begin(original) })
         targets.bindPhone(original, "usb-route")
-        assertFalse(targets.unboundPhone(original))
+        assertFalse(targets.needsBinding(original))
         val ticket = targets.begin(original)
         assertEquals("usb-route", ticket.selector)
         val pair = targets.complete(ticket, info("after", WorkflowBinding(id("after-project"), id("after-document"), 1uL, "e".repeat(64))))
@@ -96,6 +96,58 @@ class McpPhoneVerificationTest {
         assertNull(targets.kind(other))
     }
 
+    @Test fun closedTunnelSessionsLeaveTheirOriginsWaitingForARebind() {
+        val targets = McpVerificationTargets()
+        val routed = info()
+        targets.rememberSource(routed.binding, routed.sourceAssetId, "session-a", McpVerificationTargetKind.Tunnel)
+        assertTrue(targets.rememberPackage(routed))
+        val late = info("late", asset = "f".repeat(64))
+        targets.rememberUnboundTunnel(late.binding, late.sourceAssetId)
+        assertTrue(targets.rememberPackage(late))
+        assertEquals(McpVerificationTargetKind.Tunnel, targets.kind(late))
+        assertTrue(targets.needsBinding(late))
+        assertEquals(McpRecaptureRefusal.PhoneDisconnected, refusal { targets.begin(late) })
+        // A tunnel capture is never re-registered as another kind.
+        assertFalse(targets.rememberPhoneSource(late))
+        val stale = targets.begin(routed)
+        assertEquals(setOf("${routed.packageId}/${routed.target}"), targets.retireSelectors(setOf("session-a", "unrelated")))
+        assertTrue(runCatching { targets.checkCurrent(stale) }.isFailure)
+        targets.abandon(stale)
+        assertEquals(McpVerificationTargetKind.Tunnel, targets.kind(routed))
+        assertEquals(McpRecaptureRefusal.PhoneDisconnected, refusal { targets.begin(routed) })
+        assertEquals(emptySet<String>(), targets.retireSelectors(setOf("session-a")))
+        targets.bindPhone(routed, "session-b")
+        assertEquals(McpVerificationTargetKind.Phone, targets.kind(routed))
+        assertEquals("session-b", targets.begin(routed).selector)
+    }
+
+    @Test fun recaptureLabelsRoundTripThroughTheReceiptNote() {
+        assertEquals("", mcpRecaptureNote(McpVerificationTargetKind.Window))
+        for (kind in McpVerificationTargetKind.entries) assertEquals(kind, mcpRecaptureKind(mcpRecaptureNote(kind)))
+        assertEquals(McpVerificationTargetKind.Window, mcpRecaptureKind("an agent note"))
+        assertTrue(mcpRecaptureNote(McpVerificationTargetKind.Phone).contains("owner-attested"))
+    }
+
+    @Test fun phoneRoutesServeOnlyVerificationAndRetiredRoutesReportDisconnected() {
+        val route = PhoneRoute(PhoneCapture(PhoneProject()))
+        val routes = mapOf("phone" to route)
+        assertNull(mcpSelectPhoneRoute(routes, "window", verification = false))
+        assertNull(mcpSelectPhoneRoute(routes, "window", verification = true))
+        assertSame(route, mcpSelectPhoneRoute(routes, "phone", verification = true))
+        assertTrue(runCatching { mcpSelectPhoneRoute(routes, "phone", verification = false) }.exceptionOrNull() is McpRefused)
+        route.retired = true
+        assertEquals(McpRecaptureRefusal.PhoneDisconnected, refusal { mcpSelectPhoneRoute(routes, "phone", verification = true) })
+    }
+
+    @Test fun windowFeedbackLoopIsReportedAndOtherGuardFailuresAreUnchanged() {
+        assertEquals(McpRecaptureRefusal.FeedbackLoop,
+            (mcpGuardFailure(TunnelFailure(TunnelFailureKind.FeedbackLoop)) as? McpRecaptureUnavailable)?.reason)
+        for (kind in TunnelFailureKind.entries.filter { it != TunnelFailureKind.FeedbackLoop }) {
+            val original = TunnelFailure(kind)
+            assertSame(original, mcpGuardFailure(original))
+        }
+    }
+
     @Test fun manifestPlatformIsReadOnlyFromTheCheckedCaptureField() {
         fun manifest(capture: String) = """{"package_id":"x","source":{"asset_hash":"a"$capture},"markers":[]}""".toByteArray()
         assertEquals("android", mcpManifestCapturePlatform(manifest(""","capture":{"platform":"android","captured_at":"2026-11-04T00:00:00Z"}""")))
@@ -119,7 +171,7 @@ class McpPhoneVerificationTest {
         }
         // Codes are the fixed allowlist the Node bridge accepts.
         assertEquals(listOf("recapture_source_unavailable", "tunnel_runtime_unavailable", "phone_disconnected",
-            "phone_route_unbound", "feedback_loop", "source_busy"), McpRecaptureRefusal.entries.map { it.code })
+            "phone_route_unbound", "feedback_loop", "source_busy", "phone_mismatch"), McpRecaptureRefusal.entries.map { it.code })
     }
 
     @Test fun ownerWorkSendsOnlyTheFixedRefusalCategory() = runBlocking {
@@ -174,13 +226,29 @@ class McpPhoneVerificationTest {
         assertNull(checkNotNull(invalid.options.get()).semanticSnapshotId)
     }
 
-    @Test fun unavailableRouteRefusesBeforeAnyPhoneCaptureOrImport() = runBlocking {
+    @Test fun unavailableOrBusyRouteRefusesBeforeAnyPhoneCaptureOrWorkDirectory() = runBlocking {
         for (reason in listOf(McpRecaptureRefusal.TunnelRuntimeUnavailable, McpRecaptureRefusal.PhoneDisconnected)) {
             val f = PhoneFixture(TunnelHierarchy.Missing).apply { route.refusal = reason }
             val actual = try { f.run(); null } catch (error: McpRecaptureUnavailable) { error.reason }
             assertEquals(reason, actual)
             assertEquals(0, f.route.captures); assertNull(f.capture.options); assertTrue(f.retained.isEmpty())
+            assertEquals(0, f.workCreated)
         }
+        val busy = PhoneFixture(TunnelHierarchy.Missing).apply { route.busy = true }
+        assertEquals(McpRecaptureRefusal.SourceBusy, try { busy.run(); null } catch (error: McpRecaptureUnavailable) { error.reason })
+        assertEquals(0, busy.route.captures); assertEquals(0, busy.workCreated)
+    }
+
+    @Test fun workDirectoryIsCreatedOnlyAfterAnActualScreenshot() = runBlocking {
+        val f = PhoneFixture(TunnelHierarchy.Missing)
+        f.run()
+        assertEquals(1, f.workCreated)
+        val refusedInside = PhoneFixture(TunnelHierarchy.Missing)
+        var checks = 0
+        refusedInside.grant = { if (++checks == 2) throw McpRefused() } // Grant lost after admission, before info().
+        assertTrue(runCatching { refusedInside.run() }.isFailure)
+        assertEquals(0, refusedInside.workCreated)
+        assertEquals(1, refusedInside.capture.closes)
     }
 
     @Test fun grantLostAfterCompileClosesTheCompiledPackageAndKeepsProjectRetained() = runBlocking {
@@ -214,17 +282,21 @@ private class PhoneFixture(hierarchy: TunnelHierarchy) {
     val retained = mutableListOf<WorkbenchProject>()
     var unavailable = 0
     var settles = 0
+    var workCreated = 0
     var grant: suspend () -> Unit = {}
-    suspend fun run(): McpPhoneCompiled = compileMcpPhoneCapture(route, work, PhoneCore(), "fixture-device",
+    suspend fun run(): McpPhoneCompiled = compileMcpPhoneCapture(route, { workCreated++; work }, PhoneCore(), "fixture-device",
         McpCaptureProfile(PackageTarget.Generic(), false), { grant() }, { retained += it }, { settles++ }, { unavailable++ },
         semantics = { semantics }, compile = { _, value -> options.set(value); compiled })
 }
 
 private class PhoneRoute(private val captured: WorkbenchTunnelCapture) : McpPhoneCaptureRoute {
     var refusal: McpRecaptureRefusal? = null
+    var busy = false
     var captures = 0
-    override val description = "USB tunnel fixture"
+    override var retired = false
+    override val description = "USB phone fixture"
     override fun checkAvailable() { refusal?.let { throw McpRecaptureUnavailable(it) } }
+    override fun checkReady() { checkAvailable(); if (busy) throw McpRecaptureUnavailable(McpRecaptureRefusal.SourceBusy) }
     override suspend fun <T> capture(body: suspend (WorkbenchTunnelCapture) -> T): T {
         checkAvailable(); captures++
         try { return body(captured) } finally { captured.close() }

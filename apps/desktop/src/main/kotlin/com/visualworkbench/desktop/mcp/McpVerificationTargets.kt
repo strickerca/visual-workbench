@@ -33,8 +33,11 @@ internal data class McpVerificationRecapture(
  * All methods are synchronized; no lock is retained during capture or IO. */
 internal class McpVerificationTargets {
     private data class Source(val project: String, val document: String, val asset: String)
-    /** A Phone origin has no selector until the owner binds a live PC route. */
-    private class Origin(val selector: String?, val kind: McpVerificationTargetKind)
+    /** A phone-screen origin may have no live selector: a phone-app capture
+     * until the owner binds a route, or a tunnel capture whose exact session
+     * retired. `unbound` is the honest refusal reported in that state. */
+    private class Origin(val selector: String?, val kind: McpVerificationTargetKind,
+        val unbound: McpRecaptureRefusal = McpRecaptureRefusal.PhoneRouteUnbound)
     private class Bound(val source: McpVerificationPackage, val origin: Origin)
     internal class Ticket internal constructor(
         internal val original: McpVerificationPackage, internal val selector: String,
@@ -88,6 +91,42 @@ internal class McpVerificationTargets {
         return true
     }
 
+    /** A tunnel capture whose exact session was no longer live when it could be
+     * registered (session closed, or the local service was off at delivery). It
+     * stays a tunnel capture that needs a reconnect and owner binding, never a
+     * silently reclassified phone-app capture. */
+    @Synchronized fun rememberUnboundTunnel(binding: WorkflowBinding, asset: String) {
+        live()
+        require(binding.projectId.matches(Regex("[0-9a-f-]{36}"))&&binding.documentId.matches(Regex("[0-9a-f-]{36}"))&&asset.matches(Regex("[0-9a-f]{64}")))
+        val source = Source(binding.projectId, binding.documentId, asset)
+        val previous = origins[source]
+        if (previous != null) { require(previous.kind == McpVerificationTargetKind.Tunnel); return }
+        check(origins.size < 64) { "Verification source limit" }
+        origins[source] = Origin(null, McpVerificationTargetKind.Tunnel, McpRecaptureRefusal.PhoneDisconnected)
+    }
+
+    /** The engine forgot these routes because their exact sessions retired.
+     * Their origins keep their kind but need a reconnect and owner binding.
+     * Returns the affected bound package keys ("packageId/target"). */
+    @Synchronized fun retireSelectors(selectors: Set<String>): Set<String> {
+        live()
+        val replaced = java.util.IdentityHashMap<Origin, Origin>()
+        for ((source, origin) in origins.entries.toList()) {
+            val selector = origin.selector ?: continue
+            if (selector !in selectors) continue
+            val next = Origin(null, origin.kind, McpRecaptureRefusal.PhoneDisconnected)
+            replaced[origin] = next; origins[source] = next
+        }
+        if (replaced.isEmpty()) return emptySet()
+        val affected = LinkedHashSet<String>()
+        packages.replaceAll { key, value ->
+            val next = replaced[value.origin] ?: return@replaceAll value
+            affected += "${key.first}/${key.second}"
+            Bound(value.source, next)
+        }
+        return affected
+    }
+
     /** Explicit local owner action only: the owner attests that this live PC
      * route captures the same phone screen. Applies to phone-app captures and
      * to tunnel captures whose exact session was replaced; a window origin can
@@ -112,10 +151,11 @@ internal class McpVerificationTargets {
         live(); return packages[key(McpVerificationPackage.of(info))]?.origin?.kind
     }
 
-    /** True only for a Phone origin that still needs an owner binding. */
-    @Synchronized fun unboundPhone(info: PackageInfo): Boolean {
+    /** True for a phone-screen origin with no live route (never bound, or its
+     * session retired); it needs a connected phone and an owner binding. */
+    @Synchronized fun needsBinding(info: PackageInfo): Boolean {
         live(); val origin = packages[key(McpVerificationPackage.of(info))]?.origin ?: return false
-        return origin.kind == McpVerificationTargetKind.Phone && origin.selector == null
+        return origin.kind != McpVerificationTargetKind.Window && origin.selector == null
     }
 
     /** A later marked revision of the same canonical source can be bound after
@@ -136,7 +176,8 @@ internal class McpVerificationTargets {
         live(); val identity = McpVerificationPackage.of(info)
         val bound = packages[key(identity)] ?: error("Original target unavailable")
         require(bound.source == identity)
-        val selector = bound.origin.selector ?: throw McpRecaptureUnavailable(McpRecaptureRefusal.PhoneRouteUnbound)
+        // Coded, so the coordinator must check the caller's grant before reporting it.
+        val selector = bound.origin.selector ?: throw McpRecaptureUnavailable(bound.origin.unbound)
         check(pending.size < 4) { "Verification recapture limit" }
         return Ticket(identity, selector, bound.origin.kind).also { pending[it] = bound }
     }

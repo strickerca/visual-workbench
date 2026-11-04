@@ -18,6 +18,7 @@ internal enum class McpRecaptureRefusal(val code: String, val message: String) {
     PhoneRouteUnbound("phone_route_unbound", "This phone capture came from the phone. Bind the connected USB phone before recapturing it."),
     FeedbackLoop("feedback_loop", "Recapture refused: the source shows the phone mirror window."),
     SourceBusy("source_busy", "The phone tunnel is busy or waiting for a confirmation. Retry after it settles."),
+    PhoneMismatch("phone_mismatch", "The connected phone's screen size does not match this phone capture. Bind the phone it came from."),
 }
 internal class McpRecaptureUnavailable(val reason: McpRecaptureRefusal) : Exception(reason.message)
 
@@ -26,11 +27,27 @@ internal class McpRecaptureUnavailable(val reason: McpRecaptureRefusal) : Except
  * session, is never persisted and refuses once the session retires. The
  * capture-capable form is McpPhoneCaptureRoute; the coordinator needs only this. */
 internal interface McpPhoneScreenRoute {
-    /** Display text for the owner's grant list; not an identity proof. */
+    /** Display text naming the connected device model (never a serial); not an
+     * identity proof. */
     val description: String
-    /** Fail closed: runtime admission and the exact live session. */
+    /** True once the exact session closed or was replaced; never live again. */
+    val retired: Boolean
+    /** Fail closed: runtime admission and the exact live session. It does not
+     * consider transient busy state, so a capture can register during delivery. */
     fun checkAvailable()
 }
+
+/** Durable, owner-visible label written as the note of the owner's own
+ * recapture comparison receipt, so an owner-attested pairing stays labeled when
+ * a saved review is reopened. Window recaptures keep the empty note. */
+internal fun mcpRecaptureNote(kind: McpVerificationTargetKind): String = when (kind) {
+    McpVerificationTargetKind.Window -> ""
+    McpVerificationTargetKind.Tunnel -> "Recapture source: phone screen through the capturing USB tunnel session."
+    McpVerificationTargetKind.Phone -> "Recapture source: phone screen through an owner-bound USB tunnel (owner-attested pairing)."
+}
+internal fun mcpRecaptureKind(note: String): McpVerificationTargetKind =
+    McpVerificationTargetKind.entries.firstOrNull { it != McpVerificationTargetKind.Window && mcpRecaptureNote(it) == note }
+        ?: McpVerificationTargetKind.Window
 
 /** Minted only by the tunnel owner from the exact capture it is delivering to
  * the editor and the live route that produced it. No agent or portable input. */

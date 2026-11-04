@@ -75,17 +75,21 @@ class McpCoordinatorTest {
         override suspend fun select()=selected
         override suspend fun compile(selector:String,checkGrant:suspend()->Unit):WorkbenchCompiledPackage {checkGrant();calls++;enter?.complete(Unit);try{if(waitForever)awaitCancellation();beforeReturn();return Compiled(result).also{returned=it}}finally{cleanupFinish?.let{withContext(NonCancellable){cleanupEntered?.complete(Unit);it.await()}}}}
         /** Same identity rule as the native engine: one selector per route object. */
-        private val routes=mutableListOf<CoordinatorRoute>()
+        private val routes=linkedMapOf<String,CoordinatorRoute>();private var nextRoute=0
+        var runtime=true
+        override fun phoneRuntimeAvailable()=runtime
         override suspend fun retainPhoneRoute(route:McpPhoneScreenRoute):McpSelectedTarget {
             val exact=route as? CoordinatorRoute?:throw McpRecaptureUnavailable(McpRecaptureRefusal.SourceUnavailable)
             exact.checkAvailable()
-            var index=routes.indexOfFirst{it===exact}
-            if(index<0){routes+=exact;index=routes.size-1}
-            return McpSelectedTarget("phone-$index","Phone screen | ${exact.description}",McpVerificationTargetKind.Tunnel)
+            val selector=routes.entries.singleOrNull{it.value===exact}?.key?:"phone-${nextRoute++}".also{routes[it]=exact}
+            return McpSelectedTarget(selector,"Phone screen | ${exact.description}",McpVerificationTargetKind.Tunnel)
+        }
+        override suspend fun pruneRetiredRoutes():Set<String> {
+            val dead=routes.filterValues{it.retired}.keys.toSet();dead.forEach{routes.remove(it)};return dead
         }
         override suspend fun compileVerification(selector:String,profile:McpCaptureProfile,checkGrant:suspend()->Unit):WorkbenchCompiledPackage {
             if(!selector.startsWith("phone-"))return super.compileVerification(selector,profile,checkGrant)
-            val route=routes[selector.removePrefix("phone-").toInt()]
+            val route=routes[selector]?:throw McpRecaptureUnavailable(McpRecaptureRefusal.PhoneDisconnected)
             return route.capture{checkGrant();calls++;Compiled(result).also{returned=it}}
         }
         override suspend fun close(){closed++;closeFailure?.let{throw it}}
@@ -397,18 +401,108 @@ class McpCoordinatorTest {
         }
     }
 
-    @Test fun refusedTunnelRegistrationLeavesThePackageWithoutAVerificationRoute()=runBlocking {
-        val catalog=Catalog();val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),Capture(),newId={receiptId()})
+    @Test fun aTunnelCaptureWhoseSessionIsGoneStaysATunnelCaptureNeedingRebind()=runBlocking {
+        val catalog=Catalog().apply{platform="android"};val capture=Capture()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture,newId={receiptId()})
         try {
-            val route=CoordinatorRoute().apply{refusal=McpRecaptureRefusal.TunnelRuntimeUnavailable}
-            val refused=try {owner.rememberPhoneCapture(McpPhoneCaptureOrigin(binding,"d".repeat(64),route));null}
-                catch(error:McpRecaptureUnavailable) {error.reason}
-            assertEquals(McpRecaptureRefusal.TunnelRuntimeUnavailable,refused)
+            val route=CoordinatorRoute().apply{refusal=McpRecaptureRefusal.PhoneDisconnected}
+            owner.rememberPhoneCapture(McpPhoneCaptureOrigin(binding,"d".repeat(64),route))
             assertTrue(owner.state.value.targets.isEmpty())
-            val saved=owner.publish(Compiled(info("unrouted")))
-            assertTrue(checkNotNull(owner.state.value.message).contains("unavailable for verification"))
-            try {owner.recaptureOriginal(session,saved.info);fail("Unrouted phone capture recaptured")}
-            catch(_:IllegalStateException) { }
+            val saved=owner.publish(Compiled(info("closed-session")))
+            val itemKey="${saved.info.packageId}/${saved.info.target}"
+            // Not silently reclassified as a phone-app capture, even with an android manifest.
+            assertTrue(checkNotNull(owner.state.value.message).contains("Tunnel capture saved"))
+            assertEquals(setOf(itemKey),owner.state.value.phoneUnbound);assertEquals(setOf(itemKey),owner.state.value.phoneScreens)
+            // Ungranted agents learn nothing about the route state.
+            try {owner.recaptureOriginal(session,saved.info);fail("Coded refusal reached an ungranted agent")}
+            catch(_:McpRefused) { }
+            owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
+            val disconnected=try {owner.recaptureOriginal(session,saved.info);null} catch(error:McpRecaptureUnavailable) {error.reason}
+            assertEquals(McpRecaptureRefusal.PhoneDisconnected,disconnected)
+            capture.runtime=false
+            val runtime=try {owner.recaptureOriginal(session,saved.info);null} catch(error:McpRecaptureUnavailable) {error.reason}
+            assertEquals(McpRecaptureRefusal.TunnelRuntimeUnavailable,runtime)
+            assertEquals(0,route.captures);assertEquals(0,capture.calls);assertNull(owner.state.value.activeCapture)
+        } finally {owner.close()}
+    }
+
+    @Test fun captureWindowNeverReachesAPhoneSelector()=runBlocking {
+        val catalog=Catalog();val capture=Capture();val route=CoordinatorRoute()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture,newId={receiptId()})
+        try {
+            owner.rememberPhoneCapture(McpPhoneCaptureOrigin(binding,"d".repeat(64),route))
+            val phone=owner.state.value.targets.single()
+            owner.grant(session,listOf(phone.selector),60_000)
+            try {owner.capture(session,phone.selector);fail("capture_window reached the phone")}
+            catch(_:McpRefused) { }
+            assertEquals(0,route.captures);assertEquals(0,capture.calls)
+            assertNull(owner.state.value.activeCapture);assertTrue(catalog.values.isEmpty())
+        } finally {owner.close()}
+    }
+
+    @Test fun ownerAttestedPairingRefusesAnObviouslyDifferentScreenSize()=runBlocking {
+        fun sized(name:String,width:UInt,height:UInt,source:WorkflowBinding=binding)=info(name).copy(binding=source,
+            images=listOf(PackageImageInfo("clean","clean_source","images/clean.png",width,height,1uL)))
+        val catalog=Catalog().apply{platform="android"};val capture=Capture();val wire=Connection();val route=CoordinatorRoute()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),wire,capture,newId={receiptId()})
+        try {
+            val published=owner.publish(Compiled(sized("sized-original",100u,200u)))
+            owner.bindPhoneScreen(published,route)
+            val phone=owner.state.value.targets.single()
+            owner.grant(session,listOf(phone.selector),60_000)
+            capture.result=sized("other-phone",300u,300u,afterBinding)
+            val refused=try {drawCapture(owner){owner.recaptureOriginal(session,published.info)};null}
+                catch(error:McpRecaptureUnavailable) {error.reason}
+            assertEquals(McpRecaptureRefusal.PhoneMismatch,refused)
+            assertEquals(1,checkNotNull(capture.returned).closes)
+            assertEquals(1,catalog.values.size);assertEquals(1,wire.published.size)
+            // A rotation of the same screen is not a mismatch.
+            capture.result=sized("rotated",200u,100u,afterBinding)
+            val pair=drawCapture(owner){owner.recaptureOriginal(session,published.info)}
+            assertEquals(McpVerificationTargetKind.Phone,pair.kind)
+            assertEquals(2,route.captures)
+        } finally {owner.close()}
+    }
+
+    @Test fun aRetiredTunnelRouteIsPrunedAndItsOriginReportsDisconnected()=runBlocking {
+        val catalog=Catalog();val capture=Capture();val route=CoordinatorRoute()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture,newId={receiptId()})
+        try {
+            owner.rememberPhoneCapture(McpPhoneCaptureOrigin(binding,"d".repeat(64),route))
+            val phone=owner.state.value.targets.single()
+            val saved=owner.publish(Compiled(info("pruned-original")))
+            owner.grant(session,listOf(phone.selector),60_000)
+            route.retired=true
+            val refused=try {owner.recaptureOriginal(session,saved.info);null} catch(error:McpRecaptureUnavailable) {error.reason}
+            assertEquals(McpRecaptureRefusal.PhoneDisconnected,refused)
+            assertTrue(owner.state.value.targets.isEmpty())
+            assertEquals(setOf("${saved.info.packageId}/${saved.info.target}"),owner.state.value.phoneUnbound)
+            assertEquals(0,route.captures);assertNull(owner.state.value.activeCapture)
+            // The freed slot is usable again and the origin can be re-bound to a live session.
+            val next=CoordinatorRoute()
+            owner.bindPhoneScreen(saved,next)
+            assertEquals(1,owner.state.value.targets.size);assertTrue(owner.state.value.phoneUnbound.isEmpty())
+        } finally {owner.close()}
+    }
+
+    @Test fun tunnelDeliveryWaitsOnlyBoundedlyForABusyCaptureGate()=runBlocking {
+        val catalog=Catalog();val capture=Capture();val route=CoordinatorRoute()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture,newId={receiptId()})
+        try {
+            owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
+            capture.waitForever=true;capture.enter=CompletableDeferred()
+            val blocked=async{runCatching{owner.capture(session,"chosen")}}
+            val activity=withTimeout(5000){owner.state.map{it.activeCapture}.filterNotNull().first()}
+            owner.indicatorDrawn(activity.id)
+            withTimeout(5000){checkNotNull(capture.enter).await()}
+            val started=System.nanoTime()
+            withTimeout(10_000){owner.rememberPhoneCapture(McpPhoneCaptureOrigin(binding,"d".repeat(64),route))}
+            assertTrue(System.nanoTime()-started<8_000_000_000L)
+            blocked.cancel();withContext(NonCancellable){blocked.join()}
+            capture.waitForever=false
+            val saved=owner.publish(Compiled(info("busy-gate")))
+            assertTrue("${saved.info.packageId}/${saved.info.target}" in owner.state.value.phoneUnbound)
+            assertTrue(checkNotNull(owner.state.value.message).contains("Tunnel capture saved"))
         } finally {owner.close()}
     }
 
@@ -421,24 +515,44 @@ class McpCoordinatorTest {
             assertEquals(setOf(itemKey),owner.state.value.phoneUnbound)
             assertTrue(checkNotNull(owner.state.value.message).contains("Bind the connected USB phone"))
             assertTrue(owner.state.value.targets.isEmpty())
+            // Grant first: an ungranted agent gets only the ordinary refusal, on both tools.
+            try {owner.recaptureOriginal(session,published.info);fail("Coded refusal reached an ungranted agent")}
+            catch(_:McpRefused) { }
+            try {owner.markerComparison(session,published.info.packageId,published.info.target,published.info.manifestSha256,receiptId(),"f".repeat(64),1u);fail("Comparison admitted")}
+            catch(_:McpRefused) { }
+            owner.selectTarget();owner.grant(session,listOf("chosen"),60_000)
             val unbound=try {owner.recaptureOriginal(session,published.info);null} catch(error:McpRecaptureUnavailable) {error.reason}
             assertEquals(McpRecaptureRefusal.PhoneRouteUnbound,unbound)
+            val compared=try {owner.markerComparison(session,published.info.packageId,published.info.target,published.info.manifestSha256,receiptId(),"f".repeat(64),1u);null}
+                catch(error:McpRecaptureUnavailable) {error.reason}
+            assertEquals(McpRecaptureRefusal.PhoneRouteUnbound,compared)
+            // Without the compiled tunnel runtime, the honest reason is the runtime, for agent and owner.
+            capture.runtime=false
+            val agentRuntime=try {owner.recaptureOriginal(session,published.info);null} catch(error:McpRecaptureUnavailable) {error.reason}
+            assertEquals(McpRecaptureRefusal.TunnelRuntimeUnavailable,agentRuntime)
+            val ownerRuntime=try {owner.bindPhoneScreen(published,route);null} catch(error:McpRecaptureUnavailable) {error.reason}
+            assertEquals(McpRecaptureRefusal.TunnelRuntimeUnavailable,ownerRuntime)
+            capture.runtime=true
             assertNull(owner.state.value.activeCapture)
             val disconnected=try {owner.bindPhoneScreen(published,null);null} catch(error:McpRecaptureUnavailable) {error.reason}
             assertEquals(McpRecaptureRefusal.PhoneDisconnected,disconnected)
             route.refusal=McpRecaptureRefusal.TunnelRuntimeUnavailable
             val runtime=try {owner.bindPhoneScreen(published,route);null} catch(error:McpRecaptureUnavailable) {error.reason}
             assertEquals(McpRecaptureRefusal.TunnelRuntimeUnavailable,runtime)
-            assertEquals(setOf(itemKey),owner.state.value.phoneUnbound);assertTrue(owner.state.value.targets.isEmpty())
+            assertEquals(setOf(itemKey),owner.state.value.phoneUnbound)
+            assertTrue(owner.state.value.targets.none{it.kind==McpVerificationTargetKind.Tunnel})
             route.refusal=null
             owner.bindPhoneScreen(published,route)
             assertTrue(owner.state.value.phoneUnbound.isEmpty())
-            val phone=owner.state.value.targets.single();assertEquals(McpVerificationTargetKind.Tunnel,phone.kind)
-            // Binding alone grants nothing.
+            assertTrue(checkNotNull(owner.state.value.message).contains("Grant that phone screen"))
+            val phone=owner.state.value.targets.single{it.kind==McpVerificationTargetKind.Tunnel}
+            // Binding alone grants nothing: the existing grant names only the window.
             try {owner.recaptureOriginal(session,published.info);fail("Binding minted a grant")}
-            catch(_:McpRefused) { }
+            catch(_:IllegalArgumentException) { }
             assertEquals(0,route.captures)
             owner.grant(session,listOf(phone.selector),60_000)
+            owner.bindPhoneScreen(published,route) // Same route: unchanged, but the message reflects the live grant.
+            assertTrue(checkNotNull(owner.state.value.message).contains("already covers"))
             capture.result=info("phone-after").copy(binding=afterBinding)
             val pair=drawCapture(owner){owner.recaptureOriginal(session,published.info)}
             assertEquals(McpVerificationTargetKind.Phone,pair.kind)
@@ -522,7 +636,8 @@ class McpCoordinatorTest {
  * only availability/identity; this fake engine performs its pretend capture. */
 private class CoordinatorRoute:McpPhoneScreenRoute {
     var refusal:McpRecaptureRefusal?=null;var captures=0
-    override val description="USB tunnel fixture"
+    override var retired=false
+    override val description="USB phone fixture"
     override fun checkAvailable(){refusal?.let{throw McpRecaptureUnavailable(it)}}
     suspend fun <T> capture(body:suspend()->T):T {checkAvailable();captures++;return body()}
 }

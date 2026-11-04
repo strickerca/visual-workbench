@@ -3,7 +3,7 @@ import { LIMITS, Refused, requireThat } from './bounds.mjs';
 /** Fixed source-availability refusals the Desktop owner may name. Any other or
  * missing code stays 'owner_refused'; no owner text reaches an agent. */
 export const OWNER_REFUSALS = Object.freeze(['recapture_source_unavailable', 'tunnel_runtime_unavailable',
-  'phone_disconnected', 'phone_route_unbound', 'feedback_loop', 'source_busy']);
+  'phone_disconnected', 'phone_route_unbound', 'feedback_loop', 'source_busy', 'phone_mismatch']);
 /** Native callbacks retain their slot after caller cancellation until the owner
  * confirms actual settlement. This prevents file retirement racing late work. */
 export class Owner {
