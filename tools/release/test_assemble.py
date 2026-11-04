@@ -55,8 +55,10 @@ class Assembly(unittest.TestCase):
         body, raw, _ = g.finalize(receipt, {digest: text})
         self.put(".local/notices/THIRD-PARTY-NOTICES.txt", body)
         self.put(".local/notices/third-party-notices.json", raw)
+        # The synthetic opaque artifact explicitly contains none of the graphs.
         self.spec["generated_notices"] = {"text": self.row(".local/notices/THIRD-PARTY-NOTICES.txt"),
-                                          "receipt": self.row(".local/notices/third-party-notices.json")}
+                                          "receipt": self.row(".local/notices/third-party-notices.json"),
+                                          "opaque_coverage": []}
 
     def tearDown(self):
         self.temp.cleanup()
@@ -184,6 +186,22 @@ class Assembly(unittest.TestCase):
         self.refresh()
         self.assertEqual(self.run_assembly()["generated_notices"]["skipped"], ["gradle"])
         self.spec["generated_notices"]["declared_skips"] = ["unknown"]
+        self.refresh()
+        self.refuses("generated_notices", lambda: a.manifest(self.spec))
+
+    def test_opaque_artifacts_require_declared_notice_coverage(self):
+        del self.spec["generated_notices"]["opaque_coverage"]
+        self.refresh()
+        self.refuses("notices_opaque_coverage_undeclared")
+        self.assertFalse(self.destination.exists())
+        self.generated_notices(coverage=["rust:x86_64-pc-windows-msvc"])
+        self.spec["generated_notices"]["opaque_coverage"] = ["rust:aarch64-linux-android"]
+        self.refresh()
+        self.refuses("notices_opaque_coverage")
+        self.spec["generated_notices"]["opaque_coverage"] = ["rust:x86_64-pc-windows-msvc"]
+        self.refresh()
+        self.assertEqual(self.run_assembly()["generated_notices"]["status"], "complete")
+        self.spec["generated_notices"]["opaque_coverage"] = ["not-a-scope"]
         self.refresh()
         self.refuses("generated_notices", lambda: a.manifest(self.spec))
 
