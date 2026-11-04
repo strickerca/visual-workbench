@@ -29,6 +29,48 @@
         {"path": "third_party/notices/libyuv-LICENSE.txt", "sha256": "2b2cc1180c7e6988328ad2033b04b80117419db9c4c584918bbb3cfec7e9364f"}
       ],
       "reason": "camera-core bundles libyuv (BSD-3-Clause); see apps/android/DEPENDENCY_PROVENANCE.md for the revision limits."
+    },
+    {
+      "ecosystem": "maven",
+      "name": "androidx.graphics:graphics-core",
+      "version": "1.0.4",
+      "selected": null,
+      "notices": [],
+      "native_review": "Bundled libgraphics-core.so is AndroidX's own JNI code (graphics/graphics-core/src/main/cpp: egl_utils, graphics-core, sync_fence), Apache-2.0, The Android Open Source Project; no vendored third-party native code found. Reviewed 2026-11-04 against androidx-main, not a pinned 1.0.4 revision.",
+      "reason": "The AAR ships no license file; the Apache-2.0 text is therefore the canonical retained text. Source: https://github.com/androidx/androidx/tree/androidx-main/graphics/graphics-core/src/main/cpp"
+    },
+    {
+      "ecosystem": "maven",
+      "name": "androidx.graphics:graphics-path",
+      "version": "1.0.1",
+      "selected": null,
+      "notices": [],
+      "native_review": "Bundled libandroidx.graphics.path.so is AndroidX's own JNI code (graphics/graphics-path/src/main/cpp: Conic, PathIterator, pathway, math/), Apache-2.0, The Android Open Source Project (Conic.cpp also carries an AOSP 2006 copyright); no vendored third-party native code found. Reviewed 2026-11-04 against androidx-main, not a pinned 1.0.1 revision.",
+      "reason": "The AAR ships no license file; the Apache-2.0 text is therefore the canonical retained text. Source: https://github.com/androidx/androidx/tree/androidx-main/graphics/graphics-path/src/main/cpp"
+    }
+  ],
+  "pending_retention": [
+    {
+      "status": "identified, not retained: byte-exact download needs owner approval; the generator does not read this list",
+      "components": ["cargo:uniffi@0.32.2", "cargo:uniffi_bindgen@0.32.2", "cargo:uniffi_core@0.32.2", "cargo:uniffi_meta@0.32.2", "cargo:uniffi_pipeline@0.32.2", "cargo:uniffi_udl@0.32.2"],
+      "license": "MPL-2.0",
+      "source_url": "https://www.mozilla.org/media/MPL/2.0/index.txt",
+      "planned_path": "third_party/notices/MPL-2.0.txt",
+      "note": "Crate VCS commit 7bc621ee9d0d15371d792612707ba5ed4111f950 (mozilla/uniffi-rs, from .cargo_vcs_info.json). Shipped unmodified, so MPL-2.0 3.2(a) needs the license text plus where to get the Source Code Form: https://github.com/mozilla/uniffi-rs/tree/7bc621ee9d0d15371d792612707ba5ed4111f950"
+    },
+    {
+      "status": "identified, not retained: byte-exact download needs owner approval; the generator does not read this list",
+      "components": ["maven:org.jetbrains.skiko:skiko-awt-runtime-windows-x64:0.150.1"],
+      "license": "BSD-3-Clause",
+      "source_url": "https://raw.githubusercontent.com/JetBrains/skia/1f14f1166a847cb0e148f981600bf1e3e6ca6e46/LICENSE",
+      "planned_path": "third_party/notices/Skia-m150-1f14f1166a-LICENSE.txt",
+      "note": "skiko v0.150.1 skiko/gradle.properties sets dependencies.skia=m150-1f14f1166a (JetBrains/skia tag, commit 1f14f1166a847cb0e148f981600bf1e3e6ca6e46). skiko itself is Apache-2.0 with no NOTICE file found. The Skia DLL may also link Skia third_party libraries (FreeType, HarfBuzz, ICU, libpng, zlib, expat, libjpeg-turbo, libwebp); their notices are not yet established."
+    },
+    {
+      "status": "owner decision needed: upstream publishes no license text",
+      "components": ["cargo:libwebp-sys@0.14.4"],
+      "license": "MIT",
+      "note": "Crate VCS commit 3a40281fd97537b693174acb7375d64d3b471a56 (NoXF/libwebp-sys) has no LICENSE/COPYING file; README has no license statement; only Cargo.toml declares license = \"MIT\". An MIT text cannot be retained without inventing a copyright line. The vendored libwebp COPYING (BSD-3-Clause) and PATENTS ship in the crate."
     }
   ],
   "bundled": [

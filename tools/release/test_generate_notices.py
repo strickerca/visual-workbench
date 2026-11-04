@@ -383,6 +383,38 @@ class Generation(Fixture):
         self.assertIn({"component": "maven:org.example:apache-bare:2.0", "reason": "native_notice_unestablished",
                        "detail": "1 bundled native libraries and no package license file"}, receipt["unresolved"])
 
+    def test_reviewed_supplements_resolve_texts_and_native_gate(self):
+        for package in self.metadata["x86_64-pc-windows-msvc"]["packages"]:
+            if package["name"] == "native-sys":
+                package["license"] = "MPL-2.0"  # ships only MIT/BSD files: text missing
+        body = jar({"lib/x.dll": b"MZ", "com/x/A.class": b"\xca\xfe"})
+        for old in (self.gradle_cache / "org.example/apache-bare/2.0").glob("*/apache-bare-2.0.jar"):
+            old.unlink()
+        self.cache_file("org.example", "apache-bare", "2.0", "apache-bare-2.0.jar", body)
+        _, _, receipt = self.generate()
+        self.assertEqual({r["reason"] for r in receipt["unresolved"]},
+                         {"license_text_missing", "native_notice_unestablished"})
+        mpl = self.retain("MPL-2.0.txt", b"Mozilla Public License Version 2.0\n==================================\n", "MPL-2.0")
+        self.put(self.root / "third_party/LICENSES", json.dumps(
+            {"schema_version": 1, "files": sorted(self.retained.values(), key=lambda r: r["path"])}).encode())
+        path = self.root / "tools/licenses/notice-supplements.json"
+        supplements = json.loads(path.read_bytes())
+        supplements["components"] = [
+            {"ecosystem": "cargo", "name": "native-sys", "version": "0.1.0", "selected": None,
+             "notices": [{"path": mpl, "sha256": sha(self.root.joinpath(mpl).read_bytes())}],
+             "notes": ["MPL-2.0 Source Code Form: https://example.test/native-sys"]},
+            {"ecosystem": "maven", "name": "org.example:apache-bare", "version": "2.0", "selected": None,
+             "notices": [], "native_review": "x.dll is the project's own Apache-2.0 JNI code"}]
+        path.write_bytes(json.dumps(supplements).encode())
+        text, raw, receipt = self.generate()
+        self.assertEqual(receipt["status"], "complete", receipt["unresolved"])
+        native = next(c for c in receipt["components"] if c["name"] == "native-sys")
+        self.assertIn("retained:" + mpl, [t["origin"] for t in native["texts"]])
+        self.assertIn(b"note: MPL-2.0 Source Code Form: https://example.test/native-sys", text)
+        bare = next(c for c in receipt["components"] if c["name"] == "org.example:apache-bare")
+        self.assertIn("x.dll is the project's own Apache-2.0 JNI code", bare["warnings"])
+        self.assertEqual(g.verify_bundle(raw, text)["status"], "complete")
+
     def test_gradle_cache_bytes_are_hash_bound(self):
         for path in (self.gradle_cache / "org.example/with-license/1.0").glob("*/with-license-1.0.jar"):
             path.write_bytes(path.read_bytes() + b"tampered")

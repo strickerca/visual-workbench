@@ -120,18 +120,31 @@ python tools\release\generate_notices.py --output .local\notices-<release> --gra
 ```
 
 The 2026-11-04 offline run used the existing census report and local caches,
-without the desktop image. It found 415 shipped components: 266 Rust, 139
-Maven, 9 npm and 1 bundled (Node). Ten remain unresolved, so the bundle is
-incomplete and assembly refuses it:
+without the desktop image. It found 417 shipped components: 266 Rust, 141
+Maven, 9 npm and 1 bundled (Node). The `androidx.graphics` graphics-core 1.0.4
+and graphics-path 1.0.1 native libraries are resolved by a recorded source
+review (`native_review`): they are AndroidX's own Apache-2.0 JNI code. That
+review was against `androidx-main`, not a pinned release revision. Eight
+components remain unresolved, so the bundle is incomplete and assembly refuses
+it:
 
-- The six `uniffi*` 0.32.2 crates (MPL-2.0) ship no license text.
-- `libwebp-sys` 0.14.4 ships no text for its MIT wrapper. Its vendored libwebp
-  `COPYING` and `PATENTS` files are present.
-- Three artifacts bundle native libraries without a notice:
-  `androidx.graphics:graphics-core` 1.0.4, `graphics-path` 1.0.1 and
-  `org.jetbrains.skiko:skiko-awt-runtime-windows-x64` 0.150.1. Skia's
-  BSD-3-Clause notice has not been established.
+- The six `uniffi*` 0.32.2 crates (MPL-2.0) ship no license text. Retain the
+  MPL-2.0 text from mozilla.org. Because uniffi ships unmodified, MPL-2.0 3.2(a)
+  also requires a note saying where the Source Code Form is (mozilla/uniffi-rs
+  at commit `7bc621ee9d0d15371d792612707ba5ed4111f950`). A supplement `notes`
+  entry renders that note in the notices file.
+- `org.jetbrains.skiko:skiko-awt-runtime-windows-x64` 0.150.1 bundles a Skia
+  DLL. Retain Skia's BSD-3-Clause LICENSE from JetBrains/skia at commit
+  `1f14f1166a847cb0e148f981600bf1e3e6ca6e46` (tag `m150-1f14f1166a`, which skiko
+  v0.150.1 builds against). The notices of Skia's own bundled third-party
+  libraries are still unestablished.
+- `libwebp-sys` 0.14.4: the upstream repository at the crate's commit
+  (`3a40281fd97537b693174acb7375d64d3b471a56`) publishes no license text. Only
+  `Cargo.toml` declares MIT. This needs an owner decision.
 
-Each needs a reviewed, retained upstream text added to `third_party/LICENSES`
-and `notice-supplements.json`. Java runtime coverage needs a built desktop
+The identified sources are recorded under `pending_retention` in
+`notice-supplements.json`; the generator does not read that list. A new file
+under `third_party/notices` must be registered in `third_party/LICENSES`. It
+then becomes part of the notice resources packaged into both apps, so the APK
+and desktop builds must be rebuilt. Java runtime coverage needs a built desktop
 image.

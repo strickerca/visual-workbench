@@ -251,7 +251,8 @@ class Builder:
         return digest
 
     def add(self, ecosystem: str, name: str, version: str, declared: str, dnf, files: list, scope: str,
-            sources: dict | None = None, extra: list | None = None, forced: str | None = None) -> None:
+            sources: dict | None = None, extra: list | None = None, forced: str | None = None,
+            notes: list | None = None) -> None:
         """files: (origin, bytes) from the package; extra: (origin, bytes) always shipped."""
         key = (ecosystem, name, version)
         if key in self.components:
@@ -296,6 +297,9 @@ class Builder:
             self.unresolved.append({"component": ident, "reason": "license_text_missing",
                                     "detail": "no package license file for " + " OR ".join(" AND ".join(b) for b in allowed)})
             return
+        for note in notes or []:
+            require(ascii_text(note, 1024), "supplement_note")
+            warnings.append(note)
         families = {family(t) for t in choice}
         texts = []
         for origin, data, labels in labelled:
@@ -486,6 +490,19 @@ def load_supplements(root: Path, builder: Builder | None = None) -> dict:
     return value
 
 
+def supplement_for(supplements: dict, ecosystem: str, name: str, version: str) -> dict | None:
+    rows = [row for row in supplements.get("components", [])
+            if (row["ecosystem"], row["name"], row["version"]) == (ecosystem, name, version)]
+    require(len(rows) <= 1, "supplement_duplicate")
+    return rows[0] if rows else None
+
+
+def supplement_texts(root: Path, supplement: dict | None) -> list:
+    if not supplement:
+        return []
+    return [("retained:" + n["path"], retained(root, n["path"], n["sha256"])) for n in supplement.get("notices", [])]
+
+
 def canonical_texts(root: Path, supplements: dict) -> dict:
     found = {}
     for term, row in supplements.get("canonical_texts", {}).items():
@@ -538,7 +555,8 @@ def crate_files(cargo_home: Path, name: str, version: str, checksum: str | None,
     return [], {}
 
 
-def cargo_components(builder: Builder, root: Path, metadata: dict, cargo_home: Path) -> None:
+def cargo_components(builder: Builder, root: Path, metadata: dict, cargo_home: Path,
+                     supplements: dict | None = None) -> None:
     lock, raw = cargo_lock(root)
     builder.inputs["Cargo.lock"] = blob(raw)
     reached_any = set()
@@ -595,7 +613,10 @@ def cargo_components(builder: Builder, root: Path, metadata: dict, cargo_home: P
                 builder.unresolved.append({"component": ident, "reason": "crate_source_unavailable",
                                            "detail": "registry cache archive matching Cargo.lock checksum not found"})
                 continue
-            builder.add("cargo", name, version, declared, spdx_dnf(declared), files, scope, sources)
+            supplement = supplement_for(supplements or {}, "cargo", name, version)
+            builder.add("cargo", name, version, declared, spdx_dnf(declared), files, scope, sources,
+                        supplement_texts(root, supplement), supplement.get("selected") if supplement else None,
+                        supplement.get("notes", []) if supplement else None)
     for (name, version), row in lock.items():
         if (name, version) not in reached_any and row.get("source") == CRATES_IO:
             builder.exclude("cargo:not-in-shipped-graph(dev/build/other-target/tool)", f"{name} {version}")
@@ -711,7 +732,6 @@ def gradle_components(builder: Builder, root: Path, report_path: Path, cache: Pa
     # The existing gate's reader binds every copied POM and its parent chain.
     annotated = gradle.read_pom_report(json.loads(raw), report_path.parent)["dependencies"]
     reviewed = {row["coordinate"]: row for row in json.loads(read_file(root / "tools/licenses/reviewed-maven.json"))["artifacts"]}
-    extra = {(r["name"], r["version"]): r for r in supplements.get("components", []) if r["ecosystem"] == "maven"}
     for configuration in GRADLE_SHIPPING:
         builder.coverage.add(configuration)
     census = {m["moduleName"] + ":" + m["moduleVersion"] for m in annotated}
@@ -740,7 +760,7 @@ def gradle_components(builder: Builder, root: Path, report_path: Path, cache: Pa
         labels = [row.get("spdxLicense") or row.get("moduleLicense") or "" for row in module["moduleLicenses"]]
         mapped = [gradle.ALIASES.get(label.strip(), label.strip()) for label in labels]
         declared = "; ".join(label.strip() for label in labels) or "none declared"
-        supplement = extra.get((name, version))
+        supplement = supplement_for(supplements, "maven", name, version)
         forced = supplement.get("selected") if supplement else None
         if forced is not None:
             require(forced in mapped, "supplement_selection")
@@ -750,10 +770,7 @@ def gradle_components(builder: Builder, root: Path, report_path: Path, cache: Pa
         texts = []
         for file_name, data in files:
             texts += zip_license_files(file_name, data)
-        retained_texts = []
-        if supplement:
-            retained_texts += [("retained:" + n["path"], retained(root, n["path"], n["sha256"]))
-                               for n in supplement["notices"]]
+        retained_texts = supplement_texts(root, supplement)
         if module.get("licenseSourceReviewedArtifact") == key:
             retained_texts += [("retained:" + n["path"], retained(root, n["path"], n["sha256"]))
                                for n in reviewed[key]["notices"]]
@@ -763,7 +780,8 @@ def gradle_components(builder: Builder, root: Path, report_path: Path, cache: Pa
         natives = sum(native_count(data) for _, data in files)
         if natives:
             sources["native_libraries"] = natives
-        if natives and not texts and not retained_texts:
+        reviewed_native = bool(supplement and ascii_text(supplement.get("native_review") or "", 1024))
+        if natives and not texts and not retained_texts and not reviewed_native:
             # A bundled native library may embed third-party code whose notice
             # the Maven license declaration does not cover; require a package
             # notice or a reviewed supplement instead of assuming none.
@@ -775,7 +793,9 @@ def gradle_components(builder: Builder, root: Path, report_path: Path, cache: Pa
         dnf = [tuple(dict.fromkeys(mapped))]
         for scope in scopes:
             builder.add("maven", name, version, declared if ascii_text(declared, 512) else "non-ascii declaration",
-                        dnf, texts, scope, sources, retained_texts, forced)
+                        dnf, texts, scope, sources, retained_texts, forced,
+                        (supplement.get("notes", []) + ([supplement["native_review"]] if reviewed_native else []))
+                        if supplement else None)
 
 
 # --------------------------------------------------------------------- npm
@@ -849,7 +869,7 @@ def generate(root: Path, *, metadata: dict | None, cargo_home: Path, gradle_repo
     supplements = load_supplements(root, builder)
     builder.canonical = canonical_texts(root, supplements)
     if "cargo" not in skip:
-        cargo_components(builder, root, metadata or {}, cargo_home)
+        cargo_components(builder, root, metadata or {}, cargo_home, supplements)
     if "gradle" not in skip:
         require(gradle_report is not None and Path(gradle_report).is_file(), "gradle_report_missing")
         gradle_components(builder, root, Path(gradle_report), gradle_cache, supplements)
