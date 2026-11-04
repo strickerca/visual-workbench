@@ -112,3 +112,21 @@ selected explicitly without fallback. This is the current testing scope, not a
 new hardware inventory. Historical S23 stay-awake and display facts do not assert
 its present connection or settings. OnePlus tests never certify S23/S Pen or
 target-device performance. Physical thermal/recovery baselines remain absent.
+
+## Current device and host state — 2026-11-03
+
+Stage 0 of the 2026-11 completion roadmap. The connected Android device is the
+OnePlus IN2019 (model inventory only); the S23 Ultra (SM-S918U) is **not
+connected** at this snapshot. The latest S23 software evidence is the 2026-10-20
+checkpoint (225/225 isolated S23 instrumentation cases and a passing software-input
+balanced replay; see `../WINDOWS_S23_ACCEPTANCE_20261020.md` and
+`../STATE_RECONCILIATION_20261103.md`). Physical S Pen pressure, hover,
+tilt/orientation, report rate, Air Actions, thermal and carrier-recovery rows
+above remain unmeasured; Stage 2 and Stage 3 need the S23 connected.
+
+Host: `build.ps1 doctor` reports 0 missing checks with Rust 1.99.0, cargo-ndk
+4.1.2, cargo-deny 0.20.2, Python 3.14.3, OpenJDK 21 (21.0.12 LTS), gitleaks 8.30.1,
+Android SDK 37.0, build-tools 36.1.0, NDK 30.0.16248370 and MSVC from Visual
+Studio Build Tools 2026 (18.5). Visual Studio Build Tools 2022 (MSVC
+14.44.35207) is also installed. Free space on C: was 23 GB at the baseline run,
+above the 10 GB + 512 MiB floor.

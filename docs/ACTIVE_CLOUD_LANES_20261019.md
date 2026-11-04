@@ -1,5 +1,7 @@
 # Active cloud deliverables
 
+> **Reconciled 2026-11-03:** some statements here are stale (held `dae67bb`, pending main promotion, missing MSI hook, cloud-only `lib.exe`, release-hook hashes). See [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
+
 ## Desktop receiver source closure — 2026-10-20
 
 This update supersedes the historical held Desktop/caller rows below. Parent

@@ -1,5 +1,7 @@
 # Deferred aggregate validation
 
+> **Reconciled 2026-11-03:** some statements here are stale (held `dae67bb`, pending main promotion, missing MSI hook, cloud-only `lib.exe`, release-hook hashes). See [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
+
 ## 2026-10-20 integrated validation update
 
 This update supersedes the older active-code and no-publication statements below.

@@ -1,5 +1,7 @@
 # Current phased execution ledger
 
+> **Reconciled 2026-11-03:** some statements here are stale (held `dae67bb`, pending main promotion, missing MSI hook, cloud-only `lib.exe`, release-hook hashes). See [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
+
 ## Overnight practical release closeout — 2026-10-20
 
 The new overnight grant supplies a separate Windows/S23 validation task and

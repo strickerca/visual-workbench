@@ -1,6 +1,29 @@
 # Visual Workbench implementation guidance
 
-Current cloud continuation (2026-10-19): the current parent delegation and its
+Owner direction (2026-11-03): the goal is a personal G5 build: close M4-KP
+(Paint only), record G0–G3 and G5, and finish with an installable unsigned MSI
+and APK for personal use. Krita, T4.02, T4.05, T4.06, broader editors and full
+G4 stay deferred. Public signing/distribution is out of scope. The active
+sequence is the 2026-11 completion roadmap in `docs/IMPLEMENTATION_PLAN.md`
+(Stages 0–5). This supersedes the cloud continuation and pause/scope entries
+below; retain them as history.
+
+Executor convention (2026-11-03): Claude Code executes each slice locally on
+this Windows laptop. An independent Claude reviewer agent reviews each slice's
+diff and evidence before it merges into main; that review replaces the earlier
+gpt-6.1-sol executor and gpt-6-astra review rule. Do not report model/effort
+mismatches against the old Sol/Astra settings. All other process rules below
+(task branches, evidence receipts, build.ps1, device selection, disk floor,
+publishing) remain in force.
+
+Owner pre-authorization (2026-11-03): (1) fetching the assisted-selection model
+archives from this laptop's network and (2) admitting tool/runtime licenses
+(WiX/jpackage, scrcpy/tunnel DLLs, model weights) are authorized after each
+license is shown to the owner and confirmed. Live provider calls/spend (OpenAI)
+are not pre-authorized; ask at the step that needs them. Gates are recorded only
+after owner confirmation.
+
+Historical cloud continuation (2026-10-19): the current parent delegation and its
 explicit lane grant define the active deliverable. This continuation supersedes
 the older pause/scope instructions below for this delegated cloud work. Retain
 those dated entries as history; do not restart a completed old task/audit because
@@ -163,6 +186,6 @@ Inspect and then dispose them before closure; retain only text results, counts,
 hashes, source bindings and a disposal receipt. Product image assets are preserved.
 
 After each implementation slice, report its result and open verification limits,
-then name the next planned task, task size, recommended model and reasoning effort
-from that task prompt. Settings are changed by the owner; verify the actual
-session settings and report mismatches instead of changing them automatically.
+then name the next planned task and its size from the completion roadmap.
+Settings are changed by the owner; never change app or session settings
+automatically.

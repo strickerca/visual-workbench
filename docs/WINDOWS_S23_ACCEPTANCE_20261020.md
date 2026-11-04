@@ -1,5 +1,7 @@
 # Windows and S23 bounded software checkpoint — 2026-10-20
 
+> **Reconciled 2026-11-03:** some statements here are stale (held `dae67bb`, pending main promotion, missing MSI hook, cloud-only `lib.exe`, release-hook hashes). See [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
+
 **Release ready: false.** Current software tests, fresh Desktop build and packaged startup smoke passed. The owner-approved MCP cache action was aborted on a path-identity mismatch before mutation; packaged MCP and product acceptance remain open.
 
 Local source `fff9212e1bf2b98907540efb0655e7cc290543d2` and published task checkpoint `4f3b569f584e2e65d2f6ef5d78ef866a6340d317` share tree `a49b3accfb333d351c3097a3a28248505e4aea5d`. The recorded branch is `task/windows-s23-acceptance-20261020`. The companion JSON contains complete SHA256 pins for every proof below; proof names are basenames, with no private paths, device/window identifiers, raw output or media.

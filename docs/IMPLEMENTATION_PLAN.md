@@ -2,6 +2,30 @@
 
 Revision 2026-10-01. Companion to BUILD_SPECIFICATION.md v2.0 and REQUIREMENTS.json (189 requirements). Every requirement maps to at least one task below (checked by `tools/check_plan_coverage.py`).
 
+## Completion roadmap — 2026-11-03 (active)
+
+Owner-selected finish line: a **personal G5 build**. Close M4-KP (Paint only),
+record G0–G3 and G5, and finish with an installable unsigned MSI and APK for
+personal use. Krita, T4.02, T4.05, T4.06, broader editors and full G4 remain
+deferred (see the dated DECISIONS.md entry). Claude Code executes slices; an
+independent Claude reviewer agent reviews each slice before it merges into main. The model
+archive route and tool-license admission are pre-authorized once each license is
+shown to the owner. Live provider spend is not pre-authorized. Status at entry:
+main `2b6b2ea`, 1 of 189 requirements passed, no gate recorded; see
+[STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
+
+| Stage | Scope | Closes |
+| --- | --- | --- |
+| 0 Re-baseline | Executor convention, stale-doc reconciliation, requirement status sync, hardware truth refresh, branch/worktree disposition, deferral decision, Windows baseline (doctor/test-all/lint-all/license-check) and disk floor | Planning baseline |
+| 1 Blockers | B1 Windows replays (assembler 48, MSI witnesses, wrapper 16, metadata probe); B2 model archive route and runtime admission; B3 WiX/jpackage and tunnel DLL license admission; B4 Android black drawing region after eraser/resize/recreation; B5 reviewed normal-APK delivery route; B6 visible phone→Paint `baseline_wgc`; B7 Windows owned guard grant/readiness; B8 packaged MCP two-cycle smoke; B9 physical-gesture positive producer; B10 live GPT Image (ask for spend) | Blockers |
+| 2 M4-KP | Paint catalog calibration/admission; T4.03 guards (checklist item 4); T4.04 ghost ink; T4.07 Paint compatibility record; T4.08 essential controls; T4.01 ≥30 fps / PERF-003; personal packaging; owner drawing session | M4-KP checkpoint |
+| 3 G0–G2 | T0.04/05/06/10/11 carry-overs and T0.12; A01/A02/A06 plus daily use; A13/A21–A24/A26/A29 plus A06 re-run in real apps | G0, G1, G2 |
+| 4 Phase 3 | T3.01–T3.11 runtime/device work and confirmed source gaps; T3.12 scenarios | G3 |
+| 5 Phase 5 | T5.01–T5.05, T5.08 decisions, T5.06 MSI build/install/uninstall with admitted WiX and notices, T5.07 release-build scenarios and reports | Personal G5 |
+
+Device time on the S23 and owner gate confirmations are the critical path.
+Historical entries below remain as dated history.
+
 ## How to run this plan
 
 1. Put this package at `C:\dev\visual-workbench` (the repository root; any path works if you tell the agent).
@@ -41,6 +65,9 @@ latency, frame rate, ghost-ink or physical acceptance targets. Historical
 180 ms failures remain evidence of the earlier implementation. New budgets
 need matching builds, causal/restoration measurements and normal catalog-path
 validation before delivery acceptance; they are not a pass by themselves.
+*Superseded budget, R161 (2026-10-08):* the Paint provider allowance is now
+750 ms; the parent exchange stays 1,000 ms and the managed envelope 2,500 ms. The
+500 ms figures above are the 2026-10-07 history.
 
 ## Owner actions (things only Christian can do)
 

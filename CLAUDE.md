@@ -1,7 +1,10 @@
 # Visual Workbench
 
 Read and follow AGENTS.md. Current source documents are under docs/.
-The implementation sequence and scope are in docs/IMPLEMENTATION_PLAN.md.
+The implementation sequence and scope are in docs/IMPLEMENTATION_PLAN.md; the
+active sequence is its 2026-11 completion roadmap (Stages 0–5, personal G5).
+Claude Code executes slices; an independent Claude reviewer agent reviews each
+slice before it merges into main.
 Use task/<task-id>-<slug> branches. The owner's standing authorization dated
 2026-10-01 permits local task commits/dependency integration and automatic
 commit/push of phase-owned work to origin/main at each numbered phase conclusion.

@@ -333,8 +333,10 @@
       "scenarios": [
         "A01"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/T3_07_SAVED_VIEWS_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -450,8 +452,10 @@
       "scenarios": [
         "A03"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -478,8 +482,10 @@
       "scenarios": [
         "A04"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -503,9 +509,10 @@
         "A05"
       ],
       "evidence": [
-        "docs/evidence/T1.01.md — 10,000-case lens latch property suite per platform; math evidence only, product lens behavior remains T3.04."
+        "docs/evidence/T1.01.md — 10,000-case lens latch property suite per platform; math evidence only, product lens behavior remains T3.04.",
+        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
       ],
-      "impl_status": "not_started",
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -528,8 +535,10 @@
       "scenarios": [
         "A04"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -554,8 +563,10 @@
       "scenarios": [
         "A05"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -580,8 +591,10 @@
       "scenarios": [
         "A09"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/T5_04_AIR_ACTIONS_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -606,8 +619,10 @@
       "scenarios": [
         "A09"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/T5_04_AIR_ACTIONS_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -631,8 +646,10 @@
       "scenarios": [
         "A09"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/AIR_ACTIONS_PREFERENCES_NEXT_LANE_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -689,9 +706,10 @@
         "A03"
       ],
       "evidence": [
-        "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance."
+        "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
+        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
       ],
-      "impl_status": "not_started",
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new: split from PEN-001"
@@ -718,9 +736,10 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance."
+        "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
+        "docs/evidence/T3.05-DEDICATED-LEAVES-20261018.json — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
       ],
-      "impl_status": "not_started",
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new: split from PEN-001"
@@ -775,8 +794,10 @@
       "scenarios": [
         "A03"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/T3.03-T3.04-precision-adapters-20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new: hover-aim loupe"
@@ -893,8 +914,10 @@
       "scenarios": [
         "A02"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/T3.07-LAYER-CONTROL-LEAVES-20261018.json — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -1063,8 +1086,10 @@
       "scenarios": [
         "A11"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md (T3.07) — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -1122,8 +1147,10 @@
       "scenarios": [
         "A02"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/T3.07-ROTATION-CONTACT-LEAVES-20261018.json — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "new ID: rotation split out of v1 EDIT-004"
@@ -1147,8 +1174,10 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/evidence/T3.05-DEDICATED-LEAVES-20261018.json — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "new ID: split out of v1 EDIT-006"
@@ -1173,8 +1202,10 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/EDITING_OUTPUT_ASSISTED_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -1200,8 +1231,10 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/ASSISTED_RUNTIME_REGISTRATION_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement. Runtime blocked: production LiteRT catalog is empty until model admission (Stage 1 B2)."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new: assisted selection"
@@ -1389,8 +1422,10 @@
       "scenarios": [
         "A07"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/T3_01_DESKTOP_CALLER_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "new ID: picker split out of v1 CAPTURE-001"
@@ -1413,8 +1448,10 @@
       "scenarios": [
         "A18"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/ANDROID_TUNNEL_RUNTIME_HANDOFF_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement. Runtime blocked until tunnel license admission (Stage 1 B3)."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "new ID: feedback-loop half of v1 CAPTURE-006"
@@ -1467,8 +1504,10 @@
       "scenarios": [
         "A18"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/ANDROID_TUNNEL_SESSION_HANDOFF_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement. Runtime blocked: COMPILED_APPROVED_CATALOG is None until scrcpy/DLL license admission (Stage 1 B3)."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -1553,8 +1592,10 @@
       "scenarios": [
         "A18"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/ANDROID_TUNNEL_CONTROL_HANDOFF_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement. Runtime blocked until tunnel license admission (Stage 1 B3)."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -2250,9 +2291,10 @@
         "A10"
       ],
       "evidence": [
-        "docs/evidence/T0.09.md"
+        "docs/evidence/T0.09.md",
+        "docs/NATIVE_GIANT_PRODUCER_REPAIR_20261020.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
       ],
-      "impl_status": "not_started",
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -2361,8 +2403,10 @@
       "scenarios": [
         "A12"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md (T3.09) — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -2387,8 +2431,10 @@
       "scenarios": [
         "A12"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md (T3.09) — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -2442,8 +2488,10 @@
       "scenarios": [
         "A15"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/FORMAT_ROOT_COMPLETION_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): partial source; missing: PSD/PSB composite present; PDF-compatible AI opens as a PDF document rather than a labelled flattened composite (T5.08)."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent: v1 scoped composite import 'where supported'; P2"
@@ -2519,8 +2567,10 @@
       "scenarios": [
         "A10"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/FORMAT_ROOT_COMPLETION_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): partial source; missing: embedded-JPEG preview for TIFF-based DNG/CR2 only; Android platform DNG and Windows WIC Raw Image Extension routes missing (T5.08)."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "new ID: RAW/DNG preview split out of v1 FORMAT-008; P2 because v1 scoped it 'where feasible'"
@@ -2543,8 +2593,10 @@
       "scenarios": [
         "A11"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/FORMAT_ROOT_COMPLETION_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "new ID: split out of v1 FORMAT-005"
@@ -2568,8 +2620,10 @@
       "scenarios": [
         "A11"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/FORMAT_ROOT_COMPLETION_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "new ID: split out of v1 FORMAT-008"
@@ -3090,8 +3144,10 @@
       "scenarios": [
         "A19"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md (T3.09) — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -3115,8 +3171,10 @@
       "scenarios": [
         "A19"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md (T3.09) — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -3139,8 +3197,10 @@
       "scenarios": [
         "A19"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/DIAGNOSTICS_PRIVACY_COMPOSED_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -3250,8 +3310,10 @@
       "scenarios": [
         "A20"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/MSI_RELEASE_CLOSEOUT_20261020.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
       "v1_note": "unchanged intent; acceptance made measurable"
@@ -3615,8 +3677,10 @@
       "scenarios": [
         "A18"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/ANDROID_TUNNEL_SESSION_HANDOFF_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement. Runtime blocked until tunnel license admission (Stage 1 B3)."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new"
@@ -3910,8 +3974,10 @@
       "scenarios": [
         "A30"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/T5_01_VERIFICATION_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new"
@@ -4083,8 +4149,10 @@
       "scenarios": [
         "A21"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/AI_EDITOR_RESERVED_BOUNDARIES_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new"
@@ -4110,8 +4178,10 @@
       "scenarios": [
         "A25"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/ROADMAP_CURRENT_EXECUTION_LEDGER_20261019.md (T3.11) — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "explicit",
       "v1_note": "new"
@@ -4137,8 +4207,10 @@
       "scenarios": [
         "A30"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/CAPTURE_VERIFICATION_CALLERS_20261019.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): partial source; missing: Desktop window recapture and alignment present; phone-screen/tunnel captures never register a verification target (T5.01)."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new: verification loop"
@@ -4163,8 +4235,10 @@
       "scenarios": [
         "A30"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/VERIFICATION_NATIVE_COMPOSED_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new: verification loop"
@@ -4189,8 +4263,10 @@
       "scenarios": [
         "A30"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/VERIFICATION_NATIVE_COMPOSED_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new: verification loop"
@@ -4216,8 +4292,10 @@
       "scenarios": [
         "A30"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/VERIFICATION_NATIVE_COMPOSED_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new: verification loop"
@@ -4330,8 +4408,10 @@
       "scenarios": [
         "A25"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/T3_11_OFFLINE_REVIEW_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "explicit",
       "v1_note": "new"
@@ -4357,8 +4437,10 @@
       "scenarios": [
         "A25"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/T3_11_OFFLINE_REVIEW_CALLER_HANDOFF_20261018.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): implementing source and tests are integrated; build/test results and device, app and manual acceptance are not yet recorded for this requirement."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new"
@@ -4782,8 +4864,10 @@
       "scenarios": [
         "A20"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
+      "evidence": [
+        "docs/RELEASE_ROOT_COMPLETION_20261020.md — 2026-11-03 Stage 0 audit (docs/STATE_RECONCILIATION_20261103.md): partial source; missing: notices come from a curated hash-bound list, not generated from the resolved Cargo/Gradle/npm tree plus bundled binaries; 125 candidates unadmitted (T5.06)."
+      ],
+      "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
       "v1_note": "new"

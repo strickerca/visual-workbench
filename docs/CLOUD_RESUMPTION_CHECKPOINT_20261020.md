@@ -1,5 +1,7 @@
 # Cloud resumption checkpoint — 2026-10-20
 
+> **Reconciled 2026-11-03:** some statements here are stale (held `dae67bb`, pending main promotion, missing MSI hook, cloud-only `lib.exe`, release-hook hashes). See [STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
+
 Verified `/workspace/visual-workbench`, branch
 `cloud/roadmap-source-integration-20261018`, HEAD
 `27052c34af20cf779039ebcf95b975e69c2ac796`. The paused dirty and untracked
