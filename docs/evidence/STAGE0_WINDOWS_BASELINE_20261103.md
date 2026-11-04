@@ -65,7 +65,8 @@ The first workspace run had 12 failures. None was a product defect:
 - **Gitleaks:** the first Windows `gitleaks dir` scan flagged 219 lines that
   were already on main:
   - 212 are file-name keys bound to SHA-256 digests.
-  - 7 are observed Krita `5.3.4.0` versions.
+  - 7 are observed Krita four-part version strings, which the IP-address rule
+    matched.
 
   An exact-line allowlist now covers them, following the existing policy.
 

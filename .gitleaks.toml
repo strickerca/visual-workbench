@@ -5,11 +5,13 @@ useDefault = true
 
 [[allowlists]]
 description = "Generated build output and preserved input packages are not source"
-paths = ['''(^|/)(target|build|build-hil|\.gradle|\.kotlin|\.local|\.git|\.claude|fixtures-private|generated)/''']
+paths = ['''(^|/)(target|build|build-hil|\.gradle|\.kotlin|\.local|\.git|\.claude/worktrees|fixtures-private|generated)/''']
 
 [[allowlists]]
 description = "Exact source SHA-256 entries whose Kotlin filenames contain Api; reviewed Phase 1 binding receipts"
 condition = "AND"
+# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
+targetRules = ["generic-api-key"]
 paths = ['''(^|/)docs/evidence/T1\.(07|08|10)[A-Za-z0-9.-]*\.json$''']
 regexTarget = "line"
 regexes = ['''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/(CoreApi|SessionApi|StreamingApi)\.kt": "[0-9a-f]{64}",?\s*$''']
@@ -17,6 +19,8 @@ regexes = ['''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/
 [[allowlists]]
 description = "Exact Phase 2 source hash pairs independently matched to their files; no general hash or key exemption"
 condition = "AND"
+# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
+targetRules = ["generic-api-key"]
 paths = ['''(^|/)docs/evidence/T2\.11-app-tests\.json$''']
 regexTarget = "line"
 regexes = [
@@ -47,6 +51,8 @@ regexes = [
 [[allowlists]]
 description = "Exact public nodejs/release-keys Git commit, independently verified on the publisher repository"
 condition = "AND"
+# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
+targetRules = ["generic-api-key"]
 paths = ['''(^|/)tools/licenses/node-runtime\.json$''']
 regexTarget = "line"
 regexes = ['''^\s*"release_keys_commit": "481637f813e912c4aa3622d7964ab426c97b8e8d",?\s*$''']
@@ -88,6 +94,8 @@ regex = '''\bvw_mcp_[A-Za-z0-9_-]{32,}\b'''
 [[allowlists]]
 description = "Exact R126 source file SHA-256 entries; not credentials"
 condition = "AND"
+# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
+targetRules = ["generic-api-key"]
 paths = ['''(^|/)docs/evidence/M4-KP-integration-build-r126\.json$''']
 regexTarget = "line"
 regexes = [
@@ -99,6 +107,8 @@ regexes = [
 [[allowlists]]
 description = "Exact giant integration source SHA256 pairs verified against tracked source; no general credential exemption"
 condition = "AND"
+# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
+targetRules = ["generic-api-key"]
 paths = ['''(^|/)docs/evidence/GIANT_CALLER_INTEGRATION_20261018\.json$''']
 regexTarget = "line"
 regexes = [
@@ -109,6 +119,8 @@ regexes = [
 [[allowlists]]
 description = "Exact returned giant-provider source SHA256 pairs verified against its8d95427/573ddaf source; no general credential exemption"
 condition = "AND"
+# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
+targetRules = ["generic-api-key"]
 paths = ['''(^|/)core/crates/vw\-assets/giant\-provider\-accounting\-20261018\.json$''']
 regexTarget = "line"
 regexes = [
@@ -121,6 +133,8 @@ regexes = [
 [[allowlists]]
 description = "Exact reviewed evidence lines found by the 2026-11-03 Windows lint run: file-name keys bound to SHA-256 digests (some names contain Api/Key) and the observed Krita version 5.3.4.0; no general hash, key or version exemption"
 condition = "AND"
+# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
+targetRules = ["generic-api-key", "vw-evidence-ip-address"]
 paths = [
   '''(^|/)docs/evidence/CLOUD_ROOT_INTEGRATION_20261020\.json$''',
   '''(^|/)docs/evidence/GIANT_PUBLIC_INTAKE_20261018\.json$''',
