@@ -200,7 +200,8 @@ mod tests {
                     height: 100
                 }
             ),
-            Err(Error::Limit)
+            // Witness validation refuses the overflowing clock first.
+            Err(Error::Invalid)
         );
     }
 }

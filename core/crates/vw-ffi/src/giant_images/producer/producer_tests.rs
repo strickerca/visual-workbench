@@ -2,14 +2,13 @@
 //! here; these fixtures do not establish execution of an approved OS producer.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use super::*;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::MutexGuard;
 use vw_assets::{Manifest, TileRecord};
 use vw_store::{DiskSpace, FreeSpaceQuery};
 use vw_stream::{MemoryKind, SessionBudget};
 
-static SERIAL: Mutex<()> = Mutex::new(());
 fn serial() -> MutexGuard<'static, ()> {
-    SERIAL.lock().unwrap_or_else(|error| error.into_inner())
+    crate::giant_images::serial_inputs()
 }
 #[derive(Clone, Copy)]
 struct Space(u64);

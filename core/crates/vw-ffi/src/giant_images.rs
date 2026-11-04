@@ -7,6 +7,13 @@ mod producer;
 mod provider;
 mod source;
 mod tiles;
+
+/// Tests that take the process-wide giant input permits run one at a time.
+#[cfg(test)]
+fn serial_inputs() -> std::sync::MutexGuard<'static, ()> {
+    static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    SERIAL.lock().unwrap_or_else(|error| error.into_inner())
+}
 use crate::ProjectSession;
 pub use delivery::PreparedGiantTile;
 pub use intake::*;

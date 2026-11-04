@@ -8,6 +8,12 @@ use std::{
 const DEVICES: &str =
     "List of devices attached\nUSB123\tdevice usb:1-1 model:SM_S918U transport_id:7\n\n";
 
+/// An absolute owner platform-tools adb path on the host platform.
+#[cfg(windows)]
+const OWNER_ADB: &str = r"C:\platform-tools\adb.exe";
+#[cfg(not(windows))]
+const OWNER_ADB: &str = "/tmp/platform-tools/adb.exe";
+
 fn selection() -> super::Result<device::UsbSelection> {
     device::UsbSelection::new("SM_S918U".into(), 7)
 }
@@ -62,7 +68,7 @@ fn explicit_usb_selection_refuses_injection_ambiguity_and_status_substitution() 
     assert_eq!(
         session::AndroidTunnelOwner::open(
             None,
-            session::OwnerAdb::select("/tmp/platform-tools/adb.exe".into())?,
+            session::OwnerAdb::select(OWNER_ADB.into())?,
             selection()?,
             [1; 16],
             1,

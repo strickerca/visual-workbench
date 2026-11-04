@@ -834,6 +834,10 @@ fn asset_metadata_is_whitelisted_and_result_candidates_require_outside_proof() {
 #[test]
 fn tiff_first_page_notice_admits_only_a_boolean_without_widening_descriptive_metadata() {
     let mut original = asset();
+    // The notice binds to TIFF originals; other formats refuse it.
+    original.metadata_json = r#"{"first_tiff_page_only":true}"#.into();
+    assert!(vw_model::validate_asset(&original).is_err());
+    original.format = "tiff".into();
     for text in [
         r#"{"first_tiff_page_only":true}"#,
         r#"{"first_tiff_page_only":false,"description":"fixture"}"#,

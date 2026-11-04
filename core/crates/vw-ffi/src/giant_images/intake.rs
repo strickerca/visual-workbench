@@ -314,6 +314,7 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn fifo_replacement_refuses_and_releases_admission_with_bounded_child() {
+        let _serial = crate::giant_images::serial_inputs();
         use std::{
             process::{Command, Stdio},
             time::{Duration, Instant},
@@ -401,6 +402,7 @@ mod tests {
     }
     #[test]
     fn public_input_saturation_refuses_before_missing_source_or_work_access() {
+        let _serial = crate::giant_images::serial_inputs();
         runtime().block_on(async {
             let fixture = Fixture::new();
             let pool = crate::shared_session_resources().unwrap();
@@ -425,6 +427,7 @@ mod tests {
     }
     #[test]
     fn public_input_uses_the_existing_global_foreign_memory_pool_before_io() {
+        let _serial = crate::giant_images::serial_inputs();
         let fixture = Fixture::new();
         let pool = crate::shared_session_resources().unwrap();
         let before = pool.used_bytes();
@@ -443,6 +446,7 @@ mod tests {
     }
     #[test]
     fn public_prepare_transfers_one_owner_and_hides_paths_from_metadata() {
+        let _serial = crate::giant_images::serial_inputs();
         runtime().block_on(async {
             let fixture = Fixture::new();
             let pool = crate::shared_session_resources().unwrap();
@@ -526,6 +530,7 @@ mod tests {
     }
     #[test]
     fn cancelled_or_malformed_input_retires_actual_work_without_removing_original() {
+        let _serial = crate::giant_images::serial_inputs();
         runtime().block_on(async {
             let fixture = Fixture::new();
             let before = crate::shared_session_resources().unwrap().used_bytes();
@@ -556,6 +561,7 @@ mod tests {
     }
     #[test]
     fn invalid_uri_consent_and_limits_do_not_create_work() {
+        let _serial = crate::giant_images::serial_inputs();
         let fixture = Fixture::new();
         let mut uri = fixture.options();
         uri.source_path = "content://synthetic/original".into();
@@ -583,6 +589,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn symlink_original_and_work_parent_refuse_without_following() {
+        let _serial = crate::giant_images::serial_inputs();
         let fixture = Fixture::new();
         let link = fixture._root.path().join("source-link");
         std::os::unix::fs::symlink(&fixture.source, &link).unwrap();

@@ -352,7 +352,7 @@ fn writer_lock_is_exclusive_and_released_after_drop() {
                 |row| row.get::<_, String>(0)
             )
             .unwrap(),
-        "2"
+        "3"
     );
     drop(store);
     let reopened = ProjectStore::open(&path).unwrap();

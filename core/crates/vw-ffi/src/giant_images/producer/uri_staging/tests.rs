@@ -107,6 +107,7 @@ impl Fixture {
 
 #[test]
 fn uri_admission_precedes_filesystem_and_reader_open() {
+    let _serial = crate::giant_images::serial_inputs();
     let f = Fixture::new();
     let first = f.input();
     let second = f.input();
@@ -124,6 +125,7 @@ fn uri_admission_precedes_filesystem_and_reader_open() {
 
 #[test]
 fn cancellation_before_open_closes_holder_without_opening_source() {
+    let _serial = crate::giant_images::serial_inputs();
     let f = Fixture::new();
     let input = f.input();
     let reader = f.reader();
@@ -142,6 +144,7 @@ fn cancellation_before_open_closes_holder_without_opening_source() {
 
 #[test]
 fn cancellation_after_actual_read_joins_close_before_releasing_admission() {
+    let _serial = crate::giant_images::serial_inputs();
     let f = Fixture::new();
     let input = f.input();
     let mut reader = f.reader();
@@ -158,6 +161,7 @@ fn cancellation_after_actual_read_joins_close_before_releasing_admission() {
 
 #[test]
 fn failed_reader_close_retains_exact_reader_staging_and_original_quota() {
+    let _serial = crate::giant_images::serial_inputs();
     let f = Fixture::new();
     let input = f.input();
     let reader = f.reader();
@@ -192,6 +196,7 @@ fn failed_reader_close_retains_exact_reader_staging_and_original_quota() {
 
 #[test]
 fn byte_disk_read_and_foreign_count_failures_close_and_remove_partial_input() {
+    let _serial = crate::giant_images::serial_inputs();
     for mode in 0..4 {
         let f = Fixture::new();
         let input = f.input();
@@ -221,6 +226,7 @@ fn byte_disk_read_and_foreign_count_failures_close_and_remove_partial_input() {
 
 #[test]
 fn copied_bytes_transfer_the_same_admission_to_the_existing_picked_owner() {
+    let _serial = crate::giant_images::serial_inputs();
     let f = Fixture::new();
     let input = f.input();
     let reader = f.reader();

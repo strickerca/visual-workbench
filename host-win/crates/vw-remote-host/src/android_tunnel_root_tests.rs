@@ -6,9 +6,11 @@ struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Result<Self> {
         static NEXT: AtomicU64 = AtomicU64::new(1);
-        let base = std::env::temp_dir()
-            .canonicalize()
-            .map_err(|_| Error::Storage)?;
+        let base = std::env::temp_dir();
+        // Windows canonicalization yields a verbatim `\\?\` path, which the
+        // plain drive-path namespace policy refuses by design.
+        #[cfg(not(windows))]
+        let base = base.canonicalize().map_err(|_| Error::Storage)?;
         let directory = base.join(format!(
             "vw-tunnel-root-fixture-{}-{}",
             std::process::id(),

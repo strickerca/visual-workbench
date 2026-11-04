@@ -133,6 +133,7 @@ fn blocked() -> (
 
 #[test]
 fn memory_and_slot_refusals_never_invoke_the_opening_hook() {
+    let _serial = crate::giant_images::serial_inputs();
     fn root_open(budget: SessionBudget, hook: impl FnOnce(PendingInputAdmission)) -> Result<()> {
         let admitted = reserve_picked_input(budget)?;
         hook(admitted);
@@ -168,6 +169,7 @@ fn memory_and_slot_refusals_never_invoke_the_opening_hook() {
 }
 #[test]
 fn two_selected_inputs_prepare_without_a_second_permit_or_charge() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let (a, a_path, a_selected) = picked(&budget);
     let (b, b_path, b_selected) = picked(&budget);
@@ -214,6 +216,7 @@ fn two_selected_inputs_prepare_without_a_second_permit_or_charge() {
 }
 #[test]
 fn close_ready_input_cleans_before_return_and_forbids_preparation() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let (picked, path, selected) = picked(&budget);
     runtime().block_on(async {
@@ -230,6 +233,7 @@ fn close_ready_input_cleans_before_return_and_forbids_preparation() {
 }
 #[test]
 fn dropping_an_unprepared_picker_retires_its_actual_input() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let (picked, path, selected) = picked(&budget);
     drop(picked);
@@ -239,6 +243,7 @@ fn dropping_an_unprepared_picker_retires_its_actual_input() {
 }
 #[test]
 fn cancelled_before_start_consumes_one_attempt_and_never_runs_the_body() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let (picked, path, selected) = picked(&budget);
     let cancel = Arc::new(Cancellation::new());
@@ -266,6 +271,7 @@ fn cancelled_before_start_consumes_one_attempt_and_never_runs_the_body() {
 }
 #[test]
 fn close_joins_blocked_preparation_and_keeps_the_same_charge_until_release() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let (picked, path, selected) = picked(&budget);
     let (query, ready, release, _retired) = blocked();
@@ -288,6 +294,7 @@ fn close_joins_blocked_preparation_and_keeps_the_same_charge_until_release() {
 }
 #[test]
 fn abandoned_running_reply_cancels_actual_work_and_close_joins_cleanup() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let (picked, path, selected) = picked(&budget);
     let (query, ready, release, _retired) = blocked();
@@ -308,6 +315,7 @@ fn abandoned_running_reply_cancels_actual_work_and_close_joins_cleanup() {
 }
 #[test]
 fn abandoned_completed_reply_retires_the_undelivered_source_without_a_worker() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let (picked, path, selected) = picked(&budget);
     let (query, ready, release, retired) = blocked();
@@ -328,6 +336,7 @@ fn abandoned_completed_reply_retires_the_undelivered_source_without_a_worker() {
 }
 #[test]
 fn close_retires_completed_source_while_reply_future_is_alive_and_unpolled() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let (picked, path, selected) = picked(&budget);
     let (query, ready, release, retired) = blocked();
@@ -349,6 +358,7 @@ fn close_retires_completed_source_while_reply_future_is_alive_and_unpolled() {
 }
 #[test]
 fn failed_attach_retires_file_directory_permit_and_charge() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let admitted = reserve_picked_input(budget.clone()).unwrap();
     let (original, mut limits, path, selected) = opened();
@@ -366,6 +376,7 @@ fn failed_attach_retires_file_directory_permit_and_charge() {
 }
 #[test]
 fn failed_prepared_worker_constructor_retires_its_actual_state() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let (picked, path, selected) = picked(&budget);
     runtime().block_on(async {
@@ -381,6 +392,7 @@ fn failed_prepared_worker_constructor_retires_its_actual_state() {
 }
 #[test]
 fn prepared_close_keeps_admission_with_an_actual_retained_source() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let (picked, path, _selected) = picked(&budget);
     runtime().block_on(async {
@@ -405,6 +417,7 @@ fn prepared_close_keeps_admission_with_an_actual_retained_source() {
 }
 #[test]
 fn abandoned_queued_body_is_skipped_and_retains_admission_until_actual_drop() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let (picked, path, selected) = picked(&budget);
     runtime().block_on(async {
@@ -455,6 +468,7 @@ fn abandoned_queued_body_is_skipped_and_retains_admission_until_actual_drop() {
 }
 #[test]
 fn storage_operation_failure_does_not_invent_a_cleanup_failure() {
+    let _serial = crate::giant_images::serial_inputs();
     struct FailedQuery;
     impl FreeSpaceQuery for FailedQuery {
         fn query(&self, _: &Path) -> std::result::Result<DiskSpace, StoreError> {
@@ -478,6 +492,7 @@ fn storage_operation_failure_does_not_invent_a_cleanup_failure() {
 }
 #[test]
 fn startup_saturation_retires_the_input_without_starting_its_body() {
+    let _serial = crate::giant_images::serial_inputs();
     let budget = budget();
     let (picked, path, selected) = picked(&budget);
     runtime().block_on(async {
@@ -516,6 +531,7 @@ fn startup_saturation_retires_the_input_without_starting_its_body() {
 }
 #[test]
 fn cleanup_failure_retains_the_real_admission_in_an_isolated_process() {
+    let _serial = crate::giant_images::serial_inputs();
     // libtest omits the crate prefix carried by module_path!. Require one
     // executed case below so a misspelled --exact filter cannot silently pass.
     let module = module_path!().split_once("::").unwrap().1;
@@ -589,6 +605,7 @@ fn quarantine_probe() {
 #[cfg(target_os = "linux")]
 #[test]
 fn completed_unpolled_replies_do_not_retain_actual_startup_workers() {
+    let _serial = crate::giant_images::serial_inputs();
     fn startup_workers() -> usize {
         std::fs::read_dir("/proc/self/task")
             .unwrap()
