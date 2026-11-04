@@ -828,7 +828,12 @@ def gradle_components(builder: Builder, root: Path, report_path: Path, cache: Pa
         if embedded:
             sources["embedded_native_components"] = embedded
             shipped = b"\n".join(data for _, data in texts + retained_texts).decode("utf-8", "replace").lower()
-            missing = [name for name in embedded if not any(word in shipped for word in EMBEDDED[name][1])]
+            # A generic text (e.g. plain Apache-2.0) names no project; a retained
+            # notice registered under the library's name in third_party/LICENSES
+            # covers it by that registered name.
+            named = " ".join(leaf(origin) for origin, _ in retained_texts).lower()
+            missing = [name for name in embedded
+                       if not any(word in shipped for word in EMBEDDED[name][1]) and name.lower() not in named]
             if missing:
                 builder.unresolved.append({"component": f"maven:{key}", "reason": "embedded_native_notice_missing",
                                            "detail": "bundled native code contains " + ", ".join(missing) +

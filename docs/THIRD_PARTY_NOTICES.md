@@ -125,8 +125,10 @@ libjpeg-turbo, FreeType, HarfBuzz, ICU, expat, Wuffs and libwebp. A component
 stays unresolved until one of its shipped texts covers each detected library.
 
 The 2026-11-04 offline run used the existing census report and local caches,
-without the desktop image. It found 424 shipped components: 273 Rust, 141
-Maven, 9 npm and 1 bundled (Node). Owner-approved texts were added to
+without the desktop image. Status: `complete`, 0 unresolved. It found 425
+shipped components: 273 Rust, 142 Maven, 9 npm and 1 bundled (Node), with 202
+distinct texts. Output sha256 is `e877f668…a229`, deterministic across runs.
+Owner-approved texts were added to
 `third_party/LICENSES` on 2026-11-04:
 
 - `notices/MPL-2.0.txt` (sha256 `3f3d9e00…9b04`), from
@@ -148,11 +150,23 @@ Other resolutions:
   libraries are AndroidX's own Apache-2.0 JNI code. A `native_review` records
   this; the review was against `androidx-main`, not a pinned release revision.
 
-**Open item:** `org.jetbrains.skiko:skiko-awt-runtime-windows-x64` 0.150.1.
-Its DLL contains copyright or identifying strings for libjpeg-turbo, libpng,
-zlib (1.3.0.1), HarfBuzz, ICU data, expat and Wuffs. Skia's LICENSE covers none
-of them. Until their texts are retained, the bundle stays `incomplete` and
-assembly refuses it.
+- `org.jetbrains.skiko:skiko-awt-runtime-windows-x64` 0.150.1: the read-only
+  byte probe of its DLL found libjpeg-turbo, libpng, zlib (1.3.0.1), HarfBuzz,
+  ICU data, expat and Wuffs. FreeType and libwebp were not detected. Their
+  license texts were retained on 2026-11-04 (owner-approved) at the revisions
+  that JetBrains/skia `1f14f1166a` DEPS pins, as `third_party/notices/Skia-m150-*`.
+  The source URLs are in `third_party/LICENSES`. A library whose retained text
+  is generic (Wuffs ships plain Apache-2.0) counts as covered by the name it is
+  registered under.
+
+**Owner decision 2026-11-04:** the global allow list, in both
+`tools/check_setup.py` and `deny.toml` (kept identical), gains
+`MIT-Modern-Variant` (HarfBuzz "Old MIT"), `IJG` (libjpeg-turbo, with
+BSD-3-Clause and Zlib) and `libpng-2.0`. The decision also classifies the ICU
+LICENSE as Unicode-3.0. That file's GPL-with-exception sections cover
+build-time autoconf files (for example `aclocal.m4`, ICU4C only) that are not
+compiled into the DLL. This widening also applies to Rust crates through
+cargo-deny. `docs/BUILD_SPECIFICATION.md` still lists the earlier license set.
 
 Adding files under `third_party/notices` changes the notice resources packaged
 into both apps (the desktop resources and the Android assets). The APK and

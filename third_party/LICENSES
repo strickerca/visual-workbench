@@ -207,7 +207,56 @@
       "license": "BSD-3-Clause",
       "source_url": "https://raw.githubusercontent.com/JetBrains/skia/1f14f1166a847cb0e148f981600bf1e3e6ca6e46/LICENSE",
       "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd",
-      "notice_scope": "Skia LICENSE at JetBrains/skia tag m150-1f14f1166a (retrieved 2026-11-04), the revision skiko 0.150.1 builds against. Covers Skia only; notices for third-party code linked into the skiko DLL are not established."
+      "notice_scope": "Skia LICENSE at JetBrains/skia tag m150-1f14f1166a (retrieved 2026-11-04), the revision skiko 0.150.1 builds against. Covers Skia itself; the libraries embedded in the skiko DLL have their own Skia-m150-* notices."
+    },
+    {
+      "path": "notices/Skia-m150-expat-6154446f-COPYING.txt",
+      "license": "MIT",
+      "source_url": "https://chromium.googlesource.com/external/github.com/libexpat/libexpat.git/+/6154446fccefbf3ca644894f598969113b0c7bcd/expat/COPYING",
+      "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87",
+      "notice_scope": "expat embedded in the skiko 0.150.1 Skia DLL; revision pinned by JetBrains/skia 1f14f1166a DEPS (retrieved 2026-11-04)."
+    },
+    {
+      "path": "notices/Skia-m150-harfbuzz-9cb1fee5-COPYING.txt",
+      "license": "MIT-Modern-Variant",
+      "source_url": "https://chromium.googlesource.com/external/github.com/harfbuzz/harfbuzz.git/+/9cb1fee51069b206effb4736e443b038d230789d/COPYING",
+      "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+      "notice_scope": "HarfBuzz (\"Old MIT\") embedded in the skiko 0.150.1 Skia DLL; revision pinned by JetBrains/skia 1f14f1166a DEPS (retrieved 2026-11-04)."
+    },
+    {
+      "path": "notices/Skia-m150-icu-364118a1-LICENSE.txt",
+      "license": "Unicode-3.0",
+      "source_url": "https://chromium.googlesource.com/chromium/deps/icu.git/+/364118a1d9da24bb5b770ac3d762ac144d6da5a4/LICENSE",
+      "sha256": "17510cf7a58b4879b887ec05a45d72cf1b73544dd9ec7e72f20110ed104229ee",
+      "notice_scope": "ICU embedded in the skiko 0.150.1 Skia DLL; revision pinned by JetBrains/skia 1f14f1166a DEPS (retrieved 2026-11-04). Classified Unicode-3.0 by owner decision 2026-11-04; the file's GPL-with-exception sections cover build-time autoconf files (e.g. aclocal.m4, ICU4C) that are not compiled into the DLL."
+    },
+    {
+      "path": "notices/Skia-m150-libjpeg-turbo-e14cbfaa-LICENSE.md",
+      "license": "IJG",
+      "source_url": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/LICENSE.md",
+      "sha256": "96f5b328adbb78eeaaec6980d73fd558cb1e4d62560ed615646bc3cf5e532430",
+      "notice_scope": "libjpeg-turbo embedded in the skiko 0.150.1 Skia DLL; revision pinned by JetBrains/skia 1f14f1166a DEPS (retrieved 2026-11-04). Full expression IJG AND BSD-3-Clause AND Zlib; all three are allowed."
+    },
+    {
+      "path": "notices/Skia-m150-libpng-d5515b5b-LICENSE.txt",
+      "license": "libpng-2.0",
+      "source_url": "https://skia.googlesource.com/third_party/libpng.git/+/d5515b5b8be3901aac04e5bd8bd5c89f287bcd33/LICENSE",
+      "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+      "notice_scope": "libpng embedded in the skiko 0.150.1 Skia DLL; revision pinned by JetBrains/skia 1f14f1166a DEPS (retrieved 2026-11-04)."
+    },
+    {
+      "path": "notices/Skia-m150-wuffs-e3f919cc-LICENSE.txt",
+      "license": "Apache-2.0",
+      "source_url": "https://skia.googlesource.com/external/github.com/google/wuffs-mirror-release-c.git/+/e3f919ccfe3ef542cfc983a82146070258fb57f8/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "notice_scope": "Wuffs embedded in the skiko 0.150.1 Skia DLL; revision pinned by JetBrains/skia 1f14f1166a DEPS (retrieved 2026-11-04)."
+    },
+    {
+      "path": "notices/Skia-m150-zlib-646b7f56-LICENSE.txt",
+      "license": "Zlib",
+      "source_url": "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/646b7f569718921d7d4b5b8e22572ff6c76f2596/LICENSE",
+      "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
+      "notice_scope": "zlib embedded in the skiko 0.150.1 Skia DLL; revision pinned by JetBrains/skia 1f14f1166a DEPS (retrieved 2026-11-04)."
     }
   ]
 }

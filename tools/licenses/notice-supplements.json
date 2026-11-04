@@ -123,9 +123,18 @@
       "name": "org.jetbrains.skiko:skiko-awt-runtime-windows-x64",
       "version": "0.150.1",
       "selected": null,
-      "notices": [{"path": "third_party/notices/Skia-m150-1f14f1166a-LICENSE.txt", "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd"}],
-      "provenance": {"source_url": "https://raw.githubusercontent.com/JetBrains/skia/1f14f1166a847cb0e148f981600bf1e3e6ca6e46/LICENSE", "retrieved": "2026-11-04", "skia_tag": "m150-1f14f1166a", "skiko_setting": "skiko v0.150.1 skiko/gradle.properties dependencies.skia=m150-1f14f1166a"},
-      "reason": "skiko is Apache-2.0 with no NOTICE file; its DLL bundles Skia (BSD-3-Clause). Third-party code linked into the DLL is checked by the generator's native byte probe and stays unresolved until its notices are retained."
+      "notices": [
+        {"path": "third_party/notices/Skia-m150-1f14f1166a-LICENSE.txt", "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd"},
+        {"path": "third_party/notices/Skia-m150-expat-6154446f-COPYING.txt", "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87"},
+        {"path": "third_party/notices/Skia-m150-harfbuzz-9cb1fee5-COPYING.txt", "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64"},
+        {"path": "third_party/notices/Skia-m150-icu-364118a1-LICENSE.txt", "sha256": "17510cf7a58b4879b887ec05a45d72cf1b73544dd9ec7e72f20110ed104229ee"},
+        {"path": "third_party/notices/Skia-m150-libjpeg-turbo-e14cbfaa-LICENSE.md", "sha256": "96f5b328adbb78eeaaec6980d73fd558cb1e4d62560ed615646bc3cf5e532430"},
+        {"path": "third_party/notices/Skia-m150-libpng-d5515b5b-LICENSE.txt", "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526"},
+        {"path": "third_party/notices/Skia-m150-wuffs-e3f919cc-LICENSE.txt", "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"},
+        {"path": "third_party/notices/Skia-m150-zlib-646b7f56-LICENSE.txt", "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c"}
+      ],
+      "provenance": {"source_url": "https://raw.githubusercontent.com/JetBrains/skia/1f14f1166a847cb0e148f981600bf1e3e6ca6e46/LICENSE", "retrieved": "2026-11-04", "skia_tag": "m150-1f14f1166a", "skiko_setting": "skiko v0.150.1 skiko/gradle.properties dependencies.skia=m150-1f14f1166a", "embedded_revisions": "JetBrains/skia 1f14f1166a DEPS pins expat 6154446f, harfbuzz 9cb1fee5, icu 364118a1, libjpeg-turbo e14cbfaa, libpng d5515b5b, wuffs e3f919cc, zlib 646b7f56 (owner-approved retrieval 2026-11-04; source URLs in third_party/LICENSES)"},
+      "reason": "skiko is Apache-2.0 with no NOTICE file; its DLL bundles Skia (BSD-3-Clause) and, per the generator's read-only byte probe, libjpeg-turbo, libpng, zlib, HarfBuzz, ICU, expat and Wuffs. FreeType and libwebp were not detected. ICU is classified Unicode-3.0 (owner decision 2026-11-04); its GPL-with-exception text covers build-time autoconf files not compiled into the DLL."
     }
   ],
   "bundled": [

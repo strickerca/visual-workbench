@@ -431,27 +431,32 @@ class Generation(Fixture):
         self.assertEqual(g.verify_bundle(raw, text)["status"], "complete")
 
     def test_embedded_native_components_need_a_covering_notice(self):
-        body = jar({"lib/x.dll": b"MZ...deflate 1.3 Copyright Jean-loup Gailly and Mark Adler...", "LICENSE": APACHE})
+        body = jar({"lib/x.dll": b"MZ...deflate 1.3 Copyright Jean-loup Gailly and Mark Adler...wuffs_base...",
+                    "LICENSE": APACHE})
         for old in (self.gradle_cache / "org.example/apache-bare/2.0").glob("*/apache-bare-2.0.jar"):
             old.unlink()
         self.cache_file("org.example", "apache-bare", "2.0", "apache-bare-2.0.jar", body)
         _, _, receipt = self.generate()
         self.assertIn({"component": "maven:org.example:apache-bare:2.0", "reason": "embedded_native_notice_missing",
-                       "detail": "bundled native code contains zlib with no notice in the shipped texts"},
+                       "detail": "bundled native code contains Wuffs, zlib with no notice in the shipped texts"},
                       receipt["unresolved"])
+        # zlib is covered by its text's content; Wuffs ships a generic Apache-2.0
+        # text and is covered by the name it is registered under.
         zlib = self.retain("zlib-LICENSE.txt", b"zlib License\nThis software is provided 'as-is'\n", "Zlib")
+        wuffs = self.retain("Skia-wuffs-LICENSE.txt", APACHE, "Apache-2.0")
         self.put(self.root / "third_party/LICENSES", json.dumps(
             {"schema_version": 1, "files": sorted(self.retained.values(), key=lambda r: r["path"])}).encode())
         path = self.root / "tools/licenses/notice-supplements.json"
         supplements = json.loads(path.read_bytes())
         supplements["components"] = [{"ecosystem": "maven", "name": "org.example:apache-bare", "version": "2.0",
-                                      "selected": None, "notices": [{"path": zlib, "sha256": sha(
-                                          self.root.joinpath(zlib).read_bytes())}]}]
+                                      "selected": None, "notices": [
+                                          {"path": item, "sha256": sha(self.root.joinpath(item).read_bytes())}
+                                          for item in (zlib, wuffs)]}]
         path.write_bytes(json.dumps(supplements).encode())
         _, _, receipt = self.generate()
         self.assertEqual(receipt["status"], "complete", receipt["unresolved"])
         bare = next(c for c in receipt["components"] if c["name"] == "org.example:apache-bare")
-        self.assertEqual(bare["sources"]["embedded_native_components"], ["zlib"])
+        self.assertEqual(bare["sources"]["embedded_native_components"], ["Wuffs", "zlib"])
 
     def test_gradle_cache_bytes_are_hash_bound(self):
         for path in (self.gradle_cache / "org.example/with-license/1.0").glob("*/with-license-1.0.jar"):
