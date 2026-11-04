@@ -81,6 +81,8 @@ DESKTOP_COVERAGE = frozenset({"rust:x86_64-pc-windows-msvc", ":desktop:runtimeCl
                               "bundled:node-runtime", "bundled:" + JAVA_RUNTIME, "bundled:" + RUST_STD})
 ANDROID_COVERAGE = frozenset({"rust:aarch64-linux-android", ":android:debugRuntimeClasspath",
                               "bundled:" + RUST_STD, "bundled:" + NDK_RUNTIME})
+KNOWN_SCOPES = DESKTOP_COVERAGE | ANDROID_COVERAGE | frozenset(GRADLE_SHIPPING) | frozenset(
+    "rust:" + triple for triple in RUST_ROOTS)
 FORBIDDEN = re.compile(r"\b(?:A?GPL|LGPL|SSPL|BUSL|CC-BY-NC)(?:[-\s]|$)|General Public License|non[- ]commercial", re.I)
 NAME = re.compile(r"(?i)^(?:licen[cs]e|copying|copyright|notice|patents|unlicense|third[-_]?party[-_]?notices?)"
                   r"(?:[-_. ][a-z0-9._ -]*)?$|^[a-z0-9.]+[-_]licen[cs]e(?:\.[a-z]+)?$")
@@ -218,32 +220,54 @@ def family(term: str) -> str:
 def detect(data: bytes) -> frozenset:
     """Coarse license-family detection from full license texts.
 
-    Short pointer files ("Licensed under the Apache License 2.0, see ...") do
-    not match: Apache-2.0 requires its terms-and-conditions body.
+    Every family needs markers from its license body (grant plus a condition
+    or disclaimer clause), so short pointer files such as "Licensed under the
+    MPL-2.0, see ..." match no family, and the Boost grant is not read as MIT.
     """
-    text = re.sub(r"\s+", " ", data[:65536].decode("utf-8", "replace")).lower()
+    text = re.sub(r"\s+", " ", data[:262144].decode("utf-8", "replace")).lower()
+    text = text.replace("“", '"').replace("”", '"').replace("``", '"').replace("''", '"')
     found = set()
-    checks = (("apache", "apache license" in text and "terms and conditions for use, reproduction" in text),
-              ("mit", "permission is hereby granted, free of charge" in text),
-              ("mit-modern", "permission is hereby granted, without written agreement and without license" in text),
-              ("bsd", "redistribution and use in source and binary forms" in text),
-              ("isc", "permission to use, copy, modify, and/or distribute this software" in text or
-               "permission to use, copy, modify, and distribute this software for any purpose" in text),
-              ("zlib", "provided 'as-is'" in text or "provided \"as-is\"" in text or "provided as-is" in text),
-              ("unicode", "unicode, inc" in text or "unicode license" in text),
-              ("mpl", "mozilla public license" in text),
-              ("bsl", "boost software license" in text),
-              ("cc0", "cc0" in text or "creative commons legal code" in text),
-              ("unlicense", "free and unencumbered software released into the public domain" in text),
-              ("ofl", "sil open font license" in text),
-              ("ijg", "independent jpeg group" in text),
-              ("libpng", "png reference library license" in text),
-              ("lgpl", "gnu lesser general public license" in text or "gnu library general public" in text),
-              ("gpl", "gnu general public license" in text and "lesser" not in text[:400]))
-    for name, hit in checks:
-        if hit:
+    for name, markers in FULL_TEXT_MARKERS:
+        if all(any(option in text for option in marker) for marker in markers):
             found.add(name)
     return frozenset(found)
+
+
+# (family, [marker groups]); every group must match one of its options.
+FULL_TEXT_MARKERS = (
+    ("apache", [("apache license",), ("terms and conditions for use, reproduction",)]),
+    ("mit", [("permission is hereby granted, free of charge, to any person obtaining a copy",),
+             ("the above copyright notice and this permission notice shall be included",)]),
+    ("mit-modern", [("permission is hereby granted, without written agreement and without license",),
+                    ("in no event shall the copyright holder be liable",)]),
+    ("bsd", [("redistribution and use in source and binary forms",),
+             ("redistributions of source code must retain",),
+             ("redistributions in binary form must reproduce",)]),
+    ("isc", [("permission to use, copy, modify, and/or distribute this software",
+              "permission to use, copy, modify, and distribute this software for any purpose"),
+             ("disclaims all warranties", "disclaim all warranties")]),
+    ("zlib", [("provided 'as-is', without any express or implied warranty",
+               'provided "as-is", without any express or implied warranty'),
+              ("altered source versions must be plainly marked as such",)]),
+    ("unicode", [("unicode",), ("permission is hereby granted, free of charge, to any person obtaining a copy",),
+                 ("data files",)]),
+    ("mpl", [("mozilla public license",), ("exhibit a - source code form license notice",
+                                           "exhibit a -- source code form license notice")]),
+    ("bsl", [("boost software license",), ("the copyright notices in the software and this entire statement",)]),
+    ("cc0", [("cc0",), ("statement of purpose",)]),
+    ("unlicense", [("free and unencumbered software released into the public domain",),
+                   ("anyone is free to copy, modify, publish, use, compile, sell, or distribute",)]),
+    ("ofl", [("sil open font license",), ("permission is hereby granted, free of charge, to any person obtaining a copy "
+                                          "of the font software",)]),
+    ("ijg", [("independent jpeg group",), ("this software is provided \"as is\", and you, its user, assume the entire "
+                                           "risk", "with respect to this software, its quality, accuracy",)]),
+    ("libpng", [("png reference library license",), ("permission is hereby granted to use, copy, modify, and "
+                                                     "distribute this software",)]),
+    ("lgpl", [("gnu lesser general public license", "gnu library general public license"),
+              ("terms and conditions for copying, distribution and modification",)]),
+    ("gpl", [("gnu general public license",), ("terms and conditions for copying, distribution and modification",
+                                               "terms and conditions",)]),
+)
 
 
 def term_allowed(term: str) -> bool:
@@ -452,13 +476,14 @@ def finalize(receipt: dict, texts: dict) -> tuple[bytes, bytes, dict]:
 # ------------------------------------------------------------- verification
 def verify_bundle(receipt_raw: bytes, text_raw: bytes, *, artifact_kinds=frozenset(),
                   declarations: dict | None = None, declared_skips=frozenset(),
-                  desktop_files: dict | None = None) -> dict:
+                  desktop_files: dict | None = None, opaque_coverage=None) -> dict:
     """Re-check a generated bundle without regenerating it (used by assembly).
 
     Checked: the text is exactly render(receipt, texts); every component has at
     least one text and a selected license on the allow list (or the documented
     Java runtime exception); status is complete; coverage includes the graphs
-    the delivered artifact kinds contain (an MSI contains the desktop image);
+    the delivered artifact kinds contain (an MSI contains the desktop image;
+    opaque artifacts contain exactly the release-declared opaque_coverage);
     no ecosystem was skipped unless the release declares it; any input the
     release binding also declares has identical bytes; and, when desktop image
     files are supplied, the Java runtime legal files and node.exe match them.
@@ -513,6 +538,12 @@ def verify_bundle(receipt_raw: bytes, text_raw: bytes, *, artifact_kinds=frozens
         require(DESKTOP_COVERAGE <= coverage, "notices_desktop_coverage")
     if "apk" in artifact_kinds:
         require(ANDROID_COVERAGE <= coverage, "notices_android_coverage")
+    if "opaque" in artifact_kinds:
+        # Opaque bytes are not classified, so the release must say which graphs
+        # they contain (an explicit empty list declares none).
+        require(opaque_coverage is not None, "notices_opaque_coverage_undeclared")
+        require(set(opaque_coverage) <= KNOWN_SCOPES and set(opaque_coverage) <= coverage,
+                "notices_opaque_coverage")
     for path, expected in (declarations or {}).items():
         if path in receipt["inputs"]:
             require(receipt["inputs"][path] == expected, "notices_stale_input")
@@ -707,29 +738,110 @@ def crate_files(cargo_home: Path, name: str, version: str, checksum: str | None,
     return [], {}
 
 
-def parse_metadata(raw: bytes, lock: dict) -> dict:
-    """cargo metadata JSON, cross-checked against Cargo.lock."""
+METADATA_COMMAND = ("cargo +{toolchain} metadata --format-version 1 --locked --offline --all-features "
+                    "--filter-platform {triple}")
+# cfg facts for the product targets (rustc --print cfg subset used by crates).
+TARGET_CFG = {
+    "x86_64-pc-windows-msvc": {"target_os": "windows", "target_family": "windows", "target_arch": "x86_64",
+                               "target_env": "msvc", "target_vendor": "pc", "target_pointer_width": "64",
+                               "target_endian": "little", "flags": {"windows"}},
+    "aarch64-linux-android": {"target_os": "android", "target_family": "unix", "target_arch": "aarch64",
+                              "target_env": "", "target_vendor": "unknown", "target_pointer_width": "64",
+                              "target_endian": "little", "flags": {"unix"}},
+}
+
+
+def cfg_value(expression: str, triple: str):
+    """Evaluate a dependency `target` string for a triple: True, False or None (unknown)."""
+    facts = TARGET_CFG[triple]
+    if not expression.startswith("cfg("):
+        return expression == triple
+    tokens = re.findall(r'"[^"]*"|[A-Za-z_][A-Za-z0-9_]*|[(),=]', expression[3:])
+    position = 0
+
+    def take():
+        nonlocal position
+        require(position < len(tokens), "cargo_metadata_cfg")
+        position += 1
+        return tokens[position - 1]
+
+    def predicate():
+        name = take()
+        if name in ("all", "any", "not"):
+            require(take() == "(", "cargo_metadata_cfg")
+            values = []
+            while tokens[position] != ")":
+                values.append(predicate())
+                if tokens[position] == ",":
+                    take()
+            take()
+            if name == "not":
+                require(len(values) == 1, "cargo_metadata_cfg")
+                return None if values[0] is None else not values[0]
+            if name == "all":
+                return False if False in values else (None if None in values else True)
+            return True if True in values else (None if None in values else False)
+        if position < len(tokens) and tokens[position] == "=":
+            take()
+            value = take().strip('"')
+            return (facts[name] == value) if name in facts and name != "flags" else None
+        return (name in facts["flags"]) if name in ("windows", "unix") else None
+
+    require(take() == "(", "cargo_metadata_cfg")
+    result = predicate()
+    require(take() == ")" and position == len(tokens), "cargo_metadata_cfg")
+    return result
+
+
+def parse_metadata(raw: bytes, lock: dict, triple: str) -> dict:
+    """cargo metadata JSON, checked for the required flags and against Cargo.lock.
+
+    Content checks for the flags this tool requires: every workspace member
+    resolves with all of its declared features (--all-features), and no
+    dependency edge has only target expressions that are false for the triple
+    (--filter-platform). Every package and edge must also exist in Cargo.lock.
+    These are necessary, not sufficient, conditions for the required command.
+    """
     data = strict_json(raw, "cargo_metadata_structure")
     require(data.get("version") == 1 and isinstance(data.get("resolve"), dict), "cargo_metadata_structure")
+    packages = {row["id"]: row for row in data["packages"]}
     for package in data["packages"]:
         if package.get("source") == CRATES_IO:
             entry = lock.get((package["name"], package["version"]))
             require(entry is not None and entry.get("source") == CRATES_IO, "cargo_metadata_lock_mismatch")
         elif package.get("source") is None:
             require((package["name"], package["version"]) in lock, "cargo_metadata_lock_mismatch")
+    members = set(data["workspace_members"])
+    for node in data["resolve"]["nodes"]:
+        package = packages[node["id"]]
+        if node["id"] in members:
+            require(set(package.get("features", {})) <= set(node.get("features", [])), "cargo_metadata_flags")
+        locked = lock.get((package["name"], package["version"]), {})
+        locked_deps = {item.split(" ")[0] for item in locked.get("dependencies", [])}
+        for dep in node["deps"]:
+            child = packages[dep["pkg"]]
+            require(child["name"] in locked_deps, "cargo_metadata_lock_mismatch")
+            # --filter-platform keeps an edge (listing all of its kinds) when at
+            # least one kind applies; an edge whose every kind is false for the
+            # triple means the graph was not filtered for it.
+            values = [cfg_value(kind["target"], triple) if kind.get("target") else True for kind in dep["dep_kinds"]]
+            require(dep["dep_kinds"] and any(value is not False for value in values), "cargo_metadata_flags")
     return data
 
 
 def cargo_components(builder: Builder, root: Path, metadata: dict, cargo_home: Path,
-                     supplements: dict | None = None) -> None:
-    """metadata: {target triple: raw `cargo metadata` JSON bytes}."""
+                     supplements: dict | None = None, metadata_origin: str = "supplied") -> None:
+    """metadata: {target triple: raw `cargo metadata` JSON bytes}, one per product target."""
     lock, raw = cargo_lock(root)
     builder.inputs["Cargo.lock"] = blob(raw)
+    require(set(metadata) == set(RUST_ROOTS), "rust_target")
     reached_any = set()
     for triple in sorted(metadata):
-        require(triple in RUST_ROOTS, "rust_target")
-        builder.inputs[f"cargo-metadata/{triple}.json"] = blob(metadata[triple])
-        data = parse_metadata(metadata[triple], lock)
+        data = parse_metadata(metadata[triple], lock, triple)
+        builder.inputs[f"cargo-metadata/{triple}.json"] = {
+            **blob(metadata[triple]), "origin": metadata_origin,
+            "required_command": METADATA_COMMAND.format(toolchain=RUST_TOOLCHAIN, triple=triple),
+            "checked": "all workspace features resolved; no edge target false for the triple; packages and edges in Cargo.lock"}
         packages = {row["id"]: row for row in data["packages"]}
         nodes = {row["id"]: row for row in data["resolve"]["nodes"]}
         members = set(data["workspace_members"])
@@ -1172,14 +1284,15 @@ def bundled_components(builder: Builder, root: Path, supplements: dict, desktop_
 def generate(root: Path, *, metadata: dict | None, cargo_home: Path, gradle_report: Path | None,
              gradle_cache: Path, npm_modules: Path | None, desktop_image: Path | None,
              rust_toolchain: Path | None = None, android_ndk: Path | None = None,
-             skip: frozenset = frozenset()) -> tuple[bytes, bytes, dict]:
+             skip: frozenset = frozenset(), metadata_origin: str = "supplied") -> tuple[bytes, bytes, dict]:
     require(set(skip) <= set(ECOSYSTEMS), "skip_unknown")
     builder = Builder({})
     builder.skipped = set(skip)
     supplements = load_supplements(root, builder)
     builder.canonical = canonical_texts(root, supplements)
     if "cargo" not in skip:
-        cargo_components(builder, root, metadata or {}, cargo_home, supplements)
+        require(metadata_origin in ("supplied", "generated-by-this-run"), "cargo_metadata_origin")
+        cargo_components(builder, root, metadata or {}, cargo_home, supplements, metadata_origin)
     if "gradle" not in skip:
         require(gradle_report is not None and Path(gradle_report).is_file(), "gradle_report_missing")
         gradle_components(builder, root, Path(gradle_report), gradle_cache, supplements)
@@ -1231,7 +1344,7 @@ def main(argv: list[str] | None = None) -> int:
     skip = frozenset(args.skip)
     report = args.gradle_report or root / "apps/build/reports/dependency-license/dependencies.json"
     try:
-        metadata = None
+        metadata, origin = None, "supplied"
         if "cargo" not in skip:
             if args.cargo_metadata:
                 metadata = {}
@@ -1239,12 +1352,13 @@ def main(argv: list[str] | None = None) -> int:
                     triple, _, path = item.partition("=")
                     metadata[triple] = read_file(Path(path), MAX_ARCHIVE)
             else:
-                metadata = run_cargo_metadata(root, args.cargo_toolchain)
+                require(args.cargo_toolchain == RUST_TOOLCHAIN, "rust_toolchain_version")
+                metadata, origin = run_cargo_metadata(root, args.cargo_toolchain), "generated-by-this-run"
         text, receipt_raw, receipt = generate(
             root, metadata=metadata, cargo_home=args.cargo_home, gradle_report=report,
             gradle_cache=args.gradle_cache, npm_modules=args.npm_modules, desktop_image=args.desktop_image,
             rust_toolchain=args.rust_toolchain or default_rust_toolchain(home),
-            android_ndk=args.android_ndk or default_android_ndk(home), skip=skip)
+            android_ndk=args.android_ndk or default_android_ndk(home), skip=skip, metadata_origin=origin)
         args.output.mkdir()  # exclusive: never reuse an existing delivery directory
         (args.output / TEXT_NAME).write_bytes(text)
         (args.output / RECEIPT_NAME).write_bytes(receipt_raw)

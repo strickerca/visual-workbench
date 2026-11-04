@@ -85,9 +85,19 @@ owner decides otherwise.
 ### What counts as shipped
 
 - **Rust:** `cargo metadata --locked --offline --all-features` for each
-  product target (`x86_64-pc-windows-msvc`, `aarch64-linux-android`). The
-  metadata JSON is bound by hash in the receipt, and every package in it must
-  agree with `Cargo.lock`.
+  product target (`x86_64-pc-windows-msvc`, `aarch64-linux-android`), both
+  required. The receipt binds each metadata JSON by hash and records whether
+  this run generated it or it was supplied. The JSON itself does not record its
+  flags, so they are checked from content:
+  - every workspace member resolves with all of its declared features
+    (`--all-features`);
+  - no dependency edge has only target expressions that are false for the
+    triple (`--filter-platform`);
+  - every package and edge exists in `Cargo.lock`.
+
+  These checks are necessary, not sufficient, conditions for the required
+  command. On real data they reject both unfiltered and default-feature
+  metadata.
   - The walk starts at the crates whose binaries ship (`vw-ffi`, `vw-host-ffi`,
     `vw-capture`, `vw-remote-host`, `vw-mcp-native`; Android: `vw-ffi`) and
     follows normal edges only. Dev- and build-dependencies are excluded.
@@ -128,18 +138,30 @@ owner decides otherwise.
   `check_npm_licenses.py`. The 11 dev-only packages are excluded.
 - **Bundled binaries:** the Node runtime record. When `--desktop-image` names a
   built app image, the generator also copies the jlink runtime's `legal/` files
-  under the documented Java runtime exception. Assembly cross-checks those files
-  and `node.exe` against the delivered desktop image. The 125 unadmitted
+  under the documented Java runtime exception. When the release delivers the
+  desktop image as `desktop-file` artifacts, assembly cross-checks those files
+  and `node.exe` against it. An MSI (`external-package`) is opaque to assembly,
+  so it gets coverage checks but not this byte cross-check. The 125 unadmitted
   model/runtime/scrcpy proposals under `docs/license-proposals/` stay out,
   because no shipped artifact contains them.
 
 ### Selection rules
 
 - **Policy:** a license outside the `check_setup.py` allow list fails the run.
-- **What counts as license text:** only full texts do. NOTICE, COPYRIGHT,
-  PATENTS and THIRD_PARTY files, and short pointer files such as "Licensed
-  under the Apache License...", always ship but never count. Apache-2.0 is
-  recognised only by its terms-and-conditions body.
+- **What counts as license text:** only full texts do. Every recognised
+  license family needs markers from its body: the grant, plus a condition or
+  disclaimer clause. Examples:
+  - Apache-2.0: its terms-and-conditions section.
+  - MIT: "shall be included". This keeps the Boost grant from being read as
+    MIT.
+  - zlib: "altered source versions".
+  - MPL-2.0: Exhibit A.
+  - BSL-1.0: its "entire statement" clause.
+
+  A short pointer such as "Licensed under the MPL-2.0" therefore matches no
+  family. Pointers ship with the package's other license files but do not count
+  as text. NOTICE, COPYRIGHT, PATENTS and THIRD_PARTY files also ship but never
+  count, whatever they contain.
 - **Canonical Apache-2.0 fallback:** if the only Apache file is a pointer, or
   there is none, the canonical retained Apache-2.0 text is used.
   `pdfium-render` 0.9.4 is a real example.
@@ -162,6 +184,10 @@ owner decides otherwise.
   file is the full text of the license it is registered under.
 - **Receipt:** skipped ecosystems are recorded, and assembly refuses them unless
   the release declares the skip.
+- **Opaque artifacts:** assembly cannot classify them. A release that delivers
+  any must declare `generated_notices.opaque_coverage`, which can be an empty
+  list, naming the generated graphs those artifacts contain. Each declared
+  graph must be in the receipt's coverage.
 
 A failing run is still written for diagnosis, with status `incomplete` and exit
 code 2. `tools/release/assemble.py` refuses any incomplete bundle.
@@ -182,8 +208,11 @@ python tools\release\generate_notices.py --output .local\notices-<release> --gra
 The 2026-11-04 offline run used the existing census report and local caches,
 without the desktop image. Status: `complete`, 0 unresolved, deterministic
 across runs. It found 427 shipped components: 273 Rust, 142 Maven, 9 npm and 3
-bundled (Node, Rust standard library, NDK LLVM runtime), with 211 distinct
-texts. Output sha256 is `98b258ce…de3a`.
+bundled (Node, Rust standard library, NDK LLVM runtime), with 213 distinct
+texts. Output sha256 is `f6d33afe…fe2c`, from the hardening follow-up. The
+stricter detection now also ships `bytemuck`'s LICENSE-MIT and
+`constant_time_eq`'s LICENSE-MIT0 as unrecognised package files; neither is
+counted as the selected text.
 
 Owner-approved texts were added to `third_party/LICENSES`:
 
@@ -256,3 +285,30 @@ Adding files under `third_party/notices` changes the notice resources packaged
 into both apps (the desktop resources and the Android assets). The APK and
 desktop image must be rebuilt before the package notice checks pass. Java
 runtime coverage needs a built desktop image.
+
+### Known limits (accepted 2026-11-04)
+
+- **Artifact contents are not inspected against the graphs.** Coverage says
+  which graphs were generated; assembly does not prove that an APK, MSI or
+  opaque artifact contains exactly those components. The Java runtime and
+  `node.exe` byte cross-check runs only for `desktop-file` deliveries.
+- **The generated graphs are supersets.** `--all-features` and the
+  standard-library aggregate notice include code that a given binary may not
+  link.
+- **Cargo metadata flag checks are content-based.** Assembly does not
+  regenerate the metadata.
+- **The Gradle census is consumed as written.** Artifact bytes come from the
+  local Gradle cache, bound by Gradle's own hashes. The census does not record
+  which variant file each configuration selected.
+- **License-family detection uses text markers.** It is not full license
+  matching; unusual wordings need a hash-bound `reviewed_files` entry.
+- **The embedded-library probe matches strings.** A stripped library can hide
+  code from it. `build_components` records libraries proven only by build
+  configuration (D3D12MemoryAllocator).
+- **Two reviews are not pinned.** The androidx.graphics native reviews were
+  made against `androidx-main`, not the released artifacts' revisions.
+- **libjpeg-turbo's IJG terms are a summary.** Its `LICENSE.md` summarises the
+  IJG terms and includes the required attribution sentence; the full IJG
+  README text is not retained.
+- **Placement.** The generated notices sit in the release directory, not
+  inside the APK or the desktop image.

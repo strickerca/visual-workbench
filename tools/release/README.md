@@ -135,7 +135,10 @@ desktop image is delivered.
 `generated_notices` (required, LIC-003) names the exact output of
 `generate_notices.py`. An optional `declared_skips` list names ecosystems
 (`cargo`, `gradle`, `npm`, `bundled`) that the release accepts as not
-generated. Assembly never regenerates the bundle. Before it creates the
+generated. `opaque_coverage` is required whenever an `opaque` artifact is
+delivered. It lists the generated graphs those artifacts contain, using
+coverage names such as `rust:x86_64-pc-windows-msvc`. An empty list declares
+that they contain none. Assembly never regenerates the bundle. Before it creates the
 destination, `generate_notices.verify_bundle` checks the hash-bound text and
 receipt for the following:
 
@@ -151,11 +154,15 @@ receipt for the following:
     coverage.
   - `apk` artifacts require the Android Rust, Android Gradle, Rust standard
     library and NDK LLVM runtime coverage.
+  - `opaque` artifacts require their declared `opaque_coverage` to be part of
+    the receipt's coverage.
 - **Freshness:** any generator input (for example `Cargo.lock`) that the source
   binding also declares has identical bytes.
-- **Desktop cross-check:** the delivered `runtime/legal/**` files must equal the
-  Java runtime texts in the receipt, and any delivered `node.exe` must match the
-  Node record's executable hash.
+- **Desktop cross-check:** for `desktop-file` deliveries only, the delivered
+  `runtime/legal/**` files must equal the Java runtime texts in the receipt, and
+  any delivered `node.exe` must match the Node record's executable hash. An MSI
+  is opaque here. Its app-image closure is bound separately by `msi.py`, and
+  assembly does not compare its contents with the receipt.
 
 These checks do not prove that every byte in a delivered artifact came from
 the generator's graphs. Coverage names graphs that were generated; it does not

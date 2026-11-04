@@ -544,11 +544,16 @@ def manifest(value: dict) -> dict:
     require(sum(row["bytes"] for row in value["notices"]) <= 32 * CHUNK, "notice_total")
     generated = value["generated_notices"]
     # declared_skips: ecosystems the release explicitly accepts as not generated.
+    # opaque_coverage: the generated graphs that opaque artifacts contain
+    # (required, possibly empty, whenever an opaque artifact is delivered).
     require(isinstance(generated, dict) and {"text", "receipt"} <= set(generated) <=
-            {"text", "receipt", "declared_skips"}, "generated_notices")
+            {"text", "receipt", "declared_skips", "opaque_coverage"}, "generated_notices")
     skips = generated.get("declared_skips", [])
     require(isinstance(skips, list) and len(set(skips)) == len(skips) and
             all(item in NOTICES.ECOSYSTEMS for item in skips), "generated_notices")
+    opaque = generated.get("opaque_coverage")
+    require(opaque is None or (isinstance(opaque, list) and len(set(opaque)) == len(opaque) and
+                               all(item in NOTICES.KNOWN_SCOPES for item in opaque)), "generated_notices")
     descriptor(generated["text"], GENERATED_TEXT_LIMIT)
     descriptor(generated["receipt"], MAX_JSON)
     require(generated["text"]["bytes"] > 0 and generated["receipt"]["bytes"] > 0, "generated_notices")
@@ -691,6 +696,8 @@ def assemble(root: Path, manifest_name: str, expected_sha256: str, destination: 
             generated_summary = NOTICES.verify_bundle(
                 notice_receipt, notice_text, artifact_kinds=frozenset(row["kind"] for row in spec["artifacts"]),
                 declarations=declarations, declared_skips=frozenset(generated.get("declared_skips", [])),
+                opaque_coverage=None if generated.get("opaque_coverage") is None
+                else frozenset(generated["opaque_coverage"]),
                 desktop_files={row["path"].removeprefix(DESKTOP): row["sha256"]
                                for row in spec["artifacts"] if row["kind"] == "desktop-file"})
         except NOTICES.Refused as error:

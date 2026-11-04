@@ -24,9 +24,15 @@ APACHE = b"                                 Apache License\n                    
          b"   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n"
 APACHE_POINTER = b"Licensed under the Apache License, Version 2.0; see https://www.apache.org/licenses/LICENSE-2.0\n"
 BSD = b"Copyright (c) Fixture\nRedistribution and use in source and binary forms, with or without modification,\n" \
+      b"1. Redistributions of source code must retain the above copyright notice\n" \
+      b"2. Redistributions in binary form must reproduce the above copyright notice\n" \
       b"* Neither the name of the copyright holder nor the names of its contributors\n"
-GPL = b"                    GNU GENERAL PUBLIC LICENSE\n                       Version 2, June 1991\n"
-MPL = b"Mozilla Public License Version 2.0\n==================================\n"
+GPL = b"                    GNU GENERAL PUBLIC LICENSE\n                       Version 2, June 1991\n" \
+      b"    TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION\n"
+MPL = b"Mozilla Public License Version 2.0\n==================================\n" \
+      b"Exhibit A - Source Code Form License Notice\n"
+BOOST = b"Boost Software License - Version 1.0\nPermission is hereby granted, free of charge, to any person or " \
+        b"organization obtaining a copy of the software\nThe copyright notices in the Software and this entire statement\n"
 
 
 def sha(data: bytes) -> str:
@@ -77,6 +83,22 @@ class Spdx(unittest.TestCase):
             self.assertTrue(g.is_license_file(name), name)
         for name in ("license.rs", "README.md", "LicenseCheck.class", "src/licenses.json", "x.kotlin_module"):
             self.assertFalse(g.is_license_file(name), name)
+
+    def test_every_family_needs_full_text_markers(self):
+        for pointer in (b"This crate is licensed under the Mozilla Public License 2.0 (MPL-2.0).\n",
+                        b"Distributed under the Boost Software License, Version 1.0.\n",
+                        b"Unicode-3.0: see the Unicode license at https://www.unicode.org/license.txt\n",
+                        b"Licensed under the SIL Open Font License 1.1.\n",
+                        b"Dedicated to the public domain under CC0 1.0.\n",
+                        b"zlib license: this software is provided as-is.\n",
+                        b"Redistribution and use in source and binary forms are permitted (see BSD).\n"):
+            with self.subTest(pointer=pointer):
+                self.assertEqual(g.detect(pointer), frozenset())
+        self.assertEqual(g.detect(MPL), {"mpl"})
+        self.assertEqual(g.detect(BOOST), {"bsl"})  # the Boost grant is not MIT
+        zlib = b"This software is provided 'as-is', without any express or implied warranty.\n" \
+               b"2. Altered source versions must be plainly marked as such\n"
+        self.assertEqual(g.detect(zlib), {"zlib"})
 
 
 class Selection(unittest.TestCase):
@@ -282,9 +304,12 @@ class Fixture(unittest.TestCase):
                 roots[name] = f"path+file:///fixture/{name}#0.1.0"
         members = sorted(set(roots.values()))
         for name, ident in sorted(roots.items()):
-            lock += ["[[package]]", f'name = "{name}"', 'version = "0.1.0"', ""]
+            dependencies = ["shipped", "native-sys", "devonly", "buildonly", "derive"] if name == "vw-ffi" else []
+            lock += ["[[package]]", f'name = "{name}"', 'version = "0.1.0"',
+                     "dependencies = [" + ", ".join(f'"{d}"' for d in dependencies) + "]", ""]
             packages.append({"id": ident, "name": name, "version": "0.1.0", "source": None,
-                             "license": "LicenseRef-VisualWorkbench-Proprietary", "targets": [{"kind": ["lib"]}]})
+                             "license": "LicenseRef-VisualWorkbench-Proprietary", "targets": [{"kind": ["lib"]}],
+                             "features": {"default": [], "extra": []}})
             deps = []
             if name == "vw-ffi":
                 deps = [{"pkg": pid("shipped", "1.0.0"), "dep_kinds": normal},
@@ -292,10 +317,11 @@ class Fixture(unittest.TestCase):
                         {"pkg": pid("devonly", "1.0.0"), "dep_kinds": dev},
                         {"pkg": pid("buildonly", "1.0.0"), "dep_kinds": build},
                         {"pkg": pid("derive", "1.0.0"), "dep_kinds": normal}]
-            nodes.append({"id": ident, "deps": deps})
+            nodes.append({"id": ident, "deps": deps, "features": ["default", "extra"]})
         self.put(self.root / "Cargo.lock", "\n".join(lock).encode())
-        self.metadata_values = {triple: {"version": 1, "packages": packages, "resolve": {"nodes": nodes},
-                                         "workspace_members": members} for triple in g.RUST_ROOTS}
+        self.metadata_values = {triple: json.loads(json.dumps({"version": 1, "packages": packages,
+                                                               "resolve": {"nodes": nodes}, "workspace_members": members}))
+                                for triple in g.RUST_ROOTS}
 
     @property
     def metadata(self):
@@ -424,7 +450,8 @@ class Generation(Fixture):
         self.assertEqual(shipped["sources"]["crate_sha256"],
                          sha((self.cargo_home / "registry/cache/index.fixture/shipped-1.0.0.crate").read_bytes()))
         for triple, value in self.metadata.items():
-            self.assertEqual(receipt["inputs"][f"cargo-metadata/{triple}.json"], {"bytes": len(value), "sha256": sha(value)})
+            entry = receipt["inputs"][f"cargo-metadata/{triple}.json"]
+            self.assertEqual((entry["bytes"], entry["sha256"]), (len(value), sha(value)))
         # Maven: product configurations only; redirect and BOM have no own bytes.
         self.assertIn(("maven", "org.example:with-license"), names)
         self.assertIn(("maven", "org.example:kmp-root-jvm"), names)
@@ -447,7 +474,7 @@ class Generation(Fixture):
         self.assertNotIn("bundled:java-runtime", receipt["coverage"])
         self.assertIn(MIT, text)
         self.assertEqual(receipt["output"]["sha256"], sha(text))
-        summary = g.verify_bundle(raw, text, artifact_kinds=frozenset({"opaque", "apk"}))
+        summary = g.verify_bundle(raw, text, artifact_kinds=frozenset({"opaque", "apk"}), opaque_coverage=frozenset())
         self.assertEqual(summary["output_sha256"], sha(text))
 
     def test_output_is_deterministic(self):
@@ -466,6 +493,40 @@ class Generation(Fixture):
         self.assertIn({"component": "cargo:shipped@1.0.0", "reason": "crate_source_unavailable",
                        "detail": "registry cache archive matching Cargo.lock checksum not found"}, receipt["unresolved"])
 
+    def test_metadata_flags_are_checked_from_content(self):
+        _, _, receipt = self.generate()
+        entry = receipt["inputs"]["cargo-metadata/x86_64-pc-windows-msvc.json"]
+        self.assertEqual(entry["origin"], "supplied")
+        self.assertIn("--all-features --filter-platform x86_64-pc-windows-msvc", entry["required_command"])
+        nodes = self.metadata_values["x86_64-pc-windows-msvc"]["resolve"]["nodes"]
+        ffi = next(node for node in nodes if "vw-ffi" in node["id"])
+        ffi["features"] = ["default"]  # not --all-features
+        with self.assertRaisesRegex(g.Refused, "^cargo_metadata_flags$"):
+            self.generate()
+        ffi["features"] = ["default", "extra"]
+        ffi["deps"][0]["dep_kinds"] = [{"kind": None, "target": "cfg(unix)"}]  # not --filter-platform windows
+        with self.assertRaisesRegex(g.Refused, "^cargo_metadata_flags$"):
+            self.generate()
+        ffi["deps"][0]["dep_kinds"] = [{"kind": None, "target": "cfg(windows)"}]
+        self.assertEqual(self.generate()[2]["status"], "complete")
+        # Cargo keeps an applicable edge with all of its kinds, including false ones.
+        ffi["deps"][0]["dep_kinds"] = [{"kind": None, "target": "cfg(unix)"}, {"kind": None, "target": "cfg(windows)"}]
+        self.assertEqual(self.generate()[2]["status"], "complete")
+        del self.metadata_values["aarch64-linux-android"]
+        with self.assertRaisesRegex(g.Refused, "^rust_target$"):
+            self.generate()
+
+    def test_cfg_evaluation_for_product_targets(self):
+        for expression, windows, android in (
+                ("cfg(windows)", True, False), ("cfg(unix)", False, True),
+                ('cfg(target_os = "android")', False, True), ('cfg(all(unix, not(target_os = "macos")))', False, True),
+                ('cfg(any(target_os = "linux", target_os = "android"))', False, True),
+                ('cfg(target_feature = "sse2")', None, None), ('cfg(all(windows, target_feature = "x"))', None, False),
+                ("x86_64-pc-windows-msvc", True, False)):
+            with self.subTest(expression=expression):
+                self.assertIs(g.cfg_value(expression, "x86_64-pc-windows-msvc"), windows)
+                self.assertIs(g.cfg_value(expression, "aarch64-linux-android"), android)
+
     def test_metadata_must_agree_with_cargo_lock(self):
         for value in self.metadata_values.values():
             for package in value["packages"]:
@@ -474,8 +535,14 @@ class Generation(Fixture):
         with self.assertRaisesRegex(g.Refused, "^cargo_metadata_lock_mismatch$"):
             self.generate()
 
+    def test_metadata_edges_must_exist_in_cargo_lock(self):
+        lock = (self.root / "Cargo.lock").read_text()
+        self.put(self.root / "Cargo.lock", lock.replace('"shipped", ', "").encode())
+        with self.assertRaisesRegex(g.Refused, "^cargo_metadata_lock_mismatch$"):
+            self.generate()
+
     def test_forbidden_crate_license_makes_bundle_incomplete_and_unassemblable(self):
-        for package in self.metadata_values["x86_64-pc-windows-msvc"]["packages"]:
+        for package in (p for value in self.metadata_values.values() for p in value["packages"]):
             if package["name"] == "shipped":
                 package["license"] = "AGPL-3.0-only"
         text, raw, receipt = self.generate()
@@ -508,7 +575,7 @@ class Generation(Fixture):
                     self.generate()
 
     def test_reviewed_supplements_resolve_texts_and_native_gate(self):
-        for package in self.metadata_values["x86_64-pc-windows-msvc"]["packages"]:
+        for package in (p for value in self.metadata_values.values() for p in value["packages"]):
             if package["name"] == "native-sys":
                 package["license"] = "MPL-2.0"  # ships only MIT/BSD files: text missing
         self.replace_jar("apache-bare", "2.0", jar({"lib/x.dll": b"MZ", "com/x/A.class": b"\xca\xfe"}))
@@ -661,6 +728,13 @@ class Verification(Fixture):
         for kinds in ({"desktop-file"}, {"external-package"}):
             with self.assertRaisesRegex(g.Refused, "^notices_desktop_coverage$"):
                 g.verify_bundle(raw, text, artifact_kinds=frozenset(kinds))  # no Java runtime here
+        with self.assertRaisesRegex(g.Refused, "^notices_opaque_coverage_undeclared$"):
+            g.verify_bundle(raw, text, artifact_kinds=frozenset({"opaque"}))
+        with self.assertRaisesRegex(g.Refused, "^notices_opaque_coverage$"):
+            g.verify_bundle(raw, text, artifact_kinds=frozenset({"opaque"}),
+                            opaque_coverage=frozenset({"bundled:" + g.JAVA_RUNTIME}))  # not generated here
+        self.assertEqual(g.verify_bundle(raw, text, artifact_kinds=frozenset({"opaque"}),
+                                         opaque_coverage=frozenset({"rust:x86_64-pc-windows-msvc"}))["status"], "complete")
         with self.assertRaisesRegex(g.Refused, "^notices_stale_input$"):
             g.verify_bundle(raw, text, declarations={"Cargo.lock": {"bytes": 1, "sha256": "0" * 64}})
         self.assertEqual(g.verify_bundle(raw, text, declarations={"Cargo.lock": receipt["inputs"]["Cargo.lock"]})
