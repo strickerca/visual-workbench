@@ -195,7 +195,8 @@ function Assert-VwExistingAdbServer {
     try {
         $task = $tcp.ConnectAsync('127.0.0.1', 5037)
         if (-not $task.Wait(1500)) { throw 'Existing adb server unavailable; start it yourself before delivery.' }
-        $task.GetAwaiter().GetResult()
+        # GetResult() returns a VoidTaskResult object in PowerShell 7; keep it off the pipeline.
+        $null = $task.GetAwaiter().GetResult()
         $stream = $tcp.GetStream(); $stream.ReadTimeout = 1500; $stream.WriteTimeout = 1500
         $request = [Text.Encoding]::ASCII.GetBytes('000chost:version')
         $stream.Write($request, 0, $request.Length)

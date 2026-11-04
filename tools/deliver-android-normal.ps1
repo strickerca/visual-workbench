@@ -29,7 +29,7 @@ foreach ($tool in @($adbPath, $apkSignerPath, $aaptPath)) {
 $redact = @($projectRoot, $env:USERPROFILE)
 
 $selectDevice = {
-    Assert-VwExistingAdbServer -AdbPath $adbPath -Root $projectRoot
+    $null = Assert-VwExistingAdbServer -AdbPath $adbPath -Root $projectRoot
     # Explicit model selection; exactly one matching physical device, no fallback.
     $selected = Get-VwAndroidDevice -Root $projectRoot -ExpectedModel $ExpectedModel
     if ([IO.Path]::GetFullPath($selected.AdbPath) -ine [IO.Path]::GetFullPath($adbPath)) { throw 'Device selection used a different adb client.' }
