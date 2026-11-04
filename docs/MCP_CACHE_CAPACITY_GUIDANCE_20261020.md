@@ -126,3 +126,42 @@ Results:
 The earlier receipt `preflight-20261104T091111Z-d3c49eb1.json` is superseded:
 it showed the cache base relative to the override root. Neither the cache nor
 any process was changed. The packaged two-cycle smoke has still not run.
+
+## 2026-11-04 B8: MCP start verification cost
+
+**Measured cause.** The packaged smoke spent `bundle_verify_ms=59226` on the
+first start and timed out in `bundle_verify` on the second. A read-only replica
+of `McpRuntime.verify` was run against the existing extracted bundle on this
+laptop (1,514 files, 119,499,486 bytes, Defender real-time protection on). It
+took 64.2 s:
+
+- 32.7 s in the per-file `noRedirect` check;
+- 30.6 s in the same check during the final inventory walk;
+- 0.96 s opening, reading and SHA-256 hashing.
+
+`noRedirect` calls `toRealPath` on every ancestor of every path. On Windows,
+each `toRealPath` does one directory lookup per path component, so each start
+cost O(files x depth^2) lookups. Defender, per-file opens and buffer size were
+not the cause. Sequential 64 KiB hashing of every file took 1.4 s. Holding
+read-only, no-write/no-delete handles on every file did not change the replica
+time (54.7 s).
+
+**Change.** Every start still opens and hashes every admitted byte against the
+application-resource manifest, in manifest order. The redirect check now runs
+`toRealPath` on the bundle root once, then walks the tree once. The walk uses
+each directory entry's own attributes (links are never followed) and its name
+as stored. It refuses any symlink, junction or other reparse point, any special
+file, any unlisted file, and any directory at the depth limit. The stored
+relative names must equal the manifest keys exactly. This also refuses
+case-variant and 8.3 alias names; the old `Path` comparison ignored case. The
+same inventory is checked again after hashing.
+
+The replica of the new procedure took 0.74 s on the same bundle (walk 64 ms,
+hash 617 ms, re-walk 45 ms). Nothing reuses an earlier verification. There is
+no cross-process trust cache, no metadata-based trust and no security setting
+change. Bundle pins, inventory and markers are unchanged.
+
+**Expected packaged timing (not yet measured in the app).** Each start should
+take about 3.9 s inventory + 1 s verify + 1.1 s service open. Both starts of the
+two-cycle smoke should then finish well inside the 90 s budget. Only a packaged
+`--mcp-runtime-smoke` run can confirm this.
