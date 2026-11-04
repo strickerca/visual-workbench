@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('build-remote-helpers', 'test-remote-helpers', 'build-remote-integration', 'build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-editor', 'lint-editor', 'test-shared', 'test-apps', 'test-mcp', 'build-ai', 'test-ai', 'build-managed-apps', 'package-managed-apps', 'package-background-apps', 'package-android-app', 'package-desktop-app', 'package-desktop-msi', 'assemble-release', 'test-paint-integration', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'build-desktop-distribution', 'test-all', 'lint-all', 'license-check', 'hil-test', 'run-desktop', 'doctor')]
+    [ValidateSet('build-remote-helpers', 'test-remote-helpers', 'build-remote-integration', 'build-core', 'build-raster', 'test-raster', 'build-network', 'test-network', 'build-pairing', 'build-ffi', 'test-ffi', 'test-editor', 'lint-editor', 'test-shared', 'test-apps', 'test-mcp', 'build-ai', 'test-ai', 'build-managed-apps', 'package-managed-apps', 'package-background-apps', 'package-android-app', 'package-desktop-app', 'package-desktop-msi', 'assemble-release', 'test-paint-integration', 'build-android', 'build-stroke-core', 'build-stroke', 'build-pen-probe', 'build-pen-inject', 'build-transport', 'build-video-pc', 'build-video-android', 'build-image-android', 'build-vdd-probe', 'build-desktop', 'build-desktop-distribution', 'test-all', 'lint-all', 'license-check', 'hil-test', 'deliver-android-normal', 'run-desktop', 'doctor')]
     [string]$Command = 'doctor',
     [Parameter(Position = 1)][ValidateSet('app', 'rust', 'stroke', 'pen', 'pen-owner', 'win-pen', 'transport', 'pairing', 'shared-ffi', 'video-pc', 'video-android', 'video-tiles', 'image-pc', 'image-android', 'vdd')][string]$HilMode = 'app',
     [Parameter(Position = 2)][ValidatePattern('^[a-z][a-z0-9-]*$')][string]$Crate,
@@ -26,7 +26,10 @@ param(
     [ValidatePattern('^[0-9a-f]{64}$')][string]$ReleasePythonSha256,
     [string]$MsiToolchainManifest,
     [ValidatePattern('^[0-9a-f]{64}$')][string]$MsiToolchainSha256,
-    [string]$MsiWorkDirectory
+    [string]$MsiWorkDirectory,
+    [string]$DeliveryApk,
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$DeliveryApkSha256,
+    [ValidateSet('SM-S918U')][string]$DeliveryModel
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -395,6 +398,11 @@ try {
             throw 'MSI toolchain/work inputs are limited to package-desktop-msi.'
         }
     }
+    foreach ($deliveryName in @('DeliveryApk', 'DeliveryApkSha256', 'DeliveryModel')) {
+        if ($Command -ne 'deliver-android-normal' -and $PSBoundParameters.ContainsKey($deliveryName)) {
+            throw 'Delivery APK/hash/model inputs are limited to deliver-android-normal.'
+        }
+    }
     if ($PairingTests -and $ProjectFlowTests) { throw 'Select one focused managed test batch' }
     if ($ProjectFlowTests -and $Command -ne 'package-managed-apps') { throw 'Focused project-flow tests require managed packaging' }
     if ($PairingTests -and $Command -ne 'package-managed-apps') { throw 'Focused pairing tests require managed packaging' }
@@ -737,6 +745,7 @@ try {
             Test-McpRuntime
             Run-Step 'test-device-selection' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/device-selection-fixtures.ps1')
             Run-Step 'test-app-device-scope' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/app-hil-device-fixtures.ps1')
+            Run-Step 'test-normal-delivery' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/android-normal-delivery-fixtures.ps1')
             Run-Step 'test-store-crash-receipt' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/store-crash-receipt-fixtures.ps1')
             Run-Cargo 'test-rust' @('test', '--workspace', '--exclude', 'vw-sim', '--locked', '--', '--test-threads=2')
             # Run the complete 10,000-seed simulator in its measured optimized
@@ -752,6 +761,24 @@ try {
             Run-Cargo 'lint-rust-clippy' @('clippy', '--workspace', '--all-targets', '--locked', '--', '-D', 'warnings')
             Run-Step 'lint-secrets' 'gitleaks.exe' @('dir', '.', '--config', '.gitleaks.toml', '--redact=100', '--no-banner')
             Run-Gradle 'lint-kotlin' @(':android:lintDebug', ':shared:check', ':desktop:check', ':pen-probe:lintDebug', ':video-bench:lintDebug', ':image-bench:lintDebug')
+        }
+        'deliver-android-normal' {
+            # Reviewed same-signer update of the NORMAL app for owner user 0 on
+            # the explicitly selected model. No build, uninstall, downgrade or
+            # data clear. See docs/ANDROID_NORMAL_DELIVERY_20261104.md.
+            foreach ($deliveryName in @('DeliveryApk', 'DeliveryApkSha256', 'DeliveryModel')) {
+                if (-not $PSBoundParameters.ContainsKey($deliveryName) -or [string]::IsNullOrWhiteSpace([string]$PSBoundParameters[$deliveryName])) {
+                    throw 'Normal delivery requires explicit -DeliveryApk, -DeliveryApkSha256 and -DeliveryModel.'
+                }
+            }
+            $deliveryPath = if ([IO.Path]::IsPathRooted($DeliveryApk)) { $DeliveryApk } else { Join-Path (Get-Location).ProviderPath $DeliveryApk }
+            $deliveryPath = [IO.Path]::GetFullPath($deliveryPath)
+            # Synthetic decision fixtures run before any device access.
+            Run-Step 'test-normal-delivery' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/tests/android-normal-delivery-fixtures.ps1') -Limit 120
+            # Fixed outer budget: every inner adb/tool phase is separately
+            # bounded, and a rollback must not be preempted by this deadline.
+            Run-Step 'deliver-android-normal' 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/deliver-android-normal.ps1',
+                '-ApkPath', $deliveryPath, '-ApkSha256', $DeliveryApkSha256, '-ExpectedModel', $DeliveryModel, '-Execute') -Limit 3600
         }
         'hil-test' {
             if ($HilMode -eq 'app') {
