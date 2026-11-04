@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.PorterDuff
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -24,8 +25,21 @@ import com.visualworkbench.shared.GiantVisibleFrame
 import android.graphics.Bitmap
 import com.visualworkbench.shared.DocumentDrawLease
 import kotlinx.coroutines.CompletableDeferred
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
-/** One immutable scene slot per surface generation bounds queued render memory. */
+/** One immutable scene slot per renderer generation bounds queued render memory.
+ *
+ * The canvas exists only in AndroidX child layers: the SurfaceView's own opaque
+ * surface is never drawn and shows black wherever no generation has a committed
+ * frame. A size change is therefore make-before-break. The presented generation
+ * stays attached until its successor's first multi-buffered frame is committed and
+ * is released only then, so at most two generations (two AndroidX buffer pools)
+ * coexist: the predecessor survives the successor's first frame (normally 1-3
+ * display frames; Main waits at most [SUCCESSOR_PRESENT_WAIT_MS] before AndroidX
+ * resizes the predecessor) plus its asynchronous release. No generation is
+ * allocated while any release is settling, so a third pool never exists. Giant
+ * mode keeps break-before-make so its single surface reservation is never shared. */
 internal class CanvasSurface(context: Context, val controller: EditorController) : SurfaceView(context) {
     private class RenderSession {
         var closed = false
@@ -37,7 +51,11 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         var documentReader:DocumentDrawLease<PreparedDocumentTile>?=null
         var giantDrawn:GiantVisibleFrame<Bitmap>?=null
         var giantFrontDrawn:GiantVisibleFrame<Bitmap>?=null
+        /** Released once a visible multi-buffered frame of this generation is committed. */
+        val firstPresent = CountDownLatch(1)
+        val presented: Boolean get() = firstPresent.count == 0L
     }
+    private class Generation(val renderer: CanvasFrontBufferedRenderer<Frame>, val session: RenderSession)
     private data class Frame(val session: RenderSession, val dry: Boolean, val inputMs: Long,
                              val dryRequest: CanvasDryFrames.Request? = null)
     private val lock = Any()
@@ -49,9 +67,13 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private val retirementHook:suspend()->Unit = {retireForProject()}
     private var renderer: CanvasFrontBufferedRenderer<Frame>? = null
     private var session: RenderSession? = null
-    private var retiring = false
-    private var retirement=CompletableDeferred<Unit>().apply{complete(Unit)}
+    /** The presented generation kept while its successor prepares its first frame. */
+    private var kept: Generation? = null
+    /** A resize arrived while a release was settling: replace once it settles. */
+    private var replaceAfterRelease = false
+    private val generations = CanvasGenerations()
     private val retirementProgress=CanvasRetirementProgress()
+    private val redraws = CanvasRedrawHandshake({ task, delay -> main.postDelayed(task, delay) }, { main.removeCallbacks(it) }, REDRAW_FALLBACK_MS)
     private var surfaceWidth = 0
     private var surfaceHeight = 0
     private var latest: CanvasScene? = null
@@ -63,16 +85,23 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         contentDescription = "Document canvas. Pen draws; one finger pans; two fingers zoom and rotate."
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         isFocusable = true
-        holder.addCallback(object : SurfaceHolder.Callback {
+        holder.addCallback(object : SurfaceHolder.Callback2 {
             override fun surfaceCreated(holder: SurfaceHolder) { ensureRenderer() }
             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
                 val changed = surfaceWidth != width || surfaceHeight != height
                 surfaceWidth = width; surfaceHeight = height
-                if (changed) { cancelInput(); retireRenderer(CanvasRetirementReason.SurfaceChanged); controller.viewport(width, height, resources.displayMetrics.density) }
+                if (changed) { cancelInput(); resize(width, height) }
                 ensureRenderer()
             }
             override fun surfaceDestroyed(holder: SurfaceHolder) {
                 surfaceWidth = 0; surfaceHeight = 0; cancelInput(); retireRenderer(CanvasRetirementReason.SurfaceDestroyed)
+                redraws.finish()
+            }
+            override fun surfaceRedrawNeeded(holder: SurfaceHolder) {}
+            // Finish SurfaceView's redraw only over a committed frame (bounded);
+            // finishing first would cut the window hole over an empty black layer.
+            override fun surfaceRedrawNeededAsync(holder: SurfaceHolder, drawingFinished: Runnable) {
+                redraws.request(drawingFinished, !attached || session?.presented == true)
             }
         })
     }
@@ -84,7 +113,12 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     }
     override fun onDetachedFromWindow() {
         attached = false; cancelInput(); controller.detachCanvas(retirementHook)
-        retireRenderer(CanvasRetirementReason.WindowDetached).invokeOnCompletion{error->if(error==null)main.post{if(!attached)controller.canvasRendererRetired(retirementHook)}}
+        // A retirement can complete exceptionally only after AndroidX released the
+        // renderer pipeline (its document reader close failed, and that frame keeps
+        // its own quarantine). Confirm either way: an unconfirmed hook gates every
+        // successor canvas forever and leaves the recreated canvas black.
+        retireRenderer(CanvasRetirementReason.WindowDetached).invokeOnCompletion{main.post{if(!attached)controller.canvasRendererRetired(retirementHook)}}
+        redraws.finish()
         super.onDetachedFromWindow()
     }
 
@@ -122,8 +156,57 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         if (dry) current.renderMultiBufferedLayer(listOf(frame)) else current.renderFrontBufferedLayer(frame)
     }
 
+    /** Main, for an actual SurfaceView size change. */
+    private fun resize(width: Int, height: Int) {
+        val density = resources.displayMetrics.density
+        val current = renderer; val currentSession = session
+        if (current == null || currentSession == null || controller.giantMode) {
+            retireRenderer(CanvasRetirementReason.SurfaceChanged); controller.viewport(width, height, density); return
+        }
+        if (!generations.canReplace(true, kept != null, false)) {
+            // A replacement is still settling. Presented generations resize through
+            // their own AndroidX holder callbacks; replace once the release settles.
+            replaceAfterRelease = true
+            controller.viewport(width, height, density); keptFollowsLatest(); return
+        }
+        kept = Generation(current, currentSession); renderer = null; session = null
+        controller.viewport(width, height, density) // Its publish creates the successor from the new viewport.
+        ensureRenderer()
+        val successor = session ?: run { restoreKept(); return }
+        keptFollowsLatest()
+        // AndroidX resizes the kept generation from its own holder callback right
+        // after this one, swapping that generation's layers. Wait (bounded) so the
+        // swap finds the successor's frame already committed underneath.
+        successor.firstPresent.await(SUCCESSOR_PRESENT_WAIT_MS, TimeUnit.MILLISECONDS)
+    }
+
+    /** The kept generation's own AndroidX resize redraw paints the newest scene. */
+    private fun keptFollowsLatest() {
+        val target = kept ?: return
+        synchronized(lock) { if (!target.session.closed) target.session.latest = latest }
+    }
+
+    /** No successor could be allocated: the kept generation stays current. */
+    private fun restoreKept() {
+        val target = kept ?: return
+        kept = null; renderer = target.renderer; session = target.session
+        synchronized(lock) { if (!target.session.closed) target.session.latest = latest }
+    }
+
+    private fun replaceAfterSettled() {
+        if (!replaceAfterRelease || generations.releasing || kept != null) return
+        replaceAfterRelease = false
+        val current = renderer ?: return; val currentSession = session ?: return
+        if (controller.giantMode) return
+        // No layer swap is pending: the successor is created above the presented
+        // generation and covers it once its first frame commits.
+        kept = Generation(current, currentSession); renderer = null; session = null
+        ensureRenderer()
+        if (session == null) restoreKept()
+    }
+
     private fun ensureRenderer() {
-        if (!attached || !controller.canCreateCanvas(retirementHook) || !holder.surface.isValid || width <= 0 || height <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0 || latest == null || renderer != null || retiring) return
+        if (!attached || !controller.canCreateCanvas(retirementHook) || !holder.surface.isValid || width <= 0 || height <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0 || latest == null || !generations.canCreate(renderer != null)) return
         val currentSession = RenderSession().also { it.latest = latest;it.documentReader=latest?.documentFrame?.acquire() }
         session = currentSession
         renderer = CanvasFrontBufferedRenderer(this, object : CanvasFrontBufferedRenderer.Callback<Frame> {
@@ -158,13 +241,24 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
             override fun onMultiBufferedLayerRenderComplete(frontBufferedLayerSurfaceControl: SurfaceControlCompat,
                                                             multiBufferedLayerSurfaceControl: SurfaceControlCompat,
                                                             transaction: SurfaceControlCompat.Transaction) {
-                synchronized(lock) {
+                val visible = synchronized(lock) {
                     if (!currentSession.closed) currentSession.dryFrames.drawCompleted()
                     currentSession.frontDrawn = minOf(currentSession.frontDrawn, currentSession.drawn)
-                    if (currentSession.closed || currentSession.giantDrawn?.let{!controller.giantFrameCurrent(it)}==true) {
+                    val hidden = currentSession.closed || currentSession.giantDrawn?.let{!controller.giantFrameCurrent(it)}==true
+                    if (hidden) {
                         transaction.setVisibility(frontBufferedLayerSurfaceControl, false)
                         transaction.setVisibility(multiBufferedLayerSurfaceControl, false)
                     }
+                    !hidden
+                }
+                // Presentation means committed, not recorded: only then may a kept
+                // predecessor leave or SurfaceView cut its window hole over this layer.
+                if (visible && !currentSession.presented) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                        transaction.addTransactionCommittedListener({ it.run() }, object : SurfaceControlCompat.TransactionCommittedListener {
+                            override fun onTransactionCommitted() { presented(currentSession) }
+                        })
+                    else main.post { presented(currentSession) }
                 }
                 currentSession.giantDrawn?.let{frame->main.post{
                     if(!currentSession.closed&&currentSession===session&&controller.giantFrameCurrent(frame))
@@ -177,6 +271,17 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
             }
         })
         enqueue(currentSession, true)
+    }
+
+    /** Any thread: the generation's first visible frame has been committed. */
+    private fun presented(target: RenderSession) {
+        if (target.presented) return
+        target.firstPresent.countDown()
+        main.post {
+            if (target !== session || target.closed) return@post
+            retireKept(CanvasRetirementReason.SurfaceChanged)
+            redraws.finish()
+        }
     }
 
     private fun redrawNewer(target: RenderSession) {
@@ -213,41 +318,49 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         else reader?.read{tiles->PrecisionDrawing.draw(canvas,snapshot.copy(documentTiles=tiles))}
     }
     private suspend fun retireForProject(){latest=null;retireRenderer(CanvasRetirementReason.ProjectRetirement).await()}
+    /** Retires every generation, kept and current; completes after all releases settle. */
     private fun retireRenderer(reason:CanvasRetirementReason):CompletableDeferred<Unit> {
         controller.canvasRendererRetiring()
-        val target=session
-        synchronized(lock) { target?.closed = true; target?.dryFrames?.close() }
-        session=null
-        val previous=renderer;renderer=null
-        if(previous!=null){
-            retiring=true;retirement=CompletableDeferred()
-            val joined=retirement
-            val release=retirementProgress.begin(reason)
-            try {
-                previous.release(true){
-                    release.reached(CanvasRetirementMilestone.LibraryCallbackEntered)
-                    val posted=main.post{
-                        release.reached(CanvasRetirementMilestone.MainCallbackEntered)
-                        var readerClosed=false
-                        try{
-                            release.reached(CanvasRetirementMilestone.ReaderCloseRunning)
-                            target?.documentReader?.close();target?.documentReader=null
-                            readerClosed=true
-                            release.reached(CanvasRetirementMilestone.ReaderClosed)
-                            joined.complete(Unit)
-                            release.reached(CanvasRetirementMilestone.CompletionPublished)
-                        }
-                        catch(error:Exception){
-                            release.failed(if(readerClosed)CanvasRetirementMilestone.CompletionPublished else CanvasRetirementMilestone.ReaderCloseRunning)
-                            joined.completeExceptionally(error)
-                        }
-                        finally{retiring=false;ensureRenderer()}
+        replaceAfterRelease=false
+        retireKept(reason)
+        val target=session;val previous=renderer
+        session=null;renderer=null
+        if(previous!=null&&target!=null)release(Generation(previous,target),reason)
+        else if(target!=null)synchronized(lock){target.closed=true;target.dryFrames.close()}
+        return generations.joined()
+    }
+    private fun retireKept(reason:CanvasRetirementReason) {
+        val target=kept?:return
+        kept=null;release(target,reason)
+    }
+    private fun release(target:Generation,reason:CanvasRetirementReason) {
+        val owned=target.session
+        synchronized(lock) { owned.closed = true; owned.dryFrames.close() }
+        val joined=generations.beginRelease()
+        val release=retirementProgress.begin(reason)
+        try {
+            target.renderer.release(true){
+                release.reached(CanvasRetirementMilestone.LibraryCallbackEntered)
+                val posted=main.post{
+                    release.reached(CanvasRetirementMilestone.MainCallbackEntered)
+                    var readerClosed=false
+                    try{
+                        release.reached(CanvasRetirementMilestone.ReaderCloseRunning)
+                        owned.documentReader?.close();owned.documentReader=null
+                        readerClosed=true
+                        release.reached(CanvasRetirementMilestone.ReaderClosed)
+                        joined.complete(Unit)
+                        release.reached(CanvasRetirementMilestone.CompletionPublished)
                     }
-                    if(!posted)release.failed(CanvasRetirementMilestone.MainCallbackEntered)
+                    catch(error:Exception){
+                        release.failed(if(readerClosed)CanvasRetirementMilestone.CompletionPublished else CanvasRetirementMilestone.ReaderCloseRunning)
+                        joined.completeExceptionally(error)
+                    }
+                    finally{generations.settled(joined);ensureRenderer();replaceAfterSettled()}
                 }
-            }catch(error:Throwable){release.failed(CanvasRetirementMilestone.ReleaseRequested);throw error}
-        }
-        return retirement
+                if(!posted)release.failed(CanvasRetirementMilestone.MainCallbackEntered)
+            }
+        }catch(error:Throwable){release.failed(CanvasRetirementMilestone.ReleaseRequested);throw error}
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -290,4 +403,11 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         return super.onGenericMotionEvent(event)
     }
     override fun performClick(): Boolean { super.performClick(); return true }
+
+    private companion object {
+        /** Main-thread bound for a successor's first committed frame on resize. */
+        const val SUCCESSOR_PRESENT_WAIT_MS = 150L
+        /** Upper bound for holding SurfaceView's redraw completion. */
+        const val REDRAW_FALLBACK_MS = 750L
+    }
 }

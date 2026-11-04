@@ -200,8 +200,10 @@ internal object EditorDrawing {
     }
 
     /** Full opaque front frame makes multiply wet ink correct across SurfaceControls. */
+    /** Canvas surround outside the page; also the canvas host's backdrop while no frame is committed. */
+    fun surroundArgb(dark: Boolean): Int = if (dark) 0xff17252d.toInt() else 0xffdce5e3.toInt()
     fun draw(canvas: Canvas, scene: CanvasScene) {
-        canvas.drawColor(if (scene.dark) 0xff17252d.toInt() else 0xffdce5e3.toInt())
+        canvas.drawColor(surroundArgb(scene.dark))
         val pageSave = canvas.save()
         canvas.concat(matrix(scene.matrix))
         canvas.clipRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat())

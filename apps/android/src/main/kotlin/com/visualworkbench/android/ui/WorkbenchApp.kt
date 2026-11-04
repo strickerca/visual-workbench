@@ -18,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -350,7 +351,9 @@ private fun EditorScreen(editor: EditorController, onExport: () -> Unit, onSelec
                 TextButton(onClick = editor::cancelTransfer, modifier = Modifier.heightIn(min = 48.dp)) { Text("Cancel transfer") }
             }
         }
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        // Until a canvas frame is committed SurfaceView keeps its window hole closed;
+        // the host then shows the surround instead of the SurfaceView's black layer.
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().background(Color(EditorDrawing.surroundArgb(editor.preferences.darkTheme)))) {
             AndroidView(factory = { context -> CanvasSurface(context, editor) }, update = { it.updatePreferences() }, modifier = Modifier.fillMaxSize().clipToBounds())
             editor.scene?.takeIf { (it.background != null||it.documentFrame!=null||it.giantFrame!=null) && editor.blockingMessage == null }?.let { scene -> EraserOverlay(editor.erasers, scene.camera, scene.document.render.revision, scene.document.documentId) }
             editor.scene?.takeIf { (it.background != null||it.documentFrame!=null||it.giantFrame!=null) && editor.blockingMessage == null }?.let { scene -> SelectionOverlay(editor.selections, scene.camera, scene.document.render.revision, scene.document.documentId) }
