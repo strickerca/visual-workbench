@@ -148,16 +148,29 @@ time (54.7 s).
 
 **Change.** Every start still opens and hashes every admitted byte against the
 application-resource manifest, in manifest order. The redirect check now runs
-`toRealPath` on the bundle root once, then walks the tree once. The walk uses
-each directory entry's own attributes (links are never followed) and its name
-as stored. It refuses any symlink, junction or other reparse point, any special
-file, any unlisted file, and any directory at the depth limit. The stored
-relative names must equal the manifest keys exactly. This also refuses
-case-variant and 8.3 alias names; the old `Path` comparison ignored case. The
-same inventory is checked again after hashing.
+`toRealPath` on the bundle root once, then walks the tree once. The walk takes
+each entry's name as stored and reads that entry's own attributes again
+(links are never followed). It refuses any symlink, junction or other reparse
+point, any special file, any unlisted file, and any directory at the depth
+limit. The stored relative names must equal the manifest keys exactly. A
+single case-variant or 8.3 manifest name was already refused by the old final
+walk. The exact comparison also refuses what the old code accepted: two
+manifest names that alias one stored file. `DesktopMcpBundle.parse` already
+refuses such case-insensitive duplicates, so the bundle path was not exposed.
+`verify` now also applies the manifest path grammar itself (charset, reserved
+DOS names, trailing dot, depth). The same inventory is checked again after
+hashing.
+
+Files are then opened by path. Between the walk and each open, `verify`
+relies on the caller's inventory pins: `DesktopMcpBundle` holds
+no-write/no-delete handles on every runtime file and directory, checked against
+their final paths, from before verification until the bundle closes. The old
+per-ancestor checks were also only point-in-time checks under the same pins.
 
 The replica of the new procedure took 0.74 s on the same bundle (walk 64 ms,
-hash 617 ms, re-walk 45 ms). Nothing reuses an earlier verification. There is
+hash 617 ms, re-walk 45 ms). The follow-up that re-reads each entry's
+attributes was measured at 1.9 s total (walks 226 ms and 169 ms) while a
+distribution build was loading the laptop. Nothing reuses an earlier verification. There is
 no cross-process trust cache, no metadata-based trust and no security setting
 change. Bundle pins, inventory and markers are unchanged.
 

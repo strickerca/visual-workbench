@@ -18,21 +18,46 @@ internal class McpRuntime private constructor(val root: Path) {
         internal const val MAX_DEPTH=32
         private const val MAX_ENTRIES=30_000
         private const val READ_BUFFER=1 shl 20
-        /** Every start re-hashes every admitted byte. Redirection is refused by
-         * one canonical check of the root plus one tree walk whose directory
-         * entries carry the names exactly as stored and their own attributes:
-         * a reparse point, symlink, special file, 8.3 alias, case variant or
-         * unlisted file anywhere below the root is refused before and again
-         * after hashing. This replaces a per-file toRealPath of every ancestor
+        private val RESERVED=setOf("CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9","LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9")
+        /** The bundle path grammar, shared with [DesktopMcpBundle.parse]:
+         * 1..256 chars, at most [MAX_DEPTH] '/'-separated segments, each made
+         * only of ASCII letters/digits and `._-@+`, never `.`/`..`, never ending
+         * in a dot (spaces are outside the charset) and never a reserved DOS
+         * device base name. */
+        internal fun admissibleName(name:String):Boolean = name.length in 1..256 && name.split('/').let{parts->
+            parts.size<=MAX_DEPTH && parts.all{segment->
+                segment.isNotEmpty() && segment !in listOf(".","..") &&
+                    segment.all{it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it in "._-@+"} &&
+                    !segment.endsWith('.') && segment.substringBefore('.').uppercase() !in RESERVED
+            }
+        }
+        /** Every call re-hashes every admitted byte; nothing is reused from an
+         * earlier call. Redirection checks: one canonical toRealPath check of
+         * the root, then a no-follow tree walk that reads each entry's own
+         * attributes and takes its name as stored. Any reparse point, symlink,
+         * special file, unlisted file or directory at the depth limit is
+         * refused, as is a manifest whose names are not exactly the stored
+         * names (for example two manifest names that alias one stored file).
+         * The walk runs before and again after hashing.
+         *
+         * Files are then opened by path. Between the walk and each open, this
+         * function relies on the caller's inventory pins: [DesktopMcpBundle]
+         * holds no-write/no-delete handles on every runtime file and
+         * directory, checked against their final paths, from before this call
+         * until the bundle closes. Without such pins the walk is only a
+         * point-in-time check, as the previous per-ancestor checks were.
+         *
+         * The previous version ran toRealPath on every ancestor of every file
          * (O(files x depth^2) directory lookups, about 60 s for the packaged
-         * 1,514-file bundle) with the same refusals at O(entries) cost. */
+         * 1,514-file bundle). This walk is O(entries). */
         fun verify(root: Path, trustedHashes: Map<String,String>,serverOnly:Boolean=false,progress:McpStartupProgress?=null): McpRuntime {
             require(trustedHashes.size in 4..20_000)
             val base=root.toAbsolutePath().normalize()
             require(base==root && Files.isDirectory(base,LinkOption.NOFOLLOW_LINKS))
             noRedirect(base)
+            val folded=HashSet<String>()
             trustedHashes.forEach { (name, expected) ->
-                require(name.length in 1..256 && !name.contains('\\') && name.split('/').let{parts->parts.size<=MAX_DEPTH && parts.all { it.isNotEmpty() && it !in listOf(".","..") }})
+                require(admissibleName(name) && folded.add(name.lowercase()))
                 require(expected.matches(Regex("[0-9a-f]{64}")))
                 require(base.resolve(name).normalize().startsWith(base))
             }
@@ -40,8 +65,8 @@ internal class McpRuntime private constructor(val root: Path) {
             for(name in required+listOf("vw-codex-host.exe", "mcp/codex/main.mjs", "mcp/codex/client.mjs", "mcp/codex/package.mjs", "mcp/codex/process.mjs", "mcp/codex/schema.mjs", "mcp/codex/schema-worker.mjs", "mcp/codex/image-profiles.json")) require(trustedHashes.containsKey(name))
             // Node searches dependencies on disk: an unlisted injection cannot be
             // admitted alongside valid pins. This directory is a dedicated bundle.
-            // Exact (case-sensitive) equality with stored names also proves each
-            // manifest path names that stored entry rather than an alias.
+            // Exact (case-sensitive) set equality with the stored names means
+            // each manifest name is the stored name, not a second alias of it.
             require(storedFiles(base)==trustedHashes.keys)
             var total=0L
             val buffer=ByteArray(READ_BUFFER)
@@ -58,19 +83,24 @@ internal class McpRuntime private constructor(val root: Path) {
             return McpRuntime(base)
         }
         /** Relative '/' names of every regular file below [base], as the
-         * directory entries store them. Attributes are the entries' own
-         * (links are never followed); anything other than a plain directory
-         * or plain regular file is refused, as is a directory at [MAX_DEPTH]. */
+         * directory entries store them. Each entry's attributes are read again
+         * from the entry itself (links never followed) rather than taken from
+         * the directory listing: anything other than a plain directory or a
+         * plain regular file is refused. With maxDepth = [MAX_DEPTH], a
+         * directory at that depth is delivered to visitFile and refused there
+         * as not a regular file; deeper entries are never reached. */
         internal fun storedFiles(base:Path):Set<String> {
             val files=HashSet<String>();var count=0
+            fun own(path:Path)=Files.readAttributes(path,BasicFileAttributes::class.java,LinkOption.NOFOLLOW_LINKS)
             Files.walkFileTree(base,emptySet(),MAX_DEPTH,object:SimpleFileVisitor<Path>(){
                 override fun preVisitDirectory(dir:Path,attrs:BasicFileAttributes):FileVisitResult {
-                    require(++count<=MAX_ENTRIES && attrs.isDirectory && !attrs.isSymbolicLink && !attrs.isOther)
-                    require(dir.nameCount-base.nameCount<MAX_DEPTH)
+                    val actual=own(dir)
+                    require(++count<=MAX_ENTRIES && actual.isDirectory && !actual.isSymbolicLink && !actual.isOther)
                     return FileVisitResult.CONTINUE
                 }
                 override fun visitFile(file:Path,attrs:BasicFileAttributes):FileVisitResult {
-                    require(++count<=MAX_ENTRIES && attrs.isRegularFile && !attrs.isSymbolicLink && !attrs.isOther)
+                    val actual=own(file)
+                    require(++count<=MAX_ENTRIES && actual.isRegularFile && !actual.isSymbolicLink && !actual.isOther)
                     require(files.add(base.relativize(file).toString().replace('\\','/')))
                     return FileVisitResult.CONTINUE
                 }

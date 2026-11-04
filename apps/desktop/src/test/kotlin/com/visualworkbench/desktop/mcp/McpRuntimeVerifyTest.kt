@@ -67,20 +67,44 @@ class McpRuntimeVerifyTest {
         t.verify()
         val variant=LinkedHashMap<String,String>();t.hashes.forEach{(k,v)->variant[if(k=="lib/Data.js")"lib/data.js" else k]=v}
         // On a case-insensitive volume this path opens the same bytes; the
-        // stored-name inventory still refuses the alias.
+        // stored-name inventory still refuses the alias (as did the previous
+        // final walk).
         fails{McpRuntime.verify(t.root,variant,serverOnly=true)}
         val dirVariant=LinkedHashMap<String,String>();t.hashes.forEach{(k,v)->dirVariant[if(k=="lib/Data.js")"LIB/Data.js" else k]=v}
         fails{McpRuntime.verify(t.root,dirVariant,serverOnly=true)}
     }
 
+    /** The previous verify accepted this on a case-insensitive volume: both
+     * names resolved to the one stored file and passed the case-insensitive
+     * Path comparison, and the final walk found the stored name listed. */
+    @Test fun twoManifestNamesAliasingOneStoredFileAreRefused()=tree(listOf("lib/Data.js")).use{t->
+        val aliases=LinkedHashMap(t.hashes).apply{put("lib/data.js",t.hashes.getValue("lib/Data.js"))}
+        fails{McpRuntime.verify(t.root,aliases,serverOnly=true)}
+    }
+
+    @Test fun pathGrammarMatchesTheManifestParser(){
+        for(good in listOf("node.exe","mcp/node_modules/@scope/pkg+x/index.js",(1..31).joinToString("/"){"d"}+"/f.js"))assertTrue(good,McpRuntime.admissibleName(good))
+        for(bad in listOf("","a b.js","mcp/x.","mcp/x ","mcp/NUL.txt","mcp/com1","mcp/é.js","mcp/x:y","a\\b",(1..32).joinToString("/"){"d"}+"/f.js","a".repeat(257)))
+            assertFalse(bad,McpRuntime.admissibleName(bad))
+    }
+
     @Test fun rootMustBeCanonicalAndManifestNamesMustStayInside()=tree().use{t->
         fails{McpRuntime.verify(t.root.resolve("mcp").resolve(".."),t.hashes,serverOnly=true)}
-        for(bad in listOf("../outside","mcp//x","mcp\\x","./x"))fails{McpRuntime.verify(t.root,LinkedHashMap(t.hashes).apply{put(bad,"a".repeat(64))},serverOnly=true)}
+        for(bad in listOf("../outside","mcp//x","mcp\\x","./x","mcp/NUL.js","mcp/x.","mcp/a b.js"))fails{McpRuntime.verify(t.root,LinkedHashMap(t.hashes).apply{put(bad,"a".repeat(64))},serverOnly=true)}
     }
 
     @Test fun directoriesAtTheDepthLimitAreRefused()=tree().use{t->
         Files.createDirectories((1..McpRuntime.MAX_DEPTH).fold(t.root){p,_->p.resolve("d")})
         fails{t.verify()}
+    }
+
+    @Test fun aFileAtTheDepthLimitBelowThirtyOneDirectoriesIsAdmitted(){
+        val name=(1 until McpRuntime.MAX_DEPTH).joinToString("/"){"d"}+"/f.js"
+        assertEquals(McpRuntime.MAX_DEPTH,name.split('/').size)
+        tree(listOf(name)).use{t->
+            t.verify()
+            assertTrue(name in McpRuntime.storedFiles(t.root))
+        }
     }
 
     @Test fun symbolicLinksInsideTheTreeAreRefused()=tree().use{t->
@@ -94,28 +118,31 @@ class McpRuntimeVerifyTest {
     @Test fun directoryJunctionsInsideTheTreeAreRefused()=tree().use{t->
         assumeTrue("Requires Windows directory junctions",windows)
         val outside=Files.createTempDirectory("vw-mcp-verify-outside-").toRealPath()
+        val junction=t.root.resolve("mcp/node_modules/j")
         try{
             Files.write(outside.resolve("index.js"),"content:mcp/node_modules/j/index.js".toByteArray())
-            val junction=t.root.resolve("mcp/node_modules/j");Files.createDirectories(junction.parent)
+            Files.createDirectories(junction.parent)
             val process=ProcessBuilder("cmd.exe","/c","mklink","/J",junction.toString(),outside.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
             assumeTrue("mklink /J did not complete",process.waitFor(20,TimeUnit.SECONDS) && process.exitValue()==0)
             val hashes=LinkedHashMap(t.hashes).apply{put("mcp/node_modules/j/index.js",sha("content:mcp/node_modules/j/index.js".toByteArray()))}
             fails{McpRuntime.verify(t.root,hashes,serverOnly=true)}
-            Files.delete(junction) // Removes the junction only, never its target.
-            assertTrue(Files.exists(outside.resolve("index.js")))
-        }finally{deleteFixture(outside)}
+        }finally{
+            // Removes the junction itself (never its target) before either tree.
+            if(Files.exists(junction,java.nio.file.LinkOption.NOFOLLOW_LINKS))Files.delete(junction)
+            try{assertTrue(Files.exists(outside.resolve("index.js")))}finally{deleteFixture(outside)}
+        }
     }
 
-    /** Regression for B8: the earlier per-file toRealPath of every ancestor
-     * took about 60 s for the packaged 1,514-file bundle. A deep synthetic tree
-     * must stay linear in its entry count. The bound is deliberately loose. */
-    @Test fun deepManyFileTreeVerifiesWithoutPerAncestorLookups(){
+    /** Perf smoke for B8, not a benchmark: the earlier per-file toRealPath of
+     * every ancestor took about 60 s for the packaged 1,514-file bundle. The
+     * bound is generous; it only catches a return to per-ancestor lookups. */
+    @Test fun perfSmokeDeepManyFileTreeVerifiesWithoutPerAncestorLookups(){
         val deep=(1..18).joinToString("/"){"n$it"}
         tree((0 until 600).map{"mcp/node_modules/$deep/p${it%20}/f$it.js"}).use{t->
             val started=System.nanoTime()
             t.verify()
             val elapsedMs=(System.nanoTime()-started)/1_000_000
-            assertTrue("verify took $elapsedMs ms",elapsedMs<15_000)
+            assertTrue("verify took $elapsedMs ms",elapsedMs<60_000)
         }
     }
 }

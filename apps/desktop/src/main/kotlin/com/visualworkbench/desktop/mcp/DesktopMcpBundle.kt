@@ -25,10 +25,9 @@ internal class DesktopMcpBundle private constructor(
                 require(seen.size<20_000)
                 val part=line.split(' ',limit=3);require(part.size==3 && part[0].matches(Regex("[0-9a-f]{64}")))
                 val size=part[1].toLongOrNull()?:throw McpRefused();require(size in 0..256L*1024*1024)
-                val name=part[2];require(name.length in 1..256 && name.split('/').size<=32 && name.split('/').all{segment->
-                    segment.isNotEmpty() && segment !in listOf(".","..") && segment.all{it.isLetterOrDigit() || it in "._-@+"} &&
-                        !segment.endsWith('.') && segment.substringBefore('.').uppercase() !in setOf("CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9","LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9")
-                })
+                // Shared with McpRuntime.verify. The manifest is already printable
+                // ASCII, so the ASCII-only charset matches the former isLetterOrDigit.
+                val name=part[2];require(McpRuntime.admissibleName(name))
                 require(seen.add(name.lowercase()))
                 total=Math.addExact(total,size);require(total<=1024L*1024*1024)
                 Entry(part[0],size,name)
