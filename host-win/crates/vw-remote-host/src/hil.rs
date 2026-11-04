@@ -133,6 +133,8 @@ struct SurfaceState {
     controller_fixture: Option<controller_surface::ControllerSurface>,
     release_marker: Option<(PathBuf, String)>,
     published: bool,
+    /// Owner-physical receiver only: append coalesced pen history rows.
+    pen_history: bool,
 }
 impl SurfaceState {
     fn report_counts(&mut self) {
@@ -184,6 +186,59 @@ fn input_provenance(source: Option<(i32, i32)>, extra_info: u64) -> serde_json::
         "origin_id": source.map(|v| v.1),
         "message_extra_info": format!("{extra_info:016x}")
     })
+}
+/// Original receiver record. The synthetic/controller routes keep exactly this
+/// schema; only the owner-physical receiver appends `pen_history`.
+fn pointer_record(
+    message: u32,
+    index: usize,
+    count: u32,
+    pen: Option<&POINTER_PEN_INFO>,
+) -> serde_json::Value {
+    serde_json::json!({"message":message,"index":index,"count":count,"pointer_available":pen.is_some(),
+        "pressure":pen.map(|v| v.pressure),"pen_flags":pen.map(|v| v.penFlags),
+        "performance_count":pen.map(|v| v.pointerInfo.PerformanceCount),
+        "pointer_flags":pen.map(|v| v.pointerInfo.pointerFlags.0),
+        "pointer_id":pen.map(|v| v.pointerInfo.pointerId)})
+}
+/// Bound on coalesced frames read for one pointer message.
+const PEN_HISTORY_LIMIT: u32 = 256;
+/// Coalesced GetPointerPenInfoHistory frames as returned (newest first),
+/// emitted oldest first. Mirrors the T0.05 recorder columns
+/// (tools/pen-inject/harness/src/platform.rs); raw native values only, with
+/// no physical-provenance or device inference.
+fn pen_history_rows(history: &[POINTER_PEN_INFO]) -> serde_json::Value {
+    serde_json::Value::Array(
+        history
+            .iter()
+            .rev()
+            .map(|pen| {
+                let p = &pen.pointerInfo;
+                serde_json::json!({"x":p.ptPixelLocation.x,"y":p.ptPixelLocation.y,"pressure":pen.pressure,
+                    "tilt_x":pen.tiltX,"tilt_y":pen.tiltY,"rotation":pen.rotation,"pen_flags":pen.penFlags,
+                    "pen_mask":pen.penMask,"pointer_flags":p.pointerFlags.0,"frame_id":p.frameId,
+                    "performance_count":p.PerformanceCount,"history_count":p.historyCount})
+            })
+            .collect(),
+    )
+}
+fn current_pen_history(pointer: u32) -> Option<Vec<POINTER_PEN_INFO>> {
+    let mut count = 0u32;
+    // SAFETY: length-only history query for the pointer message currently
+    // dispatched on this receiver UI thread; no buffer is written.
+    unsafe { GetPointerPenInfoHistory(pointer, &mut count, None) }.ok()?;
+    if !(1..=PEN_HISTORY_LIMIT).contains(&count) {
+        return None;
+    }
+    let mut history = vec![POINTER_PEN_INFO::default(); count as usize];
+    // SAFETY: `history` holds `count` initialized writable elements and stays
+    // alive for the call; the API writes at most `count` entries.
+    unsafe { GetPointerPenInfoHistory(pointer, &mut count, Some(history.as_mut_ptr())) }.ok()?;
+    if count == 0 || count as usize > history.len() {
+        return None;
+    }
+    history.truncate(count as usize);
+    Some(history)
 }
 fn current_input_provenance() -> serde_json::Value {
     let mut source = INPUT_MESSAGE_SOURCE::default();
@@ -316,11 +371,16 @@ unsafe extern "system" fn surface_proc(
                 // SAFETY: bounded pointer ID from the actual window message, initialized output.
                 let pen_ok = index < 3
                     && unsafe { GetPointerPenInfo((wp.0 & 0xffff) as u32, &mut pen) }.is_ok();
-                let mut record = serde_json::json!({"message":message,"index":index,"count":state.counts[index],"pointer_available":pen_ok,
-                    "pressure":if pen_ok{Some(pen.pressure)}else{None},"pen_flags":if pen_ok{Some(pen.penFlags)}else{None},
-                    "performance_count":if pen_ok{Some(pen.pointerInfo.PerformanceCount)}else{None},
-                    "pointer_flags":if pen_ok{Some(pen.pointerInfo.pointerFlags.0)}else{None},
-                    "pointer_id":if pen_ok{Some(pen.pointerInfo.pointerId)}else{None}});
+                let mut record =
+                    pointer_record(message, index, state.counts[index], pen_ok.then_some(&pen));
+                if state.pen_history && pen_ok {
+                    // A failed history query is recorded as null; the
+                    // physical validator refuses it rather than guessing.
+                    record["pen_history"] = current_pen_history((wp.0 & 0xffff) as u32)
+                        .map_or(serde_json::Value::Null, |history| {
+                            pen_history_rows(&history)
+                        });
+                }
                 if let Some(provenance) = provenance {
                     record["input_provenance"] = provenance;
                 }
@@ -428,7 +488,15 @@ fn pump_receiver_startup() -> Result<()> {
     }
     Ok(())
 }
-fn surface(output: &Path, position: i32, controller_fixture: bool) -> Result<()> {
+fn surface(
+    output: &Path,
+    position: i32,
+    controller_fixture: bool,
+    pen_history: bool,
+) -> Result<()> {
+    if pen_history && !controller_fixture {
+        return Err(Error::Invalid);
+    }
     platform::initialize_hil_dpi()?;
     std::fs::create_dir(output)?;
     let mut state = Box::new(SurfaceState {
@@ -458,6 +526,7 @@ fn surface(output: &Path, position: i32, controller_fixture: bool) -> Result<()>
             None
         },
         published: false,
+        pen_history,
     });
     // SAFETY: one owned window/class, boxed state outlives DestroyWindow and native message loop.
     let hwnd = unsafe {
@@ -1566,11 +1635,17 @@ fn readiness_click(
 }
 pub fn run() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.len() == 3 && matches!(args[0].as_str(), "--surface" | "--surface-controller") {
+    if args.len() == 3
+        && matches!(
+            args[0].as_str(),
+            "--surface" | "--surface-controller" | "--surface-controller-physical"
+        )
+    {
         surface(
             Path::new(&args[1]),
             args[2].parse().map_err(|_| Error::Invalid)?,
-            args[0] == "--surface-controller",
+            args[0] != "--surface",
+            args[0] == "--surface-controller-physical",
         )
     } else {
         drive(&args)
@@ -1638,6 +1713,107 @@ mod receiver_provenance_tests {
             assert!(!consume_controller_pointer_lifecycle(true, message));
             assert!(!consume_controller_pointer_lifecycle(false, message));
         }
+    }
+}
+#[cfg(test)]
+mod receiver_record_tests {
+    use super::*;
+
+    fn pen(x: i32, frame: u32, pressure: u32, flags: u32) -> POINTER_PEN_INFO {
+        POINTER_PEN_INFO {
+            pointerInfo: POINTER_INFO {
+                pointerId: 3,
+                frameId: frame,
+                ptPixelLocation: POINT { x, y: 40 },
+                pointerFlags: POINTER_FLAGS(flags),
+                PerformanceCount: u64::from(frame) * 10,
+                historyCount: 2,
+                ..Default::default()
+            },
+            pressure,
+            tiltX: -7,
+            tiltY: 9,
+            rotation: 45,
+            penFlags: 1,
+            penMask: 7,
+        }
+    }
+
+    #[test]
+    fn legacy_record_keeps_exact_synthetic_schema() {
+        let record = pointer_record(WM_POINTERUPDATE, 1, 4, Some(&pen(10, 1, 512, 0x20006)));
+        let keys: Vec<&str> = record
+            .as_object()
+            .map(|v| v.keys().map(String::as_str).collect())
+            .unwrap_or_default();
+        let mut sorted = keys.clone();
+        sorted.sort_unstable();
+        assert_eq!(
+            sorted,
+            vec![
+                "count",
+                "index",
+                "message",
+                "pen_flags",
+                "performance_count",
+                "pointer_available",
+                "pointer_flags",
+                "pointer_id",
+                "pressure"
+            ]
+        );
+        assert_eq!(record["pressure"], 512);
+        assert_eq!(record["pointer_id"], 3);
+        let unavailable = pointer_record(WM_LBUTTONDOWN, 3, 1, None);
+        assert_eq!(unavailable["pointer_available"], false);
+        assert!(unavailable["pressure"].is_null() && unavailable["pointer_id"].is_null());
+        assert!(unavailable.get("pen_history").is_none());
+    }
+
+    #[test]
+    fn pen_history_rows_are_oldest_first_with_closed_columns() {
+        // GetPointerPenInfoHistory returns the newest frame first.
+        let rows = pen_history_rows(&[pen(12, 9, 700, 0x20006), pen(11, 8, 300, 0x20006)]);
+        let rows = rows.as_array().cloned().unwrap_or_default();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0]["frame_id"], 8);
+        assert_eq!(rows[0]["x"], 11);
+        assert_eq!(rows[0]["pressure"], 300);
+        assert_eq!(rows[1]["frame_id"], 9);
+        assert_eq!(rows[1]["pressure"], 700);
+        for row in &rows {
+            let mut keys: Vec<&str> = row
+                .as_object()
+                .map(|v| v.keys().map(String::as_str).collect())
+                .unwrap_or_default();
+            keys.sort_unstable();
+            assert_eq!(
+                keys,
+                vec![
+                    "frame_id",
+                    "history_count",
+                    "pen_flags",
+                    "pen_mask",
+                    "performance_count",
+                    "pointer_flags",
+                    "pressure",
+                    "rotation",
+                    "tilt_x",
+                    "tilt_y",
+                    "x",
+                    "y"
+                ]
+            );
+            assert_eq!(row["tilt_x"], -7);
+            assert_eq!(row["tilt_y"], 9);
+            assert_eq!(row["rotation"], 45);
+            assert_eq!(row["pen_mask"], 7);
+            assert_eq!(row["pen_flags"], 1);
+            assert_eq!(row["history_count"], 2);
+            assert_eq!(row["pointer_flags"], 0x20006);
+            assert_eq!(row["y"], 40);
+        }
+        assert_eq!(pen_history_rows(&[]), serde_json::json!([]));
     }
 }
 #[cfg(test)]
