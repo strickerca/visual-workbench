@@ -256,3 +256,12 @@ regexes = [
   '''^\s*"tokenizers\-0\.23\.3\.tar\.gz": "cded33237c77caeef62944d32aa9a7ef42bdce2b3497e18d137e072a8c4be438",?\s*$''',
   '''bound\ and\ observed\ an\ owned\ native\ surface\ and\ Krita\ 5\.3\.4\.0\.\ Krita's\ complete''',
 ]
+
+[[allowlists]]
+description = "Exact WSL2 kernel version recorded in the B2 local reproduction host block (2026-11-04); a version string, not a network address; no general version exemption"
+condition = "AND"
+# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
+targetRules = ["vw-evidence-ip-address"]
+paths = ['''(^|/)docs/evidence/ASSISTED_MODEL_LOCAL_REPRODUCTION_20261104\.json$''']
+regexTarget = "line"
+regexes = ['''^\s*"kernel": "6\.6\.87\.2-microsoft-standard-WSL2",?\s*$''']
