@@ -214,7 +214,27 @@ class ConsumerGuardTests(unittest.TestCase):
 
     def test_unreadable_runtime_image_is_ambiguous(self):
         result = self.guard([row(5, 4, "node.exe", None), row(6, 4, "svchost.exe", None)])
-        self.assertEqual([c["reason"] for c in result["conflicts"]], ["runtime_named_image_unreadable"])
+        self.assertEqual([c["reason"] for c in result["conflicts"]], ["runtime_named_image_ambiguous"])
+        unc = self.guard([row(5, 4, "node.exe", r"\\server\share\node.exe")])
+        self.assertEqual([c["reason"] for c in unc["conflicts"]], ["runtime_named_image_ambiguous"])
+
+    def test_workbench_app_anywhere_refuses_unless_explicitly_excluded(self):
+        rows = [row(1, 0, "python.exe", r"C:\Python\python.exe"),
+                row(20, 3, "VisualWorkbench.exe", r"C:\Program Files\Visual Workbench\VisualWorkbench.exe", 100),
+                row(21, 20, "node.exe", r"C:\Program Files\nodejs\node.exe", 110),
+                row(22, 3, "VisualWorkbenchDev.exe", r"D:\build\VisualWorkbenchDev.exe", 100)]
+        result = self.guard(rows)
+        self.assertTrue(result["workbench_app_running"])
+        self.assertEqual({(c["pid"], c["reason"]) for c in result["conflicts"]},
+                         {(20, "workbench_app_running"), (21, "workbench_app_child_runtime"),
+                          (22, "workbench_app_running")})
+        excluded = classify_processes(rows, owned_roots=(1,), packaged_roots=(CACHE,), excluded_pids=(20, 22))
+        self.assertEqual((excluded["status"], excluded["workbench_app_running"]), ("clear", False))
+
+    def test_workbench_runtime_binary_anywhere_refuses(self):
+        for name in ("vw-mcp-host.exe", "VW-CODEX-HOST.EXE", "vw-mcp-package.exe", "vw-mcp.exe"):
+            result = self.guard([row(9, 4, name, "E:\\elsewhere\\" + name)])
+            self.assertEqual(result["conflicts"][0]["reason"], "workbench_runtime_named_process")
 
     def test_prefix_is_component_wise(self):
         lookalike = CACHE + "-old\\" + KEY_A + "\\runtime\\node.exe"
@@ -252,6 +272,27 @@ class PlanTests(unittest.TestCase):
         plan = pre.plan_cache_entries(entries, requested_key="1" * 64, in_use=set())
         self.assertEqual((plan["slots_needed"], plan["proposed_for_owner_review"], plan["owner_action"]), (0, [], "none"))
         self.assertEqual({r["state"] for r in plan["entries"] if r["key"] == "1" * 64}, {"requested_current_keep"})
+
+    def test_running_workbench_blocks_incomplete_proposal(self):
+        keys = [f"{i:x}" * 64 for i in range(1, 9)]
+        entries = [entry(k, modified=1_700_000_000 + i) for i, k in enumerate(keys)]
+        entries[0] = entry(keys[0], ready=False, modified=1_700_000_000)
+        plan = pre.plan_cache_entries(entries, requested_key=KEY_C, in_use=set(), workbench_running=True)
+        states = {r["key"]: r["state"] for r in plan["entries"]}
+        self.assertEqual(states[keys[0]], "incomplete_possible_live_extraction_keep")
+        self.assertNotIn(keys[0], plan["proposed_for_owner_review"])
+        self.assertTrue(plan["workbench_app_running"])
+
+    def test_requested_key_present_but_incomplete_needs_owner_action(self):
+        for broken in (entry(KEY_C, ready=False), entry(KEY_C, owner=False), entry(KEY_C, unexpected=True),
+                       entry(KEY_C, runtime=False)):
+            plan = pre.plan_cache_entries([entry(KEY_A), broken], requested_key=KEY_C, in_use=set())
+            self.assertEqual(plan["slots_needed"], 0)
+            self.assertTrue(plan["owner_action_required"])
+            self.assertNotEqual(plan["owner_action"], "none")
+            self.assertIn("requested_current_incomplete_owner_action", {r["state"] for r in plan["entries"]})
+        healthy = pre.plan_cache_entries([entry(KEY_C)], requested_key=KEY_C, in_use=set())
+        self.assertFalse(healthy["owner_action_required"])
 
     def test_unsatisfiable_and_invalid_key(self):
         entries = [entry(f"{i:x}" * 64, owner=False) for i in range(1, 9)]
@@ -315,6 +356,51 @@ class ScanAndRunTests(unittest.TestCase):
         states = {r["key"]: r["state"] for r in receipt["cache_plan"]["entries"]}
         self.assertEqual(states["1" * 64], "in_use_keep")
         self.assertNotIn("1" * 64, receipt["cache_plan"]["proposed_for_owner_review"])
+
+    def test_run_turns_later_failures_into_refusal_receipts(self):
+        def snapshot_refused():
+            raise PreflightRefused("process_snapshot_incomplete", "consumer_guard")
+
+        def scan_oserror(_):
+            raise PermissionError(5, "denied")
+
+        def scan_refused(_):
+            raise PreflightRefused("cache_listing_unbounded", "scan_cache")
+
+        cases = [(snapshot_refused, pre.scan_cache, "consumer_guard", "process_snapshot_incomplete"),
+                 (lambda: [], scan_oserror, "scan_cache", "os_error"),
+                 (lambda: [], scan_refused, "scan_cache", "cache_listing_unbounded")]
+        for processes, scan, phase, code in cases:
+            probe = FakeProbe(namespace())
+            receipt = pre.run(LAD, KEY_C, [1], [], probe, processes, scan=scan)
+            self.assertEqual((receipt["status"], receipt["phase"], receipt["refusal_code"]), ("refused", phase, code))
+            self.assertTrue(probe.closed)
+            self.assertFalse(receipt["mutation_performed"])
+
+    def test_run_tolerates_unc_and_device_images(self):
+        self.make("1" * 64)
+        rows = [row(9, 4, "node.exe", r"\\server\share\node.exe"), row(10, 4, "vw-mcp-host.exe", r"\\.\device\x.exe"),
+                row(11, 4, "other.exe", r"\\?\UNC\server\share\other.exe")]
+        receipt = pre.run(LAD, KEY_C, [1], [], FakeProbe(namespace()), lambda: rows,
+                          scan=lambda _: pre.scan_cache(self.base))
+        self.assertEqual(receipt["status"], "refused")
+        self.assertEqual({c["pid"] for c in receipt["consumer_guard"]["conflicts"]}, {9, 10})
+
+    def test_snapshot_walk_must_end_with_no_more_files(self):
+        pre._require_complete_walk(18, 5)
+        for error, count in ((5, 5), (0, 5), (18, 0)):
+            with self.assertRaises(PreflightRefused) as caught:
+                pre._require_complete_walk(error, count)
+            self.assertEqual(caught.exception.code, "process_snapshot_incomplete")
+
+    def test_receipt_is_written_new_and_parseable(self):
+        import json
+        out = Path(self.temp.name) / "receipts"
+        first = pre.write_receipt({"status": "refused", "package_family": None}, out)
+        second = pre.write_receipt({"status": "clear"}, out)
+        self.assertNotEqual(first, second)
+        self.assertEqual(json.loads(first.read_text(encoding="utf-8"))["status"], "refused")
+        self.assertEqual(pre.RECEIPT_DIR.relative_to(pre.RECEIPT_DIR.parents[1]).as_posix(), ".local/mcp-cache-preflight")
 
     def test_run_reports_pin_refusal_and_absent_namespace(self):
         refused = pre.run(LAD, None, [1], [], FakeProbe(namespace(swap_base=True)), lambda: [])

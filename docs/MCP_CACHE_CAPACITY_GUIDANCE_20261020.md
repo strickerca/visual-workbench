@@ -47,20 +47,34 @@ equal the requested string. The retained read-only diagnosis
 (`WINDOWS_MCP_CANONICAL_READONLY_DIAGNOSIS_20261020.json`) shows the first
 difference at the `Visual Workbench` child: 6 requested components, 10
 observed, no reparse tag, and the same volume serial and 128-bit file id on
-both opens. That is MSIX app-data virtualization. The build and app were
-launched from inside the Codex desktop app's package container, so Windows
-redirected the child to
-`%LOCALAPPDATA%\Packages\<family>\LocalCache\Local\Visual Workbench`. A
-read-only listing on 2026-11-04 confirmed that the cache exists only there
-(8 entries) and that `%LOCALAPPDATA%\Visual Workbench` is absent. It was not
-8.3 names, case, a `\\?\` prefix, a trailing separator, a junction or OneDrive.
-The desktop app already admits this one-child redirection (`NativeCacheAnchor`)
-and uses the canonical path for the MCP cache. Only the ad-hoc helper did not,
-and that helper was never committed.
+both opens. The cause is **inferred, not proven by a receipt**: MSIX app-data
+virtualization. The likely sequence is that the build and app were launched
+from inside the Codex desktop app's package container, and Windows redirected
+the child to `%LOCALAPPDATA%\Packages\<family>\LocalCache\Local\Visual Workbench`.
+Supporting observations:
 
-**Consequence.** The cache depends on the launcher's container. A run started
-from another packaged agent app, or from a plain PowerShell window, uses a
-different `Visual Workbench` directory that has its own capacity count.
+- The 10-component shape matches that redirect exactly.
+- A read-only listing on 2026-11-04 found the cache only under the Codex
+  package's `LocalCache\Local` (8 entries), with no `%LOCALAPPDATA%\Visual Workbench`.
+  That listing was not retained.
+- The retained receipt below records `environment_anchor_visible=false` from
+  this (Claude) session and the cache's location under the Codex package.
+
+No receipt was taken from inside the Codex container, which is what would show
+the redirect directly. The observed shape rules out 8.3 names, case, a `\\?\`
+prefix, a trailing separator and a junction (reparse tag 0); OneDrive does not
+redirect `AppData\Local`. The desktop app already admits a one-child
+redirection (`NativeCacheAnchor`) and uses the canonical path for the MCP
+cache. Only the ad-hoc helper did not, and that helper was never committed.
+The new preflight is stricter than `NativeCacheAnchor`, which only requires the
+canonical anchor to start with LOCALAPPDATA and end in `Visual Workbench`. The
+preflight also requires the exact
+`Packages\<family>\LocalCache\Local` shape, a valid family name and file-object
+identity.
+
+**Consequence.** The cache very likely depends on the launcher's container. A
+run started from another packaged agent app, or from a plain PowerShell window,
+would use a different `Visual Workbench` directory with its own capacity count.
 
 **`tools/mcp_cache_preflight.py`** (read-only; tests in
 `tools/tests/test_mcp_cache_preflight.py`):
@@ -70,18 +84,45 @@ different `Visual Workbench` directory that has its own capacity count.
   the same file object. Reparse points, a different object, other packages,
   redirection anywhere else, a descendant that leaves the redirection, and
   unexpanded 8.3 names still refuse.
-- The consumer guard refuses when a process image lies under the cache base
-  (requested or canonical form) or under an explicit `--packaged-root`. It
-  also refuses when a runtime-named process from a task-owned tree is still
-  alive, or when such a process's image is unreadable. Unrelated Node tools
-  are counted and ignored. A PID that exits after the snapshot is dropped.
+- The consumer guard refuses on:
+  - any `VisualWorkbench.exe` / `VisualWorkbenchDev.exe` process, wherever it
+    is installed;
+  - any `vw-mcp-host.exe`, `vw-mcp-package.exe`, `vw-codex-host.exe` or
+    `vw-mcp.exe`, wherever it is;
+  - any image under the cache base (requested or canonical form) or under an
+    explicit `--packaged-root`;
+  - a `node.exe` descended from a Workbench app or a task-owned root
+    (`--owned-root-pid`);
+  - a runtime-named process whose image is unreadable or not a drive path.
+
+  Only `--exclude-pid` exempts a process, after owner review. Other `node.exe`
+  processes are counted and ignored. **Limitation:** a `node.exe` installed
+  outside the cache that runs a script from the cache is not detectable by
+  image path. It is reported only if it descends from a Workbench or
+  task-owned process. Snapshot walks that end with any error other than
+  ERROR_NO_MORE_FILES refuse. A PID that exits after the snapshot is dropped.
 - The dry-run plan lists entries and proposes the fewest task-owned entries to
   retire: incomplete entries first, then the oldest. Entries without a valid
-  owner marker, the requested key and entries in use are always kept. Nothing
-  is moved or deleted; the owner approves and moves entries by hand.
+  owner marker, the requested key and entries in use are always kept. While
+  any Workbench app runs, incomplete entries are kept, because they may be a
+  live extraction. A requested key that exists but is incomplete is reported
+  as needing owner action. Nothing is moved or deleted; the owner approves
+  and moves entries by hand.
+- Every run writes a JSON receipt under `.local/mcp-cache-preflight/` with
+  redacted paths. Every failure, including snapshot, scan and OS errors, is
+  recorded as a structured refusal.
 
-A 2026-11-04 dry run against the Codex-container cache (manifest key
-`3ec32279…`) proposed one slot: `5ca6cb7d…`, which has an owner marker and no
-`ready` marker. The guard was clear: 9 unrelated Node processes were ignored
-and no image was under the cache. Neither the cache nor any process was
-changed. The packaged two-cycle smoke has still not run.
+Retained dry run: `.local/mcp-cache-preflight/preflight-20261104T091138Z-66515db6.json`
+(sha256 `b4a02514…f2c6`, local only and gitignored). It used
+`--local-app-data` pointed at the Codex package's `LocalCache\Local`, run from
+this Claude session, with manifest key `3ec32279…` from the 2026-10-20 receipt.
+Results:
+
+- Status `ready_for_owner_review`, `environment_anchor_visible=false`.
+- Guard clear: no Workbench app running, 4 unrelated Node processes ignored.
+- 8 entries, 1 slot needed. Proposed: `5ca6cb7d…`, which has an owner marker
+  and no `ready` marker.
+
+The earlier receipt `preflight-20261104T091111Z-d3c49eb1.json` is superseded:
+it showed the cache base relative to the override root. Neither the cache nor
+any process was changed. The packaged two-cycle smoke has still not run.

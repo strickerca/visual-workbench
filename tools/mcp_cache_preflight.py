@@ -4,10 +4,11 @@ The 2026-10-20 owner-approved cache action stopped at ``pin_cache_ancestors``
 with ``canonical_path_changed``. The read-only diagnosis showed the refusal at
 the app-data child ``Visual Workbench``: the requested path had 6 components,
 GetFinalPathNameByHandle returned 10, and both opens named the same object
-(volume serial and 128-bit file id equal, no reparse tag). That is MSIX
-app-data virtualization: a process inside a packaged app container (here the
-agent desktop app that launched the build) has ``%LOCALAPPDATA%\\<child>``
-redirected to ``%LOCALAPPDATA%\\Packages\\<family>\\LocalCache\\Local\\<child>``.
+(volume serial and 128-bit file id equal, no reparse tag). The inferred
+cause (not proven by a retained receipt) is MSIX app-data virtualization: a
+process inside a packaged app container (likely the agent desktop app that
+launched the build) has ``%LOCALAPPDATA%\\<child>`` redirected to
+``%LOCALAPPDATA%\\Packages\\<family>\\LocalCache\\Local\\<child>``.
 The desktop app already admits exactly this one-child redirection in
 ``NativeCacheAnchor``; the ad-hoc helper did not.
 
@@ -18,14 +19,19 @@ This module mirrors that rule and adds three read-only pieces:
   and only when the requested and canonical opens are the same file object.
   Reparse points, different objects, other redirections and unexpanded 8.3
   names still refuse.
-* ``classify_processes`` scopes the consumer guard to task-owned process
-  trees and to executables inside the packaged runtime cache, so unrelated
-  Node tools no longer block, while a live packaged runtime still refuses.
+  This is stricter than NativeCacheAnchor, which only requires the canonical
+  anchor to start with LOCALAPPDATA and end in the anchor name.
+* ``classify_processes`` refuses on any Workbench app or Workbench-only
+  runtime binary by basename wherever installed, any image under the cache
+  or an explicit packaged root, and node.exe descended from a Workbench or
+  task-owned process. Other node.exe processes no longer block. A node.exe
+  outside the cache running a cache script is not detectable by image path.
 * ``plan_cache_entries`` lists task-owned cache entries and proposes which
   ones the owner could retire to free a slot. It never moves or deletes.
 
-Nothing here writes, renames or deletes. The CLI prints a JSON plan with paths
-rewritten relative to ``%LOCALAPPDATA%``.
+Nothing here renames or deletes cache content. The CLI prints a JSON plan
+with paths rewritten relative to ``%LOCALAPPDATA%`` and writes the same
+receipt under ``.local/mcp-cache-preflight/`` in this checkout.
 """
 from __future__ import annotations
 
@@ -47,9 +53,12 @@ KEY_RE = re.compile(r"[0-9a-f]{64}\Z")
 # PackageFamilyName = <Name 3..50 of [A-Za-z0-9.-]>_<13-char publisher id>.
 PACKAGE_FAMILY_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9.\-]{2,49}_[0-9a-hjkmnp-tv-z]{13}\Z")
 SHORT_NAME_RE = re.compile(r"[^~\\]{1,6}~[0-9]{1,6}(\.[^.\\]{0,3})?\Z")
-RUNTIME_IMAGE_NAMES = frozenset(n.upper() for n in (
-    "node.exe", "vw-mcp-host.exe", "vw-mcp-package.exe", "vw-codex-host.exe", "vw-mcp.exe",
-    "VisualWorkbench.exe", "VisualWorkbenchDev.exe"))
+# Launcher names from apps/desktop/build.gradle.kts (packageName) and
+# mcp/package_runtime.py; runtime names from the bundle manifest contract.
+APP_IMAGE_NAMES = frozenset(n.upper() for n in ("VisualWorkbench.exe", "VisualWorkbenchDev.exe"))
+WORKBENCH_RUNTIME_NAMES = frozenset(n.upper() for n in (
+    "vw-mcp-host.exe", "vw-mcp-package.exe", "vw-codex-host.exe", "vw-mcp.exe"))
+RUNTIME_IMAGE_NAMES = frozenset({"NODE.EXE"}) | WORKBENCH_RUNTIME_NAMES | APP_IMAGE_NAMES
 MAX_PATH_CHARS = 32767
 MAX_COMPONENTS = 256
 
@@ -323,41 +332,76 @@ def owned_tree(rows: list[ProcessRow], roots: Iterable[int]) -> set[int]:
     return owned
 
 
-def classify_processes(rows: list[ProcessRow], *, owned_roots: Iterable[int],
-                       packaged_roots: Iterable[str], self_pid: int | None = None) -> dict:
-    """Scope the consumer guard to task-owned processes and the packaged runtime.
+def _parseable(path: str) -> bool:
+    try:
+        split_dos_path(path)
+    except PreflightRefused:
+        return False
+    return True
 
-    Refuses (``conflicts`` non-empty) when:
-    * any process image lies under a packaged runtime root (the cache base in
-      both its requested and canonical forms, or an explicit packaged image),
-    * a runtime-named process (node.exe, vw-mcp-*.exe, ...) in a task-owned
-      tree is still alive,
-    * a runtime-named process's image path is unreadable (ambiguous).
-    Node processes whose readable images lie elsewhere are unrelated and only
-    counted; the previous guard refused on any node.exe.
+
+def classify_processes(rows: list[ProcessRow], *, owned_roots: Iterable[int],
+                       packaged_roots: Iterable[str], self_pid: int | None = None,
+                       excluded_pids: Iterable[int] = ()) -> dict:
+    """Scope the consumer guard to Workbench/task-owned processes.
+
+    Refuses (``conflicts`` non-empty) when, for any process not in
+    ``excluded_pids``:
+    * its image lies under a packaged root (the cache base in both its
+      requested and canonical forms, or an explicit ``--packaged-root``);
+    * its image basename is the Workbench app (VisualWorkbench.exe /
+      VisualWorkbenchDev.exe), wherever it is installed;
+    * its image basename is a Workbench-only runtime binary (vw-mcp-host.exe,
+      vw-mcp-package.exe, vw-codex-host.exe, vw-mcp.exe), wherever it is;
+    * it is node.exe descended from a task-owned root or from a running
+      Workbench app process;
+    * it is a runtime-named process whose image is unreadable or not a
+      drive path (ambiguous).
+    Other node.exe processes are counted and ignored. Limitation: a node.exe
+    installed outside the cache that executes a script from the cache is not
+    detectable by image path and is not reported unless it descends from a
+    Workbench or task-owned process.
     """
     roots = [r for r in packaged_roots if r]
+    excluded = set(excluded_pids)
+    if self_pid is not None:
+        excluded.add(self_pid)
+    live = [row for row in rows if row.pid not in excluded]
+    app_pids = [row.pid for row in live if row.name.upper() in APP_IMAGE_NAMES]
     owned = owned_tree(rows, owned_roots)
+    app_tree = owned_tree(rows, app_pids)
     conflicts: list[dict] = []
-    unrelated_runtime_named = 0
-    for row in rows:
-        if self_pid is not None and row.pid == self_pid:
-            continue
-        runtime_named = row.name.upper() in RUNTIME_IMAGE_NAMES
-        if row.executable is not None and any(_under(row.executable, root) for root in roots):
-            conflicts.append({"pid": row.pid, "name": row.name, "reason": "packaged_runtime_in_use"})
+    unrelated_node = 0
+    for row in live:
+        name = row.name.upper()
+        runtime_named = name in RUNTIME_IMAGE_NAMES
+        readable = row.executable is not None and _parseable(row.executable)
+        if readable and any(_under(row.executable, root) for root in roots):
+            reason = "packaged_runtime_in_use"
+        elif name in APP_IMAGE_NAMES:
+            reason = "workbench_app_running"
+        elif name in WORKBENCH_RUNTIME_NAMES:
+            reason = "workbench_runtime_named_process"
         elif runtime_named and row.pid in owned:
-            conflicts.append({"pid": row.pid, "name": row.name, "reason": "task_owned_runtime_alive"})
-        elif runtime_named and row.executable is None:
-            conflicts.append({"pid": row.pid, "name": row.name, "reason": "runtime_named_image_unreadable"})
-        elif runtime_named:
-            unrelated_runtime_named += 1
+            reason = "task_owned_runtime_alive"
+        elif runtime_named and row.pid in app_tree:
+            reason = "workbench_app_child_runtime"
+        elif runtime_named and not readable:
+            reason = "runtime_named_image_ambiguous"
+        else:
+            if runtime_named:
+                unrelated_node += 1
+            continue
+        conflicts.append({"pid": row.pid, "name": row.name, "reason": reason})
     return {
         "status": "refused" if conflicts else "clear",
         "conflicts": conflicts,
+        "workbench_app_running": bool(app_pids),
         "owned_tree_size": len(owned),
-        "unrelated_runtime_named_processes_ignored": unrelated_runtime_named,
+        "excluded_pid_count": len(excluded - ({self_pid} if self_pid is not None else set())),
+        "unrelated_runtime_named_processes_ignored": unrelated_node,
         "processes_changed": False,
+        "limitation": "node.exe outside the cache running a cache script is not detectable by image path",
     }
 
 
@@ -416,27 +460,38 @@ def _owner_valid(path: Path, key: str) -> bool:
 
 
 def plan_cache_entries(entries: list[CacheEntry], *, requested_key: str | None, in_use: set[str],
-                       capacity: int = CACHE_CAPACITY) -> dict:
+                       capacity: int = CACHE_CAPACITY, workbench_running: bool = False) -> dict:
     """Classify entries and propose (never perform) the minimum retirement.
 
     Only entries with a valid task owner marker, a plain directory and no
     unexpected children are candidates; the requested key and anything a
     live process uses are always kept. Incomplete entries (no ``ready``)
-    are proposed first, then the oldest complete ones.
+    are proposed first, then the oldest complete ones. While any Workbench
+    app process runs, an incomplete entry may be a live extraction and is
+    never proposed. A requested key that exists but is not complete needs
+    owner action: the app refuses it at ``bundle_markers`` and never
+    re-extracts it.
     """
     if requested_key is not None and not KEY_RE.match(requested_key):
         raise PreflightRefused("requested_key_invalid", "plan")
     rows = []
     candidates = []
+    requested_damaged = False
     for entry in sorted(entries, key=lambda e: (e.modified, e.name)):
         task_owned = (entry.plain_directory and KEY_RE.match(entry.name) is not None and entry.owner_marker_valid
                       and entry.runtime_present and not entry.unexpected_children)
         if entry.name == requested_key:
-            state = "requested_current_keep"
+            if task_owned and entry.ready_present:
+                state = "requested_current_keep"
+            else:
+                state = "requested_current_incomplete_owner_action"
+                requested_damaged = True
         elif not task_owned:
             state = "not_task_owned_keep"
         elif entry.name in in_use:
             state = "in_use_keep"
+        elif not entry.ready_present and workbench_running:
+            state = "incomplete_possible_live_extraction_keep"
         elif not entry.ready_present:
             state = "incomplete_task_owned"
         else:
@@ -460,9 +515,15 @@ def plan_cache_entries(entries: list[CacheEntry], *, requested_key: str | None, 
         "satisfiable_from_task_owned_candidates": len(candidates) >= slots_needed,
         "entries": rows,
         "proposed_for_owner_review": [r["key"] for r in proposal],
-        "owner_action": ("none" if slots_needed == 0 else
-                         "review each proposed key; close Workbench/agent owners; move (do not delete) the "
-                         "approved entries out of the cache, then rerun this preflight before the smoke"),
+        "workbench_app_running": workbench_running,
+        "owner_action_required": requested_damaged or slots_needed > 0,
+        "owner_action": (
+            "the requested key exists but is incomplete or not task-owned; the app will refuse it at "
+            "bundle_markers. Close Workbench, review that entry and move (do not delete) it out of the "
+            "cache, then rerun this preflight" if requested_damaged else
+            "none" if slots_needed == 0 else
+            "review each proposed key; close Workbench/agent owners; move (do not delete) the "
+            "approved entries out of the cache, then rerun this preflight before the smoke"),
     }
 
 
@@ -607,9 +668,17 @@ def windows_processes() -> list[ProcessRow]:  # pragma: no cover - Windows only
             if not gone:
                 rows.append(ProcessRow(entry.pid, entry.ppid, entry.exe, executable, created))
             ok = k.Process32NextW(snapshot, ctypes.byref(entry))
+        # Only ERROR_NO_MORE_FILES ends a complete walk; any other failure
+        # means rows are missing, which must not read as "clear".
+        _require_complete_walk(ctypes.get_last_error(), len(rows))
     finally:
         k.CloseHandle(snapshot)
     return rows
+
+
+def _require_complete_walk(last_error: int, row_count: int) -> None:
+    if last_error != 18 or row_count == 0:
+        raise PreflightRefused("process_snapshot_incomplete", "consumer_guard")
 
 
 # --------------------------------------------------------------------------- CLI
@@ -623,19 +692,28 @@ def _redact(path: str, lad_forms: list[str]) -> str:
     return "<outside %LOCALAPPDATA%>"
 
 
+def _cache_key_of(executable: str, cache_forms: list[str]) -> str | None:
+    for form in cache_forms:
+        if not _under(executable, form):
+            continue  # _under is False for any unparseable path
+        exe_parts, base_parts = split_dos_path(executable)[1], split_dos_path(form)[1]
+        if len(exe_parts) > len(base_parts) + 1:
+            return exe_parts[len(base_parts)]
+    return None
+
+
 def run(local_app_data: str, requested_key: str | None, owned_roots: list[int], packaged_roots: list[str],
         probe: Probe, processes: Callable[[], list[ProcessRow]], scan: Callable[[Path], list[CacheEntry]] = scan_cache,
-        self_pid: int | None = None) -> dict:
-    receipt: dict = {"kind": "mcp-cache-preflight-dry-run", "schema": 1, "mutation_performed": False,
+        self_pid: int | None = None, excluded_pids: Iterable[int] = ()) -> dict:
+    """Every failure becomes a structured refusal receipt; nothing escapes as
+    a traceback that could be mistaken for an inconclusive pass."""
+    receipt: dict = {"kind": "mcp-cache-preflight-dry-run", "schema": 2, "mutation_performed": False,
                      "smoke_executed": False}
+    phase = "pin_cache_ancestors"
     try:
-        try:
-            chain = pin_cache_ancestors(local_app_data, [ANCHOR_NAME, CACHE_BASE_NAME], probe, optional_tail=2)
-        except PreflightRefused as refused:
-            receipt.update(status="refused", phase=refused.phase or "pin_cache_ancestors", refusal_code=refused.code)
-            return receipt
+        chain = pin_cache_ancestors(local_app_data, [ANCHOR_NAME, CACHE_BASE_NAME], probe, optional_tail=2)
         if chain is None:
-            receipt.update(status="cache_absent_in_this_namespace", phase="pin_cache_ancestors",
+            receipt.update(status="cache_absent_in_this_namespace", phase=phase,
                            note="no Visual Workbench cache is visible to this process; a launcher in a "
                                 "different package container sees a different cache")
             return receipt
@@ -646,24 +724,49 @@ def run(local_app_data: str, requested_key: str | None, owned_roots: list[int], 
             "cache_base": _redact(chain.canonical, [lad_canonical]),
         }
         cache_forms = [chain.components[-1].requested, chain.canonical]
+        phase = "consumer_guard"
         rows = processes()
         guard = classify_processes(rows, owned_roots=owned_roots, packaged_roots=cache_forms + packaged_roots,
-                                   self_pid=self_pid)
+                                   self_pid=self_pid, excluded_pids=excluded_pids)
         receipt["consumer_guard"] = guard
+        by_pid = {r.pid: r for r in rows}
         in_use = set()
         for conflict in guard["conflicts"]:
-            row = next((r for r in rows if r.pid == conflict["pid"]), None)
-            if row is not None and row.executable is not None:
-                for form in cache_forms:
-                    exe_parts, base_parts = split_dos_path(row.executable)[1], split_dos_path(form)[1]
-                    if _under(row.executable, form) and len(exe_parts) > len(base_parts) + 1:
-                        in_use.add(exe_parts[len(base_parts)])
-        receipt["cache_plan"] = plan_cache_entries(scan(Path(chain.canonical)), requested_key=requested_key,
-                                                   in_use=in_use)
+            row = by_pid.get(conflict["pid"])
+            key = _cache_key_of(row.executable, cache_forms) if row is not None and row.executable else None
+            if key is not None:
+                in_use.add(key)
+        phase = "scan_cache"
+        entries = scan(Path(chain.canonical))
+        phase = "plan"
+        receipt["cache_plan"] = plan_cache_entries(entries, requested_key=requested_key, in_use=in_use,
+                                                   workbench_running=guard["workbench_app_running"])
         receipt["status"] = "refused" if guard["conflicts"] else "ready_for_owner_review"
+        return receipt
+    except PreflightRefused as refused:
+        receipt.update(status="refused", phase=refused.phase or phase, refusal_code=refused.code)
+        return receipt
+    except OSError as error:
+        receipt.update(status="refused", phase=phase, refusal_code="os_error",
+                       os_error=type(error).__name__, winerror=getattr(error, "winerror", None))
         return receipt
     finally:
         probe.close()
+
+
+RECEIPT_DIR = Path(__file__).resolve().parents[1] / ".local" / "mcp-cache-preflight"
+
+
+def write_receipt(receipt: dict, directory: Path = RECEIPT_DIR) -> Path:
+    """Write a new receipt file (never overwrite) and return its path. The
+    receipt carries only redacted paths, keys, counts and fixed codes."""
+    directory.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    target = directory / f"preflight-{stamp}-{os.urandom(4).hex()}.json"
+    with target.open("x", encoding="utf-8", newline="\n") as handle:
+        json.dump(receipt, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    return target
 
 
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI wrapper
@@ -673,17 +776,42 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI wrappe
                         help="PID whose process tree this task owns (repeatable)")
     parser.add_argument("--packaged-root", action="append", default=[],
                         help="additional exact packaged image directory treated as the runtime")
+    parser.add_argument("--exclude-pid", type=int, action="append", default=[],
+                        help="PID the owner has reviewed and explicitly excludes from the guard (repeatable)")
+    parser.add_argument("--local-app-data", help="inspect this app-data root instead of %%LOCALAPPDATA%% "
+                        "(read-only; e.g. another package container's LocalCache\\Local)")
     args = parser.parse_args(argv)
+    receipt: dict
+    env_lad = os.environ.get("LOCALAPPDATA")
     if os.name != "nt":
-        print(json.dumps({"status": "refused", "refusal_code": "windows_only"}))
-        return 2
-    lad = os.environ.get("LOCALAPPDATA")
-    if not lad:
-        print(json.dumps({"status": "refused", "refusal_code": "local_app_data_unavailable"}))
-        return 2
-    receipt = run(lad, args.requested_key, [os.getpid()] + args.owned_root_pid, args.packaged_root,
-                  WindowsProbe(), windows_processes, self_pid=os.getpid())
-    print(json.dumps(receipt, indent=2, sort_keys=True))
+        receipt = {"kind": "mcp-cache-preflight-dry-run", "status": "refused", "refusal_code": "windows_only"}
+    elif not env_lad:
+        receipt = {"kind": "mcp-cache-preflight-dry-run", "status": "refused",
+                   "refusal_code": "local_app_data_unavailable"}
+    else:
+        lad = args.local_app_data or env_lad
+        receipt = run(lad, args.requested_key, [os.getpid()] + args.owned_root_pid, args.packaged_root,
+                      WindowsProbe(), windows_processes, self_pid=os.getpid(), excluded_pids=args.exclude_pid)
+        receipt["local_app_data_source"] = "override" if args.local_app_data else "environment"
+        if args.local_app_data:
+            shown = _redact(args.local_app_data, [env_lad])
+            receipt["local_app_data_override"] = shown
+            identity = receipt.get("path_identity")
+            if identity and identity["cache_base"].startswith("%LOCALAPPDATA%"):
+                # run() redacts against the root it inspected; show it against
+                # the environment's root so the receipt is not misleading.
+                identity["cache_base"] = shown + identity["cache_base"][len("%LOCALAPPDATA%"):]
+        # Evidence for the namespace question: does the environment's own
+        # app-data child exist as seen by this process?
+        receipt["environment_anchor_visible"] = os.path.isdir(os.path.join(env_lad, ANCHOR_NAME))
+    try:
+        path = write_receipt(receipt)
+        receipt_path = path.relative_to(RECEIPT_DIR.parents[1]).as_posix()
+    except OSError:
+        receipt_path = None
+    print(json.dumps(dict(receipt, receipt_path=receipt_path), indent=2, sort_keys=True))
+    if receipt_path is None:
+        return 1
     return 0 if receipt["status"] in ("ready_for_owner_review", "cache_absent_in_this_namespace") else 1
 
 
