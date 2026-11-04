@@ -345,3 +345,32 @@ collecting a baseline, not permission to relabel 30-second samples as 1 Hz data.
     an LGPL (non-GPL, non-nonfree) build before admission.
 - **Unchanged:** the no-GPL/AGPL policy, the license gate and public
   distribution boundaries.
+
+## D23 — Generated notices and widened allow list — 2026-11-04
+
+- **Status:** owner-approved on 2026-11-04 (in chat, during Stage 1, LIC-003).
+- **Allow list:** `MIT-Modern-Variant` (HarfBuzz), `IJG` (libjpeg-turbo) and
+  `libpng-2.0` (libpng) are added to the single allow list in
+  `tools/check_setup.py`. `deny.toml` is changed identically so the two lists
+  stay equal. All three are permissive, attribution-only licenses. The owner
+  chose a global widening over a component-scoped exception.
+- **Retained texts:** these were downloaded only with the owner's approval,
+  byte-exact from official sources at pinned revisions, and are registered in
+  `third_party/LICENSES` with their provenance:
+  - MPL-2.0, for uniffi 0.32.2. Its §3.2(a) source note points to
+    mozilla/uniffi-rs `7bc621ee`.
+  - Skia's LICENSE (JetBrains/skia `1f14f116`).
+  - The libraries compiled into the skiko Windows DLL: expat, HarfBuzz, ICU,
+    libjpeg-turbo, libpng, Wuffs, zlib, libwebp (COPYING and PATENTS),
+    SPIRV-Cross, and D3D12MemoryAllocator (LICENSE and NOTICES).
+- **ICU classification:** ICU is classified as Unicode-3.0. The
+  GPL-with-exception sections in its license file cover build-time autoconf
+  files, which are not compiled into the DLL.
+- **libwebp-sys 0.14.4:** a declaration-only MIT entry, since upstream ships
+  no MIT text. The crate's vendored libwebp COPYING (BSD-3-Clause) and
+  PATENTS files ship instead.
+- **Release notices:** the release notices are now generated from the resolved
+  shipped dependency graphs (`tools/release/generate_notices.py`), and
+  assembly refuses an incomplete or stale bundle. The generated file lives in
+  the release directory. The apps keep their curated `third_party/notices`
+  resources.
