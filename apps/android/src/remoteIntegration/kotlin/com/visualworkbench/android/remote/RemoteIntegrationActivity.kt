@@ -160,9 +160,7 @@ internal class RemoteIntegrationActivity:ComponentActivity() {
                 "eraser-tool"->"With the Eraser tool selected in Paint, erase across the earlier strokes $strokes times."
                 else->"Draw $strokes strokes on $where."
             }
-            return "Pen test: $task
-Use only the pen. A finger or palm touch stops the test.
-Recorded: $admitted of $strokes"
+            return listOf("Pen test: $task","Use only the pen. A finger or palm touch stops the test.","Recorded: $admitted of $strokes").joinToString("\n")
         }
         private val owners=ConcurrentHashMap<String,WorkbenchRemoteEdit>()
         private val pending=ConcurrentHashMap.newKeySet<RemoteEditController>()
