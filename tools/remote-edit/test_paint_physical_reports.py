@@ -3,23 +3,24 @@ import copy
 import hashlib
 import json
 import re
+import struct
 import subprocess
 import sys
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 
 import paint_physical_reports as reports
 import physical_gesture_reports as gesture
-import struct
-import zlib
 from test_physical_gesture_reports import event, record, views
 
 HERE = Path(__file__).resolve().parent
 KOTLIN_CASES = HERE.parents[1] / "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/RemotePhysicalCompatibilityCases.kt"
 CANVAS = {"x": 10, "y": 20, "width": 200, "height": 220}
-BLACK, RED = (0, 0, 0), (200, 30, 30)
+BLACK, RED, WHITE = (0, 0, 0), (200, 30, 30), (255, 255, 255)
 PRESSURE_ROWS = (20, 50, 80, 110, 140)
+DEFAULT_BLOCKS = ("paint-pressure", "paint-hover", "paint-barrel", "paint-eraser-tool")
 
 
 def chunk(kind, data):
@@ -38,33 +39,38 @@ def ident(n):
     return f"019f7c21-5678-7000-8000-{n:012x}"
 
 
-def journal_for(block, strokes, flags=0, buttons=0, hover_only=False):
-    """A valid phone journal for strokes given in canvas coordinates."""
+def run_id(index):
+    return f"{index + 1:032x}"
+
+
+def journal_for(block, strokes, run, flags=0, buttons=0, tool=2, hover_only=False, device="SM-S918U"):
+    """A valid, hardware-shaped phone journal for strokes in canvas coordinates."""
     events, samples = [], []
 
     def add(phase, x, y, pressure):
         index = len(events)
-        events.append(event(index, buttons=buttons))
+        batched = phase in ("Move", "Hover")
+        events.append(event(index, tool=tool, buttons=buttons, phase=phase, history=1 if batched else 0))
         samples.append({"seq": len(samples) + 1, "event": index, "phase": phase, "host_x": CANVAS["x"] + x,
                         "host_y": CANVAS["y"] + y, "sent_pressure": min(1024, int(pressure * 1024 + 0.5)),
                         "raw_pressure": pressure, "raw_tilt": None, "raw_orientation": None, "raw_distance": 0.0,
                         "tilt_x": 0, "tilt_y": 0, "pen_mask": 1, "pen_flags": flags, "sampled_ns": 1000 + len(samples),
-                        "historical": False, "origin": "PhysicalStylus"})
-    for stroke in strokes:
-        x0, y0, _ = stroke[0]
+                        "historical": phase == "Move" and len(samples) % 2 == 1, "origin": "PhysicalStylus"})
+    for points in strokes:
+        x0, y0, _ = points[0]
         add("Hover", x0, y0, 0.0)
         add("Leave", x0, y0, 0.0)
         if hover_only:
-            for x, y, _ in stroke:
+            for x, y, _ in points:
                 add("Hover", x, y, 0.0)
-            add("Leave", stroke[-1][0], stroke[-1][1], 0.0)
+            add("Leave", points[-1][0], points[-1][1], 0.0)
             continue
-        for position, (x, y, pressure) in enumerate(stroke):
+        for position, (x, y, pressure) in enumerate(points):
             add("Down" if position == 0 else "Move", x, y, pressure)
-        add("Up", stroke[-1][0], stroke[-1][1], 0.0)
+        add("Up", points[-1][0], points[-1][1], 0.0)
     count, _ = gesture.strokes(samples, hover_only)
-    return {"schema": 1, "kind": "remote-physical-gesture-journal", "run_id": "0123456789abcdef0123456789abcdef",
-            "block": block, "target_strokes": len(strokes), "hover_only": hover_only, "device_model": "SM-S918U", "sdk": 36,
+    return {"schema": 1, "kind": "remote-physical-gesture-journal", "run_id": run,
+            "block": block, "target_strokes": len(strokes), "hover_only": hover_only, "device_model": device, "sdk": 36,
             "clock": "android_uptime_ns", "timestamp_resolution_ns": 1, "complete": True, "stop_reason": "target_reached",
             "synthetic_dispatches": 0, "window_deliveries": len(events) + 3, "admitted_strokes": count,
             "acknowledged_through": len(samples), "echo": {"observed": len(samples), "missing": 0, "pending": 0},
@@ -72,9 +78,10 @@ def journal_for(block, strokes, flags=0, buttons=0, hover_only=False):
             "events": events, "samples": samples, "owner_pauses": []}
 
 
-def stroke(y, x0=10, x1=190, low=0.05, high=0.95):
+def stroke(y, x0=10, x1=190, low=0.05, high=0.95, rising=True):
     points = list(range(x0, x1 + 1, 2))
-    return [(x, y, low + (high - low) * i / (len(points) - 1)) for i, x in enumerate(points)]
+    span = len(points) - 1
+    return [(x, y, low + (high - low) * (i if rising else span - i) / span) for i, x in enumerate(points)]
 
 
 class PaintPhysicalReportsTest(unittest.TestCase):
@@ -93,13 +100,29 @@ class PaintPhysicalReportsTest(unittest.TestCase):
             at = (y * CANVAS["width"] + x) * 4
             pixels[at:at + 3] = bytes(colour)
 
-    def ink(self, pixels, strokes, colour, pressure_width=True, half=2):
-        for s in strokes:
-            for x, y, pressure in s:
-                h = 1 + round(4 * pressure) if pressure_width else half
-                for dy in range(-h, h + 1):
-                    for dx in (0, 1):
+    def ink(self, pixels, strokes, colour, width="pressure", half=2):
+        """Anti-aliased ink: an opaque core plus half-blended edge rows."""
+        edge = tuple((c + 255) // 2 for c in colour)
+        for points in strokes:
+            for x, y, pressure in points:
+                if width == "pressure":
+                    h = 1 + round(4 * pressure)
+                elif width == "position":
+                    h = 1 + round(4 * (x - 10) / 180)
+                else:
+                    h = half
+                for dx in (0, 1):
+                    for dy in range(-h, h + 1):
                         self.paint(pixels, x + dx, y + dy, colour)
+                    for dy in (-h - 1, h + 1):
+                        at = ((y + dy) * CANVAS["width"] + x + dx) * 4
+                        if 0 <= y + dy < CANVAS["height"] and pixels[at:at + 3] == bytes(WHITE):
+                            self.paint(pixels, x + dx, y + dy, edge)
+
+    def whiten(self, pixels, x0, x1, y0, y1, colour=WHITE):
+        for x in range(x0, x1 + 1):
+            for y in range(y0, y1 + 1):
+                self.paint(pixels, x, y, colour)
 
     def image(self, pixels):
         pixels = bytes(pixels)
@@ -155,7 +178,7 @@ class PaintPhysicalReportsTest(unittest.TestCase):
         journal_path = self.root / f"physical-journal-{index}.json"
         journal_path.write_bytes(raw)
         render = views()
-        run = f"{index + 1:032x}"
+        run = journal["run_id"]
         native = {"schema": 1, "kind": "normal-native-remote-usb-integration", "status": "passed", "model": "SM-S918U", "owner_user": 0,
                   "controller_input_scenario": "owner-physical", "physical_owner_block": name, "run_id": run, "retained_input_nonce": run,
                   "owned_editor_contract_sha256": "b" * 64, "physical_journal_sha256": hashlib.sha256(raw).hexdigest(),
@@ -184,51 +207,66 @@ class PaintPhysicalReportsTest(unittest.TestCase):
         return {"block": name, "baseline": frames[:2], "after": frames[2:], "phone": phone, "native_phone": native,
                 "canvas_files": files, "cursor_samples": cursor}
 
-    def fixture(self, brush_width_follows_pressure=True, barrel_colour=RED, hover_ink=False, eraser_restores=True):
+    def fixture(self, names=DEFAULT_BLOCKS, width="pressure", barrel_colour=RED, hover_ink=False, eraser_restores=True,
+                rising_only=False, devices=None):
         self.target = {"token": ident(10), "window": 99, "process_id": 100, "thread_id": 101, "process_created": 102,
                        "window_rect": {"x": -5, "y": -20, "width": 2010, "height": 330},
                        "frame_rect": {"x": -5, "y": -20, "width": 2010, "height": 330},
                        "client_rect": {"x": 0, "y": 0, "width": 2000, "height": 300}, "dpi": 96, "integrity": 8192}
         self.image_identity = {"executableName": "mspaint.exe", "executableBlake3": "c" * 64, "executableBytes": 1000, "fileVersion": None,
                                "packageFullName": "Microsoft.Paint_11.2605.81.0_x64__8wekyb3d8bbwe", "packageVersion": "11.2605.81.0"}
-        white = self.pixels()
-        pressure_strokes = [stroke(y) for y in PRESSURE_ROWS]
-        after_pressure = bytearray(white)
-        self.ink(after_pressure, pressure_strokes, BLACK, pressure_width=brush_width_follows_pressure, half=3)
-        hover_strokes = [stroke(200, 20, 120)]
-        after_hover = bytearray(after_pressure)
-        if hover_ink:
-            self.ink(after_hover, [[(60, 200, 0.5)]], BLACK, pressure_width=False, half=1)
-        barrel_strokes = [stroke(190, 20, 180, 0.5, 0.5)]
-        after_barrel = bytearray(after_hover)
-        self.ink(after_barrel, barrel_strokes, barrel_colour, pressure_width=False, half=2)
-        eraser_strokes = [[(x, 20, 0.5) for x in range(40, 81, 2)]]
-        after_eraser = bytearray(after_barrel)
-        for x in range(40, 82):
-            for y in range(14, 27):
-                self.paint(after_eraser, x, y, (255, 255, 255) if eraser_restores else (90, 90, 90))
-        blocks = [
-            self.block(0, "paint-pressure", white, after_pressure, journal_for("paint-pressure", pressure_strokes)),
-            self.block(1, "paint-hover", after_pressure, after_hover, journal_for("paint-hover", hover_strokes, hover_only=True)),
-            self.block(2, "paint-barrel", after_hover, after_barrel, journal_for("paint-barrel", barrel_strokes, flags=1, buttons=0x20)),
-            self.block(3, "paint-eraser-tool", after_barrel, after_eraser, journal_for("paint-eraser-tool", eraser_strokes)),
-        ]
+        current, blocks, eraser_frame, restored = self.pixels(), [], None, None
+        for index, name in enumerate(names):
+            after, run, base = bytearray(current), run_id(index), 10 + 200 * index
+            device = (devices or {}).get(index, "SM-S918U")
+            if name == "paint-pressure":
+                # Alternating direction separates pressure from stroke position.
+                strokes = [stroke(y, rising=rising_only or i % 2 == 0) for i, y in enumerate(PRESSURE_ROWS)]
+                self.ink(after, strokes, BLACK, width=width, half=3)
+                journal = journal_for(name, strokes, run, device=device)
+            elif name == "paint-hover":
+                strokes = [stroke(200, 20, 120)]
+                if hover_ink:
+                    self.ink(after, [[(60, 200, 0.5)]], BLACK, width="constant", half=1)
+                journal = journal_for(name, strokes, run, hover_only=True, device=device)
+            elif name == "paint-barrel":
+                strokes = [stroke(190, 20, 180, 0.3, 0.7)]
+                self.ink(after, strokes, barrel_colour, width="constant", half=2)
+                journal = journal_for(name, strokes, run, flags=1, buttons=0x20, device=device)
+            elif name == "paint-eraser":
+                strokes = [stroke(50, 40, 80, 0.3, 0.7)]
+                self.whiten(after, 40, 81, 44, 56)
+                journal = journal_for(name, strokes, run, flags=4, tool=4, device=device)
+            else:
+                strokes = [stroke(20, 40, 80, 0.3, 0.7)]
+                self.whiten(after, 40, 81, 14, 26, WHITE if eraser_restores else (90, 90, 90))
+                journal = journal_for(name, strokes, run, device=device)
+                eraser_frame = self.witness(base + 30, "Using Eraser tool on Canvas", "9" * 64)
+                restored = self.witness(base + 52)
+            blocks.append(self.block(index, name, current, after, journal))
+            current = after
         return {"schema": 1, "target": self.target, "image": self.image_identity, "paint_frame": self.witness(1),
-                "eraser_frame": self.witness(3, "Using Eraser tool on Canvas", "9" * 64), "canvas_rect": dict(CANVAS),
-                "stroke_radius_pixels": 8, "device_model": "SM-S918U", "blocks": blocks}
+                "eraser_frame": eraser_frame, "restored_frame": restored, "canvas_rect": dict(CANVAS),
+                "stroke_radius_pixels": 8, "blocks": blocks}
 
-    def rows(self, result, tool):
+    @staticmethod
+    def rows(result, tool):
         document = next(d for d in result["documents"] if d["toolId"] == tool)
         return {row["aspect"]: row for row in document["observations"]}
 
-    def test_complete_physical_paint_blocks_produce_valid_rows(self):
-        result = reports.report(self.fixture())
+    def passed(self, value):
+        result = reports.report(value)
         self.assertEqual("passed", result["status"], result["rejection_reason"])
+        return result
+
+    def test_complete_physical_paint_blocks_produce_valid_rows(self):
+        result = self.passed(self.fixture())
         brush = self.rows(result, "paint.brush")
         self.assertEqual([r["aspect"] for r in result["documents"][0]["observations"]], list(reports.ASPECTS))
         self.assertEqual("Supported", brush["Drawing"]["result"])
         self.assertEqual("Supported", brush["Pressure"]["result"])
-        self.assertEqual("Supported", brush["Hover"]["result"])
+        # No ink during hover is not positive hover evidence.
+        self.assertEqual("Inconclusive", brush["Hover"]["result"])
         self.assertEqual("Supported", brush["BarrelButton"]["result"])
         for aspect in ("Tilt", "InvertedEraser", "Shortcuts"):
             self.assertEqual({"aspect": aspect, "result": "NotTested", "method": "NotPerformed", "inputApi": "Unknown",
@@ -236,37 +274,47 @@ class PaintPhysicalReportsTest(unittest.TestCase):
         for aspect in ("Drawing", "Pressure", "Hover", "BarrelButton"):
             row = brush[aspect]
             self.assertEqual(("PhysicalOwnerGesture", "WindowsPointerInput", "SM-S918U"), (row["method"], row["inputApi"], row["deviceModel"]))
-            self.assertIn(row["evidenceSha256"], result["evidence"])
             self.assertEqual(row["evidenceSha256"], reports.canonical_sha(result["evidence"][row["evidenceSha256"]]))
+        measurement = result["evidence"][brush["Pressure"]["evidenceSha256"]]["measurement"]
+        self.assertGreaterEqual(measurement["width_r_rising"], 0.8)
+        self.assertGreaterEqual(measurement["width_r_falling"], 0.8)
         eraser = self.rows(result, "paint.eraser")
         self.assertEqual("Supported", eraser["Drawing"]["result"])
-        self.assertEqual("9" * 64, result["documents"][1]["settingsDigest"])
-        self.assertEqual("d" * 64, result["documents"][0]["settingsDigest"])
+        self.assertEqual(("d" * 64, "9" * 64), (result["documents"][0]["settingsDigest"], result["documents"][1]["settingsDigest"]))
         self.assertTrue(all(eraser[a]["result"] == "NotTested" for a in reports.ASPECTS if a != "Drawing"))
         self.assertTrue(result["editor_effect"])
-        self.assertFalse(result["tilt_calibrated"])
-        self.assertFalse(result["shortcuts_tested"])
+        self.assertEqual("SM-S918U", result["device_model"])
+        self.assertEqual(gesture.PHYSICAL_CLAIM, result["physical_claim"])
+        self.assertFalse(result["tilt_calibrated"] or result["shortcuts_tested"])
         for document in result["documents"]:
-            self.assertEqual(document["identity"]["packageVersion"], "11.2605.81.0")
             self.assertLessEqual(len(reports.document_bytes(document)), 32 * 1024)
 
-    def test_constant_width_with_wide_pressure_is_unsupported(self):
-        result = reports.report(self.fixture(brush_width_follows_pressure=False))
-        self.assertEqual("passed", result["status"], result["rejection_reason"])
-        self.assertEqual("Unsupported", self.rows(result, "paint.brush")["Pressure"]["result"])
+    def test_pressure_classification_separates_pressure_from_position(self):
+        self.assertEqual("Unsupported", self.rows(self.passed(self.fixture(width="constant")), "paint.brush")["Pressure"]["result"])
+        # Width that follows stroke position correlates with pressure only in rising strokes.
+        self.assertEqual("Inconclusive", self.rows(self.passed(self.fixture(width="position")), "paint.brush")["Pressure"]["result"])
+        # Without a falling-pressure subset, position cannot be excluded.
+        self.assertEqual("Inconclusive", self.rows(self.passed(self.fixture(rising_only=True)), "paint.brush")["Pressure"]["result"])
 
-    def test_primary_colour_barrel_ink_is_unsupported(self):
-        result = reports.report(self.fixture(barrel_colour=BLACK))
-        self.assertEqual("Unsupported", self.rows(result, "paint.brush")["BarrelButton"]["result"])
+    def test_barrel_compares_core_ink_colour_not_anti_aliased_means(self):
+        self.assertEqual("Unsupported", self.rows(self.passed(self.fixture(barrel_colour=BLACK)), "paint.brush")["BarrelButton"]["result"])
+        # Barrel-only with a white Colour 2 on a white canvas proves nothing either way.
+        result = self.passed(self.fixture(names=("paint-barrel",), barrel_colour=WHITE))
+        brush = self.rows(result, "paint.brush")
+        self.assertEqual(("Inconclusive", "Inconclusive"), (brush["Drawing"]["result"], brush["BarrelButton"]["result"]))
+        self.assertFalse(result["editor_effect"])
 
     def test_hover_that_inks_is_unsupported(self):
-        result = reports.report(self.fixture(hover_ink=True))
-        self.assertEqual("passed", result["status"], result["rejection_reason"])
-        self.assertEqual("Unsupported", self.rows(result, "paint.brush")["Hover"]["result"])
+        self.assertEqual("Unsupported", self.rows(self.passed(self.fixture(hover_ink=True)), "paint.brush")["Hover"]["result"])
+
+    def test_inverted_eraser_is_tested_only_with_eraser_samples(self):
+        result = self.passed(self.fixture(names=("paint-pressure", "paint-eraser")))
+        row = self.rows(result, "paint.brush")["InvertedEraser"]
+        self.assertEqual(("Supported", "PhysicalOwnerGesture"), (row["result"], row["method"]))
+        self.assertEqual(1, len(result["documents"]))
 
     def test_eraser_tool_that_paints_is_unsupported(self):
-        result = reports.report(self.fixture(eraser_restores=False))
-        self.assertEqual("Unsupported", self.rows(result, "paint.eraser")["Drawing"]["result"])
+        self.assertEqual("Unsupported", self.rows(self.passed(self.fixture(eraser_restores=False)), "paint.eraser")["Drawing"]["result"])
 
     def refused(self, value, reason):
         result = reports.report(value)
@@ -275,13 +323,12 @@ class PaintPhysicalReportsTest(unittest.TestCase):
         self.assertEqual([], result["documents"])
 
     def test_ink_outside_any_owner_stroke_is_refused(self):
-        value = self.fixture()
-        strokes = [stroke(y) for y in PRESSURE_ROWS]
+        value = self.fixture(names=("paint-pressure",))
+        strokes = [stroke(y, rising=i % 2 == 0) for i, y in enumerate(PRESSURE_ROWS)]
         after = self.pixels()
         self.ink(after, strokes, BLACK)
         self.paint(after, 199, 219, BLACK)
-        value["blocks"] = [self.block(0, "paint-pressure", self.pixels(), after, journal_for("paint-pressure", strokes))]
-        value["eraser_frame"] = None
+        value["blocks"] = [self.block(0, "paint-pressure", self.pixels(), after, journal_for("paint-pressure", strokes, run_id(0)))]
         self.refused(value, "outside_stroke_region")
 
     def test_unchained_or_unordered_or_nonwhite_baselines_are_refused(self):
@@ -290,49 +337,58 @@ class PaintPhysicalReportsTest(unittest.TestCase):
         self.refused(value, "clock_order")
         value = self.fixture()
         value["blocks"] = value["blocks"][1:2]
-        value["eraser_frame"] = None
+        value["eraser_frame"] = value["restored_frame"] = None
         self.refused(value, "baseline_not_white")
         value = self.fixture()
-        barrel = [stroke(190, 20, 180, 0.5, 0.5)]
+        barrel = [stroke(190, 20, 180, 0.3, 0.7)]
         after = self.pixels()
-        self.ink(after, barrel, RED, pressure_width=False, half=2)
-        value["blocks"][2] = self.block(2, "paint-barrel", self.pixels(), after, journal_for("paint-barrel", barrel, flags=1, buttons=0x20))
+        self.ink(after, barrel, RED, width="constant", half=2)
+        value["blocks"][2] = self.block(2, "paint-barrel", self.pixels(), after, journal_for("paint-barrel", barrel, run_id(2), flags=1, buttons=0x20))
         value["blocks"] = value["blocks"][:3]
-        value["eraser_frame"] = None
+        value["eraser_frame"] = value["restored_frame"] = None
         self.refused(value, "chain_mismatch")
 
     def test_synthetic_or_unbound_phone_evidence_is_refused(self):
-        value = self.fixture()
-        value["blocks"][0]["native_phone"]["software_generated_input"] = True
-        self.refused(value, "phone_physical")
-        value = self.fixture()
-        value["blocks"][0]["native_phone"]["controller_input_scenario"] = "balanced"
-        self.refused(value, "phone_physical")
-        value = self.fixture()
-        value["blocks"][0]["phone"]["journal_sha256"] = "0" * 64
-        self.refused(value, "phone_physical")
-        value = self.fixture()
-        Path(value["blocks"][0]["phone"]["journal_path"]).write_bytes(b"{}")
+        for change, reason in (
+                (lambda v: v["blocks"][0]["native_phone"].update(software_generated_input=True), "phone_physical"),
+                (lambda v: v["blocks"][0]["native_phone"].update(controller_input_scenario="balanced"), "phone_physical"),
+                (lambda v: v["blocks"][0]["phone"].update(journal_sha256="0" * 64), "phone_physical"),
+                (lambda v: Path(v["blocks"][0]["phone"]["journal_path"]).write_bytes(b"{}"), "journal_binding")):
+            value = self.fixture()
+            change(value)
+            self.refused(value, reason)
+        # The journal's own run must be the settled receipt's run.
+        value = self.fixture(names=("paint-pressure",))
+        strokes = [stroke(y, rising=i % 2 == 0) for i, y in enumerate(PRESSURE_ROWS)]
+        after = self.pixels()
+        self.ink(after, strokes, BLACK)
+        rebuilt = self.block(0, "paint-pressure", self.pixels(), after, journal_for("paint-pressure", strokes, run_id(0)))
+        native = rebuilt["native_phone"]
+        native["run_id"] = native["retained_input_nonce"] = "f" * 32
+        native["physical_journal_retained"] = f"physical-journal-{'f' * 32}.json"
+        value["blocks"] = [rebuilt]
         self.refused(value, "journal_binding")
 
-    def test_eraser_witness_and_census_rules(self):
-        value = self.fixture()
-        value["eraser_frame"] = None
-        self.refused(value, "eraser_witness")
-        value = self.fixture()
-        value["eraser_frame"]["canvasToolName"] = "Using Brush tool on Canvas"
-        self.refused(value, "eraser_witness")
-        value = self.fixture()
-        value["blocks"].append(copy.deepcopy(value["blocks"][0]))
-        self.refused(value, "block_census")
-        value = self.fixture()
-        value["blocks"][1]["cursor_samples"][1]["after"] = {"x": -49, "y": -50}
-        self.refused(value, "cursor_pairs")
+    def test_device_model_comes_from_consistent_journals(self):
+        self.refused(self.fixture(devices={1: "SM-X000"}), "device_model")
+
+    def test_eraser_and_restored_witness_rules(self):
+        for change, reason in (
+                (lambda v: v.update(eraser_frame=None), "eraser_witness"),
+                (lambda v: v["eraser_frame"].update(canvasToolName="Using Brush tool on Canvas"), "eraser_witness"),
+                (lambda v: v["eraser_frame"].update(observedStartQpc100ns=5, observedEndQpc100ns=6), "eraser_witness"),
+                (lambda v: v.update(restored_frame=None), "restored_witness"),
+                (lambda v: v["restored_frame"].update(settingsDigest="8" * 64), "restored_witness"),
+                (lambda v: v["restored_frame"].update(observedStartQpc100ns=651, observedEndQpc100ns=652), "restored_witness"),
+                (lambda v: v["blocks"].append(copy.deepcopy(v["blocks"][0])), "block_census"),
+                (lambda v: v["blocks"][1]["cursor_samples"][1]["after"].update(x=-49), "cursor_pairs")):
+            value = self.fixture()
+            change(value)
+            self.refused(value, reason)
 
     def test_cli_reports_closed_json(self):
-        value = self.fixture()
         path = self.root / "physical-evaluation.json"
-        path.write_text(json.dumps(value))
+        path.write_text(json.dumps(self.fixture()))
         done = subprocess.run([sys.executable, str(HERE / "paint_physical_reports.py"), "--input", str(path)],
                               capture_output=True, text=True, timeout=120, cwd=str(HERE))
         self.assertEqual(0, done.returncode, done.stdout[-400:] + done.stderr[-400:])
@@ -341,29 +397,27 @@ class PaintPhysicalReportsTest(unittest.TestCase):
         done = subprocess.run([sys.executable, str(HERE / "paint_physical_reports.py")], capture_output=True, text=True, timeout=60, cwd=str(HERE))
         self.assertEqual("arguments", json.loads(done.stdout)["rejection_reason"])
 
-
-CROSS_IMAGE = {"executableName": "mspaint.exe", "executableBlake3": "a" * 64, "executableBytes": 1024, "fileVersion": "11.2605.81.0",
-               "packageFullName": "Microsoft.Paint_11.2605.81.0_x64__8wekyb3d8bbwe", "packageVersion": "11.2605.81.0"}
-
-
-def cross_documents():
-    brush = reports.compatibility_document(CROSS_IMAGE, "paint.brush", "d" * 64, {
-        "Drawing": ("Supported", "1" * 64), "Pressure": ("Supported", "2" * 64), "Hover": ("Supported", "3" * 64),
-        "BarrelButton": ("Inconclusive", "4" * 64)}, "SM-S918U")
-    eraser = reports.compatibility_document(CROSS_IMAGE, "paint.eraser", "e" * 64, {"Drawing": ("Supported", "5" * 64)}, "SM-S918U")
-    return reports.document_bytes(brush).decode(), reports.document_bytes(eraser).decode()
-
-
-class KotlinCrossCheckTest(unittest.TestCase):
-    """The Kotlin case decodes these exact bytes with NativeRemoteCompatibility."""
-
-    def test_python_documents_equal_the_kotlin_validfor_fixtures(self):
+    def test_report_documents_equal_the_kotlin_validfor_fixtures(self):
+        """The Kotlin case decodes these exact report() bytes with NativeRemoteCompatibility."""
         source = KOTLIN_CASES.read_text(encoding="utf-8")
         fixtures = dict(re.findall(r'/\*(PHYSICAL_[A-Z]+_FIXTURE)\*/"""(.*?)"""', source, re.S))
-        brush, eraser = cross_documents()
+        brush, eraser = (reports.document_bytes(d).decode() for d in self.passed(self.fixture())["documents"])
         self.assertEqual(brush, fixtures["PHYSICAL_BRUSH_FIXTURE"])
         self.assertEqual(eraser, fixtures["PHYSICAL_ERASER_FIXTURE"])
 
 
+def report_documents():
+    """Regenerate the Kotlin cross-check fixtures from report() output."""
+    case = PaintPhysicalReportsTest("test_report_documents_equal_the_kotlin_validfor_fixtures")
+    case.setUp()
+    try:
+        return [reports.document_bytes(d).decode() for d in reports.report(case.fixture())["documents"]]
+    finally:
+        case.doCleanups()
+
+
 if __name__ == "__main__":
-    unittest.main()
+    if sys.argv[1:] == ["--print-kotlin-fixtures"]:
+        print("\n".join(report_documents()))
+    else:
+        unittest.main()

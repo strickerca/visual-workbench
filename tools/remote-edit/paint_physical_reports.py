@@ -13,6 +13,12 @@ canonical evidence record retained in this report (journal, receipt and image
 hashes plus measurements). Images stay under the caller's private root and are
 disposed by it. Tilt stays NotTested (no calibration is wired) and Shortcuts
 are left to T4.08.
+
+"PhysicalOwnerGesture" here carries exactly physical_gesture_reports'
+PHYSICAL_CLAIM: system-dispatched, signed, pen-digitizer-shaped input with no
+synthetic dispatch. It is not proof against a privileged injector crafted to
+match every predicate. Hover has no positive Paint-side signal, so a clean
+hover pass is Inconclusive (only inking hover is Unsupported).
 """
 import hashlib
 import json
@@ -28,7 +34,7 @@ from paint_phone_reports import near_segment, require, same, uint, keys, digest
 
 ASPECTS = ("Drawing", "Pressure", "Hover", "Tilt", "InvertedEraser", "BarrelButton", "Shortcuts")
 PAINT_BLOCKS = ("paint-pressure", "paint-hover", "paint-barrel", "paint-eraser", "paint-eraser-tool")
-TOP_KEYS = "schema target image paint_frame eraser_frame canvas_rect stroke_radius_pixels device_model blocks".split()
+TOP_KEYS = "schema target image paint_frame eraser_frame restored_frame canvas_rect stroke_radius_pixels blocks".split()
 BLOCK_KEYS = "block baseline after phone native_phone canvas_files cursor_samples".split()
 PHONE_KEYS = ("schema status block native_receipt_path native_receipt_sha256 contract_sha256 journal_path journal_sha256 "
               "actual_remote_retirement retained_parent_returned receiver_observed editor_effect local_history_may_begin "
@@ -36,6 +42,8 @@ PHONE_KEYS = ("schema status block native_receipt_path native_receipt_sha256 con
 MODEL = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
 ERASER_TOOL_NAME = "Using Eraser tool on Canvas"
 MIN_PRESSURE_POINTS = 20
+MIN_DIRECTION_POINTS = 10  # per rising/falling subset, separating pressure from stroke position
+CORE_FRACTION = 0.9
 SUPPORTED_R = 0.8
 SUPPORTED_WIDTH_SPAN = 2.0
 SUPPORTED_DARKNESS_SPAN = 20.0
@@ -43,7 +51,7 @@ UNSUPPORTED_CV = 0.05
 UNSUPPORTED_PRESSURE_SPAN = 0.5
 COLOUR_DISTANCE = 60.0
 REASONS = frozenset(paint.REASONS | gesture.REASONS | set(
-    "block_shape block_census eraser_witness device_model phone_physical journal_binding cursor_pairs chain_mismatch".split()))
+    "block_shape block_census eraser_witness restored_witness device_model phone_physical journal_binding cursor_pairs chain_mismatch".split()))
 
 
 def witness_eraser(value, brush, canvas):
@@ -55,6 +63,16 @@ def witness_eraser(value, brush, canvas):
     start = uint(value["observedStartQpc100ns"], paint.I64 // 100, 1, "eraser_witness")
     end = uint(value["observedEndQpc100ns"], paint.I64 // 100, 1, "eraser_witness")
     require(start < end, "eraser_witness")
+    return start, end
+
+
+def witness_restored(value, brush, canvas):
+    """The owner's return to the exact brush settings after the eraser block."""
+    try:
+        start, end = paint.witness(value, brush, canvas)
+    except ValueError:
+        raise ValueError("restored_witness") from None
+    return start, end
 
 
 def phone_physical(phone, native, block):
@@ -102,7 +120,7 @@ def load_journal(phone, native):
     require(hashlib.sha256(raw).hexdigest() == phone["journal_sha256"], "journal_binding")
     journal = gesture.parse(raw)
     gesture.validate_journal(journal, raw)
-    require(journal["block"] == phone["block"], "journal_binding")
+    require(journal["block"] == phone["block"] and journal["run_id"] == native["run_id"], "journal_binding")
     # The retained receipt's phone record must still bind these exact bytes.
     gesture.validate_record(native.get("physical_records"), native.get("phone_render_records"), journal, raw)
     return journal, raw
@@ -144,11 +162,15 @@ def hover_points(journal, canvas):
 
 
 def changed_pixels(before, after, width, height):
-    out = []
-    for pixel in range(width * height):
-        at = pixel * 4
-        if before[at:at + 3] != after[at:at + 3]:
-            out.append((pixel % width, pixel // width))
+    out, stride = [], width * 4
+    for y in range(height):
+        row = slice(y * stride, (y + 1) * stride)
+        if before[row] == after[row]:
+            continue  # Byte-level row compare keeps large unchanged canvases fast.
+        for x in range(width):
+            at = y * stride + x * 4
+            if before[at:at + 3] != after[at:at + 3]:
+                out.append((x, y))
     return out
 
 
@@ -182,9 +204,30 @@ def mean_colour(pixels, points, width):
     return [v / len(points) for v in total]
 
 
+def core_colour(before, after, points, width):
+    """Mean colour of the most-changed (core) pixels. Anti-aliased edges and
+    partially opaque pressure ink are excluded, so the ink's own colour remains."""
+    if not points:
+        return None
+    deviation = []
+    for x, y in points:
+        at = (y * width + x) * 4
+        deviation.append(max(abs(after[at + c] - before[at + c]) for c in range(3)))
+    threshold = CORE_FRACTION * max(deviation)
+    core = [point for point, value in zip(points, deviation) if value >= threshold]
+    return mean_colour(after, core, width)
+
+
 def percentile(values, fraction):
     ordered = sorted(values)
     return ordered[min(len(ordered) - 1, max(0, int(round(fraction * (len(ordered) - 1)))))]
+
+
+def stroke_trend(stroke):
+    """Pressure trend along the stroke: rising, falling or flat."""
+    pairs = [(position, p[2]) for position, p in enumerate(stroke) if p[3] in ("Down", "Move")]
+    r = gesture.pearson(pairs)
+    return "flat" if r is None or abs(r) < 0.5 else ("rising" if r > 0 else "falling")
 
 
 def measure_pressure(strokes, changed, after, canvas, radius):
@@ -195,6 +238,7 @@ def measure_pressure(strokes, changed, after, canvas, radius):
     points = []
     for index, stroke in enumerate(strokes):
         others = [(p[0], p[1]) for j, other in enumerate(strokes) if j != index for p in other]
+        trend = stroke_trend(stroke)
         last = None
         for position, (x, y, pressure, phase) in enumerate(stroke):
             if phase != "Move" or position < 3 or position > len(stroke) - 4:
@@ -207,14 +251,25 @@ def measure_pressure(strokes, changed, after, canvas, radius):
                 continue
             inked = [(x + dx, y + dy) for dx, dy in disk if (x + dx, y + dy) in mask]
             darkness = statistics.fmean(255 - luminance(after, px, py, width_px) for px, py in inked) if inked else 0.0
-            points.append({"pressure": pressure, "width": len(inked) / (2 * radius), "darkness": darkness})
+            points.append({"pressure": pressure, "width": len(inked) / (2 * radius), "darkness": darkness, "trend": trend})
             last = (x, y)
     return points
 
 
+def subset_r(points, trend, metric):
+    rows = [p for p in points if p["trend"] == trend]
+    if len(rows) < MIN_DIRECTION_POINTS:
+        return None
+    return gesture.pearson([(p["pressure"], p[metric]) for p in rows])
+
+
 def pressure_result(points):
     summary = {"points": len(points), "width_r": None, "darkness_r": None, "width_span": None, "darkness_span": None,
-               "width_cv": None, "darkness_cv": None, "pressure_span": None}
+               "width_cv": None, "darkness_cv": None, "pressure_span": None,
+               "rising_points": sum(p["trend"] == "rising" for p in points),
+               "falling_points": sum(p["trend"] == "falling" for p in points),
+               "width_r_rising": subset_r(points, "rising", "width"), "width_r_falling": subset_r(points, "falling", "width"),
+               "darkness_r_rising": subset_r(points, "rising", "darkness"), "darkness_r_falling": subset_r(points, "falling", "darkness")}
     if len(points) < MIN_PRESSURE_POINTS:
         return "Inconclusive", summary
     pressures = [p["pressure"] for p in points]
@@ -227,8 +282,15 @@ def pressure_result(points):
     mean_width, mean_dark = statistics.fmean(widths), statistics.fmean(darkness)
     summary["width_cv"] = statistics.pstdev(widths) / mean_width if mean_width > 0 else None
     summary["darkness_cv"] = statistics.pstdev(darkness) / mean_dark if mean_dark > 0 else None
-    width_ok = summary["width_r"] is not None and summary["width_r"] >= SUPPORTED_R and summary["width_span"] >= SUPPORTED_WIDTH_SPAN
-    dark_ok = summary["darkness_r"] is not None and summary["darkness_r"] >= SUPPORTED_R and summary["darkness_span"] >= SUPPORTED_DARKNESS_SPAN
+    def both_directions(metric):
+        # Stroke position cannot masquerade as pressure: the correlation must
+        # hold in strokes going light-to-firm AND firm-to-light.
+        return all(summary[f"{metric}_r_{trend}"] is not None and summary[f"{metric}_r_{trend}"] >= SUPPORTED_R
+                   for trend in ("rising", "falling"))
+    width_ok = (summary["width_r"] is not None and summary["width_r"] >= SUPPORTED_R
+                and summary["width_span"] >= SUPPORTED_WIDTH_SPAN and both_directions("width"))
+    dark_ok = (summary["darkness_r"] is not None and summary["darkness_r"] >= SUPPORTED_R
+               and summary["darkness_span"] >= SUPPORTED_DARKNESS_SPAN and both_directions("darkness"))
     if width_ok or dark_ok:
         return "Supported", summary
     flat = (summary["width_cv"] is not None and summary["width_cv"] <= UNSUPPORTED_CV
@@ -280,8 +342,6 @@ def validate(value):
     brush = value["paint_frame"]
     _, previous_end = paint.witness(brush, None, canvas)
     radius = uint(value["stroke_radius_pixels"], 64, 1, "stroke_shape")
-    device = value["device_model"]
-    require(isinstance(device, str) and MODEL.fullmatch(device), "device_model")
     blocks = value["blocks"]
     require(isinstance(blocks, list) and 1 <= len(blocks) <= len(PAINT_BLOCKS), "block_census")
     names = []
@@ -289,12 +349,13 @@ def validate(value):
         keys(block, BLOCK_KEYS, reason="block_shape")
         require(block["block"] in PAINT_BLOCKS and block["block"] not in names, "block_census")
         names.append(block["block"])
-    eraser = value["eraser_frame"]
+    eraser, restored = value["eraser_frame"], value["restored_frame"]
     require((eraser is not None) == ("paint-eraser-tool" in names), "eraser_witness")
-    if eraser is not None:
-        witness_eraser(eraser, brush, canvas)
+    require((restored is not None) == (eraser is not None), "restored_witness")
+    eraser_window = witness_eraser(eraser, brush, canvas) if eraser is not None else None
+    restored_window = witness_restored(restored, brush, canvas) if restored is not None else None
 
-    analyses, helpers, packages, previous_after = {}, set(), [], None
+    analyses, helpers, packages, previous_after, devices = {}, set(), [], None, set()
     for index, block in enumerate(blocks):
         name = block["block"]
         require(isinstance(block["baseline"], list) and len(block["baseline"]) == 2 and isinstance(block["after"], list)
@@ -303,8 +364,15 @@ def validate(value):
         frames, metrics = block["baseline"] + block["after"], []
         for position, frame in enumerate(frames):
             if position == 2:
+                if name == "paint-eraser-tool":
+                    # The probe saw the Eraser after this block's baseline and
+                    # before its phone run, and the restored brush after the run.
+                    require(previous_end < eraser_window[0] and eraser_window[1] < phone_start, "eraser_witness")
                 require(previous_end < phone_start, "clock_order")
                 previous_end = phone_end
+                if name == "paint-eraser-tool":
+                    require(previous_end < restored_window[0], "restored_witness")
+                    previous_end = restored_window[1]
             previous_end, m = paint.native_frame(frame, target, image, brush, canvas, previous_end)
             metrics.append(m)
             helpers.add(frame["helper_sha256"])
@@ -319,6 +387,7 @@ def validate(value):
             require(images[0] == previous_after, "chain_mismatch")
         previous_after = images[2]
         journal, raw = load_journal(block["phone"], block["native_phone"])
+        devices.add(journal["device_model"])
         changed = changed_pixels(images[0], images[2], canvas["width"], canvas["height"])
         record = {"block": name, "journal_sha256": hashlib.sha256(raw).hexdigest(),
                   "native_receipt_sha256": block["phone"]["native_receipt_sha256"],
@@ -338,11 +407,13 @@ def validate(value):
     sample_ids = [f["sample_id"] for block in blocks for f in block["baseline"] + block["after"]]
     require(len(helpers) == 1 and len(set(sample_ids)) == len(sample_ids)
             and all(same(p, packages[0]) for p in packages), "native_identity")
-    return build_results(value, analyses, radius)
+    # The rows name the device the phone journals recorded, never a caller constant.
+    require(len(devices) == 1 and MODEL.fullmatch(next(iter(devices))), "device_model")
+    return build_results(value, analyses, radius, next(iter(devices)))
 
 
-def build_results(value, analyses, radius):
-    canvas, image, device = value["canvas_rect"], value["image"], value["device_model"]
+def build_results(value, analyses, radius, device):
+    canvas, image = value["canvas_rect"], value["image"]
     width = canvas["width"]
     evidence = {}
 
@@ -354,34 +425,37 @@ def build_results(value, analyses, radius):
 
     brush, eraser = {}, {}
     primary = None
-    for name in ("paint-pressure", "paint-barrel"):
-        if name in analyses:
-            a = analyses[name]
-            result = "Supported" if a["changed"] else "Unsupported"
-            brush["Drawing"] = tested("Drawing", "paint.brush", result, a["record"])
-            break
+    if "paint-pressure" in analyses:
+        # Primary-button strokes on the canvas: no ink means the pen did not draw.
+        a = analyses["paint-pressure"]
+        brush["Drawing"] = tested("Drawing", "paint.brush", "Supported" if a["changed"] else "Unsupported", a["record"])
+    elif "paint-barrel" in analyses:
+        # Barrel ink may be a white Colour 2 on a white canvas: absence is not refusal.
+        a = analyses["paint-barrel"]
+        brush["Drawing"] = tested("Drawing", "paint.brush", "Supported" if a["changed"] else "Inconclusive", a["record"])
     if "paint-pressure" in analyses:
         a = analyses["paint-pressure"]
-        primary = mean_colour(a["after"], a["changed"], width)
+        primary = core_colour(a["before"], a["after"], a["changed"], width)
         points = measure_pressure(a["strokes"], a["changed"], a["after"], canvas, radius)
         result, summary = pressure_result(points)
         brush["Pressure"] = tested("Pressure", "paint.brush", result, a["record"], measurement=summary)
     if "paint-hover" in analyses:
         a = analyses["paint-hover"]
         inside = a["record"]["hover_samples_in_canvas"]
-        result = "Inconclusive" if not inside else ("Supported" if not a["changed"] else "Unsupported")
+        # No ink is not positive hover evidence (Paint exposes no hover signal).
+        result = "Unsupported" if inside and a["changed"] else "Inconclusive"
         brush["Hover"] = tested("Hover", "paint.brush", result, a["record"])
     if "paint-barrel" in analyses:
         a = analyses["paint-barrel"]
-        colour = mean_colour(a["after"], a["changed"], width)
+        colour = core_colour(a["before"], a["after"], a["changed"], width)
         if not a["changed"] or primary is None:
             result = "Inconclusive"
         else:
             distance = math.dist(colour, primary)
             result = "Supported" if distance > COLOUR_DISTANCE else "Unsupported"
         brush["BarrelButton"] = tested("BarrelButton", "paint.brush", result, a["record"],
-                                       barrel_mean_rgb=[round(c, 3) for c in colour] if colour else None,
-                                       primary_mean_rgb=[round(c, 3) for c in primary] if primary else None)
+                                       barrel_core_rgb=[round(c, 3) for c in colour] if colour else None,
+                                       primary_core_rgb=[round(c, 3) for c in primary] if primary else None)
     if "paint-eraser" in analyses:
         a = analyses["paint-eraser"]
         if any(s["pen_flags"] & gesture.PEN_FLAG_ERASER for s in a["journal"]["samples"]):
@@ -406,7 +480,8 @@ def build_results(value, analyses, radius):
     summaries = [{"block": name, "changed_rgb_pixels": len(a["changed"]), "journal_sha256": a["record"]["journal_sha256"]}
                  for name, a in analyses.items()]
     return {"documents": documents, "document_sha256": [hashlib.sha256(document_bytes(d)).hexdigest() for d in documents],
-            "evidence": evidence, "blocks": summaries, "editor_effect": editor_effect}
+            "evidence": evidence, "blocks": summaries, "editor_effect": editor_effect, "device_model": device,
+            "physical_claim": gesture.PHYSICAL_CLAIM}
 
 
 def report(value):

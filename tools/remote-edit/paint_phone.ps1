@@ -122,7 +122,7 @@ function Wait-ChildSettlement($Child,[switch]$RequestRetirement){
         Start-Sleep -Milliseconds 50
     }
 }
-function Invoke-OwnedHelper([string]$Path,[string[]]$Arguments,[int]$Seconds=30,[switch]$Verdict,[ref]$VerdictExitCode,[ValidateSet('probe_runner','frame_runner','pixel_evaluator')][string]$Role,[string]$FrameSample){
+function Invoke-OwnedHelper([string]$Path,[string[]]$Arguments,[int]$Seconds=30,[switch]$Verdict,[ref]$VerdictExitCode,[ValidateSet('probe_runner','frame_runner','pixel_evaluator')][string]$Role,[string]$FrameSample,[switch]$OwnBudget){
     $diagnostic.helper_role=$Role;$diagnostic.helper_exit_code='unknown';$diagnostic.helper_timed_out='unknown';$diagnostic.helper_output_limit='unknown';$diagnostic.native_error='unknown';$diagnostic.native_capture_refusal='unknown'
     Assert-WorkBudget
     $child=[M4FrameChild]::Launch($Path,$Arguments,$true);$children.Add($child)
@@ -130,7 +130,8 @@ function Invoke-OwnedHelper([string]$Path,[string[]]$Arguments,[int]$Seconds=30,
     try{
         if($null -ne $child.StartupError){throw 'Native helper startup failed'}
         while(-not $child.IsSettled){
-            if($timer.Elapsed.TotalSeconds -ge $Seconds -or $work.Elapsed.TotalSeconds -ge $WorkTimeoutSeconds){$timedOut=$true;break}
+            # -OwnBudget: an explicitly sized helper bound replaces the shared work budget.
+            if($timer.Elapsed.TotalSeconds -ge $Seconds -or (-not $OwnBudget -and $work.Elapsed.TotalSeconds -ge $WorkTimeoutSeconds)){$timedOut=$true;break}
             Start-Sleep -Milliseconds 25
         }
         $workCompleted=-not $timedOut
@@ -321,8 +322,8 @@ try{
         # Owner-physical Paint blocks. Each block retains its own stable WGC
         # baseline/after pair with the mouse parked outside the canvas, and its
         # own retained remote run whose only input is the owner's pen.
-        foreach($required in @('tools/remote-edit/paint_physical_reports.py','tools/remote-edit/physical_gesture_reports.py','tools/pen-inject/analyze.py')){if(-not $sourceHashes.Contains($required)){throw 'Visible Paint caller source missing from artifact inventory'}}
-        $physicalBlocks=[Collections.Generic.List[object]]::new();$eraserFrame=$null;$previousAfter=$null
+        foreach($required in @('tools/remote-edit/paint_physical_reports.py','tools/remote-edit/physical_gesture_reports.py','tools/remote-edit/controller_input_reports.py','tools/remote-edit/integration_reports.py','tools/pen-inject/analyze.py')){if(-not $sourceHashes.Contains($required)){throw 'Visible Paint caller source missing from artifact inventory'}}
+        $physicalBlocks=[Collections.Generic.List[object]]::new();$eraserFrame=$null;$restoredFrame=$null;$previousAfter=$null
         foreach($block in $OwnerBlocks){
             $phase='physical_'+$block.Replace('-','_');$diagnostic.checkpoint=$phase
             # Each block anchors its own parked pointer; the owner may use the
@@ -345,7 +346,7 @@ try{
             $receipt.input_settlement=$remoteSettlement.State
             if($block -ceq 'paint-eraser-tool'){
                 Write-Host 'Select the Brush tool in Paint again with its earlier settings, then park the mouse pointer outside the canvas'
-                $restored=Wait-PaintTool 'brush'
+                $restored=Wait-PaintTool 'brush';$restoredFrame=$restored
                 foreach($key in @('settingsDigest','canvasRuntimeIdHash','canvasToolName')){if([string]$restored[$key] -cne [string]$paintFrame[$key]){throw 'Owner did not restore the exact Paint brush settings'}}
                 if(($restored.canvasRectHost|ConvertTo-Json -Compress) -cne ($paintFrame.canvasRectHost|ConvertTo-Json -Compress)){throw 'Owner did not restore the exact Paint brush settings'}
                 $script:cursorAnchor=$null
@@ -360,12 +361,16 @@ try{
             $physicalBlocks.Add([ordered]@{block=$block;baseline=$base;after=$after;phone=$phone;native_phone=$nativePhone;canvas_files=@($canvasFiles[$canvasStart..($canvasStart+3)]);cursor_samples=@($cursorSamples[$cursorStart..($cursorStart+3)])})
             $receipt.physical_blocks=@($receipt.physical_blocks)+@([ordered]@{block=$block;native_receipt_sha256=$phone.native_receipt_sha256;journal_sha256=$phone.journal_sha256})
         }
-        $evaluation=[ordered]@{schema=1;target=$target;image=$image;paint_frame=$paintFrame;eraser_frame=$eraserFrame;canvas_rect=$canvas;stroke_radius_pixels=24;device_model='SM-S918U';blocks=@($physicalBlocks)}
+        $evaluation=[ordered]@{schema=1;target=$target;image=$image;paint_frame=$paintFrame;eraser_frame=$eraserFrame;restored_frame=$restoredFrame;canvas_rect=$canvas;stroke_radius_pixels=24;blocks=@($physicalBlocks)}
         $evaluationPath=Join-Path $fixtureRoot 'physical-evaluation.json';Write-NewJson $evaluationPath $evaluation
         [void](Pin-File $evaluationPath (Get-FileHash -LiteralPath $evaluationPath -Algorithm SHA256).Hash.ToLowerInvariant())
         $phase='physical_pixel_assertion';$diagnostic.checkpoint=$phase
         $pixelExit=$null
-        $evaluated=Invoke-OwnedHelper $PythonPath @((Join-Path $PSScriptRoot 'paint_physical_reports.py'),'--input',$evaluationPath) -Verdict -VerdictExitCode ([ref]$pixelExit) -Role pixel_evaluator
+        # Pure-Python PNG decode of four canvas samples per block: an explicit,
+        # block-sized bound (90 s + 60 s per block, at most 600 s).
+        $evaluatorSeconds=[Math]::Min(600,90+60*$physicalBlocks.Count)
+        $work.Restart()
+        $evaluated=Invoke-OwnedHelper $PythonPath @((Join-Path $PSScriptRoot 'paint_physical_reports.py'),'--input',$evaluationPath) -Seconds $evaluatorSeconds -OwnBudget -Verdict -VerdictExitCode ([ref]$pixelExit) -Role pixel_evaluator
         $proof=$evaluated|ConvertFrom-Json -AsHashtable -Depth 30
         $receipt.pixel_evidence=$proof
         if($pixelExit -ne 0 -or $proof.schema -ne 1 -or $proof.operation -cne 'owned-paint-physical-compatibility' -or $proof.status -cne 'passed' -or $proof.accepted -ne $true){throw 'Actual stable Paint pixel effect refused'}
