@@ -217,6 +217,95 @@ function Write-VwPrivateText {
     try { $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
 }
 
+function Test-VwPlainItem($Item) {
+    return ($Item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0
+}
+
+# Final run statuses whose backup a later verified delivery supersedes. A
+# rollback-failed backup is the owner's recovery copy and is never pruned; a
+# backup whose run receipt is missing or unreadable is kept as well.
+$script:PrunableOutcomes = @('delivered', 'refused', 'rolled-back', 'install-failed-unchanged', 'install-timeout-unchanged',
+    'delivered-foreground-inconclusive', 'delivered-launch-inconclusive', 'delivered-process-exited')
+
+function Get-VwOwnBackupPlan {
+    # The exact files and directories to delete when the directory holds only
+    # what this module writes: its backup.json, the APK files that manifest
+    # names and, after a failed readback, a readback directory with only
+    # base.apk. $null otherwise.
+    param([Parameter(Mandatory = $true)][IO.DirectoryInfo]$Directory)
+    if (-not (Test-VwPlainItem $Directory)) { return $null }
+    $manifestItem = Get-Item -LiteralPath (Join-Path $Directory.FullName 'backup.json') -Force -ErrorAction SilentlyContinue
+    if ($null -eq $manifestItem -or $manifestItem.PSIsContainer -or -not (Test-VwPlainItem $manifestItem) -or $manifestItem.Length -gt 65536) { return $null }
+    $manifest = [IO.File]::ReadAllText($manifestItem.FullName) | ConvertFrom-Json
+    if ($manifest.kind -cne 'android-normal-delivery-backup' -or $manifest.run_id -cne $Directory.Name) { return $null }
+    $expected = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    [void]$expected.Add('backup.json')
+    foreach ($file in @($manifest.files)) {
+        if ([string]$file.name -cnotmatch '^(?:base|split_[A-Za-z0-9_.-]+)\.apk$') { return $null }
+        [void]$expected.Add([string]$file.name)
+    }
+    $files = @(); $directories = @()
+    foreach ($child in @(Get-ChildItem -LiteralPath $Directory.FullName -Force)) {
+        if (-not (Test-VwPlainItem $child)) { return $null }
+        if (-not $child.PSIsContainer) {
+            if (-not $expected.Contains($child.Name)) { return $null }
+            $files += $child.FullName; continue
+        }
+        if ($child.Name -cne 'readback') { return $null }
+        foreach ($inner in @(Get-ChildItem -LiteralPath $child.FullName -Force)) {
+            if ($inner.PSIsContainer -or $inner.Name -cne 'base.apk' -or -not (Test-VwPlainItem $inner)) { return $null }
+            $files += $inner.FullName
+        }
+        $directories += $child.FullName
+    }
+    return [pscustomobject]@{ Files = $files; Directories = $directories; Written = $manifestItem.LastWriteTimeUtc }
+}
+
+function Get-VwDeliveryRunOutcome {
+    # The final status recorded in a run's own receipt, or $null when absent.
+    param([Parameter(Mandatory = $true)][string]$Local, [Parameter(Mandatory = $true)][string]$RunId)
+    $item = Get-Item -LiteralPath (Join-Path $Local ('android-normal-delivery-' + $RunId + '.json')) -Force -ErrorAction SilentlyContinue
+    if ($null -eq $item -or $item.PSIsContainer -or -not (Test-VwPlainItem $item) -or $item.Length -gt 1048576) { return $null }
+    try { return [string](([IO.File]::ReadAllText($item.FullName) | ConvertFrom-Json).status) } catch { return $null }
+}
+
+function Remove-VwOldDeliveryBackups {
+    # Called only after a verified delivery. Among this module's own backups,
+    # keeps the newest $Keep (the current run's included) and removes older ones
+    # whose run outcome a later delivery supersedes. Deletion is file by file and
+    # never recursive, so a link that appears later is never followed.
+    param([Parameter(Mandatory = $true)][string]$Parent, [Parameter(Mandatory = $true)][string]$Local,
+        [Parameter(Mandatory = $true)][string]$Current, [Parameter(Mandatory = $true)][int]$Keep)
+    Assert-VwPlainPath $Parent -Directory
+    $removed = 0; $skipped = 0; $owned = @()
+    foreach ($directory in @(Get-ChildItem -LiteralPath $Parent -Directory -Force)) {
+        if ($directory.Name -cnotmatch '^[0-9a-f]{32}$' -or $directory.Name -ceq $Current) { continue }
+        $plan = $null
+        try { $plan = Get-VwOwnBackupPlan $directory } catch { $plan = $null }
+        # Ownership is decided before retention, so a foreign directory can
+        # never take a kept slot from a real previous backup.
+        if ($null -eq $plan) { $skipped++; continue }
+        $owned += [pscustomobject]@{ Directory = $directory; Plan = $plan; Written = $plan.Written; Name = $directory.Name }
+    }
+    $owned = @($owned | Sort-Object -Property @{ Expression = 'Written'; Descending = $true }, @{ Expression = 'Name'; Descending = $true })
+    foreach ($entry in @($owned | Select-Object -Skip ([Math]::Max(0, $Keep - 1)))) {
+        if ((Get-VwDeliveryRunOutcome $Local $entry.Name) -cnotin $script:PrunableOutcomes) { $skipped++; continue }
+        try {
+            # backup.json goes last, so a partial failure leaves a still-owned,
+            # still-prunable directory. Every parent is re-checked per file.
+            $files = @(@($entry.Plan.Files) | Where-Object { [IO.Path]::GetFileName($_) -cne 'backup.json' }) + @(@($entry.Plan.Files) | Where-Object { [IO.Path]::GetFileName($_) -ceq 'backup.json' })
+            foreach ($path in $files) {
+                Assert-VwPlainPath $path
+                [IO.File]::Delete($path)
+            }
+            foreach ($path in @($entry.Plan.Directories)) { [IO.Directory]::Delete($path, $false) }
+            [IO.Directory]::Delete($entry.Directory.FullName, $false)
+            $removed++
+        } catch { $skipped++ }
+    }
+    return [pscustomobject]@{ Removed = $removed; Skipped = $skipped }
+}
+
 function Invoke-VwNormalDelivery {
     <#
     Delivers one hash-pinned APK as a same-signer update of the normal package
@@ -257,7 +346,9 @@ function Invoke-VwNormalDelivery {
         [ValidateRange(1, 5)][int]$ForegroundAttempts = 3,
         [ValidateRange(0, 10)][int]$ForegroundDelaySeconds = 2,
         [ValidateRange(0, 600)][int]$InstallSettleSeconds = 30,
-        [ValidateRange(0, 30)][int]$ProcessCheckDelaySeconds = 3
+        [ValidateRange(0, 30)][int]$ProcessCheckDelaySeconds = 3,
+        # Backups kept after a verified delivery, this run's included.
+        [ValidateRange(1, 10)][int]$KeepBackups = 2
     )
     $root = [IO.Path]::GetFullPath($ProjectRoot)
     $package = $script:NormalPackage
@@ -270,7 +361,7 @@ function Invoke-VwNormalDelivery {
         input = [ordered]@{ apk_name = [IO.Path]::GetFileName($ApkPath); sha256 = $null; bytes = $null; signer_sha256 = $null; version_code = $null; version_name = $null; launcher_activity = $null }
         device_scope = [ordered]@{ current_user = $null; profile_count = $null; installed_for_owner = $false; other_profiles_with_package = $null; other_profiles_modified = $false }
         installed_before = [ordered]@{ signer_sha256 = $null; version_code = $null; version_name = $null; files = @() }
-        backup = [ordered]@{ directory = $null; complete = $false; device_digest_bound = $false; retained = $false }
+        backup = [ordered]@{ directory = $null; complete = $false; device_digest_bound = $false; retained = $false; skipped_identical = $false; keep_latest = $KeepBackups; pruned_previous = 0; prune_skipped = 0 }
         install = [ordered]@{ attempted = $false; skipped_identical = $false; success_reported = $false; timed_out = $false; settled_after_timeout = $null; arguments = @('install', '-r', '--user', '0', '<apk>'); downgrade_flag = $false; uninstall_performed = $false; data_cleared = $false }
         readback = [ordered]@{ file_count = $null; sha256 = $null; matches = $false }
         launch = [ordered]@{ component = $script:NormalComponent; attempted = $false; status_ok = $false; foreground = $false; attempts = 0; process_state_after_launch = $null }
@@ -338,12 +429,17 @@ function Invoke-VwNormalDelivery {
         # update would also change those profiles, so they are never touched.
         if ($others -ne 0) { Stop-VwDelivery 'package_installed_in_other_profile' }
     }
+    function Get-LaunchStatus([string]$Outcome) {
+        # Identical bytes were never installed: say so instead of 'delivered'.
+        if ($ctx.identical) { return 'already-installed-' + $Outcome }
+        return 'delivered-' + $Outcome
+    }
     function Invoke-Rollback([string]$Reason) {
         $rollback = $receipt.rollback
         $rollback.reason = $Reason
         try {
             # Never let an `adb -s` call spawn a replacement server in a job.
-            try { & $AssertAdbServer } catch { $rollback.failure_code = 'adb_server_unavailable'; Stop-VwDelivery 'adb_server_unavailable' }
+            try { $null = & $AssertAdbServer } catch { $rollback.failure_code = 'adb_server_unavailable'; Stop-VwDelivery 'adb_server_unavailable' }
             $current = $null
             try { $current = @(Read-InstalledState) } catch { $current = $null }
             if ($null -ne $current -and (Test-StateMatches $current $ctx.backup)) {
@@ -450,6 +546,21 @@ function Invoke-VwNormalDelivery {
 
         Enter-Phase 'backup'
         $state = @(Read-InstalledState)
+        # The device digest already proves the installed bytes are the pinned
+        # input: nothing is installed or rolled back, so no backup is pulled.
+        $ctx.identical = $state.Count -eq 1 -and $state[0].Name -ceq 'base.apk' -and $state[0].Sha256 -ceq $ApkSha256
+        if ($ctx.identical) {
+            $files = @([ordered]@{ name = 'base.apk'; sha256 = $ApkSha256; bytes = $receipt.input.bytes })
+            $receipt.installed_before.files = $files
+            $receipt.backup.skipped_identical = $true
+            Set-PhaseStatus 'skipped'
+            Enter-Phase 'installed-signer'
+            # Same bytes as the verified input, so the same signer and version.
+            $receipt.installed_before.signer_sha256 = $receipt.input.signer_sha256
+            $receipt.installed_before.version_code = $identity.VersionCode
+            $receipt.installed_before.version_name = $identity.VersionName
+            Set-PhaseStatus 'skipped'
+        } else {
         $parent = Join-Path $ctx.local 'android-normal-backups'
         if (-not (Test-Path -LiteralPath $parent)) { [void][IO.Directory]::CreateDirectory($parent) }
         Assert-VwPlainPath $parent -Directory
@@ -498,15 +609,15 @@ function Invoke-VwNormalDelivery {
         # Android refuses; record it so a failed rollback is not a surprise.
         $receipt.rollback.may_require_downgrade = $identity.VersionCode -gt $installedIdentity.VersionCode
         Set-PhaseStatus 'passed'
+        }
 
         Enter-Phase 'install'
-        $ctx.identical = $files.Count -eq 1 -and $files[0].name -ceq 'base.apk' -and $files[0].sha256 -ceq $ApkSha256
         if ($ctx.identical) {
             # Already the exact delivered bytes: nothing to install or roll back.
             $receipt.install.skipped_identical = $true
             Set-PhaseStatus 'skipped'
         } else {
-            try { & $AssertAdbServer } catch { Stop-VwDelivery 'adb_server_unavailable' }
+            try { $null = & $AssertAdbServer } catch { Stop-VwDelivery 'adb_server_unavailable' }
             $ctx.installAttempted = $true
             $receipt.install.attempted = $true
             $installed = Invoke-Device 'normal-delivery-install' @('install', '-r', '--user', '0', $apk) 300 -AllowFailure
@@ -530,9 +641,9 @@ function Invoke-VwNormalDelivery {
 
         Enter-Phase 'readback'
         if ($ctx.identical) {
-            # The backup pull already bound these exact installed bytes.
+            # The device digest already bound these exact installed bytes.
             $receipt.readback.file_count = 1
-            $receipt.readback.sha256 = $files[0].sha256
+            $receipt.readback.sha256 = $ApkSha256
             $receipt.readback.matches = $true
             Set-PhaseStatus 'skipped'
         } else {
@@ -578,7 +689,7 @@ function Invoke-VwNormalDelivery {
             # Verified bytes stay installed. A shared phone can hold focus
             # elsewhere; never stop another app to win foreground.
             Set-PhaseStatus 'inconclusive'
-            $receipt.status = 'delivered-foreground-inconclusive'
+            $receipt.status = Get-LaunchStatus 'foreground-inconclusive'
             $receipt.failure_phase = 'foreground'
             $receipt.failure_code = 'foreground_not_observed'
         } else {
@@ -592,14 +703,22 @@ function Invoke-VwNormalDelivery {
             if ($processState -ceq 'alive') {
                 Set-PhaseStatus 'passed'
                 $receipt.status = if ($ctx.identical) { 'already-installed' } else { 'delivered' }
+                if (-not $ctx.identical) {
+                    # Verified delivery: this run's backup holds the previous
+                    # install; older backups beyond the retention limit go.
+                    try {
+                        $pruned = Remove-VwOldDeliveryBackups -Parent (Join-Path $ctx.local 'android-normal-backups') -Local $ctx.local -Current $RunId -Keep $KeepBackups
+                        $receipt.backup.pruned_previous = $pruned.Removed; $receipt.backup.prune_skipped = $pruned.Skipped
+                    } catch { Write-Host '[normal-delivery] older backups were not pruned; the delivery result is unchanged.' }
+                }
             } elseif ($processState -ceq 'absent') {
                 Set-PhaseStatus 'failed'
-                $receipt.status = 'delivered-process-exited'
+                $receipt.status = Get-LaunchStatus 'process-exited'
                 $receipt.failure_phase = 'process-check'
                 $receipt.failure_code = 'process_exited_after_launch'
             } else {
                 Set-PhaseStatus 'inconclusive'
-                $receipt.status = 'delivered-launch-inconclusive'
+                $receipt.status = Get-LaunchStatus 'launch-inconclusive'
                 $receipt.failure_phase = 'process-check'
                 $receipt.failure_code = 'process_state_unknown'
             }
@@ -613,7 +732,7 @@ function Invoke-VwNormalDelivery {
         $receipt.status = 'refused'
         if ($ctx.launchAttempted) {
             # Verified bytes were launched (or a launch was attempted): keep them.
-            $receipt.status = 'delivered-launch-inconclusive'
+            $receipt.status = Get-LaunchStatus 'launch-inconclusive'
         } elseif ($ctx.installAttempted) {
             $receipt.status = 'failed-after-install'
             Invoke-Rollback $code

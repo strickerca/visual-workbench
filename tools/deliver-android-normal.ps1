@@ -60,6 +60,10 @@ switch ($receipt.status) {
     'delivered-foreground-inconclusive' { Write-Host 'Normal app installed and read back, but foreground was not observed on the shared phone; launch result is inconclusive. No other app was stopped.' }
     'delivered-launch-inconclusive' { Write-Host ("Normal app installed and read back; launch did not complete cleanly (" + $receipt.failure_code + "). The new build may have run, so it was NOT rolled back automatically. Diagnose on the phone; the backup is under .local/android-normal-backups.") }
     'delivered-process-exited' { Write-Host 'Normal app installed, read back and shown, but its process exited shortly after launch (possible crash). Not rolled back; diagnose on the phone.' }
+    # Identical bytes: nothing was installed, so there is nothing to roll back.
+    'already-installed-foreground-inconclusive' { Write-Host 'The installed normal app already has these exact bytes; nothing was installed. Foreground was not observed on the shared phone.' }
+    'already-installed-launch-inconclusive' { Write-Host ("The installed normal app already has these exact bytes; nothing was installed. Its launch did not complete cleanly (" + $receipt.failure_code + '). Diagnose on the phone.') }
+    'already-installed-process-exited' { Write-Host 'The installed normal app already has these exact bytes; nothing was installed. Its process exited shortly after launch (possible crash). Diagnose on the phone.' }
     'install-timeout-unchanged' { Write-Host 'adb install timed out; settled re-reads show the previous bytes still installed. A device-side session may still finish: re-check before retrying.' }
     'rolled-back' { Write-Host 'Normal app delivery FAILED after install and before launch; the previous installed APK bytes were restored and verified.' }
     'rollback-failed' { Write-Host 'Normal app delivery FAILED and rollback could not be verified. Keep the backup under .local/android-normal-backups; do not uninstall the app.' }

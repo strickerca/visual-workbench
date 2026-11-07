@@ -512,6 +512,14 @@ class Generation(Fixture):
         # Cargo keeps an applicable edge with all of its kinds, including false ones.
         ffi["deps"][0]["dep_kinds"] = [{"kind": None, "target": "cfg(unix)"}, {"kind": None, "target": "cfg(windows)"}]
         self.assertEqual(self.generate()[2]["status"], "complete")
+        # A normal kind false for the triple does not ship, even when another
+        # (build) kind keeps the edge in the filtered graph.
+        ffi["deps"][0]["dep_kinds"] = [{"kind": "build", "target": None}, {"kind": None, "target": "cfg(unix)"}]
+        receipt = self.generate()[2]
+        self.assertEqual(receipt["status"], "complete")
+        shipped = next(c for c in receipt["components"] if c["name"] == "shipped")
+        self.assertEqual(shipped["scope"], ["rust:aarch64-linux-android"])
+        ffi["deps"][0]["dep_kinds"] = [{"kind": None, "target": None}]
         del self.metadata_values["aarch64-linux-android"]
         with self.assertRaisesRegex(g.Refused, "^rust_target$"):
             self.generate()
@@ -735,6 +743,17 @@ class Verification(Fixture):
                             opaque_coverage=frozenset({"bundled:" + g.JAVA_RUNTIME}))  # not generated here
         self.assertEqual(g.verify_bundle(raw, text, artifact_kinds=frozenset({"opaque"}),
                                          opaque_coverage=frozenset({"rust:x86_64-pc-windows-msvc"}))["status"], "complete")
+        # Wrong JSON types are a static refusal, not a traceback.
+        for mutate in (lambda r: r["components"][0].__setitem__("texts", ["abc"]),
+                       lambda r: r["components"][0].__setitem__("scope", 7),
+                       lambda r: r.__setitem__("coverage", 5)):
+            malformed = json.loads(raw)
+            mutate(malformed)
+            with self.subTest(malformed=malformed["components"][0]["texts"][:1]):
+                with self.assertRaises(g.Refused):
+                    g.verify_bundle(json.dumps(malformed).encode(), text)
+        with self.assertRaises(TypeError):  # a caller mistake is not a receipt refusal
+            g.verify_bundle(raw, text, artifact_kind=frozenset())
         with self.assertRaisesRegex(g.Refused, "^notices_stale_input$"):
             g.verify_bundle(raw, text, declarations={"Cargo.lock": {"bytes": 1, "sha256": "0" * 64}})
         self.assertEqual(g.verify_bundle(raw, text, declarations={"Cargo.lock": receipt["inputs"]["Cargo.lock"]})

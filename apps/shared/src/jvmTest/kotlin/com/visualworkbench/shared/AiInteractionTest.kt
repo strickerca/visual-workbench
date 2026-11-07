@@ -52,8 +52,9 @@ class AiInteractionTest {
         val owner=AiInteraction(api,scope)
         try {
             val preparing=launch{try{owner.prepare(options())}catch(_:CancellationException){}}
-            // Yield so the cancelled caller cancels the owned job before the late request settles.
-            withTimeout(5000){entered.await()};preparing.cancel();yield();settle.complete(Unit);preparing.join()
+            // No yield: cancelling the caller must cancel the owned job synchronously,
+            // so the late request settles into a cancelled job and is retired.
+            withTimeout(5000){entered.await()};preparing.cancel();settle.complete(Unit);preparing.join()
             assertEquals(1,request.closed)
             owner.close();assertEquals(2,request.closed)
         } finally { settle.complete(Unit);owner.close();scope.cancel() }

@@ -477,6 +477,22 @@ def finalize(receipt: dict, texts: dict) -> tuple[bytes, bytes, dict]:
 def verify_bundle(receipt_raw: bytes, text_raw: bytes, *, artifact_kinds=frozenset(),
                   declarations: dict | None = None, declared_skips=frozenset(),
                   desktop_files: dict | None = None, opaque_coverage=None) -> dict:
+    """Re-check a generated bundle; see _verify_bundle. A structurally malformed
+    receipt (wrong JSON types) is a static refusal, never a traceback. Explicit
+    keywords keep a misspelled caller argument a TypeError, not a refusal."""
+    try:
+        return _verify_bundle(receipt_raw, text_raw, artifact_kinds=artifact_kinds, declarations=declarations,
+                              declared_skips=declared_skips, desktop_files=desktop_files,
+                              opaque_coverage=opaque_coverage)
+    except Refused:
+        raise
+    except (TypeError, KeyError, AttributeError, IndexError, ValueError) as error:
+        raise Refused("notices_receipt_structure") from error
+
+
+def _verify_bundle(receipt_raw: bytes, text_raw: bytes, *, artifact_kinds=frozenset(),
+                   declarations: dict | None = None, declared_skips=frozenset(),
+                   desktop_files: dict | None = None, opaque_coverage=None) -> dict:
     """Re-check a generated bundle without regenerating it (used by assembly).
 
     Checked: the text is exactly render(receipt, texts); every component has at
@@ -854,8 +870,13 @@ def cargo_components(builder: Builder, root: Path, metadata: dict, cargo_home: P
                 continue
             seen.add(pid)
             for dep in nodes[pid]["deps"]:
-                if not any(kind.get("kind") is None for kind in dep["dep_kinds"]):
-                    continue  # dev-dependencies and build-dependencies do not ship
+                # Cargo keeps an edge with all of its kinds when any one applies, so
+                # only a normal kind whose own target holds for this triple ships.
+                # An unknown cfg (None) counts as shipping: over-inclusion is safe.
+                if not any(kind.get("kind") is None and
+                           (not kind.get("target") or cfg_value(kind["target"], triple) is not False)
+                           for kind in dep["dep_kinds"]):
+                    continue  # dev/build-only, or normal only on another target
                 child = packages[dep["pkg"]]
                 if any("proc-macro" in target["kind"] for target in child["targets"]):
                     builder.exclude("cargo:proc-macro-build-host-only", f"{child['name']} {child['version']}")
