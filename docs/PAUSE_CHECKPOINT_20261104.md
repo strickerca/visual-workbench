@@ -8,7 +8,7 @@ is builds, device runs and owner sessions.
 
 - Updated 2026-11-06 after a full review of the session's work. Local
   `main` is at the review-fix merge (`caf8978` plus this checkpoint update),
-  **4 commits ahead of `origin/main` (`f5574fd`) and not pushed**. Stage 1
+  **ahead of `origin/main` (`f5574fd`) and not pushed**. Stage 1
   publishing waits for the remaining blockers.
 - The review-fix merge includes two **uncompiled** code changes on main:
   `apps/shared/.../AiInteraction.kt` (caller cancellation now cancels the
@@ -85,7 +85,7 @@ is builds, device runs and owner sessions.
 - Hands-off windows for B6 and the B9 S Pen session.
 - B10: approve live OpenAI spend (about $1–5), or keep the mock-only carry-over.
 - Stage 0 confirmations still open: D21 (personal G5 finish line).
-- Pushing the 4 local commits (review fixes and this update); they are not
+- Pushing the local commits since `f5574fd` (review fixes and checkpoint updates); they are not
   on GitHub yet.
 
 ## Environment notes
