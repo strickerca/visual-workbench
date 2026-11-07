@@ -409,10 +409,16 @@ internal class DesktopMcpCoordinator(
                 require(target.kind==McpVerificationTargetKind.Tunnel)
                 verificationTargets.rememberSource(origin.binding,origin.sourceAssetId,target.selector,McpVerificationTargetKind.Tunnel)
             }}}
-        } catch(_:McpRecaptureUnavailable) { null } // dead route
+        } catch(error:CancellationException) { throw error } // also an IllegalStateException: never swallow it
+        catch(_:McpRecaptureUnavailable) { null } // dead route
         catch(_:IllegalArgumentException) { null } // full slots or a conflicting origin
-        catch(_:IllegalStateException) { null } // the engine is closing
-        if(selected==null)catalogGate.withLock{verificationTargets.rememberUnboundTunnel(origin.binding,origin.sourceAssetId)}
+        if(selected!=null)return@owned
+        // Bounded too: a long publication holding catalogGate must not stall the
+        // tunnel's capture delivery. An unrecorded origin is later treated as a
+        // phone capture that needs an explicit owner binding, never as routed.
+        // (A refused route's forget and the prune wait only on the engine gate.)
+        val recorded=withTimeoutOrNull(OBSERVER_WAIT_MS){catalogGate.withLock{verificationTargets.rememberUnboundTunnel(origin.binding,origin.sourceAssetId)}}
+        if(recorded==null)mutable.update{it.copy(message="Tunnel capture saved, but its verification route could not be recorded in time. Bind the connected USB phone before an agent recaptures it.")}
     }
     /** Caller holds captureGate (then catalogGate, the existing order). Retains
      * [route] and runs [register] under catalogGate. A route this call newly

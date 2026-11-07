@@ -45,10 +45,16 @@ internal fun mcpRecaptureNote(kind: McpVerificationTargetKind): String = when (k
     McpVerificationTargetKind.Tunnel -> "Recapture source: phone screen through the capturing USB tunnel session."
     McpVerificationTargetKind.Phone -> "Recapture source: phone screen through an owner-bound USB tunnel (owner-attested pairing)."
 }
-/** True when [note] is one of the owner-written recapture labels above. Agent
- * returns refuse these notes, so a reopened review can trust the label. */
-internal fun mcpReservedRecaptureNote(note: String): Boolean =
-    McpVerificationTargetKind.entries.any { it != McpVerificationTargetKind.Window && mcpRecaptureNote(it) == note }
+/** True when [note] could pass for an owner-written recapture label: after
+ * dropping invisible format characters and normalizing whitespace, it starts
+ * with the labels' shared prefix (any case). Agent returns refuse these notes,
+ * so neither a reopened review's kind nor the Compare text can be imitated. */
+internal fun mcpReservedRecaptureNote(note: String): Boolean {
+    val visible = note.filterNot { Character.getType(it) == Character.FORMAT.toInt() }
+        .replace(Regex("\\s+"), " ").trim()
+    return visible.startsWith(RECAPTURE_LABEL_PREFIX, ignoreCase = true)
+}
+private const val RECAPTURE_LABEL_PREFIX = "Recapture source:"
 internal fun mcpRecaptureKind(note: String): McpVerificationTargetKind =
     McpVerificationTargetKind.entries.firstOrNull { it != McpVerificationTargetKind.Window && mcpRecaptureNote(it) == note }
         ?: McpVerificationTargetKind.Window

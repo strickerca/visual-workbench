@@ -128,7 +128,11 @@ class McpCoordinatorTest {
         // An agent note may not carry an owner-written recapture source label.
         for(kind in McpVerificationTargetKind.entries.filter{it!=McpVerificationTargetKind.Window})
             assertThrows(IllegalArgumentException::class.java){decodeMcpReturn(null,Base64.getEncoder().encodeToString(bytes),mcpRecaptureNote(kind))}
-        assertEquals("x",decodeMcpReturn("x",null,mcpRecaptureNote(McpVerificationTargetKind.Phone)+" ").first)
+        // Near-copies that would look the same in Compare are refused too.
+        for(note in listOf(mcpRecaptureNote(McpVerificationTargetKind.Phone)+" ","  recapture  SOURCE: phone","​Recapture source: x"))
+            assertThrows(IllegalArgumentException::class.java){decodeMcpReturn("x",null,note)}
+        assertEquals("x",decodeMcpReturn("x",null,"Agent says: recapture source unknown").first)
+        assertTrue(mcpRecaptureNote(McpVerificationTargetKind.Window).isEmpty()&&!mcpReservedRecaptureNote(""))
     }
     @Test fun publicationNeverSendsAndOnlyDisplayedPreviewMaySend()=runBlocking {
         val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture,newId={receiptId()})
@@ -612,6 +616,24 @@ class McpCoordinatorTest {
             // The refused binding released the route it retained: no hidden slot.
             assertTrue(owner.state.value.targets.isEmpty());assertEquals(0,capture.routeCount)
         } finally {owner.close()}
+    }
+
+    @Test fun aTimedOutTunnelRegistrationReleasesItsRouteSlot()=runBlocking {
+        val catalog=Catalog();val capture=Capture();val route=CoordinatorRoute()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture,newId={receiptId()})
+        val entered=CompletableDeferred<Unit>();val finish=CompletableDeferred<Unit>()
+        try {
+            // A publication holds catalogGate past the observer's bounded wait.
+            catalog.publishEntered=entered;catalog.publishFinish=finish
+            val publishing=async{owner.publish(Compiled(info("held-catalog")))}
+            withTimeout(5000){entered.await()}
+            val remembering=async{owner.rememberPhoneCapture(McpPhoneCaptureOrigin(binding,"d".repeat(64),route))}
+            delay(3_500)
+            // The retained route was forgotten when its registration timed out.
+            assertEquals(0,capture.routeCount);assertTrue(owner.state.value.targets.isEmpty())
+            finish.complete(Unit);publishing.await();withTimeout(10_000){remembering.await()}
+            assertEquals(0,capture.routeCount);assertTrue(owner.state.value.targets.isEmpty())
+        } finally {finish.complete(Unit);owner.close()}
     }
 
     @Test fun aRefusedTunnelRegistrationReleasesItsRouteSlot()=runBlocking {
