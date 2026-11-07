@@ -291,9 +291,11 @@ function Remove-VwOldDeliveryBackups {
     foreach ($entry in @($owned | Select-Object -Skip ([Math]::Max(0, $Keep - 1)))) {
         if ((Get-VwDeliveryRunOutcome $Local $entry.Name) -cnotin $script:PrunableOutcomes) { $skipped++; continue }
         try {
-            foreach ($path in @($entry.Plan.Files)) {
-                $item = Get-Item -LiteralPath $path -Force
-                if ($item.PSIsContainer -or -not (Test-VwPlainItem $item)) { throw 'Backup file changed.' }
+            # backup.json goes last, so a partial failure leaves a still-owned,
+            # still-prunable directory. Every parent is re-checked per file.
+            $files = @(@($entry.Plan.Files) | Where-Object { [IO.Path]::GetFileName($_) -cne 'backup.json' }) + @(@($entry.Plan.Files) | Where-Object { [IO.Path]::GetFileName($_) -ceq 'backup.json' })
+            foreach ($path in $files) {
+                Assert-VwPlainPath $path
                 [IO.File]::Delete($path)
             }
             foreach ($path in @($entry.Plan.Directories)) { [IO.Directory]::Delete($path, $false) }
