@@ -6,10 +6,17 @@ is builds, device runs and owner sessions.
 
 ## Repository state
 
-- Local `main` is at `961cd80`, **25 commits ahead of `origin/main`
-  (`64d78c3`) and not pushed**. Stage 1 publishing waits for the remaining
-  blockers.
-- Working tree: clean, apart from this checkpoint.
+- Updated 2026-11-06 after a full review of the session's work. Local
+  `main` is at the review-fix merge (`caf8978` plus this checkpoint update),
+  **4 commits ahead of `origin/main` (`f5574fd`) and not pushed**. Stage 1
+  publishing waits for the remaining blockers.
+- The review-fix merge includes two **uncompiled** code changes on main:
+  `apps/shared/.../AiInteraction.kt` (caller cancellation now cancels the
+  owned job synchronously; `AiInteractionTest` no longer yields) and
+  `host-win/.../editor_probe_runner/frame/paint.rs` (dead overflow checks
+  removed). The B5 delivery and notices changes in it are covered by passing
+  PowerShell 5 fixtures and Python tests.
+- Working tree: clean.
 - Unmerged branches waiting for builds (each has its own worktree under
   `.claude/worktrees/`):
 
@@ -17,7 +24,7 @@ is builds, device runs and owner sessions.
 | --- | --- | --- | --- | --- |
 | `task/b4-canvas-present-20261104` | `89bd3a3` | `b4-canvas` | B4 canvas make-before-break and Callback2 handshake, plus a pixel test | Fix `b562578` verified on the S23 (before: 224/226 with black frames; after: 226/226, twice). Review fixes in `89bd3a3` are **uncompiled** |
 | `task/b9-physical-gesture-producer-20261104` | `d4d3e5a` | `agent-afc498451465324ed` | B9 Tier 1 physical-gesture producer (phone journal, owner-physical scenario, receiver pen history, validators, Paint per-aspect rows) | Reviewed; H1/H2/M1–M5/L1–L5 fixed. Python and PowerShell tests pass; Kotlin and Rust are **uncompiled** |
-| `task/t501-phone-recapture-20261104` | `6443b11` | `agent-a147779b1954bb954` | VERIFY-001/004 phone and tunnel verification origins | Reviewed; all 7 findings fixed. Node tests 23/23; Kotlin **uncompiled** |
+| `task/t501-phone-recapture-20261104` | `6deadfa` | `agent-a147779b1954bb954` | VERIFY-001/004 phone and tunnel verification origins | Reviewed; all 7 findings fixed. 2026-11-06 review fixes (reserved recapture labels, refused-route slot release, bounded fallback) independently reviewed twice. Node tests 23/23; Kotlin **uncompiled** |
 
 ## Stage 1 blockers
 
@@ -58,7 +65,9 @@ is builds, device runs and owner sessions.
    - `build-android`, then deliver with `build.ps1 deliver-android-normal`.
    - `build-desktop-distribution`, then rerun the packaged MCP smoke
      (`tools/desktop-test/run.ps1 -Execute -Mode mcp`).
-   - `test-all` (run `build-ffi` first) and `lint-all`.
+   - `test-all` (run `build-ffi` first) and `lint-all`. These are the first
+     compile of main's review fixes (`AiInteraction`, `paint.rs`); fix
+     anything that fails before B6.
 5. **B6.** Freeze main, then `build.ps1 build-remote-integration`, then
    `pwsh .local/b6-prep/run-b6.ps1 -Stage Check`, then `-Stage Prepare`, then
    the owner-attended `-Stage Run`. That needs about 10–15 minutes hands off,
@@ -76,7 +85,8 @@ is builds, device runs and owner sessions.
 - Hands-off windows for B6 and the B9 S Pen session.
 - B10: approve live OpenAI spend (about $1–5), or keep the mock-only carry-over.
 - Stage 0 confirmations still open: D21 (personal G5 finish line).
-- Pushing the 25 local commits; they are not on GitHub yet.
+- Pushing the 4 local commits (review fixes and this update); they are not
+  on GitHub yet.
 
 ## Environment notes
 
