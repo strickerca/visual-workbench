@@ -416,7 +416,9 @@ internal class DesktopMcpCoordinator(
         // Bounded too: a long publication holding catalogGate must not stall the
         // tunnel's capture delivery. An unrecorded origin is later treated as a
         // phone capture that needs an explicit owner binding, never as routed.
-        // (A refused route's forget and the prune wait only on the engine gate.)
+        // Not bounded by OBSERVER_WAIT_MS: a refused route's forget waits on the
+        // engine gate, and pruning a retired route waits on catalogGate under
+        // NonCancellable so no origin keeps pointing at a forgotten route.
         val recorded=withTimeoutOrNull(OBSERVER_WAIT_MS){catalogGate.withLock{verificationTargets.rememberUnboundTunnel(origin.binding,origin.sourceAssetId)}}
         if(recorded==null)mutable.update{it.copy(message="Tunnel capture saved, but its verification route could not be recorded in time. Bind the connected USB phone before an agent recaptures it.")}
     }

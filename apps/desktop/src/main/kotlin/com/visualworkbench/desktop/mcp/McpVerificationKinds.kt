@@ -46,12 +46,16 @@ internal fun mcpRecaptureNote(kind: McpVerificationTargetKind): String = when (k
     McpVerificationTargetKind.Phone -> "Recapture source: phone screen through an owner-bound USB tunnel (owner-attested pairing)."
 }
 /** True when [note] could pass for an owner-written recapture label: after
- * dropping invisible format characters and normalizing whitespace, it starts
- * with the labels' shared prefix (any case). Agent returns refuse these notes,
- * so neither a reopened review's kind nor the Compare text can be imitated. */
+ * dropping invisible format code points (supplementary ones included) and
+ * folding every Unicode space or separator to one space, it starts with the
+ * labels' shared prefix (any case). Agent returns refuse these notes, so a
+ * reopened review's kind cannot be forged and Compare text cannot pass for a
+ * label by spacing tricks. Look-alike letters from other scripts can still
+ * pass a text check; Compare shows agent notes as untrusted content. */
 internal fun mcpReservedRecaptureNote(note: String): Boolean {
-    val visible = note.filterNot { Character.getType(it) == Character.FORMAT.toInt() }
-        .replace(Regex("\\s+"), " ").trim()
+    val visible = buildString {
+        note.codePoints().forEach { point -> if (Character.getType(point) != Character.FORMAT.toInt()) appendCodePoint(point) }
+    }.replace(Regex("[\\s\\p{Z}]+"), " ").trim()
     return visible.startsWith(RECAPTURE_LABEL_PREFIX, ignoreCase = true)
 }
 private const val RECAPTURE_LABEL_PREFIX = "Recapture source:"
