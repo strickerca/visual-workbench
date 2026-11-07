@@ -398,20 +398,25 @@ try {
     $phone = New-FakePhone $newText; $phone.processAlive = $false
     Check ((Invoke-Scenario $phone $newText).Receipt.status -ceq 'already-installed-process-exited') 'identical bytes process exit is not reported as delivered'
 
-    # 22. Backup retention after a verified delivery: keep the newest two (this
-    # run's included); remove older module-owned backups only; skip anything else.
-    $oldBackups = @{ keep = ('a' * 32); old = ('b' * 32); foreign = ('c' * 32); oldest = ('d' * 32) }
+    # 22. Backup retention after a verified delivery: among module-owned backups,
+    # keep the newest two (this run's included) and remove older ones whose run a
+    # later delivery supersedes. Foreign directories never take a kept slot;
+    # rollback-failed and receipt-less backups are never removed.
+    $oldBackups = [ordered]@{ unknown = ('e' * 32); held = ('f' * 32); oldest = ('d' * 32); old = ('b' * 32); keep = ('a' * 32); foreign = ('c' * 32) }
+    $outcomes = @{ held = 'rollback-failed'; oldest = 'delivered'; old = 'rolled-back'; keep = 'delivered'; foreign = 'delivered' }
     $prepare = {
         param($Root)
-        $parent = Join-Path $Root '.local/android-normal-backups'
+        $local = Join-Path $Root '.local'; $parent = Join-Path $local 'android-normal-backups'
         $stamp = 0
-        foreach ($key in @('oldest', 'foreign', 'old', 'keep')) {
+        foreach ($key in @($oldBackups.Keys)) {
             $id = $oldBackups[$key]; $directory = Join-Path $parent $id
             [void][IO.Directory]::CreateDirectory($directory)
             [IO.File]::WriteAllText((Join-Path $directory 'base.apk'), 'OLDAPK', $utf8)
             $manifest = [ordered]@{ schema = 1; kind = 'android-normal-delivery-backup'; run_id = $id; package = 'com.visualworkbench.android'; owner_user = 0; files = @([ordered]@{ name = 'base.apk'; sha256 = ('0' * 64); bytes = 6 }) }
             [IO.File]::WriteAllText((Join-Path $directory 'backup.json'), ($manifest | ConvertTo-Json -Depth 4), $utf8)
             if ($key -ceq 'foreign') { [IO.File]::WriteAllText((Join-Path $directory 'notes.txt'), 'owner file', $utf8) }
+            if ($key -ceq 'old') { [void][IO.Directory]::CreateDirectory((Join-Path $directory 'readback')); [IO.File]::WriteAllText((Join-Path $directory 'readback/base.apk'), 'READBACK', $utf8) }
+            if ($outcomes.ContainsKey($key)) { [IO.File]::WriteAllText((Join-Path $local ('android-normal-delivery-' + $id + '.json')), ([ordered]@{ schema = 1; status = $outcomes[$key] } | ConvertTo-Json), $utf8) }
             $stamp++
             [IO.File]::SetLastWriteTimeUtc((Join-Path $directory 'backup.json'), [DateTime]::UtcNow.AddDays(-10 + $stamp))
         }
@@ -421,15 +426,17 @@ try {
     $run = Invoke-Scenario $phone $newText -Prepare $prepare
     $r = $run.Receipt
     $parent = Join-Path $run.Root '.local/android-normal-backups'
-    Check ($r.status -ceq 'delivered' -and (Test-Path -LiteralPath (Join-Path $parent $r.run_id)) -and (Test-Path -LiteralPath (Join-Path $parent $oldBackups.keep))) 'newest previous backup and this run backup are kept'
-    Check (-not (Test-Path -LiteralPath (Join-Path $parent $oldBackups.old)) -and -not (Test-Path -LiteralPath (Join-Path $parent $oldBackups.oldest))) 'older module-owned backups are removed'
-    Check ((Test-Path -LiteralPath (Join-Path $parent $oldBackups.foreign)) -and (Test-Path -LiteralPath (Join-Path $parent 'not-a-run'))) 'backups with foreign files and non-run directories are left alone'
-    Check ($r.backup.pruned_previous -eq 2 -and $r.backup.prune_skipped -eq 1 -and $r.backup.keep_latest -eq 2) 'retention counts recorded'
+    $present = { param($Key) Test-Path -LiteralPath (Join-Path $parent $oldBackups[$Key]) }
+    Check ($r.status -ceq 'delivered' -and (Test-Path -LiteralPath (Join-Path $parent $r.run_id)) -and (& $present 'keep')) 'newest previous owned backup and this run backup are kept'
+    Check (-not (& $present 'old') -and -not (& $present 'oldest')) 'older superseded module-owned backups are removed, readback included'
+    Check ((& $present 'foreign') -and (Test-Path -LiteralPath (Join-Path $parent 'not-a-run'))) 'a newer foreign directory neither takes the kept slot nor is removed'
+    Check ((& $present 'held') -and (& $present 'unknown')) 'rollback-failed and receipt-less backups are never removed'
+    Check ($r.backup.pruned_previous -eq 2 -and $r.backup.prune_skipped -eq 3 -and $r.backup.keep_latest -eq 2) 'retention counts recorded'
     # Not pruned unless the delivery is verified.
     $phone = New-FakePhone $oldText; $phone.launchMode = 'error'
     $run = Invoke-Scenario $phone $newText -Prepare $prepare
     $parent = Join-Path $run.Root '.local/android-normal-backups'
-    Check ($run.Receipt.status -ceq 'delivered-launch-inconclusive' -and (Test-Path -LiteralPath (Join-Path $parent $oldBackups.oldest)) -and $run.Receipt.backup.pruned_previous -eq 0) 'unverified delivery keeps every backup'
+    Check ($run.Receipt.status -ceq 'delivered-launch-inconclusive' -and (& $present 'oldest') -and $run.Receipt.backup.pruned_previous -eq 0) 'unverified delivery keeps every backup'
 
     # 19. adb install timeout: settled delayed re-reads decide the outcome.
     $phone = New-FakePhone $oldText; $phone.installModes[0] = 'timeout-unchanged'

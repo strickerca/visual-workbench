@@ -56,14 +56,16 @@ inputs are refused on every other `build.ps1` command.
    package must be installed for user 0 and **absent from every other
    profile**. An APK update would also change any other profile that holds
    the package, so that case is refused.
-6. Backs up every installed APK (`pm path --user 0`: base and splits) with
-   `adb pull` into `.local/android-normal-backups/<run-id>/`. Each pulled
-   file's hash must match the phone's `sha256sum`. `backup.json` records the
-   names and hashes.
+6. Reads the installed APKs (`pm path --user 0`: base and splits) and their
+   phone-side `sha256sum`. If the installed APK is a single `base.apk` with
+   exactly the input bytes, nothing is pulled, installed or rolled back
+   (`already-installed`); the signer and versionCode are the verified input's.
+   Otherwise every installed APK is backed up with `adb pull` into
+   `.local/android-normal-backups/<run-id>/`. Each pulled file's hash must
+   match the phone's `sha256sum`. `backup.json` records the names and hashes.
 7. Runs apksigner on the backed-up APKs: they must have one signer between
    them, and it must equal the new APK's signer. The new versionCode must not
-   be lower than the installed one. If the installed APK already has exactly
-   the input bytes, nothing is installed (`already-installed`).
+   be lower than the installed one.
 8. Checks that the existing adb server is still alive, then runs
    `adb install -r --user 0 <apk>`. It never uses `-d`, never uninstalls, and
    never clears app data. If the install times out (exit 124), the outcome is
@@ -131,6 +133,9 @@ and is never written to log files. Screenshots: none.
 | `delivered-foreground-inconclusive` | Installed and read back. Foreground was not observed (shared phone). No other app was stopped and nothing was rolled back | 1 |
 | `delivered-launch-inconclusive` | Installed and read back. Launch failed, timed out or could not be confirmed. Not rolled back (see above) | 1 |
 | `delivered-process-exited` | Installed, read back and shown, but the process was gone shortly after launch (possible crash). Not rolled back | 1 |
+| `already-installed-foreground-inconclusive` | The installed APK already had these exact bytes; nothing was installed. Foreground was not observed | 1 |
+| `already-installed-launch-inconclusive` | The installed APK already had these exact bytes; nothing was installed. Launch failed, timed out or could not be confirmed | 1 |
+| `already-installed-process-exited` | The installed APK already had these exact bytes; nothing was installed. The process was gone shortly after launch | 1 |
 | `refused` | A precondition failed (including a missing adb server before install). Nothing was installed | 1 |
 | `install-failed-unchanged` | Android refused the install. The previous bytes were confirmed in place | 1 |
 | `install-timeout-unchanged` | adb install timed out. Settled delayed reads show the previous bytes. A device-side session may still finish, so re-check before retrying | 1 |
@@ -157,7 +162,14 @@ and is never written to log files. Screenshots: none.
   is its acceptance.
 - Test-only APKs (`android:testOnly`) are refused by Android because the route
   does not pass `-t`.
-- Backups are kept. Delete old `.local/android-normal-backups/<run-id>`
-  folders yourself once a delivery is accepted.
+- Backup retention (`-KeepBackups`, default 2, range 1-10): only after a
+  `delivered` run, the newest module-owned backups are kept, this run's
+  included, and older ones are removed file by file (never recursively).
+  A directory counts as module-owned only when it holds exactly its
+  `backup.json`, the APKs that manifest names and, after a failed readback,
+  `readback/base.apk`; anything else is left alone and never takes a kept
+  slot. A backup whose run ended `rollback-failed`, or whose run receipt is
+  missing or unreadable, is never removed. The receipt records
+  `keep_latest`, `pruned_previous` and `prune_skipped`.
 - A delivery does not count as physical S Pen, performance, normal paired
   session or owner acceptance evidence.

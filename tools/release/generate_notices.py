@@ -474,11 +474,16 @@ def finalize(receipt: dict, texts: dict) -> tuple[bytes, bytes, dict]:
 
 
 # ------------------------------------------------------------- verification
-def verify_bundle(receipt_raw: bytes, text_raw: bytes, **options) -> dict:
+def verify_bundle(receipt_raw: bytes, text_raw: bytes, *, artifact_kinds=frozenset(),
+                  declarations: dict | None = None, declared_skips=frozenset(),
+                  desktop_files: dict | None = None, opaque_coverage=None) -> dict:
     """Re-check a generated bundle; see _verify_bundle. A structurally malformed
-    receipt (wrong JSON types) is a static refusal, never a traceback."""
+    receipt (wrong JSON types) is a static refusal, never a traceback. Explicit
+    keywords keep a misspelled caller argument a TypeError, not a refusal."""
     try:
-        return _verify_bundle(receipt_raw, text_raw, **options)
+        return _verify_bundle(receipt_raw, text_raw, artifact_kinds=artifact_kinds, declarations=declarations,
+                              declared_skips=declared_skips, desktop_files=desktop_files,
+                              opaque_coverage=opaque_coverage)
     except Refused:
         raise
     except (TypeError, KeyError, AttributeError, IndexError, ValueError) as error:

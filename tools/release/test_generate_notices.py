@@ -752,6 +752,8 @@ class Verification(Fixture):
             with self.subTest(malformed=malformed["components"][0]["texts"][:1]):
                 with self.assertRaises(g.Refused):
                     g.verify_bundle(json.dumps(malformed).encode(), text)
+        with self.assertRaises(TypeError):  # a caller mistake is not a receipt refusal
+            g.verify_bundle(raw, text, artifact_kind=frozenset())
         with self.assertRaisesRegex(g.Refused, "^notices_stale_input$"):
             g.verify_bundle(raw, text, declarations={"Cargo.lock": {"bytes": 1, "sha256": "0" * 64}})
         self.assertEqual(g.verify_bundle(raw, text, declarations={"Cargo.lock": receipt["inputs"]["Cargo.lock"]})
