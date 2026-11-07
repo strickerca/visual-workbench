@@ -87,6 +87,9 @@ class McpCoordinatorTest {
         override suspend fun pruneRetiredRoutes():Set<String> {
             val dead=routes.filterValues{it.retired}.keys.toSet();dead.forEach{routes.remove(it)};return dead
         }
+        override suspend fun forgetPhoneRoute(selector:String){routes.remove(selector)}
+        /** Retained phone routes, each holding one of the shared target slots. */
+        val routeCount:Int get()=routes.size
         override suspend fun compileVerification(selector:String,profile:McpCaptureProfile,checkGrant:suspend()->Unit):WorkbenchCompiledPackage {
             if(!selector.startsWith("phone-"))return super.compileVerification(selector,profile,checkGrant)
             val route=routes[selector]?:throw McpRecaptureUnavailable(McpRecaptureRefusal.PhoneDisconnected)
@@ -122,6 +125,10 @@ class McpCoordinatorTest {
         assertThrows(IllegalArgumentException::class.java){decodeMcpReturn(null,"eB==","")}
         assertThrows(IllegalArgumentException::class.java){decodeMcpReturn("Ã©".repeat(17000),null,"")}
         val bytes=byteArrayOf(0,1,2,3);assertArrayEquals(bytes,decodeMcpReturn(null,Base64.getEncoder().encodeToString(bytes),"").second)
+        // An agent note may not carry an owner-written recapture source label.
+        for(kind in McpVerificationTargetKind.entries.filter{it!=McpVerificationTargetKind.Window})
+            assertThrows(IllegalArgumentException::class.java){decodeMcpReturn(null,Base64.getEncoder().encodeToString(bytes),mcpRecaptureNote(kind))}
+        assertEquals("x",decodeMcpReturn("x",null,mcpRecaptureNote(McpVerificationTargetKind.Phone)+" ").first)
     }
     @Test fun publicationNeverSendsAndOnlyDisplayedPreviewMaySend()=runBlocking {
         val catalog=Catalog();val inbox=Inbox();val wire=Connection();val capture=Capture();val owner=DesktopMcpCoordinator(catalog,inbox,wire,capture,newId={receiptId()})
@@ -589,8 +596,8 @@ class McpCoordinatorTest {
     }
 
     @Test fun onlyAndroidPlatformPackagesBecomePhoneOriginsAndRetirementClearsThePrompt()=runBlocking {
-        val catalog=Catalog().apply{platform="windows"}
-        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),Capture(),newId={receiptId()})
+        val catalog=Catalog().apply{platform="windows"};val capture=Capture()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture,newId={receiptId()})
         try {
             owner.publish(Compiled(info("windows-unrouted")))
             assertTrue(owner.state.value.phoneUnbound.isEmpty())
@@ -602,6 +609,29 @@ class McpCoordinatorTest {
             assertTrue(owner.state.value.phoneUnbound.isEmpty());assertTrue(owner.state.value.phoneScreens.isEmpty())
             val refused=try {owner.bindPhoneScreen(phone,CoordinatorRoute());false} catch(_:Exception) {true}
             assertTrue(refused)
+            // The refused binding released the route it retained: no hidden slot.
+            assertTrue(owner.state.value.targets.isEmpty());assertEquals(0,capture.routeCount)
+        } finally {owner.close()}
+    }
+
+    @Test fun aRefusedTunnelRegistrationReleasesItsRouteSlot()=runBlocking {
+        val catalog=Catalog();val capture=Capture();val closed=CoordinatorRoute();val live=CoordinatorRoute()
+        val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture,newId={receiptId()})
+        try {
+            // The first delivery found its session closed: an unbound tunnel origin.
+            closed.refusal=McpRecaptureRefusal.PhoneDisconnected
+            owner.rememberPhoneCapture(McpPhoneCaptureOrigin(binding,"d".repeat(64),closed))
+            assertTrue(owner.state.value.targets.isEmpty())
+            // A later live session cannot silently rebind that origin; its retained
+            // route is forgotten and the capture stays an unbound tunnel capture.
+            owner.rememberPhoneCapture(McpPhoneCaptureOrigin(binding,"d".repeat(64),live))
+            assertTrue(owner.state.value.targets.isEmpty());assertEquals(0,capture.routeCount)
+            val saved=owner.publish(Compiled(info("refused-registration")))
+            assertTrue("${saved.info.packageId}/${saved.info.target}" in owner.state.value.phoneUnbound)
+            // The owner can still bind it explicitly to the live session.
+            owner.bindPhoneScreen(saved,live)
+            assertEquals(1,owner.state.value.targets.size);assertEquals(1,capture.routeCount)
+            assertTrue(owner.state.value.phoneUnbound.isEmpty())
         } finally {owner.close()}
     }
 

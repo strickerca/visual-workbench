@@ -29,6 +29,8 @@ internal interface McpCaptureEngine {
     suspend fun retainPhoneRoute(route:McpPhoneScreenRoute):McpSelectedTarget = throw McpRecaptureUnavailable(McpRecaptureRefusal.SourceUnavailable)
     /** Forget routes whose exact session closed; returns their selectors. */
     suspend fun pruneRetiredRoutes():Set<String> = emptySet()
+    /** Forget one retained route whose registration the coordinator refused. */
+    suspend fun forgetPhoneRoute(selector:String) {}
     /** Compiled tunnel runtime admission (false until the approved catalog exists). */
     fun phoneRuntimeAvailable():Boolean = false
     suspend fun close()
@@ -403,16 +405,29 @@ internal class DesktopMcpCoordinator(
         // gate or a session that is no longer live records the capture as a
         // tunnel capture needing a reconnect/binding, never as a phone-app one.
         val selected=try {
-            withTimeoutOrNull(OBSERVER_WAIT_MS){captureGate.withLock{pruneRetiredRoutesLocked();captureEngine.retainPhoneRoute(origin.route)}}
-        } catch(_:McpRecaptureUnavailable) { null } catch(_:IllegalArgumentException) { null } // dead route or full slots
-        catalogGate.withLock{
-            if(selected==null)verificationTargets.rememberUnboundTunnel(origin.binding,origin.sourceAssetId)
-            else {
-                require(selected.kind==McpVerificationTargetKind.Tunnel)
-                verificationTargets.rememberSource(origin.binding,origin.sourceAssetId,selected.selector,McpVerificationTargetKind.Tunnel)
-            }
+            withTimeoutOrNull(OBSERVER_WAIT_MS){captureGate.withLock{pruneRetiredRoutesLocked();retainRouteFor(origin.route){target->
+                require(target.kind==McpVerificationTargetKind.Tunnel)
+                verificationTargets.rememberSource(origin.binding,origin.sourceAssetId,target.selector,McpVerificationTargetKind.Tunnel)
+            }}}
+        } catch(_:McpRecaptureUnavailable) { null } // dead route
+        catch(_:IllegalArgumentException) { null } // full slots or a conflicting origin
+        catch(_:IllegalStateException) { null } // the engine is closing
+        if(selected==null)catalogGate.withLock{verificationTargets.rememberUnboundTunnel(origin.binding,origin.sourceAssetId)}
+    }
+    /** Caller holds captureGate (then catalogGate, the existing order). Retains
+     * [route] and runs [register] under catalogGate. A route this call newly
+     * retained is forgotten again when registration fails, so a refused binding
+     * never keeps one of the 16 target slots without a listed target. */
+    private suspend fun retainRouteFor(route:McpPhoneScreenRoute,register:suspend(McpSelectedTarget)->Unit):McpSelectedTarget {
+        val target=captureEngine.retainPhoneRoute(route)
+        val fresh=mutable.value.targets.none{it.selector==target.selector}
+        try { catalogGate.withLock{register(target)} }
+        catch(error:Throwable) {
+            if(fresh)withContext(NonCancellable){captureEngine.forgetPhoneRoute(target.selector)}
+            throw error
         }
-        if(selected!=null)mutable.update{it.copy(targets=if(it.targets.any{target->target.selector==selected.selector})it.targets else it.targets+selected)}
+        mutable.update{it.copy(targets=if(it.targets.any{t->t.selector==target.selector})it.targets else it.targets+target)}
+        return target
     }
     /** Explicit local owner action, never an McpOwnerActions method: the owner
      * attests that the connected USB phone shows the screen this phone-app or
@@ -422,15 +437,13 @@ internal class DesktopMcpCoordinator(
         if(!captureEngine.phoneRuntimeAvailable())throw McpRecaptureUnavailable(McpRecaptureRefusal.TunnelRuntimeUnavailable)
         val live=route?:throw McpRecaptureUnavailable(McpRecaptureRefusal.PhoneDisconnected)
         live.checkAvailable()
-        val target=captureGate.withLock{pruneRetiredRoutesLocked();captureEngine.retainPhoneRoute(live)}
         val itemKey=key(selected.info.packageId,selected.info.target)
-        catalogGate.withLock{
+        val target=captureGate.withLock{pruneRetiredRoutesLocked();retainRouteFor(live){retained->
             val exact=checkedVerificationPackage(selected.info).info
-            verificationTargets.bindPhone(exact,target.selector)
-        }
+            verificationTargets.bindPhone(exact,retained.selector)
+        }}
         val covered=synchronized(lifecycle){val at=nowNs();grants.values.any{at<it.expiresNs&&target.selector in it.selectors}}
-        mutable.update{it.copy(targets=if(it.targets.any{t->t.selector==target.selector})it.targets else it.targets+target,
-            phoneUnbound=it.phoneUnbound-itemKey,phoneScreens=it.phoneScreens+itemKey,
+        mutable.update{it.copy(phoneUnbound=it.phoneUnbound-itemKey,phoneScreens=it.phoneScreens+itemKey,
             message=if(covered)"Phone capture bound to ${live.description}. An active grant already covers this phone screen, so that agent can recapture it now."
                 else "Phone capture bound to ${live.description}. Grant that phone screen before an agent recaptures it.")}
     }
@@ -557,6 +570,8 @@ internal class DesktopMcpCoordinator(
 }
 internal fun decodeMcpReturn(text:String?,encoded:String?,note:String):Pair<String?,ByteArray?> {
     require((text==null)!=(encoded==null));require(note.length<=32768 && note.toByteArray(Charsets.UTF_8).size<=32768)
+    // Recapture source labels are owner-written; an agent note may never carry one.
+    require(!mcpReservedRecaptureNote(note))
     if(text!=null){require(text.isNotEmpty()&&text.length<=32768&&text.toByteArray(Charsets.UTF_8).size<=32768);return text to null}
     val value=requireNotNull(encoded)
     require(value.length in 4..5_592_408 && value.length%4==0)

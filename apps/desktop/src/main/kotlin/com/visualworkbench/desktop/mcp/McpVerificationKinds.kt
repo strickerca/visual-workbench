@@ -45,6 +45,10 @@ internal fun mcpRecaptureNote(kind: McpVerificationTargetKind): String = when (k
     McpVerificationTargetKind.Tunnel -> "Recapture source: phone screen through the capturing USB tunnel session."
     McpVerificationTargetKind.Phone -> "Recapture source: phone screen through an owner-bound USB tunnel (owner-attested pairing)."
 }
+/** True when [note] is one of the owner-written recapture labels above. Agent
+ * returns refuse these notes, so a reopened review can trust the label. */
+internal fun mcpReservedRecaptureNote(note: String): Boolean =
+    McpVerificationTargetKind.entries.any { it != McpVerificationTargetKind.Window && mcpRecaptureNote(it) == note }
 internal fun mcpRecaptureKind(note: String): McpVerificationTargetKind =
     McpVerificationTargetKind.entries.firstOrNull { it != McpVerificationTargetKind.Window && mcpRecaptureNote(it) == note }
         ?: McpVerificationTargetKind.Window

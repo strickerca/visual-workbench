@@ -66,6 +66,9 @@ internal class NativeMcpCaptureEngine private constructor(
         dead.forEach{phoneRoutes.remove(it)}
         dead
     }
+    /** The coordinator refused to register a route it had just retained. A closed
+     * engine already cleared every route, so there is nothing left to forget. */
+    override suspend fun forgetPhoneRoute(selector:String) { gate.withLock { phoneRoutes.remove(selector) } }
     override fun phoneRuntimeAvailable():Boolean = androidTunnelAvailable()
     override suspend fun select():McpSelectedTarget=gate.withLock {
         check(!closed);require(targets.size+phoneRoutes.size<16)
