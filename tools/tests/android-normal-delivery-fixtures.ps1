@@ -220,10 +220,11 @@ $fakeAapt = {
 $base = Join-Path ([IO.Path]::GetTempPath()) ('vw-normal-delivery-fixtures-' + [guid]::NewGuid().ToString('N'))
 $script:scenario = 0
 function Invoke-Scenario {
-    param($Phone, [string]$ApkText, [string]$Sha256, [string]$Model = 'SM-S918U', [string]$DeviceModel = 'SM-S918U', [string]$ApkName)
+    param($Phone, [string]$ApkText, [string]$Sha256, [string]$Model = 'SM-S918U', [string]$DeviceModel = 'SM-S918U', [string]$ApkName, [scriptblock]$Prepare)
     $script:scenario++
     $root = Join-Path $base ('root-' + $script:scenario)
     [void][IO.Directory]::CreateDirectory($root)
+    if ($Prepare) { & $Prepare $root }
     if (-not $ApkName) { $ApkName = 'input-' + $script:scenario + '.apk' }
     $apkDirectory = Join-Path $base ('input-' + $script:scenario)
     [void][IO.Directory]::CreateDirectory($apkDirectory)
@@ -379,10 +380,56 @@ try {
     $phone.users = @('Users:', '	UserInfo{0:Owner:c13} running', '	UserInfo{150:Secure Folder:1030}'); $phone.dumpIds = @('0')
     Check ((Invoke-Scenario $phone $newText).Receipt.failure_code -ceq 'package_user_states_inconsistent') 'missing profile row refused'
 
-    # 18. Byte-identical delivery: distinct status, nothing installed.
+    # 18. Byte-identical delivery: distinct status, nothing installed, and the
+    # device digest replaces a backup pull (no APK copy is written locally).
     $phone = New-FakePhone $newText
-    $r = (Invoke-Scenario $phone $newText).Receipt
+    $run = Invoke-Scenario $phone $newText
+    $r = $run.Receipt
     Check ($r.status -ceq 'already-installed' -and $r.install.skipped_identical -and -not $r.install.attempted -and (Get-InstallCalls $phone).Count -eq 0 -and $r.readback.matches -and $r.launch.foreground) 'identical bytes reported as already installed'
+    $pulls = @($phone.calls | Where-Object { @($_)[0] -ceq 'pull' })
+    Check ($pulls.Count -eq 0 -and $r.backup.skipped_identical -and -not $r.backup.complete -and -not (Test-Path -LiteralPath (Join-Path $run.Root '.local/android-normal-backups'))) 'identical bytes pull and keep no backup'
+    Check ($r.installed_before.signer_sha256 -ceq $signerA -and @($r.installed_before.files).Count -eq 1 -and $r.installed_before.files[0].sha256 -ceq (Get-TextSha256 $newText)) 'identical bytes record the installed identity from the device digest'
+    # Identical bytes whose launch fails were never installed: never 'delivered-*'.
+    $phone = New-FakePhone $newText; $phone.launchMode = 'error'
+    $r = (Invoke-Scenario $phone $newText).Receipt
+    Check ($r.status -ceq 'already-installed-launch-inconclusive' -and $r.failure_code -ceq 'launch_failed' -and (Get-InstallCalls $phone).Count -eq 0) 'identical bytes launch failure is not reported as delivered'
+    $phone = New-FakePhone $newText; $phone.foreground = $false
+    Check ((Invoke-Scenario $phone $newText).Receipt.status -ceq 'already-installed-foreground-inconclusive') 'identical bytes foreground contention is not reported as delivered'
+    $phone = New-FakePhone $newText; $phone.processAlive = $false
+    Check ((Invoke-Scenario $phone $newText).Receipt.status -ceq 'already-installed-process-exited') 'identical bytes process exit is not reported as delivered'
+
+    # 22. Backup retention after a verified delivery: keep the newest two (this
+    # run's included); remove older module-owned backups only; skip anything else.
+    $oldBackups = @{ keep = ('a' * 32); old = ('b' * 32); foreign = ('c' * 32); oldest = ('d' * 32) }
+    $prepare = {
+        param($Root)
+        $parent = Join-Path $Root '.local/android-normal-backups'
+        $stamp = 0
+        foreach ($key in @('oldest', 'foreign', 'old', 'keep')) {
+            $id = $oldBackups[$key]; $directory = Join-Path $parent $id
+            [void][IO.Directory]::CreateDirectory($directory)
+            [IO.File]::WriteAllText((Join-Path $directory 'base.apk'), 'OLDAPK', $utf8)
+            $manifest = [ordered]@{ schema = 1; kind = 'android-normal-delivery-backup'; run_id = $id; package = 'com.visualworkbench.android'; owner_user = 0; files = @([ordered]@{ name = 'base.apk'; sha256 = ('0' * 64); bytes = 6 }) }
+            [IO.File]::WriteAllText((Join-Path $directory 'backup.json'), ($manifest | ConvertTo-Json -Depth 4), $utf8)
+            if ($key -ceq 'foreign') { [IO.File]::WriteAllText((Join-Path $directory 'notes.txt'), 'owner file', $utf8) }
+            $stamp++
+            [IO.File]::SetLastWriteTimeUtc((Join-Path $directory 'backup.json'), [DateTime]::UtcNow.AddDays(-10 + $stamp))
+        }
+        [void][IO.Directory]::CreateDirectory((Join-Path $parent 'not-a-run'))
+    }.GetNewClosure()
+    $phone = New-FakePhone $oldText
+    $run = Invoke-Scenario $phone $newText -Prepare $prepare
+    $r = $run.Receipt
+    $parent = Join-Path $run.Root '.local/android-normal-backups'
+    Check ($r.status -ceq 'delivered' -and (Test-Path -LiteralPath (Join-Path $parent $r.run_id)) -and (Test-Path -LiteralPath (Join-Path $parent $oldBackups.keep))) 'newest previous backup and this run backup are kept'
+    Check (-not (Test-Path -LiteralPath (Join-Path $parent $oldBackups.old)) -and -not (Test-Path -LiteralPath (Join-Path $parent $oldBackups.oldest))) 'older module-owned backups are removed'
+    Check ((Test-Path -LiteralPath (Join-Path $parent $oldBackups.foreign)) -and (Test-Path -LiteralPath (Join-Path $parent 'not-a-run'))) 'backups with foreign files and non-run directories are left alone'
+    Check ($r.backup.pruned_previous -eq 2 -and $r.backup.prune_skipped -eq 1 -and $r.backup.keep_latest -eq 2) 'retention counts recorded'
+    # Not pruned unless the delivery is verified.
+    $phone = New-FakePhone $oldText; $phone.launchMode = 'error'
+    $run = Invoke-Scenario $phone $newText -Prepare $prepare
+    $parent = Join-Path $run.Root '.local/android-normal-backups'
+    Check ($run.Receipt.status -ceq 'delivered-launch-inconclusive' -and (Test-Path -LiteralPath (Join-Path $parent $oldBackups.oldest)) -and $run.Receipt.backup.pruned_previous -eq 0) 'unverified delivery keeps every backup'
 
     # 19. adb install timeout: settled delayed re-reads decide the outcome.
     $phone = New-FakePhone $oldText; $phone.installModes[0] = 'timeout-unchanged'

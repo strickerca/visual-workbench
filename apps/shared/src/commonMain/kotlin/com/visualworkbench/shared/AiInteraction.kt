@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.coroutines.resume
 public enum class AiStage { Idle, Preparing, Sending, Comparing, Accepting, Saving, Closed }
 public data class AiInteractionState(public val stage:AiStage=AiStage.Idle,public val review:AiReview?=null,
     public val candidate:AiCandidateInfo?=null,public val failure:AiFailureKind?=null,public val receipt:AiResultReceipt?=null)
@@ -36,9 +37,19 @@ public class AiInteraction private constructor(private val edits:()->WorkbenchAi
             }.also{operation=it}
         }
         job.start()
-        try{return job.await()}
+        try{return awaitLinked(job)}
         catch(error:CancellationException){job.cancel();withContext(NonCancellable){job.join()};throw error}
         finally{withContext(NonCancellable){guard.withLock{if(operation===job)operation=null}}}
+    }
+    /** Awaits [job]; cancelling the caller cancels [job] synchronously, inside the
+     * caller's cancel() call. A plain await() would cancel it only after the caller
+     * is re-dispatched, and a result settling in that gap would still be adopted. */
+    private suspend fun <T> awaitLinked(job:Deferred<T>):T{
+        suspendCancellableCoroutine<Unit>{waiter->
+            val completion=job.invokeOnCompletion{waiter.resume(Unit)}
+            waiter.invokeOnCancellation{completion.dispose();job.cancel()}
+        }
+        return job.await() // Already complete: returns or throws without suspending.
     }
     public suspend fun prepare(options:AiPrepareOptions):AiReview=run(AiStage.Preparing){
         if(failedRetirements.isNotEmpty())throw AiFailure(AiFailureKind.Busy)
@@ -47,7 +58,8 @@ public class AiInteraction private constructor(private val edits:()->WorkbenchAi
         var acquired:WorkbenchAiRequest?=null
         try{val next=edits().prepare(options);acquired=next
             currentCoroutineContext().ensureActive()
-            guard.withLock{if(closed)throw AiFailure(AiFailureKind.Closed);request=next;acquired=null}
+            // An uncontended lock does not check cancellation; check again under it.
+            guard.withLock{if(closed)throw AiFailure(AiFailureKind.Closed);currentCoroutineContext().ensureActive();request=next;acquired=null}
             mutable.value=mutable.value.copy(review=next.review);next.review
         }finally{withContext(NonCancellable){acquired?.let{
             failedRetirements+=it

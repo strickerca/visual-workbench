@@ -40,16 +40,9 @@ pub(super) fn admit(
     canvas: Rect,
     client: Rect,
 ) -> Result<()> {
+    // validate() also refuses any clock whose nanosecond value would overflow.
     expected.validate()?;
     actual.validate()?;
-    expected
-        .observed_end_qpc_100ns
-        .checked_mul(100)
-        .ok_or(Error::Limit)?;
-    actual
-        .observed_end_qpc_100ns
-        .checked_mul(100)
-        .ok_or(Error::Limit)?;
     if !stable(expected, actual)
         || actual.canvas_rect_host != canvas
         || !canvas.inside(client)
