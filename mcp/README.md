@@ -33,7 +33,11 @@ exact Origin. `null`, aliases, foreign origins, duplicate security headers,
 compressed bodies, upgrade requests and non-POST operations are refused.
 HTTP is stateless request/response; parked subscriptions are refused. HTTP
 capture is also refused: an arbitrary per-request client name cannot inherit
-another agent's capture grant. The recommended token-free transport is stdio.
+another agent's capture grant. `submit_result` is refused over HTTP with
+`bridge_connection_required`: every Compare inbox record is bound to an
+OS-authenticated bridge connection, which a bearer token alone does not
+provide. HTTP clients can list and read packages. The recommended token-free
+transport is stdio.
 
 The official SDK factory exposes six tools and `vw://package/{id}`. It serves
 both 2025-11-25 legacy initialization and 2026-07-28 per-request metadata through

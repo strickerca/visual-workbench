@@ -23,6 +23,9 @@ for(const [version,era,mode] of [['2025-11-25','legacy','legacy'],['2026-07-28',
     try{await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${server.port}/mcp`),{requestInit:{headers:{Authorization:`Bearer ${token}`}}}));
       assert.equal(client.getProtocolEra(),era);assert.equal((await client.listTools()).tools.length,8);
       assert.deepEqual((await client.callTool({name:'list_packages',arguments:{}})).structuredContent,{packages:[]});
+      // HTTP has no authenticated bridge identity: refused by name before any package or owner work.
+      const submit=await client.callTool({name:'submit_result',arguments:{package_id:'019a3aaa-0123-789a-8abc-0123456789ab',text:'result',note:'note'}});
+      assert.equal(submit.isError,true);assert.deepEqual(submit.content,[{type:'text',text:'bridge_connection_required'}]);
     }finally{await client.close();await server.close();}
   });
 }
