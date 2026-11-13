@@ -34,6 +34,16 @@ function markerCount(entry) {
 }
 function cancelled(signal) { if (signal?.aborted) throw new Refused('cancelled'); }
 function receiptId(value) { identifier(value); }
+/** Admission refuses instead of queueing. Once the owner has committed a side
+ * effect its receipt must still be returned, so that one follow-up check waits
+ * for a free reader/verifier (bounded) instead of failing with `busy`. */
+async function afterCommit(action, signal, waitMs = 20_000, stepMs = 50) {
+  for (const deadline = Date.now() + waitMs; ;) {
+    try { return await action(); }
+    catch (error) { if (!(error instanceof Refused) || error.code !== 'busy' || Date.now() >= deadline) throw error; }
+    cancelled(signal); await new Promise(resolve => setTimeout(resolve, stepMs));
+  }
+}
 
 /** Validate bounded PNG framing, checksums, geometry and decompressed scanlines.
  * The checked native owner supplies the crop/correspondence; parsing a PNG here
@@ -111,14 +121,14 @@ export function registerVerificationTools(tool, { packages, owner, principal }) 
       requireThat(after.package_id !== original.package_id && after.target === original.target, 'package_changed');
       receiptId(result.receipt_id); hex(result.receipt_blake3);
       requireThat(Number.isInteger(result.marker_count) && result.marker_count === markers);
-      return packages.withChecked(after.package_id, after.target, signal, async published => {
+      return afterCommit(() => packages.withChecked(after.package_id, after.target, signal, async published => {
         checkedIdentity(published, after); cancelled(signal);
         const response = {
           content: [{ type: 'text', text: 'Recapture published. Marker correspondence and owner review remain separate.' }],
           structuredContent: { original: before, after, receipt_id: result.receipt_id, receipt_blake3: result.receipt_blake3, marker_count: markers },
         };
         encoded(response); return response;
-      });
+      }), signal);
     });
   }, false);
 

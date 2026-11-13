@@ -105,9 +105,11 @@ export class Packages {
   list(limit = 20, since) {
     requireThat(Number.isInteger(limit) && limit >= 1 && limit <= 64);
     if (since !== undefined) requireThat(typeof since === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(since) && Number.isFinite(Date.parse(since)) && new Date(since).toISOString() === since);
-    return [...this.#entries.values()].filter(e => !since || e.manifest.created_at > since)
-      .sort((a, b) => a.manifest.created_at.localeCompare(b.manifest.created_at) || a.hash.localeCompare(b.hash))
-      .slice(0, limit).map(e => this.summary(e));
+    const ordered = [...this.#entries.values()].filter(e => !since || e.manifest.created_at > since)
+      .sort((a, b) => a.manifest.created_at.localeCompare(b.manifest.created_at) || a.hash.localeCompare(b.hash));
+    // Always oldest-first. A `since` cursor pages forward from that instant;
+    // without one the caller wants what is current, so keep the newest `limit`.
+    return (since ? ordered.slice(0, limit) : ordered.slice(-limit)).map(e => this.summary(e));
   }
   entry(id, target) {
     identifier(id);

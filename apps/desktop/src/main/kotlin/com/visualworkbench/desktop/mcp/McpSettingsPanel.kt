@@ -22,7 +22,9 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
     var profile by remember{mutableStateOf("generic")};var model by remember{mutableStateOf("")}
     var snapshot by remember{mutableStateOf("")};var title by remember{mutableStateOf(false)}
     var assumeSrgb by remember{mutableStateOf(false)};var depth by remember{mutableStateOf(false)}
-    fun act(body:suspend()->Unit){if(busy)return;busy=true;message=null;scope.launch{try{body()}catch(error:CancellationException){throw error}catch(_:Exception){message="The operation was refused or did not finish. Refresh to recover durable publication; do not assume it was sent."}finally{busy=false}}}
+    // withTimeout reports expiry as a CancellationException subtype. It is a
+    // failed owner operation, not cancellation of this panel, so it must be shown.
+    fun act(body:suspend()->Unit){if(busy)return;busy=true;message=null;scope.launch{try{body()}catch(_:TimeoutCancellationException){message="The operation timed out and may still finish in the background. Refresh to see its durable result; do not assume it was sent."}catch(error:CancellationException){throw error}catch(_:Exception){message="The operation was refused or did not finish. Refresh to recover durable publication; do not assume it was sent."}finally{busy=false}}}
     AlertDialog(onDismissRequest=onClose,title={Text("Local agent access")},text={Column(Modifier.width(850.dp).heightIn(max=750.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
         Text("Local service: 127.0.0.1:${state.port} | credentials stay in Windows Credential Manager")
         Text("Access is limited to immutable packages. Capture requires a separate grant for a selected window and connection.",style=MaterialTheme.typography.caption)
@@ -105,7 +107,8 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
     var issue by remember(owner){mutableStateOf<String?>(null)}
     fun revoke(){if(stopping)return;stopping=true;scope.launch{try{
         owner.revokeAll()
-    }catch(error:CancellationException){throw error}
+    }catch(_:TimeoutCancellationException){issue="Local revocation timed out. Cleanup is uncertain; retry or stop the service."}
+    catch(error:CancellationException){throw error}
     catch(_:Exception){issue="Local revocation was requested. Cleanup is uncertain; retry or stop the service."}
     finally{stopping=false}}}
     Window(onCloseRequest={revoke()},title="Visual Workbench capture grants",alwaysOnTop=true,resizable=false,
