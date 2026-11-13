@@ -41,6 +41,9 @@ pub(super) fn remove(
     struct Disposition {
         delete: u8,
     }
+    // SAFETY: this declaration matches the documented kernel32
+    // SetFileInformationByHandle ABI: HANDLE, FILE_INFO_BY_HANDLE_CLASS (a C
+    // int enum), LPVOID, DWORD and a BOOL result, `system` calling convention.
     #[link(name = "kernel32")]
     unsafe extern "system" {
         fn SetFileInformationByHandle(
