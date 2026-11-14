@@ -139,4 +139,73 @@ class DiagnosticsBundleTest {
         assertEquals(before.rotatedEventCount, after.rotatedEventCount)
         assertTrue(diagnosticsPrivacyAudit(before.jsonText, before.eventCount, before.rotatedEventCount))
     }
+
+    private fun coreLog(count: Int, dropped: Long = 0L): CoreEventLog = CoreEventLog((1..count).map { n ->
+        CoreEvent(n.toLong(), n * 10L, CoreEventKind.entries[n % 3], "store", "commit stage-$n", n * 7L)
+    }, dropped)
+
+    @Test fun coreSectionIsAnExactClosedLayoutAndTheReportWithoutItIsUnchanged() {
+        val log = PrivateDiagnosticLog().also { it.append(0L, DiagnosticEventCode.AppStarted) }
+        val plain = log.prepare(DiagnosticPlatform.Android, DiagnosticMetrics())
+        assertTrue(plain.jsonText.startsWith("{\"schema_version\":1,"))
+        assertEquals(null, plain.coreEventCount)
+        val core = CoreEventLog(listOf(
+            CoreEvent(4, 12, CoreEventKind.Failure, "store", "low disk space", 0),
+            CoreEvent(9, 3000, CoreEventKind.DurationMicros, "project", "export_image", 41_250),
+            CoreEvent(10, 3001, CoreEventKind.Count, "project", "objects", 768),
+        ), dropped = 2)
+        val report = log.prepare(DiagnosticPlatform.Android, DiagnosticMetrics(), core)
+        val expected = """{"schema_version":2,"platform":"android","metrics":{"startup_ms":null,"heap_used_bytes":null,"trace_samples":null,"frames_decoded":null,"frames_dropped":null,"echo_rtt_ms":null},"events_rotated":0,"events":[{"elapsed_ms":0,"code":"app_started"}],"core_dropped":2,"core":[{"seq":4,"elapsed_ms":12,"kind":"failure","area":"store","name":"low disk space","value":0},{"seq":9,"elapsed_ms":3000,"kind":"duration_us","area":"project","name":"export_image","value":41250},{"seq":10,"elapsed_ms":3001,"kind":"count","area":"project","name":"objects","value":768}]}""" + "\n"
+        assertEquals(expected, report.jsonText)
+        assertEquals(3, report.coreEventCount)
+        assertEquals(2L, report.coreDroppedCount)
+        assertTrue(diagnosticsPrivacyAudit(report.jsonText, 1, 0L, 3, 2L))
+        // A schema 2 report is never accepted as schema 1, nor the reverse, nor with wrong counts.
+        assertFalse(diagnosticsPrivacyAudit(report.jsonText, 1, 0L))
+        assertFalse(diagnosticsPrivacyAudit(plain.jsonText, 1, 0L, 0, 0L))
+        assertFalse(diagnosticsPrivacyAudit(report.jsonText, 1, 0L, 2, 2L))
+        assertFalse(diagnosticsPrivacyAudit(report.jsonText, 1, 0L, 3, 1L))
+        assertFalse(diagnosticsPrivacyAudit(report.jsonText, 1, 0L, 3, null))
+        // An empty core log still produces a valid schema 2 report.
+        val empty = PrivateDiagnosticLog().prepare(DiagnosticPlatform.Windows, DiagnosticMetrics(), CoreEventLog(emptyList(), 0))
+        assertTrue(empty.jsonText.endsWith("\"events\":[],\"core_dropped\":0,\"core\":[]}\n"))
+        assertTrue(diagnosticsPrivacyAudit(empty.jsonText, 0, 0L, 0, 0L))
+    }
+
+    @Test fun coreSectionKeepsTheNewestEventsAndCountsTheRest() {
+        val report = PrivateDiagnosticLog().prepare(DiagnosticPlatform.Android, DiagnosticMetrics(), coreLog(400, dropped = 5))
+        assertEquals(MAX_REPORTED_CORE_EVENTS, report.coreEventCount)
+        assertEquals(5L + 400 - MAX_REPORTED_CORE_EVENTS, report.coreDroppedCount)
+        assertFalse(report.jsonText.contains("\"seq\":144,"))
+        assertTrue(report.jsonText.contains("\"seq\":145,") && report.jsonText.contains("\"seq\":400,"))
+        assertTrue(diagnosticsPrivacyAudit(report.jsonText, 0, 0L, report.coreEventCount, report.coreDroppedCount))
+        // The largest possible report still fits the audited size.
+        val longest = "z".repeat(64)
+        val largest = CoreEventLog((1..512).map { n ->
+            CoreEvent(9_007_199_254_740_000L + n, 9_007_199_254_740_991L, CoreEventKind.DurationMicros, longest, longest, 9_007_199_254_740_991L)
+        }, 9_007_199_254_740_000L)
+        val full = PrivateDiagnosticLog(256).also { log -> repeat(256) { log.append(9_007_199_254_740_991L, DiagnosticEventCode.TraceInterrupted) } }
+        val big = full.prepare(DiagnosticPlatform.Windows, DiagnosticMetrics(), largest)
+        assertTrue(big.jsonText.length < 131_072)
+        assertEquals(256, big.coreEventCount)
+    }
+
+    @Test fun coreSectionRefusesAnythingThatCouldCarryPrivateText() {
+        val report = PrivateDiagnosticLog().prepare(DiagnosticPlatform.Android, DiagnosticMetrics(), coreLog(3))
+        val text = report.jsonText
+        fun audited(changed: String) = diagnosticsPrivacyAudit(changed, 0, 0L, 3, 0L)
+        assertTrue(audited(text))
+        for (bad in listOf("Store", "sto/re", "c:", "st\\ore", "a\"b", "", "x".repeat(65), "caf\u00e9", "a\tb")) {
+            assertFalse(audited(text.replaceFirst("\"area\":\"store\"", "\"area\":\"$bad\"")), bad)
+            assertFalse(audited(text.replaceFirst("\"name\":\"commit stage-1\"", "\"name\":\"$bad\"")), bad)
+        }
+        assertFalse(audited(text.replaceFirst("\"kind\":\"duration_us\"", "\"kind\":\"note\"")))
+        assertFalse(audited(text.replaceFirst("\"seq\":2,", "\"seq\":1,")))
+        assertFalse(audited(text.replaceFirst("\"value\":7}", "\"value\":-7}")))
+        assertFalse(audited(text.replaceFirst("\"value\":7}", "\"value\":7,\"path\":\"x\"}")))
+        assertFalse(audited(text.replace("]}\n", "],\"extra\":1}\n")))
+        assertFalse(audited(text.dropLast(1)))
+        // The typed event itself refuses such text before a report can be built.
+        assertFailsWith<IllegalArgumentException> { CoreEvent(1, 0, CoreEventKind.Failure, "store", "folder/file.png", 0) }
+    }
 }

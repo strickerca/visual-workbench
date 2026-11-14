@@ -4,8 +4,13 @@ package com.visualworkbench.shared
 private const val AUDIT_MAX_COUNTER: Long = 9_007_199_254_740_991L
 private const val AUDIT_MAX_EVENTS: Int = 256
 private const val AUDIT_MAX_REPORT_CHARS: Int = 65_536
+// Schema 2 adds the core section; its limits are equally fixed here.
+private const val AUDIT_MAX_CORE_EVENTS: Int = 256
+private const val AUDIT_MAX_CORE_TEXT: Int = 64
+private const val AUDIT_MAX_CORE_REPORT_CHARS: Int = 131_072
 
-/** Validates the existing private factory's exact canonical v1 layout, not
+/** Validates the existing private factory's exact canonical layout (schema 1, or
+ * schema 2 when both core counts are given), not
  * arbitrary JSON. Fixed literals reject unknown/duplicate keys, escaped aliases
  * and free text without accepting a last-key-wins parse. There is no recursive
  * descent, arbitrary string allocation, normalization or redaction. The input
@@ -14,17 +19,29 @@ private const val AUDIT_MAX_REPORT_CHARS: Int = 65_536
  * This establishes the closed representation and numeric bounds. It cannot
  * establish the provenance of an otherwise valid numeric measurement.
  */
-internal fun diagnosticsPrivacyAudit(text: String, eventCount: Int, rotatedEventCount: Long): Boolean {
-    if (text.length > AUDIT_MAX_REPORT_CHARS || text.any { it.code !in 0..127 } ||
+internal fun diagnosticsPrivacyAudit(
+    text: String,
+    eventCount: Int,
+    rotatedEventCount: Long,
+    coreEventCount: Int? = null,
+    coreDroppedCount: Long? = null,
+): Boolean {
+    // Schema 1 has no core section; schema 2 has both core counts. Nothing in between.
+    if ((coreEventCount == null) != (coreDroppedCount == null)) return false
+    val limit = if (coreEventCount == null) AUDIT_MAX_REPORT_CHARS else AUDIT_MAX_CORE_REPORT_CHARS
+    if (text.length > limit || text.any { it.code !in 0..127 } ||
         eventCount !in 0..AUDIT_MAX_EVENTS || rotatedEventCount !in 0L..AUDIT_MAX_COUNTER) return false
-    return DiagnosticReportAudit(text).accepts(eventCount, rotatedEventCount)
+    if (coreEventCount != null && coreDroppedCount != null &&
+        (coreEventCount !in 0..AUDIT_MAX_CORE_EVENTS || coreDroppedCount !in 0L..AUDIT_MAX_COUNTER)) return false
+    return DiagnosticReportAudit(text).accepts(eventCount, rotatedEventCount, coreEventCount, coreDroppedCount)
 }
 
 private class DiagnosticReportAudit(private val text: String) {
     private var at: Int = 0
 
-    fun accepts(eventCount: Int, rotatedEventCount: Long): Boolean {
-        if (!take("{\"schema_version\":1,\"platform\":\"") ||
+    fun accepts(eventCount: Int, rotatedEventCount: Long, coreEventCount: Int?, coreDroppedCount: Long?): Boolean {
+        if (!take("{\"schema_version\":") || !take(if (coreEventCount == null) "1" else "2") ||
+            !take(",\"platform\":\"") ||
             !(take("android") || take("windows")) || !take("\",\"metrics\":{")) return false
         if (!metric("\"startup_ms\":", AUDIT_MAX_COUNTER) ||
             !metric(",\"heap_used_bytes\":", AUDIT_MAX_COUNTER) ||
@@ -34,20 +51,61 @@ private class DiagnosticReportAudit(private val text: String) {
             !metric(",\"echo_rtt_ms\":", AUDIT_MAX_COUNTER) ||
             !take("},\"events_rotated\":")) return false
         if (integer(AUDIT_MAX_COUNTER) != rotatedEventCount || !take(",\"events\":[")) return false
-        if (take("]}\n")) return eventCount == 0 && at == text.length
         var seen = 0
-        var lastElapsed = 0L
-        while (seen < AUDIT_MAX_EVENTS) {
-            if (!take("{\"elapsed_ms\":")) return false
-            val elapsed = integer(AUDIT_MAX_COUNTER) ?: return false
-            if (elapsed < lastElapsed || !take(",\"code\":")) return false
-            if (!eventCode() || !take("}")) return false
-            lastElapsed = elapsed
-            seen++
-            if (take("]}\n")) return seen == eventCount && at == text.length
-            if (!take(",")) return false
+        if (!take("]")) {
+            var lastElapsed = 0L
+            while (true) {
+                if (seen == AUDIT_MAX_EVENTS || !take("{\"elapsed_ms\":")) return false
+                val elapsed = integer(AUDIT_MAX_COUNTER) ?: return false
+                if (elapsed < lastElapsed || !take(",\"code\":")) return false
+                if (!eventCode() || !take("}")) return false
+                lastElapsed = elapsed
+                seen++
+                if (take("]")) break
+                if (!take(",")) return false
+            }
         }
-        return false
+        if (seen != eventCount) return false
+        if (coreEventCount != null && coreDroppedCount != null && !coreSection(coreEventCount, coreDroppedCount)) return false
+        return take("}\n") && at == text.length
+    }
+
+    /** `,"core_dropped":N,"core":[{"seq":N,"elapsed_ms":N,"kind":K,"area":T,"name":T,"value":N},...]`
+     * where K is one of three fixed words and T is 1 to 64 characters of
+     * lower-case letters, digits, space, dot, underscore and hyphen. That
+     * alphabet has no quote, backslash, slash or colon, so a path, a URL or an
+     * escape sequence cannot appear. Sequence numbers must strictly increase. */
+    private fun coreSection(coreEventCount: Int, coreDroppedCount: Long): Boolean {
+        if (!take(",\"core_dropped\":") || integer(AUDIT_MAX_COUNTER) != coreDroppedCount ||
+            !take(",\"core\":[")) return false
+        var seen = 0
+        if (!take("]")) {
+            var lastSequence = 0L
+            while (true) {
+                if (seen == AUDIT_MAX_CORE_EVENTS || !take("{\"seq\":")) return false
+                val sequence = integer(AUDIT_MAX_COUNTER) ?: return false
+                if (sequence <= lastSequence || !take(",\"elapsed_ms\":")) return false
+                if (integer(AUDIT_MAX_COUNTER) == null || !take(",\"kind\":")) return false
+                if (!(take("\"failure\"") || take("\"duration_us\"") || take("\"count\""))) return false
+                if (!take(",\"area\":\"") || !coreText() || !take("\",\"name\":\"") || !coreText()) return false
+                if (!take("\",\"value\":") || integer(AUDIT_MAX_COUNTER) == null || !take("}")) return false
+                lastSequence = sequence
+                seen++
+                if (take("]")) break
+                if (!take(",")) return false
+            }
+        }
+        return seen == coreEventCount
+    }
+
+    private fun coreText(): Boolean {
+        val start = at
+        while (at < text.length && at - start <= AUDIT_MAX_CORE_TEXT) {
+            val c = text[at]
+            if (!(c in 'a'..'z' || c in '0'..'9' || c == ' ' || c == '.' || c == '_' || c == '-')) break
+            at++
+        }
+        return at - start in 1..AUDIT_MAX_CORE_TEXT
     }
 
     private fun metric(key: String, maximum: Long): Boolean = take(key) &&
