@@ -7,95 +7,96 @@ Revision 2026-10-01. Companion to BUILD_SPECIFICATION.md v2.0 and REQUIREMENTS.j
 > as one line in the commit or task status, and delete artifacts after use. See
 > "Only do what makes the product better" in `AGENTS.md`.
 
-## Completion roadmap — 2026-11-03 (active)
+## Active roadmap — 2026-11-14
 
 Owner-selected finish line: a **personal G5 build**. Close M4-KP (Paint only),
-record G0–G3 and G5, and finish with an installable MSI and APK for personal use, without
-release signing (the APK keeps its existing development signer). Krita, T4.02, T4.05, T4.06, broader editors and full G4 remain
-deferred (D21, pending owner confirmation). Claude Code executes slices; an
-independent Claude reviewer agent reviews each slice before it merges into main. The model
-archive route and tool-license admission are pre-authorized after each license is
-shown to the owner and confirmed. Live provider spend is not pre-authorized. Status at entry:
-main `2b6b2ea`, 1 of 189 requirements passed, no gate recorded; see
-[STATE_RECONCILIATION_20261103.md](STATE_RECONCILIATION_20261103.md).
+record G0–G3 and G5, and finish with an installable MSI and APK for personal
+use, without release signing (the APK keeps its existing development signer).
+Krita, T4.02, T4.05, T4.06, broader editors and full G4 remain deferred (D21,
+pending owner confirmation). Live provider spend is not pre-authorized. Device
+time on the S23 and owner gate confirmations are the critical path.
+
+Two tracks run together: the completion roadmap (what must be verified) and the
+improvement program (what makes the product better and cheaper to verify).
+
+### Completion roadmap
 
 | Stage | Scope | Closes |
 | --- | --- | --- |
-| 0 Re-baseline | Executor convention, stale-doc reconciliation, requirement status sync, hardware truth refresh, branch/worktree disposition, deferral decision, Windows baseline (doctor/test-all/lint-all/license-check) and disk floor | Planning baseline |
-| 1 Blockers | B1 Windows replays (assembler 48, MSI witnesses, wrapper 16, metadata probe); B2 model archive route and runtime admission; B3 WiX/jpackage and tunnel DLL license admission; B4 Android black drawing region after eraser/resize/recreation; B5 reviewed normal-APK delivery route; B6 visible phone→Paint `baseline_wgc`; B7 Windows owned guard grant/readiness; B8 packaged MCP two-cycle smoke; B9 physical-gesture positive producer; B10 live GPT Image (ask for spend) | Blockers |
+| 0 Re-baseline | Done 2026-11-03 | Planning baseline |
+| 1 Blockers | B1–B10 below | Blockers |
 | 2 M4-KP | Paint catalog calibration/admission; T4.03 guards (checklist item 4); T4.04 ghost ink; T4.07 Paint compatibility record; T4.08 essential controls; T4.01 ≥30 fps / PERF-003; personal packaging; owner drawing session | M4-KP checkpoint |
 | 3 G0–G2 | T0.04/05/06/10/11 carry-overs and T0.12; A01/A02/A06 plus daily use; A13/A21–A24/A26/A29 plus A06 re-run in real apps | G0, G1, G2 |
 | 4 Phase 3 | T3.01–T3.11 runtime/device work and confirmed source gaps; T3.12 scenarios | G3 |
 | 5 Phase 5 | Depends on M4-KP instead of T4.09 only once D21 is confirmed. T5.01–T5.05, T5.08 decisions, T5.06 MSI build/install/uninstall with admitted WiX and notices, T5.07 release-build scenarios and reports | Personal G5 |
 
-Device time on the S23 and owner gate confirmations are the critical path.
-Historical entries below remain as dated history.
+Stage 1 blockers:
+
+| Blocker | Status |
+| --- | --- |
+| B1 Windows release replays | Closed 2026-11-04 |
+| B2 model graphs and LiteRT scan | Graphs reproduced byte-identical ([ASSISTED_MODEL_REPRODUCTION.md](ASSISTED_MODEL_REPRODUCTION.md)); Android runtime admission open |
+| B3 WiX and scrcpy licences | Conditions met (D22); the tunnel catalog compile is T5.03 |
+| B4 black canvas | Fix verified on the S23 (226/226, no black frames) before its review fixes; merged 2026-11-13; device re-check pending |
+| B5 normal APK delivery | Accepted on the S23 ([ANDROID_DELIVERY.md](ANDROID_DELIVERY.md)) |
+| B6 visible phone→Paint run | Prepared, not run. Owner-attended, 10–15 minutes hands off, USB tethering on, Paint closed with Brush last used |
+| B7 Windows owned guard | Closed: 103 cases |
+| B8 packaged MCP smoke | Closed: two-cycle pass, about 6.5 s per start |
+| B9 physical-gesture producer | Code merged 2026-11-13; needs an owner S Pen session (about 30 minutes). The S Pen source (0x5002) and `verifyInputEvent` signing are unconfirmed on the device |
+| B10 live GPT Image | Waits for an owner spend decision (about $1–5) |
+| LIC-003 generated notices | Complete (427 components, D23) |
+
+Open code and admission gaps:
+
+- T5.06: QUALITY-006 has no comparison tool for checking reproducibility.
+- T5.08: FORMAT-012 lacks its OS decoder routes (Android platform DNG, Windows
+  WIC Raw Image Extension); FORMAT-009 opens PDF-compatible AI as a PDF. Both
+  are P2 and may be deferred. INSTR-005 needs a dated owner decision.
+- T3.11: PERF-007 — moving back to a higher-priority carrier that returns is
+  unconfirmed (improvement Stage 6 covers it).
+- Runtime admissions, not code: SEL-001 (empty LiteRT catalog, B2);
+  TUNNEL-002, TUNNEL-005, SEM-007 and CAPTURE-008 (no compiled approved
+  catalog, B3); FORMAT-006, QUALITY-001 and QUALITY-002 (PDFium, qpdf and LPAC).
+
+### Improvement program
+
+Each stage ends with green automatic checks and one independent code review.
+Effort levels are in `AGENTS.md`. Hardware-dependent changes land switched off
+or behaviour-preserving until they are run on the laptop or the S23.
+
+| Stage | Scope | Status |
+| --- | --- | --- |
+| Step 0 | Compile and test the code merged uncompiled (B4, B9, T5.01) | Linux, 2026-11-14: Rust lint clean, 1,993 tests pass; Kotlin compiles, shared 633 / Android 273 / desktop 692 tests pass. Fixed one call-slot ordering bug and one invalid test method. Windows-only code compiles, lints clean and passes its tests on a hosted Windows runner (5 failures were the runner's short temp path, fixed in `tools/ci/windows-rust.ps1`). Device re-checks pending. Effort: high |
+| 0 Cloud build setup | Android SDK and pinned tools in cloud sessions | Done 2026-11-14: `tools/ci/install-tools.sh`; cloud environment `visual-workbench` saved (first fresh start unproven). Effort: high |
+| 1 Automatic checks | `.github/workflows/ci.yml`, `tools/ci`, vulnerability scan | Done 2026-11-14: workflow and scripts in place; 13 known vulnerabilities fixed by upgrades, 3 unmaintained notices tolerated in `deny.toml`. All eight jobs green on dc20e2e; Windows and Kotlin jobs now part of `ci-required`. Effort: high |
+| 2 Cleanup | Only files that help build, test or run the product remain | Done 2026-11-14: 513 receipts, handoffs, old copies and dead probes removed; secret-scan exceptions 278 → 43 lines; this plan 1,099 → about 690 lines. Old GitHub branches still to delete. Effort: high |
+| 3 Proof | End-to-end loop test; requirements linked to tests; speed budgets; parser property tests; emulator pixel tests | Mostly done 2026-11-14: loop test passes on Linux (`vw-ffi/tests/golden_path.rs`); 140 of 175 active requirements linked to 297 existing tests, checked on every push; stroke-save benchmark added (2.5 ms empty, 56 ms at 250 strokes, 120 ms at 500, fails at the 769th object in a layer). Corrupted-input tests (deterministic, 6,000 to 20,000 mutations each) pass for the AVIF, HEIF, video, PDF-metadata and capture-data readers. Still open: budgets in CI after Stage 5, the same test for project archives, emulator pixel tests. Effort: high |
+| 4 Diagnosability | Timing ring and logging over FFI; error causes kept; plain-language error catalog | Core part done 2026-11-14: failures keep a fixed-text cause and timed stages record durations in a bounded in-memory ring (`core_diagnostics`); the apps can read it (`readCoreEvents`) and `ErrorCatalog` gives every failure a plain message and an action. Linux: core tests pass, shared 638 tests pass, both apps compile. The exported problem report can now carry those core events (schema 2) under the same closed privacy audit. Still open: showing it in a problem-report screen (Stage 8) and replacing the remaining discarded errors. Effort: high |
+| 5 Core engine | A layer must hold far more than 768 objects (order keys run out today); edit cost independent of document size; dependency tidy | In progress (delegated, xhigh) |
+| 6 Connect without typing | Pair once, then discover, recognise by certificate and connect; carrier upgrade | Not started |
+| 7 Pen path | Remote-edit input fixes; wet ink draws only new strokes; no wait behind save; latency shown in diagnostics | Not started |
+| 8 Product interface | Shared UI module, Material 3, icons, strings, plain copy, first-run guide | Started 2026-11-14: eight logic files that existed as identical copies in both apps (about 1,400 lines each side) now live once in `apps/shared`; Linux: shared 654, desktop 679, Android 260 tests pass. Eight identical Compose panels still duplicated (need a shared UI module). Effort: high |
+| 9 AI handoff | Real MCP tool descriptions and structured results; evaluation set | Partly done 2026-11-14: all eight tools carry a description written for the agent, the server sends usage guidance, and every refusal now says what to do next (retry, refresh, ask the owner, or stop); MCP tests 77/77 on Node 24.21.0. Still open: the evaluation set (live runs need the owner's spend approval). Effort: high |
+| 10 Portability and installers | Paint catalog as data with re-measure; GPU capability probe; MSI and APK built automatically | Started 2026-11-14: `build-apps` workflow builds and checks the Android package on request (same commands give a 165 MB package on Linux; `check_apk` passes; the workflow first runs once it is on main). Still open: MSI, Paint catalog, GPU probe, release shrinking. Effort: high |
+
+Only the owner can: merge pull requests and protect main on `ci-required`; run
+the S23 sessions (B4 re-check, latency baseline, B6, B9, pen-path re-measure,
+Jetpack Ink A/B); decide live AI spend; check Paint's version and auto-update.
 
 ## How to run this plan
 
 1. Put this package at `C:\dev\visual-workbench` (the repository root; any path works if you tell the agent).
 2. Run tasks in the order of their dependencies. Each Phase 0 and Phase 1 task has a ready-to-paste prompt in `prompts/`, and each prompt is complete on its own.
 3. One task at a time per folder. A task run in parallel needs its own `git worktree` folder, and tasks that use the phone take turns.
-4. Paste one prompt into a fresh coding-agent session. The agent starts from main with validated dependencies integrated, uses its task branch, writes evidence and requirement statuses, and reports results plus the next task's model/effort. Local commits and completed dependency integration are authorized without repeated Git approval.
-5. Review results and complete listed owner actions. At each numbered phase conclusion the agent automatically commits and pushes validated phase-owned source/evidence under the publishing policy below. Owner confirmation of product gates and manual decisions remains separate.
+4. Paste one prompt into a fresh coding-agent session. The agent starts from main with validated dependencies integrated, uses its task branch, records one-line results and requirement statuses, and reports results plus the next task. Local commits and completed dependency integration are authorized without repeated Git approval.
+5. Review results and complete listed owner actions. At each numbered phase conclusion the agent automatically commits and pushes validated phase-owned source under the publishing policy below. Owner confirmation of product gates and manual decisions remains separate.
 6. A Phase 1 task may start as soon as its own dependencies are done; Gate G0 must pass before the Phase 1 acceptance run (T1.12). Prompts for Phases 2–5 are written after Gate G1, using real Phase 0 measurements. Generating them now would bake in guesses.
 
 **Phase gates.** A phase ends when its gate passes. A scenario passes at a gate when all of its requirements whose phase is ≤ that gate's phase pass; requirements from later phases re-run the same scenario at their own gate. Each scenario's gate and re-runs are in `REQUIREMENTS.json → scenarios[].gate` and `rerun_at`.
 
 **Requirement status.** A task that delivers only part of a requirement sets it to `in_progress` / `partial` and names the open clauses and the task that closes them. Only the last task that lists a requirement may set it to `passed`, and that task is always in the requirement's own phase. Each phase's acceptance task may correct the status of any requirement up to its phase, including setting `passed` when its own run verifies every clause. A P2 or P3 requirement Christian defers in a dated DECISIONS.md entry (`impl_status` deferred, `verify_status` not_applicable) does not block its scenarios. Every gate task depends, directly or through other tasks, on the last listing task of each requirement its scenarios check. `tools/check_plan_coverage.py` checks all of this.
 
-**Owner Phase 4 scope update, 2026-10-03:** prioritize the free Krita/Paint
-remote-edit milestone M4-KP described below and in D20. Expanded Phase 4 features
-are deferred until the owner resumes them. This supersedes blanket continuation
-for those deferred features; retain original requirements and pending full gates.
-
-**Owner Paint focus and budget update, 2026-10-07:** continue M4-KP with Paint
-as the current editor target; defer Krita acceptance and preserve its work.
-Repeated Paint toolbar validation exhausted 180 ms before input: Undo succeeded
-at 176,914 us, while Redo and Size timed out at 180,409 and 180,517 us. The owner
-authorized a Paint-specific 500 ms provider budget and 1,000 ms parent exchange
-budget. Paint uses the established current-property UI Automation reads: the
-new cache prototype rejected valid empty identifiers and was removed after an
-input-free comparison against the installed editor. Preparation,
-final proof and both Size stages share one original-start provider deadline;
-the full eight-action authority query also shares one 500 ms deadline.
-
-The larger parent envelope applies only to shortcut/authority-refresh requests
-whose digest matches exact Paint authority returned by the pinned native helper
-for the opened target and catalog. Krita and legacy routes, unknown/mismatched
-authority, Pen, Check, finite Click and finite Wheel keep 250 ms; Krita provider
-work remains 180 ms. Source/target/focus, input release and stale-tail refusal
-guards remain required. These finite toolbar limits do not relax S23 pen
-latency, frame rate, ghost-ink or physical acceptance targets. Historical
-180 ms failures remain evidence of the earlier implementation. New budgets
-need matching builds, causal/restoration measurements and normal catalog-path
-validation before delivery acceptance; they are not a pass by themselves.
-*Superseded budget, R161 (2026-10-08):* the Paint provider allowance is now
-750 ms; the parent exchange stays 1,000 ms and the managed envelope 2,500 ms. The
-500 ms figures above are the 2026-10-07 history.
-
 ## Owner actions (things only Christian can do)
-
-**Owner continuation update, 2026-10-02:** continue implementation through the
-project without slice pauses. Use the connected OnePlus/IN2019 for applicable
-software/device tests and defer S23-specific testing while that phone is away.
-Software preparation may continue against the recorded provisional designs when
-physical evidence is the missing dependency; this does not complete that
-dependency, finalize a decision, pass a gate or relax a target. Keep per-task
-results and open clauses explicit. S23/S Pen comparisons, owner preferences,
-external credentials and manual acceptance remain separate outstanding work.
-Use isolated worktrees for independent tasks and serialize builds/device runs.
-
-**Owner continuation update, 2026-10-03:** the S23 Ultra is connected again.
-Select SM-S918U explicitly for applicable tests and delivery; preserve other apps
-and profiles. The previous IN2019 authorization remains available when separately
-selected. Continue every software phase without slice pauses, using Sol 6.1
-(`gpt-6.1-sol`) / `xhigh`, which overrides the recommendation tables below.
-Verify actual executor settings and report any existing-session mismatch.
-Publish validated phase software checkpoints under the standing Git policy while
-keeping hardware, provider, installed-client and owner acceptance gaps explicit.
-Continuous implementation is authorized despite those pending gate dependencies;
-publication and proceeding with software do not pass a product gate.
 
 | When | Action |
 |---|---|
@@ -129,7 +130,7 @@ visual-workbench/
   README.md  CLAUDE.md  Cargo.toml  rust-toolchain.toml  deny.toml  justfile (or build.ps1)
   .gitignore  .gitattributes
   docs/        BUILD_SPECIFICATION.md DECISIONS.md REQUIREMENTS.json IMPLEMENTATION_PLAN.md
-               TOOLCHAIN.md SOURCES.json evidence/ compat/
+               TOOLCHAIN.md SOURCES.json compat/
   contracts/   vw_protocol.proto package.schema.json storage.sql
   prompts/     phase-0/ phase-1/ (later phases added after G1)
   tools/       diagnostics/ diag-win/ pen-trace/ pen-inject/ bench/ pair-cli/ hello/ check_plan_coverage.py
@@ -153,62 +154,44 @@ Git-ignored: `target/`, `build/`, `.gradle/`, `local.properties`, `*.apk`, `fixt
 - **Kotlin:** official style; explicit API mode in shared modules; coroutines for async work; nothing blocking on the main thread.
 - **Tests** live next to the code. Hardware tests are marked and run through `hil-test`; Rust tests run on the phone through `hil-test rust <crate>`.
 - **Scripts:** PowerShell scripts run as `powershell -NoProfile -ExecutionPolicy Bypass -File <script>`.
-- **Evidence:** `docs/evidence/<task>.md` starts with `Status: PASS`, `Status: PASS WITH GAPS` or `Status: FAIL`, then one line per acceptance check. A dependency blocks a later task only when its evidence is missing or says FAIL. Screenshots come from a Per-Monitor-V2-aware capture (`tools/diag-win --screenshot`, from T0.03), cropped to the window under test, with QR codes, addresses, serials, user names and chat content removed.
+- **Results:** one line per task in this plan or the commit message: what ran, pass or fail, the device and the effort level. No evidence files (`AGENTS.md`). A dependency blocks a later task only when its result is missing or failed. Screenshots come from a Per-Monitor-V2-aware capture (`tools/diag-win --screenshot`, from T0.03), stay outside Git and are disposed after inspection.
 - **Definition of done for every task:**
   - Deliverables exist.
-  - `test-all`, `lint-all` and `license-check` pass.
-  - REQUIREMENTS.json status and evidence are updated per the status rule above.
-  - `docs/evidence/<task>.md` lists commands, numbers, and what was not tested.
+  - `test-all`, `lint-all` and `license-check` pass, and `ci-required` is green.
+  - REQUIREMENTS.json status and its one-line result are updated per the status rule above.
+  - The one-line result names what was not tested.
   - No secrets or identifiers anywhere.
 
 ## Automatic phase publishing
 
-Owner instruction, 2026-10-01: create a public GitHub repository, commit/push all
-work completed so far, and automatically commit/push after each phase concludes.
-The delivery remote is origin, repository
-[strickerca/visual-workbench](https://github.com/strickerca/visual-workbench),
-and delivery branch main.
+Owner instruction, 2026-10-01: the repository
+[strickerca/visual-workbench](https://github.com/strickerca/visual-workbench) is
+public, and completed phase work is published without asking for Git permission
+again. Since 2026-11-14 publishing goes through the automatic checks.
 
-This applies to numbered Phases 0–5, not an instruction to push after every task.
-Tasks may use local commits and integrate validated dependency work as needed.
-The initial T0.01–T0.03 publication is an explicitly authorized progress checkpoint;
-Phase 0 remains in progress until its gate criteria and owner decisions are met.
+At each phase conclusion, and for any earlier slice worth publishing:
 
-At each phase conclusion:
-
-1. Complete implementation/validation and record the phase gate result,
-   requirement statuses, measured facts and remaining gaps. Pending owner
-   decisions remain pending; publishing a checkpoint does not pass a gate or
-   authorize the next phase. Never loosen a performance target without the
-   owner's explicit decision.
-2. Inspect Git status, worktree/branch ownership and the configured remote.
-   Preserve unrelated/concurrent changes. Integrate only completed, validated
-   phase/dependency work into main. Resolve conflicts deliberately and preserve
-   relevant requirement, decision and toolchain changes from both sides.
-3. Run required affected tests, lint, license and hardware checks. Record
-   physical/external gaps honestly. Resolve failed required software, license or
-   secret checks before publication and retain their failure receipts.
-4. Stage explicit phase-owned source and text evidence paths. Exclude local
-   build/cache/runtime data, credentials, signing keys, private fixtures and
-   verification images. Inspect the exact staged diff and scan staged bytes for
-   secrets/identifiers. Dispose task-owned verification images before closure.
-5. Commit with a conventional message identifying the phase, then use a normal
-   git push origin main. Commit, safe integration and push are already authorized;
-   do not ask for another Git permission.
-6. Verify remote main equals the local published commit. Report commit hash,
-   repository URL, publication result, open verification limits and the next
-   task/phase model and effort. If nothing changed, verify/report parity without
-   making an empty commit.
+1. Finish the work and record the result in one line in this plan or the commit
+   message. Pending owner decisions stay pending; publishing does not pass a
+   gate or authorize the next phase. Never loosen a performance target without
+   the owner's explicit decision.
+2. Check Git status, worktrees and the remote. Preserve unrelated or concurrent
+   changes and resolve conflicts deliberately.
+3. Stage explicit paths. Leave out build output, caches, credentials, signing
+   keys, private fixtures and verification images, and inspect the staged diff.
+4. Push the task or session branch and wait for `ci-required` to be green on its
+   head commit. Fix failures; never bypass a failing check.
+5. Merge into main. On the laptop the standing authorization covers the merge
+   and a normal `git push origin main` once the checks are green. Cloud sessions
+   open a pull request for the owner to merge.
+6. Confirm the remote main commit, report its hash and what is still unverified,
+   and delete the merged branch and its worktree.
 
 Never force-push, rewrite shared history, discard unrelated changes or change
-visibility again during automatic publication. If authentication, divergence,
-branch protection or another concrete blocker prevents a normal push, preserve
-the local work and report it; do not bypass the blocker. Git publication does
-not authorize deployments, releases, notifications or security/device changes.
-
-Carry this policy into future phase prompts. Existing task prompts defer to it;
-their Git checklists record integration/publication status rather than asking
-for repeated merge/push approval.
+repository visibility. If authentication, divergence, branch protection or
+another concrete blocker prevents a normal push, keep the local work and report
+it. Publishing does not authorize deployments, releases, notifications or
+security or device changes.
 
 ## Phase overview
 
@@ -221,39 +204,7 @@ for repeated merge/push approval.
 | 4 | Krita + Paint first milestone; expanded scope deferred (D20) | Re-estimate after dependency review | M4-KP checkpoint; full G4 pending | Focused A08/A27 checks on harness, Krita and Paint | Disconnect/reconnect safety; full A14 later |
 | 5 | Verification, Android tunnel, release | 2–3 weeks | G5 | A09, A18, A19, A20, A28, A30 | A10, A15, A21, A24, plus every scenario once on the release build |
 
-### Recommended Codex settings
-
-For maximum quality, Astra 6 leads every phase and Sol 6.1 handles the bounded tasks listed below. These are project-specific recommendations, not experimentally proven optimal settings. They apply to the coding agent running a task, not the app's image-provider models. Select and verify the model and reasoning effort manually before implementation; these annotations do not configure running sessions.
-
-| Phase | Recommended model | Reasoning effort | Reason |
-|---|---|---|---|
-| 0 — Hardware truth and setup | Astra 6 (`gpt-6-astra`) | `xhigh` | Design meaningful measurements and reconcile provisional architecture decisions. |
-| 1 — Markup core | Astra 6 (`gpt-6-astra`) | `max` | Establish deterministic geometry, transactions, crash recovery, pairing, and synchronization. |
-| 2 — Image editing and agent handoff | Astra 6 (`gpt-6-astra`) | `xhigh` | Integrate semantic capture, image providers, instruction packages, and agent interfaces. |
-| 3 — Precision, capture, sync | Astra 6 (`gpt-6-astra`) | `max` | Handle frame identity, coordinate correctness, giant images, redaction, and offline conflicts. |
-| 4 — Krita + Paint first milestone | Sol 6.1 (`gpt-6.1-sol`) | `xhigh` | Current owner executor choice; integrate streaming, guarded input and focused editor behavior. Driver and other-editor work is deferred. |
-| 5 — Verification and release | Astra 6 (`gpt-6-astra`) | `xhigh` | Complete remaining integrations and assemble release evidence across the product. |
-
-### Task model and effort exceptions
-
-Every task inherits its phase default unless listed below. Sol means `gpt-6.1-sol`; Astra means `gpt-6-astra`.
-
-| Phase | Exceptions |
-|---|---|
-| 0 | **Sol / high:** T0.01 toolchain, T0.03 diagnostics. **Sol / xhigh:** T0.02 build infrastructure, T0.09 image fixtures and benchmarks. **Astra / max:** T0.08 virtual-display spike, T0.10 stroke-engine decision, T0.11 image-edit proof, T0.12 gate review. |
-| 1 | **Sol / xhigh:** T1.08b Android editing tools and layout. **Astra / xhigh:** T1.09 desktop shell, T1.11 import/export integration. |
-| 2 | **Sol / xhigh:** T2.04 markers and instruction UI. **Sol / high:** T2.05 voice and handwriting entry. **Astra / max:** T2.03 crop-and-stitch proof, T2.06 semantic capture, T2.08 package compiler, T2.09 MCP server, T2.11 acceptance. |
-| 3 | **Sol / xhigh:** T3.05 additional selection tools and tilt. **Astra / xhigh:** T3.01 capture picker, T3.03 loupe, T3.06 assisted selection, T3.07 document editing controls, T3.10 additional formats and color. |
-| 4 | **Sol / xhigh:** active T4.01, T4.03, T4.04, T4.07 (Krita/Paint remote input only), T4.08 (essential controls only), and the M4-KP checkpoint. Deferred tasks are retained below for traceability. |
-| 5 | **Sol / xhigh:** T5.02 additional image adapters, T5.04 Air Actions. **Astra / max:** T5.01 verification loop, T5.06 release packaging, T5.07 full acceptance. |
-
-The original recommendation assignments covered all 66 tasks. The owner executor update overrides those recommendations with Sol/xhigh; D20 narrows active Phase 4 work. Verify actual session settings and report mismatches. Retained task IDs do not authorize deferred work.
-
-Higher effort is assigned to unresolved contracts involving dropped delta updates, unreliable offline clocks, integer bounds in storage, package-path validation, proof enforcement, and stale remote input. It still requires validation and does not establish hardware acceptance.
-
-Each existing Phase 0 and Phase 1 prompt states its resolved settings and a task-specific reason before `## Context`. Keep Phase 2–5 recommendations in this plan and carry them into their prompts when those prompts are authored after G1, using the measured evidence.
-
-Sources: [official model guidance](https://developers.openai.com/api/docs/guides/latest-model) and [official effort guidance](https://developers.openai.com/api/docs/guides/deployment-checklist).
+Agent effort levels are set by the table in `AGENTS.md`.
 
 Total: about 13.5–19 weeks of agent-built work; ±40% (estimate).
 
@@ -295,8 +246,8 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
 - **Deliverables:**
   - `tools/diag-win` (Rust, Per-Monitor-V2): per-monitor resolution, DPI, refresh and HDR; Media Foundation hardware codecs; a `--screenshot` mode for evidence images.
   - Runs of both diagnostics scripts (Smart App Control, Developer Mode, OneDrive-synced Documents, Wi-Fi band and channel with Location allowed).
-  - `docs/evidence/hardware-truth.md`.
-  - `docs/evidence/PERF-template.md` with a method for every PERF requirement.
+  - `docs/HARDWARE_TRUTH.md`.
+  - `docs/PERF_METHODS.md` with a method for every PERF requirement.
 - **Acceptance:** every row of BUILD_SPECIFICATION §2.1 is verified or explicitly marked untestable with a reason.
 
 ### T0.04 — Pen probe app and trace recorder
@@ -310,7 +261,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
 
   Also an instrumentation replay harness that injects traces with stylus tool type, pressure, tilt, hover and buttons. Report: tilt yes/no, hover yes/no, report rate, barrel behavior with Air Command on and off, Air Actions delivery, battery temperature over a 10-minute pen session.
 - **Acceptance:** at least 24 owner traces recorded (lines, circles, small handwriting, fast flicks, hover-only passes, palm-down drawing, tilt calibration); replay reproduces sample counts exactly and every sample's timestamp within 1 ms.
-- **Execution, 2026-10-01:** probe/recorder/replay software implemented; required S23 owner corpus and thermal/capability measurements remain pending. See `docs/evidence/T0.04.md`. This task is not an accepted dependency for T0.10 and does not pass G0.
+- **Execution, 2026-10-01:** probe/recorder/replay software implemented; required S23 owner corpus and thermal/capability measurements remain pending. This task is not an accepted dependency for T0.10 and does not pass G0.
 - **Owner deferral, 2026-10-02:** continue code work while S23 measurements are deferred and the OnePlus is reserved by another project. Integrate the validated T0.04 software checkpoint; retain the incomplete physical acceptance and T0.10 dependency block. T0.05 depends only on T0.02 and may proceed independently.
 
 ### T0.05 — Windows pen-injection probe and test harness
@@ -322,7 +273,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - Runs against the harness, Paint, Krita (Windows 8+ Pointer Input), GIMP and Photopea in Edge (and Chrome if installed).
   - Results in `docs/compat/injection-smoke.md`, with screenshots of pressure-varying strokes; a dated D10 entry.
 - **Acceptance:** harness pressure tracks commanded pressure (Pearson r ≥ 0.95); each editor's result is recorded as yes, no or partial with evidence; 0 stray events in 100 guard trials.
-- **Execution checkpoint, 2026-10-02:** the host-only recorder, guarded injector, bounded HIL runner and strict analyzers are implemented. Owner-authorized native harness testing measured pressure r = 1.000 and a 26.480 ms maximum normal contact interval; combined inverted/eraser flags did not pass through. See `docs/evidence/T0.05.md` for live guard results and retained source-bound reports. Editor and elevation acceptance remain open; this checkpoint does not close T0.05, T4.03's dependency or G0. No phone was accessed. The next independent task is T0.06 (M, gpt-6-astra / xhigh), with physical transport measurements deferred while the phone is reserved.
+- **Execution checkpoint, 2026-10-02:** the host-only recorder, guarded injector, bounded HIL runner and strict analyzers are implemented. Owner-authorized native harness testing measured pressure r = 1.000 and a 26.480 ms maximum normal contact interval; combined inverted/eraser flags did not pass through. Editor and elevation acceptance remain open; this checkpoint does not close T0.05, T4.03's dependency or G0. No phone was accessed.
 
 ### T0.06 — Transport spike
 - **Size:** M · **Depends on:** T0.02, T0.03 · **Prompt:** `prompts/phase-0/T0.06-transport-spike.md`
@@ -333,7 +284,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - RTT p50/p95/p99, jitter and throughput for 64 B, 4 KB and 1 MB messages; carrier recovery time after unplug/replug and a Wi-Fi drop.
   - A route-table check proving whether tethering takes over the PC's default route, with the fix and its revert.
 - **Acceptance:** numbers recorded; D7 carrier order confirmed or revised in DECISIONS.md.
-- **Execution checkpoint, 2026-10-02:** bounded Windows/Android transport benchmark implemented; authorized S23 adb TCP measured 3,000 verified echoes and 256 MiB at 32.41 MiB/s. Phone Wi-Fi is disabled, USB tethering is absent and physical recovery is unmeasured. D7 remains provisional; T0.06 remains incomplete and does not unblock T1.06a. Source and exact validation are in `docs/evidence/T0.06.md`. Next independent task: T0.07, M, gpt-6-astra / xhigh.
+- **Execution checkpoint, 2026-10-02:** bounded Windows/Android transport benchmark implemented; authorized S23 adb TCP measured 3,000 verified echoes and 256 MiB at 32.41 MiB/s. Phone Wi-Fi is disabled, USB tethering is absent and physical recovery is unmeasured. D7 remains provisional; T0.06 remains incomplete and does not unblock T1.06a.
 
 ### T0.07 — Video encode/decode spike
 - **Size:** M · **Depends on:** T0.02 · **Prompt:** `prompts/phase-0/T0.07-video-spike.md`
@@ -344,7 +295,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - A JPEG dirty-tile encode-time measurement for the D9 frame stream.
 - **Acceptance:** p50/p95 encode and decode latencies recorded; D9 confirmed or revised.
 
-- **Execution checkpoint, 2026-10-02:** T0.07 measurements completed with gaps on the PC and authorized S23. Isolated native workers and both 130-frame hardware decoder profiles passed; recorded 10%/25% dirty tiles reached 17.872/18.695 fps over adb including phone decode/posting. Coarse WGC regions, a retained Intel unloaded-library crash and unadvertised decoder low-latency controls remain limitations; no integrated stream/performance requirement passed. D9 updated; source-bound results and media disposal are in `docs/evidence/T0.07.md`. Next: T0.08 (M, gpt-6-astra / max); current session xhigh differs, and driver/security owner actions remain pending. Continue safe preparation and independent implementation.
+- **Execution checkpoint, 2026-10-02:** T0.07 measurements completed with gaps on the PC and authorized S23. Isolated native workers and both 130-frame hardware decoder profiles passed; recorded 10%/25% dirty tiles reached 17.872/18.695 fps over adb including phone decode/posting. Coarse WGC regions, a retained Intel unloaded-library crash and unadvertised decoder low-latency controls remain limitations; no integrated stream/performance requirement passed. Continue safe preparation and independent implementation.
 
 ### T0.08 — Virtual display spike (SudoVDA, Memory Integrity on)
 - **Size:** M · **Depends on:** T0.02 (and the NuGet cache from T0.01) · **Prompt:** `prompts/phase-0/T0.08-sudovda-spike.md`
@@ -358,7 +309,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - Crash test (kill the client → display removed); full uninstall including certificate removal.
 - **Acceptance:** works with Secure Boot and Memory Integrity on, or a documented failure with the VirtualDrivers VDD fallback tested.
 
-- **Execution checkpoint, 2026-10-02:** T0.08 is an incomplete software preparation checkpoint (`Status: FAIL`), with reviewed source hashes, an independent Rust probe and guarded preflight. Missing Spectre libraries, unresolved EDID output licensing, signing/install/uninstall deliverables, owner restore/security actions and live driver/fallback measurements remain open. DISPLAY-002 statuses are unchanged and D11 stays provisional. See `docs/evidence/T0.08.md`. Continue independent T0.09 (S, gpt-6.1-sol / xhigh); current gpt-6-astra / xhigh differs in model.
+- **Execution checkpoint, 2026-10-02:** T0.08 is an incomplete software preparation checkpoint (`Status: FAIL`), with reviewed source hashes, an independent Rust probe and guarded preflight. Missing Spectre libraries, unresolved EDID output licensing, signing/install/uninstall deliverables, owner restore/security actions and live driver/fallback measurements remain open. DISPLAY-002 statuses are unchanged and D11 stays provisional.
 
 ### T0.09 — Giant image spike and fixtures
 - **Size:** S · **Depends on:** T0.02 · **Prompt:** `prompts/phase-0/T0.09-image-spike.md`
@@ -369,7 +320,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - libvips pyramid timing and memory on the laptop.
   - Android BitmapRegionDecoder timing per region (top vs bottom of a 200 MP JPEG) and HEIF decode memory on the phone.
 - **Acceptance:** numbers recorded; D15 confirmed or revised.
-- **Execution checkpoint, 2026-10-02:** T0.09 produces 19 hashed/provenanced synthetic fixtures and PC/S23 decoder measurements (`Status: PASS WITH GAPS`). Host fixtures reproduce byte-for-byte after correcting PDF image IDs; HEIF has 200 MP dimensions from a scaled small pattern. PC preview/pyramid and HEIF memory measurements miss or challenge existing targets; no target is relaxed. Full-size HEIF is guard-skipped and the real sanitized owner photo remains absent, so FORMAT-001 stays partial. See `docs/evidence/T0.09.md`. T0.10 (M, gpt-6-astra/max) is next in order but still blocked by T0.04 physical traces and owner comparison; T0.11 needs owner API setup, and G0 remains open. Continue independently eligible T1.01 (M, gpt-6-astra/max); actual gpt-6-astra/xhigh differs in effort.
+- **Execution checkpoint, 2026-10-02:** T0.09 produces 19 hashed/provenanced synthetic fixtures and PC/S23 decoder measurements (`Status: PASS WITH GAPS`). Host fixtures reproduce byte-for-byte after correcting PDF image IDs; HEIF has 200 MP dimensions from a scaled small pattern. PC preview/pyramid and HEIF memory measurements miss or challenge existing targets; no target is relaxed. Full-size HEIF is guard-skipped and the real sanitized owner photo remains absent, so FORMAT-001 stays partial.
 
 ### T0.10 — Stroke engine spike
 - **Size:** M · **Depends on:** T0.04 · **Prompt:** `prompts/phase-0/T0.10-stroke-spike.md`
@@ -382,7 +333,7 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - Owner feel test (blind A/B across three stroke types).
   - An attempt to build google/ink's C++ core for Windows, time-boxed to 4 hours.
 - **Acceptance:** a D6 decision recorded under the D6 rule, with numbers and the owner's preference.
-- **Execution checkpoint, 2026-10-02:** the Rust/JNI and Jetpack Ink comparison builds and all three instrumentation tests pass on IN2019. Four source-pinned Windows Google Ink attempts remain unsuccessful; the last reaches an upstream constexpr/MSVC incompatibility after 137/205 actions. `docs/evidence/T0.10.md` and `T0.10-results.json` retain actual attempts, timings and cleanup. Owner preferences, recorded S Pen traces, S23 presentation latency and final D6 remain pending; the spike is incomplete. Continue provisional Rust software under the owner instruction; no phase gate is closed.
+- **Execution checkpoint, 2026-10-02:** the Rust/JNI and Jetpack Ink comparison builds and all three instrumentation tests pass on IN2019. Four source-pinned Windows Google Ink attempts remain unsuccessful; the last reaches an upstream constexpr/MSVC incompatibility after 137/205 actions. Owner preferences, recorded S Pen traces, S23 presentation latency and final D6 remain pending; the spike is incomplete. Continue provisional Rust software under the owner instruction; no phase gate is closed.
 
 ### T0.11 — GPT Image round-trip spike
 - **Size:** S · **Depends on:** T0.02, T0.09, owner API key · **Prompt:** `prompts/phase-0/T0.11-gpt-image-spike.md`
@@ -391,15 +342,15 @@ Goal: replace every "unverified" with a measurement, install a working toolchain
   - The current OpenAI image-edit endpoint, model IDs, limits (including minimum pixels and aspect range) and prices, verified on official docs.
   - A Rust CLI: image + mask + prompt → crop-and-stitch → edit request → composite → proof (changed_outside), with timings and a running cost total capped at $2.
   - Five test edits on the owner's photos: a color change, an object removal, a sign-text change, a mask touching the border, and a mask under 100×100 px.
-- **Acceptance:** `changed_outside` = 0 for all edits, confirmed independently; limits and prices recorded in `docs/evidence/T0.11.md`; the API key stays in Credential Manager.
-- **Execution checkpoint, 2026-10-02:** local crop/stitch/proof, request adapter and cost guards are implemented. All five synthetic mock cases independently preserve the exterior; 28 Windows Rust, 27 IN2019 native and10 Python tests pass after correcting normalized-float resizing. `docs/evidence/T0.11.md` and its results retain exact source/artifact bindings, failures and disposal of 72 verification images. No live API call, credential read or spend occurred; owner-photo/model/latency/billing acceptance remains open, so the measurement spike stays incomplete. Requirement statuses are unchanged. Continue the G0 gap report and T1.05 software under owner authorization.
+- **Acceptance:** `changed_outside` = 0 for all edits, confirmed independently; limits and prices recorded in the task status; the API key stays in Credential Manager.
+- **Execution checkpoint, 2026-10-02:** local crop/stitch/proof, request adapter and cost guards are implemented. All five synthetic mock cases independently preserve the exterior; 28 Windows Rust, 27 IN2019 native and10 Python tests pass after correcting normalized-float resizing. No live API call, credential read or spend occurred; owner-photo/model/latency/billing acceptance remains open, so the measurement spike stays incomplete. Requirement statuses are unchanged. Continue the G0 gap report and T1.05 software under owner authorization.
 
 ### T0.12 — Phase 0 gate review
 - **Size:** S · **Depends on:** T0.01–T0.11 · **Prompt:** `prompts/phase-0/T0.12-gate-g0.md`
 - **Requirements:** QUALITY-004
 - **Deliverables:** a consolidated Phase 0 summary; a dated DECISIONS.md entry confirming or adjusting every PERF target (loosened targets need Christian's OK); checks that dated D6, D7, D9, D10, D11 and D15 entries exist; corrected statuses for every phase-0 requirement; the G0 decision; a list of carry-overs into Phase 1.
 - **Acceptance:** Gate G0 recorded, confirmed by Christian.
-- **Execution checkpoint, 2026-10-02:** the recorded-evidence reconciliation is complete in `docs/evidence/T0.12.md` and its source-bound results. G0 remains BLOCKED: six spikes are incomplete, physical baselines/current-main gate health and owner confirmation are absent. All twelve phase-0 requirements remain in_progress/partial and all nine PERF targets are retained unchanged. The dated PERF proposal and chronological hardware update record the carryovers. Independent software continues under the owner's full-continuation instruction; this does not conclude Phase 0 or waive T1.12's gate dependency.
+G0 remains BLOCKED: six spikes are incomplete, physical baselines/current-main gate health and owner confirmation are absent. All twelve phase-0 requirements remain in_progress/partial and all nine PERF targets are retained unchanged. The dated PERF proposal and chronological hardware update record the carryovers. Independent software continues under the owner's full-continuation instruction; this does not conclude Phase 0 or waive T1.12's gate dependency.
 
 **Gate G0:** hardware-truth.md complete; D6, D7, D9, D10, D11 and D15 confirmed or revised with evidence; PERF targets confirmed or adjusted (QUALITY-004); toolchain pinned; license gate working.
 
@@ -414,7 +365,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
 - **Requirements:** CORE-002, TUNNEL-007 (math and property tests; hardware verification in T3.01)
 - **Deliverables:** all spaces of BUILD_SPECIFICATION §4.2 (R, D, V, P, L, F, H, A), affine type with inverse, camera model, EXIF orientation transforms, PDF page transforms, pixel-snap helpers, property tests (round trip ≤ 1e-6 px for scales 1/64–64 and any rotation; F→H integer-exact).
 - **Acceptance:** proptest suites pass with ≥ 10,000 cases each, on Windows and on the phone.
-- **Execution checkpoint, 2026-10-02:** shared geometry implemented; `docs/evidence/T1.01.md` is PASS. Five 10,000-case suites and eight known-answer tests pass on Windows and the physical SM-S918U; checked affine mapping measures 10.590 ns/point (95% interval 10.226–10.962 ns, <50 ns target). The Android wrapper's initial verified compiler-telemetry survivor failure is retained; corrected full run and owned cleanup pass. CORE-002 and TUNNEL-007 remain in_progress/partial for downstream app/hardware clauses; PEN-006 receives math evidence only. Next independently eligible task: T1.02, size L, gpt-6-astra/max; actual session last verified gpt-6-astra/xhigh. No numbered phase gate or phase-end push is due.
+Five 10,000-case suites and eight known-answer tests pass on Windows and the physical SM-S918U; checked affine mapping measures 10.590 ns/point (95% interval 10.226–10.962 ns, <50 ns target). The Android wrapper's initial verified compiler-telemetry survivor failure is retained; corrected full run and owned cleanup pass. CORE-002 and TUNNEL-007 remain in_progress/partial for downstream app/hardware clauses; PEN-006 receives math evidence only. No numbered phase gate or phase-end push is due.
 
 ### T1.02 — vw-model and vw-ops: document, operations, transactions, undo
 - **Size:** L · **Depends on:** T1.01 · **Prompt:** `prompts/phase-1/T1.02-model-ops.md`
@@ -424,7 +375,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Ops and transactions per §4.4: host sequencing, idempotent txn IDs, LWW properties, the offline conflict rule with conflict records, fractional ordering with cycle checks.
   - Per-device undo/redo; provisional gesture state with expiry and cancel; canonical state hash.
 - **Acceptance:** property tests (undo/redo restore identical hashes over 500 random sequences); duplicate transactions are idempotent; a stale offline write produces a conflict record; gesture expiry and cancel are unit-tested.
-- **Execution checkpoint, 2026-10-02:** T1.02 implements the shared model, draft code generation, atomic host sequencing, offline conflict retention, optimistic replica/rebase, per-device inverse history and provisional gestures. Final verification and source-bound results are recorded in `docs/evidence/T1.02.md` and `T1.02-results.json`; broader requirements remain partial for storage, transport and app integration. Owner-requested parallel model/engine implementation and independent review used separate file ownership; heavy builds and S23 tests were serialized. The owner has ended overnight continuation: complete this slice, report results and pause before T1.03 (M, gpt-6-astra/max). Actual session is gpt-6-astra/xhigh; settings were not changed. No numbered phase gate or phase-end push is due.
+- **Execution checkpoint, 2026-10-02:** T1.02 implements the shared model, draft code generation, atomic host sequencing, offline conflict retention, optimistic replica/rebase, per-device inverse history and provisional gestures. Owner-requested parallel model/engine implementation and independent review used separate file ownership; heavy builds and S23 tests were serialized. No numbered phase gate or phase-end push is due.
 
 ### T1.03 — vw-store: SQLite project store and blobs
 - **Size:** M · **Depends on:** T1.02 · **Prompt:** `prompts/phase-1/T1.03-vw-store.md`
@@ -437,7 +388,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Crash-recovery tests (kill during write).
   - Migrations framework; `.vwbz` export/import (labels stripped).
 - **Acceptance:** kill-during-write tests never corrupt the store; a reopened store has an identical state hash; the disk reserve blocks caching and never touches originals.
-- **Execution checkpoint, 2026-10-02:** shared SQLite storage, immutable blobs, offline queue/conflicts, sequencer checkpoints, bounded caches, schema migrations and portable archives are implemented. `docs/evidence/T1.03.md` and `T1.03-results.json` bind the validation: 112 distinct Windows tests (111 in the full run, then the final 25-case cache suite) and 113 on physical SM-S918U; recovery passes after 1,000 Windows and 100 Android killed writers. Independent review is clear. CORE-008, FORMAT-003, SYNC-001 and HOOK-001 remain in_progress/partial for downstream app, transport and gate clauses. Actual session is gpt-6-astra/max. Pause after this slice; next is T1.04 (M, gpt-6-astra/max), which still requires the T0.10 dated D6 decision and owner pen comparison. No numbered phase gate or phase-end push is due.
+- **Execution checkpoint, 2026-10-02:** shared SQLite storage, immutable blobs, offline queue/conflicts, sequencer checkpoints, bounded caches, schema migrations and portable archives are implemented. Independent review is clear. CORE-008, FORMAT-003, SYNC-001 and HOOK-001 remain in_progress/partial for downstream app, transport and gate clauses. No numbered phase gate or phase-end push is due.
 
 ### T1.04 — vw-ink: deterministic stroke modeling
 - **Size:** M · **Depends on:** T1.01, T0.10 decision · **Prompt:** `prompts/phase-1/T1.04-vw-ink.md`
@@ -449,7 +400,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Golden tests from recorded traces, identical on Windows and Android builds.
 - **Acceptance:** goldens are byte-identical across `x86_64-pc-windows-msvc` and `aarch64-linux-android` (Android goldens run on the device via `hil-test rust`).
 
-- **Execution checkpoint, 2026-10-02:** T1.04 implements the provisional Rust D6 candidate under the owner's full-continuation instruction. Twenty-one engine tests and one JNI registry test pass on Windows and physical IN2019; sixteen synthetic geometry hashes match exactly, three real Android instrumentation tests pass, and CPU append p95 is 1.354 us on IN2019 (5.300 us on Windows). `docs/evidence/T1.04.md` and `T1.04-results.json` retain exact source/artifact bindings, corrected Android 11 lifecycle failures and cleanup. PEN-001, PEN-002 and DEV-006 remain in_progress/partial for app, export and physical clauses. Owner traces, S23 presentation latency and final D6 selection remain deferred; G0/G1 are open. Continue T0.11 (S) and T1.05 (M), both gpt-6-astra/max, matching the current session. No phase-end push is due yet.
+- **Execution checkpoint, 2026-10-02:** T1.04 implements the provisional Rust D6 candidate under the owner's full-continuation instruction. Twenty-one engine tests and one JNI registry test pass on Windows and physical IN2019; sixteen synthetic geometry hashes match exactly, three real Android instrumentation tests pass, and CPU append p95 is 1.354 us on IN2019 (5.300 us on Windows). PEN-001, PEN-002 and DEV-006 remain in_progress/partial for app, export and physical clauses. Owner traces, S23 presentation latency and final D6 selection remain deferred; G0/G1 are open. No phase-end push is due yet.
 
 ### T1.05 — vw-raster: exports
 - **Size:** M · **Depends on:** T1.02, T1.04 · **Prompt:** `prompts/phase-1/T1.05-vw-raster.md`
@@ -460,7 +411,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Revision and asset-hash metadata in exports; golden tests.
 - **Acceptance:** byte-exact goldens on both platforms; oversize WebP refused with alternatives; clean exports equal source pixels.
 
-- **Execution checkpoint, 2026-10-02:** T1.05 native raster software passes 62 tests on Windows and IN2019, with nine matching PNG/layout goldens. The explicit Windows 50MP PNG16 scratch/marked-export test passes and cleans its temporary files. Strict lint/format and license gates pass; three inspected verification images were disposed. `docs/evidence/T1.05.md` and results retain source/artifact bindings, failures, measured memory and remaining buffered/app/S23 boundaries. The eight task requirements remain in_progress/partial. Continue T1.06a (L, gpt-6-astra/max) and T1.06b (M, gpt-6-astra/max) software under owner authorization; G0/G1 and physical-link acceptance stay pending. No phase-end push is due.
+- **Execution checkpoint, 2026-10-02:** T1.05 native raster software passes 62 tests on Windows and IN2019, with nine matching PNG/layout goldens. The explicit Windows 50MP PNG16 scratch/marked-export test passes and cleans its temporary files. Strict lint/format and license gates pass; three inspected verification images were disposed. The eight task requirements remain in_progress/partial. No phase-end push is due.
 
 ### T1.06a — vw-proto and vw-net transport: protocol, carriers, simulation
 - **Size:** L · **Depends on:** T1.02, T0.06 · **Prompt:** `prompts/phase-1/T1.06a-transport.md`
@@ -472,7 +423,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - `vw-sim` deterministic fault simulation (drop, duplicate, reorder, partition, offline).
 - **Acceptance:** 10,000 seeded simulation runs converge with zero lost or duplicated transactions; MEDIA keeps latest-frame semantics under 2× overload on both carriers on hardware; ops exchange over tethering and adb on hardware. CONNECT-001/002 stay partial until T1.10.
 
-- **Execution checkpoint, 2026-10-02:** T1.06a protocol v1.2, TCP/QUIC, durable resync and bounded blob transport pass 74 ordinary Windows and 58 IN2019 tests. The 10,000-seed simulation converges in 222.96 seconds with no lost/duplicate edits or replayed INPUT. ADB TLS synthetic OPS exchange passes. Physical MEDIA overload/tether checks remain open. See `docs/evidence/T1.06a.md`, `T1.06b.md` and shared results; task requirements remain in_progress/partial under provisional continuation.
+- **Execution checkpoint, 2026-10-02:** T1.06a protocol v1.2, TCP/QUIC, durable resync and bounded blob transport pass 74 ordinary Windows and 58 IN2019 tests. The 10,000-seed simulation converges in 222.96 seconds with no lost/duplicate edits or replayed INPUT. ADB TLS synthetic OPS exchange passes. Physical MEDIA overload/tether checks remain open.
 
 ### T1.06b — Pairing, trust store, discovery and route safety
 - **Size:** M · **Depends on:** T1.06a · **Prompt:** `prompts/phase-1/T1.06b-pairing.md`
@@ -484,7 +435,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - `tools/pair-cli` (PC console plus an adb-pushed phone binary) for hardware tests before the apps exist.
 - **Acceptance:** unit tests for expiry, reuse, replay, lockout, revoked refusal and TXT contents pass; hardware pairing with pair-cli over tethering succeeds and a revoked peer is refused; no key material in project files.
 
-- **Execution checkpoint, 2026-10-02:** T1.06b QR/SPAKE2, DPAPI, lockout, revocation, discovery and route APIs are implemented. IN2019 ADB QR pairing, exact synthetic OPS acknowledgment and refusal after revocation pass with cleanup. Keystore, app flows, project/export secret scans, tethering and security acceptance remain open. Continue T1.07 (M, gpt-6-astra/max), matching the current session; no phase-end push is due. See `docs/evidence/T1.06a.md`, `T1.06b.md` and shared results; task requirements remain in_progress/partial under provisional continuation.
+- **Execution checkpoint, 2026-10-02:** T1.06b QR/SPAKE2, DPAPI, lockout, revocation, discovery and route APIs are implemented. IN2019 ADB QR pairing, exact synthetic OPS acknowledgment and refusal after revocation pass with cleanup. Keystore, app flows, project/export secret scans, tethering and security acceptance remain open.
 
 ### T1.07 — vw-ffi and the Kotlin shared module
 - **Size:** M · **Depends on:** T1.02, T1.03, T1.04, T1.05 · **Prompt:** `prompts/phase-1/T1.07-ffi-shared.md`
@@ -495,7 +446,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - `apps/shared` KMP module (commonMain with no Android-only or JDK-only imports, plus an enforcing check); Gradle tasks invoking cargo-ndk and the Windows build.
 - **Acceptance:** a smoke test creates a project, draws a stroke and exports from both Android and desktop through the bindings, matching the Rust golden; the alignment check passes; the commonMain import check passes and is proven to fail on a violation.
 
-- **Execution checkpoint, 2026-10-03:** T1.07 generated/native wrappers pass on Windows and IN2019 with matching state/PNG bytes, 100,000 samples, cancellation and owned cleanup. The guarded commonMain import boundary passes its negative fixture; HOOK-002 passes that exact criterion. Native alignment is checked without claiming a 16 KB runtime device. See `docs/evidence/T1.07.md` and its two exact receipts. Continue T1.08a (L, gpt-6-astra/max); actual session matches.
+- **Execution checkpoint, 2026-10-03:** T1.07 generated/native wrappers pass on Windows and IN2019 with matching state/PNG bytes, 100,000 samples, cancellation and owned cleanup. The guarded commonMain import boundary passes its negative fixture; HOOK-002 passes that exact criterion. Native alignment is checked without claiming a 16 KB runtime device.
 
 ### T1.08a — Android app: shell, stylus input, canvas, wet ink
 - **Size:** L · **Depends on:** T1.04, T1.05, T1.07 · **Prompt:** `prompts/phase-1/T1.08a-android-canvas.md`
@@ -507,7 +458,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Front-buffered wet ink with prediction using the core geometry; pen, highlighter and marker; undo/redo.
   - Offline local projects through vw-store.
 - **Acceptance:** PERF-001 measured (≤ 25 ms p95 target); injected-event tests of the gesture map, palm/cancel and the generic profile pass; the app works in airplane mode.
-- **Execution checkpoint, 2026-10-03:** integrated app source and the isolated physical IN2019 run pass 65 total instrumentation cases shared across T1.08a/T1.08b and synthetic T1.10/T1.11 coverage. Exact APK/native binding and owned cleanup pass. `docs/evidence/T1.08a.md` and `T1.08-app-tests.json` record the repaired native-packaging/import-readiness failures, limits and counts. S23 presentation timing, owner gestures, airplane-mode acceptance and large-image display remain open. Continue T1.08b (M, gpt-6.1-sol/xhigh); actual session remains gpt-6-astra/max under the full-continuation instruction.
+- **Execution checkpoint, 2026-10-03:** integrated app source and the isolated physical IN2019 run pass 65 total instrumentation cases shared across T1.08a/T1.08b and synthetic T1.10/T1.11 coverage. Exact APK/native binding and owned cleanup pass. S23 presentation timing, owner gestures, airplane-mode acceptance and large-image display remain open.
 
 ### T1.08b — Android app: shapes, text, selection, brush settings, layout
 - **Size:** M · **Depends on:** T1.08a · **Prompt:** `prompts/phase-1/T1.08b-android-tools.md`
@@ -517,7 +468,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Brush settings: Bézier pressure-curve editor with live preview stored per brush; stabilization slider; hover width cursor.
   - Layout per §4.17: tool rail (mirrored for left-handed use, movable), status bar, context bar; dark and light themes; 48 dp targets; reduced motion; contrast check.
 - **Acceptance:** phone text matches the export golden at 1:1; every tool creates editable objects; the curve editor and stabilization change replayed-fixture output; both themes pass WCAG AA contrast.
-- **Execution checkpoint, 2026-10-03:** native tool/reopen/text-golden, pressure/stabilization, saved-preference, declared contrast and exercised touch-target cases pass in the same 65-case IN2019 run. Full rendered accessibility, physical hover, owner layout and cross-device acceptance remain open. See `docs/evidence/T1.08b.md`; applicable requirements remain partial. Continue T1.09 (L, gpt-6-astra/xhigh), with the session still gpt-6-astra/max. Gates remain pending; software continuation is explicitly authorized.
+- **Execution checkpoint, 2026-10-03:** native tool/reopen/text-golden, pressure/stabilization, saved-preference, declared contrast and exercised touch-target cases pass in the same 65-case IN2019 run. Full rendered accessibility, physical hover, owner layout and cross-device acceptance remain open. Gates remain pending; software continuation is explicitly authorized.
 
 ### T1.09 — Desktop app: window, canvas, PC editing, pairing, shortcuts
 - **Size:** L · **Depends on:** T1.06b, T1.07, T1.08b · **Prompt:** `prompts/phase-1/T1.09-desktop-shell.md`
@@ -532,7 +483,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Placeholders for the instruction panel and transfer shelf, labelled "not available yet" (never inert).
 - **Acceptance:** all three window modes keep state; the window reports the Windows display scale and evidence screenshots are crisp; objects can be selected, moved, resized and recolored with the mouse, each as one undo step; pairing with the pair-cli phone binary succeeds; every command has a shortcut.
 
-- **Execution checkpoint, 2026-10-03:** T1.09 actual packaged desktop startup draws a frame, confirms PMv2 at density 1.75 / DPI 168 and exits through ordinary cleanup. The initial redirected-native-cache failure is retained; canonical-root/handle repairs pass 19 targeted cases and the final aggregate passes 96 desktop cases. `docs/evidence/T1.09.md` binds actual build/startup artifacts. Visual, window-mode, interaction and pairing acceptance remain open. Continue T1.10 (L, gpt-6-astra/max); actual session matches.
+- **Execution checkpoint, 2026-10-03:** T1.09 actual packaged desktop startup draws a frame, confirms PMv2 at density 1.75 / DPI 168 and exits through ordinary cleanup. The initial redirected-native-cache failure is retained; canonical-root/handle repairs pass 19 targeted cases and the final aggregate passes 96 desktop cases. Visual, window-mode, interaction and pairing acceptance remain open.
 
 ### T1.10 — Phone pairing and live sync integration
 - **Size:** L · **Depends on:** T1.06b, T1.08b, T1.09 · **Prompt:** `prompts/phase-1/T1.10-live-sync.md`
@@ -545,7 +496,7 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Offline phone work with a forced conflict; temporary firewall rules, removed at the end.
 - **Acceptance:** A02 and A06 pass on hardware; PERF-002 measured; unplugging mid-gesture produces no duplicate; pairing and editing work over tethering with Developer options off, and over Wi-Fi with the router's internet unplugged; the route-safety check runs on every tether connection; the phone's trust list is Keystore-wrapped and no key material is in projects or exports; the forced conflict writes a conflicts row; camera independence verified with the phone.
 
-- **Execution checkpoint, 2026-10-03:** T1.10 native sessions, provisional gestures, recovery, durable blobs and platform trust adapters are integrated. Aggregate simulation passes all 10,000 fault seeds; the 68-case isolated IN2019 app increment includes real Keystore encryption/tamper refusal and native loopback pairing/revocation persistence. These are not live cross-device or physical reconnect/performance acceptance. `docs/evidence/T1.10.md` and its exact receipt retain limits; task requirements remain partial. Continue T1.11 (M, gpt-6-astra/xhigh); actual session remains gpt-6-astra/max.
+- **Execution checkpoint, 2026-10-03:** T1.10 native sessions, provisional gestures, recovery, durable blobs and platform trust adapters are integrated. Aggregate simulation passes all 10,000 fault seeds; the 68-case isolated IN2019 app increment includes real Keystore encryption/tamper refusal and native loopback pairing/revocation persistence. These are not live cross-device or physical reconnect/performance acceptance.
 
 ### T1.11 — Import, export and handoff basics
 - **Size:** M · **Depends on:** T1.05, T1.08b, T1.09, T1.10 · **Prompt:** `prompts/phase-1/T1.11-import-export.md`
@@ -556,14 +507,14 @@ Goal: by the end, you screenshot something, mark it on the phone, see it live on
   - Revision and resolution shown on export.
 - **Acceptance:** tested into Claude desktop, ChatGPT desktop, a browser chat and Claude Code (A13, partial; Christian runs the Claude Code paste himself); a `.mp4` asset syncs with an identical hash; in airplane mode the phone exports a marked PNG; SYNCED, SYNCING, RECONNECTING, OFFLINE (n pending) and EXPORT READY each observed on both devices.
 
-- **Execution checkpoint, 2026-10-03:** T1.11 import/export, clipboard formats, drag and Android share/camera/provider paths are integrated and exercised by native/JVM/isolated-app fixtures. Real recipient apps, owner clipboard workflows, airplane mode and full status observations remain pending. See `docs/evidence/T1.11.md`; task requirements remain partial. Continue T1.12 (S, gpt-6-astra/max), matching the actual session, as a software/gap checkpoint under owner authorization; G0/G1 remain pending.
+- **Execution checkpoint, 2026-10-03:** T1.11 import/export, clipboard formats, drag and Android share/camera/provider paths are integrated and exercised by native/JVM/isolated-app fixtures. Real recipient apps, owner clipboard workflows, airplane mode and full status observations remain pending.
 
 ### T1.12 — Phase 1 acceptance run
 - **Size:** S · **Depends on:** T0.12 and every Phase 1 task · **Prompt:** `prompts/phase-1/T1.12-phase1-acceptance.md`
 - **Requirements:** CORE-001, CORE-002, CORE-003, CORE-005, PEN-001, PEN-003
 - **Deliverables:** scripted A01, A02 and A06 runs with evidence; PERF-001/002 numbers; corrected statuses for every phase ≤ 1 requirement; a list of gaps; an installable APK and desktop app image; `docs/QUICKSTART.md`.
 - **Acceptance:** Gate G1 — recorded as pending until Christian confirms daily use after a day with the build.
-- **Execution checkpoint, 2026-10-03:** T1.12 closes the current software checkpoint: aggregate tests pass 458 ordinary Rust, two release simulator and 99 JUnit cases; all 10,000 simulation seeds pass; aggregate lint/license checks pass after retained repairs. The final 68-case IN2019 app suite passes with cleanup, the normal APK is signature/hash verified and installed/foregrounded, and the packaged desktop draws and shuts down cleanly. `docs/evidence/T1.12.md` reconciles exact evidence and limits. G0/G1, physical/manual scenarios and S23 performance remain pending. Publish the validated Phase 1 checkpoint under standing authorization, then continue T2.01 (M, gpt-6-astra/xhigh) under the explicit full-continuation instruction; actual session remains gpt-6-astra/max.
+- **Execution checkpoint, 2026-10-03:** T1.12 closes the current software checkpoint: aggregate tests pass 458 ordinary Rust, two release simulator and 99 JUnit cases; all 10,000 simulation seeds pass; aggregate lint/license checks pass after retained repairs. The final 68-case IN2019 app suite passes with cleanup, the normal APK is signature/hash verified and installed/foregrounded, and the packaged desktop draws and shuts down cleanly. G0/G1, physical/manual scenarios and S23 performance remain pending.
 
 ---
 
@@ -586,7 +537,7 @@ Prompts are written after G1. Tasks and acceptance are fixed now.
 | T2.11 Phase 2 acceptance | S | T2.01–T2.10 | (verification of the above) | A13, A21, A22, A23, A24, A26, A29 on real apps, plus the A06 re-run → Gate G2. |
 
 
-- **Phase 2 software checkpoint, 2026-10-03:** T2.01–T2.11 source is integrated. Aggregate validation passes 776 Rust and 339 JVM cases plus all 10,000 simulation seeds; the separate 50 MP PNG16 export lane and 154/154 isolated S23 cases pass. Final lint/licenses, exact-hash normal S23 delivery and fresh packaged MCP startup/shutdown pass. CAPTURE-001 paired capture now appends to the retained journal and existing OPS/BLOB link; the earlier replacement defect and validation failures remain documented. `docs/evidence/T2.11.md` and its public text receipts retain counts, hashes, cleanup and limits. G0/G1/G2 and all 46 Phase 2 requirement acceptance statuses remain partial/pending; real apps, providers, physical inputs and owner scenarios were not substituted by software fixtures. Automatically publish this validated software checkpoint under the owner's Git policy. The owner directly confirmed D20's Krita/Paint milestone; prioritize T3.01 capture/DPI (M), necessary transport/frame/input lifecycle components and active T4.01/T4.03/T4.04/T4.07/T4.08 work using gpt-6.1-sol/xhigh, without slice pauses. Preserve broader Phase 3 candidates and deferred Phase 4 scope; this checkpoint does not start Phase 5 or pass M4-KP.
+- **Phase 2 software checkpoint, 2026-10-03:** T2.01–T2.11 source is integrated. Aggregate validation passes 776 Rust and 339 JVM cases plus all 10,000 simulation seeds; the separate 50 MP PNG16 export lane and 154/154 isolated S23 cases pass. Final lint/licenses, exact-hash normal S23 delivery and fresh packaged MCP startup/shutdown pass. CAPTURE-001 paired capture now appends to the retained journal and existing OPS/BLOB link; the earlier replacement defect and validation failures remain documented. G0/G1/G2 and all 46 Phase 2 requirement acceptance statuses remain partial/pending; real apps, providers, physical inputs and owner scenarios were not substituted by software fixtures. Automatically publish this validated software checkpoint under the owner's Git policy. Preserve broader Phase 3 candidates and deferred Phase 4 scope; this checkpoint does not start Phase 5 or pass M4-KP.
 
 ## Phase 3 — Precision, capture, sync
 
@@ -620,296 +571,16 @@ paired transport, frame identity, input ownership and lifecycle dependencies;
 then T4.01 -> T4.03 -> T4.04 -> the Krita/Paint subset of T4.07 -> the essential
 controls subset of T4.08 -> milestone checkpoint M4-KP. T4.07 and T4.08 may be
 implemented independently after guarded input is integrated; serialize heavy
-builds and device/editor input tests. Continue using the recorded Sol/xhigh
-executor choice, verifying actual settings rather than changing them.
+builds and device/editor input tests.
 
 The original full-task dependencies below remain the dependency graph for G4.
-For M4-KP, record an evidence-backed dependency checklist and validate the exact
-shared components it uses. The owner's existing software-progression exception
+For M4-KP, validate the exact shared components it uses. The owner's existing software-progression exception
 allows work while hardware-only evidence is pending; it does not waive failed
 required software or hardware checks for declaring the milestone usable.
 Unrelated PDF/SVG, giant-image, additional-format or paid-provider work is not a
 new M4-KP prerequisite. Preserve existing earlier-phase work and open gates.
 
 ### Milestone acceptance and delivery (M4-KP)
-
-**Owner device/progress update, 2026-10-03:** continue the build while the owner
-has the S23 away. Use explicitly selected IN2019 for applicable Android checks
-and defer S23-specific physical/performance acceptance until its return. Report
-the remaining build-task count after each completion: T4.01, T4.03, T4.04, the
-active Krita/Paint subset of T4.07, essential T4.08 and personal-use packaging
-are six build tasks. Required capture/DPI/transport dependencies are included in
-their implementation; unrelated deferred tasks are excluded. Source freezes or
-partial foundations do not decrement this count. Build-task completion requires
-integrated source and appropriate software validation; it does not pass pending
-device, editor, practical drawing or product-gate acceptance.
-
-**Owner device update, 2026-10-04:** the S23 Ultra is connected again; run needed
-project tests on explicitly selected SM-S918U. Separately selected IN2019 tests
-remain authorized. The six-task counting rule and pending physical/performance
-acceptance above remain unchanged; renewed device availability is not acceptance.
-
-**Integration software checkpoint, 2026-10-04:** the shared-parser correction
-passes 254 native tests with strict lint/format; the separate real-render receipt
-parser passes seven cases. The latest startup/observation helper check passes
-62 cases, strict lint/format and all five fresh license gates, preserving its
-115-path source snapshot and confirming actual nested/outer Job and stream
-retirement. The guard harness now requires a new balanced click/release in the
-owned target, so automatic focus cannot start it. The previous 68/100 live attempt
-remains failed. The measured S23 route response requires a narrow text-format
-parser correction before the real USB run. See `docs/evidence/M4-KP.md` and the
-immutable progress receipts. Full app integration/build validation is next (L)
-with Sol/xhigh feature work; six build tasks remain and physical/editor/performance
-acceptance is pending.
-
-The subsequent S23 route parser passes 23 pure cases. The first full integration
-build failed at desktop compilation because the test host's generated core APIs
-were absent from its direct compile dependencies. Native Windows/Android and
-shared-binding stages passed; final app/APK artifacts did not. All 11 nested
-phases and the outer Job retired with streams complete and 115 source paths
-preserved. Retain `docs/evidence/M4-KP-integration-build-r17-failure.json` and
-admit a separate dependency/warning repair before the next build. No build task
-or product gate is completed by these successful subphases.
-
-The separate dependency/warning correction subsequently passed the full
-integration build, including desktop compilation, both isolated Android test
-APKs and native-packaging verification. All 12 nested phases and the outer Job
-retired with completed streams and all 115 source paths preserved. Exact artifact
-bindings are retained in `docs/evidence/M4-KP-integration-build-r18.json`.
-Fresh native helper/app checks and live Windows/S23 validation follow. This build
-did not install or launch an app and does not complete a build task or product
-gate; six build tasks remain.
-
-The fresh native helper run passed 62 cases, strict lint/format and five license
-gates. The normal app check then completed 391 cases with five failures in shared
-cancellation identity and desktop runtime-anchor fixtures. Android's six unit
-cases passed; the complete run remains failed, with actual process/stream cleanup
-and 115 source paths preserved. Separate query-only owned blank Paint/Krita
-observations passed and retired without input or images. Paint's installed
-package identity and selected-root tree were verified; Krita's unnamed numeric
-candidates do not establish size authority. Retain the app failure and editor
-observation receipts; repair the actual app-check failures and measure editor
-effects before enabling reviewed control profiles. The 15 active milestone
-requirement records are now in_progress; their verification statuses, acceptance
-clauses, prior evidence and all deferred records remain unchanged. Six build
-tasks remain.
-
-The separately reviewed R19 app repair passes all 392 shared/desktop/Android
-unit cases, including the new cancellation-during-retirement regression; all
-Jobs/streams retired with the 120-path source snapshot preserved. The original
-five failures remain retained in their immutable receipt and private XML reports.
-New source-retention/frame harness fixtures then passed all 73 native cases after
-a test-only UUIDv7 correction, but the strict run remains failed on two lint
-diagnostics; formatting was not reached. Both attempts are retained; equivalent
-lint and OS temporary-directory shape corrections have been admitted. A separate
-FFI attempt stopped on actual StorageFull while allocating its large orphan
-fixture, then a secondary poisoned mutex. The reviewed test-only sparse-file
-repair preserves the logical quota input and all refusal assertions; all 254
-FFI cases, strict lint and formatting now pass with actual Job/stream retirement
-and 121 source paths preserved. Only obsolete owned test debug-symbol cache was
-disposed of, preserving executables, fingerprints, current symbols, source,
-evidence and production payloads. The fresh helper check passes 75 cases,
-strict lint/format and five license gates; the current full integration build
-passes all 12 nested phases with the same 121 source paths preserved and actual
-Job/stream retirement. Original failures and disposal receipts remain retained.
-Source-only capture sampling and editor observations grant no palette authority.
-The selected S23's real USB run reached its controller but failed at the 30-second
-render callback deadline with zero render records; USB routing passed. Actual OS
-process/stream cleanup, isolated-package removal and private-work disposal passed.
-Internal runtime retirement and final profile preservation remain unobserved.
-Add retained stage diagnostics before retrying. See the R20 build/helper and USB
-failure receipts in docs/evidence. Six build tasks remain.
-
-The R23 checkpoint passes 80 native helper cases, strict lint/format, fresh
-license gates and the complete twelve-stage integration build with all 123
-bound source paths preserved. The real selected-S23 USB run then reached a
-configured host stream and a Ready hardware decoder but failed at the unchanged
-render-callback deadline with zero rendered frames. OS Jobs/streams retired,
-isolated packages were removed and private work was disposed of. The retained
-diagnostics distinguish decoder readiness from actual render delivery. The
-reviewed R24 repair retains the exact first keyframe through asynchronous decoder
-startup within the original three-second deadline; affected validation is next.
-See the R23 helper/build and USB-failure receipts in docs/evidence.
-
-The corrected input-free Paint query measured size, zoom and canvas state but
-could not identify the brush/style, so it grants no control-profile authority.
-An unattended, exact-owned blank Krita run passed bind, foreground rebind and
-tool/settings observation, then received the typed capture refusal ColorDepth.
-No image or input was produced. Its empty owned TEMP marker/sample was disposed
-of after actual native/editor/outer retirement. The original refusal is retained;
-diagnose its color stage without relaxing capture predicates. Reviewed explicit
-unattended guard readiness is now admitted: an actual guarded software click,
-new balanced receiver pair, released buttons and exact foreground remain
-mandatory before the unchanged 100 trials. Physical human/S Pen provenance stays
-separate. Six build tasks remain; these diagnostics and source repairs complete
-no build task or product gate. Continue without requesting owner input.
-
-The R24 affected run subsequently passes all 400 JVM cases (including eight
-new decoder-startup cases), 80 strict native cases and all twelve integration
-build stages with 125 source paths preserved and actual Job/stream retirement.
-The unattended Windows guard passes 103 cases and all 100 target-change trials:
-each trial preserves all six sink categories and retires its old input owner,
-with 200 distinct old/fresh session identities. Readiness comes from an actual
-guarded software click and a newly observed balanced receiver pair. This closes
-that scoped software guard check, not physical mouse/S Pen or editor fidelity.
-The matching S23 USB run still records no native-validated render; it now reaches
-RecoveryRequired(RenderedIdentity), rather than remaining Ready as in R23.
-Retain this failure and diagnose the actual callback predicate before another
-phone run. All owned test packages, OS processes/streams and private work retired.
-See the R24 app/helper/build, unattended-guard and USB-failure receipts. Six
-build tasks remain. The empty R7 capture TEMP cleanup is separately retained in
-docs/evidence/M4-KP-empty-frame-disposal-r7.json.
-
-The R28 diagnostic checkpoint passes 101 native helper/capture cases, 254 FFI
-cases, 409 JVM cases across 55 retained XML reports, 31 diagnostic grammar
-cases and all twelve integration build stages. Strict lint/format and fresh
-license checks pass. The complete 131-path source map is preserved through
-those runs, with actual build Jobs and output streams retired. The subsequent
-selected-S23 tether run measures exactly one failing render predicate: codec
-render time precedes the actual phone-local release request (mask 16). Media PTS
-matches and callback enqueue delay is 20.766302 ms; the other clock differences
-are clamped diagnostics, not exact measured offsets. Zero native-validated
-renders are recorded. OS processes/streams, isolated user-0 packages and private
-work are cleaned up; internal decoder/host retirement and the final profile
-inventory comparison are not proved by this failed run. Do not retry unchanged
-source or substitute phone readiness for actual render delivery.
-
-The matching owned blank Krita frame run identifies ColorDepth's nonopaque-pixel
-stage with alpha 228. Its monitor color-space and texture descriptor checks
-pass, but pixel location, count and cause remain unknown. The original opaque
-pixel predicate remains intact; no image or input is produced. Actual editor,
-native and outer Jobs/streams retire, and the exact empty owned TEMP/sample is
-disposed of nonrecursively. The R28 helper/FFI/app/grammar/build, USB failure,
-blank-frame failure and disposal receipts are retained in docs/evidence.
-
-Reviewed R30 local Surface timestamp scheduling and the Paint query R2 reader
-are now admitted with 132 source bindings. Their affected native check passes
-103 cases, strict lint/format and fresh licenses. Fresh JVM checks pass 414
-cases across 56 retained XML reports, including all five local scheduling cases.
-These sources are not yet a hardware or editor-effect pass. Continue the
-retained finite-input owner, production controls/catalog and bounded private
-alpha-location diagnostic under Sol/xhigh feature execution, with the root
-remaining Sol/max for administrative admission/review/validation. Six build
-tasks remain; physical pen, performance and owner acceptance remain separate.
-
-The retained finite-input owner and its terminal correction are composed with
-136 source bindings before any runtime execution. Independent review found and
-corrected the original Pending-to-immediate-Complete child-exit gap; a reported
-Pending must now remain alive through exact Stop/Stopped. The affected native
-run passes all 138 cases but fails strict clippy on one nested conditional.
-Its failure and actual Job/stream retirement are retained in
-docs/evidence/M4-KP-finite-check-r31-lint-failure.json. The narrow ordered
-let-chain correction is admitted for a fresh check, without a lint waiver or
-new style-only tests. Input-capable editor effects remain blocked until their
-separate terminal-rendezvous consumer and actual outer retention are integrated.
-This foundation completes no build task; six remain.
-
-The R33 affected rerun passes all 138 native cases, strict clippy, formatting and
-fresh license checks. The matching FFI run passes all 254 cases and strict checks.
-Both preserve all 136 source bindings and retire the actual nested/outer Jobs and
-output streams; their receipts are M4-KP-finite-helper-check-r33.json and
-M4-KP-finite-ffi-check-r33.json in docs/evidence. A fresh helper build also passes
-its six stages. The next checks use these exact binaries for unattended guard
-trials, followed by corrected capture diagnostics and the integrated S23 path.
-The corrected R32/R35 alpha diagnostic is subsequently admitted with 137 source
-bindings. All 156 affected native cases, strict lint, formatting and fresh
-license checks pass; no opaque-pixel predicate is relaxed. The full integration
-build then fails MSVC LNK1140 while linking vw_core.dll. Its five license stages,
-exact source map, failed log hash and actual Job/stream retirement are retained
-in docs/evidence/M4-KP-integration-build-r35-link-failure.json. The subsequent
-narrow Windows/MSVC cdylib-only PDB correction passes the full integration rebuild
-with 143 source bindings, 183 affected native cases and all 12 build stages.
-Its Windows binaries and isolated Android APKs are bound in
-docs/evidence/M4-KP-integration-build-r37.json. The later FFI run fails the separate
-Windows lib-test PDB limit and a parallel archive write fails OS112. That failed
-run changes core/host DLL bytes, so another successful build is required before
-phone testing. Its failure and actual retirement are retained in
-docs/evidence/M4-KP-ffi-r37-link-and-space-failure.json. Only resolved project
-symbol files were disposed of, preserving sources, evidence, payloads,
-executables and fingerprints; the text disposal receipt records counts and hashes.
-
-The matching R33 unattended guard run passes 103 cases, all 100 target-change
-trials, actual balanced software readiness and receiver input, and zero sink
-events, with all owned processes/streams retired. The read-only Paint controls
-query completes and retires but remains semantically incomplete: primary brush
-and slider thumb witnesses are Unknown. Its 275438 us whole-harness measurement
-does not establish the production 180 ms budget. Both results are retained in
-docs/evidence/M4-KP-guard-unattended-r33.json and
-docs/evidence/M4-KP-paint-controls-query-r33.json. The S23 tether route is freshly
-confirmed Up without settings changes or OnePlus access. Six build tasks remain;
-editor effects, integrated streaming and physical/performance/owner acceptance
-remain pending.
-
-The R37 input-free Krita capture diagnoses 84 nonopaque pixels, all outside the
-freshly verified opaque canvas. The original full-client color-depth refusal is
-preserved; no cause, canvas-only capture pass or editor effect is inferred.
-All editor/native/outer Jobs and streams retire, no images are created, and the
-exact empty owned temporary fixture is disposed of. Paint's corrected primitive
-query now observes the brush primary button, size/zoom thumbs, settings digest
-and frame witness. Undo/Redo are Known disabled on the blank fixture. Its
-246444 us isolated query still does not pass the production 180 ms budget.
-Source review identifies three runtime repairs: UI command refusal and
-post-request lifecycle fencing, synchronous remote-owner publication versus
-close, and delayed MEDIA frames from recognized retired video scopes. These are
-being reviewed and combined before the next affected checks. The retained editor
-effect owner also requires exact owned-request binding before any input run.
-Six build tasks remain; feature executors remain Sol/xhigh, root Sol/max performs
-administration/review/validation, and independent review uses Astra/xhigh.
-
-The retained private owner compiles and passes all 69 contract cases with exact
-owned-request and wrapped-invocation binding. Its first actual no-input lifecycle
-runs stop before native binding because the ordinary ancestor lease cannot open
-Paint's protected installation directory. Both setup failures preserve the actual
-root/editor/process/Job/stream retirement evidence and send no input; they do not
-validate the finite owner's actual OS lifecycle. The explicit InstalledPaint
-launch path is being corrected without changing Windows permissions or native
-package/source authority.
-
-The earlier R37 claim that `/PDB:NONE` omits a PDB is corrected by the observed
-MSF7 file named `NONE` and Microsoft's linker documentation. That flag names the
-output; `/DEBUG:NONE` is the documented omission option. The original successful
-12-stage build and all failure receipts remain intact. The narrow ordered source
-repair and fresh build are required before delivery; the text-only correction is
-docs/evidence/M4-KP-pdb-flag-correction-r37.json. Six build tasks remain.
-
-The explicit InstalledPaint launch path now passes three actual no-input lifecycle
-cases: a foreign owned-request PID is refused before start, a wrong-image native
-request completes safely with its exact editor retained, and the valid observation
-completes. All effect/root/editor Jobs and output readers retire; the original
-R6/R7 setup failures remain preserved. This is actual input-free ownership evidence,
-not accepted-input release or editor/history restoration.
-
-The ordered runtime/linker repairs are admitted with 151 source bindings. Fresh
-strict helper checks pass 183 native cases, FFI checks pass 265 cases (including
-all eleven retired-MEDIA/source-epoch regressions), the pure artifact parser passes
-26 cases, and JVM checks pass 433 cases across 59 retained XML reports. The selected
-lib-unit executable is the exact Cargo-reported test artifact with the same SHA256
-before actual execution. The private actual linker trace confirms explicit
-/OPT:REF,NOICF, /DEBUG and final /DEBUG:NONE; there is no CodeView record, matching
-PDB or new NONE file. Type13 POGO metadata remains, so an empty PE debug directory
-is not claimed. A failed administrative projection that assumed otherwise is
-retained separately; product tests did not fail. Exact named-PDB and superseded
-project test-executable disposal receipts retain hashes and preserved payloads.
-
-The next source cohort adds a distinct verified-editor-canvas fixture and the
-common finite Krita adapter. Independent review found a late final target query
-that could cross the same 3s capture budget and a disabled Undo/Redo post-action
-query that could prevent restoration. Both receive ordered source corrections
-before runtime. Full-client opacity, native source/grant and actual input-release
-predicates remain enforced. Six integrated build tasks remain; final artifact
-rebuild, S23 software integration, causal editor/profile checks and personal-use
-packaging are pending. Physical pen, performance and owner acceptance remain
-separate. Feature coding is Sol/xhigh; root Sol/max remains administration,
-review and validation, with independent Astra/xhigh source review.
-
-The current160 source cohort passes 222 native helper cases, strict formatting
-and warnings-denied lint, all five fresh license checks, 31 pure render diagnostic
-cases and all 12 integration-build stages. The first Krita digest import and
-catalog Gradle namespace failures remain retained; narrow ordered corrections
-resolve them. The exact build artifacts are bound to this cohort. No editor input
-or phone execution is claimed from these checks. Live causal editor restoration,
-matching final app/FFI checks, S23 integration and personal-use packaging remain
-pending. Six integrated build tasks remain, with physical acceptance separate.
 
 1. Installable Android APK and Windows app image, artifact hashes, third-party
    notices and a short setup guide. Open Krita or Paint, connect the S23, select
@@ -933,9 +604,9 @@ pending. Six integrated build tasks remain, with physical acceptance separate.
    drawing/control. Essential palettes name the destination and offer undo/redo,
    brush/eraser, brush size and canvas navigation with tested editor shortcuts.
 6. Record affected software/lint/license checks, hardware measurements, editor
-   compatibility and remaining gaps in text evidence. Keep verification images
-   outside Git and dispose of them after inspection. A compiling APK or a
-   passing harness alone does not pass M4-KP.
+   compatibility and remaining gaps as one-line results in this plan. Keep
+   verification images outside Git and dispose of them after inspection. A
+   compiling APK or a passing harness alone does not pass M4-KP.
 
 M4-KP is a focused usable-build checkpoint, not full G4 or G5 acceptance. The
 full carrier-switch A14 re-run, A15/A16 Photoshop, A17 virtual monitor and broader
@@ -998,102 +669,3 @@ in earlier tasks when they exist solely to support deferred Phase 4 features.
 | 13 | Smart App Control blocks locally built programs | High if on | High | T0.01 checks first; Christian turns it off for development (reversible since April 2026); sign every binary before any distribution | Smart App Control is on or in evaluation |
 | 14 | Windows Firewall silently blocks QUIC on tether or Wi-Fi links (often classified Public) | Medium | Medium | Temporary rules in development, an installer rule limited to the local subnet, and a firewall check before declaring a carrier failed | A carrier times out while adb works |
 | 15 | Parallel tasks in one folder or unmerged dependencies corrupt shared files (REQUIREMENTS.json, DECISIONS.md) | Medium | Medium | Start from `main` with dependencies merged; one task per folder; worktrees for parallel tasks | A merge conflict in a shared doc |
-
-Unattended continuation: the ordered R45/R46 canvas implementation passed 198 native cases plus strict checks against 153 exact source paths; the private common owner R11 and canvas orchestration contracts passed 84 and 60 cases respectively. These results do not prove live editor causality or device behavior. The independently reviewed R9/R12 Krita finite-input implementation was then admitted against 155 source paths, but its first helper build failed before test execution with E0432 (missing direct sha2 import dependency). The complete failure receipt is M4-KP-krita-compile-failure-r12.json; every actual build Job and output reader retired, and all 155 source paths were preserved. A narrow source repair is pending. Six integrated milestone build tasks remain, with physical acceptance separate.
-
-Owner-requested pause checkpoint, 2026-10-04: finish the current held-lifecycle
-parser correction and focused S23 retry, then commit, integrate into main and
-push the reviewed source/text checkpoint. Pause further implementation until a
-new owner request. The latest state supersedes earlier running counts: streaming
-startup/recovery software has passed actual initial/background/reconnect S23
-renders; five build tasks remain (T4.03, T4.04, active T4.07, essential T4.08,
-personal packaging). Physical pen/performance and owner acceptance are separate.
-See docs/M4_KP_CHECKPOINT.md and docs/evidence/M4-KP.md. The lifecycle key parser
-now preserves the producer's required sha256 field; its 135 focused checks pass.
-Unbuilt R106/R107/R119 editor candidates and the narrowed validation/build drafts
-remain preserved locally, not admitted as completed work. Use the owner's chosen
-model/effort without overrides; do not commandeer the OnePlus. No deferred
-editor, driver or Phase 5 work is authorized by this checkpoint.
-
-Paint continuation, 2026-10-08: R160's combined source batch is admitted after
-review of the actual Eraser/Size hit diagnostics, managed receipt timing,
-nonblocking post-stroke authority and durable installer-session ownership.
-The installer has 32 passing pure fixtures; changed native/managed checks and
-the coherent integration build are next. Prior R154 checks remain historical
-evidence for their exact bytes. Actual normal paired Paint controls and sustained
-viewing are not yet accepted. Five tasks remain (T4.03, T4.04, active T4.07,
-essential T4.08, personal packaging); Krita is deferred, S23 only, physical
-acceptance separate. Keep the owner's selected model and effort without overrides.
-
-R160a's affected checks now pass: 106 native and 15 managed cases, strict Clippy
-and formatting, nine retired phases with unchanged source. One full ordinary
-host/Android integration build is next; five scoped tasks remain open.
-
-Safe pause, R161 (2026-10-08): the R160a ordinary13 build passed. Actual
-history/Eraser and normalized Zoom cases passed with exact restoration; Size
-failed during its second pre-send validation (3/5 events, keys not sent).
-S23 viewing stopped before app launch on full installer-status output; its exact
-empty session was abandoned with historical terminal proof, normal app untouched.
-Four reviewed R161 source changes are now admitted: Paint provider750ms (parent1000,
-managed2500 unchanged), related existing regression expectations, and the targeted
-installer session query. R161 is UNBUILT/UNTESTED; compiled artifacts remain R160a.
-The owner requested no check reruns and then a safe pause. No build/device/input
-session is active. Existing121/32 checks and passing runtime cases remain scoped
-to their original bytes. All task verification images were inspected/disposed.
-Resume from ../M4-KP-PAINT-SAFE-PAUSE-2026-10-08-R161.md and stopped-agent checkpoints;
-retain all drafts/failures/archives. Five tasks remain open, Paint only, S23 only,
-Krita deferred and physical acceptance separate.
-
-Owner-authorized local Paint resume, 2026-10-08: continue the saved R161 work
-with the selected executor settings. The integrated source delta will include
-bounded calibration timing using the original command clock, alongside the
-750 ms Paint provider allowance and targeted installer-status query. Timing
-does not renew the deadline or authorize input. Bind a fresh current build to
-the exact consolidated source review; the original 121/32 checks remain
-historical and will not be rerun. Preserve scoped history, Eraser and normalized
-Zoom passes; run the missing Size pair, then S23 viewing, balanced input and
-phone/editor causality in sequence. Bind the measured Paint catalog before
-normal personal packaging and paired-app acceptance. First-use Zoom coverage,
-automatic post-stroke authority and sustained viewing remain actual runtime
-acceptance work. Five scoped tasks remain open; physical acceptance stays separate.
-
-R161b/c local delivery results, 2026-10-08: the single current integration
-build passed all 13 phases. The missing Size pair passed exact whole-pixel,
-settings and geometry restoration. Actual S23 initial/background/reconnect
-viewing, balanced input and automated phone-to-Paint Undo/Redo/final Undo
-causality passed with complete actual retirement. A script-only installer
-raw-progress correction was reviewed, admitted and checked once with 13 new
-saved-record cases; it reused the compiled artifacts. Historical 121/32 and
-scoped history/Eraser/normalized-Zoom passes were not repeated or promoted.
-
-The exact eight-action Paint catalog is packaged. Ordinary Android (10 phases)
-and complete Windows (17 phases) builds passed serially, then resource
-verification and an exact output archive passed. The normal S23 app was updated
-with its existing signer, installed bytes read back, and launched normally;
-the complete Windows app opened without test flags. No app-data clear occurred.
-Normal paired palette behavior, first-use Zoom, automatic post-pen-lift Undo
-eligibility, sustained normal viewing and normal shutdown still need actual
-normal-session evidence. Five scoped tasks remain open; physical S Pen,
-performance, A27 and owner acceptance are separate. Krita remains deferred.
-
-R164/R165 continuation checkpoint, 2026-10-11: the owner authorized separately
-selected OnePlus/IN2019 tests while taking the S23 away. The original-image
-repair passed its actual native/main build, and two compiled normal-device tests
-passed with synthetic stylus input. Those results retain their original source,
-artifact and device bindings. The normal tagged generated image was visibly
-rendered; the untagged draft awaits explicit sRGB consent. Image screenshots
-were inspected/disposed and temporary rotation was restored with exact readback.
-Windows protected-body observability still limits unattended GUI coordination.
-
-The owner has now put builds and memory-intensive work on hold. Five Android
-layout/lifecycle paths are independently reviewed and frozen as source only:
-compact project actions, conditional bounded tool controls, a separate color
-recovery dialog, native canvas accessibility and idle cancellation correction.
-They are unbuilt, uninstalled and runtime-unverified. Android-only packaging
-and the native touch helper are being prepared without executing producers.
-Do not repeat unchanged passing builds/tests or use an old source snapshot as
-new admission. Resume from
-../M4-KP-resume-coordinator-20261008/M4-KP-R165-BUILD-HOLD-CHECKPOINT-20261011.md
-and its referenced source reviews/receipts. Five scoped tasks remain open;
-OnePlus software proof does not pass physical S23/S Pen, performance or owner
-acceptance. Krita remains deferred and all milestone gates remain pending.

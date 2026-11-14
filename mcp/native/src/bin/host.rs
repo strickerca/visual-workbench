@@ -20,7 +20,7 @@ fn run() -> vw_mcp_native::Result<()> {
         process::{Command, Stdio},
         sync::{
             Arc, Mutex,
-            atomic::{AtomicBool, Ordering},
+            atomic::{AtomicBool, AtomicUsize, Ordering},
             mpsc,
         },
         thread,
@@ -29,6 +29,16 @@ fn run() -> vw_mcp_native::Result<()> {
     use vw_mcp_native::{
         REQUEST_BYTES, Result, WIRE_BYTES, framing, package_reader::no_redirect, windows,
     };
+    /// One agent connection's outbound side. Replies are queued as serialized
+    /// lines so the bound is in bytes: a burst of small replies is ordinary,
+    /// and only a peer that stops reading reaches the limit and is closed.
+    struct Agent {
+        send: mpsc::SyncSender<Vec<u8>>,
+        closed: Arc<AtomicBool>,
+        queued: Arc<AtomicUsize>,
+    }
+    const OUTBOUND_MESSAGES: usize = 64;
+    const OUTBOUND_BYTES: usize = 2 * WIRE_BYTES;
     #[derive(serde::Deserialize)]
     #[serde(deny_unknown_fields)]
     struct Start {
@@ -181,13 +191,12 @@ fn run() -> vw_mcp_native::Result<()> {
             }
         });
     }
-    let (accepted, connections) =
-        mpsc::sync_channel::<(String, u32, mpsc::SyncSender<Value>, Arc<AtomicBool>)>(4);
+    let (accepted, connections) = mpsc::sync_channel::<(String, u32, Agent)>(4);
     let events_pipe = events.clone();
     let stop = stopped.clone();
     thread::spawn(move || {
         let mut listener = first_pipe;
-        let active = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let active = Arc::new(AtomicUsize::new(0));
         while !stop.load(Ordering::Acquire) {
             match windows::connect_server(&listener, &sid) {
                 Ok(false) => {
@@ -222,16 +231,19 @@ fn run() -> vw_mcp_native::Result<()> {
                 Ok(v) => v,
                 Err(_) => return,
             };
-            let (out, output) = mpsc::sync_channel::<Value>(2);
+            let (out, output) = mpsc::sync_channel::<Vec<u8>>(OUTBOUND_MESSAGES);
             let closed = Arc::new(AtomicBool::new(false));
+            let queued = Arc::new(AtomicUsize::new(0));
             let pid = match windows::client_pid(&pipe) {
                 Ok(pid) => pid,
                 Err(_) => continue,
             };
-            if accepted
-                .try_send((id.clone(), pid, out, closed.clone()))
-                .is_err()
-            {
+            let agent = Agent {
+                send: out,
+                closed: closed.clone(),
+                queued: queued.clone(),
+            };
+            if accepted.try_send((id.clone(), pid, agent)).is_err() {
                 continue;
             }
             active.fetch_add(1, Ordering::AcqRel);
@@ -240,18 +252,15 @@ fn run() -> vw_mcp_native::Result<()> {
             let stop = stop.clone();
             thread::spawn(move || {
                 let mut input = Vec::new();
-                let mut buffer = [0u8; 8192];
+                let mut buffer = vec![0u8; 65536];
                 let mut outgoing: Option<(Vec<u8>, usize, Instant)> = None;
                 while !closed.load(Ordering::Acquire) && !stop.load(Ordering::Acquire) {
+                    // Sleep only when neither direction moved; a large reply or
+                    // a burst is pumped continuously instead of 8 KiB per tick.
+                    let mut progressed = false;
                     if outgoing.is_none() {
                         match output.try_recv() {
-                            Ok(value) => match serde_json::to_vec(&value) {
-                                Ok(mut bytes) if bytes.len() <= WIRE_BYTES => {
-                                    bytes.push(b'\n');
-                                    outgoing = Some((bytes, 0, Instant::now()));
-                                }
-                                _ => break,
-                            },
+                            Ok(bytes) => outgoing = Some((bytes, 0, Instant::now())),
                             Err(mpsc::TryRecvError::Disconnected) => break,
                             Err(mpsc::TryRecvError::Empty) => {}
                         }
@@ -263,8 +272,10 @@ fn run() -> vw_mcp_native::Result<()> {
                         match pipe.write(&bytes[*at..]) {
                             Ok(0) => {}
                             Ok(n) => {
+                                progressed = true;
                                 *at += n;
                                 if *at == bytes.len() {
+                                    queued.fetch_sub(bytes.len(), Ordering::AcqRel);
                                     outgoing = None;
                                 }
                             }
@@ -277,12 +288,27 @@ fn run() -> vw_mcp_native::Result<()> {
                     match pipe.read(&mut buffer) {
                         Ok(0) => break,
                         Ok(n) => {
+                            progressed = true;
                             let mut refused = false;
                             for b in &buffer[..n] {
                                 if *b == b'\n' {
-                                    let parsed = framing::parse(&input);
-                                    input.clear();
-                                    match parsed{Ok(message)=>{if send.try_send(json!({"origin":"pipe","connection":id,"message":message})).is_err(){refused=true;break;}},Err(_)=>{refused=true;break;}}
+                                    // Forward the checked line as one opaque string. The
+                                    // SDK process validates the owner frame that carries
+                                    // it, so agent JSON must never be part of that frame's
+                                    // own structure. Escaping at most doubles a line that
+                                    // is capped at REQUEST_BYTES, well inside WIRE_BYTES.
+                                    let line = std::mem::take(&mut input);
+                                    let forwarded = framing::parse(&line)
+                                        .ok()
+                                        .and_then(|_| String::from_utf8(line).ok())
+                                        .is_some_and(|text| {
+                                            send.try_send(json!({"origin":"pipe","connection":id,"message":text}))
+                                                .is_ok()
+                                        });
+                                    if !forwarded {
+                                        refused = true;
+                                        break;
+                                    }
                                 } else {
                                     if input.len() >= REQUEST_BYTES {
                                         refused = true;
@@ -300,7 +326,9 @@ fn run() -> vw_mcp_native::Result<()> {
                                 || e.kind() == io::ErrorKind::WouldBlock => {}
                         Err(_) => break,
                     }
-                    thread::sleep(Duration::from_millis(2));
+                    if !progressed {
+                        thread::sleep(Duration::from_millis(2));
+                    }
                 }
                 closed.store(true, Ordering::Release);
                 active.fetch_sub(1, Ordering::AcqRel);
@@ -308,21 +336,17 @@ fn run() -> vw_mcp_native::Result<()> {
             });
         }
     });
-    let mut pipes =
-        std::collections::BTreeMap::<String, (mpsc::SyncSender<Value>, Arc<AtomicBool>)>::new();
+    let mut pipes = std::collections::BTreeMap::<String, Agent>::new();
     let mut ready = false;
     let launched = Instant::now();
     let mut output = io::stdout();
-    let reap = |pipes: &mut std::collections::BTreeMap<
-        String,
-        (mpsc::SyncSender<Value>, Arc<AtomicBool>),
-    >,
+    let reap = |pipes: &mut std::collections::BTreeMap<String, Agent>,
                 sdk: &mut dyn Write,
                 out: &mut dyn Write|
      -> Result<()> {
         let retired: Vec<_> = pipes
             .iter()
-            .filter(|(_, (_, closed))| closed.load(Ordering::Acquire))
+            .filter(|(_, agent)| agent.closed.load(Ordering::Acquire))
             .map(|(id, _)| id.clone())
             .collect();
         for id in retired {
@@ -334,13 +358,13 @@ fn run() -> vw_mcp_native::Result<()> {
     };
     loop {
         reap(&mut pipes, &mut sdk_input, &mut output)?;
-        while let Ok((id, pid, sender, closed)) = connections.try_recv() {
+        while let Ok((id, pid, agent)) = connections.try_recv() {
             reap(&mut pipes, &mut sdk_input, &mut output)?;
-            if closed.load(Ordering::Acquire) {
+            if agent.closed.load(Ordering::Acquire) {
                 continue;
             }
             if pipes.len() >= 4 {
-                closed.store(true, Ordering::Release);
+                agent.closed.store(true, Ordering::Release);
                 continue;
             }
             write(&mut sdk_input, &json!({"kind":"pipe/open","connection":id}))?;
@@ -348,7 +372,7 @@ fn run() -> vw_mcp_native::Result<()> {
                 &mut output,
                 &json!({"kind":"agent/open","connection":id,"bridge_pid":pid}),
             )?;
-            pipes.insert(id, (sender, closed));
+            pipes.insert(id, agent);
         }
         let event = match receive.recv_timeout(Duration::from_millis(20)) {
             Ok(v) => v,
@@ -366,13 +390,13 @@ fn run() -> vw_mcp_native::Result<()> {
         // Accept notices are enqueued before a pipe worker can enqueue bytes.
         // Drain again after recv: the first initialize must never overtake open.
         reap(&mut pipes, &mut sdk_input, &mut output)?;
-        while let Ok((id, pid, sender, closed)) = connections.try_recv() {
+        while let Ok((id, pid, agent)) = connections.try_recv() {
             reap(&mut pipes, &mut sdk_input, &mut output)?;
-            if closed.load(Ordering::Acquire) {
+            if agent.closed.load(Ordering::Acquire) {
                 continue;
             }
             if pipes.len() >= 4 {
-                closed.store(true, Ordering::Release);
+                agent.closed.store(true, Ordering::Release);
                 continue;
             }
             write(&mut sdk_input, &json!({"kind":"pipe/open","connection":id}))?;
@@ -380,7 +404,7 @@ fn run() -> vw_mcp_native::Result<()> {
                 &mut output,
                 &json!({"kind":"agent/open","connection":id,"bridge_pid":pid}),
             )?;
-            pipes.insert(id, (sender, closed));
+            pipes.insert(id, agent);
         }
         match event["origin"].as_str() {
             Some("owner") => {
@@ -458,17 +482,29 @@ fn run() -> vw_mcp_native::Result<()> {
                         let Some(id) = m["connection"].as_str() else {
                             break;
                         };
-                        if let Some((send, closed)) = pipes.get(id)
-                            && send.try_send(m["message"].clone()).is_err()
-                        {
-                            closed.store(true, Ordering::Release);
+                        if let Some(agent) = pipes.get(id) {
+                            // Count before queueing: the pump subtracts only after
+                            // it has received and fully written the same line.
+                            let accepted = serde_json::to_vec(&m["message"])
+                                .ok()
+                                .filter(|bytes| bytes.len() <= WIRE_BYTES)
+                                .is_some_and(|mut bytes| {
+                                    bytes.push(b'\n');
+                                    let size = bytes.len();
+                                    agent.queued.fetch_add(size, Ordering::AcqRel) + size
+                                        <= OUTBOUND_BYTES
+                                        && agent.send.try_send(bytes).is_ok()
+                                });
+                            if !accepted {
+                                agent.closed.store(true, Ordering::Release);
+                            }
                         }
                     }
                     Some("pipe/close") => {
                         if let Some(id) = m["connection"].as_str()
-                            && let Some((_, closed)) = pipes.get(id)
+                            && let Some(agent) = pipes.get(id)
                         {
-                            closed.store(true, Ordering::Release);
+                            agent.closed.store(true, Ordering::Release);
                         }
                     }
                     Some("owner/request" | "owner/cancel" | "control/reply") => {
@@ -481,8 +517,8 @@ fn run() -> vw_mcp_native::Result<()> {
         }
     }
     stopped.store(true, Ordering::Release);
-    for (_, (_, closed)) in pipes {
-        closed.store(true, Ordering::Release);
+    for agent in pipes.into_values() {
+        agent.closed.store(true, Ordering::Release);
     }
     let _ = child.kill();
     let _ = child.wait();

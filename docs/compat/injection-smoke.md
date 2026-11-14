@@ -7,7 +7,7 @@ S23 physical work is owner-deferred.
 
 | Target | Local version/inventory | Pointer | Pressure | Tilt | Eraser | Evidence / next check |
 |---|---|---|---|---|---|---|
-| Native T0.05 harness | workspace 0.1.0; Windows 11 build 26200; DPI 168 (175%) | Partial: 472 native samples; eraser lifecycle differs | Yes: 65 ramp pairs, Pearson r = 1.000 | Yes: both axes -60 to +60 degrees | No for the tested combined INVERTED + ERASER flags; editor semantics untested | [T0.05 evidence](../evidence/T0.05.md); 469/472 coordinate/lifecycle matches; rotation and barrel matched; maximum normal contact interval 26.480 ms |
+| Native T0.05 harness | workspace 0.1.0; Windows 11 build 26200; DPI 168 (175%) | Partial: 472 native samples; eraser lifecycle differs | Yes: 65 ramp pairs, Pearson r = 1.000 | Yes: both axes -60 to +60 degrees | No for the tested combined INVERTED + ERASER flags; editor semantics untested | 469/472 coordinate/lifecycle matches; rotation and barrel matched; maximum normal contact interval 26.480 ms |
 | Paint | Microsoft.Paint 11.2605.81.0 | Not tested | Not tested | Not tested | Not tested | Installed Appx inventory; disposable canvas and brush selection needed |
 | Krita | Not found in HKCU/HKLM uninstall inventory | Not tested | Not tested | Not tested | Not tested | Owner approval before install; choose Windows 8+ Pointer Input |
 | GIMP | Not found in HKCU/HKLM uninstall inventory | Not tested | Not tested | Not tested | Not tested | Owner approval before install; record brush/input configuration |

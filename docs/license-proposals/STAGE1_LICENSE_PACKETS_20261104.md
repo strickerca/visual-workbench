@@ -1,6 +1,6 @@
 # License-review packets: B2 assisted selection, B3 WiX, B3 Android tunnel
 
-Prepared 2026-11-04. Repo: `C:\Users\stric\projects\Design Workbench\visual-workbench` (read only, nothing edited).
+Prepared 2026-11-04. Repo: `C:\Users\redacted\projects\Design Workbench\visual-workbench` (read only, nothing edited).
 Policy (BUILD_SPECIFICATION.md section 2.5 / D17): no GPL/AGPL/SSPL/non-commercial/unknown licenses in the app or anything linked into it. LGPL is allowed only on Windows, as dynamically linked, replaceable DLLs, and **never on Android**.
 Scope: a personal build that is not distributed. Most Apache/MIT/LGPL/MS-RL obligations apply only on *distribution*, and installing on your own PC or phone is generally not distribution. Each packet still lists the notices so the build is ready for distribution later.
 "Unverified" means I could not confirm it this session.
@@ -58,7 +58,7 @@ Nothing is legally required for a build that is never distributed. For distribut
 Apache-2.0 section 4(d) does not apply, because MobileSAM has no NOTICE file. The repo's candidate MobileSAM text is `docs/license-proposals/notices/assisted-selection/upstream/MobileSAM-f706ad9c-LICENSE`. It is not yet registered.
 
 ### Risks / unknowns
-- **Weights rights are implied, not stated.** This is the main legal gap the repo itself flags (ASSISTED_LICENSE_CLOSURE_20261019.md).
+- **Weights rights are implied, not stated.** This is the main legal gap the repo itself flags.
 - **Training data.** According to the MobileSAM paper (not re-checked here), MobileSAM was distilled on a subset of SA-1B, and SA-1B has its own research-only dataset license. Whether that restricts the derived weights is legally unsettled. The risk is low for personal use.
 - **GPL texts in the LiteRT aggregate notice.** `THIRD_PARTY_NOTICE.txt` (35,718 lines) contains about 35 GNU license headers: GPLv2 + Classpath exception, a "Google Runtime Environment" GPL text, and autoconf/bison exception texts. These look like build-environment notices. It is unverified whether any GPL/LGPL code is compiled into the arm64 `.so` files that ship. Because Android forbids LGPL, the repo's still-open per-native-component review must close this before release.
 - The real Android CPU/GPU execution, memory bound and APK census are unrun. Those are separate gates, not license gates.
@@ -68,7 +68,7 @@ Apache-2.0 section 4(d) does not apply, because MobileSAM has no NOTICE file. Th
 - **They can be reproduced on the laptop from public, pinned sources:**
   - `download_pinned_inputs.py` fetches the checkpoint (raw.githubusercontent.com at f706ad9c) and the source files.
   - The 71 wheels come from PyPI / download.pytorch.org with `--require-hashes` against `host-wheel-requirements.txt`.
-  - Then run `reference_parity.py`, `convert_mobile_sam.py` and `tflite_parity.py` under `offline_exec.py`, following `tools/assisted-selection/HOST_DELIVERY_20261019.md`.
+  - Then run `reference_parity.py`, `convert_mobile_sam.py` and `tflite_parity.py` under `offline_exec.py`.
 - **The catch:** the wheels are cp311 manylinux_2_17/2_27/2_28 **x86_64**, and `offline_exec.py` is a **Linux seccomp** launcher. Neither runs on native Windows Python.
 - **`wsl.exe -l -v` result (run read-only, exit 0):**
   ```
@@ -103,8 +103,8 @@ Apache-2.0 section 4(d) does not apply, because MobileSAM has no NOTICE file. Th
 **Local copies (observed read-only; neither has been admitted):**
 | Path | What it is |
 |---|---|
-| `C:\Users\stric\.gradle\compose-jb\wix311.zip` | **WiX 3.11.2, not 3.14.1.** `candle.exe` and `wix.dll` FileVersion 3.11.2.4516. 34,670,186 B, SHA-256 `2C1888D5D1DBA377FC7FA14444CF556963747FF9A0A289A3599CF09DA03B9E2E`, 220 entries. Do not use it for this profile. |
-| `C:\Users\stric\AppData\Local\tauri\WixTools314\` | **WiX 3.14.1.8722**, an extracted directory of 68 files including WixUIExtension, WixUtilExtension and others. `candle.exe` SHA-256 `A464676E2A2191D58E6CA643E89505BFB9628D3E721873A14994D3F4667987E5`; `light.exe` `8EE3D7FA5592511152A4D1FC605780EAE1B27AC7B41D75D518C958515DE39529`; `wix.dll` `A2C897A03F9F4795426EE058EA386A6891ACB9A8179B77060515A6BA6525E242`. The Tauri CLI downloaded it and its provenance is unverified. Compare it file by file with the official zip before reusing it. |
+| `C:\Users\redacted\.gradle\compose-jb\wix311.zip` | **WiX 3.11.2, not 3.14.1.** `candle.exe` and `wix.dll` FileVersion 3.11.2.4516. 34,670,186 B, SHA-256 `2C1888D5D1DBA377FC7FA14444CF556963747FF9A0A289A3599CF09DA03B9E2E`, 220 entries. Do not use it for this profile. |
+| `C:\Users\redacted\AppData\Local\tauri\WixTools314\` | **WiX 3.14.1.8722**, an extracted directory of 68 files including WixUIExtension, WixUtilExtension and others. `candle.exe` SHA-256 `A464676E2A2191D58E6CA643E89505BFB9628D3E721873A14994D3F4667987E5`; `light.exe` `8EE3D7FA5592511152A4D1FC605780EAE1B27AC7B41D75D518C958515DE39529`; `wix.dll` `A2C897A03F9F4795426EE058EA386A6891ACB9A8179B77060515A6BA6525E242`. The Tauri CLI downloaded it and its provenance is unverified. Compare it file by file with the official zip before reusing it. |
 
 Both copies contain the same `LICENSE.TXT` (SHA `4004370957CF…0000`), which states MS-RL.
 

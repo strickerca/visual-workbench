@@ -10,6 +10,7 @@ import com.visualworkbench.shared.RenderItem
 import com.visualworkbench.shared.Shape
 import com.visualworkbench.shared.Transform
 import com.visualworkbench.shared.Point
+import com.visualworkbench.shared.*
 
 /** Object selection uses the exact transformed image rectangle. Alpha does
  * not remove a Result's editable bounds; its pixel erasing is a mask action. */

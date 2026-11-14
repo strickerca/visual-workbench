@@ -49,4 +49,4 @@ Platform API references:
 - [DeviceIoControl](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-deviceiocontrol)
 
 Wire layout and malformed-response tests run without a driver. They do not prove
-the runtime behavior documented above. See docs/evidence/T0.08.md for what ran.
+the runtime behavior documented above.

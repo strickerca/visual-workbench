@@ -69,8 +69,10 @@ mod offline_review;
 pub use offline_review::*;
 mod workflow;
 pub use streaming_ffi::*;
+mod diagnostics;
 pub mod session;
 pub use camera::*;
+pub use diagnostics::{CoreDiagnosticEvent, CoreDiagnosticKind, CoreDiagnostics, core_diagnostics};
 pub use dto::*;
 pub use gesture::*;
 pub use instructions::*;
@@ -110,32 +112,38 @@ pub enum CoreError {
 }
 pub type Result<T> = std::result::Result<T, CoreError>;
 impl From<vw_model::ModelError> for CoreError {
-    fn from(_: vw_model::ModelError) -> Self {
+    fn from(error: vw_model::ModelError) -> Self {
+        diagnostics::failure("model", diagnostics::model_cause(&error));
         Self::Invalid
     }
 }
 impl From<std::io::Error> for CoreError {
-    fn from(_: std::io::Error) -> Self {
+    fn from(error: std::io::Error) -> Self {
+        diagnostics::failure("io", diagnostics::io_cause(&error));
         Self::Storage
     }
 }
 impl From<vw_ops::OpsError> for CoreError {
-    fn from(_: vw_ops::OpsError) -> Self {
+    fn from(error: vw_ops::OpsError) -> Self {
+        diagnostics::failure("operation", diagnostics::ops_cause(&error));
         Self::Invalid
     }
 }
 impl From<vw_geom::GeometryError> for CoreError {
     fn from(_: vw_geom::GeometryError) -> Self {
+        diagnostics::failure("geometry", "geometry rejected");
         Self::Invalid
     }
 }
 impl From<vw_store::StoreError> for CoreError {
-    fn from(_: vw_store::StoreError) -> Self {
+    fn from(error: vw_store::StoreError) -> Self {
+        diagnostics::failure("store", diagnostics::store_cause(&error));
         Self::Storage
     }
 }
 impl From<vw_ink::InkError> for CoreError {
-    fn from(_: vw_ink::InkError) -> Self {
+    fn from(error: vw_ink::InkError) -> Self {
+        diagnostics::failure("ink", diagnostics::ink_cause(&error));
         Self::Stroke
     }
 }

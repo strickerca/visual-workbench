@@ -57,17 +57,17 @@ fixed and retained in the evidence.
 
 No owner handwriting/circle/fast-line preference has been recorded, and no S23
 presentation-latency comparison or owner-recorded trace parity was performed.
-Google Ink Windows feasibility attempts are recorded in `docs/evidence/T0.10.md`.
+Four bounded Google Ink Windows build attempts did not produce a Windows core.
 The original two-of-three preference/latency/build rule is unchanged. D6 remains
 provisional; software integration, a Windows core build, or IN2019 timing alone
-cannot select either engine or pass PERF-001. See `docs/evidence/T1.04.md`.
+cannot select either engine or pass PERF-001.
 
 ## D7 — Transport
 - **Context:** adb forward/reverse carries TCP only (no UDP), so QUIC can't run over adb; USB tethering gives a real IP link but may take over the PC's internet route; the default path must not require developer mode (possible future product).
 - **Decision (provisional):** one framed protobuf protocol over two carriers: QUIC (quinn: reliable streams plus datagrams) on Wi-Fi or USB tethering, and a TCP multiplexer over adb as a developer/power option. Default order: USB tethering → Wi-Fi → adb. Route safety check on the PC.
 - **Spike (T0.06):** measure RTT, jitter and throughput for tethered QUIC, Wi-Fi QUIC and adb TCP on the real devices; reorder defaults if the numbers say so.
 - **Confidence:** 85% · **Status:** provisional (T0.06).
-- **2026-10-02 measurement checkpoint:** S23 Ultra SM-S918U / Android 16, adb TCP: 1,000 echoes per size; 64 B p50/p95/p99 9.703/40.273/64.194 ms, 4 KiB 8.016/32.896/74.416 ms, 1 MiB 70.394/133.265/222.764 ms; 256 MiB verified upload 32.41 MiB/s. No USB-tether interface was present; phone Wi-Fi was disabled. Physical recovery and Windows inbound firewall checks remain open. Preserve USB tethering → Wi-Fi → adb provisionally; one measured carrier cannot justify reordering. Echo RTT does not establish PERF-002. See docs/evidence/T0.06.md.
+- **2026-10-02 measurement checkpoint:** S23 Ultra SM-S918U / Android 16, adb TCP: 1,000 echoes per size; 64 B p50/p95/p99 9.703/40.273/64.194 ms, 4 KiB 8.016/32.896/74.416 ms, 1 MiB 70.394/133.265/222.764 ms; 256 MiB verified upload 32.41 MiB/s. No USB-tether interface was present; phone Wi-Fi was disabled. Physical recovery and Windows inbound firewall checks remain open. Preserve USB tethering → Wi-Fi → adb provisionally; one measured carrier cannot justify reordering. Echo RTT does not establish PERF-002.
 
 ## D8 — Pairing and trust
 - **Decision:** QR code with the PC certificate fingerprint and a 128-bit one-time secret; TLS 1.3 with mutual certificate pinning; secret proven by HMAC over the TLS exporter; revocable trust list kept at app level (never in projects); mDNS advertises only a random ID regenerated at each start. The 8-digit code fallback runs through a PAKE (SPAKE2 or CPace, bound to the TLS exporter; T1.06b picks a stable, permissively licensed crate and records why); codes are single-use, expire after 5 minutes, and pairing locks for 10 minutes after 5 failures.
@@ -105,7 +105,7 @@ remain unverified. The S23 advertises the QTI picture-order parameter but neithe
 FEATURE_LowLatency nor the QTI low-latency parameter. Record requests separately
 from supported/applied behavior and use explicit monotonic Surface timestamps.
 
-See docs/evidence/T0.07.md and T0.07-results.json. STREAM/PERF statuses and targets
+STREAM/PERF statuses and targets
 remain unchanged. D9's architecture is retained with these measured conditions;
 integrated performance and the G0 owner decision remain open.
 
@@ -135,9 +135,8 @@ Windows timeout guarantee.
 Editor compatibility and elevated-window behavior remain unmeasured. The native
 guard experiment observes only its two owned harness windows and cannot prove
 absence of input to every other desktop window. D10 remains provisional and G0
-remains open. See [T0.05 evidence](evidence/T0.05.md) and the
-[compatibility matrix](compat/injection-smoke.md) for source bindings, guard
-results, retained failures and untested clauses. No TUNNEL requirement is passed.
+remains open. See the [compatibility matrix](compat/injection-smoke.md) for the
+measured rows and untested clauses. No TUNNEL requirement is passed.
 
 ## D11 — Virtual monitor
 - **Decision (provisional):** fork SudoVDA, build it from source with the WDK from NuGet, sign it with a project-only self-signed code-signing certificate, and install the certificate into LocalMachine Root and TrustedPublisher. After signing, the private key moves offline (a password-protected `.pfx` on removable media) and is deleted from the certificate store. Control by IOCTL with a watchdog. Secure Boot and Memory Integrity stay on (Memory Integrity is verified on).
@@ -148,7 +147,7 @@ results, retained failures and untested clauses. No TUNNEL requirement is passed
 - **Consequences:** no EV certificate (about €330+/yr) until distribution; then Microsoft attestation signing is required.
 - **Confidence:** 80% · **Status:** provisional (T0.08).
 
-- **2026-10-02 D11 preparation checkpoint (T0.08):** SudoVDA source is pinned at `a4b09fa2aa731a964d0cb5d139cb1e6240e4da12`; eleven reviewed files are retained, while two EDID files remain withheld because their output licensing is unresolved. The source build gate refuses the incomplete vendor. MSVC 14.50.35717 lacks x64 Spectre libraries; all three 10.0.28000.2526 NuGet hashes match. Running HVCI is confirmed; a fresh Secure Boot read and restore-point enumeration were unavailable. Independent Rust probe code handles the exact ABI and shared-watchdog constraints, but no driver was built, signed, installed or accepted. D11 and fallback selection remain provisional; no security setting or requirement was relaxed. See `docs/evidence/T0.08.md` and the driver source review/rollback plan.
+- **2026-10-02 D11 preparation checkpoint (T0.08):** SudoVDA source is pinned at `a4b09fa2aa731a964d0cb5d139cb1e6240e4da12`; eleven reviewed files are retained, while two EDID files remain withheld because their output licensing is unresolved. The source build gate refuses the incomplete vendor. MSVC 14.50.35717 lacks x64 Spectre libraries; all three 10.0.28000.2526 NuGet hashes match. Running HVCI is confirmed; a fresh Secure Boot read and restore-point enumeration were unavailable. Independent Rust probe code handles the exact ABI and shared-watchdog constraints, but no driver was built, signed, installed or accepted. D11 and fallback selection remain provisional; no security setting or requirement was relaxed.
 
 ## D12 — Android screen on the PC
 - **Decision:** pinned scrcpy 4.1 (Apache-2.0) for live view and control (bundled client window or own client); markup captures use lossless `screencap` and the accessibility tree, never the video.
@@ -195,7 +194,6 @@ full-resolution HEIF work on the paired PC pending bounded mobile evidence.
 The existing 1.5 s preview, 6 s pyramid and 700 MB phone targets remain unchanged
 and unpassed; no performance relaxation or gate acceptance is implied. T3.08
 must test the real mixed-format pipeline, full app/GPU memory and viewport fill.
-See `docs/evidence/T0.09.md` and its raw text-only measurements/failure receipts.
 
 ## D16 — PDF and SVG
 - **Decision:** PDFium (bundled per platform, BSD/Apache) via pdfium-render on both devices; true redaction via object removal, rasterization of affected areas, full rewrite and qpdf (Apache-2.0) cleanup, run in the PC worker process; on the phone without the PC, a redacted PDF export rasterizes every page; resvg with a deny-all resource resolver and bundled fonts.
@@ -221,8 +219,8 @@ See `docs/evidence/T0.09.md` and its raw text-only measurements/failure receipts
 The T0.12 reconciliation recommends retaining all nine original targets. Component
 measurements expose engineering work; they do not establish replacement product
 targets. No target or requirement acceptance text is relaxed. G0 remains BLOCKED
-and this proposal is not owner approval. See [T0.12](evidence/T0.12.md) for the
-original methods, source-bound comparisons and remaining physical baselines.
+and this proposal is not owner approval. Measurement methods are in
+[PERF_METHODS.md](PERF_METHODS.md); the physical baselines are still to be taken.
 
 | Requirement | Target retained |
 |---|---|
@@ -374,3 +372,28 @@ collecting a baseline, not permission to relabel 30-second samples as 1 Hz data.
   assembly refuses an incomplete or stale bundle. The generated file lives in
   the release directory. The apps keep their curated `third_party/notices`
   resources.
+
+## D24 — Automatic checks, no retained receipts, and delivery by pull request — 2026-11-14
+
+- **Context:** main carried code that had been reviewed but never compiled,
+  every check ran by hand on one laptop, and process files outnumbered what the
+  product needed. The owner asked for the best, most organized repository and
+  product, with nothing kept that does not help build, test or run it.
+- **Decision:**
+  - Every push runs `.github/workflows/ci.yml`. A merge into main needs its
+    `ci-required` status green, plus the one independent review of the code
+    diff that `AGENTS.md` requires. A green check is not a device result.
+  - No evidence files, receipts, handoffs or archives are kept. Results are one
+    line in the commit message or the plan's task status. Everything removed on
+    2026-11-14 is still in the tree of commit `4795d30`.
+  - Cloud sessions deliver by pull request from their session branch.
+  - Known-vulnerable dependencies fail a scan on every push. Advisories with no
+    fixed release are listed in `deny.toml` with the reason they are tolerated.
+  - Effort levels for delegated work follow the table in `AGENTS.md`.
+- **Alternatives:** keep per-slice receipts and add checks on top (paperwork
+  keeps growing); checks only, with no review (nothing looks at design mistakes
+  the checks cannot see); an in-tree archive folder (still read and searched).
+- **Consequences:** hardware-dependent changes land switched off or
+  behaviour-preserving until run on the laptop or the S23. The Windows and
+  Kotlin jobs join `ci-required` once they are stable on hosted machines.
+- **Confidence:** 85% · **Status:** accepted (owner instruction).

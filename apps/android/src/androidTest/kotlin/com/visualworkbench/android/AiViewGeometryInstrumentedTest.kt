@@ -8,6 +8,7 @@ import com.visualworkbench.shared.Camera
 import com.visualworkbench.shared.Point
 import org.junit.Assert.*
 import org.junit.Test
+import com.visualworkbench.shared.*
 
 class AiViewGeometryInstrumentedTest {
     private val camera = Camera(Point(100.0, 80.0), 2.0, 0.25, 800.0, 600.0)

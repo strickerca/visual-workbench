@@ -11,8 +11,9 @@ There is no release signing; the APK keeps its existing development signer.
 Krita, T4.02, T4.05, T4.06, broader editors, full G4, and public signing or
 distribution are deferred.
 
-The active sequence is the 2026-11 completion roadmap in
-`docs/IMPLEMENTATION_PLAN.md` (Stages 0–5). The product sources are
+The active sequence is the roadmap at the top of `docs/IMPLEMENTATION_PLAN.md`.
+It has two tracks: the completion roadmap (Stages 0–5, what must be verified)
+and the improvement program (improvement stages 0–10). The product sources are
 `docs/BUILD_SPECIFICATION.md`, `docs/REQUIREMENTS.json` and that plan. Current
 owner instructions take precedence over all of them.
 
@@ -27,7 +28,7 @@ product. If it doesn't, don't make it. If it already exists, delete it.
   requirement in `docs/IMPLEMENTATION_PLAN.md` and the other docs.
 - **Results go in one line.** Record a test or device result as a short line in
   the commit message or the plan's status for that task (what ran, pass/fail,
-  device). Don't create a separate file for it.
+  device, and the effort level it ran at). Don't create a separate file for it.
 - **Dispose after use.** Build output, captures, screenshots, logs, device
   pulls and scratch folders are deleted as soon as they've served their purpose.
   Keep only what the next build or test step actually reads (for example, a
@@ -46,6 +47,16 @@ product. If it doesn't, don't make it. If it already exists, delete it.
 - Claude Code executes each slice locally on this Windows laptop on a
   `task/<task-id>-<slug>` branch. An independent Claude reviewer agent reviews
   the slice's diff before it merges into main. Review the code, not paperwork.
+  One review round per slice.
+- **Automatic checks (2026-11-14).** Every push runs `.github/workflows/ci.yml`.
+  Nothing merges into main unless its `ci-required` status is green on the head
+  commit. The same checks run by hand through `tools/ci/*.sh` on Linux and
+  through `build.ps1` on the laptop. A green check is not a device result.
+- **Cloud sessions** can't run `build.ps1`, Windows-only code or the phone. They
+  work on the branch the session assigns, run the `tools/ci` scripts, read the
+  Windows and Kotlin results from the automatic checks, and deliver by pull
+  request. Anything that needs the laptop, Paint or the S23 stays pending and is
+  said so.
 - Standing Git authorization (2026-10-01): commit validated task work, merge
   completed work into main, and push main to origin at each numbered phase
   conclusion, without asking for Git permission again. Never force-push or
@@ -60,13 +71,28 @@ product. If it doesn't, don't make it. If it already exists, delete it.
   confirmed.
 - After each slice, report the result, open verification limits, and the next
   planned task from the completion roadmap. Never change app or session
-  settings yourself.
+  settings yourself. The one exception is the effort level of delegated work,
+  which follows the table below without asking.
+
+## Effort levels (owner instruction, 2026-11-14)
+
+Effort switching is automatic. The main session never changes its own level;
+it sets the level of each agent it starts from this table and does not stop to
+ask at stage boundaries.
+
+| Work | Runs as | Effort |
+| --- | --- | --- |
+| Coordination and every other stage of either track | Main session | Its current level |
+| Improvement stages 5 (core engine), 6 (connect without typing) and 7 (pen path) | Delegated agent | `xhigh` |
+| Independent review of a slice's code diff | Fresh agent | `high` |
+| Anything | | Never `max` |
 
 ## Builds and devices
 
-- Start with `tools/doctor.ps1`. Build, check and run hardware smoke tests
-  through `build.ps1`. License checks run before builds; unknown or forbidden
-  licenses fail. Keep dependency pins and lockfiles current.
+- On the laptop, start with `tools/doctor.ps1`. Build, check and run hardware
+  smoke tests through `build.ps1`. License checks run before builds; unknown or
+  forbidden licenses fail. Keep dependency pins and lockfiles current, and keep
+  `tools/ci/pins.env` in step with them.
 - Run one heavy build at a time with at most two build workers, and keep at
   least 10.5 GB of disk free. If a build stalls, diagnose it before retrying.
 - Android device: select the S23 Ultra (SM-S918U) explicitly, with no fallback

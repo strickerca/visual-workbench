@@ -400,11 +400,20 @@ impl ProjectSession {
                 state
                     .events
                     .publish(ChangeKind::ExportStarted, info.clone());
+                let timer = crate::diagnostics::timer("export", "image");
                 let result =
                     crate::queries::export(state, options, &cancellation).and_then(|value| {
                         cancellation.check()?;
                         Ok(value)
                     });
+                drop(timer);
+                if let Ok(exported) = &result {
+                    crate::diagnostics::count(
+                        "export",
+                        "image bytes",
+                        u64::try_from(exported.bytes.len()).unwrap_or(u64::MAX),
+                    );
+                }
                 state.events.publish(
                     if result.is_ok() {
                         ChangeKind::ExportReady
@@ -427,6 +436,7 @@ pub async fn open_project(
     valid_path(&path)?;
     startup(move || {
         cancellation.check()?;
+        let _timer = crate::diagnostics::timer("project", "open");
         let permit = SessionPermit::acquire()?;
         let store = ProjectStore::open(Path::new(&path))?;
         let blobs = BlobStore::new(Path::new(&path))?;

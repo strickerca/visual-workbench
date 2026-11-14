@@ -130,4 +130,4 @@ are explicitly not ten-minute baseline evidence.
 - [Front-buffer renderer callbacks](https://developer.android.com/reference/kotlin/androidx/graphics/lowlatency/CanvasFrontBufferedRenderer.Callback)
 
 These APIs do not establish what the owner's S Pen actually delivers. That comes
-from the physical recordings and the capability table in `docs/evidence/T0.04.md`.
+from the physical recordings on the device.

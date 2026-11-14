@@ -121,7 +121,7 @@ the production API; loopback substitution is compiled only into unit tests.
   0.2.0 and JNI 0.22; the matching packaged component must pass the central
   license/lock/inventory gates before app use. No cert-logging, ffi-testing,
   aws-lc, native-tls or insecure features are selected.
-- Existing project pins reused: rustls0.23.45/ring, tokio1.53.1, bytes1.12.1,
+- Existing project pins reused: rustls0.23.46/ring, tokio1.53.3, bytes1.12.1,
   futures-util0.3.34 (existing lock), zeroize1.9.0, serde1.0.229,
   serde_json1.0.151 and thiserror2.0.21. Test-only pins are already used locally.
   Global manifest/lock and fetched-artifact hashes are owned by root integration;

@@ -8,47 +8,6 @@ description = "Generated build output and preserved input packages are not sourc
 paths = ['''(^|/)(target|build|build-hil|\.gradle|\.kotlin|\.local|\.git|\.claude/worktrees|fixtures-private|generated)/''']
 
 [[allowlists]]
-description = "Exact source SHA-256 entries whose Kotlin filenames contain Api; reviewed Phase 1 binding receipts"
-condition = "AND"
-# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
-targetRules = ["generic-api-key"]
-paths = ['''(^|/)docs/evidence/T1\.(07|08|10)[A-Za-z0-9.-]*\.json$''']
-regexTarget = "line"
-regexes = ['''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/(CoreApi|SessionApi|StreamingApi)\.kt": "[0-9a-f]{64}",?\s*$''']
-
-[[allowlists]]
-description = "Exact Phase 2 source hash pairs independently matched to their files; no general hash or key exemption"
-condition = "AND"
-# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
-targetRules = ["generic-api-key"]
-paths = ['''(^|/)docs/evidence/T2\.11-app-tests\.json$''']
-regexTarget = "line"
-regexes = [
-  '''^\s*"apps/android/src/main/kotlin/com/visualworkbench/android/editor/ProviderKeyDialog\.kt": "82b29061104563401d046b95105a2c0b4d4dc300cc78726ecb0a9c379cd776bd",?\s*$''',
-  '''^\s*"apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/ProviderCredentialsInstrumentedTest\.kt": "d02236e8618992d5233319c26608a1906baa88cb1ed572ab508e728e5731da37",?\s*$''',
-  '''^\s*"apps/shared/src/androidMain/kotlin/com/visualworkbench/shared/AndroidProviderKeyStore\.kt": "1f8764841dfaa87ec8c55aa65d50f81aa5e8974f76b9c94a70b755306b8e727d",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/AgentCaptureApi\.kt": "3948a8a6708e0a066992569fdb51f9f9ccb1cccf16f499782bf8963fdbcce16a",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/AiEditsApi\.kt": "7f7f93e1751ffcd6c83271e3581738acef50859a11ecf9691e008d175b33ed6d",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureDeliveryApi\.kt": "6ccba25754dc12462dcb365d0ebbd6833392871d0a5f7ee590c722d45d25e4ca",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureImportsApi\.kt": "0f3f1ef0f065530734110c715d09b67c37f368551271bc822196041dacb087b0",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CoreApi\.kt": "d5e9c2b251c4b8dddf8f8f23f9ba7e08f9e9052312ca44fc269fecb408c2ff7f",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/EraserApi\.kt": "f686a510ec0186e4a9ca75c091557ddb6cfc9688780ec0459b2ebde8c79f5ef6",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/FocusApi\.kt": "ee2cffb80b6159df04033a92228cb8f8d7045ddba16ef437e35ab36db057e903",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/InstructionsApi\.kt": "9276b961f4fc6aa5841817dbed8ece316bbcbde9835f7dd3b4c35e361cf893da",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/MaskApi\.kt": "896bf5fb43e2b1385cbd04fd73fbaedf4a9263e4b24371209e3c2b1164e839de",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/McpInboxApi\.kt": "b5198553566ff743e7063f969577561dce45771f7e6d34505cbc390c87c650de",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/OsImagesApi\.kt": "1c3d18048e7b59fcd042467f3ad93d22827bd48342e60855cbcfc4559cdfcdf7",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/PackagesApi\.kt": "acf4ffc18e2820e2f330e695dfc9a0fa9f3caa9224f12997e233af8ae478aef0",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SemanticUiApi\.kt": "051312acf7d25e1f7e08ccc6e994994cfeaaf70f4d089155f7b86f849311ad17",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SemanticsApi\.kt": "139da215cb7e055a7c79ff4eab090f591926c98390076650fc9b3f7589bdc56c",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionApi\.kt": "02d839ceea10f752747f5583e0f8cdc528b754628e53b285f53df0bcae94dfd8",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/StreamingApi\.kt": "07b0bccbc0bf3a493e968f579101dd2cc84dc0aebc2c6ae5227fa32a08f3669c",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/WorkflowApi\.kt": "92ae94685bc9594c863db9d81b62ce2dbd769544bf331f5b2d647635820c26ee",?\s*$''',
-  '''^\s*"core/crates/vw\-ai\-provider/src/secret\.rs": "c956539975120d546ab8f793deaf5161b61876c3456c5730bf842aa2f743535a",?\s*$''',
-  '''^\s*"third_party/notices/npm\-path\-key\-3\.1\.1\-license\.txt": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0",?\s*$''',
-]
-
-[[allowlists]]
 description = "Exact public nodejs/release-keys Git commit, independently verified on the publisher repository"
 condition = "AND"
 # dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
@@ -58,33 +17,14 @@ regexTarget = "line"
 regexes = ['''^\s*"release_keys_commit": "481637f813e912c4aa3622d7964ab426c97b8e8d",?\s*$''']
 
 [[rules]]
-id = "vw-evidence-ip-address"
-description = "Network addresses must be removed from evidence"
-path = '''(^|/)docs/evidence/'''
-regex = '''\b(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?:\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}\b'''
-
-[[rules]]
-id = "vw-evidence-mac-address"
-description = "Hardware addresses must be removed from evidence"
-path = '''(^|/)docs/evidence/'''
-regex = '''\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b'''
-
-[[rules]]
-id = "vw-evidence-device-serial"
-description = "An adb listing must never expose a hardware device serial"
-path = '''(^|/)docs/evidence/'''
-regex = '''(?m)^\s*[A-Za-z0-9_-]{6,}\s+(?:device|unauthorized|offline)(?:\s|$)'''
-
-[[rules]]
-id = "vw-evidence-user-profile"
-description = "User profile names must be removed from retained evidence"
-path = '''(^|/)docs/evidence/'''
-regex = '''(?:[A-Za-z]:[\\/]Users[\\/]|/(?:home|Users)/)[A-Za-z0-9._-]+'''
+id = "vw-repo-user-profile"
+description = "A real user profile name must not be committed anywhere in this public repository"
+regex = '''(?i)(?:[A-Za-z]:(?:\\{1,2}|/)Users(?:\\{1,2}|/)|/(?:home|Users)/)[A-Za-z0-9._-]+'''
 
 [[rules.allowlists]]
-description = "Only explicit redacted or synthetic user placeholders are allowed"
+description = "Only redacted, synthetic or well-known machine accounts are allowed"
 regexTarget = "match"
-regexes = ['''(?i)(?:[\\/])(?:redacted|synthetic-user|example-user)$''']
+regexes = ['''(?i)[\\/](?:redacted|synthetic-user|example-user|owner|other|public|default|runner|user|root|name|you|me)$''']
 
 [[rules]]
 id = "vw-mcp-token"
@@ -92,176 +32,11 @@ description = "Reserved token rule; the final format is defined in T2.09"
 regex = '''\bvw_mcp_[A-Za-z0-9_-]{32,}\b'''
 
 [[allowlists]]
-description = "Exact R126 source file SHA-256 entries; not credentials"
+description = "Exact reviewed lines in the licence-audit tool that pair file names with SHA-256 digests; not credentials"
 condition = "AND"
-# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
+paths = ['''(^|/)tools/assisted\-selection/license\-audit/audit\.py$''']
 targetRules = ["generic-api-key"]
-paths = ['''(^|/)docs/evidence/M4-KP-integration-build-r126\.json$''']
 regexTarget = "line"
 regexes = [
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/FocusApi\.kt": "ee2cffb80b6159df04033a92228cb8f8d7045ddba16ef437e35ab36db057e903",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditApi\.kt": "09d8e0972e9dd23a8e3d09044084cc0994f5d75d94af0319cd0cf0e506329fe3",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionApi\.kt": "c4c2c7625fcb546f636d6620009f58a00ecde851e89823e3d6861f6c92e67741",?\s*$''',
-]
-
-[[allowlists]]
-description = "Exact giant integration source SHA256 pairs verified against tracked source; no general credential exemption"
-condition = "AND"
-# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
-targetRules = ["generic-api-key"]
-paths = ['''(^|/)docs/evidence/GIANT_CALLER_INTEGRATION_20261018\.json$''']
-regexTarget = "line"
-regexes = [
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImagesApi\.kt": "07eacea34d19332bbaec31facc96f69250c36037fd6031d5bca7f471e154cf27",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionResourcesApi\.kt": "ded5b6811373b4b3f19b79bb9eaccb2b1cac8004e8fa8f42e120038f2a10c1b2",?\s*$''',
-]
-
-[[allowlists]]
-description = "Exact returned giant-provider source SHA256 pairs verified against its8d95427/573ddaf source; no general credential exemption"
-condition = "AND"
-# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
-targetRules = ["generic-api-key"]
-paths = ['''(^|/)core/crates/vw\-assets/giant\-provider\-accounting\-20261018\.json$''']
-regexTarget = "line"
-regexes = [
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/WorkflowApi\.kt": "92ae94685bc9594c863db9d81b62ce2dbd769544bf331f5b2d647635820c26ee",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImagesApi\.kt": "07eacea34d19332bbaec31facc96f69250c36037fd6031d5bca7f471e154cf27",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CoreApi\.kt": "ce4d637aa01689b60bc8f0789c5d9f752430be462676feb39e4e53201a22ee0d",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionResourcesApi\.kt": "ded5b6811373b4b3f19b79bb9eaccb2b1cac8004e8fa8f42e120038f2a10c1b2",?\s*$''',
-]
-
-[[allowlists]]
-description = "Exact reviewed evidence lines found by the 2026-11-03 Windows lint run: file-name keys bound to SHA-256 digests (some names contain Api/Key) and the observed Krita version 5.3.4.0; no general hash, key or version exemption"
-condition = "AND"
-# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
-targetRules = ["generic-api-key", "vw-evidence-ip-address"]
-paths = [
-  '''(^|/)docs/evidence/CLOUD_ROOT_INTEGRATION_20261020\.json$''',
-  '''(^|/)docs/evidence/GIANT_PUBLIC_INTAKE_20261018\.json$''',
-  '''(^|/)docs/evidence/GIANT_URI_OWNER_20261018\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-alpha\-helper\-check\-r35\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-app\-check\-r18\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-app\-check\-r19\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-app\-check\-r24\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-app\-check\-r28\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-app\-check\-r30\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-app\-check\-r43\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-app\-foundation\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-blank\-frame\-r28\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-blank\-frame\-r37\-alpha\-census\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-canvas\-helper\-check\-r46\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-catalog\-gradle\-compile\-failure\-r48\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-catalog\-krita\-helper\-check\-r16\-r49\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-common\-owner\-and\-canvas\-contracts\-r11\-r46\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-diagnostic\-grammar\-r28\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-directory\-lease\-correction\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-editor\-observations\-r18\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-editor\-probe\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-ffi\-check\-r20\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-ffi\-check\-r28\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-ffi\-check\-r4\-storage\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-ffi\-r37\-link\-and\-space\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-finite\-check\-r31\-lint\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-finite\-ffi\-check\-r33\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-finite\-helper\-check\-r33\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-frame\-check\-r1\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-frame\-check\-r2\-lint\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-frame\-r7\-color\-refusal\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-guard\-foundation\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-guard\-readiness\-r20\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-guard\-unattended\-r24\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-guard\-unattended\-r33\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-helper\-check\-paint\-r23\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-helper\-check\-r24\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-helper\-check\-r28\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-helper\-check\-r30\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-helper\-check\-r4\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-input\-controls\-jvm\-r61\-r62b\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-input\-controls\-jvm\-r66\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r13\-r49\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r17\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r18\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r20\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r23\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r24\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r28\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r35\-link\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r37\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r52\-r54c\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r61\-r62b\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r66\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r80\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-build\-r89\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-progress\-r1\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-progress\-r2\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-integration\-r61\-r62b\-aapt\-startup\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-krita\-compile\-failure\-r12\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-krita\-foreground\-refusal\-r18\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-krita\-owned\-root\-foreground\-refusal\-r19\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-krita\-r58d\-dot\-guard\-refusal\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-linker\-and\-parser\-r43\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-native\-measurements\-r8\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-normal\-catalog\-arguments\-r48\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-paint\-controls\-query\-r33\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-paint\-controls\-query\-r37\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-paint\-controls\-r23\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-paint\-helper\-check\-r37\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-paint\-r58q\-blank\-assertion\-refusal\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-render\-diagnostics\-r13\-r49\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-retained\-owner\-contracts\-r6\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-retained\-owner\-inputfree\-lifecycle\-r8\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-retained\-owner\-setup\-failures\-r6\-r7\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-retained\-progress\-r18\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-runtime\-ffi\-check\-r43\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-runtime\-helper\-check\-r43\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-software\-validation\-r92\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-startup\-r72\-junit\-contract\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-stream\-jvm\-r52\-r54c\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-stream\-r52\-r54c\-s23\-render\-validation\-refusal\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-stream\-r52\-r60\-s23\-render\-timeout\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-stream\-r61\-r62b\-reconnect\-timeout\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-stream\-r80\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-stream\-r89\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-usb\-render\-r20\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-usb\-render\-r23\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-usb\-render\-r24\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\-usb\-render\-r28\-failure\.json$''',
-  '''(^|/)docs/evidence/M4\-KP\.md$''',
-  '''(^|/)docs/evidence/NATIVE_PROJECT_CLOSE_20261019\.json$''',
-  '''(^|/)docs/evidence/OUTPUT_EXPORT_CONTRACT_20261019\.json$''',
-  '''(^|/)docs/evidence/PAINT_CONCRETE_NATIVE_INTEGRATION_20261019\.json$''',
-  '''(^|/)evidence/PAINT_RUNTIME_OBSERVATION_20261019\.json$''',
-  '''(^|/)tools/assisted\-selection/license\-audit/audit\.py$''',
-]
-regexTarget = "line"
-regexes = [
-  '''"fileVersion":\ "5\.3\.4\.0",''',
-  '''"file_version":\ "5\.3\.4\.0",''',
-  '''Krita\ \*\*5\.3\.4\.0\*\*\ yielded\ both\ bounded\ control\-candidate\ groups\ completely\.\ Its\ two''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureAndroidTunnelApi\.kt": "286482344b1edc7b34431a71bc79d98a8901d6234a2039a58295294a8a53a434",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/CaptureLocalApi\.kt": "3e304dfda2834c4b1470a5b22c05c564c55e2fcfd305b55e798eb4cd6467bce1",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/FocusApi\.kt": "ee2cffb80b6159df04033a92228cb8f8d7045ddba16ef437e35ab36db057e903",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImportsApi\.kt": "60c36508339c733ae044588050ccae35bb397a0502b9c1149ae5787c299f6d7f",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/GiantImportsApi\.kt": "fe265244e751a5d80b20470ab194ac130e8ccc530661e5cac05f9785f0d1d230",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/ImageOutputExportApi\.kt": "8a359cfb5891acab0e8dbe0e01bab4e6b5efa17eaeeaf967a69493325e36b8d8",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditApi\.kt": "26907317a6b5693716d71361b68453d6db1125df5256a35768a234614441cdff",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditApi\.kt": "a029a98131df0a2042d7496c41da56fb181fa0e0be7ab7d29da8846f97f24aa0",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/RemoteEditApi\.kt": "b890d1383eedc6f91a9bf46be0469b38302724b38b5649dfc905ce20fb2915de",?\s*$''',
-  '''^\s*"apps/shared/src/commonMain/kotlin/com/visualworkbench/shared/SessionApi\.kt": "c4c2c7625fcb546f636d6620009f58a00ecde851e89823e3d6861f6c92e67741",?\s*$''',
-  '''^\s*"apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCompatibilityRuntimeAccess\.kt": "20dd316fe82e83c2c811d4522dbc9ce0ee520396a175793dfb55b38f2928541c",?\s*$''',
-  '''^\s*"apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeCompatibilityRuntimeAccess\.kt": "e817204ee20a9be261f2feb0cf2a3c96bbc5133ab74d047cb09078b3cb47e6b7",?\s*$''',
-  '''^\s*"apps/shared/src/jvmMain/kotlin/com/visualworkbench/shared/NativeDrawingRuntimeAccess\.kt": "28985799615d9c7d254be84fc6dab138448e57fe16883f8217efaa335ef7da19",?\s*$''',
-  '''^\s*"core/crates/vw\-ffi/src/android_tunnel/api\.rs": "ce8ec023c98db5c46a39bac8a42e2add2c7c3da98316803d9a6940a3b8c24cd2",?\s*$''',
-  '''^\s*"core/crates/vw\-ffi/src/session/stream/publication_api\.rs": "c332d05f3f7c4943a42909b211ea47b785a96590e55247bfb713858ad6ad49cf",?\s*$''',
   '''^\s*"tokenizers\-0\.23\.3\.tar\.gz": "cded33237c77caeef62944d32aa9a7ef42bdce2b3497e18d137e072a8c4be438",?\s*$''',
-  '''bound\ and\ observed\ an\ owned\ native\ surface\ and\ Krita\ 5\.3\.4\.0\.\ Krita's\ complete''',
 ]
-
-[[allowlists]]
-description = "Exact WSL2 kernel version recorded in the B2 local reproduction host block (2026-11-04); a version string, not a network address; no general version exemption"
-condition = "AND"
-# dir mode skips whole files for path-only matching; targetRules forces per-finding AND.
-targetRules = ["vw-evidence-ip-address"]
-paths = ['''(^|/)docs/evidence/ASSISTED_MODEL_LOCAL_REPRODUCTION_20261104\.json$''']
-regexTarget = "line"
-regexes = ['''^\s*"kernel": "6\.6\.87\.2-microsoft-standard-WSL2",?\s*$''']

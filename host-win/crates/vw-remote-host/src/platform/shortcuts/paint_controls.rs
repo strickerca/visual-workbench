@@ -1119,6 +1119,8 @@ pub(crate) fn observe(target: &Target, budget: &SourceBudget) -> Result<Snapshot
             kind: 50032,
         },
     )?;
+    // SAFETY: read-only property getter on the owned root element obtained
+    // above on the caller's MTA; the HWND is returned by value.
     if q.call("Paint root HWND", || unsafe {
         root.CurrentNativeWindowHandle()
     })? != HWND(target.window as usize as *mut std::ffi::c_void)

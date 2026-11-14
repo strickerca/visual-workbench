@@ -334,6 +334,8 @@ pub fn run_isolated_android_document_job(
 ) -> JobResult<DocumentJobResult> {
     #[cfg(target_os = "android")]
     {
+        // SAFETY: matches bionic `uid_t getuid(void)`; uid_t is a 32-bit unsigned
+        // integer on every Android ABI and the function takes no arguments.
         unsafe extern "C" {
             fn getuid() -> u32;
         }

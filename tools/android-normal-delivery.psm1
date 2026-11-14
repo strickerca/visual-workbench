@@ -231,7 +231,8 @@ function Get-VwOwnBackupPlan {
     # The exact files and directories to delete when the directory holds only
     # what this module writes: its backup.json, the APK files that manifest
     # names and, after a failed readback, a readback directory with only
-    # base.apk. $null otherwise.
+    # base.apk. $null otherwise. The manifest is returned on its own, never in
+    # Files, because it is what marks the directory as owned and so goes last.
     param([Parameter(Mandatory = $true)][IO.DirectoryInfo]$Directory)
     if (-not (Test-VwPlainItem $Directory)) { return $null }
     $manifestItem = Get-Item -LiteralPath (Join-Path $Directory.FullName 'backup.json') -Force -ErrorAction SilentlyContinue
@@ -249,7 +250,8 @@ function Get-VwOwnBackupPlan {
         if (-not (Test-VwPlainItem $child)) { return $null }
         if (-not $child.PSIsContainer) {
             if (-not $expected.Contains($child.Name)) { return $null }
-            $files += $child.FullName; continue
+            if ($child.Name -cne 'backup.json') { $files += $child.FullName }
+            continue
         }
         if ($child.Name -cne 'readback') { return $null }
         foreach ($inner in @(Get-ChildItem -LiteralPath $child.FullName -Force)) {
@@ -258,7 +260,7 @@ function Get-VwOwnBackupPlan {
         }
         $directories += $child.FullName
     }
-    return [pscustomobject]@{ Files = $files; Directories = $directories; Written = $manifestItem.LastWriteTimeUtc }
+    return [pscustomobject]@{ Files = $files; Directories = $directories; Manifest = $manifestItem.FullName; Written = $manifestItem.LastWriteTimeUtc }
 }
 
 function Get-VwDeliveryRunOutcome {
@@ -293,12 +295,13 @@ function Remove-VwOldDeliveryBackups {
         try {
             # backup.json goes last, so a partial failure leaves a still-owned,
             # still-prunable directory. Every parent is re-checked per file.
-            $files = @(@($entry.Plan.Files) | Where-Object { [IO.Path]::GetFileName($_) -cne 'backup.json' }) + @(@($entry.Plan.Files) | Where-Object { [IO.Path]::GetFileName($_) -ceq 'backup.json' })
-            foreach ($path in $files) {
+            foreach ($path in @($entry.Plan.Files)) {
                 Assert-VwPlainPath $path
                 [IO.File]::Delete($path)
             }
             foreach ($path in @($entry.Plan.Directories)) { [IO.Directory]::Delete($path, $false) }
+            Assert-VwPlainPath $entry.Plan.Manifest
+            [IO.File]::Delete($entry.Plan.Manifest)
             [IO.Directory]::Delete($entry.Directory.FullName, $false)
             $removed++
         } catch { $skipped++ }

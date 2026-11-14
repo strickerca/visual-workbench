@@ -12,5 +12,14 @@ $module = Import-Module (Join-Path $PSScriptRoot '../android-device.psm1') -Pass
         catch { $rejected = $true }
         if (-not $rejected) { throw 'Unsafe device selection was not rejected' }
     }
-    Write-Host 'Device selection: PASS (authorized model with reserved peer; missing, duplicate, offline and emulator rejected). No adb commands executed.'
+    # No configured model: refuse before adb is located or run, even with one phone attached.
+    $oldModel = $env:VW_ANDROID_EXPECTED_MODEL; $env:VW_ANDROID_EXPECTED_MODEL = $null
+    $emptyRoot = Join-Path ([IO.Path]::GetTempPath()) ('vw-device-selection-' + [guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($emptyRoot)
+    try {
+        $message = ''
+        try { Get-VwAndroidDevice -Root $emptyRoot | Out-Null } catch { $message = $_.Exception.Message }
+        if ($message -notlike 'HIL requires an explicitly selected device model*') { throw 'Device selection without a model was not refused before adb' }
+    } finally { $env:VW_ANDROID_EXPECTED_MODEL = $oldModel; [IO.Directory]::Delete($emptyRoot, $false) }
+    Write-Host 'Device selection: PASS (authorized model with reserved peer; missing, duplicate, offline, emulator and unconfigured model rejected). No adb commands executed.'
 }

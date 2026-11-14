@@ -180,7 +180,7 @@ owner's Claude Code paste remain unverified. Those are T1.11 acceptance gaps.
 ## Dependency and platform sources
 
 UniFFI is the parent-approved exact `0.32.2` (MPL-2.0), with default features off.
-Existing exact `windows-sys 0.61.2`, `tokio 1.53.1` and `thiserror 2.0.21` pins are
+Existing exact `windows-sys 0.61.2`, `tokio 1.53.3` and `thiserror 2.0.21` pins are
 reused. T1.11 promotes the existing `png 0.18.1` test dependency to production for
 bounded lossless DIB normalization/row validation. It reuses approved exact
 `blake3 1.8.7` (std/pure), `serde 1.0.229`, `serde_json 1.0.151`, `fs2 0.4.3`, and

@@ -14,6 +14,7 @@ import java.io.OutputStream
 import javax.imageio.ImageIO
 import javax.imageio.stream.MemoryCacheImageOutputStream
 import java.util.concurrent.atomic.AtomicReference
+import com.visualworkbench.shared.*
 
 /** Only unpublished images may be abandoned explicitly. Once a frame is
  * published, Compose/Skia may still retain it after the controller replaces the

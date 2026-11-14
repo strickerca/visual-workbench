@@ -3,6 +3,9 @@ package com.visualworkbench.shared
 private const val MAX_DIAGNOSTIC_VALUE: Long = 9_007_199_254_740_991L
 private const val MAX_DIAGNOSTIC_EVENTS: Int = 256
 
+/** The most core events one report carries; older ones are counted, not listed. */
+public const val MAX_REPORTED_CORE_EVENTS: Int = 256
+
 public enum class DiagnosticPlatform { Android, Windows }
 
 /** Closed event codes. Do not add an arbitrary message, identifier or path field. */
@@ -56,9 +59,15 @@ public class PrivateDiagnosticLog(public val capacity: Int = 64) {
         lastElapsedMillis = elapsedMillis
     }
 
-    /** Freezes the exact preview/export payload; subsequent events cannot alter it. */
-    public fun prepare(platform: DiagnosticPlatform, metrics: DiagnosticMetrics): PreparedDiagnosticsReport =
-        PreparedDiagnosticsReport.create(platform, metrics, events.toList(), rotated)
+    /** Freezes the exact preview/export payload; subsequent events cannot alter it.
+     * With [core], the report also carries the core's failure reasons and stage
+     * timings (schema 2): fixed words and numbers only, the newest
+     * [MAX_REPORTED_CORE_EVENTS] at most. Without it the report is schema 1. */
+    public fun prepare(
+        platform: DiagnosticPlatform,
+        metrics: DiagnosticMetrics,
+        core: CoreEventLog? = null,
+    ): PreparedDiagnosticsReport = PreparedDiagnosticsReport.create(platform, metrics, events.toList(), rotated, core)
 }
 
 /** The immutable body shown in the preview is the body written by exporters.
@@ -68,6 +77,10 @@ public class PreparedDiagnosticsReport private constructor(
     public val jsonText: String,
     public val eventCount: Int,
     public val rotatedEventCount: Long,
+    /** Core events in the report; null when the report has no core section. */
+    public val coreEventCount: Int? = null,
+    /** Core events not in the report: discarded by the core or beyond the cap. */
+    public val coreDroppedCount: Long? = null,
 ) {
     internal companion object {
         internal fun create(
@@ -75,11 +88,15 @@ public class PreparedDiagnosticsReport private constructor(
             metrics: DiagnosticMetrics,
             events: List<PrivateDiagnosticEvent>,
             rotated: Long,
+            core: CoreEventLog? = null,
         ): PreparedDiagnosticsReport {
             require(events.size <= MAX_DIAGNOSTIC_EVENTS && rotated in 0L..MAX_DIAGNOSTIC_VALUE)
             require(events.zipWithNext().all { (before, after) -> before.elapsedMillis <= after.elapsedMillis })
+            val coreEvents = core?.events?.takeLast(MAX_REPORTED_CORE_EVENTS)
+            val coreDropped = core?.let { it.dropped + (it.events.size - coreEvents!!.size) }
+            require(coreDropped == null || coreDropped in 0L..MAX_DIAGNOSTIC_VALUE)
             val text = buildString {
-                append("{\"schema_version\":1,\"platform\":\"")
+                append("{\"schema_version\":").append(if (core == null) 1 else 2).append(",\"platform\":\"")
                 append(when (platform) { DiagnosticPlatform.Android -> "android"; DiagnosticPlatform.Windows -> "windows" })
                 append("\",\"metrics\":{")
                 append("\"startup_ms\":").append(metrics.startupMillis)
@@ -94,12 +111,26 @@ public class PreparedDiagnosticsReport private constructor(
                     append("{\"elapsed_ms\":").append(event.elapsedMillis)
                     append(",\"code\":\"").append(event.code.wireCode()).append("\"}")
                 }
-                append("]}\n")
+                append(']')
+                if (coreEvents != null) {
+                    append(",\"core_dropped\":").append(coreDropped).append(",\"core\":[")
+                    coreEvents.forEachIndexed { index, event ->
+                        if (index != 0) append(',')
+                        append("{\"seq\":").append(event.sequence)
+                        append(",\"elapsed_ms\":").append(event.elapsedMillis)
+                        append(",\"kind\":\"").append(event.kind.wireCode())
+                        append("\",\"area\":\"").append(event.area)
+                        append("\",\"name\":\"").append(event.name)
+                        append("\",\"value\":").append(event.value).append('}')
+                    }
+                    append(']')
+                }
+                append("}\n")
             }
-            check(diagnosticsPrivacyAudit(text, events.size, rotated)) {
+            check(diagnosticsPrivacyAudit(text, events.size, rotated, coreEvents?.size, coreDropped)) {
                 "Diagnostics report failed its privacy audit"
             }
-            return PreparedDiagnosticsReport(text, events.size, rotated)
+            return PreparedDiagnosticsReport(text, events.size, rotated, coreEvents?.size, coreDropped)
         }
     }
 }
@@ -114,4 +145,10 @@ private fun DiagnosticEventCode.wireCode(): String = when (this) {
     DiagnosticEventCode.ExportSucceeded -> "export_succeeded"
     DiagnosticEventCode.ExportFailed -> "export_failed"
     DiagnosticEventCode.ExportCancelled -> "export_cancelled"
+}
+
+private fun CoreEventKind.wireCode(): String = when (this) {
+    CoreEventKind.Failure -> "failure"
+    CoreEventKind.DurationMicros -> "duration_us"
+    CoreEventKind.Count -> "count"
 }

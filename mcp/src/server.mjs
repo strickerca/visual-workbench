@@ -1,6 +1,8 @@
 import { McpServer, ResourceTemplate, fromJsonSchema } from '@modelcontextprotocol/server';
 import { LIMITS, ID_PATTERN, Slots, boundedString, encoded, identifier, requireThat, safeCode } from './bounds.mjs';
 import { registerVerificationTools } from './verification.mjs';
+import { DESCRIPTIONS, SERVER_INSTRUCTIONS } from './descriptions.mjs';
+import { errorResult } from './errors.mjs';
 const id = { type: 'string', pattern: ID_PATTERN };
 const object = (properties, required = Object.keys(properties)) => fromJsonSchema({ type: 'object', properties, required, additionalProperties: false });
 const text = { type: 'string', maxLength: LIMITS.text };
@@ -10,15 +12,17 @@ export function factory({ packages, owner, grants, principal, slots = new Slots(
     const server = new McpServer({ name: 'visual-workbench', version: '0.1.0' }, {
       capabilities: { tools: {}, resources: {}, ...(channel ? { experimental: { 'claude/channel': {} } } : {}) },
       maxToolInputElements: 512,
+      instructions: SERVER_INSTRUCTIONS,
     });
     function tool(name, properties, required, action, readOnly = true) {
-      server.registerTool(name, { description: name.replaceAll('_', ' '), inputSchema: object(properties, required),
+      requireThat(typeof DESCRIPTIONS[name] === 'string', 'tool_description_missing');
+      server.registerTool(name, { description: DESCRIPTIONS[name], inputSchema: object(properties, required),
         annotations: { readOnlyHint: readOnly, destructiveHint: false, openWorldHint: false } }, async (args, context) => {
         try {
           return await slots.run(async () => {
             const result = await action(args, context.mcpReq?.signal); encoded(result); return result;
           });
-        } catch (error) { return { isError: true, content: [{ type: 'text', text: safeCode(error) }] }; }
+        } catch (error) { return errorResult(safeCode(error)); }
       });
     }
     registerVerificationTools(tool, { packages, owner, principal });
@@ -37,6 +41,10 @@ export function factory({ packages, owner, grants, principal, slots = new Slots(
       return { content: [{ type: 'text', text: 'Capture is ready in Visual Workbench.' }], structuredContent: packages.summary(entry) };
     }, false);
     tool('submit_result', { package_id: id, text, image: { type: 'string', maxLength: Math.ceil(LIMITS.result / 3) * 4 }, note: text }, ['package_id', 'note'], async (args, signal) => {
+      // A saved result is bound to an OS-authenticated bridge connection. The
+      // token-only HTTP principal has none, so say so instead of letting the
+      // owner refuse it without a reason. Only bridge connections carry `channel`.
+      requireThat(channel, 'bridge_connection_required');
       return packages.withChecked(args.package_id, undefined, signal, async entry => {
       requireThat((args.text === undefined) !== (args.image === undefined)); boundedString(args.note);
       if (args.text !== undefined) boundedString(args.text);

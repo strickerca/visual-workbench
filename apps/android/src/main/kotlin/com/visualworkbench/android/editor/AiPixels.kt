@@ -10,6 +10,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicReference
+import com.visualworkbench.shared.*
 
 /** Never recycle a published bitmap while Android's render thread may hold it. */
 internal class AiBitmap(val image: Bitmap) {

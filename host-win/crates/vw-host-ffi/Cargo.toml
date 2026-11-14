@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 vw-capture = { version = "=0.1.0", path = "../../../core/crates/vw-capture" }
 uniffi = { version = "=0.32.2", default-features = false }
 thiserror = "=2.0.21"
-tokio = { version = "=1.53.1", default-features = false, features = ["sync"] }
+tokio = { version = "=1.53.3", default-features = false, features = ["sync"] }
 vw-raster = { version = "=0.1.0", path = "../../../core/crates/vw-raster" }
 vw-model = { version = "=0.1.0", path = "../../../core/crates/vw-model" }
 png = "=0.18.1"
@@ -53,4 +53,4 @@ windows-sys = { version = "=0.61.2", features = [
 [dev-dependencies]
 moxcms = "=0.8.1"
 tempfile = "=3.27.0"
-tokio = { version = "=1.53.1", default-features = false, features = ["rt", "macros", "time"] }
+tokio = { version = "=1.53.3", default-features = false, features = ["rt", "macros", "time"] }

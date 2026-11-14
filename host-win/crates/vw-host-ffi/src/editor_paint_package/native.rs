@@ -297,6 +297,10 @@ fn snapshot(process: HANDLE, budget: &Budget<'_>) -> Result<PaintPackageEvidence
         return Err(PaintPackageError::Policy);
     }
     let full_units: Vec<u16> = full.encode_utf16().chain([0]).collect();
+    // SAFETY: full_units is a NUL-terminated UTF-16 copy of the verified full
+    // name and outlives every use of this closure. sized_string supplies an
+    // initialized count plus either null (size probe) or a buffer of exactly
+    // that many units.
     let path = |kind, stage| unsafe {
         sized_string(stage, budget, |count, out| {
             GetPackagePathByFullName2(full_units.as_ptr(), kind, count, out)

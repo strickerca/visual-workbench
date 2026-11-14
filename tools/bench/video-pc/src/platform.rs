@@ -59,6 +59,10 @@ impl Drop for Runtime {
     }
 }
 
+/// # Safety
+/// Window procedure for the class registered in `SourceWindow::new` only. It
+/// must be called by Windows message dispatch, so `hwnd` is a live window of
+/// that class and `lparam` is the payload Windows defines for `msg`.
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if msg == WM_GETMINMAXINFO {
         // SAFETY: Windows supplies a valid writable MINMAXINFO for this message.

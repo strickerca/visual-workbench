@@ -240,3 +240,53 @@ fn animated_brand_and_hdr_container_color_are_explicit_refusals() {
     bytes[at + 6..at + 8].copy_from_slice(&16_u16.to_be_bytes());
     assert_eq!(inspect(&bytes, BUDGET), Err(Error::Color));
 }
+
+/// Hostile-input robustness: a valid file with random bytes flipped, lengths
+/// overwritten, truncated or extended must always return, never panic, hang
+/// or admit more than the budget. Deterministic so a failure reproduces.
+#[test]
+fn mutated_containers_never_panic_and_always_return() {
+    let seed = ordinary();
+    let mut state = 0x9e37_79b9_7f4a_7c15u64;
+    let mut next = move || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state
+    };
+    let mut accepted = 0u32;
+    for round in 0..20_000u32 {
+        let mut bytes = seed.clone();
+        let edits = 1 + (next() % 4) as usize;
+        for _ in 0..edits {
+            let at = (next() as usize) % bytes.len();
+            match next() % 5 {
+                0 => bytes[at] ^= 1 << (next() % 8),
+                1 => bytes[at] = next() as u8,
+                // Overwrite a 32-bit big-endian field: sizes, counts and offsets live there.
+                2 if at + 4 <= bytes.len() => {
+                    let value = match next() % 4 {
+                        0 => 0u32,
+                        1 => u32::MAX,
+                        2 => (bytes.len() as u32).wrapping_add(next() as u32 % 9),
+                        _ => next() as u32,
+                    };
+                    bytes[at..at + 4].copy_from_slice(&value.to_be_bytes());
+                }
+                3 => bytes.truncate(at.max(1)),
+                _ => bytes.extend(std::iter::repeat_n(next() as u8, (next() % 64) as usize)),
+            }
+        }
+        let _ = is_avif(&bytes);
+        if inspect(&bytes, BUDGET).is_ok() {
+            accepted += 1;
+        }
+        // A tiny budget must refuse rather than allocate.
+        assert!(
+            inspect(&bytes, 1).is_err(),
+            "round {round} admitted with a 1-byte budget"
+        );
+    }
+    // Most mutations break the file; a few leave it valid. Both outcomes are fine.
+    assert!(accepted < 20_000);
+}

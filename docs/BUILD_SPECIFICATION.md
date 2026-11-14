@@ -30,13 +30,13 @@
 
 1. **Read order:** this spec → `DECISIONS.md` → the requirement IDs your task lists in `REQUIREMENTS.json` → your task in `IMPLEMENTATION_PLAN.md` → the relevant `contracts/` file.
 2. **Normative words:** MUST, MUST NOT, SHOULD, SHOULD NOT and MAY carry their RFC 2119 meanings.
-3. **IDs are permanent.** Never delete, renumber or reuse a requirement ID. Update `impl_status` and `verify_status` separately and link evidence.
+3. **IDs are permanent.** Never delete, renumber or reuse a requirement ID. Update `impl_status` and `verify_status` separately and record the result in one line.
 4. **Untested is not passed.** Code that compiles is not a working feature. Emulator or simulator results never count as hardware verification for pen, capture, injection, driver, codec or latency requirements.
-5. **No silent redefinition.** When a platform restriction or a failed spike invalidates an approach, record the evidence in `docs/evidence/`, propose an explicit alternative in `DECISIONS.md`, and keep the requirement. Never quietly turn pressure input into mouse events, independent zoom into screen duplication, original pixels into a video frame, a virtual display into a borderless window, or USB into a network toggle that doesn't exist.
+5. **No silent redefinition.** When a platform restriction or a failed spike invalidates an approach, record what was found and an explicit alternative in a dated `DECISIONS.md` entry, and keep the requirement. Never quietly turn pressure input into mouse events, independent zoom into screen duplication, original pixels into a video frame, a virtual display into a borderless window, or USB into a network toggle that doesn't exist.
 6. **No GPL or AGPL code** in the app or anything linked into it (D17). Reading GPL source for ideas is allowed; copying or transliterating it is not.
 7. **Ask the owner only** for decisions that are genuinely theirs or for physical actions: holding the pen, approving an admin prompt, installing a paid app, providing an API key, granting a permission on the phone.
 8. **Secrets stay out:** API keys, pairing secrets and signing keys never enter the repo, logs, packages, evidence files or screenshots.
-9. **Evidence for every task:** write `docs/evidence/<task-id>.md` with commands run, outputs, measured numbers, screenshots where useful, and an explicit list of what was *not* tested.
+9. **Results in one line:** record what ran, the measured numbers, the device and what was *not* tested as a short line in the commit message or the task's status in the plan. Keep no evidence files, receipts or screenshots (`AGENTS.md`).
 
 ---
 
@@ -326,7 +326,7 @@ Full records are in `DECISIONS.md`.
 
 **4.9.1 Coding agents (D14)**
 - **MCP tools:** `list_packages(limit, since)`, `get_package(id, target)` → images plus structured content, `get_marker(id, n)`, `get_semantic(id)`, `capture_window(selector)` (requires the agent_capture grant), `submit_result(package_id, image | text, note)` → shown in Compare (Phase 5). Resource: `vw://package/{id}`.
-- Supports MCP protocol versions 2025-11-25 and 2026-07-28 (stateless) over stdio (the bridge) and Streamable HTTP (127.0.0.1, `Origin` validated, bearer token from Credential Manager). Both versions are checked with the official MCP SDK test client or MCP Inspector, since the named clients may speak only one.
+- Supports MCP protocol versions 2025-11-25 and 2026-07-28 (stateless) over stdio (the bridge) and Streamable HTTP (127.0.0.1, `Origin` validated, bearer token from Credential Manager). Streamable HTTP is read-only (owner decision 2026-11-13): `capture_window` and `submit_result` require the stdio bridge, because a capture grant and a saved Compare result are each bound to an OS-authenticated bridge connection; over HTTP `submit_result` returns `bridge_connection_required`. Both versions are checked with the official MCP SDK test client or MCP Inspector, since the named clients may speak only one.
 - **Push to Claude Code:** the `vw-mcp` stdio bridge declares the channel capability and emits `notifications/claude/channel` with `content` (the package summary and folder path) and `meta` attributes. Channels are a research preview: the owner starts Claude Code with `claude --dangerously-load-development-channels server:<name>`, and on Team or Enterprise plans an admin must enable channels.
 - **Push to Codex:** App Server `turn/start` with a `localImage` input ({type, path}). The App Server is experimental; the adapter checks the installed version's generated schema at runtime and disables itself with a clear message when unsupported. (No other Codex push path is documented.)
 - **Fallbacks, always available:** copy the image (PNG), then copy the text, as two explicit steps; or drag the package folder or images.

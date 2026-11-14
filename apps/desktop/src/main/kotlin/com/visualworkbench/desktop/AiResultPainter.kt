@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.IntOffset
 import com.visualworkbench.shared.RenderItem
 import com.visualworkbench.shared.Shape
 import com.visualworkbench.shared.Transform
+import com.visualworkbench.shared.*
 
 /** Call inside the transparent document stack, before it is shown over the
  * white page. A full-opacity materialized Result REPLACES samples, including

@@ -2156,4 +2156,80 @@ mod tests {
         }
     }
     include!("format_stream_tests.rs");
+
+    fn mp4_box(tag: &[u8; 4], body: &[u8]) -> Vec<u8> {
+        let mut out = (8 + body.len() as u32).to_be_bytes().to_vec();
+        out.extend_from_slice(tag);
+        out.extend_from_slice(body);
+        out
+    }
+    fn mp4() -> Vec<u8> {
+        let mut bytes = mp4_box(b"ftyp", b"isom\0\0\x02\0isomiso2mp41");
+        bytes.extend(mp4_box(b"free", &[0; 8]));
+        bytes.extend(mp4_box(b"moov", &[1; 40]));
+        bytes.extend(mp4_box(b"mdat", &[2; 64]));
+        bytes
+    }
+    fn checked_mp4(file: &mut File, bytes: &[u8]) -> TransferResult<()> {
+        file.set_len(0).unwrap();
+        file.seek(SeekFrom::Start(0)).unwrap();
+        file.write_all(bytes).unwrap();
+        validate_mp4(file, bytes.len() as u64, &Cancellation::new())
+    }
+    /// Hostile-input robustness for the attached-video structure check: a valid
+    /// file with bytes flipped, box sizes overwritten, truncated or extended
+    /// must always return, never panic, hang or read past the end.
+    /// Deterministic so a failure reproduces.
+    #[test]
+    fn mutated_videos_never_panic_and_always_return() {
+        let root = temp();
+        let mut file = File::options()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(root.path().join("video"))
+            .unwrap();
+        let seed = mp4();
+        checked_mp4(&mut file, &seed).unwrap();
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        let (mut accepted, mut refused) = (0u32, 0u32);
+        for _ in 0..6_000u32 {
+            let mut bytes = seed.clone();
+            for _ in 0..1 + next() % 3 {
+                let at = (next() as usize) % bytes.len();
+                match next() % 5 {
+                    0 => bytes[at] ^= 1 << (next() % 8),
+                    1 => bytes[at] = next() as u8,
+                    // Box sizes are 32-bit big-endian; 0 and 1 have special meanings.
+                    2 if at + 4 <= bytes.len() => {
+                        let value = match next() % 5 {
+                            0 => 0u32,
+                            1 => 1,
+                            2 => u32::MAX,
+                            3 => (bytes.len() as u32).wrapping_add(next() as u32 % 9),
+                            _ => next() as u32 % 256,
+                        };
+                        bytes[at..at + 4].copy_from_slice(&value.to_be_bytes());
+                    }
+                    3 => bytes.truncate(at.max(1)),
+                    _ => bytes.extend(std::iter::repeat_n(next() as u8, (next() % 24) as usize)),
+                }
+            }
+            match checked_mp4(&mut file, &bytes) {
+                Ok(()) => accepted += 1,
+                Err(_) => refused += 1,
+            }
+        }
+        assert!(
+            refused > 1_500,
+            "many mutations should be refused: {refused}"
+        );
+        assert!(accepted > 0, "harmless mutations should still be accepted");
+    }
 }

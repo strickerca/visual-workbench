@@ -4,7 +4,7 @@ Private Rust tool, exact windows crate pin 0.62.2, MIT OR Apache-2.0.
 Build from the repository root through the license-gated entry point:
 
     powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1 build-core
-    target/debug/diag-win.exe --out docs/evidence/win-diagnostics.json
+    target/debug/diag-win.exe --out .local/win-diagnostics.json
 
 The process sets Per-Monitor-V2 awareness before any DPI/display/COM API.
 Monitor JSON reports physical bounds, effective DPI, scale, rotation, refresh
