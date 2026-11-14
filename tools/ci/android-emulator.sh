@@ -32,6 +32,9 @@ cargo build --locked -p vw-ffi -p vw-host-ffi --features vw-ffi/bindgen --lib --
 cargo ndk -t arm64-v8a -t x86_64 --platform 29 -o target/android-jni build --locked -p vw-ffi
 
 step "start emulator"
+# The tool that creates the emulator and the emulator itself must agree on where it lives.
+export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
+mkdir -p "$ANDROID_AVD_HOME"
 echo no | "$avdmanager" create avd --force -n vw-ci -k "$ANDROID_EMULATOR_IMAGE" -d pixel_6 >/dev/null
 "$ANDROID_HOME/emulator/emulator" -avd vw-ci -no-window -no-audio -no-boot-anim -no-snapshot \
   -gpu swiftshader_indirect -memory 4096 -cores 4 -camera-back none >"${TMPDIR:-/tmp}/vw-emulator.log" 2>&1 &
