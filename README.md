@@ -86,6 +86,11 @@ tools/ci/kotlin-linux.sh         # Kotlin tests, lint and licence check
 Every push runs these through `.github/workflows/ci.yml`, plus the Rust
 workspace on Windows. Nothing merges into `main` unless `ci-required` is green.
 
+Three more workflows run beside it: `emulator` runs the on-screen Android tests
+on a headless emulator (informational; no pen, software screen), `weekly-scan`
+checks the pinned libraries for newly published vulnerabilities, and
+`build-apps` builds a downloadable Android package on request.
+
 ## Repository map
 
 | Path | What it is |
