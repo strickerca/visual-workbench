@@ -1,0 +1,146 @@
+# Automatic checks for every push. The logic lives in tools/ci so the same
+# scripts run in cloud sessions and here. "ci-required" is the one status that
+# must be green before a merge; the other jobs join it as they prove stable.
+name: ci
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_BUILD_JOBS: "4"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+
+jobs:
+  policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - run: tools/ci/install-tools.sh gitleaks
+      - run: tools/ci/policy.sh
+
+  rust-lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: tools/ci/install-tools.sh deny
+      - run: tools/ci/rust-lint.sh
+
+  rust-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: tools/ci/rust-test.sh
+
+  python-node:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.21.0"
+      - run: tools/ci/python-node.sh
+
+  # Not yet part of ci-required: first runs on hosted machines decide that.
+  advisories:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: tools/ci/install-tools.sh deny
+      - run: cargo deny check advisories
+
+  kotlin-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper
+          key: kotlin-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'apps/**/*.lockfile', 'apps/gradle/wrapper/gradle-wrapper.properties') }}
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: tools/ci/install-tools.sh ndk android
+      - run: tools/ci/kotlin-linux.sh
+
+  rust-windows:
+    runs-on: windows-2025
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - run: rustup show active-toolchain; if ($LASTEXITCODE -ne 0) { rustup toolchain install }
+      - run: pwsh -NoProfile -File tools/ci/windows-rust.ps1
+
+  ci-required:
+    if: always()
+    needs: [policy, rust-lint, rust-test, python-node]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: All required checks passed
+        run: |
+          results='${{ join(needs.*.result, ' ') }}'
+          echo "required results: $results"
+          for result in $results; do
+            [ "$result" = "success" ] || { echo "a required check did not pass"; exit 1; }
+          done

@@ -1,6 +1,6 @@
 # License-review packets: B2 assisted selection, B3 WiX, B3 Android tunnel
 
-Prepared 2026-11-04. Repo: `C:\Users\stric\projects\Design Workbench\visual-workbench` (read only, nothing edited).
+Prepared 2026-11-04. Repo: `C:\Users\redacted\projects\Design Workbench\visual-workbench` (read only, nothing edited).
 Policy (BUILD_SPECIFICATION.md section 2.5 / D17): no GPL/AGPL/SSPL/non-commercial/unknown licenses in the app or anything linked into it. LGPL is allowed only on Windows, as dynamically linked, replaceable DLLs, and **never on Android**.
 Scope: a personal build that is not distributed. Most Apache/MIT/LGPL/MS-RL obligations apply only on *distribution*, and installing on your own PC or phone is generally not distribution. Each packet still lists the notices so the build is ready for distribution later.
 "Unverified" means I could not confirm it this session.
@@ -103,8 +103,8 @@ Apache-2.0 section 4(d) does not apply, because MobileSAM has no NOTICE file. Th
 **Local copies (observed read-only; neither has been admitted):**
 | Path | What it is |
 |---|---|
-| `C:\Users\stric\.gradle\compose-jb\wix311.zip` | **WiX 3.11.2, not 3.14.1.** `candle.exe` and `wix.dll` FileVersion 3.11.2.4516. 34,670,186 B, SHA-256 `2C1888D5D1DBA377FC7FA14444CF556963747FF9A0A289A3599CF09DA03B9E2E`, 220 entries. Do not use it for this profile. |
-| `C:\Users\stric\AppData\Local\tauri\WixTools314\` | **WiX 3.14.1.8722**, an extracted directory of 68 files including WixUIExtension, WixUtilExtension and others. `candle.exe` SHA-256 `A464676E2A2191D58E6CA643E89505BFB9628D3E721873A14994D3F4667987E5`; `light.exe` `8EE3D7FA5592511152A4D1FC605780EAE1B27AC7B41D75D518C958515DE39529`; `wix.dll` `A2C897A03F9F4795426EE058EA386A6891ACB9A8179B77060515A6BA6525E242`. The Tauri CLI downloaded it and its provenance is unverified. Compare it file by file with the official zip before reusing it. |
+| `C:\Users\redacted\.gradle\compose-jb\wix311.zip` | **WiX 3.11.2, not 3.14.1.** `candle.exe` and `wix.dll` FileVersion 3.11.2.4516. 34,670,186 B, SHA-256 `2C1888D5D1DBA377FC7FA14444CF556963747FF9A0A289A3599CF09DA03B9E2E`, 220 entries. Do not use it for this profile. |
+| `C:\Users\redacted\AppData\Local\tauri\WixTools314\` | **WiX 3.14.1.8722**, an extracted directory of 68 files including WixUIExtension, WixUtilExtension and others. `candle.exe` SHA-256 `A464676E2A2191D58E6CA643E89505BFB9628D3E721873A14994D3F4667987E5`; `light.exe` `8EE3D7FA5592511152A4D1FC605780EAE1B27AC7B41D75D518C958515DE39529`; `wix.dll` `A2C897A03F9F4795426EE058EA386A6891ACB9A8179B77060515A6BA6525E242`. The Tauri CLI downloaded it and its provenance is unverified. Compare it file by file with the official zip before reusing it. |
 
 Both copies contain the same `LICENSE.TXT` (SHA `4004370957CF…0000`), which states MS-RL.
 
