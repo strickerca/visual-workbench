@@ -1408,7 +1408,10 @@ fn validate_checkpoint_change(change: &Change) -> Result<(), OpsError> {
                     .bytes()
                     .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
         })
-        || (change.before.is_none() && change.after.is_none())
+        // An entity always has a value on one side. A property need not: a
+        // write that leaves an absent optional value absent is journaled as
+        // null before and after, and null reads back as no value at all.
+        || (address.path.is_empty() && change.before.is_none() && change.after.is_none())
     {
         return Err(OpsError::Invalid("checkpoint journal address"));
     }
