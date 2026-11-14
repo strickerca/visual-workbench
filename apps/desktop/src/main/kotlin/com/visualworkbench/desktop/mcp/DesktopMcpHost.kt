@@ -60,7 +60,10 @@ internal class DesktopMcpHost private constructor(private val process: Process, 
     private val ownerWork=McpOwnerWork(scope, { id, result ->
         send(if(result == null) mapOf("kind" to "owner/reply","id" to id,"ok" to false)
             else mapOf("kind" to "owner/reply","id" to id,"ok" to true,"result" to result))
-    }, ::shutdownAsync)
+    }, ::shutdownAsync, { id, reason ->
+        // A fixed allowlisted category only; the bridge maps anything else to owner_refused.
+        send(mapOf("kind" to "owner/reply","id" to id,"ok" to false,"code" to reason.code))
+    })
     private val closed=AtomicBoolean(false)
     private val stopped=CompletableDeferred<Unit>()
     private val ready=CompletableDeferred<Int>()

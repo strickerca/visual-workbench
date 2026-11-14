@@ -11,6 +11,9 @@ internal class McpOwnerWork(
     private val scope: CoroutineScope,
     private val reply: (String, Map<String, Any?>?) -> Unit,
     private val failedReply: () -> Unit,
+    /** Optional fixed-category negative receipt for an unavailable recapture
+     * source. Without it every refusal stays the generic negative reply. */
+    private val refused: ((String, McpRecaptureRefusal) -> Unit)? = null,
 ) {
     private val lock = Any()
     private val running = mutableMapOf<String, Job>()
@@ -22,18 +25,22 @@ internal class McpOwnerWork(
         require(!running.containsKey(id))
         if (running.size >= 4) return@synchronized false
         val result = AtomicReference<Map<String, Any?>?>(null)
+        val refusal = AtomicReference<McpRecaptureRefusal?>(null)
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 val value = action()
                 currentCoroutineContext().ensureActive()
                 result.set(value)
-            } catch (_: Exception) { /* Only a bounded negative receipt crosses IPC. */ }
+            } catch (error: McpRecaptureUnavailable) { refusal.set(error.reason) }
+            catch (_: Exception) { /* Only a bounded negative receipt crosses IPC. */ }
         }
         // Publish ownership before attaching the handler: an already-cancelled
         // parent may invoke it immediately. The body never owns these resources.
         running[id] = job
         job.invokeOnCompletion { cause ->
-            try { reply(id, if (cause == null) result.get() else null) }
+            val reason = refusal.get()
+            val coded = refused
+            try { if (cause == null && reason != null && coded != null) coded(id, reason) else reply(id, if (cause == null) result.get() else null) }
             catch (_: Exception) { failedReply() }
             finally { synchronized(lock) { check(running.remove(id) === job) } }
         }

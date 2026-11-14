@@ -104,7 +104,7 @@ public suspend fun verificationCoordinates(catalog:WorkbenchPackageCatalog,pair:
     selected_tests = original_coordinator_tests[:original_coordinator_tests.index('    @Test fun decoder')]
     selected_tests += original_coordinator_tests[original_coordinator_tests.index('    private suspend fun <T> drawCapture'):]
     coordinator_names = re.findall(r'@Test fun (\w+)\(', selected_tests)
-    assert len(coordinator_names) == 7
+    assert len(coordinator_names) == 17
     selected_tests = '\n'.join(line for line in selected_tests.splitlines() if not line.startswith('import org.junit.')).replace('@Test ', '')
     sources['CoordinatorSelectedTests.kt'] = selected_tests + helpers
     registration_tests = (tests / 'McpImageRegistrationTest.kt').read_text()
@@ -155,7 +155,7 @@ internal object DesktopMcpService {
         path.write_text(text)
         files.append(str(path))
     files += [str(shared / 'VerificationInteraction.kt'), str(jvm / 'PackageOwnership.kt')]
-    files += [str(production / name) for name in ('McpJson.kt','McpVerificationTargets.kt','McpMarkerAssessments.kt','McpSemanticMarkerAlignment.kt','McpImageRegistration.kt','McpNormalizedVerification.kt','McpVerificationWorkflow.kt','McpCaptureSourceRecovery.kt','DesktopMcpLifetime.kt','McpStartupProgress.kt')]
+    files += [str(production / name) for name in ('McpJson.kt','McpVerificationKinds.kt','McpVerificationTargets.kt','McpMarkerAssessments.kt','McpSemanticMarkerAlignment.kt','McpImageRegistration.kt','McpNormalizedVerification.kt','McpVerificationWorkflow.kt','McpCaptureSourceRecovery.kt','DesktopMcpLifetime.kt','McpStartupProgress.kt')]
     files += [str(tests / 'McpVerificationWorkflowProbe.kt')]
     output = scratch / 'classes'
     command = [str(java), '-Xmx384m', '-cp', str(lib / '*'), 'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler', '-no-stdlib', '-no-reflect', '-Werror', '-jvm-target', '21', '-classpath', classpath, '-d', str(output), *files]
