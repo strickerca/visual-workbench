@@ -7,6 +7,17 @@
 //! Run: cargo bench -p vw-ffi --bench commit
 //! Set VW_BENCH_STROKES to change the largest document (default 2000), and
 //! VW_BENCH_BUDGET_MS to fail when the median at the largest size exceeds it.
+//!
+//! Recommended regression check (a few seconds, no other tooling needed):
+//!
+//!   VW_BENCH_STROKES=2000 VW_BENCH_BUDGET_MS=10 \
+//!     cargo bench -p vw-ffi --bench commit --locked
+//!
+//! A commit costs about half a millisecond at every size up to 8,000 strokes
+//! on a four-core Linux container (0.5 ms at 2,000, 0.85 ms at 8,000). Ten
+//! milliseconds leaves room for a slow or busy machine, and still fails on
+//! any return to work that grows with the document: hashing the whole project
+//! once at 2,000 strokes already takes about 60 ms.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::{
     sync::Arc,
