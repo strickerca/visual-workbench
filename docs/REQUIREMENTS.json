@@ -96,6 +96,11 @@
       "evidence": [
         "T1.02 — shared canonical model and immutable asset metadata verified; blob-byte immutability/storage and real cross-device latency remain T1.03, T1.10 and T1.12."
       ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/golden_path.rs::pair_share_mark_sync_export_package_and_verify",
+        "core/crates/vw-store/tests/blobs_cache.rs::corruption_is_detected_and_original_is_never_overwritten",
+        "core/crates/vw-ops/tests/engine.rs::immutable_assets_reject_metadata_replacement_and_duplicate_metadata_is_a_noop"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -124,6 +129,11 @@
       "evidence": [
         "T1.01 — shared camera and transforms verified on Windows/S23; receiving camera invariance across 100 peer edits and explicit default-off follow/match remain T1.09, T1.10 and T1.12.",
         "T1.09 — Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open."
+      ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopStateTest.kt::remoteEditsAndViewUpdatesNeverChangeAnUnfollowedLocalCamera",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorSyncInstrumentedTest.kt::peerViewportRemainsIndependentUntilExplicitMatchOrFollow",
+        "core/crates/vw-store/tests/local_views.rs::twenty_four_documents_and_two_devices_reopen_with_exact_camera_bits_without_canonical_changes"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -155,6 +165,11 @@
       ],
       "evidence": [
         "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
+      ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorSyncInstrumentedTest.kt::nativeStrokeHandleStreamsRealBatchesOnlyAndFinishesAfterDurableCommit",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopCoherenceTest.kt::handlePreviewAndCommitShareIdentityAndCancelCommitsNothing",
+        "core/crates/vw-ffi/tests/lifecycle.rs::prediction_retry_cancel_and_malformed_batch_leave_history_unchanged"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -218,6 +233,11 @@
         "T1.02 — 500 seeded undo/redo sequences per platform and commit/cancel identities verified; actual app gestures and end-to-end cancellation remain T1.08b, T1.10 and T1.12.",
         "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
+      "verified_by": [
+        "core/crates/vw-ops/tests/engine.rs::five_hundred_random_sequences_undo_and_redo_identical_hashes",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/GestureInstrumentedTest.kt::canceledPenAndFingerTransitionCommitNothing",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorSurfaceInstrumentedTest.kt::everyDrawingToolPersistsAndCancellationCreatesNoObject"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -248,6 +268,11 @@
         "T1.02 — capture session/frame/geometry and semantic binding round-trip on both platforms; evidence only, capture storage/import/export metadata remain downstream.",
         "T1.05 — PNG iTXt and JPEG/WebP XMP include revision, original hash, dimensions/settings and supplied capture IDs; capture persistence/end-to-end and app integration remain open.",
         "T1.11 — Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
+      ],
+      "verified_by": [
+        "core/crates/vw-raster/tests/formats.rs::metadata_revision_hash_settings_and_capture_identity_in_every_format",
+        "core/crates/vw-model/tests/model_contract.rs::capture_info_round_trips_all_fields_without_integer_precision_loss",
+        "core/crates/vw-store/tests/database.rs::rich_document_projections_preserve_full_capture_identity_and_model_types"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -281,6 +306,11 @@
         "T1.06a — All 10,000 fault seeds converge and native recovery tests pass; app lifecycle/replication integration remains T1.10.",
         "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
+      "verified_by": [
+        "core/crates/vw-sim/tests/offline_rebase.rs::existing_authenticated_fault_simulation_still_converges_after_batch_recovery_change",
+        "core/crates/vw-sim/tests/offline_rebase.rs::five_thousand_exact_offline_transactions_rebase_across_interruption_and_lost_receipts",
+        "core/crates/vw-ops/tests/engine.rs::duplicate_ack_is_byte_identical_and_payload_reuse_is_rejected"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -309,6 +339,11 @@
       "evidence": [
         "T1.03 — atomic history/checkpoint persistence, schema-1 forward migration and exact last-committed recovery pass Windows/S23 checks after 1000/100 killed writers; integrated app-kill recovery remains A18/T1.12 acceptance."
       ],
+      "verified_by": [
+        "core/crates/vw-store/tests/crash_recovery.rs::random_process_kills_preserve_last_committed_state",
+        "core/crates/vw-store/tests/migrations.rs::version_two_upgrade_preserves_exact_history_local_data_and_linked_projection_rows",
+        "core/crates/vw-store/tests/migrations.rs::draft_migration_replays_history_preserves_hash_retries_labels_and_pending_queue"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -336,6 +371,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/document_controls.rs::twenty_independent_documents_share_original_bytes_and_reopen_with_distinct_titles",
+        "core/crates/vw-store/tests/local_views.rs::twenty_four_documents_and_two_devices_reopen_with_exact_camera_bits_without_canonical_changes",
+        "core/crates/vw-store/tests/local_views.rs::bookmarks_have_independent_names_and_cameras_and_local_edits_do_not_create_undo_history"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -366,6 +406,11 @@
       ],
       "evidence": [
         "T1.04 — Provisional pressure-driven geometry and synthetic cancellation pass on Windows/IN2019; physical palm/S Pen and app diagnostics remain for T1.08a/T1.12."
+      ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/GestureInstrumentedTest.kt::canceledPenAndFingerTransitionCommitNothing",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorCoreInstrumentedTest.kt::realCorePressureCurveStabilizationAndPredictionHaveDistinctSemantics",
+        "core/crates/vw-ink/tests/engine.rs::pressure_curve_is_monotonic_including_degenerate_endpoint_controls"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -399,6 +444,11 @@
         "T1.04 — Monotonic Bezier curves and stabilization are replay-tested; editable persisted settings and hover cursor remain for T1.08b/T1.12.",
         "T1.08b — Per-brush settings persist and native pressure/stabilization fixtures pass; physical hover behavior remains deferred."
       ],
+      "verified_by": [
+        "core/crates/vw-ink/tests/engine.rs::pressure_curve_is_monotonic_including_degenerate_endpoint_controls",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorCoreInstrumentedTest.kt::realCorePressureCurveStabilizationAndPredictionHaveDistinctSemantics",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorPreferencesInstrumentedTest.kt::perBrushSettingsRoundTripAndCorruptPreferencesUseSafeDefaults"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -428,6 +478,10 @@
       "evidence": [
         "T1.08a — IN2019 injected input tests pass for pen/finger routing and the saved finger-drawing option; physical owner/S23 acceptance remains pending."
       ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/GestureInstrumentedTest.kt::fingersNavigateAndPenNeverPansEvenWithPalmBesideIt",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/GestureInstrumentedTest.kt::longPressAndHoverDoNotStartDrawing"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -455,6 +509,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/PrecisionInstrumentedTest.kt::inspectionOnAndOffPreservesAllAcceptedSampleBits",
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/PrecisionPlacementTest.kt::nibAtEveryViewportCornerKeepsExactlySixteenPixelsOfClearance",
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PrecisionTest.kt::allViewportEdgesAvoidTheNibAndRemainContained"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -486,6 +545,11 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/precision.rs::closing_restores_the_exact_saved_matrix_at_every_scale_and_rotation",
+        "core/crates/vw-ffi/tests/precision.rs::the_focus_maps_to_inset_center_and_native_samples_return_to_document",
+        "core/crates/vw-geom/tests/precision_recovery.rs::exact_restore_across_supported_scales_rotations_and_magnifications"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -513,6 +577,11 @@
         "T1.01 — 10,000-case lens latch property suite per platform; math evidence only, product lens behavior remains T3.04.",
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-geom/tests/properties.rs::lens_stroke_snapshot_is_immutable",
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PrecisionTest.kt::insetSamplesStayLatchedAcrossMovedResizedToggledRequests",
+        "core/crates/vw-ffi/tests/precision.rs::outside_down_stays_bit_identical_after_crossing_inset_and_queued_open"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -538,6 +607,10 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PrecisionTest.kt::pixelGridIsRotatedDocumentEdgesAndHasBoundedWork",
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PrecisionTest.kt::insetSamplesStayLatchedAcrossMovedResizedToggledRequests"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -567,6 +640,11 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/precision.rs::two_hundred_midstroke_toggle_traces_have_one_unbroken_mapping",
+        "core/crates/vw-geom/tests/precision_recovery.rs::opening_during_base_contact_is_deferred_until_release",
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PrecisionTest.kt::clickQueuesUntilUpAndClosePreservesExactCameraObject"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -595,6 +673,10 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/AirActionRouterTest.kt::air_action_contract_scenarios",
+        "apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionKeysTest.kt::declared_key_contract_scenarios"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -622,6 +704,10 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionCallerTest.kt::remapped_and_explicit_disabled_slots_round_trip_by_stable_name",
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/AirActionRouterTest.kt::air_action_contract_scenarios"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -679,6 +765,10 @@
         "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/AirActionRouterTest.kt::air_action_contract_scenarios",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpCoordinatorTest.kt::publicationNeverSendsAndOnlyDisplayedPreviewMaySend"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -709,6 +799,10 @@
       "evidence": [
         "T0.04 — Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/PrecisionTest.kt::heldBarrelIsPeekOnlyAndNoHoverCapabilityNeedsNoSyntheticPoint",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/GestureInstrumentedTest.kt::longPressAndHoverDoNotStartDrawing"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -767,6 +861,10 @@
       ],
       "evidence": [
         "T1.08a — Generic capability/input, palm and cancellation fixtures pass in the actual IN2019 app; S23 hardware-specific behavior remains deferred."
+      ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/GestureInstrumentedTest.kt::genericProfilePreservesHistoricalRawPressureTiltButtonsAndCancel",
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/StylusTiltContractTest.kt::optionalHardwareAxesAndMissingCalibrationStayDistinctAcrossBinding"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -829,6 +927,11 @@
         "T0.04 — Probe recorder and bounded HIL replay implemented; physical OnePlus synthetic software checks are separate from S23 acceptance. At least 24 S23 owner traces, their replay, capability measurements and thermal session remain pending in T0.04. Public MotionEvent construction cannot reproduce nonzero actionButton; affected traces fail explicitly.",
         "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
+      "verified_by": [
+        "tools/pen-trace/probe-android/src/androidTest/java/com/visualworkbench/penprobe/ReplayTest.kt::recorderPreservesHistoryAndAllPointers",
+        "tools/pen-trace/probe-android/src/androidTest/java/com/visualworkbench/penprobe/ReplayTest.kt::replayAndMeasure",
+        "tools/tests/test_pen_traces.py::test_complete_owner_category_set"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -861,6 +964,11 @@
         "T1.08b — Editable tool/reopen and Android-versus-native text outline golden cases pass; cross-device UI acceptance remains pending.",
         "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorSurfaceInstrumentedTest.kt::everyDrawingToolPersistsAndCancellationCreatesNoObject",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorCoreInstrumentedTest.kt::bundledTextOutlinesHaveOneToOneAndroidAndExportPixelComparison",
+        "core/crates/vw-raster/tests/rendering.rs::all_annotation_kinds_render_and_keep_uncovered_16bit_samples_exact"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -891,6 +999,11 @@
         "T2.04 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-instructions/tests/workflow.rs::marker_numbers_follow_accepted_placement_and_keep_identity_and_pixel_conventions",
+        "core/crates/vw-instructions/tests/workflow.rs::deleting_middle_marker_renumbers_atomically_and_canonical_undo_restores_exact_state",
+        "core/crates/vw-instructions/tests/workflow.rs::one_global_instruction_and_no_duplicate_or_stranded_marker_links"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -917,6 +1030,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/document_controls.rs::layer_changes_are_immutable_retryable_undoable_and_persisted",
+        "core/crates/vw-ffi/tests/document_controls.rs::locked_layer_refuses_visibility_reorder_delete_and_group_member_edits_atomically",
+        "core/crates/vw-ffi/tests/document_controls.rs::nested_group_flags_move_and_ungroup_preserve_every_object_identity"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -949,6 +1067,11 @@
         "T1.09 — Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open.",
         "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorSurfaceInstrumentedTest.kt::textSelectionMoveResizeEraserUndoAndActivityRecreationUseRealCore",
+        "core/crates/vw-ffi/tests/lifecycle.rs::stroke_style_width_rebuilds_geometry_and_undo_restores_it",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopCoherenceTest.kt::handlePreviewAndCommitShareIdentityAndCancelCommitsNothing"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -976,6 +1099,11 @@
       "evidence": [
         "T2.01 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/eraser.rs::highlighter_split_keeps_alpha_outside_and_raw_samples_are_exactly_undoable",
+        "core/crates/vw-ffi/tests/masks.rs::subtractive_paint_erases_mask_only_and_undo_restores_its_exact_asset",
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/EraserInteractionTest.kt::objectCommitCarriesFullCasAndExactlyTheHitIds"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1006,6 +1134,11 @@
         "T2.01 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/masks.rs::rectangle_is_exact_document_coverage_and_one_durable_transaction",
+        "core/crates/vw-ffi/tests/masks.rs::lasso_matches_independent_axis_aligned_rectangle_answers",
+        "core/crates/vw-mask/tests/known_answers.rs::painted_dabs_capsules_and_opacity_are_applied_once"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -1034,6 +1167,11 @@
       "evidence": [
         "T2.01 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "core/crates/vw-mask/tests/known_answers.rs::every_math_operation_preserves_inputs_and_returns_a_new_version",
+        "core/crates/vw-mask/tests/properties.rs::disk_filters_equal_independent_per_pixel_references",
+        "core/crates/vw-mask/tests/properties.rs::mask_algebra_matches_scalar_values_and_retains_history"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1064,6 +1202,10 @@
         "T2.04 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-instructions/tests/export.rs::unlinked_regions_keep_roles_and_none_is_context_independent_of_color",
+        "core/crates/vw-instructions/tests/workflow.rs::every_entry_method_preserves_literal_text_and_role_updates_do_not_change_appearance"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -1089,6 +1231,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/image_frames.rs::draft_prepare_commit_retry_undo_disable_and_remove_preserve_originals_and_d_extent",
+        "core/crates/vw-ffi/tests/tone_controls.rs::draft_and_prepare_are_read_only_and_committed_preview_matches_undo_redo",
+        "core/crates/vw-raster/tests/rendering.rs::nondestructive_adjustment_preserves_alpha_original_and_identity"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1123,6 +1270,11 @@
         "T2.03 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-ai/tests/properties.rs::zero_feather_composite_is_exact_source_outside_and_full_result_inside",
+        "core/crates/vw-ai/tests/contracts.rs::malicious_full_frame_model_changes_cannot_escape_a_naively_checked_disk",
+        "core/crates/vw-mask/tests/properties.rs::feather_never_changes_pixels_outside_dilated_support"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -1151,6 +1303,11 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/object_rotation.rs::a_two_object_rotation_is_one_undoable_retryable_transaction_and_matches_independent_export_geometry",
+        "core/crates/vw-geom/tests/object_rotation.rs::snapping_uses_fifteen_degree_delta_and_can_be_released_without_accumulation",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/RotationEditorTest.kt::handleUpCommitsOneTransactionAndOrdinaryUndoRestoresItsOriginalTransform"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -1177,6 +1334,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/selection_shapes.rs::ellipse_has_exact_native_golden_and_undo_redo_reopens_without_touching_source",
+        "core/crates/vw-ffi/tests/selection_shapes.rs::polygon_subtraction_and_intersection_share_existing_mask_versions",
+        "core/crates/vw-mask/tests/shape_selection.rs::new_shapes_combine_with_the_same_coverage_math"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1205,6 +1367,10 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/AssistedSelectionInteractionTest.kt::acceptUsesExistingIdentityAndManualBrushAndMathTargetTheImportedVersion",
+        "core/crates/vw-ffi/tests/selection_import.rs::import_combines_with_exact_existing_version_using_existing_mask_math"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1235,6 +1401,11 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: empty production LiteRT catalog (B2); 100 ms."
       ],
+      "verified_by": [
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/AssistedSelectionInteractionTest.kt::promptsReuseOneEncoderAndOnlyLatestQueuedPromptSurvives",
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/AssistedSelectionInteractionTest.kt::settledUnsupportedGpuInitialisationFallsBackToAdmittedCpuExactlyOnce",
+        "tools/assisted-selection/license-audit/test_audit.py::test_unknown_license_is_not_admission"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -1262,6 +1433,10 @@
       "evidence": [
         "T2.06 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "core/crates/vw-capture/tests/png.rs::png_publication_preserves_exact_rgba_and_source_hash",
+        "core/crates/vw-ffi/tests/capture_delivery.rs::actual_existing_authenticated_link_delivers_a_new_original_without_project_replacement"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1294,6 +1469,11 @@
       "evidence": [
         "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
+      "verified_by": [
+        "core/crates/vw-stream/tests/freeze.rs::first_pen_freezes_displayed_frame_not_newer_decode_or_capture",
+        "core/crates/vw-stream/tests/freeze.rs::timeout_flags_degraded_without_discarding_draft_then_exact_lossless_can_swap",
+        "core/crates/vw-stream/tests/workflow_freshness.rs::freeze_uses_the_acknowledged_frame_and_swaps_only_its_verified_lossless_original"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -1319,6 +1499,10 @@
       ],
       "evidence": [
         "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+      ],
+      "verified_by": [
+        "core/crates/vw-stream/tests/freeze.rs::cancel_then_new_contact_refuses_old_lossless_reply_and_saved_document_is_not_discarded",
+        "core/crates/vw-ffi/src/session/stream/receiver_tests.rs::frozen_draft_refuses_remote_source_replacement_and_explicit_dispose_resumes_with_repair"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1346,6 +1530,9 @@
       "evidence": [
         "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
+      "verified_by": [
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/CaptureAnnotationSessionTest.kt::frameAgeUsesPeerMinusLocalClockOffsetAndNeverClaimsUnsynchronizedAge"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -1371,6 +1558,10 @@
       ],
       "evidence": [
         "M4-KP — recorded in the plan's task status"
+      ],
+      "verified_by": [
+        "core/crates/vw-stream/tests/freeze.rs::remote_edit_and_invalid_hover_contact_never_freeze",
+        "core/crates/vw-ffi/src/session/stream/receiver_tests.rs::remote_edit_never_requests_a_freeze"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1399,6 +1590,11 @@
         "T2.06 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-capture/tests/admission.rs::own_window_refuses_without_calling_capture",
+        "core/crates/vw-capture/tests/picker.rs::own_windows_and_zero_owner_cannot_enter_any_picker_source",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/capture/CapturePickerTest.kt::refusedCaptureExclusionShowsEditorAndDisablesCapture"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -1426,6 +1622,11 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-capture/tests/picker.rs::distinct_window_monitor_and_region_types_cannot_silently_broaden",
+        "core/crates/vw-capture/tests/picker.rs::region_uses_pixel_edges_and_refuses_cross_monitor_silent_clipping",
+        "core/crates/vw-stream/tests/consent.rs::incoming_request_never_grants_source_access_without_explicit_local_approval"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -1451,6 +1652,10 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: tunnel license admission (B3); device run."
+      ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopAndroidTunnelTest.kt::nativeFeedbackLoopRefusalIsReportedAsSuchAndNeverBypassed",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpPhoneVerificationTest.kt::windowFeedbackLoopIsReportedAndOtherGuardFailuresAreUnchanged"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1481,6 +1686,9 @@
       "evidence": [
         "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
+      "verified_by": [
+        "core/crates/vw-capture/tests/stream_producer.rs::actual_producer_packet_validates_with_capture_utc_and_no_local_network_authority"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -1507,6 +1715,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: COMPILED_APPROVED_CATALOG is None until B3."
+      ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopAndroidTunnelTest.kt::capturePinsDestinationBeforeAcquisitionAndKeepsPixelsNative",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopAndroidTunnelTest.kt::semanticAttachmentKeepsMeasuredTimingAndCapturePixelBounds",
+        "tools/android-tunnel/test_scrcpy_runtime.py::test_checked_in_inventory_and_unadmitted_notice_proposals_are_complete"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1536,6 +1749,9 @@
       "evidence": [
         "T2.09 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "core/crates/vw-ffi/src/session/stream/order_tests.rs::source_metadata_is_exact_and_does_not_imply_an_input_grant"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1569,6 +1785,11 @@
       "evidence": [
         "M4-KP — recorded in the plan's task status"
       ],
+      "verified_by": [
+        "tools/tests/test_pen_injection.py::test_constant_received_pressure_fails",
+        "tools/remote-edit/test_physical_gesture_reports.py::test_exact_physical_pressure_route_passes_with_correlation",
+        "apps/android/src/test/kotlin/com/visualworkbench/android/remote/RemoteInputGrantFenceTest.kt::only_fresh_explicit_input_binding_can_reopen_local_fence"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -1596,6 +1817,11 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: B3; device run."
       ],
+      "verified_by": [
+        "tools/android-tunnel/test_scrcpy_runtime.py::test_verified_archive_censuses_all_bytes_and_never_delivers_adb",
+        "host-win/crates/vw-remote-host/src/android_tunnel_root_tests.rs::matching_confirmation_consumes_the_exact_pending_challenge_once",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopAndroidTunnelTest.kt::onlyTheExactDisplayedConfirmationIsDispatchedOnce"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -1622,6 +1848,11 @@
       ],
       "evidence": [
         "M4-KP — recorded in the plan's task status"
+      ],
+      "verified_by": [
+        "host-win/crates/vw-remote-host/tests/guard_regressions.rs::every_retained_identity_and_geometry_change_latches_before_injection",
+        "host-win/crates/vw-remote-host/tests/guard_regressions.rs::foreground_and_actual_destination_occlusion_latch_independently",
+        "host-win/crates/vw-remote-host/tests/guard_regressions.rs::failed_os_snapshot_is_a_latched_revoke_not_an_implicit_new_grant"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1651,6 +1882,11 @@
       "evidence": [
         "T1.01 — exact integer F/H property suite passes at 100–300% DPI and negative/rotated origins on Windows/S23; physical Windows scaling/injection mapping remains T3.01 and negative-origin display hardware remains DISPLAY-003."
       ],
+      "verified_by": [
+        "core/crates/vw-geom/tests/properties.rs::capture_exact_physical_pixels",
+        "core/crates/vw-geom/tests/known_answers.rs::capture_rotation_edges_stale_revisions_and_overflow",
+        "core/crates/vw-capture/tests/picker.rs::physical_mapping_is_exact_and_dpi_is_only_metadata"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -1678,6 +1914,11 @@
       "evidence": [
         "M4-KP — recorded in the plan's task status"
       ],
+      "verified_by": [
+        "core/crates/vw-net/src/duplex_tests.rs::dropping_duplex_receiver_revokes_sender_and_discards_input_queue",
+        "core/crates/vw-sim/tests/offline_rebase.rs::existing_authenticated_fault_simulation_still_converges_after_batch_recovery_change",
+        "host-win/crates/vw-remote-host/tests/guard_regressions.rs::reconnect_cannot_reuse_latched_session_and_requires_new_guard"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -1704,6 +1945,9 @@
       ],
       "evidence": [
         "M4-KP — recorded in the plan's task status"
+      ],
+      "verified_by": [
+        "apps/android/src/test/kotlin/com/visualworkbench/android/airactions/AirActionCallerTest.kt::remote_mapping_has_no_local_undo_fallback_or_guessed_view_command"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1744,6 +1988,9 @@
         "T0.06 — Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
         "T1.06b — Native QR/code/discovery and IN2019 ADB QR pairing pass; app QR/discovery and physical route scenarios remain T1.10.",
         "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
+      ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/ConnectionAssistanceTest.kt::routeInspectionDoesNotApplyAndAResultOffersTheExactBoundInverse"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1806,6 +2053,11 @@
         "T1.06b — DPAPI, expiry/reuse/replay, code lockout and live revocation pass; Android Keystore and real-app flows remain T1.10.",
         "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/TrustStoreInstrumentedTest.kt::nativeLoopbackPairingAndRevocationPersistThroughKeystoreReopen",
+        "core/crates/vw-ffi/tests/sessions.rs::synchronized_projects_and_real_archive_exclude_generated_pairing_credentials",
+        "core/crates/vw-net/src/carrier_cancellation_tests.rs::revoked_peer_cannot_receive_a_frame_retained_across_cancellation"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -1832,6 +2084,11 @@
       "evidence": [
         "T0.06 — Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
         "T1.06a — Latest-only MEDIA and bounded queue tests pass; physical 2x-overload rendering on both carriers remains open."
+      ],
+      "verified_by": [
+        "core/crates/vw-net/src/duplex_tests.rs::blocked_quic_media_preserves_bidirectional_control_input_and_ops",
+        "core/crates/vw-net/src/duplex_tests.rs::blocked_tcp_write_does_not_block_opposite_direction_receive",
+        "core/crates/vw-net/src/capture_retention_tests.rs::latest_replacement_and_disconnect_retire_exactly_their_queued_owners"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1860,6 +2117,11 @@
       ],
       "evidence": [
         "T1.06a — Fresh-connection invalidation and durable resync tests pass; app carrier switching and hardware reconnect measurements remain open."
+      ],
+      "verified_by": [
+        "core/crates/vw-net/src/duplex_tests.rs::dropping_duplex_receiver_revokes_sender_and_discards_input_queue",
+        "core/crates/vw-net/src/capture_retention_tests.rs::latest_replacement_and_disconnect_retire_exactly_their_queued_owners",
+        "core/crates/vw-store/tests/database.rs::pending_queue_survives_restart_in_order_and_deletes_only_exact_acked_bytes"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2264,6 +2526,10 @@
         "T0.09 — recorded in the plan's task status",
         "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
+      "verified_by": [
+        "tools/tests/test_image_fixtures.py::test_same_size_substitution_rejected",
+        "tools/tests/test_image_fixtures.py::test_malformed_bytes_verified_without_decoding"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -2295,6 +2561,11 @@
         "T0.09 — recorded in the plan's task status",
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-assets/tests/tiles.rs::actual_200mp_dimensions_have_bounded_complete_odd_edge_pyramid",
+        "core/crates/vw-assets/tests/tiles.rs::viewport_selects_native_density_and_exact_single_ring",
+        "core/crates/vw-assets/tests/tiles.rs::live_cache_evicts_only_unleased_lru_and_failed_allocation_releases_reserve"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -2324,6 +2595,11 @@
       "evidence": [
         "T1.03 — RAM accounting/LRU defaults of 256/512 MiB, disk budgets, the exact decimal reserve formula, post-write space checks and original preservation pass Windows/S23 tests; app cache wiring, releasing RAM victims and the visible low-space state remain T1.08a/T1.10 and A10/A19/T1.12. GPU texture accounting belongs to FORMAT-002 in phase 3."
       ],
+      "verified_by": [
+        "core/crates/vw-store/tests/blobs_cache.rs::ram_defaults_are_bytes_and_named_usage_is_exact",
+        "core/crates/vw-store/tests/blobs_cache.rs::reserve_formula_has_exact_decimal_floor_slope_and_ceiling",
+        "core/crates/vw-store/tests/blobs_cache.rs::disk_lru_is_durable_and_eviction_preserves_originals_and_unknown_files"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -2351,6 +2627,10 @@
       ],
       "evidence": [
         "T1.05 — Native exports bind original hash/revision/dimensions and reject preview-only input; T1.11 app preflight/reporting remains open."
+      ],
+      "verified_by": [
+        "core/crates/vw-raster/tests/formats.rs::preview_missing_revision_bad_buffer_and_bounded_decode_fail",
+        "core/crates/vw-formats/tests/invariants.rs::preview_without_original_never_writes_an_export"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2380,6 +2660,11 @@
         "T1.05 — PNG8/16, JPEG and WebP native codec tests pass on Windows/IN2019, including exact PNG alpha/depth round trips; app integration remains T1.11.",
         "T1.11 — Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
+      "verified_by": [
+        "core/crates/vw-raster/tests/formats.rs::png_8_and_16_roundtrip_preserve_every_channel_including_transparent_rgb",
+        "core/crates/vw-raster/tests/formats.rs::lossless_webp_roundtrip_alpha_and_rgb",
+        "core/crates/vw-raster/tests/formats.rs::jpeg_and_lossy_webp_decode_at_exact_requested_dimensions"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -2406,6 +2691,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "core/crates/vw-pdf/tests/pdfium_worker.rs::verified_pdfium_worker_contract",
+        "core/crates/vw-pdf/tests/overlays.rs::compound_hole_and_highlighter_stay_one_paint_object",
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/DocumentControllerTest.kt::pageSwitchChangesPrivateViewWithoutInventingACanonicalRevision"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2435,6 +2725,11 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-svg/tests/static_svg.rs::scripts_events_foreign_content_and_animations_have_explicit_notices",
+        "core/crates/vw-svg/tests/static_svg.rs::all_image_resources_are_denied_including_data_urls_and_local_paths",
+        "core/crates/vw-svg/tests/static_svg.rs::compound_highlighter_is_one_fill_with_a_preserved_hole_and_exact_roundtrip"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -2463,6 +2758,9 @@
       "evidence": [
         "T2.06 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "core/crates/vw-codec-os/tests/admission.rs::primary_identity_and_original_hash_are_preserved"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2518,6 +2816,10 @@
       "evidence": [
         "T1.05 — Typed dimension, depth, alpha, profile and memory refusals pass native tests without scaling; T1.11 still owns user-visible alternatives and conversion choices."
       ],
+      "verified_by": [
+        "core/crates/vw-raster/tests/formats.rs::limits_preflight_before_allocations_and_never_silently_reduce",
+        "core/crates/vw-ffi/tests/streaming_ffi.rs::depth_and_alpha_reductions_require_explicit_export_choices"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -2543,6 +2845,11 @@
       ],
       "evidence": [
         "T1.05 — Native tests cover all eight orientations, exact retained ICC, explicit sRGB conversion and provenance, hostile ICC admission; OS capture/import integration remains T1.11 and later capture tasks."
+      ],
+      "verified_by": [
+        "core/crates/vw-raster/tests/formats.rs::all_eight_exif_orientations_move_pixels_into_document_space_once",
+        "core/crates/vw-raster/tests/formats.rs::clean_rgb_icc_is_preserved_in_png_jpeg_and_webp",
+        "core/crates/vw-raster/tests/formats.rs::ai_color_conversion_requires_explicit_untagged_assumption_and_records_profile"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2597,6 +2904,11 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/ordinary_formats.rs::ordinary_memory_bmp_intake_preserves_immutable_encoded_original_and_profile",
+        "core/crates/vw-ffi/tests/ordinary_formats.rs::ordinary_memory_tiff16_export_keeps_samples_profile_and_revision",
+        "core/crates/vw-ffi/tests/ordinary_formats.rs::multipage_tiff_memory_notice_precedes_display_consent_and_keeps_original_pages"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -2624,6 +2936,10 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/ordinary_formats.rs::admitted_avif_reports_missing_codec_before_any_project_is_published",
+        "core/crates/vw-avif-os/tests/admission.rs::source_and_exact_color_declaration_survive"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -2650,6 +2966,10 @@
       "evidence": [
         "T1.05 — Clean PNG full/region samples, including hidden RGB and alpha, are exact in native Windows/IN2019 tests; T1.11 still owns app handoff and UI-free output integration."
       ],
+      "verified_by": [
+        "core/crates/vw-raster/tests/formats.rs::clean_region_is_exact_source_samples_without_scale",
+        "core/crates/vw-raster/tests/streaming.rs::clean_stream_matches_samples_and_bytes_for_every_strip_height"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -2675,6 +2995,11 @@
       ],
       "evidence": [
         "T1.05 — Visible annotations render at source resolution with nine byte-exact PNG/layout goldens on Windows/IN2019; app export wiring and full scenario coverage remain T1.11/T1.12."
+      ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/golden_path.rs::pair_share_mark_sync_export_package_and_verify",
+        "core/crates/vw-raster/tests/goldens.rs::committed_png_and_layout_manifest_matches_byte_for_byte",
+        "core/crates/vw-raster/tests/streaming.rs::marked_strips_equal_whole_render_including_transforms_and_region"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2703,6 +3028,11 @@
       "evidence": [
         "T2.01 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/masks.rs::mask_export_is_exact_gray_png_and_never_overwrites_a_destination",
+        "core/crates/vw-ffi/tests/masks.rs::cutout_preserves_sixteen_bit_hidden_rgb_and_multiplies_alpha_once",
+        "core/crates/vw-mask/tests/known_answers.rs::cutouts_preserve_original_rgb_depth_and_partial_alpha"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2734,6 +3064,10 @@
         "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-package/tests/workflow.rs::point_at_source_corner_gets_minimum_crop_without_negative_coordinates",
+        "core/crates/vw-package/tests/workflow.rs::deterministic_files_and_uniform_coordinates_bind_full_revision"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -2761,6 +3095,10 @@
         "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopTransferTest.kt::explicitPasteAloneReadsTheInjectedClipboard",
+        "host-win/crates/vw-host-ffi/src/handoff_tests.rs::paste_is_explicit_read_only_and_bad_preferred_png_does_not_fall_back"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -2787,6 +3125,11 @@
       ],
       "evidence": [
         "T1.11 — Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
+      ],
+      "verified_by": [
+        "host-win/crates/vw-host-ffi/src/handoff_tests.rs::dual_copy_retains_export_binding_and_exact_png_while_dib_roundtrips_alpha",
+        "host-win/crates/vw-host-ffi/src/handoff_tests.rs::drag_files_are_exact_bound_leased_and_never_use_clipboard",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/MediaHandoffInstrumentedTest.kt::pngShareContainsOnlyImageAndTemporaryReadGrant"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2844,6 +3187,11 @@
         "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-instructions/tests/export.rs::literal_instruction_export_is_repeatable_and_captured_injection_stays_quoted",
+        "core/crates/vw-instructions/tests/export.rs::mismatched_role_duplicate_links_and_wrong_revision_are_refused",
+        "core/crates/vw-ffi/tests/golden_path.rs::pair_share_mark_sync_export_package_and_verify"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -2871,6 +3219,9 @@
       "evidence": [
         "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpCoordinatorTest.kt::publicationNeverSendsAndOnlyDisplayedPreviewMaySend"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2932,6 +3283,11 @@
         "T2.03 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-ai/tests/contracts.rs::partial_accept_keeps_all_zero_selection_pixels_exact_and_supports_empty",
+        "core/crates/vw-ai/tests/contracts.rs::compare_views_use_source_result_and_make_alpha_differences_visible",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/AiEditorOwnershipTest.kt::partialAcceptanceHasOneUpAndCancelledOrMovedViewHasNone"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -2957,6 +3313,9 @@
       ],
       "evidence": [
         "T1.09 — Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open."
+      ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopStateTest.kt::allWindowModesPersistTheirWindowedBounds"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3010,6 +3369,9 @@
       "evidence": [
         "T1.08b — Declared theme text-pair contrast passes; all rendered controls and reduced-motion acceptance remain pending."
       ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorCoreInstrumentedTest.kt::bothThemesMeetAaForAllDeclaredTextPairs"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -3036,6 +3398,9 @@
       "evidence": [
         "T1.08b — Exercised project actions pass 48 dp assertions; all PC shortcuts and whole-product touch-target acceptance remain pending.",
         "T1.09 — Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open."
+      ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/TouchTargetsInstrumentedTest.kt::projectActionsExposeAtLeastFortyEightDpTouchTargetsInBothThemes"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3065,6 +3430,9 @@
         "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open.",
         "T1.11 — Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopSessionsTest.kt::carrierOrderingAndStatusWordsHaveNoImplicitEndpoint"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -3090,6 +3458,11 @@
       ],
       "evidence": [
         "T1.08a — Injected gesture and generic surface cases pass; full physical gesture/layout acceptance remains pending."
+      ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/GestureInstrumentedTest.kt::multiFingerTapsRouteUndoRedoAndPinchIsNotAnUndo",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/GestureInstrumentedTest.kt::fingersNavigateAndPenNeverPansEvenWithPalmBesideIt",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/GestureInstrumentedTest.kt::longPressAndHoverDoNotStartDrawing"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3120,6 +3493,10 @@
         "T2.04 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/InstructionFocusControllerTest.kt::peerFieldOpensWithoutEchoOrAnyCanonicalEdit",
+        "core/crates/vw-instructions/tests/entry_focus.rs::focus_is_bound_to_peer_epoch_sequence_revision_and_late_ui_ticket"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -3148,6 +3525,11 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-svg/tests/hostile.rs::gzip_bomb_is_refused_before_any_inflate",
+        "core/crates/vw-raster/tests/formats.rs::hostile_headers_truncation_and_mutations_respect_decode_limits",
+        "host-win/crates/vw-document-win/tests/windows_worker.rs::hanging_and_noisy_workers_are_refused_and_owned_resources_join_before_return"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -3175,6 +3557,11 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-pdf/tests/pc_redaction_worker.rs::pc_copy_removes_covered_text_preserves_unaffected_polygons_and_qpdf_verifies_every_resource",
+        "core/crates/vw-pdf/tests/raster_redaction_worker.rs::phone_copy_reconstructs_every_page_and_verifies_no_text_or_original_resources",
+        "host-win/crates/vw-document-win/tests/admission.rs::successful_normal_copy_can_never_claim_redaction"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "v1-accepted",
@@ -3200,6 +3587,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/DiagnosticsPrivacyAuditTest.kt::syntheticIdentityCredentialAndPathStringsNeverFitKnownValuePositions",
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/DiagnosticsBundleTest.kt::reportHasOnlyClosedSchemaStringsAndTypedMetrics",
+        "tools/tests/test_diagnostics.py::test_raw_input_identifiers_are_omitted"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3286,6 +3678,10 @@
         "T0.03 — Dated PC/IN2019 hardware facts and explicit untestable S23 states; all remaining hardware-dependent requirements still require named-device/OS/app evidence in their owning phases.",
         "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
+      "verified_by": [
+        "tools/ffi-test/test_shared_reports.py::test_zero_unrelated_or_missing_required_test_never_passes",
+        "tools/tests/test_pen_traces.py::test_synthetic_cannot_satisfy_acceptance"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "v1-accepted",
@@ -3313,6 +3709,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: partial source; present: TOOLCHAIN/SHA256SUMS/notices assembly and MSI hook; missing: reproducibility comparison tool, generated notices (LIC-003), WiX/jpackage admission and Windows run (T5.06)."
+      ],
+      "verified_by": [
+        "tools/release/test_assemble.py::test_assembly_hashes_inventory_and_preserves_originals",
+        "tools/release/test_generate_notices.py::test_toolchains_must_be_the_pinned_versions",
+        "tools/release/test_assemble.py::test_generated_notices_are_required_and_bound"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3372,6 +3773,11 @@
         "T2.04 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-instructions/tests/entry_focus.rs::focus_is_bound_to_peer_epoch_sequence_revision_and_late_ui_ticket",
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/InstructionFocusControllerTest.kt::peerFieldOpensWithoutEchoOrAnyCanonicalEdit",
+        "core/crates/vw-instructions/tests/entry_focus.rs::focused_field_callbacks_keep_all_four_explicit_entry_methods"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "explicit",
@@ -3398,6 +3804,11 @@
       "evidence": [
         "T2.04 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/instructions/InstructionEntryInstrumentedTest.kt::nativeTextInputPreservesLiteralBoundsAndExplicitEntryMode",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/instructions/InstructionRoundTripInstrumentedTest.kt::markerInstructionRoleEntryUndoAndReopenRetainCanonicalIdentity",
+        "core/crates/vw-instructions/tests/workflow.rs::every_entry_method_preserves_literal_text_and_role_updates_do_not_change_appearance"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3428,6 +3839,11 @@
         "T2.05 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/instructions/InstructionEntryInstrumentedTest.kt::permissionDenialLeavesKeyboardPathAndNeverStartsMicrophone",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/instructions/InstructionRoundTripInstrumentedTest.kt::markerInstructionRoleEntryUndoAndReopenRetainCanonicalIdentity",
+        "core/crates/vw-instructions/tests/entry_focus.rs::partial_entry_results_are_bounded_monotonic_literal_and_not_transactions"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "explicit",
@@ -3454,6 +3870,10 @@
       "evidence": [
         "T2.05 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/workflows.rs::final_handwriting_draft_requires_explicit_plan_and_durable_commit",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/instructions/InstructionEntryInstrumentedTest.kt::nativeTextInputPreservesLiteralBoundsAndExplicitEntryMode"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3507,6 +3927,11 @@
         "T2.06 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-semantics/tests/workflow.rs::physical_host_mapping_clips_bounds_without_applying_dpi_again",
+        "core/crates/vw-capture/tests/picker.rs::only_exact_lossless_window_receipts_can_authorize_a_semantic_subtree",
+        "core/crates/vw-capture/tests/admission.rs::no_implicit_extended_tree_deadline"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "explicit",
@@ -3536,6 +3961,9 @@
       "evidence": [
         "T2.06 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "core/crates/vw-semantics/tests/workflow.rs::android_requires_matching_platform_and_screenshot_coordinates"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3595,6 +4023,11 @@
         "T2.07 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-semantics/tests/snap_export.rs::twelve_pixel_point_threshold_tracks_scale_rotation_and_insets",
+        "core/crates/vw-semantics/tests/snap_export.rs::boxes_compare_all_corners_in_physical_screen_space",
+        "core/crates/vw-ffi/tests/semantic_ui.rs::native_snap_uses_physical_affine_threshold_and_box_corners"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -3625,6 +4058,10 @@
         "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-semantics/tests/snap_export.rs::references_are_snapshot_scoped_schema_fields_and_fail_on_missing_or_duplicate_ids",
+        "core/crates/vw-package/tests/semantics.rs::semantic_references_require_explicit_snapshot_and_match_exact_capture"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -3654,6 +4091,11 @@
         "T2.07 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "core/crates/vw-instructions/tests/export.rs::literal_instruction_export_is_repeatable_and_captured_injection_stays_quoted",
+        "core/crates/vw-semantics/tests/snap_export.rs::injection_remains_literal_quoted_data_and_private_capture_metadata_is_omitted",
+        "core/crates/vw-package/tests/workflow.rs::owner_and_captured_strings_are_literal_and_private_identity_is_absent"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3708,6 +4150,11 @@
         "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-package/tests/integrity.rs::changed_payload_unknown_fields_and_duplicate_json_keys_fail",
+        "core/crates/vw-package/tests/integrity.rs::hashes_do_not_hide_malformed_images_or_wrong_coordinate_and_revision_binding",
+        "core/crates/vw-package/tests/workflow.rs::deterministic_files_and_uniform_coordinates_bind_full_revision"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -3739,6 +4186,10 @@
         "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-package/tests/workflow.rs::target_profiles_keep_actual_dimensions_and_gemini_yxyx",
+        "core/crates/vw-package/tests/workflow.rs::deterministic_files_and_uniform_coordinates_bind_full_revision"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -3768,6 +4219,10 @@
         "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-package/tests/workflow.rs::point_at_source_corner_gets_minimum_crop_without_negative_coordinates",
+        "core/crates/vw-package/tests/workflow.rs::hidden_unlabeled_objects_remain_context_descriptions_without_identity_fields"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -3796,6 +4251,10 @@
       "evidence": [
         "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "core/crates/vw-package/tests/workflow.rs::owner_and_captured_strings_are_literal_and_private_identity_is_absent",
+        "core/crates/vw-package/tests/image_output.rs::transformed_prompt_names_o_context_and_keeps_literal_owner_text"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3831,6 +4290,11 @@
         "T2.09 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/golden_path.rs::pair_share_mark_sync_export_package_and_verify",
+        "core/crates/vw-ffi/src/packages/catalog_tests.rs::compile_publish_retry_reopen_read_and_retire_are_exact",
+        "mcp/native/tests/package_reader.rs::all_sixty_four_marker_crops_and_five_support_files_are_admitted"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "explicit",
@@ -3861,6 +4325,9 @@
         "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpCoordinatorTest.kt::publicationNeverSendsAndOnlyDisplayedPreviewMaySend"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "explicit",
@@ -3889,6 +4356,11 @@
       "evidence": [
         "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/CodexHandoffTest.kt::acceptanceAndCompletionAreExactBoundAndNeverRetireAnotherTurn",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/CodexHandoffTest.kt::missingMeasuredImageContractProducesActionableRefusal",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/CodexHandoffTest.kt::packagedRuntimeMustContainEveryCodexAdapterAndItsMeasuredProfileInput"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3950,6 +4422,11 @@
         "T2.09 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpCoordinatorTest.kt::captureWaitsForDrawnIndicatorAndRevocationSettlesIt",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpCoordinatorTest.kt::ownerRevokeBypassesFourOccupiedCallbacksAndStopsFurtherCapture",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/EditorSyncInstrumentedTest.kt::grantIndicatorUsesActualLinkCollectorAndRetiresBeforeProjectClose"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -3977,6 +4454,10 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/golden_path.rs::pair_share_mark_sync_export_package_and_verify",
+        "apps/shared/src/jvmTest/kotlin/com/visualworkbench/shared/McpInboxAdmissionTest.kt::textAndImageTogetherOrNoBodyNeverReachNativeOwnership"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4007,6 +4488,11 @@
         "T0.11 — Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
         "T2.02 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "core/crates/vw-ai/tests/contracts.rs::configuration_is_typed_bounded_and_prices_round_once",
+        "core/crates/vw-ai/tests/budget.rs::multipart_and_response_mapping_are_bounded_and_bound_to_request",
+        "core/crates/vw-ai/tests/provider_protocols.rs::provider_identity_geometry_and_flat_quote_are_explicit"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4039,6 +4525,11 @@
         "T2.03 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-ai/tests/contracts.rs::crop_known_answer_and_extreme_aspect_never_discard_selection",
+        "core/crates/vw-ai/tests/properties.rs::crop_always_contains_every_selected_pixel_and_chooses_valid_size",
+        "core/crates/vw-ai/tests/properties.rs::zero_feather_composite_is_exact_source_outside_and_full_result_inside"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -4070,6 +4561,11 @@
         "T2.03 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-ai/tests/contracts.rs::proof_audit_detects_one_exterior_alpha_bit_without_accepting_stale_metadata",
+        "core/crates/vw-ai/tests/contracts.rs::malicious_full_frame_model_changes_cannot_escape_a_naively_checked_disk",
+        "core/crates/vw-model/tests/model_contract.rs::asset_metadata_is_whitelisted_and_result_candidates_require_outside_proof"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -4096,6 +4592,11 @@
       "evidence": [
         "T2.02 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+      ],
+      "verified_by": [
+        "core/crates/vw-ai/tests/budget.rs::explicit_confirmation_and_one_durable_attempt_bind_exact_review",
+        "core/crates/vw-ai/tests/budget.rs::absent_estimate_and_zero_estimate_cannot_authorize_spending",
+        "core/crates/vw-ai/tests/budget.rs::soft_budget_acknowledgement_actual_cost_and_clock_rollback_are_explicit"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4125,6 +4626,9 @@
         "T2.02 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "apps/shared/src/androidDeviceTest/kotlin/com/visualworkbench/shared/ProviderCredentialsInstrumentedTest.kt::encryptedRoundtripFreshArrayOwnershipAndRemove"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -4152,6 +4656,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "core/crates/vw-ai/tests/provider_protocols.rs::flux_payload_uses_exact_reviewed_pngs_and_white_change_mask",
+        "core/crates/vw-ai/tests/provider_protocols.rs::gemini_payload_is_image_only_with_bound_inline_source_and_guidance",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/AiEditorOwnershipTest.kt::gridRetainsIndependentExplicitSendOwnersAndExactSelection"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4182,6 +4691,10 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-net/tests/phone_result_sync.rs::interrupted_phone_result_assets_reopen_and_sync_once_with_exact_journal_and_mask",
+        "core/crates/vw-ffi/src/session/offline_recovery_tests.rs::saved_phone_result_uses_real_transaction_bound_asset_and_acknowledgement_callers"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "explicit",
@@ -4211,6 +4724,10 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: partial source; present: Desktop window recapture and alignment; missing: phone-screen and tunnel captures never register a verification target (T5.01)."
       ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpImageRegistrationTest.kt::exactTranslationUsesPixelsAndReportsTheVerifiedSupport",
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/mcp/McpCoordinatorTest.kt::verificationRecaptureUsesOnlyTheCheckedOriginalAndJoinedAfterPackage"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -4239,6 +4756,9 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/golden_path.rs::pair_share_mark_sync_export_package_and_verify"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -4266,6 +4786,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/verification.rs::durable_manual_cas_checks_real_pair_and_compiles_only_failed_markers_against_full_after_source",
+        "core/crates/vw-package/tests/verification.rs::deterministic_failure_package_keeps_original_numbers_and_existing_png_owners",
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/VerificationInteractionTest.kt::failedSubsetKeepsOriginalNumbersAndPendingNeverLooksComplete"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4322,6 +4847,9 @@
       "evidence": [
         "M4-KP — recorded in the plan's task status"
       ],
+      "verified_by": [
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemoteEditCompositionTest.kt::multi_second_contact_keeps_fresh_segments_without_resetting_old_creation"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -4349,6 +4877,11 @@
       ],
       "evidence": [
         "M4-KP — recorded in the plan's task status"
+      ],
+      "verified_by": [
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemoteGhostInkTest.kt::ack_fades_at_150_ms_and_duplicate_never_restarts_fade",
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemoteGhostInkTest.kt::missing_callback_still_expires_at_500_ms",
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/RemoteGhostInkTest.kt::late_ack_is_clamped_by_independent_creation_expiry"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4382,6 +4915,11 @@
         "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open.",
         "T1.11 — Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/sessions.rs::authenticated_bootstrap_offline_undo_reopen_and_reconnect_are_durable",
+        "core/crates/vw-ops/tests/engine.rs::stale_writes_use_later_wall_clock_and_ties_favor_host_in_both_orders",
+        "core/crates/vw-store/tests/database.rs::reopen_retains_exact_retry_ack_undo_and_conflict_records"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "explicit",
@@ -4412,6 +4950,11 @@
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
+      "verified_by": [
+        "core/crates/vw-sim/tests/offline_rebase.rs::five_thousand_exact_offline_transactions_rebase_across_interruption_and_lost_receipts",
+        "core/crates/vw-ops/tests/recovered_outbox.rs::recovery_keeps_original_base_and_replays_over_an_advanced_host",
+        "core/crates/vw-ffi/src/session/offline_recovery_tests.rs::real_startup_restores_five_thousand_exact_rows_and_counter_floor_after_reopen"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "explicit",
@@ -4440,6 +4983,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+      ],
+      "verified_by": [
+        "core/crates/vw-store/tests/conflict_review.rs::object_property_swap_uses_normal_typed_operations_and_remains_undoable",
+        "core/crates/vw-store/tests/conflict_review.rs::keep_is_local_durable_metadata_and_does_not_remove_losing_values",
+        "core/crates/vw-ops/tests/engine.rs::stale_writes_use_later_wall_clock_and_ties_favor_host_in_both_orders"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4471,6 +5019,11 @@
         "T1.02 — duplicate acknowledgements and atomic host sequencing pass simulation; durable sequencing/restart and finalized live transport remain T1.03, T1.06a, T1.10 and T1.12.",
         "T1.06a — Duplicate receipts and transaction replay preserve exactly-once accepted history in simulation/native tests; full application scenario acceptance remains pending."
       ],
+      "verified_by": [
+        "core/crates/vw-ops/tests/engine.rs::duplicate_ack_is_byte_identical_and_payload_reuse_is_rejected",
+        "core/crates/vw-ops/tests/engine.rs::live_host_order_wins_even_when_wall_clock_is_earlier",
+        "core/crates/vw-sim/tests/offline_rebase.rs::five_thousand_exact_offline_transactions_rebase_across_interruption_and_lost_receipts"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -4500,6 +5053,10 @@
         "T1.02 — 1,000 ms expiry, immediate cancel, stale-packet suppression and gesture identity pass; within-frame rendering and flash-free commit replacement remain T1.08b/T1.10/T1.12.",
         "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
+      "verified_by": [
+        "core/crates/vw-ops/tests/root_owned.rs::gesture_expiry_retains_sequence_watermarks_and_cancel_suppresses_late_packets",
+        "core/crates/vw-store/tests/database.rs::cancellation_survives_a_checkpoint_without_mutating_visible_state"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -4527,6 +5084,10 @@
         "T0.07 — recorded in the plan's task status",
         "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
+      "verified_by": [
+        "core/crates/vw-stream/tests/tiles.rs::tiled_keyframe_and_dirty_delta_preserve_every_unchanged_pixel",
+        "core/crates/vw-stream/tests/tiles.rs::capture_clock_is_attached_without_changing_frame_identity_or_charge"
+      ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
       "owner_decision": "default-accepted",
@@ -4553,6 +5114,10 @@
       "evidence": [
         "T0.07 — recorded in the plan's task status",
         "M4-KP — recorded in the plan's task status"
+      ],
+      "verified_by": [
+        "core/crates/vw-remote/tests/admission.rs::main_sps_dimension_and_depth_bounds_are_enforced",
+        "apps/android/src/androidTest/kotlin/com/visualworkbench/android/remote/RemoteDecoderInstrumentedTest.kt::first_frame_requires_idr_and_scope_generation_must_match"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4612,6 +5177,10 @@
       ],
       "evidence": [
         "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+      ],
+      "verified_by": [
+        "core/crates/vw-stream/tests/ring.rs::default_ring_retains_exact_last_eight_and_never_substitutes",
+        "core/crates/vw-stream/tests/ring.rs::eight_4k_frames_fit_hard_300mb_but_large_sources_cannot_relax_capacity"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4812,6 +5381,11 @@
         "SETUP_STARTUP — recorded in the plan's task status",
         "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
+      "verified_by": [
+        "tools/release/test_generate_notices.py::test_unknown_and_forbidden_licenses_fail",
+        "tools/release/test_generate_notices.py::test_java_runtime_legal_files_from_desktop_image",
+        "tools/android-tunnel/test_dll_license_probe.py::test_empty_misleading_gpl_and_unknown_configuration_refuse"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "explicit",
@@ -4840,6 +5414,11 @@
         "SETUP_STARTUP — recorded in the plan's task status",
         "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
+      "verified_by": [
+        "tools/tests/test_setup_gates.py::test_gpl_dependency_fails",
+        "tools/tests/test_setup_gates.py::test_unknown_dependency_fails",
+        "tools/release/test_generate_notices.py::test_forbidden_crate_license_makes_bundle_incomplete_and_unassemblable"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "explicit",
@@ -4867,6 +5446,11 @@
       ],
       "evidence": [
         "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: partial source; present: curated hash-bound notices; missing: generation from the resolved Cargo/Gradle/npm tree plus bundled binaries; 125 candidates unadmitted (T5.06)."
+      ],
+      "verified_by": [
+        "tools/release/test_generate_notices.py::test_output_is_deterministic",
+        "tools/release/test_generate_notices.py::test_embedded_native_components_need_a_covering_notice",
+        "tools/release/test_assemble.py::test_generated_notices_require_artifact_coverage"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4980,6 +5564,10 @@
       "evidence": [
         "T1.06b — TLS-bound proofs, durable lockout and revocation pass; project/export secret scan, app Keystore and production-security acceptance remain open."
       ],
+      "verified_by": [
+        "apps/desktop/src/test/kotlin/com/visualworkbench/desktop/DesktopSessionsTest.kt::expiredOfferClosesWithoutAccepting",
+        "core/crates/vw-ffi/tests/sessions.rs::code_pairing_requires_both_live_confirmation_handles"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -5009,6 +5597,10 @@
         "SETUP_STARTUP — recorded in the plan's task status",
         "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
+      "verified_by": [
+        "apps/shared/src/commonTest/kotlin/com/visualworkbench/shared/DiagnosticsPrivacyAuditTest.kt::syntheticIdentityCredentialAndPathStringsNeverFitKnownValuePositions",
+        "core/crates/vw-ffi/tests/sessions.rs::synchronized_projects_and_real_archive_exclude_generated_pairing_credentials"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -5036,6 +5628,9 @@
         "T0.01 — recorded in the plan's task status",
         "SETUP_STARTUP — recorded in the plan's task status",
         "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+      ],
+      "verified_by": [
+        "tools/release/test_generate_notices.py::test_toolchains_must_be_the_pinned_versions"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5096,6 +5691,10 @@
         "T0.04 — Probe recorder and bounded HIL replay implemented; physical OnePlus synthetic software checks are separate from S23 acceptance. At least 24 S23 owner traces, their replay, capability measurements and thermal session remain pending in T0.04. Public MotionEvent construction cannot reproduce nonzero actionButton; affected traces fail explicitly.",
         "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
+      "verified_by": [
+        "tools/app-test/test_reports.py::test_complete_statuses_and_summary_pass",
+        "tools/pen-trace/probe-android/src/androidTest/java/com/visualworkbench/penprobe/ReplayTest.kt::replayAndMeasure"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -5123,6 +5722,9 @@
         "T0.05 — Native harness and guarded injector implemented; 65 pressure pairs r=1.000, 472 received samples, and 100 acknowledged guard trials with zero samples in the selected sink. Combined inverted/eraser flags and three lifecycle matches differ; full event-fidelity verification and editor/elevation acceptance remain open in T0.05, before T0.12/G0 closure.",
         "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
+      "verified_by": [
+        "tools/tests/test_pen_injection.py::test_tilt_rotation_barrel_eraser_mask_and_cancel_are_checked"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -5148,6 +5750,10 @@
       ],
       "evidence": [
         "T1.06a — 10,000 seeds pass in 222.96 seconds with exact replay/no-loss invariants; full app/gate coverage remains open."
+      ],
+      "verified_by": [
+        "core/crates/vw-sim/tests/offline_rebase.rs::existing_authenticated_fault_simulation_still_converges_after_batch_recovery_change",
+        "core/crates/vw-sim/tests/offline_rebase.rs::five_thousand_exact_offline_transactions_rebase_across_interruption_and_lost_receipts"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5175,6 +5781,11 @@
       "evidence": [
         "T1.04 — Sixteen algorithm-1 synthetic geometry goldens match Windows and IN2019; recorded S Pen traces and T1.05 export goldens remain open.",
         "T1.05 — Nine committed PNG/layout hashes match Windows and IN2019, alongside T1.04 geometry goldens; recorded S Pen fixtures and final scenario/device acceptance remain open."
+      ],
+      "verified_by": [
+        "core/crates/vw-ink/tests/engine.rs::committed_synthetic_goldens_match_every_fixture",
+        "core/crates/vw-raster/tests/goldens.rs::committed_png_and_layout_manifest_matches_byte_for_byte",
+        "core/crates/vw-ink/tests/engine.rs::quantization_ties_and_signed_zero_are_platform_independent"
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5415,6 +6026,10 @@
         "T2.03 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
         "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
+      "verified_by": [
+        "core/crates/vw-ai/tests/properties.rs::zero_feather_composite_is_exact_source_outside_and_full_result_inside",
+        "core/crates/vw-ai/tests/contracts.rs::malicious_full_frame_model_changes_cannot_escape_a_naively_checked_disk"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "default-accepted",
@@ -5444,6 +6059,11 @@
         "T1.03 — generated synthetic MP4 bytes and metadata round-trip through database, blob storage and .vwbz; live asset sync remains T1.06a/T1.10 and A18/T1.12 acceptance. Timeline stays reserved; no video-editing UI is required by this hook.",
         "T1.11 — Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
+      "verified_by": [
+        "core/crates/vw-model/tests/model_contract.rs::reserved_timeline_unknown_kind_and_schema_return_typed_errors",
+        "core/crates/vw-store/tests/video.rs::generated_one_second_mp4_roundtrips_database_blob_and_archive",
+        "core/crates/vw-ffi/tests/streaming_ffi.rs::file_attachments_are_exact_retryable_immutable_assets_without_documents"
+      ],
       "impl_status": "in_progress",
       "verify_status": "partial",
       "owner_decision": "explicit",
@@ -5470,6 +6090,10 @@
       "evidence": [
         "T1.07 — commonMain guard and four violation/parser fixtures pass; both native Kotlin wrappers pass on Windows/IN2019. Integrated slice closure and final fixture re-run are pending.",
         "T1.07 — commonMain platform-import guard passes and deliberate violations fail; final Windows/IN2019 native golden and cancellation rerun passed. This requirement is only the import guard, not broader product acceptance."
+      ],
+      "verified_by": [
+        "tools/ffi-test/test_imports.py::test_deliberate_platform_violation",
+        "tools/ffi-test/test_imports.py::test_alias_comments_backticks_cannot_hide_import"
       ],
       "impl_status": "implemented",
       "verify_status": "passed",
