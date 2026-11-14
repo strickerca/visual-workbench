@@ -1,5 +1,6 @@
 use crate::{
     HostSnapshot, OpsError,
+    draft::{self, Originals},
     patch::{self, Change},
     plan,
 };
@@ -282,14 +283,15 @@ impl Replica {
                 admit_payload_bytes(bytes, &pending.transaction)
             })?;
         validate_transaction(&transaction)?;
-        let project = optimistic(&self.visible, &transaction, &self.inverse_previews)?;
-        let inverse = patch::between(&self.visible, &project)?
-            .into_iter()
-            .rev()
-            .map(|change| change.inverse())
-            .collect();
+        let replaced = optimistic(&mut self.visible, &transaction, &self.inverse_previews)?;
+        let inverse = match inverse_of(&replaced, &self.visible) {
+            Ok(inverse) => inverse,
+            Err(error) => {
+                replaced.restore(&mut self.visible);
+                return Err(error);
+            }
+        };
         self.inverse_previews.insert(id, inverse);
-        self.visible = project;
         self.pending.push(PendingTransaction {
             transaction,
             blocked_reason: None,
@@ -342,18 +344,13 @@ fn replay(
 ) -> Result<(Project, BTreeMap<Id, Vec<Change>>), OpsError> {
     let mut visible = base.clone();
     for pending in pending {
-        match optimistic(&visible, &pending.transaction, &inverses) {
-            Ok(next) => {
-                let inverse = patch::between(&visible, &next)?
-                    .into_iter()
-                    .rev()
-                    .map(|change| change.inverse())
-                    .collect();
+        match optimistic(&mut visible, &pending.transaction, &inverses) {
+            Ok(replaced) => {
+                let inverse = inverse_of(&replaced, &visible)?;
                 inverses.insert(
                     Id::from_proto(pending.transaction.txn_id.as_ref())?,
                     inverse,
                 );
-                visible = next;
                 pending.blocked_reason = None;
             }
             Err(error) => pending.blocked_reason = Some(error.to_string()),
@@ -376,11 +373,13 @@ fn owned_previews(snapshot: &HostSnapshot, device: &DeviceId) -> BTreeMap<Id, Ve
         .collect()
 }
 
+/// Apply one pending transaction to the visible project in place and return
+/// what it replaced. A refused transaction leaves the project untouched.
 fn optimistic(
-    project: &Project,
+    project: &mut Project,
     transaction: &v1::Transaction,
     inverses: &BTreeMap<Id, Vec<Change>>,
-) -> Result<Project, OpsError> {
+) -> Result<Originals, OpsError> {
     if let [
         v1::Op {
             kind: Some(v1::op::Kind::UndoTransaction(undo)),
@@ -390,10 +389,19 @@ fn optimistic(
     {
         let id = Id::from_proto(undo.target_txn_id.as_ref())?;
         let changes = inverses.get(&id).ok_or(OpsError::UndoOwnership)?;
-        patch::apply(project, changes)
+        draft::edit(project, |draft| patch::apply(draft, changes))
     } else {
-        plan::plan(project, transaction)
+        draft::edit(project, |draft| plan::apply(draft, transaction))
     }
+}
+
+/// The changes that take `project` back to what an edit replaced.
+fn inverse_of(replaced: &Originals, project: &Project) -> Result<Vec<Change>, OpsError> {
+    Ok(patch::between(replaced, project)?
+        .into_iter()
+        .rev()
+        .map(|change| change.inverse())
+        .collect())
 }
 
 fn validate_snapshot(snapshot: &HostSnapshot) -> Result<(), OpsError> {

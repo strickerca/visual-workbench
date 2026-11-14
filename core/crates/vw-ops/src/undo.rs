@@ -29,6 +29,12 @@ pub struct UndoManager {
     redo: Vec<Id>,
     events: BTreeMap<Id, Event>,
     next_local_order: u64,
+    // Summaries of `events`, kept so that registering the newest event does
+    // not have to sort the whole history again.
+    unacknowledged: usize,
+    highest_ack: u64,
+    /// Targets named by a known inverse whose own event has not arrived.
+    unresolved: BTreeSet<Id>,
 }
 
 impl UndoManager {
@@ -40,6 +46,9 @@ impl UndoManager {
             redo: Vec::new(),
             events: BTreeMap::new(),
             next_local_order: 0,
+            unacknowledged: 0,
+            highest_ack: 0,
+            unresolved: BTreeSet::new(),
         }
     }
 
@@ -169,6 +178,20 @@ impl UndoManager {
             }
         }
 
+        // A new event that sorts after every known one extends the cursors
+        // directly. That is every edit, undo and redo in the order it is made:
+        // an acknowledged event above all earlier acknowledgements while none
+        // is still pending, or a pending event, which takes the next local
+        // order. Anything else (a late or out-of-order acknowledgement, an
+        // event another one was already waiting for) is ordered from scratch.
+        let extends = !self.events.contains_key(&id)
+            && !self.unresolved.contains(&id)
+            && acceptance.is_none_or(|value| {
+                self.unacknowledged == 0 && value.ack.host_seq > self.highest_ack
+            });
+        if extends {
+            return self.append(id, project, bytes, kind, acceptance);
+        }
         let mut candidate = self.clone();
         candidate.project = Some(project);
         if let Some(event) = candidate.events.get_mut(&id) {
@@ -195,6 +218,103 @@ impl UndoManager {
         }
         candidate.rebuild()?;
         *self = candidate;
+        Ok(())
+    }
+
+    /// Register an event known to sort last. The checks are those `rebuild`
+    /// applies to it, and the cursor step is the one `rebuild` ends with.
+    fn append(
+        &mut self,
+        id: Id,
+        project: Id,
+        bytes: Vec<u8>,
+        kind: EventKind,
+        acceptance: Option<&Acceptance>,
+    ) -> Result<(), OpsError> {
+        if let EventKind::Inverse { redo, target } = &kind {
+            if &id == target {
+                return Err(OpsError::Invalid("inverse self reference"));
+            }
+            if let Some(previous) = self.events.get(target) {
+                let valid_kind = matches!(
+                    (redo, &previous.kind),
+                    (false, EventKind::Ordinary)
+                        | (false, EventKind::Inverse { redo: true, .. })
+                        | (true, EventKind::Inverse { redo: false, .. })
+                );
+                if !valid_kind {
+                    return Err(OpsError::Invalid("inverse direction"));
+                }
+                if let (Some(before), Some(after)) = (&previous.ack, acceptance)
+                    && before.host_seq >= after.ack.host_seq
+                {
+                    return Err(OpsError::Invalid("inverse host order"));
+                }
+            }
+        }
+        let local_order = if acceptance.is_none() {
+            Some(
+                self.next_local_order
+                    .checked_add(1)
+                    .ok_or(OpsError::CounterExhausted)?,
+            )
+        } else {
+            None
+        };
+        if let Some(order) = local_order {
+            self.next_local_order = order;
+        }
+        self.project = Some(project);
+        match &kind {
+            EventKind::Ordinary => {
+                self.undo.push(id.clone());
+                self.redo.clear();
+            }
+            EventKind::Inverse { redo, target } => {
+                let source = if *redo {
+                    &mut self.redo
+                } else {
+                    &mut self.undo
+                };
+                if let Some(position) = source.iter().rposition(|value| value == target) {
+                    source.remove(position);
+                    if *redo {
+                        self.undo.push(id.clone());
+                    } else {
+                        self.redo.push(id.clone());
+                    }
+                }
+                if !self.events.contains_key(target) {
+                    self.unresolved.insert(target.clone());
+                }
+            }
+        }
+        match acceptance {
+            Some(value) => self.highest_ack = value.ack.host_seq,
+            None => self.unacknowledged += 1,
+        }
+        self.events.insert(
+            id,
+            Event {
+                bytes,
+                kind,
+                ack: acceptance.map(|value| value.ack.clone()),
+                local_order,
+            },
+        );
+        #[cfg(debug_assertions)]
+        {
+            let mut reference = self.clone();
+            debug_assert!(
+                reference.rebuild().is_ok()
+                    && reference.undo == self.undo
+                    && reference.redo == self.redo
+                    && reference.unacknowledged == self.unacknowledged
+                    && reference.highest_ack == self.highest_ack
+                    && reference.unresolved == self.unresolved,
+                "an appended undo event differs from ordering the history again"
+            );
+        }
         Ok(())
     }
 
@@ -239,13 +359,16 @@ impl UndoManager {
             {
                 return Err(OpsError::Invalid("acknowledgement identity"));
             }
-            if self.events.iter().any(|(previous_id, event)| {
-                previous_id != &id
-                    && event
-                        .ack
-                        .as_ref()
-                        .is_some_and(|ack| ack.host_seq == acceptance.ack.host_seq)
-            }) {
+            // No known acknowledgement can share a sequence above them all.
+            if acceptance.ack.host_seq <= self.highest_ack
+                && self.events.iter().any(|(previous_id, event)| {
+                    previous_id != &id
+                        && event
+                            .ack
+                            .as_ref()
+                            .is_some_and(|ack| ack.host_seq == acceptance.ack.host_seq)
+                })
+            {
                 return Err(OpsError::Invalid("duplicate host sequence"));
             }
         }
@@ -291,6 +414,27 @@ impl UndoManager {
         }
         self.undo = undo;
         self.redo = redo;
+        self.unacknowledged = self
+            .events
+            .values()
+            .filter(|event| event.ack.is_none())
+            .count();
+        self.highest_ack = self
+            .events
+            .values()
+            .filter_map(|event| event.ack.as_ref().map(|ack| ack.host_seq))
+            .max()
+            .unwrap_or(0);
+        self.unresolved = self
+            .events
+            .values()
+            .filter_map(|event| match &event.kind {
+                EventKind::Inverse { target, .. } if !self.events.contains_key(target) => {
+                    Some(target.clone())
+                }
+                _ => None,
+            })
+            .collect();
         Ok(())
     }
 

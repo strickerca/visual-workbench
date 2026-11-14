@@ -1,11 +1,15 @@
 use crate::{
     OpsError,
-    patch::{self, Address, Change},
+    draft::{self, Draft, Originals, Touched},
+    patch::{self, Address, Change, Values},
     plan,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
-use vw_model::{AssetId, DeviceId, Id, Object, Project, StateHash};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Bound,
+};
+use vw_model::{AssetId, DeviceId, Id, Object, Project, StateHash, StateHasher};
 use vw_proto::{
     Message,
     v1::{self, op::Kind},
@@ -147,8 +151,10 @@ pub struct HostSnapshot {
     pub(crate) inverse_previews: BTreeMap<Id, Vec<Change>>,
 }
 
-/// Host-ordered in-memory engine. Every submission is applied to a private clone
-/// and installed only after validation, so rejection cannot partly mutate state.
+/// Host-ordered in-memory engine. A submission edits the project in place and
+/// is recorded only after validation; a rejection puts back every entity it
+/// touched, so it cannot partly mutate state. The work per submission follows
+/// what the transaction changes, not the size of the project or its history.
 #[derive(Debug, Clone, Serialize)]
 pub struct HostSequencer {
     host_device: DeviceId,
@@ -162,6 +168,11 @@ pub struct HostSequencer {
     gestures: BTreeSet<(DeviceId, Id)>,
     cancelled: BTreeSet<(DeviceId, Id)>,
     conflicts: Vec<v1::ConflictRecord>,
+    /// Derived from `project`; never part of a checkpoint.
+    #[serde(skip)]
+    hasher: StateHasher,
+    #[serde(skip)]
+    canonical_len: usize,
 }
 
 // A private remote deserializer keeps callers from bypassing the validated
@@ -180,6 +191,80 @@ struct CheckpointState {
     gestures: BTreeSet<(DeviceId, Id)>,
     cancelled: BTreeSet<(DeviceId, Id)>,
     conflicts: Vec<v1::ConflictRecord>,
+    #[serde(skip)]
+    hasher: StateHasher,
+    #[serde(skip)]
+    canonical_len: usize,
+}
+
+/// What deciding a transaction reads but never changes.
+struct View<'a> {
+    host_device: &'a DeviceId,
+    sequence: u64,
+    revisions: &'a BTreeMap<u64, StateHash>,
+    records: &'a BTreeMap<Id, Record>,
+    writes: &'a BTreeMap<String, WriteStamp>,
+    tombstones: &'a BTreeMap<Id, Object>,
+    seen_ops: &'a BTreeSet<(DeviceId, u64)>,
+    gestures: &'a BTreeSet<(DeviceId, Id)>,
+    cancelled: &'a BTreeSet<(DeviceId, Id)>,
+}
+
+/// A transaction the host accepts: the project already holds its result, and
+/// this is everything still to be recorded.
+struct Decision {
+    id: Id,
+    device: DeviceId,
+    sequence: u64,
+    hash: StateHash,
+    canonical_len: usize,
+    record: Record,
+    originals: Originals,
+    operations: Vec<(DeviceId, u64)>,
+    gesture: Option<(DeviceId, Id)>,
+    /// Object tombstones to set (`Some`) or clear (`None`), in journal order.
+    tombstones: Vec<(Id, Option<Object>)>,
+}
+
+/// How to take one recorded transaction back out again.
+struct Undo {
+    id: Id,
+    sequence: u64,
+    canonical_len: usize,
+    conflicts: usize,
+    originals: Originals,
+    operations: Vec<(DeviceId, u64)>,
+    gesture: Option<(DeviceId, Id)>,
+    tombstones: Vec<(Id, Option<Object>)>,
+    writes: Vec<(String, Option<WriteStamp>)>,
+}
+
+/// Puts a recorded transaction back unless its persistence succeeded, also
+/// when the persisting code unwinds.
+struct Recorded<'a> {
+    host: &'a mut HostSequencer,
+    undo: Option<Undo>,
+}
+impl Drop for Recorded<'_> {
+    fn drop(&mut self) {
+        if let Some(undo) = self.undo.take() {
+            self.host.revert(undo);
+        }
+    }
+}
+
+enum Admission {
+    Duplicate(Acceptance),
+    New(DeviceId, Id),
+}
+
+/// Tell the hasher which part of the project an edit replaced.
+fn forget(hasher: &mut StateHasher, originals: &Originals) {
+    if !originals.only_objects() {
+        hasher.reset();
+    } else if let Some(first) = originals.objects.keys().next() {
+        hasher.objects_changed_from(first);
+    }
 }
 
 impl HostSequencer {
@@ -276,7 +361,7 @@ impl HostSequencer {
             return Err(OpsError::Invalid("checkpoint checksum"));
         }
         let mut decoder = serde_json::Deserializer::from_slice(payload);
-        let host = CheckpointState::deserialize(&mut decoder)?;
+        let mut host = CheckpointState::deserialize(&mut decoder)?;
         decoder.end()?;
         // This also rejects unknown fields in journal Address/Change values and
         // duplicate JSON map keys, whose serde representation would be lossy.
@@ -287,13 +372,18 @@ impl HostSequencer {
         Ok(host)
     }
 
-    fn validate_checkpoint(&self) -> Result<(), OpsError> {
+    fn validate_checkpoint(&mut self) -> Result<(), OpsError> {
         let count =
             usize::try_from(self.sequence).map_err(|_| OpsError::Invalid("checkpoint sequence"))?;
         if self.records.len() != count
             || self.revisions.len() != count.checked_add(1).ok_or(OpsError::CounterExhausted)?
-            || self.revisions.get(&self.sequence) != Some(&self.project.state_hash()?)
         {
+            return Err(OpsError::Invalid("checkpoint revision binding"));
+        }
+        self.project.validate()?;
+        let (hash, canonical_len) = self.hasher.hash(&self.project)?;
+        self.canonical_len = canonical_len;
+        if self.revisions.get(&self.sequence) != Some(&hash) {
             return Err(OpsError::Invalid("checkpoint revision binding"));
         }
         for (expected, sequence) in self.revisions.keys().enumerate() {
@@ -443,7 +533,9 @@ impl HostSequencer {
 
     /// Establish revision zero for a validated project and an explicit host ID.
     pub fn new(project: Project, host_device: DeviceId) -> Result<Self, OpsError> {
-        let hash = project.state_hash()?;
+        project.validate()?;
+        let mut hasher = StateHasher::default();
+        let (hash, canonical_len) = hasher.hash(&project)?;
         Ok(Self {
             host_device,
             project,
@@ -456,7 +548,32 @@ impl HostSequencer {
             gestures: BTreeSet::new(),
             cancelled: BTreeSet::new(),
             conflicts: Vec::new(),
+            hasher,
+            canonical_len,
         })
+    }
+    /// The canonical state hash of the current revision.
+    pub fn state_hash(&self) -> Result<&StateHash, OpsError> {
+        self.revisions
+            .get(&self.sequence)
+            .ok_or(OpsError::RevisionMismatch)
+    }
+    /// Length of the canonical project bytes the current revision hashes.
+    pub const fn canonical_len(&self) -> usize {
+        self.canonical_len
+    }
+    fn view(&self) -> View<'_> {
+        View {
+            host_device: &self.host_device,
+            sequence: self.sequence,
+            revisions: &self.revisions,
+            records: &self.records,
+            writes: &self.writes,
+            tombstones: &self.tombstones,
+            seen_ops: &self.seen_ops,
+            gestures: &self.gestures,
+            cancelled: &self.cancelled,
+        }
     }
     /// Current visible state; callers cannot mutate it outside transactions.
     pub const fn project(&self) -> &Project {
@@ -479,20 +596,27 @@ impl HostSequencer {
     }
     /// Snapshot plus exact retry bindings for local simulation and replica rebase.
     pub fn snapshot(&self) -> Result<HostSnapshot, OpsError> {
+        // Inverses are tried on one working copy, which each trial restores.
+        let mut project = self.project.clone();
+        let view = self.view();
+        let inverse_previews = self
+            .records
+            .iter()
+            .map(|(id, record)| {
+                let device = DeviceId::try_from(record.transaction.device_id.clone())?;
+                let undo = v1::UndoTransaction {
+                    target_txn_id: Some(id.to_proto()),
+                };
+                Ok((
+                    id.clone(),
+                    view.inverse(&mut project, &undo, &device, &mut Vec::new())?,
+                ))
+            })
+            .collect::<Result<_, OpsError>>()?;
         Ok(HostSnapshot {
-            project: self.project.clone(),
+            project,
             revision: self.revision()?,
-            inverse_previews: self
-                .records
-                .iter()
-                .map(|(id, record)| {
-                    let device = DeviceId::try_from(record.transaction.device_id.clone())?;
-                    let undo = v1::UndoTransaction {
-                        target_txn_id: Some(id.to_proto()),
-                    };
-                    Ok((id.clone(), self.inverse(&undo, &device, &mut Vec::new())?))
-                })
-                .collect::<Result<_, OpsError>>()?,
+            inverse_previews,
             accepted: self
                 .records
                 .iter()
@@ -523,6 +647,79 @@ impl HostSequencer {
         authenticated: &DeviceId,
         accepted_at_ms: i64,
     ) -> Result<Acceptance, OpsError> {
+        let (acceptance, _) =
+            self.submit_with(transaction, authenticated, accepted_at_ms, |_, _, _| {
+                Ok::<(), OpsError>(())
+            })?;
+        Ok(acceptance)
+    }
+
+    /// Accept a transaction only if `persist` then succeeds. `persist` sees the
+    /// host as it will be, the acknowledgement and the entities the transaction
+    /// touched; when it fails or unwinds, the host is exactly as before the
+    /// call. A retry of an accepted transaction returns the original
+    /// acknowledgement and `None` without calling `persist`.
+    pub fn submit_with<T, E: From<OpsError>>(
+        &mut self,
+        transaction: v1::Transaction,
+        authenticated: &DeviceId,
+        accepted_at_ms: i64,
+        persist: impl FnOnce(&Self, &Acceptance, &Touched) -> Result<T, E>,
+    ) -> Result<(Acceptance, Option<T>), E> {
+        let (device, id) = match self.admit(&transaction, authenticated)? {
+            Admission::Duplicate(acceptance) => return Ok((acceptance, None)),
+            Admission::New(device, id) => (device, id),
+        };
+        let (acceptance, undo) = self.commit(transaction, device, id, accepted_at_ms)?;
+        let touched = undo.originals.touched();
+        let mut recorded = Recorded {
+            host: self,
+            undo: Some(undo),
+        };
+        let value = persist(&*recorded.host, &acceptance, &touched)?;
+        recorded.undo = None;
+        Ok((acceptance, Some(value)))
+    }
+
+    /// What `submit` would answer, without accepting anything, and the length
+    /// of the canonical project bytes the transaction would leave. Only the
+    /// project is copied to try it on, not the accepted history.
+    pub fn check(
+        &self,
+        transaction: v1::Transaction,
+        authenticated: &DeviceId,
+        accepted_at_ms: i64,
+    ) -> Result<(Acceptance, usize), OpsError> {
+        let (device, id) = match self.admit(&transaction, authenticated)? {
+            Admission::Duplicate(acceptance) => return Ok((acceptance, self.canonical_len)),
+            Admission::New(device, id) => (device, id),
+        };
+        let mut project = self.project.clone();
+        let mut hasher = self.hasher.clone();
+        let decision = evaluate(
+            &self.view(),
+            &mut project,
+            &mut hasher,
+            transaction,
+            device,
+            id,
+            accepted_at_ms,
+        )?;
+        Ok((
+            Acceptance {
+                ack: decision.record.ack,
+                conflicts: decision.record.conflicts,
+                duplicate: false,
+            },
+            decision.canonical_len,
+        ))
+    }
+
+    fn admit(
+        &self,
+        transaction: &v1::Transaction,
+        authenticated: &DeviceId,
+    ) -> Result<Admission, OpsError> {
         let device = DeviceId::try_from(transaction.device_id.clone())?;
         if &device != authenticated {
             return Err(OpsError::DeviceMismatch);
@@ -532,288 +729,156 @@ impl HostSequencer {
             if record.transaction.encode_to_vec() != transaction.encode_to_vec() {
                 return Err(OpsError::IdCollision);
             }
-            return Ok(Acceptance {
+            return Ok(Admission::Duplicate(Acceptance {
                 ack: record.ack.clone(),
                 conflicts: Vec::new(),
                 duplicate: true,
-            });
+            }));
         }
-        let mut candidate = self.clone();
-        let result = candidate.commit(transaction, device, id, accepted_at_ms)?;
-        *self = candidate;
-        Ok(result)
+        Ok(Admission::New(device, id))
     }
 
+    /// Decide the transaction against the project in place, then record it.
+    /// Nothing changes when the decision is a rejection.
     fn commit(
         &mut self,
         transaction: v1::Transaction,
         device: DeviceId,
         id: Id,
         accepted_at_ms: i64,
-    ) -> Result<Acceptance, OpsError> {
-        if Id::from_proto(transaction.project_id.as_ref())? != self.project.id {
-            return Err(OpsError::Invalid("project identity"));
-        }
-        if transaction.ops.is_empty()
-            || transaction.ops.len() > 4096
-            || transaction.created_at_wall_ms < 0
-            || accepted_at_ms < 0
-            || accepted_at_ms as u64 >= 1u64 << 48
-        {
-            return Err(OpsError::Invalid("transaction bounds"));
-        }
-        let base = transaction
-            .base_revision
-            .as_ref()
-            .ok_or(OpsError::Invalid("base revision"))?;
-        if self
-            .revisions
-            .get(&base.host_seq)
-            .map(|v| v.bytes().to_vec())
-            != Some(base.state_hash.clone())
-        {
-            return Err(OpsError::RevisionMismatch);
-        }
-        let sequence = self
-            .sequence
-            .checked_add(1)
-            .ok_or(OpsError::CounterExhausted)?;
-        for op in &transaction.ops {
-            let op_id = op
-                .op_id
-                .as_ref()
-                .ok_or(OpsError::Invalid("operation identity"))?;
-            if op_id.device_id != device.as_str()
-                || op_id.lamport == 0
-                || !self.seen_ops.insert((device.clone(), op_id.lamport))
-            {
-                return Err(OpsError::Invalid("operation identity/counter"));
-            }
-        }
-        if let Some(gesture) = &transaction.gesture_id {
-            let key = (device.clone(), Id::from_proto(Some(gesture))?);
-            if self.cancelled.contains(&key) || !self.gestures.insert(key) {
-                return Err(OpsError::Invalid("cancelled or duplicate gesture"));
-            }
-        }
-        let mut notices = Vec::new();
-        let mut conflicts = Vec::new();
-        let changes = if let [
-            v1::Op {
-                kind: Some(Kind::UndoTransaction(undo)),
-                ..
-            },
-        ] = transaction.ops.as_slice()
-        {
-            self.inverse(undo, &device, &mut notices)?
-        } else {
-            let mut filtered = transaction.clone();
-            filtered.ops.clear();
-            let mut ghosts = BTreeMap::<Id, v1::ObjectState>::new();
-            let mut ghost_paths = BTreeSet::<(Id, String)>::new();
-            for op in &transaction.ops {
-                match op.kind.as_ref() {
-                    Some(Kind::SetProperty(property)) => {
-                        let object_id = Id::from_proto(property.object_id.as_ref())?;
-                        if !self.project.objects.contains_key(&object_id)
-                            && let Some(deleted) = self.tombstones.get(&object_id)
-                        {
-                            let state = ghosts
-                                .entry(object_id.clone())
-                                .or_insert_with(|| deleted.state.clone());
-                            plan::set_property(state, property)?;
-                            ghost_paths.insert((object_id, property.property.clone()));
-                            continue;
-                        }
-                    }
-                    Some(Kind::Reorder(value)) => {
-                        let object_id = Id::from_proto(value.object_id.as_ref())?;
-                        if !self.project.objects.contains_key(&object_id)
-                            && let Some(deleted) = self.tombstones.get(&object_id)
-                        {
-                            let destination = self
-                                .project
-                                .layers
-                                .get(&Id::from_proto(value.layer_id.as_ref())?)
-                                .ok_or(OpsError::NotFound)?;
-                            if Id::from_proto(destination.definition.document_id.as_ref())?
-                                != deleted.document_id
-                            {
-                                return Err(OpsError::Invalid("cross-document object layer"));
-                            }
-                            if destination.locked || deleted.state.locked {
-                                return Err(OpsError::Locked);
-                            }
-                            vw_model::OrderKey::try_from(value.order_key.clone())?;
-                            let state = ghosts
-                                .entry(object_id.clone())
-                                .or_insert_with(|| deleted.state.clone());
-                            state.layer_id = value.layer_id.clone();
-                            state.order_key = value.order_key.clone();
-                            ghost_paths.insert((object_id, "reorder".into()));
-                            continue;
-                        }
-                    }
-                    Some(Kind::DeleteObject(value)) => {
-                        let object_id = Id::from_proto(value.object_id.as_ref())?;
-                        if !self.project.objects.contains_key(&object_id)
-                            && self.tombstones.contains_key(&object_id)
-                        {
-                            continue;
-                        }
-                    }
-                    Some(Kind::CreateObject(value)) => {
-                        let state = value
-                            .state
-                            .as_ref()
-                            .ok_or(OpsError::Invalid("object state"))?;
-                        if self
-                            .tombstones
-                            .contains_key(&Id::from_proto(state.object_id.as_ref())?)
-                        {
-                            return Err(OpsError::AlreadyExists);
-                        }
-                    }
-                    _ => {}
-                }
-                filtered.ops.push(op.clone());
-            }
-            for (object_id, property) in ghost_paths {
-                let edited = ghosts.get(&object_id).ok_or(OpsError::NotFound)?;
-                let address = Address {
-                    collection: "objects".into(),
-                    entity: object_id.to_string(),
-                    path: Vec::new(),
-                };
-                let stamp = self
-                    .latest(&address)
-                    .ok_or(OpsError::Invalid("deletion stamp"))?;
-                conflicts.push(conflict(
-                    &id,
-                    &address,
-                    &property,
-                    None,
-                    Some(&serde_json::to_value(edited)?),
-                    &stamp.device,
-                    &device,
-                    accepted_at_ms,
-                    true,
-                    Some(edited.clone()),
-                )?);
-            }
-            let proposed = plan::plan(&self.project, &filtered)?;
-            let mut planned = patch::between(&self.project, &proposed)?;
-            append_explicit_writes(&self.project, &proposed, &filtered, &mut planned)?;
-            let mut accepted = Vec::new();
-            for change in planned {
-                let opposing = self.effective_opposing(&change, base.host_seq, &device);
-                if let Some(stamp) = opposing {
-                    let deleting = change.address.path.is_empty() && change.after.is_none();
-                    let incoming_wins = deleting
-                        || transaction.created_at_wall_ms > stamp.wall_ms
-                        || (transaction.created_at_wall_ms == stamp.wall_ms
-                            && device == self.host_device);
-                    let (kept, other, kept_device, other_device) = if incoming_wins {
-                        (
-                            change.after.as_ref(),
-                            change.before.as_ref(),
-                            &device,
-                            &stamp.device,
-                        )
-                    } else {
-                        (
-                            change.before.as_ref(),
-                            change.after.as_ref(),
-                            &stamp.device,
-                            &device,
-                        )
-                    };
-                    let edited = if deleting && change.address.collection == "objects" {
-                        self.project
-                            .objects
-                            .get(&Id::try_from(change.address.entity.clone())?)
-                            .map(|o| o.state.clone())
-                    } else {
-                        None
-                    };
-                    // Equal-value writes still establish ownership, but have
-                    // no distinct losing value for the user to review.
-                    if change.before != change.after {
-                        conflicts.push(conflict(
-                            &id,
-                            &change.address,
-                            &change.address.property(),
-                            kept,
-                            other,
-                            kept_device,
-                            other_device,
-                            accepted_at_ms,
-                            edited.is_some(),
-                            edited,
-                        )?);
-                    }
-                    if incoming_wins {
-                        accepted.push(change);
-                    }
-                } else {
-                    accepted.push(change);
-                }
-            }
-            accepted
+    ) -> Result<(Acceptance, Undo), OpsError> {
+        let Self {
+            host_device,
+            project,
+            sequence,
+            revisions,
+            records,
+            writes,
+            tombstones,
+            seen_ops,
+            gestures,
+            cancelled,
+            conflicts: _,
+            hasher,
+            canonical_len: _,
+        } = self;
+        let view = View {
+            host_device,
+            sequence: *sequence,
+            revisions,
+            records,
+            writes,
+            tombstones,
+            seen_ops,
+            gestures,
+            cancelled,
         };
-        let project = patch::apply(&self.project, &changes)?;
-        for change in &changes {
-            if change.address.collection == "objects" && change.address.path.is_empty() {
-                let object_id = Id::try_from(change.address.entity.clone())?;
-                if change.after.is_none() {
-                    if let Some(old) = self.project.objects.get(&object_id) {
-                        self.tombstones.insert(object_id, old.clone());
-                    }
-                } else {
-                    self.tombstones.remove(&object_id);
-                }
-            }
-            self.writes.insert(
-                change.address.key(),
+        let decision = evaluate(
+            &view,
+            project,
+            hasher,
+            transaction,
+            device,
+            id,
+            accepted_at_ms,
+        )?;
+        let Decision {
+            id,
+            device,
+            sequence,
+            hash,
+            canonical_len,
+            record,
+            originals,
+            operations,
+            gesture,
+            tombstones,
+        } = decision;
+        let mut undo = Undo {
+            id: id.clone(),
+            sequence: self.sequence,
+            canonical_len: self.canonical_len,
+            conflicts: self.conflicts.len(),
+            originals,
+            operations: operations.clone(),
+            gesture: gesture.clone(),
+            tombstones: Vec::with_capacity(tombstones.len()),
+            writes: Vec::with_capacity(record.changes.len()),
+        };
+        self.seen_ops.extend(operations);
+        self.gestures.extend(gesture);
+        for (object, deleted) in tombstones {
+            let previous = match deleted {
+                Some(deleted) => self.tombstones.insert(object.clone(), deleted),
+                None => self.tombstones.remove(&object),
+            };
+            undo.tombstones.push((object, previous));
+        }
+        for change in &record.changes {
+            let key = change.address.key();
+            let previous = self.writes.insert(
+                key.clone(),
                 WriteStamp {
                     address: change.address.clone(),
                     device: device.clone(),
                     sequence,
-                    wall_ms: transaction.created_at_wall_ms,
+                    wall_ms: record.transaction.created_at_wall_ms,
                 },
             );
+            undo.writes.push((key, previous));
         }
-        let hash = project.state_hash()?;
-        let ack = v1::TxnAck {
-            txn_id: Some(id.to_proto()),
-            host_seq: sequence,
-            state_hash: hash.bytes().to_vec(),
-            notices,
+        let acceptance = Acceptance {
+            ack: record.ack.clone(),
+            conflicts: record.conflicts.clone(),
+            duplicate: false,
         };
-        self.records.insert(
-            id,
-            Record {
-                transaction,
-                ack: ack.clone(),
-                changes,
-                accepted_at_ms,
-                conflicts: conflicts.clone(),
-            },
-        );
-        self.project = project;
+        self.conflicts.extend(record.conflicts.iter().cloned());
+        self.records.insert(id, record);
         self.sequence = sequence;
         self.revisions.insert(sequence, hash);
-        self.conflicts.extend(conflicts.iter().cloned());
-        Ok(Acceptance {
-            ack,
-            conflicts,
-            duplicate: false,
-        })
+        self.canonical_len = canonical_len;
+        Ok((acceptance, undo))
     }
 
-    fn latest(&self, address: &Address) -> Option<&WriteStamp> {
+    /// Take the newest recorded transaction back out.
+    fn revert(&mut self, undo: Undo) {
+        for (key, previous) in undo.writes.into_iter().rev() {
+            match previous {
+                Some(stamp) => self.writes.insert(key, stamp),
+                None => self.writes.remove(&key),
+            };
+        }
+        for (object, previous) in undo.tombstones.into_iter().rev() {
+            match previous {
+                Some(deleted) => self.tombstones.insert(object, deleted),
+                None => self.tombstones.remove(&object),
+            };
+        }
+        for operation in &undo.operations {
+            self.seen_ops.remove(operation);
+        }
+        if let Some(gesture) = &undo.gesture {
+            self.gestures.remove(gesture);
+        }
+        self.records.remove(&undo.id);
+        self.revisions.remove(&self.sequence);
+        self.sequence = undo.sequence;
+        self.conflicts.truncate(undo.conflicts);
+        self.canonical_len = undo.canonical_len;
+        forget(&mut self.hasher, &undo.originals);
+        undo.originals.restore(&mut self.project);
+    }
+}
+
+impl<'a> View<'a> {
+    /// The newest write stamp at, above or below an address. Stamps are keyed
+    /// `collection/entity/path…`, so one entity's stamps are adjacent.
+    fn latest(&self, address: &Address) -> Option<&'a WriteStamp> {
+        let entity = format!("{}/{}", address.collection, address.entity);
         self.writes
-            .values()
+            .range::<str, _>((Bound::Included(entity.as_str()), Bound::Unbounded))
+            .take_while(|(key, _)| key.starts_with(&entity))
+            .map(|(_, stamp)| stamp)
             .filter(|stamp| stamp.address.overlaps(address))
             .max_by_key(|stamp| stamp.sequence)
     }
@@ -826,7 +891,7 @@ impl HostSequencer {
         change: &Change,
         base_sequence: u64,
         device: &DeviceId,
-    ) -> Option<&WriteStamp> {
+    ) -> Option<&'a WriteStamp> {
         let Some(before) = change.before.as_ref() else {
             return self
                 .latest(&change.address)
@@ -852,8 +917,11 @@ impl HostSequencer {
         opposing
     }
 
+    /// The changes that undo a recorded transaction now. They are tried on
+    /// `project`, which must be the current project and is left unchanged.
     fn inverse(
         &self,
+        project: &mut Project,
         undo: &v1::UndoTransaction,
         device: &DeviceId,
         notices: &mut Vec<String>,
@@ -888,7 +956,8 @@ impl HostSequencer {
                 inverse.push(change.inverse());
             }
         }
-        if patch::apply(&self.project, &inverse).is_ok() {
+        if let Ok(replaced) = draft::edit(project, |draft| patch::apply(draft, &inverse)) {
+            replaced.restore(project);
             return Ok(inverse);
         }
         // A skipped child edit can leave a parent deletion invalid. Preserve
@@ -896,14 +965,16 @@ impl HostSequencer {
         // pending changes after each pass, since parents may be restored later.
         let mut pending = inverse;
         let mut applied = Vec::new();
-        let mut project = self.project.clone();
+        let mut replaced = Vec::new();
         loop {
             let mut remaining = Vec::new();
             let mut progress = false;
             for change in pending {
-                match patch::apply(&project, std::slice::from_ref(&change)) {
-                    Ok(next) => {
-                        project = next;
+                match draft::edit(project, |draft| {
+                    patch::apply(draft, std::slice::from_ref(&change))
+                }) {
+                    Ok(originals) => {
+                        replaced.push(originals);
                         applied.push(change);
                         progress = true;
                     }
@@ -924,8 +995,312 @@ impl HostSequencer {
             }
             pending = remaining;
         }
+        for originals in replaced.into_iter().rev() {
+            originals.restore(project);
+        }
         Ok(applied)
     }
+}
+
+/// Decide one new transaction. On success `project` holds the accepted result
+/// and `hasher` has followed it; on any error both describe the project as it
+/// was. Nothing in `view` is changed either way.
+fn evaluate(
+    view: &View<'_>,
+    project: &mut Project,
+    hasher: &mut StateHasher,
+    transaction: v1::Transaction,
+    device: DeviceId,
+    id: Id,
+    accepted_at_ms: i64,
+) -> Result<Decision, OpsError> {
+    if Id::from_proto(transaction.project_id.as_ref())? != project.id {
+        return Err(OpsError::Invalid("project identity"));
+    }
+    if transaction.ops.is_empty()
+        || transaction.ops.len() > 4096
+        || transaction.created_at_wall_ms < 0
+        || accepted_at_ms < 0
+        || accepted_at_ms as u64 >= 1u64 << 48
+    {
+        return Err(OpsError::Invalid("transaction bounds"));
+    }
+    let base = transaction
+        .base_revision
+        .as_ref()
+        .ok_or(OpsError::Invalid("base revision"))?;
+    if view
+        .revisions
+        .get(&base.host_seq)
+        .map(|v| v.bytes().to_vec())
+        != Some(base.state_hash.clone())
+    {
+        return Err(OpsError::RevisionMismatch);
+    }
+    let sequence = view
+        .sequence
+        .checked_add(1)
+        .ok_or(OpsError::CounterExhausted)?;
+    let mut operations = Vec::with_capacity(transaction.ops.len());
+    let mut counters = BTreeSet::new();
+    for op in &transaction.ops {
+        let op_id = op
+            .op_id
+            .as_ref()
+            .ok_or(OpsError::Invalid("operation identity"))?;
+        let operation = (device.clone(), op_id.lamport);
+        if op_id.device_id != device.as_str()
+            || op_id.lamport == 0
+            || view.seen_ops.contains(&operation)
+            || !counters.insert(op_id.lamport)
+        {
+            return Err(OpsError::Invalid("operation identity/counter"));
+        }
+        operations.push(operation);
+    }
+    let gesture = match &transaction.gesture_id {
+        Some(gesture) => {
+            let key = (device.clone(), Id::from_proto(Some(gesture))?);
+            if view.cancelled.contains(&key) || view.gestures.contains(&key) {
+                return Err(OpsError::Invalid("cancelled or duplicate gesture"));
+            }
+            Some(key)
+        }
+        None => None,
+    };
+    let mut notices = Vec::new();
+    let mut conflicts = Vec::new();
+    let changes = if let [
+        v1::Op {
+            kind: Some(Kind::UndoTransaction(undo)),
+            ..
+        },
+    ] = transaction.ops.as_slice()
+    {
+        view.inverse(project, undo, &device, &mut notices)?
+    } else {
+        let mut filtered = transaction.clone();
+        filtered.ops.clear();
+        let mut ghosts = BTreeMap::<Id, v1::ObjectState>::new();
+        let mut ghost_paths = BTreeSet::<(Id, String)>::new();
+        for op in &transaction.ops {
+            match op.kind.as_ref() {
+                Some(Kind::SetProperty(property)) => {
+                    let object_id = Id::from_proto(property.object_id.as_ref())?;
+                    if !project.objects.contains_key(&object_id)
+                        && let Some(deleted) = view.tombstones.get(&object_id)
+                    {
+                        let state = ghosts
+                            .entry(object_id.clone())
+                            .or_insert_with(|| deleted.state.clone());
+                        plan::set_property(state, property)?;
+                        ghost_paths.insert((object_id, property.property.clone()));
+                        continue;
+                    }
+                }
+                Some(Kind::Reorder(value)) => {
+                    let object_id = Id::from_proto(value.object_id.as_ref())?;
+                    if !project.objects.contains_key(&object_id)
+                        && let Some(deleted) = view.tombstones.get(&object_id)
+                    {
+                        let destination = project
+                            .layers
+                            .get(&Id::from_proto(value.layer_id.as_ref())?)
+                            .ok_or(OpsError::NotFound)?;
+                        if Id::from_proto(destination.definition.document_id.as_ref())?
+                            != deleted.document_id
+                        {
+                            return Err(OpsError::Invalid("cross-document object layer"));
+                        }
+                        if destination.locked || deleted.state.locked {
+                            return Err(OpsError::Locked);
+                        }
+                        vw_model::OrderKey::try_from(value.order_key.clone())?;
+                        let state = ghosts
+                            .entry(object_id.clone())
+                            .or_insert_with(|| deleted.state.clone());
+                        state.layer_id = value.layer_id.clone();
+                        state.order_key = value.order_key.clone();
+                        ghost_paths.insert((object_id, "reorder".into()));
+                        continue;
+                    }
+                }
+                Some(Kind::DeleteObject(value)) => {
+                    let object_id = Id::from_proto(value.object_id.as_ref())?;
+                    if !project.objects.contains_key(&object_id)
+                        && view.tombstones.contains_key(&object_id)
+                    {
+                        continue;
+                    }
+                }
+                Some(Kind::CreateObject(value)) => {
+                    let state = value
+                        .state
+                        .as_ref()
+                        .ok_or(OpsError::Invalid("object state"))?;
+                    if view
+                        .tombstones
+                        .contains_key(&Id::from_proto(state.object_id.as_ref())?)
+                    {
+                        return Err(OpsError::AlreadyExists);
+                    }
+                }
+                _ => {}
+            }
+            filtered.ops.push(op.clone());
+        }
+        for (object_id, property) in ghost_paths {
+            let edited = ghosts.get(&object_id).ok_or(OpsError::NotFound)?;
+            let address = Address {
+                collection: "objects".into(),
+                entity: object_id.to_string(),
+                path: Vec::new(),
+            };
+            let stamp = view
+                .latest(&address)
+                .ok_or(OpsError::Invalid("deletion stamp"))?;
+            conflicts.push(conflict(
+                &id,
+                &address,
+                &property,
+                None,
+                Some(&serde_json::to_value(edited)?),
+                &stamp.device,
+                &device,
+                accepted_at_ms,
+                true,
+                Some(edited.clone()),
+            )?);
+        }
+        // Carry the operations out in place to learn what they change, then
+        // put the project back: stale changes may still lose below.
+        let mut draft = Draft::new(project);
+        let planned = plan::apply(&mut draft, &filtered)
+            .and_then(|()| Ok(draft.validate()?))
+            .and_then(|()| {
+                let mut planned = patch::between(draft.originals(), draft.project())?;
+                append_explicit_writes(
+                    draft.originals(),
+                    draft.project(),
+                    &filtered,
+                    &mut planned,
+                )?;
+                Ok(planned)
+            });
+        draft.discard();
+        let mut accepted = Vec::new();
+        for change in planned? {
+            let opposing = view.effective_opposing(&change, base.host_seq, &device);
+            if let Some(stamp) = opposing {
+                let deleting = change.address.path.is_empty() && change.after.is_none();
+                let incoming_wins = deleting
+                    || transaction.created_at_wall_ms > stamp.wall_ms
+                    || (transaction.created_at_wall_ms == stamp.wall_ms
+                        && &device == view.host_device);
+                let (kept, other, kept_device, other_device) = if incoming_wins {
+                    (
+                        change.after.as_ref(),
+                        change.before.as_ref(),
+                        &device,
+                        &stamp.device,
+                    )
+                } else {
+                    (
+                        change.before.as_ref(),
+                        change.after.as_ref(),
+                        &stamp.device,
+                        &device,
+                    )
+                };
+                let edited = if deleting && change.address.collection == "objects" {
+                    project
+                        .objects
+                        .get(&Id::try_from(change.address.entity.clone())?)
+                        .map(|o| o.state.clone())
+                } else {
+                    None
+                };
+                // Equal-value writes still establish ownership, but have
+                // no distinct losing value for the user to review.
+                if change.before != change.after {
+                    conflicts.push(conflict(
+                        &id,
+                        &change.address,
+                        &change.address.property(),
+                        kept,
+                        other,
+                        kept_device,
+                        other_device,
+                        accepted_at_ms,
+                        edited.is_some(),
+                        edited,
+                    )?);
+                }
+                if incoming_wins {
+                    accepted.push(change);
+                }
+            } else {
+                accepted.push(change);
+            }
+        }
+        accepted
+    };
+    let originals = draft::edit(project, |draft| patch::apply(draft, &changes))?;
+    forget(hasher, &originals);
+    // The project now holds the result. Anything that still fails has to put
+    // it back before reporting the error.
+    let concluded = (|| {
+        let mut tombstones = Vec::new();
+        for change in &changes {
+            if change.address.collection == "objects" && change.address.path.is_empty() {
+                let object_id = Id::try_from(change.address.entity.clone())?;
+                if change.after.is_some() {
+                    tombstones.push((object_id, None));
+                } else if let Some(Some(old)) = originals.objects.get(&object_id) {
+                    tombstones.push((object_id, Some(old.clone())));
+                }
+            }
+        }
+        let (hash, canonical_len) = hasher.hash(project)?;
+        debug_assert_eq!(
+            Some(&hash),
+            project.state_hash().ok().as_ref(),
+            "incremental state hash differs from the whole-project hash"
+        );
+        Ok::<_, OpsError>((tombstones, hash, canonical_len))
+    })();
+    let (tombstones, hash, canonical_len) = match concluded {
+        Ok(concluded) => concluded,
+        Err(error) => {
+            forget(hasher, &originals);
+            originals.restore(project);
+            return Err(error);
+        }
+    };
+    let ack = v1::TxnAck {
+        txn_id: Some(id.to_proto()),
+        host_seq: sequence,
+        state_hash: hash.bytes().to_vec(),
+        notices,
+    };
+    Ok(Decision {
+        id,
+        device,
+        sequence,
+        hash,
+        canonical_len,
+        record: Record {
+            transaction,
+            ack,
+            changes,
+            accepted_at_ms,
+            conflicts,
+        },
+        originals,
+        operations,
+        gesture,
+        tombstones,
+    })
 }
 
 fn validate_checkpoint_operation(operation: &v1::Op, device: &DeviceId) -> Result<(), OpsError> {
@@ -1367,13 +1742,12 @@ fn conflict(
 // A value-equal explicit write is still a write: it establishes ordering and
 // ownership for later stale conflicts and undo. A pure state diff loses it.
 fn append_explicit_writes(
-    before: &Project,
+    before: &Originals,
     after: &Project,
     transaction: &v1::Transaction,
     changes: &mut Vec<Change>,
 ) -> Result<(), OpsError> {
-    let old = serde_json::to_value(before)?;
-    let new = serde_json::to_value(after)?;
+    let mut values = Values::new(before, after);
     for op in &transaction.ops {
         let mut addresses = Vec::new();
         match op.kind.as_ref() {
@@ -1464,32 +1838,18 @@ fn append_explicit_writes(
             _ => {}
         }
         for address in addresses {
-            append_same_leaves(&old, &new, address, changes);
+            append_same_leaves(&mut values, address, changes)?;
         }
     }
     Ok(())
 }
-fn journal_value<'a>(
-    project: &'a serde_json::Value,
-    address: &Address,
-) -> Option<&'a serde_json::Value> {
-    let mut value = project.get(&address.collection)?.get(&address.entity)?;
-    for part in &address.path {
-        value = value.get(part)?;
-    }
-    Some(value)
-}
 fn append_same_leaves(
-    old: &serde_json::Value,
-    new: &serde_json::Value,
+    values: &mut Values<'_>,
     address: Address,
     changes: &mut Vec<Change>,
-) {
-    let Some(before) = journal_value(old, &address) else {
-        return;
-    };
-    let Some(after) = journal_value(new, &address) else {
-        return;
+) -> Result<(), OpsError> {
+    let (Some(before), Some(after)) = values.at(&address)? else {
+        return Ok(());
     };
     // Transform and identifiers are indivisible validated properties.
     let shape_variant_changed = address.path.last().is_some_and(|part| part == "shape")
@@ -1507,22 +1867,29 @@ fn append_same_leaves(
             )
         });
     if !atomic && let (Some(before), Some(after)) = (before.as_object(), after.as_object()) {
-        for key in before.keys().filter(|key| after.contains_key(*key)) {
+        let shared = before
+            .keys()
+            .filter(|key| after.contains_key(*key))
+            .cloned()
+            .collect::<Vec<_>>();
+        for key in shared {
             let mut child = address.clone();
-            child.path.push(key.clone());
-            append_same_leaves(old, new, child, changes);
+            child.path.push(key);
+            append_same_leaves(values, child, changes)?;
         }
-        return;
+        return Ok(());
     }
     if before == after
         && !changes
             .iter()
             .any(|change| change.address.overlaps(&address))
     {
+        let (before, after) = (Some(before.clone()), Some(after.clone()));
         changes.push(Change {
             address,
-            before: Some(before.clone()),
-            after: Some(after.clone()),
+            before,
+            after,
         });
     }
+    Ok(())
 }
