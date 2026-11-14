@@ -2,6 +2,7 @@ import { McpServer, ResourceTemplate, fromJsonSchema } from '@modelcontextprotoc
 import { LIMITS, ID_PATTERN, Slots, boundedString, encoded, identifier, requireThat, safeCode } from './bounds.mjs';
 import { registerVerificationTools } from './verification.mjs';
 import { DESCRIPTIONS, SERVER_INSTRUCTIONS } from './descriptions.mjs';
+import { errorResult } from './errors.mjs';
 const id = { type: 'string', pattern: ID_PATTERN };
 const object = (properties, required = Object.keys(properties)) => fromJsonSchema({ type: 'object', properties, required, additionalProperties: false });
 const text = { type: 'string', maxLength: LIMITS.text };
@@ -21,7 +22,7 @@ export function factory({ packages, owner, grants, principal, slots = new Slots(
           return await slots.run(async () => {
             const result = await action(args, context.mcpReq?.signal); encoded(result); return result;
           });
-        } catch (error) { return { isError: true, content: [{ type: 'text', text: safeCode(error) }] }; }
+        } catch (error) { return errorResult(safeCode(error)); }
       });
     }
     registerVerificationTools(tool, { packages, owner, principal });
