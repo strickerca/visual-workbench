@@ -224,18 +224,6 @@ impl StrokeGesture {
                 if batch.sequence != state.next_sequence {
                     return Err(CoreError::Invalid);
                 }
-                if state
-                    .builder
-                    .geometry()
-                    .polygons()
-                    .iter()
-                    .map(|p| p.points.len())
-                    .sum::<usize>()
-                    > 131072
-                {
-                    return Err(CoreError::Backpressure);
-                }
-                let mut prediction = state.builder.clone();
                 let samples = (0..batch.x.len())
                     .map(|i| vw_ink::Sample {
                         x: batch.x[i],
@@ -246,12 +234,14 @@ impl StrokeGesture {
                         orientation: batch.orientation.get(i).map(|v| f64::from(*v)),
                     })
                     .collect::<Vec<_>>();
-                let range = prediction.append(&samples)?;
+                // The stroke is not copied: the predicted contours are built
+                // from its current end and never join it.
+                let predicted = state.builder.preview(&samples)?;
                 Ok(InkUpdate {
                     sequence: batch.sequence,
-                    first_polygon: range.start as u64,
+                    first_polygon: state.builder.geometry().polygons().len() as u64,
                     sample_count: state.stroke.x.len() as u64,
-                    contours: contours(&prediction.geometry().polygons()[range.start..range.end])?,
+                    contours: contours(&predicted)?,
                 })
             })
             .await
