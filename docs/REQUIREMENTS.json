@@ -44,7 +44,7 @@
       "partial",
       "not_applicable"
     ],
-    "evidence": "Paths under docs/evidence/ added when verification runs",
+    "evidence": "One-line results: the task, what ran and what stays open. No evidence files are kept (AGENTS.md).",
     "milestone_scope": "Optional owner-approved milestone inclusion/deferral and decision reference. Subset verification cannot pass a full requirement; not_applicable for a deferred milestone is not full-gate acceptance."
   },
   "counts": {
@@ -93,7 +93,7 @@
         "A01"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — shared canonical model and immutable asset metadata verified; blob-byte immutability/storage and real cross-device latency remain T1.03, T1.10 and T1.12."
+        "T1.02 — shared canonical model and immutable asset metadata verified; blob-byte immutability/storage and real cross-device latency remain T1.03, T1.10 and T1.12."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -121,8 +121,8 @@
         "A01"
       ],
       "evidence": [
-        "docs/evidence/T1.01.md — shared camera and transforms verified on Windows/S23; receiving camera invariance across 100 peer edits and explicit default-off follow/match remain T1.09, T1.10 and T1.12.",
-        "docs/evidence/T1.09.md - Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open."
+        "T1.01 — shared camera and transforms verified on Windows/S23; receiving camera invariance across 100 peer edits and explicit default-off follow/match remain T1.09, T1.10 and T1.12.",
+        "T1.09 — Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -153,7 +153,7 @@
         "A02"
       ],
       "evidence": [
-        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
+        "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -184,7 +184,7 @@
         "A06"
       ],
       "evidence": [
-        "docs/evidence/T1.08a.md - Local project/edit/export paths execute in the isolated app; airplane-mode input-to-present measurement and trace acceptance remain pending."
+        "T1.08a — Local project/edit/export paths execute in the isolated app; airplane-mode input-to-present measurement and trace acceptance remain pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -214,8 +214,8 @@
         "A06"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — 500 seeded undo/redo sequences per platform and commit/cancel identities verified; actual app gestures and end-to-end cancellation remain T1.08b, T1.10 and T1.12.",
-        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
+        "T1.02 — 500 seeded undo/redo sequences per platform and commit/cancel identities verified; actual app gestures and end-to-end cancellation remain T1.08b, T1.10 and T1.12.",
+        "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -244,9 +244,9 @@
         "A13"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — capture session/frame/geometry and semantic binding round-trip on both platforms; evidence only, capture storage/import/export metadata remain downstream.",
-        "docs/evidence/T1.05.md — PNG iTXt and JPEG/WebP XMP include revision, original hash, dimensions/settings and supplied capture IDs; capture persistence/end-to-end and app integration remain open.",
-        "docs/evidence/T1.11.md - Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
+        "T1.02 — capture session/frame/geometry and semantic binding round-trip on both platforms; evidence only, capture storage/import/export metadata remain downstream.",
+        "T1.05 — PNG iTXt and JPEG/WebP XMP include revision, original hash, dimensions/settings and supplied capture IDs; capture persistence/end-to-end and app integration remain open.",
+        "T1.11 — Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -277,8 +277,8 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/T1.06a.md — All 10,000 fault seeds converge and native recovery tests pass; app lifecycle/replication integration remains T1.10.",
-        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
+        "T1.06a — All 10,000 fault seeds converge and native recovery tests pass; app lifecycle/replication integration remains T1.10.",
+        "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -306,7 +306,7 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/T1.03.md — atomic history/checkpoint persistence, schema-1 forward migration and exact last-committed recovery pass Windows/S23 checks after 1000/100 killed writers; integrated app-kill recovery remains A18/T1.12 acceptance."
+        "T1.03 — atomic history/checkpoint persistence, schema-1 forward migration and exact last-committed recovery pass Windows/S23 checks after 1000/100 killed writers; integrated app-kill recovery remains A18/T1.12 acceptance."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -334,7 +334,7 @@
         "A01"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -364,7 +364,7 @@
         "A06"
       ],
       "evidence": [
-        "docs/evidence/T1.04.md — Provisional pressure-driven geometry and synthetic cancellation pass on Windows/IN2019; physical palm/S Pen and app diagnostics remain for T1.08a/T1.12."
+        "T1.04 — Provisional pressure-driven geometry and synthetic cancellation pass on Windows/IN2019; physical palm/S Pen and app diagnostics remain for T1.08a/T1.12."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -395,8 +395,8 @@
         "A01"
       ],
       "evidence": [
-        "docs/evidence/T1.04.md — Monotonic Bezier curves and stabilization are replay-tested; editable persisted settings and hover cursor remain for T1.08b/T1.12.",
-        "docs/evidence/T1.08b.md - Per-brush settings persist and native pressure/stabilization fixtures pass; physical hover behavior remains deferred."
+        "T1.04 — Monotonic Bezier curves and stabilization are replay-tested; editable persisted settings and hover cursor remain for T1.08b/T1.12.",
+        "T1.08b — Per-brush settings persist and native pressure/stabilization fixtures pass; physical hover behavior remains deferred."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -425,7 +425,7 @@
         "A01"
       ],
       "evidence": [
-        "docs/evidence/T1.08a.md - IN2019 injected input tests pass for pen/finger routing and the saved finger-drawing option; physical owner/S23 acceptance remains pending."
+        "T1.08a — IN2019 injected input tests pass for pen/finger routing and the saved finger-drawing option; physical owner/S23 acceptance remains pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -453,7 +453,7 @@
         "A03"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -483,7 +483,7 @@
         "A04"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -509,8 +509,8 @@
         "A05"
       ],
       "evidence": [
-        "docs/evidence/T1.01.md — 10,000-case lens latch property suite per platform; math evidence only, product lens behavior remains T3.04.",
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "T1.01 — 10,000-case lens latch property suite per platform; math evidence only, product lens behavior remains T3.04.",
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -536,7 +536,7 @@
         "A04"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -564,7 +564,7 @@
         "A05"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -592,7 +592,7 @@
         "A09"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -620,7 +620,7 @@
         "A09"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -647,7 +647,7 @@
         "A09"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -675,8 +675,8 @@
         "A13"
       ],
       "evidence": [
-        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -706,8 +706,8 @@
         "A03"
       ],
       "evidence": [
-        "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "T0.04 — Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -736,8 +736,8 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "T0.04 — Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -765,7 +765,7 @@
         "A06"
       ],
       "evidence": [
-        "docs/evidence/T1.08a.md - Generic capability/input, palm and cancellation fixtures pass in the actual IN2019 app; S23 hardware-specific behavior remains deferred."
+        "T1.08a — Generic capability/input, palm and cancellation fixtures pass in the actual IN2019 app; S23 hardware-specific behavior remains deferred."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -795,7 +795,7 @@
         "A03"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -825,8 +825,8 @@
         "A06"
       ],
       "evidence": [
-        "docs/evidence/T0.04.md: Probe recorder and bounded HIL replay implemented; physical OnePlus synthetic software checks are separate from S23 acceptance. At least 24 S23 owner traces, their replay, capability measurements and thermal session remain pending in T0.04. Public MotionEvent construction cannot reproduce nonzero actionButton; affected traces fail explicitly.",
-        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+        "T0.04 — Probe recorder and bounded HIL replay implemented; physical OnePlus synthetic software checks are separate from S23 acceptance. At least 24 S23 owner traces, their replay, capability measurements and thermal session remain pending in T0.04. Public MotionEvent construction cannot reproduce nonzero actionButton; affected traces fail explicitly.",
+        "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -856,9 +856,9 @@
         "A02"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — all 13 object representations and editable operations validated; brush/tool UI, font rendering and golden images remain T1.04, T1.05, T1.08b and T1.12.",
-        "docs/evidence/T1.08b.md - Editable tool/reopen and Android-versus-native text outline golden cases pass; cross-device UI acceptance remains pending.",
-        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
+        "T1.02 — all 13 object representations and editable operations validated; brush/tool UI, font rendering and golden images remain T1.04, T1.05, T1.08b and T1.12.",
+        "T1.08b — Editable tool/reopen and Android-versus-native text outline golden cases pass; cross-device UI acceptance remains pending.",
+        "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -887,8 +887,8 @@
         "A22"
       ],
       "evidence": [
-        "docs/evidence/T2.04.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.04 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -915,7 +915,7 @@
         "A02"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -943,10 +943,10 @@
         "A02"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — transform/style/shape property transactions and inverse behavior verified; interactive handles and streamed intermediate UI states remain T1.08b/T1.09/T1.10/T1.12.",
-        "docs/evidence/T1.08b.md - Injected Android select/move/resize/undo cases pass with native revision binding; physical two-device intermediate-state streaming remains pending.",
-        "docs/evidence/T1.09.md - Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open.",
-        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
+        "T1.02 — transform/style/shape property transactions and inverse behavior verified; interactive handles and streamed intermediate UI states remain T1.08b/T1.09/T1.10/T1.12.",
+        "T1.08b — Injected Android select/move/resize/undo cases pass with native revision binding; physical two-device intermediate-state streaming remains pending.",
+        "T1.09 — Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open.",
+        "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -973,8 +973,8 @@
         "A06"
       ],
       "evidence": [
-        "docs/evidence/T2.01.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.01 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1002,8 +1002,8 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T2.01.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.01 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1031,8 +1031,8 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T2.01.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.01 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1060,8 +1060,8 @@
         "A22"
       ],
       "evidence": [
-        "docs/evidence/T2.04.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.04 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1087,7 +1087,7 @@
         "A11"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1119,8 +1119,8 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T2.03.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.03 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1148,7 +1148,7 @@
         "A02"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1175,7 +1175,7 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1203,7 +1203,7 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1232,7 +1232,7 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: empty production LiteRT catalog (B2); 100 ms."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: empty production LiteRT catalog (B2); 100 ms."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1259,8 +1259,8 @@
         "A23"
       ],
       "evidence": [
-        "docs/evidence/T2.06.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.06 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1291,7 +1291,7 @@
         "A07"
       ],
       "evidence": [
-        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+        "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1317,7 +1317,7 @@
         "A07"
       ],
       "evidence": [
-        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+        "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1343,7 +1343,7 @@
         "A07"
       ],
       "evidence": [
-        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+        "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1369,7 +1369,7 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1395,8 +1395,8 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/T2.06.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.06 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1423,7 +1423,7 @@
         "A07"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1449,7 +1449,7 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: tunnel license admission (B3); device run."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: tunnel license admission (B3); device run."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1478,7 +1478,7 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+        "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1505,7 +1505,7 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: COMPILED_APPROVED_CATALOG is None until B3."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: COMPILED_APPROVED_CATALOG is None until B3."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1533,8 +1533,8 @@
         "A29"
       ],
       "evidence": [
-        "docs/evidence/T2.09.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.09 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1566,7 +1566,7 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1593,7 +1593,7 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: B3; device run."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: B3; device run."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1620,7 +1620,7 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1648,7 +1648,7 @@
         "A07"
       ],
       "evidence": [
-        "docs/evidence/T1.01.md — exact integer F/H property suite passes at 100–300% DPI and negative/rotated origins on Windows/S23; physical Windows scaling/injection mapping remains T3.01 and negative-origin display hardware remains DISPLAY-003."
+        "T1.01 — exact integer F/H property suite passes at 100–300% DPI and negative/rotated origins on Windows/S23; physical Windows scaling/injection mapping remains T3.01 and negative-origin display hardware remains DISPLAY-003."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1675,7 +1675,7 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1702,7 +1702,7 @@
         "A09"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -1740,9 +1740,9 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
-        "docs/evidence/T1.06b.md — Native QR/code/discovery and IN2019 ADB QR pairing pass; app QR/discovery and physical route scenarios remain T1.10.",
-        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
+        "T0.06 — Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
+        "T1.06b — Native QR/code/discovery and IN2019 ADB QR pairing pass; app QR/discovery and physical route scenarios remain T1.10.",
+        "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1770,8 +1770,8 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/T1.06b.md — Both TLS carriers and IN2019 ADB operation exchange work in the CLI; app reconnect, tether/Wi-Fi and timing acceptance remain T1.10.",
-        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
+        "T1.06b — Both TLS carriers and IN2019 ADB operation exchange work in the CLI; app reconnect, tether/Wi-Fi and timing acceptance remain T1.10.",
+        "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1802,8 +1802,8 @@
         "A19"
       ],
       "evidence": [
-        "docs/evidence/T1.06b.md — DPAPI, expiry/reuse/replay, code lockout and live revocation pass; Android Keystore and real-app flows remain T1.10.",
-        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
+        "T1.06b — DPAPI, expiry/reuse/replay, code lockout and live revocation pass; Android Keystore and real-app flows remain T1.10.",
+        "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1829,8 +1829,8 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
-        "docs/evidence/T1.06a.md — Latest-only MEDIA and bounded queue tests pass; physical 2x-overload rendering on both carriers remains open."
+        "T0.06 — Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
+        "T1.06a — Latest-only MEDIA and bounded queue tests pass; physical 2x-overload rendering on both carriers remains open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1858,7 +1858,7 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/T1.06a.md — Fresh-connection invalidation and durable resync tests pass; app carrier switching and hardware reconnect measurements remain open."
+        "T1.06a — Fresh-connection invalidation and durable resync tests pass; app carrier switching and hardware reconnect measurements remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -1918,7 +1918,7 @@
         "A17"
       ],
       "evidence": [
-        "docs/evidence/T0.08.md"
+        "T0.08 — recorded in the plan's task status"
       ],
       "impl_status": "deferred",
       "verify_status": "not_applicable",
@@ -2081,7 +2081,7 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2108,7 +2108,7 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2233,7 +2233,7 @@
         "A15"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2260,8 +2260,8 @@
         "A10"
       ],
       "evidence": [
-        "docs/evidence/T0.09.md",
-        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+        "T0.09 — recorded in the plan's task status",
+        "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2291,8 +2291,8 @@
         "A10"
       ],
       "evidence": [
-        "docs/evidence/T0.09.md",
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "T0.09 — recorded in the plan's task status",
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2321,7 +2321,7 @@
         "A19"
       ],
       "evidence": [
-        "docs/evidence/T1.03.md — RAM accounting/LRU defaults of 256/512 MiB, disk budgets, the exact decimal reserve formula, post-write space checks and original preservation pass Windows/S23 tests; app cache wiring, releasing RAM victims and the visible low-space state remain T1.08a/T1.10 and A10/A19/T1.12. GPU texture accounting belongs to FORMAT-002 in phase 3."
+        "T1.03 — RAM accounting/LRU defaults of 256/512 MiB, disk budgets, the exact decimal reserve formula, post-write space checks and original preservation pass Windows/S23 tests; app cache wiring, releasing RAM victims and the visible low-space state remain T1.08a/T1.10 and A10/A19/T1.12. GPU texture accounting belongs to FORMAT-002 in phase 3."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2349,7 +2349,7 @@
         "A10"
       ],
       "evidence": [
-        "docs/evidence/T1.05.md — Native exports bind original hash/revision/dimensions and reject preview-only input; T1.11 app preflight/reporting remains open."
+        "T1.05 — Native exports bind original hash/revision/dimensions and reject preview-only input; T1.11 app preflight/reporting remains open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2376,8 +2376,8 @@
         "A11"
       ],
       "evidence": [
-        "docs/evidence/T1.05.md — PNG8/16, JPEG and WebP native codec tests pass on Windows/IN2019, including exact PNG alpha/depth round trips; app integration remains T1.11.",
-        "docs/evidence/T1.11.md - Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
+        "T1.05 — PNG8/16, JPEG and WebP native codec tests pass on Windows/IN2019, including exact PNG alpha/depth round trips; app integration remains T1.11.",
+        "T1.11 — Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2404,7 +2404,7 @@
         "A12"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2432,7 +2432,7 @@
         "A12"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2460,8 +2460,8 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T2.06.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.06 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2489,7 +2489,7 @@
         "A15"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: partial source; present: PSD/PSB labelled composite; missing: PDF-compatible AI opens as a PDF document, not a labelled flattened composite (T5.08)."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: partial source; present: PSD/PSB labelled composite; missing: PDF-compatible AI opens as a PDF document, not a labelled flattened composite (T5.08)."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2515,7 +2515,7 @@
         "A11"
       ],
       "evidence": [
-        "docs/evidence/T1.05.md — Typed dimension, depth, alpha, profile and memory refusals pass native tests without scaling; T1.11 still owns user-visible alternatives and conversion choices."
+        "T1.05 — Typed dimension, depth, alpha, profile and memory refusals pass native tests without scaling; T1.11 still owns user-visible alternatives and conversion choices."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2541,7 +2541,7 @@
         "A11"
       ],
       "evidence": [
-        "docs/evidence/T1.05.md — Native tests cover all eight orientations, exact retained ICC, explicit sRGB conversion and provenance, hostile ICC admission; OS capture/import integration remains T1.11 and later capture tasks."
+        "T1.05 — Native tests cover all eight orientations, exact retained ICC, explicit sRGB conversion and provenance, hostile ICC admission; OS capture/import integration remains T1.11 and later capture tasks."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2568,7 +2568,7 @@
         "A10"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: partial source; present: embedded-JPEG preview for TIFF-based DNG/CR2; missing: Android platform DNG and Windows WIC Raw Image Extension routes (T5.08)."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: partial source; present: embedded-JPEG preview for TIFF-based DNG/CR2; missing: Android platform DNG and Windows WIC Raw Image Extension routes (T5.08)."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2594,7 +2594,7 @@
         "A11"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2621,7 +2621,7 @@
         "A11"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -2647,7 +2647,7 @@
         "A13"
       ],
       "evidence": [
-        "docs/evidence/T1.05.md — Clean PNG full/region samples, including hidden RGB and alpha, are exact in native Windows/IN2019 tests; T1.11 still owns app handoff and UI-free output integration."
+        "T1.05 — Clean PNG full/region samples, including hidden RGB and alpha, are exact in native Windows/IN2019 tests; T1.11 still owns app handoff and UI-free output integration."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2673,7 +2673,7 @@
         "A13"
       ],
       "evidence": [
-        "docs/evidence/T1.05.md — Visible annotations render at source resolution with nine byte-exact PNG/layout goldens on Windows/IN2019; app export wiring and full scenario coverage remain T1.11/T1.12."
+        "T1.05 — Visible annotations render at source resolution with nine byte-exact PNG/layout goldens on Windows/IN2019; app export wiring and full scenario coverage remain T1.11/T1.12."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2700,8 +2700,8 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T2.01.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.01 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2730,8 +2730,8 @@
         "A22"
       ],
       "evidence": [
-        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2757,8 +2757,8 @@
         "A13"
       ],
       "evidence": [
-        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2785,7 +2785,7 @@
         "A13"
       ],
       "evidence": [
-        "docs/evidence/T1.11.md - Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
+        "T1.11 — Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2811,8 +2811,8 @@
         "A13"
       ],
       "evidence": [
-        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2840,8 +2840,8 @@
         "A22"
       ],
       "evidence": [
-        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2868,8 +2868,8 @@
         "A13"
       ],
       "evidence": [
-        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2899,8 +2899,8 @@
         "A23"
       ],
       "evidence": [
-        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2928,8 +2928,8 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T2.03.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.03 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2955,7 +2955,7 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/T1.09.md - Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open."
+        "T1.09 — Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -2981,7 +2981,7 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/T1.08b.md - Movable/mirrored tool rail is integrated; complete portrait/landscape owner reachability review remains pending."
+        "T1.08b — Movable/mirrored tool rail is integrated; complete portrait/landscape owner reachability review remains pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3007,7 +3007,7 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/T1.08b.md - Declared theme text-pair contrast passes; all rendered controls and reduced-motion acceptance remain pending."
+        "T1.08b — Declared theme text-pair contrast passes; all rendered controls and reduced-motion acceptance remain pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3033,8 +3033,8 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/T1.08b.md - Exercised project actions pass 48 dp assertions; all PC shortcuts and whole-product touch-target acceptance remain pending.",
-        "docs/evidence/T1.09.md - Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open."
+        "T1.08b — Exercised project actions pass 48 dp assertions; all PC shortcuts and whole-product touch-target acceptance remain pending.",
+        "T1.09 — Actual packaged Windows frame/PMv2/shutdown and desktop JVM regressions passed; all-mode interaction, crisp visual review and paired app acceptance remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3061,8 +3061,8 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open.",
-        "docs/evidence/T1.11.md - Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
+        "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open.",
+        "T1.11 — Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3088,7 +3088,7 @@
         "A01"
       ],
       "evidence": [
-        "docs/evidence/T1.08a.md - Injected gesture and generic surface cases pass; full physical gesture/layout acceptance remains pending."
+        "T1.08a — Injected gesture and generic surface cases pass; full physical gesture/layout acceptance remains pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3116,8 +3116,8 @@
         "A24"
       ],
       "evidence": [
-        "docs/evidence/T2.04.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.04 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3145,7 +3145,7 @@
         "A19"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3172,7 +3172,7 @@
         "A19"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3198,7 +3198,7 @@
         "A19"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3215,7 +3215,7 @@
       "phase": 0,
       "depends_on": [],
       "acceptance": [
-        "Every PERF requirement has a documented measurement method, tools, sample count and environment fields (docs/evidence/PERF-template.md).",
+        "Every PERF requirement has a documented measurement method, tools, sample count and environment fields (docs/PERF_METHODS.md).",
         "Phase 0 records baselines for phone battery temperature over a 10-minute pen session and for carrier recovery time after unplug/replug and a Wi-Fi drop.",
         "Gate G0 records the confirmed or adjusted PERF targets in a dated DECISIONS.md entry."
       ],
@@ -3227,10 +3227,10 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/T0.03.md: All nine PERF methods defined in PERF-template.md; 10-minute S23 thermal baseline T0.04, recovery baseline T0.06, dated target confirmation T0.12 pending.",
-        "docs/evidence/T0.04.md: Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
-        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
-        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+        "T0.03 — All nine PERF methods defined in PERF-template.md; 10-minute S23 thermal baseline T0.04, recovery baseline T0.06, dated target confirmation T0.12 pending.",
+        "T0.04 — Recorder and measurement tools prepared. S23 physical hover, tilt/orientation calibration and ten-minute drawing temperature baseline are unmeasured; injected OnePlus data does not establish those capabilities. Status unchanged; owning later tasks and T0.12 remain responsible for acceptance.",
+        "T0.06 — Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
+        "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3247,7 +3247,7 @@
       "phase": 5,
       "depends_on": [],
       "acceptance": [
-        "Every PERF requirement is measured on the release build with numbers in docs/evidence/.",
+        "Every PERF requirement is measured on the release build, with the numbers recorded as one-line results in the plan's task status.",
         "Thermals: phone battery temperature and any throttling during 30-minute markup and remote-edit sessions are recorded.",
         "Recovery: app crash, PC sleep/resume and carrier loss each recover without data loss, with times recorded."
       ],
@@ -3282,8 +3282,8 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/T0.03.md: Dated PC/IN2019 hardware facts and explicit untestable S23 states; all remaining hardware-dependent requirements still require named-device/OS/app evidence in their owning phases.",
-        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+        "T0.03 — Dated PC/IN2019 hardware facts and explicit untestable S23 states; all remaining hardware-dependent requirements still require named-device/OS/app evidence in their owning phases.",
+        "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3311,7 +3311,7 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: partial source; present: TOOLCHAIN/SHA256SUMS/notices assembly and MSI hook; missing: reproducibility comparison tool, generated notices (LIC-003), WiX/jpackage admission and Windows run (T5.06)."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: partial source; present: TOOLCHAIN/SHA256SUMS/notices assembly and MSI hook; missing: reproducibility comparison tool, generated notices (LIC-003), WiX/jpackage admission and Windows run (T5.06)."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3339,9 +3339,9 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/T0.02.md",
-        "docs/evidence/SETUP_STARTUP.md",
-        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+        "T0.02 — recorded in the plan's task status",
+        "SETUP_STARTUP — recorded in the plan's task status",
+        "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3368,8 +3368,8 @@
         "A24"
       ],
       "evidence": [
-        "docs/evidence/T2.04.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.04 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3395,8 +3395,8 @@
         "A24"
       ],
       "evidence": [
-        "docs/evidence/T2.04.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.04 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3424,8 +3424,8 @@
         "A24"
       ],
       "evidence": [
-        "docs/evidence/T2.05.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.05 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3451,8 +3451,8 @@
         "A24"
       ],
       "evidence": [
-        "docs/evidence/T2.05.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.05 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3503,8 +3503,8 @@
         "A26"
       ],
       "evidence": [
-        "docs/evidence/T2.06.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.06 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3533,8 +3533,8 @@
         "A26"
       ],
       "evidence": [
-        "docs/evidence/T2.06.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.06 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3560,8 +3560,8 @@
         "A23"
       ],
       "evidence": [
-        "docs/evidence/T2.06.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.06 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3591,8 +3591,8 @@
         "A26"
       ],
       "evidence": [
-        "docs/evidence/T2.07.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.07 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3620,9 +3620,9 @@
         "A22"
       ],
       "evidence": [
-        "docs/evidence/T2.07.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.07 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3650,9 +3650,9 @@
         "A22"
       ],
       "evidence": [
-        "docs/evidence/T2.07.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.07 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3678,7 +3678,7 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: B3; device run."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded. Runtime blocked: B3; device run."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -3704,8 +3704,8 @@
         "A22"
       ],
       "evidence": [
-        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3735,8 +3735,8 @@
         "A23"
       ],
       "evidence": [
-        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3764,8 +3764,8 @@
         "A22"
       ],
       "evidence": [
-        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3793,8 +3793,8 @@
         "A22"
       ],
       "evidence": [
-        "docs/evidence/T2.08.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.08 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3827,8 +3827,8 @@
         "A23"
       ],
       "evidence": [
-        "docs/evidence/T2.09.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.09 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3857,8 +3857,8 @@
         "A22"
       ],
       "evidence": [
-        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3886,8 +3886,8 @@
         "A23"
       ],
       "evidence": [
-        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3916,8 +3916,8 @@
         "A23"
       ],
       "evidence": [
-        "docs/evidence/T2.10.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.10 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3946,8 +3946,8 @@
         "A29"
       ],
       "evidence": [
-        "docs/evidence/T2.09.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.09 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -3975,7 +3975,7 @@
         "A30"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4003,9 +4003,9 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
-        "docs/evidence/T2.02.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T0.11 — Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
+        "T2.02 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4034,9 +4034,9 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
-        "docs/evidence/T2.03.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T0.11 — Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
+        "T2.03 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4065,9 +4065,9 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
-        "docs/evidence/T2.03.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T0.11 — Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
+        "T2.03 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4093,8 +4093,8 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T2.02.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.02 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4121,8 +4121,8 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T2.02.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.02 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4150,7 +4150,7 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4179,7 +4179,7 @@
         "A25"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4208,7 +4208,7 @@
         "A30"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: partial source; present: Desktop window recapture and alignment; missing: phone-screen and tunnel captures never register a verification target (T5.01)."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: partial source; present: Desktop window recapture and alignment; missing: phone-screen and tunnel captures never register a verification target (T5.01)."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4236,7 +4236,7 @@
         "A30"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4264,7 +4264,7 @@
         "A30"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4293,7 +4293,7 @@
         "A30"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: partial source; present: grant-gated recapture_package and get_marker_comparison; missing: phone recapture inherits the VERIFY-001 gap (T5.01)."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: partial source; present: grant-gated recapture_package and get_marker_comparison; missing: phone recapture inherits the VERIFY-001 gap (T5.01)."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4319,7 +4319,7 @@
         "A27"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4347,7 +4347,7 @@
         "A27"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4375,11 +4375,11 @@
         "A25"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — offline queue/rebase, optimistic undo/redo and conflict retention pass simulation; durable conflict table and PC-off app open/edit/export/save remain T1.03, T1.08a, T1.10 and T1.12.",
-        "docs/evidence/T1.03.md — pending queue, conflicts, retries and undo ownership persist through restart; PC-off app open/edit/export/save and finalized transport remain T1.08a/T1.10/T1.12.",
-        "docs/evidence/T1.08a.md - Native app create/edit/reopen/export and synthetic peer state fences pass; PC-off and real paired conflict scenarios remain pending.",
-        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open.",
-        "docs/evidence/T1.11.md - Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
+        "T1.02 — offline queue/rebase, optimistic undo/redo and conflict retention pass simulation; durable conflict table and PC-off app open/edit/export/save remain T1.03, T1.08a, T1.10 and T1.12.",
+        "T1.03 — pending queue, conflicts, retries and undo ownership persist through restart; PC-off app open/edit/export/save and finalized transport remain T1.08a/T1.10/T1.12.",
+        "T1.08a — Native app create/edit/reopen/export and synthetic peer state fences pass; PC-off and real paired conflict scenarios remain pending.",
+        "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open.",
+        "T1.11 — Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4409,7 +4409,7 @@
         "A25"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4438,7 +4438,7 @@
         "A25"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: implementing source and tests are integrated; build/test, device, app and manual acceptance are not recorded."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4467,8 +4467,8 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — duplicate acknowledgements and atomic host sequencing pass simulation; durable sequencing/restart and finalized live transport remain T1.03, T1.06a, T1.10 and T1.12.",
-        "docs/evidence/T1.06a.md — Duplicate receipts and transaction replay preserve exactly-once accepted history in simulation/native tests; full application scenario acceptance remains pending."
+        "T1.02 — duplicate acknowledgements and atomic host sequencing pass simulation; durable sequencing/restart and finalized live transport remain T1.03, T1.06a, T1.10 and T1.12.",
+        "T1.06a — Duplicate receipts and transaction replay preserve exactly-once accepted history in simulation/native tests; full application scenario acceptance remains pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4496,8 +4496,8 @@
         "A06"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — 1,000 ms expiry, immediate cancel, stale-packet suppression and gesture identity pass; within-frame rendering and flash-free commit replacement remain T1.08b/T1.10/T1.12.",
-        "docs/evidence/T1.10.md - Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
+        "T1.02 — 1,000 ms expiry, immediate cancel, stale-packet suppression and gesture identity pass; within-frame rendering and flash-free commit replacement remain T1.08b/T1.10/T1.12.",
+        "T1.10 — Integrated native/shared/app sync paths and synthetic/native lifecycle tests passed; physical paired-app carriers, reconnection, gesture timing and owner scenarios remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4523,8 +4523,8 @@
         "A07"
       ],
       "evidence": [
-        "docs/evidence/T0.07.md",
-        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+        "T0.07 — recorded in the plan's task status",
+        "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4550,8 +4550,8 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/T0.07.md",
-        "docs/evidence/M4-KP.md"
+        "T0.07 — recorded in the plan's task status",
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4610,7 +4610,7 @@
         "A07"
       ],
       "evidence": [
-        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+        "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4640,7 +4640,7 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4770,7 +4770,7 @@
         "A09"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4807,9 +4807,9 @@
         "A28"
       ],
       "evidence": [
-        "docs/evidence/T0.02.md",
-        "docs/evidence/SETUP_STARTUP.md",
-        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+        "T0.02 — recorded in the plan's task status",
+        "SETUP_STARTUP — recorded in the plan's task status",
+        "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4835,9 +4835,9 @@
         "A28"
       ],
       "evidence": [
-        "docs/evidence/T0.02.md",
-        "docs/evidence/SETUP_STARTUP.md",
-        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+        "T0.02 — recorded in the plan's task status",
+        "SETUP_STARTUP — recorded in the plan's task status",
+        "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4865,7 +4865,7 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/STAGE0_REQUIREMENT_AUDIT_20261103.md — source audit, not a verification run: partial source; present: curated hash-bound notices; missing: generation from the resolved Cargo/Gradle/npm tree plus bundled binaries; 125 candidates unadmitted (T5.06)."
+        "STAGE0_REQUIREMENT_AUDIT_20261103 — source audit, not a verification run: partial source; present: curated hash-bound notices; missing: generation from the resolved Cargo/Gradle/npm tree plus bundled binaries; 125 candidates unadmitted (T5.06)."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4922,8 +4922,8 @@
         "A29"
       ],
       "evidence": [
-        "docs/evidence/T2.09.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T2.09 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4949,7 +4949,7 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/M4-KP.md"
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -4977,7 +4977,7 @@
         "A19"
       ],
       "evidence": [
-        "docs/evidence/T1.06b.md — TLS-bound proofs, durable lockout and revocation pass; project/export secret scan, app Keystore and production-security acceptance remain open."
+        "T1.06b — TLS-bound proofs, durable lockout and revocation pass; project/export secret scan, app Keystore and production-security acceptance remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -4995,7 +4995,7 @@
       "depends_on": [],
       "acceptance": [
         "An automated scan of logs, packages, evidence and the repo finds no API keys, pairing secrets, MCP tokens or signing keys.",
-        "From Phase 0, docs/evidence/ is also scanned for device identifiers (IP and MAC addresses, adb serial numbers, user names in paths); screenshots and recordings are checked by hand and QR codes and identifiers are blurred before commit."
+        "From Phase 0, the secret scan also blocks user names in paths anywhere in the repository; device output, screenshots and recordings are disposed after use and never committed (AGENTS.md)."
       ],
       "test_method": [
         "unit"
@@ -5004,9 +5004,9 @@
         "A19"
       ],
       "evidence": [
-        "docs/evidence/T0.02.md",
-        "docs/evidence/SETUP_STARTUP.md",
-        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+        "T0.02 — recorded in the plan's task status",
+        "SETUP_STARTUP — recorded in the plan's task status",
+        "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5032,9 +5032,9 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/T0.01.md",
-        "docs/evidence/SETUP_STARTUP.md",
-        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+        "T0.01 — recorded in the plan's task status",
+        "SETUP_STARTUP — recorded in the plan's task status",
+        "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5062,9 +5062,9 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/T0.02.md",
-        "docs/evidence/SETUP_STARTUP.md",
-        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+        "T0.02 — recorded in the plan's task status",
+        "SETUP_STARTUP — recorded in the plan's task status",
+        "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5092,8 +5092,8 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/T0.04.md: Probe recorder and bounded HIL replay implemented; physical OnePlus synthetic software checks are separate from S23 acceptance. At least 24 S23 owner traces, their replay, capability measurements and thermal session remain pending in T0.04. Public MotionEvent construction cannot reproduce nonzero actionButton; affected traces fail explicitly.",
-        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+        "T0.04 — Probe recorder and bounded HIL replay implemented; physical OnePlus synthetic software checks are separate from S23 acceptance. At least 24 S23 owner traces, their replay, capability measurements and thermal session remain pending in T0.04. Public MotionEvent construction cannot reproduce nonzero actionButton; affected traces fail explicitly.",
+        "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5119,8 +5119,8 @@
         "A08"
       ],
       "evidence": [
-        "docs/evidence/T0.05.md: Native harness and guarded injector implemented; 65 pressure pairs r=1.000, 472 received samples, and 100 acknowledged guard trials with zero samples in the selected sink. Combined inverted/eraser flags and three lifecycle matches differ; full event-fidelity verification and editor/elevation acceptance remain open in T0.05, before T0.12/G0 closure.",
-        "docs/evidence/T0.12.md — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
+        "T0.05 — Native harness and guarded injector implemented; 65 pressure pairs r=1.000, 472 received samples, and 100 acknowledged guard trials with zero samples in the selected sink. Combined inverted/eraser flags and three lifecycle matches differ; full event-fidelity verification and editor/elevation acceptance remain open in T0.05, before T0.12/G0 closure.",
+        "T0.12 — Phase 0 recorded evidence and remaining clauses reconciled; G0 remains blocked, with no status or target relaxation."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5146,7 +5146,7 @@
         "A14"
       ],
       "evidence": [
-        "docs/evidence/T1.06a.md — 10,000 seeds pass in 222.96 seconds with exact replay/no-loss invariants; full app/gate coverage remains open."
+        "T1.06a — 10,000 seeds pass in 222.96 seconds with exact replay/no-loss invariants; full app/gate coverage remains open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5172,8 +5172,8 @@
         "A01"
       ],
       "evidence": [
-        "docs/evidence/T1.04.md — Sixteen algorithm-1 synthetic geometry goldens match Windows and IN2019; recorded S Pen traces and T1.05 export goldens remain open.",
-        "docs/evidence/T1.05.md — Nine committed PNG/layout hashes match Windows and IN2019, alongside T1.04 geometry goldens; recorded S Pen fixtures and final scenario/device acceptance remain open."
+        "T1.04 — Sixteen algorithm-1 synthetic geometry goldens match Windows and IN2019; recorded S Pen traces and T1.05 export goldens remain open.",
+        "T1.05 — Nine committed PNG/layout hashes match Windows and IN2019, alongside T1.04 geometry goldens; recorded S Pen fixtures and final scenario/device acceptance remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5200,7 +5200,7 @@
         "A27"
       ],
       "evidence": [
-        "docs/evidence/T0.10.md — Synthetic callback and native CPU timings exclude display presentation; S23 input-to-present p95 and owner comparison remain deferred, with the 25 ms target unchanged."
+        "T0.10 — Synthetic callback and native CPU timings exclude display presentation; S23 input-to-present p95 and owner comparison remain deferred, with the 25 ms target unchanged."
       ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
@@ -5226,8 +5226,8 @@
         "A02"
       ],
       "evidence": [
-        "docs/evidence/T0.06.md: Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
-        "docs/evidence/T1.10.md - Live preview and echo diagnostics are implemented; no drawing-latency acceptance measurement was made. Verification remains not_tested."
+        "T0.06 — Evidence only; S23 adb TCP measured 3000 verified echoes and 256 MiB at 32.41 MiB/s. Wi-Fi, USB tethering, physical recovery and Windows listener firewall acceptance remain open; echo RTT is not product latency. Implementation and verification statuses unchanged.",
+        "T1.10 — Live preview and echo diagnostics are implemented; no drawing-latency acceptance measurement was made. Verification remains not_tested."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -5254,8 +5254,8 @@
         "A27"
       ],
       "evidence": [
-        "docs/evidence/T0.07.md",
-        "docs/evidence/M4-KP.md"
+        "T0.07 — recorded in the plan's task status",
+        "M4-KP — recorded in the plan's task status"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -5281,8 +5281,8 @@
         "A07"
       ],
       "evidence": [
-        "docs/evidence/T0.07.md",
-        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+        "T0.07 — recorded in the plan's task status",
+        "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",
@@ -5308,7 +5308,7 @@
         "A10"
       ],
       "evidence": [
-        "docs/evidence/T0.09.md"
+        "T0.09 — recorded in the plan's task status"
       ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
@@ -5334,7 +5334,7 @@
         "A10"
       ],
       "evidence": [
-        "docs/evidence/T0.09.md"
+        "T0.09 — recorded in the plan's task status"
       ],
       "impl_status": "not_started",
       "verify_status": "not_tested",
@@ -5410,9 +5410,9 @@
         "A21"
       ],
       "evidence": [
-        "docs/evidence/T0.11.md - Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
-        "docs/evidence/T2.03.md — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
-        "docs/evidence/T2.11.md — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
+        "T0.11 — Offline software checkpoint: five synthetic exterior proofs,28 Windows/27 IN2019/10 Python tests; real API/owner photos and 12 MP release timing remain unverified. Status unchanged.",
+        "T2.03 — integrated source and partial software validation; exact open clauses and final acceptance remain recorded in the task evidence.",
+        "T2.11 — final software checkpoint:776 Rust,339 JVM,154 S23 app cases,10000 simulation seeds; real/manual clauses and gates remain partial."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5439,9 +5439,9 @@
         "A18"
       ],
       "evidence": [
-        "docs/evidence/T1.02.md — reserved/unknown document kinds fail with typed errors and mp4 metadata is accepted; storing/syncing actual video bytes remains T1.03/T1.06a/T1.10.",
-        "docs/evidence/T1.03.md — generated synthetic MP4 bytes and metadata round-trip through database, blob storage and .vwbz; live asset sync remains T1.06a/T1.10 and A18/T1.12 acceptance. Timeline stays reserved; no video-editing UI is required by this hook.",
-        "docs/evidence/T1.11.md - Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
+        "T1.02 — reserved/unknown document kinds fail with typed errors and mp4 metadata is accepted; storing/syncing actual video bytes remains T1.03/T1.06a/T1.10.",
+        "T1.03 — generated synthetic MP4 bytes and metadata round-trip through database, blob storage and .vwbz; live asset sync remains T1.06a/T1.10 and A18/T1.12 acceptance. Timeline stays reserved; no video-editing UI is required by this hook.",
+        "T1.11 — Native import/export/revision/MP4 and IN2019 provider/share-scope fixtures passed; actual receiving apps, physical cross-device MP4, airplane-mode export and status observations remain open."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -5467,8 +5467,8 @@
         "A20"
       ],
       "evidence": [
-        "docs/evidence/T1.07.md - commonMain guard and four violation/parser fixtures pass; both native Kotlin wrappers pass on Windows/IN2019. Integrated slice closure and final fixture re-run are pending.",
-        "docs/evidence/T1.07.md - commonMain platform-import guard passes and deliberate violations fail; final Windows/IN2019 native golden and cancellation rerun passed. This requirement is only the import guard, not broader product acceptance."
+        "T1.07 — commonMain guard and four violation/parser fixtures pass; both native Kotlin wrappers pass on Windows/IN2019. Integrated slice closure and final fixture re-run are pending.",
+        "T1.07 — commonMain platform-import guard passes and deliberate violations fail; final Windows/IN2019 native golden and cancellation rerun passed. This requirement is only the import guard, not broader product acceptance."
       ],
       "impl_status": "implemented",
       "verify_status": "passed",
@@ -5494,7 +5494,7 @@
         "A07"
       ],
       "evidence": [
-        "docs/evidence/T3.02_NATIVE_SHARED_20261019.md — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
+        "T3.02_NATIVE_SHARED_20261019 — native/common source and bounded software checks only; actual platform producer/canvas/controller wiring, Windows/apps/device/performance/manual acceptance remain pending."
       ],
       "impl_status": "in_progress",
       "verify_status": "partial",
@@ -6232,231 +6232,231 @@
       "value": "HP Spectre x360 Convertible 15-eb1xxx",
       "status": "verified 2026-10-01",
       "command": "Win32_ComputerSystem.Model",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "CPU / RAM",
       "value": "11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz; 4 cores/8 threads; 16801923072 usable bytes (15.65 GiB), nominal 16 GB",
       "status": "verified 2026-10-01",
       "command": "Win32_Processor; Win32_ComputerSystem.TotalPhysicalMemory",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Windows",
       "value": "Microsoft Windows 11 Home 25H2; build 26200, revision 9457",
       "status": "verified 2026-10-01",
       "command": "Win32_OperatingSystem; CurrentVersion registry",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Memory Integrity",
       "value": "On, running; configured registry=1",
       "status": "verified 2026-10-01",
       "command": "Win32_DeviceGuard.SecurityServicesRunning contains 2",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Secure Boot",
       "value": "True; owner-confirmed, not a successful elevated query by this agent",
       "status": "verified 2026-10-01",
       "command": "Owner administrator PowerShell: Confirm-SecureBootUEFI",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Smart App Control",
       "value": "off",
       "status": "verified 2026-10-01",
       "command": "CI Policy.VerifiedAndReputablePolicyState=0",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Graphics driver",
       "value": "Intel Iris Xe; version components major 32, minor 0, branch 101, revision 7088",
       "status": "verified 2026-10-01",
       "command": "Win32_VideoController.DriverVersion",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Display",
       "value": "Monitor 1: 3840x2160, DPI 168, scale 1.75, 60.004 Hz, rotation 0; monitor 2: 1920x1080, DPI 96, scale 1.00, 119.998 Hz, rotation 0. Advanced color off/on respectively; gamut and distinct HDR classification untestable without calibration/newer packet",
       "status": "verified 2026-10-01 (physical geometry/DPI/refresh/advanced-color flags); gamut/HDR distinction untestable",
       "command": "diag-win: EnumDisplayMonitors, GetDpiForMonitor, QueryDisplayConfig, DisplayConfigGetDeviceInfo",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Free disk C:",
       "value": "51597021184 bytes (48.05 GiB) at snapshot; storage warning waived by owner",
       "status": "verified 2026-10-01",
       "command": "Win32_LogicalDisk C:",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Creative apps",
       "value": "No matching supported creative-app install in enumerated classic uninstall keys or current-user Store packages; portable/web/manual installs not surveyed",
       "status": "verified 2026-10-01 (enumerated install sources only)",
       "command": "Uninstall registry keys; Get-AppxPackage filtered supported names",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Paint",
       "value": "Paint version components 11 / 2605 / 81 / 0",
       "status": "verified 2026-10-01",
       "command": "Get-AppxPackage Microsoft.Paint",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "HEIF/HEVC extensions",
       "value": "HEIF and HEVC installed for current user; AV1/WebP/Raw also present; processing not tested",
       "status": "verified 2026-10-01",
       "command": "Get-AppxPackage extension-name allowlist",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "adb",
       "value": "37.0.1",
       "status": "verified 2026-10-01",
       "command": "adb.exe version; only numeric platform-tools version retained",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Phone",
       "value": "Product target: Galaxy S23 Ultra; actual connected startup device: OnePlus IN2019",
       "status": "untestable: target Galaxy S23 Ultra is not connected; IN2019 startup evidence does not verify the target",
       "command": "phone-diagnostics.ps1 (selected physical device, read-only adb probes)",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Phone OS",
       "value": "S23 OS/build untestable; actual IN2019 Android 11, API 30, build RP1A.201005.001, security patch 2023-02-01",
       "status": "untestable: target Galaxy S23 Ultra is not connected; IN2019 startup evidence does not verify the target",
       "command": "adb shell getprop selected software fields",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "S Pen pressure",
       "value": "S23 pressure levels/normalization untestable; connected IN2019 listing has no BTN_TOOL_PEN device",
       "status": "untestable: target Galaxy S23 Ultra is not connected; IN2019 startup evidence does not verify the target",
       "command": "adb shell getevent -lp; axes bound to BTN_TOOL_PEN block",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "S Pen tilt / orientation",
       "value": "ABS_TILT_X / ABS_TILT_Y and orientation on S23 untestable; no pen device on connected IN2019",
       "status": "untestable: target Galaxy S23 Ultra is not connected; IN2019 startup evidence does not verify the target",
       "command": "adb shell getevent -lp; T0.04 physical traces pending",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "S Pen hover",
       "value": "ABS_DISTANCE and hover behavior on S23 untestable; no pen device on IN2019",
       "status": "untestable: target Galaxy S23 Ultra is not connected; IN2019 startup evidence does not verify the target",
       "command": "adb shell getevent -lp; T0.04 hover traces pending",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "S Pen report rate",
       "value": "S23 report rate untestable without historical MotionEvent/physical traces",
       "status": "untestable: target Galaxy S23 Ultra is not connected; IN2019 startup evidence does not verify the target",
       "command": "T0.04 recorder and timestamp analysis pending",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Air Actions",
       "value": "S23 Air Actions and barrel/Air Command interaction untestable on IN2019",
       "status": "untestable: target Galaxy S23 Ultra is not connected; IN2019 startup evidence does not verify the target",
       "command": "T0.04 declarative KeyEvent/owner actions pending",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Phone video decode",
       "value": "S23 hardware decode, low latency and 4:4:4 paths untestable. IN2019 vendor XML declares AVC/HEVC/VP9 and software AV1 names; declarations do not prove hardware execution",
       "status": "untestable: target Galaxy S23 Ultra is not connected; IN2019 startup evidence does not verify the target",
       "command": "adb shell cat /vendor/etc/media_codecs*.xml; MediaCodec processing probes pending",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Actual startup phone",
       "value": "OnePlus IN2019; Android 11/API 30; RP1A.201005.001; patch 2023-02-01; starter 0.0.1-dev",
       "status": "verified 2026-10-01",
       "command": "phone-diagnostics.ps1 (selected physical device, read-only adb probes)",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Actual phone display",
       "value": "1080x2400 physical, density 450; declared 60 and 90 Hz display modes",
       "status": "verified 2026-10-01 (static mode listing)",
       "command": "adb shell wm size; wm density; dumpsys display numeric fields",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Actual phone pen axes",
       "value": "Zero BTN_TOOL_PEN devices in readable listing; ABS_PRESSURE/DISTANCE/TILT_X/TILT_Y are not established for any pen",
       "status": "verified 2026-10-01 (static listing only)",
       "command": "adb shell getevent -lp; pen-scoped parser",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Phone temperature snapshot",
       "value": "28.4 C; battery 100%; no ten-minute baseline",
       "status": "verified 2026-10-01 (snapshot only)",
       "command": "adb shell dumpsys battery",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Wi-Fi",
       "value": "5 GHz; 802.11ax; channel 44; no network identifiers retained",
       "status": "verified 2026-10-01",
       "command": "netsh wlan show interfaces; only band/radio/channel retained",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Developer Mode",
       "value": "On",
       "status": "verified 2026-10-01",
       "command": "AppModelUnlock.AllowDevelopmentWithoutDevLicense=1",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Documents cloud sync",
       "value": "True (path withheld); provider configuration/in-flight sync not assessed",
       "status": "verified 2026-10-01 (folder path classification)",
       "command": "Environment.GetFolderPath(MyDocuments); boolean only",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "USB controller",
       "value": "Intel(R) USB 3.10 eXtensible Host Controller - 1.20 (Microsoft)",
       "status": "verified 2026-10-01 (controller inventory, not negotiated phone speed)",
       "command": "Win32_USBController.Name",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Test signing",
       "value": "untestable: bcdedit unavailable without elevation",
       "status": "untestable: bcdedit query not elevated",
       "command": "bcdedit /enum {current} exit=1; raw output withheld",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Windows hardware encoder registrations",
       "value": "H.264 count 2; HEVC count 2; duplicate friendly names retained as separate registrations; throughput/profile/latency untested",
       "status": "verified 2026-10-01 (enumeration only)",
       "command": "MFTEnumEx with MFT_ENUM_FLAG_HARDWARE; output subtype filter",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "Windows hardware decoder registrations",
       "value": "H.264 count 0; HEVC count 0 under this hardware-MFT filter; this does not establish absence of DXVA/GPU decode",
       "status": "verified 2026-10-01 (enumeration only)",
       "command": "MFTEnumEx with MFT_ENUM_FLAG_HARDWARE; input subtype filter",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     },
     {
       "item": "S23 thermal/recovery baseline",
       "value": "No S23 thermal session or carrier recovery measurements",
       "status": "untestable: target phone and implemented probes/transport unavailable",
       "command": "T0.04 thermal; T0.06 recovery; PERF-template.md",
-      "evidence": "docs/evidence/hardware-truth.md"
+      "evidence": "docs/HARDWARE_TRUTH.md"
     }
   ],
   "future_modules": [

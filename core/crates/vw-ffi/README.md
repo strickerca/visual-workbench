@@ -169,8 +169,7 @@ These software paths do not complete physical T1.09/T1.10 acceptance. The native
 provides project-role queries, validated QR inspection/text envelopes, bounded
 discovery, explicit local-address candidates, read-only tether route command
 text, reverse acquisition of phone-created originals before host acceptance, and
-new-shape previews. See `T1.10-INTEGRATION.md` for exact limits and integration
-order. New phone-origin projects are not yet handed to a new Windows authority.
+new-shape previews. New phone-origin projects are not yet handed to a new Windows authority.
 Partial transfer state is not persisted across process death. Automatic per-frame
 UI invalidation is integrated; large-document display/performance remains
 acceptance work.
@@ -207,8 +206,7 @@ handle-delivery boundary. Twelve real native create/open cycles and seventy-two
 gestures separately stress both queued cancellation and valid inline completion;
 they exceed live handle limits and verify released locks and unchanged revisions.
 Both the first and final paired Windows/IN2019 runs passed. The final run uses
-the refined race stress fixture; exact receipts and the distinct source bindings
-are retained in `docs/evidence/T1.07.md`.
+the refined race stress fixture.
 
 Primary dependency records: [UniFFI 0.32.2 MPL-2.0 manifest](https://raw.githubusercontent.com/mozilla/uniffi-rs/v0.32.2/uniffi/Cargo.toml),
 [UniFFI futures](https://mozilla.github.io/uniffi-rs/latest/futures.html),

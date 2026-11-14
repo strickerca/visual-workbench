@@ -765,7 +765,7 @@ try {
         'deliver-android-normal' {
             # Reviewed same-signer update of the NORMAL app for owner user 0 on
             # the explicitly selected model. No build, uninstall, downgrade or
-            # data clear. See docs/ANDROID_NORMAL_DELIVERY_20261104.md.
+            # data clear. See docs/ANDROID_DELIVERY.md.
             foreach ($deliveryName in @('DeliveryApk', 'DeliveryApkSha256', 'DeliveryModel')) {
                 if (-not $PSBoundParameters.ContainsKey($deliveryName) -or [string]::IsNullOrWhiteSpace([string]$PSBoundParameters[$deliveryName])) {
                     throw 'Normal delivery requires explicit -DeliveryApk, -DeliveryApkSha256 and -DeliveryModel.'

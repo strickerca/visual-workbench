@@ -307,7 +307,7 @@ synthetic Python cases and root offline policy passing in its dated receipt.
 PowerShell is absent in the cloud, so
 PowerShell parsing/execution and Windows wrapper/NTFS/process-tree checks remain
 unrun. No product assembly, package, installer, signature or deployment was
-produced by this change. See `docs/RELEASE_ASSEMBLY_ROOT_HOOK_20261020.md`.
+produced by this change.
 
 ## Finalized-image MSI build hook
 

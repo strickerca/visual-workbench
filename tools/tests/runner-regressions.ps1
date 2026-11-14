@@ -23,7 +23,6 @@ try {
         if (-not $receipt.process_tree_cleanup_confirmed) { throw 'Runner cleanup unconfirmed' }
     }
     foreach ($value in $checks.Values) { if (-not $value) { throw 'Runner regression failed' } }
-    $checks | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $root 'docs/evidence/T003_RUNNER_REGRESSIONS.json')
     Write-Output 'Five runner checks passed; all owned cleanup confirmed.'
 } finally {
     if (-not $sentinel.HasExited) { $sentinel.Kill(); [void]$sentinel.WaitForExit(5000) }

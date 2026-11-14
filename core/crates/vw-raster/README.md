@@ -6,8 +6,7 @@ paths, contact providers, consult system fonts, replace originals, or use previe
 The committed nine-entry PNG/layout golden manifest matches Windows x64 and
 physical OnePlus IN2019 arm64. Sixty-two ordinary tests pass on each platform;
 Windows additionally passes the explicit 50MP PNG16 scratch/marked-export test.
-See `docs/evidence/T1.05.md` for exact bindings, resource measurements and open
-application/S23 acceptance. These native tests do not establish app performance.
+Application and S23 acceptance remain open. These native tests do not establish app performance.
 
 ## APIs and exact semantics
 

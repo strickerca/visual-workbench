@@ -1,103 +1,104 @@
-# Visual Workbench — spec package v2.0
+# Visual Workbench
 
-## Development starter — 2026-10-01
+A paired Android phone and Windows PC workbench for precise visual instructions.
+Capture or import anything visual, mark it up with pen precision, say what
+should change, send it to an AI coding agent or image model in the form that
+model understands best, and verify the result. The same pen surface also drives
+a Windows app (Microsoft Paint in this build) from the phone.
 
-The active working folder is this `visual-workbench/` directory. The Rust/Kotlin/Compose development starter builds and runs on Windows and the approved IN2019 phone. Pen, canvas, pairing, capture, synchronization and AI features are still planned. See [the startup receipt](docs/evidence/SETUP_STARTUP.md) for tested scope and remaining setup clauses.
+This is a personal build for one owner, one Samsung S23 Ultra and one Windows
+laptop. It is not signed for distribution.
 
-Read [the setup assessment](docs/SETUP_ASSESSMENT.md) for source authority, the selected compatible stack, the available-device boundary and the next tasks. The v2 authority is [docs/BUILD_SPECIFICATION.md](docs/BUILD_SPECIFICATION.md), [docs/REQUIREMENTS.json](docs/REQUIREMENTS.json), [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) and [docs/SOURCES.json](docs/SOURCES.json). Root specification/requirement copies and the archived folders preserve v1/reference material.
+## Status
 
-### Build and start
+Software is built and checked automatically; most of it has not yet been proven
+on the real devices. `docs/REQUIREMENTS.json` holds the status of each of the
+189 requirements, and `docs/IMPLEMENTATION_PLAN.md` holds the active roadmap and
+open blockers.
 
-Run from this directory in a shell with the selected JDK 21, Android SDK/NDK, Rust/Cargo, Python and gitleaks available. Local environment paths and measured verification belong to the setup report under `docs/evidence/`.
+| Area | Built | Checked automatically | Proven on the S23 and laptop |
+| --- | --- | --- | --- |
+| Markup core: canvas, pen, shapes, text, undo, export | Yes | Yes | Partly; pen feel and latency not measured |
+| Pairing by QR or code, encrypted link, sync, offline edits | Yes | Yes | Partly |
+| Capture, masks, instruction packages, local MCP tools | Yes | Yes | Partly |
+| Image edit through an image model | Yes | Yes, against recorded responses | No live run yet |
+| Remote pen editing in Paint | Yes | Compiles and unit-tests on Windows | Not yet accepted |
+| Installers (MSI and APK) | Yes | Not yet built automatically | App image and APK installed and launched once; MSI install not yet accepted |
+
+No product gate (G0–G5) has been recorded yet.
+
+## What you need
+
+- Samsung S23 Ultra with its S Pen (the only supported phone for now).
+- Windows 11 (24H2 or later) PC. Remote editing currently needs an Intel GPU
+  and the exact Microsoft Paint version named in `docs/compat/M4-KP.md`.
+
+## Install and use
+
+- Install and first launch: [docs/M4_KP_INSTALLATION.md](docs/M4_KP_INSTALLATION.md)
+- Daily use — open an image, pair, mark up, export, hand off: [docs/QUICKSTART.md](docs/QUICKSTART.md)
+- Connecting Claude Code or Codex: [docs/MCP_SETUP.md](docs/MCP_SETUP.md)
+- Backing up, updating and removing: [docs/UNINSTALL_RECOVERY.md](docs/UNINSTALL_RECOVERY.md)
+
+## Build from source
+
+On the laptop (Windows, PowerShell), with the tools pinned in
+[docs/TOOLCHAIN.md](docs/TOOLCHAIN.md):
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 doctor
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 build-core
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 build-android
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 build-desktop
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
-```
-
-`build-desktop` creates a Windows application JAR using the owner's installed JDK 21. `start.ps1` opens that built starter and leaves it running. The development JAR does not bundle a Java runtime; app-image/MSI packaging and the documented Java-runtime exception manifest remain later packaging work. `build.ps1 run-desktop` offers a bounded Gradle development session (`-TimeoutSeconds`, default 600). Every build runs the license gate first.
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 license-check
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 test-all
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 lint-all
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 hil-test
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 hil-test rust vw-ffi
 ```
 
-HIL requires exactly one authorized physical Android device. The app form installs the built debug APK, checks foreground startup and requires an actual passing instrumentation test. It then restores and opens the starter after the test runner removes its installation. Model IN2019 on Android 11/API 30 is suitable for starter smoke checks, while S23 Ultra hardware acceptance remains pending. `hil-test rust vw-ffi` targets the setup ABI smoke test.
+Every build runs the licence gate first. `build.ps1 hil-test` runs the hardware
+tests and needs the S23 connected. `build.ps1 deliver-android-normal` updates the
+installed phone app ([docs/ANDROID_DELIVERY.md](docs/ANDROID_DELIVERY.md)).
 
-Next: T0.04 pen probe/trace recorder, following the Phase 0 dependencies and current model/effort recommendations. Setup/hardware carry-overs remain explicit; the owner's storage-warning waiver continues to apply. Phase-end Git publication is authorized under the policy below.
+On Linux, in a cloud session or on GitHub, the same checks run without devices:
 
-The IN2019 is shared with another app development session. Foreground checks allow up to three brief starter relaunches; persistent focus contention is reported as inconclusive. Other apps are preserved and adb/device resets are avoided.
+```bash
+tools/ci/install-tools.sh        # pinned licence checker, secret scanner, Android SDK
+tools/ci/policy.sh               # IDs, plan coverage, licences, secret scan
+tools/ci/rust-lint.sh && tools/ci/rust-test.sh
+tools/ci/python-node.sh          # tooling tests and the MCP server tests
+tools/ci/kotlin-linux.sh         # Kotlin tests, lint and licence check
+```
 
-## GitHub publication
+Every push runs these through `.github/workflows/ci.yml`, plus the Rust
+workspace on Windows. Nothing merges into `main` unless `ci-required` is green.
 
-The repository is public at [strickerca/visual-workbench](https://github.com/strickerca/visual-workbench).
-The owner authorized the initial T0.01–T0.03 checkpoint and automatic commit/push
-to origin/main at the conclusion of each numbered phase. Follow
-[Automatic phase publishing](docs/IMPLEMENTATION_PLAN.md#automatic-phase-publishing).
-Phase gates and physical acceptance remain separate; Phase 0 is still in progress.
-Local caches, build outputs, credentials, signing material, private fixtures and
-verification screenshots stay outside Git.
-
-## Preserved original package README
-
-The original package overview below is retained unchanged. Its statement that nothing had been built describes the package at intake, before the development starter was added.
-
-Revision 2026-10-01. Supersedes the 2026-09-22 package (v1).
-
-**This package is a specification and a build plan, not the app.** Nothing in it has been built or tested on hardware yet. Facts marked *verified* in the spec come from the owner's diagnostics run on 2026-10-01; everything else stays unverified until Phase 0 evidence exists.
-
-## Start here
-
-1. Extract the zip into `C:\dev` so you get `C:\dev\visual-workbench`. That folder becomes the repository root.
-2. Open a fresh Claude Code session in that folder and paste the whole of `prompts/phase-0/T0.01-toolchain.md`.
-3. When the agent finishes, read its five-part report, do anything listed under "What Christian needs to do next", and say yes when it asks to merge if you're happy.
-4. Paste the next prompt (T0.02, T0.03, …). The dependencies are in `docs/IMPLEMENTATION_PLAN.md`; run one task at a time unless you set up a separate worktree folder.
-
-Prompts for Phases 2–5 are written after Gate G1, from real Phase 0 measurements.
-
-## Contents
+## Repository map
 
 | Path | What it is |
-|---|---|
-| `docs/BUILD_SPECIFICATION.md` | The product, hardware facts, architecture and every contract (coordinates, document model, sync, storage, protocol, pairing, packages for AI, capture, remote editing, virtual display, editor bridges, formats, performance budgets, invariants, gates, scenarios). |
-| `docs/REQUIREMENTS.json` | 189 requirements, each with priority, phase, dependencies, measurable acceptance, test method and status. All 98 v1 IDs are kept. Also holds scenarios A01–A30 (with each one's gate and re-runs) and the hardware truth table. |
-| `docs/IMPLEMENTATION_PLAN.md` | Phases 0–5, 66 agent-sized tasks, owner actions, repository layout, gates, status rules and risks. |
-| `docs/DECISIONS.md` | Architecture decisions D1–D19, with alternatives, confidence and the spike that confirms each provisional one. |
-| `docs/TOOLCHAIN.md` | Known-good tool and library versions as of 2026-10-01. Task T0.01 pins exact versions. |
-| `docs/SOURCES.json` | 68 sources checked 2026-09-30 / 2026-10-01, each with the narrow claim it supports. |
-| `contracts/` | Draft wire protocol (`vw_protocol.proto`), AI package manifest schema (`package.schema.json`) and project database schema (`storage.sql`). |
-| `prompts/phase-0/`, `prompts/phase-1/` | 26 standalone Claude Code prompts, one per task. Each carries its full context, rules, definition of done and report format. |
-| `tools/check_plan_coverage.py` | Checks that every requirement is assigned to a task that can pass it at its own gate, that every gate task depends on the tasks its scenarios need, that the plan and prompts use only real IDs, and that each prompt's requirements and dependencies match the plan. |
-| `tools/diagnostics/` | Read-only PC and phone diagnostics scripts. They print no serial numbers, account names or addresses. |
+| --- | --- |
+| `core/crates/` | The shared Rust core: geometry, document model, edit log, storage, ink, export, protocol, networking, pairing, and the bindings both apps use |
+| `host-win/crates/` | Windows-only Rust: capture, video, pen injection, UI Automation |
+| `apps/shared`, `apps/android`, `apps/desktop` | Kotlin and Compose apps for the phone and the PC, with their shared module |
+| `mcp/` | The local MCP server that AI coding agents talk to |
+| `contracts/` | Wire protocol, package schema and database schema |
+| `tools/` | Build, test, release and hardware-test tooling; `tools/ci` holds the automatic checks |
+| `docs/` | Specification, requirements, decisions, plan, toolchain and user guides |
+| `prompts/` | Task prompts for Phase 0 and Phase 1 |
+| `drivers/`, `third_party/`, `fixtures/` | Vendored driver source for the optional virtual display, bundled notices, and test fixtures |
 
-## What changed from v1
+## Documents
 
-- **Built around your first two wins.** Marking up an image so GPT Image edits it (W1) and marking up app screens so Claude Code or Codex changes the UI (W2) are Phase 2, right after the markup core.
-- **91 new requirements** for semantic capture (UI Automation and the Android accessibility tree), the AI instruction package, agent hand-off (MCP, Claude Code channels, Codex), masked image edits with proof that nothing outside the mask changed, verification, sync, streaming, editor bridges, licensing, security, developer setup and performance budgets. Eight of them split a v1 requirement whose parts land in different phases, so every gate can actually pass.
-- **Architecture decided (D1–D19):** one Rust core shared by both apps; Kotlin and Compose on the phone and the PC; a host-authoritative operation log so the phone works offline and syncs on reconnect; QUIC over USB tethering or Wi-Fi with no developer mode needed for normal use; QR pairing with pinned TLS.
-- **Phase 0 spikes first.** After two setup tasks, nine measurement tasks (T0.03–T0.11) prove the risky parts (pen data, Windows pen injection, transport, video, the virtual display driver, giant images, stroke geometry, GPT Image masks) on your actual laptop and phone before anything depends on them, and a gate review locks the performance targets.
-- **No GPL or AGPL code in the app**, so it stays sellable. Each dependency's license is checked automatically.
-- **Hooks for later:** video editing and the iPad are reserved in the data model and protocol so they don't need a rewrite.
+- [docs/BUILD_SPECIFICATION.md](docs/BUILD_SPECIFICATION.md) — what the product is and every contract
+- [docs/REQUIREMENTS.json](docs/REQUIREMENTS.json) — 189 requirements with status
+- [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) — active roadmap, tasks and gates
+- [docs/DECISIONS.md](docs/DECISIONS.md) — architecture and owner decisions
+- [docs/PERF_METHODS.md](docs/PERF_METHODS.md) — how each performance target is measured
+- [docs/HARDWARE_TRUTH.md](docs/HARDWARE_TRUTH.md) — measured facts about the laptop and phone
+- [AGENTS.md](AGENTS.md) — rules for the AI agents that build this
 
-## Checks
+## Licences and privacy
 
-```
-python tools/check_plan_coverage.py --v1 <path to the v1 REQUIREMENTS.json>
-```
-
-## Diagnostics ready (T0.03)
-
-The Windows diagnostics and bounded selected-window screenshot wrapper are in
-[tools/diag-win](tools/diag-win/README.md). Dated PC/IN2019 facts and explicit
-untestable S23/S Pen states are in [hardware-truth.md](docs/evidence/hardware-truth.md).
-[PERF-template.md](docs/evidence/PERF-template.md) defines all nine measurement
-methods. Screenshots are inspected and disposed outside Git; text receipts remain.
-T0.04 is the next slice: pen probe/trace recorder, size M, recommended
-`gpt-6-astra` with `xhigh` reasoning. Actual S23 pen traces require that device;
-IN2019 startup results do not verify S Pen behavior. Settings are owner-controlled.
+The project's own code is proprietary and unpublished. No GPL or AGPL code is
+linked into the apps; every dependency's licence is checked on each build, and
+bundled components are listed in
+[docs/THIRD_PARTY_NOTICES.md](docs/THIRD_PARTY_NOTICES.md). The repository is
+public: no secrets, signing keys, captures, device serials, network identifiers
+or user-profile paths may be committed, and a secret scan runs on every push.

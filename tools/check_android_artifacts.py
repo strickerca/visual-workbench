@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 from pathlib import Path
 import struct
 import subprocess
@@ -57,12 +56,9 @@ def main() -> None:
                               "load_alignments_bytes": alignments, "zip_compression": "stored"})
     if not any(row["path"] == "lib/arm64-v8a/libvw_core.so" for row in libraries):
         raise ValueError("APK does not contain the actual Rust core library")
-    receipt = {"artifact": artifact_path, "apk_sha256": hashlib.sha256(apk.read_bytes()).hexdigest(),
-               "apk_bytes": apk.stat().st_size, "zipalign_16kb_exit_code": 0, "libraries": libraries,
-               "artifact_check_only": True, "native_16kb_device_execution_verified": False}
-    output = ROOT / "docs/evidence/APK_VERIFICATION.json"
-    output.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
-    print(f"APK ARTIFACTS: PASS ({len(libraries)} ARM64 libraries; ELF LOAD >=16 KB; ZIP 16 KB check)")
+    digest = hashlib.sha256(apk.read_bytes()).hexdigest()
+    print(f"APK ARTIFACTS: PASS ({len(libraries)} ARM64 libraries; ELF LOAD >=16 KB; ZIP 16 KB check; "
+          f"{artifact_path} sha256 {digest}; artifact check only, not a device result)")
 
 
 if __name__ == "__main__":

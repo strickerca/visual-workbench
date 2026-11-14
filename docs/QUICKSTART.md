@@ -4,8 +4,8 @@ Before replacing or removing a build, follow [Back up, update, recover and
 remove](UNINSTALL_RECOVERY.md). A rendered image export is not an editable
 project backup.
 
-This guide describes the current development app. Check `docs/evidence/` for
-the tested build and outstanding checks. Current isolated app tests also run on
+This guide describes the current development app. The README status table and
+the plan list what is verified and what is still open. Isolated app tests run on
 the S23 Ultra; neither automated phone suite establishes physical S Pen
 performance or daily-use acceptance.
 

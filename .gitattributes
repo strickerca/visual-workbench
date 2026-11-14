@@ -24,16 +24,9 @@ core/crates/vw-raster/fonts/inter-OFL.txt -text -whitespace
 core/crates/vw-raster/fonts/notosans-OFL.txt -text -whitespace
 core/crates/vw-raster/fonts/notosansmono-OFL.txt -text -whitespace
 core/crates/vw-raster/licenses/libwebp-COPYING -text -whitespace
-# Notices and copied execution receipts bind exact upstream/observed bytes.
+# Notices bind exact upstream bytes.
 third_party/notices/** -text -whitespace
 docs/license-proposals/notices/** -text -whitespace
-docs/evidence/T1.07-shared-*.json -text -whitespace
-docs/evidence/T1.08-*.json -text -whitespace
-docs/evidence/T1.09-*.json -text -whitespace
-docs/evidence/T1.10-*.json -text -whitespace
-docs/evidence/T1.12-*.json -text -whitespace
-docs/evidence/T2.*.json -text -whitespace
-docs/evidence/M4-KP*.json -text -whitespace
 # These metadata bytes are bound by the recorded S23 source inventory.
 apps/gradle/wrapper/gradle-wrapper.properties -text -whitespace
 tools/ffi-test/android-inventory.json -text -whitespace
