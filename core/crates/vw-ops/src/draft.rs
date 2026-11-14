@@ -8,7 +8,7 @@ use crate::OpsError;
 use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 use vw_model::{
     AssetId, Document, Group, Id, Instruction, Layer, ModelError, Object, Project, ResultCandidate,
-    SemanticSnapshot,
+    SemanticSnapshot, StateHasher,
 };
 use vw_proto::v1;
 
@@ -106,6 +106,16 @@ impl Originals {
         }
         for_each_collection!(keys);
         touched
+    }
+
+    /// Tell a hasher that follows the project which part these edits replaced.
+    /// Call it once the edits are in place, and again after undoing them.
+    pub fn forget_in(&self, hasher: &mut StateHasher) {
+        if !self.only_objects() {
+            hasher.reset();
+        } else if let Some(first) = self.objects.keys().next() {
+            hasher.objects_changed_from(first);
+        }
     }
 
     /// Put every remembered value back, undoing the draft that produced this.

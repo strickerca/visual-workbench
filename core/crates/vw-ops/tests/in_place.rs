@@ -404,3 +404,83 @@ fn appended_objects_carry_the_whole_project_hash() {
     assert_eq!(restored.revision().unwrap(), host.revision().unwrap());
     assert_eq!(restored.canonical_len(), host.canonical_len());
 }
+
+#[test]
+fn a_replica_always_knows_the_hash_of_what_it_shows() {
+    let mut host = fixture();
+    let peer = device(2);
+    let mut replica = vw_ops::Replica::new(peer.clone(), host.snapshot().unwrap()).unwrap();
+    let shown = |replica: &vw_ops::Replica| {
+        assert_eq!(
+            replica.state_hash(),
+            &replica.project().state_hash().unwrap(),
+            "the replica's carried hash is not the hash of its visible project"
+        );
+    };
+    shown(&replica);
+    // Queue edits against the same base: objects, a property, an undo.
+    let base = host.revision().unwrap();
+    let mut queued = Vec::new();
+    for (n, kinds) in [
+        (30, vec![create_in(60, 3, &peer)]),
+        (31, vec![create_in(61, 3, &peer), layer(8)]),
+        (32, vec![property(60, "hidden", Value::Flag(true))]),
+        (33, vec![undo(32)]),
+        (34, vec![create_in(62, 8, &peer)]),
+    ] {
+        let txn = transaction(base.clone(), &peer, n, 100 + n as i64, kinds);
+        replica.queue(txn.clone()).unwrap();
+        shown(&replica);
+        queued.push(txn);
+    }
+    assert!(!replica.project().objects[&id(60)].state.hidden);
+    // A refused edit changes neither the project nor its hash.
+    let before = (replica.project().clone(), replica.state_hash().clone());
+    let refused = transaction(
+        base.clone(),
+        &peer,
+        35,
+        200,
+        vec![
+            create_in(63, 3, &peer),
+            property(999, "hidden", Value::Flag(true)),
+        ],
+    );
+    assert!(replica.queue(refused).is_err());
+    assert_eq!(
+        (replica.project(), replica.state_hash()),
+        (&before.0, &before.1)
+    );
+    // The host accepts the first two; the rest are replayed on its snapshot.
+    for txn in queued.iter().take(2) {
+        host.submit(txn.clone(), &peer, CLOCK as i64).unwrap();
+        replica.receive(host.snapshot().unwrap()).unwrap();
+        shown(&replica);
+    }
+    assert_eq!(replica.pending().len(), 3);
+    assert!(replica.pending().iter().all(|p| p.blocked_reason.is_none()));
+    // Abandon the property edit: its undo goes with it.
+    let removed = replica.discard_pending(&id(10_032)).unwrap();
+    assert_eq!(removed.len(), 2);
+    shown(&replica);
+    // An edit authored before the base advanced is recovered, not refused.
+    let late = transaction(base, &peer, 36, 300, vec![create_in(64, 3, &peer)]);
+    replica.queue_recovered(late).unwrap();
+    shown(&replica);
+    assert!(replica.project().objects.contains_key(&id(64)));
+    // Once everything is accepted the replica shows the host's own state.
+    let rest = replica
+        .pending()
+        .iter()
+        .map(|p| p.transaction.clone())
+        .collect::<Vec<_>>();
+    for txn in rest {
+        host.submit(txn, &peer, CLOCK as i64).unwrap();
+    }
+    replica.receive(host.snapshot().unwrap()).unwrap();
+    assert!(replica.pending().is_empty());
+    assert_eq!(
+        replica.state_hash().bytes().to_vec(),
+        host.revision().unwrap().state_hash
+    );
+}

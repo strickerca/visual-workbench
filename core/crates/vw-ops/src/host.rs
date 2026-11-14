@@ -258,15 +258,6 @@ enum Admission {
     New(DeviceId, Id),
 }
 
-/// Tell the hasher which part of the project an edit replaced.
-fn forget(hasher: &mut StateHasher, originals: &Originals) {
-    if !originals.only_objects() {
-        hasher.reset();
-    } else if let Some(first) = originals.objects.keys().next() {
-        hasher.objects_changed_from(first);
-    }
-}
-
 impl HostSequencer {
     /// Conservative single-representation workspace charge for admission by
     /// callers which clone/hash this state. Includes private journal values,
@@ -865,7 +856,7 @@ impl HostSequencer {
         self.sequence = undo.sequence;
         self.conflicts.truncate(undo.conflicts);
         self.canonical_len = undo.canonical_len;
-        forget(&mut self.hasher, &undo.originals);
+        undo.originals.forget_in(&mut self.hasher);
         undo.originals.restore(&mut self.project);
     }
 }
@@ -1246,7 +1237,7 @@ fn evaluate(
         accepted
     };
     let originals = draft::edit(project, |draft| patch::apply(draft, &changes))?;
-    forget(hasher, &originals);
+    originals.forget_in(hasher);
     // The project now holds the result. Anything that still fails has to put
     // it back before reporting the error.
     let concluded = (|| {
@@ -1272,7 +1263,7 @@ fn evaluate(
     let (tombstones, hash, canonical_len) = match concluded {
         Ok(concluded) => concluded,
         Err(error) => {
-            forget(hasher, &originals);
+            originals.forget_in(hasher);
             originals.restore(project);
             return Err(error);
         }

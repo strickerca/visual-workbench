@@ -272,6 +272,11 @@ impl ProjectStore {
         self.host.host_device()
     }
 
+    /// One accepted transaction and its acknowledgement, by transaction ID.
+    pub fn accepted_transaction(&self, id: &Id) -> Option<(&v1::Transaction, &v1::TxnAck)> {
+        self.host.accepted_transaction(id)
+    }
+
     /// Accepted bindings for restoring application undo cursors without replay
     /// or quadratic generation of every transaction's inverse preview.
     pub fn accepted_transactions(&self) -> impl Iterator<Item = (&v1::Transaction, &v1::TxnAck)> {
