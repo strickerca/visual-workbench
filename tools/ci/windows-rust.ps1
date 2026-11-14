@@ -6,6 +6,16 @@ Set-StrictMode -Version Latest
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 Set-Location $root
 
+# Hosted runners hand out TEMP in 8.3 short form (a RUNNER~1 path component). The
+# path-pinning tests compare against the canonical long path, so give them one.
+foreach ($name in 'TEMP', 'TMP') {
+    $value = [Environment]::GetEnvironmentVariable($name)
+    if ($value -and (Test-Path -LiteralPath $value)) {
+        [Environment]::SetEnvironmentVariable($name, (Get-Item -LiteralPath $value).FullName)
+    }
+}
+Write-Host "TEMP=$env:TEMP"
+
 function Step([string]$Name, [scriptblock]$Body) {
     Write-Host "`n=== $Name ==="
     & $Body

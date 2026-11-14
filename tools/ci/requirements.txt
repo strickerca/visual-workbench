@@ -1,0 +1,3 @@
+# Python packages the tooling tests import. Versions follow docs/TOOLCHAIN.md.
+numpy==2.3.5
+pillow==12.1.0

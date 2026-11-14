@@ -4,6 +4,9 @@
 # the NDK, then run Gradle. Needs ANDROID_HOME with the pinned platform,
 # build-tools and NDK (tools/ci/install-tools.sh android) and cargo-ndk.
 # Usage: tools/ci/kotlin-linux.sh [gradle tasks...]   (default: the full check set)
+# Where github.com raw downloads are blocked, clone the maven-archive branch of
+# rustls/rustls-platform-verifier and set VW_RUSTLS_MAVEN to the file:// URL of
+# its android-release-support/maven directory.
 . "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 : "${ANDROID_HOME:?set ANDROID_HOME to the Android SDK directory}"
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$ANDROID_NDK"
@@ -20,7 +23,7 @@ cargo ndk -t arm64-v8a --platform 29 -o target/android-jni build --locked -p vw-
 if [ "$#" -eq 0 ]; then
   set -- checkDependencyLicenses \
     :shared:allTests :android:testDebugUnitTest :desktop:test :pen-probe:testDebugUnitTest \
-    :android:lintDebug :shared:check :desktop:check
+    :android:lintDebug :shared:check :desktop:check --continue
 fi
 step "gradle: $*"
 # The connection-runtime packaging task needs Windows binaries; every recorded
