@@ -206,7 +206,10 @@ fn interleaved_appends_prepends_and_inserts_keep_strict_order() {
         }
         assert!(keys.windows(2).all(|pair| pair[0] < pair[1]));
         let longest = keys.iter().map(|k| k.as_str().len()).max().unwrap();
-        assert!(longest <= 16, "seed {seed}: longest key has {longest} digits");
+        assert!(
+            longest <= 16,
+            "seed {seed}: longest key has {longest} digits"
+        );
     }
 }
 

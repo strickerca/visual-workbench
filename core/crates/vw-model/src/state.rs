@@ -135,7 +135,7 @@ impl Project {
     /// Visible state hash excludes revision counters, so undo can restore a hash
     /// while its newly appended transaction still receives a new host sequence.
     pub fn state_hash(&self) -> Result<StateHash, ModelError> {
-        let mut bytes = b"VisualWorkbench.Project.v1\0".to_vec();
+        let mut bytes = crate::hasher::DOMAIN.to_vec();
         bytes.extend(self.canonical_bytes()?);
         Ok(StateHash::hash(&bytes))
     }
@@ -152,7 +152,7 @@ impl Project {
 
 // serde_json's default object map is ordered. Normalize signed floating zero,
 // retaining integer precision; normal floating values use its stable formatter.
-fn normalize(value: &mut serde_json::Value) {
+pub(crate) fn normalize(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Number(number) if number.is_f64() && number.as_f64() == Some(0.0) => {
             *value = serde_json::Value::Number(0.into());
