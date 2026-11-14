@@ -744,16 +744,39 @@ class Verification(Fixture):
         self.assertEqual(g.verify_bundle(raw, text, artifact_kinds=frozenset({"opaque"}),
                                          opaque_coverage=frozenset({"rust:x86_64-pc-windows-msvc"}))["status"], "complete")
         # Wrong JSON types are a static refusal, not a traceback.
-        for mutate in (lambda r: r["components"][0].__setitem__("texts", ["abc"]),
-                       lambda r: r["components"][0].__setitem__("scope", 7),
-                       lambda r: r.__setitem__("coverage", 5)):
+        for number, mutate in enumerate((
+                lambda r: r["components"][0].__setitem__("texts", ["abc"]),
+                lambda r: r["components"][0].__setitem__("texts", [{"sha256": 1, "origin": "x"}]),
+                lambda r: r["components"][0].__setitem__("texts", "abc"),
+                lambda r: r["components"][0].__setitem__("scope", 7),
+                lambda r: r["components"][0].__setitem__("warnings", [[]]),
+                lambda r: r["components"][0].__setitem__("sources", []),
+                lambda r: r["components"][0].__setitem__("selected", None),
+                lambda r: r["components"][0].__setitem__("name", {}),
+                lambda r: r.__setitem__("coverage", 5),
+                lambda r: r.__setitem__("coverage", [[]]),
+                lambda r: r.__setitem__("skipped", [{}]),
+                lambda r: r.__setitem__("inputs", []),
+                lambda r: r.__setitem__("generator", 3))):
             malformed = json.loads(raw)
             mutate(malformed)
-            with self.subTest(malformed=malformed["components"][0]["texts"][:1]):
-                with self.assertRaises(g.Refused):
+            with self.subTest(malformed=number):
+                with self.assertRaisesRegex(g.Refused, "^notices_receipt_structure$"):
                     g.verify_bundle(json.dumps(malformed).encode(), text)
+        for expected, mutate in (("notices_components", lambda r: r.__setitem__("components", {})),
+                                 ("notices_component", lambda r: r.__setitem__("components", [7])),
+                                 ("notices_texts", lambda r: r.__setitem__("texts", []))):
+            malformed = json.loads(raw)
+            mutate(malformed)
+            with self.assertRaisesRegex(g.Refused, f"^{expected}$"):
+                g.verify_bundle(json.dumps(malformed).encode(), text)
         with self.assertRaises(TypeError):  # a caller mistake is not a receipt refusal
             g.verify_bundle(raw, text, artifact_kind=frozenset())
+        # Wrong-typed caller arguments are caller defects and keep their traceback.
+        with self.assertRaises(AttributeError):
+            g.verify_bundle(raw, text, declarations=["Cargo.lock"])
+        with self.assertRaises(TypeError):
+            g.verify_bundle(raw, text, artifact_kinds=frozenset({"opaque"}), opaque_coverage=5)
         with self.assertRaisesRegex(g.Refused, "^notices_stale_input$"):
             g.verify_bundle(raw, text, declarations={"Cargo.lock": {"bytes": 1, "sha256": "0" * 64}})
         self.assertEqual(g.verify_bundle(raw, text, declarations={"Cargo.lock": receipt["inputs"]["Cargo.lock"]})

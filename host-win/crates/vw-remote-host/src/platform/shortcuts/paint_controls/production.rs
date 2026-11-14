@@ -56,6 +56,9 @@ fn view<'a>(target: &'a Target, budget: &'a SourceBudget) -> Result<View<'a>> {
         source_budget: budget,
         deadline,
     };
+    // SAFETY: q.automation is the owned interface created above on the
+    // caller's MTA. The selected HWND is passed by value as an opaque handle;
+    // UI Automation fails the call if it is stale. Never the desktop root.
     let root = q.call("Paint action selected root", || unsafe {
         q.automation
             .ElementFromHandle(HWND(target.window as usize as *mut std::ffi::c_void))
@@ -70,6 +73,8 @@ fn view<'a>(target: &'a Target, budget: &'a SourceBudget) -> Result<View<'a>> {
             kind: 50032,
         },
     )?;
+    // SAFETY: read-only property getter on the owned root element obtained
+    // above on the caller's MTA; the HWND is returned by value.
     if q.call("Paint action exact HWND", || unsafe {
         root.CurrentNativeWindowHandle()
     })? != HWND(target.window as usize as *mut std::ffi::c_void)

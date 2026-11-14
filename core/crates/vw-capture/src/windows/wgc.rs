@@ -352,6 +352,10 @@ fn admit_sdr(
 ) -> Result<()> {
     // SDR8 is admitted only when the actual target monitor reports RGB/P709.
     // HDR/wide-gamut captures need an explicit high-depth adapter, not clipping.
+    // SAFETY: MonitorFromWindow takes the HWND by value as an opaque handle and
+    // returns null for a stale one. The DXGI calls run on the caller's live
+    // borrowed device and on owned interfaces it returns; every result is
+    // returned by value and no raw pointer is dereferenced here.
     unsafe {
         let monitor = MonitorFromWindow(
             HWND(target.window as usize as *mut _),

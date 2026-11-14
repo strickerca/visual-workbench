@@ -267,6 +267,11 @@ impl State {
     }
 }
 
+/// # Safety
+/// Window procedure for the class registered in `run` only. It must be
+/// called by Windows message dispatch on the UI thread that created the
+/// window, whose create parameter is the boxed `State` that outlives the
+/// window; `lp` is then the payload Windows defines for `message`.
 unsafe extern "system" fn window_proc(h: HWND, message: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     if message == WM_NCCREATE {
         // SAFETY: WM_NCCREATE supplies CREATESTRUCTW with our live State pointer.

@@ -5,11 +5,13 @@ import { Grants } from './grants.mjs';
 import { NativeVerifier, Packages } from './packages.mjs';
 import { factory } from './server.mjs';
 import { listenHttp } from './http.mjs';
-import { Slots, requireThat, safeCode, identifier } from './bounds.mjs';
+import { LIMITS, Slots, json, requireThat, safeCode, identifier } from './bounds.mjs';
 requireThat(process.versions.node === '24.21.0', 'runtime_version');
 
 // The native supervisor is the only producer of this inherited input. Agent
-// bytes arrive nested in pipe/message and can never become owner commands.
+// bytes arrive in pipe/message as one opaque string and can never become owner
+// commands; nothing an agent writes is parsed as part of the owner frame, so a
+// refused agent line ends that agent's connection and never this process.
 const writer = new Writer(process.stdout); const owner = new Owner(writer); const grants = new Grants();
 const controls = new Slots(4); const toolSlots = new Slots(4); const pipes = new Map();
 let packages, http, started = false, stopping = false;
@@ -39,8 +41,12 @@ async function command(message) {
     return;
   }
   if (message.kind === 'pipe/message') {
-    const pipe = pipes.get(message.connection); requireThat(pipe, 'closed');
-    try { pipe.transport.deliver(message.message); } catch { await pipe.transport.close(); } return;
+    // Lines already forwarded for a connection this side has closed are dropped.
+    const pipe = pipes.get(message.connection); if (!pipe) return;
+    try {
+      requireThat(typeof message.message === 'string');
+      pipe.transport.deliver(json(Buffer.from(message.message), LIMITS.request));
+    } catch { await pipe.transport.close(); } return;
   }
   if (message.kind === 'pipe/closed') { await pipes.get(message.connection)?.transport.close(); return; }
   requireThat(typeof message.id === 'string' && message.id.length <= 64);
@@ -70,10 +76,23 @@ async function command(message) {
 // Serialize dispatch itself so pipe open/close boundaries cannot be overtaken.
 // Long owner operations run independently inside bounded controls; responses
 // and cancellation continue to flow while a package is being checked.
-let opening = Promise.resolve(); let incoming = 0;
+// Agent lines have their own bound: a burst sheds the connection which sent it
+// and cannot consume the owner's admission or fail the owner channel.
+let opening = Promise.resolve(); let incoming = 0; let relayed = 0; const shed = new Set();
 const lines = new Lines(message => {
+  if (started && message?.kind === 'pipe/message') {
+    const connection = message.connection;
+    if (shed.has(connection)) return;
+    if (relayed >= 16) {
+      shed.add(connection);
+      opening = opening.then(() => pipes.get(connection)?.transport.close()).catch(() => shutdown()).finally(() => shed.delete(connection));
+      return;
+    }
+    relayed++; opening = opening.then(() => command(message)).catch(() => shutdown()).finally(() => relayed--);
+    return;
+  }
   requireThat(++incoming <= 16, 'busy');
-  if (!started || message.kind === 'pipe/open' || message.kind === 'pipe/message' || message.kind === 'pipe/closed') {
+  if (!started || message.kind === 'pipe/open' || message.kind === 'pipe/closed') {
     opening = opening.then(() => command(message)).catch(() => shutdown()).finally(() => incoming--);
   } else void opening.then(() => command(message)).catch(error => writer.send({ kind: 'control/reply', id: message.id, ok: false, code: safeCode(error) }).catch(() => shutdown())).finally(() => incoming--);
 }, () => { void shutdown(); });

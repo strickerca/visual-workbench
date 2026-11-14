@@ -179,6 +179,8 @@ impl Query<'_> {
             self.members = Some(found);
         }
         let members = self.members.as_ref().ok_or(Error::Invalid)?;
+        // SAFETY: members is the owned array retained from the selected-root
+        // FindAll above; Length is a read-only getter with no pointer arguments.
         let count = bounded_count(
             self.budget.native(|| unsafe { members.Length() })?,
             MAX_MEMBERSHIP,
