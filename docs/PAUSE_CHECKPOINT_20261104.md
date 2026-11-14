@@ -7,9 +7,9 @@ is builds, device runs and owner sessions.
 ## Repository state
 
 - Updated 2026-11-06 after a full review of the session's work. Local
-  `main` is at the review-fix merge (`caf8978` plus this checkpoint update),
-  **ahead of `origin/main` (`f5574fd`) and not pushed**. Stage 1
-  publishing waits for the remaining blockers.
+  `main` was at the review-fix merge (`caf8978` plus checkpoint updates).
+  Those commits have since been pushed to `origin/main`. Stage 1 sign-off
+  still waits for the remaining blockers.
 - The review-fix merge includes two **uncompiled** code changes on main:
   `apps/shared/.../AiInteraction.kt` (caller cancellation now cancels the
   owned job synchronously; `AiInteractionTest` no longer yields) and
@@ -17,8 +17,12 @@ is builds, device runs and owner sessions.
   removed). The B5 delivery and notices changes in it are covered by passing
   PowerShell 5 fixtures and Python tests.
 - Working tree: clean.
-- Unmerged branches waiting for builds (each has its own worktree under
-  `.claude/worktrees/`):
+- 2026-11-13: on the owner's instruction, the three branches below were
+  merged into main **before** their compile and device checks, and main was
+  pushed to `origin/main`. The branches and their worktrees were deleted.
+  Their pending checks (resume steps 1–3) now run on main, not in worktrees.
+  Main therefore holds uncompiled Kotlin and Rust from all three.
+- Merged branches (formerly waiting for builds):
 
 | Branch | Tip | Worktree | What it is | Reviewed |
 | --- | --- | --- | --- | --- |
@@ -44,23 +48,27 @@ is builds, device runs and owner sessions.
 
 ## Resume order (builds; one heavy build at a time, ≥10.5 GB free)
 
-1. **B4.** In `.claude/worktrees/b4-canvas`, run Gradle
+Steps 1–3 now run on main (the branches are merged; their worktrees are gone,
+so native libraries must be rebuilt with `build-ffi` first). Fix failures on
+main in a new task branch.
+
+1. **B4.** Run Gradle
    `:android:testDebugUnitTest` (with `-PvwAndroidHil=true` and
-   `-PvwNativeDir`/`-PvwAndroidNativeDir` pointing at the worktree's copied
+   `-PvwNativeDir`/`-PvwAndroidNativeDir` pointing at the rebuilt
    `target\`). Then run `build.ps1 hil-test app` with
    `VW_ANDROID_EXPECTED_MODEL=SM-S918U`. It must pass 226/226 with
    `black_band_samples=0`. Then get a short independent re-review of
-   `89bd3a3` and merge into main.
-2. **B9.** In its worktree:
+   `89bd3a3`.
+2. **B9.** On main:
    - Android unit tests (`RemotePhysicalGestureJournalTest`,
      `RemoteWindowDeliveryTest`) and the remote-integration HIL variant.
    - Shared `RemotePhysicalCompatibilityTest` (expects 11).
    - Desktop compile.
    - `cargo clippy -D warnings` and `cargo test -p vw-remote-host`.
 
-   Fix anything that fails to compile, then merge.
+   Fix anything that fails to compile.
 3. **VERIFY-001/004.** Desktop compile, then `:desktop:test` for
-   `com.visualworkbench.desktop.mcp.*` and `DesktopAndroidTunnelTest`. Merge.
+   `com.visualworkbench.desktop.mcp.*` and `DesktopAndroidTunnelTest`.
 4. **Rebuild on merged main:**
    - `build-android`, then deliver with `build.ps1 deliver-android-normal`.
    - `build-desktop-distribution`, then rerun the packaged MCP smoke
@@ -85,13 +93,10 @@ is builds, device runs and owner sessions.
 - Hands-off windows for B6 and the B9 S Pen session.
 - B10: approve live OpenAI spend (about $1–5), or keep the mock-only carry-over.
 - Stage 0 confirmations still open: D21 (personal G5 finish line).
-- Pushing the local commits since `f5574fd` (review fixes and checkpoint updates); they are not
-  on GitHub yet.
 
 ## Environment notes
 
-- Agent worktrees hold copied native libraries and build output (B4: about
-  2.1 GB). Remove them with `git worktree remove` after their branches merge.
+- The task worktrees under `.claude/worktrees/` were removed on 2026-11-13.
 - Downloads and private artifacts live under `.local/` (gitignored):
   - scrcpy and WiX archives;
   - LiteRT AAR scan;
