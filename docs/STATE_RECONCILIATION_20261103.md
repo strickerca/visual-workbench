@@ -103,8 +103,9 @@ B3); FORMAT-006, QUALITY-001 and QUALITY-002 (PDFium, qpdf and LPAC runtime admi
   Main already contains the evolved `ProjectFilePickerRequest` form of that
   `Main.kt` draft.
 - **Deleted (already in main):** `task/phase2-editor-integration` (`679dc28`).
-- **Kept:** remote branches, `recovery/source-candidates-20261018` and
-  `task/m4-krita-paint`. All 6 locked retired worktrees are kept. Five
-  (`desktop`, `image-spike`, `ink-core`, `m4-input-retention`, `transport`) hold
-  uncommitted early-phase work. `windows-s23-20261020` holds ignored local
-  evidence receipts (about 1.7 GB).
+- **Kept at the time:** `recovery/source-candidates-20261018`.
+- **Deleted 2026-11-13:** the 39 merged remote branches, `task/m4-krita-paint`,
+  all 6 retired worktrees under `.local/retired-worktrees/` (superseded draft
+  snapshots and the S23 receipts referenced above), and their branches.
+  The owner does not want evidence, receipts or drafts kept once they've
+  been used.
