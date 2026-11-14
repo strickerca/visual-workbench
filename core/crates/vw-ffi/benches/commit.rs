@@ -164,10 +164,7 @@ fn main() {
                 count += 1;
             }
             last = median(&mut timings);
-            println!(
-                "{checkpoint:>19} | {:>8.2} ms",
-                last.as_secs_f64() * 1000.0
-            );
+            println!("{checkpoint:>19} | {:>8.2} ms", last.as_secs_f64() * 1000.0);
         }
         project.close().await.unwrap();
         last
