@@ -2,6 +2,11 @@
 
 Revision 2026-10-01. Companion to BUILD_SPECIFICATION.md v2.0 and REQUIREMENTS.json (189 requirements). Every requirement maps to at least one task below (checked by `tools/check_plan_coverage.py`).
 
+> **Owner rule (2026-11-13):** wherever this plan asks for evidence files,
+> receipts, snapshots or preserved artifacts, don't produce them. Record results
+> as one line in the commit or task status, and delete artifacts after use. See
+> "Only do what makes the product better" in `AGENTS.md`.
+
 ## Completion roadmap — 2026-11-03 (active)
 
 Owner-selected finish line: a **personal G5 build**. Close M4-KP (Paint only),

@@ -1,191 +1,92 @@
 # Visual Workbench implementation guidance
 
-Owner direction (2026-11-03): the goal is a personal G5 build: close M4-KP
-(Paint only), record G0–G3 and G5, and finish with an installable MSI and APK for personal use,
-without release signing (the APK keeps its existing development signer). Krita, T4.02, T4.05, T4.06, broader editors and full
-G4 stay deferred. Public signing/distribution is out of scope. The active
-sequence is the 2026-11 completion roadmap in `docs/IMPLEMENTATION_PLAN.md`
-(Stages 0–5). This supersedes the cloud continuation and pause/scope entries
-below; retain them as history.
+Rewritten 2026-11-13 by the owner's instruction. Earlier dated owner updates
+were superseded and are in Git history; do not revive them.
 
-Executor convention (2026-11-03): Claude Code executes each slice locally on
-this Windows laptop. An independent Claude reviewer agent reviews each slice's
-diff and evidence before it merges into main; that review replaces the earlier
-gpt-6.1-sol executor and gpt-6-astra review rule. Do not report model/effort
-mismatches against the old Sol/Astra settings. All other process rules below
-(task branches, evidence receipts, build.ps1, device selection, disk floor,
-publishing) remain in force.
+## Goal and scope
 
-Owner pre-authorization (2026-11-03): (1) fetching the assisted-selection model
-archives from this laptop's network and (2) admitting tool/runtime licenses
-(WiX/jpackage, scrcpy/tunnel DLLs, model weights) are authorized after each
-license is shown to the owner and confirmed. Live provider calls/spend (OpenAI)
-are not pre-authorized; ask at the step that needs them. Gates are recorded only
-after owner confirmation.
+Build a personal G5 version of the product: close M4-KP (Paint only), record
+G0–G3 and G5, and finish with an installable MSI and APK for personal use.
+There is no release signing; the APK keeps its existing development signer.
+Krita, T4.02, T4.05, T4.06, broader editors, full G4, and public signing or
+distribution are deferred.
 
-Historical cloud continuation (2026-10-19): the current parent delegation and its
-explicit lane grant define the active deliverable. This continuation supersedes
-the older pause/scope instructions below for this delegated cloud work. Retain
-those dated entries as history; do not restart a completed old task/audit because
-a reused thread or checkout still mentions it. See
-`docs/ACTIVE_CLOUD_LANES_20261019.md` for current source ownership and handoffs.
-Current user instructions remain authoritative if that coordination map is stale.
+The active sequence is the 2026-11 completion roadmap in
+`docs/IMPLEMENTATION_PLAN.md` (Stages 0–5). The product sources are
+`docs/BUILD_SPECIFICATION.md`, `docs/REQUIREMENTS.json` and that plan. Current
+owner instructions take precedence over all of them.
 
-Before claiming progress after a resumed/reassigned turn, establish actual cwd,
-branch/HEAD, dirty owned paths and the current requested deliverable. Preserve
-useful old work/receipts and unrelated dirty files; do not reset or silently
-replace them. An unrelated old-task commit is preserved work, not evidence that
-the current assigned implementation or model conversion was performed. If the
-active task/checkout differs from the parent delegation, report the mismatch
-and continue the current authorized task in a suitable isolated checkout.
+## Only do what makes the product better (owner rule, 2026-11-13)
 
-The parent controls cloud lane activation and the single heavy slot. Root does
-not silently reassign E/Android or dispatch another executor. This cloud scope
-excludes live provider calls, credentials/signing/deployment, GUI input/capture,
-device/security/driver changes. Keep expensive aggregate/device validation
-deferred as requested, and never treat slot reservation as execution evidence.
+Every piece of work, file and artifact must help build, test or run the
+product. If it doesn't, don't make it. If it already exists, delete it.
 
-The active repository is this directory. Use `docs/BUILD_SPECIFICATION.md`,
-`docs/REQUIREMENTS.json` and `docs/IMPLEMENTATION_PLAN.md` as the v2 product sources.
-Root specification/requirements copies are preserved v1 references. Read the
-matching task prompt as task guidance; current user instructions take precedence.
+- **No evidence, receipts or archives.** Don't write evidence JSON, receipts,
+  before/after snapshot folders, "preserved" drafts, backups or history copies.
+  Don't keep them "just in case". This overrides every evidence or receipt
+  requirement in `docs/IMPLEMENTATION_PLAN.md` and the other docs.
+- **Results go in one line.** Record a test or device result as a short line in
+  the commit message or the plan's status for that task (what ran, pass/fail,
+  device). Don't create a separate file for it.
+- **Dispose after use.** Build output, captures, screenshots, logs, device
+  pulls and scratch folders are deleted as soon as they've served their purpose.
+  Keep only what the next build or test step actually reads (for example, a
+  downloaded toolchain archive or a model file the build needs).
+- **No hidden work.** Don't start side work the owner didn't ask for and the
+  product doesn't need, such as audits, reconciliations, history reports or
+  extra review rounds.
+- **Tell the owner what's left.** At the end of every task, list anything you
+  left on disk outside source control that's larger than about 50 MB, and why
+  the product needs it. If you can't name a reason, delete it first.
+- **Don't leave branches or worktrees behind.** Once a task branch is merged,
+  delete the branch and its worktree.
 
-Follow the implementation plan's dependency order and keep implementation status
-separate from verification. Hardware evidence applies only to the named device.
-The IN2019 is authorized for startup smoke tests; S23 Ultra pen/capture/latency
-verification remains pending. Do not mark a phase gate or product feature passed
-from a compiling skeleton.
+## Process
 
-Owner update (2026-10-02): defer S23 Ultra physical work and continue software
-implementation. The OnePlus/IN2019 is reserved by another project; do not query,
-install on, launch on, or otherwise use it until the owner releases that reservation.
-Host builds and offline tests may continue. This deferral does not pass hardware
-acceptance or waive the Phase 0 gate.
+- Claude Code executes each slice locally on this Windows laptop on a
+  `task/<task-id>-<slug>` branch. An independent Claude reviewer agent reviews
+  the slice's diff before it merges into main. Review the code, not paperwork.
+- Standing Git authorization (2026-10-01): commit validated task work, merge
+  completed work into main, and push main to origin at each numbered phase
+  conclusion, without asking for Git permission again. Never force-push or
+  rewrite shared history. Never commit secrets, signing keys, private captures,
+  real device serials or network identifiers. The repository is public.
+- Owner confirmation is still required for product gates, performance changes,
+  live provider spend (OpenAI) and other manual decisions. Record a gate only
+  after the owner confirms it.
+- Owner pre-authorization (2026-11-03): fetching the assisted-selection model
+  archives, and admitting tool or runtime licenses (WiX/jpackage, scrcpy and
+  tunnel DLLs, model weights) after each license is shown to the owner and
+  confirmed.
+- After each slice, report the result, open verification limits, and the next
+  planned task from the completion roadmap. Never change app or session
+  settings yourself.
 
-Owner update (2026-10-02, overnight continuation): continue the full implementation
-plan without pausing between slices. The connected S23 Ultra (SM-S918U) is now
-authorized for project builds, installs and tests as needed. Device-name inventory
-is explicitly authorized to select it. Pin automated selection to SM-S918U; never
-fall back to the reserved OnePlus. Physical owner gestures and manual gate decisions
-remain unverified until performed; continue independent implementation while they
-are pending. Report each slice's result and next task/model/effort as work continues.
+## Builds and devices
 
-Owner update (2026-10-02, awake): finish the current implementation slice and pause
-after reporting results, the next task, and its recommended model/effort so the
-owner can adjust settings. This supersedes the overnight no-pause cadence.
-Parallel agent implementation/review is explicitly authorized where it improves
-quality and efficiency; assign separate file ownership and serialize heavy builds
-and device tests. The S23 authorization and OnePlus reservation remain in force.
+- Start with `tools/doctor.ps1`. Build, check and run hardware smoke tests
+  through `build.ps1`. License checks run before builds; unknown or forbidden
+  licenses fail. Keep dependency pins and lockfiles current.
+- Run one heavy build at a time with at most two build workers, and keep at
+  least 10.5 GB of disk free. If a build stalls, diagnose it before retrying.
+- Android device: select the S23 Ultra (SM-S918U) explicitly, with no fallback
+  to any other device. Install, instrument and clean up as owner user 0, and
+  leave other apps and profiles alone. Don't use the OnePlus/IN2019 unless the
+  owner says so.
+- A compiling skeleton doesn't pass a feature or gate. Physical S Pen gestures,
+  target-device performance and owner acceptance stay pending until actually
+  performed.
+- Never change machine-wide execution policy or security settings, or install a
+  driver, without the owner's explicit authorization. Leave unrelated processes
+  and installations alone.
 
-Owner update (2026-10-02, full continuation): proceed through the project without
-pausing between implementation slices. The OnePlus/IN2019 is connected again and
-is authorized for applicable project tests; the prior reservation is released for
-this work. The S23 Ultra is being taken away, so defer all checks specifically
-requiring it. Select IN2019 explicitly, with no fallback to another device. Keep
-OnePlus software evidence separate from S23/S Pen, target-device performance and
-owner acceptance. Continue software using the documented provisional designs
-where hardware-only dependencies are deferred; keep those decisions and product
-gates pending. Do not invent pen measurements, preferences or gate approval.
-This supersedes the awake pause cadence and the earlier OnePlus reservation.
-Parallel implementation remains authorized; preserve other apps and processes.
+## Code conventions
 
-Owner update (2026-10-03): the S23 Ultra is connected again. Use SM-S918U
-explicitly for applicable Android validation and delivery, without device fallback.
-The released IN2019 authorization remains available for separately selected tests.
-Preserve other apps and Android profiles. Test package installation, instrumentation
-and cleanup must target owner user 0; refuse ambiguous existing test installations.
-Keep physical S Pen gestures, latency, provider quality and owner gates pending
-unless the corresponding acceptance was actually performed.
-
-Owner executor update (2026-10-03): continue the full plan with gpt-6.1-sol / xhigh.
-This overrides the plan's model/effort recommendations. Verify each executor's
-actual session; an existing executor whose effort differs must report that
-limitation. New delegated coding uses the requested Sol/xhigh settings. Do not
-resume a superseded max-effort coding executor or silently change app settings.
-
-Owner scope confirmation (2026-10-03): follow D20's Krita/Paint milestone M4-KP.
-Prioritize the capture/DPI, transport and frame/input ownership needed for T4.01,
-T4.03, T4.04 and the active Krita/Paint subsets of T4.07/T4.08, then personal-use
-packaging and focused acceptance. Preserve broader Phase 3 candidates without
-making them new milestone prerequisites. Keep deferred Phase 4 tasks and Phase 5
-deferred; this scope confirmation does not pass M4-KP, G4 or earlier product gates.
-
-Owner device/progress update (2026-10-03): the S23 Ultra is being taken away.
-Defer further S23-specific tests until the owner returns. The OnePlus/IN2019 is
-explicitly authorized for applicable app tests; select it by model without
-falling back to another device. Continue build work and suitable Windows/offline
-validation. Keep earlier S23 evidence bound to its exact source and artifacts;
-OnePlus results do not pass S23 pen or performance acceptance. After each active
-milestone build task completes, state how many build tasks remain. Track the
-five active Phase 4 implementation tasks plus personal-use packaging, with
-physical S23 acceptance separate and pending. Foundations and source-only
-freezes do not complete a build task.
-
-The owner shares the IN2019 with another app development session. Backgrounding
-can be normal. Check actual foreground state, use bounded starter-only relaunches,
-and preserve the other app and its processes. Do not reset adb or the device to
-recover a focus change. A persistently contested UI run is inconclusive.
-
-Owner device update (2026-10-04): the S23 Ultra is connected again and needed
-project tests are authorized. Select SM-S918U explicitly with no fallback. The
-IN2019 authorization remains available for separately selected applicable tests.
-Preserve other apps/profiles and retain each result's actual source/artifact/device
-binding. Physical S Pen gestures, target-device performance and owner acceptance
-remain pending until measured. Continue reporting the remaining six scoped build
-tasks as actual integrated and software-validated tasks complete.
-
-Owner unattended update (2026-10-04): the owner is going to sleep and requests
-continuation without further input. Automate applicable setup, builds, diagnostics
-and interaction in exact task-owned blank editor/test windows within the already
-authorized milestone. Use an explicit unattended harness mode for automated
-readiness; preserve actual target, foreground, balanced-input, grant, lifecycle
-and retirement predicates. Record automated interaction separately from physical
-human gestures. Continue independent work when a physical S Pen measurement or
-owner drawing acceptance is unavailable; those checks remain pending. Do not
-request further foreground or desktop-reservation replies during this run.
-
-Use Rust edition 2024, private unpublished proprietary crates, rustfmt and clippy
-with warnings denied. No unwrap/expect/panic in libraries; isolate unsafe code in
-FFI/platform modules and explain each unsafe operation with a SAFETY comment.
-
-Latest owner checkpoint instruction (2026-10-04): finish the current lifecycle
-parser correction and focused validation, then pause, commit, integrate into
-main, push, and provide a continuation handoff. Do not start further milestone
-implementation during this pause. For this milestone use only the explicitly
-selected connected S23 (SM-S918U); do not commandeer the OnePlus/IN2019. This
-supersedes the older device authorizations above. Keep the owner's selected
-model and effort without overrides. Preserve unfinished candidates, worktrees,
-failure receipts and pending owners. Resume only when the owner requests it.
-Use explicit Kotlin API mode in shared code and keep commonMain platform-neutral.
-Keep Windows DPI and capture math in physical pixels with Per-Monitor-V2 awareness.
-
-Build through `build.ps1`; license checks run before builds. Keep dependency pins
-and lockfiles current. Unknown/forbidden licenses fail. Never add secrets, signing
-keys, private captures, real device serials or network identifiers to source/evidence.
-
-Run one heavy build at a time, at most two build workers. Use bounded process-tree
-execution with progress and retain failure receipts; diagnose a stall before retry.
-Preserve unrelated processes, installations, files and worktrees. Never change
-machine-wide execution policy, security settings or install a driver without the
-owner's explicit authorization.
-
-Standing owner authorization (2026-10-01): this project's GitHub repository is
-public. Commit validated task work locally and integrate completed dependency
-work without repeated Git permission questions. At the conclusion of each
-numbered phase, automatically commit all phase-owned source/evidence and push
-main to origin, following docs/IMPLEMENTATION_PLAN.md "Automatic phase publishing".
-This covers Git publication; owner confirmation of product gates, performance
-changes and other manual decisions still follows the plan.
-Preserve unrelated work, stage explicit phase-owned paths, scan staged bytes,
-exclude local caches/secrets/signing material/verification images, and never
-force-push or rewrite shared history. Report the commit, remote URL and verified
-remote SHA, or the concrete blocker if publication cannot finish.
-
-Verification screenshots go in an owned temporary directory outside the repository.
-Inspect and then dispose them before closure; retain only text results, counts,
-hashes, source bindings and a disposal receipt. Product image assets are preserved.
-
-After each implementation slice, report its result and open verification limits,
-then name the next planned task and its size from the completion roadmap.
-Settings are changed by the owner; never change app or session settings
-automatically.
+- Rust edition 2024, private unpublished crates, rustfmt, and clippy with
+  warnings denied. No `unwrap`/`expect`/`panic` in libraries. Isolate unsafe
+  code in FFI or platform modules and explain each unsafe operation with a
+  `SAFETY` comment.
+- Kotlin: explicit API mode in shared code; keep `commonMain`
+  platform-neutral.
+- Windows DPI and capture math use physical pixels with Per-Monitor-V2
+  awareness.
