@@ -22,8 +22,8 @@ open blockers.
 | Pairing by QR or code, encrypted link, sync, offline edits | Yes | Yes | Partly |
 | Capture, masks, instruction packages, local MCP tools | Yes | Yes | Partly |
 | Image edit through an image model | Yes | Yes, against recorded responses | No live run yet |
-| Remote pen editing in Paint | Yes | Compiles and lints on Windows; its Windows tests are not all green yet | Not yet accepted |
-| Installers (MSI and APK) | Yes | Not yet built automatically | App image and APK installed and launched once; MSI install not yet accepted |
+| Remote pen editing in Paint | Yes | Yes, on a Windows build machine without Paint or a pen | Not yet accepted |
+| Installers (MSI and APK) | Yes | APK can be built on request (`build-apps` workflow); MSI not yet | App image and APK installed and launched once; MSI install not yet accepted |
 
 No product gate (G0–G5) has been recorded yet.
 

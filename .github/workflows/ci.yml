@@ -1,6 +1,6 @@
 # Automatic checks for every push. The logic lives in tools/ci so the same
 # scripts run in cloud sessions and here. "ci-required" is the one status that
-# must be green before a merge; the other jobs join it as they prove stable.
+# must be green before a merge; it waits for every job below.
 name: ci
 
 on:
@@ -147,7 +147,7 @@ jobs:
 
   ci-required:
     if: always()
-    needs: [policy, rust-lint, rust-test, python-node, advisories]
+    needs: [policy, rust-lint, rust-test, python-node, advisories, kotlin-linux, rust-windows]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
