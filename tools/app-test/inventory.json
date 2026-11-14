@@ -91,6 +91,7 @@
     "com.visualworkbench.android.EditorReadinessInstrumentedTest#interveningOperationRevokesAnUnconsumedIdleOffer",
     "com.visualworkbench.android.EditorReadinessInstrumentedTest#pendingEditMustSettleEvenAfterBusyClears",
     "com.visualworkbench.android.EditorReadinessInstrumentedTest#publicationDoesNotReenterAnUnfinishedFinallyBlock",
+    "com.visualworkbench.android.EditorSurfaceInstrumentedTest#eraserResizeAndRecreationPresentCanvasPixels",
     "com.visualworkbench.android.EditorSurfaceInstrumentedTest#everyDrawingToolPersistsAndCancellationCreatesNoObject",
     "com.visualworkbench.android.EditorSurfaceInstrumentedTest#textSelectionMoveResizeEraserUndoAndActivityRecreationUseRealCore",
     "com.visualworkbench.android.EditorSyncInstrumentedTest#backgroundCancelsPreviewAndProjectSwapClosesLinkBeforeProject",

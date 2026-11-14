@@ -1,5 +1,9 @@
 package com.visualworkbench.android
 
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.Rect
+import android.graphics.RectF
 import android.os.SystemClock
 import android.util.Log
 import android.view.InputDevice
@@ -16,6 +20,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import kotlin.math.abs
 
 /** Actual app SurfaceView MotionEvents + native persistence; synthetic input only. */
 @RunWith(AndroidJUnit4::class)
@@ -47,6 +52,132 @@ class EditorSurfaceInstrumentedTest {
         if (view is CanvasSurface) return view
         if (view is ViewGroup) for (i in 0 until view.childCount) canvas(view.getChildAt(i))?.let { return it }
         return null
+    }
+
+    /** Screen-space probes for the composited canvas. The renderer draws into
+     * child SurfaceControls, so PixelCopy of the SurfaceView's own Surface or of
+     * the Window cannot observe it; only a display composition screenshot can. */
+    private class CanvasProbe(val canvas: Rect, val page: RectF, val pagePoint: Point, val surround: Int, val railAtEnd: Boolean)
+    private class PresentSample(val presented: Boolean, val blackFraction: Double, val blackBandFraction: Double, val detail: String)
+
+    private fun canvasProbe(activity: MainActivity): CanvasProbe? {
+        val view = canvas(activity.window.decorView) ?: return null
+        val scene = activity.editor.scene ?: return null
+        if (scene.background == null || !view.holder.surface.isValid || view.width <= 0 || view.height <= 0) return null
+        val location = IntArray(2); view.getLocationOnScreen(location)
+        val w = scene.document.width.toDouble(); val h = scene.document.height.toDouble()
+        val corners = listOf(Point(0.0, 0.0), Point(w, 0.0), Point(0.0, h), Point(w, h)).map { EditorDrawing.map(scene.matrix, it) }
+        val page = RectF(corners.minOf { it.x }.toFloat(), corners.minOf { it.y }.toFloat(),
+            corners.maxOf { it.x }.toFloat(), corners.maxOf { it.y }.toFloat())
+        page.offset(location[0].toFloat(), location[1].toFloat())
+        // Lower-right page area: every drawing fixture in this class stays above/left of it.
+        val inside = EditorDrawing.map(scene.matrix, Point(w * .85, h * .85))
+        return CanvasProbe(Rect(location[0], location[1], location[0] + view.width, location[1] + view.height), page,
+            Point(inside.x + location[0], inside.y + location[1]), EditorDrawing.surroundArgb(scene.dark),
+            activity.editor.preferences.leftHanded)
+    }
+
+    private fun near(actual: Int, expected: Int, tolerance: Int): Boolean =
+        abs(Color.red(actual) - Color.red(expected)) <= tolerance && abs(Color.green(actual) - Color.green(expected)) <= tolerance &&
+            abs(Color.blue(actual) - Color.blue(expected)) <= tolerance
+
+    private fun presentSample(shot: Bitmap, probe: CanvasProbe): PresentSample {
+        fun pixel(x: Double, y: Double): Int? {
+            val ix = x.toInt(); val iy = y.toInt()
+            return if (ix in 0 until shot.width && iy in 0 until shot.height) shot.getPixel(ix, iy) else null
+        }
+        val c = probe.canvas
+        // The tool rail overlays one canvas edge; the central 40% band never contains it.
+        // Every row of the band is sampled so a partial black strip is measured too.
+        val band = Rect(c.left + (c.width() * .3).toInt(), c.top, c.left + (c.width() * .7).toInt(), c.bottom)
+        var black = 0; var total = 0; var run = 0; var longestRun = 0
+        if (band.intersect(0, 0, shot.width, shot.height) && band.width() > 0) {
+            val rowPixels = IntArray(band.width())
+            for (y in band.top until band.bottom) {
+                shot.getPixels(rowPixels, 0, band.width(), band.left, y, band.width(), 1)
+                var rowBlack = 0; var rowTotal = 0
+                var x = 0
+                while (x < rowPixels.size) {
+                    val color = rowPixels[x]
+                    rowTotal++
+                    if (Color.red(color) <= 10 && Color.green(color) <= 10 && Color.blue(color) <= 10) rowBlack++
+                    x += 8
+                }
+                black += rowBlack; total += rowTotal
+                // A row is black when >=90% of its samples are near-black.
+                if (rowBlack * 10 >= rowTotal * 9) { run++; if (run > longestRun) longestRun = run } else run = 0
+            }
+        }
+        val fraction = if (total == 0) 1.0 else black.toDouble() / total
+        val bandFraction = if (c.height() <= 0) 1.0 else longestRun.toDouble() / c.height()
+        val pageColors = (-1..1).flatMap { dy -> (-1..1).map { dx -> pixel(probe.pagePoint.x + 4 * dx, probe.pagePoint.y + 4 * dy) } }
+        val white = pageColors.all { it != null && near(it, Color.WHITE, 12) }
+        val surroundPoints = buildList {
+            val p = probe.page
+            if (p.top - c.top >= 24) add(Point(c.exactCenterX().toDouble(), ((c.top + p.top) / 2).toDouble()))
+            if (c.bottom - p.bottom >= 24) add(Point(c.exactCenterX().toDouble(), ((c.bottom + p.bottom) / 2).toDouble()))
+            if (probe.railAtEnd && p.left - c.left >= 24) add(Point(((c.left + p.left) / 2).toDouble(), p.centerY().toDouble()))
+            if (!probe.railAtEnd && c.right - p.right >= 24) add(Point(((c.right + p.right) / 2).toDouble(), p.centerY().toDouble()))
+        }
+        val surroundColors = surroundPoints.map { pixel(it.x, it.y) }
+        val surround = surroundColors.isNotEmpty() && surroundColors.all { it != null && near(it, probe.surround, 16) }
+        fun hex(value: Int?) = value?.let { String.format("%08x", it) } ?: "none"
+        return PresentSample(white && surround && fraction < .01 && bandFraction < .02, fraction, bandFraction,
+            "page=${hex(pageColors[4])} surround=${surroundColors.joinToString(",") { hex(it) }} black=${"%.3f".format(fraction)} " +
+                "black_band=${"%.3f".format(bandFraction)}")
+    }
+
+    /** Polls composited display pixels: the page must be white, the surround its
+     * theme colour and the canvas band <1% near-black with no contiguous black
+     * strip of >=2% of the canvas rows. Any sample that is >=90% black, or that
+     * contains such a strip, during the observation window fails, so a transient
+     * full or partial black presentation gap is reported with its count, not only
+     * a persistent one. Screenshots stay in memory and are recycled immediately. */
+    private fun assertPresented(scenario: ActivityScenario<MainActivity>, phase: String, deadlineMs: Long = 2_000, observeMs: Long = 800) {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val start = SystemClock.uptimeMillis()
+        var samples = 0; var blackSamples = 0; var bandSamples = 0; var firstBlackMs = -1L; var lastBlackMs = -1L
+        var firstPresentedMs = -1L; var lastPresented = false; var detail = "canvas-unavailable"
+        while (true) {
+            var probe: CanvasProbe? = null
+            scenario.onActivity { probe = canvasProbe(it) }
+            val current = probe
+            val elapsed = SystemClock.uptimeMillis() - start
+            if (current == null) { lastPresented = false; detail = "canvas-unavailable" }
+            else {
+                val raw = automation.takeScreenshot()
+                if (raw == null) { lastPresented = false; detail = "screenshot-unavailable" }
+                else {
+                    val shot = if (raw.config == Bitmap.Config.HARDWARE) raw.copy(Bitmap.Config.ARGB_8888, false).also { raw.recycle() } else raw
+                    try {
+                        val sample = presentSample(shot, current)
+                        samples++
+                        val fullBlack = sample.blackFraction >= .9
+                        val blackBand = sample.blackBandFraction >= .02
+                        if (fullBlack) blackSamples++
+                        if (blackBand) bandSamples++
+                        if (fullBlack || blackBand) { if (firstBlackMs < 0) firstBlackMs = elapsed; lastBlackMs = elapsed }
+                        lastPresented = sample.presented; detail = sample.detail
+                        if (sample.presented && firstPresentedMs < 0) firstPresentedMs = elapsed
+                    } finally { shot.recycle() }
+                }
+            }
+            val now = SystemClock.uptimeMillis() - start
+            if ((lastPresented && now >= observeMs) || now >= deadlineMs) break
+        }
+        val summary = "phase=$phase samples=$samples black_samples=$blackSamples black_band_samples=$bandSamples " +
+            "first_black_ms=$firstBlackMs last_black_ms=$lastBlackMs first_presented_ms=$firstPresentedMs presented=$lastPresented $detail"
+        Log.i("VW_CANVAS_PRESENT", summary)
+        if (!lastPresented || blackSamples > 0 || bandSamples > 0) fail("Canvas presentation failed: $summary")
+    }
+
+    private fun resizeCanvas(scenario: ActivityScenario<MainActivity>, phase: String, shrink: Boolean, action: (MainActivity) -> Unit) {
+        var before = 0
+        scenario.onActivity { before = requireNotNull(canvas(it.window.decorView)).height; action(it) }
+        await(scenario, phase) { activity ->
+            val view = canvas(activity.window.decorView)
+            view != null && view.holder.surface.isValid && (if (shrink) view.height < before else view.height > before)
+        }
     }
     private fun gesture(scenario: ActivityScenario<MainActivity>, tool: EditorTool, points: List<Point>, cancel: Boolean = false, finger: Boolean = false) {
         // The real input gate also waits for the instruction/semantic refreshes
@@ -169,9 +300,22 @@ class EditorSurfaceInstrumentedTest {
         var hash = ""
         scenario.onActivity { assertEquals(2, it.editor.document?.render?.items?.size); hash = requireNotNull(it.editor.info).stateHash }
         scenario.recreate()
-        await(scenario, "renderer-after-recreation") { it.editor.scene?.background != null && canvas(it.window.decorView)?.holder?.surface?.isValid == true }
+        // Native state and a valid Surface do not prove presentation: require actual composited pixels.
+        assertPresented(scenario, "renderer-after-recreation", deadlineMs = 3_000)
         scenario.onActivity { assertEquals(hash, it.editor.info?.stateHash); assertEquals(2, it.editor.document?.render?.items?.size) }
         gesture(scenario, EditorTool.Pen, listOf(Point(900.0, 600.0), Point(970.0, 650.0)))
         scenario.onActivity { assertEquals(3, it.editor.document?.render?.items?.size) }
+    }
+
+    @Test fun eraserResizeAndRecreationPresentCanvasPixels() = withCanvas { scenario, _ ->
+        gesture(scenario, EditorTool.Pen, listOf(Point(260.0, 100.0), Point(330.0, 115.0), Point(420.0, 145.0)))
+        assertPresented(scenario, "baseline")
+        // Eraser controls take layout space below the weighted canvas: an actual SurfaceView resize.
+        resizeCanvas(scenario, "eraser-controls-resize", shrink = true) { it.editor.chooseTool(EditorTool.Eraser) }
+        assertPresented(scenario, "after-eraser-resize")
+        scenario.recreate()
+        assertPresented(scenario, "after-recreation", deadlineMs = 3_000)
+        resizeCanvas(scenario, "pen-controls-resize", shrink = false) { it.editor.chooseTool(EditorTool.Pen) }
+        assertPresented(scenario, "after-pen-resize")
     }
 }

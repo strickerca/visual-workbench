@@ -67,7 +67,7 @@ relaunch on foreground contention; a contested UI assertion remains inconclusive
 
 ## Assertion and evidence boundary
 
-`inventory.json` explicitly names all 225 current methods. Every Kotlin test source
+`inventory.json` explicitly names all 226 current methods. Every Kotlin test source
 is parsed before the build; additions, removals, skips, unusual test declaration
 shapes or parameterization require a reviewed inventory/parser update. This
 prevents a new test from silently avoiding the evidence contract. The same source
@@ -77,7 +77,7 @@ and Android Rust library are included. Native directory properties are pinned
 with explicit canonical `-P` arguments; unbound environment overrides refuse.
 This binds the generator inputs without claiming a new compiler-provenance run.
 
-Passing requires all 225 distinct test start/success pairs, consistent exact
+Passing requires all 226 distinct test start/success pairs, consistent exact
 `current`/`numtests` counters, no failed/ignored/assumption statuses, no extra or
 missing methods, one matching `OK (N tests)` summary and final instrumentation
 code `-1`. Printed success prose alone never establishes a pass. Direct adb
@@ -119,7 +119,7 @@ For the two exact surface fixtures, failure diagnosis may also retain an
 discarded. The exact stale-page sync fixture adds a fixed suppressed phase
 marker to its original timeout; only its allowlisted enum value is retained,
 and secondary cleanup cannot replace the primary failure. Existing wait limits,
-readiness predicates and all 225 required test names remain unchanged. These
+readiness predicates and all 226 required test names remain unchanged. These
 diagnostics and the giant factory cancellation cleanup repair require a fresh
 bound run; they do not establish a passing result from earlier receipts.
 
