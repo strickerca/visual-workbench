@@ -401,10 +401,11 @@ impl StrokeGesture {
                 }
                 let model = state.project()?;
                 let layer_id = Id::try_from(options.layer_id)?;
+                let layer_wire = layer_id.to_proto();
                 let left = model
                     .objects
                     .values()
-                    .filter(|o| o.state.layer_id.as_ref() == Some(&layer_id.to_proto()))
+                    .filter(|o| o.state.layer_id.as_ref() == Some(&layer_wire))
                     .map(|o| o.state.order_key.as_str())
                     .max()
                     .map(|key| OrderKey::try_from(key.to_owned()))

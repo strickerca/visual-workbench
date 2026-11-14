@@ -377,13 +377,12 @@ impl ProjectSession {
                             transform,
                         } => {
                             let layer = Id::try_from(layer_id)?;
+                            let layer_wire = layer.to_proto();
                             let left = order_by_layer.get(&layer).cloned().or_else(|| {
                                 project
                                     .objects
                                     .values()
-                                    .filter(|o| {
-                                        o.state.layer_id.as_ref() == Some(&layer.to_proto())
-                                    })
+                                    .filter(|o| o.state.layer_id.as_ref() == Some(&layer_wire))
                                     .map(|o| o.state.order_key.as_str())
                                     .max()
                                     .and_then(|v| OrderKey::try_from(v.to_owned()).ok())
