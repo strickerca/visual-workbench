@@ -27,12 +27,26 @@ def chunk(kind, data):
     return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
 
 
+def stored_zlib(data):
+    """A zlib stream of stored blocks. Compressed output differs between zlib
+    builds (CPython ships zlib on Linux and zlib-ng on Windows), and these PNG
+    bytes are hashed into fixtures shared with the Kotlin tests, so the test
+    encoder must not depend on the compressor."""
+    blocks = [b"\x78\x01"]
+    for start in range(0, len(data), 65535):
+        block = data[start:start + 65535]
+        final = start + 65535 >= len(data)
+        blocks.append(struct.pack("<BHH", 1 if final else 0, len(block), len(block) ^ 0xffff) + block)
+    blocks.append(struct.pack(">I", zlib.adler32(data) & 0xffffffff))
+    return b"".join(blocks)
+
+
 def png(pixels, width, height):
-    """Unfiltered RGBA8 PNG with an explicit sRGB chunk (fast test encoder)."""
+    """Unfiltered RGBA8 PNG with an explicit sRGB chunk (deterministic test encoder)."""
     stride = width * 4
     scan = b"".join(b"\x00" + pixels[y * stride:(y + 1) * stride] for y in range(height))
     return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
-            + chunk(b"sRGB", b"\x00") + chunk(b"IDAT", zlib.compress(scan, 1)) + chunk(b"IEND", b""))
+            + chunk(b"sRGB", b"\x00") + chunk(b"IDAT", stored_zlib(scan)) + chunk(b"IEND", b""))
 
 
 def ident(n):

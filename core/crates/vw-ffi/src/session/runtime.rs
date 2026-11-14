@@ -102,8 +102,13 @@ impl NetworkRuntime {
             .map_err(|_| SessionError::Backpressure)?;
         let (send, receive) = oneshot::channel();
         let task = self.0.handle.spawn(async move {
-            let _permit = permit;
-            let result = future.await;
+            // Release admission before the caller can observe the result, so a
+            // caller that immediately issues its next call is never refused by
+            // the slot of the call it just finished.
+            let result = {
+                let _permit = permit;
+                future.await
+            };
             let _ = send.send(result);
         });
         let _abort = Abort(task.abort_handle());
