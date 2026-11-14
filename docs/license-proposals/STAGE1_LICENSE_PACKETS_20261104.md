@@ -58,7 +58,7 @@ Nothing is legally required for a build that is never distributed. For distribut
 Apache-2.0 section 4(d) does not apply, because MobileSAM has no NOTICE file. The repo's candidate MobileSAM text is `docs/license-proposals/notices/assisted-selection/upstream/MobileSAM-f706ad9c-LICENSE`. It is not yet registered.
 
 ### Risks / unknowns
-- **Weights rights are implied, not stated.** This is the main legal gap the repo itself flags (ASSISTED_LICENSE_CLOSURE_20261019.md).
+- **Weights rights are implied, not stated.** This is the main legal gap the repo itself flags.
 - **Training data.** According to the MobileSAM paper (not re-checked here), MobileSAM was distilled on a subset of SA-1B, and SA-1B has its own research-only dataset license. Whether that restricts the derived weights is legally unsettled. The risk is low for personal use.
 - **GPL texts in the LiteRT aggregate notice.** `THIRD_PARTY_NOTICE.txt` (35,718 lines) contains about 35 GNU license headers: GPLv2 + Classpath exception, a "Google Runtime Environment" GPL text, and autoconf/bison exception texts. These look like build-environment notices. It is unverified whether any GPL/LGPL code is compiled into the arm64 `.so` files that ship. Because Android forbids LGPL, the repo's still-open per-native-component review must close this before release.
 - The real Android CPU/GPU execution, memory bound and APK census are unrun. Those are separate gates, not license gates.
@@ -68,7 +68,7 @@ Apache-2.0 section 4(d) does not apply, because MobileSAM has no NOTICE file. Th
 - **They can be reproduced on the laptop from public, pinned sources:**
   - `download_pinned_inputs.py` fetches the checkpoint (raw.githubusercontent.com at f706ad9c) and the source files.
   - The 71 wheels come from PyPI / download.pytorch.org with `--require-hashes` against `host-wheel-requirements.txt`.
-  - Then run `reference_parity.py`, `convert_mobile_sam.py` and `tflite_parity.py` under `offline_exec.py`, following `tools/assisted-selection/HOST_DELIVERY_20261019.md`.
+  - Then run `reference_parity.py`, `convert_mobile_sam.py` and `tflite_parity.py` under `offline_exec.py`.
 - **The catch:** the wheels are cp311 manylinux_2_17/2_27/2_28 **x86_64**, and `offline_exec.py` is a **Linux seccomp** launcher. Neither runs on native Windows Python.
 - **`wsl.exe -l -v` result (run read-only, exit 0):**
   ```

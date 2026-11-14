@@ -56,7 +56,7 @@ The hardware flag's zero decoder counts do not establish absence of OS/DXVA deco
 Advanced-color support is true on both displays; enabled is false/true; wide-color-enforced is true/false; 8 bits/channel are reported.
 Distinct HDR classification and gamut/colorimeter calibration are explicitly untested.
 
-Evidence: pc-diagnostics.json, phone-diagnostics.txt, win-diagnostics.json and T003_SCREENSHOT_VERIFICATION.json.
+Source: the PC, phone and Windows diagnostics commands above.
 Synthetic screenshot PNGs were inspected and disposed; only text hash/pixel/cleanup receipts remain.
 No display device names, network names/addresses, input device paths/names or serials are retained.
 
@@ -67,7 +67,7 @@ logger are implemented. The connected test device remains the OnePlus IN2019;
 injected stylus events are software verification only. Zero S23 owner traces and
 zero ten-minute drawing sessions have been recorded in this task. Samsung
 pressure, hover, tilt/orientation signs, report rates, barrel/eraser behavior,
-Air Actions and Air Command interference remain unmeasured, as listed in T0.04.md.
+Air Actions and Air Command interference remain unmeasured (task T0.04).
 They are not classified as “not reported by device” without a physical S23 test.
 
 ## Historical authorized S23 update, 2026-10-02
@@ -91,7 +91,7 @@ The owner requested charging stay-awake. `svc power stayon true` was applied;
 `stay_on_while_plugged_in` read back 15, with `mWakefulness=Awake` and
 `mStayOn=true`. The previous value (7) is retained locally. Keep this setting
 as requested. The S23's Wi-Fi was disabled during T0.06; no USB-tether network
-interface was present. See T0.06.md for the real adb TCP measurement and gaps.
+interface was present. The real adb TCP measurement is recorded under D7 in DECISIONS.md.
 
 Text-only diagnostic receipt: s23-sanitized-hardware-facts-678c7f1173d24aaca86f8b8a37946cfa.log.
 No serial, network identifier, screen capture or other app content is retained here.

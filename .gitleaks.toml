@@ -19,12 +19,12 @@ regexes = ['''^\s*"release_keys_commit": "481637f813e912c4aa3622d7964ab426c97b8e
 [[rules]]
 id = "vw-repo-user-profile"
 description = "A real user profile name must not be committed anywhere in this public repository"
-regex = '''(?i)[A-Za-z]:\\{1,2}Users\\{1,2}[A-Za-z0-9._-]+'''
+regex = '''(?i)(?:[A-Za-z]:(?:\\{1,2}|/)Users(?:\\{1,2}|/)|/(?:home|Users)/)[A-Za-z0-9._-]+'''
 
 [[rules.allowlists]]
-description = "Only redacted or synthetic placeholders are allowed"
+description = "Only redacted, synthetic or well-known machine accounts are allowed"
 regexTarget = "match"
-regexes = ['''(?i)\\(?:redacted|synthetic-user|example-user|owner|other|public|default)$''']
+regexes = ['''(?i)[\\/](?:redacted|synthetic-user|example-user|owner|other|public|default|runner|user|root|name|you|me)$''']
 
 [[rules]]
 id = "vw-mcp-token"

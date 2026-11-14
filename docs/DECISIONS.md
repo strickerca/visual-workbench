@@ -385,7 +385,7 @@ collecting a baseline, not permission to relabel 30-second samples as 1 Hz data.
     diff that `AGENTS.md` requires. A green check is not a device result.
   - No evidence files, receipts, handoffs or archives are kept. Results are one
     line in the commit message or the plan's task status. Everything removed on
-    2026-11-14 stays reachable in Git history before commit `4795d30`.
+    2026-11-14 is still in the tree of commit `4795d30`.
   - Cloud sessions deliver by pull request from their session branch.
   - Known-vulnerable dependencies fail a scan on every push. Advisories with no
     fixed release are listed in `deny.toml` with the reason they are tolerated.

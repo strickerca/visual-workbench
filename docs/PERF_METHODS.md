@@ -165,9 +165,8 @@ battery_percent, charging, thermal_status, activity_marker, validity/reason.
 
 ## Current environment and gaps
 
-PC/phone facts are bound in pc-diagnostics.json, win-diagnostics.json and
-phone-diagnostics.txt; hardware-truth.md distinguishes the S23 target from the
-connected IN2019. Calibration/gamut, codec execution/low-latency, pen behavior,
+PC and phone facts are in HARDWARE_TRUTH.md, which distinguishes the S23 target
+from the connected IN2019. Calibration/gamut, codec execution/low-latency, pen behavior,
 thermal sessions, recovery, release-mode numbers and all nine product PERF
 measurements remain untested. T0.04 and T0.06 fill baseline fields; T0.12 owns
 dated target confirmation. Further feature owners execute the relevant methods.

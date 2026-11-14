@@ -11,8 +11,9 @@ There is no release signing; the APK keeps its existing development signer.
 Krita, T4.02, T4.05, T4.06, broader editors, full G4, and public signing or
 distribution are deferred.
 
-The active sequence is the 2026-11 completion roadmap in
-`docs/IMPLEMENTATION_PLAN.md` (Stages 0–5). The product sources are
+The active sequence is the roadmap at the top of `docs/IMPLEMENTATION_PLAN.md`.
+It has two tracks: the completion roadmap (Stages 0–5, what must be verified)
+and the improvement program (improvement stages 0–10). The product sources are
 `docs/BUILD_SPECIFICATION.md`, `docs/REQUIREMENTS.json` and that plan. Current
 owner instructions take precedence over all of them.
 
@@ -81,8 +82,8 @@ ask at stage boundaries.
 
 | Work | Runs as | Effort |
 | --- | --- | --- |
-| Coordination and every stage not listed below | Main session | Its current level |
-| Stage 5 core engine, Stage 6 connect without typing, Stage 7 pen path | Delegated agent | `xhigh` |
+| Coordination and every other stage of either track | Main session | Its current level |
+| Improvement stages 5 (core engine), 6 (connect without typing) and 7 (pen path) | Delegated agent | `xhigh` |
 | Independent review of a slice's code diff | Fresh agent | `high` |
 | Anything | | Never `max` |
 
