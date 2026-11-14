@@ -216,6 +216,11 @@ impl ProjectStore {
     pub fn revision(&self) -> Result<v1::Revision, StoreError> {
         Ok(self.host.revision()?)
     }
+    /// The canonical state hash of the current revision, already known from
+    /// the last commit; nothing is serialized or hashed to answer this.
+    pub fn state_hash(&self) -> Result<&vw_model::StateHash, StoreError> {
+        Ok(self.host.state_hash()?)
+    }
     /// Validated complete sequencing state for authenticated transport resume.
     pub fn checkpoint_bytes(&self) -> Result<Vec<u8>, StoreError> {
         Ok(self.host.checkpoint_bytes()?)
@@ -446,9 +451,10 @@ impl ProjectStore {
         accepted_at_ms: i64,
     ) -> Result<Acceptance, StoreError> {
         bounded_encode(txn)?;
-        let mut candidate = self.host.clone();
-        let acceptance = candidate.submit(txn.clone(), authenticated, accepted_at_ms)?;
-        if candidate.project().canonical_bytes()?.len() > MAX_PAYLOAD {
+        let (acceptance, canonical_len) =
+            self.host
+                .check(txn.clone(), authenticated, accepted_at_ms)?;
+        if canonical_len > MAX_PAYLOAD {
             return Err(StoreError::Invalid("snapshot size"));
         }
         sql_u64(acceptance.ack.host_seq)?;
@@ -487,54 +493,72 @@ impl ProjectStore {
         mut observer: F,
     ) -> Result<Acceptance, StoreError> {
         let bytes = bounded_encode(txn)?;
-        let mut candidate = self.host.clone();
-        let acceptance = candidate.submit(txn.clone(), authenticated, accepted_at_ms)?;
-        if acceptance.duplicate {
-            return Ok(acceptance);
-        }
-        if candidate.project().canonical_bytes()?.len() > MAX_PAYLOAD {
-            return Err(StoreError::Invalid("snapshot size"));
-        }
-        let seq = sql_u64(acceptance.ack.host_seq)?;
-        let base = txn
-            .base_revision
-            .as_ref()
-            .ok_or(StoreError::Invalid("base revision"))?;
-        let base_seq = sql_u64(base.host_seq)?;
-        for op in &txn.ops {
-            sql_u64(
-                op.op_id
+        let Self {
+            host,
+            connection,
+            last_snapshot_seq,
+            last_snapshot_ms,
+            ..
+        } = self;
+        // The host accepts the transaction in place and takes it back out if
+        // anything below fails, so neither side ever holds a half commit.
+        let (acceptance, persisted) = host.submit_with(
+            txn.clone(),
+            authenticated,
+            accepted_at_ms,
+            |host, acceptance, touched| -> Result<bool, StoreError> {
+                if host.canonical_len() > MAX_PAYLOAD {
+                    return Err(StoreError::Invalid("snapshot size"));
+                }
+                let seq = sql_u64(acceptance.ack.host_seq)?;
+                let base = txn
+                    .base_revision
                     .as_ref()
-                    .ok_or(StoreError::Invalid("op ID"))?
-                    .lamport,
-            )?;
+                    .ok_or(StoreError::Invalid("base revision"))?;
+                let base_seq = sql_u64(base.host_seq)?;
+                for op in &txn.ops {
+                    sql_u64(
+                        op.op_id
+                            .as_ref()
+                            .ok_or(StoreError::Invalid("op ID"))?
+                            .lamport,
+                    )?;
+                }
+                let snapshot_due = acceptance.ack.host_seq - *last_snapshot_seq
+                    >= SNAPSHOT_TRANSACTIONS
+                    || accepted_at_ms.saturating_sub(*last_snapshot_ms) >= SNAPSHOT_INTERVAL_MS;
+                observer(CommitStage::Prepared);
+                let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+                migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
+                tx.prepare("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)")?
+                    .execute(params![seq,uuid(txn.txn_id.as_ref())?,authenticated.as_str(),base_seq,optional_uuid(txn.gesture_id.as_ref())?,bytes,host.state_hash()?.as_str(),txn.created_at_wall_ms,accepted_at_ms,acceptance.ack.encode_to_vec()])?;
+                observer(CommitStage::LogWritten);
+                super::projections::persist_touched(
+                    &tx,
+                    host.project(),
+                    touched,
+                    seq,
+                    accepted_at_ms,
+                )?;
+                for conflict in &acceptance.conflicts {
+                    write_conflict(&tx, conflict)?;
+                }
+                if snapshot_due {
+                    write_snapshot(&tx, host, accepted_at_ms)?;
+                }
+                observer(CommitStage::BeforeCommit);
+                tx.commit()?;
+                Ok(snapshot_due)
+            },
+        )?;
+        // A retry of an accepted transaction persisted nothing.
+        if let Some(snapshot_due) = persisted {
+            if snapshot_due {
+                self.last_snapshot_seq = acceptance.ack.host_seq;
+                self.last_snapshot_ms = accepted_at_ms;
+            }
+            observer(CommitStage::Committed);
         }
-        let snapshot_due = acceptance.ack.host_seq - self.last_snapshot_seq
-            >= SNAPSHOT_TRANSACTIONS
-            || accepted_at_ms.saturating_sub(self.last_snapshot_ms) >= SNAPSHOT_INTERVAL_MS;
-        observer(CommitStage::Prepared);
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
-        tx.execute("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-            params![seq,uuid(txn.txn_id.as_ref())?,authenticated.as_str(),base_seq,optional_uuid(txn.gesture_id.as_ref())?,bytes,candidate.project().state_hash()?.as_str(),txn.created_at_wall_ms,accepted_at_ms,acceptance.ack.encode_to_vec()])?;
-        observer(CommitStage::LogWritten);
-        super::projections::persist(&tx, candidate.project(), seq, accepted_at_ms)?;
-        for conflict in &acceptance.conflicts {
-            write_conflict(&tx, conflict)?;
-        }
-        if snapshot_due {
-            write_snapshot(&tx, &candidate, accepted_at_ms)?;
-        }
-        observer(CommitStage::BeforeCommit);
-        tx.commit()?;
-        self.host = candidate;
-        if snapshot_due {
-            self.last_snapshot_seq = acceptance.ack.host_seq;
-            self.last_snapshot_ms = accepted_at_ms;
-        }
-        observer(CommitStage::Committed);
         Ok(acceptance)
     }
 
@@ -789,7 +813,7 @@ pub(crate) fn write_snapshot(
         return Err(StoreError::Invalid("snapshot size"));
     }
     connection.execute("INSERT INTO snapshots(host_seq,state,state_hash,created_at,checkpoint,checkpoint_hash) VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(host_seq) DO UPDATE SET state=excluded.state,state_hash=excluded.state_hash,created_at=excluded.created_at,checkpoint=excluded.checkpoint,checkpoint_hash=excluded.checkpoint_hash",
-        params![sql_u64(host.revision()?.host_seq)?,state,host.project().state_hash()?.as_str(),now_ms,&checkpoint,AssetId::hash(&checkpoint).as_str()])?;
+        params![sql_u64(host.revision()?.host_seq)?,state,host.state_hash()?.as_str(),now_ms,&checkpoint,AssetId::hash(&checkpoint).as_str()])?;
     Ok(())
 }
 pub(crate) fn replay_log(
@@ -810,7 +834,7 @@ pub(crate) fn replay_log(
         let accepted = host.submit(txn, &device, row.get(8)?)?;
         if accepted.duplicate
             || sql_u64(accepted.ack.host_seq)? != seq
-            || host.project().state_hash()?.as_str() != row.get::<_, String>(6)?
+            || host.state_hash()?.as_str() != row.get::<_, String>(6)?
         {
             return Err(StoreError::Corrupt("operation replay"));
         }
@@ -1094,6 +1118,12 @@ pub(crate) fn restore(connection: &Connection) -> Result<Restored, StoreError> {
     }
     verify_prefix(connection, &host, seq)?;
     let replayed = replay_log(connection, &mut host, seq, true)?;
+    // Each replayed step was matched with the hash the host carries forward.
+    // Recompute the final state from nothing once, so the stored history and
+    // the carried hash cannot agree on a state the project is not in.
+    if replayed > 0 && &host.project().state_hash()? != host.state_hash()? {
+        return Err(StoreError::Corrupt("operation replay"));
+    }
     let conflicts = read_conflicts(connection)?;
     if conflicts != host.conflicts() {
         return Err(StoreError::Corrupt("conflict projection"));

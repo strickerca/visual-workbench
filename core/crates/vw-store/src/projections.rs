@@ -5,12 +5,19 @@ use crate::{
     database::{decode, optional_uuid, sql_u64, uuid},
 };
 use rusqlite::{Connection, OptionalExtension, params};
-use vw_model::{AssetId, Project};
+use vw_model::{
+    AssetId, Document, Group, Id, Instruction, Layer, Object, Project, ResultCandidate,
+    SemanticSnapshot,
+};
+use vw_ops::Touched;
 use vw_proto::{
     Message,
     v1::{self, object_state::Shape},
 };
 
+/// Rebuild every projection row from the project. Used when a project is
+/// created, migrated or replaced by a checkpoint, and as the reference that
+/// `verify` compares the stored rows with.
 pub(crate) fn persist(db: &Connection, p: &Project, seq: i64, now: i64) -> Result<(), StoreError> {
     for asset in p.assets.values() {
         persist_asset(db, asset)?;
@@ -22,91 +29,273 @@ pub(crate) fn persist(db: &Connection, p: &Project, seq: i64, now: i64) -> Resul
         [now],
     )?;
     for (id, document) in &p.documents {
-        let d = &document.definition;
-        let kind = match v1::DocumentKind::try_from(d.kind) {
-            Ok(v1::DocumentKind::Image) => "image",
-            Ok(v1::DocumentKind::Pdf) => "pdf",
-            Ok(v1::DocumentKind::Svg) => "svg",
-            Ok(v1::DocumentKind::Capture) => "capture",
-            _ => return Err(StoreError::Invalid("document kind")),
-        };
-        db.execute("INSERT INTO documents(document_id,kind,schema_version,title,primary_asset_id,created_at,deleted_at,state) VALUES(?1,?2,?3,?4,?5,?6,NULL,?7) ON CONFLICT(document_id) DO UPDATE SET kind=excluded.kind,schema_version=excluded.schema_version,title=excluded.title,primary_asset_id=excluded.primary_asset_id,created_at=excluded.created_at,deleted_at=NULL,state=excluded.state",
-            params![id.as_str(),kind,d.schema_version,d.title,optional_text(&d.primary_asset_id),document.created_at_ms,serde_json::to_vec(document)?])?;
-        for page in &document.pages {
-            db.execute(
-                "INSERT INTO pdf_pages VALUES(?1,?2,?3)",
-                params![id.as_str(), page.page_index, serde_json::to_vec(page)?],
-            )?;
-        }
-        if let Some(c) = &d.capture {
-            let geometry = c
-                .geometry
-                .as_ref()
-                .ok_or(StoreError::Invalid("capture geometry"))?;
-            db.execute("INSERT INTO captures(document_id,capture_session_id,frame_id,geometry,platform,app_name,window_title,lossless,degraded,captured_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-                params![id.as_str(),uuid(c.capture_session_id.as_ref())?,c.frame_id.to_string(),geometry.encode_to_vec(),c.platform,c.app_name,c.window_title,c.lossless,c.degraded,c.captured_at_ms])?;
-        }
+        write_document(db, id, document)?;
     }
     for (id, layer) in &p.layers {
-        let d = &layer.definition;
-        db.execute("INSERT INTO layers(layer_id,document_id,page_index,name,kind,order_key,visible,locked,opacity,blend) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",params![id.as_str(),uuid(d.document_id.as_ref())?,d.page_index,d.name,d.kind,d.order_key,layer.visible,layer.locked,layer.opacity,layer.blend])?;
+        write_layer(db, id, layer)?;
     }
     for group in p.groups.values() {
-        db.execute(
-            "INSERT INTO groups VALUES(?1,?2,?3)",
-            params![
-                group.id.as_str(),
-                group.document_id.as_str(),
-                group.parent.as_ref().map(|id| id.as_str())
-            ],
-        )?;
+        write_group(db, group)?;
     }
     for (id, object) in &p.objects {
-        let o = &object.state;
-        let (kind, marker) = shape_name(
-            o.shape
-                .as_ref()
-                .ok_or(StoreError::Invalid("object shape"))?,
-        );
-        db.execute("INSERT INTO objects(object_id,document_id,layer_id,kind,order_key,role,marker_number,group_id,state,updated_seq) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",params![id.as_str(),object.document_id.as_str(),uuid(o.layer_id.as_ref())?,kind,o.order_key,role(o.role)?,marker,optional_uuid(o.group_id.as_ref())?,o.encode_to_vec(),seq])?;
+        write_object(db, id, object, seq)?;
     }
     for (id, instruction) in &p.instructions {
-        let d = &instruction.definition;
-        let targets = d
-            .target_object_ids
-            .iter()
-            .map(|id| uuid(Some(id)))
-            .collect::<Result<Vec<_>, _>>()?;
-        db.execute(
-            "INSERT INTO instructions VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
-            params![
-                id.as_str(),
-                uuid(d.document_id.as_ref())?,
-                serde_json::to_string(&targets)?,
-                role(d.role)?,
-                d.text,
-                d.entry_method,
-                d.language,
-                instruction.updated_at_ms
-            ],
-        )?;
+        write_instruction(db, id, instruction)?;
     }
     for (id, snapshot) in &p.semantic_snapshots {
-        let d = &snapshot.definition;
-        db.execute("INSERT INTO semantic_snapshots(snapshot_id,document_id,platform,frame_delta_ms,elements,created_at,capture_session_id,frame_id) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",params![id.as_str(),uuid(d.document_id.as_ref())?,d.platform,d.frame_delta_ms,d.elements_json_zstd,snapshot.created_at_ms,snapshot.capture_session_id.as_ref().map(|v|v.as_str()),snapshot.frame_id.map(|v|v.to_string())])?;
+        write_semantic_snapshot(db, id, snapshot)?;
     }
     for (id, result) in &p.results {
-        let d = &result.definition;
-        db.execute("INSERT INTO results(result_id,document_id,package_id,provider,model,request_json,output_asset_id,composite_asset_id,proof_json,metrics_json,cost_estimate_usd,status,acceptance_mask_asset_id,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",params![id.as_str(),uuid(d.document_id.as_ref())?,optional_uuid(d.package_id.as_ref())?,d.provider,d.model,d.request_json,optional_text(&d.output_asset_id),optional_text(&d.composite_asset_id),d.proof_json,d.metrics_json,d.cost_estimate_usd,result.status,result.acceptance_mask_asset_id.as_ref().map(|v|v.as_str()),result.created_at_ms])?;
+        write_result(db, id, result)?;
     }
     for (id, versions) in &p.mask_versions {
-        db.execute(
-            "INSERT INTO mask_versions VALUES(?1,?2)",
-            params![id.as_str(), serde_json::to_vec(versions)?],
-        )?;
+        write_mask_versions(db, id, versions)?;
     }
     Ok(())
 }
+
+/// Bring the projection rows up to date after one accepted transaction by
+/// writing only the entities it touched. The rows end up exactly as `persist`
+/// would leave them, apart from `updated_seq` on objects the transaction did
+/// not touch, which now keeps the sequence that last changed them.
+pub(crate) fn persist_touched(
+    db: &Connection,
+    p: &Project,
+    touched: &Touched,
+    seq: i64,
+    now: i64,
+) -> Result<(), StoreError> {
+    for id in &touched.assets {
+        if let Some(asset) = p.assets.get(id) {
+            persist_asset(db, asset)?;
+        }
+    }
+    // New and changed rows first, parents before the rows that refer to them.
+    for id in &touched.documents {
+        match p.documents.get(id) {
+            Some(document) => write_document(db, id, document)?,
+            None => {
+                // Keep the identity for local package history and mark it removed.
+                remove_document_rows(db, id)?;
+                db.prepare(
+                    "UPDATE documents SET deleted_at=?1 WHERE document_id=?2 AND deleted_at IS NULL",
+                )?
+                .execute(params![now, id.as_str()])?;
+            }
+        }
+    }
+    for id in &touched.layers {
+        if let Some(layer) = p.layers.get(id) {
+            write_layer(db, id, layer)?;
+        }
+    }
+    for id in &touched.groups {
+        if let Some(group) = p.groups.get(id) {
+            write_group(db, group)?;
+        }
+    }
+    for id in &touched.objects {
+        if let Some(object) = p.objects.get(id) {
+            write_object(db, id, object, seq)?;
+        }
+    }
+    for id in &touched.instructions {
+        if let Some(instruction) = p.instructions.get(id) {
+            write_instruction(db, id, instruction)?;
+        }
+    }
+    for id in &touched.semantic_snapshots {
+        if let Some(snapshot) = p.semantic_snapshots.get(id) {
+            write_semantic_snapshot(db, id, snapshot)?;
+        }
+    }
+    for id in &touched.results {
+        if let Some(result) = p.results.get(id) {
+            write_result(db, id, result)?;
+        }
+    }
+    for id in &touched.mask_versions {
+        if let Some(versions) = p.mask_versions.get(id) {
+            write_mask_versions(db, id, versions)?;
+        }
+    }
+    // Then removed rows, in the order `persist` clears the tables: a row goes
+    // before the layer it refers to.
+    let remove = |sql: &str, id: &str| -> Result<(), StoreError> {
+        db.prepare(sql)?.execute([id])?;
+        Ok(())
+    };
+    for id in &touched.results {
+        if !p.results.contains_key(id) {
+            remove("DELETE FROM results WHERE result_id=?1", id.as_str())?;
+        }
+    }
+    for id in &touched.semantic_snapshots {
+        if !p.semantic_snapshots.contains_key(id) {
+            remove(
+                "DELETE FROM semantic_snapshots WHERE snapshot_id=?1",
+                id.as_str(),
+            )?;
+        }
+    }
+    for id in &touched.instructions {
+        if !p.instructions.contains_key(id) {
+            remove(
+                "DELETE FROM instructions WHERE instruction_id=?1",
+                id.as_str(),
+            )?;
+        }
+    }
+    for id in &touched.objects {
+        if !p.objects.contains_key(id) {
+            remove("DELETE FROM objects WHERE object_id=?1", id.as_str())?;
+        }
+    }
+    for id in &touched.mask_versions {
+        if !p.mask_versions.contains_key(id) {
+            remove("DELETE FROM mask_versions WHERE object_id=?1", id.as_str())?;
+        }
+    }
+    for id in &touched.groups {
+        if !p.groups.contains_key(id) {
+            remove("DELETE FROM groups WHERE group_id=?1", id.as_str())?;
+        }
+    }
+    for id in &touched.layers {
+        if !p.layers.contains_key(id) {
+            remove("DELETE FROM layers WHERE layer_id=?1", id.as_str())?;
+        }
+    }
+    Ok(())
+}
+
+// One function per table writes a row, for `persist` and `persist_touched`
+// alike, so the two cannot disagree about a row's contents. Each replaces the
+// row when it exists: a changed layer cannot be deleted and inserted again
+// while objects still refer to it.
+
+fn remove_document_rows(db: &Connection, id: &Id) -> Result<(), StoreError> {
+    db.prepare("DELETE FROM pdf_pages WHERE document_id=?1")?
+        .execute([id.as_str()])?;
+    db.prepare("DELETE FROM captures WHERE document_id=?1")?
+        .execute([id.as_str()])?;
+    Ok(())
+}
+
+fn write_document(db: &Connection, id: &Id, document: &Document) -> Result<(), StoreError> {
+    let d = &document.definition;
+    let kind = match v1::DocumentKind::try_from(d.kind) {
+        Ok(v1::DocumentKind::Image) => "image",
+        Ok(v1::DocumentKind::Pdf) => "pdf",
+        Ok(v1::DocumentKind::Svg) => "svg",
+        Ok(v1::DocumentKind::Capture) => "capture",
+        _ => return Err(StoreError::Invalid("document kind")),
+    };
+    db.prepare("INSERT INTO documents(document_id,kind,schema_version,title,primary_asset_id,created_at,deleted_at,state) VALUES(?1,?2,?3,?4,?5,?6,NULL,?7) ON CONFLICT(document_id) DO UPDATE SET kind=excluded.kind,schema_version=excluded.schema_version,title=excluded.title,primary_asset_id=excluded.primary_asset_id,created_at=excluded.created_at,deleted_at=NULL,state=excluded.state")?
+        .execute(params![id.as_str(),kind,d.schema_version,d.title,optional_text(&d.primary_asset_id),document.created_at_ms,serde_json::to_vec(document)?])?;
+    remove_document_rows(db, id)?;
+    for page in &document.pages {
+        db.prepare("INSERT INTO pdf_pages VALUES(?1,?2,?3)")?
+            .execute(params![
+                id.as_str(),
+                page.page_index,
+                serde_json::to_vec(page)?
+            ])?;
+    }
+    if let Some(c) = &d.capture {
+        let geometry = c
+            .geometry
+            .as_ref()
+            .ok_or(StoreError::Invalid("capture geometry"))?;
+        db.prepare("INSERT INTO captures(document_id,capture_session_id,frame_id,geometry,platform,app_name,window_title,lossless,degraded,captured_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)")?
+            .execute(params![id.as_str(),uuid(c.capture_session_id.as_ref())?,c.frame_id.to_string(),geometry.encode_to_vec(),c.platform,c.app_name,c.window_title,c.lossless,c.degraded,c.captured_at_ms])?;
+    }
+    Ok(())
+}
+
+fn write_layer(db: &Connection, id: &Id, layer: &Layer) -> Result<(), StoreError> {
+    let d = &layer.definition;
+    db.prepare("INSERT INTO layers(layer_id,document_id,page_index,name,kind,order_key,visible,locked,opacity,blend) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT(layer_id) DO UPDATE SET document_id=excluded.document_id,page_index=excluded.page_index,name=excluded.name,kind=excluded.kind,order_key=excluded.order_key,visible=excluded.visible,locked=excluded.locked,opacity=excluded.opacity,blend=excluded.blend")?
+        .execute(params![id.as_str(),uuid(d.document_id.as_ref())?,d.page_index,d.name,d.kind,d.order_key,layer.visible,layer.locked,layer.opacity,layer.blend])?;
+    Ok(())
+}
+
+fn write_group(db: &Connection, group: &Group) -> Result<(), StoreError> {
+    db.prepare("INSERT INTO groups(group_id,document_id,parent_id) VALUES(?1,?2,?3) ON CONFLICT(group_id) DO UPDATE SET document_id=excluded.document_id,parent_id=excluded.parent_id")?
+        .execute(params![
+            group.id.as_str(),
+            group.document_id.as_str(),
+            group.parent.as_ref().map(|id| id.as_str())
+        ])?;
+    Ok(())
+}
+
+fn write_object(db: &Connection, id: &Id, object: &Object, seq: i64) -> Result<(), StoreError> {
+    let o = &object.state;
+    let (kind, marker) = shape_name(
+        o.shape
+            .as_ref()
+            .ok_or(StoreError::Invalid("object shape"))?,
+    );
+    db.prepare("INSERT INTO objects(object_id,document_id,layer_id,kind,order_key,role,marker_number,group_id,state,updated_seq) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT(object_id) DO UPDATE SET document_id=excluded.document_id,layer_id=excluded.layer_id,kind=excluded.kind,order_key=excluded.order_key,role=excluded.role,marker_number=excluded.marker_number,group_id=excluded.group_id,state=excluded.state,updated_seq=excluded.updated_seq")?
+        .execute(params![id.as_str(),object.document_id.as_str(),uuid(o.layer_id.as_ref())?,kind,o.order_key,role(o.role)?,marker,optional_uuid(o.group_id.as_ref())?,o.encode_to_vec(),seq])?;
+    Ok(())
+}
+
+fn write_instruction(
+    db: &Connection,
+    id: &Id,
+    instruction: &Instruction,
+) -> Result<(), StoreError> {
+    let d = &instruction.definition;
+    let targets = d
+        .target_object_ids
+        .iter()
+        .map(|id| uuid(Some(id)))
+        .collect::<Result<Vec<_>, _>>()?;
+    db.prepare("INSERT INTO instructions(instruction_id,document_id,target_ids,role,text,entry_method,language,updated_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8) ON CONFLICT(instruction_id) DO UPDATE SET document_id=excluded.document_id,target_ids=excluded.target_ids,role=excluded.role,text=excluded.text,entry_method=excluded.entry_method,language=excluded.language,updated_at=excluded.updated_at")?
+        .execute(params![
+            id.as_str(),
+            uuid(d.document_id.as_ref())?,
+            serde_json::to_string(&targets)?,
+            role(d.role)?,
+            d.text,
+            d.entry_method,
+            d.language,
+            instruction.updated_at_ms
+        ])?;
+    Ok(())
+}
+
+fn write_semantic_snapshot(
+    db: &Connection,
+    id: &Id,
+    snapshot: &SemanticSnapshot,
+) -> Result<(), StoreError> {
+    let d = &snapshot.definition;
+    db.prepare("INSERT INTO semantic_snapshots(snapshot_id,document_id,platform,frame_delta_ms,elements,created_at,capture_session_id,frame_id) VALUES(?1,?2,?3,?4,?5,?6,?7,?8) ON CONFLICT(snapshot_id) DO UPDATE SET document_id=excluded.document_id,platform=excluded.platform,frame_delta_ms=excluded.frame_delta_ms,elements=excluded.elements,created_at=excluded.created_at,capture_session_id=excluded.capture_session_id,frame_id=excluded.frame_id")?
+        .execute(params![id.as_str(),uuid(d.document_id.as_ref())?,d.platform,d.frame_delta_ms,d.elements_json_zstd,snapshot.created_at_ms,snapshot.capture_session_id.as_ref().map(|v|v.as_str()),snapshot.frame_id.map(|v|v.to_string())])?;
+    Ok(())
+}
+
+fn write_result(db: &Connection, id: &Id, result: &ResultCandidate) -> Result<(), StoreError> {
+    let d = &result.definition;
+    db.prepare("INSERT INTO results(result_id,document_id,package_id,provider,model,request_json,output_asset_id,composite_asset_id,proof_json,metrics_json,cost_estimate_usd,status,acceptance_mask_asset_id,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14) ON CONFLICT(result_id) DO UPDATE SET document_id=excluded.document_id,package_id=excluded.package_id,provider=excluded.provider,model=excluded.model,request_json=excluded.request_json,output_asset_id=excluded.output_asset_id,composite_asset_id=excluded.composite_asset_id,proof_json=excluded.proof_json,metrics_json=excluded.metrics_json,cost_estimate_usd=excluded.cost_estimate_usd,status=excluded.status,acceptance_mask_asset_id=excluded.acceptance_mask_asset_id,created_at=excluded.created_at")?
+        .execute(params![id.as_str(),uuid(d.document_id.as_ref())?,optional_uuid(d.package_id.as_ref())?,d.provider,d.model,d.request_json,optional_text(&d.output_asset_id),optional_text(&d.composite_asset_id),d.proof_json,d.metrics_json,d.cost_estimate_usd,result.status,result.acceptance_mask_asset_id.as_ref().map(|v|v.as_str()),result.created_at_ms])?;
+    Ok(())
+}
+
+fn write_mask_versions(
+    db: &Connection,
+    id: &Id,
+    versions: &[v1::MaskOp],
+) -> Result<(), StoreError> {
+    db.prepare("INSERT INTO mask_versions(object_id,state) VALUES(?1,?2) ON CONFLICT(object_id) DO UPDATE SET state=excluded.state")?
+        .execute(params![id.as_str(), serde_json::to_vec(versions)?])?;
+    Ok(())
+}
+
 pub(crate) fn verify_assets(db: &Connection, p: &Project) -> Result<(), StoreError> {
     let mut query = db.prepare("SELECT asset_id,byte_size,definition FROM assets")?;
     let mut rows = query.query([])?;
