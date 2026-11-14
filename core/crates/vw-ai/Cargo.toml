@@ -15,7 +15,7 @@ image = { version = "=0.25.10", default-features = false, features = ["png", "jp
 libm = { version = "=0.2.16", default-features = false }
 moxcms = "=0.8.1"
 png = "=0.18.1"
-rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled", "limits"] }
+rusqlite = { version = "=0.41.1", default-features = false, features = ["bundled", "limits"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
 sha2 = "=0.11.0"

@@ -17,7 +17,7 @@ pub use connection_assist::*;
 ```
 
 The reviewed host already has exact approved `uniffi=0.32.2`, `thiserror=2.0.21`,
-`tokio=1.53.1` with `sync`, `blake3=1.8.7` with `std,pure`, `serde=1.0.229` with
+`tokio=1.53.3` with `sync`, `blake3=1.8.7` with `std,pure`, `serde=1.0.229` with
 `derive`, `serde_json=1.0.151`, and `windows-sys=0.61.2`. No new dependency version
 is proposed. Extend the existing Windows features with:
 

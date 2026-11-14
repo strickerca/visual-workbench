@@ -96,7 +96,7 @@ Rustls defaults are disabled to exclude aws-lc-rs; the lockfile fixes transitive
 versions. The resolved graph passed cargo-deny license/source/ban policy.
 
 - [Quinn 0.11.12](https://docs.rs/quinn/0.11.12/quinn/): MIT OR Apache-2.0.
-- [Rustls 0.23.45](https://docs.rs/rustls/0.23.45/rustls/): Apache-2.0 OR ISC OR MIT.
-- [Tokio 1.53.1](https://docs.rs/tokio/1.53.1/tokio/): MIT.
+- [Rustls 0.23.46](https://docs.rs/rustls/0.23.46/rustls/): Apache-2.0 OR ISC OR MIT.
+- [Tokio 1.53.3](https://docs.rs/tokio/1.53.3/tokio/): MIT.
 - [rcgen 0.14.10](https://docs.rs/rcgen/0.14.10/rcgen/): MIT OR Apache-2.0.
 - serde 1.0.229, serde_json 1.0.151, thiserror 2.0.21: MIT OR Apache-2.0.

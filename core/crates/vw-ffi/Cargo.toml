@@ -20,7 +20,7 @@ fixtures = ["tokio/rt", "tokio/macros"]
 
 [dependencies]
 uniffi = { version = "=0.32.2", default-features = false }
-tokio = { version = "=1.53.1", features = ["sync", "rt", "net", "time", "macros"] }
+tokio = { version = "=1.53.3", features = ["sync", "rt", "net", "time", "macros"] }
 thiserror = "=2.0.21"
 serde_json = "=1.0.151"
 serde = { version = "=1.0.229", features = ["derive"] }
@@ -58,7 +58,7 @@ sha2 = "=0.11.0"
 png = "=0.18.1"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
-rustix = { version = "=1.1.5", features = ["fs", "process"] }
+rustix = { version = "=1.1.6", features = ["fs", "process"] }
 
 [target.'cfg(windows)'.dependencies]
 vw-assets-win = { version = "=0.1.0", path = "../../../host-win/crates/vw-assets-win" }
@@ -74,7 +74,7 @@ jni = { version = "=0.22.4", default-features = false }
 [dev-dependencies]
 vw-svg = { version = "=0.1.0", path = "../vw-svg" }
 pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881"] }
-tokio = { version = "=1.53.1", features = ["rt", "macros", "time"] }
+tokio = { version = "=1.53.3", features = ["rt", "macros", "time"] }
 
 [[bin]]
 name = "vw-bindgen"

@@ -30,7 +30,7 @@ model/runtime/memory admission remain open. The local model API graph excludes
 the unused Play AI-pack delivery module and its Play Core terms; no license
 allowlist exception or missing-class warning suppression was added.
 
-Phase 2 adds zstd-sys 2.1.0 / bundled Zstandard 1.5.7 under BSD-3-Clause.
+Phase 2 adds zstd-sys 2.1.3 / bundled Zstandard 1.5.7 under BSD-3-Clause.
 The Rust wrapper, generated-bindings and native Zstandard notices are retained
 separately and hashed in the manifest. Their source is the registry archive
 whose checksum matches Cargo.lock. These texts enter both app packages through
