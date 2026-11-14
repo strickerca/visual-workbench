@@ -76,7 +76,7 @@ or behaviour-preserving until they are run on the laptop or the S23.
 | 6 Connect without typing | Pair once, then discover, recognise by certificate and connect; carrier upgrade | Not started |
 | 7 Pen path | Remote-edit input fixes; wet ink draws only new strokes; no wait behind save; latency shown in diagnostics | Not started |
 | 8 Product interface | Shared UI module, Material 3, icons, strings, plain copy, first-run guide | Not started |
-| 9 AI handoff | Real MCP tool descriptions and structured results; evaluation set | Not started |
+| 9 AI handoff | Real MCP tool descriptions and structured results; evaluation set | Partly done 2026-11-14: all eight tools carry a description written for the agent and the server sends usage guidance; MCP tests 76/76 on Node 24.21.0. Still open: the evaluation set (live runs need the owner's spend approval). Effort: high |
 | 10 Portability and installers | Paint catalog as data with re-measure; GPU capability probe; MSI and APK built automatically | Not started |
 
 Only the owner can: merge pull requests and protect main on `ci-required`; run

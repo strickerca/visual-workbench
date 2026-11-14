@@ -39,7 +39,9 @@ OS-authenticated bridge connection, which a bearer token alone does not
 provide. HTTP clients can list and read packages. The recommended token-free
 transport is stdio.
 
-The official SDK factory exposes six tools and `vw://package/{id}`. It serves
+The official SDK factory exposes eight tools and `vw://package/{id}`. Each tool
+carries a description written for the agent (`src/descriptions.mjs`), and the
+server sends short usage guidance at initialization. It serves
 both 2025-11-25 legacy initialization and 2026-07-28 per-request metadata through
 the official era routers. We did not implement a homemade version handshake.
 `DEPENDENCIES.md` distinguishes verified upstream support from unrun local tests.

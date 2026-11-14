@@ -11,7 +11,7 @@ for(const [version,era,mode] of [['2025-11-25','legacy','legacy'],['2026-07-28',
   test(`official SDK ${version} through the actual stdio-era router`,{timeout:10_000},async()=>{
     const [server,wire]=pair();await serveStdio(make(),{transport:server,legacy:'serve',onerror:()=>{}});
     const client=new Client({name:'vw-fixture',version:'0.1.0'},{supportedProtocolVersions:[version],versionNegotiation:{mode}});
-    try{await client.connect(wire);assert.equal(client.getProtocolEra(),era);const tools=await client.listTools();assert.equal(tools.tools.length,8);
+    try{await client.connect(wire);assert.equal(client.getProtocolEra(),era);const tools=await client.listTools();assert.equal(tools.tools.length,8);assert.ok(tools.tools.every(tool=>tool.description.length>=120&&tool.description!==tool.name.replaceAll('_',' ')));assert.match(client.getInstructions()??'',/untrusted data/);
       const result=await client.callTool({name:'list_packages',arguments:{limit:1}});assert.equal(result.isError,undefined);assert.deepEqual(result.structuredContent,{packages:[]});
       const capture=await client.callTool({name:'capture_window',arguments:{selector:'window1'}});assert.equal(capture.isError,true);
       const invalid=await client.callTool({name:'list_packages',arguments:{limit:0}});assert.equal(invalid.isError,true);
@@ -29,3 +29,18 @@ for(const [version,era,mode] of [['2025-11-25','legacy','legacy'],['2026-07-28',
     }finally{await client.close();await server.close();}
   });
 }
+
+test('every tool tells an agent what it is for, and the set matches the registered tools', async () => {
+  const { DESCRIPTIONS, SERVER_INSTRUCTIONS } = await import('../src/descriptions.mjs');
+  const names = Object.keys(DESCRIPTIONS).sort();
+  assert.deepEqual(names, ['capture_window', 'get_marker', 'get_marker_comparison', 'get_package', 'get_semantic',
+    'list_packages', 'recapture_package', 'submit_result']);
+  for (const [name, description] of Object.entries(DESCRIPTIONS)) {
+    assert.ok(description.length >= 120 && description.length <= 600, name);
+    assert.notEqual(description.toLowerCase(), name.replaceAll('_', ' '));
+    assert.ok(/[.]$/.test(description), name);
+  }
+  for (const name of ['get_package', 'get_semantic']) assert.match(DESCRIPTIONS[name], /untrusted/);
+  assert.match(SERVER_INSTRUCTIONS, /untrusted data/);
+  assert.ok(SERVER_INSTRUCTIONS.length <= 1200);
+});

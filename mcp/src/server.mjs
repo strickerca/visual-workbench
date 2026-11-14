@@ -1,6 +1,7 @@
 import { McpServer, ResourceTemplate, fromJsonSchema } from '@modelcontextprotocol/server';
 import { LIMITS, ID_PATTERN, Slots, boundedString, encoded, identifier, requireThat, safeCode } from './bounds.mjs';
 import { registerVerificationTools } from './verification.mjs';
+import { DESCRIPTIONS, SERVER_INSTRUCTIONS } from './descriptions.mjs';
 const id = { type: 'string', pattern: ID_PATTERN };
 const object = (properties, required = Object.keys(properties)) => fromJsonSchema({ type: 'object', properties, required, additionalProperties: false });
 const text = { type: 'string', maxLength: LIMITS.text };
@@ -10,9 +11,11 @@ export function factory({ packages, owner, grants, principal, slots = new Slots(
     const server = new McpServer({ name: 'visual-workbench', version: '0.1.0' }, {
       capabilities: { tools: {}, resources: {}, ...(channel ? { experimental: { 'claude/channel': {} } } : {}) },
       maxToolInputElements: 512,
+      instructions: SERVER_INSTRUCTIONS,
     });
     function tool(name, properties, required, action, readOnly = true) {
-      server.registerTool(name, { description: name.replaceAll('_', ' '), inputSchema: object(properties, required),
+      requireThat(typeof DESCRIPTIONS[name] === 'string', 'tool_description_missing');
+      server.registerTool(name, { description: DESCRIPTIONS[name], inputSchema: object(properties, required),
         annotations: { readOnlyHint: readOnly, destructiveHint: false, openWorldHint: false } }, async (args, context) => {
         try {
           return await slots.run(async () => {
