@@ -45,6 +45,7 @@
       "not_applicable"
     ],
     "evidence": "One-line results: the task, what ran and what stays open. No evidence files are kept (AGENTS.md).",
+    "verified_by": "Optional list of automated tests that exercise the requirement, each written <test file path>::<test name>. Checked by tools/ci/requirements_status.py. A link never changes verify_status.",
     "milestone_scope": "Optional owner-approved milestone inclusion/deferral and decision reference. Subset verification cannot pass a full requirement; not_applicable for a deferred milestone is not full-gate acceptance."
   },
   "counts": {

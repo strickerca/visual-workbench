@@ -70,9 +70,9 @@ or behaviour-preserving until they are run on the laptop or the S23.
 | 0 Cloud build setup | Android SDK and pinned tools in cloud sessions | Done 2026-11-14: `tools/ci/install-tools.sh`; cloud environment `visual-workbench` saved (first fresh start unproven). Effort: high |
 | 1 Automatic checks | `.github/workflows/ci.yml`, `tools/ci`, vulnerability scan | Done 2026-11-14: workflow and scripts in place; 13 known vulnerabilities fixed by upgrades, 3 unmaintained notices tolerated in `deny.toml`. Windows and Kotlin jobs not yet in `ci-required`. Effort: high |
 | 2 Cleanup | Only files that help build, test or run the product remain | Done 2026-11-14: 513 receipts, handoffs, old copies and dead probes removed; secret-scan exceptions 278 → 43 lines; this plan 1,099 → about 690 lines. Old GitHub branches still to delete. Effort: high |
-| 3 Proof | End-to-end loop test; requirements linked to tests; speed budgets; parser property tests; emulator pixel tests | Not started |
+| 3 Proof | End-to-end loop test; requirements linked to tests; speed budgets; parser property tests; emulator pixel tests | In progress 2026-11-14: loop test passes on Linux (`vw-ffi/tests/golden_path.rs`); link checker and README table in place; stroke-save benchmark added. Benchmark result: one more stroke costs 2.5 ms in an empty document, 56 ms at 250 strokes, 120 ms at 500, and saving fails at the 769th object in a layer. Effort: high |
 | 4 Diagnosability | Timing ring and logging over FFI; error causes kept; plain-language error catalog | Not started |
-| 5 Core engine | Edit cost independent of document size; dependency tidy | Not started |
+| 5 Core engine | A layer must hold far more than 768 objects (order keys run out today); edit cost independent of document size; dependency tidy | Not started |
 | 6 Connect without typing | Pair once, then discover, recognise by certificate and connect; carrier upgrade | Not started |
 | 7 Pen path | Remote-edit input fixes; wet ink draws only new strokes; no wait behind save; latency shown in diagnostics | Not started |
 | 8 Product interface | Shared UI module, Material 3, icons, strings, plain copy, first-run guide | Not started |
@@ -89,7 +89,7 @@ Jetpack Ink A/B); decide live AI spend; check Paint's version and auto-update.
 2. Run tasks in the order of their dependencies. Each Phase 0 and Phase 1 task has a ready-to-paste prompt in `prompts/`, and each prompt is complete on its own.
 3. One task at a time per folder. A task run in parallel needs its own `git worktree` folder, and tasks that use the phone take turns.
 4. Paste one prompt into a fresh coding-agent session. The agent starts from main with validated dependencies integrated, uses its task branch, records one-line results and requirement statuses, and reports results plus the next task. Local commits and completed dependency integration are authorized without repeated Git approval.
-5. Review results and complete listed owner actions. At each numbered phase conclusion the agent automatically commits and pushes validated phase-owned source/evidence under the publishing policy below. Owner confirmation of product gates and manual decisions remains separate.
+5. Review results and complete listed owner actions. At each numbered phase conclusion the agent automatically commits and pushes validated phase-owned source under the publishing policy below. Owner confirmation of product gates and manual decisions remains separate.
 6. A Phase 1 task may start as soon as its own dependencies are done; Gate G0 must pass before the Phase 1 acceptance run (T1.12). Prompts for Phases 2–5 are written after Gate G1, using real Phase 0 measurements. Generating them now would bake in guesses.
 
 **Phase gates.** A phase ends when its gate passes. A scenario passes at a gate when all of its requirements whose phase is ≤ that gate's phase pass; requirements from later phases re-run the same scenario at their own gate. Each scenario's gate and re-runs are in `REQUIREMENTS.json → scenarios[].gate` and `rerun_at`.
@@ -130,7 +130,7 @@ visual-workbench/
   README.md  CLAUDE.md  Cargo.toml  rust-toolchain.toml  deny.toml  justfile (or build.ps1)
   .gitignore  .gitattributes
   docs/        BUILD_SPECIFICATION.md DECISIONS.md REQUIREMENTS.json IMPLEMENTATION_PLAN.md
-               TOOLCHAIN.md SOURCES.json evidence/ compat/
+               TOOLCHAIN.md SOURCES.json compat/
   contracts/   vw_protocol.proto package.schema.json storage.sql
   prompts/     phase-0/ phase-1/ (later phases added after G1)
   tools/       diagnostics/ diag-win/ pen-trace/ pen-inject/ bench/ pair-cli/ hello/ check_plan_coverage.py
@@ -164,52 +164,34 @@ Git-ignored: `target/`, `build/`, `.gradle/`, `local.properties`, `*.apk`, `fixt
 
 ## Automatic phase publishing
 
-Owner instruction, 2026-10-01: create a public GitHub repository, commit/push all
-work completed so far, and automatically commit/push after each phase concludes.
-The delivery remote is origin, repository
-[strickerca/visual-workbench](https://github.com/strickerca/visual-workbench),
-and delivery branch main.
+Owner instruction, 2026-10-01: the repository
+[strickerca/visual-workbench](https://github.com/strickerca/visual-workbench) is
+public, and completed phase work is published without asking for Git permission
+again. Since 2026-11-14 publishing goes through the automatic checks.
 
-This applies to numbered Phases 0–5, not an instruction to push after every task.
-Tasks may use local commits and integrate validated dependency work as needed.
-The initial T0.01–T0.03 publication is an explicitly authorized progress checkpoint;
-Phase 0 remains in progress until its gate criteria and owner decisions are met.
+At each phase conclusion, and for any earlier slice worth publishing:
 
-At each phase conclusion:
-
-1. Complete implementation/validation and record the phase gate result,
-   requirement statuses, measured facts and remaining gaps. Pending owner
-   decisions remain pending; publishing a checkpoint does not pass a gate or
-   authorize the next phase. Never loosen a performance target without the
-   owner's explicit decision.
-2. Inspect Git status, worktree/branch ownership and the configured remote.
-   Preserve unrelated/concurrent changes. Integrate only completed, validated
-   phase/dependency work into main. Resolve conflicts deliberately and preserve
-   relevant requirement, decision and toolchain changes from both sides.
-3. Run required affected tests, lint, license and hardware checks. Record
-   physical/external gaps honestly. Resolve failed required software, license or
-   secret checks before publication and retain their failure receipts.
-4. Stage explicit phase-owned source and text evidence paths. Exclude local
-   build/cache/runtime data, credentials, signing keys, private fixtures and
-   verification images. Inspect the exact staged diff and scan staged bytes for
-   secrets/identifiers. Dispose task-owned verification images before closure.
-5. Commit with a conventional message identifying the phase, then use a normal
-   git push origin main. Commit, safe integration and push are already authorized;
-   do not ask for another Git permission.
-6. Verify remote main equals the local published commit. Report commit hash,
-   repository URL, publication result, open verification limits and the next
-   task/phase model and effort. If nothing changed, verify/report parity without
-   making an empty commit.
+1. Finish the work and record the result in one line in this plan or the commit
+   message. Pending owner decisions stay pending; publishing does not pass a
+   gate or authorize the next phase. Never loosen a performance target without
+   the owner's explicit decision.
+2. Check Git status, worktrees and the remote. Preserve unrelated or concurrent
+   changes and resolve conflicts deliberately.
+3. Stage explicit paths. Leave out build output, caches, credentials, signing
+   keys, private fixtures and verification images, and inspect the staged diff.
+4. Push the task or session branch and wait for `ci-required` to be green on its
+   head commit. Fix failures; never bypass a failing check.
+5. Merge into main. On the laptop the standing authorization covers the merge
+   and a normal `git push origin main` once the checks are green. Cloud sessions
+   open a pull request for the owner to merge.
+6. Confirm the remote main commit, report its hash and what is still unverified,
+   and delete the merged branch and its worktree.
 
 Never force-push, rewrite shared history, discard unrelated changes or change
-visibility again during automatic publication. If authentication, divergence,
-branch protection or another concrete blocker prevents a normal push, preserve
-the local work and report it; do not bypass the blocker. Git publication does
-not authorize deployments, releases, notifications or security/device changes.
-
-Carry this policy into future phase prompts. Existing task prompts defer to it;
-their Git checklists record integration/publication status rather than asking
-for repeated merge/push approval.
+repository visibility. If authentication, divergence, branch protection or
+another concrete blocker prevents a normal push, keep the local work and report
+it. Publishing does not authorize deployments, releases, notifications or
+security or device changes.
 
 ## Phase overview
 

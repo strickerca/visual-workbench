@@ -2,10 +2,7 @@
 //! production entry points use DPAPI or the platform protection callback.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 mod support;
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::time::Duration;
 use support::*;
 use vw_core::*;
 use vw_model::DeviceId;
@@ -19,100 +16,6 @@ fn temp() -> tempfile::TempDir {
     }
 }
 
-#[derive(Clone, Default)]
-struct FixtureTrust(Arc<Mutex<Option<Vec<u8>>>>);
-impl ProtectedTrustCallback for FixtureTrust {
-    fn load(&self) -> SessionResult<Option<Vec<u8>>> {
-        Ok(self.0.lock().unwrap().clone())
-    }
-    fn clear_loaded_plaintext(&self) {}
-    fn compare_exchange(
-        &self,
-        expected: u64,
-        replacement: u64,
-        bytes: Vec<u8>,
-    ) -> SessionResult<bool> {
-        let decoded = TrustState::decode_unprotected(&bytes).map_err(|_| SessionError::Storage)?;
-        if decoded.revision() != replacement || expected.checked_add(1) != Some(replacement) {
-            return Err(SessionError::Storage);
-        }
-        let mut stored = self.0.lock().unwrap();
-        let revision = stored
-            .as_ref()
-            .map(|value| TrustState::decode_unprotected(value).unwrap().revision())
-            .unwrap_or(0);
-        if revision != expected {
-            return Ok(false);
-        }
-        *stored = Some(bytes);
-        Ok(true)
-    }
-}
-async fn service(id: String, fixture: FixtureTrust) -> Arc<SessionService> {
-    open_callback_session_service(id, Box::new(fixture))
-        .await
-        .unwrap()
-}
-async fn paired() -> (Arc<SessionService>, Arc<SessionService>) {
-    let host = service(device(), FixtureTrust::default()).await;
-    let client = service(
-        DeviceId::from_bytes([8; 16]).to_string(),
-        FixtureTrust::default(),
-    )
-    .await;
-    let listener = host.listen_pairing("127.0.0.1:0".into()).await.unwrap();
-    let offer = listener.offer(false).await.unwrap();
-    let details = client.inspect_qr(offer.qr.clone()).unwrap();
-    assert_eq!(details.peer_device_id, device());
-    assert_eq!(details.endpoints, vec![offer.endpoint.clone()]);
-    assert_eq!(details.expires_at_ms, offer.expires_at_ms);
-    assert!(client.inspect_qr(vec![0; 4097]).is_err());
-    let (accepted, joined) = tokio::join!(
-        listener.accept(cancel()),
-        client.join_qr(offer.qr, offer.endpoint)
-    );
-    assert_eq!(
-        accepted.unwrap().paired_device_id,
-        Some(client.local_device().await.unwrap().device_id)
-    );
-    assert_eq!(joined.unwrap(), device());
-    listener.close().await.unwrap();
-    (host, client)
-}
-async fn converged(host: &LiveSession, client: &LiveSession) {
-    let result = tokio::time::timeout(Duration::from_secs(30), async {
-        loop {
-            let a = host.status();
-            let b = client.status();
-            if a.status == SyncStatus::Synced
-                && b.status == SyncStatus::Synced
-                && a.host_seq == b.host_seq
-                && a.state_hash == b.state_hash
-            {
-                return;
-            }
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-    })
-    .await;
-    let a = host.status();
-    let b = client.status();
-    assert!(
-        result.is_ok(),
-        "convergence deadline: host={:?}/seq{}/pending{}/blocked{}/failure{:?}; client={:?}/seq{}/pending{}/blocked{}/failure{:?}; same_hash={}",
-        a.status,
-        a.host_seq,
-        a.pending,
-        a.blocked,
-        a.failure,
-        b.status,
-        b.host_seq,
-        b.pending,
-        b.blocked,
-        b.failure,
-        a.state_hash == b.state_hash,
-    );
-}
 fn rectangle(object: u8) -> EditCommand {
     EditCommand::Create {
         object_id: id(object),
