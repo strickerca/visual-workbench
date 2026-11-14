@@ -1,0 +1,49 @@
+# Builds installable app packages on request. Run it from the Actions tab
+# ("Run workflow") or by pushing a tag that starts with "v".
+#
+# The Android package is signed with a throwaway development key created on the
+# build machine. It installs on a phone that does not have the app yet; it will
+# not install over a copy signed by the laptop's key. A stable personal key,
+# stored as a repository secret, is the owner's decision.
+name: build-apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  android-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: never
+      CARGO_BUILD_JOBS: "4"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: tools/ci/install-tools.sh ndk android
+      - run: tools/ci/kotlin-linux.sh :android:assembleDebug
+      - name: Check the package (native library present, 16 KB aligned)
+        run: python tools/ffi-test/check_apk.py apps/android/build/outputs/apk/debug/android-debug.apk
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: visual-workbench-android-development
+          path: apps/android/build/outputs/apk/debug/android-debug.apk
+          if-no-files-found: error
+          retention-days: 30
