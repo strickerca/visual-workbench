@@ -693,4 +693,62 @@ pub(crate) mod tests {
         ));
         assert_eq!(bytes, original);
     }
+    /// Hostile-input robustness: a completed copy with bytes flipped, numbers
+    /// overwritten, truncated or extended must always return, never panic or
+    /// hang, and a refused embed must leave the file untouched. Deterministic
+    /// so a failure reproduces.
+    #[test]
+    fn mutated_files_never_panic_and_a_refused_embed_changes_nothing() {
+        let cancel = PdfCancellation::default();
+        let plain = fixture();
+        let mut embedded = fixture();
+        embed_pdf_copy_metadata(&mut embedded, &identity(), PdfLimits::default(), &cancel).unwrap();
+        let seeds = [plain, embedded];
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        let (mut refused, mut verified) = (0u32, 0u32);
+        for round in 0..20_000u32 {
+            let mut bytes = seeds[round as usize % 2].clone();
+            for _ in 0..1 + next() % 3 {
+                let at = (next() as usize) % bytes.len();
+                match next() % 6 {
+                    0 => bytes[at] ^= 1 << (next() % 8),
+                    1 => bytes[at] = next() as u8,
+                    // Offsets, sizes and object numbers are decimal digits.
+                    2 => bytes[at] = b'0' + (next() % 10) as u8,
+                    3 => bytes
+                        .splice(at..at, *b"99999999999999999999")
+                        .for_each(drop),
+                    4 => bytes.truncate(at.max(1)),
+                    _ => bytes.extend(std::iter::repeat_n(next() as u8, (next() % 64) as usize)),
+                }
+            }
+            if verify_pdf_copy_metadata(&bytes, &identity(), u64::MAX, &cancel).is_ok() {
+                verified += 1;
+            }
+            let before = bytes.clone();
+            if embed_pdf_copy_metadata(&mut bytes, &identity(), PdfLimits::default(), &cancel)
+                .is_err()
+            {
+                assert_eq!(
+                    bytes, before,
+                    "round {round}: a refused embed changed the file"
+                );
+                refused += 1;
+            }
+        }
+        assert!(
+            refused > 2_000,
+            "many mutations should be refused: {refused}"
+        );
+        assert!(
+            verified < 10_000,
+            "a plain copy must never verify: {verified}"
+        );
+    }
 }
