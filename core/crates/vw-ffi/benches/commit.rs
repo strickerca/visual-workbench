@@ -2,7 +2,10 @@
 //!
 //! Each stroke goes through the same path the apps use: begin, append samples,
 //! commit. The table shows the median commit time once the document already
-//! holds N strokes, so growth with document size is visible directly.
+//! holds N strokes, so growth with document size is visible directly, and the
+//! slowest commit since the previous row. The slowest one is the recovery
+//! checkpoint the store writes every 500 commits: it serializes the whole
+//! accepted history, so it does grow with the document.
 //!
 //! Run: cargo bench -p vw-ffi --bench commit
 //! Set VW_BENCH_STROKES to change the largest document (default 2000), and
@@ -161,12 +164,15 @@ fn main() {
         )
         .await
         .unwrap();
-        println!("strokes in document | median commit of one more stroke");
+        println!(
+            "strokes in document | median commit of one more stroke | slowest since previous row"
+        );
         let mut count = 0u32;
         let mut last = Duration::ZERO;
         for checkpoint in checkpoints {
+            let mut slowest = Duration::ZERO;
             while count < checkpoint {
-                stroke(&project, count).await;
+                slowest = slowest.max(stroke(&project, count).await);
                 count += 1;
             }
             let mut timings = Vec::with_capacity(MEASURED);
@@ -174,8 +180,13 @@ fn main() {
                 timings.push(stroke(&project, count).await);
                 count += 1;
             }
+            slowest = timings.iter().copied().fold(slowest, Duration::max);
             last = median(&mut timings);
-            println!("{checkpoint:>19} | {:>8.2} ms", last.as_secs_f64() * 1000.0);
+            println!(
+                "{checkpoint:>19} | {:>30.2} ms | {:>24.2} ms",
+                last.as_secs_f64() * 1000.0,
+                slowest.as_secs_f64() * 1000.0
+            );
         }
         project.close().await.unwrap();
         last
