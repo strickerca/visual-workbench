@@ -302,10 +302,10 @@ impl UndoManager {
                 local_order,
             },
         );
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "cross-check")]
         {
             let mut reference = self.clone();
-            debug_assert!(
+            assert!(
                 reference.rebuild().is_ok()
                     && reference.undo == self.undo
                     && reference.redo == self.redo

@@ -1253,7 +1253,8 @@ fn evaluate(
             }
         }
         let (hash, canonical_len) = hasher.hash(project)?;
-        debug_assert_eq!(
+        #[cfg(feature = "cross-check")]
+        assert_eq!(
             Some(&hash),
             project.state_hash().ok().as_ref(),
             "incremental state hash differs from the whole-project hash"

@@ -149,7 +149,8 @@ impl Originals {
                 .iter()
                 .map(|(id, original)| (id, original.as_ref())),
         );
-        debug_assert_eq!(
+        #[cfg(feature = "cross-check")]
+        assert_eq!(
             result.as_ref().err().map(ToString::to_string),
             project.validate().err().map(|error| error.to_string()),
             "changed-object validation differs from whole-project validation"

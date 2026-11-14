@@ -307,7 +307,8 @@ impl Replica {
                 return Err(error);
             }
         };
-        debug_assert_eq!(
+        #[cfg(feature = "cross-check")]
+        assert_eq!(
             Some(&hash),
             self.visible.state_hash().ok().as_ref(),
             "incremental visible hash differs from the whole-project hash"
@@ -399,7 +400,8 @@ fn replay(
         }
     }
     let (hash, _) = hasher.hash(&visible)?;
-    debug_assert_eq!(
+    #[cfg(feature = "cross-check")]
+    assert_eq!(
         Some(&hash),
         visible.state_hash().ok().as_ref(),
         "incremental visible hash differs from the whole-project hash"
