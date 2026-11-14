@@ -1,12 +1,11 @@
-package com.visualworkbench.android.editor
+package com.visualworkbench.shared
 
-import com.visualworkbench.shared.AiTokenEstimate
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 /** Explicit dated provider estimates only. The app has no invented image-token
  * formula and never fills missing figures from the requested image dimensions. */
-internal fun aiEstimateInput(text: String, input: String, output: String,
+public fun aiEstimateInput(text: String, input: String, output: String,
     provenance: String, verified: String, expires: String): AiTokenEstimate? {
     val fields = listOf(text, input, output, provenance, verified, expires)
     if (fields.all(String::isEmpty)) return null

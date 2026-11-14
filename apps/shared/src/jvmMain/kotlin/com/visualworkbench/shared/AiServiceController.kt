@@ -1,6 +1,5 @@
-package com.visualworkbench.android.editor
+package com.visualworkbench.shared
 
-import com.visualworkbench.shared.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -8,7 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal data class AiServiceState(
+public data class AiServiceState(
     val busy: Boolean = false,
     val configuration: AiConfiguration? = null,
     val readiness: AiReadiness? = null,
@@ -19,14 +18,14 @@ internal data class AiServiceState(
 /** Application-scope owner, confined to its UI scope. Opening settings may read
  * readiness but never sends or initializes a missing budget ledger. Only the
  * separate explicit initialize() action may provision first-use private state. */
-internal class AiServiceController(
+public class AiServiceController(
     private val scope: CoroutineScope,
     private val privateDirectory: String,
     private val create: suspend (String, Boolean) -> WorkbenchAiService =
         { path, initialize -> createAiService(path, provisionFirstInstall = initialize) },
 ) {
     private val mutable = MutableStateFlow(AiServiceState())
-    val state: StateFlow<AiServiceState> = mutable.asStateFlow()
+    public val state: StateFlow<AiServiceState> = mutable.asStateFlow()
     private var service: WorkbenchAiService? = null
     private var operation: Job? = null
     private var closing = false
@@ -41,9 +40,9 @@ internal class AiServiceController(
         }
     }
 
-    fun activate() { load(false) }
-    fun initialize() { load(true) }
-    fun requireService(): WorkbenchAiService {
+    public fun activate() { load(false) }
+    public fun initialize() { load(true) }
+    public fun requireService(): WorkbenchAiService {
         if (closing) throw AiFailure(AiFailureKind.Closed)
         if (operation?.isCompleted == false) throw AiFailure(AiFailureKind.Busy)
         return service ?: throw AiFailure(AiFailureKind.Unsupported)
@@ -71,7 +70,7 @@ internal class AiServiceController(
         }
     }
 
-    fun configure(json: String, expectedFingerprint: String) {
+    public fun configure(json: String, expectedFingerprint: String) {
         // Bound before UTF-8 conversion. Configuration contains model/cost policy,
         // never a provider key. Native validates the schema and exact fingerprint.
         if (json.length > 65_536 || json.encodeToByteArray().size > 65_536) {
@@ -87,7 +86,7 @@ internal class AiServiceController(
         }
     }
 
-    fun configureDailyBudget(expectedFingerprint: String, microusd: ULong) = launch {
+    public fun configureDailyBudget(expectedFingerprint: String, microusd: ULong): Job? = launch {
         val owner = service ?: throw AiFailure(AiFailureKind.Unsupported)
         val configuration = owner.configureDailyBudget(expectedFingerprint, microusd)
         val readiness = owner.readiness()
@@ -99,7 +98,7 @@ internal class AiServiceController(
     /** Windows settings only. Caller hands over this bounded byte array; it is
      * wiped on every branch, including admission refusal and never-started work.
      * Android uses the existing ProviderKeyDialog/AndroidProviderKeyStore. */
-    fun saveWindowsKey(bytes: ByteArray) {
+    public fun saveWindowsKey(bytes: ByteArray) {
         if (bytes.size !in 1..2560 || bytes.any { (it.toInt() and 255) !in 33..126 }) {
             bytes.fill(0); fail(AiFailureKind.Credentials); return
         }
@@ -119,7 +118,7 @@ internal class AiServiceController(
         // launch may be refused/cancelled before its body gets ownership.
         if (job == null) bytes.fill(0) else job.invokeOnCompletion { bytes.fill(0) }
     }
-    fun removeWindowsKey() = launch {
+    public fun removeWindowsKey(): Job? = launch {
         val owner = service ?: throw AiFailure(AiFailureKind.Unsupported)
         owner.removeWindowsKey()
         val readiness = owner.readiness()
@@ -127,8 +126,8 @@ internal class AiServiceController(
         if (closing) throw CancellationException("AI settings closing")
         mutable.value = mutable.value.copy(readiness = readiness)
     }
-    fun cancelSettings() { operation?.cancel() }
-    fun clearFailure() { mutable.value = mutable.value.copy(failure = null) }
+    public fun cancelSettings() { operation?.cancel() }
+    public fun clearFailure() { mutable.value = mutable.value.copy(failure = null) }
 
     private fun fail(kind: AiFailureKind) {
         mutable.value = mutable.value.copy(failure = kind)
@@ -163,7 +162,7 @@ internal class AiServiceController(
 
     /** Project request and tile owners must settle before this application owner.
      * Idempotent; a cancelled caller still waits for actual service closure. */
-    suspend fun close() {
+    public suspend fun close() {
         closing = true
         mutable.value = mutable.value.copy(closed = true, busy = true, configuration = null, readiness = null)
         withContext(NonCancellable) {
@@ -184,13 +183,13 @@ internal class AiServiceController(
     }
 }
 
-internal fun aiMoney(microusd: ULong): String {
+public fun aiMoney(microusd: ULong): String {
     val dollars = microusd / 1_000_000uL
     val fraction = (microusd % 1_000_000uL).toString().padStart(6, '0').trimEnd('0')
     return "$" + dollars + if (fraction.isEmpty()) ".00" else "." + fraction.padEnd(2, '0')
 }
 /** Exact decimal dollars with at most six fractional digits. No Float money. */
-internal fun aiParseMoney(value: String): ULong? {
+public fun aiParseMoney(value: String): ULong? {
     if (value.isEmpty() || value.length > 27 || !Regex("[0-9]+(\\.[0-9]{1,6})?").matches(value)) return null
     val parts = value.split('.')
     val whole = parts[0].toULongOrNull() ?: return null
@@ -198,11 +197,11 @@ internal fun aiParseMoney(value: String): ULong? {
     if (whole > (ULong.MAX_VALUE - fraction) / 1_000_000uL) return null
     return whole * 1_000_000uL + fraction
 }
-internal fun aiBudgetExceeded(readiness: AiReadiness, estimate: ULong): Boolean =
+public fun aiBudgetExceeded(readiness: AiReadiness, estimate: ULong): Boolean =
     estimate > readiness.dailySoftBudgetMicrousd ||
         readiness.spentTodayMicrousd > readiness.dailySoftBudgetMicrousd - estimate.coerceAtMost(readiness.dailySoftBudgetMicrousd)
 
-internal fun aiFailureText(kind: AiFailureKind): String = when (kind) {
+public fun aiFailureText(kind: AiFailureKind): String = when (kind) {
     AiFailureKind.Invalid -> "Check the input values and review the request again."
     AiFailureKind.Stale -> "The document, source, masks or settings changed. Prepare a fresh review before sending."
     AiFailureKind.Limit -> "This operation exceeds the supported size or complexity. Reduce its scope."

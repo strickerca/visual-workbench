@@ -14,6 +14,7 @@ import javax.swing.JPasswordField
 import javax.swing.text.AbstractDocument
 import javax.swing.text.AttributeSet
 import javax.swing.text.DocumentFilter
+import com.visualworkbench.shared.*
 
 /** Uses an ordinary non-saveable password component. No call reads the stored
  * secret into UI; only readiness/configured metadata is displayed. */

@@ -1,6 +1,5 @@
-package com.visualworkbench.android.documents
+package com.visualworkbench.shared
 
-import com.visualworkbench.shared.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.*
@@ -10,22 +9,22 @@ import kotlinx.coroutines.sync.withLock
 /** A call owns its cancellation token, source and any unretired private output.
  * retire must either join/release them or retain the SAME owner and throw
  * Isolation. Returning from execute alone is not a retirement assertion. */
-internal interface DocumentCall {
+public interface DocumentCall {
     /** Idempotent, nonthrowing signal; it does not release owned resources. */
-    fun cancel()
-    suspend fun execute(request: DocumentRequest, source: ByteArray): DocumentReply
-    suspend fun retire()
+    public fun cancel()
+    public suspend fun execute(request: DocumentRequest, source: ByteArray): DocumentReply
+    public suspend fun retire()
 }
 
-internal interface DocumentBackend {
-    val pcRedaction: Boolean
-    fun call(): DocumentCall
-    suspend fun close()
+public interface DocumentBackend {
+    public val pcRedaction: Boolean
+    public fun call(): DocumentCall
+    public suspend fun close()
 }
 
 /** close signals the active owner before waiting for run admission. A failed
  * retirement quarantines that owner; replacement calls cannot bypass it. */
-internal class JoinedDocumentJobs(private val backend: DocumentBackend) : DocumentJobs {
+public class JoinedDocumentJobs(private val backend: DocumentBackend) : DocumentJobs {
     private val gate = Mutex()
     private val closing = AtomicBoolean(false)
     private val active = AtomicReference<DocumentCall?>(null)

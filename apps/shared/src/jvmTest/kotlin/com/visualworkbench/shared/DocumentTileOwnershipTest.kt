@@ -1,6 +1,5 @@
-package com.visualworkbench.desktop.documents
+package com.visualworkbench.shared
 
-import com.visualworkbench.shared.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.*

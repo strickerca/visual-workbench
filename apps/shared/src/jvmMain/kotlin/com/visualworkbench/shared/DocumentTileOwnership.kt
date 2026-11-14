@@ -1,14 +1,13 @@
-package com.visualworkbench.android.documents
+package com.visualworkbench.shared
 
-import com.visualworkbench.shared.*
 import java.util.IdentityHashMap
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.*
 
-internal class DocumentForeignBudget(private val limit: Long) {
+public class DocumentForeignBudget(private val limit: Long) {
     private var used = 0L
     init { require(limit > 0) }
-    @Synchronized fun reserve(bytes: Long): AutoCloseable {
+    @Synchronized public fun reserve(bytes: Long): AutoCloseable {
         if (bytes <= 0 || bytes > limit - used) throw DocumentFailure(DocumentFailureKind.Limit)
         used += bytes
         return object : AutoCloseable {
@@ -16,13 +15,13 @@ internal class DocumentForeignBudget(private val limit: Long) {
             override fun close() = synchronized(this@DocumentForeignBudget) { if (held) { used -= bytes; held = false } }
         }
     }
-    @Synchronized fun retainedBytes(): Long = used
+    @Synchronized public fun retainedBytes(): Long = used
 }
 
-internal class DocumentImage<T>(val value: T, private val reservation: AutoCloseable, private val dispose: () -> Unit) {
+public class DocumentImage<T>(public val value: T, private val reservation: AutoCloseable, private val dispose: () -> Unit) {
     private var references = 1 // Cache/staging owner; frames acquire independent references.
-    @Synchronized fun retain() { check(references > 0); references++ }
-    @Synchronized fun release() {
+    @Synchronized public fun retain() { check(references > 0); references++ }
+    @Synchronized public fun release() {
         check(references > 0)
         if (references == 1) { dispose(); reservation.close(); references = 0 } else references--
     }
@@ -30,13 +29,13 @@ internal class DocumentImage<T>(val value: T, private val reservation: AutoClose
 
 /** A published frame owns this lease until its LAST platform draw reader has
  * retired. UI state replacement alone is not that proof. */
-internal class PreparedTile<T>(val source: DocumentDisplayTile, val binding: DocumentFrameBinding, private val image: DocumentImage<T>) : AutoCloseable {
+public class PreparedTile<T>(public val source: DocumentDisplayTile, public val binding: DocumentFrameBinding, private val image: DocumentImage<T>) : AutoCloseable {
     private var held = true
-    val value: T get() = synchronized(this) { check(held); image.value }
+    public val value: T get() = synchronized(this) { check(held); image.value }
     @Synchronized override fun close() { if (held) { image.release(); held = false } }
 }
 
-internal class DocumentTileImages<T>(
+public class DocumentTileImages<T>(
     budgetBytes: Long,
     private val convert: (DocumentDisplayTile, () -> Boolean) -> Pair<T, () -> Unit>,
 ) : AutoCloseable {
@@ -44,7 +43,7 @@ internal class DocumentTileImages<T>(
     private val images = IdentityHashMap<DocumentDisplayTile, DocumentImage<T>>()
     private var binding: DocumentFrameBinding? = null
     private val quarantine = mutableListOf<PreparedTile<T>>()
-    @Synchronized fun prepare(frame: DocumentDisplayFrame, stillCurrent: () -> Boolean): List<PreparedTile<T>> {
+    @Synchronized public fun prepare(frame: DocumentDisplayFrame, stillCurrent: () -> Boolean): List<PreparedTile<T>> {
         if (quarantine.isNotEmpty()) throw DocumentFailure(DocumentFailureKind.Isolation)
         validateDocumentDisplayFrame(frame, frame.binding)
         for (tile in frame.tiles) {
@@ -86,7 +85,7 @@ internal class DocumentTileImages<T>(
     }
     /** Capture the acquired frame BEFORE dispatcher return, so prompt
      * cancellation cannot discard image leases that the caller never saw. */
-    suspend fun prepareOwned(frame: DocumentDisplayFrame, stillCurrent: () -> Boolean): List<PreparedTile<T>> {
+    public suspend fun prepareOwned(frame: DocumentDisplayFrame, stillCurrent: () -> Boolean): List<PreparedTile<T>> {
         val handoff = AtomicReference<List<PreparedTile<T>>?>(null)
         val caller = currentCoroutineContext()[Job]
         try {
@@ -106,7 +105,7 @@ internal class DocumentTileImages<T>(
         for (tile in tiles) try { tile.close() } catch (_: Exception) { quarantine += tile }
         if (quarantine.isNotEmpty()) throw DocumentFailure(DocumentFailureKind.Isolation)
     }
-    @Synchronized fun retainedBytes(): Long = budget.retainedBytes()
+    @Synchronized public fun retainedBytes(): Long = budget.retainedBytes()
     @Synchronized override fun close() {
         for (index in quarantine.indices.reversed()) try { quarantine[index].close(); quarantine.removeAt(index) } catch (_: Exception) { }
         clear()
@@ -122,6 +121,6 @@ internal class DocumentTileImages<T>(
     private fun current(check: () -> Boolean) { if (!check()) throw DocumentFailure(DocumentFailureKind.Stale) }
 }
 
-internal fun documentArgb(rgba: ByteArray, offset: Int): Int =
+public fun documentArgb(rgba: ByteArray, offset: Int): Int =
     ((rgba[offset + 3].toInt() and 255) shl 24) or ((rgba[offset].toInt() and 255) shl 16) or
         ((rgba[offset + 1].toInt() and 255) shl 8) or (rgba[offset + 2].toInt() and 255)

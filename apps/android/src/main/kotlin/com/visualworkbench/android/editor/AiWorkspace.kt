@@ -196,9 +196,9 @@ private fun AiCandidateGrid(controller: AiEditorController<AiBitmap>, state: AiE
                                             else "Center crop (${region.x}, ${region.y}) ${region.width} × ${region.height}", style = MaterialTheme.typography.caption)
                                     } else Text(if (entry.candidate != null) "Preview unavailable · select to inspect" else "No generated pixels", style = MaterialTheme.typography.caption)
                                     Text(when {
-                                        entry.receipt != null -> "Saved Result · revision ${entry.receipt.revision.hostSeq}"
+                                        entry.receipt != null -> "Saved Result · revision ${entry.receipt?.revision?.hostSeq}"
                                         entry.retrySave -> "Exact save retry retained"
-                                        entry.candidate != null -> "${if (entry.candidate.partial) "Partial" else "Candidate"} · outside changed ${entry.candidate.proof.changedOutside}"
+                                        entry.candidate != null -> "${if (entry.candidate?.partial == true) "Partial" else "Candidate"} · outside changed ${entry.candidate?.proof?.changedOutside}"
                                         entry.attempted -> "Attempt used · recover or discard"
                                         else -> "Review ready · Send required"
                                     }, style = MaterialTheme.typography.caption)

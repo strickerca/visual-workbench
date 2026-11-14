@@ -1,6 +1,5 @@
-package com.visualworkbench.desktop.documents
+package com.visualworkbench.shared
 
-import com.visualworkbench.shared.*
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.*
 import org.junit.Assert.*

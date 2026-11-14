@@ -1,28 +1,27 @@
-package com.visualworkbench.android.editor
+package com.visualworkbench.shared
 
-import com.visualworkbench.shared.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-internal data class AiResultImage<T>(val objectId: String, val resultId: String, val compositeAssetId: String,
+public data class AiResultImage<T>(val objectId: String, val resultId: String, val compositeAssetId: String,
     val width: UInt, val height: UInt, val tiles: List<AiDisplayTile<T>>)
-internal data class AiResultFrame<T>(val attachment: AiAttachment, val camera: Camera,
+public data class AiResultFrame<T>(val attachment: AiAttachment, val camera: Camera,
     val images: Map<String, AiResultImage<T>>, val poses: Map<String, Transform>) {
-    fun matches(owner: AiAttachment?, view: Camera, preview: Map<String, Transform>): Boolean = attachment.sameProject(owner) &&
+    public fun matches(owner: AiAttachment?, view: Camera, preview: Map<String, Transform>): Boolean = attachment.sameProject(owner) &&
         attachment.binding == owner?.binding && camera == view && poses.all { (id, pose) ->
             (preview[id] ?: owner?.document?.render?.items?.firstOrNull { it.objectId == id }?.transform) == pose
         }
 }
-internal data class AiResultState<T>(val frame: AiResultFrame<T>? = null, val loading: Boolean = false,
+public data class AiResultState<T>(val frame: AiResultFrame<T>? = null, val loading: Boolean = false,
     val message: String? = null)
-internal data class AiResultPlan(val item: RenderItem, val shape: Shape.Result, val tiles: AiTilePlan)
+public data class AiResultPlan(val item: RenderItem, val shape: Shape.Result, val tiles: AiTilePlan)
 
 /** Volatile preview messages cannot introduce an unpublished Result/asset or
  * add an annotation to a materialized Result's dedicated layer. Such pixels
  * become readable only after the corresponding canonical revision arrives. */
-internal fun aiAdmitResultPreview(document: DocumentSnapshot, item: RenderItem): Boolean {
+public fun aiAdmitResultPreview(document: DocumentSnapshot, item: RenderItem): Boolean {
     val prior = document.render.items.firstOrNull { it.objectId == item.objectId }
     val resultLayer = document.render.items.any { it.layerId == item.layerId && it.shape is Shape.Result }
     if (resultLayer && prior?.shape !is Shape.Result) return false
@@ -34,7 +33,7 @@ internal fun aiAdmitResultPreview(document: DocumentSnapshot, item: RenderItem):
 /** Affine inversion is used only for conservative tile admission. Camera
  * physical/D mapping comes from WorkbenchCore; painting uses its same transform.
  * Native remains responsible for Result binding, pixel conversion and proof. */
-internal fun aiResultPlans(document: DocumentSnapshot, documentCorners: List<Point>, preview: Map<String, Transform> = emptyMap()): List<AiResultPlan> {
+public fun aiResultPlans(document: DocumentSnapshot, documentCorners: List<Point>, preview: Map<String, Transform> = emptyMap()): List<AiResultPlan> {
     val results = document.render.items.asSequence().filter { it.shape is Shape.Result }.take(9).toList()
     if (results.size > 8) throw AiDisplayRefusal(AiDisplayRefusal.Reason.ZoomIn)
     var remaining = AI_DISPLAY_BYTES
@@ -63,7 +62,7 @@ internal fun aiResultPlans(document: DocumentSnapshot, documentCorners: List<Poi
 /** Provider-independent, lazy project reader. Opening an ordinary Result never
  * touches key settings, a provider service or budget-history initialization.
  * One active read and one latest viewport; detach joins before project close. */
-internal class AiResultController<T>(
+public class AiResultController<T>(
     private val scope: CoroutineScope,
     private val core: WorkbenchCore,
     private val attachment: () -> AiAttachment?,
@@ -74,7 +73,7 @@ internal class AiResultController<T>(
     private val results: (WorkbenchProject) -> WorkbenchAiResults = { it.aiResults() },
 ) {
     private val mutable = MutableStateFlow(AiResultState<T>())
-    val state: StateFlow<AiResultState<T>> = mutable.asStateFlow()
+    public val state: StateFlow<AiResultState<T>> = mutable.asStateFlow()
     private val reader = AiLatestTask(scope)
     private var ticket = 0L
     private var closed = false
@@ -82,7 +81,7 @@ internal class AiResultController<T>(
     private var retirements = 0
     private var requested: AiResultFrame<T>? = null
 
-    fun request() {
+    public fun request() {
         if (closed || retiring || !scope.isActive) return
         val owner = attachment() ?: run { invalidate(); return }
         val view = camera()
@@ -150,12 +149,12 @@ internal class AiResultController<T>(
             }
         }
     }
-    fun retry() { requested = null; request() }
-    fun invalidate() { ticket++; requested = null; reader.cancelPending(); mutable.value = AiResultState() }
-    suspend fun detach() {
+    public fun retry() { requested = null; request() }
+    public fun invalidate() { ticket++; requested = null; reader.cancelPending(); mutable.value = AiResultState() }
+    public suspend fun detach() {
         retirements++; retiring = true; invalidate()
         try { withContext(NonCancellable) { reader.pause() } }
         finally { retirements--; retiring = retirements != 0 }
     }
-    suspend fun close() { closed = true; invalidate(); withContext(NonCancellable) { reader.close() } }
+    public suspend fun close() { closed = true; invalidate(); withContext(NonCancellable) { reader.close() } }
 }

@@ -1,11 +1,11 @@
-package com.visualworkbench.android.editor
+package com.visualworkbench.shared
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 
 /** One active producer plus one overwritten intent, even if a native producer
  * takes time to acknowledge cancellation. Owner UI dispatcher only. */
-internal class AiLatestTask(private val scope: CoroutineScope, private val failed: (Exception) -> Unit = {}) {
+public class AiLatestTask(private val scope: CoroutineScope, private val failed: (Exception) -> Unit = {}) {
     private val wake = Channel<Unit>(Channel.CONFLATED)
     private var pending: (suspend () -> Unit)? = null
     private var active: Deferred<Unit>? = null
@@ -30,19 +30,19 @@ internal class AiLatestTask(private val scope: CoroutineScope, private val faile
             }
         }
     }
-    fun offer(work: suspend () -> Unit) {
+    public fun offer(work: suspend () -> Unit) {
         if (closed || !scope.isActive) return
         pending = work
         active?.cancel()
         wake.trySend(Unit)
         runner.start()
     }
-    fun cancelPending() { pending = null; active?.cancel() }
-    suspend fun pause() {
+    public fun cancelPending() { pending = null; active?.cancel() }
+    public suspend fun pause() {
         cancelPending()
         withContext(NonCancellable) { active?.join() }
     }
-    suspend fun close() {
+    public suspend fun close() {
         closed = true; pending = null; wake.close(); active?.cancel()
         withContext(NonCancellable) { runner.cancelAndJoin() }
     }

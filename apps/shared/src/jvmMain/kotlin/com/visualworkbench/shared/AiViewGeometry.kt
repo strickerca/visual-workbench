@@ -1,25 +1,21 @@
-package com.visualworkbench.android.editor
+package com.visualworkbench.shared
 
-import com.visualworkbench.shared.AiCompareMode
-import com.visualworkbench.shared.AiRegion
-import com.visualworkbench.shared.Camera
-import com.visualworkbench.shared.Point
 import kotlin.math.ceil
 import kotlin.math.floor
 
-internal const val AI_TILE_EDGE: Int = 512
-internal const val AI_DISPLAY_BYTES: Long = 64L * 1024L * 1024L
-internal const val AI_CONTACT_POINTS: Int = 4096
+public const val AI_TILE_EDGE: Int = 512
+public const val AI_DISPLAY_BYTES: Long = 64L * 1024L * 1024L
+public const val AI_CONTACT_POINTS: Int = 4096
 
 /** Display admission is separate from the native request/decode budget. A large
  * view is refused with a zoom-in message; it is never downsampled or cropped
  * silently. Framework/render-thread retention is outside this one-frame cap. */
-internal class AiDisplayRefusal(val reason: Reason) : Exception(reason.name) {
-    enum class Reason { Invalid, ZoomIn, ContactLimit, Stale }
+public class AiDisplayRefusal(public val reason: Reason) : Exception(reason.name) {
+    public enum class Reason { Invalid, ZoomIn, ContactLimit, Stale }
 }
-internal data class AiTilePlan(val width: UInt, val height: UInt, val regions: List<AiRegion>, val rgbaBytes: Long)
+public data class AiTilePlan(val width: UInt, val height: UInt, val regions: List<AiRegion>, val rgbaBytes: Long)
 
-internal fun aiCanvasWidth(sourceWidth: UInt, mode: AiCompareMode): UInt {
+public fun aiCanvasWidth(sourceWidth: UInt, mode: AiCompareMode): UInt {
     if (sourceWidth == 0u || sourceWidth > Int.MAX_VALUE.toUInt())
         throw AiDisplayRefusal(AiDisplayRefusal.Reason.Invalid)
     val width = sourceWidth.toULong() * if (mode == AiCompareMode.Split) 2uL else 1uL
@@ -29,7 +25,7 @@ internal fun aiCanvasWidth(sourceWidth: UInt, mode: AiCompareMode): UInt {
 
 /** corners must come from WorkbenchCore.mapPoints(camera, true, ...).
  * Only integer tile clipping lives here; no second camera/affine implementation. */
-internal fun aiTilePlan(
+public fun aiTilePlan(
     width: UInt,
     height: UInt,
     corners: List<Point>,
@@ -70,7 +66,7 @@ internal fun aiTilePlan(
     return AiTilePlan(width, height, tiles, bytes)
 }
 
-internal fun aiCheckPixels(region: AiRegion, width: UInt, height: UInt, bytes: ByteArray) {
+public fun aiCheckPixels(region: AiRegion, width: UInt, height: UInt, bytes: ByteArray) {
     if (region.width !in 1u..AI_TILE_EDGE.toUInt() || region.height !in 1u..AI_TILE_EDGE.toUInt() ||
         width == 0u || height == 0u ||
         region.x.toULong() + region.width.toULong() > width.toULong() ||
@@ -81,14 +77,14 @@ internal fun aiCheckPixels(region: AiRegion, width: UInt, height: UInt, bytes: B
 
 /** Straight RGBA8 from native sRGB display conversion. This packs channels only;
  * source/profile conversion, compositing and proof stay in the native core. */
-internal fun aiArgb(bytes: ByteArray, offset: Int): Int {
+public fun aiArgb(bytes: ByteArray, offset: Int): Int {
     if (offset < 0 || offset > bytes.size - 4) throw AiDisplayRefusal(AiDisplayRefusal.Reason.Invalid)
     return ((bytes[offset + 3].toInt() and 255) shl 24) or
         ((bytes[offset].toInt() and 255) shl 16) or
         ((bytes[offset + 1].toInt() and 255) shl 8) or (bytes[offset + 2].toInt() and 255)
 }
 
-internal data class AiContact(
+public data class AiContact(
     val candidateId: String,
     val camera: Camera,
     val points: List<Point>,
@@ -99,17 +95,17 @@ internal data class AiContact(
 
 /** Exactly one bounded real contact. Candidate/camera changes cancel the entire
  * contact. In Split mode a contact cannot cross the before/after seam. */
-internal class AiContactCollector {
+public class AiContactCollector {
     private data class Contact(
         val candidateId: String, val camera: Camera, val width: UInt, val height: UInt,
         val split: Boolean, val pane: Int, val radius: Double, val subtract: Boolean,
         val clearFirst: Boolean, val points: ArrayList<Point>,
     )
     private var current: Contact? = null
-    val active: Boolean get() = current != null
-    val points: List<Point> get() = current?.points?.toList() ?: emptyList()
+    public val active: Boolean get() = current != null
+    public val points: List<Point> get() = current?.points?.toList() ?: emptyList()
 
-    fun begin(candidateId: String, camera: Camera, width: UInt, height: UInt, split: Boolean,
+    public fun begin(candidateId: String, camera: Camera, width: UInt, height: UInt, split: Boolean,
               point: Point, radius: Double, subtract: Boolean, clearFirst: Boolean) {
         cancel()
         if (candidateId.isEmpty() || candidateId.length > 128 || width == 0u || height == 0u ||
@@ -126,7 +122,7 @@ internal class AiContactCollector {
             arrayListOf(admitted))
     }
 
-    fun append(candidateId: String, camera: Camera, mappedPoints: List<Point>) {
+    public fun append(candidateId: String, camera: Camera, mappedPoints: List<Point>) {
         val contact = current ?: return
         try {
             if (candidateId != contact.candidateId || camera != contact.camera)
@@ -142,7 +138,7 @@ internal class AiContactCollector {
         } catch (failure: Exception) { cancel(); throw failure }
     }
 
-    fun finish(candidateId: String, camera: Camera): AiContact? {
+    public fun finish(candidateId: String, camera: Camera): AiContact? {
         val contact = current ?: return null
         current = null
         if (contact.candidateId != candidateId || contact.camera != camera)
@@ -150,7 +146,7 @@ internal class AiContactCollector {
         return AiContact(contact.candidateId, contact.camera, contact.points.toList(),
             contact.radius, contact.subtract, contact.clearFirst)
     }
-    fun cancel() { current = null }
+    public fun cancel() { current = null }
 
     private fun sourcePoint(point: Point, width: UInt, height: UInt, split: Boolean, pane: Int): Point {
         val canvasWidth = width.toDouble() * if (split) 2 else 1
