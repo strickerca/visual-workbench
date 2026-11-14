@@ -107,12 +107,14 @@ class TraceRecorder {
     @Synchronized fun atLimit(): Boolean = stopReason == "sample_limit" || stopReason == "event_limit"
 
     private fun capability(device: InputDevice): JSONObject {
+        // Shared capability-only census; the trace schema keeps its original fields.
+        val census = inputDeviceCapability(device)
         val ranges = JSONArray()
-        device.motionRanges.forEach { range -> ranges.put(JSONObject().put("axis", range.axis)
+        census.ranges.forEach { range -> ranges.put(JSONObject().put("axis", range.axis)
             .put("source", range.source).put("min", range.min.toDouble()).put("max", range.max.toDouble())
             .put("flat", range.flat.toDouble()).put("fuzz", range.fuzz.toDouble()).put("resolution", range.resolution.toDouble())) }
-        return JSONObject().put("device_id", device.id).put("sources", device.sources)
-            .put("declares_stylus", device.supportsSource(InputDevice.SOURCE_STYLUS))
-            .put("virtual", device.isVirtual).put("ranges", ranges)
+        return JSONObject().put("device_id", census.deviceId).put("sources", census.sources)
+            .put("declares_stylus", census.declaresStylus)
+            .put("virtual", census.virtual).put("ranges", ranges)
     }
 }

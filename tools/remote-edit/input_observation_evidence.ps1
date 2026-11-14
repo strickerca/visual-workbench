@@ -1,11 +1,11 @@
 Set-StrictMode -Version Latest
 # Observation only: no grants, settlement, success, or validation authority.
 function New-M4InputObservationEvidence {
-    return @{balanced=@{Pending=[ordered]@{};Seen=$false};held=@{Pending=[ordered]@{};Seen=$false}}
+    return @{balanced=@{Pending=[ordered]@{};Seen=$false};held=@{Pending=[ordered]@{};Seen=$false};physical=@{Pending=[ordered]@{};Seen=$false}}
 }
 function New-M4InputObservationReceipt {
     $result=[ordered]@{}
-    foreach($kind in @('balanced','held')){
+    foreach($kind in @('balanced','held','physical')){
         $result[$kind]=[ordered]@{records=@();observed_count=0L;omitted_count=0L;partial_record=$null;partial_status=$null;duplicate_fields=0L;unknown_fields=0L;withheld_fields=0L;aborted_bundles=0L;records_validated=$false;acceptance=$false}
     }
     return $result
@@ -21,6 +21,18 @@ function Copy-M4InputObservation($Record) {
 function Get-M4InputObservationPatterns([string]$Kind) {
     $uuid='[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
     $binding='[0-9]{1,20},'+$uuid+',[0-9]{1,20},'+$uuid+',[0-9]{1,10},'+$uuid
+    if($Kind -ceq 'physical'){
+        # Closed owner-physical route only: a software_generated=true or
+        # physical_owner_gesture=false route value is withheld, never admitted.
+        return @{
+            remote_physical_binding=$binding
+            remote_physical_block='pressure|hover|barrel|eraser|paint-pressure|paint-hover|paint-barrel|paint-eraser|paint-eraser-tool'
+            remote_physical_strokes='[0-9]{1,2},[1-9][0-9]?';remote_physical_samples='[1-9][0-9]{0,4}';remote_physical_sequences='1,[1-9][0-9]{0,19}'
+            remote_physical_owner=$uuid;remote_physical_ack='[0-9]{1,20},[0-9]{1,20},[0-9]{1,20}';remote_physical_echo='[0-9]{1,20},[0-9]{1,20},[0-9]{1,10}'
+            remote_physical_witness='[0-9]{1,19},[0-9]{1,19}';remote_physical_journal='[a-f0-9]{64},[1-9][0-9]{0,6}'
+            remote_physical_route='surface_touch,software_generated=false,physical_owner_gesture=true,window_delivered=true,synthetic_dispatches=0,ack_covered=true,latency_acceptance=false'
+        }
+    }
     if($Kind -ceq 'balanced'){
         return @{
             remote_input_binding=$binding;remote_input_sequences='[0-9]{1,20},[0-9]{1,20}'
@@ -44,10 +56,17 @@ function Get-M4HeldStatusLine([string]$Line) {
     if(-not $patterns.ContainsKey($key)){throw 'Unknown held lifecycle field.'}
     return [pscustomobject]@{Key=$key;Value=$value}
 }
+function Get-M4PhysicalStatusLine([string]$Line) {
+    if($null -eq $Line -or $Line.Length -gt 4096){return $null}
+    if($Line -cnotmatch '\AINSTRUMENTATION_STATUS: (remote_physical_[a-z0-9_]{1,64})=(.{1,2048})\z'){return $null}
+    $key=$Matches[1];$value=$Matches[2];$patterns=Get-M4InputObservationPatterns 'physical'
+    if(-not $patterns.ContainsKey($key)){throw 'Unknown physical gesture field.'}
+    return [pscustomobject]@{Key=$key;Value=$value}
+}
 function Add-M4InputObservationEvidence($State,$Receipt,[string]$Line) {
     if($null -eq $Line -or $Line.Length -gt 4096){return}
-    if($Line -cmatch '\AINSTRUMENTATION_STATUS: (remote_(input|lifecycle)_[a-z0-9_]{1,64})=(.{0,2048})\z'){
-        $key=$Matches[1];$kind=if($Matches[2] -ceq 'input'){'balanced'}else{'held'};$value=$Matches[3]
+    if($Line -cmatch '\AINSTRUMENTATION_STATUS: (remote_(input|lifecycle|physical)_[a-z0-9_]{1,64})=(.{0,2048})\z'){
+        $key=$Matches[1];$kind=switch -CaseSensitive ($Matches[2]){'input'{'balanced'};'lifecycle'{'held'};default{'physical'}};$value=$Matches[3]
         $pending=$State[$kind];$observed=$Receipt[$kind];$patterns=Get-M4InputObservationPatterns $kind
         $pending.Seen=$true
         if(-not $patterns.ContainsKey($key)){Add-M4InputObservationCount $observed 'unknown_fields'}
@@ -61,7 +80,7 @@ function Add-M4InputObservationEvidence($State,$Receipt,[string]$Line) {
     }
     if($Line -cmatch '\AINSTRUMENTATION_STATUS_CODE: (-?[0-9]{1,10})\z'){
         $status=[long]$Matches[1]
-        foreach($kind in @('balanced','held')){
+        foreach($kind in @('balanced','held','physical')){
             $pending=$State[$kind];$observed=$Receipt[$kind]
             if(-not $pending.Seen){continue}
             if($status -eq 0){

@@ -12,6 +12,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.visualworkbench.shared.*
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID
 import kotlinx.coroutines.*
@@ -34,13 +36,23 @@ class RemoteNormalPathInstrumentedTest {
         val controllerInput=args.getString("remoteControllerInput")=="true"
         check(args.getString("remoteControllerInput") in listOf(null,"true"))
         val inputScenario=args.getString("remoteInputScenario")?:"balanced"
-        check(inputScenario in setOf("balanced","pause-held","background-held","disconnect-held"))
+        check(inputScenario in setOf("balanced","pause-held","background-held","disconnect-held","owner-physical"))
         check(controllerInput||inputScenario=="balanced")
+        // Owner-physical: no synthetic dispatch. Only the owner's pen produces
+        // admitted samples; block/stroke arguments shape the prompt and journal.
+        val ownerBlock=args.getString("remoteOwnerBlock")
+        val ownerStrokesText=args.getString("remoteOwnerStrokes")
+        check((inputScenario=="owner-physical")==(ownerBlock!=null)&&(ownerBlock==null)==(ownerStrokesText==null))
+        val ownerStrokes=if(ownerStrokesText==null)0 else{
+            check(ownerStrokesText.matches(Regex("[1-9][0-9]?"))&&requireNotNull(ownerBlock) in REMOTE_PHYSICAL_BLOCKS)
+            ownerStrokesText.toInt().also{check(it in 1..64)}
+        }
         val editorKind=args.getString("remoteOwnedEditorKind")
         val editorStrokeText=args.getString("remoteEditorStroke")
         check((editorKind==null)==(editorStrokeText==null))
         val editorStroke=if(editorKind==null)null else{
             check(controllerInput&&inputScenario=="balanced"&&editorKind in setOf("krita","paint"))
+            check(ownerBlock==null)
             val text=requireNotNull(editorStrokeText)
             check(text.matches(Regex("[0-9]{4,6}(,[0-9]{4,6}){5}")))
             text.split(',').map{it.toInt()}.also{
@@ -79,7 +91,9 @@ class RemoteNormalPathInstrumentedTest {
             val instance=UUID.randomUUID().toString().replace("-","")
             RemoteIntegrationActivity.bind(instance,value)
             try {
-                scenario=ActivityScenario.launch(Intent(app,RemoteIntegrationActivity::class.java).putExtra("ownedRunId",instance))
+                val intent=Intent(app,RemoteIntegrationActivity::class.java).putExtra("ownedRunId",instance)
+                if(ownerBlock!=null&&viewIndex==0)intent.putExtra("ownerPhysicalBlock",ownerBlock).putExtra("ownerPhysicalStrokes",ownerStrokes)
+                scenario=ActivityScenario.launch(intent)
                 var result:RemoteEditController?=null
                 requireNotNull(scenario).onActivity{result=it.controller}
                 return requireNotNull(result)
@@ -237,6 +251,92 @@ class RemoteNormalPathInstrumentedTest {
             check(active.inputObservation.value==null&&active.ghost.snapshot(System.nanoTime()).isEmpty())
             phase("controller_input_complete")
         }
+        suspend fun controllerOwnerPhysical(first:RemoteRenderedFrameObservation){
+            val active=requireNotNull(controller);val native=requireNotNull(remote);val block=requireNotNull(ownerBlock)
+            val journal=RemotePhysicalGestureJournal(ownerStrokes,remotePhysicalHoverOnly(block))
+            // Armed before the grant: every natively admitted sample of this
+            // input session is journaled, starting at sequence 1.
+            requireNotNull(scenario).onActivity{it.armPhysicalJournal(journal)}
+            val exact=actualGrant(first)
+            phase("controller_owner_physical_ready")
+            phase("controller_input_dispatch_attempted")
+            val strokeDeadline=System.nanoTime()+120_000_000_000L;var report=0L;var shown=-1
+            while(true){
+                val progress=journal.progress()
+                check(progress.complete&&progress.pauses==0){"Physical journal incomplete or owner pause"}
+                if(!progress.accepting&&progress.admittedStrokes>=ownerStrokes)break
+                check(System.nanoTime()<strokeDeadline){"Owner physical strokes were not admitted within 120 s"}
+                check(native.target.value?.let{it.grantActive&&it.binding==exact}==true)
+                if(progress.admittedStrokes!=shown){val count=progress.admittedStrokes;shown=count;requireNotNull(scenario).onActivity{it.ownerProgress(count)}}
+                val now=System.nanoTime();if(now>=report){phase("waiting_owner_physical_strokes");report=now+2_000_000_000L};delay(20)
+            }
+            phase("controller_input_dispatch_completed")
+            val admitted=journal.progress()
+            val firstSequence=requireNotNull(admitted.firstSequence);val lastSequence=requireNotNull(admitted.lastSequence)
+            check(firstSequence==1uL&&lastSequence>=firstSequence)
+            // Every journaled sample must be covered by an actual native retained
+            // ACK. Echo counters are recorded as observed; the host validator
+            // refuses any missing or unmatched coverage.
+            var covered:RemoteControllerInputEvidence?=null
+            val ackDeadline=System.nanoTime()+30_000_000_000L;report=0L
+            while(System.nanoTime()<ackDeadline){
+                val evidence=active.inputEvidence();val ack=evidence.rendered?.acknowledgment
+                if(ack!=null&&ack.binding==exact&&ack.lastInputSequenceApplied>=lastSequence&&evidence.echo.binding==exact&&evidence.echo.pending==0){covered=evidence;break}
+                check(native.target.value?.let{it.grantActive&&it.binding==exact}==true)
+                val now=System.nanoTime();if(now>=report){renderDiagnostic(active,"waiting_physical_ack_coverage");report=now+2_000_000_000L};delay(5)
+            }
+            val evidence=requireNotNull(covered){"Native retained ACK did not cover the physical journal"}
+            val frame=requireNotNull(evidence.rendered);val ack=requireNotNull(frame.acknowledgment);val echo=evidence.echo
+            check(ack.frameId==frame.frameId&&ack.ticket==frame.ticket&&frame.callbackNanos>=frame.renderedNanos)
+            var synthetic=-1L;var deliveries=-1L
+            requireNotNull(scenario).onActivity{synthetic=it.witness.syntheticDispatches;deliveries=it.witness.windowDeliveries}
+            check(synthetic==0L&&deliveries>0L){"Synthetic dispatch or missing window delivery"}
+            val snapshot=journal.snapshot()
+            check(snapshot.complete&&snapshot.pauses.isEmpty()&&snapshot.samples.size==admitted.samples)
+            val allPhysical=snapshot.events.isNotEmpty()&&snapshot.events.all{it.origin==RemoteInputOrigin.PhysicalStylus}&&
+                snapshot.samples.all{it.origin==RemoteInputOrigin.PhysicalStylus}
+            val header=RemotePhysicalJournalHeader(id,block,Build.MODEL,Build.VERSION.SDK_INT,if(Build.VERSION.SDK_INT>=34)1L else 1_000_000L,
+                synthetic,deliveries,ack.lastInputSequenceApplied,echo.observed,echo.missing,echo.pending)
+            val bytes=snapshot.toJson(header).toByteArray(Charsets.UTF_8)
+            check(bytes.size in 1..6*1024*1024){"Physical journal exceeds its bound"}
+            val journalFile=File(root,"physical-journal.json")
+            Files.write(journalFile.toPath(),bytes,StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE)
+            check(journalFile.canonicalFile.parentFile==root.canonicalFile&&!Files.isSymbolicLink(journalFile.toPath()))
+            val sha=MessageDigest.getInstance("SHA-256").digest(bytes).joinToString(""){"%02x".format(it.toInt() and 255)}
+            val route="surface_touch,software_generated=false,physical_owner_gesture=$allPhysical,window_delivered=true,synthetic_dispatches=0,ack_covered=true,latency_acceptance=false"
+            instrumentation.sendStatus(0,Bundle().apply{
+                putString("remote_physical_binding","${exact.connectionEpoch},${exact.captureSessionId},${exact.sourceGeneration},${exact.targetToken},${exact.geometryRevision},${exact.inputSessionId}")
+                putString("remote_physical_block",block)
+                putString("remote_physical_strokes","${snapshot.admittedStrokes},$ownerStrokes")
+                putString("remote_physical_samples",snapshot.samples.size.toString())
+                putString("remote_physical_sequences","$firstSequence,$lastSequence")
+                putString("remote_physical_owner",frame.ownerId)
+                putString("remote_physical_ack","${frame.frameId},${frame.ticket},${ack.lastInputSequenceApplied}")
+                putString("remote_physical_echo","${echo.observed},${echo.missing},${echo.pending}")
+                putString("remote_physical_witness","$deliveries,$synthetic")
+                putString("remote_physical_journal","$sha,${bytes.size}")
+                putString("remote_physical_route",route)
+            })
+            // Root pulls the exact bytes through bounded run-as and answers with
+            // their hash before this private run directory is disposed.
+            phase("physical_journal_ready")
+            val pulled=File(root,"physical-journal-pulled");val pullDeadline=System.nanoTime()+30_000_000_000L;report=0L
+            while(!pulled.isFile){
+                check(System.nanoTime()<pullDeadline){"Root did not confirm the physical journal pull"}
+                check(native.target.value?.let{it.grantActive&&it.binding==exact}==true)
+                val now=System.nanoTime();if(now>=report){phase("waiting_physical_journal_pull");report=now+2_000_000_000L};delay(10)
+            }
+            check(pulled.canonicalFile.parentFile==root.canonicalFile&&!Files.isSymbolicLink(pulled.toPath())&&pulled.length() in 1..256)
+            check(pulled.readLines()==listOf("M4_PHYSICAL_JOURNAL_PULLED_V1",id,sha)){"Root pulled different physical journal bytes"}
+            active.disarmPhysicalJournal()
+            check(allPhysical){"Admitted input was not exclusively physical stylus input"}
+            active.deactivate("owner_pause");native.pause("owner_pause")
+            check(active.inputObservation.value==null&&active.ghost.snapshot(System.nanoTime()).isEmpty())
+            // Prompt text changes only after the grant is released; its height
+            // is fixed anyway, so the remote surface size never changes mid-grant.
+            requireNotNull(scenario).onActivity{it.ownerProgress(ownerStrokes,finished=true)}
+            phase("controller_input_complete")
+        }
         suspend fun controllerHeld(first:RemoteRenderedFrameObservation){
             val active=requireNotNull(controller);val native=requireNotNull(remote)
             val exact=actualGrant(first);val rect=requireNotNull(native.state.value.clientRect)
@@ -319,7 +419,9 @@ class RemoteNormalPathInstrumentedTest {
             // This marker is inside the existing retained-owner finally. Even
             // reporting failure cannot leave an attempted session unowned.
             phase("phone_owners_starting")
-            withTimeout(150_000) {
+            // The owner-physical route adds at most 120 s of owner strokes plus
+            // bounded ACK/pull waits; every other route keeps its 150 s bound.
+            withTimeout(if(inputScenario=="owner-physical")330_000L else 150_000L) {
                 sessions=createAndroidSessions(context,workbenchCore().newDeviceId())
                 val peer=requireNotNull(sessions).joinQr(qr,pairingEndpoint);qr.fill(0)
                 val routes=listOf(SessionEndpoint(SessionCarrier.QuicTether,endpoint))
@@ -334,7 +436,7 @@ class RemoteNormalPathInstrumentedTest {
                 link=requireNotNull(sessions).connect(requireNotNull(project),peer,routes)
                 remote=remoteEdit(requireNotNull(link));controller=attach(requireNotNull(remote))
                 val first=rendered(requireNotNull(controller),null,"initial_controller_ready");phase("initial_rendered")
-                if(controllerInput){if(inputScenario=="balanced")controllerStylus(first)else controllerHeld(first)}
+                if(controllerInput){when(inputScenario){"balanced"->controllerStylus(first);"owner-physical"->controllerOwnerPhysical(first);else->controllerHeld(first)}}
                 scenario?.moveToState(Lifecycle.State.CREATED)
                 assertNull(controller?.renderedObservation?.value)
                 retireView()

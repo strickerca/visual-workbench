@@ -24,7 +24,12 @@ param(
     [Parameter(Mandatory)][ValidateRange(1024,65535)][int]$Port,
     [string]$PythonPath='python',
     [ValidateRange(0,60)][int]$InspectSeconds=10,
-    [ValidateRange(30,300)][int]$WorkTimeoutSeconds=90
+    [ValidateRange(30,300)][int]$WorkTimeoutSeconds=90,
+    # Owner-physical blocks: the owner's pen drives each retained remote run.
+    [switch]$OwnerPhysical,
+    [ValidateSet('paint-pressure','paint-hover','paint-barrel','paint-eraser','paint-eraser-tool')][string[]]$OwnerBlocks=@('paint-pressure','paint-hover','paint-barrel','paint-eraser-tool'),
+    [ValidateRange(1,64)][int]$OwnerStrokes=6,
+    [ValidateRange(30,600)][int]$OwnerToolSeconds=120
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
@@ -42,6 +47,10 @@ $phase='artifact_binding';$work=[Diagnostics.Stopwatch]::StartNew()
 $diagnostic=[ordered]@{checkpoint='artifact_binding';refusal_code='unknown';helper_role='none';helper_exit_code='unknown';helper_timed_out='unknown';helper_output_limit='unknown';native_error='unknown';native_capture_refusal='unknown'}
 $receipt=[ordered]@{schema=1;kind='owned-paint-phone-visible-drawing';run_id=$run;status='failed';failure_phase=$phase;artifact_manifest_sha256=$ArtifactManifestSha256;source_count=0;paint_sha256=$PaintSha256;helper_bindings=[ordered]@{probe_runner=$ProbeRunnerSha256;probe=$ProbeSha256;frame_runner=$FrameRunnerSha256;capture=$CaptureHelperSha256};fixture_sha256=$null;created_process=$null;process_created=$null;initial_thread=$null;selected_window=$null;selected_thread=$null;suspended_before_job_assignment=$false;exact_image_verified_before_resume=$false;actual_private_job=$false;source_observation_sha256=$null;phone=$null;pixel_evidence=$null;editor_effect=$false;software_generated_input=$false;physical_pen_fidelity=$false;latency_acceptance=$false;input_settlement='NoInputStarted';editor_process_and_job_retired=$false;helper_processes_jobs_and_io_retired=$false;private_images_disposed=$false;failure_error_type=$null}
 $receipt.failure_diagnostics=$diagnostic
+if($OwnerPhysical){
+    if(@($OwnerBlocks).Count -lt 1 -or @($OwnerBlocks|Sort-Object -Unique).Count -ne @($OwnerBlocks).Count){throw 'Distinct owner-physical Paint blocks required'}
+    $receipt.kind='owned-paint-phone-physical';$receipt.physical_owner_gesture=$false;$receipt.physical_blocks=@();$receipt.compatibility=$null
+}
 
 function Get-PaintRefusalCode([string]$Message){
     # Exact static messages only. Unknown bodies never enter the receipt.
@@ -61,6 +70,8 @@ function Get-PaintRefusalCode([string]$Message){
         'Native canvas is not the fresh white fixture' {'baseline_white';break}
         'Actual stable Paint pixel effect refused' {'pixel_effect';break}
         'Private image disposal incomplete' {'private_disposal';break}
+        'Owner Paint tool selection was not observed' {'owner_tool_selection';break}
+        'Owner did not restore the exact Paint brush settings' {'owner_tool_restore';break}
         default {'unknown'}
     }
 }
@@ -111,7 +122,7 @@ function Wait-ChildSettlement($Child,[switch]$RequestRetirement){
         Start-Sleep -Milliseconds 50
     }
 }
-function Invoke-OwnedHelper([string]$Path,[string[]]$Arguments,[int]$Seconds=30,[switch]$Verdict,[ref]$VerdictExitCode,[ValidateSet('probe_runner','frame_runner','pixel_evaluator')][string]$Role,[string]$FrameSample){
+function Invoke-OwnedHelper([string]$Path,[string[]]$Arguments,[int]$Seconds=30,[switch]$Verdict,[ref]$VerdictExitCode,[ValidateSet('probe_runner','frame_runner','pixel_evaluator')][string]$Role,[string]$FrameSample,[switch]$OwnBudget){
     $diagnostic.helper_role=$Role;$diagnostic.helper_exit_code='unknown';$diagnostic.helper_timed_out='unknown';$diagnostic.helper_output_limit='unknown';$diagnostic.native_error='unknown';$diagnostic.native_capture_refusal='unknown'
     Assert-WorkBudget
     $child=[M4FrameChild]::Launch($Path,$Arguments,$true);$children.Add($child)
@@ -119,7 +130,8 @@ function Invoke-OwnedHelper([string]$Path,[string[]]$Arguments,[int]$Seconds=30,
     try{
         if($null -ne $child.StartupError){throw 'Native helper startup failed'}
         while(-not $child.IsSettled){
-            if($timer.Elapsed.TotalSeconds -ge $Seconds -or $work.Elapsed.TotalSeconds -ge $WorkTimeoutSeconds){$timedOut=$true;break}
+            # -OwnBudget: an explicitly sized helper bound replaces the shared work budget.
+            if($timer.Elapsed.TotalSeconds -ge $Seconds -or (-not $OwnBudget -and $work.Elapsed.TotalSeconds -ge $WorkTimeoutSeconds)){$timedOut=$true;break}
             Start-Sleep -Milliseconds 25
         }
         $workCompleted=-not $timedOut
@@ -154,7 +166,7 @@ function Read-CanvasCursor {
     if($point[0] -ge $canvas.x -and $point[0] -lt ([long]$canvas.x+$canvas.width) -and $point[1] -ge $canvas.y -and $point[1] -lt ([long]$canvas.y+$canvas.height)){throw 'Actual mouse pointer must remain outside the owned Paint canvas'}
     return [ordered]@{x=$point[0];y=$point[1]}
 }
-function Capture-Paint([ValidateSet('baseline1','baseline2','after1','after2')][string]$Label){
+function Capture-Paint([ValidatePattern('\A[a-z0-9-]{1,48}\z')][string]$Label){
     $diagnostic.checkpoint=$Label+'_work_editor'
     Assert-WorkBudget;Assert-Editor
     $Sample=[M4FrameChild]::NewNativeId()
@@ -176,6 +188,21 @@ function Capture-Paint([ValidateSet('baseline1','baseline2','after1','after2')][
     $cursorSamples.Add([ordered]@{before=$cursorBefore;after=$cursorAfter})
     $diagnostic.checkpoint=$Label+'_editor_after';Assert-Editor
     return $value
+}
+function Wait-PaintTool([ValidateSet('brush','eraser')][string]$Tool){
+    # Owner-selected tool, observed read-only by the native probe. No input is
+    # sent; the probe witness is the only evidence of the selected tool.
+    $clock=[Diagnostics.Stopwatch]::StartNew();$next=0
+    while($true){
+        $work.Restart();Assert-Editor
+        $observed=Invoke-PaintProbe '--observe-paint-controls' ([ordered]@{schema=1;owner_pid=$PID;target=$target;image=$image})
+        $controls=$observed.observation.controls
+        if(($observed.target|ConvertTo-Json -Depth 15 -Compress) -cne ($target|ConvertTo-Json -Depth 15 -Compress) -or ($observed.image|ConvertTo-Json -Depth 15 -Compress) -cne ($image|ConvertTo-Json -Depth 15 -Compress) -or $controls.selectedRootOnly -ne $true -or $controls.inputSent -ne $false -or $controls.profileAuthority -ne $false){throw 'Native Paint brush/canvas controls unproved'}
+        if($controls.requiredSettingsKnown -eq $true -and $controls.recognizedTool.status -ceq 'known' -and $controls.recognizedTool.value -ceq $Tool -and $controls.frameWitness.status -ceq 'known'){return $controls.frameWitness.value}
+        if($clock.Elapsed.TotalSeconds -ge $OwnerToolSeconds){throw 'Owner Paint tool selection was not observed'}
+        if($clock.Elapsed.TotalSeconds -ge $next){Write-Host ('Waiting for the owner to select the Paint '+$Tool+' tool');$next+=5}
+        Start-Sleep -Milliseconds 500
+    }
 }
 function Wait-RemoteSettlement {
     if($null -eq $remoteSettlement -or $remoteSettlement.State -ceq 'NoInputStarted'){return}
@@ -260,6 +287,7 @@ try{
     $receipt.source_observation_sha256=(Get-FileHash -LiteralPath $observationPath -Algorithm SHA256).Hash.ToLowerInvariant()
     [void](Pin-File $observationPath $receipt.source_observation_sha256)
     $captureSession=[M4FrameChild]::NewNativeId()
+    if(-not $OwnerPhysical){
     $phase='baseline_wgc';$baseline=@((Capture-Paint 'baseline1'),(Capture-Paint 'baseline2'))
     # Refuse a nonblank or unstable baseline BEFORE authorizing phone input.
     $first=$baseline[0].canvas_metrics.image;$second=$baseline[1].canvas_metrics.image
@@ -290,6 +318,65 @@ try{
     $receipt.pixel_evidence=$proof
     if($pixelExit -ne 0 -or $proof.schema -ne 1 -or $proof.status -cne 'passed' -or $proof.accepted -ne $true -or $proof.editor_effect -ne $true){throw 'Actual stable Paint pixel effect refused'}
     $receipt.editor_effect=$true;$receipt.status='passed';$receipt.failure_phase=$null
+    }else{
+        # Owner-physical Paint blocks. Each block retains its own stable WGC
+        # baseline/after pair with the mouse parked outside the canvas, and its
+        # own retained remote run whose only input is the owner's pen.
+        foreach($required in @('tools/remote-edit/paint_physical_reports.py','tools/remote-edit/physical_gesture_reports.py','tools/remote-edit/controller_input_reports.py','tools/remote-edit/integration_reports.py','tools/pen-inject/analyze.py')){if(-not $sourceHashes.Contains($required)){throw 'Visible Paint caller source missing from artifact inventory'}}
+        $physicalBlocks=[Collections.Generic.List[object]]::new();$eraserFrame=$null;$restoredFrame=$null;$previousAfter=$null
+        foreach($block in $OwnerBlocks){
+            $phase='physical_'+$block.Replace('-','_');$diagnostic.checkpoint=$phase
+            # Each block anchors its own parked pointer; the owner may use the
+            # mouse on the Paint toolbar between blocks, never on the canvas.
+            $script:cursorAnchor=$null;$canvasStart=$canvasFiles.Count;$cursorStart=$cursorSamples.Count
+            Write-Host ('Physical pen block '+$block+': park the mouse pointer outside the Paint canvas and leave it still')
+            $work.Restart()
+            $base=@((Capture-Paint ($block+'-baseline1')),(Capture-Paint ($block+'-baseline2')))
+            if($base[0].canvas_metrics.image.decoded_rgba_sha256 -cne $base[1].canvas_metrics.image.decoded_rgba_sha256){throw 'Stable native blank baseline required'}
+            if($null -ne $previousAfter -and $base[0].canvas_metrics.image.decoded_rgba_sha256 -cne $previousAfter){throw 'Stable native blank baseline required'}
+            if($block -ceq 'paint-eraser-tool'){
+                Write-Host 'Select the Eraser tool in Paint now, then park the mouse pointer outside the canvas'
+                $eraserFrame=Wait-PaintTool 'eraser'
+            }
+            Assert-Editor
+            $phoneStarted=[M4FrameChild]::Clock100ns()
+            $phone=Invoke-M4OwnedEditorPhoneStroke -OwnedEditor $editor -EditorKind paint -Target $target -CanvasRect $canvas -ExecutableSha256 $PaintSha256 -SourceObservationSha256 $receipt.source_observation_sha256 -PrivateRunDirectory $fixtureRoot -ArtifactManifest $ArtifactManifest -ArtifactManifestSha256 $ArtifactManifestSha256 -SourceHashes $sourceHashes -UsbInterfaceIndex $UsbInterfaceIndex -UsbDeviceInstanceSha256 $UsbDeviceInstanceSha256 -PcUsbAddress $PcUsbAddress -PhoneUsbAddress $PhoneUsbAddress -Port $Port -OwnerBlock $block -OwnerStrokes $OwnerStrokes -Settlement ([ref]$remoteSettlement)
+            $phone.started_qpc_100ns=$phoneStarted;$phone.completed_qpc_100ns=[M4FrameChild]::Clock100ns()
+            Wait-RemoteSettlement
+            $receipt.input_settlement=$remoteSettlement.State
+            if($block -ceq 'paint-eraser-tool'){
+                Write-Host 'Select the Brush tool in Paint again with its earlier settings, then park the mouse pointer outside the canvas'
+                $restored=Wait-PaintTool 'brush';$restoredFrame=$restored
+                foreach($key in @('settingsDigest','canvasRuntimeIdHash','canvasToolName')){if([string]$restored[$key] -cne [string]$paintFrame[$key]){throw 'Owner did not restore the exact Paint brush settings'}}
+                if(($restored.canvasRectHost|ConvertTo-Json -Compress) -cne ($paintFrame.canvasRectHost|ConvertTo-Json -Compress)){throw 'Owner did not restore the exact Paint brush settings'}
+                $script:cursorAnchor=$null
+            }
+            $work.Restart()
+            $after=@((Capture-Paint ($block+'-after1')),(Capture-Paint ($block+'-after2')))
+            if($after[0].canvas_metrics.image.decoded_rgba_sha256 -cne $after[1].canvas_metrics.image.decoded_rgba_sha256){throw 'Actual stable Paint pixel effect refused'}
+            $previousAfter=$after[0].canvas_metrics.image.decoded_rgba_sha256
+            [void](Pin-File $remoteSettlement.NativeReceiptPath $phone.native_receipt_sha256)
+            [void](Pin-File $phone.journal_path $phone.journal_sha256)
+            $nativePhone=Get-Content -Raw -LiteralPath $remoteSettlement.NativeReceiptPath|ConvertFrom-Json -AsHashtable -Depth 55
+            $physicalBlocks.Add([ordered]@{block=$block;baseline=$base;after=$after;phone=$phone;native_phone=$nativePhone;canvas_files=@($canvasFiles[$canvasStart..($canvasStart+3)]);cursor_samples=@($cursorSamples[$cursorStart..($cursorStart+3)])})
+            $receipt.physical_blocks=@($receipt.physical_blocks)+@([ordered]@{block=$block;native_receipt_sha256=$phone.native_receipt_sha256;journal_sha256=$phone.journal_sha256})
+        }
+        $evaluation=[ordered]@{schema=1;target=$target;image=$image;paint_frame=$paintFrame;eraser_frame=$eraserFrame;restored_frame=$restoredFrame;canvas_rect=$canvas;stroke_radius_pixels=24;blocks=@($physicalBlocks)}
+        $evaluationPath=Join-Path $fixtureRoot 'physical-evaluation.json';Write-NewJson $evaluationPath $evaluation
+        [void](Pin-File $evaluationPath (Get-FileHash -LiteralPath $evaluationPath -Algorithm SHA256).Hash.ToLowerInvariant())
+        $phase='physical_pixel_assertion';$diagnostic.checkpoint=$phase
+        $pixelExit=$null
+        # Pure-Python PNG decode of four canvas samples per block: an explicit,
+        # block-sized bound (90 s + 60 s per block, at most 600 s).
+        $evaluatorSeconds=[Math]::Min(600,90+60*$physicalBlocks.Count)
+        $work.Restart()
+        $evaluated=Invoke-OwnedHelper $PythonPath @((Join-Path $PSScriptRoot 'paint_physical_reports.py'),'--input',$evaluationPath) -Seconds $evaluatorSeconds -OwnBudget -Verdict -VerdictExitCode ([ref]$pixelExit) -Role pixel_evaluator
+        $proof=$evaluated|ConvertFrom-Json -AsHashtable -Depth 30
+        $receipt.pixel_evidence=$proof
+        if($pixelExit -ne 0 -or $proof.schema -ne 1 -or $proof.operation -cne 'owned-paint-physical-compatibility' -or $proof.status -cne 'passed' -or $proof.accepted -ne $true){throw 'Actual stable Paint pixel effect refused'}
+        $receipt.compatibility=$proof.documents;$receipt.physical_owner_gesture=$true;$receipt.editor_effect=$proof.editor_effect -eq $true
+        $receipt.status='passed';$receipt.failure_phase=$null
+    }
     if($InspectSeconds -gt 0){Write-Host ('Verified Paint canvas pixel change; retaining visible owned document for '+$InspectSeconds+' seconds');$inspection=[Diagnostics.Stopwatch]::StartNew();while($inspection.Elapsed.TotalSeconds -lt $InspectSeconds -and -not $editor.HasExited){Start-Sleep -Milliseconds 100}}
 }catch{
     $receipt.failure_phase=$phase;$receipt.failure_error_type=$_.Exception.GetType().Name;$diagnostic.refusal_code=Get-PaintRefusalCode $_.Exception.Message
@@ -316,7 +403,9 @@ try{
         $receipt.private_images_disposed=$true
     }catch{$receipt.status='failed';$receipt.failure_phase='private_disposal';$receipt.failure_error_type=$_.Exception.GetType().Name;$diagnostic.checkpoint='private_disposal';$diagnostic.refusal_code=Get-PaintRefusalCode $_.Exception.Message}
     $local=Join-Path $repo '.local';if(-not(Test-Path -LiteralPath $local)){[void][IO.Directory]::CreateDirectory($local)};Assert-Plain $local
-    Write-NewJson (Join-Path $local ('paint-phone-visible-'+$run+'.json')) $receipt
+    $receiptStem=if($OwnerPhysical){'paint-phone-physical-'}else{'paint-phone-visible-'}
+    Write-NewJson (Join-Path $local ($receiptStem+$run+'.json')) $receipt
 }
-Write-Host ('Paint phone visible-drawing receipt: paint-phone-visible-'+$run+'.json; status='+$receipt.status)
+if($OwnerPhysical){Write-Host ('Paint phone physical receipt: paint-phone-physical-'+$run+'.json; status='+$receipt.status)}
+else{Write-Host ('Paint phone visible-drawing receipt: paint-phone-visible-'+$run+'.json; status='+$receipt.status)}
 if($receipt.status -cne 'passed'){exit 1}

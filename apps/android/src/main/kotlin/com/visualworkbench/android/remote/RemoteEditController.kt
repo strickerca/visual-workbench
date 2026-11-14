@@ -6,6 +6,7 @@ import androidx.annotation.RequiresApi
 import android.view.MotionEvent
 import android.view.Surface
 import com.visualworkbench.shared.*
+import com.visualworkbench.android.diagnostics.inputDeviceCapability
 import java.util.concurrent.atomic.AtomicReference
 import java.security.MessageDigest
 import kotlinx.coroutines.*
@@ -28,7 +29,8 @@ internal data class RemoteControllerInputEvidence(val input:RemoteControllerInpu
     val rendered:RemoteRenderedFrameObservation?,val echo:RemoteEchoTiming,val ghosts:List<VisibleGhost>)
 internal data class RemoteControllerInputObservation(val admission:RemoteInputAdmission,
     val phase:RemotePenPhase,val ghostAccepted:Boolean,val ghostSegment:GhostSegment?)
-internal data class TouchAdmission(val binding:RemoteTargetBinding,val sample:RemotePenSample,val point:GhostPoint,val contact:Boolean,val fence:Long)
+internal data class TouchAdmission(val binding:RemoteTargetBinding,val sample:RemotePenSample,val point:GhostPoint,val contact:Boolean,val fence:Long,
+    val trace:RemotePhysicalSampleTrace?=null)
 /** Read-only accessibility observation. No setter, grant or input reservation. */
 internal data class RemoteAccessibilityInputSnapshot(val ready:Boolean,val nativeGrant:Boolean,
     val paintTarget:Boolean,val bindingDigest:String,val localViewport:IntArray?,val hostClientRect:IntArray?,val renderAgeMillis:Long)
@@ -99,6 +101,14 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
     private var previousActual:Pair<RemoteTargetBinding,GhostPoint>?=null
     private var suppressedGesture=false
     private val inputGrantFence=RemoteInputGrantFence()
+    private class PhysicalCapture(val journal:RemotePhysicalGestureJournal,val witness:RemoteInputDeliveryWitness)
+    private val physical=AtomicReference<PhysicalCapture?>(null)
+    /** Explicit integration owner only. Observation of actually admitted samples;
+     * it never changes grant, admission, ACK or ghost behavior, except that a
+     * closed journal drops later events locally (no seal) so the recorded
+     * samples keep exact ACK/echo coverage. */
+    internal fun armPhysicalJournal(journal:RemotePhysicalGestureJournal,witness:RemoteInputDeliveryWitness){physical.set(PhysicalCapture(journal,witness))}
+    internal fun disarmPhysicalJournal(){physical.set(null)}
     init {
         remote.registerConsumer(this)
         // NativeRemoteEdit synchronously invalidates registered consumers before
@@ -112,7 +122,7 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
         scope.launch(Dispatchers.Default) {
             for(item in input){
                 val age=System.nanoTime()-item.sample.sampledLocalNanos
-                if(age !in 0 until 50_000_000L){deactivate("input_expired");continue}
+                if(age !in 0 until 50_000_000L){physical.get()?.journal?.pause("input_expired");deactivate("input_expired");continue}
                 val allowed=synchronized(inputFence){enabled&&foregroundActive&&item.fence==admissionFence&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true}
                 if(!allowed)continue
                 try{
@@ -126,6 +136,10 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
                             // Actual native transport admission only; predictions and
                             // queued MotionEvents never publish a sequence here.
                             inputObservationMutable.value=RemoteControllerInputObservation(admission,item.sample.phase,ghostAccepted,admittedGhost)
+                            item.trace?.let{t->val s=item.sample
+                                t.journal.admitted(RemotePhysicalJournalRow(admission.sequence,t.event,s.phase,s.hostX,s.hostY,s.pressure,
+                                    t.rawPressure,t.rawTilt,t.rawOrientation,t.rawDistance,s.tiltX,s.tiltY,s.nativePenMask,s.penFlags,
+                                    s.sampledLocalNanos,t.historical,t.origin))}
                             if(ghostAccepted&&item.contact&&before!=null){
                                 val dt=item.point.localNanos-before.localNanos
                                 if(dt in 1..50_000_000L){val horizon=12_000_000L;val factor=horizon.toFloat()/dt
@@ -138,7 +152,7 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
                         }
                     }
                 }catch(cancelled:CancellationException){throw cancelled}
-                catch(_:Exception){deactivate("owner_pause")}
+                catch(_:Exception){physical.get()?.journal?.pause("pen_exception");deactivate("owner_pause")}
             }
         }
     }
@@ -309,13 +323,15 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
     /** MotionEvent is borrowed only during this call; copy bounded actual data.
      * Inverted(2) is unavailable in Android's tool type; Eraser(4) stays distinct. */
     fun touch(event:MotionEvent):Boolean {
+        val capture=physical.get()
+        if(capture!=null&&!capture.journal.accepting())return false
         val map=mapping.get()?:return false;val target=remote.target.value?:return false
         if(!enabled||!foregroundActive||!target.grantActive||target.binding.scope()!=map.frame.config.scope)return false
         val fence=synchronized(inputFence){admissionFence}
         val batch=mutableListOf<TouchAdmission>()
-        if(event.pointerCount!=1||event.historySize>7)return rejectTouch()
-        val tool=event.getToolType(0);if(tool!=MotionEvent.TOOL_TYPE_STYLUS&&tool!=MotionEvent.TOOL_TYPE_ERASER)return rejectTouch()
-        val phase=when(event.actionMasked){MotionEvent.ACTION_DOWN->RemotePenPhase.Down;MotionEvent.ACTION_MOVE->RemotePenPhase.Move;MotionEvent.ACTION_UP->RemotePenPhase.Up;MotionEvent.ACTION_HOVER_ENTER,MotionEvent.ACTION_HOVER_MOVE->RemotePenPhase.Hover;MotionEvent.ACTION_HOVER_EXIT,MotionEvent.ACTION_CANCEL->RemotePenPhase.Leave;else->return rejectTouch()}
+        if(event.pointerCount!=1||event.historySize>7)return rejectTouch("pointer_batch")
+        val tool=event.getToolType(0);if(tool!=MotionEvent.TOOL_TYPE_STYLUS&&tool!=MotionEvent.TOOL_TYPE_ERASER)return rejectTouch("tool_type")
+        val phase=when(event.actionMasked){MotionEvent.ACTION_DOWN->RemotePenPhase.Down;MotionEvent.ACTION_MOVE->RemotePenPhase.Move;MotionEvent.ACTION_UP->RemotePenPhase.Up;MotionEvent.ACTION_HOVER_ENTER,MotionEvent.ACTION_HOVER_MOVE->RemotePenPhase.Hover;MotionEvent.ACTION_HOVER_EXIT,MotionEvent.ACTION_CANCEL->RemotePenPhase.Leave;else->return rejectTouch("action")}
         synchronized(inputFence){
             if(suppressedGesture){
                 if(phase==RemotePenPhase.Up||phase==RemotePenPhase.Leave)suppressedGesture=false
@@ -327,7 +343,14 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
                 return false
             }
         }
-        val axes=try{com.visualworkbench.android.input.StylusInput().snapshot(event)}catch(_:IllegalArgumentException){return rejectTouch()}
+        // Integration-armed provenance is copied before admission so every
+        // natively admitted sample can name its event. Never input authority.
+        val journalEvent=if(capture==null)null else{
+            event.device?.let{if(!capture.journal.hasDevice(it.id))capture.journal.recordDevice(inputDeviceCapability(it))}
+            capture.journal.recordEvent(captureRemoteInputProvenance(event,capture.witness),event.action,capture.witness.syntheticDispatches)
+                ?:return false
+        }
+        val axes=try{com.visualworkbench.android.input.StylusInput().snapshot(event)}catch(_:IllegalArgumentException){return rejectTouch("axes")}
         // RemoteViewport is translation plus positive uniform scale, so its
         // actual view-to-frame directional rotation is zero (no guessed display rotation).
         val calibration=measuredTiltCalibration(event.deviceId)
@@ -336,22 +359,26 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
         val samples=if(phase==RemotePenPhase.Move)event.historySize+1 else 1
         for(index in 0 until samples){val historical=samples>1&&index<event.historySize
             val x=if(historical)event.getHistoricalX(0,index)else event.x;val y=if(historical)event.getHistoricalY(0,index)else event.y
-            val point=map.viewport.host(x,y,map.rect)?:return rejectTouch()
+            val point=map.viewport.host(x,y,map.rect)?:return rejectTouch("viewport")
             val sampledUptime=if(Build.VERSION.SDK_INT>=34)eventNanos(event,historical,index) else (if(historical)event.getHistoricalEventTime(index)else event.eventTime)*1_000_000L
             // Align to this phone's System.nanoTime without BOOTTIME. Uptime's
             // millisecond upper edge conservatively adds at most 1 ms of age.
             val age=(uptime+1L)*1_000_000L-sampledUptime
-            if(age !in 0 until 50_000_000L)return rejectTouch();val sampled=now-age
+            if(age !in 0 until 50_000_000L)return rejectTouch("sample_age");val sampled=now-age
             val pressure=if(historical)event.getHistoricalPressure(0,index)else event.pressure
-            if(!pressure.isFinite()||pressure<0)return rejectTouch()
+            if(!pressure.isFinite()||pressure<0)return rejectTouch("pressure")
             val normalized=pressure.coerceAtMost(1f)
             val reported=axes.frames[if(historical)index else axes.frames.lastIndex].pointers.single()
             val projected=try{remotePenAxes(reported.tilt?.toDouble(),reported.orientation?.toDouble(),0.0,calibration)}
-                catch(_:StylusTiltFailure){return rejectTouch()}
+                catch(_:StylusTiltFailure){return rejectTouch("tilt")}
             val samplePhase=if(historical)RemotePenPhase.Move else phase
             val sample=RemotePenSample(samplePhase,point.first,point.second,(normalized*1024).roundToInt().toUInt(),projected.tiltX,projected.tiltY,0u,flags,sampled,projected.nativePenMask)
             val contact=samplePhase==RemotePenPhase.Down||samplePhase==RemotePenPhase.Move
-            batch+=TouchAdmission(target.binding,sample,GhostPoint(x,y,normalized,sampled,false),contact,fence)
+            val trace=if(capture!=null&&journalEvent!=null){
+                val distance=if(historical)event.getHistoricalAxisValue(MotionEvent.AXIS_DISTANCE,0,index)else event.getAxisValue(MotionEvent.AXIS_DISTANCE)
+                RemotePhysicalSampleTrace(capture.journal,journalEvent.first,pressure,reported.tilt,reported.orientation,distance,historical,journalEvent.second)
+            }else null
+            batch+=TouchAdmission(target.binding,sample,GhostPoint(x,y,normalized,sampled,false),contact,fence,trace)
         }
         // Validate the complete borrowed event before admitting any prefix.
         var commandBusy=false
@@ -368,16 +395,17 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
                 complete
             }
         }
-        }catch(_:Exception){return rejectTouch()}
+        }catch(_:Exception){return rejectTouch("admission_exception")}
         if(commandBusy){
             displayMutable.update{it.copy(message="Editor command is finishing. Lift the pen, then draw again.")}
             return false
         }
-        if(!admitted)return rejectTouch()
+        if(!admitted)return rejectTouch("admission_refused")
+        capture?.journal?.queued(phase)
         return true
     }
     @RequiresApi(34) private fun eventNanos(event:MotionEvent,historical:Boolean,index:Int):Long = if(historical)event.getHistoricalEventTimeNanos(index)else event.eventTimeNanos
-    private fun rejectTouch():Boolean{deactivate("owner_pause");return false}
+    private fun rejectTouch(reason:String):Boolean{physical.get()?.journal?.pause(reason);deactivate("owner_pause");return false}
     suspend fun background(){deactivate("background");decoderMutex.withLock{closeDecoder()}}
     override suspend fun retire():Boolean = withContext(NonCancellable){
         if(retired)return@withContext true
