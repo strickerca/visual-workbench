@@ -35,3 +35,7 @@ public fun readCoreEvents(afterSequence: Long = 0L): CoreEventLog {
  * (the report is then written without them, as before). Fixed words and
  * numbers only: see [readCoreEvents]. */
 public fun coreEventsForReport(): CoreEventLog? = try { readCoreEvents() } catch (_: Throwable) { null }
+
+/** Plain-words messages for core failures, fed by the real core's event log. */
+public fun nativeCoreFailureReasons(): CoreFailureReasons =
+    CoreFailureReasons { after -> try { readCoreEvents(after) } catch (_: Throwable) { null } }

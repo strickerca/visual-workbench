@@ -72,6 +72,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
     private val exportGeometry:suspend (WorkbenchProject,WorkflowBinding,SelectionRegion?,ULong)->ImageOutputExportGeometry=::imageOutputExportGeometry) {
     constructor(scope:CoroutineScope,core:WorkbenchCore,host:HostService,location:LocationPolicy,deviceId:String,workRoot:Path):this(scope,core,NativeDesktopHandoff(host),location,deviceId,workRoot)
     private val mutable=MutableStateFlow(EditorState());val state:StateFlow<EditorState> = mutable
+    private val coreFailureReasons=nativeCoreFailureReasons()
     private var precisionClosed=false
     private fun cancelPrecision(){if(!precisionClosed)precision.cancel()}
     private fun closePrecision(){precision.close();precisionClosed=true}
@@ -735,7 +736,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
                         report(when (error) {
                             is HandoffFailure, is TransferFailure, is java.nio.file.FileAlreadyExistsException -> transferMessage(error)
                             is DocumentFailure -> documentFailureText(error)
-                            is CoreFailure -> if(error.kind==CoreFailureKind.ImageCodecUnavailable) "A compatible image decoder is unavailable on this system. The original is preserved." else "Core ${error.kind.name.lowercase()}. The last accepted revision is preserved."
+                            is CoreFailure -> coreFailureReasons.text(error)
                             is SessionFailure -> sessionMessage(error)
                             is UnsupportedOperationException -> error.message ?: "This document feature is unavailable."
                             else -> "The operation could not finish. Check diagnostics and retry."

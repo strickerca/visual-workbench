@@ -421,6 +421,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var sliderSequence = 0u
     private var sliderRevision: ProjectInfo? = null
     val diagnostics = DiagnosticsController(application, scope)
+    private val coreFailureReasons = nativeCoreFailureReasons()
     private var screenState by mutableStateOf(WorkbenchScreen.Projects)
     var screen: WorkbenchScreen
         get() = screenState
@@ -2945,13 +2946,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 GiantImageFailureKind.Cancelled -> "Large-JPEG import was canceled."
                 else -> "The large JPEG could not be verified or opened. Existing projects are unchanged."
             }
-            is CoreFailure -> when (error.kind) {
-                CoreFailureKind.Backpressure -> "The core is at its resource limit. The unfinished action was canceled; saved work is intact."
-                CoreFailureKind.Storage -> "The edit could not be saved. Check available storage and try again."
-                CoreFailureKind.ImageCodecUnavailable -> "An installed AVIF decoder is unavailable. The original is unchanged."
-                CoreFailureKind.Cancelled -> "The unfinished action was canceled."
-                else -> "The core could not complete this action (${error.kind}). Saved work is intact."
-            }
+            // What happened and what to do, in plain words, made more specific by
+            // the core's own reason for this failure when it recorded one.
+            is CoreFailure -> coreFailureReasons.text(error)
             is IllegalArgumentException, is IllegalStateException, is UnsupportedOperationException -> error.message ?: "This action could not be completed."
             else -> "This action could not be completed. Saved work is intact."
         }
