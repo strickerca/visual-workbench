@@ -80,33 +80,57 @@ class RemotePenIntakeTest {
         assertEquals(listOf("reserve:8", "reserve:4") + (1..10).map { "enqueue:$it" }, full.log)
     }
 
-    @Test fun pacer_releases_eight_at_once_then_one_per_millisecond_and_never_delays_ordinary_drawing() {
-        val ms = 1_000_000L
-        val pacer = RemoteSendPacer()
+    private val ms = 1_000_000L
+    /** One frame of a 120 Hz display. */
+    private val frame = 8_333_333L
+
+    @Test fun pacer_lets_eight_go_within_one_frame_as_today_and_never_delays_ordinary_drawing() {
+        val pacer = RemoteSendPacer(windowNanos = frame)
         var now = 5_000 * ms
         repeat(8) { assertEquals(0L, pacer.acquire(now)) }
-        assertEquals(ms, pacer.acquire(now))
-        now += ms / 4
-        assertEquals(ms - ms / 4, pacer.acquire(now))
-        now += ms - ms / 4
-        assertEquals(0L, pacer.acquire(now)); assertEquals(ms, pacer.acquire(now))
-        // Three milliseconds later exactly three more may go.
-        now += 3 * ms
-        repeat(3) { assertEquals(0L, pacer.acquire(now)) }
-        assertTrue(pacer.acquire(now) in 1..ms)
-        // A long pause refills to eight, never more.
+        // A ninth must wait until the first of the eight is a whole frame old.
+        assertEquals(frame, pacer.acquire(now))
+        now += frame / 4
+        assertEquals(frame - frame / 4, pacer.acquire(now))
+        now += frame - frame / 4 - 1
+        assertEquals(1L, pacer.acquire(now))
+        // One frame after the eight, the next eight may go: two events a frame apart, as today.
+        now += 1
+        repeat(8) { assertEquals(0L, pacer.acquire(now)) }
+        assertEquals(frame, pacer.acquire(now))
+        // A long pause never allows more than eight at once.
         now += 10_000 * ms
         repeat(8) { assertEquals(0L, pacer.acquire(now)) }
-        assertEquals(ms, pacer.acquire(now))
-        // Four samples per 120 Hz frame (a 480 Hz pen) for a second: never a wait.
-        val steady = RemoteSendPacer()
-        var frame = 0L
-        repeat(120) { repeat(4) { assertEquals(0L, steady.acquire(frame)) }; frame += 8_333_333L }
-        // A clock that steps backwards cannot mint slots or wait forever.
-        val backwards = RemoteSendPacer()
+        assertEquals(frame, pacer.acquire(now))
+        // Four samples per frame (a 480 Hz pen) for a second, delivered per frame or one by one: never a wait.
+        val batched = RemoteSendPacer(windowNanos = frame)
+        var vsync = 0L
+        repeat(120) { repeat(4) { assertEquals(0L, batched.acquire(vsync)) }; vsync += frame }
+        val unbuffered = RemoteSendPacer(windowNanos = frame)
+        for (sample in 0 until 480) assertEquals(0L, unbuffered.acquire(sample * (frame / 4)))
+        // A clock that steps backwards cannot mint slots or wait longer than one frame.
+        val backwards = RemoteSendPacer(windowNanos = frame)
         repeat(8) { assertEquals(0L, backwards.acquire(1_000 * ms)) }
-        assertEquals(ms, backwards.acquire(900 * ms))
-        assertEquals(0L, backwards.acquire(901 * ms))
+        assertEquals(frame, backwards.acquire(900 * ms))
+        assertEquals(frame - ms, backwards.acquire(901 * ms))
+        assertEquals(0L, backwards.acquire(900 * ms + frame))
+    }
+
+    @Test fun in_no_frame_long_window_does_the_computer_get_more_than_the_eight_it_can_get_today() {
+        // Whatever arrives, however bunched: release times never put nine samples within one frame.
+        for (burst in listOf(9, 12, 16, 24, 32, 100)) {
+            val pacer = RemoteSendPacer(windowNanos = frame)
+            var now = 0L
+            val sentAt = mutableListOf<Long>()
+            repeat(burst) {
+                while (true) { val wait = pacer.acquire(now); if (wait <= 0L) break; now += wait }
+                sentAt += now
+                now += 100_000 // The sender itself takes a moment per sample.
+            }
+            for (start in sentAt) assertTrue("burst=$burst", sentAt.count { it >= start && it < start + frame } <= 8)
+            // Sixteen go as eight and, a frame later, eight more.
+            if (burst == 16) { assertTrue(sentAt[7] < ms); assertEquals(frame, sentAt[8]); assertTrue(sentAt[15] < frame + ms) }
+        }
     }
 
     @Test fun sends_are_paced_only_with_a_switch_that_can_hand_over_more_than_one_frames_samples() {
@@ -117,45 +141,60 @@ class RemotePenIntakeTest {
         assertTrue(remoteSendPaced(longBatches = true, unbufferedPen = true))
     }
 
-    @Test fun a_slot_that_was_not_used_is_given_back_and_never_adds_a_ninth() {
-        val ms = 1_000_000L
+    @Test fun the_pacer_follows_the_displays_own_frame_time() {
+        assertEquals(8_333_333L, remoteFrameNanos(120f)); assertEquals(16_666_666L, remoteFrameNanos(60f)); assertEquals(11_111_111L, remoteFrameNanos(90f))
+        // Unknown or implausible: the slow frame, which only ever paces more.
+        for (rate in listOf(0f, -60f, 10f, 1_000f, Float.NaN, Float.POSITIVE_INFINITY)) assertEquals(RemoteSendPacer.SLOW_FRAME_NANOS, remoteFrameNanos(rate))
         val pacer = RemoteSendPacer()
-        // A full bucket stays at eight.
-        pacer.giveBack()
+        assertEquals(RemoteSendPacer.SLOW_FRAME_NANOS, pacer.windowNanos)
         repeat(8) { assertEquals(0L, pacer.acquire(0L)) }
-        assertEquals(ms, pacer.acquire(0L))
+        assertEquals(RemoteSendPacer.SLOW_FRAME_NANOS, pacer.acquire(0L))
+        pacer.windowNanos = remoteFrameNanos(120f)
+        assertEquals(8_333_333L, pacer.acquire(0L)); assertEquals(0L, pacer.acquire(8_333_333L))
+    }
+
+    @Test fun a_slot_that_was_not_used_is_given_back_and_never_adds_a_ninth() {
         // Looking for a second sample that is not there costs nothing: a pen
-        // reporting every millisecond for a second never waits.
-        val steady = RemoteSendPacer()
+        // reporting every millisecond for a second is paced exactly as if nobody had looked.
+        val looked = RemoteSendPacer(windowNanos = frame); val plain = RemoteSendPacer(windowNanos = frame)
         var now = 0L
         repeat(1_000) {
-            assertEquals(0L, steady.acquire(now))   // the sample itself
-            assertEquals(0L, steady.acquire(now))   // a look for one more
-            steady.giveBack()                       // none was waiting
+            val wait = plain.acquire(now)
+            assertEquals(wait, looked.acquire(now))
+            if (wait == 0L && looked.acquire(now) == 0L) looked.giveBack() // A look for one more; none was waiting.
             now += ms
         }
         // A slot given back is the very next one granted, without waiting.
-        val empty = RemoteSendPacer()
-        repeat(8) { assertEquals(0L, empty.acquire(0L)) }
-        assertEquals(ms, empty.acquire(0L))
-        empty.giveBack()
-        assertEquals(0L, empty.acquire(0L))
-        assertEquals(ms, empty.acquire(0L))
+        val full = RemoteSendPacer(windowNanos = frame)
+        repeat(8) { assertEquals(0L, full.acquire(0L)) }
+        assertEquals(frame, full.acquire(0L))
+        full.giveBack(); full.giveBack() // Only the one slot that was granted last can come back.
+        assertEquals(0L, full.acquire(0L))
+        assertEquals(frame, full.acquire(0L))
     }
 
-    @Test fun a_sixteen_sample_burst_reaches_the_computer_as_eight_then_eight_within_about_eight_milliseconds() {
-        val ms = 1_000_000L
-        val pacer = RemoteSendPacer()
-        var now = 0L
-        val sentAt = mutableListOf<Long>()
-        repeat(16) {
-            while (true) { val wait = pacer.acquire(now); if (wait <= 0L) break; now += wait }
-            sentAt += now
-        }
-        assertEquals(List(8) { 0L }, sentAt.take(8))
-        assertEquals((1..8).map { it * ms }, sentAt.drop(8))
-        // In any eight-millisecond window at most sixteen samples leave: no more
-        // than two back-to-back eight-sample events can produce today.
-        for (start in sentAt) assertTrue(sentAt.count { it >= start && it < start + 8 * ms } <= 16)
+    @Test fun typed_batches_send_together_what_is_already_waiting_up_to_eight() {
+        fun waiting(count: Int) = ArrayDeque((2..count).toList())
+        // No pacer: the first sample and up to seven more that are waiting.
+        val three = waiting(3)
+        assertEquals(listOf(1, 2, 3), remotePenGroup(1, null, { 0L }) { three.removeFirstOrNull() })
+        val twenty = waiting(20)
+        assertEquals((1..8).toList(), remotePenGroup(1, null, { 0L }) { twenty.removeFirstOrNull() })
+        assertEquals(12, twenty.size)
+        assertEquals(listOf(1), remotePenGroup(1, null, { 0L }) { null })
+        // Paced: the first sample already holds a slot; each further one needs its own.
+        val pacer = RemoteSendPacer(windowNanos = frame)
+        assertEquals(0L, pacer.acquire(0L))
+        val paced = waiting(20)
+        assertEquals((1..8).toList(), remotePenGroup(1, pacer, { 0L }) { paced.removeFirstOrNull() })
+        // The frame's eight slots are used: the next call takes one sample and no more.
+        assertEquals(frame, pacer.acquire(0L))
+        assertEquals(0L, pacer.acquire(frame))
+        assertEquals((9..16).toList(), remotePenGroup(paced.removeFirst(), pacer, { frame }) { paced.removeFirstOrNull() })
+        // Nothing waiting: the slot taken for the look is given back, so the next sample still goes at once.
+        val idle = RemoteSendPacer(windowNanos = frame)
+        repeat(7) { assertEquals(0L, idle.acquire(0L)) }
+        assertEquals(listOf(7), remotePenGroup(7, idle, { 0L }) { null })
+        assertEquals(0L, idle.acquire(0L)); assertEquals(frame, idle.acquire(0L))
     }
 }

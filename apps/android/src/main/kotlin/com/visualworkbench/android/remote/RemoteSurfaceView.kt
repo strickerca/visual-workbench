@@ -31,6 +31,8 @@ internal class RemoteSurfaceView(context:Context,private val controller:RemoteEd
         importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_YES
         contentDescription="Remote computer canvas. A pen draws when computer control is active."
     }
+    private fun reportDisplay(){display?.let{controller.displayRefreshRate(it.refreshRate)}}
+    override fun onAttachedToWindow(){super.onAttachedToWindow();if(controller.sendsPaced)reportDisplay()}
     override fun getAccessibilityClassName():CharSequence = RemoteSurfaceView::class.java.name
     override fun onInitializeAccessibilityNodeInfo(info:AccessibilityNodeInfo){
         super.onInitializeAccessibilityNodeInfo(info)
@@ -65,6 +67,8 @@ internal class RemoteSurfaceView(context:Context,private val controller:RemoteEd
         // Developer switch only: deliver this contact's samples as the pen reports
         // them instead of grouped once per display frame. Android ends it at pen-up.
         if(remoteUnbufferedPenRequest(controller.unbufferedPen,event.actionMasked,event.getToolType(0)))requestUnbufferedDispatch(event)
+        // Developer switches only: paced sends follow this display's frame time.
+        if(controller.sendsPaced&&event.actionMasked==MotionEvent.ACTION_DOWN)reportDisplay()
         return controller.touch(event)||event.getToolType(0) in setOf(MotionEvent.TOOL_TYPE_STYLUS,MotionEvent.TOOL_TYPE_ERASER)
     }
     override fun onHoverEvent(event:MotionEvent):Boolean = controller.touch(event)||super.onHoverEvent(event)

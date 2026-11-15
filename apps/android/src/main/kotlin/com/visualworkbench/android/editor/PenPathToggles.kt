@@ -17,7 +17,7 @@ internal enum class PenPathToggle(val key: String, val title: String, val effect
     RemoteExactTimes("remoteExactTimes", "Remote pen: exact sample times",
         "Each sample keeps the time the pen reported it instead of a time rounded to when the phone handled it. Steadier ghost ink and truer timings. Applies the next time the remote view opens."),
     RemoteLongBatches("remoteLongBatches", "Remote pen: keep drawing through a hitch",
-        "A burst of more than 8 pen samples in one event is sent to the computer in paced groups of 8 instead of pausing input. Applies the next time the remote view opens."),
+        "A burst of more than 8 pen samples in one event no longer pauses input: 8 go to the computer at once and the rest one display frame later, never more than it gets today. How long a burst can be depends on the pen's rate, because a sample older than 50 ms is still refused. Applies the next time the remote view opens."),
     RemoteTypedBatches("remoteTypedBatches", "Remote pen: fewer, typed calls to the core",
         "Pen samples that are waiting go to the core together as typed values instead of one text message each. Less work per sample; with the hitch switch it also takes bursts of up to 32 samples. The computer receives exactly the same data. Applies the next time the remote view opens."),
     RemoteQuickFrames("remoteQuickFrames", "Remote view: show each frame sooner",
