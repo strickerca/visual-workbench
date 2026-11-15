@@ -66,6 +66,10 @@ struct Known {
     end: Option<blake3::Hasher>,
     /// Bytes in all pages, the comma in front of the first entry included.
     bytes: usize,
+    /// How many bytes longer all entries are when zeros are not normalized.
+    zeros: usize,
+    /// The length of the project as plain JSON, as of the last hash.
+    json_len: usize,
 }
 
 /// Consecutive object entries, each written `,"<id>":{…}`. The canonical
@@ -78,6 +82,8 @@ struct Page {
     bytes: Vec<u8>,
     /// Where each entry ends in `bytes`.
     ends: Vec<u32>,
+    /// How many bytes longer each entry is when its zeros are not normalized.
+    zeros: Vec<u32>,
 }
 
 impl Page {
@@ -107,7 +113,13 @@ impl Page {
         Err(low)
     }
     /// Replace the entries `range` with `entry` (empty to remove them).
-    fn splice(&mut self, range: std::ops::Range<usize>, entry: &[u8]) -> Result<(), ModelError> {
+    /// Returns the zero bytes of the entries that went.
+    fn splice(
+        &mut self,
+        range: std::ops::Range<usize>,
+        entry: &[u8],
+        zeros: u32,
+    ) -> Result<usize, ModelError> {
         let (from, to) = (self.start(range.start), self.start(range.end));
         self.bytes.splice(from..to, entry.iter().copied());
         let end = u32::try_from(from + entry.len())
@@ -115,12 +127,17 @@ impl Page {
         let removed = to - from;
         let inserted = if entry.is_empty() { None } else { Some(end) };
         self.ends.splice(range.clone(), inserted);
+        let gone = self
+            .zeros
+            .splice(range.clone(), inserted.map(|_| zeros))
+            .map(|zeros| zeros as usize)
+            .sum();
         let next = range.start + usize::from(!entry.is_empty());
         for later in &mut self.ends[next..] {
             *later = u32::try_from(*later as usize - removed + entry.len())
                 .map_err(|_| ModelError::Invalid("canonical object size"))?;
         }
-        Ok(())
+        Ok(gone)
     }
     /// Cut the page in two at the entry nearest its middle.
     fn split(&mut self) -> Option<Self> {
@@ -141,6 +158,7 @@ impl Page {
             before: blake3::Hasher::new(),
             bytes,
             ends,
+            zeros: self.zeros.split_off(at),
         })
     }
 }
@@ -205,6 +223,13 @@ impl StateHasher {
         self.members.clear();
     }
 
+    /// The length of the project hashed last when serde_json writes it as it
+    /// is, without normalizing zeros: what it takes inside a larger JSON
+    /// document. Nothing before the first hash or after a failed one.
+    pub fn json_len(&self) -> Option<usize> {
+        self.known.as_ref().map(|known| known.json_len)
+    }
+
     /// The state hash of `project` and the length of its canonical bytes.
     pub fn hash(&mut self, project: &Project) -> Result<(StateHash, usize), ModelError> {
         let result = self.follow(project);
@@ -244,6 +269,8 @@ impl StateHasher {
                     fresh: 0,
                     end: None,
                     bytes: 0,
+                    zeros: 0,
+                    json_len: 0,
                 };
                 known.extend(project, None)?;
                 self.known.insert(known)
@@ -271,11 +298,12 @@ impl Known {
     /// Bring the entry of one object up to date with the project.
     fn sync(&mut self, project: &Project, id: &Id) -> Result<(), ModelError> {
         let mut entry = Vec::new();
+        let mut zeros = 0;
         if let Some(object) = project.objects.get(id) {
-            write_entry(&mut entry, id, object)?;
+            zeros = write_entry(&mut entry, id, object)?;
         }
         if self.pages.is_empty() {
-            return self.append(&entry);
+            return self.append(&entry, zeros);
         }
         let index = self.page_of(id);
         match self.pages[index].find(id) {
@@ -283,7 +311,10 @@ impl Known {
                 self.bytes -=
                     self.pages[index].start(position + 1) - self.pages[index].start(position);
                 self.bytes += entry.len();
-                self.pages[index].splice(position..position + 1, &entry)?;
+                self.zeros -= self.pages[index].splice(position..position + 1, &entry, zeros)?;
+                if !entry.is_empty() {
+                    self.zeros += zeros as usize;
+                }
                 self.changed(index);
                 if self.pages[index].ends.is_empty() {
                     self.pages.remove(index);
@@ -294,10 +325,11 @@ impl Known {
             Err(position) => {
                 let last = index + 1 == self.pages.len();
                 if last && position == self.pages[index].ends.len() {
-                    return self.append(&entry);
+                    return self.append(&entry, zeros);
                 }
                 self.bytes += entry.len();
-                self.pages[index].splice(position..position, &entry)?;
+                self.zeros += zeros as usize;
+                self.pages[index].splice(position..position, &entry, zeros)?;
                 self.changed(index);
                 if self.pages[index].bytes.len() > PAGE_SPLIT
                     && let Some(second) = self.pages[index].split()
@@ -311,7 +343,7 @@ impl Known {
 
     /// Add an entry behind every other. The state behind the last entry, when
     /// it is current, takes the new bytes and stays current.
-    fn append(&mut self, entry: &[u8]) -> Result<(), ModelError> {
+    fn append(&mut self, entry: &[u8], zeros: u32) -> Result<(), ModelError> {
         if entry.is_empty() {
             return Ok(());
         }
@@ -334,6 +366,7 @@ impl Known {
                 before,
                 bytes: Vec::new(),
                 ends: Vec::new(),
+                zeros: Vec::new(),
             });
         }
         let index = self.pages.len() - 1;
@@ -343,7 +376,9 @@ impl Known {
             u32::try_from(page.bytes.len())
                 .map_err(|_| ModelError::Invalid("canonical object size"))?,
         );
+        page.zeros.push(zeros);
         self.bytes += entry.len();
+        self.zeros += zeros as usize;
         match &mut self.end {
             Some(end) if self.fresh == self.pages.len() => {
                 end.update(if first { &entry[1..] } else { entry });
@@ -372,9 +407,15 @@ impl Known {
             return;
         }
         self.bytes -= removed;
+        self.zeros -= self.pages[index].zeros[position..]
+            .iter()
+            .chain(self.pages[index + 1..].iter().flat_map(|page| &page.zeros))
+            .map(|zeros| *zeros as usize)
+            .sum::<usize>();
         self.pages.truncate(index + 1);
         self.pages[index].bytes.truncate(cut);
         self.pages[index].ends.truncate(position);
+        self.pages[index].zeros.truncate(position);
         self.changed(index);
         if position == 0 {
             self.pages.pop();
@@ -391,8 +432,8 @@ impl Known {
         };
         for (id, object) in objects {
             entry.clear();
-            write_entry(&mut entry, id, object)?;
-            self.append(&entry)?;
+            let zeros = write_entry(&mut entry, id, object)?;
+            self.append(&entry, zeros)?;
         }
         Ok(())
     }
@@ -439,6 +480,7 @@ impl Known {
         // The comma in front of the first entry is not part of the bytes.
         let length =
             self.outline.head.len() + self.bytes.saturating_sub(1) + self.outline.tail.len();
+        self.json_len = length + self.zeros + self.outline.zeros();
         (StateHash::from_digest(hasher.finalize()), length)
     }
 }
@@ -466,9 +508,8 @@ struct Shell<'a> {
 /// member by member so that one changed member is serialized alone.
 #[derive(Debug, Clone)]
 struct Outline {
-    /// `"name":value` of every member in the order serde_json writes them;
-    /// for `objects` only `"objects":{`.
-    members: Vec<(String, Vec<u8>)>,
+    /// Every member in the order serde_json writes them.
+    members: Vec<Member>,
     /// The position of `objects` among them.
     objects: usize,
     /// Everything in front of the first object entry.
@@ -477,7 +518,21 @@ struct Outline {
     tail: Vec<u8>,
 }
 
+/// One member of the project.
+#[derive(Debug, Clone)]
+struct Member {
+    name: String,
+    /// `"name":value`; for `objects` only `"objects":{`.
+    bytes: Vec<u8>,
+    /// How many bytes longer the value is when its zeros are not normalized.
+    zeros: usize,
+}
+
 impl Outline {
+    fn zeros(&self) -> usize {
+        self.members.iter().map(|member| member.zeros).sum()
+    }
+
     fn of(project: &Project) -> Result<Self, ModelError> {
         let Project {
             id,
@@ -509,13 +564,13 @@ impl Outline {
             results,
             mask_versions,
         })?;
-        normalize(&mut value);
-        let serde_json::Value::Object(values) = value else {
+        let serde_json::Value::Object(values) = &mut value else {
             return Err(ModelError::Invalid("canonical project outline"));
         };
         let mut members = Vec::with_capacity(values.len());
         let mut objects = None;
-        for (index, (name, member)) in values.iter().enumerate() {
+        for (index, (name, member)) in values.iter_mut().enumerate() {
+            let zeros = normalize(member);
             let mut bytes = Vec::new();
             if name == "objects" {
                 objects = Some(index);
@@ -524,7 +579,11 @@ impl Outline {
             } else {
                 write_member(&mut bytes, name, member)?;
             }
-            members.push((name.clone(), bytes));
+            members.push(Member {
+                name: name.clone(),
+                bytes,
+                zeros,
+            });
         }
         let mut outline = Self {
             members,
@@ -540,18 +599,18 @@ impl Outline {
     fn position(&self, name: &str) -> Option<usize> {
         self.members
             .iter()
-            .position(|(member, _)| member == name)
+            .position(|member| member.name == name)
             .filter(|position| *position != self.objects)
     }
 
     /// Serialize the member at `position` again. True when it is written in
     /// front of the objects, so that every byte behind it has moved.
     fn refresh(&mut self, project: &Project, position: usize) -> Result<bool, ModelError> {
-        let (name, bytes) = self
+        let member = self
             .members
             .get_mut(position)
             .ok_or(ModelError::Invalid("canonical project outline"))?;
-        let mut value = match name.as_str() {
+        let mut value = match member.name.as_str() {
             "documents" => serde_json::to_value(&project.documents)?,
             "assets" => serde_json::to_value(&project.assets)?,
             "layers" => serde_json::to_value(&project.layers)?,
@@ -566,9 +625,9 @@ impl Outline {
             "schema_version" => serde_json::to_value(project.schema_version)?,
             _ => return Err(ModelError::Invalid("canonical project outline")),
         };
-        normalize(&mut value);
-        bytes.clear();
-        write_member(bytes, name, &value)?;
+        member.zeros = normalize(&mut value);
+        member.bytes.clear();
+        write_member(&mut member.bytes, &member.name, &value)?;
         let before = position < self.objects;
         self.join(before, !before);
         Ok(before)
@@ -580,19 +639,19 @@ impl Outline {
         if head {
             self.head.clear();
             self.head.push(b'{');
-            for (index, (_, bytes)) in self.members[..=self.objects].iter().enumerate() {
+            for (index, member) in self.members[..=self.objects].iter().enumerate() {
                 if index > 0 {
                     self.head.push(b',');
                 }
-                self.head.extend_from_slice(bytes);
+                self.head.extend_from_slice(&member.bytes);
             }
         }
         if tail {
             self.tail.clear();
             self.tail.push(b'}');
-            for (_, bytes) in &self.members[self.objects + 1..] {
+            for member in &self.members[self.objects + 1..] {
                 self.tail.push(b',');
-                self.tail.extend_from_slice(bytes);
+                self.tail.extend_from_slice(&member.bytes);
             }
             self.tail.push(b'}');
         }
@@ -615,13 +674,14 @@ fn write_member(
     Ok(())
 }
 
-/// One `,"id":{object}` member of `objects`.
-fn write_entry(out: &mut Vec<u8>, id: &Id, object: &Object) -> Result<(), ModelError> {
+/// One `,"id":{object}` member of `objects`. Returns how many bytes longer
+/// the object is when its zeros are not normalized.
+fn write_entry(out: &mut Vec<u8>, id: &Id, object: &Object) -> Result<u32, ModelError> {
     out.push(b',');
     serde_json::to_writer(&mut *out, id)?;
     out.push(b':');
     let mut value = serde_json::to_value(object)?;
-    normalize(&mut value);
+    let zeros = normalize(&mut value);
     serde_json::to_writer(&mut *out, &value)?;
-    Ok(())
+    u32::try_from(zeros).map_err(|_| ModelError::Invalid("canonical object size"))
 }

@@ -155,6 +155,8 @@ pub struct ProjectStore {
     /// The history has outgrown what a checkpoint may hold. Writing one was
     /// tried and refused; it is not tried again while the project is open.
     beyond_checkpoint: bool,
+    /// A lower limit on the size of a checkpoint than the one it has anyway.
+    history_limit: usize,
 }
 
 /// The advisory lock, given up explicitly. A lock belongs to the open file
@@ -240,6 +242,7 @@ impl ProjectStore {
             replayed_transactions: 0,
             opened: OpenReport::default(),
             beyond_checkpoint: false,
+            history_limit: usize::MAX,
         })
     }
 
@@ -304,6 +307,7 @@ impl ProjectStore {
             replayed_transactions: 0,
             opened: OpenReport::default(),
             beyond_checkpoint: false,
+            history_limit: usize::MAX,
         })
     }
 
@@ -364,6 +368,7 @@ impl ProjectStore {
                 ..OpenReport::default()
             },
             beyond_checkpoint: false,
+            history_limit: usize::MAX,
         };
         store.upkeep(&upkeep, &mut observer);
         observer(OpenStage::Compacted);
@@ -650,6 +655,19 @@ impl ProjectStore {
         integrity(&self.connection)
     }
 
+    /// How many bytes `checkpoint_bytes` would return. Every save keeps this
+    /// up to date; nothing is serialized to answer it.
+    pub fn checkpoint_len(&self) -> usize {
+        self.host.checkpoint_len()
+    }
+
+    /// Refuse saves that would leave a checkpoint larger than `bytes`. The
+    /// limit a checkpoint has anyway (256 MB) always applies; this can only
+    /// lower it, which is how the limit is tested.
+    pub fn limit_history(&mut self, bytes: usize) {
+        self.history_limit = bytes;
+    }
+
     /// Validate against the current authority without advancing it. Transport
     /// uses this before acquiring new originals; commit revalidates after I/O.
     /// The transaction is decided in place and taken back out, so the store
@@ -661,11 +679,21 @@ impl ProjectStore {
         accepted_at_ms: i64,
     ) -> Result<Acceptance, StoreError> {
         bounded_encode(txn)?;
-        let (acceptance, canonical_len) =
+        let limit = self.history_limit;
+        let (acceptance, (canonical_len, history)) =
             self.host
-                .check(txn.clone(), authenticated, accepted_at_ms)?;
+                .check_with(txn.clone(), authenticated, accepted_at_ms, |host| {
+                    (
+                        host.canonical_len(),
+                        host.admit_checkpoint_len_within(limit),
+                    )
+                })?;
         if canonical_len > MAX_PAYLOAD {
             return Err(StoreError::Invalid("snapshot size"));
+        }
+        // A retry of an accepted transaction adds nothing.
+        if !acceptance.duplicate {
+            history?;
         }
         sql_u64(acceptance.ack.host_seq)?;
         sql_u64(
@@ -712,6 +740,7 @@ impl ProjectStore {
             seal,
             cost,
             log,
+            history_limit,
             ..
         } = self;
         // The host accepts the transaction in place and takes it back out if
@@ -724,6 +753,11 @@ impl ProjectStore {
                 if host.canonical_len() > MAX_PAYLOAD {
                     return Err(StoreError::Invalid("snapshot size"));
                 }
+                // The history a checkpoint holds, and with it what a joining
+                // device is given, has a limit. Saves no longer write a
+                // checkpoint, so the save that would cross it is refused
+                // here, from the size the host keeps up to date.
+                host.admit_checkpoint_len_within(*history_limit)?;
                 let seq = sql_u64(acceptance.ack.host_seq)?;
                 let base = txn
                     .base_revision

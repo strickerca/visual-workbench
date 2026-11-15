@@ -574,6 +574,7 @@ fn every_kind_of_edit_on_a_large_document_is_decided_as_from_nothing() {
             store.checkpoint_bytes().unwrap() == before,
             "refusals at {n}"
         );
+        assert_eq!(store.checkpoint_len(), before.len(), "refusals at {n}");
     };
 
     let mut history = Vec::<(pb::Revision, Id)>::new();
@@ -604,7 +605,7 @@ fn every_kind_of_edit_on_a_large_document_is_decided_as_from_nothing() {
                 (name, device(2), txn)
             }
         };
-        if n % 3 == 0 {
+        if n.is_multiple_of(3) {
             refused(&mut store, n);
         }
         let before = store.checkpoint_bytes().unwrap();
@@ -632,6 +633,12 @@ fn every_kind_of_edit_on_a_large_document_is_decided_as_from_nothing() {
             twin.checkpoint_bytes().unwrap() == store.checkpoint_bytes().unwrap(),
             "{name}: sequencing state"
         );
+        // The size of a checkpoint is known without writing one.
+        assert_eq!(
+            store.checkpoint_len(),
+            store.checkpoint_bytes().unwrap().len(),
+            "{name}: checkpoint length"
+        );
         // The hash carried forward is the hash of the whole project.
         let whole = store.project().state_hash().unwrap();
         assert_eq!(store.state_hash().unwrap(), &whole, "{name}");
@@ -642,7 +649,7 @@ fn every_kind_of_edit_on_a_large_document_is_decided_as_from_nothing() {
 
         // Opening compares every stored row with a full rebuild and decides
         // the log again.
-        if n % 4 == 0 {
+        if n.is_multiple_of(4) {
             let state = store.checkpoint_bytes().unwrap();
             drop(store);
             store = ProjectStore::open(&path).unwrap();

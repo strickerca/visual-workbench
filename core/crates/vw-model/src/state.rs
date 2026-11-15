@@ -152,21 +152,17 @@ impl Project {
 
 // serde_json's default object map is ordered. Normalize signed floating zero,
 // retaining integer precision; normal floating values use its stable formatter.
-pub(crate) fn normalize(value: &mut serde_json::Value) {
+// Returns how many bytes shorter the value is written for it: `0.0` and
+// `-0.0` both become `0`.
+pub(crate) fn normalize(value: &mut serde_json::Value) -> usize {
     match value {
         serde_json::Value::Number(number) if number.is_f64() && number.as_f64() == Some(0.0) => {
+            let negative = number.as_f64().is_some_and(f64::is_sign_negative);
             *value = serde_json::Value::Number(0.into());
+            if negative { 3 } else { 2 }
         }
-        serde_json::Value::Array(values) => {
-            for value in values {
-                normalize(value);
-            }
-        }
-        serde_json::Value::Object(values) => {
-            for value in values.values_mut() {
-                normalize(value);
-            }
-        }
-        _ => {}
+        serde_json::Value::Array(values) => values.iter_mut().map(normalize).sum(),
+        serde_json::Value::Object(values) => values.values_mut().map(normalize).sum(),
+        _ => 0,
     }
 }

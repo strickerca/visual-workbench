@@ -17,6 +17,55 @@ use vw_proto::{
 
 const CHECKPOINT_PREFIX: &[u8] = b"VisualWorkbench.HostCheckpoint.v1\n";
 const MAX_CHECKPOINT_BYTES: usize = 256 * 1024 * 1024;
+/// What a value that cannot be written counts as: more than any checkpoint
+/// may hold, so that the size limit refuses it instead of losing track.
+const UNCOUNTABLE: usize = usize::MAX / 4;
+
+/// Counts the bytes written to it.
+struct Count(usize);
+impl std::io::Write for Count {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0 = self.0.saturating_add(bytes.len());
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// The length of `value` as JSON, for a value without 32-bit floats: text,
+/// integers, identifiers, and values that are JSON already.
+fn written<T: Serialize + ?Sized>(value: &T) -> usize {
+    let mut count = Count(0);
+    match serde_json::to_writer(&mut count, value) {
+        Ok(()) => count.0,
+        Err(_) => UNCOUNTABLE,
+    }
+}
+
+/// The length of `value` as a checkpoint writes it. A checkpoint is written
+/// from a JSON value, in which a 32-bit float (a pressure, a tilt) has become
+/// a 64-bit one and takes more digits than it would written directly.
+fn checkpointed<T: Serialize + ?Sized>(value: &T) -> usize {
+    match serde_json::to_value(value) {
+        Ok(value) => written(&value),
+        Err(_) => UNCOUNTABLE,
+    }
+}
+
+fn digits(mut number: u64) -> usize {
+    let mut count = 1;
+    while number >= 10 {
+        number /= 10;
+        count += 1;
+    }
+    count
+}
+
+/// `["<device>",` in a set of pairs: a device ID is 26 characters.
+const PAIR_DEVICE: usize = 1 + 28 + 1;
+/// `"<id>"`: an ID is 36 characters.
+const QUOTED_ID: usize = 38;
 
 /// Internal admission meter, NOT a journal export API. serde streams borrowed
 /// fields through a fixed-size lexical state; only bounded ID serialization
@@ -131,6 +180,35 @@ struct Record {
     conflicts: Vec<v1::ConflictRecord>,
 }
 
+impl Record {
+    /// The length of this record as a checkpoint writes it. The journal is
+    /// JSON already and the acknowledgement holds no floats; only the
+    /// transaction and conflict records are converted to be measured.
+    fn checkpointed(&self) -> usize {
+        #[derive(Serialize)]
+        struct Parts<'a> {
+            transaction: serde_json::Value,
+            ack: &'a v1::TxnAck,
+            changes: &'a [Change],
+            accepted_at_ms: i64,
+            conflicts: serde_json::Value,
+        }
+        let (Ok(transaction), Ok(conflicts)) = (
+            serde_json::to_value(&self.transaction),
+            serde_json::to_value(&self.conflicts),
+        ) else {
+            return UNCOUNTABLE;
+        };
+        written(&Parts {
+            transaction,
+            ack: &self.ack,
+            changes: &self.changes,
+            accepted_at_ms: self.accepted_at_ms,
+            conflicts,
+        })
+    }
+}
+
 /// Result of an accepted transaction. A retry returns the original ack and no
 /// duplicate conflict events. Persist the host checkpoint atomically with its log.
 #[derive(Debug, Clone)]
@@ -178,6 +256,13 @@ pub struct HostSequencer {
     /// whole history. Never part of a checkpoint.
     #[serde(skip)]
     order: Vec<(Id, DeviceId)>,
+    /// How long a checkpoint of this state is, kept up to date by every
+    /// change so that it is known without writing one: everything but the
+    /// project, and the project. Never part of a checkpoint.
+    #[serde(skip)]
+    history_len: usize,
+    #[serde(skip)]
+    project_len: usize,
 }
 
 // A private remote deserializer keeps callers from bypassing the validated
@@ -202,6 +287,10 @@ struct CheckpointState {
     canonical_len: usize,
     #[serde(skip)]
     order: Vec<(Id, DeviceId)>,
+    #[serde(skip)]
+    history_len: usize,
+    #[serde(skip)]
+    project_len: usize,
 }
 
 /// What deciding a transaction reads but never changes.
@@ -226,6 +315,7 @@ struct Decision {
     sequence: u64,
     hash: StateHash,
     canonical_len: usize,
+    project_len: usize,
     record: Record,
     originals: Originals,
     operations: Vec<(DeviceId, u64)>,
@@ -239,6 +329,8 @@ struct Undo {
     id: Id,
     sequence: u64,
     canonical_len: usize,
+    history_len: usize,
+    project_len: usize,
     conflicts: usize,
     originals: Originals,
     operations: Vec<(DeviceId, u64)>,
@@ -382,6 +474,53 @@ impl HostSequencer {
         Ok(bytes)
     }
 
+    /// How many bytes `checkpoint_bytes` would return, known without writing
+    /// them: every accepted transaction adds what it adds to this.
+    pub const fn checkpoint_len(&self) -> usize {
+        CHECKPOINT_PREFIX
+            .len()
+            .saturating_add(32)
+            .saturating_add(self.history_len)
+            .saturating_add(self.project_len)
+    }
+
+    /// Refuse a state whose checkpoint a joining device could not be given
+    /// and an older build could not store, with the error `checkpoint_bytes`
+    /// has for it. Saving checks this for the state a transaction leaves;
+    /// deciding a stored log again does not.
+    pub fn admit_checkpoint_len(&self) -> Result<(), OpsError> {
+        if self.checkpoint_len() > MAX_CHECKPOINT_BYTES {
+            return Err(OpsError::Invalid("checkpoint size"));
+        }
+        Ok(())
+    }
+
+    /// The same for a lower limit than the one a checkpoint has.
+    pub fn admit_checkpoint_len_within(&self, limit: usize) -> Result<(), OpsError> {
+        if self.checkpoint_len() > limit.min(MAX_CHECKPOINT_BYTES) {
+            return Err(OpsError::Invalid("checkpoint size"));
+        }
+        Ok(())
+    }
+
+    /// Stop if the running length is not the length of a checkpoint. Small
+    /// states only: writing a checkpoint takes as long as the state is large.
+    #[cfg(feature = "cross-check")]
+    fn cross_check_len(&self) {
+        // Every change of a short history, every sixteenth of a longer one.
+        if self.checkpoint_len() <= 1024 * 1024
+            && (self.sequence < 64 || self.sequence.is_multiple_of(16))
+        {
+            assert_eq!(
+                Some(self.checkpoint_len()),
+                self.checkpoint_bytes().ok().map(|bytes| bytes.len()),
+                "running checkpoint length differs from a written checkpoint"
+            );
+        }
+    }
+    #[cfg(not(feature = "cross-check"))]
+    const fn cross_check_len(&self) {}
+
     /// Restore private sequencing state without re-executing historical
     /// transactions. Retained journal metadata is checked against its indexes;
     /// the current project is fully validated and bound to the last revision.
@@ -411,6 +550,7 @@ impl HostSequencer {
             return Err(OpsError::Invalid("noncanonical checkpoint"));
         }
         host.validate_checkpoint()?;
+        host.history_len = payload.len().saturating_sub(host.project_len);
         Ok(host)
     }
 
@@ -425,6 +565,7 @@ impl HostSequencer {
         self.project.validate()?;
         let (hash, canonical_len) = self.hasher.hash(&self.project)?;
         self.canonical_len = canonical_len;
+        self.project_len = self.hasher.json_len().unwrap_or(UNCOUNTABLE);
         if self.revisions.get(&self.sequence) != Some(&hash) {
             return Err(OpsError::Invalid("checkpoint revision binding"));
         }
@@ -577,7 +718,8 @@ impl HostSequencer {
         project.validate()?;
         let mut hasher = StateHasher::default();
         let (hash, canonical_len) = hasher.hash(&project)?;
-        Ok(Self {
+        let project_len = hasher.json_len().unwrap_or(UNCOUNTABLE);
+        let mut host = Self {
             host_device,
             project,
             sequence: 0,
@@ -592,7 +734,12 @@ impl HostSequencer {
             hasher,
             canonical_len,
             order: Vec::new(),
-        })
+            history_len: 0,
+            project_len,
+        };
+        // Written once, here, to know what surrounds the project.
+        host.history_len = checkpointed(&host).saturating_sub(project_len);
+        Ok(host)
     }
     /// The canonical state hash of the current revision.
     pub fn state_hash(&self) -> Result<&StateHash, OpsError> {
@@ -673,7 +820,13 @@ impl HostSequencer {
         if self.gestures.contains(&(device.clone(), gesture.clone())) {
             return Err(OpsError::Invalid("gesture already committed"));
         }
-        self.cancelled.insert((device, gesture));
+        if self.cancelled.insert((device, gesture)) {
+            self.history_len = self
+                .history_len
+                .saturating_add(PAIR_DEVICE + QUOTED_ID + 1)
+                .saturating_add(usize::from(self.cancelled.len() > 1));
+        }
+        self.cross_check_len();
         Ok(())
     }
     /// Borrow the accepted/cancelled authority without serializing a checkpoint.
@@ -764,8 +917,13 @@ impl HostSequencer {
         }
         let touched = Touched::of(&undo.originals);
         if let Some(record) = self.records.get_mut(&id) {
+            self.history_len = self
+                .history_len
+                .saturating_sub(written(&record.ack.notices))
+                .saturating_add(written(&stored.notices));
             record.ack.notices.clone_from(&stored.notices);
         }
+        self.cross_check_len();
         Ok(Some(touched))
     }
 
@@ -787,6 +945,26 @@ impl HostSequencer {
         let canonical_len = self.canonical_len;
         self.revert(undo);
         Ok((acceptance, canonical_len))
+    }
+
+    /// `check`, and what `inspect` makes of the host while it holds the
+    /// transaction: its sizes, for a caller with limits of its own. A retry
+    /// of an accepted transaction is inspected as the host is.
+    pub fn check_with<T>(
+        &mut self,
+        transaction: v1::Transaction,
+        authenticated: &DeviceId,
+        accepted_at_ms: i64,
+        inspect: impl FnOnce(&Self) -> T,
+    ) -> Result<(Acceptance, T), OpsError> {
+        let (device, id) = match self.admit(&transaction, authenticated)? {
+            Admission::Duplicate(acceptance) => return Ok((acceptance, inspect(self))),
+            Admission::New(device, id) => (device, id),
+        };
+        let (acceptance, undo) = self.commit(transaction, device, id, accepted_at_ms)?;
+        let inspected = inspect(self);
+        self.revert(undo);
+        Ok((acceptance, inspected))
     }
 
     fn admit(
@@ -836,6 +1014,8 @@ impl HostSequencer {
             hasher,
             canonical_len: _,
             order,
+            history_len: _,
+            project_len: _,
         } = self;
         let view = View {
             host_device,
@@ -864,16 +1044,44 @@ impl HostSequencer {
             sequence,
             hash,
             canonical_len,
+            project_len,
             record,
             originals,
             operations,
             gesture,
             tombstones,
         } = decision;
+        // What the transaction adds to a checkpoint, and takes out of it.
+        let mut added = QUOTED_ID
+            + 1
+            + record.checkpointed()
+            + usize::from(!self.records.is_empty())
+            // Its revision: `,"<sequence>":"<hash>"`.
+            + 1
+            + digits(sequence)
+            + 2
+            + 1
+            + 66
+            + digits(sequence);
+        let mut removed = digits(self.sequence);
+        for (index, (_, lamport)) in operations.iter().enumerate() {
+            added +=
+                PAIR_DEVICE + digits(*lamport) + 1 + usize::from(self.seen_ops.len() + index > 0);
+        }
+        if gesture.is_some() {
+            added += PAIR_DEVICE + QUOTED_ID + 1 + usize::from(!self.gestures.is_empty());
+        }
+        for (index, conflict) in record.conflicts.iter().enumerate() {
+            added = added
+                .saturating_add(checkpointed(conflict))
+                .saturating_add(usize::from(self.conflicts.len() + index > 0));
+        }
         let mut undo = Undo {
             id: id.clone(),
             sequence: self.sequence,
             canonical_len: self.canonical_len,
+            history_len: self.history_len,
+            project_len: self.project_len,
             conflicts: self.conflicts.len(),
             originals,
             operations: operations.clone(),
@@ -884,23 +1092,47 @@ impl HostSequencer {
         self.seen_ops.extend(operations);
         self.gestures.extend(gesture);
         for (object, deleted) in tombstones {
+            let entries = self.tombstones.len();
             let previous = match deleted {
-                Some(deleted) => self.tombstones.insert(object.clone(), deleted),
-                None => self.tombstones.remove(&object),
+                Some(deleted) => {
+                    added = added.saturating_add(QUOTED_ID + 1 + checkpointed(&deleted));
+                    let previous = self.tombstones.insert(object.clone(), deleted);
+                    if previous.is_none() {
+                        added += usize::from(entries > 0);
+                    }
+                    previous
+                }
+                None => {
+                    let previous = self.tombstones.remove(&object);
+                    if previous.is_some() {
+                        removed += usize::from(entries > 1);
+                    }
+                    previous
+                }
             };
+            if let Some(previous) = &previous {
+                removed = removed.saturating_add(QUOTED_ID + 1 + checkpointed(previous));
+            }
             undo.tombstones.push((object, previous));
         }
         for change in &record.changes {
             let key = change.address.key();
-            let previous = self.writes.insert(
-                key.clone(),
-                WriteStamp {
-                    address: change.address.clone(),
-                    device: device.clone(),
-                    sequence,
-                    wall_ms: record.transaction.created_at_wall_ms,
-                },
-            );
+            let stamp = WriteStamp {
+                address: change.address.clone(),
+                device: device.clone(),
+                sequence,
+                wall_ms: record.transaction.created_at_wall_ms,
+            };
+            added = added.saturating_add(written(&stamp));
+            let previous = self.writes.insert(key.clone(), stamp);
+            match &previous {
+                Some(previous) => removed = removed.saturating_add(written(previous)),
+                None => {
+                    added = added
+                        .saturating_add(written(&key) + 1)
+                        .saturating_add(usize::from(self.writes.len() > 1));
+                }
+            }
             undo.writes.push((key, previous));
         }
         let acceptance = Acceptance {
@@ -914,6 +1146,12 @@ impl HostSequencer {
         self.sequence = sequence;
         self.revisions.insert(sequence, hash);
         self.canonical_len = canonical_len;
+        self.project_len = project_len;
+        self.history_len = self
+            .history_len
+            .saturating_add(added)
+            .saturating_sub(removed);
+        self.cross_check_len();
         Ok((acceptance, undo))
     }
 
@@ -943,8 +1181,11 @@ impl HostSequencer {
         self.sequence = undo.sequence;
         self.conflicts.truncate(undo.conflicts);
         self.canonical_len = undo.canonical_len;
+        self.history_len = undo.history_len;
+        self.project_len = undo.project_len;
         self.hasher.replaced(&undo.originals);
         undo.originals.restore(&mut self.project);
+        self.cross_check_len();
     }
 }
 
@@ -1391,9 +1632,10 @@ fn evaluate(
             project.state_hash().ok().as_ref(),
             "incremental state hash differs from the whole-project hash"
         );
-        Ok::<_, OpsError>((tombstones, hash, canonical_len))
+        let project_len = hasher.json_len().unwrap_or(UNCOUNTABLE);
+        Ok::<_, OpsError>((tombstones, hash, canonical_len, project_len))
     })();
-    let (tombstones, hash, canonical_len) = match concluded {
+    let (tombstones, hash, canonical_len, project_len) = match concluded {
         Ok(concluded) => concluded,
         Err(error) => {
             hasher.replaced(&originals);
@@ -1413,6 +1655,7 @@ fn evaluate(
         sequence,
         hash,
         canonical_len,
+        project_len,
         record: Record {
             transaction,
             ack,

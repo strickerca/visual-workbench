@@ -208,6 +208,15 @@ fn assert_same(hasher: &mut StateHasher, project: &Project, what: &str) {
         project.canonical_bytes().unwrap().len(),
         "length after {what}"
     );
+    assert_eq!(
+        hasher.json_len(),
+        Some(
+            serde_json::to_vec(&serde_json::to_value(project).unwrap())
+                .unwrap()
+                .len()
+        ),
+        "plain JSON length after {what}"
+    );
 }
 
 #[test]
