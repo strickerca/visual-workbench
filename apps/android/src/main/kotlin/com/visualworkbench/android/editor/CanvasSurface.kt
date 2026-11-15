@@ -53,9 +53,12 @@ import java.util.concurrent.atomic.AtomicInteger
  * deferred into one coalesced replacement. Giant mode keeps break-before-make so
  * its single surface reservation is never shared.
  *
- * A generation always starts from the scene for the surface's current size: while
- * the controller is being told a new size, the scenes it publishes on the way are
- * only remembered, and the generation is created after it returns.
+ * A generation always starts from the scene for the surface's current size: from
+ * the moment the surface has a new size until the controller has been told it,
+ * every scene published on the way (cancelling the input in hand, cancelling the
+ * tool) is only remembered, and the generation is created afterwards. This holds
+ * for the first size of a new or returning surface as much as for a later change,
+ * so a surface starts with one generation, not one for each size.
  *
  * Lifecycle diagnostics ([CanvasLife]) are written only when switched on, and a
  * surface reads that switch once, when it is constructed. Pen-sample work (ink
@@ -146,7 +149,15 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                 val changed = surfaceWidth != width || surfaceHeight != height
                 if (lifeOn) { life("surface_changed size=${width}x$height changed=$changed"); lifeWatchWindowFrame() }
                 surfaceWidth = width; surfaceHeight = height
-                if (changed) { cancelInput(); resize(width, height) }
+                if (changed) {
+                    // Cancelling the input in hand publishes too, and the controller
+                    // has not been told this size yet: after a recreation, or when the
+                    // surface comes back, it still holds the camera for the size before.
+                    // No generation may start from that scene (it would be kept, and a
+                    // second one built for the new size), so the cancel is held as well.
+                    generations.whileViewportChanges { cancelInput() }
+                    resize(width, height)
+                }
                 ensureRenderer()
             }
             override fun surfaceDestroyed(holder: SurfaceHolder) {
