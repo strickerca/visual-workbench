@@ -253,15 +253,17 @@ async fn open(
         .await
         .map(CarrierIo::Quic)
 }
-/// Open pinned TLS carriers to every address at once and keep the best
-/// carrier that authenticated. Nothing is said on the losers: the application
-/// Hello goes only to the chosen one, so the peer never sees two sessions.
-/// An address that fails authentication is simply not the paired device.
+/// Open pinned TLS carriers to every address at once and keep the one that
+/// authenticated and comes first in `paths`. Once any address has answered,
+/// the addresses before it get `earlier_within` to answer too. Nothing is said
+/// on the losers: the application Hello goes only to the chosen one, so the
+/// peer never sees two sessions. An address that fails authentication is
+/// simply not the paired device.
 pub(super) async fn dial(
     paths: &[Path],
     manager: &PairingManager,
     peer: &DeviceId,
-    (limit, better_within): (Duration, Duration),
+    (limit, earlier_within): (Duration, Duration),
     causes: Option<&Causes>,
 ) -> SessionResult<Dialled> {
     let note = |cause: &'static str| {
@@ -308,20 +310,14 @@ pub(super) async fn dial(
         pending.retain(|waiting| *waiting != index);
         match opened {
             Ok(io) => {
-                // Addresses are ordered best first, so a lower index never loses.
                 if best.as_ref().is_none_or(|(chosen, _)| index < *chosen) {
                     best = Some((index, io));
                 }
-                let rank = best
-                    .as_ref()
-                    .map_or(u8::MAX, |(chosen, _)| paths[*chosen].0.rank());
-                if !pending
-                    .iter()
-                    .any(|waiting| paths[*waiting].0.rank() < rank)
-                {
+                let chosen = best.as_ref().map_or(usize::MAX, |(chosen, _)| *chosen);
+                if !pending.iter().any(|waiting| *waiting < chosen) {
                     break;
                 }
-                grace.get_or_insert(tokio::time::Instant::now() + better_within);
+                grace.get_or_insert(tokio::time::Instant::now() + earlier_within);
             }
             Err(failed) => {
                 note(dial_cause(&failed));
@@ -435,6 +431,9 @@ impl Seeker {
                     continue;
                 }
                 rescue = now + RESCUE_EVERY;
+                // The address in use is asked first and given time to answer:
+                // while it does, the peer is only busy and nothing may move.
+                paths.sort_by_key(|(_, address)| Some(*address) != watch.address);
             } else {
                 if now < upgrade || !watch.pulse.settled.load(Ordering::Acquire) {
                     continue;
@@ -526,19 +525,29 @@ impl Standby {
     /// bound is skipped. Returns what is bound now.
     pub async fn listen(&self, wanted: Vec<Path>) -> SessionResult<Vec<SessionEndpoint>> {
         let _gate = self.gate.lock().await;
-        let missing: Vec<Path> = {
-            let mut bound = self.bound.lock().map_err(|_| SessionError::Worker)?;
-            bound.retain(|entry| wanted.contains(&(entry.carrier, entry.requested)));
-            wanted
-                .iter()
-                .filter(|(carrier, address)| {
-                    !bound
-                        .iter()
-                        .any(|entry| entry.carrier == *carrier && entry.requested == *address)
-                })
-                .copied()
-                .collect()
+        // A listener serves a wanted address whether the caller names what it
+        // asked for (possibly port 0) or the address that was actually bound.
+        let serves = |entry: &Bound, (carrier, address): &Path| {
+            entry.carrier == *carrier && (entry.requested == *address || entry.local == *address)
         };
+        let (missing, retired): (Vec<Path>, bool) = {
+            let mut bound = self.bound.lock().map_err(|_| SessionError::Worker)?;
+            let before = bound.len();
+            bound.retain(|entry| wanted.iter().any(|path| serves(entry, path)));
+            let missing = wanted
+                .iter()
+                .filter(|path| !bound.iter().any(|entry| serves(entry, path)))
+                .copied()
+                .collect();
+            (missing, bound.len() != before)
+        };
+        if retired {
+            // Let the retired acceptors and their sockets go before an address
+            // is bound again under another carrier.
+            for _ in 0..4 {
+                tokio::task::yield_now().await;
+            }
+        }
         for (carrier, address) in missing {
             let room = self.bound.lock().map_err(|_| SessionError::Worker)?.len() < MAX_LISTENERS;
             if !room {
@@ -774,7 +783,7 @@ mod tests {
             hint(AppCarrier::QuicWifi, "127.0.0.1:0"),
             hint(AppCarrier::QuicWifi, "0.0.0.0:1"),
             hint(AppCarrier::QuicWifi, "[fe80::1]:1"),
-            hint(AppCarrier::TcpAdb, "10.0.0.1:1"),
+            hint(AppCarrier::TcpAdb, "[fe80::1%7]:1"),
         ] {
             assert!(paths(vec![refused], MAX_HINTS, false).is_err());
         }

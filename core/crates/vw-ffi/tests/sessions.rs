@@ -758,6 +758,24 @@ async fn on_carrier(host: &LiveSession, client: &LiveSession, carrier: AppCarrie
         b.failure
     );
 }
+/// The client receives the host's revision `host_seq` over the connection it
+/// already has: the link never leaves `carrier` while waiting.
+async fn arrived(client: &LiveSession, host_seq: u64, carrier: AppCarrier) {
+    let reached = tokio::time::timeout(Duration::from_secs(20), async {
+        while client.status().host_seq < host_seq {
+            let status = client.status();
+            assert!(linked(&status) && status.carrier == Some(carrier));
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await;
+    assert!(
+        reached.is_ok(),
+        "revision {host_seq} did not arrive: {:?}/{:?}",
+        client.status().status,
+        client.status().failure
+    );
+}
 async fn failed_with(link: &LiveSession, code: &str) {
     let reached = tokio::time::timeout(Duration::from_secs(20), async {
         while link.status().failure.as_deref() != Some(code) {
@@ -804,6 +822,11 @@ async fn a_paired_device_reconnects_with_no_address_supplied_and_a_hint_is_never
         .unwrap();
     let listening = server.endpoints();
     assert_eq!(listening.len(), 1);
+    // Asking for what is already bound changes nothing.
+    assert_eq!(
+        addresses(&server.listen_on(listening.clone()).await.unwrap()),
+        addresses(&listening)
+    );
     assert!(client_service.known_routes(device()).unwrap().is_empty());
     // First contact: the one address pairing already handed over, as a hint.
     let client_path = temp.path().join("client");
@@ -1014,49 +1037,80 @@ async fn a_paired_device_reconnects_with_no_address_supplied_and_a_hint_is_never
 struct Cable {
     address: String,
     up: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Conversations opened before this number are silenced; later ones pass.
+    quiet_before: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    opened: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 impl Cable {
     async fn to(target: &str) -> Self {
-        use std::sync::{Arc, atomic::Ordering};
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, AtomicU64, Ordering},
+        };
         let target: std::net::SocketAddr = target.parse().unwrap();
         let front = Arc::new(tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap());
         let address = front.local_addr().unwrap().to_string();
-        let up = Arc::new(std::sync::atomic::AtomicBool::new(true));
-        let live = up.clone();
+        let up = Arc::new(AtomicBool::new(true));
+        let quiet_before = Arc::new(AtomicU64::new(0));
+        let opened = Arc::new(AtomicU64::new(0));
+        let (live, quiet, count) = (up.clone(), quiet_before.clone(), opened.clone());
         tokio::spawn(async move {
-            let mut flows = std::collections::HashMap::<_, Arc<tokio::net::UdpSocket>>::new();
+            let mut flows =
+                std::collections::HashMap::<_, (u64, Arc<tokio::net::UdpSocket>)>::new();
             let mut buffer = vec![0_u8; 65536];
             while let Ok((size, from)) = front.recv_from(&mut buffer).await {
                 if !live.load(Ordering::Acquire) {
                     continue;
                 }
-                let back = match flows.get(&from) {
-                    Some(back) => back.clone(),
+                let (flow, back) = match flows.get(&from) {
+                    Some(known) => known.clone(),
                     None => {
+                        let flow = count.fetch_add(1, Ordering::AcqRel);
                         let back =
                             Arc::new(tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap());
                         back.connect(target).await.unwrap();
-                        flows.insert(from, back.clone());
-                        let (front, live, replies) = (front.clone(), live.clone(), back.clone());
+                        flows.insert(from, (flow, back.clone()));
+                        let (front, live, quiet, replies) =
+                            (front.clone(), live.clone(), quiet.clone(), back.clone());
                         tokio::spawn(async move {
                             let mut buffer = vec![0_u8; 65536];
                             while let Ok(size) = replies.recv(&mut buffer).await {
-                                if live.load(Ordering::Acquire) {
+                                if live.load(Ordering::Acquire)
+                                    && flow >= quiet.load(Ordering::Acquire)
+                                {
                                     let _ = front.send_to(&buffer[..size], from).await;
                                 }
                             }
                         });
-                        back
+                        (flow, back)
                     }
                 };
-                let _ = back.send(&buffer[..size]).await;
+                if flow >= quiet.load(Ordering::Acquire) {
+                    let _ = back.send(&buffer[..size]).await;
+                }
             }
         });
-        Self { address, up }
+        Self {
+            address,
+            up,
+            quiet_before,
+            opened,
+        }
     }
     fn plug(&self, connected: bool) {
         self.up
             .store(connected, std::sync::atomic::Ordering::Release);
+    }
+    /// The far end stops talking on what is already open (as during a long
+    /// local operation) but still answers anyone who asks anew.
+    fn busy(&self, silent: bool) {
+        use std::sync::atomic::Ordering;
+        let before = if silent {
+            self.opened.load(Ordering::Acquire)
+        } else {
+            0
+        };
+        self.quiet_before.store(before, Ordering::Release);
     }
 }
 
@@ -1128,6 +1182,32 @@ async fn a_better_carrier_takes_over_and_a_dead_route_fails_over_without_losing_
     let upgrade = offered.elapsed();
     converged(&server, &link).await;
 
+    // The computer goes quiet without going away, as during a long local
+    // operation. Its address still answers, so the link is left where it is
+    // instead of being torn down and restarted on Wi-Fi.
+    cable.busy(true);
+    let quiet = std::time::Instant::now();
+    while quiet.elapsed() < Duration::from_millis(2600) {
+        for status in [server.status(), link.status()] {
+            assert!(linked(&status), "a busy peer must not be dropped");
+            assert_eq!(status.carrier, Some(AppCarrier::QuicTether));
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    cable.busy(false);
+    // The same connection carries on: a new edit crosses it.
+    let resumed = host
+        .apply_edit(
+            edit(33, host.info().await.unwrap().next_lamport),
+            vec![rectangle(34)],
+            cancel(),
+        )
+        .await
+        .unwrap();
+    arrived(&link, resumed.host_seq, AppCarrier::QuicTether).await;
+    converged(&server, &link).await;
+    assert_eq!(link.status().carrier, Some(AppCarrier::QuicTether));
+
     // The cable is pulled while both sides have unsent work.
     host.apply_edit(
         edit(30, host.info().await.unwrap().next_lamport),
@@ -1173,6 +1253,23 @@ async fn a_better_carrier_takes_over_and_a_dead_route_fails_over_without_losing_
         "failover took {failover:?}"
     );
 
+    // The listeners can change under a live connection without dropping it:
+    // one is retired, another address is added later.
+    assert_eq!(
+        addresses(&server.listen_on(vec![wifi.clone()]).await.unwrap()),
+        vec![wifi.address.clone()]
+    );
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(linked(&server.status()) && linked(&link.status()));
+    assert_eq!(server.status().carrier, Some(AppCarrier::QuicTether));
+    let widened = server
+        .listen_on(vec![listen(AppCarrier::QuicTether), wifi.clone()])
+        .await
+        .unwrap();
+    assert_eq!(widened.len(), 2);
+    assert_eq!(server.endpoints().len(), 2);
+    converged(&server, &link).await;
+
     for project in [&host, &client] {
         assert_eq!(
             project
@@ -1182,7 +1279,7 @@ async fn a_better_carrier_takes_over_and_a_dead_route_fails_over_without_losing_
                 .render
                 .items
                 .len(),
-            5
+            6
         );
     }
     assert_eq!(
@@ -1194,7 +1291,7 @@ async fn a_better_carrier_takes_over_and_a_dead_route_fails_over_without_losing_
     client.close().await.unwrap();
     host.close().await.unwrap();
     let persisted = vw_store::ProjectStore::open(&host_path).unwrap();
-    for transaction in [20, 21, 22, 30] {
+    for transaction in [20, 21, 22, 30, 33] {
         assert_eq!(
             persisted
                 .accepted_transactions()
