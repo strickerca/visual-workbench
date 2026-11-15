@@ -96,21 +96,35 @@ public class AutomaticRouteKeeper(
     private var offered: List<SessionEndpoint>? = null
     private var offeredOn: String? = null
     private var remembered: Pair<String, List<SessionEndpoint>>? = null
+    /** Addresses this run was given at pairing, by device id, that the core
+     * has not authenticated yet. Memory only: offered as hints, never saved
+     * and never put among the core's remembered routes. */
+    private val pairingHints = HashMap<String, String>()
 
     public suspend fun saved(): SavedRoutes = withContext(Dispatchers.IO) { store.load() }
     public suspend fun change(change: (SavedRoutes) -> SavedRoutes): SavedRoutes = withContext(Dispatchers.IO) { store.update(change) }
     public fun key(device: PairedDevice): String? = KnownRouteStore.peerKey(device.deviceId, device.fingerprint)
 
+    /** Drop everything kept for a device that is not paired any more (revoked,
+     * or simply unknown): its saved routes, the note that it was used last,
+     * and a pairing hint not yet used. Call it whenever the list of paired
+     * devices is read or changes, whether automatic connection is on or off. */
+    public suspend fun prune(paired: List<PairedDevice>) {
+        val active = paired.filter { it.revokedAtMs == null }
+        val keys = active.mapNotNull(::key).toSet()
+        val saved = saved()
+        if (saved.peers.any { it !in keys } || saved.lastPeer?.let { it !in keys } == true) change { it.keepOnly(keys) }
+        restored.retainAll(keys)
+        pairingHints.keys.retainAll(active.map { it.deviceId }.toSet())
+    }
+
     /** Hand the core the routes saved by earlier runs, once per paired device,
      * and drop whatever belongs to devices that are no longer paired. */
     public suspend fun restore(service: WorkbenchSessions, paired: List<PairedDevice>) {
         if (restoredInto !== service) { restoredInto = service; restored.clear() }
-        val active = paired.filter { it.revokedAtMs == null }
-        val keys = active.mapNotNull(::key).toSet()
-        var saved = saved()
-        if (saved.peers.any { it !in keys } || saved.lastPeer?.let { it !in keys } == true) saved = change { it.keepOnly(keys) }
-        restored.retainAll(keys)
-        for (device in active) {
+        prune(paired)
+        val saved = saved()
+        for (device in paired.filter { it.revokedAtMs == null }) {
             val key = key(device) ?: continue
             if (!restored.add(key)) continue
             val routes = saved.routesFor(key)
@@ -133,21 +147,22 @@ public class AutomaticRouteKeeper(
         return AutomaticPlan(saved, local, tether, local.filter { !it.loopback && (usable(it) || tether(it)) })
     }
 
-    /** An address this device was just given for a paired device, such as the
-     * one in the pairing code it scanned. It becomes the first hint. */
-    public suspend fun learned(service: WorkbenchSessions, device: PairedDevice, address: String) {
-        val key = key(device) ?: return
-        val plan = plan()
-        val hint = classifyRouteHints(listOf(address), plan.local, plan.tether)
-        if (hint.isEmpty()) return
-        try {
-            val routes = (hint + service.knownRoutes(device.deviceId)).distinctBy { it.address }.take(6)
-            service.restoreRoutes(device.deviceId, routes)
-            restored.add(key)
-            change { it.remember(key, routes) }
-        } catch (cancel: CancellationException) { throw cancel }
-        catch (_: SessionFailure) { }
+    /** An address this device was just given for a paired device: the one in
+     * the pairing code it scanned. Pairing proved the device at the pairing
+     * listener, not at its project listener, so the address is only a place to
+     * try. It is offered to the core as a hint for the rest of this run and is
+     * saved only once the core has authenticated the device there. */
+    public fun offerFromPairing(device: PairedDevice, address: String) {
+        val text = address.trim()
+        if (device.revokedAtMs == null && key(device) != null && isNumericSessionEndpoint(text)) pairingHints[device.deviceId] = text
     }
+
+    /** What to offer the core for [peer] besides the routes it remembers: an
+     * address given at pairing and, with [look], what discovery finds now.
+     * Every one is an untrusted hint. */
+    public suspend fun hints(service: WorkbenchSessions, peer: String, plan: AutomaticPlan, look: Boolean = true): List<SessionEndpoint> =
+        classifyRouteHints(listOfNotNull(pairingHints[peer]) + (if (look) discovery.found(service, plan.usable) else emptyList()),
+            plan.local, plan.tether)
 
     /** One upkeep step for [link], a connection that was started automatically
      * with [peer]. [status] is its newest status. */
@@ -164,7 +179,7 @@ public class AutomaticRouteKeeper(
                     discovery.advertise(service, bound.filter { it.carrier != SessionCarrier.TcpAdb }.map { it.address })
                 }
             } else {
-                val hints = classifyRouteHints(discovery.found(service, plan.usable), plan.local, plan.tether)
+                val hints = hints(service, peer.deviceId, plan)
                 // A local link that came or went (USB tethering switched on) is
                 // offered again even with the same hints: that asks the core
                 // for a fresh look at once instead of at its next slow retry.
@@ -188,6 +203,8 @@ public class AutomaticRouteKeeper(
                 change { if (routes.isEmpty()) it.withLastPeer(key) else it.remember(key, routes) }
                 remembered = key to routes
             }
+            // The address from pairing has now authenticated: it is a route, no longer a hint.
+            if (routes.any { it.address == pairingHints[peer.deviceId] }) pairingHints.remove(peer.deviceId)
         } catch (cancel: CancellationException) { throw cancel }
         catch (_: SessionFailure) { /* Asked again at the next step. */ }
     }

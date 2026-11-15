@@ -48,6 +48,7 @@ class AutomaticPairingTest {
         val calls = ArrayList<String>()
         val known = HashMap<String, List<SessionEndpoint>>()
         var received: Pair<String, List<SessionEndpoint>>? = null
+        var receiveFails = false
         val link = Link(); val project = Project()
         override suspend fun knownRoutes(peer: String) = known[peer].orEmpty()
         override suspend fun restoreRoutes(peer: String, endpoints: List<SessionEndpoint>) { known[peer] = endpoints }
@@ -56,7 +57,9 @@ class AutomaticPairingTest {
         }
         override suspend fun connectAutomatic(project: WorkbenchProject, peer: String, hints: List<SessionEndpoint>): ProjectLink { calls += "connectAutomatic $peer ${hints.size}"; return link }
         override suspend fun receiveProjectAutomatic(path: String, peer: String, hints: List<SessionEndpoint>, expectedProjectId: String?, maxBlobBytes: ULong): WorkbenchProject {
-            calls += "receiveAutomatic $peer"; received = path to hints; return project
+            calls += "receiveAutomatic $peer"; received = path to hints
+            if (receiveFails) throw SessionFailure(SessionFailureKind.Transport)
+            return project
         }
         override suspend fun host(project: WorkbenchProject, peer: String, endpoints: List<SessionEndpoint>): ProjectLink { calls += "host $peer ${endpoints.single().address}"; return link }
         override suspend fun connect(project: WorkbenchProject, peer: String, endpoints: List<SessionEndpoint>): ProjectLink { calls += "connect $peer ${endpoints.single().address}"; return link }
@@ -89,7 +92,7 @@ class AutomaticPairingTest {
         val keeper = AutomaticRouteKeeper(KnownRouteStore(file), nearby,
             { _ -> { address -> isAndroidUsbTetherInterface(address.interfaceName) } },
             { _ -> { address -> isAndroidWifiInterface(address.interfaceName) || isAndroidUsbTetherInterface(address.interfaceName) } }, { local })
-        val pairing = AutomaticPairing(keeper, nearby) { waited += it }
+        val pairing = AutomaticPairing(keeper) { waited += it }
         val routed = pairing.routed(real)
         var paired = emptyList<PairedDevice>()
         var view = AutomaticView(null, null, false, false)
@@ -144,7 +147,7 @@ class AutomaticPairingTest {
         assertNull(step()); assertFalse(pairing.load())
         // The address from a scanned pairing code is not kept, nor is a
         // connection made with a typed address.
-        pairing.learned(real, computer, "192.0.2.20:$AUTOMATIC_SESSION_PORT")
+        pairing.learned(computer, "192.0.2.20:$AUTOMATIC_SESSION_PORT")
         assertTrue(real.known.isEmpty())
         real.known[computer.deviceId] = listOf(SessionEndpoint(SessionCarrier.QuicWifi, "192.0.2.20:47000"))
         view = open(status = status(SessionCarrier.QuicWifi, SyncStatus.Synced))
@@ -261,6 +264,81 @@ class AutomaticPairingTest {
         real.known.clear(); nearby.looks = 0
         routed.receiveProject("/synthetic/path", computer.deviceId, pairing.endpoints, null, 1uL)
         assertTrue(real.received!!.second.isEmpty()); assertEquals(4000L, waited)
+        // Looking was for the receive alone: it stopped each time, and it stops
+        // when the receive fails as well.
+        assertEquals(3, nearby.stops)
+        real.receiveFails = true
+        val failure = runCatching { routed.receiveProject("/synthetic/path", computer.deviceId, pairing.endpoints, null, 1uL) }.exceptionOrNull()
+        assertEquals(SessionFailureKind.Transport, (failure as SessionFailure).kind)
+        assertEquals(4, nearby.stops)
+        // While a connection of ours is using it, a receive leaves the looking alone.
+        real.receiveFails = false
+        routed.connect(real.project, computer.deviceId, pairing.endpoints)
+        routed.receiveProject("/synthetic/path", computer.deviceId, pairing.endpoints, null, 1uL)
+        assertEquals(4, nearby.stops)
+    }
+
+    @Test fun theAddressFromPairingRidesAlongAsAHintAndIsNotSaved() = fixture {
+        paired = listOf(computer)
+        pairing.learned(computer, "192.0.2.20:$AUTOMATIC_SESSION_PORT")
+        val hint = listOf(SessionEndpoint(SessionCarrier.QuicWifi, "192.0.2.20:$AUTOMATIC_SESSION_PORT"))
+        // Nothing was handed to the core as a place where the computer was
+        // authenticated, and nothing about it was saved.
+        assertTrue(real.known.isEmpty() && keeper.saved().peers.isEmpty())
+        // A first receive right after pairing needs no wait for discovery...
+        routed.receiveProject("/synthetic/path", computer.deviceId, pairing.endpoints, null, 1uL)
+        assertEquals(hint, real.received!!.second); assertEquals(0L, waited)
+        // ...and a connect offers it too, beside whatever the core remembers.
+        routed.connect(real.project, computer.deviceId, pairing.endpoints)
+        assertEquals("connectAutomatic ${computer.deviceId} 1", real.calls.last())
+        assertTrue(keeper.saved().peers.isEmpty())
+        // Once the computer has authenticated there it is saved as a route.
+        real.known[computer.deviceId] = hint
+        view = open(status = status(SessionCarrier.QuicWifi, SyncStatus.Synced))
+        assertNull(step())
+        assertEquals(hint, keeper.saved().routesFor(keeper.key(computer)))
+    }
+
+    @Test fun switchedOffWhileAConnectionIsStartingItAsksForThatConnectionToEnd() = fixture {
+        paired = listOf(computer)
+        view = open()
+        assertEquals(computer.deviceId, step())
+        // The owner switches it off before the editor has connected: nothing exists yet.
+        pairing.setEnabled(false)
+        assertFalse(pairing.shouldStop(null))
+        // The connect that was already under way finishes after all.
+        routed.connect(real.project, computer.deviceId, pairing.endpoints)
+        val looking = status(null, SyncStatus.Reconnecting)
+        assertTrue(pairing.shouldStop(looking))
+        // A step with the switch off does nothing, and still says so.
+        view = open(status = looking)
+        assertNull(step())
+        assertTrue(pairing.shouldStop(looking))
+        assertEquals(0, nearby.looks); assertTrue(nearby.advertised.isEmpty())
+        // Had it connected in the meantime, it would be the owner's to end.
+        assertFalse(pairing.shouldStop(status(SessionCarrier.QuicWifi, SyncStatus.Synced)))
+        // The editor disconnects it: nothing is left to stop.
+        assertFalse(pairing.shouldStop(null))
+        // A connection made by hand, or the switch back on, is never asked to stop.
+        routed.connect(real.project, computer.deviceId, listOf(SessionEndpoint(SessionCarrier.QuicWifi, "192.0.2.20:47000")))
+        assertFalse(pairing.shouldStop(looking))
+        routed.connect(real.project, computer.deviceId, pairing.endpoints)
+        pairing.setEnabled(true)
+        assertFalse(pairing.shouldStop(looking))
+    }
+
+    @Test fun aRevokedComputerLosesWhatWasSavedForItEvenWhileSwitchedOff() = fixture {
+        val key = keeper.key(computer)!!
+        keeper.change { it.remember(key, listOf(SessionEndpoint(SessionCarrier.QuicWifi, "192.0.2.20:$AUTOMATIC_SESSION_PORT"))) }
+        pairing.setEnabled(false)
+        // Still paired: switching off forgets nothing.
+        pairing.prune(listOf(computer))
+        assertEquals(1, keeper.saved().routesFor(key).size)
+        pairing.prune(listOf(computer.copy(revokedAtMs = 5uL)))
+        val after = KnownRouteStore(file).load()
+        assertTrue(after.peers.isEmpty()); assertFalse(after.isLastPeer(key))
+        assertFalse(String(Files.readAllBytes(file), Charsets.ISO_8859_1).contains(key))
+        assertEquals(0, nearby.looks); assertTrue(real.calls.isEmpty())
     }
 
     @Test fun theConnectScreenSaysWhatIsHappeningInPlainWords() {

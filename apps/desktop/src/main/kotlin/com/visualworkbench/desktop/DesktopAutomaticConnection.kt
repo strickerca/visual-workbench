@@ -109,15 +109,25 @@ internal class DesktopAutomaticConnection(
         }
     }
 
+    /** The owner's newest choice in this run. It counts from the moment the
+     * switch is touched, before it has been saved and before the next step. */
+    private var chosen: Boolean? = null
+
     fun setEnabled(value: Boolean) {
+        chosen = value
+        if (!value) stopWaiting()
         scope.launch {
             val saved = keeper.change { it.withAutomatic(value) }
             if (value) decision.resume()
-            // Switched off while its connection was still only waiting or
-            // looking: that stops too. A live connection is the owner's to end.
-            else if (editor.automaticLink() != null && editor.status?.carrier == null) editor.stop()
             publish(saved)
         }
+    }
+
+    /** Switched off: a connection of ours that is still only waiting or
+     * looking stops too, whenever it turns up, including one whose start was
+     * already under way. A live connection is the owner's to end. */
+    private fun stopWaiting() {
+        if (editor.automaticLink() != null && editor.status?.carrier == null) editor.stop()
     }
 
     /** Called when the owner picks the adapter for the USB project connection.
@@ -147,12 +157,16 @@ internal class DesktopAutomaticConnection(
     suspend fun step() {
         val session = sessions.state.value
         val setting = keeper.saved()
-        if (!session.ready || !setting.automatic) {
+        val on = chosen ?: setting.automatic
+        if (!session.ready || !on) {
             // Switched off: nothing is listened on, announced, looked for,
             // dialled or saved. A live connection is left for the owner to end.
             if (keeping) { keeping = false; keeper.release() }
+            if (!on) stopWaiting()
+            // What was saved for a phone that is no longer paired goes, on or off.
+            if (session.ready) keeper.prune(session.paired)
             decision.closed(); note = null; roleAskedFor = null
-            mutable.value = AutomaticStatus(setting.automatic, setting.tetherAdapter, adapters = setting.adapters.toList())
+            mutable.value = AutomaticStatus(on, setting.tetherAdapter, adapters = setting.adapters.toList())
             return
         }
         val service = sessions.requireService()
@@ -166,9 +180,11 @@ internal class DesktopAutomaticConnection(
         val active = session.paired.filter { it.revokedAtMs == null }
         val peer = if (project != null && role != null) automaticPeer(session.paired, role) { plan.saved.isLastPeer(keeper.key(it)) } else null
         val status = editor.status
-        val target = decision.next(AutomaticSituation(plan.saved.automatic, project?.takeIf { role != null }, peer?.deviceId,
+        // The switch may have gone off while this step was looking at the network.
+        val stillOn = chosen ?: plan.saved.automatic
+        val target = decision.next(AutomaticSituation(stillOn, project?.takeIf { role != null }, peer?.deviceId,
             status != null, editor.busy || session.pairing, plan.network))
-        if (project == null || role == null || status != null || !plan.saved.automatic) note = null
+        if (project == null || role == null || status != null || !stillOn) note = null
         else if (peer == null) note = when {
             !role.isHost -> AutomaticNote.DifferentHost
             active.size > 1 -> AutomaticNote.ChoosePhone
@@ -187,7 +203,12 @@ internal class DesktopAutomaticConnection(
             } else {
                 note = null
                 val accepted = editor.start(peer.deviceId, if (role.isHost) plan.binds else emptyList(), { tetherInterface }) { error ->
-                    if (error != null) note = AutomaticNote.CouldNotStart else decision.started(project)
+                    if (error != null) note = AutomaticNote.CouldNotStart
+                    else {
+                        decision.started(project)
+                        // Starting takes a moment; the switch may have gone off meanwhile.
+                        if (chosen == false) stopWaiting()
+                    }
                 }
                 // The editor was busy after all: ask again at the next step.
                 if (!accepted) decision.retry()
@@ -195,7 +216,7 @@ internal class DesktopAutomaticConnection(
         }
         val link = editor.automaticLink()
         val linkPeer = status?.let { current -> active.firstOrNull { it.deviceId == current.peerDeviceId } }
-        if (link != null && linkPeer != null && role != null) {
+        if (stillOn && link != null && linkPeer != null && role != null) {
             keeping = true
             keeper.keep(service, link, role.isHost, linkPeer, status, plan)
         } else {
@@ -203,10 +224,10 @@ internal class DesktopAutomaticConnection(
             // A connection made with the buttons counts too: where it
             // authenticated is tried first next time, and the phone it reached
             // is the one to prefer when several are paired.
-            if (linkPeer != null) keeper.authenticated(service, linkPeer, status)
+            if (stillOn && linkPeer != null) keeper.authenticated(service, linkPeer, status)
         }
         val saved = keeper.saved()
-        mutable.value = AutomaticStatus(saved.automatic, saved.tetherAdapter, link != null, role?.isHost == true,
+        mutable.value = AutomaticStatus(chosen ?: saved.automatic, saved.tetherAdapter, link != null, role?.isHost == true,
             if (link != null && role?.isHost == true) try { link.endpoints.size } catch (_: SessionFailure) { 0 } else 0, note,
             decision.isQuietFor(project), saved.adapters.toList())
     }

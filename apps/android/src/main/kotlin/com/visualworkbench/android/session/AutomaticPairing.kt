@@ -1,7 +1,9 @@
 package com.visualworkbench.android.session
 
 import com.visualworkbench.shared.*
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /** One plain sentence about automatic connection for the Connect screen. */
 internal fun automaticConnectionLine(automatic: Boolean, quiet: Boolean, manual: Boolean, paired: Boolean, status: SessionStatus?): String = when {
@@ -36,7 +38,6 @@ internal class AutomaticView(
  * pinned-certificate session. Not thread-safe: call from the main thread. */
 internal class AutomaticPairing(
     private val keeper: AutomaticRouteKeeper,
-    private val discovery: RouteDiscovery,
     private val pause: suspend (Long) -> Unit = { delay(it) },
 ) {
     // Never a real address: if it ever reached the core it would be refused.
@@ -62,15 +63,21 @@ internal class AutomaticPairing(
      * routes; every other call goes to [real] unchanged. */
     fun routed(real: WorkbenchSessions): WorkbenchSessions = Routed(real)
 
+    /** The owner's newest choice in this run. It counts from the moment the
+     * switch is touched, before it has been saved. */
+    private var chosen: Boolean? = null
+
     suspend fun setEnabled(value: Boolean) {
-        enabled = keeper.change { it.withAutomatic(value) }.automatic
-        if (value) { decision.resume(); quiet = false } else idle()
+        chosen = value; enabled = value
+        if (!value) idle()
+        keeper.change { it.withAutomatic(value) }
+        if (value) { decision.resume(); quiet = false }
     }
 
-    /** Read the owner's saved setting. While it is off nothing is announced,
-     * looked for, dialled or saved, and [step] must not be called. */
+    /** Read the owner's setting. While it is off nothing is announced, looked
+     * for, dialled or saved, and [step] must not be called. */
     suspend fun load(): Boolean {
-        enabled = keeper.saved().automatic
+        enabled = chosen ?: keeper.saved().automatic
         if (!enabled) idle()
         return enabled
     }
@@ -85,16 +92,26 @@ internal class AutomaticPairing(
      * live one is the owner's to end. */
     fun waiting(status: SessionStatus?): Boolean = link != null && status != null && status.carrier == null
 
+    /** Switched off, yet a connection of ours is still only waiting or
+     * looking: its start was already under way when the switch went off. The
+     * caller ends it, as Disconnect would. */
+    fun shouldStop(status: SessionStatus?): Boolean = !enabled && waiting(status)
+
     fun projectClosed() { decision.closed(); quiet = false; asked = null }
 
     /** The editor could not act on the newest answer from [step]. */
     fun missed() { decision.retry(); asked = null }
 
-    /** The pairing address the phone just used is the first place to look.
-     * Nothing is kept while automatic connection is switched off. */
-    suspend fun learned(service: WorkbenchSessions, device: PairedDevice, address: String) {
-        if (load()) keeper.learned(service, device, address)
+    /** The pairing address the phone just used is a first place to try. It
+     * stays a hint in memory until the computer has authenticated there, and
+     * is not kept at all while automatic connection is switched off. */
+    suspend fun learned(device: PairedDevice, address: String) {
+        if (load()) keeper.offerFromPairing(device, address)
     }
+
+    /** What was saved for a computer that is no longer paired goes, whether
+     * automatic connection is on or off. */
+    suspend fun prune(paired: List<PairedDevice>) = keeper.prune(paired)
 
     /** Stop announcing and looking (the app left the foreground). A live
      * connection is not touched. */
@@ -145,7 +162,7 @@ internal class AutomaticPairing(
         repeat(16) {
             val plan = keeper.plan()
             upkeep = true
-            val hints = classifyRouteHints(discovery.found(real, plan.usable), plan.local, plan.tether)
+            val hints = keeper.hints(real, peer, plan)
             if (hints.isNotEmpty() || real.knownRoutes(peer).isNotEmpty()) return hints
             pause(250)
         }
@@ -162,10 +179,15 @@ internal class AutomaticPairing(
         }
         override suspend fun connect(project: WorkbenchProject, peer: String, endpoints: List<SessionEndpoint>): ProjectLink {
             if (!isAutomatic(endpoints)) { link = null; asked = null; return real.connect(project, peer, endpoints) }
-            return real.connectAutomatic(project, peer, emptyList()).also { adopt(it, peer, false) }
+            // The core dials what it remembers; an address given at pairing goes along as a hint.
+            return real.connectAutomatic(project, peer, keeper.hints(real, peer, keeper.plan(), look = false)).also { adopt(it, peer, false) }
         }
-        override suspend fun receiveProject(path: String, peer: String, endpoints: List<SessionEndpoint>, expectedProjectId: String?, maxBlobBytes: ULong): WorkbenchProject =
-            if (!isAutomatic(endpoints)) real.receiveProject(path, peer, endpoints, expectedProjectId, maxBlobBytes)
-            else real.receiveProjectAutomatic(path, peer, hintsFor(real, peer), expectedProjectId, maxBlobBytes)
+        override suspend fun receiveProject(path: String, peer: String, endpoints: List<SessionEndpoint>, expectedProjectId: String?, maxBlobBytes: ULong): WorkbenchProject {
+            if (!isAutomatic(endpoints)) return real.receiveProject(path, peer, endpoints, expectedProjectId, maxBlobBytes)
+            try { return real.receiveProjectAutomatic(path, peer, hintsFor(real, peer), expectedProjectId, maxBlobBytes) }
+            // Looking was for this receive alone. It stops when the receive ends,
+            // failed or not, unless a connection of ours is still using it.
+            finally { if (link == null) withContext(NonCancellable) { upkeep = false; keeper.release() } }
+        }
     }
 }
