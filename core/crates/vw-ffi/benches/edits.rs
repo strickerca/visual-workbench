@@ -542,6 +542,33 @@ fn store_rows(path: &Path, strokes: u32) -> f64 {
         },
         true,
     ));
+    // Large entities cost what their size is; they are not held to the
+    // budget of the rows above.
+    editor.row(
+        "add a result with 900 KB of request",
+        |n| {
+            vec![Kind::AddResult(pb::AddResult {
+                result_id: uid(10, 2000 + n),
+                document_id: uid(2, 0),
+                provider: "benchmark".into(),
+                model: "benchmark".into(),
+                request_json: large_json(n, 900 * 1024),
+                ..Default::default()
+            })]
+        },
+        true,
+    );
+    editor.commit(vec![instruction(1001, "x".repeat(900 * 1024))]);
+    editor.row(
+        "edit a 900 KB instruction",
+        |n| vec![instruction(1001, format!("{n} {}", "y".repeat(900 * 1024)))],
+        true,
+    );
+    editor.row(
+        "add a 512 KB semantic snapshot",
+        |n| vec![snapshot(n, 512 * 1024)],
+        true,
+    );
     editor.row(
         "move 50 early strokes at once",
         |n| {
@@ -552,6 +579,320 @@ fn store_rows(path: &Path, strokes: u32) -> f64 {
         true,
     );
     slowest
+}
+
+/// A JSON object of about `size` bytes.
+fn large_json(n: u32, size: usize) -> String {
+    format!("{{\"n\":{n},\"prompt\":\"{}\"}}", "p".repeat(size))
+}
+fn snapshot(n: u32, size: usize) -> Kind {
+    Kind::AddSemanticSnapshot(pb::AddSemanticSnapshot {
+        snapshot_id: uid(15, n),
+        document_id: uid(2, 0),
+        platform: "uia".into(),
+        frame_delta_ms: 0,
+        elements_json_zstd: (0..size).map(|i| (i % 251) as u8).collect(),
+    })
+}
+
+/// The project the replay estimates are measured on: the benchmark's image
+/// document with its layer, without the image itself.
+fn bare_project() -> vw_model::Project {
+    let source = source();
+    let asset = AssetId::hash(&source);
+    let mut project = vw_model::Project::new(raw_id(1, 0), "estimates".into(), device_id());
+    project.assets.insert(
+        asset.clone(),
+        pb::AddAsset {
+            asset_id: asset.to_string(),
+            format: "png".into(),
+            width: 1024,
+            height: 1024,
+            orientation: 1,
+            bit_depth: 8,
+            color_space: "untagged".into(),
+            byte_size: source.len() as u64,
+            source: "import".into(),
+            ..Default::default()
+        },
+    );
+    project.documents.insert(
+        raw_id(2, 0),
+        vw_model::Document {
+            definition: pb::CreateDocument {
+                document_id: uid(2, 0),
+                kind: pb::DocumentKind::Image as i32,
+                schema_version: 1,
+                title: "estimates".into(),
+                primary_asset_id: asset.to_string(),
+                ..Default::default()
+            },
+            pages: vec![],
+            created_at_ms: TIME as i64,
+        },
+    );
+    project.layers.insert(
+        raw_id(3, 0),
+        vw_model::Layer {
+            definition: pb::CreateLayer {
+                layer_id: uid(3, 0),
+                document_id: uid(2, 0),
+                page_index: -1,
+                name: "Annotations".into(),
+                kind: "annotation".into(),
+                order_key: "V".into(),
+            },
+            visible: true,
+            locked: false,
+            opacity: 1.0,
+            blend: "normal".into(),
+        },
+    );
+    project
+}
+fn stroke_kind(n: u32, author: &DeviceId) -> Kind {
+    let mut state = object(uid(6, n), uid(3, 0), "V");
+    state.created_by = author.to_string();
+    state.shape = Some(pb::object_state::Shape::Stroke(pb::Stroke {
+        x: (0..SAMPLES_PER_STROKE)
+            .map(|i| f64::from(n % 900) + i as f64)
+            .collect(),
+        y: (0..SAMPLES_PER_STROKE)
+            .map(|i| f64::from(n % 700) + i as f64 * 0.5)
+            .collect(),
+        t_ms: (0..SAMPLES_PER_STROKE).map(|i| (i * 4) as u32).collect(),
+        pressure: vec![0.6; SAMPLES_PER_STROKE],
+        tilt: vec![],
+        orientation: vec![],
+        brush: Some(pb::Brush {
+            family: "pen".into(),
+            algorithm_version: 1,
+            base_width: 4.0,
+            pressure_curve: vec![0.0, 0.0, 0.25, 0.25, 0.75, 0.75, 1.0, 1.0],
+            stabilization: 0.0,
+        }),
+    }));
+    Kind::CreateObject(pb::CreateObject {
+        document_id: uid(2, 0),
+        state: Some(state),
+    })
+}
+
+/// A store taking a history, and how long deciding it again takes.
+struct History {
+    store: ProjectStore,
+    project: vw_model::Project,
+    next: u32,
+}
+impl History {
+    fn new(path: &Path) -> Self {
+        let project = bare_project();
+        Self {
+            store: ProjectStore::create(path, project.clone(), device_id(), 0).unwrap(),
+            project,
+            next: 0,
+        }
+    }
+    fn commit(&mut self, author: &DeviceId, kinds: Vec<Kind>) -> Id {
+        self.next += 1;
+        let time = TIME as i64 + i64::from(self.next);
+        let id = raw_id(9, self.next);
+        let txn = pb::Transaction {
+            txn_id: Some(id.to_proto()),
+            project_id: uid(1, 0),
+            device_id: author.to_string(),
+            base_revision: Some(self.store.revision().unwrap()),
+            created_at_wall_ms: time,
+            ops: kinds
+                .into_iter()
+                .enumerate()
+                .map(|(index, kind)| pb::Op {
+                    op_id: Some(pb::OpId {
+                        device_id: author.to_string(),
+                        lamport: u64::from(self.next) * 4096 + index as u64 + 1,
+                    }),
+                    kind: Some(kind),
+                })
+                .collect(),
+            gesture_id: None,
+        };
+        self.store.commit(&txn, author, time).unwrap();
+        id
+    }
+    /// Decide the whole stored history again from the project it started
+    /// from, as an open with no later checkpoint does, and time the
+    /// transactions after the first `untimed`.
+    fn replay(&self, untimed: usize) -> Duration {
+        let mut rows = self.store.accepted_transactions().collect::<Vec<_>>();
+        rows.sort_by_key(|(_, ack)| ack.host_seq);
+        let mut host = vw_ops::HostSequencer::new(self.project.clone(), device_id()).unwrap();
+        let mut timed = Duration::ZERO;
+        for (index, (txn, ack)) in rows.into_iter().enumerate() {
+            let at = self
+                .store
+                .host()
+                .accepted_at(&Id::from_proto(txn.txn_id.as_ref()).unwrap())
+                .unwrap();
+            let started = Instant::now();
+            assert!(host.replay(txn.clone(), at, ack).unwrap().is_some());
+            if index >= untimed {
+                timed += started.elapsed();
+            }
+        }
+        timed
+    }
+}
+
+/// For each pattern of edits after a base of strokes: what the store
+/// estimates replaying it costs, which decides when a checkpoint is due,
+/// beside what deciding it again measures.
+fn estimates(strokes: u32) {
+    println!("\nreplay estimate beside measured replay, after {strokes} strokes");
+    println!(
+        "{:<52} | {:>10} | {:>10}",
+        "history", "estimate", "measured"
+    );
+    let peer = DeviceId::from_bytes([8; 16]);
+    type Pattern = fn(&mut History, &DeviceId);
+    let patterns: [(&str, Pattern); 8] = [
+        ("200 more strokes", |history, _| {
+            for n in 0..200 {
+                history.commit(&device_id(), vec![stroke_kind(100_000 + n, &device_id())]);
+            }
+        }),
+        ("100 moves of the first stroke", |history, _| {
+            for n in 0..100 {
+                history.commit(
+                    &device_id(),
+                    vec![property(0, "transform", Value::Transform(transform(n)))],
+                );
+            }
+        }),
+        ("100 layer renames", |history, _| {
+            for n in 0..100 {
+                history.commit(
+                    &device_id(),
+                    vec![layer_update(|u| u.name = Some(format!("Layer {n}")))],
+                );
+            }
+        }),
+        ("50 edits of a 900 KB instruction", |history, _| {
+            for n in 0..50 {
+                history.commit(
+                    &device_id(),
+                    vec![instruction(0, format!("{n} {}", "z".repeat(900 * 1024)))],
+                );
+            }
+        }),
+        ("300 results of 20 KB, 100 status changes", |history, _| {
+            for n in 0..300 {
+                history.commit(
+                    &device_id(),
+                    vec![Kind::AddResult(pb::AddResult {
+                        result_id: uid(10, n),
+                        document_id: uid(2, 0),
+                        provider: "benchmark".into(),
+                        model: "benchmark".into(),
+                        request_json: large_json(n, 20 * 1024),
+                        ..Default::default()
+                    })],
+                );
+            }
+            for n in 0..100 {
+                history.commit(
+                    &device_id(),
+                    vec![Kind::UpdateResult(pb::UpdateResult {
+                        result_id: uid(10, n * 3),
+                        status: if n % 2 == 0 { "rejected" } else { "error" }.into(),
+                        acceptance_mask_asset_id: String::new(),
+                    })],
+                );
+            }
+        }),
+        ("10 semantic snapshots of 512 KB", |history, _| {
+            for n in 0..10 {
+                history.commit(&device_id(), vec![snapshot(n, 512 * 1024)]);
+            }
+        }),
+        (
+            "200 strokes moved at once, then 300 peer edits",
+            |history, peer| {
+                history.commit(
+                    &device_id(),
+                    (0..200)
+                        .map(|k| property(k, "transform", Value::Transform(transform(k))))
+                        .collect(),
+                );
+                for n in 0..300 {
+                    history.commit(
+                        peer,
+                        (0..20)
+                            .map(|k| {
+                                property(
+                                    1000 + (n * 20 + k) % 900,
+                                    "transform",
+                                    Value::Transform(transform(n)),
+                                )
+                            })
+                            .collect(),
+                    );
+                }
+            },
+        ),
+        (
+            "  ... and 40 undos and redos of the 200-stroke move",
+            |history, _| {
+                // Undo the move, redo it, and so on: each compared with the
+                // 300 edits by the other device.
+                let mut target = history
+                    .store
+                    .accepted_transactions()
+                    .filter(|(txn, _)| txn.ops.len() == 200)
+                    .map(|(txn, _)| Id::from_proto(txn.txn_id.as_ref()).unwrap())
+                    .next()
+                    .unwrap();
+                for _ in 0..40 {
+                    target = history.commit(
+                        &device_id(),
+                        vec![Kind::UndoTransaction(pb::UndoTransaction {
+                            target_txn_id: Some(target.to_proto()),
+                        })],
+                    );
+                }
+            },
+        ),
+    ];
+    let root = tempfile::tempdir().unwrap();
+    let mut chained: Option<History> = None;
+    for (index, (name, pattern)) in patterns.into_iter().enumerate() {
+        // The last pattern goes on from the one before it.
+        let mut history = match chained.take() {
+            Some(history) if name.starts_with("  ") => history,
+            _ => {
+                let mut history = History::new(&root.path().join(format!("history-{index}")));
+                for n in 0..strokes {
+                    let author = if n % 2 == 0 {
+                        device_id()
+                    } else {
+                        peer.clone()
+                    };
+                    history.commit(&author, vec![stroke_kind(n, &author)]);
+                }
+                history
+            }
+        };
+        let before = history.store.replay_estimate_micros();
+        let untimed = history.store.accepted_transactions().count();
+        pattern(&mut history, &peer);
+        let estimate = history.store.replay_estimate_micros() - before;
+        let measured = history.replay(untimed);
+        println!(
+            "{name:<52} | {:>7.1} ms | {:>7.1} ms",
+            estimate as f64 / 1000.0,
+            ms(measured)
+        );
+        chained = Some(history);
+    }
 }
 
 fn binding(info: &ProjectInfo) -> WorkflowBinding {
@@ -977,6 +1318,9 @@ fn main() {
             project.close().await.unwrap();
             println!("closing the project: {:.0} ms", ms(started.elapsed()));
         });
+    }
+    if std::env::var("VW_BENCH_ESTIMATES").map_or(true, |value| value != "0") {
+        estimates(2000);
     }
     if let Some(budget) = budget
         && slowest > budget

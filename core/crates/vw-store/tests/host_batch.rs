@@ -226,10 +226,20 @@ fn an_update_taken_in_equals_installing_the_host_and_a_bad_one_changes_nothing()
     refused(&mut mirror, update, &pc());
     assert!(mirror.checkpoint_bytes().unwrap() == host.checkpoint_bytes().unwrap());
     // Reopened, every stored row equals a full rebuild and the log is the
-    // host's, decided again.
+    // host's, decided again. What replaying it was estimated to cost when
+    // the update came is what the open that replayed it estimates, but for
+    // the kept bytes the refused batches above made the store hash again.
     let state = host.checkpoint_bytes().unwrap();
+    let estimate = mirror.replay_estimate_micros();
+    assert!(estimate > 0);
     drop(mirror);
     let mirror = ProjectStore::open(&path).unwrap();
     assert!(mirror.checkpoint_bytes().unwrap() == state);
+    assert_eq!(mirror.replayed_transactions(), 2);
+    let reopened = mirror.replay_estimate_micros();
+    assert!(
+        reopened.abs_diff(estimate) * 10 <= reopened,
+        "{estimate} {reopened}"
+    );
     mirror.integrity_check().unwrap();
 }

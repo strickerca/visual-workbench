@@ -191,7 +191,27 @@ fn bootstrap_keeps_undone_original_inventory_and_transfer_files_are_project_priv
             target_txn_id: Some(id(11).to_proto()),
         }),
     );
-    store.commit(&redo, &device(1), 201).unwrap();
+    // The host redoes it, and the mirror takes the update in. A mirror
+    // never accepts a transaction itself.
+    assert!(store.commit(&redo, &device(1), 201).is_err());
+    let base = store.revision().unwrap();
+    host.submit(redo, &device(1), 201).unwrap();
+    let (txn, ack) = host.accepted_transaction(&id(12)).unwrap();
+    let update = pb::SyncBatch {
+        txns: vec![pb::AckedTransaction {
+            host_seq: ack.host_seq,
+            state_hash: ack.state_hash.clone(),
+            txn: Some(txn.clone()),
+            ack: Some(ack.clone()),
+            accepted_at_ms: 201,
+        }],
+        complete: true,
+        project_id: Some(id(1).to_proto()),
+        base: Some(base),
+        revision: Some(host.revision().unwrap()),
+        ..Default::default()
+    };
+    store.receive_host_batch(&update, &device(1), 201).unwrap();
     assert!(store.project().assets.contains_key(&asset));
     drop(store);
     let reopened = ProjectStore::open(&path).unwrap();

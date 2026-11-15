@@ -935,7 +935,7 @@ fn sync_does_not_depend_on_how_the_other_build_words_its_notices() {
 
     // What matters for integrity is still compared, whatever the wording.
     type Tamper = fn(&mut pb::SyncBatch);
-    let tampered: [(&str, Tamper); 7] = [
+    let tampered: [(&str, Tamper); 10] = [
         ("state hash in the acknowledgement", |batch| {
             batch.txns[2].ack.as_mut().unwrap().state_hash[0] ^= 1;
         }),
@@ -955,6 +955,15 @@ fn sync_does_not_depend_on_how_the_other_build_words_its_notices() {
         ("no acknowledgement", |batch| batch.txns[2].ack = None),
         ("a notice no acknowledgement may hold", |batch| {
             batch.txns[2].ack.as_mut().unwrap().notices = vec!["x".repeat(1025)];
+        }),
+        ("an empty notice", |batch| {
+            batch.txns[2].ack.as_mut().unwrap().notices = vec![String::new()];
+        }),
+        ("a notice with a control character", |batch| {
+            batch.txns[2].ack.as_mut().unwrap().notices = vec!["Skipped\u{1b}[2J".into()];
+        }),
+        ("more notices than are kept", |batch| {
+            batch.txns[2].ack.as_mut().unwrap().notices = vec!["Skipped".into(); 257];
         }),
     ];
     for (name, tamper) in tampered {

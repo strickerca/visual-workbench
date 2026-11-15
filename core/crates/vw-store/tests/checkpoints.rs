@@ -912,7 +912,7 @@ fn regroup(revision: pb::Revision, n: u64, members: u64) -> pb::Transaction {
     txn
 }
 /// Edits that are expensive to replay, numbered from `first`: in a heavy
-/// project each regroups 120 rectangles; elsewhere each is a new title.
+/// project each regroups 200 rectangles; elsewhere each is a new title.
 fn expensive_edits(store: &mut ProjectStore, first: u64, count: u64) {
     let heavy = store
         .project()
@@ -921,7 +921,7 @@ fn expensive_edits(store: &mut ProjectStore, first: u64, count: u64) {
     for n in first..first + count {
         let revision = store.revision().unwrap();
         let txn = if heavy {
-            regroup(revision, 2000 + n, 120)
+            regroup(revision, 2000 + n, 200)
         } else {
             title(revision, 2000 + n, 0)
         };
@@ -963,7 +963,7 @@ fn a_checkpoint_is_written_once_replaying_costs_more_than_loading_one_and_never_
         expensive += 1;
         assert!(expensive < 40, "a checkpoint never became due");
     }
-    assert!((8..=20).contains(&expensive), "{expensive}");
+    assert!((5..=20).contains(&expensive), "{expensive}");
     let revision = store.revision().unwrap().host_seq;
     assert_eq!(checkpoints(&path), [0, revision as i64]);
     assert!(!store.checkpoint_if_due(902).unwrap());
