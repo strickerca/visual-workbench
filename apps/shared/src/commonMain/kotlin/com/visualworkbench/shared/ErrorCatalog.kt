@@ -53,7 +53,70 @@ public object ErrorCatalog {
         }
     }
 
-    public fun session(kind: SessionFailureKind): ProblemAdvice = when (kind) {
+    /** [cause] is the core's reason for a failed connection attempt (area
+     * `session` or `discovery`), when the app has one. */
+    public fun session(kind: SessionFailureKind, cause: String? = null): ProblemAdvice =
+        connection(cause) ?: general(kind)
+
+    /** Advice for the failure word a live project connection reports in its
+     * status, or null when the status carries nothing the owner can act on. */
+    public fun link(failure: String?): ProblemAdvice? = when (failure) {
+        "no_known_route" -> connection("no known route")
+        "untrusted_or_revoked" -> connection("paired device revoked or unknown")
+        "upgrade_required" -> connection("upgrade required")
+        "timeout", "connection" -> connection("link lost")
+        "storage" -> general(SessionFailureKind.Storage)
+        "capacity" -> general(SessionFailureKind.Backpressure)
+        else -> null
+    }
+
+    private fun connection(cause: String?): ProblemAdvice? = when (cause) {
+        "no known route" -> ProblemAdvice(
+            "The other device has not been found yet.",
+            "Open the app on both devices on the same Wi-Fi, or turn on USB tethering. It connects by itself once the device is found.",
+        )
+        "route did not answer in time", "route unreachable", "route busy" -> ProblemAdvice(
+            "The other device did not answer where it was last found.",
+            "Check that it is switched on with the app open. The app keeps looking and connects by itself.",
+        )
+        "route did not prove the paired device", "route handshake rejected" -> ProblemAdvice(
+            "A device answered, but it is not the one you paired.",
+            "Nothing was shared with it. The app keeps looking for your paired device.",
+        )
+        "paired device revoked or unknown", "paired device revoked or not verified", "incoming device not verified" -> ProblemAdvice(
+            "The other device is no longer paired with this one.",
+            "Pair the two devices again by scanning the code.",
+        )
+        "upgrade required" -> ProblemAdvice(
+            "The two devices run different versions of the app.",
+            "Update the app on both devices, then connect again.",
+        )
+        "listener bind failed" -> ProblemAdvice(
+            "This device could not start listening for the other one.",
+            "Check that Wi-Fi or USB tethering is on, then open the project again.",
+        )
+        "link lost", "link closed", "paired device silent too long", "incoming connection dropped",
+        "incoming handshake timed out", "incoming hello timed out", "incoming handshake rejected" -> ProblemAdvice(
+            "The connection to the other device dropped.",
+            "Your edits are saved. The app reconnects by itself when the device is reachable again.",
+        )
+        "paired device sent an invalid message", "link capacity exceeded" -> ProblemAdvice(
+            "The connection was restarted after an unexpected reply.",
+            "Your edits are saved. If it keeps happening, update the app on both devices.",
+        )
+        "project storage failed during sync", "trust store unavailable" -> ProblemAdvice(
+            "The connection stopped because this device could not save.",
+            "Check free space on this device, then open the project again.",
+        )
+        "discovery network unavailable", "advertising could not start", "browsing could not start",
+        "discovery failed", "discovery timed out", "too many discoveries open" -> ProblemAdvice(
+            "Finding the other device automatically is not available on this network.",
+            "The devices can still connect: use the address shown under Other connection options.",
+        )
+        else -> null
+    }
+
+    private fun general(kind: SessionFailureKind): ProblemAdvice = when (kind) {
         SessionFailureKind.Authentication -> ProblemAdvice(
             "The other device could not be verified.",
             "Pair the two devices again by scanning the code.",

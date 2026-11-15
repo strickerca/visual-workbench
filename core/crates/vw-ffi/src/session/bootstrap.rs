@@ -1,6 +1,7 @@
 use super::{
     SessionEndpoint, SessionError, SessionResult, SessionService, device,
     link::{self, MAX_TRANSFER},
+    routing,
     runtime::NetworkRuntime,
 };
 use crate::{ProjectSession, project::SessionPermit};
@@ -34,6 +35,32 @@ impl SessionService {
         options: ReceiveProjectOptions,
         cancellation: Arc<crate::Cancellation>,
     ) -> SessionResult<Arc<ProjectSession>> {
+        let addresses = link::routes(options.endpoints.clone(), false)?;
+        self.receive(options, link::Route::Client(addresses), cancellation)
+            .await
+    }
+    /// As `receive_project`, without a typed address: the routes this paired
+    /// device was last authenticated on are tried first, then
+    /// `options.endpoints` as untrusted hints (they may be empty). The same
+    /// pinned certificate and checkpoint verification decide the outcome.
+    pub async fn receive_project_automatic(
+        &self,
+        options: ReceiveProjectOptions,
+        cancellation: Arc<crate::Cancellation>,
+    ) -> SessionResult<Arc<ProjectSession>> {
+        let hints = routing::paths(options.endpoints.clone(), routing::MAX_HINTS, false)?;
+        let seeker = routing::Seeker::new(self.routes.clone(), hints);
+        self.receive(options, link::Route::Seek(seeker), cancellation)
+            .await
+    }
+}
+impl SessionService {
+    async fn receive(
+        &self,
+        options: ReceiveProjectOptions,
+        route: link::Route,
+        cancellation: Arc<crate::Cancellation>,
+    ) -> SessionResult<Arc<ProjectSession>> {
         if options.path.len() > 32767
             || options.path.contains('\0')
             || !Path::new(&options.path).is_absolute()
@@ -43,7 +70,7 @@ impl SessionService {
             return Err(SessionError::Invalid);
         }
         let peer = device(options.peer_device_id)?;
-        let addresses = link::routes(options.endpoints, false)?;
+        let book = self.routes.clone();
         let expected = options
             .expected_project_id
             .map(Id::try_from)
@@ -73,13 +100,23 @@ impl SessionService {
                     .tempdir_in(&parent)
                     .map_err(|_| SessionError::Storage)?;
                 let local = manager.identity()?.device().clone();
-                let (_, connection) = link::establish(
-                    &link::Route::Client(addresses),
+                let causes = routing::Causes::new("session");
+                let link::Established {
+                    carrier,
+                    address,
+                    connection,
+                } = link::establish(
+                    &route,
                     &manager,
                     &peer,
                     &link::hello(local.clone()),
+                    &causes,
                 )
                 .await?;
+                // The pinned certificate matched here: a place to try first next time.
+                if let Some(address) = address {
+                    book.remember(&peer, (carrier, address));
+                }
                 if !connection.session().capabilities().contains("app_sync_v1")
                     || !connection
                         .session()

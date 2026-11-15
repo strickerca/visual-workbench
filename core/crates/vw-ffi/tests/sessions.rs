@@ -707,3 +707,599 @@ async fn synchronized_projects_and_real_archive_exclude_generated_pairing_creden
     drop(imported);
     assert!(scan_fixture_tree(&extracted, &secrets) > 0);
 }
+
+fn listen(carrier: AppCarrier) -> SessionEndpoint {
+    SessionEndpoint {
+        carrier,
+        address: "127.0.0.1:0".into(),
+    }
+}
+fn addresses(endpoints: &[SessionEndpoint]) -> Vec<String> {
+    endpoints
+        .iter()
+        .map(|endpoint| endpoint.address.clone())
+        .collect()
+}
+fn receive_options(path: &std::path::Path, hints: Vec<SessionEndpoint>) -> ReceiveProjectOptions {
+    ReceiveProjectOptions {
+        path: path.to_string_lossy().into(),
+        peer_device_id: device(),
+        endpoints: hints,
+        expected_project_id: Some(id(1)),
+        max_total_blob_bytes: 16 * 1024 * 1024,
+    }
+}
+fn linked(status: &SessionStatus) -> bool {
+    matches!(status.status, SyncStatus::Syncing | SyncStatus::Synced)
+}
+/// Both ends authenticated on `carrier`. The status never names a carrier
+/// before the pinned handshake and Hello have completed on it.
+async fn on_carrier(host: &LiveSession, client: &LiveSession, carrier: AppCarrier) {
+    let reached = tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            let (a, b) = (host.status(), client.status());
+            if linked(&a) && linked(&b) && a.carrier == Some(carrier) && b.carrier == Some(carrier)
+            {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await;
+    let (a, b) = (host.status(), client.status());
+    assert!(
+        reached.is_ok(),
+        "carrier deadline for {carrier:?}: host={:?}/{:?}/{:?}; client={:?}/{:?}/{:?}",
+        a.status,
+        a.carrier,
+        a.failure,
+        b.status,
+        b.carrier,
+        b.failure
+    );
+}
+/// The client receives the host's revision `host_seq` over the connection it
+/// already has: the link never leaves `carrier` while waiting.
+async fn arrived(client: &LiveSession, host_seq: u64, carrier: AppCarrier) {
+    let reached = tokio::time::timeout(Duration::from_secs(20), async {
+        while client.status().host_seq < host_seq {
+            let status = client.status();
+            assert!(linked(&status) && status.carrier == Some(carrier));
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await;
+    assert!(
+        reached.is_ok(),
+        "revision {host_seq} did not arrive: {:?}/{:?}",
+        client.status().status,
+        client.status().failure
+    );
+}
+async fn failed_with(link: &LiveSession, code: &str) {
+    let reached = tokio::time::timeout(Duration::from_secs(20), async {
+        while link.status().failure.as_deref() != Some(code) {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await;
+    assert!(
+        reached.is_ok(),
+        "expected {code}, found {:?}",
+        link.status().failure
+    );
+}
+fn recorded(after: u64, area: &str, cause: &str) -> bool {
+    core_diagnostics(after).events.iter().any(|event| {
+        event.kind == CoreDiagnosticKind::Failure && event.area == area && event.name == cause
+    })
+}
+
+#[tokio::test]
+async fn a_paired_device_reconnects_with_no_address_supplied_and_a_hint_is_never_trusted() {
+    let _serial = SERIAL.lock().await;
+    let temp = temp();
+    let (host_service, client_service) = paired().await;
+    let host = create_image_project(create(&temp.path().join("host")), cancel())
+        .await
+        .unwrap();
+    draw(&host).await;
+    let client_id = client_service.local_device().await.unwrap().device_id;
+    // The computer listens by itself; nobody chose an address or a port.
+    assert!(matches!(
+        host_service
+            .host_project_automatic(host.clone(), client_id.clone(), vec![])
+            .await,
+        Err(SessionError::Invalid)
+    ));
+    let server = host_service
+        .host_project_automatic(
+            host.clone(),
+            client_id.clone(),
+            vec![listen(AppCarrier::QuicWifi)],
+        )
+        .await
+        .unwrap();
+    let listening = server.endpoints();
+    assert_eq!(listening.len(), 1);
+    // Asking for what is already bound changes nothing.
+    assert_eq!(
+        addresses(&server.listen_on(listening.clone()).await.unwrap()),
+        addresses(&listening)
+    );
+    assert!(client_service.known_routes(device()).unwrap().is_empty());
+    // First contact: the one address pairing already handed over, as a hint.
+    let client_path = temp.path().join("client");
+    let client = client_service
+        .receive_project_automatic(receive_options(&client_path, listening.clone()), cancel())
+        .await
+        .unwrap();
+    assert_eq!(
+        addresses(&client_service.known_routes(device()).unwrap()),
+        addresses(&listening)
+    );
+
+    // From here on no call supplies an address.
+    let link = client_service
+        .connect_project_automatic(client.clone(), device(), vec![])
+        .await
+        .unwrap();
+    converged(&server, &link).await;
+    assert_eq!(addresses(&link.endpoints()), addresses(&listening));
+    assert_eq!(link.status().peer_device_id, device());
+    assert!(matches!(
+        link.listen_on(vec![]).await,
+        Err(SessionError::Invalid)
+    ));
+    assert!(matches!(
+        server.offer_routes(vec![]),
+        Err(SessionError::Invalid)
+    ));
+    link.close().await.unwrap();
+    drop(link);
+    let mut add = edit(20, client.info().await.unwrap().next_lamport);
+    add.device_id = client_id.clone();
+    client
+        .apply_edit(add, vec![rectangle(24)], cancel())
+        .await
+        .unwrap();
+    host.apply_edit(
+        edit(30, host.info().await.unwrap().next_lamport),
+        vec![rectangle(31)],
+        cancel(),
+    )
+    .await
+    .unwrap();
+    let link = client_service
+        .connect_project_automatic(client.clone(), device(), vec![])
+        .await
+        .unwrap();
+    converged(&server, &link).await;
+    assert_eq!(
+        client
+            .document_snapshot(id(2), cancel())
+            .await
+            .unwrap()
+            .render
+            .items
+            .len(),
+        3
+    );
+    link.close().await.unwrap();
+    drop(link);
+
+    // Nothing remembered and nothing offered: the session waits offline and
+    // says why. It never reports a carrier it has not authenticated.
+    client_service.forget_routes(device()).unwrap();
+    let before = core_diagnostics(0).latest_sequence;
+    let link = client_service
+        .connect_project_automatic(client.clone(), device(), vec![])
+        .await
+        .unwrap();
+    failed_with(&link, "no_known_route").await;
+    assert!(!linked(&link.status()) && link.status().carrier.is_none());
+    assert!(link.endpoints().is_empty());
+    assert!(recorded(before, "session", "no known route"));
+
+    // A device with the same DeviceId but another certificate listens on the
+    // preferred carrier. Its address is only a hint.
+    let (impostor_service, _) = paired().await;
+    let impostor_project = create_image_project(create(&temp.path().join("impostor")), cancel())
+        .await
+        .unwrap();
+    let impostor = impostor_service
+        .host_project_automatic(
+            impostor_project.clone(),
+            client_id.clone(),
+            vec![listen(AppCarrier::QuicTether)],
+        )
+        .await
+        .unwrap();
+    link.offer_routes(impostor.endpoints()).unwrap();
+    failed_with(&link, "connection").await;
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    assert!(!linked(&link.status()) && link.status().carrier.is_none());
+    assert!(!linked(&impostor.status()) && impostor.status().carrier.is_none());
+    assert!(recorded(
+        before,
+        "session",
+        "route did not prove the paired device"
+    ));
+    assert!(client_service.known_routes(device()).unwrap().is_empty());
+
+    // Discovery: the computer advertises, the phone's platform browser reports
+    // what it resolved, and the app offers those addresses as hints.
+    let advertised = host_service
+        .create_discovery(addresses(&listening))
+        .await
+        .unwrap();
+    let advertisement = advertised.advertisement().unwrap();
+    let browsing = client_service.browse_discovery(vec![]).await.unwrap();
+    browsing
+        .observe(
+            advertisement.service_type.clone(),
+            advertisement.properties.clone(),
+            addresses(&listening),
+        )
+        .await
+        .unwrap();
+    let found = browsing.snapshot().await.unwrap();
+    assert_eq!(found.len(), 1);
+    let mut hints = impostor.endpoints();
+    hints.extend(found[0].endpoints.iter().map(|address| SessionEndpoint {
+        carrier: AppCarrier::QuicWifi,
+        address: address.clone(),
+    }));
+    link.offer_routes(hints).unwrap();
+    converged(&server, &link).await;
+    assert_eq!(link.status().carrier, Some(AppCarrier::QuicWifi));
+    assert_eq!(addresses(&link.endpoints()), addresses(&listening));
+    assert!(!linked(&impostor.status()));
+    // Only the address that authenticated is remembered.
+    assert_eq!(
+        addresses(&client_service.known_routes(device()).unwrap()),
+        addresses(&listening)
+    );
+    browsing.close().await.unwrap();
+    advertised.close().await.unwrap();
+    link.close().await.unwrap();
+    drop(link);
+
+    // Hints saved by an earlier run are accepted for a paired device only,
+    // and only as numeric local addresses.
+    client_service.forget_routes(device()).unwrap();
+    assert!(matches!(
+        client_service
+            .restore_routes(DeviceId::from_bytes([9; 16]).to_string(), listening.clone())
+            .await,
+        Err(SessionError::Authentication)
+    ));
+    assert!(matches!(
+        client_service
+            .restore_routes(
+                device(),
+                vec![SessionEndpoint {
+                    carrier: AppCarrier::QuicWifi,
+                    address: "192.0.2.7:47000".into(),
+                }]
+            )
+            .await,
+        Err(SessionError::Invalid)
+    ));
+    client_service
+        .restore_routes(device(), listening.clone())
+        .await
+        .unwrap();
+    let link = client_service
+        .connect_project_automatic(client.clone(), device(), vec![])
+        .await
+        .unwrap();
+    converged(&server, &link).await;
+    link.close().await.unwrap();
+    drop(link);
+
+    // Revocation still wins: the hints go, and a remembered address no longer
+    // connects.
+    client_service.revoke_device(device()).await.unwrap();
+    assert!(client_service.known_routes(device()).unwrap().is_empty());
+    assert!(matches!(
+        client_service
+            .restore_routes(device(), listening.clone())
+            .await,
+        Err(SessionError::Authentication)
+    ));
+    let link = client_service
+        .connect_project_automatic(client.clone(), device(), listening.clone())
+        .await
+        .unwrap();
+    failed_with(&link, "untrusted_or_revoked").await;
+    assert!(!linked(&link.status()) && link.status().carrier.is_none());
+    link.close().await.unwrap();
+    impostor.close().await.unwrap();
+    server.close().await.unwrap();
+    impostor_project.close().await.unwrap();
+    client.close().await.unwrap();
+    host.close().await.unwrap();
+    let persisted = vw_store::ProjectStore::open(&client_path).unwrap();
+    assert!(persisted.pending().unwrap().is_empty());
+    assert_eq!(
+        persisted
+            .accepted_transactions()
+            .filter(|(txn, _)| txn.txn_id.as_ref()
+                == Some(&vw_model::Id::try_from(id(20)).unwrap().to_proto()))
+            .count(),
+        1
+    );
+}
+
+/// Stands in for a cable on loopback: while it is up, datagrams pass both
+/// ways; once cut they vanish and neither end is told.
+struct Cable {
+    address: String,
+    up: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Conversations opened before this number are silenced; later ones pass.
+    quiet_before: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    opened: std::sync::Arc<std::sync::atomic::AtomicU64>,
+}
+impl Cable {
+    async fn to(target: &str) -> Self {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, AtomicU64, Ordering},
+        };
+        let target: std::net::SocketAddr = target.parse().unwrap();
+        let front = Arc::new(tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap());
+        let address = front.local_addr().unwrap().to_string();
+        let up = Arc::new(AtomicBool::new(true));
+        let quiet_before = Arc::new(AtomicU64::new(0));
+        let opened = Arc::new(AtomicU64::new(0));
+        let (live, quiet, count) = (up.clone(), quiet_before.clone(), opened.clone());
+        tokio::spawn(async move {
+            let mut flows =
+                std::collections::HashMap::<_, (u64, Arc<tokio::net::UdpSocket>)>::new();
+            let mut buffer = vec![0_u8; 65536];
+            while let Ok((size, from)) = front.recv_from(&mut buffer).await {
+                if !live.load(Ordering::Acquire) {
+                    continue;
+                }
+                let (flow, back) = match flows.get(&from) {
+                    Some(known) => known.clone(),
+                    None => {
+                        let flow = count.fetch_add(1, Ordering::AcqRel);
+                        let back =
+                            Arc::new(tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap());
+                        back.connect(target).await.unwrap();
+                        flows.insert(from, (flow, back.clone()));
+                        let (front, live, quiet, replies) =
+                            (front.clone(), live.clone(), quiet.clone(), back.clone());
+                        tokio::spawn(async move {
+                            let mut buffer = vec![0_u8; 65536];
+                            while let Ok(size) = replies.recv(&mut buffer).await {
+                                if live.load(Ordering::Acquire)
+                                    && flow >= quiet.load(Ordering::Acquire)
+                                {
+                                    let _ = front.send_to(&buffer[..size], from).await;
+                                }
+                            }
+                        });
+                        (flow, back)
+                    }
+                };
+                if flow >= quiet.load(Ordering::Acquire) {
+                    let _ = back.send(&buffer[..size]).await;
+                }
+            }
+        });
+        Self {
+            address,
+            up,
+            quiet_before,
+            opened,
+        }
+    }
+    fn plug(&self, connected: bool) {
+        self.up
+            .store(connected, std::sync::atomic::Ordering::Release);
+    }
+    /// The far end stops talking on what is already open (as during a long
+    /// local operation) but still answers anyone who asks anew.
+    fn busy(&self, silent: bool) {
+        use std::sync::atomic::Ordering;
+        let before = if silent {
+            self.opened.load(Ordering::Acquire)
+        } else {
+            0
+        };
+        self.quiet_before.store(before, Ordering::Release);
+    }
+}
+
+/// PERF-007 in simulation: loopback only, no radio, cable or phone.
+#[tokio::test]
+async fn a_better_carrier_takes_over_and_a_dead_route_fails_over_without_losing_or_repeating_edits()
+{
+    let _serial = SERIAL.lock().await;
+    let temp = temp();
+    let (host_service, client_service) = paired().await;
+    let host_path = temp.path().join("host");
+    let host = create_image_project(create(&host_path), cancel())
+        .await
+        .unwrap();
+    draw(&host).await;
+    let client_id = client_service.local_device().await.unwrap().device_id;
+    let server = host_service
+        .host_project_automatic(
+            host.clone(),
+            client_id.clone(),
+            vec![listen(AppCarrier::QuicTether), listen(AppCarrier::QuicWifi)],
+        )
+        .await
+        .unwrap();
+    let bound = |carrier| {
+        server
+            .endpoints()
+            .into_iter()
+            .find(|endpoint| endpoint.carrier == carrier)
+            .unwrap()
+    };
+    let wifi = bound(AppCarrier::QuicWifi);
+    let cable = Cable::to(&bound(AppCarrier::QuicTether).address).await;
+    let usb = SessionEndpoint {
+        carrier: AppCarrier::QuicTether,
+        address: cable.address.clone(),
+    };
+    let both = vec![usb.clone(), wifi.clone()];
+
+    // The phone starts on Wi-Fi: no cable yet.
+    let client = client_service
+        .receive_project_automatic(
+            receive_options(&temp.path().join("client"), vec![wifi.clone()]),
+            cancel(),
+        )
+        .await
+        .unwrap();
+    let link = client_service
+        .connect_project_automatic(client.clone(), device(), vec![])
+        .await
+        .unwrap();
+    on_carrier(&server, &link, AppCarrier::QuicWifi).await;
+    converged(&server, &link).await;
+    let mark = |transaction: u8, object: u8, lamport: u64| {
+        let mut options = edit(transaction, lamport);
+        options.device_id = client_id.clone();
+        (options, vec![rectangle(object)])
+    };
+
+    // USB tethering comes up: the link moves to it by itself.
+    let (options, commands) = mark(20, 24, client.info().await.unwrap().next_lamport);
+    client
+        .apply_edit(options, commands, cancel())
+        .await
+        .unwrap();
+    let offered = std::time::Instant::now();
+    link.offer_routes(both.clone()).unwrap();
+    on_carrier(&server, &link, AppCarrier::QuicTether).await;
+    let upgrade = offered.elapsed();
+    converged(&server, &link).await;
+
+    // The computer goes quiet without going away, as during a long local
+    // operation. Its address still answers, so the link is left where it is
+    // instead of being torn down and restarted on Wi-Fi.
+    cable.busy(true);
+    let quiet = std::time::Instant::now();
+    while quiet.elapsed() < Duration::from_millis(2600) {
+        for status in [server.status(), link.status()] {
+            assert!(linked(&status), "a busy peer must not be dropped");
+            assert_eq!(status.carrier, Some(AppCarrier::QuicTether));
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    cable.busy(false);
+    // The same connection carries on: a new edit crosses it.
+    let resumed = host
+        .apply_edit(
+            edit(33, host.info().await.unwrap().next_lamport),
+            vec![rectangle(34)],
+            cancel(),
+        )
+        .await
+        .unwrap();
+    arrived(&link, resumed.host_seq, AppCarrier::QuicTether).await;
+    converged(&server, &link).await;
+    assert_eq!(link.status().carrier, Some(AppCarrier::QuicTether));
+
+    // The cable is pulled while both sides have unsent work.
+    host.apply_edit(
+        edit(30, host.info().await.unwrap().next_lamport),
+        vec![rectangle(31)],
+        cancel(),
+    )
+    .await
+    .unwrap();
+    cable.plug(false);
+    let pulled = std::time::Instant::now();
+    let (options, commands) = mark(21, 25, client.info().await.unwrap().next_lamport);
+    client
+        .apply_edit(options, commands, cancel())
+        .await
+        .unwrap();
+    on_carrier(&server, &link, AppCarrier::QuicWifi).await;
+    let failover = pulled.elapsed();
+    converged(&server, &link).await;
+
+    // The cable returns: back to the better carrier.
+    cable.plug(true);
+    let (options, commands) = mark(22, 26, client.info().await.unwrap().next_lamport);
+    client
+        .apply_edit(options, commands, cancel())
+        .await
+        .unwrap();
+    let returned = std::time::Instant::now();
+    link.offer_routes(both).unwrap();
+    on_carrier(&server, &link, AppCarrier::QuicTether).await;
+    let comeback = returned.elapsed();
+    converged(&server, &link).await;
+    println!(
+        "carrier switch on loopback: to better carrier {upgrade:?}, off dead route {failover:?}, back to better carrier {comeback:?}"
+    );
+    assert!(upgrade < Duration::from_secs(2), "upgrade took {upgrade:?}");
+    assert!(
+        comeback < Duration::from_secs(2),
+        "return took {comeback:?}"
+    );
+    // Includes noticing the silence; the other carrier was available throughout.
+    assert!(
+        failover < Duration::from_secs(4),
+        "failover took {failover:?}"
+    );
+
+    // The listeners can change under a live connection without dropping it:
+    // one is retired, another address is added later.
+    assert_eq!(
+        addresses(&server.listen_on(vec![wifi.clone()]).await.unwrap()),
+        vec![wifi.address.clone()]
+    );
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(linked(&server.status()) && linked(&link.status()));
+    assert_eq!(server.status().carrier, Some(AppCarrier::QuicTether));
+    let widened = server
+        .listen_on(vec![listen(AppCarrier::QuicTether), wifi.clone()])
+        .await
+        .unwrap();
+    assert_eq!(widened.len(), 2);
+    assert_eq!(server.endpoints().len(), 2);
+    converged(&server, &link).await;
+
+    for project in [&host, &client] {
+        assert_eq!(
+            project
+                .document_snapshot(id(2), cancel())
+                .await
+                .unwrap()
+                .render
+                .items
+                .len(),
+            6
+        );
+    }
+    assert_eq!(
+        host.info().await.unwrap().state_hash,
+        client.info().await.unwrap().state_hash
+    );
+    link.close().await.unwrap();
+    server.close().await.unwrap();
+    client.close().await.unwrap();
+    host.close().await.unwrap();
+    let persisted = vw_store::ProjectStore::open(&host_path).unwrap();
+    for transaction in [20, 21, 22, 30, 33] {
+        assert_eq!(
+            persisted
+                .accepted_transactions()
+                .filter(|(txn, _)| txn.txn_id.as_ref()
+                    == Some(&vw_model::Id::try_from(id(transaction)).unwrap().to_proto()))
+                .count(),
+            1,
+            "transaction {transaction} must be accepted exactly once"
+        );
+    }
+}

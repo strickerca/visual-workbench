@@ -89,6 +89,17 @@ impl Bridge {
     pub fn is_stopped(&self) -> bool {
         self.endpoint.stop.load(Ordering::Acquire)
     }
+    /// No receiver, lossless flow or publisher is live or still retiring, so
+    /// moving the connection to a better carrier interrupts no live media.
+    pub fn is_quiet(&self) -> bool {
+        self.lease.is_none()
+            && self.receiver.is_none()
+            && self.retiring.is_none()
+            && self.flow.is_none()
+            && self.flow_retiring.is_none()
+            && self.publisher.is_none()
+            && self.publisher_retiring.is_none()
+    }
     /// Cancellation of this waiting future keeps both the decoder result and
     /// exact retirement future in this owner, ready for the next select poll.
     pub async fn next(&mut self) -> Event {
