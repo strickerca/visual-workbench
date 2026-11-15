@@ -649,7 +649,9 @@ fn preflight_file(
         OUTPUT_LIMIT,
         options.max_scratch_bytes,
     )?;
-    crate::workflow::canonical_workspace(state, options.export.memory_budget_bytes, false)
+    // Rendering reads the project in place; pixel and encoder work is
+    // admitted separately against the same budget.
+    crate::workflow::borrowed_workspace(options.export.memory_budget_bytes)
         .map_err(output_error)?;
     let project = state.project()?;
     let document = Id::try_from(options.export.document_id.clone())?;

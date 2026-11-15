@@ -759,30 +759,36 @@ async fn grow_unrelated_documents_without_touching_request_source(project: &Arc<
     project
         .worker
         .call(|state| {
-            let mut grown = state.project()?.clone();
-            let template = grown.documents[&Id::try_from(id(2)).unwrap()].clone();
-            for n in 0..600u32 {
-                let mut entropy = [77u8; 10];
-                entropy[..4].copy_from_slice(&n.to_be_bytes());
-                let key = Id::from_parts(2, entropy).unwrap();
-                let mut document = template.clone();
-                document.definition.document_id = Some(key.to_proto());
-                document.definition.title = "x".repeat(4096);
-                grown.documents.insert(key, document);
-            }
             // A real validated canonical replica supplies the large borrowed state;
             // no provider fixture or forged estimator substitutes for production.
-            let device = state.store()?.local_device()?;
-            let host = vw_ops::HostSequencer::new(grown, device.clone()).unwrap();
-            state.replica = Some(vw_ops::Replica::new(device, host.snapshot().unwrap()).unwrap());
-            assert!(
+            fn install(state: &mut crate::project::ProjectState, count: u32) -> u64 {
+                let mut grown = state.project().unwrap().clone();
+                let template = grown.documents[&Id::try_from(id(2)).unwrap()].clone();
+                for n in 0..count {
+                    let mut entropy = [77u8; 10];
+                    entropy[..4].copy_from_slice(&n.to_be_bytes());
+                    let key = Id::from_parts(2, entropy).unwrap();
+                    let mut document = template.clone();
+                    document.definition.document_id = Some(key.to_proto());
+                    document.definition.title = "x".repeat(4096);
+                    grown.documents.insert(key, document);
+                }
+                let device = state.store().unwrap().local_device().unwrap();
+                let host = vw_ops::HostSequencer::new(grown, device.clone()).unwrap();
+                state.replica =
+                    Some(vw_ops::Replica::new(device, host.snapshot().unwrap()).unwrap());
                 crate::workflow::canonical_workspace(state, crate::workflow::MAX_MEMORY, false)
-                    .is_ok()
-            );
-            assert!(
-                crate::workflow::canonical_workspace(state, crate::workflow::MAX_MEMORY, true)
-                    .is_err()
-            );
+                    .unwrap()
+            }
+            // Grow until hashing the page takes nearly the whole budget: a read
+            // still fits, while the complete result's reserved pixels and
+            // staging cannot fit beside it.
+            let reserve = crate::workflow::RESERVE;
+            let sample = 600;
+            let per_document = (install(state, sample) - reserve).div_ceil(u64::from(sample));
+            let count = (crate::workflow::MAX_MEMORY - 8 * 1024 * 1024 - reserve) / per_document;
+            let charge = install(state, u32::try_from(count).unwrap());
+            assert!(charge > crate::workflow::MAX_MEMORY - 16 * 1024 * 1024);
             Ok(())
         })
         .await

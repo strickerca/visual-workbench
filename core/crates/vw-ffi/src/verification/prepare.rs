@@ -274,7 +274,7 @@ pub(super) fn compile(
         .memory_budget_bytes
         .checked_sub(retained)
         .ok_or(PackageError::Limit)?;
-    let mut canonical = workflow::canonical_workspace(state, available, true)?;
+    let mut canonical = workflow::checkpoint_workspace(state, available)?;
     let budget = available
         .checked_sub(canonical)
         .ok_or(PackageError::Limit)?;

@@ -9,6 +9,7 @@ use std::sync::{
 };
 use vw_model::{DeviceId, Id, StateHash};
 use vw_proto::v1 as pb;
+mod cost;
 
 pub(crate) const MAX_MEMORY: u64 = 256 * 1024 * 1024;
 pub(crate) const INSTRUCTION_WORK: u64 = 48 * 1024 * 1024;
@@ -181,45 +182,292 @@ impl Drop for HandlePermit {
     }
 }
 
-/// Resident state is not charged twice, but every new clone/hash/serialization
-/// representation is. This is the same policy as the reviewed mask helper.
-pub(crate) fn canonical_workspace(
-    state: &ProjectState,
-    budget: u64,
-    mutation: bool,
-) -> WorkflowResult<u64> {
+/// Kept out of every workflow budget for fixed state and small allocations.
+pub(crate) const RESERVE: u64 = 4 * 1024 * 1024;
+
+// Resident state is not charged again. What a workflow adds is charged by
+// what it does with the canonical state, each part from the data it touches:
+//
+// * `canonical_workspace`: the workflow may hash or serialize the whole
+//   visible project once (`DocumentView`, semantic bindings and published
+//   giant images call `Project::state_hash`): one `Value` tree of the visible
+//   project and its bytes. Never the history, which no such workflow reads.
+// * `borrowed_workspace`: the workflow only reads the project in place.
+// * `commit_workspace`: deciding a transaction in place, as validation and
+//   commit both do: its own representations, and the entities it changes or
+//   removes, which are copied, journaled as `Value`s and hashed again; on a
+//   mirror also the copy of the authoritative project that taking a queued
+//   edit back replays from. Every commit is admitted by it (directly or by
+//   `admit_transaction`) after any hashing of the same workflow has ended,
+//   so a mutation's earlier admission charges nothing more than a read.
+//
+// This used to charge four (for a mutation sixteen) conservative copies of
+// the store, its entire history and the replica, found by serializing all of
+// them on every call: a page of a hundred pen strokes passed every budget,
+// and the estimate took as long as the history was large.
+
+/// Costs of projects by their state hash. A project is counted once per
+/// state, and a state hash identifies the content exactly, so an entry never
+/// goes stale. A project is counted to the end: even one too large to hash
+/// within any budget may have a copy that fits one.
+type Counted = (StateHash, Option<cost::JsonCost>);
+static PROJECT_COSTS: Mutex<Vec<Counted>> = Mutex::new(Vec::new());
+const PROJECT_COST_ENTRIES: usize = 8;
+
+fn measure<T: serde::Serialize + ?Sized>(value: &T) -> WorkflowResult<Option<cost::JsonCost>> {
+    cost::measure(value, MAX_MEMORY).map_err(|_| WorkflowError::Invalid)
+}
+/// The cost of `project`, whose state hash is `hash`: one walk over the
+/// project (not its history) the first time a state is asked for.
+fn project_cost(
+    project: &vw_model::Project,
+    hash: &StateHash,
+) -> WorkflowResult<Option<cost::JsonCost>> {
+    if let Ok(costs) = PROJECT_COSTS.lock()
+        && let Some((_, known)) = costs.iter().find(|(key, _)| key == hash)
+    {
+        return Ok(*known);
+    }
+    let counted = cost::measure(project, u64::MAX).map_err(|_| WorkflowError::Invalid)?;
+    if let Ok(mut costs) = PROJECT_COSTS.lock() {
+        if costs.len() >= PROJECT_COST_ENTRIES {
+            costs.remove(0);
+        }
+        costs.push((hash.clone(), counted));
+    }
+    Ok(counted)
+}
+/// The cost of the visible project: with a mirror's pending edits.
+fn visible_cost(state: &ProjectState) -> WorkflowResult<Option<cost::JsonCost>> {
+    match &state.replica {
+        Some(replica) => project_cost(replica.project(), replica.state_hash()),
+        None => {
+            let store = state.store()?;
+            project_cost(store.project(), store.state_hash()?)
+        }
+    }
+}
+/// Hashing the visible project once: `Project::state_hash`.
+fn visible_hash_bytes(state: &ProjectState) -> WorkflowResult<Option<u64>> {
+    Ok(visible_cost(state)?.map(cost::JsonCost::hashed))
+}
+/// What a mirror allocates to take a queued edit back when its outbox refuses
+/// it: a copy of the authoritative project (the mirror store's project), and
+/// a fresh state hasher over the copy, whose pages of canonical bytes grow by
+/// doubling.
+///
+/// Not counted: the copy of the undo previews of this device's own accepted
+/// edits that the same replay makes. Their size is private to
+/// `vw_ops::Replica`; it is about the `Value` tree of what this device drew,
+/// more after many of its own deletions or undos.
+fn replay_bytes(state: &ProjectState) -> WorkflowResult<Option<u64>> {
+    if state.replica.is_none() {
+        return Ok(Some(0));
+    }
+    let store = state.store()?;
+    Ok(project_cost(store.project(), store.state_hash()?)?
+        .map(|counted| counted.copy.saturating_add(counted.text.saturating_mul(2))))
+}
+/// The reserve and `parts`, refused once they pass `budget`. A part that is
+/// `None` was past `MAX_MEMORY` and passes any budget.
+fn charge(budget: u64, parts: &[Option<u64>]) -> WorkflowResult<u64> {
     if budget == 0 || budget > MAX_MEMORY {
         return Err(WorkflowError::Invalid);
     }
-    let copies = if mutation { 16 } else { 4 };
-    let reserve = 4 * 1024 * 1024;
-    let single_limit = budget.saturating_sub(reserve) / copies;
-    let mut single = state.store()?.workspace_estimate_bytes(single_limit)?;
-    if single <= single_limit
-        && let Some(replica) = &state.replica
-    {
-        single = single
-            .checked_add(
-                replica
-                    .workspace_estimate_bytes(single_limit - single)
-                    .map_err(|_| WorkflowError::Invalid)?,
-            )
-            .ok_or(WorkflowError::Limit)?;
+    let estimated = parts
+        .iter()
+        .try_fold(RESERVE, |total, part| total.checked_add((*part)?));
+    match estimated {
+        Some(estimated) if estimated <= budget => Ok(estimated),
+        Some(estimated) => Err(WorkflowError::Memory { estimated, budget }),
+        None => Err(WorkflowError::Memory {
+            estimated: MAX_MEMORY + 1,
+            budget,
+        }),
     }
-    let estimated = single
-        .checked_mul(copies)
-        .and_then(|n| n.checked_add(reserve))
-        .ok_or(WorkflowError::Limit)?;
-    if estimated > budget {
-        return Err(WorkflowError::Memory { estimated, budget });
-    }
-    Ok(estimated)
 }
-pub(crate) fn admit(
+/// A workflow that may hash or serialize the whole visible project once.
+/// `_mutation` charges nothing more: a commit is admitted by
+/// `commit_workspace` once the transaction exists.
+pub(crate) fn canonical_workspace(
     state: &ProjectState,
     budget: u64,
-    mutation: bool,
+    _mutation: bool,
+) -> WorkflowResult<u64> {
+    charge(budget, &[visible_hash_bytes(state)?])
+}
+/// A workflow that only reads the canonical state in place: the reserve.
+pub(crate) fn borrowed_workspace(budget: u64) -> WorkflowResult<u64> {
+    charge(budget, &[])
+}
+/// Copying the whole host, history included, through its checkpoint, as
+/// compiling a verification package does: the store writes a `Value` tree of
+/// the host and its bytes, the host is read back from them and written once
+/// more to check they are canonical, and the copy stays alive while its
+/// project is hashed. The store's conservative serialization charge bounds
+/// one in-memory copy, or one tree with its bytes; twice it covers each step.
+/// This walks the history, as the work it admits does.
+pub(crate) fn checkpoint_workspace(state: &ProjectState, budget: u64) -> WorkflowResult<u64> {
+    if budget == 0 || budget > MAX_MEMORY {
+        return Err(WorkflowError::Invalid);
+    }
+    let limit = budget.saturating_sub(RESERVE) / 2;
+    let host = state.store()?.workspace_estimate_bytes(limit)?;
+    charge(budget, &[(host <= limit).then(|| host * 2)])
+}
+/// Deciding `transaction` in place, by validation or commit: sixteen
+/// borrowed representations of the transaction (its new content included),
+/// what deciding it holds of the entities it touches, and on a mirror the
+/// replay copy.
+pub(crate) fn commit_workspace(
+    state: &ProjectState,
+    transaction: &pb::Transaction,
+    budget: u64,
+) -> WorkflowResult<u64> {
+    charge(budget, &commit_parts(state, transaction)?)
+}
+fn commit_parts(
+    state: &ProjectState,
+    transaction: &pb::Transaction,
+) -> WorkflowResult<[Option<u64>; 3]> {
+    let single =
+        vw_ops::HostSequencer::transaction_workspace_estimate_bytes(transaction, MAX_MEMORY / 16)
+            .map_err(|_| WorkflowError::Invalid)?;
+    let representations = (single <= MAX_MEMORY / 16).then(|| single * 16);
+    Ok([
+        representations,
+        touched_bytes(state.project()?, transaction)?,
+        replay_bytes(state)?,
+    ])
+}
+/// The entities `transaction` changes or removes, as deciding it holds them
+/// at once: the copy kept to restore each, the `Value`s before and after
+/// that the journal and the conflict check keep, the removed entity's
+/// journal value, and its bytes written again into the state hasher. Four
+/// hashed costs per entity cover those; two more of the largest cover the
+/// pair of values the journal diff converts one entity at a time. Created
+/// entities are content of the transaction, charged with it. An undo touches
+/// what its target touched, which only the history knows: the whole project
+/// stands in for it.
+fn touched_bytes(
+    project: &vw_model::Project,
+    transaction: &pb::Transaction,
+) -> WorkflowResult<Option<u64>> {
+    use pb::op::Kind;
+    use std::collections::BTreeSet;
+    fn ids<'a>(values: impl IntoIterator<Item = &'a pb::Uuid>) -> impl Iterator<Item = Id> {
+        values
+            .into_iter()
+            .filter_map(|value| Id::from_proto(Some(value)).ok())
+    }
+    let mut documents = BTreeSet::new();
+    let mut layers = BTreeSet::new();
+    let mut objects = BTreeSet::new();
+    let mut groups = BTreeSet::new();
+    let mut instructions = BTreeSet::new();
+    let mut results = BTreeSet::new();
+    let mut masks = BTreeSet::new();
+    let mut undo = false;
+    for op in &transaction.ops {
+        match &op.kind {
+            Some(Kind::UpdateDocument(value)) => documents.extend(ids(&value.document_id)),
+            Some(Kind::UpdateLayer(value)) => layers.extend(ids(&value.layer_id)),
+            Some(Kind::DeleteLayer(value)) => {
+                layers.extend(ids(&value.layer_id));
+                objects.extend(
+                    project
+                        .objects
+                        .iter()
+                        .filter(|(_, object)| object.state.layer_id == value.layer_id)
+                        .map(|(id, _)| id.clone()),
+                );
+            }
+            Some(Kind::SetProperty(value)) => objects.extend(ids(&value.object_id)),
+            Some(Kind::DeleteObject(value)) => objects.extend(ids(&value.object_id)),
+            Some(Kind::Reorder(value)) => objects.extend(ids(&value.object_id)),
+            Some(Kind::Group(value)) => {
+                groups.extend(ids(&value.group_id));
+                for member in ids(&value.object_ids) {
+                    objects.insert(member.clone());
+                    groups.insert(member);
+                }
+            }
+            Some(Kind::Ungroup(value)) => {
+                let group = ids(&value.group_id).next();
+                objects.extend(
+                    project
+                        .objects
+                        .iter()
+                        .filter(|(_, object)| object.state.group_id == value.group_id)
+                        .map(|(id, _)| id.clone()),
+                );
+                if let Some(group) = group {
+                    groups.extend(
+                        project
+                            .groups
+                            .iter()
+                            .filter(|(_, child)| child.parent.as_ref() == Some(&group))
+                            .map(|(id, _)| id.clone()),
+                    );
+                    groups.insert(group);
+                }
+            }
+            Some(Kind::SetInstruction(value)) => instructions.extend(ids(&value.instruction_id)),
+            Some(Kind::DeleteInstruction(value)) => {
+                instructions.extend(ids(&value.instruction_id));
+            }
+            Some(Kind::UpdateResult(value)) => results.extend(ids(&value.result_id)),
+            Some(Kind::MaskOp(value)) => masks.extend(ids(&value.output_object_id)),
+            Some(Kind::UndoTransaction(_)) => undo = true,
+            // New entities, or ops a host refuses before it touches anything.
+            _ => {}
+        }
+    }
+    let mut counted = Vec::new();
+    if undo {
+        counted.push(measure(project)?);
+    }
+    for id in &documents {
+        counted.extend(project.documents.get(id).map(measure).transpose()?);
+    }
+    for id in &layers {
+        counted.extend(project.layers.get(id).map(measure).transpose()?);
+    }
+    for id in &objects {
+        counted.extend(project.objects.get(id).map(measure).transpose()?);
+    }
+    for id in &groups {
+        counted.extend(project.groups.get(id).map(measure).transpose()?);
+    }
+    for id in &instructions {
+        counted.extend(project.instructions.get(id).map(measure).transpose()?);
+    }
+    for id in &results {
+        counted.extend(project.results.get(id).map(measure).transpose()?);
+    }
+    for id in &masks {
+        counted.extend(project.mask_versions.get(id).map(measure).transpose()?);
+    }
+    let mut total = 0u64;
+    let mut largest = 0u64;
+    for entity in counted {
+        let Some(entity) = entity else {
+            return Ok(None);
+        };
+        total = total.saturating_add(entity.hashed());
+        largest = largest.max(entity.hashed());
+    }
+    let bytes = total
+        .saturating_mul(4)
+        .saturating_add(largest.saturating_mul(2));
+    Ok((bytes <= MAX_MEMORY).then_some(bytes))
+}
+/// Admit `workspace` (counted within what `extra` leaves of `budget`) and
+/// the workflow's own `extra` together.
+fn admit_with(
+    budget: u64,
     extra: u64,
+    workspace: impl FnOnce(u64) -> WorkflowResult<u64>,
 ) -> WorkflowResult<()> {
     if budget == 0 || budget > MAX_MEMORY {
         return Err(WorkflowError::Invalid);
@@ -230,7 +478,7 @@ pub(crate) fn admit(
             budget,
         });
     }
-    let canonical = match canonical_workspace(state, budget - extra, mutation) {
+    let canonical = match workspace(budget - extra) {
         Err(WorkflowError::Memory { estimated, .. }) => {
             return Err(WorkflowError::Memory {
                 estimated: estimated.checked_add(extra).ok_or(WorkflowError::Limit)?,
@@ -244,27 +492,50 @@ pub(crate) fn admit(
     }
     Ok(())
 }
+/// `canonical_workspace` and the workflow's own `extra`.
+pub(crate) fn admit(
+    state: &ProjectState,
+    budget: u64,
+    mutation: bool,
+    extra: u64,
+) -> WorkflowResult<()> {
+    admit_with(budget, extra, |left| {
+        canonical_workspace(state, left, mutation)
+    })
+}
+/// `borrowed_workspace` and the workflow's own `extra`.
+pub(crate) fn admit_borrowed(budget: u64, extra: u64) -> WorkflowResult<()> {
+    admit_with(budget, extra, borrowed_workspace)
+}
 /// Newly planned transaction content is not resident in the admitted store.
-/// Charge its borrowed canonical representation before cloning or committing it.
+/// Charge it and what deciding it touches before validating or committing it.
 pub(crate) fn admit_transaction(
     state: &ProjectState,
     transaction: &pb::Transaction,
     budget: u64,
     extra: u64,
 ) -> WorkflowResult<()> {
-    if budget == 0 || budget > MAX_MEMORY {
-        return Err(WorkflowError::Invalid);
-    }
-    let copies = 16u64;
-    let single_limit = budget.saturating_sub(extra) / copies;
-    let single =
-        vw_ops::HostSequencer::transaction_workspace_estimate_bytes(transaction, single_limit)
-            .map_err(|_| WorkflowError::Invalid)?;
-    let transaction_work = single.checked_mul(copies).ok_or(WorkflowError::Limit)?;
-    let all_extra = extra
-        .checked_add(transaction_work)
-        .ok_or(WorkflowError::Limit)?;
-    admit(state, budget, true, all_extra)
+    admit_with(budget, extra, |left| {
+        commit_workspace(state, transaction, left)
+    })
+}
+/// A preview decided on a private host built from a copy of the visible
+/// project: the transaction and what it touches, the copy, and the new host,
+/// which writes the project into its state hasher and counts its checkpoint
+/// length from a `Value` tree of it (together less than one hashed cost).
+/// The private host never replays a mirror's queue.
+pub(crate) fn admit_isolated_host(
+    state: &ProjectState,
+    transaction: &pb::Transaction,
+    budget: u64,
+    extra: u64,
+) -> WorkflowResult<()> {
+    admit_with(budget, extra, |left| {
+        let [representations, touched, _] = commit_parts(state, transaction)?;
+        let host =
+            visible_cost(state)?.and_then(|counted| counted.copy.checked_add(counted.hashed()));
+        charge(left, &[representations, touched, host])
+    })
 }
 pub(crate) fn current(state: &ProjectState, document: &str) -> WorkflowResult<WorkflowBinding> {
     let id = Id::try_from(document.to_owned())?;
