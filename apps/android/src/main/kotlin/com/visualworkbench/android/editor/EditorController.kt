@@ -383,7 +383,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private val preferencesQueue = Channel<EditorPreferences>(Channel.CONFLATED)
     private val mutations = Mutex()
     private val refreshMutex = Mutex()
-    private val refreshAdmission = RefreshAdmission()
+    // A save whose own re-read was dropped stays pending until the queued refresh adopts.
+    private val refreshAdmission = RefreshAdmission { pending += it }
     private val documentRefresh = DocumentRefreshAdmission()
     private var changesJob: Job? = null
     private var refreshJob: Job? = null
@@ -559,6 +560,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var sceneRevision = 0L
     private var background: Bitmap? = null
     private var objects = emptyList<DrawObject>()
+    /** Diagnostics only: the newest pen sample that has ink, and the pen-down of its stroke. */
+    private var inkSampleMs = 0L
+    private var inkStartMs = 0L
     private var savedIdsOf: List<DrawObject>? = null
     private var savedIdsKept: Set<String> = emptySet()
     private var camera = Camera(Point(800.0, 600.0), 1.0, 0.0, 1.0, 1.0)
@@ -1660,13 +1664,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         captureArrivals.bind(current, token, checkNotNull(info).hostSeq)
         val queue = Channel<Unit>(Channel.CONFLATED)
         refreshQueue = queue
+        val serving = refreshAdmission.serve()
         refreshJob = scope.launch {
-            for (ignored in queue) {
-                if (token != epoch || current !== project || disposing) break
-                try { refresh(current, current.info(), token) }
-                catch (cancel: CancellationException) { throw cancel }
-                catch (error: Exception) { report(error) }
-            }
+            try {
+                for (ignored in queue) {
+                    if (token != epoch || current !== project || disposing) break
+                    refreshAdmission.queuedTurn(::report) { refreshDocument(current, current.info(), token, queued = true) }
+                }
+            } finally { refreshAdmission.stopServing(serving) }
         }
         changesJob = scope.launch {
             try {
@@ -1690,6 +1695,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 }
             } catch (cancel: CancellationException) { throw cancel }
             catch (error: Exception) { if (token == epoch && !disposing) report(error) }
+            // No further change will queue a refresh for this project.
+            finally { refreshAdmission.stopServing(serving) }
         }
     }
 
@@ -2050,12 +2057,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if(giantDraw.get()!==giantFrame)giantRenderReady=false
         giantDraw.set(giantFrame)
         val displayBackground=background.takeIf { !doc.hasToneAdjustments || composedCurrent(doc) }
-        val inked=strokes.lastOrNull { it.drawing != null } // Diagnostics: which pen sample this ink frame is measured against.
         val next = CanvasScene(++sceneRevision, doc, displayBackground, camera, core.cameraMatrix(camera), visibleObjects,
             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
             aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame,rotationHandle=rotationHandle(),
-            wetSampleMs=inked?.lastTime?:0L,wetStartMs=inked?.start?.timeMs?:0L,keepDryPicture=keepDry)
+            wetSampleMs=inkSampleMs,wetStartMs=inkStartMs,keepDryPicture=keepDry)
         scene = next
         if(streamDraftOnly)streamSceneState.value=renderScene(next).also{check(it.background==null)}
         canvasSink?.invoke(renderScene(next))
@@ -2382,34 +2388,42 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
 
     // region Stroke: ink, then save
-    private val strokeTurns = StrokeTurns()
-
     private fun startStroke(current: WorkbenchProject, run: StrokeRun) {
         // Developer switch, read at pen-down. Off: the whole stroke, from its
         // first sample to its refresh, runs under the mutation lock, so it
-        // starts only after the stroke before it is saved and refreshed. On:
-        // ink needs no lock; only the save takes it, in pen-down order.
-        val turn = if (preferences.penPath[PenPathToggle.CanvasInkBeforeSave]) strokeTurns.enter() else null
+        // starts only after the stroke before it is saved and refreshed.
+        val inkFirst = preferences.penPath[PenPathToggle.CanvasInkBeforeSave]
         scope.launch {
             try {
-                if (turn == null) mutations.withLock {
-                    val native = inkStroke(current, run, lockFree = false) ?: return@withLock
+                // On: the core begins the stroke without waiting for the project.
+                // A stroke it cannot begin that way (a highlighter, which may have
+                // to create its layer from what the project holds) is null here and
+                // takes the original path below, whole.
+                val early = if (run.canceled.get() || run.epoch != epoch) null else earlyInkStroke(inkFirst, current, run.options)
+                if (early == null) mutations.withLock {
+                    val native = inkStroke(current, run, null) ?: return@withLock
                     val saved = saveStroke(run, native) ?: return@withLock
                     refresh(current, saved.first, run.epoch)
                     diagnostics.pen.recordMillis(PenTiming.CanvasRefresh, SystemClock.uptimeMillis() - saved.second)
                 } else {
-                    val native = inkStroke(current, run, lockFree = true)
-                    val saved = try {
-                        if (native == null) null
-                        // A cancelled stroke has nothing to save and waits for nobody.
-                        else if (!(run.finished && !run.canceled.get() && run.epoch == epoch)) { cancelNative(native); null }
-                        else {
+                    run.native = early
+                    // The stroke takes its place in the mutation queue now, at
+                    // pen-down, as it always did, so strokes, edits, undo and
+                    // closing are still saved in the order they were asked for.
+                    // Only its ink no longer waits there.
+                    val saved = inkThenSaveInOrder(mutations, ink = {
+                        val native = inkStroke(current, run, early)
+                        if (native != null && run.finished && !run.canceled.get() && run.epoch == epoch) {
                             // The predicted tail goes at pen-up, not after a wait for the lock.
                             run.drawing = wetObject(run, Path(run.real)); publish()
-                            turn.awaitEarlier()
-                            mutations.withLock { saveStroke(run, native) }
+                            native
+                        } else {
+                            // A cancelled stroke has nothing to save and waits for nobody.
+                            if (native != null) cancelNative(native)
+                            null
                         }
-                    } finally { turn.done() } // The next stroke may save now; it does not wait for this refresh.
+                    }, save = { saveStroke(run, it) })
+                    // The next stroke may save now; it does not wait for this refresh.
                     if (saved != null) {
                         refresh(current, saved.first, run.epoch)
                         diagnostics.pen.recordMillis(PenTiming.CanvasRefresh, SystemClock.uptimeMillis() - saved.second)
@@ -2418,7 +2432,6 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             } catch (cancel: CancellationException) { cancelNative(run.native); throw cancel }
             catch (error: Exception) { cancelNative(run.native); if (!run.canceled.get()) report(error) }
             finally {
-                turn?.done()
                 withContext(NonCancellable) {
                     try { if (!run.committed) finishRemotePreview(run.link, run.options.gestureId, true) }
                     finally {
@@ -2430,20 +2443,20 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
 
-    /** Begins the native stroke and feeds it every queued batch until pen-up or
-     * cancellation. Null: the stroke ended before it began. With [lockFree] the
-     * stroke begins without reading the project when the core offers that (not
-     * for a highlighter), and each batch makes one trip off the main thread. */
-    private suspend fun inkStroke(current: WorkbenchProject, run: StrokeRun, lockFree: Boolean): WorkbenchStroke? {
-        if (run.canceled.get() || run.epoch != epoch) return null
-        val native = beginInkStroke(current, run.options, lockFree)
+    /** Begins the native stroke, unless [early] already began it, and feeds it
+     * every queued batch until pen-up or cancellation. Null: the stroke ended
+     * before it began. With [early] each batch makes one trip off the main
+     * thread instead of three. */
+    private suspend fun inkStroke(current: WorkbenchProject, run: StrokeRun, early: WorkbenchStroke?): WorkbenchStroke? {
+        if (run.canceled.get() || run.epoch != epoch) { if (early != null) cancelNative(early); return null }
+        val native = early ?: current.beginStroke(run.options)
         run.native = native
         diagnostics.pen.recordMillis(PenTiming.CanvasStrokeStart, SystemClock.uptimeMillis() - run.start.timeMs)
         if (run.canceled.get()) { cancelNative(native); return null }
         for (samples in run.queue) {
             if (run.canceled.get() || run.epoch != epoch) break
             require(run.samples + samples.size <= 100_000) { "Stroke sample limit reached. The unfinished stroke was canceled." }
-            if (lockFree) { inkBatchInOneTrip(native, run, samples); continue }
+            if (early != null) { inkBatchInOneTrip(native, run, samples); continue }
             val realBatch = batch(run, samples)
             val update = appendWithBackpressure(native, realBatch)
             try { run.link?.streamStroke(native, realBatch, run.samples.toUInt()) }
@@ -2458,7 +2471,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 try { path.addPath(EditorDrawing.contourPath(native.predict(batch(run, listOf(predicted), true)).contours, run.origin)) }
                 catch (error: CoreFailure) { if (error.kind != CoreFailureKind.Backpressure && error.kind != CoreFailureKind.Cancelled) throw error }
             }
-            if (!run.canceled.get() && run.epoch == epoch) { run.drawing = wetObject(run, path); publish() }
+            if (!run.canceled.get() && run.epoch == epoch) { inkSampleMs = run.lastTime; inkStartMs = run.start.timeMs; run.drawing = wetObject(run, path); publish() }
         }
         return native
     }
@@ -2487,7 +2500,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         run.samples += samples.size; run.lastTime = last; run.sequence++
         val path = Path(run.real)
         if (tail != null && !run.finished) path.addPath(tail)
-        if (!run.canceled.get() && run.epoch == epoch) { run.drawing = wetObject(run, path); publish() }
+        if (!run.canceled.get() && run.epoch == epoch) { inkSampleMs = run.lastTime; inkStartMs = run.start.timeMs; run.drawing = wetObject(run, path); publish() }
     }
 
     /** Saves a finished stroke and returns its revision with the time it was
@@ -2572,25 +2585,28 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
     private suspend fun refresh(current: WorkbenchProject, revision: ProjectInfo, token: Long) {
+        refreshDocument(current, revision, token, queued = false)
+    }
+    /** One read of the document and, when nothing newer was observed during
+     * it, its adoption. A save's own read ([queued] false) that its change
+     * event overtook is dropped as before; the refresh that event queued
+     * adopts, and the save stays pending until then. */
+    private suspend fun refreshDocument(current: WorkbenchProject, revision: ProjectInfo, token: Long, queued: Boolean): RefreshAdmission.Verdict =
         refreshMutex.withLock {
-        if (token != epoch || current !== project || disposing || revision.projectId != info?.projectId) return
-        // A save's own change event can arrive while this read is in flight. The
-        // read is then repeated instead of dropped, so an idle editor
-        // (pending == 0) always shows the edit it just saved.
-        val loaded = refreshAdmission.readLatest(REFRESH_READ_ATTEMPTS) {
-            if (token != epoch || current !== project || disposing) return@readLatest null
-            val doc = document ?: return@readLatest null
+        if (token != epoch || current !== project || disposing || revision.projectId != info?.projectId) return@withLock RefreshAdmission.Verdict.Dropped
+        refreshAdmission.refresh(queued, read = {
+            val doc = document ?: return@refresh null
             // Developer switch: ask only for what changed and keep the paths
             // already built for untouched strokes. Off: the full read, as before.
             val quick = preferences.penPath[PenPathToggle.CanvasQuickRefresh]
-            val fetched = documentRefresh.load(doc,{document}){readDocumentSnapshot(current,doc,quick)} ?: return@readLatest null
+            val fetched = documentRefresh.load(doc,{document}){readDocumentSnapshot(current,doc,quick)} ?: return@refresh null
             val prepared = preparedDrawing(fetched.snapshot.render.items, if (quick) objects else emptyList())
             if (token != epoch || project !== current || disposing ||
                 !documentRefresh.accepts(fetched.ticket,document,fetched.snapshot)) null
             else fetched.snapshot to prepared
-        } ?: return
-        val next = loaded.first
-        val drawing = loaded.second
+        }, adopt = { loaded -> adoptDocument(current, loaded.first, loaded.second) })
+        }
+    private suspend fun adoptDocument(current: WorkbenchProject, next: DocumentSnapshot, drawing: List<DrawObject>) {
         // The document and its own revision are one native snapshot. Host sequence
         // alone cannot order optimistic edits sharing the same accepted base.
         if (document?.render?.revision != next.render.revision) clearPeerObjects()
@@ -2616,7 +2632,6 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
         if (objects.none { it.item.objectId == selected }) selected = null
         publish()
-        }
     }
     fun saveText(text: String, font: String, size: Double) {
         if (streamEditsSealed || captureStreamBlocksParent || busy || pending != 0) return
@@ -2988,7 +3003,3 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
 }
 
 private fun PressureCurve.values() = listOf(0.0, 0.0, x1.toDouble(), y1.toDouble(), x2.toDouble(), y2.toDouble(), 1.0, 1.0)
-
-/** One read for the save itself, one for its own change event, one for a peer
- * edit landing at the same moment. Past that the queued refresh takes over. */
-private const val REFRESH_READ_ATTEMPTS = 3

@@ -2,7 +2,14 @@ package com.visualworkbench.android.editor
 
 import com.visualworkbench.shared.*
 import java.lang.reflect.Proxy
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.yield
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -61,25 +68,94 @@ class PenPathChoicesTest {
         assertEquals(listOf("document:doc"), calls)
     }
 
-    @Test fun ink_before_save_switched_off_begins_the_stroke_with_only_the_original_call(): Unit = runBlocking {
+    @Test fun ink_before_save_switched_off_asks_the_project_for_nothing_before_the_lock() {
+        // Nothing is begun early; the stroke begins with the original call, under the lock.
         for (capabilities in listOf(true, false)) {
             val calls = mutableListOf<String>()
-            assertSame(original, beginInkStroke(project(calls, capabilities), options, lockFree = false))
-            assertEquals(listOf("beginStroke:gesture"), calls)
+            assertNull(earlyInkStroke(false, project(calls, capabilities), options))
+            assertTrue(calls.isEmpty())
         }
     }
 
-    @Test fun ink_before_save_switched_on_begins_early_and_falls_back_to_the_original_call(): Unit = runBlocking {
+    @Test fun ink_before_save_switched_on_begins_early_or_says_to_take_the_original_path() {
         val calls = mutableListOf<String>()
-        assertSame(deferred, beginInkStroke(project(calls, true), options, lockFree = true))
+        assertSame(deferred, earlyInkStroke(true, project(calls, true), options))
         assertEquals(listOf("beginStrokeDeferred:gesture"), calls)
-        // A highlighter has no early start: the core answers null.
+        // A highlighter may have to create its layer from what the project
+        // holds, and two of them begun side by side would each create one. It
+        // has no early start: null, and nothing else is asked here. The caller
+        // then takes the original path, whole, under the lock.
         calls.clear()
-        assertSame(original, beginInkStroke(project(calls, true, early = null), options, lockFree = true))
-        assertEquals(listOf("beginStrokeDeferred:gesture", "beginStroke:gesture"), calls)
+        assertNull(earlyInkStroke(true, project(calls, true, early = null), options))
+        assertEquals(listOf("beginStrokeDeferred:gesture"), calls)
         calls.clear()
-        assertSame(original, beginInkStroke(project(calls, false), options, lockFree = true))
-        assertEquals(listOf("beginStroke:gesture"), calls)
+        assertNull(earlyInkStroke(true, project(calls, false), options))
+        assertTrue(calls.isEmpty())
+    }
+
+    private suspend fun settle() { repeat(50) { yield() } }
+
+    @Test fun a_stroke_inks_at_once_and_is_saved_in_the_order_the_pens_went_down(): Unit = runBlocking {
+        val lock = Mutex(); val log = mutableListOf<String>()
+        // S0 is finished and its save is slow (a recovery checkpoint).
+        val slow = CompletableDeferred<Unit>()
+        val s0 = launch(start = CoroutineStart.UNDISPATCHED) {
+            assertEquals("s0", inkThenSaveInOrder(lock, ink = { "s0" }, save = { log += "save:$it:started"; slow.await(); log += "save:$it"; it }))
+        }
+        settle()
+        // S1's pen goes down while S0 is still saving: its ink does not wait.
+        val s1Up = CompletableDeferred<String>()
+        val s1 = launch(start = CoroutineStart.UNDISPATCHED) {
+            assertEquals("s1", inkThenSaveInOrder(lock, ink = { log += "ink:s1"; s1Up.await() }, save = { log += "save:$it"; it }))
+        }
+        assertEquals(listOf("save:s0:started", "ink:s1"), log)
+        s1Up.complete("s1"); settle() // S1 is finished and waits for S0's save.
+        // An edit is asked for now, and then the editor is closed.
+        val edit = launch(start = CoroutineStart.UNDISPATCHED) { lock.withLock { log += "edit" } }
+        val close = launch(start = CoroutineStart.UNDISPATCHED) { lock.withLock { log += "close" } }
+        settle(); assertEquals(listOf("save:s0:started", "ink:s1"), log)
+        slow.complete(Unit); joinAll(s0, s1, edit, close)
+        // S1 was drawn before the edit was asked for and is saved before it; closing comes last.
+        assertEquals(listOf("save:s0:started", "ink:s1", "save:s0", "save:s1", "edit", "close"), log)
+        assertFalse(lock.isLocked)
+    }
+
+    @Test fun a_stroke_still_being_drawn_holds_its_place_against_an_edit_asked_for_meanwhile(): Unit = runBlocking {
+        val lock = Mutex(); val log = mutableListOf<String>()
+        val up = CompletableDeferred<String>()
+        val stroke = launch(start = CoroutineStart.UNDISPATCHED) { inkThenSaveInOrder(lock, ink = { up.await() }, save = { log += "save:$it"; it }) }
+        val edit = launch(start = CoroutineStart.UNDISPATCHED) { lock.withLock { log += "edit" } }
+        settle(); assertTrue(log.isEmpty()) // As on the original path, where the stroke holds the lock while it is drawn.
+        up.complete("stroke"); joinAll(stroke, edit)
+        assertEquals(listOf("save:stroke", "edit"), log)
+    }
+
+    @Test fun a_cancelled_stroke_gives_its_place_up_and_waits_for_nobody(): Unit = runBlocking {
+        val lock = Mutex(); lock.lock() // An earlier save is under way.
+        var saved = 0
+        assertNull(inkThenSaveInOrder<String, String>(lock, ink = { null }, save = { saved++; it }))
+        assertTrue(lock.isLocked); assertEquals(0, saved)
+        lock.unlock()
+        // The place already holds the lock while the stroke is drawn; cancelling the stroke frees it.
+        val gate = CompletableDeferred<String?>()
+        val drawing = launch(start = CoroutineStart.UNDISPATCHED) { assertNull(inkThenSaveInOrder<String, String>(lock, ink = { gate.await() }, save = { saved++; it })) }
+        settle(); assertTrue(lock.isLocked)
+        gate.complete(null); drawing.join()
+        assertFalse(lock.isLocked); assertEquals(0, saved)
+        // A save that finds nothing to save any more (cancelled at the last moment) answers null.
+        assertNull(inkThenSaveInOrder<String, String>(lock, ink = { "late" }, save = { null }))
+        assertFalse(lock.isLocked)
+    }
+
+    @Test fun a_failure_of_the_ink_or_of_the_save_is_thrown_and_frees_the_lock(): Unit = runBlocking {
+        val lock = Mutex()
+        try { inkThenSaveInOrder<String, String>(lock, ink = { throw IllegalStateException("ink") }, save = { it }); fail("the ink failure was swallowed") }
+        catch (error: IllegalStateException) { assertEquals("ink", error.message) }
+        assertFalse(lock.isLocked)
+        try { inkThenSaveInOrder<String, String>(lock, ink = { "stroke" }, save = { throw IllegalArgumentException("save") }); fail("the save failure was swallowed") }
+        catch (error: IllegalArgumentException) { assertEquals("save", error.message) }
+        assertFalse(lock.isLocked)
+        assertEquals("next", inkThenSaveInOrder(lock, ink = { "next" }, save = { it }))
     }
 
     @Test fun ink_before_save_switched_off_never_lets_a_pen_down_past_the_list_refresh() {

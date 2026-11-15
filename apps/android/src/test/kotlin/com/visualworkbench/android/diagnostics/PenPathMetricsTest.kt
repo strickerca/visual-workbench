@@ -52,6 +52,39 @@ class PenPathMetricsTest {
         metrics.inkDrawn(2_013, 2_000, 2_016, 1_000_000)
         assertEquals(1, metrics.summary(PenTiming.CanvasFirstInk).count)
     }
+    /** The same ink is drawn again for a hover, a status change, after a saved
+     * frame and while a finished stroke waits to be saved. Those frames show no
+     * new pen sample and must not be reported as pen-to-ink time, or a slow
+     * save would look like slow ink. */
+    @Test fun a_frame_that_shows_no_new_pen_sample_is_not_timed() {
+        val metrics = PenPathMetrics()
+        metrics.inkDrawn(1_004, 1_000, 1_012, 3_000_000); metrics.frameReady(1_004, 1_014)
+        // The stroke is finished and stays on screen for 400 ms while it is saved; it is redrawn four times.
+        for (redrawn in listOf(1_060L, 1_150L, 1_290L, 1_410L)) { metrics.inkDrawn(1_004, 1_000, redrawn, 2_000_000); metrics.frameReady(1_004, redrawn + 2) }
+        assertEquals(TimingSummary(1, 1, 8_000, 8_000, 8_000), metrics.summary(PenTiming.CanvasInkDrawn))
+        assertEquals(TimingSummary(1, 1, 10_000, 10_000, 10_000), metrics.summary(PenTiming.CanvasFrameReady))
+        assertEquals(TimingSummary(1, 1, 3_000, 3_000, 3_000), metrics.summary(PenTiming.CanvasDrawTime))
+        assertEquals(TimingSummary(1, 1, 12_000, 12_000, 12_000), metrics.summary(PenTiming.CanvasFirstInk))
+        // The next stroke's first sample is timed again, and a hover frame between two strokes is not.
+        metrics.inkDrawn(1_004, 1_000, 1_900, 1_000_000)
+        metrics.inkDrawn(2_005, 2_000, 2_011, 1_000_000); metrics.frameReady(2_005, 2_012)
+        assertEquals(2, metrics.summary(PenTiming.CanvasInkDrawn).count); assertEquals(8_000L, metrics.summary(PenTiming.CanvasInkDrawn).maxMicros)
+        assertEquals(2, metrics.summary(PenTiming.CanvasFrameReady).count); assertEquals(10_000L, metrics.summary(PenTiming.CanvasFrameReady).maxMicros)
+        assertEquals(2, metrics.summary(PenTiming.CanvasFirstInk).count)
+        // A frame without wet ink is still nothing to time.
+        metrics.inkDrawn(0, 0, 3_000, 1_000_000); metrics.frameReady(0, 3_001)
+        assertEquals(2, metrics.summary(PenTiming.CanvasInkDrawn).count)
+    }
+    @Test fun recording_from_several_threads_loses_nothing_and_takes_no_lock() {
+        val window = TimingWindow(capacity = 4_096)
+        val threads = (1..4).map { thread -> Thread { for (value in 1..1_000) window.record((thread * 10_000 + value).toLong()) } }
+        threads.forEach { it.start() }; threads.forEach { it.join() }
+        val all = window.summary()
+        assertEquals(4_000, all.count); assertEquals(4_000L, all.total); assertEquals(41_000L, all.maxMicros)
+        // Nothing in the recording path may synchronise: it runs on the drawing thread.
+        for (method in TimingWindow::class.java.declaredMethods + PenPathMetrics::class.java.declaredMethods)
+            assertFalse(method.name, java.lang.reflect.Modifier.isSynchronized(method.modifiers))
+    }
     /** Privacy rule: the copied text holds static names, durations and counts only. */
     @Test fun the_copied_text_contains_only_fixed_names_durations_counts_and_switch_keys() {
         val metrics = PenPathMetrics()

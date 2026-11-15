@@ -71,8 +71,9 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         var resizeFrom: SurfaceControlCompat? = null
         /** Diagnostics only: the pen sample time of the last drawn ink frame. */
         @Volatile var frontSampleMs = 0L
-        /** Developer switch only, drawing thread only: the kept picture an ink frame draws over. */
-        var wetInk: WetInkLayer? = null
+        /** Developer switch only: the kept picture an ink frame draws over. Made and
+         * used on the drawing thread; discarded on Main once that thread has stopped. */
+        @Volatile var wetInk: WetInkLayer? = null
     }
     private class Generation(val renderer: CanvasFrontBufferedRenderer<Frame>, val session: RenderSession)
     private data class Frame(val session: RenderSession, val dry: Boolean, val inputMs: Long,
@@ -294,6 +295,8 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                         currentSession.latest?.also { currentSession.drawn = it.revision;currentSession.giantDrawn=it.giantFrame }
                     }
                 }
+                // Developer switch only: the kept picture is held while ink is wet, never between strokes.
+                currentSession.wetInk?.forget()
                 if (snapshot == null) canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
                 else drawOwned(canvas,snapshot,currentSession)
             }
