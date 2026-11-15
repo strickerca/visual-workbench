@@ -38,6 +38,22 @@ impl Admission {
             .ok_or(SessionError::Backpressure)?;
         Ok(true)
     }
+    /// The typed reservation for a longer pen event: the same counter with
+    /// more room. `queue` keeps its own bounds.
+    pub fn queue_batch(&mut self, samples: u32) -> SessionResult<bool> {
+        if samples == 0 || samples > 32 {
+            return Err(SessionError::Invalid);
+        }
+        if self.busy() {
+            return Ok(false);
+        }
+        self.queued = self
+            .queued
+            .checked_add(samples)
+            .filter(|v| *v <= 64)
+            .ok_or(SessionError::Backpressure)?;
+        Ok(true)
+    }
     pub fn check_pen(&self, phase: Phase) -> SessionResult<()> {
         if self.busy() {
             return Err(SessionError::Backpressure);
@@ -169,6 +185,39 @@ mod tests {
         assert_eq!(a.last_pen, 9);
         assert_eq!(a.covered, 9);
         assert!(a.command.is_none());
+        Ok(())
+    }
+    #[test]
+    fn the_longer_typed_reservation_has_its_own_bounds_and_leaves_the_old_ones_alone()
+    -> SessionResult<()> {
+        // The original call: at most 8 at once, 16 waiting.
+        let mut old = Admission::default();
+        assert!(old.queue(9).is_err());
+        assert!(old.queue(8)?);
+        assert!(old.queue(8)?);
+        assert!(matches!(old.queue(1), Err(SessionError::Backpressure)));
+        // The typed call: at most 32 at once, 64 waiting, same refusals.
+        let mut typed = Admission::default();
+        assert!(matches!(typed.queue_batch(0), Err(SessionError::Invalid)));
+        assert!(matches!(typed.queue_batch(33), Err(SessionError::Invalid)));
+        assert!(typed.queue_batch(32)?);
+        assert!(typed.queue_batch(32)?);
+        assert!(matches!(
+            typed.queue_batch(1),
+            Err(SessionError::Backpressure)
+        ));
+        // Admitting samples frees room again, one for one.
+        typed.admit_pen(Phase::Down, 1);
+        assert!(typed.queue_batch(1)?);
+        // A busy editor command refuses the event without counting it.
+        let mut busy = Admission::default();
+        reserve(&mut busy)?;
+        assert!(!busy.queue_batch(12)?);
+        assert!(busy.check_pen(Phase::Down).is_err());
+        // A waiting typed reservation blocks a command exactly like the old one.
+        let mut waiting = Admission::default();
+        assert!(waiting.queue_batch(12)?);
+        assert!(reserve(&mut waiting).is_err());
         Ok(())
     }
     #[test]

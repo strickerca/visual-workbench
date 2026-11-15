@@ -46,6 +46,25 @@ class RemotePenIntakeTest {
         assertEquals(listOf("reserve:8", "reserve:8") + (1..16).map { "enqueue:$it" }, sixteen.log)
     }
 
+    @Test fun the_typed_switch_alone_changes_no_bound_and_with_long_batches_reserves_a_whole_event_at_once() {
+        val typedOnly = RemotePenIntake(longBatches = false, typed = true)
+        assertEquals(7, typedOnly.maxHistory); assertEquals(8, typedOnly.maxSamples); assertEquals(8, typedOnly.queueCapacity)
+        val eight = Calls()
+        assertEquals(RemotePenIntake.Result.Admitted, typedOnly.admit((1..8).toList(), eight.reserve, eight.enqueue))
+        assertEquals(listOf("reserve:8") + (1..8).map { "enqueue:$it" }, eight.log)
+        val both = RemotePenIntake(longBatches = true, typed = true)
+        assertEquals(31, both.maxHistory); assertEquals(32, both.maxSamples); assertEquals(64, both.queueCapacity)
+        val twenty = Calls()
+        assertEquals(RemotePenIntake.Result.Admitted, both.admit((1..20).toList(), twenty.reserve, twenty.enqueue))
+        assertEquals(listOf("reserve:20") + (1..20).map { "enqueue:$it" }, twenty.log)
+        val full = Calls()
+        assertEquals(RemotePenIntake.Result.Admitted, both.admit((1..32).toList(), full.reserve, full.enqueue))
+        assertEquals("reserve:32", full.log.first()); assertEquals(33, full.log.size)
+        val busy = Calls(busyAt = 0)
+        assertEquals(RemotePenIntake.Result.CommandBusy, both.admit((1..20).toList(), busy.reserve, busy.enqueue))
+        assertEquals(listOf("reserve:20"), busy.log)
+    }
+
     @Test fun switched_on_never_queues_a_sample_of_an_event_it_could_not_fully_reserve() {
         val intake = RemotePenIntake(longBatches = true)
         val busy = Calls(busyAt = 0)

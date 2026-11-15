@@ -16,6 +16,8 @@ internal enum class PenPathToggle(val key: String, val title: String, val effect
         "A burst of more than 8 pen samples in one event is sent to the computer in paced groups of 8 instead of pausing input. Applies the next time the remote view opens."),
     RemoteUnbufferedPen("remoteUnbufferedPen", "Remote pen: samples at the pen's own rate",
         "Asks Android to deliver each pen sample as it is reported instead of once per display frame, so samples leave for the computer up to a frame sooner. Applies the next time the remote view opens."),
+    RemoteTypedBatches("remoteTypedBatches", "Remote pen: fewer, typed calls to the core",
+        "Pen samples that are waiting go to the core together as typed values instead of one text message each. Less work per sample; with the hitch switch it also takes bursts of up to 32 samples. The computer receives exactly the same data. Applies the next time the remote view opens."),
     RemoteExactTimes("remoteExactTimes", "Remote pen: exact sample times",
         "Each sample keeps the time the pen reported it instead of a time rounded to when the phone handled it. Steadier ghost ink and truer timings. Applies the next time the remote view opens."),
 }

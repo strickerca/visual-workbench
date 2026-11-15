@@ -10,13 +10,19 @@ package com.visualworkbench.android.remote
  * later released to the computer by [RemoteSendPacer]. Without it this class
  * makes exactly the calls the controller made before: one reservation for the
  * whole event, then one enqueue per sample, stopping at the first refusal. */
-internal class RemotePenIntake(val longBatches: Boolean) {
+internal class RemotePenIntake(val longBatches: Boolean, val typed: Boolean = false) {
     enum class Result { Admitted, CommandBusy, Refused }
 
     /** Largest MotionEvent history accepted; one more sample is the event itself. */
-    val maxHistory: Int get() = if (longBatches) LONG_SAMPLES - 1 else GROUP - 1
+    val maxHistory: Int get() = maxSamples - 1
+    /** Samples of one event: 8 as before; 16 with long batches (two reservations
+     * of the original call, whose queue holds 16); 32 when the typed reservation,
+     * which has room for 64, is used as well. */
+    val maxSamples: Int get() = if (!longBatches) GROUP else if (typed) TYPED_SAMPLES else LONG_SAMPLES
     /** Samples that may wait on the phone between the touch thread and the sender. */
-    val queueCapacity: Int get() = if (longBatches) LONG_QUEUE else GROUP
+    val queueCapacity: Int get() = if (!longBatches) GROUP else if (typed) TYPED_QUEUE else LONG_QUEUE
+    /** Largest single reservation: 8 for the original call, a whole event for the typed one. */
+    private val reservation: Int get() = if (longBatches && typed) TYPED_SAMPLES else GROUP
 
     /** [reserve] is the short native state-only reservation: false means an
      * editor command is refreshing and no sample of this event may be queued.
@@ -30,7 +36,7 @@ internal class RemotePenIntake(val longBatches: Boolean) {
         }
         var reserved = 0
         while (reserved < batch.size) {
-            val group = minOf(GROUP, batch.size - reserved)
+            val group = minOf(reservation, batch.size - reserved)
             if (!reserve(group.toUInt())) return if (reserved == 0) Result.CommandBusy else Result.Refused
             reserved += group
         }
@@ -43,6 +49,9 @@ internal class RemotePenIntake(val longBatches: Boolean) {
         /** Two native reservations: the native queue bound is sixteen samples. */
         const val LONG_SAMPLES = 16
         const val LONG_QUEUE = 32
+        /** The typed reservation takes up to 32 samples at once and holds 64. */
+        const val TYPED_SAMPLES = 32
+        const val TYPED_QUEUE = 64
     }
 }
 

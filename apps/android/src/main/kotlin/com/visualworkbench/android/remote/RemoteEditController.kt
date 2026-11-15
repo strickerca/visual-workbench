@@ -91,9 +91,12 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
     val echo:StateFlow<RemoteEchoTiming> = echoMutable.asStateFlow()
     private val mapping=AtomicReference<RemoteRenderMapping?>(null)
     private val nativeTickets=linkedMapOf<ULong,RemoteVideoFrame>()
-    private val intake=RemotePenIntake(toggles[PenPathToggle.RemoteLongBatches])
+    private val intake=RemotePenIntake(toggles[PenPathToggle.RemoteLongBatches],
+        typed=toggles[PenPathToggle.RemoteTypedBatches]&&remote is RemotePenBatches)
     private val input=Channel<TouchAdmission>(intake.queueCapacity)
     private val pacer=if(intake.longBatches)RemoteSendPacer() else null
+    /** Developer switch: reservation and sends go through the typed calls, several samples at once. */
+    private val batches=(remote as? RemotePenBatches)?.takeIf{toggles[PenPathToggle.RemoteTypedBatches]}
     private val sampleClock=RemoteSampleClock(toggles[PenPathToggle.RemoteExactTimes])
     /** Developer switch: the remote surface asks Android for unbatched pen samples during a contact. */
     val unbufferedPen:Boolean=toggles[PenPathToggle.RemoteUnbufferedPen]
@@ -138,39 +141,48 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
             for(item in input){
                 // Long batches only: never hand the computer's eight-slot input queue more than it takes today.
                 if(pacer!=null)while(true){val wait=pacer.acquire(System.nanoTime());if(wait<=0L)break;delay((wait+999_999L)/1_000_000L)}
-                val age=System.nanoTime()-item.sample.sampledLocalNanos
-                if(age !in 0 until 50_000_000L){physical.get()?.journal?.pause("input_expired");deactivate("input_expired");continue}
-                val allowed=synchronized(inputFence){enabled&&foregroundActive&&item.fence==admissionFence&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true}
+                // Typed batches only: whatever else is already waiting goes in the same call,
+                // up to eight samples. A send slot taken for a sample that is not there is lost, not reused.
+                val group=if(batches==null)listOf(item)else buildList{add(item);while(size<RemotePenIntake.GROUP){
+                    if(pacer!=null&&pacer.acquire(System.nanoTime())>0L)break
+                    add(input.tryReceive().getOrNull()?:break)}}
+                val now=System.nanoTime()
+                if(group.any{(now-it.sample.sampledLocalNanos) !in 0 until 50_000_000L}){physical.get()?.journal?.pause("input_expired");deactivate("input_expired");continue}
+                val allowed=synchronized(inputFence){enabled&&foregroundActive&&group.all{it.fence==admissionFence&&it.binding==item.binding}&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true}
                 if(!allowed)continue
                 try{
-                    val admission=remote.pen(item.binding,item.sample)
-                    metrics?.recordNanos(PenTiming.RemoteSent,System.nanoTime()-item.sample.sampledLocalNanos)
-                    synchronized(inputFence){
-                        if(enabled&&foregroundActive&&item.fence==admissionFence&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true){
-                            echoLedger.record(admission);echoMutable.value=echoLedger.snapshot(System.nanoTime())
-                            val before=previousActual?.takeIf{it.first==item.binding}?.second
-                            val ghostAccepted=segments.admitted(admission,item.point,item.contact)
-                            val admittedGhost=ghost.snapshot(System.nanoTime()).firstOrNull{it.segment.binding==admission.binding&&admission.sequence in it.segment.firstInputSequence..it.segment.lastInputSequence}?.segment
-                            // Actual native transport admission only; predictions and
-                            // queued MotionEvents never publish a sequence here.
-                            inputObservationMutable.value=RemoteControllerInputObservation(admission,item.sample.phase,ghostAccepted,admittedGhost)
-                            item.trace?.let{t->val s=item.sample
-                                t.journal.admitted(RemotePhysicalJournalRow(admission.sequence,t.event,s.phase,s.hostX,s.hostY,s.pressure,
-                                    t.rawPressure,t.rawTilt,t.rawOrientation,t.rawDistance,s.tiltX,s.tiltY,s.nativePenMask,s.penFlags,
-                                    s.sampledLocalNanos,t.historical,t.origin))}
-                            if(ghostAccepted&&item.contact&&before!=null){
-                                val dt=item.point.localNanos-before.localNanos
-                                if(dt in 1..50_000_000L){val horizon=12_000_000L;val factor=horizon.toFloat()/dt
-                                    val dx=((item.point.x-before.x)*factor).coerceIn(-64f,64f)
-                                    val dy=((item.point.y-before.y)*factor).coerceIn(-64f,64f)
-                                    segments.prediction(item.point.copy(x=item.point.x+dx,y=item.point.y+dy,localNanos=item.point.localNanos+horizon,predicted=true))
-                                }
-                            }
-                            previousActual=if(item.contact)item.binding to item.point else null
-                        }
-                    }
+                    val admissions=if(batches==null)listOf(remote.pen(item.binding,item.sample))else batches.penBatch(item.binding,group.map{it.sample})
+                    for((sent,admission) in group.zip(admissions))admitted(sent,admission)
                 }catch(cancelled:CancellationException){throw cancelled}
                 catch(_:Exception){physical.get()?.journal?.pause("pen_exception");deactivate("owner_pause")}
+            }
+        }
+    }
+    /** One sample the core has sent: timing, ghost ink and the echo ledger, under the input fence. */
+    private fun admitted(item:TouchAdmission,admission:RemoteInputAdmission){
+        metrics?.recordNanos(PenTiming.RemoteSent,System.nanoTime()-item.sample.sampledLocalNanos)
+        synchronized(inputFence){
+            if(enabled&&foregroundActive&&item.fence==admissionFence&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true){
+                echoLedger.record(admission);echoMutable.value=echoLedger.snapshot(System.nanoTime())
+                val before=previousActual?.takeIf{it.first==item.binding}?.second
+                val ghostAccepted=segments.admitted(admission,item.point,item.contact)
+                val admittedGhost=ghost.snapshot(System.nanoTime()).firstOrNull{it.segment.binding==admission.binding&&admission.sequence in it.segment.firstInputSequence..it.segment.lastInputSequence}?.segment
+                // Actual native transport admission only; predictions and
+                // queued MotionEvents never publish a sequence here.
+                inputObservationMutable.value=RemoteControllerInputObservation(admission,item.sample.phase,ghostAccepted,admittedGhost)
+                item.trace?.let{t->val s=item.sample
+                    t.journal.admitted(RemotePhysicalJournalRow(admission.sequence,t.event,s.phase,s.hostX,s.hostY,s.pressure,
+                        t.rawPressure,t.rawTilt,t.rawOrientation,t.rawDistance,s.tiltX,s.tiltY,s.nativePenMask,s.penFlags,
+                        s.sampledLocalNanos,t.historical,t.origin))}
+                if(ghostAccepted&&item.contact&&before!=null){
+                    val dt=item.point.localNanos-before.localNanos
+                    if(dt in 1..50_000_000L){val horizon=12_000_000L;val factor=horizon.toFloat()/dt
+                        val dx=((item.point.x-before.x)*factor).coerceIn(-64f,64f)
+                        val dy=((item.point.y-before.y)*factor).coerceIn(-64f,64f)
+                        segments.prediction(item.point.copy(x=item.point.x+dx,y=item.point.y+dy,localNanos=item.point.localNanos+horizon,predicted=true))
+                    }
+                }
+                previousActual=if(item.contact)item.binding to item.point else null
             }
         }
     }
@@ -403,7 +415,7 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
         var commandBusy=false
         val admitted=try{synchronized(inputFence){
             if(!enabled||!foregroundActive||fence!=admissionFence||mapping.get()!==map||remote.target.value?.binding!=target.binding)false
-            else when(intake.admit(batch,{remote.reservePen(target.binding,it)},{input.trySend(it).isSuccess})){
+            else when(intake.admit(batch,{batches?.reservePenBatch(target.binding,it)?:remote.reservePen(target.binding,it)},{input.trySend(it).isSuccess})){
                 RemotePenIntake.Result.Admitted->true
                 RemotePenIntake.Result.CommandBusy->{
                     commandBusy=true

@@ -81,6 +81,79 @@ pub struct RemoteInputAdmitted {
     pub binding_json: String,
     pub input_sequence: u64,
 }
+/// The target binding as fields instead of JSON, for the typed pen calls.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct RemotePenBinding {
+    pub connection_epoch: u64,
+    pub capture_session_id: String,
+    pub source_generation: u64,
+    pub target_token: String,
+    pub geometry_revision: u32,
+    pub input_session_id: String,
+}
+impl RemotePenBinding {
+    fn binding(self) -> Binding {
+        Binding {
+            scope: Scope {
+                connection_epoch: self.connection_epoch,
+                capture_session_id: self.capture_session_id,
+                source_generation: self.source_generation,
+                target_token: self.target_token,
+                geometry_revision: self.geometry_revision,
+            },
+            input_session_id: self.input_session_id,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum RemotePenPointPhase {
+    Hover,
+    Down,
+    Move,
+    Up,
+    Leave,
+}
+/// One pen sample as fields: the same values the JSON sample of `remote_pen` carries.
+#[derive(Clone, Copy, Debug, uniffi::Record)]
+pub struct RemotePenPoint {
+    pub phase: RemotePenPointPhase,
+    pub x: i32,
+    pub y: i32,
+    pub pressure: u32,
+    pub tilt_x: i32,
+    pub tilt_y: i32,
+    pub rotation: u32,
+    pub pen_flags: u32,
+    pub pen_mask: u32,
+}
+impl RemotePenPoint {
+    fn sample(self) -> vw_remote::wire::PenSample {
+        vw_remote::wire::PenSample {
+            phase: match self.phase {
+                RemotePenPointPhase::Hover => vw_remote::wire::Phase::Hover,
+                RemotePenPointPhase::Down => vw_remote::wire::Phase::Down,
+                RemotePenPointPhase::Move => vw_remote::wire::Phase::Move,
+                RemotePenPointPhase::Up => vw_remote::wire::Phase::Up,
+                RemotePenPointPhase::Leave => vw_remote::wire::Phase::Leave,
+            },
+            x: self.x,
+            y: self.y,
+            pressure: self.pressure,
+            tilt_x: self.tilt_x,
+            tilt_y: self.tilt_y,
+            rotation: self.rotation,
+            pen_flags: self.pen_flags,
+            pen_mask: self.pen_mask,
+        }
+    }
+}
+/// The samples of one `remote_pen_batch` call were sent with consecutive
+/// input sequences starting at `first_input_sequence`.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct RemotePenBatchAdmitted {
+    pub first_input_sequence: u64,
+    pub admitted: u32,
+}
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct RemoteWindow {
     pub window: u64,
@@ -1393,8 +1466,113 @@ impl LiveSession {
         let sample: vw_remote::wire::PenSample = parse(&sample_json, 1024)?;
         sample.validate().map_err(failure)?;
         let mut s = self.remote.state.lock().map_err(|_| SessionError::Worker)?;
+        let sequence = self.remote.send_pen(&mut s, &binding, &sample)?;
+        Ok(RemoteInputAdmitted {
+            binding_json: json(&binding)?,
+            input_sequence: sequence,
+        })
+    }
+    /// `remote_reserve_pen` without JSON and with room for a longer event:
+    /// up to 32 samples at once, 64 waiting in all. False means command
+    /// refresh is busy; it does not revoke the pen grant.
+    pub fn remote_reserve_pen_batch(
+        &self,
+        binding: RemotePenBinding,
+        samples: u32,
+    ) -> SessionResult<bool> {
+        if self.remote.host || self.closed.load(Ordering::Acquire) {
+            return Err(SessionError::Closed);
+        }
+        let binding = binding.binding();
+        binding.validate().map_err(failure)?;
+        let mut s = self.remote.state.lock().map_err(|_| SessionError::Worker)?;
         RemoteHub::current(&s)?;
         if s.binding.as_ref() != Some(&binding) {
+            return Err(SessionError::Authentication);
+        }
+        s.admission.queue_batch(samples)
+    }
+    /// One `remote_pen` per sample, in order, without JSON and in one call.
+    /// Every sample is checked and sent exactly as `remote_pen` checks and
+    /// sends it: one input event each, the same bytes. It stops at the first
+    /// sample that is refused and returns that error; the samples before it
+    /// stay sent and admitted, as they would after separate calls.
+    pub fn remote_pen_batch(
+        &self,
+        binding: RemotePenBinding,
+        samples: Vec<RemotePenPoint>,
+    ) -> SessionResult<RemotePenBatchAdmitted> {
+        if self.remote.host || self.closed.load(Ordering::Acquire) {
+            return Err(SessionError::Closed);
+        }
+        if samples.is_empty() || samples.len() > 32 {
+            return Err(SessionError::Invalid);
+        }
+        let binding = binding.binding();
+        let mut s = self.remote.state.lock().map_err(|_| SessionError::Worker)?;
+        let mut first = 0;
+        for (index, point) in samples.iter().enumerate() {
+            let sample = point.sample();
+            sample.validate().map_err(failure)?;
+            let sequence = self.remote.send_pen(&mut s, &binding, &sample)?;
+            if index == 0 {
+                first = sequence;
+            }
+        }
+        Ok(RemotePenBatchAdmitted {
+            first_input_sequence: first,
+            admitted: samples.len() as u32,
+        })
+    }
+}
+/// The input event for one admitted pen sample. Both pen calls build it here.
+fn pen_event(
+    binding: &Binding,
+    client: vw_remote::Rect,
+    sample: &vw_remote::wire::PenSample,
+    sequence: u64,
+) -> SessionResult<pb::InputEvent> {
+    let phase = match sample.phase {
+        vw_remote::wire::Phase::Hover => pb::PenPhase::Hover,
+        vw_remote::wire::Phase::Down => pb::PenPhase::Down,
+        vw_remote::wire::Phase::Move => pb::PenPhase::Move,
+        vw_remote::wire::Phase::Up => pb::PenPhase::Up,
+        vw_remote::wire::Phase::Leave => pb::PenPhase::Cancel,
+    };
+    Ok(pb::InputEvent {
+        input_session_id: Some(native_id(&binding.input_session_id)?.to_proto()),
+        capture_session_id: Some(native_id(&binding.scope.capture_session_id)?.to_proto()),
+        geometry_revision: binding.scope.geometry_revision,
+        input_seq: sequence,
+        remote_scope: Some(scope_pb(&binding.scope)?),
+        request_nonce: 0,
+        event: Some(pb::input_event::Event::Pen(pb::PenEvent {
+            phase: phase as i32,
+            x: f64::from(sample.x - client.x),
+            y: f64::from(sample.y - client.y),
+            pressure: sample.pressure as f32 / 1024.0,
+            tilt_x: sample.tilt_x as f32,
+            tilt_y: sample.tilt_y as f32,
+            rotation: sample.rotation as f32,
+            barrel: sample.pen_flags & 1 != 0,
+            eraser: sample.pen_flags & 4 != 0,
+            t_ns: 0,
+            native_pen_flags: Some(sample.pen_flags),
+            native_pen_mask: Some(sample.pen_mask),
+        })),
+    })
+}
+impl RemoteHub {
+    /// Checks one validated pen sample against the current grant and target,
+    /// sends it and records it as admitted. Returns its input sequence.
+    fn send_pen(
+        &self,
+        s: &mut State,
+        binding: &Binding,
+        sample: &vw_remote::wire::PenSample,
+    ) -> SessionResult<u64> {
+        RemoteHub::current(s)?;
+        if s.binding.as_ref() != Some(binding) {
             return Err(SessionError::Authentication);
         }
         s.admission.check_pen(sample.phase)?;
@@ -1406,48 +1584,17 @@ impl LiveSession {
             .input_seq
             .checked_add(1)
             .ok_or(SessionError::Backpressure)?;
-        let phase = match sample.phase {
-            vw_remote::wire::Phase::Hover => pb::PenPhase::Hover,
-            vw_remote::wire::Phase::Down => pb::PenPhase::Down,
-            vw_remote::wire::Phase::Move => pb::PenPhase::Move,
-            vw_remote::wire::Phase::Up => pb::PenPhase::Up,
-            vw_remote::wire::Phase::Leave => pb::PenPhase::Cancel,
-        };
-        let event = pb::InputEvent {
-            input_session_id: Some(native_id(&binding.input_session_id)?.to_proto()),
-            capture_session_id: Some(native_id(&binding.scope.capture_session_id)?.to_proto()),
-            geometry_revision: binding.scope.geometry_revision,
-            input_seq: sequence,
-            remote_scope: Some(scope_pb(&binding.scope)?),
-            request_nonce: 0,
-            event: Some(pb::input_event::Event::Pen(pb::PenEvent {
-                phase: phase as i32,
-                x: f64::from(sample.x - selected.target.client_rect.x),
-                y: f64::from(sample.y - selected.target.client_rect.y),
-                pressure: sample.pressure as f32 / 1024.0,
-                tilt_x: sample.tilt_x as f32,
-                tilt_y: sample.tilt_y as f32,
-                rotation: sample.rotation as f32,
-                barrel: sample.pen_flags & 1 != 0,
-                eraser: sample.pen_flags & 4 != 0,
-                t_ns: 0,
-                native_pen_flags: Some(sample.pen_flags),
-                native_pen_mask: Some(sample.pen_mask),
-            })),
-        };
+        let event = pen_event(binding, selected.target.client_rect, sample, sequence)?;
         s.sender
             .as_ref()
             .ok_or(SessionError::Closed)?
             .enqueue(Body::InputEvent(event))?;
         s.admission.admit_pen(sample.phase, sequence);
         s.stroke.pen(sample.phase, sequence);
-        self.remote.apply_pending_stroke_authority(&mut s)?;
+        self.apply_pending_stroke_authority(s)?;
         s.input_seq = sequence;
         s.last_input = Instant::now();
-        Ok(RemoteInputAdmitted {
-            binding_json: json(&binding)?,
-            input_sequence: sequence,
-        })
+        Ok(sequence)
     }
 }
 #[uniffi::export]
@@ -1493,6 +1640,124 @@ mod retained_tests {
             keyframe: true,
             annexb: vec![0, 0, 1, 38, 1],
         }
+    }
+    /// The typed pen calls must put the same bytes on the wire as the JSON
+    /// call: for every phase, flag and axis mask the event built from a typed
+    /// point equals the event built from the JSON the phone sends today.
+    #[test]
+    fn a_typed_pen_point_builds_the_same_wire_event_as_its_json_sample() -> SessionResult<()> {
+        use vw_proto::Message;
+        let typed_binding = RemotePenBinding {
+            connection_epoch: 1,
+            capture_session_id: scope().capture_session_id,
+            source_generation: 1,
+            target_token: scope().target_token,
+            geometry_revision: 1,
+            input_session_id: binding().input_session_id,
+        }
+        .binding();
+        assert_eq!(typed_binding, binding());
+        let binding_json = json(&binding())?;
+        assert_eq!(parse::<Binding>(&binding_json, 2048)?, typed_binding);
+        let client = vw_remote::Rect {
+            x: -40,
+            y: 25,
+            width: 800,
+            height: 600,
+        };
+        let phases = [
+            (RemotePenPointPhase::Hover, "Hover"),
+            (RemotePenPointPhase::Down, "Down"),
+            (RemotePenPointPhase::Move, "Move"),
+            (RemotePenPointPhase::Up, "Up"),
+            (RemotePenPointPhase::Leave, "Leave"),
+        ];
+        let mut sequence = 0;
+        for (phase, name) in phases {
+            for (pressure, tilt_x, tilt_y, rotation, pen_flags, pen_mask) in [
+                (0, 0, 0, 0, 0, 1),
+                (1024, 90, -90, 359, 5, 15),
+                (511, -37, 12, 0, 1, 13),
+                (1, 0, 0, 180, 4, 3),
+            ] {
+                sequence += 1;
+                let point = RemotePenPoint {
+                    phase,
+                    x: 123,
+                    y: 456,
+                    pressure,
+                    tilt_x,
+                    tilt_y,
+                    rotation,
+                    pen_flags,
+                    pen_mask,
+                };
+                // Exactly the text the phone's JSON call builds for this sample.
+                let text = format!(
+                    "{{\"phase\":\"{name}\",\"x\":123,\"y\":456,\"pressure\":{pressure},\"tilt_x\":{tilt_x},\"tilt_y\":{tilt_y},\"rotation\":{rotation},\"pen_flags\":{pen_flags},\"pen_mask\":{pen_mask}}}"
+                );
+                let parsed: vw_remote::wire::PenSample = parse(&text, 1024)?;
+                parsed.validate().map_err(failure)?;
+                let sample = point.sample();
+                sample.validate().map_err(failure)?;
+                assert_eq!(sample, parsed);
+                let from_json = pen_event(&binding(), client, &parsed, sequence)?;
+                let from_typed = pen_event(&typed_binding, client, &sample, sequence)?;
+                assert_eq!(from_typed, from_json);
+                assert_eq!(from_typed.encode_to_vec(), from_json.encode_to_vec());
+                // No clock travels with a pen sample: the wire's time field stays empty.
+                let Some(pb::input_event::Event::Pen(pen)) = &from_typed.event else {
+                    return Err(SessionError::Invalid);
+                };
+                assert_eq!(pen.t_ns, 0);
+                assert_eq!((pen.x, pen.y), (163.0, 431.0));
+            }
+        }
+        // A sample the JSON call refuses is refused as a typed point too.
+        let bad = RemotePenPoint {
+            phase: RemotePenPointPhase::Move,
+            x: 0,
+            y: 0,
+            pressure: 1025,
+            tilt_x: 0,
+            tilt_y: 0,
+            rotation: 0,
+            pen_flags: 0,
+            pen_mask: 1,
+        };
+        assert!(bad.sample().validate().is_err());
+        Ok(())
+    }
+    /// Both pen calls go through one admission. Without a carrier it sends
+    /// nothing, uses no input sequence and counts no contact, whatever the
+    /// sample or binding.
+    #[test]
+    fn the_shared_pen_path_admits_nothing_without_a_carrier() -> SessionResult<()> {
+        let hub = close_fixture(false)?;
+        let sample = RemotePenPoint {
+            phase: RemotePenPointPhase::Down,
+            x: 10,
+            y: 10,
+            pressure: 512,
+            tilt_x: 0,
+            tilt_y: 0,
+            rotation: 0,
+            pen_flags: 0,
+            pen_mask: 1,
+        }
+        .sample();
+        let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+        let mut other = binding();
+        other.input_session_id = "018bcfe5-6800-7000-8000-000000000009".into();
+        for target in [binding(), other] {
+            assert!(matches!(
+                hub.send_pen(&mut s, &target, &sample),
+                Err(SessionError::Closed)
+            ));
+        }
+        assert_eq!(s.input_seq, 0);
+        assert!(s.admission.authority_idle());
+        Ok(())
     }
     fn close_fixture(host: bool) -> SessionResult<Arc<RemoteHub>> {
         let hub = RemoteHub::new(host);
