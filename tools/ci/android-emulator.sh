@@ -59,10 +59,14 @@ done
 # system dialog lying over the app can be told from a defect in the app.
 focus_log="${TMPDIR:-/tmp}/vw-focus.log"
 (
-  last=""
+  set +e
+  last=""; count=0
   while :; do
-    now="$("$adb" shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus | tr -d '\r' || true)"
-    if [ -n "$now" ] && [ "$now" != "$last" ]; then echo "$(date +%T) $now"; last="$now"; fi
+    now="$("$adb" shell dumpsys window </dev/null 2>/dev/null | tr -d '\r' \
+      | grep -E 'mCurrentFocus=|mFocusedApp=' | sed 's/^ *//' | sort -u | tr '\n' ' ')"
+    count=$((count + 1))
+    if [ -n "$now" ] && [ "$now" != "$last" ]; then echo "$(date +%T) sample $count: $now"; last="$now"; fi
+    echo "$count" >"$focus_log.count"
     sleep 1
   done
 ) >"$focus_log" 2>/dev/null &
@@ -83,6 +87,7 @@ if [ "$status" -ne 0 ]; then
   "$adb" logcat -d -v brief '*:W' | grep -iE "visualworkbench|VW_|vw_core|AndroidRuntime" | tail -n 40 || true
   echo "--- focused window during the tests (changes only) ---"
   tail -n 60 "$focus_log" || true
+  echo "focus samples taken: $(cat "$focus_log.count" 2>/dev/null || echo 0)"
 fi
 "$PYTHON" - <<'PY' || true
 import glob, xml.etree.ElementTree as ET
