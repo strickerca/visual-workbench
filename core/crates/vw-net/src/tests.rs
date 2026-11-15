@@ -742,6 +742,235 @@ fn sync_checkpoint_refuses_forgotten_cancellation_and_changed_receipt_history() 
         local.checkpoint_bytes().unwrap()
     );
 }
+/// A project with one layer, an object the phone made, a move of it by the
+/// host, and the phone's undo of its object, which the host answers with a
+/// notice: the move by the other device is in the way.
+fn history_with_a_notice() -> (HostSequencer, HostSync, Id) {
+    use vw_model::{Document, Layer};
+    let mut project = Project::new(id(1), "Notice fixture".into(), device(1));
+    project.documents.insert(
+        id(2),
+        Document {
+            definition: pb::CreateDocument {
+                document_id: Some(id(2).to_proto()),
+                kind: pb::DocumentKind::Image as i32,
+                schema_version: 1,
+                title: "Fixture".into(),
+                ..Default::default()
+            },
+            pages: Vec::new(),
+            created_at_ms: 0,
+        },
+    );
+    project.layers.insert(
+        id(3),
+        Layer {
+            definition: pb::CreateLayer {
+                layer_id: Some(id(3).to_proto()),
+                document_id: Some(id(2).to_proto()),
+                page_index: -1,
+                name: "Layer".into(),
+                kind: "annotation".into(),
+                order_key: "V".into(),
+            },
+            visible: true,
+            locked: false,
+            opacity: 1.0,
+            blend: "normal".into(),
+        },
+    );
+    let initial = HostSequencer::new(project, device(1)).unwrap();
+    let mut host = HostSync::new(initial.clone()).unwrap();
+    let transform = |e: f64| pb::Affine {
+        a: 1.0,
+        d: 1.0,
+        e,
+        ..Default::default()
+    };
+    let by = |author: u8, n: u64, kind: Kind, host: &HostSync| pb::Transaction {
+        txn_id: Some(id(200 + n).to_proto()),
+        project_id: Some(id(1).to_proto()),
+        device_id: device(author).to_string(),
+        base_revision: Some(host.host().revision().unwrap()),
+        created_at_wall_ms: 1000 + n as i64,
+        gesture_id: None,
+        ops: vec![pb::Op {
+            op_id: Some(pb::OpId {
+                device_id: device(author).to_string(),
+                lamport: n,
+            }),
+            kind: Some(kind),
+        }],
+    };
+    let created = by(
+        2,
+        1,
+        Kind::CreateObject(pb::CreateObject {
+            document_id: Some(id(2).to_proto()),
+            state: Some(pb::ObjectState {
+                object_id: Some(id(4).to_proto()),
+                layer_id: Some(id(3).to_proto()),
+                order_key: "V".into(),
+                transform: Some(transform(0.0)),
+                style: Some(pb::Style {
+                    stroke: Some(pb::Color { rgba: 0x112233ff }),
+                    width: 1.0,
+                    ..Default::default()
+                }),
+                role: pb::Role::None as i32,
+                created_by: device(2).to_string(),
+                created_at_ms: 1,
+                shape: Some(pb::object_state::Shape::Rect(pb::RectD {
+                    x: 0.0,
+                    y: 0.0,
+                    w: 4.0,
+                    h: 3.0,
+                })),
+                ..Default::default()
+            }),
+        }),
+        &host,
+    );
+    host.submit(created, &device(2), 2001).unwrap();
+    let moved = by(
+        1,
+        2,
+        Kind::SetProperty(pb::SetProperty {
+            object_id: Some(id(4).to_proto()),
+            property: "transform".into(),
+            value: Some(pb::PropertyValue {
+                value: Some(pb::property_value::Value::Transform(transform(5.0))),
+            }),
+        }),
+        &host,
+    );
+    host.submit(moved, &device(1), 2002).unwrap();
+    let undo = by(
+        2,
+        3,
+        Kind::UndoTransaction(pb::UndoTransaction {
+            target_txn_id: Some(id(201).to_proto()),
+        }),
+        &host,
+    );
+    let answered = host.submit(undo, &device(2), 2003).unwrap();
+    assert_eq!(answered.ack.notices.len(), 1, "{:?}", answered.ack.notices);
+    (initial, host, id(203))
+}
+
+/// Two builds word a notice differently, or one gives a notice where the
+/// other gives none. What the host decided is the revision and the state
+/// hash; the device that receives the transaction decides those again and
+/// keeps the host's notices as they came.
+#[test]
+fn sync_does_not_depend_on_how_the_other_build_words_its_notices() {
+    let (initial, host, undo) = history_with_a_notice();
+    let response = host
+        .respond(&SyncReceiver::new(initial.clone()).request().unwrap())
+        .unwrap();
+    assert_eq!(response.batch.txns.len(), 3);
+    let own = response.batch.txns[2].ack.as_ref().unwrap().notices.clone();
+    // As this build words it, the batch is accepted as it always was.
+    let mut same = SyncReceiver::new(initial.clone());
+    same.receive(response.batch.clone(), &device(1))
+        .unwrap()
+        .unwrap();
+
+    type Reword = fn(&mut pb::SyncBatch);
+    let rewordings: [(&str, Reword); 4] = [
+        ("another wording", |batch| {
+            batch.txns[2].ack.as_mut().unwrap().notices =
+                vec!["Left the object where the other device put it".into()];
+        }),
+        ("no notice where this build gives one", |batch| {
+            batch.txns[2].ack.as_mut().unwrap().notices.clear();
+        }),
+        ("two notices where this build gives one", |batch| {
+            batch.txns[2].ack.as_mut().unwrap().notices = vec!["First".into(), "Second".into()];
+        }),
+        ("a notice where this build gives none", |batch| {
+            batch.txns[0].ack.as_mut().unwrap().notices = vec!["Welcome".into()];
+        }),
+    ];
+    for (name, reword) in rewordings {
+        let mut batch = response.batch.clone();
+        reword(&mut batch);
+        let mut receive = SyncReceiver::new(initial.clone());
+        let snapshot = receive
+            .receive(batch.clone(), &device(1))
+            .unwrap_or_else(|error| panic!("{name}: {error}"))
+            .unwrap();
+        // The same project at the same revision as the host.
+        assert_eq!(snapshot.revision, host.host().revision().unwrap(), "{name}");
+        assert_eq!(snapshot.project, *host.host().project(), "{name}");
+        // The host's acknowledgements, word for word: in what the replica is
+        // given, in what the mirror answers a retry with and in what it stores.
+        for entry in &batch.txns {
+            let txn = entry.txn.as_ref().unwrap();
+            let key = Id::from_proto(txn.txn_id.as_ref()).unwrap();
+            let sent = entry.ack.as_ref().unwrap();
+            assert_eq!(&snapshot.accepted[&key].1, sent, "{name}");
+            assert_eq!(
+                receive.host().accepted_transaction(&key).unwrap().1,
+                sent,
+                "{name}"
+            );
+        }
+        let stored =
+            HostSequencer::from_checkpoint_bytes(&receive.host().checkpoint_bytes().unwrap())
+                .unwrap();
+        assert_eq!(
+            stored.accepted_transaction(&undo).unwrap().1,
+            batch.txns[2].ack.as_ref().unwrap(),
+            "{name}"
+        );
+        // A second device that gets the same batch agrees with the first.
+        let mut other = SyncReceiver::new(initial.clone());
+        other.receive(batch, &device(1)).unwrap().unwrap();
+        assert!(
+            other.host().checkpoint_bytes().unwrap() == receive.host().checkpoint_bytes().unwrap(),
+            "{name}"
+        );
+    }
+
+    // What matters for integrity is still compared, whatever the wording.
+    type Tamper = fn(&mut pb::SyncBatch);
+    let tampered: [(&str, Tamper); 7] = [
+        ("state hash in the acknowledgement", |batch| {
+            batch.txns[2].ack.as_mut().unwrap().state_hash[0] ^= 1;
+        }),
+        ("state hash of the entry", |batch| {
+            batch.txns[2].state_hash[0] ^= 1
+        }),
+        ("both state hashes", |batch| {
+            batch.txns[2].state_hash[0] ^= 1;
+            batch.txns[2].ack.as_mut().unwrap().state_hash[0] ^= 1;
+        }),
+        ("revision in the acknowledgement", |batch| {
+            batch.txns[2].ack.as_mut().unwrap().host_seq += 1;
+        }),
+        ("transaction named by the acknowledgement", |batch| {
+            batch.txns[2].ack.as_mut().unwrap().txn_id = Some(id(999).to_proto());
+        }),
+        ("no acknowledgement", |batch| batch.txns[2].ack = None),
+        ("a notice no acknowledgement may hold", |batch| {
+            batch.txns[2].ack.as_mut().unwrap().notices = vec!["x".repeat(1025)];
+        }),
+    ];
+    for (name, tamper) in tampered {
+        let mut batch = response.batch.clone();
+        batch.txns[2].ack.as_mut().unwrap().notices = vec!["Another wording".into()];
+        tamper(&mut batch);
+        let mut receive = SyncReceiver::new(initial.clone());
+        let before = receive.host().checkpoint_bytes().unwrap();
+        assert!(receive.receive(batch, &device(1)).is_err(), "{name}");
+        assert!(
+            receive.host().checkpoint_bytes().unwrap() == before,
+            "{name}"
+        );
+    }
+    assert_eq!(own.len(), 1);
+}
 fn tls_pair() -> (carrier::PinnedTls, carrier::PinnedTls) {
     let a = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
     let b = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();

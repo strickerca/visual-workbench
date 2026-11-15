@@ -1120,9 +1120,9 @@ fn valid_notices(notices: &[String]) -> bool {
 /// engine version today; the build that first needs one adds it, and rows
 /// without it were decided by this rule.
 ///
-/// Two devices in a session ask the same of each other, and more: the one
-/// that receives a transaction decides it again and compares the whole
-/// acknowledgement, notices included (`vw-net`, sync).
+/// Two devices in a session ask the same of each other: the one that
+/// receives a transaction decides it again, compares the revision and the
+/// state hash, and keeps the notices the host sent (`vw-net`, sync).
 ///
 /// The pinned logs in `vw-store/tests/replay_rule.rs` (two devices, and the
 /// same script as a build of 2026-11-13 stored it) and
