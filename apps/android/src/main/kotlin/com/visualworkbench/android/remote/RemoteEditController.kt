@@ -98,6 +98,8 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
     /** Developer switch: reservation and sends go through the typed calls, several samples at once. */
     private val batches=(remote as? RemotePenBatches)?.takeIf{toggles[PenPathToggle.RemoteTypedBatches]}
     private val sampleClock=RemoteSampleClock(toggles[PenPathToggle.RemoteExactTimes])
+    /** Developer switch: the video decoder picks each frame up the moment it is decoded. */
+    private val quickFrames:Boolean=toggles[PenPathToggle.RemoteQuickFrames]
     /** Developer switch: the remote surface asks Android for unbatched pen samples during a contact. */
     val unbufferedPen:Boolean=toggles[PenPathToggle.RemoteUnbufferedPen]
     @Volatile private var borrowedSurface:Surface?=null
@@ -272,7 +274,7 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
             val configuration=DecoderConfig(decoderScope,frame.config.generation,frame.config.codedWidth,frame.config.codedHeight,frame.config.visibleWidth,frame.config.visibleHeight,frame.config.vps,frame.config.sps,frame.config.pps)
             val ownerReference=AtomicReference<String?>(null)
             val expectedSurfaceEpoch=synchronized(inputFence){surfaceEpoch}
-            when(val result=RemoteHardwareDecoder.open(surface,consumer,configuration){ticket,ptsUs,renderedNanos,callbackNanos->
+            when(val result=RemoteHardwareDecoder.open(surface,consumer,configuration,quickFrames){ticket,ptsUs,renderedNanos,callbackNanos->
                 val expected=ownerReference.get()?:return@open
                 scope.launch(Dispatchers.Default){rendered(expected,expectedSurfaceEpoch,ticket,ptsUs,renderedNanos,callbackNanos)}
             }) {
