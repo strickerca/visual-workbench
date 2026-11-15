@@ -101,7 +101,8 @@ private fun sameObjects(a: List<DrawObject>, b: List<DrawObject>): Boolean {
  * [discard] runs on the main thread only after that thread has stopped drawing
  * for the session, which is why the two references are volatile. The picture
  * is kept only while ink is wet: [forget] drops it at every saved frame, so
- * between strokes it holds no bitmap, document or graphics memory. */
+ * between strokes this holds no bitmap or document, and the renderer is free
+ * to release the finished layer once the front buffer no longer shows it. */
 internal class WetInkLayer {
     private val node = RenderNode("vw-dry-scene")
     @Volatile private var kept: Kept? = null

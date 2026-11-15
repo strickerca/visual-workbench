@@ -50,12 +50,12 @@ internal suspend fun <N : Any, S> inkThenSaveInOrder(lock: Mutex, ink: suspend (
     if (finished == null) { saving.cancel(); null } else { inked.complete(finished); saving.await() }
 }
 
-private val INK_TOOLS = setOf(EditorTool.Pen, EditorTool.Highlighter, EditorTool.Marker)
+internal val INK_TOOLS = setOf(EditorTool.Pen, EditorTool.Highlighter, EditorTool.Marker)
 
 /** Whether a pen-down may pass while the instruction and marker lists are
  * read again after a save. Only a plain ink stroke may, and only with the
  * switch on; [route] is asked last and not at all with the switch off. */
-internal fun inkPassesListRefresh(switchOn: Boolean, tool: EditorTool, assistedCollecting: Boolean,
+internal inline fun inkPassesListRefresh(switchOn: Boolean, tool: EditorTool, assistedCollecting: Boolean,
     textTool: Boolean, regionTool: Boolean, route: () -> EraserInputRoute): Boolean =
     switchOn && tool in INK_TOOLS && !assistedCollecting && !textTool && !regionTool && route() == EraserInputRoute.Editor
 
