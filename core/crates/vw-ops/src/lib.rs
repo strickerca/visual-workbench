@@ -8,7 +8,7 @@ mod patch;
 mod plan;
 mod replica;
 mod undo;
-pub use draft::Touched;
+pub use draft::{Touched, Work};
 pub use gesture::GestureStore;
 pub use host::{Acceptance, HostSequencer, HostSnapshot, InversePreview};
 pub use replica::{PendingTransaction, Replica};

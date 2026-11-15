@@ -1,6 +1,6 @@
 use crate::{
     OpsError,
-    draft::{self, Draft, Originals, Touched},
+    draft::{self, Draft, Originals, Touched, Work},
     patch::{self, Address, Change, Values},
     plan,
 };
@@ -316,6 +316,7 @@ struct Decision {
     hash: StateHash,
     canonical_len: usize,
     project_len: usize,
+    work: Work,
     record: Record,
     originals: Originals,
     operations: Vec<(DeviceId, u64)>,
@@ -331,6 +332,7 @@ struct Undo {
     canonical_len: usize,
     history_len: usize,
     project_len: usize,
+    work: Work,
     conflicts: usize,
     originals: Originals,
     operations: Vec<(DeviceId, u64)>,
@@ -819,7 +821,7 @@ impl HostSequencer {
                 };
                 Ok((
                     id.clone(),
-                    view.inverse(&mut project, &undo, &device, &mut Vec::new())?,
+                    view.inverse(&mut project, &undo, &device, &mut Vec::new(), &mut 0)?,
                 ))
             })
             .collect::<Result<_, OpsError>>()?;
@@ -887,7 +889,7 @@ impl HostSequencer {
             Admission::New(device, id) => (device, id),
         };
         let (acceptance, undo) = self.commit(transaction, device, id, accepted_at_ms)?;
-        let touched = Touched::of(&undo.originals);
+        let touched = Touched::of(&undo.originals, undo.work);
         let mut recorded = Recorded {
             host: self,
             undo: Some(undo),
@@ -980,7 +982,11 @@ impl HostSequencer {
             self.revert(undo);
             return Ok(None);
         }
-        let touched = Touched::of(&undo.originals);
+        if !valid_kept_notices(&stored.notices, ack.notices.len()) {
+            self.revert(undo);
+            return Err(OpsError::Invalid("stored acknowledgement"));
+        }
+        let touched = Touched::of(&undo.originals, undo.work);
         if let Some(record) = self.records.get_mut(&id) {
             self.history_len = self
                 .history_len
@@ -1040,6 +1046,7 @@ impl HostSequencer {
             &undo,
             device,
             &mut Vec::new(),
+            &mut 0,
         )?))
     }
 
@@ -1058,8 +1065,13 @@ impl HostSequencer {
             Admission::New(device, id) => (device, id),
         };
         let (acceptance, undo) = self.commit(transaction, device, id, accepted_at_ms)?;
-        let canonical_len = self.canonical_len;
-        self.revert(undo);
+        // Taken back out when this guard goes, also should anything unwind.
+        let recorded = Recorded {
+            host: self,
+            undo: Some(undo),
+        };
+        let canonical_len = recorded.host.canonical_len;
+        drop(recorded);
         Ok((acceptance, canonical_len))
     }
 
@@ -1078,8 +1090,13 @@ impl HostSequencer {
             Admission::New(device, id) => (device, id),
         };
         let (acceptance, undo) = self.commit(transaction, device, id, accepted_at_ms)?;
-        let inspected = inspect(self);
-        self.revert(undo);
+        // Taken back out when this guard goes, also when `inspect` unwinds.
+        let recorded = Recorded {
+            host: self,
+            undo: Some(undo),
+        };
+        let inspected = inspect(&*recorded.host);
+        drop(recorded);
         Ok((acceptance, inspected))
     }
 
@@ -1161,6 +1178,7 @@ impl HostSequencer {
             hash,
             canonical_len,
             project_len,
+            work,
             record,
             originals,
             operations,
@@ -1198,6 +1216,7 @@ impl HostSequencer {
             canonical_len: self.canonical_len,
             history_len: self.history_len,
             project_len: self.project_len,
+            work,
             conflicts: self.conflicts.len(),
             originals,
             operations: operations.clone(),
@@ -1360,6 +1379,7 @@ impl<'a> View<'a> {
         undo: &v1::UndoTransaction,
         device: &DeviceId,
         notices: &mut Vec<String>,
+        compared: &mut usize,
     ) -> Result<Vec<Change>, OpsError> {
         let record = self
             .records
@@ -1379,6 +1399,14 @@ impl<'a> View<'a> {
             .filter(|(_, author)| author != device)
             .filter_map(|(id, _)| self.records.get(id))
             .collect::<Vec<_>>();
+        *compared = compared.saturating_add(
+            self.order.len().saturating_sub(after).saturating_add(
+                record
+                    .changes
+                    .len()
+                    .saturating_mul(peers.iter().map(|later| later.changes.len()).sum()),
+            ),
+        );
         let mut inverse = Vec::new();
         for change in record.changes.iter().rev() {
             // The last-write index is insufficient here: an intervening peer
@@ -1447,11 +1475,32 @@ impl<'a> View<'a> {
 }
 
 /// What a stored acknowledgement's notices may be.
+/// What a stored acknowledgement's notices may be.
 fn valid_notices(notices: &[String]) -> bool {
     notices
         .iter()
         .all(|notice| notice.len() <= 1024 && !notice.contains('\0'))
 }
+
+/// Notices of an acknowledgement that came from elsewhere (a stored log, the
+/// host of a session) and is kept as it came. Another build may word them
+/// differently or give a different number of them (see the replay rule), so
+/// their text is not compared; but they are kept for good, so each has to
+/// be text for a person (not empty, no control characters), and there may
+/// be no more of them than this engine gives for the same transaction or
+/// `MAX_NOTICES`, whichever is more, and no more than `MAX_NOTICE_BYTES` in
+/// all.
+fn valid_kept_notices(notices: &[String], own: usize) -> bool {
+    valid_notices(notices)
+        && notices.len() <= own.max(MAX_NOTICES)
+        && notices
+            .iter()
+            .all(|notice| !notice.is_empty() && !notice.chars().any(char::is_control))
+        && notices.iter().map(String::len).sum::<usize>() <= MAX_NOTICE_BYTES.max(own * 1024)
+}
+/// More notices than this engine's own are kept up to this many.
+const MAX_NOTICES: usize = 256;
+const MAX_NOTICE_BYTES: usize = 64 * 1024;
 
 /// Decide one new transaction. On success `project` holds the accepted result
 /// and `hasher` has followed it; on any error both describe the project as it
@@ -1550,6 +1599,7 @@ fn evaluate(
     };
     let mut notices = Vec::new();
     let mut conflicts = Vec::new();
+    let mut work = Work::default();
     let changes = if let [
         v1::Op {
             kind: Some(Kind::UndoTransaction(undo)),
@@ -1557,7 +1607,7 @@ fn evaluate(
         },
     ] = transaction.ops.as_slice()
     {
-        view.inverse(project, undo, &device, &mut notices)?
+        view.inverse(project, undo, &device, &mut notices, &mut work.compared)?
     } else {
         let mut filtered = transaction.clone();
         filtered.ops.clear();
@@ -1749,6 +1799,15 @@ fn evaluate(
             "incremental state hash differs from the whole-project hash"
         );
         let project_len = hasher.json_len().unwrap_or(UNCOUNTABLE);
+        let hashing = hasher.work();
+        work.serialized = hashing.serialized;
+        work.values = hashing.values;
+        work.hashed = hashing.hashed;
+        // Checking what the edit replaced looks through every object's and
+        // group's references when anything but objects changed.
+        if !originals.only_objects() {
+            work.scanned = project.objects.len() + project.groups.len();
+        }
         Ok::<_, OpsError>((tombstones, hash, canonical_len, project_len))
     })();
     let (tombstones, hash, canonical_len, project_len) = match concluded {
@@ -1772,6 +1831,7 @@ fn evaluate(
         hash,
         canonical_len,
         project_len,
+        work,
         record: Record {
             transaction,
             ack,

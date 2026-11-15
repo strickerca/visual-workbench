@@ -1221,3 +1221,157 @@ fn validation_of_what_an_edit_replaced_agrees_with_whole_project_validation() {
     assert!(outcomes.len() >= 30, "{outcomes:?}");
     assert!(outcomes["valid"] > 4_000, "{outcomes:?}");
 }
+
+/// Edits to single entities of every member other than the objects, reported
+/// as an edit in place reports them: the hasher serializes only those
+/// entities again, and the hash and lengths stay exact.
+#[test]
+fn entity_reports_in_every_member_keep_the_incremental_hash_exact() {
+    let (mut value, mask) = linked_project();
+    let mut hasher = StateHasher::default();
+    assert_same(&mut hasher, &value, "start");
+    let mut random = Random(99);
+    for step in 0..600_u32 {
+        let base = value.clone();
+        let mut replaced = vw_model::Replaced::default();
+        for _ in 0..1 + random.below(3) {
+            match random.below(10) {
+                0 => {
+                    let key = id(8, random.below(4) as u32);
+                    touch!(replaced, base, instructions, key);
+                    if random.below(4) == 0 {
+                        value.instructions.remove(&key);
+                    } else {
+                        value.instructions.insert(
+                            key.clone(),
+                            Instruction {
+                                definition: pb::SetInstruction {
+                                    instruction_id: Some(key.to_proto()),
+                                    document_id: Some(id(2, 0).to_proto()),
+                                    target_object_ids: vec![],
+                                    role: pb::Role::Change as i32,
+                                    text: "Long \u{03a9} ".repeat(random.below(3000) as usize),
+                                    entry_method: "voice".into(),
+                                    language: "en".into(),
+                                },
+                                updated_at_ms: i64::from(step),
+                            },
+                        );
+                    }
+                }
+                1 => {
+                    // Not the result an object shows.
+                    let key = id(11, 1 + random.below(3) as u32);
+                    touch!(replaced, base, results, key);
+                    if random.below(4) == 0 {
+                        value.results.remove(&key);
+                    } else {
+                        value.results.insert(
+                            key.clone(),
+                            vw_model::ResultCandidate {
+                                definition: pb::AddResult {
+                                    result_id: Some(key.to_proto()),
+                                    document_id: Some(id(2, 0).to_proto()),
+                                    provider: "synthetic".into(),
+                                    model: "synthetic".into(),
+                                    request_json: format!("{{\"n\":{step}}}"),
+                                    cost_estimate_usd: if step % 2 == 0 { -0.0 } else { 0.25 },
+                                    ..Default::default()
+                                },
+                                status: "pending".into(),
+                                acceptance_mask_asset_id: None,
+                                created_at_ms: 0,
+                            },
+                        );
+                    }
+                }
+                2 => {
+                    // The annotation layers; the output layer has rules.
+                    let key = id(3, random.below(2) as u32);
+                    touch!(replaced, base, layers, key);
+                    if let Some(layer) = value.layers.get_mut(&key) {
+                        layer.opacity = if step % 3 == 0 { 0.0 } else { 0.5 };
+                        layer.definition.name = format!("Layer {step}");
+                    }
+                }
+                3 => {
+                    let key = id(7, 10 + random.below(3) as u32);
+                    touch!(replaced, base, groups, key);
+                    if value.groups.remove(&key).is_none() {
+                        value.groups.insert(
+                            key.clone(),
+                            Group {
+                                id: key,
+                                document_id: id(2, 0),
+                                parent: None,
+                            },
+                        );
+                    }
+                }
+                4 => {
+                    let key = id(6, 100);
+                    touch!(replaced, base, mask_versions, key);
+                    value
+                        .mask_versions
+                        .entry(key)
+                        .or_default()
+                        .push(pb::MaskOp {
+                            op: "feather".into(),
+                            input_object_ids: vec![],
+                            output_object_id: Some(id(6, 100).to_proto()),
+                            amount: if step % 2 == 0 { -0.0 } else { 1.5 },
+                        });
+                }
+                5 => {
+                    let key = id(2, random.below(2) as u32);
+                    touch!(replaced, base, documents, key);
+                    if let Some(document) = value.documents.get_mut(&key) {
+                        document.definition.title = format!("Title {step}");
+                    }
+                }
+                6 => {
+                    let new = pb::AddAsset {
+                        asset_id: AssetId::hash(format!("asset {}", random.below(5)).as_bytes())
+                            .to_string(),
+                        ..asset()
+                    };
+                    let key = AssetId::try_from(new.asset_id.clone()).unwrap();
+                    touch!(replaced, base, assets, key);
+                    if value.assets.remove(&key).is_none() {
+                        value.assets.insert(key, new);
+                    }
+                }
+                7 => {
+                    touch!(replaced, base, semantic_snapshots, id(10, 0));
+                    if let Some(snapshot) = value.semantic_snapshots.get_mut(&id(10, 0)) {
+                        snapshot.definition.elements_json_zstd =
+                            vec![step as u8; random.below(5000) as usize];
+                    }
+                }
+                8 => {
+                    // An object together with members, as most edits are.
+                    let key = id(6, random.below(24) as u32);
+                    touch!(replaced, base, objects, key);
+                    if let Some(object) = value.objects.get_mut(&key) {
+                        object.state.transform.as_mut().unwrap().e = f64::from(step);
+                    }
+                }
+                _ => {
+                    touch!(replaced, base, assets, mask);
+                }
+            }
+        }
+        hasher.replaced(&replaced);
+        if step % 2 == 0 || step > 580 {
+            assert_same(&mut hasher, &value, "an entity edit");
+            // Only what changed was serialized again.
+            let work = hasher.work();
+            assert!(
+                work.serialized < value.canonical_bytes().unwrap().len(),
+                "step {step}: {work:?}"
+            );
+        } else {
+            hasher.hash(&value).unwrap();
+        }
+    }
+}

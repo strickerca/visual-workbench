@@ -455,6 +455,11 @@ impl ProjectStore {
     pub fn project(&self) -> &Project {
         self.host.project()
     }
+    /// The sequencing state this store holds, to read: what answering a
+    /// device's sync request takes from it. Only the store changes it.
+    pub const fn host(&self) -> &HostSequencer {
+        &self.host
+    }
     pub fn revision(&self) -> Result<v1::Revision, StoreError> {
         Ok(self.host.revision()?)
     }
@@ -804,7 +809,7 @@ impl ProjectStore {
                             params![id, bytes],
                         )?;
                     }
-                    replay.add(host, touched, bytes.len());
+                    replay.add(touched, bytes.len());
                     span.add(bytes.len());
                     all.extend(touched);
                 }
@@ -838,6 +843,13 @@ impl ProjectStore {
         *cost = replay;
         *log = span;
         Ok(received)
+    }
+
+    /// What replaying the log after the newest checkpoint is estimated to
+    /// cost, in the microseconds of the estimate (see `ReplayCost`); for a
+    /// measurement to set beside it.
+    pub const fn replay_estimate_micros(&self) -> u64 {
+        self.cost.micros
     }
 
     /// What undoing the accepted transaction `target` would change in the
@@ -986,7 +998,7 @@ impl ProjectStore {
                 let ack = acceptance.ack.encode_to_vec();
                 let sealed = seal.with_row(seq, &bytes, hash, accepted_at_ms, &ack);
                 let mut replay = *cost;
-                replay.add(host, touched, stored);
+                replay.add(touched, stored);
                 observer(CommitStage::Prepared);
                 let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
                 migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
@@ -1526,49 +1538,31 @@ fn cancelled(host: &HostSequencer) -> BTreeSet<(DeviceId, Id)> {
 }
 
 /// What replaying a stretch of the log costs. It is estimated from what each
-/// transaction touched and never timed, so that the same log gives the same
-/// answer on every machine and every run. The unit is a microsecond on the
-/// machine the estimate was fitted on (a four-core Linux container); only its
-/// ratio to `LogSpan::load_micros`, fitted on the same machine, matters.
+/// transaction took when it was decided (`vw_ops::Work`) and never timed, so
+/// that the same log gives the same answer on every machine and every run.
+/// The unit is a microsecond on the machine the estimate was fitted on (a
+/// four-core Linux container); only its ratio to `LogSpan::load_micros`,
+/// fitted on the same machine, matters.
 ///
-/// Replaying a transaction costs what accepting it did: the entities it
-/// touched are decided, journaled and serialized again, and the project's
-/// canonical bytes are hashed from the first one it changed to the end. A new
-/// stroke is the last object and has next to nothing behind it. An earlier
-/// object has every later object behind it, and a layer, an instruction, a
-/// document, a mask history, a group or an asset is written in front of all
-/// objects. Nothing behind the change is serialized or checked again, only
-/// hashed, at about 2.5 GB a second.
-///
-/// Measured on that machine. A new entity: 0.06 ms for a stroke of 48
-/// samples, less for a small shape, and always less than loading it from a
-/// checkpoint costs. A changed one: 0.07 ms for a small shape, 0.13 ms for
-/// such a stroke. The hash, at 8,000 strokes and 20 MB of canonical bytes:
-/// 7 ms for a change to the first object or to a layer or a title (the whole
-/// edit was 45 to 170 ms while the engine went over the whole project for
-/// it), nothing to speak of for a result, which is written behind the
-/// objects.
+/// Replaying a transaction costs what deciding it did: a little for each
+/// entity it touched, a pass over every byte of those entities to decide,
+/// journal, check and serialize them again, the hash of the canonical bytes
+/// from the first change to the end (a new stroke has next to nothing
+/// behind it, a layer, an instruction or the title has the whole project
+/// behind it), an undo's comparison with what other devices did since, and
+/// a look through every object's references when anything but objects
+/// changed. The coefficients are fitted on measured replays of strokes,
+/// moves, layer and title changes, large instructions, large results,
+/// large semantic snapshots and undos after many edits by another device
+/// (`vw-ffi/benches/edits.rs` prints both side by side).
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct ReplayCost {
     micros: u64,
     span: LogSpan,
 }
 impl ReplayCost {
-    /// One transaction, given the state it left and what it touched.
-    fn add(&mut self, host: &HostSequencer, touched: &Touched, stored: usize) {
-        let project = host.project();
-        let canonical = host.canonical_len() as u64;
-        let entities = (project.documents.len()
-            + project.assets.len()
-            + project.layers.len()
-            + project.objects.len()
-            + project.groups.len()
-            + project.instructions.len()
-            + project.semantic_snapshots.len()
-            + project.results.len()
-            + project.mask_versions.len()) as u64;
-        // What one entity takes of the canonical bytes, on average.
-        let size = canonical / entities.max(1);
+    /// One transaction, given what it touched and what deciding it took.
+    fn add(&mut self, touched: &Touched, stored: usize) {
         let all = (touched.documents.len()
             + touched.assets.len()
             + touched.layers.len()
@@ -1580,31 +1574,35 @@ impl ReplayCost {
             + touched.mask_versions.len()) as u64;
         let created = (touched.created as u64).min(all);
         let changed = all - created;
-        // The canonical bytes list the members by name: these before the
-        // objects, results and semantic snapshots after them.
-        let before_objects = !(touched.documents.is_empty()
-            && touched.assets.is_empty()
-            && touched.layers.is_empty()
-            && touched.groups.is_empty()
-            && touched.instructions.is_empty()
-            && touched.mask_versions.is_empty());
-        let hashed = if before_objects {
-            canonical
-        } else if let Some(first) = touched.objects.first() {
-            // The share of the bytes that the objects from there on take.
-            let behind = project.objects.range(first..).count() as u64;
-            canonical.saturating_mul(behind) / (project.objects.len() as u64).max(1)
-        } else {
-            0
-        };
+        let work = &touched.work;
         self.micros = self.micros.saturating_add(
-            50 + created.saturating_mul(15 + size / 60)
-                + changed.saturating_mul(55 + size / 36)
-                + hashed / 2500,
+            REPLAY_TRANSACTION
+                .saturating_add(created.saturating_mul(REPLAY_CREATED))
+                .saturating_add(changed.saturating_mul(REPLAY_CHANGED))
+                .saturating_add(work.serialized as u64 / REPLAY_SERIALIZED)
+                .saturating_add(work.values as u64 / REPLAY_VALUES)
+                .saturating_add(work.hashed as u64 / REPLAY_HASHED)
+                .saturating_add(work.compared as u64 / REPLAY_COMPARED)
+                .saturating_add(work.scanned as u64 / REPLAY_SCANNED),
         );
         self.span.add(stored);
     }
 }
+/// Every transaction: reading the row, admitting, recording.
+const REPLAY_TRANSACTION: u64 = 50;
+/// Each entity it created, and each it changed, besides its bytes.
+const REPLAY_CREATED: u64 = 15;
+const REPLAY_CHANGED: u64 = 45;
+/// Bytes of touched entities per microsecond, and JSON values in them per
+/// microsecond: a long text passes fast, a long list of numbers slowly.
+const REPLAY_SERIALIZED: u64 = 230;
+const REPLAY_VALUES: u64 = 12;
+/// Bytes hashed per microsecond.
+const REPLAY_HASHED: u64 = 2500;
+/// Journal entries compared per microsecond.
+const REPLAY_COMPARED: u64 = 50;
+/// Objects and groups looked through per microsecond.
+const REPLAY_SCANNED: u64 = 50;
 
 /// How much log a stretch is: its rows and the bytes of their transactions.
 #[derive(Debug, Clone, Copy, Default)]
@@ -1967,15 +1965,15 @@ pub(crate) fn replay_log(
                     return Err(StoreError::Corrupt("operation ack"));
                 }
                 match host.replay(txn, accepted_at, &stored) {
-                    Ok(Some(touched)) => cost.add(host, &touched, bytes.len()),
+                    Ok(Some(touched)) => cost.add(&touched, bytes.len()),
                     Ok(None) | Err(_) => return Ok(Replay::Differs(seq)),
                 }
             }
             Acks::Write => {
                 let device = DeviceId::try_from(txn.device_id.clone())?;
                 let (accepted, replayed) =
-                    host.submit_with(txn, &device, accepted_at, |host, _, touched| {
-                        cost.add(host, touched, bytes.len());
+                    host.submit_with(txn, &device, accepted_at, |_, _, touched| {
+                        cost.add(touched, bytes.len());
                         Ok::<(), StoreError>(())
                     })?;
                 // A stored row is never a retry of an earlier one.

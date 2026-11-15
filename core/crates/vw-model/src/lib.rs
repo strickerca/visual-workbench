@@ -8,7 +8,7 @@ mod order;
 mod replaced;
 mod state;
 mod validate;
-pub use hasher::StateHasher;
+pub use hasher::{HashWork, StateHasher};
 pub use ids::{AssetId, DeviceId, Id, StateHash};
 pub use image_output::{DocumentImageOutput, IMAGE_OUTPUT_CAPABILITY, IMAGE_OUTPUT_LAYER_KIND};
 pub use order::OrderKey;
