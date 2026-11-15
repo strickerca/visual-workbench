@@ -163,6 +163,53 @@ baseline. A shared-phone interruption is labeled, not erased. T0.03's IN2019
 28.4 C snapshot is not this S23 baseline. Raw fields: elapsed_s, temperature_c,
 battery_percent, charging, thermal_status, activity_marker, validity/reason.
 
+## Pen-path switches — S23 measuring session
+
+Stage 7 added eight developer switches (phone: Settings → Developer options).
+All are off after install; with all off the app behaves as before. Each is
+switched on once, measured, and then left on or switched back off. Timings are
+on the same screen and under Pen diagnostics → Pen path timings; each line
+reads "typical · slow end · worst" (typical is the median, slow end is p95).
+
+Preparation: this build installed, all switches off, 120 Hz display, battery
+saver off, phone cool. One empty canvas and one full page with a few hundred
+strokes. For the remote part: PC app running, Paint open, connected, control
+granted.
+
+- Canvas exercise (on the full page): 30 long slow curves, then about 60 quick
+  short strokes at handwriting speed.
+- Remote exercise: 30 s of steady circles, then 30 s of fast zigzag in Paint.
+- Each measurement: Clear timings, do the exercise, Copy timings, paste into a
+  text file on the laptop. Compare two files with
+  `python tools/pen-trace/trace_tool.py timings before.txt after.txt`; it
+  answers `leave_on`, `switch_back_off`, `no_measurable_difference` or
+  `too_few_samples`.
+
+| Step | Switch on | Watch | Check by hand |
+| --- | --- | --- | --- |
+| 1 | none (canvas baseline) | every "Canvas:" line; take the PERF-001 camera measurement once | — |
+| 2 | Canvas: quick refresh after a save | "saved to canvas refreshed" falls | erase part of a stroke, undo, redo, move a selection, hide and show a layer, close and reopen: same picture |
+| 3 | Canvas: next stroke starts while the last one saves | "pen-down to stroke accepted", "pen-down to first ink" fall | count the strokes, undo ten (last first), reopen |
+| 4 | Canvas: draw only the new stroke | "time to draw one ink frame", "ink drawn", "frame ready" fall | magnifier open and closed, after zoom and rotate, dark theme, a lower layer, highlighter; no flicker at pen-up |
+| 5 | — | PERF-001 camera measurement again with what stayed on | — |
+| 6 | none (remote baseline) | both "Remote:" lines; pauses in five minutes of drawing | — |
+| 7 | Remote pen: samples at the pen's own rate | "pen sample to sent" falls by several ms | if input pauses more often, decide together with step 9 |
+| 8 | Remote pen: exact sample times | by eye: the ghost line's tip wobbles less | — |
+| 9 | Remote pen: keep drawing through a hitch | fewer pauses in five minutes | no disconnect |
+| 10 | Remote pen: fewer, typed calls to the core | "pen sample to sent" same or lower | drawing in Paint looks the same |
+| 11 | Remote view: show each frame sooner | "pen sample to frame that shows it" falls by 2–4 ms | the remote picture starts and runs as before |
+| 12 | everything that stayed on | both exercises again, ten minutes of mixed drawing | battery temperature |
+
+Remote switches take effect the next time the remote view is opened.
+
+Leave a switch on when the tool says `leave_on`, nothing else got worse and
+its hand check passed. Switch it back off when the tool says `switch_back_off`
+or a hand check fails even once (wrong picture, missing or misordered stroke,
+flicker, a new pause or disconnect, the remote picture not starting). A small
+rise in "saved to canvas refreshed" under step 3 is expected. The timings end
+when a frame is handed to the display, so the camera measurement still decides
+PERF-001 (25 ms p95) and PERF-003 (80 ms p95).
+
 ## Current environment and gaps
 
 PC and phone facts are in HARDWARE_TRUTH.md, which distinguishes the S23 target
