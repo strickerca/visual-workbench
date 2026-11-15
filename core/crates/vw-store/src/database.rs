@@ -1603,9 +1603,6 @@ fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
         .prepare("INSERT INTO meta(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value")?
         .execute(params![RECLAIM_KEY, format!("{attempts} {free}")])?;
     observer(OpenStage::Compacting);
-    if in_memory {
-        connection.execute_batch("PRAGMA temp_store=MEMORY")?;
-    }
     // Tell the observer once from inside the copy.
     let mut inside = Some(observer.clone());
     connection.progress_handler(
@@ -1617,10 +1614,15 @@ fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
             false
         }),
     )?;
-    let compacted = connection.execute_batch("VACUUM");
-    connection.progress_handler(0, None::<fn() -> bool>)?;
+    let compacted = if in_memory {
+        connection.execute_batch("PRAGMA temp_store=MEMORY; VACUUM")
+    } else {
+        connection.execute_batch("VACUUM")
+    };
+    // Whatever became of it, the connection goes back to how it was.
+    let _ = connection.progress_handler(0, None::<fn() -> bool>);
     if in_memory {
-        connection.execute_batch("PRAGMA temp_store=DEFAULT")?;
+        let _ = connection.execute_batch("PRAGMA temp_store=DEFAULT");
     }
     compacted?;
     connection.execute("DELETE FROM meta WHERE key=?1", [RECLAIM_KEY])?;

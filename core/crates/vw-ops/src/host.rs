@@ -1100,16 +1100,22 @@ fn valid_notices(notices: &[String]) -> bool {
 /// (`HostSequencer::replay`, `vw_store::StoreError::EngineMismatch`).
 ///
 /// Free to change: the wording and number of notices (replay keeps the stored
-/// ones), what is refused that was refused before, new kinds of operation,
-/// speed. Not free: who wins a conflict, what an undo restores, defaults
-/// filled in, validation that turns an accepted input into a refused one,
-/// the canonical bytes, any field of a conflict record. To change one of
-/// those, keep the old rule for transactions stored before the change. A log
-/// row carries no engine version today; the build that first needs one adds
-/// it, and rows without it were decided by this rule.
+/// ones), accepting what used to be refused, new kinds of operation, speed.
+/// Not free: who wins a conflict, what an undo restores, defaults filled in,
+/// validation that turns an accepted input into a refused one, the canonical
+/// bytes, any field of a conflict record. To change one of those, keep the
+/// old rule for transactions stored before the change. A log row carries no
+/// engine version today; the build that first needs one adds it, and rows
+/// without it were decided by this rule.
 ///
-/// The pinned logs in `vw-store/tests/replay_rule.rs` fail when this is
-/// broken. Do not update their expected values to make them pass.
+/// Two devices in a session ask the same of each other, and more: the one
+/// that receives a transaction decides it again and compares the whole
+/// acknowledgement, notices included (`vw-net`, sync).
+///
+/// The pinned logs in `vw-store/tests/replay_rule.rs` (two devices, and the
+/// same script as a build of 2026-11-13 stored it) and
+/// `vw-store/tests/touched_rows.rs` (every kind of operation) fail when this
+/// is broken. Do not update their expected values to make them pass.
 fn evaluate(
     view: &View<'_>,
     project: &mut Project,
