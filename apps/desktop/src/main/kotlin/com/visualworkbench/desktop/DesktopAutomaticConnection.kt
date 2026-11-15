@@ -38,6 +38,8 @@ internal interface AutomaticEditor {
     fun start(peer: String, endpoints: List<SessionEndpoint>, tether: () -> UInt?, finished: (Exception?) -> Unit): Boolean
     /** The live connection, if it is one that [start] created. */
     fun automaticLink(): ProjectLink?
+    /** End the connection that [start] created, as Disconnect would. */
+    fun stop()
     /** Tell the owner one thing they can do, in the editor's own status line. */
     fun hint(message: String)
 }
@@ -53,6 +55,7 @@ internal class EditorAutomaticPort(private val editor: EditorController, private
     override fun start(peer: String, endpoints: List<SessionEndpoint>, tether: () -> UInt?, finished: (Exception?) -> Unit): Boolean =
         editor.connectAutomatically(sessions, peer, endpoints, tether, finished)
     override fun automaticLink(): ProjectLink? = editor.automaticLink()
+    override fun stop() { if (editor.automaticLink() != null) editor.disconnectSession() }
     override fun hint(message: String) = editor.report(message)
 }
 
@@ -110,6 +113,9 @@ internal class DesktopAutomaticConnection(
         scope.launch {
             val saved = keeper.change { it.withAutomatic(value) }
             if (value) decision.resume()
+            // Switched off while its connection was still only waiting or
+            // looking: that stops too. A live connection is the owner's to end.
+            else if (editor.automaticLink() != null && editor.status?.carrier == null) editor.stop()
             publish(saved)
         }
     }
@@ -143,7 +149,7 @@ internal class DesktopAutomaticConnection(
         val setting = keeper.saved()
         if (!session.ready || !setting.automatic) {
             // Switched off: nothing is listened on, announced, looked for,
-            // dialled or saved. A connection that already exists is left alone.
+            // dialled or saved. A live connection is left for the owner to end.
             if (keeping) { keeping = false; keeper.release() }
             decision.closed(); note = null; roleAskedFor = null
             mutable.value = AutomaticStatus(setting.automatic, setting.tetherAdapter, adapters = setting.adapters.toList())

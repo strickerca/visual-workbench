@@ -119,6 +119,8 @@ internal class PairingController(
             catch (_: Exception) { /* The setting stays as it was. */ }
         }
     }
+    /** The connection automatic connection started is still only waiting or looking. */
+    fun automaticWaiting(status: SessionStatus?): Boolean = automaticPairing.waiting(status)
     fun automaticProjectClosed() { automaticPairing.projectClosed(); automaticQuiet = false }
     /** The editor was busy and did not start the connection [automaticStep] asked for. */
     fun automaticMissed() = automaticPairing.missed()

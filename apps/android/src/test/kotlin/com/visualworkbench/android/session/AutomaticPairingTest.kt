@@ -196,6 +196,8 @@ class AutomaticPairingTest {
         routed.receiveProject("/unused", computer.deviceId, typed, null, 1uL)
         assertEquals(listOf("connect ${computer.deviceId} 192.0.2.20:47000", "host ${computer.deviceId} 192.0.2.20:47000", "receive ${computer.deviceId} 192.0.2.20:47000"),
             real.calls.takeLast(3))
+        // A connection made by hand is never one that switching off would end.
+        assertFalse(pairing.waiting(status(null, SyncStatus.Offline)))
         routed.close()
         assertEquals("close", real.calls.last())
     }
@@ -232,6 +234,10 @@ class AutomaticPairingTest {
         assertEquals(computer.deviceId, step())
         routed.host(real.project, computer.deviceId, pairing.endpoints)
         assertEquals("hostAutomatic ${computer.deviceId} QuicTether@198.51.100.1:$AUTOMATIC_SESSION_PORT, QuicWifi@192.0.2.10:$AUTOMATIC_SESSION_PORT", real.calls.single())
+        // Until the computer connects it is only waiting, which switching off would end.
+        assertTrue(pairing.waiting(status(null, SyncStatus.Offline)))
+        assertFalse(pairing.waiting(status(SessionCarrier.QuicTether, SyncStatus.Synced)))
+        assertFalse(pairing.waiting(null))
         view = open(status = status(null, SyncStatus.Offline))
         assertNull(step())
         assertEquals(2, real.link.listens.single().size)

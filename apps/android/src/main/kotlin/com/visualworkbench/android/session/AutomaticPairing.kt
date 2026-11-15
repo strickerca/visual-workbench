@@ -80,6 +80,11 @@ internal class AutomaticPairing(
         decision.closed(); quiet = false; asked = null
     }
 
+    /** True while the connection it started is still only waiting or looking.
+     * Switching automatic connection off ends such a connection as well; a
+     * live one is the owner's to end. */
+    fun waiting(status: SessionStatus?): Boolean = link != null && status != null && status.carrier == null
+
     fun projectClosed() { decision.closed(); quiet = false; asked = null }
 
     /** The editor could not act on the newest answer from [step]. */

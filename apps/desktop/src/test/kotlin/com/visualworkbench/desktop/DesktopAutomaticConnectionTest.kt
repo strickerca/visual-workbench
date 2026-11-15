@@ -47,6 +47,8 @@ class DesktopAutomaticConnectionTest {
         override fun automaticLink(): ProjectLink? = link
         val hints = ArrayList<String>()
         override fun hint(message: String) { hints += message }
+        var stops = 0
+        override fun stop() { stops++; disconnect() }
         fun disconnect() { link = null; status = null }
     }
     private class Nearby : RouteDiscovery {
@@ -150,6 +152,28 @@ class DesktopAutomaticConnectionTest {
         assertTrue(editor.starts.isEmpty())
         assertEquals(AutomaticNote.ChooseNetwork, automatic.state.value.note)
         assertEquals(1, editor.hints.size)
+    }
+
+    @Test fun switchingItOffStopsWaitingButLeavesALiveConnectionToTheOwner() = fixture {
+        editor.project = "1:project"; editor.role = hostRole
+        automatic.step(); automatic.step()
+        assertNotNull(editor.link)
+        // Connected to the phone: only the announcement stops.
+        editor.status = connected(SessionCarrier.QuicWifi)
+        automatic.setEnabled(false)
+        until { !automatic.state.value.enabled }
+        automatic.step()
+        assertEquals(0, editor.stops); assertNotNull(editor.link)
+        assertEquals(1, nearby.stops)
+        // Still only waiting for the phone: the listener goes as well.
+        automatic.setEnabled(true)
+        until { automatic.state.value.enabled }
+        editor.status = sessionStatus(3u, SyncStatus.Offline)
+        automatic.setEnabled(false)
+        until { !automatic.state.value.enabled }
+        assertEquals(1, editor.stops); assertNull(editor.link)
+        automatic.step()
+        assertTrue(editor.starts.size == 1 && !automatic.state.value.active)
     }
 
     @Test fun itLeavesTheOwnersDecisionsAlone() = fixture {

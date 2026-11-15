@@ -222,7 +222,9 @@ internal fun PairingScreen(editor: EditorController) {
             Divider()
             Text("Automatic connection", style = MaterialTheme.typography.h6)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(state.automatic, { state.chooseAutomatic(it) }, enabled = available, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp))
+                // Switched off while its connection is still only waiting or looking: that stops too.
+                Switch(state.automatic, { on -> if (!on && state.automaticWaiting(editor.connection)) editor.disconnect(); state.chooseAutomatic(on) },
+                    enabled = available, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp))
                 Text("Find and connect to my computer by itself", Modifier.padding(start = 12.dp))
             }
             Text(automaticConnectionLine(state.automatic, state.automaticQuiet, configured.isNotEmpty(), activePeers.isNotEmpty(), editor.connection))
