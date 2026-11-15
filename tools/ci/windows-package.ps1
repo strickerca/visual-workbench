@@ -20,6 +20,15 @@ foreach ($name in 'TEMP', 'TMP') {
     }
 }
 
+# The agent server's packaging refuses any inherited npm or Node setting, so
+# that a machine's own configuration cannot change what gets packaged. Hosted
+# build machines set some (for example an npm install prefix); clear them for
+# this process and say which.
+foreach ($entry in @(Get-ChildItem Env: | Where-Object { $_.Name -imatch '^npm_config_' -or $_.Name -in 'NODE_OPTIONS', 'NODE_PATH' })) {
+    Write-Host "cleared for this build: $($entry.Name)"
+    Remove-Item -LiteralPath "Env:$($entry.Name)"
+}
+
 # tools/mcp-build.ps1 is written against build.ps1's Run-Step and Run-Cargo.
 # These are the plain equivalents: run, show the output, stop on failure.
 # Output goes to the host so that it never becomes a function's return value.
@@ -69,13 +78,14 @@ Run-Step 'fill npm cache' (Join-Path $nodeDirectory 'node.exe') @(
     '--cache', (Join-Path $projectRoot '.local/npm-cache')) $prime
 Remove-Item -LiteralPath $prime -Recurse -Force
 
-# 3. Native libraries and helper programs, optimised.
-Run-Cargo 'windows natives (optimised)' @('build', '--release', '--locked', '-p', 'vw-ffi', '-p', 'vw-host-ffi',
-    '-p', 'vw-capture', '-p', 'vw-remote-host', '--features', 'vw-ffi/bindgen,vw-ffi/fixtures')
-
-# 4. The local agent server, staged exactly as on the laptop.
+# 3. The local agent server, staged exactly as on the laptop (first, because
+#    it is quick and a problem here should not cost the long native build).
 $nonce = [guid]::NewGuid().ToString('N')
 $mcpResources = Build-McpServerResources $nonce
+
+# 4. Native libraries and helper programs, optimised.
+Run-Cargo 'windows natives (optimised)' @('build', '--release', '--locked', '-p', 'vw-ffi', '-p', 'vw-host-ffi',
+    '-p', 'vw-capture', '-p', 'vw-remote-host', '--features', 'vw-ffi/bindgen,vw-ffi/fixtures')
 
 # 5. The app image, then the agent bridge that is bound to that exact image.
 Run-Step 'desktop app image' (Join-Path $projectRoot 'apps\gradlew.bat') @(
