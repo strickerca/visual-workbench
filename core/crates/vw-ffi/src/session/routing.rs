@@ -51,6 +51,11 @@ const SILENT_AFTER: Duration = Duration::from_secs(1);
 const RESCUE_GRACE: Duration = Duration::from_millis(300);
 /// Time the link loop spent unable to read does not count as peer silence.
 pub(super) const TURN_CAP: Duration = Duration::from_millis(50);
+/// Diagnostics area for what this module measures about a live link.
+const AREA: &str = "session";
+/// When a route ends, its replacement is looked for in steps of this length:
+/// once if none is being confirmed, and until the Hello ends if one is.
+pub(super) const HANDOVER_POLL: Duration = Duration::from_millis(10);
 
 pub(super) type Path = (AppCarrier, SocketAddr);
 
@@ -255,10 +260,12 @@ async fn open(
 }
 /// Open pinned TLS carriers to every address at once and keep the one that
 /// authenticated and comes first in `paths`. Once any address has answered,
-/// the addresses before it get `earlier_within` to answer too. Nothing is said
-/// on the losers: the application Hello goes only to the chosen one, so the
-/// peer never sees two sessions. An address that fails authentication is
-/// simply not the paired device.
+/// the addresses before it get `earlier_within` to answer too, or as long
+/// again as that first answer took if that is longer: on a slow network or a
+/// busy machine every handshake is slow, and a slow answer is not a dead
+/// route. Nothing is said on the losers: the application Hello goes only to
+/// the chosen one, so the peer never sees two sessions. An address that fails
+/// authentication is simply not the paired device.
 pub(super) async fn dial(
     paths: &[Path],
     manager: &PairingManager,
@@ -280,16 +287,24 @@ pub(super) async fn dial(
         note("paired device revoked or unknown");
         SessionError::from(error)
     })?);
+    let started = tokio::time::Instant::now();
     let mut attempts = tokio::task::JoinSet::new();
     for (index, (carrier, address)) in paths.iter().copied().enumerate() {
         let tls = tls.clone();
         attempts.spawn(async move {
             let opened = tokio::time::timeout(limit, open(carrier, address, &tls)).await;
-            (index, opened.unwrap_or(Err(NetError::Timeout)))
+            (
+                index,
+                opened.unwrap_or(Err(NetError::Timeout)).map(|io| Dialled {
+                    carrier,
+                    address,
+                    io,
+                }),
+            )
         });
     }
     let mut pending: Vec<usize> = (0..paths.len()).collect();
-    let mut best: Option<(usize, CarrierIo)> = None;
+    let mut best: Option<(usize, Dialled)> = None;
     let mut grace: Option<tokio::time::Instant> = None;
     let mut error = SessionError::Timeout;
     loop {
@@ -309,15 +324,18 @@ pub(super) async fn dial(
         };
         pending.retain(|waiting| *waiting != index);
         match opened {
-            Ok(io) => {
+            Ok(dialled) => {
                 if best.as_ref().is_none_or(|(chosen, _)| index < *chosen) {
-                    best = Some((index, io));
+                    best = Some((index, dialled));
                 }
                 let chosen = best.as_ref().map_or(usize::MAX, |(chosen, _)| *chosen);
                 if !pending.iter().any(|waiting| *waiting < chosen) {
                     break;
                 }
-                grace.get_or_insert(tokio::time::Instant::now() + earlier_within);
+                grace.get_or_insert_with(|| {
+                    let now = tokio::time::Instant::now();
+                    now + earlier_within.max(now.duration_since(started))
+                });
             }
             Err(failed) => {
                 note(dial_cause(&failed));
@@ -328,14 +346,7 @@ pub(super) async fn dial(
         }
     }
     attempts.abort_all();
-    match best {
-        Some((index, io)) => Ok(Dialled {
-            carrier: paths[index].0,
-            address: paths[index].1,
-            io,
-        }),
-        None => Err(error),
-    }
+    best.map(|(_, dialled)| dialled).ok_or(error)
 }
 
 /// What a live connection reports to the search for another route.
@@ -343,8 +354,14 @@ pub(super) async fn dial(
 pub(super) struct Pulse {
     silent_ms: AtomicU64,
     settled: AtomicBool,
+    confirming: AtomicBool,
 }
 impl Pulse {
+    /// True while another route has authenticated and its Hello is under way:
+    /// the peer may hand over, and close the old route, at any moment now.
+    pub fn confirming(&self) -> bool {
+        self.confirming.load(Ordering::Acquire)
+    }
     /// `settled` is false while a transfer or live media would be interrupted.
     pub fn report(&self, silence: Duration, settled: bool) {
         self.silent_ms.store(
@@ -373,6 +390,8 @@ pub(super) struct Watch<'a> {
 pub(super) struct Seeker {
     book: Arc<RouteBook>,
     hints: Mutex<Vec<Path>>,
+    /// When the newest offer was made, for timing a move from that moment.
+    offered: Mutex<Option<tokio::time::Instant>>,
     changed: Notify,
 }
 impl Seeker {
@@ -380,12 +399,16 @@ impl Seeker {
         Arc::new(Self {
             book,
             hints: Mutex::new(hints),
+            offered: Mutex::new(None),
             changed: Notify::new(),
         })
     }
     pub fn offer(&self, hints: Vec<Path>) {
         if let Ok(mut current) = self.hints.lock() {
             *current = hints;
+        }
+        if let Ok(mut offered) = self.offered.lock() {
+            *offered = Some(tokio::time::Instant::now());
         }
         self.changed.notify_one();
     }
@@ -408,18 +431,30 @@ impl Seeker {
     ///   still answers is busy, not gone, and is left alone.
     ///
     /// The peer is asked only when it also keeps accepting during a connection.
+    ///
+    /// The core times both moves itself and records them in its diagnostics
+    /// (area `session`): `route upgrade` from the newest offer, or from the
+    /// start of the attempt when nothing was offered, and `route rescue` from
+    /// when the silence was noticed; each ends once the pinned handshake and
+    /// Hello have completed on the new route. `silent route still answers` is
+    /// recorded once for each silence that turned out to be a busy peer.
     pub async fn successor(&self, watch: Watch<'_>) -> Established {
         if !watch.handoff {
             return std::future::pending().await;
         }
+        let began = tokio::time::Instant::now();
         let mut wait = PROBE_FIRST;
-        let mut upgrade = tokio::time::Instant::now() + wait;
-        let mut rescue = tokio::time::Instant::now();
+        let mut upgrade = began + wait;
+        let mut rescue = began;
+        let mut silent_since: Option<tokio::time::Instant> = None;
+        let mut kept = false;
         loop {
             tokio::select! {
                 _ = self.changed.notified() => {
+                    let now = tokio::time::Instant::now();
                     wait = PROBE_FIRST;
-                    upgrade = tokio::time::Instant::now();
+                    upgrade = now;
+                    rescue = now;
                 }
                 _ = tokio::time::sleep(PROBE_TICK) => {}
             }
@@ -427,6 +462,7 @@ impl Seeker {
             let silent = watch.pulse.silent();
             let mut paths = self.candidates(watch.peer);
             if silent {
+                silent_since.get_or_insert(now);
                 if now < rescue {
                     continue;
                 }
@@ -435,6 +471,8 @@ impl Seeker {
                 // while it does, the peer is only busy and nothing may move.
                 paths.sort_by_key(|(_, address)| Some(*address) != watch.address);
             } else {
+                silent_since = None;
+                kept = false;
                 if now < upgrade || !watch.pulse.settled.load(Ordering::Acquire) {
                     continue;
                 }
@@ -453,14 +491,43 @@ impl Seeker {
                 (DIAL_GRACE, None)
             };
             let limits = (PROBE_TIMEOUT, grace);
-            let Ok(dialled) = dial(&paths, watch.manager, watch.peer, limits, causes).await else {
+            let dialled = tokio::select! {
+                dialled = dial(&paths, watch.manager, watch.peer, limits, causes) => dialled,
+                // A new offer never waits behind an attempt that may be aimed
+                // at a dead address: the attempt is dropped (nothing was said
+                // on it) and the search starts over with what is known now.
+                _ = self.changed.notified() => {
+                    self.changed.notify_one();
+                    continue;
+                }
+            };
+            let Ok(dialled) = dialled else {
                 continue;
             };
             if Some(dialled.address) == watch.address {
+                if silent && !kept {
+                    kept = true;
+                    crate::diagnostics::count(AREA, "silent route still answers", 1);
+                }
                 continue;
             }
+            watch.pulse.confirming.store(true, Ordering::Release);
             let hello = SecureConnection::client(dialled.io, watch.local);
-            if let Ok(Ok(connection)) = tokio::time::timeout(HELLO_TIMEOUT, hello).await {
+            let hello = tokio::time::timeout(HELLO_TIMEOUT, hello).await;
+            watch.pulse.confirming.store(false, Ordering::Release);
+            if let Ok(Ok(connection)) = hello {
+                let (name, since) = if silent {
+                    ("route rescue", silent_since.unwrap_or(now))
+                } else {
+                    // An offer made on this connection; an older one says
+                    // nothing about how long this move took.
+                    let offered = self.offered.lock().ok().and_then(|offered| *offered);
+                    (
+                        "route upgrade",
+                        offered.filter(|at| *at >= began).unwrap_or(now),
+                    )
+                };
+                crate::diagnostics::duration(AREA, name, since.elapsed());
                 return Established {
                     carrier: dialled.carrier,
                     address: Some(dialled.address),
@@ -498,6 +565,7 @@ pub(super) struct Standby {
     deliver: mpsc::Sender<Established>,
     arrivals: tokio::sync::Mutex<mpsc::Receiver<Established>>,
     causes: Arc<Causes>,
+    retired: AtomicBool,
 }
 impl Standby {
     pub fn new(
@@ -518,13 +586,32 @@ impl Standby {
             deliver,
             arrivals: tokio::sync::Mutex::new(arrivals),
             causes,
+            retired: AtomicBool::new(false),
         })
+    }
+    /// The session that served these listeners is over. Nothing listens from
+    /// here on and an arrival nobody will serve is closed, so the paired
+    /// device is never left holding a connection that stays mute.
+    pub fn retire(&self) {
+        self.retired.store(true, Ordering::Release);
+        if let Ok(mut bound) = self.bound.lock() {
+            bound.clear();
+        }
+        if let Ok(mut public) = self.public.lock() {
+            public.clear();
+        }
+        if let Ok(mut arrivals) = self.arrivals.try_lock() {
+            while arrivals.try_recv().is_ok() {}
+        }
     }
     /// Make the listeners match `wanted`: bind what is new, retire what is no
     /// longer wanted and keep the rest untouched. An address that cannot be
     /// bound is skipped. Returns what is bound now.
     pub async fn listen(&self, wanted: Vec<Path>) -> SessionResult<Vec<SessionEndpoint>> {
         let _gate = self.gate.lock().await;
+        if self.retired.load(Ordering::Acquire) {
+            return Err(SessionError::Closed);
+        }
         // A listener serves a wanted address whether the caller names what it
         // asked for (possibly port 0) or the address that was actually bound.
         let serves = |entry: &Bound, (carrier, address): &Path| {
@@ -554,6 +641,8 @@ impl Standby {
                 break;
             }
             match self.bind(carrier, address).await {
+                // Retired while this address was being bound: it goes at once.
+                Ok(_) if self.retired.load(Ordering::Acquire) => return Err(SessionError::Closed),
                 Ok(entry) => self
                     .bound
                     .lock()

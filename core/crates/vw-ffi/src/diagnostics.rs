@@ -112,6 +112,12 @@ pub(crate) fn count(area: &'static str, name: &'static str, value: u64) {
     push(CoreDiagnosticKind::Count, area, name, value);
 }
 
+/// Record a duration that was measured where it happened.
+pub(crate) fn duration(area: &'static str, name: &'static str, elapsed: std::time::Duration) {
+    let micros = u64::try_from(elapsed.as_micros()).unwrap_or(u64::MAX);
+    push(CoreDiagnosticKind::DurationMicros, area, name, micros);
+}
+
 /// Measures from creation to drop and records the duration.
 pub(crate) struct Timer {
     area: &'static str,

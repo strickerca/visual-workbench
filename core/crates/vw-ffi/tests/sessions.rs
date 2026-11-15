@@ -929,24 +929,46 @@ async fn a_paired_device_reconnects_with_no_address_supplied_and_a_hint_is_never
 
     // Discovery: the computer advertises, the phone's platform browser reports
     // what it resolved, and the app offers those addresses as hints.
-    let advertised = host_service
-        .create_discovery(addresses(&listening))
-        .await
-        .unwrap();
-    let advertisement = advertised.advertisement().unwrap();
-    let browsing = client_service.browse_discovery(vec![]).await.unwrap();
-    browsing
-        .observe(
-            advertisement.service_type.clone(),
-            advertisement.properties.clone(),
-            addresses(&listening),
-        )
-        .await
-        .unwrap();
-    let found = browsing.snapshot().await.unwrap();
-    assert_eq!(found.len(), 1);
+    //
+    // A catalog fed by a platform browser is the phone's path (Android), and
+    // it can be driven here on any host that is not Windows. On Windows the
+    // core runs its own mDNS on named interfaces instead: advertising and
+    // browsing start a real multicast responder, which a build machine does
+    // not promise to carry, and browsing on no interface is refused. There
+    // the test checks that refusal and then offers the listening address the
+    // way a browser would have reported it.
+    #[cfg(not(windows))]
+    let discovered = {
+        let advertised = host_service
+            .create_discovery(addresses(&listening))
+            .await
+            .unwrap();
+        let advertisement = advertised.advertisement().unwrap();
+        let browsing = client_service.browse_discovery(vec![]).await.unwrap();
+        browsing
+            .observe(
+                advertisement.service_type.clone(),
+                advertisement.properties.clone(),
+                addresses(&listening),
+            )
+            .await
+            .unwrap();
+        let found = browsing.snapshot().await.unwrap();
+        assert_eq!(found.len(), 1);
+        browsing.close().await.unwrap();
+        advertised.close().await.unwrap();
+        found[0].endpoints.clone()
+    };
+    #[cfg(windows)]
+    let discovered = {
+        assert!(matches!(
+            client_service.browse_discovery(vec![]).await,
+            Err(SessionError::Invalid)
+        ));
+        addresses(&listening)
+    };
     let mut hints = impostor.endpoints();
-    hints.extend(found[0].endpoints.iter().map(|address| SessionEndpoint {
+    hints.extend(discovered.iter().map(|address| SessionEndpoint {
         carrier: AppCarrier::QuicWifi,
         address: address.clone(),
     }));
@@ -960,8 +982,6 @@ async fn a_paired_device_reconnects_with_no_address_supplied_and_a_hint_is_never
         addresses(&client_service.known_routes(device()).unwrap()),
         addresses(&listening)
     );
-    browsing.close().await.unwrap();
-    advertised.close().await.unwrap();
     link.close().await.unwrap();
     drop(link);
 
@@ -1032,69 +1052,99 @@ async fn a_paired_device_reconnects_with_no_address_supplied_and_a_hint_is_never
     );
 }
 
-/// Stands in for a cable on loopback: while it is up, datagrams pass both
-/// ways; once cut they vanish and neither end is told.
+/// Stands in for one network path on loopback: while it is up, datagrams
+/// pass both ways; once cut they vanish and neither end is told. It runs on a
+/// thread of its own, so a packet never waits behind this test's own work.
 struct Cable {
     address: String,
     up: std::sync::Arc<std::sync::atomic::AtomicBool>,
     /// Conversations opened before this number are silenced; later ones pass.
     quiet_before: std::sync::Arc<std::sync::atomic::AtomicU64>,
     opened: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Dropping it ends the relay thread.
+    _stop: tokio::sync::oneshot::Sender<()>,
 }
 impl Cable {
-    async fn to(target: &str) -> Self {
+    fn to(target: &str) -> Self {
         use std::sync::{
             Arc,
             atomic::{AtomicBool, AtomicU64, Ordering},
         };
         let target: std::net::SocketAddr = target.parse().unwrap();
-        let front = Arc::new(tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap());
-        let address = front.local_addr().unwrap().to_string();
+        let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+        socket.set_nonblocking(true).unwrap();
+        let address = socket.local_addr().unwrap().to_string();
         let up = Arc::new(AtomicBool::new(true));
         let quiet_before = Arc::new(AtomicU64::new(0));
         let opened = Arc::new(AtomicU64::new(0));
         let (live, quiet, count) = (up.clone(), quiet_before.clone(), opened.clone());
-        tokio::spawn(async move {
-            let mut flows =
-                std::collections::HashMap::<_, (u64, Arc<tokio::net::UdpSocket>)>::new();
-            let mut buffer = vec![0_u8; 65536];
-            while let Ok((size, from)) = front.recv_from(&mut buffer).await {
-                if !live.load(Ordering::Acquire) {
-                    continue;
-                }
-                let (flow, back) = match flows.get(&from) {
-                    Some(known) => known.clone(),
-                    None => {
-                        let flow = count.fetch_add(1, Ordering::AcqRel);
-                        let back =
-                            Arc::new(tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap());
-                        back.connect(target).await.unwrap();
-                        flows.insert(from, (flow, back.clone()));
-                        let (front, live, quiet, replies) =
-                            (front.clone(), live.clone(), quiet.clone(), back.clone());
-                        tokio::spawn(async move {
-                            let mut buffer = vec![0_u8; 65536];
-                            while let Ok(size) = replies.recv(&mut buffer).await {
-                                if live.load(Ordering::Acquire)
-                                    && flow >= quiet.load(Ordering::Acquire)
-                                {
-                                    let _ = front.send_to(&buffer[..size], from).await;
-                                }
-                            }
-                        });
-                        (flow, back)
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            let relay = async move {
+                let front = Arc::new(tokio::net::UdpSocket::from_std(socket).unwrap());
+                let mut flows =
+                    std::collections::HashMap::<_, (u64, Arc<tokio::net::UdpSocket>)>::new();
+                let mut buffer = vec![0_u8; 65536];
+                loop {
+                    // A datagram sent earlier to a port that has since closed
+                    // can come back as an error on a later receive (always on
+                    // Windows). The path is still there: carry on.
+                    let Ok((size, from)) = front.recv_from(&mut buffer).await else {
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                        continue;
+                    };
+                    if !live.load(Ordering::Acquire) {
+                        continue;
                     }
-                };
-                if flow >= quiet.load(Ordering::Acquire) {
-                    let _ = back.send(&buffer[..size]).await;
+                    let (flow, back) = match flows.get(&from) {
+                        Some(known) => known.clone(),
+                        None => {
+                            let flow = count.fetch_add(1, Ordering::AcqRel);
+                            let back =
+                                Arc::new(tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap());
+                            back.connect(target).await.unwrap();
+                            flows.insert(from, (flow, back.clone()));
+                            let (front, live, quiet, replies) =
+                                (front.clone(), live.clone(), quiet.clone(), back.clone());
+                            tokio::spawn(async move {
+                                let mut buffer = vec![0_u8; 65536];
+                                loop {
+                                    let Ok(size) = replies.recv(&mut buffer).await else {
+                                        tokio::time::sleep(Duration::from_millis(1)).await;
+                                        continue;
+                                    };
+                                    if live.load(Ordering::Acquire)
+                                        && flow >= quiet.load(Ordering::Acquire)
+                                    {
+                                        let _ = front.send_to(&buffer[..size], from).await;
+                                    }
+                                }
+                            });
+                            (flow, back)
+                        }
+                    };
+                    if flow >= quiet.load(Ordering::Acquire) {
+                        let _ = back.send(&buffer[..size]).await;
+                    }
                 }
-            }
+            };
+            runtime.block_on(async move {
+                tokio::select! {
+                    _ = relay => {}
+                    _ = stopped => {}
+                }
+            });
         });
         Self {
             address,
             up,
             quiet_before,
             opened,
+            _stop: stop,
         }
     }
     fn plug(&self, connected: bool) {
@@ -1114,7 +1164,81 @@ impl Cable {
     }
 }
 
-/// PERF-007 in simulation: loopback only, no radio, cable or phone.
+/// When the session behind an automatic host ends, nothing keeps listening:
+/// the paired device must never reach a host that accepts and then says
+/// nothing.
+#[tokio::test]
+async fn an_automatic_host_stops_listening_when_its_session_ends() {
+    let _serial = SERIAL.lock().await;
+    let temp = temp();
+    let (host_service, client_service) = paired().await;
+    let host = create_image_project(create(&temp.path().join("host")), cancel())
+        .await
+        .unwrap();
+    let client_id = client_service.local_device().await.unwrap().device_id;
+    let server = host_service
+        .host_project_automatic(host.clone(), client_id, vec![listen(AppCarrier::QuicWifi)])
+        .await
+        .unwrap();
+    let listening = server.endpoints();
+    assert_eq!(listening.len(), 1);
+
+    // The project closes under the session: its loop ends without the app
+    // having closed the session object yet.
+    host.close().await.unwrap();
+    let retired = tokio::time::timeout(Duration::from_secs(20), async {
+        while !server.endpoints().is_empty() {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await;
+    assert!(retired.is_ok(), "the listeners outlived the session");
+    assert!(!linked(&server.status()) && server.status().carrier.is_none());
+    // Nothing can be made to listen again on a session that is over.
+    assert!(matches!(
+        server.listen_on(listening.clone()).await,
+        Err(SessionError::Closed)
+    ));
+    assert!(server.endpoints().is_empty());
+    // The address is free again: nothing of the session still holds it.
+    let address: std::net::SocketAddr = listening[0].address.parse().unwrap();
+    let freed = tokio::time::timeout(Duration::from_secs(20), async {
+        while std::net::UdpSocket::bind(address).is_err() {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await;
+    assert!(freed.is_ok(), "the listening address was still held");
+    server.close().await.unwrap();
+}
+
+/// The newest diagnostics sequence number: later records belong to what the
+/// test does next.
+fn diagnostics_mark() -> u64 {
+    core_diagnostics(u64::MAX).latest_sequence
+}
+/// A duration the core measured itself and recorded after `mark`.
+fn measured(mark: u64, name: &str) -> Option<Duration> {
+    core_diagnostics(mark)
+        .events
+        .iter()
+        .rev()
+        .find(|event| {
+            event.kind == CoreDiagnosticKind::DurationMicros
+                && event.area == "session"
+                && event.name == name
+        })
+        .map(|event| Duration::from_micros(event.value))
+}
+fn counted(mark: u64, name: &str) -> bool {
+    core_diagnostics(mark).events.iter().any(|event| {
+        event.kind == CoreDiagnosticKind::Count && event.area == "session" && event.name == name
+    })
+}
+
+/// PERF-007 in simulation: loopback only, no radio, cable or phone. Both
+/// routes cross the same kind of relay, so a loaded machine delays them alike
+/// and the test compares the routes, not this machine's spare time.
 #[tokio::test]
 async fn a_better_carrier_takes_over_and_a_dead_route_fails_over_without_losing_or_repeating_edits()
 {
@@ -1142,12 +1266,16 @@ async fn a_better_carrier_takes_over_and_a_dead_route_fails_over_without_losing_
             .find(|endpoint| endpoint.carrier == carrier)
             .unwrap()
     };
-    let wifi = bound(AppCarrier::QuicWifi);
-    let cable = Cable::to(&bound(AppCarrier::QuicTether).address).await;
-    let usb = SessionEndpoint {
-        carrier: AppCarrier::QuicTether,
-        address: cable.address.clone(),
+    let listening_wifi = bound(AppCarrier::QuicWifi);
+    let listening_usb = bound(AppCarrier::QuicTether);
+    let air = Cable::to(&listening_wifi.address);
+    let cable = Cable::to(&listening_usb.address);
+    let over = |carrier, path: &Cable| SessionEndpoint {
+        carrier,
+        address: path.address.clone(),
     };
+    let wifi = over(AppCarrier::QuicWifi, &air);
+    let usb = over(AppCarrier::QuicTether, &cable);
     let both = vec![usb.clone(), wifi.clone()];
 
     // The phone starts on Wi-Fi: no cable yet.
@@ -1176,22 +1304,42 @@ async fn a_better_carrier_takes_over_and_a_dead_route_fails_over_without_losing_
         .apply_edit(options, commands, cancel())
         .await
         .unwrap();
+    let offered_mark = diagnostics_mark();
     let offered = std::time::Instant::now();
     link.offer_routes(both.clone()).unwrap();
     on_carrier(&server, &link, AppCarrier::QuicTether).await;
     let upgrade = offered.elapsed();
+    let upgrade_by_core =
+        measured(offered_mark, "route upgrade").expect("the core times its own move");
     converged(&server, &link).await;
 
     // The computer goes quiet without going away, as during a long local
     // operation. Its address still answers, so the link is left where it is
     // instead of being torn down and restarted on Wi-Fi.
+    let quiet_mark = diagnostics_mark();
     cable.busy(true);
-    let quiet = std::time::Instant::now();
-    while quiet.elapsed() < Duration::from_millis(2600) {
+    let stays = || {
         for status in [server.status(), link.status()] {
             assert!(linked(&status), "a busy peer must not be dropped");
             assert_eq!(status.carrier, Some(AppCarrier::QuicTether));
         }
+    };
+    // How soon the silence is noticed depends on how free this machine is
+    // (silence is counted only while the link loop could read), so the wait
+    // is for the core's own record that it asked the route in use and was
+    // answered, not for a fixed time.
+    let asked = tokio::time::timeout(Duration::from_secs(10), async {
+        while !counted(quiet_mark, "silent route still answers") {
+            stays();
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await;
+    assert!(asked.is_ok(), "the silent route was never asked");
+    // It is asked again every second, and each time it stays where it is.
+    let quiet = std::time::Instant::now();
+    while quiet.elapsed() < Duration::from_millis(1500) {
+        stays();
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
     cable.busy(false);
@@ -1216,6 +1364,7 @@ async fn a_better_carrier_takes_over_and_a_dead_route_fails_over_without_losing_
     )
     .await
     .unwrap();
+    let pulled_mark = diagnostics_mark();
     cable.plug(false);
     let pulled = std::time::Instant::now();
     let (options, commands) = mark(21, 25, client.info().await.unwrap().next_lamport);
@@ -1225,45 +1374,78 @@ async fn a_better_carrier_takes_over_and_a_dead_route_fails_over_without_losing_
         .unwrap();
     on_carrier(&server, &link, AppCarrier::QuicWifi).await;
     let failover = pulled.elapsed();
+    let rescue_by_core =
+        measured(pulled_mark, "route rescue").expect("the core times its own rescue");
     converged(&server, &link).await;
 
-    // The cable returns: back to the better carrier.
-    cable.plug(true);
+    // The phone's tethering comes back before the computer has an address on
+    // it. The app offers what it knows, and the core starts asking the old
+    // address, which stays dead.
+    link.offer_routes(both.clone()).unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
     let (options, commands) = mark(22, 26, client.info().await.unwrap().next_lamport);
     client
         .apply_edit(options, commands, cancel())
         .await
         .unwrap();
+    // The computer is back on the cable under a new address. This offer
+    // arrives while the attempt at the old address is still in flight, and
+    // must not wait for that attempt to run out.
+    let cable_again = Cable::to(&listening_usb.address);
+    let returned_mark = diagnostics_mark();
     let returned = std::time::Instant::now();
-    link.offer_routes(both).unwrap();
+    link.offer_routes(vec![
+        over(AppCarrier::QuicTether, &cable_again),
+        wifi.clone(),
+    ])
+    .unwrap();
     on_carrier(&server, &link, AppCarrier::QuicTether).await;
     let comeback = returned.elapsed();
+    let comeback_by_core =
+        measured(returned_mark, "route upgrade").expect("the core times its own return");
     converged(&server, &link).await;
     println!(
-        "carrier switch on loopback: to better carrier {upgrade:?}, off dead route {failover:?}, back to better carrier {comeback:?}"
+        "carrier switch on loopback: to better carrier {upgrade:?} (core {upgrade_by_core:?}), off dead route {failover:?} (core, after noticing {rescue_by_core:?}), back to better carrier {comeback:?} (core {comeback_by_core:?})"
     );
-    assert!(upgrade < Duration::from_secs(2), "upgrade took {upgrade:?}");
+    // PERF-007: sync resumes within two seconds of the better carrier
+    // becoming available. Measured from outside (offer to both ends linked on
+    // it) and by the core itself (offer to an authenticated connection).
+    let budget = Duration::from_secs(2);
+    assert!(upgrade < budget, "upgrade took {upgrade:?}");
+    assert!(upgrade_by_core < budget, "upgrade took {upgrade_by_core:?}");
+    assert!(comeback < budget, "return took {comeback:?}");
     assert!(
-        comeback < Duration::from_secs(2),
-        "return took {comeback:?}"
+        comeback_by_core < budget,
+        "return took {comeback_by_core:?}"
     );
-    // Includes noticing the silence; the other carrier was available throughout.
-    assert!(
-        failover < Duration::from_secs(4),
-        "failover took {failover:?}"
-    );
+    // Leaving a dead route. The core's own interval, from having seen a
+    // second of silence to an authenticated connection on the other route,
+    // keeps the same two seconds.
+    assert!(rescue_by_core < budget, "rescue took {rescue_by_core:?}");
+    // Seen from outside it also holds that second of silence and both ends
+    // resuming. Silence is counted only while the link loop was free to read,
+    // in slices of at most 50 ms, so on a loaded machine that second
+    // stretches. NOTICING allows for this machine's load alone; it is not a
+    // budget for the product.
+    const NOTICING: Duration = Duration::from_secs(6);
+    assert!(failover < NOTICING + budget, "failover took {failover:?}");
 
     // The listeners can change under a live connection without dropping it:
     // one is retired, another address is added later.
     assert_eq!(
-        addresses(&server.listen_on(vec![wifi.clone()]).await.unwrap()),
-        vec![wifi.address.clone()]
+        addresses(
+            &server
+                .listen_on(vec![listening_wifi.clone()])
+                .await
+                .unwrap()
+        ),
+        vec![listening_wifi.address.clone()]
     );
     tokio::time::sleep(Duration::from_millis(300)).await;
     assert!(linked(&server.status()) && linked(&link.status()));
     assert_eq!(server.status().carrier, Some(AppCarrier::QuicTether));
     let widened = server
-        .listen_on(vec![listen(AppCarrier::QuicTether), wifi.clone()])
+        .listen_on(vec![listen(AppCarrier::QuicTether), listening_wifi.clone()])
         .await
         .unwrap();
     assert_eq!(widened.len(), 2);
