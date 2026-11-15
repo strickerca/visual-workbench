@@ -45,6 +45,97 @@ async fn order_keys(project: &Arc<ProjectSession>) -> Vec<(String, String)> {
         .collect()
 }
 
+fn rectangle(object_id: String, n: u32) -> EditCommand {
+    EditCommand::Create {
+        object_id,
+        layer_id: id(3),
+        shape: NewShape::Rectangle {
+            rectangle: QueryRect {
+                x: f64::from(n % 50),
+                y: f64::from(n / 50),
+                width: 4.0,
+                height: 3.0,
+            },
+        },
+        style: ObjectStyle {
+            rgba: 0x203040ff,
+            width: 1.0,
+            screen_constant_width: false,
+            fill: None,
+        },
+        transform: Transform {
+            a: 1.0,
+            b: 0.0,
+            c: 0.0,
+            d: 1.0,
+            e: 0.0,
+            f: 0.0,
+        },
+    }
+}
+
+async fn edit(project: &Arc<ProjectSession>, number: u32, commands: Vec<EditCommand>) {
+    let options = EditOptions {
+        transaction_id: wide_id(0x44, number),
+        document_id: id(2),
+        device_id: device(),
+        lamport: project.info().await.unwrap().next_lamport,
+        created_at_ms: TIME + 1 + i64::from(number),
+    };
+    project
+        .apply_edit(options, commands, cancel())
+        .await
+        .unwrap();
+}
+
+/// Saving never writes a recovery checkpoint, whatever the edit. Closing
+/// writes one when the edits since the last would take long to replay: here,
+/// moving the object every other object is hashed after, again and again.
+#[tokio::test]
+async fn closing_writes_the_checkpoint_a_costly_history_needs_and_drawing_needs_none() {
+    for costly in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("project");
+        let project = create_image_project(create(&path), cancel()).await.unwrap();
+        for half in 0..2_u32 {
+            let shapes = (half * 450..(half + 1) * 450)
+                .map(|n| rectangle(wide_id(0x50, n), n))
+                .collect();
+            edit(&project, 900 + half, shapes).await;
+        }
+        for number in 0..6 {
+            stroke_on_top(&project, number).await;
+        }
+        if costly {
+            for number in 1..=50_u32 {
+                let moved = EditCommand::Transform {
+                    object_id: wide_id(0x50, 0),
+                    transform: Transform {
+                        a: 1.0,
+                        b: 0.0,
+                        c: 0.0,
+                        d: 1.0,
+                        e: f64::from(number),
+                        f: 0.0,
+                    },
+                };
+                edit(&project, number, vec![moved]).await;
+            }
+        }
+        let saved = project.info().await.unwrap();
+        project.close().await.unwrap();
+        // Opening replays the log after the newest checkpoint.
+        let store = vw_store::ProjectStore::open(&path).unwrap();
+        assert_eq!(store.revision().unwrap().host_seq, saved.host_seq);
+        assert_eq!(store.state_hash().unwrap().to_string(), saved.state_hash);
+        assert_eq!(
+            store.replayed_transactions(),
+            if costly { 0 } else { saved.host_seq },
+            "costly history: {costly}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn one_layer_takes_far_more_than_768_objects_in_creation_order() {
     let dir = tempfile::tempdir().unwrap();

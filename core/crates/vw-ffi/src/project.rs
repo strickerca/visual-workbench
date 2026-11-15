@@ -309,6 +309,17 @@ impl ProjectSession {
                     .as_ref()
                     .map(|store| project_info(store, &state.history))
                     .transpose();
+                // A checkpoint takes as long as the history is large. Closing
+                // is where that pause belongs; no save ever takes it. Failing
+                // to write one loses nothing: the log holds every edit, and
+                // the next open writes the checkpoint instead.
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .ok()
+                    .and_then(|elapsed| i64::try_from(elapsed.as_millis()).ok());
+                if let (Some(store), Some(now)) = (state.store.as_mut(), now) {
+                    let _ = store.checkpoint_if_due(now);
+                }
                 state.store.take();
                 // The permit and retained publication charge retire with the
                 // actual state after its model/history/replica, not this callback.
