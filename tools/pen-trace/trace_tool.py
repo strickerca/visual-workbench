@@ -1,10 +1,16 @@
-"""Validate and summarize pen-probe JSON without guessing hardware capabilities."""
+"""Validate and summarize pen-probe JSON without guessing hardware capabilities.
+
+Also compares two "Copy timings" texts from the app's Pen path timings panel:
+
+    python tools/pen-trace/trace_tool.py timings before.txt after.txt
+"""
 from __future__ import annotations
 
 import argparse
 import json
 import math
 import pathlib
+import re
 import statistics
 import sys
 
@@ -223,11 +229,90 @@ def acceptance(traces):
             'replay_and_thermal_acceptance': 'separate checks required'}
 
 
+TIMING_KEYS = ('canvas_ink_drawn', 'canvas_frame_ready', 'canvas_draw_time', 'canvas_first_ink',
+               'canvas_stroke_start', 'canvas_save', 'canvas_refresh', 'remote_sent', 'remote_echo')
+TIMING_ROW = re.compile(r'([a-z_]+) n=([0-9]{1,9}) p50_ms=([0-9]{1,6}\.[0-9]) p95_ms=([0-9]{1,6}\.[0-9]) max_ms=([0-9]{1,6}\.[0-9])')
+SWITCHES_ROW = re.compile(r'switches=(none|[A-Za-z]{3,40}(,[A-Za-z]{3,40}){0,31})')
+# Targets from the product's performance table. The app's timings end when the
+# frame is handed to the display, so staying under a target here is necessary,
+# not sufficient: the camera or input-to-present measurement decides.
+TIMING_TARGETS_P95_MS = {'canvas_ink_drawn': 25.0, 'canvas_frame_ready': 25.0, 'canvas_first_ink': 25.0, 'remote_echo': 80.0}
+# A change smaller than this, or than a tenth of the earlier value, is not called better or worse.
+TIMING_NOISE_MS = 1.0
+# One value per stroke for these; one per ink frame or pen sample for the rest.
+TIMING_PER_STROKE = ('canvas_first_ink', 'canvas_stroke_start', 'canvas_save', 'canvas_refresh')
+
+
+def parse_timings(text):
+    """The exact text "Copy timings" produces: fixed names, counts and durations only."""
+    if len(text) > 16384:
+        raise ValueError('Timings text exceeds 16 KiB bound')
+    lines = text.strip().splitlines()
+    if len(lines) < 2 or lines[0] != 'pen_path_timings v1':
+        raise ValueError('Not a copied pen path timings text')
+    switches = SWITCHES_ROW.fullmatch(lines[-1])
+    if not switches:
+        raise ValueError('Missing or malformed switches line')
+    rows = {}
+    for line in lines[1:-1]:
+        match = TIMING_ROW.fullmatch(line)
+        if not match or match.group(1) not in TIMING_KEYS or match.group(1) in rows:
+            raise ValueError('Unexpected timing line; only the fixed timing names are accepted')
+        count = int(match.group(2)); p50, p95, worst = (float(match.group(i)) for i in (3, 4, 5))
+        if count < 1 or not p50 <= p95 <= worst:
+            raise ValueError('Inconsistent timing line')
+        rows[match.group(1)] = {'count': count, 'p50_ms': p50, 'p95_ms': p95, 'max_ms': worst}
+    on = [] if switches.group(1) == 'none' else switches.group(1).split(',')
+    if len(set(on)) != len(on):
+        raise ValueError('Duplicate switch name')
+    return {'timings': rows, 'switches': sorted(on)}
+
+
+def compare_timings(before, after=None):
+    """One capture: each timing against its target. Two: also the change, and
+    for the switches that differ whether to keep them on."""
+    def judged(key, row):
+        target = TIMING_TARGETS_P95_MS.get(key)
+        return dict(row, target_p95_ms=target, within_target=None if target is None else row['p95_ms'] <= target)
+    result = {'before': {'switches': before['switches'], 'timings': {k: judged(k, v) for k, v in before['timings'].items()}}}
+    if after is None:
+        return result
+    result['after'] = {'switches': after['switches'], 'timings': {k: judged(k, v) for k, v in after['timings'].items()}}
+    changes = {}
+    worse = better = False
+    for key in TIMING_KEYS:
+        a, b = before['timings'].get(key), after['timings'].get(key)
+        if a is None or b is None:
+            continue
+        delta = round(b['p95_ms'] - a['p95_ms'], 1)
+        noise = max(TIMING_NOISE_MS, a['p95_ms'] * .1)
+        verdict = 'better' if delta < -noise else 'worse' if delta > noise else 'same'
+        enough = min(a['count'], b['count']) >= (20 if key in TIMING_PER_STROKE else 100)
+        changes[key] = {'p50_change_ms': round(b['p50_ms'] - a['p50_ms'], 1), 'p95_change_ms': delta,
+                        'verdict': verdict if enough else 'too_few_samples'}
+        if enough:
+            worse = worse or verdict == 'worse'
+            better = better or verdict == 'better'
+    result['changes'] = changes
+    result['switches_changed'] = sorted(set(before['switches']) ^ set(after['switches']))
+    result['recommendation'] = ('switch_back_off' if worse else 'leave_on' if better else 'no_measurable_difference') \
+        if changes else 'no_common_timings'
+    return result
+
+
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['validate', 'summarize', 'acceptance'])
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('command', choices=['validate', 'summarize', 'acceptance', 'timings'])
     parser.add_argument('path', type=pathlib.Path)
+    parser.add_argument('other', type=pathlib.Path, nargs='?', help='timings only: the later capture to compare with')
     args = parser.parse_args()
+    if args.command == 'timings':
+        before = parse_timings(args.path.read_text(encoding='utf-8'))
+        after = parse_timings(args.other.read_text(encoding='utf-8')) if args.other else None
+        print(json.dumps(compare_timings(before, after), indent=2, allow_nan=False))
+        return
+    if args.other is not None:
+        raise ValueError('A second path is accepted only by the timings command')
     paths = sorted(args.path.glob('*.json')) if args.path.is_dir() else [args.path]
     traces = [load(path) for path in paths]
     if args.command == 'acceptance':

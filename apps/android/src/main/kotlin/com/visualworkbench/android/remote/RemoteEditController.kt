@@ -7,6 +7,8 @@ import android.view.MotionEvent
 import android.view.Surface
 import com.visualworkbench.shared.*
 import com.visualworkbench.android.diagnostics.inputDeviceCapability
+import com.visualworkbench.android.diagnostics.PenPathMetrics
+import com.visualworkbench.android.diagnostics.PenTiming
 import com.visualworkbench.android.editor.PenPathToggle
 import com.visualworkbench.android.editor.PenPathToggles
 import java.util.concurrent.atomic.AtomicReference
@@ -41,7 +43,9 @@ internal data class RemoteAccessibilityInputSnapshot(val ready:Boolean,val nativ
 internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:CoroutineScope,
     private val measuredTiltCalibration:(Int)->StylusTiltCalibration?={null},
     /** Developer switches, read once: they apply from the next time the remote view opens. */
-    toggles:PenPathToggles=PenPathToggles()):RemoteConsumerOwner {
+    toggles:PenPathToggles=PenPathToggles(),
+    /** Local timings for the diagnostics screen; durations only. */
+    private val metrics:PenPathMetrics?=null):RemoteConsumerOwner {
     private val job=SupervisorJob(parent.coroutineContext[Job])
     private val scope=CoroutineScope(parent.coroutineContext.minusKey(Job)+job)
     private val decoderMutex=Mutex()
@@ -140,6 +144,7 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
                 if(!allowed)continue
                 try{
                     val admission=remote.pen(item.binding,item.sample)
+                    metrics?.recordNanos(PenTiming.RemoteSent,System.nanoTime()-item.sample.sampledLocalNanos)
                     synchronized(inputFence){
                         if(enabled&&foregroundActive&&item.fence==admissionFence&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true){
                             echoLedger.record(admission);echoMutable.value=echoLedger.snapshot(System.nanoTime())
@@ -328,7 +333,7 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
                     frame.config.generation,frame.ticket,frame.frameId,frame.ptsUs,renderedNanos,callbackNanos,admission,ack)
                 val target=remote.target.value
                 if(target?.grantActive==true&&inputGrantFence.permits(target.binding)&&target.binding.scope()==frame.config.scope){enabled=true;ghost.activate(target.binding,callbackNanos)}
-                if(ack!=null&&target?.grantActive==true&&target.binding==ack.binding){ghost.acknowledge(ack.binding,ack.lastInputSequenceApplied,ack.frameId,ack.ticket,callbackNanos);echoLedger.acknowledge(ack,callbackNanos)}
+                if(ack!=null&&target?.grantActive==true&&target.binding==ack.binding){ghost.acknowledge(ack.binding,ack.lastInputSequenceApplied,ack.frameId,ack.ticket,callbackNanos);echoLedger.acknowledge(ack,callbackNanos,metrics?.let{m->{nanos:Long->m.recordNanos(PenTiming.RemoteEcho,nanos)}})}
                 echoMutable.value=echoLedger.snapshot(System.nanoTime())
             }
         }catch(_:Exception){active.requestRecovery("NativeTicketRefused");recoverInput();runCatching{remote.requestKeyframe()}}

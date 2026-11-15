@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import com.visualworkbench.android.diagnostics.DiagnosticsController
+import com.visualworkbench.android.diagnostics.PenTiming
 import com.visualworkbench.android.input.*
 import com.visualworkbench.android.precision.*
 import com.visualworkbench.android.airactions.*
@@ -2048,10 +2049,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if(giantDraw.get()!==giantFrame)giantRenderReady=false
         giantDraw.set(giantFrame)
         val displayBackground=background.takeIf { !doc.hasToneAdjustments || composedCurrent(doc) }
+        val inked=strokes.lastOrNull { it.drawing != null } // Diagnostics: which pen sample this ink frame is measured against.
         val next = CanvasScene(++sceneRevision, doc, displayBackground, camera, core.cameraMatrix(camera), visibleObjects,
             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
-            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame,rotationHandle=rotationHandle())
+            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame,rotationHandle=rotationHandle(),
+            wetSampleMs=inked?.lastTime?:0L,wetStartMs=inked?.start?.timeMs?:0L)
         scene = next
         if(streamDraftOnly)streamSceneState.value=renderScene(next).also{check(it.background==null)}
         canvasSink?.invoke(renderScene(next))
@@ -2376,6 +2379,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 mutations.withLock {
                     if (run.canceled.get() || run.epoch != epoch) return@withLock
                     val native = current.beginStroke(run.options); run.native = native
+                    diagnostics.pen.recordMillis(PenTiming.CanvasStrokeStart, SystemClock.uptimeMillis() - run.start.timeMs)
                     if (run.canceled.get()) { cancelNative(native); return@withLock }
                     for (samples in run.queue) {
                         if (run.canceled.get() || run.epoch != epoch) break
@@ -2401,8 +2405,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         run.drawing = wetObject(run, Path(run.real)); publish()
                         val result = native.commit()
                         run.committed = true
+                        val saved = SystemClock.uptimeMillis()
+                        diagnostics.pen.recordMillis(PenTiming.CanvasSave, saved - run.lastTime)
                         finishRemotePreview(run.link, run.options.gestureId, false)
                         refresh(current, result, run.epoch)
+                        diagnostics.pen.recordMillis(PenTiming.CanvasRefresh, SystemClock.uptimeMillis() - saved)
                     } else cancelNative(native)
                 }
             } catch (cancel: CancellationException) { cancelNative(run.native); throw cancel }

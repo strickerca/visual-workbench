@@ -21,12 +21,14 @@ public class RemoteEchoLedger {
         if(pending.size>=256){pending.remove(pending.keys.first());missing++}
         pending[admission.sequence]=admission.sampledLocalNanos;return true
     }
-    public fun acknowledge(receipt:RemoteRenderedAcknowledgment,callbackNanos:Long):Boolean {
+    /** [measured] receives each covered sample's delay in nanoseconds, for local
+     * diagnostics only; it never changes what is acknowledged. */
+    public fun acknowledge(receipt:RemoteRenderedAcknowledgment,callbackNanos:Long,measured:((Long)->Unit)?=null):Boolean {
         if(receipt.binding!=binding||receipt.frameId<=frame||receipt.ticket==ticket||callbackNanos<clock)return false
         if(pending.any{(seq,sampled)->seq<=receipt.lastInputSequenceApplied&&sampled>callbackNanos})return false
         expire(callbackNanos)
         val covered=pending.filterKeys{it<=receipt.lastInputSequenceApplied}
-        for((seq,sampled)in covered){if(measured.size>=256)measured.removeAt(0);measured+=callbackNanos-sampled;pending.remove(seq);observed++}
+        for((seq,sampled)in covered){if(this.measured.size>=256)this.measured.removeAt(0);this.measured+=callbackNanos-sampled;measured?.invoke(callbackNanos-sampled);pending.remove(seq);observed++}
         frame=receipt.frameId;ticket=receipt.ticket;return true
     }
     private fun expire(now:Long){if(now<clock)return;clock=now;val expired=pending.filterValues{now>=it&&now-it>=500_000_000L}.keys;for(seq in expired){pending.remove(seq);missing++}}

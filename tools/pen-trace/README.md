@@ -131,3 +131,22 @@ are explicitly not ten-minute baseline evidence.
 
 These APIs do not establish what the owner's S Pen actually delivers. That comes
 from the physical recordings on the device.
+
+## Compare pen path timings before and after a developer switch
+
+In the app, open Settings, Developer options. Draw at least 20 strokes, tap
+**Copy timings** and paste the text into a file. Tap **Clear timings**, switch
+one developer switch on, draw the same strokes again and copy again. Then:
+
+    python tools/pen-trace/trace_tool.py timings before.txt after.txt
+
+The result lists each timing's typical (p50) and slow-end (p95) value, whether
+the slow end is within the product target (25 ms for pen to ink), the change
+between the two captures, and one word for the switch: `leave_on`,
+`switch_back_off` or `no_measurable_difference`. A timing with too few values on
+either side (under 20 strokes, or under 100 ink frames or pen samples) is
+reported as `too_few_samples` and does not decide. The
+copied text holds only fixed timing names, counts and durations; the tool
+refuses anything else. These timings end when the frame is handed to the
+display, so the 240 fps camera or input-to-present measurement still decides
+PERF-001.

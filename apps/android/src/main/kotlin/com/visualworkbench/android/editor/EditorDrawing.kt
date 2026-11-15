@@ -46,6 +46,10 @@ internal data class CanvasScene(
     val giantMode:Boolean=false,
     val giantFrame:GiantVisibleFrame<Bitmap>?=null,
     val rotationHandle:ObjectRotationHandle?=null,
+    /** Diagnostics only: input-clock time of the newest real pen sample in the
+     * wet ink of this scene and of that stroke's pen-down; 0 without wet ink. */
+    val wetSampleMs: Long = 0,
+    val wetStartMs: Long = 0,
 )
 
 internal object EditorDrawing {

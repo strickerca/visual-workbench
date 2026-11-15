@@ -134,7 +134,8 @@ internal fun BrushDialog(tool: EditorTool, brush: BrushPreference, preview: Path
 }
 
 @Composable
-internal fun SettingsScreen(settings: EditorPreferences, onChange: (EditorPreferences) -> Unit, onBack: () -> Unit) {
+internal fun SettingsScreen(settings: EditorPreferences, onChange: (EditorPreferences) -> Unit, onBack: () -> Unit,
+    penMetrics: com.visualworkbench.android.diagnostics.PenPathMetrics? = null) {
     Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text("← Back") }
         Text("Your workspace", style = MaterialTheme.typography.h4)
@@ -150,13 +151,14 @@ internal fun SettingsScreen(settings: EditorPreferences, onChange: (EditorPrefer
         Text("One finger: pan\nTwo fingers: zoom and rotate\nTwo-finger tap: undo\nThree-finger tap: redo\nHold one finger: canvas menu")
         Text("Generic stylus profile", style = MaterialTheme.typography.h6)
         Text("Pressure, tilt, hover, eraser and buttons use standard Android input. Samsung actions are optional and currently disabled.")
-        DeveloperPenPathSettings(settings, onChange)
+        DeveloperPenPathSettings(settings, onChange, penMetrics)
     }
 }
 
 /** Collapsed by default. Each switch is off until its effect has been measured on the phone. */
 @Composable
-private fun DeveloperPenPathSettings(settings: EditorPreferences, onChange: (EditorPreferences) -> Unit) {
+private fun DeveloperPenPathSettings(settings: EditorPreferences, onChange: (EditorPreferences) -> Unit,
+    penMetrics: com.visualworkbench.android.diagnostics.PenPathMetrics?) {
     var open by remember { mutableStateOf(false) }
     TextButton(onClick = { open = !open }, modifier = Modifier.heightIn(min = 48.dp)) {
         Text(if (open) "Hide developer options" else "Developer options")
@@ -168,6 +170,7 @@ private fun DeveloperPenPathSettings(settings: EditorPreferences, onChange: (Edi
     PenPathToggle.entries.forEach { toggle ->
         SettingSwitch(toggle.title, toggle.effect, settings.penPath[toggle]) { onChange(settings.copy(penPath = settings.penPath.with(toggle, it))) }
     }
+    if (penMetrics != null) PenPathTimings(penMetrics, settings.penPath)
 }
 
 @Composable

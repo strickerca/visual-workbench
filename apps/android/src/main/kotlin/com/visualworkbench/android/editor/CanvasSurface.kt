@@ -69,6 +69,8 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         /** An AndroidX in-place resize is pending: its redraw lands on a new layer (under [lock]). */
         var awaitingResizeRedraw = false
         var resizeFrom: SurfaceControlCompat? = null
+        /** Diagnostics only: the pen sample time of the last drawn ink frame. */
+        @Volatile var frontSampleMs = 0L
     }
     private class Generation(val renderer: CanvasFrontBufferedRenderer<Frame>, val session: RenderSession)
     private data class Frame(val session: RenderSession, val dry: Boolean, val inputMs: Long,
@@ -273,7 +275,11 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                     currentSession.frontQueued = false
                     if (currentSession.closed || param.session !== currentSession) null else currentSession.latest?.also { currentSession.frontDrawn = it.revision;currentSession.giantFrontDrawn=it.giantFrame }
                 } ?: return
+                val drawStarted = System.nanoTime()
                 drawOwned(canvas,snapshot,currentSession)
+                // Timing only: two clock reads and a bounded array write.
+                currentSession.frontSampleMs = snapshot.wetSampleMs
+                controller.diagnostics.pen.inkDrawn(snapshot.wetSampleMs, snapshot.wetStartMs, SystemClock.uptimeMillis(), System.nanoTime() - drawStarted)
                 if (param.inputMs > 0) main.post { if (!currentSession.closed) controller.drawCallback(param.inputMs) }
             }
             override fun onDrawMultiBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, params: Collection<Frame>) {
@@ -288,6 +294,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
             }
             override fun onFrontBufferedLayerRenderComplete(frontBufferedLayerSurfaceControl: SurfaceControlCompat,
                                                             transaction: SurfaceControlCompat.Transaction) {
+                controller.diagnostics.pen.frameReady(currentSession.frontSampleMs, SystemClock.uptimeMillis())
                 synchronized(lock) {
                     // A stale wet callback cannot cover a newer saved dry frame.
                     if (currentSession.closed || currentSession.frontDrawn <= currentSession.drawn ||

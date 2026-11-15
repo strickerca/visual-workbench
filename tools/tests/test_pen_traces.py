@@ -93,6 +93,53 @@ class PenTraces(unittest.TestCase):
     def test_empty_acceptance_fails(self):
         with self.assertRaises(ValueError): trace_tool.acceptance([])
 
+    BEFORE = ('pen_path_timings v1\n'
+              'canvas_ink_drawn n=640 p50_ms=9.0 p95_ms=31.0 max_ms=58.0\n'
+              'canvas_first_ink n=40 p50_ms=14.0 p95_ms=22.0 max_ms=30.0\n'
+              'canvas_refresh n=120 p50_ms=180.0 p95_ms=260.0 max_ms=400.0\n'
+              'switches=none\n')
+    AFTER = ('pen_path_timings v1\n'
+             'canvas_ink_drawn n=700 p50_ms=6.0 p95_ms=12.0 max_ms=21.0\n'
+             'canvas_first_ink n=42 p50_ms=13.0 p95_ms=21.5 max_ms=29.0\n'
+             'canvas_refresh n=130 p50_ms=4.0 p95_ms=9.0 max_ms=15.0\n'
+             'remote_sent n=3 p50_ms=0.4 p95_ms=0.9 max_ms=0.9\n'
+             'switches=canvasQuickRefresh\n')
+
+    def test_copied_timings_are_read_and_judged_against_the_targets(self):
+        one = trace_tool.compare_timings(trace_tool.parse_timings(self.BEFORE))
+        ink = one['before']['timings']['canvas_ink_drawn']
+        self.assertEqual((ink['count'], ink['p95_ms'], ink['target_p95_ms'], ink['within_target']), (640, 31.0, 25.0, False))
+        self.assertIsNone(one['before']['timings']['canvas_refresh']['within_target'])
+        self.assertNotIn('changes', one)
+
+    def test_two_captures_give_the_change_and_what_to_do_with_the_switch(self):
+        result = trace_tool.compare_timings(trace_tool.parse_timings(self.BEFORE), trace_tool.parse_timings(self.AFTER))
+        self.assertEqual(result['switches_changed'], ['canvasQuickRefresh'])
+        self.assertEqual(result['changes']['canvas_ink_drawn'], {'p50_change_ms': -3.0, 'p95_change_ms': -19.0, 'verdict': 'better'})
+        self.assertEqual(result['changes']['canvas_refresh']['verdict'], 'better')
+        # Half a millisecond on 22 ms is within the noise.
+        self.assertEqual(result['changes']['canvas_first_ink']['verdict'], 'same')
+        self.assertNotIn('remote_sent', result['changes'])
+        few = trace_tool.compare_timings(trace_tool.parse_timings(self.BEFORE.replace('n=640', 'n=64').replace('n=40', 'n=12')),
+                                         trace_tool.parse_timings(self.AFTER))
+        self.assertEqual(few['changes']['canvas_ink_drawn']['verdict'], 'too_few_samples')
+        self.assertEqual(few['changes']['canvas_first_ink']['verdict'], 'too_few_samples')
+        self.assertTrue(result['after']['timings']['canvas_ink_drawn']['within_target'])
+        self.assertEqual(result['recommendation'], 'leave_on')
+        # The other way round the same numbers say: switch it back off.
+        self.assertEqual(trace_tool.compare_timings(trace_tool.parse_timings(self.AFTER), trace_tool.parse_timings(self.BEFORE))['recommendation'], 'switch_back_off')
+        self.assertEqual(trace_tool.compare_timings(trace_tool.parse_timings(self.BEFORE), trace_tool.parse_timings(self.BEFORE))['recommendation'], 'no_measurable_difference')
+
+    def test_timings_text_with_anything_but_fixed_names_and_numbers_is_refused(self):
+        for bad in ('', 'canvas_save n=1 p50_ms=1.0 p95_ms=1.0 max_ms=1.0\nswitches=none\n',
+                    self.BEFORE.replace('canvas_first_ink', 'my_document_name'),
+                    self.BEFORE.replace('switches=none', 'switches=none\nnote=hello'),
+                    self.BEFORE.replace('p95_ms=31.0', 'p95_ms=3.0'),
+                    self.BEFORE.replace('switches=none', 'switches=a b'),
+                    self.BEFORE.replace('canvas_first_ink n=40', 'canvas_ink_drawn n=40'),
+                    self.BEFORE + 'x' * 20000):
+            with self.assertRaises(ValueError): trace_tool.parse_timings(bad)
+
     def test_incomplete_trace_fails_acceptance(self):
         trace = fixture(); trace['origin'] = 'owner'; trace['stop_reason'] = 'interrupted_background'
         with self.assertRaises(ValueError): trace_tool.acceptance([trace])
