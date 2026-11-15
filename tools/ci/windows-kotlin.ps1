@@ -22,13 +22,13 @@ function Show-FailedTests([string]$ResultsDirectory) {
     if (-not (Test-Path -LiteralPath $ResultsDirectory)) { return }
     $failed = 0
     foreach ($file in Get-ChildItem -LiteralPath $ResultsDirectory -Filter '*.xml') {
-        foreach ($case in ([xml](Get-Content -LiteralPath $file.FullName -Raw)).testsuite.testcase) {
-            $problem = if ($case.failure) { $case.failure } elseif ($case.error) { $case.error } else { $null }
-            if ($null -eq $problem) { continue }
+        $document = [xml](Get-Content -LiteralPath $file.FullName -Raw)
+        foreach ($problem in $document.SelectNodes('//testcase/failure | //testcase/error')) {
             $failed++
-            $message = ([string]$problem.message -split "`n")[0]
+            $case = $problem.ParentNode
+            $message = ($problem.GetAttribute('message') -split "`n")[0]
             if ($message.Length -gt 200) { $message = $message.Substring(0, 200) }
-            Write-Host "FAILED $($case.classname).$($case.name): $($problem.type) $message"
+            Write-Host "FAILED $($case.GetAttribute('classname')).$($case.GetAttribute('name')): $($problem.GetAttribute('type')) $message"
         }
     }
     Write-Host "failed tests: $failed"
